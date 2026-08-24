@@ -45,7 +45,7 @@ def parser() -> argparse.ArgumentParser:
     query.add_argument("--grammar")
     query.add_argument("--profile")
     query.add_argument("--route", type=Path, help="Verified workspace route JSON; grammar/profile remain explicit")
-    query.add_argument("--kind", action="append", choices=["archetype", "grammar", "principle", "operation-knowledge"])
+    query.add_argument("--kind", action="append", choices=["archetype", "grammar", "principle", "operator-knowledge"])
     query.add_argument("--top-k", type=int, default=3)
     query.add_argument("--rebuild-if-stale", action="store_true")
     query.add_argument("--embedding-model", type=Path, help="Same optional local model used to build the index")

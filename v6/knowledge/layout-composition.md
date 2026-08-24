@@ -3,7 +3,7 @@
 | Field | Value |
 | --- | --- |
 | Knowledge ID | `fe.layout-composition` |
-| Operations | `layout` |
+| Operators | `layout` |
 | Search tags | `layout, block composition, grid span, sticky, responsive, direction` |
 | Dependencies | `fe.page-model, fe.state-modeling` |
 

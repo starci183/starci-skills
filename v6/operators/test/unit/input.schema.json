@@ -1,0 +1,149 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://starci.dev/v6/operators/test/unit/input.schema.json",
+  "title": "Unit Test operator input",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "kind",
+    "schemaVersion",
+    "appId",
+    "runId",
+    "stage",
+    "status",
+    "facts",
+    "payload"
+  ],
+  "properties": {
+    "kind": {
+      "const": "test.unit.input"
+    },
+    "schemaVersion": {
+      "const": 6
+    },
+    "appId": {
+      "const": "fe-design-layout"
+    },
+    "runId": {
+      "type": "string",
+      "minLength": 1
+    },
+    "stage": {
+      "const": "test.unit"
+    },
+    "status": {
+      "const": "ready"
+    },
+    "facts": {
+      "$ref": "#/$defs/strings"
+    },
+    "payload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "workspaceRouteRef",
+        "sourceRole",
+        "sourceReferenceRef",
+        "manifestRefs",
+        "changeSetRef",
+        "changeSetHash",
+        "targetRefs",
+        "evidenceRoot"
+      ],
+      "properties": {
+        "workspaceRouteRef": {
+          "type": "string",
+          "minLength": 1
+        },
+        "sourceRole": {
+          "enum": [
+            "fe",
+            "be"
+          ]
+        },
+        "sourceReferenceRef": {
+          "enum": [
+            "starci-academy-fe",
+            "starci-academy-be"
+          ]
+        },
+        "manifestRefs": {
+          "$ref": "#/$defs/strings",
+          "minItems": 1
+        },
+        "changeSetRef": {
+          "type": "string",
+          "minLength": 1
+        },
+        "changeSetHash": {
+          "type": "string",
+          "minLength": 1
+        },
+        "targetRefs": {
+          "$ref": "#/$defs/strings",
+          "minItems": 1
+        },
+        "evidenceRoot": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    }
+  },
+  "$defs": {
+    "strings": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      },
+      "uniqueItems": true
+    },
+    "commandReceipt": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "commandRef",
+        "status",
+        "selected",
+        "passed",
+        "failed",
+        "skipped",
+        "evidenceRef"
+      ],
+      "properties": {
+        "commandRef": {
+          "type": "string",
+          "minLength": 1
+        },
+        "status": {
+          "enum": [
+            "pass",
+            "fail",
+            "blocked"
+          ]
+        },
+        "selected": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "passed": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "failed": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "skipped": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "evidenceRef": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    }
+  }
+}

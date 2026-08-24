@@ -3,7 +3,7 @@
 | Field | Value |
 | --- | --- |
 | Knowledge ID | `fe.customer-journey` |
-| Operations | `customer-journey` |
+| Operators | `customer-journey` |
 | Search tags | `journey, user flow, multi-page, direction, approval` |
 | Dependencies | `none` |
 

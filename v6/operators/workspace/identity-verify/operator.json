@@ -1,0 +1,34 @@
+{
+  "schemaVersion": 6,
+  "id": "workspace/identity-verify",
+  "domain": "workspace",
+  "inputSchema": "input.schema.json",
+  "outputSchema": "output.schema.json",
+  "knowledgeRefs": [
+    "workspace.initialization"
+  ],
+  "sourceReferenceRefs": [],
+  "accepts": [
+    {
+      "stage": "workspace.identity",
+      "status": "ready",
+      "allFacts": [],
+      "noneFacts": []
+    }
+  ],
+  "emits": [
+    {
+      "stage": "workspace.bootstrap",
+      "status": "ready",
+      "factsAdd": [
+        "workspace-identity-ready"
+      ],
+      "factsRemove": []
+    }
+  ],
+  "sideEffects": [],
+  "stopConditions": [
+    "required evidence is missing or stale",
+    "the result would cross the declared boundary"
+  ]
+}

@@ -1,0 +1,85 @@
+{
+  "$id": "https://starci.dev/v6/operators/quality/delivery-proof/input.schema.json",
+  "title": "quality/delivery-proof operator input",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "runId",
+    "stage",
+    "status",
+    "facts",
+    "payload"
+  ],
+  "allOf": [
+    {
+      "oneOf": [
+        {
+          "properties": {
+            "stage": {
+              "const": "quality.proof"
+            },
+            "status": {
+              "const": "ready"
+            }
+          },
+          "required": [
+            "stage",
+            "status"
+          ]
+        }
+      ]
+    }
+  ],
+  "properties": {
+    "schemaVersion": {
+      "const": 6
+    },
+    "runId": {
+      "type": "string",
+      "minLength": 1
+    },
+    "stage": {
+      "enum": [
+        "quality.proof"
+      ]
+    },
+    "status": {
+      "enum": [
+        "ready"
+      ]
+    },
+    "facts": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "payload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "changeReceiptRef",
+        "gateReceiptSetRef",
+        "businessHeadRef"
+      ],
+      "properties": {
+        "changeReceiptRef": {
+          "type": "string",
+          "minLength": 1
+        },
+        "gateReceiptSetRef": {
+          "type": "string",
+          "minLength": 1
+        },
+        "businessHeadRef": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    }
+  }
+}

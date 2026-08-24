@@ -1,0 +1,44 @@
+{
+  "schemaVersion": 6,
+  "id": "platform/sonar-service-reconcile",
+  "domain": "platform",
+  "inputSchema": "input.schema.json",
+  "outputSchema": "output.schema.json",
+  "knowledgeRefs": [
+    "platform.operations"
+  ],
+  "sourceReferenceRefs": [],
+  "accepts": [
+    {
+      "stage": "platform.sonar.reconcile",
+      "status": "ready",
+      "allFacts": [],
+      "noneFacts": []
+    }
+  ],
+  "emits": [
+    {
+      "stage": "platform.sonar.proved",
+      "status": "complete",
+      "factsAdd": [
+        "platform-sonar-proved"
+      ],
+      "factsRemove": []
+    },
+    {
+      "stage": "platform.blocked",
+      "status": "blocked",
+      "factsAdd": [
+        "platform-sonar-blocked"
+      ],
+      "factsRemove": []
+    }
+  ],
+  "sideEffects": [
+    "mutate declared Sonar service/project enforcement state"
+  ],
+  "stopConditions": [
+    "required evidence is missing or stale",
+    "the result would cross the declared boundary"
+  ]
+}

@@ -1,0 +1,52 @@
+{
+  "schemaVersion": 6,
+  "id": "architecture/decision-challenge",
+  "domain": "architecture",
+  "inputSchema": "input.schema.json",
+  "outputSchema": "output.schema.json",
+  "knowledgeRefs": [
+    "architecture.decision-analysis"
+  ],
+  "sourceReferenceRefs": [],
+  "accepts": [
+    {
+      "stage": "architecture.decision.challenge",
+      "status": "ready",
+      "allFacts": [
+        "architecture-options-ready"
+      ],
+      "noneFacts": []
+    }
+  ],
+  "emits": [
+    {
+      "stage": "architecture.decision.handoff",
+      "status": "ready",
+      "factsAdd": [
+        "architecture-challenge-ready"
+      ],
+      "factsRemove": []
+    },
+    {
+      "stage": "architecture.decision.alternatives",
+      "status": "ready",
+      "factsAdd": [
+        "architecture-feedback"
+      ],
+      "factsRemove": []
+    },
+    {
+      "stage": "architecture.blocked",
+      "status": "blocked",
+      "factsAdd": [
+        "architecture-decision-blocked"
+      ],
+      "factsRemove": []
+    }
+  ],
+  "sideEffects": [],
+  "stopConditions": [
+    "required evidence is missing or stale",
+    "the result would cross the declared boundary"
+  ]
+}

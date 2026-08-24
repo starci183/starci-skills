@@ -3,7 +3,7 @@
 | Field | Value |
 | --- | --- |
 | Knowledge ID | `fe.source-fit` |
-| Operations | `source-fit` |
+| Operators | `source-fit` |
 | Search tags | `source contract, effective contract, reuse, extend, create, grammar gap` |
 | Dependencies | `fe.grammar-complex-cases` |
 

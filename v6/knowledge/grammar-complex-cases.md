@@ -3,7 +3,7 @@
 | Field | Value |
 | --- | --- |
 | Knowledge ID | `fe.grammar-complex-cases` |
-| Operations | `grammar-convergence` |
+| Operators | `grammar-convergence` |
 | Search tags | `grammar, common ui, nested surface, complex case, neutral state, package` |
 | Dependencies | `none` |
 

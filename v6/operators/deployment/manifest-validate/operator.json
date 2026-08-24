@@ -1,0 +1,36 @@
+{
+  "schemaVersion": 6,
+  "id": "deployment/manifest-validate",
+  "domain": "deployment",
+  "inputSchema": "input.schema.json",
+  "outputSchema": "output.schema.json",
+  "knowledgeRefs": [
+    "deployment.lifecycle"
+  ],
+  "sourceReferenceRefs": [],
+  "accepts": [
+    {
+      "stage": "deployment.manifest",
+      "status": "ready",
+      "allFacts": [
+        "deployment-target-bound"
+      ],
+      "noneFacts": []
+    }
+  ],
+  "emits": [
+    {
+      "stage": "deployment.plan",
+      "status": "ready",
+      "factsAdd": [
+        "deployment-manifest-valid"
+      ],
+      "factsRemove": []
+    }
+  ],
+  "sideEffects": [],
+  "stopConditions": [
+    "required evidence is missing or stale",
+    "the result would cross the declared boundary"
+  ]
+}

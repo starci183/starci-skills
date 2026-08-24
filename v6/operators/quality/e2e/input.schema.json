@@ -1,0 +1,85 @@
+{
+  "$id": "https://starci.dev/v6/operators/quality/e2e/input.schema.json",
+  "title": "quality/e2e operator input",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "runId",
+    "stage",
+    "status",
+    "facts",
+    "payload"
+  ],
+  "allOf": [
+    {
+      "oneOf": [
+        {
+          "properties": {
+            "stage": {
+              "const": "quality.e2e"
+            },
+            "status": {
+              "const": "ready"
+            }
+          },
+          "required": [
+            "stage",
+            "status"
+          ]
+        }
+      ]
+    }
+  ],
+  "properties": {
+    "schemaVersion": {
+      "const": 6
+    },
+    "runId": {
+      "type": "string",
+      "minLength": 1
+    },
+    "stage": {
+      "enum": [
+        "quality.e2e"
+      ]
+    },
+    "status": {
+      "enum": [
+        "ready"
+      ]
+    },
+    "facts": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "payload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "changeReceiptRef",
+        "e2eCommandRef",
+        "seedReceiptRef"
+      ],
+      "properties": {
+        "changeReceiptRef": {
+          "type": "string",
+          "minLength": 1
+        },
+        "e2eCommandRef": {
+          "type": "string",
+          "minLength": 1
+        },
+        "seedReceiptRef": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    }
+  }
+}

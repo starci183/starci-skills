@@ -1,0 +1,42 @@
+{
+  "schemaVersion": 6,
+  "id": "deployment/proof",
+  "domain": "deployment",
+  "inputSchema": "input.schema.json",
+  "outputSchema": "output.schema.json",
+  "knowledgeRefs": [
+    "deployment.lifecycle"
+  ],
+  "sourceReferenceRefs": [],
+  "accepts": [
+    {
+      "stage": "deployment.proof",
+      "status": "ready",
+      "allFacts": [],
+      "noneFacts": []
+    }
+  ],
+  "emits": [
+    {
+      "stage": "delivery.proved",
+      "status": "ready",
+      "factsAdd": [
+        "delivery-proof-ready"
+      ],
+      "factsRemove": []
+    },
+    {
+      "stage": "deployment.blocked",
+      "status": "blocked",
+      "factsAdd": [
+        "deployment-proof-blocked"
+      ],
+      "factsRemove": []
+    }
+  ],
+  "sideEffects": [],
+  "stopConditions": [
+    "required evidence is missing or stale",
+    "the result would cross the declared boundary"
+  ]
+}

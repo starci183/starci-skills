@@ -1,0 +1,162 @@
+{
+  "$schema": "../machine.schema.json",
+  "schemaVersion": 6,
+  "id": "starci-business-authority",
+  "start": "analyze-input",
+  "states": {
+    "analyze-input": {
+      "kind": "analysis",
+      "on": [
+        {
+          "when": {
+            "inputEquals": {
+              "mode": "refresh"
+            }
+          },
+          "target": "route",
+          "label": "refresh and publish model"
+        },
+        {
+          "when": {
+            "inputEquals": {
+              "mode": "reconcile"
+            }
+          },
+          "target": "route-reconcile",
+          "label": "reconcile delivered source"
+        }
+      ]
+    },
+    "route": {
+      "kind": "operator",
+      "ref": "workspace/route-verify",
+      "on": [
+        {
+          "when": {
+            "decision": "ready"
+          },
+          "target": "evidence",
+          "label": "ready"
+        }
+      ]
+    },
+    "evidence": {
+      "kind": "operator",
+      "ref": "business/evidence-normalize",
+      "on": [
+        {
+          "when": {
+            "decision": "ready"
+          },
+          "target": "model",
+          "label": "ready"
+        }
+      ]
+    },
+    "model": {
+      "kind": "operator",
+      "ref": "business/model",
+      "on": [
+        {
+          "when": {
+            "decision": "ready"
+          },
+          "target": "model-approval",
+          "label": "ready"
+        }
+      ]
+    },
+    "model-approval": {
+      "kind": "wait",
+      "approval": {
+        "prompt": "Approve the displayed business model revision and lifecycle transition.",
+        "approve": "OK BUSINESS <hash>",
+        "reject": "REJECT BUSINESS <hash>"
+      },
+      "on": [
+        {
+          "when": {
+            "stage": "business.model.review",
+            "status": "approved"
+          },
+          "target": "publish"
+        },
+        {
+          "when": {
+            "stage": "business.model.review",
+            "status": "rejected"
+          },
+          "target": "evidence"
+        }
+      ]
+    },
+    "publish": {
+      "kind": "operator",
+      "ref": "business/publish",
+      "on": [
+        {
+          "when": {
+            "decision": "direct-plan"
+          },
+          "target": "complete",
+          "label": "direct-plan"
+        },
+        {
+          "when": {
+            "decision": "architecture-required"
+          },
+          "target": "complete",
+          "label": "architecture-required"
+        },
+        {
+          "when": {
+            "decision": "blocked"
+          },
+          "target": "blocked",
+          "label": "blocked"
+        }
+      ]
+    },
+    "route-reconcile": {
+      "kind": "operator",
+      "ref": "workspace/route-verify",
+      "on": [
+        {
+          "when": {
+            "decision": "ready"
+          },
+          "target": "reconcile",
+          "label": "ready"
+        }
+      ]
+    },
+    "reconcile": {
+      "kind": "operator",
+      "ref": "business/reconcile",
+      "on": [
+        {
+          "when": {
+            "decision": "implemented"
+          },
+          "target": "complete",
+          "label": "implemented"
+        },
+        {
+          "when": {
+            "decision": "discrepancy"
+          },
+          "target": "blocked",
+          "label": "discrepancy"
+        }
+      ]
+    },
+    "complete": {
+      "kind": "terminal",
+      "result": "complete"
+    },
+    "blocked": {
+      "kind": "terminal",
+      "result": "blocked"
+    }
+  }
+}

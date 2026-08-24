@@ -1,0 +1,34 @@
+{
+  "schemaVersion": 6,
+  "id": "platform/tunnel-plan",
+  "domain": "platform",
+  "inputSchema": "input.schema.json",
+  "outputSchema": "output.schema.json",
+  "knowledgeRefs": [
+    "platform.operations"
+  ],
+  "sourceReferenceRefs": [],
+  "accepts": [
+    {
+      "stage": "platform.tunnel.plan",
+      "status": "ready",
+      "allFacts": [],
+      "noneFacts": []
+    }
+  ],
+  "emits": [
+    {
+      "stage": "platform.tunnel.apply",
+      "status": "ready",
+      "factsAdd": [
+        "platform-tunnel-plan-ready"
+      ],
+      "factsRemove": []
+    }
+  ],
+  "sideEffects": [],
+  "stopConditions": [
+    "required evidence is missing or stale",
+    "the result would cross the declared boundary"
+  ]
+}

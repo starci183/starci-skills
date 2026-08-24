@@ -1,0 +1,36 @@
+{
+  "schemaVersion": 6,
+  "id": "business/evidence-normalize",
+  "domain": "business",
+  "inputSchema": "input.schema.json",
+  "outputSchema": "output.schema.json",
+  "knowledgeRefs": [
+    "business.authority-lifecycle"
+  ],
+  "sourceReferenceRefs": [],
+  "accepts": [
+    {
+      "stage": "business.evidence",
+      "status": "ready",
+      "allFacts": [
+        "workspace-route-ready"
+      ],
+      "noneFacts": []
+    }
+  ],
+  "emits": [
+    {
+      "stage": "business.model",
+      "status": "ready",
+      "factsAdd": [
+        "business-evidence-ready"
+      ],
+      "factsRemove": []
+    }
+  ],
+  "sideEffects": [],
+  "stopConditions": [
+    "required evidence is missing or stale",
+    "the result would cross the declared boundary"
+  ]
+}

@@ -1,0 +1,194 @@
+{
+  "$schema": "../machine.schema.json",
+  "schemaVersion": 6,
+  "id": "starci-quality-readiness",
+  "start": "analyze-input",
+  "states": {
+    "analyze-input": {
+      "kind": "analysis",
+      "on": [
+        {
+          "when": {
+            "inputEquals": {
+              "mode": "diagnose"
+            }
+          },
+          "target": "diagnose",
+          "label": "trace without mutation"
+        },
+        {
+          "when": {
+            "inputEquals": {
+              "mode": "inventory"
+            }
+          },
+          "target": "inventory",
+          "label": "measure readiness"
+        },
+        {
+          "when": {
+            "inputEquals": {
+              "mode": "repair"
+            }
+          },
+          "target": "repair-approval",
+          "label": "repair an approved finding"
+        },
+        {
+          "when": {
+            "inputEquals": {
+              "mode": "debt"
+            }
+          },
+          "target": "debt",
+          "label": "repay approved debt"
+        },
+        {
+          "when": {
+            "inputEquals": {
+              "mode": "bindings"
+            }
+          },
+          "target": "bindings",
+          "label": "check rule accountability"
+        }
+      ]
+    },
+    "diagnose": {
+      "kind": "operator",
+      "ref": "quality/workflow-diagnose",
+      "on": [
+        {
+          "when": {
+            "decision": "diagnosed"
+          },
+          "target": "complete",
+          "label": "diagnosed"
+        }
+      ]
+    },
+    "inventory": {
+      "kind": "operator",
+      "ref": "quality/readiness-inventory",
+      "on": [
+        {
+          "when": {
+            "decision": "green"
+          },
+          "target": "complete",
+          "label": "green"
+        },
+        {
+          "when": {
+            "decision": "findings"
+          },
+          "target": "repair-approval",
+          "label": "findings"
+        }
+      ]
+    },
+    "repair-approval": {
+      "kind": "wait",
+      "approval": {
+        "prompt": "Approve one exact measured finding and repair boundary.",
+        "approve": "OK REPAIR <finding>",
+        "reject": "REJECT REPAIR <finding>"
+      },
+      "on": [
+        {
+          "when": {
+            "stage": "quality.repair.review",
+            "status": "approved"
+          },
+          "target": "repair"
+        },
+        {
+          "when": {
+            "stage": "quality.repair.review",
+            "status": "rejected"
+          },
+          "target": "rejected"
+        }
+      ]
+    },
+    "repair": {
+      "kind": "operator",
+      "ref": "quality/finding-repair",
+      "on": [
+        {
+          "when": {
+            "decision": "repaired"
+          },
+          "target": "inventory",
+          "label": "repaired"
+        },
+        {
+          "when": {
+            "decision": "boundary-drift"
+          },
+          "target": "blocked",
+          "label": "boundary-drift"
+        }
+      ]
+    },
+    "debt": {
+      "kind": "operator",
+      "ref": "quality/debt-repay",
+      "on": [
+        {
+          "when": {
+            "decision": "closed"
+          },
+          "target": "complete",
+          "label": "closed"
+        },
+        {
+          "when": {
+            "decision": "progress"
+          },
+          "target": "debt",
+          "label": "progress"
+        },
+        {
+          "when": {
+            "decision": "blocked"
+          },
+          "target": "blocked",
+          "label": "blocked"
+        }
+      ]
+    },
+    "bindings": {
+      "kind": "operator",
+      "ref": "quality/rule-binding-check",
+      "on": [
+        {
+          "when": {
+            "decision": "pass"
+          },
+          "target": "complete",
+          "label": "pass"
+        },
+        {
+          "when": {
+            "decision": "fail"
+          },
+          "target": "blocked",
+          "label": "fail"
+        }
+      ]
+    },
+    "complete": {
+      "kind": "terminal",
+      "result": "complete"
+    },
+    "rejected": {
+      "kind": "terminal",
+      "result": "rejected"
+    },
+    "blocked": {
+      "kind": "terminal",
+      "result": "blocked"
+    }
+  }
+}

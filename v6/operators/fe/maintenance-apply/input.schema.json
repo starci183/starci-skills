@@ -1,0 +1,85 @@
+{
+  "$id": "https://starci.dev/v6/operators/fe/maintenance-apply/input.schema.json",
+  "title": "fe/maintenance-apply operator input",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "runId",
+    "stage",
+    "status",
+    "facts",
+    "payload"
+  ],
+  "allOf": [
+    {
+      "oneOf": [
+        {
+          "properties": {
+            "stage": {
+              "const": "fe.maintenance.maintenance-apply"
+            },
+            "status": {
+              "const": "ready"
+            }
+          },
+          "required": [
+            "stage",
+            "status"
+          ]
+        }
+      ]
+    }
+  ],
+  "properties": {
+    "schemaVersion": {
+      "const": 6
+    },
+    "runId": {
+      "type": "string",
+      "minLength": 1
+    },
+    "stage": {
+      "enum": [
+        "fe.maintenance.maintenance-apply"
+      ]
+    },
+    "status": {
+      "enum": [
+        "ready"
+      ]
+    },
+    "facts": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "payload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "feedbackRef",
+        "approvedBoundaryRef",
+        "baselineRef"
+      ],
+      "properties": {
+        "feedbackRef": {
+          "type": "string",
+          "minLength": 1
+        },
+        "approvedBoundaryRef": {
+          "type": "string",
+          "minLength": 1
+        },
+        "baselineRef": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    }
+  }
+}

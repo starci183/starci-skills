@@ -1,0 +1,85 @@
+{
+  "$id": "https://starci.dev/v6/operators/quality/rule-binding-check/input.schema.json",
+  "title": "quality/rule-binding-check operator input",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "runId",
+    "stage",
+    "status",
+    "facts",
+    "payload"
+  ],
+  "allOf": [
+    {
+      "oneOf": [
+        {
+          "properties": {
+            "stage": {
+              "const": "quality.rule-bindings"
+            },
+            "status": {
+              "const": "ready"
+            }
+          },
+          "required": [
+            "stage",
+            "status"
+          ]
+        }
+      ]
+    }
+  ],
+  "properties": {
+    "schemaVersion": {
+      "const": 6
+    },
+    "runId": {
+      "type": "string",
+      "minLength": 1
+    },
+    "stage": {
+      "enum": [
+        "quality.rule-bindings"
+      ]
+    },
+    "status": {
+      "enum": [
+        "ready"
+      ]
+    },
+    "facts": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "payload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "ruleRegistryRef",
+        "gateCatalogRef",
+        "publishedMachineRef"
+      ],
+      "properties": {
+        "ruleRegistryRef": {
+          "type": "string",
+          "minLength": 1
+        },
+        "gateCatalogRef": {
+          "type": "string",
+          "minLength": 1
+        },
+        "publishedMachineRef": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    }
+  }
+}

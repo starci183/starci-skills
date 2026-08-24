@@ -1,0 +1,42 @@
+{
+  "schemaVersion": 6,
+  "id": "fe/surface-audit",
+  "domain": "fe",
+  "inputSchema": "input.schema.json",
+  "outputSchema": "output.schema.json",
+  "knowledgeRefs": [
+    "fe.design-maintenance"
+  ],
+  "sourceReferenceRefs": [],
+  "accepts": [
+    {
+      "stage": "fe.maintenance.surface-audit",
+      "status": "ready",
+      "allFacts": [],
+      "noneFacts": []
+    }
+  ],
+  "emits": [
+    {
+      "stage": "fe.maintenance.surface-audit.result",
+      "status": "complete",
+      "factsAdd": [
+        "fe-surface-audit-complete"
+      ],
+      "factsRemove": []
+    },
+    {
+      "stage": "fe.maintenance.blocked",
+      "status": "blocked",
+      "factsAdd": [
+        "fe-surface-audit-blocked"
+      ],
+      "factsRemove": []
+    }
+  ],
+  "sideEffects": [],
+  "stopConditions": [
+    "required evidence is missing or stale",
+    "the result would cross the declared boundary"
+  ]
+}

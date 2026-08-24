@@ -1,0 +1,80 @@
+{
+  "$id": "https://starci.dev/v6/operators/fe/authority-reconcile/input.schema.json",
+  "title": "fe/authority-reconcile operator input",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "runId",
+    "stage",
+    "status",
+    "facts",
+    "payload"
+  ],
+  "allOf": [
+    {
+      "oneOf": [
+        {
+          "properties": {
+            "stage": {
+              "const": "fe.maintenance.authority-reconcile"
+            },
+            "status": {
+              "const": "ready"
+            }
+          },
+          "required": [
+            "stage",
+            "status"
+          ]
+        }
+      ]
+    }
+  ],
+  "properties": {
+    "schemaVersion": {
+      "const": 6
+    },
+    "runId": {
+      "type": "string",
+      "minLength": 1
+    },
+    "stage": {
+      "enum": [
+        "fe.maintenance.authority-reconcile"
+      ]
+    },
+    "status": {
+      "enum": [
+        "ready"
+      ]
+    },
+    "facts": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "payload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "surfaceAuditRef",
+        "approvedAuthorityBoundaryRef"
+      ],
+      "properties": {
+        "surfaceAuditRef": {
+          "type": "string",
+          "minLength": 1
+        },
+        "approvedAuthorityBoundaryRef": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    }
+  }
+}

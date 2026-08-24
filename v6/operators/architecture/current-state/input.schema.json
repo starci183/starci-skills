@@ -1,0 +1,85 @@
+{
+  "$id": "https://starci.dev/v6/operators/architecture/current-state/input.schema.json",
+  "title": "architecture/current-state operator input",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "runId",
+    "stage",
+    "status",
+    "facts",
+    "payload"
+  ],
+  "allOf": [
+    {
+      "oneOf": [
+        {
+          "properties": {
+            "stage": {
+              "const": "architecture.decision.current"
+            },
+            "status": {
+              "const": "ready"
+            }
+          },
+          "required": [
+            "stage",
+            "status"
+          ]
+        }
+      ]
+    }
+  ],
+  "properties": {
+    "schemaVersion": {
+      "const": 6
+    },
+    "runId": {
+      "type": "string",
+      "minLength": 1
+    },
+    "stage": {
+      "enum": [
+        "architecture.decision.current"
+      ]
+    },
+    "status": {
+      "enum": [
+        "ready"
+      ]
+    },
+    "facts": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "payload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "decisionFrameRef",
+        "routeReceiptRefs",
+        "sourcePartitionRefs"
+      ],
+      "properties": {
+        "decisionFrameRef": {
+          "type": "string",
+          "minLength": 1
+        },
+        "routeReceiptRefs": {
+          "type": "string",
+          "minLength": 1
+        },
+        "sourcePartitionRefs": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    }
+  }
+}

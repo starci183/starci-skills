@@ -1,0 +1,38 @@
+{
+  "schemaVersion": 6,
+  "id": "architecture/current-state",
+  "domain": "architecture",
+  "inputSchema": "input.schema.json",
+  "outputSchema": "output.schema.json",
+  "knowledgeRefs": [
+    "architecture.decision-analysis"
+  ],
+  "sourceReferenceRefs": [
+    "starci-academy-be"
+  ],
+  "accepts": [
+    {
+      "stage": "architecture.decision.current",
+      "status": "ready",
+      "allFacts": [
+        "architecture-frame-ready"
+      ],
+      "noneFacts": []
+    }
+  ],
+  "emits": [
+    {
+      "stage": "architecture.decision.alternatives",
+      "status": "ready",
+      "factsAdd": [
+        "architecture-current-state-ready"
+      ],
+      "factsRemove": []
+    }
+  ],
+  "sideEffects": [],
+  "stopConditions": [
+    "required evidence is missing or stale",
+    "the result would cross the declared boundary"
+  ]
+}

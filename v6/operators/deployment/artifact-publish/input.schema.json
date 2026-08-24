@@ -1,0 +1,90 @@
+{
+  "$id": "https://starci.dev/v6/operators/deployment/artifact-publish/input.schema.json",
+  "title": "deployment/artifact-publish operator input",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "runId",
+    "stage",
+    "status",
+    "facts",
+    "payload"
+  ],
+  "allOf": [
+    {
+      "oneOf": [
+        {
+          "properties": {
+            "stage": {
+              "const": "deployment.artifact.publish"
+            },
+            "status": {
+              "const": "ready"
+            }
+          },
+          "required": [
+            "stage",
+            "status"
+          ]
+        }
+      ]
+    }
+  ],
+  "properties": {
+    "schemaVersion": {
+      "const": 6
+    },
+    "runId": {
+      "type": "string",
+      "minLength": 1
+    },
+    "stage": {
+      "enum": [
+        "deployment.artifact.publish"
+      ]
+    },
+    "status": {
+      "enum": [
+        "ready"
+      ]
+    },
+    "facts": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "payload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "executionPlanRef",
+        "artifactBuildReceiptRef",
+        "registryRef",
+        "credentialReceiptRef"
+      ],
+      "properties": {
+        "executionPlanRef": {
+          "type": "string",
+          "minLength": 1
+        },
+        "artifactBuildReceiptRef": {
+          "type": "string",
+          "minLength": 1
+        },
+        "registryRef": {
+          "type": "string",
+          "minLength": 1
+        },
+        "credentialReceiptRef": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    }
+  }
+}

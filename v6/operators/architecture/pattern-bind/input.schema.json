@@ -1,0 +1,85 @@
+{
+  "$id": "https://starci.dev/v6/operators/architecture/pattern-bind/input.schema.json",
+  "title": "architecture/pattern-bind operator input",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "runId",
+    "stage",
+    "status",
+    "facts",
+    "payload"
+  ],
+  "allOf": [
+    {
+      "oneOf": [
+        {
+          "properties": {
+            "stage": {
+              "const": "architecture.pattern"
+            },
+            "status": {
+              "const": "ready"
+            }
+          },
+          "required": [
+            "stage",
+            "status"
+          ]
+        }
+      ]
+    }
+  ],
+  "properties": {
+    "schemaVersion": {
+      "const": 6
+    },
+    "runId": {
+      "type": "string",
+      "minLength": 1
+    },
+    "stage": {
+      "enum": [
+        "architecture.pattern"
+      ]
+    },
+    "status": {
+      "enum": [
+        "ready"
+      ]
+    },
+    "facts": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "payload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "businessHeadRef",
+        "planningContextRef",
+        "sourceReceiptRef"
+      ],
+      "properties": {
+        "businessHeadRef": {
+          "type": "string",
+          "minLength": 1
+        },
+        "planningContextRef": {
+          "type": "string",
+          "minLength": 1
+        },
+        "sourceReceiptRef": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    }
+  }
+}

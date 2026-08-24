@@ -38,7 +38,7 @@ class RealCorpusTests(unittest.TestCase):
     def test_inventory_includes_full_archetype_shelf(self) -> None:
         self.assertGreaterEqual(self.summary["counts"]["archetype"], 301)
         self.assertEqual(self.summary["counts"]["principle"], 15)
-        self.assertGreaterEqual(self.summary["counts"]["operation-knowledge"], 11)
+        self.assertGreaterEqual(self.summary["counts"]["operator-knowledge"], 33)
         self.assertGreaterEqual(self.summary["counts"]["grammar-owner"], 70)
         source_paths = [item.relative_path for item in discover_source_files(SOURCE_ROOT)]
         self.assertFalse(any(path.endswith("/en.md") or path.endswith("/vi.md") for path in source_paths))
@@ -94,11 +94,11 @@ class RealCorpusTests(unittest.TestCase):
         selected = [item["data"]["archetypeId"] for item in packet["selected"]["archetypes"]]
         self.assertEqual(selected[0], "operational-collection-workbench")
 
-    def test_v6_operation_knowledge_is_retrieved_from_qdrant(self) -> None:
+    def test_v6_operator_knowledge_is_retrieved_from_qdrant(self) -> None:
         packet = query_index(
             self.index,
             query_text="nested surface neutral affirmative check treatment complex case",
-            kinds=["operation-knowledge"],
+            kinds=["operator-knowledge"],
             top_k=3,
             project=None,
             grammar=None,
@@ -106,8 +106,23 @@ class RealCorpusTests(unittest.TestCase):
             route=None,
             embedding_model=None,
         )
-        selected = [item["data"]["knowledgeId"] for item in packet["selected"]["operationKnowledge"]]
+        selected = [item["data"]["knowledgeId"] for item in packet["selected"]["operatorKnowledge"]]
         self.assertEqual(selected[0], "fe.grammar-complex-cases")
+
+    def test_deployment_operator_knowledge_is_retrieved_from_qdrant(self) -> None:
+        packet = query_index(
+            self.index,
+            query_text="immutable artifact migration domain rollout monitor steady window rollback deployment manifest",
+            kinds=["operator-knowledge"],
+            top_k=3,
+            project=None,
+            grammar=None,
+            profile=None,
+            route=None,
+            embedding_model=None,
+        )
+        selected = [item["data"]["knowledgeId"] for item in packet["selected"]["operatorKnowledge"]]
+        self.assertEqual(selected[0], "deployment.lifecycle")
 
     def test_read_only_query_does_not_create_missing_index(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:

@@ -1,0 +1,42 @@
+{
+  "schemaVersion": 6,
+  "id": "quality/readiness-inventory",
+  "domain": "quality",
+  "inputSchema": "input.schema.json",
+  "outputSchema": "output.schema.json",
+  "knowledgeRefs": [
+    "quality.readiness-repair"
+  ],
+  "sourceReferenceRefs": [],
+  "accepts": [
+    {
+      "stage": "quality.inventory",
+      "status": "ready",
+      "allFacts": [],
+      "noneFacts": []
+    }
+  ],
+  "emits": [
+    {
+      "stage": "quality.inventory.result",
+      "status": "complete",
+      "factsAdd": [
+        "readiness-green"
+      ],
+      "factsRemove": []
+    },
+    {
+      "stage": "quality.inventory.result",
+      "status": "ready",
+      "factsAdd": [
+        "readiness-findings"
+      ],
+      "factsRemove": []
+    }
+  ],
+  "sideEffects": [],
+  "stopConditions": [
+    "required evidence is missing or stale",
+    "the result would cross the declared boundary"
+  ]
+}

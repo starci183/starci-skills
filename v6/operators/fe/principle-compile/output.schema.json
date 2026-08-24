@@ -1,0 +1,351 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://starci.dev/v6/operators/fe/principle-compile/output.schema.json",
+  "title": "FE Principle compile operator output",
+  "oneOf": [
+    {
+      "$ref": "#/$defs/compiledOutput"
+    },
+    {
+      "$ref": "#/$defs/blockedOutput"
+    }
+  ],
+  "$defs": {
+    "slug": {
+      "type": "string",
+      "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$"
+    },
+    "hash": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "ref": {
+      "type": "string",
+      "minLength": 1
+    },
+    "text": {
+      "type": "string",
+      "minLength": 1
+    },
+    "concern": {
+      "enum": [
+        "composition",
+        "spacing-boundary",
+        "hierarchy",
+        "responsive-persistence",
+        "state-interaction"
+      ]
+    },
+    "artifact": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "ref",
+        "hash"
+      ],
+      "properties": {
+        "ref": {
+          "$ref": "#/$defs/ref"
+        },
+        "hash": {
+          "$ref": "#/$defs/hash"
+        }
+      }
+    },
+    "openDecision": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "decisionId",
+        "targetRef",
+        "concern",
+        "situation",
+        "axis",
+        "openedByGrammarRef",
+        "openedBySourceFitRef",
+        "preservedInvariants",
+        "proofEnvironment"
+      ],
+      "properties": {
+        "decisionId": {
+          "$ref": "#/$defs/slug"
+        },
+        "targetRef": {
+          "$ref": "#/$defs/ref"
+        },
+        "concern": {
+          "$ref": "#/$defs/concern"
+        },
+        "situation": {
+          "$ref": "#/$defs/text"
+        },
+        "axis": {
+          "$ref": "#/$defs/slug"
+        },
+        "openedByGrammarRef": {
+          "$ref": "#/$defs/ref"
+        },
+        "openedBySourceFitRef": {
+          "$ref": "#/$defs/ref"
+        },
+        "preservedInvariants": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/slug"
+          }
+        },
+        "proofEnvironment": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "enum": [
+              "wide",
+              "intermediate",
+              "compact",
+              "keyboard",
+              "screen-reader",
+              "state-transition",
+              "content-volume",
+              "zoom"
+            ]
+          }
+        }
+      }
+    },
+    "principle": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "decisionId",
+        "targetRef",
+        "concern",
+        "situation",
+        "decision",
+        "implementationIntent",
+        "negativeBoundary",
+        "proof",
+        "authority"
+      ],
+      "properties": {
+        "decisionId": {
+          "$ref": "#/$defs/slug"
+        },
+        "targetRef": {
+          "$ref": "#/$defs/ref"
+        },
+        "concern": {
+          "$ref": "#/$defs/concern"
+        },
+        "situation": {
+          "$ref": "#/$defs/text"
+        },
+        "decision": {
+          "$ref": "#/$defs/text"
+        },
+        "implementationIntent": {
+          "$ref": "#/$defs/text"
+        },
+        "negativeBoundary": {
+          "$ref": "#/$defs/text"
+        },
+        "proof": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "cases",
+            "observations",
+            "passCondition"
+          ],
+          "properties": {
+            "cases": {
+              "type": "array",
+              "minItems": 1,
+              "uniqueItems": true,
+              "items": {
+                "enum": [
+                  "wide",
+                  "intermediate",
+                  "compact",
+                  "keyboard",
+                  "screen-reader",
+                  "state-transition",
+                  "content-volume",
+                  "zoom"
+                ]
+              }
+            },
+            "observations": {
+              "type": "array",
+              "minItems": 1,
+              "uniqueItems": true,
+              "items": {
+                "$ref": "#/$defs/text"
+              }
+            },
+            "passCondition": {
+              "$ref": "#/$defs/text"
+            }
+          }
+        },
+        "authority": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "axis",
+            "grammarRef",
+            "sourceFitRef",
+            "preservedInvariants"
+          ],
+          "properties": {
+            "axis": {
+              "$ref": "#/$defs/slug"
+            },
+            "grammarRef": {
+              "$ref": "#/$defs/ref"
+            },
+            "sourceFitRef": {
+              "$ref": "#/$defs/ref"
+            },
+            "preservedInvariants": {
+              "type": "array",
+              "minItems": 1,
+              "uniqueItems": true,
+              "items": {
+                "$ref": "#/$defs/slug"
+              }
+            }
+          }
+        }
+      }
+    },
+    "compiledOutput": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schemaVersion",
+        "appId",
+        "runId",
+        "stage",
+        "status",
+        "result",
+        "principles",
+        "receipt",
+        "factsAdd"
+      ],
+      "properties": {
+        "$schema": {
+          "type": "string"
+        },
+        "schemaVersion": {
+          "const": 6
+        },
+        "appId": {
+          "const": "fe-design-layout"
+        },
+        "runId": {
+          "$ref": "#/$defs/slug"
+        },
+        "stage": {
+          "const": "requests.review"
+        },
+        "status": {
+          "const": "ready"
+        },
+        "result": {
+          "const": "compiled"
+        },
+        "principles": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/principle"
+          }
+        },
+        "receipt": {
+          "$ref": "#/$defs/artifact"
+        },
+        "factsAdd": {
+          "const": [
+            "principles-compiled"
+          ]
+        }
+      }
+    },
+    "blockedOutput": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schemaVersion",
+        "appId",
+        "runId",
+        "stage",
+        "status",
+        "result",
+        "refusals",
+        "factsAdd"
+      ],
+      "properties": {
+        "$schema": {
+          "type": "string"
+        },
+        "schemaVersion": {
+          "const": 6
+        },
+        "appId": {
+          "const": "fe-design-layout"
+        },
+        "runId": {
+          "$ref": "#/$defs/slug"
+        },
+        "stage": {
+          "const": "requests.review"
+        },
+        "status": {
+          "const": "blocked"
+        },
+        "result": {
+          "const": "blocked"
+        },
+        "refusals": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "decisionId",
+              "code",
+              "reason"
+            ],
+            "properties": {
+              "decisionId": {
+                "$ref": "#/$defs/slug"
+              },
+              "code": {
+                "enum": [
+                  "closed-axis",
+                  "owner-substitution",
+                  "missing-situation",
+                  "missing-negative-boundary",
+                  "unprovable-decision",
+                  "product-semantic-leak",
+                  "grammar-authority-leak"
+                ]
+              },
+              "reason": {
+                "$ref": "#/$defs/text"
+              }
+            }
+          }
+        },
+        "factsAdd": {
+          "const": [
+            "principle-boundary-failed"
+          ]
+        }
+      }
+    }
+  }
+}

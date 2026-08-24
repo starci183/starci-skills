@@ -1,0 +1,80 @@
+{
+  "$id": "https://starci.dev/v6/operators/fe/consumer-align/input.schema.json",
+  "title": "fe/consumer-align operator input",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "runId",
+    "stage",
+    "status",
+    "facts",
+    "payload"
+  ],
+  "allOf": [
+    {
+      "oneOf": [
+        {
+          "properties": {
+            "stage": {
+              "const": "fe.maintenance.consumer-align"
+            },
+            "status": {
+              "const": "ready"
+            }
+          },
+          "required": [
+            "stage",
+            "status"
+          ]
+        }
+      ]
+    }
+  ],
+  "properties": {
+    "schemaVersion": {
+      "const": 6
+    },
+    "runId": {
+      "type": "string",
+      "minLength": 1
+    },
+    "stage": {
+      "enum": [
+        "fe.maintenance.consumer-align"
+      ]
+    },
+    "status": {
+      "enum": [
+        "ready"
+      ]
+    },
+    "facts": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "payload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "authorityReceiptRef",
+        "approvedConsumerSetRef"
+      ],
+      "properties": {
+        "authorityReceiptRef": {
+          "type": "string",
+          "minLength": 1
+        },
+        "approvedConsumerSetRef": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    }
+  }
+}

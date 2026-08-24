@@ -1,0 +1,55 @@
+{
+  "schemaVersion": 6,
+  "id": "business/publish",
+  "domain": "business",
+  "inputSchema": "input.schema.json",
+  "outputSchema": "output.schema.json",
+  "knowledgeRefs": [
+    "business.authority-lifecycle"
+  ],
+  "sourceReferenceRefs": [],
+  "accepts": [
+    {
+      "stage": "business.publish",
+      "status": "ready",
+      "allFacts": [
+        "business-model-ready"
+      ],
+      "noneFacts": []
+    }
+  ],
+  "emits": [
+    {
+      "stage": "architecture.decision.frame",
+      "status": "ready",
+      "factsAdd": [
+        "business-head-ready",
+        "architecture-analysis-required"
+      ],
+      "factsRemove": []
+    },
+    {
+      "stage": "architecture.source",
+      "status": "ready",
+      "factsAdd": [
+        "business-head-ready"
+      ],
+      "factsRemove": []
+    },
+    {
+      "stage": "business.blocked",
+      "status": "blocked",
+      "factsAdd": [
+        "business-publication-blocked"
+      ],
+      "factsRemove": []
+    }
+  ],
+  "sideEffects": [
+    "write and commit only the routed business worktree"
+  ],
+  "stopConditions": [
+    "required evidence is missing or stale",
+    "the result would cross the declared boundary"
+  ]
+}

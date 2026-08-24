@@ -1,0 +1,52 @@
+{
+  "schemaVersion": 6,
+  "id": "deployment/execution-plan",
+  "domain": "deployment",
+  "inputSchema": "input.schema.json",
+  "outputSchema": "output.schema.json",
+  "knowledgeRefs": [
+    "deployment.lifecycle"
+  ],
+  "sourceReferenceRefs": [],
+  "accepts": [
+    {
+      "stage": "deployment.plan",
+      "status": "ready",
+      "allFacts": [
+        "deployment-manifest-valid"
+      ],
+      "noneFacts": []
+    }
+  ],
+  "emits": [
+    {
+      "stage": "deployment.execute",
+      "status": "ready",
+      "factsAdd": [
+        "deployment-plan-ready"
+      ],
+      "factsRemove": []
+    },
+    {
+      "stage": "deployment.review",
+      "status": "pending",
+      "factsAdd": [
+        "deployment-approval-required"
+      ],
+      "factsRemove": []
+    },
+    {
+      "stage": "deployment.blocked",
+      "status": "blocked",
+      "factsAdd": [
+        "deployment-plan-blocked"
+      ],
+      "factsRemove": []
+    }
+  ],
+  "sideEffects": [],
+  "stopConditions": [
+    "required evidence is missing or stale",
+    "the result would cross the declared boundary"
+  ]
+}

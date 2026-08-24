@@ -1,0 +1,85 @@
+{
+  "$id": "https://starci.dev/v6/operators/architecture/boundary-challenge/input.schema.json",
+  "title": "architecture/boundary-challenge operator input",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "runId",
+    "stage",
+    "status",
+    "facts",
+    "payload"
+  ],
+  "allOf": [
+    {
+      "oneOf": [
+        {
+          "properties": {
+            "stage": {
+              "const": "architecture.boundary.challenge"
+            },
+            "status": {
+              "const": "ready"
+            }
+          },
+          "required": [
+            "stage",
+            "status"
+          ]
+        }
+      ]
+    }
+  ],
+  "properties": {
+    "schemaVersion": {
+      "const": 6
+    },
+    "runId": {
+      "type": "string",
+      "minLength": 1
+    },
+    "stage": {
+      "enum": [
+        "architecture.boundary.challenge"
+      ]
+    },
+    "status": {
+      "enum": [
+        "ready"
+      ]
+    },
+    "facts": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "payload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "boundaryPlanRef",
+        "sourceReceiptRef",
+        "patternBindingRef"
+      ],
+      "properties": {
+        "boundaryPlanRef": {
+          "type": "string",
+          "minLength": 1
+        },
+        "sourceReceiptRef": {
+          "type": "string",
+          "minLength": 1
+        },
+        "patternBindingRef": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,85 @@
+{
+  "$id": "https://starci.dev/v6/operators/quality/workflow-diagnose/input.schema.json",
+  "title": "quality/workflow-diagnose operator input",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "runId",
+    "stage",
+    "status",
+    "facts",
+    "payload"
+  ],
+  "allOf": [
+    {
+      "oneOf": [
+        {
+          "properties": {
+            "stage": {
+              "const": "quality.diagnose"
+            },
+            "status": {
+              "const": "ready"
+            }
+          },
+          "required": [
+            "stage",
+            "status"
+          ]
+        }
+      ]
+    }
+  ],
+  "properties": {
+    "schemaVersion": {
+      "const": 6
+    },
+    "runId": {
+      "type": "string",
+      "minLength": 1
+    },
+    "stage": {
+      "enum": [
+        "quality.diagnose"
+      ]
+    },
+    "status": {
+      "enum": [
+        "ready"
+      ]
+    },
+    "facts": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "payload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "skillRef",
+        "invocationRef",
+        "observedEnvironmentRef"
+      ],
+      "properties": {
+        "skillRef": {
+          "type": "string",
+          "minLength": 1
+        },
+        "invocationRef": {
+          "type": "string",
+          "minLength": 1
+        },
+        "observedEnvironmentRef": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    }
+  }
+}

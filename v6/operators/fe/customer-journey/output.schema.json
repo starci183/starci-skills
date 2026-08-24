@@ -1,0 +1,224 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://starci.dev/v6/operators/fe/customer-journey/output.schema.json",
+  "title": "FE customer journey operator output",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "runId",
+    "stage",
+    "status",
+    "facts",
+    "payload"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "const": 6
+    },
+    "runId": {
+      "type": "string",
+      "pattern": "^[a-z0-9][a-z0-9-]{2,127}$"
+    },
+    "stage": {
+      "const": "flow.review"
+    },
+    "status": {
+      "const": "pending"
+    },
+    "facts": {
+      "type": "array",
+      "contains": {
+        "const": "flow-directions-ready"
+      },
+      "items": {
+        "type": "string",
+        "minLength": 1
+      },
+      "uniqueItems": true
+    },
+    "payload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "directions",
+        "recommendedDirectionId",
+        "batchHash",
+        "approval"
+      ],
+      "properties": {
+        "directions": {
+          "type": "array",
+          "minItems": 2,
+          "maxItems": 3,
+          "items": {
+            "$ref": "#/$defs/direction"
+          }
+        },
+        "recommendedDirectionId": {
+          "type": "string",
+          "pattern": "^[a-z0-9][a-z0-9-]*$"
+        },
+        "batchHash": {
+          "$ref": "#/$defs/hash"
+        },
+        "approval": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "checkpoint",
+            "status",
+            "commandPattern"
+          ],
+          "properties": {
+            "checkpoint": {
+              "const": "flow"
+            },
+            "status": {
+              "const": "pending"
+            },
+            "commandPattern": {
+              "const": "OK FLOW <id>"
+            }
+          }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "ref": {
+      "type": "string",
+      "minLength": 1
+    },
+    "hash": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "journeyStep": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "sequence",
+        "pageIntent",
+        "userCommitment",
+        "systemResponse",
+        "recovery"
+      ],
+      "properties": {
+        "sequence": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "pageIntent": {
+          "type": "string",
+          "minLength": 1
+        },
+        "userCommitment": {
+          "type": "string",
+          "minLength": 1
+        },
+        "systemResponse": {
+          "type": "string",
+          "minLength": 1
+        },
+        "recovery": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "direction": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "thesis",
+        "actorGoal",
+        "entryCondition",
+        "terminalSuccess",
+        "materialAxis",
+        "journeyProgress",
+        "steps",
+        "benefits",
+        "costs",
+        "risks"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[a-z0-9][a-z0-9-]*$"
+        },
+        "thesis": {
+          "type": "string",
+          "minLength": 1
+        },
+        "actorGoal": {
+          "type": "string",
+          "minLength": 1
+        },
+        "entryCondition": {
+          "type": "string",
+          "minLength": 1
+        },
+        "terminalSuccess": {
+          "type": "string",
+          "minLength": 1
+        },
+        "materialAxis": {
+          "type": "string",
+          "minLength": 1
+        },
+        "journeyProgress": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "required",
+            "ownerScope"
+          ],
+          "properties": {
+            "required": {
+              "type": "boolean"
+            },
+            "ownerScope": {
+              "enum": [
+                "none",
+                "global"
+              ]
+            }
+          }
+        },
+        "steps": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/journeyStep"
+          }
+        },
+        "benefits": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "costs": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "risks": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    }
+  }
+}

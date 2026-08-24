@@ -1,0 +1,36 @@
+{
+  "schemaVersion": 6,
+  "id": "platform/mcp-config",
+  "domain": "platform",
+  "inputSchema": "input.schema.json",
+  "outputSchema": "output.schema.json",
+  "knowledgeRefs": [
+    "platform.operations"
+  ],
+  "sourceReferenceRefs": [],
+  "accepts": [
+    {
+      "stage": "platform.mcp.config",
+      "status": "ready",
+      "allFacts": [],
+      "noneFacts": []
+    }
+  ],
+  "emits": [
+    {
+      "stage": "platform.mcp.index",
+      "status": "ready",
+      "factsAdd": [
+        "platform-mcp-config-ready"
+      ],
+      "factsRemove": []
+    }
+  ],
+  "sideEffects": [
+    "write ignored generated MCP execution config"
+  ],
+  "stopConditions": [
+    "required evidence is missing or stale",
+    "the result would cross the declared boundary"
+  ]
+}

@@ -1,0 +1,80 @@
+{
+  "$id": "https://starci.dev/v6/operators/workspace/routes-hydrate/input.schema.json",
+  "title": "workspace/routes-hydrate operator input",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "runId",
+    "stage",
+    "status",
+    "facts",
+    "payload"
+  ],
+  "allOf": [
+    {
+      "oneOf": [
+        {
+          "properties": {
+            "stage": {
+              "const": "workspace.routes.hydrate"
+            },
+            "status": {
+              "const": "ready"
+            }
+          },
+          "required": [
+            "stage",
+            "status"
+          ]
+        }
+      ]
+    }
+  ],
+  "properties": {
+    "schemaVersion": {
+      "const": 6
+    },
+    "runId": {
+      "type": "string",
+      "minLength": 1
+    },
+    "stage": {
+      "enum": [
+        "workspace.routes.hydrate"
+      ]
+    },
+    "status": {
+      "enum": [
+        "ready"
+      ]
+    },
+    "facts": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "payload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "compiledDeclarationsRef",
+        "localRepositoryMapRef"
+      ],
+      "properties": {
+        "compiledDeclarationsRef": {
+          "type": "string",
+          "minLength": 1
+        },
+        "localRepositoryMapRef": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    }
+  }
+}

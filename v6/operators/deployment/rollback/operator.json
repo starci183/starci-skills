@@ -1,0 +1,46 @@
+{
+  "schemaVersion": 6,
+  "id": "deployment/rollback",
+  "domain": "deployment",
+  "inputSchema": "input.schema.json",
+  "outputSchema": "output.schema.json",
+  "knowledgeRefs": [
+    "deployment.lifecycle"
+  ],
+  "sourceReferenceRefs": [],
+  "accepts": [
+    {
+      "stage": "deployment.rollback",
+      "status": "ready",
+      "allFacts": [
+        "deployment-rollback-required"
+      ],
+      "noneFacts": []
+    }
+  ],
+  "emits": [
+    {
+      "stage": "deployment.proof",
+      "status": "ready",
+      "factsAdd": [
+        "deployment-rolled-back"
+      ],
+      "factsRemove": []
+    },
+    {
+      "stage": "deployment.blocked",
+      "status": "blocked",
+      "factsAdd": [
+        "deployment-rollback-blocked"
+      ],
+      "factsRemove": []
+    }
+  ],
+  "sideEffects": [
+    "apply declared rollback to provider and runtime state"
+  ],
+  "stopConditions": [
+    "required evidence is missing or stale",
+    "the result would cross the declared boundary"
+  ]
+}

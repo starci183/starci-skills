@@ -1,0 +1,85 @@
+{
+  "$id": "https://starci.dev/v6/operators/business/reconcile/input.schema.json",
+  "title": "business/reconcile operator input",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "runId",
+    "stage",
+    "status",
+    "facts",
+    "payload"
+  ],
+  "allOf": [
+    {
+      "oneOf": [
+        {
+          "properties": {
+            "stage": {
+              "const": "delivery.proved"
+            },
+            "status": {
+              "const": "ready"
+            }
+          },
+          "required": [
+            "stage",
+            "status"
+          ]
+        }
+      ]
+    }
+  ],
+  "properties": {
+    "schemaVersion": {
+      "const": 6
+    },
+    "runId": {
+      "type": "string",
+      "minLength": 1
+    },
+    "stage": {
+      "enum": [
+        "delivery.proved"
+      ]
+    },
+    "status": {
+      "enum": [
+        "ready"
+      ]
+    },
+    "facts": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "payload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "businessHeadRef",
+        "deliveryProofRef",
+        "finalSourceHeadsRef"
+      ],
+      "properties": {
+        "businessHeadRef": {
+          "type": "string",
+          "minLength": 1
+        },
+        "deliveryProofRef": {
+          "type": "string",
+          "minLength": 1
+        },
+        "finalSourceHeadsRef": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    }
+  }
+}

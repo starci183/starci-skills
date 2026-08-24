@@ -1,0 +1,38 @@
+{
+  "schemaVersion": 6,
+  "id": "deployment/artifact-publish",
+  "domain": "deployment",
+  "inputSchema": "input.schema.json",
+  "outputSchema": "output.schema.json",
+  "knowledgeRefs": [
+    "deployment.lifecycle"
+  ],
+  "sourceReferenceRefs": [],
+  "accepts": [
+    {
+      "stage": "deployment.artifact.publish",
+      "status": "ready",
+      "allFacts": [
+        "deployment-artifacts-built"
+      ],
+      "noneFacts": []
+    }
+  ],
+  "emits": [
+    {
+      "stage": "deployment.migration",
+      "status": "ready",
+      "factsAdd": [
+        "deployment-artifacts-published"
+      ],
+      "factsRemove": []
+    }
+  ],
+  "sideEffects": [
+    "publish declared immutable artifacts"
+  ],
+  "stopConditions": [
+    "required evidence is missing or stale",
+    "the result would cross the declared boundary"
+  ]
+}

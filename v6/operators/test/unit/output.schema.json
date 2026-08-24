@@ -1,0 +1,158 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://starci.dev/v6/operators/test/unit/output.schema.json",
+  "title": "Unit Test operator output",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "kind",
+    "schemaVersion",
+    "appId",
+    "runId",
+    "stage",
+    "status",
+    "facts",
+    "payload"
+  ],
+  "properties": {
+    "kind": {
+      "const": "test.unit.output"
+    },
+    "schemaVersion": {
+      "const": 6
+    },
+    "appId": {
+      "const": "fe-design-layout"
+    },
+    "runId": {
+      "type": "string",
+      "minLength": 1
+    },
+    "stage": {
+      "enum": [
+        "test.e2e",
+        "code.repair",
+        "test.review"
+      ]
+    },
+    "status": {
+      "enum": [
+        "ready",
+        "repair",
+        "blocked"
+      ]
+    },
+    "facts": {
+      "$ref": "#/$defs/strings"
+    },
+    "payload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "unitEvidenceRef",
+        "unitEvidenceHash",
+        "commandReceipts",
+        "selected",
+        "passed",
+        "failed",
+        "skipped",
+        "failedTargetRefs",
+        "stopReasons"
+      ],
+      "properties": {
+        "unitEvidenceRef": {
+          "type": "string",
+          "minLength": 1
+        },
+        "unitEvidenceHash": {
+          "type": "string",
+          "minLength": 1
+        },
+        "commandReceipts": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/commandReceipt"
+          }
+        },
+        "selected": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "passed": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "failed": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "skipped": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "failedTargetRefs": {
+          "$ref": "#/$defs/strings"
+        },
+        "stopReasons": {
+          "$ref": "#/$defs/strings"
+        }
+      }
+    }
+  },
+  "$defs": {
+    "strings": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      },
+      "uniqueItems": true
+    },
+    "commandReceipt": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "commandRef",
+        "status",
+        "selected",
+        "passed",
+        "failed",
+        "skipped",
+        "evidenceRef"
+      ],
+      "properties": {
+        "commandRef": {
+          "type": "string",
+          "minLength": 1
+        },
+        "status": {
+          "enum": [
+            "pass",
+            "fail",
+            "blocked"
+          ]
+        },
+        "selected": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "passed": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "failed": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "skipped": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "evidenceRef": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    }
+  }
+}

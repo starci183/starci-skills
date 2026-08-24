@@ -1,0 +1,352 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://starci.dev/v6/operators/fe/state/output.schema.json",
+  "title": "FE state operator output",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "runId",
+    "stage",
+    "status",
+    "facts",
+    "payload"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "const": 6
+    },
+    "runId": {
+      "type": "string",
+      "pattern": "^[a-z0-9][a-z0-9-]{2,127}$"
+    },
+    "stage": {
+      "enum": [
+        "layout.generate",
+        "state.result"
+      ]
+    },
+    "status": {
+      "enum": [
+        "ready",
+        "blocked"
+      ]
+    },
+    "facts": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      },
+      "uniqueItems": true
+    },
+    "payload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "stateModelRef",
+        "stateModelHash",
+        "states",
+        "unknowns"
+      ],
+      "properties": {
+        "stateModelRef": {
+          "$ref": "#/$defs/ref"
+        },
+        "stateModelHash": {
+          "$ref": "#/$defs/hash"
+        },
+        "states": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/state"
+          }
+        },
+        "unknowns": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/unknown"
+          }
+        }
+      }
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "stage": {
+            "const": "layout.generate"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "status": {
+            "const": "ready"
+          },
+          "facts": {
+            "allOf": [
+              {
+                "contains": {
+                  "const": "state-model-ready"
+                }
+              },
+              {
+                "contains": {
+                  "const": "neutral-facts-ready"
+                }
+              }
+            ]
+          },
+          "payload": {
+            "properties": {
+              "unknowns": {
+                "items": {
+                  "properties": {
+                    "blocking": {
+                      "const": false
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "stage": {
+            "const": "state.result"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "status": {
+            "const": "blocked"
+          },
+          "facts": {
+            "contains": {
+              "const": "sensitive-state-unknown"
+            }
+          },
+          "payload": {
+            "properties": {
+              "unknowns": {
+                "minItems": 1,
+                "contains": {
+                  "properties": {
+                    "blocking": {
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "blocking"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  ],
+  "$defs": {
+    "ref": {
+      "type": "string",
+      "minLength": 1
+    },
+    "hash": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "sensitivity": {
+      "enum": [
+        "money",
+        "access",
+        "entitlement",
+        "data-loss",
+        "legal",
+        "terminal-outcome"
+      ]
+    },
+    "state": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "blockRef",
+        "meaning",
+        "trigger",
+        "provenance",
+        "evidenceRefs",
+        "derivedFromRefs",
+        "availableActions",
+        "transitionTargets",
+        "neutralPresentation"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[a-z0-9][a-z0-9-]*$"
+        },
+        "blockRef": {
+          "$ref": "#/$defs/ref"
+        },
+        "meaning": {
+          "type": "string",
+          "minLength": 1
+        },
+        "trigger": {
+          "type": "string",
+          "minLength": 1
+        },
+        "provenance": {
+          "enum": [
+            "business",
+            "derived-block"
+          ]
+        },
+        "evidenceRefs": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/ref"
+          },
+          "uniqueItems": true
+        },
+        "derivedFromRefs": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/ref"
+          },
+          "uniqueItems": true
+        },
+        "availableActions": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "uniqueItems": true
+        },
+        "transitionTargets": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^[a-z0-9][a-z0-9-]*$"
+          },
+          "uniqueItems": true
+        },
+        "neutralPresentation": {
+          "enum": [
+            "default",
+            "informative",
+            "affirmative",
+            "caution",
+            "critical",
+            "pending",
+            "disabled"
+          ]
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "provenance": {
+                "const": "business"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "evidenceRefs": {
+                "minItems": 1
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "provenance": {
+                "const": "derived-block"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "derivedFromRefs": {
+                "minItems": 1
+              }
+            }
+          }
+        }
+      ]
+    },
+    "unknown": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "blockRef",
+        "question",
+        "sensitivity",
+        "blocking",
+        "requiredEvidence"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[a-z0-9][a-z0-9-]*$"
+        },
+        "blockRef": {
+          "$ref": "#/$defs/ref"
+        },
+        "question": {
+          "type": "string",
+          "minLength": 1
+        },
+        "sensitivity": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/sensitivity"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "blocking": {
+          "type": "boolean"
+        },
+        "requiredEvidence": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "sensitivity": {
+                "$ref": "#/$defs/sensitivity"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "blocking": {
+                "const": true
+              }
+            }
+          }
+        }
+      ]
+    }
+  }
+}

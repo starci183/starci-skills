@@ -1,0 +1,246 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://starci.dev/v6/operators/fe/product-seed/output.schema.json",
+  "title": "FE Product Seed operator output",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "kind",
+    "schemaVersion",
+    "appId",
+    "runId",
+    "stage",
+    "status",
+    "facts",
+    "payload"
+  ],
+  "properties": {
+    "kind": {
+      "const": "fe.product-seed.output"
+    },
+    "schemaVersion": {
+      "const": 6
+    },
+    "appId": {
+      "const": "fe-design-layout"
+    },
+    "runId": {
+      "type": "string",
+      "minLength": 1
+    },
+    "stage": {
+      "enum": [
+        "test.unit",
+        "seed.result"
+      ]
+    },
+    "status": {
+      "enum": [
+        "ready",
+        "blocked"
+      ]
+    },
+    "facts": {
+      "$ref": "#/$defs/factList"
+    },
+    "payload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "seedEvidenceRef",
+        "seedEvidenceHash",
+        "stateReceipts",
+        "uncoveredStateIds",
+        "stopReasons"
+      ],
+      "properties": {
+        "seedEvidenceRef": {
+          "type": "string",
+          "minLength": 1
+        },
+        "seedEvidenceHash": {
+          "type": "string",
+          "minLength": 1
+        },
+        "stateReceipts": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/stateReceipt"
+          }
+        },
+        "uncoveredStateIds": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "uniqueItems": true
+        },
+        "stopReasons": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "uniqueItems": true
+        }
+      }
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "status": {
+            "const": "ready"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "stage": {
+            "const": "test.unit"
+          },
+          "payload": {
+            "properties": {
+              "stateReceipts": {
+                "minItems": 1
+              },
+              "uncoveredStateIds": {
+                "maxItems": 0
+              },
+              "stopReasons": {
+                "maxItems": 0
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "status": {
+            "const": "blocked"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "stage": {
+            "const": "seed.result"
+          },
+          "payload": {
+            "properties": {
+              "uncoveredStateIds": {
+                "minItems": 1
+              },
+              "stopReasons": {
+                "minItems": 1
+              }
+            }
+          }
+        }
+      }
+    }
+  ],
+  "$defs": {
+    "factList": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      },
+      "uniqueItems": true
+    },
+    "requiredState": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "stateId",
+        "ownerRef",
+        "provenance",
+        "evidenceRef",
+        "materializationIntent",
+        "sensitivity"
+      ],
+      "properties": {
+        "stateId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "ownerRef": {
+          "type": "string",
+          "minLength": 1
+        },
+        "provenance": {
+          "enum": [
+            "business",
+            "derived-block"
+          ]
+        },
+        "evidenceRef": {
+          "type": "string",
+          "minLength": 1
+        },
+        "materializationIntent": {
+          "type": "string",
+          "minLength": 1
+        },
+        "sensitivity": {
+          "enum": [
+            "none",
+            "money",
+            "access",
+            "entitlement",
+            "data-loss",
+            "legal",
+            "terminal-outcome"
+          ]
+        }
+      }
+    },
+    "stateReceipt": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "stateId",
+        "ownerRef",
+        "setupRef",
+        "observableRef",
+        "resetRef",
+        "evidenceRef",
+        "deterministic"
+      ],
+      "properties": {
+        "stateId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "ownerRef": {
+          "type": "string",
+          "minLength": 1
+        },
+        "setupRef": {
+          "type": "string",
+          "minLength": 1
+        },
+        "observableRef": {
+          "type": "string",
+          "minLength": 1
+        },
+        "resetRef": {
+          "type": "string",
+          "minLength": 1
+        },
+        "evidenceRef": {
+          "type": "string",
+          "minLength": 1
+        },
+        "deterministic": {
+          "const": true
+        }
+      }
+    }
+  }
+}

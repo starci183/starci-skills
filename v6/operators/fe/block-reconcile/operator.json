@@ -1,0 +1,42 @@
+{
+  "schemaVersion": 6,
+  "id": "fe/block-reconcile",
+  "domain": "fe",
+  "inputSchema": "input.schema.json",
+  "outputSchema": "output.schema.json",
+  "knowledgeRefs": [
+    "fe.design-maintenance"
+  ],
+  "sourceReferenceRefs": [],
+  "accepts": [
+    {
+      "stage": "fe.maintenance.block-reconcile",
+      "status": "ready",
+      "allFacts": [],
+      "noneFacts": []
+    }
+  ],
+  "emits": [
+    {
+      "stage": "fe.maintenance.block-reconcile.result",
+      "status": "complete",
+      "factsAdd": [
+        "fe-block-reconcile-complete"
+      ],
+      "factsRemove": []
+    },
+    {
+      "stage": "fe.maintenance.blocked",
+      "status": "blocked",
+      "factsAdd": [
+        "fe-block-reconcile-blocked"
+      ],
+      "factsRemove": []
+    }
+  ],
+  "sideEffects": [],
+  "stopConditions": [
+    "required evidence is missing or stale",
+    "the result would cross the declared boundary"
+  ]
+}

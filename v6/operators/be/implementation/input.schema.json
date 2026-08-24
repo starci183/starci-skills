@@ -1,0 +1,106 @@
+{
+  "$id": "https://starci.dev/v6/operators/be/implementation/input.schema.json",
+  "title": "be/implementation operator input",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "runId",
+    "stage",
+    "status",
+    "facts",
+    "payload"
+  ],
+  "allOf": [
+    {
+      "oneOf": [
+        {
+          "properties": {
+            "stage": {
+              "const": "architecture.boundary.review"
+            },
+            "status": {
+              "const": "approved"
+            }
+          },
+          "required": [
+            "stage",
+            "status"
+          ]
+        },
+        {
+          "properties": {
+            "stage": {
+              "const": "be.repair"
+            },
+            "status": {
+              "const": "ready"
+            }
+          },
+          "required": [
+            "stage",
+            "status"
+          ]
+        }
+      ]
+    }
+  ],
+  "properties": {
+    "schemaVersion": {
+      "const": 6
+    },
+    "runId": {
+      "type": "string",
+      "minLength": 1
+    },
+    "stage": {
+      "enum": [
+        "architecture.boundary.review",
+        "be.repair"
+      ]
+    },
+    "status": {
+      "enum": [
+        "approved",
+        "ready"
+      ]
+    },
+    "facts": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "payload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "approvedBoundaryRef",
+        "approvalReceiptRef",
+        "businessHeadRef",
+        "baselineCommitRef"
+      ],
+      "properties": {
+        "approvedBoundaryRef": {
+          "type": "string",
+          "minLength": 1
+        },
+        "approvalReceiptRef": {
+          "type": "string",
+          "minLength": 1
+        },
+        "businessHeadRef": {
+          "type": "string",
+          "minLength": 1
+        },
+        "baselineCommitRef": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    }
+  }
+}

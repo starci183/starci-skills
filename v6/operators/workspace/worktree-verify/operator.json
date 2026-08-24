@@ -1,0 +1,36 @@
+{
+  "schemaVersion": 6,
+  "id": "workspace/worktree-verify",
+  "domain": "workspace",
+  "inputSchema": "input.schema.json",
+  "outputSchema": "output.schema.json",
+  "knowledgeRefs": [
+    "workspace.initialization"
+  ],
+  "sourceReferenceRefs": [],
+  "accepts": [
+    {
+      "stage": "workspace.worktree",
+      "status": "ready",
+      "allFacts": [
+        "workspace-routes-hydrated"
+      ],
+      "noneFacts": []
+    }
+  ],
+  "emits": [
+    {
+      "stage": "workspace.ready",
+      "status": "ready",
+      "factsAdd": [
+        "workspace-worktree-ready"
+      ],
+      "factsRemove": []
+    }
+  ],
+  "sideEffects": [],
+  "stopConditions": [
+    "required evidence is missing or stale",
+    "the result would cross the declared boundary"
+  ]
+}

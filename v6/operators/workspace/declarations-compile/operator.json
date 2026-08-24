@@ -1,0 +1,38 @@
+{
+  "schemaVersion": 6,
+  "id": "workspace/declarations-compile",
+  "domain": "workspace",
+  "inputSchema": "input.schema.json",
+  "outputSchema": "output.schema.json",
+  "knowledgeRefs": [
+    "workspace.initialization"
+  ],
+  "sourceReferenceRefs": [],
+  "accepts": [
+    {
+      "stage": "workspace.declarations",
+      "status": "ready",
+      "allFacts": [
+        "workspace-bootstrap-ready"
+      ],
+      "noneFacts": []
+    }
+  ],
+  "emits": [
+    {
+      "stage": "workspace.routes.hydrate",
+      "status": "ready",
+      "factsAdd": [
+        "workspace-declarations-ready"
+      ],
+      "factsRemove": []
+    }
+  ],
+  "sideEffects": [
+    "write tracked portable workspace declarations only"
+  ],
+  "stopConditions": [
+    "required evidence is missing or stale",
+    "the result would cross the declared boundary"
+  ]
+}

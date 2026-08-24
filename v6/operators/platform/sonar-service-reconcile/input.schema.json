@@ -1,0 +1,85 @@
+{
+  "$id": "https://starci.dev/v6/operators/platform/sonar-service-reconcile/input.schema.json",
+  "title": "platform/sonar-service-reconcile operator input",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "runId",
+    "stage",
+    "status",
+    "facts",
+    "payload"
+  ],
+  "allOf": [
+    {
+      "oneOf": [
+        {
+          "properties": {
+            "stage": {
+              "const": "platform.sonar.reconcile"
+            },
+            "status": {
+              "const": "ready"
+            }
+          },
+          "required": [
+            "stage",
+            "status"
+          ]
+        }
+      ]
+    }
+  ],
+  "properties": {
+    "schemaVersion": {
+      "const": 6
+    },
+    "runId": {
+      "type": "string",
+      "minLength": 1
+    },
+    "stage": {
+      "enum": [
+        "platform.sonar.reconcile"
+      ]
+    },
+    "status": {
+      "enum": [
+        "ready"
+      ]
+    },
+    "facts": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "payload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "projectSetRef",
+        "qualityProfileRef",
+        "credentialReceiptRef"
+      ],
+      "properties": {
+        "projectSetRef": {
+          "type": "string",
+          "minLength": 1
+        },
+        "qualityProfileRef": {
+          "type": "string",
+          "minLength": 1
+        },
+        "credentialReceiptRef": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    }
+  }
+}

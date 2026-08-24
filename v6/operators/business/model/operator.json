@@ -1,0 +1,36 @@
+{
+  "schemaVersion": 6,
+  "id": "business/model",
+  "domain": "business",
+  "inputSchema": "input.schema.json",
+  "outputSchema": "output.schema.json",
+  "knowledgeRefs": [
+    "business.authority-lifecycle"
+  ],
+  "sourceReferenceRefs": [],
+  "accepts": [
+    {
+      "stage": "business.model",
+      "status": "ready",
+      "allFacts": [
+        "business-evidence-ready"
+      ],
+      "noneFacts": []
+    }
+  ],
+  "emits": [
+    {
+      "stage": "business.publish",
+      "status": "ready",
+      "factsAdd": [
+        "business-model-ready"
+      ],
+      "factsRemove": []
+    }
+  ],
+  "sideEffects": [],
+  "stopConditions": [
+    "required evidence is missing or stale",
+    "the result would cross the declared boundary"
+  ]
+}

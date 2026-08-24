@@ -1,0 +1,36 @@
+{
+  "schemaVersion": 6,
+  "id": "deployment/domain-reconcile",
+  "domain": "deployment",
+  "inputSchema": "input.schema.json",
+  "outputSchema": "output.schema.json",
+  "knowledgeRefs": [
+    "deployment.lifecycle"
+  ],
+  "sourceReferenceRefs": [],
+  "accepts": [
+    {
+      "stage": "deployment.domain",
+      "status": "ready",
+      "allFacts": [],
+      "noneFacts": []
+    }
+  ],
+  "emits": [
+    {
+      "stage": "deployment.rollout",
+      "status": "ready",
+      "factsAdd": [
+        "deployment-domain-ready"
+      ],
+      "factsRemove": []
+    }
+  ],
+  "sideEffects": [
+    "reconcile declared domain and TLS provider state"
+  ],
+  "stopConditions": [
+    "required evidence is missing or stale",
+    "the result would cross the declared boundary"
+  ]
+}

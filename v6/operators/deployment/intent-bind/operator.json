@@ -1,0 +1,36 @@
+{
+  "schemaVersion": 6,
+  "id": "deployment/intent-bind",
+  "domain": "deployment",
+  "inputSchema": "input.schema.json",
+  "outputSchema": "output.schema.json",
+  "knowledgeRefs": [
+    "deployment.lifecycle"
+  ],
+  "sourceReferenceRefs": [],
+  "accepts": [
+    {
+      "stage": "deployment.intent",
+      "status": "ready",
+      "allFacts": [
+        "quality-sonar-pass"
+      ],
+      "noneFacts": []
+    }
+  ],
+  "emits": [
+    {
+      "stage": "deployment.manifest",
+      "status": "ready",
+      "factsAdd": [
+        "deployment-target-bound"
+      ],
+      "factsRemove": []
+    }
+  ],
+  "sideEffects": [],
+  "stopConditions": [
+    "required evidence is missing or stale",
+    "the result would cross the declared boundary"
+  ]
+}

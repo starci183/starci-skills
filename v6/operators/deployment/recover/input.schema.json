@@ -1,0 +1,90 @@
+{
+  "$id": "https://starci.dev/v6/operators/deployment/recover/input.schema.json",
+  "title": "deployment/recover operator input",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "runId",
+    "stage",
+    "status",
+    "facts",
+    "payload"
+  ],
+  "allOf": [
+    {
+      "oneOf": [
+        {
+          "properties": {
+            "stage": {
+              "const": "deployment.recover"
+            },
+            "status": {
+              "const": "ready"
+            }
+          },
+          "required": [
+            "stage",
+            "status"
+          ]
+        }
+      ]
+    }
+  ],
+  "properties": {
+    "schemaVersion": {
+      "const": 6
+    },
+    "runId": {
+      "type": "string",
+      "minLength": 1
+    },
+    "stage": {
+      "enum": [
+        "deployment.recover"
+      ]
+    },
+    "status": {
+      "enum": [
+        "ready"
+      ]
+    },
+    "facts": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "payload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "executionPlanRef",
+        "monitorReceiptRef",
+        "failureEvidenceRef",
+        "ownedBoundaryRef"
+      ],
+      "properties": {
+        "executionPlanRef": {
+          "type": "string",
+          "minLength": 1
+        },
+        "monitorReceiptRef": {
+          "type": "string",
+          "minLength": 1
+        },
+        "failureEvidenceRef": {
+          "type": "string",
+          "minLength": 1
+        },
+        "ownedBoundaryRef": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    }
+  }
+}

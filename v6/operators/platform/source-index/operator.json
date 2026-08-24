@@ -1,0 +1,38 @@
+{
+  "schemaVersion": 6,
+  "id": "platform/source-index",
+  "domain": "platform",
+  "inputSchema": "input.schema.json",
+  "outputSchema": "output.schema.json",
+  "knowledgeRefs": [
+    "platform.operations"
+  ],
+  "sourceReferenceRefs": [],
+  "accepts": [
+    {
+      "stage": "platform.mcp.index",
+      "status": "ready",
+      "allFacts": [
+        "platform-mcp-config-ready"
+      ],
+      "noneFacts": []
+    }
+  ],
+  "emits": [
+    {
+      "stage": "platform.mcp.publish",
+      "status": "ready",
+      "factsAdd": [
+        "platform-source-index-ready"
+      ],
+      "factsRemove": []
+    }
+  ],
+  "sideEffects": [
+    "replace only declared Qdrant source partitions"
+  ],
+  "stopConditions": [
+    "required evidence is missing or stale",
+    "the result would cross the declared boundary"
+  ]
+}

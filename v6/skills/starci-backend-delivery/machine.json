@@ -1,0 +1,653 @@
+{
+  "$schema": "../machine.schema.json",
+  "schemaVersion": 6,
+  "id": "starci-backend-delivery",
+  "start": "analyze-input",
+  "states": {
+    "analyze-input": {
+      "kind": "analysis",
+      "on": [
+        {
+          "when": {
+            "inputEquals": {
+              "mode": "deliver"
+            }
+          },
+          "target": "route",
+          "label": "plan and deliver backend source"
+        },
+        {
+          "when": {
+            "inputEquals": {
+              "mode": "repair"
+            }
+          },
+          "target": "implement",
+          "label": "resume approved in-boundary repair"
+        }
+      ]
+    },
+    "route": {
+      "kind": "operator",
+      "ref": "workspace/route-verify",
+      "on": [
+        {
+          "when": {
+            "decision": "ready"
+          },
+          "target": "business-evidence",
+          "label": "ready"
+        }
+      ]
+    },
+    "business-evidence": {
+      "kind": "operator",
+      "ref": "business/evidence-normalize",
+      "on": [
+        {
+          "when": {
+            "decision": "ready"
+          },
+          "target": "business-model",
+          "label": "ready"
+        }
+      ]
+    },
+    "business-model": {
+      "kind": "operator",
+      "ref": "business/model",
+      "on": [
+        {
+          "when": {
+            "decision": "ready"
+          },
+          "target": "business-publish",
+          "label": "ready"
+        }
+      ]
+    },
+    "business-publish": {
+      "kind": "operator",
+      "ref": "business/publish",
+      "on": [
+        {
+          "when": {
+            "decision": "direct-plan"
+          },
+          "target": "architecture-choice",
+          "label": "direct-plan"
+        },
+        {
+          "when": {
+            "decision": "architecture-required"
+          },
+          "target": "architecture-frame",
+          "label": "architecture-required"
+        },
+        {
+          "when": {
+            "decision": "blocked"
+          },
+          "target": "blocked",
+          "label": "blocked"
+        }
+      ]
+    },
+    "architecture-choice": {
+      "kind": "choice",
+      "on": [
+        {
+          "when": {
+            "inputEquals": {
+              "options.architectureMode": "required"
+            }
+          },
+          "target": "architecture-frame"
+        },
+        {
+          "when": {
+            "inputEquals": {
+              "options.architectureMode": "auto"
+            }
+          },
+          "target": "source-discovery"
+        },
+        {
+          "when": {
+            "inputEquals": {
+              "options.architectureMode": "skip"
+            }
+          },
+          "target": "source-discovery"
+        }
+      ]
+    },
+    "architecture-frame": {
+      "kind": "operator",
+      "ref": "architecture/decision-frame",
+      "on": [
+        {
+          "when": {
+            "decision": "ready"
+          },
+          "target": "architecture-current",
+          "label": "ready"
+        }
+      ]
+    },
+    "architecture-current": {
+      "kind": "operator",
+      "ref": "architecture/current-state",
+      "on": [
+        {
+          "when": {
+            "decision": "ready"
+          },
+          "target": "architecture-alternatives",
+          "label": "ready"
+        }
+      ]
+    },
+    "architecture-alternatives": {
+      "kind": "operator",
+      "ref": "architecture/alternatives",
+      "on": [
+        {
+          "when": {
+            "decision": "ready"
+          },
+          "target": "architecture-challenge",
+          "label": "ready"
+        }
+      ]
+    },
+    "architecture-challenge": {
+      "kind": "operator",
+      "ref": "architecture/decision-challenge",
+      "on": [
+        {
+          "when": {
+            "decision": "ready"
+          },
+          "target": "architecture-handoff",
+          "label": "ready"
+        },
+        {
+          "when": {
+            "decision": "revise"
+          },
+          "target": "architecture-alternatives",
+          "label": "revise"
+        },
+        {
+          "when": {
+            "decision": "blocked"
+          },
+          "target": "blocked",
+          "label": "blocked"
+        }
+      ]
+    },
+    "architecture-handoff": {
+      "kind": "operator",
+      "ref": "architecture/decision-handoff",
+      "on": [
+        {
+          "when": {
+            "decision": "ready"
+          },
+          "target": "source-discovery",
+          "label": "ready"
+        }
+      ]
+    },
+    "source-discovery": {
+      "kind": "operator",
+      "ref": "architecture/source-discovery",
+      "on": [
+        {
+          "when": {
+            "decision": "ready"
+          },
+          "target": "pattern-bind",
+          "label": "ready"
+        }
+      ]
+    },
+    "pattern-bind": {
+      "kind": "operator",
+      "ref": "architecture/pattern-bind",
+      "on": [
+        {
+          "when": {
+            "decision": "ready"
+          },
+          "target": "boundary-plan",
+          "label": "ready"
+        }
+      ]
+    },
+    "boundary-plan": {
+      "kind": "operator",
+      "ref": "architecture/boundary-plan",
+      "on": [
+        {
+          "when": {
+            "decision": "ready"
+          },
+          "target": "boundary-challenge",
+          "label": "ready"
+        }
+      ]
+    },
+    "boundary-challenge": {
+      "kind": "operator",
+      "ref": "architecture/boundary-challenge",
+      "on": [
+        {
+          "when": {
+            "decision": "clean"
+          },
+          "target": "boundary-approval",
+          "label": "clean"
+        },
+        {
+          "when": {
+            "decision": "revise"
+          },
+          "target": "boundary-plan",
+          "label": "revise"
+        },
+        {
+          "when": {
+            "decision": "blocked"
+          },
+          "target": "blocked",
+          "label": "blocked"
+        }
+      ]
+    },
+    "boundary-approval": {
+      "kind": "wait",
+      "approval": {
+        "prompt": "Approve the exact backend plan hash and file boundary.",
+        "approve": "OK BACKEND <hash>",
+        "reject": "REJECT BACKEND <hash>"
+      },
+      "on": [
+        {
+          "when": {
+            "stage": "architecture.boundary.review",
+            "status": "approved"
+          },
+          "target": "implement"
+        },
+        {
+          "when": {
+            "stage": "architecture.boundary.review",
+            "status": "rejected"
+          },
+          "target": "boundary-plan"
+        }
+      ]
+    },
+    "implement": {
+      "kind": "operator",
+      "ref": "be/implementation",
+      "on": [
+        {
+          "when": {
+            "decision": "ready"
+          },
+          "target": "format",
+          "label": "ready"
+        }
+      ]
+    },
+    "format": {
+      "kind": "operator",
+      "ref": "quality/format",
+      "on": [
+        {
+          "when": {
+            "decision": "pass"
+          },
+          "target": "lint",
+          "label": "pass"
+        },
+        {
+          "when": {
+            "decision": "in-boundary"
+          },
+          "target": "implement",
+          "label": "in-boundary"
+        },
+        {
+          "when": {
+            "decision": "boundary-drift"
+          },
+          "target": "boundary-plan",
+          "label": "boundary-drift"
+        },
+        {
+          "when": {
+            "decision": "external-blocker"
+          },
+          "target": "blocked",
+          "label": "external-blocker"
+        }
+      ]
+    },
+    "lint": {
+      "kind": "operator",
+      "ref": "quality/lint",
+      "on": [
+        {
+          "when": {
+            "decision": "pass"
+          },
+          "target": "typecheck",
+          "label": "pass"
+        },
+        {
+          "when": {
+            "decision": "in-boundary"
+          },
+          "target": "implement",
+          "label": "in-boundary"
+        },
+        {
+          "when": {
+            "decision": "boundary-drift"
+          },
+          "target": "boundary-plan",
+          "label": "boundary-drift"
+        },
+        {
+          "when": {
+            "decision": "external-blocker"
+          },
+          "target": "blocked",
+          "label": "external-blocker"
+        }
+      ]
+    },
+    "typecheck": {
+      "kind": "operator",
+      "ref": "quality/typecheck",
+      "on": [
+        {
+          "when": {
+            "decision": "pass"
+          },
+          "target": "build",
+          "label": "pass"
+        },
+        {
+          "when": {
+            "decision": "in-boundary"
+          },
+          "target": "implement",
+          "label": "in-boundary"
+        },
+        {
+          "when": {
+            "decision": "boundary-drift"
+          },
+          "target": "boundary-plan",
+          "label": "boundary-drift"
+        },
+        {
+          "when": {
+            "decision": "external-blocker"
+          },
+          "target": "blocked",
+          "label": "external-blocker"
+        }
+      ]
+    },
+    "build": {
+      "kind": "operator",
+      "ref": "quality/build",
+      "on": [
+        {
+          "when": {
+            "decision": "pass"
+          },
+          "target": "unit",
+          "label": "pass"
+        },
+        {
+          "when": {
+            "decision": "in-boundary"
+          },
+          "target": "implement",
+          "label": "in-boundary"
+        },
+        {
+          "when": {
+            "decision": "boundary-drift"
+          },
+          "target": "boundary-plan",
+          "label": "boundary-drift"
+        },
+        {
+          "when": {
+            "decision": "external-blocker"
+          },
+          "target": "blocked",
+          "label": "external-blocker"
+        }
+      ]
+    },
+    "unit": {
+      "kind": "operator",
+      "ref": "quality/unit-coverage",
+      "on": [
+        {
+          "when": {
+            "decision": "pass"
+          },
+          "target": "integration",
+          "label": "pass"
+        },
+        {
+          "when": {
+            "decision": "in-boundary"
+          },
+          "target": "implement",
+          "label": "in-boundary"
+        },
+        {
+          "when": {
+            "decision": "boundary-drift"
+          },
+          "target": "boundary-plan",
+          "label": "boundary-drift"
+        },
+        {
+          "when": {
+            "decision": "external-blocker"
+          },
+          "target": "blocked",
+          "label": "external-blocker"
+        }
+      ]
+    },
+    "integration": {
+      "kind": "operator",
+      "ref": "quality/integration",
+      "on": [
+        {
+          "when": {
+            "decision": "pass"
+          },
+          "target": "e2e",
+          "label": "pass"
+        },
+        {
+          "when": {
+            "decision": "in-boundary"
+          },
+          "target": "implement",
+          "label": "in-boundary"
+        },
+        {
+          "when": {
+            "decision": "boundary-drift"
+          },
+          "target": "boundary-plan",
+          "label": "boundary-drift"
+        },
+        {
+          "when": {
+            "decision": "external-blocker"
+          },
+          "target": "blocked",
+          "label": "external-blocker"
+        }
+      ]
+    },
+    "e2e": {
+      "kind": "operator",
+      "ref": "quality/e2e",
+      "on": [
+        {
+          "when": {
+            "decision": "pass"
+          },
+          "target": "sonar",
+          "label": "pass"
+        },
+        {
+          "when": {
+            "decision": "in-boundary"
+          },
+          "target": "implement",
+          "label": "in-boundary"
+        },
+        {
+          "when": {
+            "decision": "boundary-drift"
+          },
+          "target": "boundary-plan",
+          "label": "boundary-drift"
+        },
+        {
+          "when": {
+            "decision": "external-blocker"
+          },
+          "target": "blocked",
+          "label": "external-blocker"
+        }
+      ]
+    },
+    "sonar": {
+      "kind": "operator",
+      "ref": "quality/sonar",
+      "on": [
+        {
+          "when": {
+            "decision": "pass"
+          },
+          "target": "post-quality",
+          "label": "pass"
+        },
+        {
+          "when": {
+            "decision": "in-boundary"
+          },
+          "target": "implement",
+          "label": "in-boundary"
+        },
+        {
+          "when": {
+            "decision": "boundary-drift"
+          },
+          "target": "boundary-plan",
+          "label": "boundary-drift"
+        },
+        {
+          "when": {
+            "decision": "external-blocker"
+          },
+          "target": "blocked",
+          "label": "external-blocker"
+        }
+      ]
+    },
+    "post-quality": {
+      "kind": "choice",
+      "on": [
+        {
+          "when": {
+            "inputEquals": {
+              "options.deploymentMode": "none"
+            }
+          },
+          "target": "source-proof"
+        },
+        {
+          "when": {
+            "inputEquals": {
+              "options.deploymentMode": "handoff"
+            }
+          },
+          "target": "deployment-handoff"
+        }
+      ]
+    },
+    "source-proof": {
+      "kind": "operator",
+      "ref": "quality/delivery-proof",
+      "on": [
+        {
+          "when": {
+            "decision": "pass"
+          },
+          "target": "business-reconcile",
+          "label": "pass"
+        },
+        {
+          "when": {
+            "decision": "blocked"
+          },
+          "target": "blocked",
+          "label": "blocked"
+        }
+      ]
+    },
+    "business-reconcile": {
+      "kind": "operator",
+      "ref": "business/reconcile",
+      "on": [
+        {
+          "when": {
+            "decision": "implemented"
+          },
+          "target": "complete",
+          "label": "implemented"
+        },
+        {
+          "when": {
+            "decision": "discrepancy"
+          },
+          "target": "blocked",
+          "label": "discrepancy"
+        }
+      ]
+    },
+    "complete": {
+      "kind": "terminal",
+      "result": "complete"
+    },
+    "deployment-handoff": {
+      "kind": "terminal",
+      "result": "handoff"
+    },
+    "blocked": {
+      "kind": "terminal",
+      "result": "blocked"
+    }
+  }
+}

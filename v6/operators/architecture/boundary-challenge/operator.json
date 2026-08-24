@@ -1,0 +1,54 @@
+{
+  "schemaVersion": 6,
+  "id": "architecture/boundary-challenge",
+  "domain": "architecture",
+  "inputSchema": "input.schema.json",
+  "outputSchema": "output.schema.json",
+  "knowledgeRefs": [
+    "be.boundary-planning"
+  ],
+  "sourceReferenceRefs": [
+    "starci-academy-be"
+  ],
+  "accepts": [
+    {
+      "stage": "architecture.boundary.challenge",
+      "status": "ready",
+      "allFacts": [
+        "backend-boundary-ready"
+      ],
+      "noneFacts": []
+    }
+  ],
+  "emits": [
+    {
+      "stage": "architecture.boundary.review",
+      "status": "pending",
+      "factsAdd": [
+        "backend-boundary-challenged"
+      ],
+      "factsRemove": []
+    },
+    {
+      "stage": "architecture.boundary",
+      "status": "ready",
+      "factsAdd": [
+        "backend-boundary-feedback"
+      ],
+      "factsRemove": []
+    },
+    {
+      "stage": "architecture.blocked",
+      "status": "blocked",
+      "factsAdd": [
+        "backend-boundary-blocked"
+      ],
+      "factsRemove": []
+    }
+  ],
+  "sideEffects": [],
+  "stopConditions": [
+    "required evidence is missing or stale",
+    "the result would cross the declared boundary"
+  ]
+}

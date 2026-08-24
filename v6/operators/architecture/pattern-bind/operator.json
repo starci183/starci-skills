@@ -1,0 +1,36 @@
+{
+  "schemaVersion": 6,
+  "id": "architecture/pattern-bind",
+  "domain": "architecture",
+  "inputSchema": "input.schema.json",
+  "outputSchema": "output.schema.json",
+  "knowledgeRefs": [
+    "be.boundary-planning"
+  ],
+  "sourceReferenceRefs": [],
+  "accepts": [
+    {
+      "stage": "architecture.pattern",
+      "status": "ready",
+      "allFacts": [
+        "backend-source-ready"
+      ],
+      "noneFacts": []
+    }
+  ],
+  "emits": [
+    {
+      "stage": "architecture.boundary",
+      "status": "ready",
+      "factsAdd": [
+        "backend-patterns-ready"
+      ],
+      "factsRemove": []
+    }
+  ],
+  "sideEffects": [],
+  "stopConditions": [
+    "required evidence is missing or stale",
+    "the result would cross the declared boundary"
+  ]
+}

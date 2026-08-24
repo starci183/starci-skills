@@ -1,0 +1,36 @@
+{
+  "schemaVersion": 6,
+  "id": "architecture/decision-handoff",
+  "domain": "architecture",
+  "inputSchema": "input.schema.json",
+  "outputSchema": "output.schema.json",
+  "knowledgeRefs": [
+    "architecture.decision-analysis"
+  ],
+  "sourceReferenceRefs": [],
+  "accepts": [
+    {
+      "stage": "architecture.decision.handoff",
+      "status": "ready",
+      "allFacts": [
+        "architecture-challenge-ready"
+      ],
+      "noneFacts": []
+    }
+  ],
+  "emits": [
+    {
+      "stage": "architecture.source",
+      "status": "ready",
+      "factsAdd": [
+        "architecture-decision-ready"
+      ],
+      "factsRemove": []
+    }
+  ],
+  "sideEffects": [],
+  "stopConditions": [
+    "required evidence is missing or stale",
+    "the result would cross the declared boundary"
+  ]
+}

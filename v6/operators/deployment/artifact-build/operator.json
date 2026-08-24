@@ -1,0 +1,38 @@
+{
+  "schemaVersion": 6,
+  "id": "deployment/artifact-build",
+  "domain": "deployment",
+  "inputSchema": "input.schema.json",
+  "outputSchema": "output.schema.json",
+  "knowledgeRefs": [
+    "deployment.lifecycle"
+  ],
+  "sourceReferenceRefs": [],
+  "accepts": [
+    {
+      "stage": "deployment.artifact.build",
+      "status": "ready",
+      "allFacts": [
+        "deployment-host-ready"
+      ],
+      "noneFacts": []
+    }
+  ],
+  "emits": [
+    {
+      "stage": "deployment.artifact.publish",
+      "status": "ready",
+      "factsAdd": [
+        "deployment-artifacts-built"
+      ],
+      "factsRemove": []
+    }
+  ],
+  "sideEffects": [
+    "write ignored build outputs and immutable local artifacts"
+  ],
+  "stopConditions": [
+    "required evidence is missing or stale",
+    "the result would cross the declared boundary"
+  ]
+}

@@ -1,0 +1,38 @@
+{
+  "schemaVersion": 6,
+  "id": "workspace/routes-hydrate",
+  "domain": "workspace",
+  "inputSchema": "input.schema.json",
+  "outputSchema": "output.schema.json",
+  "knowledgeRefs": [
+    "workspace.initialization"
+  ],
+  "sourceReferenceRefs": [],
+  "accepts": [
+    {
+      "stage": "workspace.routes.hydrate",
+      "status": "ready",
+      "allFacts": [
+        "workspace-declarations-ready"
+      ],
+      "noneFacts": []
+    }
+  ],
+  "emits": [
+    {
+      "stage": "workspace.worktree",
+      "status": "ready",
+      "factsAdd": [
+        "workspace-routes-hydrated"
+      ],
+      "factsRemove": []
+    }
+  ],
+  "sideEffects": [
+    "write ignored machine-local route state"
+  ],
+  "stopConditions": [
+    "required evidence is missing or stale",
+    "the result would cross the declared boundary"
+  ]
+}

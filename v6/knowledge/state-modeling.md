@@ -3,7 +3,7 @@
 | Field | Value |
 | --- | --- |
 | Knowledge ID | `fe.state-modeling` |
-| Operations | `state` |
+| Operators | `state` |
 | Search tags | `business state, block state, unknown, presentation state, safety` |
 | Dependencies | `fe.page-model` |
 

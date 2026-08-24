@@ -1,0 +1,85 @@
+{
+  "$id": "https://starci.dev/v6/operators/deployment/rollback/input.schema.json",
+  "title": "deployment/rollback operator input",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "runId",
+    "stage",
+    "status",
+    "facts",
+    "payload"
+  ],
+  "allOf": [
+    {
+      "oneOf": [
+        {
+          "properties": {
+            "stage": {
+              "const": "deployment.rollback"
+            },
+            "status": {
+              "const": "ready"
+            }
+          },
+          "required": [
+            "stage",
+            "status"
+          ]
+        }
+      ]
+    }
+  ],
+  "properties": {
+    "schemaVersion": {
+      "const": 6
+    },
+    "runId": {
+      "type": "string",
+      "minLength": 1
+    },
+    "stage": {
+      "enum": [
+        "deployment.rollback"
+      ]
+    },
+    "status": {
+      "enum": [
+        "ready"
+      ]
+    },
+    "facts": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "payload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "executionPlanRef",
+        "rollbackPointRef",
+        "failureEvidenceRef"
+      ],
+      "properties": {
+        "executionPlanRef": {
+          "type": "string",
+          "minLength": 1
+        },
+        "rollbackPointRef": {
+          "type": "string",
+          "minLength": 1
+        },
+        "failureEvidenceRef": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    }
+  }
+}

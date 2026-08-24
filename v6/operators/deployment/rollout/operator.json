@@ -1,0 +1,39 @@
+{
+  "schemaVersion": 6,
+  "id": "deployment/rollout",
+  "domain": "deployment",
+  "inputSchema": "input.schema.json",
+  "outputSchema": "output.schema.json",
+  "knowledgeRefs": [
+    "deployment.lifecycle"
+  ],
+  "sourceReferenceRefs": [],
+  "accepts": [
+    {
+      "stage": "deployment.rollout",
+      "status": "ready",
+      "allFacts": [
+        "deployment-artifacts-published",
+        "deployment-domain-ready"
+      ],
+      "noneFacts": []
+    }
+  ],
+  "emits": [
+    {
+      "stage": "deployment.monitor",
+      "status": "ready",
+      "factsAdd": [
+        "deployment-rollout-ready"
+      ],
+      "factsRemove": []
+    }
+  ],
+  "sideEffects": [
+    "mutate declared remote runtime and release workflow state"
+  ],
+  "stopConditions": [
+    "required evidence is missing or stale",
+    "the result would cross the declared boundary"
+  ]
+}

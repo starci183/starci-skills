@@ -1,0 +1,36 @@
+{
+  "schemaVersion": 6,
+  "id": "workspace/bootstrap-verify",
+  "domain": "workspace",
+  "inputSchema": "input.schema.json",
+  "outputSchema": "output.schema.json",
+  "knowledgeRefs": [
+    "workspace.initialization"
+  ],
+  "sourceReferenceRefs": [],
+  "accepts": [
+    {
+      "stage": "workspace.bootstrap",
+      "status": "ready",
+      "allFacts": [
+        "workspace-identity-ready"
+      ],
+      "noneFacts": []
+    }
+  ],
+  "emits": [
+    {
+      "stage": "workspace.declarations",
+      "status": "ready",
+      "factsAdd": [
+        "workspace-bootstrap-ready"
+      ],
+      "factsRemove": []
+    }
+  ],
+  "sideEffects": [],
+  "stopConditions": [
+    "required evidence is missing or stale",
+    "the result would cross the declared boundary"
+  ]
+}

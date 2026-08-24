@@ -1,0 +1,38 @@
+{
+  "schemaVersion": 6,
+  "id": "architecture/source-discovery",
+  "domain": "architecture",
+  "inputSchema": "input.schema.json",
+  "outputSchema": "output.schema.json",
+  "knowledgeRefs": [
+    "be.boundary-planning"
+  ],
+  "sourceReferenceRefs": [
+    "starci-academy-be"
+  ],
+  "accepts": [
+    {
+      "stage": "architecture.source",
+      "status": "ready",
+      "allFacts": [
+        "business-head-ready"
+      ],
+      "noneFacts": []
+    }
+  ],
+  "emits": [
+    {
+      "stage": "architecture.pattern",
+      "status": "ready",
+      "factsAdd": [
+        "backend-source-ready"
+      ],
+      "factsRemove": []
+    }
+  ],
+  "sideEffects": [],
+  "stopConditions": [
+    "required evidence is missing or stale",
+    "the result would cross the declared boundary"
+  ]
+}

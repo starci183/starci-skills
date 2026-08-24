@@ -1,0 +1,62 @@
+{
+  "schemaVersion": 6,
+  "id": "deployment/monitor",
+  "domain": "deployment",
+  "inputSchema": "input.schema.json",
+  "outputSchema": "output.schema.json",
+  "knowledgeRefs": [
+    "deployment.lifecycle"
+  ],
+  "sourceReferenceRefs": [],
+  "accepts": [
+    {
+      "stage": "deployment.monitor",
+      "status": "ready",
+      "allFacts": [
+        "deployment-rollout-ready"
+      ],
+      "noneFacts": []
+    }
+  ],
+  "emits": [
+    {
+      "stage": "deployment.proof",
+      "status": "ready",
+      "factsAdd": [
+        "deployment-steady"
+      ],
+      "factsRemove": []
+    },
+    {
+      "stage": "deployment.recover",
+      "status": "ready",
+      "factsAdd": [
+        "deployment-recovery-required"
+      ],
+      "factsRemove": []
+    },
+    {
+      "stage": "deployment.rollback",
+      "status": "ready",
+      "factsAdd": [
+        "deployment-rollback-required"
+      ],
+      "factsRemove": []
+    },
+    {
+      "stage": "deployment.blocked",
+      "status": "blocked",
+      "factsAdd": [
+        "deployment-monitor-blocked"
+      ],
+      "factsRemove": []
+    }
+  ],
+  "sideEffects": [
+    "write value-free monitor observations below ignored execution root"
+  ],
+  "stopConditions": [
+    "required evidence is missing or stale",
+    "the result would cross the declared boundary"
+  ]
+}

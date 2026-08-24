@@ -1,0 +1,44 @@
+{
+  "schemaVersion": 6,
+  "id": "quality/delivery-proof",
+  "domain": "quality",
+  "inputSchema": "input.schema.json",
+  "outputSchema": "output.schema.json",
+  "knowledgeRefs": [
+    "quality.source-gates"
+  ],
+  "sourceReferenceRefs": [],
+  "accepts": [
+    {
+      "stage": "quality.proof",
+      "status": "ready",
+      "allFacts": [
+        "quality-sonar-pass"
+      ],
+      "noneFacts": []
+    }
+  ],
+  "emits": [
+    {
+      "stage": "delivery.proved",
+      "status": "ready",
+      "factsAdd": [
+        "delivery-proof-ready"
+      ],
+      "factsRemove": []
+    },
+    {
+      "stage": "quality.blocked",
+      "status": "blocked",
+      "factsAdd": [
+        "quality-proof-blocked"
+      ],
+      "factsRemove": []
+    }
+  ],
+  "sideEffects": [],
+  "stopConditions": [
+    "required evidence is missing or stale",
+    "the result would cross the declared boundary"
+  ]
+}

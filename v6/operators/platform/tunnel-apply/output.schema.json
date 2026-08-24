@@ -1,0 +1,117 @@
+{
+  "$id": "https://starci.dev/v6/operators/platform/tunnel-apply/output.schema.json",
+  "title": "platform/tunnel-apply operator output",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "runId",
+    "stage",
+    "status",
+    "facts",
+    "payload"
+  ],
+  "allOf": [
+    {
+      "oneOf": [
+        {
+          "properties": {
+            "stage": {
+              "const": "platform.tunnel.proved"
+            },
+            "status": {
+              "const": "complete"
+            }
+          },
+          "required": [
+            "stage",
+            "status"
+          ]
+        },
+        {
+          "properties": {
+            "stage": {
+              "const": "platform.blocked"
+            },
+            "status": {
+              "const": "blocked"
+            }
+          },
+          "required": [
+            "stage",
+            "status"
+          ]
+        }
+      ]
+    }
+  ],
+  "properties": {
+    "schemaVersion": {
+      "const": 6
+    },
+    "runId": {
+      "type": "string",
+      "minLength": 1
+    },
+    "stage": {
+      "enum": [
+        "platform.tunnel.proved",
+        "platform.blocked"
+      ]
+    },
+    "status": {
+      "enum": [
+        "complete",
+        "blocked"
+      ]
+    },
+    "facts": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "payload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "tunnelReceiptRef",
+        "decision",
+        "evidenceRefs",
+        "findings"
+      ],
+      "properties": {
+        "tunnelReceiptRef": {
+          "type": "string",
+          "minLength": 1
+        },
+        "decision": {
+          "enum": [
+            "proved",
+            "blocked"
+          ]
+        },
+        "evidenceRefs": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "findings": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    }
+  }
+}

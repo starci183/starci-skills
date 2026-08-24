@@ -1,0 +1,36 @@
+{
+  "schemaVersion": 6,
+  "id": "architecture/decision-frame",
+  "domain": "architecture",
+  "inputSchema": "input.schema.json",
+  "outputSchema": "output.schema.json",
+  "knowledgeRefs": [
+    "architecture.decision-analysis"
+  ],
+  "sourceReferenceRefs": [],
+  "accepts": [
+    {
+      "stage": "architecture.decision.frame",
+      "status": "ready",
+      "allFacts": [
+        "architecture-analysis-required"
+      ],
+      "noneFacts": []
+    }
+  ],
+  "emits": [
+    {
+      "stage": "architecture.decision.current",
+      "status": "ready",
+      "factsAdd": [
+        "architecture-frame-ready"
+      ],
+      "factsRemove": []
+    }
+  ],
+  "sideEffects": [],
+  "stopConditions": [
+    "required evidence is missing or stale",
+    "the result would cross the declared boundary"
+  ]
+}

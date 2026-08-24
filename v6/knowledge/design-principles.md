@@ -3,7 +3,7 @@
 | Field | Value |
 | --- | --- |
 | Knowledge ID | `fe.design-principles` |
-| Operations | `principle-compile` |
+| Operators | `principle-compile` |
 | Search tags | `principles, composition, spacing, hierarchy, responsive, interaction` |
 | Dependencies | `fe.layout-composition` |
 

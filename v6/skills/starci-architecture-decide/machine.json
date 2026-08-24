@@ -1,0 +1,135 @@
+{
+  "$schema": "../machine.schema.json",
+  "schemaVersion": 6,
+  "id": "starci-architecture-decide",
+  "start": "analyze-input",
+  "states": {
+    "analyze-input": {
+      "kind": "analysis",
+      "on": [
+        {
+          "when": {
+            "inputEquals": {
+              "mode": "analyze"
+            }
+          },
+          "target": "route",
+          "label": "run architecture analysis"
+        },
+        {
+          "when": {
+            "inputEquals": {
+              "mode": "skip"
+            }
+          },
+          "target": "not-needed",
+          "label": "ordinary known-shape work"
+        }
+      ]
+    },
+    "route": {
+      "kind": "operator",
+      "ref": "workspace/route-verify",
+      "on": [
+        {
+          "when": {
+            "decision": "ready"
+          },
+          "target": "frame",
+          "label": "ready"
+        }
+      ]
+    },
+    "frame": {
+      "kind": "operator",
+      "ref": "architecture/decision-frame",
+      "on": [
+        {
+          "when": {
+            "decision": "ready"
+          },
+          "target": "current",
+          "label": "ready"
+        }
+      ]
+    },
+    "current": {
+      "kind": "operator",
+      "ref": "architecture/current-state",
+      "on": [
+        {
+          "when": {
+            "decision": "ready"
+          },
+          "target": "alternatives",
+          "label": "ready"
+        }
+      ]
+    },
+    "alternatives": {
+      "kind": "operator",
+      "ref": "architecture/alternatives",
+      "on": [
+        {
+          "when": {
+            "decision": "ready"
+          },
+          "target": "challenge",
+          "label": "ready"
+        }
+      ]
+    },
+    "challenge": {
+      "kind": "operator",
+      "ref": "architecture/decision-challenge",
+      "on": [
+        {
+          "when": {
+            "decision": "ready"
+          },
+          "target": "handoff",
+          "label": "ready"
+        },
+        {
+          "when": {
+            "decision": "revise"
+          },
+          "target": "alternatives",
+          "label": "revise"
+        },
+        {
+          "when": {
+            "decision": "blocked"
+          },
+          "target": "blocked",
+          "label": "blocked"
+        }
+      ]
+    },
+    "handoff": {
+      "kind": "operator",
+      "ref": "architecture/decision-handoff",
+      "on": [
+        {
+          "when": {
+            "decision": "ready"
+          },
+          "target": "complete",
+          "label": "ready"
+        }
+      ]
+    },
+    "complete": {
+      "kind": "terminal",
+      "result": "complete"
+    },
+    "not-needed": {
+      "kind": "terminal",
+      "result": "not-needed"
+    },
+    "blocked": {
+      "kind": "terminal",
+      "result": "blocked"
+    }
+  }
+}

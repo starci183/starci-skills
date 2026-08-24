@@ -1,0 +1,95 @@
+{
+  "$id": "https://starci.dev/v6/operators/deployment/proof/input.schema.json",
+  "title": "deployment/proof operator input",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "runId",
+    "stage",
+    "status",
+    "facts",
+    "payload"
+  ],
+  "allOf": [
+    {
+      "oneOf": [
+        {
+          "properties": {
+            "stage": {
+              "const": "deployment.proof"
+            },
+            "status": {
+              "const": "ready"
+            }
+          },
+          "required": [
+            "stage",
+            "status"
+          ]
+        }
+      ]
+    }
+  ],
+  "properties": {
+    "schemaVersion": {
+      "const": 6
+    },
+    "runId": {
+      "type": "string",
+      "minLength": 1
+    },
+    "stage": {
+      "enum": [
+        "deployment.proof"
+      ]
+    },
+    "status": {
+      "enum": [
+        "ready"
+      ]
+    },
+    "facts": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "payload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "deploymentContractRef",
+        "executionPlanRef",
+        "artifactPublishReceiptRef",
+        "rolloutOrRollbackReceiptRef",
+        "monitorReceiptRef"
+      ],
+      "properties": {
+        "deploymentContractRef": {
+          "type": "string",
+          "minLength": 1
+        },
+        "executionPlanRef": {
+          "type": "string",
+          "minLength": 1
+        },
+        "artifactPublishReceiptRef": {
+          "type": "string",
+          "minLength": 1
+        },
+        "rolloutOrRollbackReceiptRef": {
+          "type": "string",
+          "minLength": 1
+        },
+        "monitorReceiptRef": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,60 @@
+{
+  "schemaVersion": 6,
+  "id": "quality/lint",
+  "domain": "quality",
+  "inputSchema": "input.schema.json",
+  "outputSchema": "output.schema.json",
+  "knowledgeRefs": [
+    "quality.source-gates"
+  ],
+  "sourceReferenceRefs": [],
+  "accepts": [
+    {
+      "stage": "quality.lint",
+      "status": "ready",
+      "allFacts": [],
+      "noneFacts": []
+    }
+  ],
+  "emits": [
+    {
+      "stage": "quality.typecheck",
+      "status": "ready",
+      "factsAdd": [
+        "quality-lint-pass"
+      ],
+      "factsRemove": []
+    },
+    {
+      "stage": "be.repair",
+      "status": "ready",
+      "factsAdd": [
+        "in-boundary-repair"
+      ],
+      "factsRemove": []
+    },
+    {
+      "stage": "architecture.boundary",
+      "status": "ready",
+      "factsAdd": [
+        "backend-boundary-feedback"
+      ],
+      "factsRemove": []
+    },
+    {
+      "stage": "quality.blocked",
+      "status": "blocked",
+      "factsAdd": [
+        "quality-external-blocker"
+      ],
+      "factsRemove": []
+    }
+  ],
+  "sideEffects": [
+    "write ignored gate evidence only"
+  ],
+  "stopConditions": [
+    "required evidence is missing or stale",
+    "the result would cross the declared boundary"
+  ]
+}

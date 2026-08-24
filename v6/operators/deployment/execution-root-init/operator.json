@@ -1,0 +1,46 @@
+{
+  "schemaVersion": 6,
+  "id": "deployment/execution-root-init",
+  "domain": "deployment",
+  "inputSchema": "input.schema.json",
+  "outputSchema": "output.schema.json",
+  "knowledgeRefs": [
+    "deployment.lifecycle"
+  ],
+  "sourceReferenceRefs": [],
+  "accepts": [
+    {
+      "stage": "deployment.execute",
+      "status": "ready",
+      "allFacts": [
+        "deployment-plan-ready"
+      ],
+      "noneFacts": []
+    },
+    {
+      "stage": "deployment.review",
+      "status": "approved",
+      "allFacts": [
+        "deployment-plan-approved"
+      ],
+      "noneFacts": []
+    }
+  ],
+  "emits": [
+    {
+      "stage": "deployment.credentials",
+      "status": "ready",
+      "factsAdd": [
+        "deployment-execution-root-ready"
+      ],
+      "factsRemove": []
+    }
+  ],
+  "sideEffects": [
+    "initialize ignored rebuildable .infra execution root"
+  ],
+  "stopConditions": [
+    "required evidence is missing or stale",
+    "the result would cross the declared boundary"
+  ]
+}

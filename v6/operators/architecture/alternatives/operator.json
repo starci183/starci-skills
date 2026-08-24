@@ -1,0 +1,36 @@
+{
+  "schemaVersion": 6,
+  "id": "architecture/alternatives",
+  "domain": "architecture",
+  "inputSchema": "input.schema.json",
+  "outputSchema": "output.schema.json",
+  "knowledgeRefs": [
+    "architecture.decision-analysis"
+  ],
+  "sourceReferenceRefs": [],
+  "accepts": [
+    {
+      "stage": "architecture.decision.alternatives",
+      "status": "ready",
+      "allFacts": [
+        "architecture-current-state-ready"
+      ],
+      "noneFacts": []
+    }
+  ],
+  "emits": [
+    {
+      "stage": "architecture.decision.challenge",
+      "status": "ready",
+      "factsAdd": [
+        "architecture-options-ready"
+      ],
+      "factsRemove": []
+    }
+  ],
+  "sideEffects": [],
+  "stopConditions": [
+    "required evidence is missing or stale",
+    "the result would cross the declared boundary"
+  ]
+}

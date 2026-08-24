@@ -1,0 +1,50 @@
+{
+  "schemaVersion": 6,
+  "id": "be/implementation",
+  "domain": "be",
+  "inputSchema": "input.schema.json",
+  "outputSchema": "output.schema.json",
+  "knowledgeRefs": [
+    "be.boundary-planning"
+  ],
+  "sourceReferenceRefs": [
+    "starci-academy-be"
+  ],
+  "accepts": [
+    {
+      "stage": "architecture.boundary.review",
+      "status": "approved",
+      "allFacts": [
+        "backend-boundary-approved"
+      ],
+      "noneFacts": []
+    },
+    {
+      "stage": "be.repair",
+      "status": "ready",
+      "allFacts": [
+        "backend-boundary-approved",
+        "in-boundary-repair"
+      ],
+      "noneFacts": []
+    }
+  ],
+  "emits": [
+    {
+      "stage": "quality.format",
+      "status": "ready",
+      "factsAdd": [
+        "backend-source-written"
+      ],
+      "factsRemove": []
+    }
+  ],
+  "sideEffects": [
+    "write only approved backend product-source paths",
+    "write immutable mutation receipt"
+  ],
+  "stopConditions": [
+    "required evidence is missing or stale",
+    "the result would cross the declared boundary"
+  ]
+}

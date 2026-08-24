@@ -1,0 +1,44 @@
+{
+  "schemaVersion": 6,
+  "id": "quality/finding-repair",
+  "domain": "quality",
+  "inputSchema": "input.schema.json",
+  "outputSchema": "output.schema.json",
+  "knowledgeRefs": [
+    "quality.readiness-repair"
+  ],
+  "sourceReferenceRefs": [],
+  "accepts": [
+    {
+      "stage": "quality.repair",
+      "status": "ready",
+      "allFacts": [],
+      "noneFacts": []
+    }
+  ],
+  "emits": [
+    {
+      "stage": "quality.repair.result",
+      "status": "complete",
+      "factsAdd": [
+        "finding-repaired"
+      ],
+      "factsRemove": []
+    },
+    {
+      "stage": "quality.blocked",
+      "status": "blocked",
+      "factsAdd": [
+        "repair-boundary-drift"
+      ],
+      "factsRemove": []
+    }
+  ],
+  "sideEffects": [
+    "mutate only the approved finding boundary"
+  ],
+  "stopConditions": [
+    "required evidence is missing or stale",
+    "the result would cross the declared boundary"
+  ]
+}

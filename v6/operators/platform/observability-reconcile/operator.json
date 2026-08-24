@@ -1,0 +1,44 @@
+{
+  "schemaVersion": 6,
+  "id": "platform/observability-reconcile",
+  "domain": "platform",
+  "inputSchema": "input.schema.json",
+  "outputSchema": "output.schema.json",
+  "knowledgeRefs": [
+    "platform.operations"
+  ],
+  "sourceReferenceRefs": [],
+  "accepts": [
+    {
+      "stage": "platform.observability.reconcile",
+      "status": "ready",
+      "allFacts": [],
+      "noneFacts": []
+    }
+  ],
+  "emits": [
+    {
+      "stage": "platform.observability.proved",
+      "status": "complete",
+      "factsAdd": [
+        "platform-observability-proved"
+      ],
+      "factsRemove": []
+    },
+    {
+      "stage": "platform.blocked",
+      "status": "blocked",
+      "factsAdd": [
+        "platform-observability-blocked"
+      ],
+      "factsRemove": []
+    }
+  ],
+  "sideEffects": [
+    "mutate declared observability stack and provider configuration"
+  ],
+  "stopConditions": [
+    "required evidence is missing or stale",
+    "the result would cross the declared boundary"
+  ]
+}

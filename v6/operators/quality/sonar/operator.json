@@ -1,0 +1,60 @@
+{
+  "schemaVersion": 6,
+  "id": "quality/sonar",
+  "domain": "quality",
+  "inputSchema": "input.schema.json",
+  "outputSchema": "output.schema.json",
+  "knowledgeRefs": [
+    "quality.source-gates"
+  ],
+  "sourceReferenceRefs": [],
+  "accepts": [
+    {
+      "stage": "quality.sonar",
+      "status": "ready",
+      "allFacts": [],
+      "noneFacts": []
+    }
+  ],
+  "emits": [
+    {
+      "stage": "deployment.intent",
+      "status": "ready",
+      "factsAdd": [
+        "quality-sonar-pass"
+      ],
+      "factsRemove": []
+    },
+    {
+      "stage": "be.repair",
+      "status": "ready",
+      "factsAdd": [
+        "in-boundary-repair"
+      ],
+      "factsRemove": []
+    },
+    {
+      "stage": "architecture.boundary",
+      "status": "ready",
+      "factsAdd": [
+        "backend-boundary-feedback"
+      ],
+      "factsRemove": []
+    },
+    {
+      "stage": "quality.blocked",
+      "status": "blocked",
+      "factsAdd": [
+        "quality-external-blocker"
+      ],
+      "factsRemove": []
+    }
+  ],
+  "sideEffects": [
+    "write ignored gate evidence only"
+  ],
+  "stopConditions": [
+    "required evidence is missing or stale",
+    "the result would cross the declared boundary"
+  ]
+}

@@ -1,0 +1,420 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://starci.dev/v6/operators/fe/layout/output.schema.json",
+  "title": "FE layout operator output",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "appId",
+    "runId",
+    "stage",
+    "status",
+    "directions",
+    "recommendation",
+    "approval",
+    "artifactHash",
+    "factsAdd"
+  ],
+  "properties": {
+    "$schema": {
+      "type": "string"
+    },
+    "schemaVersion": {
+      "const": 6
+    },
+    "appId": {
+      "const": "fe-design-layout"
+    },
+    "runId": {
+      "$ref": "#/$defs/slug"
+    },
+    "stage": {
+      "const": "layout.review"
+    },
+    "status": {
+      "const": "pending"
+    },
+    "directions": {
+      "type": "array",
+      "minItems": 2,
+      "maxItems": 3,
+      "items": {
+        "$ref": "#/$defs/direction"
+      }
+    },
+    "recommendation": {
+      "$ref": "#/$defs/slug"
+    },
+    "approval": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "status",
+        "commands"
+      ],
+      "properties": {
+        "status": {
+          "const": "pending"
+        },
+        "commands": {
+          "type": "array",
+          "minItems": 2,
+          "maxItems": 3,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "pattern": "^OK LAYOUT [a-z0-9]+(?:-[a-z0-9]+)*$"
+          }
+        }
+      }
+    },
+    "artifactHash": {
+      "$ref": "#/$defs/hash"
+    },
+    "factsAdd": {
+      "const": [
+        "layout-directions-ready"
+      ]
+    }
+  },
+  "$defs": {
+    "slug": {
+      "type": "string",
+      "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$"
+    },
+    "hash": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "ref": {
+      "type": "string",
+      "minLength": 1
+    },
+    "text": {
+      "type": "string",
+      "minLength": 1
+    },
+    "artifact": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "ref",
+        "hash"
+      ],
+      "properties": {
+        "ref": {
+          "$ref": "#/$defs/ref"
+        },
+        "hash": {
+          "$ref": "#/$defs/hash"
+        }
+      }
+    },
+    "blockSummary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "blockId",
+        "owner",
+        "scope",
+        "taskWeight",
+        "contentDensity",
+        "dataVolume",
+        "dependsOn",
+        "visibleWhen"
+      ],
+      "properties": {
+        "blockId": {
+          "$ref": "#/$defs/slug"
+        },
+        "owner": {
+          "$ref": "#/$defs/slug"
+        },
+        "scope": {
+          "enum": [
+            "global",
+            "page"
+          ]
+        },
+        "taskWeight": {
+          "enum": [
+            "primary",
+            "supporting",
+            "reference"
+          ]
+        },
+        "contentDensity": {
+          "enum": [
+            "low",
+            "medium",
+            "high"
+          ]
+        },
+        "dataVolume": {
+          "enum": [
+            "single",
+            "few",
+            "many",
+            "variable"
+          ]
+        },
+        "dependsOn": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/slug"
+          }
+        },
+        "visibleWhen": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/slug"
+          }
+        }
+      }
+    },
+    "track": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "share",
+        "role"
+      ],
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/slug"
+        },
+        "share": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 12
+        },
+        "role": {
+          "enum": [
+            "primary",
+            "supporting",
+            "full"
+          ]
+        }
+      }
+    },
+    "placement": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "blockId",
+        "trackId",
+        "order",
+        "mode",
+        "persistence",
+        "because"
+      ],
+      "properties": {
+        "blockId": {
+          "$ref": "#/$defs/slug"
+        },
+        "trackId": {
+          "$ref": "#/$defs/slug"
+        },
+        "order": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "mode": {
+          "enum": [
+            "in-flow",
+            "named-replacement",
+            "owner-local-overflow"
+          ]
+        },
+        "persistence": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "reason",
+            "scrollOwner",
+            "releaseCondition"
+          ],
+          "properties": {
+            "kind": {
+              "enum": [
+                "static",
+                "sticky"
+              ]
+            },
+            "reason": {
+              "$ref": "#/$defs/text"
+            },
+            "scrollOwner": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "releaseCondition": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          }
+        },
+        "because": {
+          "$ref": "#/$defs/text"
+        }
+      }
+    },
+    "viewport": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "mode",
+        "tracks",
+        "placements"
+      ],
+      "properties": {
+        "mode": {
+          "enum": [
+            "grid",
+            "stack"
+          ]
+        },
+        "tracks": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/track"
+          }
+        },
+        "placements": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/placement"
+          }
+        }
+      }
+    },
+    "pageLayout": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "pageId",
+        "readingOrder",
+        "wide",
+        "intermediate",
+        "compact",
+        "tabsDecision"
+      ],
+      "properties": {
+        "pageId": {
+          "$ref": "#/$defs/slug"
+        },
+        "readingOrder": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/slug"
+          }
+        },
+        "wide": {
+          "$ref": "#/$defs/viewport"
+        },
+        "intermediate": {
+          "$ref": "#/$defs/viewport"
+        },
+        "compact": {
+          "$ref": "#/$defs/viewport"
+        },
+        "tabsDecision": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "used",
+            "reason"
+          ],
+          "properties": {
+            "used": {
+              "type": "boolean"
+            },
+            "reason": {
+              "$ref": "#/$defs/text"
+            }
+          }
+        }
+      }
+    },
+    "direction": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "title",
+        "thesis",
+        "materialDifferences",
+        "compositionHash",
+        "globalBlockRefs",
+        "pages",
+        "tradeoffs",
+        "proofObligations"
+      ],
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/slug"
+        },
+        "title": {
+          "$ref": "#/$defs/text"
+        },
+        "thesis": {
+          "$ref": "#/$defs/text"
+        },
+        "materialDifferences": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/text"
+          }
+        },
+        "compositionHash": {
+          "$ref": "#/$defs/hash"
+        },
+        "globalBlockRefs": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/slug"
+          }
+        },
+        "pages": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/pageLayout"
+          }
+        },
+        "tradeoffs": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/text"
+          }
+        },
+        "proofObligations": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/text"
+          }
+        }
+      }
+    }
+  }
+}

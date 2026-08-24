@@ -1,0 +1,101 @@
+{
+  "$id": "https://starci.dev/v6/operators/deployment/execution-root-init/input.schema.json",
+  "title": "deployment/execution-root-init operator input",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "runId",
+    "stage",
+    "status",
+    "facts",
+    "payload"
+  ],
+  "allOf": [
+    {
+      "oneOf": [
+        {
+          "properties": {
+            "stage": {
+              "const": "deployment.execute"
+            },
+            "status": {
+              "const": "ready"
+            }
+          },
+          "required": [
+            "stage",
+            "status"
+          ]
+        },
+        {
+          "properties": {
+            "stage": {
+              "const": "deployment.review"
+            },
+            "status": {
+              "const": "approved"
+            }
+          },
+          "required": [
+            "stage",
+            "status"
+          ]
+        }
+      ]
+    }
+  ],
+  "properties": {
+    "schemaVersion": {
+      "const": 6
+    },
+    "runId": {
+      "type": "string",
+      "minLength": 1
+    },
+    "stage": {
+      "enum": [
+        "deployment.execute",
+        "deployment.review"
+      ]
+    },
+    "status": {
+      "enum": [
+        "ready",
+        "approved"
+      ]
+    },
+    "facts": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "payload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "executionPlanRef",
+        "manifestReceiptRef",
+        "ignoreProofRef"
+      ],
+      "properties": {
+        "executionPlanRef": {
+          "type": "string",
+          "minLength": 1
+        },
+        "manifestReceiptRef": {
+          "type": "string",
+          "minLength": 1
+        },
+        "ignoreProofRef": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    }
+  }
+}

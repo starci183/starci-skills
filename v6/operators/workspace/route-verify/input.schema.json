@@ -1,0 +1,85 @@
+{
+  "$id": "https://starci.dev/v6/operators/workspace/route-verify/input.schema.json",
+  "title": "workspace/route-verify operator input",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "runId",
+    "stage",
+    "status",
+    "facts",
+    "payload"
+  ],
+  "allOf": [
+    {
+      "oneOf": [
+        {
+          "properties": {
+            "stage": {
+              "const": "request.received"
+            },
+            "status": {
+              "const": "ready"
+            }
+          },
+          "required": [
+            "stage",
+            "status"
+          ]
+        }
+      ]
+    }
+  ],
+  "properties": {
+    "schemaVersion": {
+      "const": 6
+    },
+    "runId": {
+      "type": "string",
+      "minLength": 1
+    },
+    "stage": {
+      "enum": [
+        "request.received"
+      ]
+    },
+    "status": {
+      "enum": [
+        "ready"
+      ]
+    },
+    "facts": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "payload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "projectRef",
+        "roleRef",
+        "requestRef"
+      ],
+      "properties": {
+        "projectRef": {
+          "type": "string",
+          "minLength": 1
+        },
+        "roleRef": {
+          "type": "string",
+          "minLength": 1
+        },
+        "requestRef": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    }
+  }
+}

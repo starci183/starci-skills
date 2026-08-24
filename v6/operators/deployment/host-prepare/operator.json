@@ -1,0 +1,38 @@
+{
+  "schemaVersion": 6,
+  "id": "deployment/host-prepare",
+  "domain": "deployment",
+  "inputSchema": "input.schema.json",
+  "outputSchema": "output.schema.json",
+  "knowledgeRefs": [
+    "deployment.lifecycle"
+  ],
+  "sourceReferenceRefs": [],
+  "accepts": [
+    {
+      "stage": "deployment.host",
+      "status": "ready",
+      "allFacts": [
+        "deployment-credentials-ready"
+      ],
+      "noneFacts": []
+    }
+  ],
+  "emits": [
+    {
+      "stage": "deployment.artifact.build",
+      "status": "ready",
+      "factsAdd": [
+        "deployment-host-ready"
+      ],
+      "factsRemove": []
+    }
+  ],
+  "sideEffects": [
+    "apply only declared idempotent host setup"
+  ],
+  "stopConditions": [
+    "required evidence is missing or stale",
+    "the result would cross the declared boundary"
+  ]
+}

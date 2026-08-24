@@ -1,0 +1,46 @@
+{
+  "schemaVersion": 6,
+  "id": "platform/mcp-publish",
+  "domain": "platform",
+  "inputSchema": "input.schema.json",
+  "outputSchema": "output.schema.json",
+  "knowledgeRefs": [
+    "platform.operations"
+  ],
+  "sourceReferenceRefs": [],
+  "accepts": [
+    {
+      "stage": "platform.mcp.publish",
+      "status": "ready",
+      "allFacts": [
+        "platform-source-index-ready"
+      ],
+      "noneFacts": []
+    }
+  ],
+  "emits": [
+    {
+      "stage": "platform.mcp.proved",
+      "status": "complete",
+      "factsAdd": [
+        "platform-mcp-proved"
+      ],
+      "factsRemove": []
+    },
+    {
+      "stage": "platform.blocked",
+      "status": "blocked",
+      "factsAdd": [
+        "platform-mcp-blocked"
+      ],
+      "factsRemove": []
+    }
+  ],
+  "sideEffects": [
+    "reconcile declared MCP/Qdrant runtime services"
+  ],
+  "stopConditions": [
+    "required evidence is missing or stale",
+    "the result would cross the declared boundary"
+  ]
+}

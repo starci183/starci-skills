@@ -1,0 +1,85 @@
+{
+  "$id": "https://starci.dev/v6/operators/deployment/manifest-validate/input.schema.json",
+  "title": "deployment/manifest-validate operator input",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "runId",
+    "stage",
+    "status",
+    "facts",
+    "payload"
+  ],
+  "allOf": [
+    {
+      "oneOf": [
+        {
+          "properties": {
+            "stage": {
+              "const": "deployment.manifest"
+            },
+            "status": {
+              "const": "ready"
+            }
+          },
+          "required": [
+            "stage",
+            "status"
+          ]
+        }
+      ]
+    }
+  ],
+  "properties": {
+    "schemaVersion": {
+      "const": 6
+    },
+    "runId": {
+      "type": "string",
+      "minLength": 1
+    },
+    "stage": {
+      "enum": [
+        "deployment.manifest"
+      ]
+    },
+    "status": {
+      "enum": [
+        "ready"
+      ]
+    },
+    "facts": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "payload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "deploymentContractRef",
+        "manifestRef",
+        "routeReceiptRefs"
+      ],
+      "properties": {
+        "deploymentContractRef": {
+          "type": "string",
+          "minLength": 1
+        },
+        "manifestRef": {
+          "type": "string",
+          "minLength": 1
+        },
+        "routeReceiptRefs": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,462 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://starci.dev/v6/operators/fe/source-fit/input.schema.json",
+  "title": "FE source-fit operator input",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "appId",
+    "runId",
+    "stage",
+    "status",
+    "grammarConvergence",
+    "sourceContext",
+    "sourceBoundary",
+    "requirements",
+    "candidates"
+  ],
+  "properties": {
+    "$schema": {
+      "type": "string"
+    },
+    "schemaVersion": {
+      "const": 6
+    },
+    "appId": {
+      "const": "fe-design-layout"
+    },
+    "runId": {
+      "$ref": "#/$defs/slug"
+    },
+    "stage": {
+      "const": "source-fit.resolve"
+    },
+    "status": {
+      "const": "ready"
+    },
+    "grammarConvergence": {
+      "$ref": "#/$defs/artifact"
+    },
+    "sourceContext": {
+      "$ref": "#/$defs/artifact"
+    },
+    "sourceBoundary": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "$ref": "#/$defs/ref"
+      }
+    },
+    "requirements": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/requirement"
+      }
+    },
+    "candidates": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/candidate"
+      }
+    }
+  },
+  "$defs": {
+    "slug": {
+      "type": "string",
+      "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$"
+    },
+    "hash": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "ref": {
+      "type": "string",
+      "minLength": 1
+    },
+    "text": {
+      "type": "string",
+      "minLength": 1
+    },
+    "slugSet": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "$ref": "#/$defs/slug"
+      }
+    },
+    "artifact": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "ref",
+        "hash"
+      ],
+      "properties": {
+        "ref": {
+          "$ref": "#/$defs/ref"
+        },
+        "hash": {
+          "$ref": "#/$defs/hash"
+        }
+      }
+    },
+    "sourceDelta": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "boundSlots",
+        "boundStateInputs",
+        "resolvedVariableAxes",
+        "declaredExtensions",
+        "provenanceRef"
+      ],
+      "properties": {
+        "boundSlots": {
+          "$ref": "#/$defs/slugSet"
+        },
+        "boundStateInputs": {
+          "$ref": "#/$defs/slugSet"
+        },
+        "resolvedVariableAxes": {
+          "$ref": "#/$defs/slugSet"
+        },
+        "declaredExtensions": {
+          "$ref": "#/$defs/slugSet"
+        },
+        "provenanceRef": {
+          "$ref": "#/$defs/ref"
+        }
+      }
+    },
+    "effectiveContract": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "baseRef",
+        "baseHash",
+        "effectiveRef",
+        "effectiveHash",
+        "slots",
+        "stateInputs",
+        "variableAxes",
+        "extensionPolicy",
+        "closedInvariants",
+        "sourceDelta",
+        "resolvedBy"
+      ],
+      "properties": {
+        "baseRef": {
+          "$ref": "#/$defs/ref"
+        },
+        "baseHash": {
+          "$ref": "#/$defs/hash"
+        },
+        "effectiveRef": {
+          "$ref": "#/$defs/ref"
+        },
+        "effectiveHash": {
+          "$ref": "#/$defs/hash"
+        },
+        "slots": {
+          "$ref": "#/$defs/slugSet"
+        },
+        "stateInputs": {
+          "$ref": "#/$defs/slugSet"
+        },
+        "variableAxes": {
+          "$ref": "#/$defs/slugSet"
+        },
+        "extensionPolicy": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "allowed",
+            "forbidden"
+          ],
+          "properties": {
+            "allowed": {
+              "$ref": "#/$defs/slugSet"
+            },
+            "forbidden": {
+              "type": "array",
+              "minItems": 1,
+              "uniqueItems": true,
+              "items": {
+                "enum": [
+                  "anatomy",
+                  "closed-invariant",
+                  "owner-substitution"
+                ]
+              }
+            }
+          }
+        },
+        "closedInvariants": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/slug"
+          }
+        },
+        "sourceDelta": {
+          "$ref": "#/$defs/sourceDelta"
+        },
+        "resolvedBy": {
+          "const": "source-context-script"
+        }
+      }
+    },
+    "candidate": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "candidateId",
+        "sourceRef",
+        "tier",
+        "importPath",
+        "effectiveContract"
+      ],
+      "properties": {
+        "candidateId": {
+          "$ref": "#/$defs/slug"
+        },
+        "sourceRef": {
+          "$ref": "#/$defs/ref"
+        },
+        "tier": {
+          "enum": [
+            "leaves",
+            "branch",
+            "composites",
+            "block",
+            "layout",
+            "page"
+          ]
+        },
+        "importPath": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "effectiveContract": {
+          "$ref": "#/$defs/effectiveContract"
+        }
+      }
+    },
+    "requirement": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "ownerRef",
+        "desiredTier",
+        "grammarSelectionRef",
+        "candidateIds",
+        "requiredAxes"
+      ],
+      "properties": {
+        "ownerRef": {
+          "$ref": "#/$defs/slug"
+        },
+        "desiredTier": {
+          "enum": [
+            "leaves",
+            "branch",
+            "composites",
+            "block",
+            "layout",
+            "page"
+          ]
+        },
+        "grammarSelectionRef": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "candidateIds": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/slug"
+          }
+        },
+        "requiredAxes": {
+          "$ref": "#/$defs/slugSet"
+        }
+      }
+    },
+    "reuseDecision": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "ownerRef",
+        "verdict",
+        "candidateId",
+        "effectiveContract",
+        "exactImport",
+        "because"
+      ],
+      "properties": {
+        "ownerRef": {
+          "$ref": "#/$defs/slug"
+        },
+        "verdict": {
+          "const": "reuse"
+        },
+        "candidateId": {
+          "$ref": "#/$defs/slug"
+        },
+        "effectiveContract": {
+          "$ref": "#/$defs/effectiveContract"
+        },
+        "exactImport": {
+          "$ref": "#/$defs/ref"
+        },
+        "because": {
+          "$ref": "#/$defs/text"
+        }
+      }
+    },
+    "extendDecision": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "ownerRef",
+        "verdict",
+        "candidateId",
+        "effectiveContract",
+        "axes",
+        "declaredDelta",
+        "because"
+      ],
+      "properties": {
+        "ownerRef": {
+          "$ref": "#/$defs/slug"
+        },
+        "verdict": {
+          "const": "extend"
+        },
+        "candidateId": {
+          "$ref": "#/$defs/slug"
+        },
+        "effectiveContract": {
+          "$ref": "#/$defs/effectiveContract"
+        },
+        "axes": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/slug"
+          }
+        },
+        "declaredDelta": {
+          "$ref": "#/$defs/sourceDelta"
+        },
+        "because": {
+          "$ref": "#/$defs/text"
+        }
+      }
+    },
+    "createDecision": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "ownerRef",
+        "verdict",
+        "createTier",
+        "lowerTierOwnerRefs",
+        "requestId",
+        "because"
+      ],
+      "properties": {
+        "ownerRef": {
+          "$ref": "#/$defs/slug"
+        },
+        "verdict": {
+          "const": "create-block-or-above"
+        },
+        "createTier": {
+          "enum": [
+            "block",
+            "layout",
+            "page"
+          ]
+        },
+        "lowerTierOwnerRefs": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/ref"
+          }
+        },
+        "requestId": {
+          "$ref": "#/$defs/slug"
+        },
+        "because": {
+          "$ref": "#/$defs/text"
+        }
+      }
+    },
+    "gapDecision": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "ownerRef",
+        "verdict",
+        "missing",
+        "requestId",
+        "requestReason",
+        "localReconstructionBlocked"
+      ],
+      "properties": {
+        "ownerRef": {
+          "$ref": "#/$defs/slug"
+        },
+        "verdict": {
+          "const": "grammar-gap"
+        },
+        "missing": {
+          "enum": [
+            "lower-tier-owner",
+            "package-export",
+            "state-map",
+            "complex-case",
+            "extension-axis"
+          ]
+        },
+        "requestId": {
+          "$ref": "#/$defs/slug"
+        },
+        "requestReason": {
+          "$ref": "#/$defs/text"
+        },
+        "localReconstructionBlocked": {
+          "const": true
+        }
+      }
+    },
+    "decision": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/reuseDecision"
+        },
+        {
+          "$ref": "#/$defs/extendDecision"
+        },
+        {
+          "$ref": "#/$defs/createDecision"
+        },
+        {
+          "$ref": "#/$defs/gapDecision"
+        }
+      ]
+    }
+  }
+}

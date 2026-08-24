@@ -3,7 +3,7 @@
 | Field | Value |
 | --- | --- |
 | Knowledge ID | `fe.request-lifecycle` |
-| Operations | `request-emission` |
+| Operators | `request-emission` |
 | Search tags | `request, stable id, create, grammar gap, persistence` |
 | Dependencies | `fe.source-fit` |
 

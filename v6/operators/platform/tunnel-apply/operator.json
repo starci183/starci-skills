@@ -1,0 +1,46 @@
+{
+  "schemaVersion": 6,
+  "id": "platform/tunnel-apply",
+  "domain": "platform",
+  "inputSchema": "input.schema.json",
+  "outputSchema": "output.schema.json",
+  "knowledgeRefs": [
+    "platform.operations"
+  ],
+  "sourceReferenceRefs": [],
+  "accepts": [
+    {
+      "stage": "platform.tunnel.apply",
+      "status": "ready",
+      "allFacts": [
+        "platform-tunnel-plan-ready"
+      ],
+      "noneFacts": []
+    }
+  ],
+  "emits": [
+    {
+      "stage": "platform.tunnel.proved",
+      "status": "complete",
+      "factsAdd": [
+        "platform-tunnel-proved"
+      ],
+      "factsRemove": []
+    },
+    {
+      "stage": "platform.blocked",
+      "status": "blocked",
+      "factsAdd": [
+        "platform-tunnel-blocked"
+      ],
+      "factsRemove": []
+    }
+  ],
+  "sideEffects": [
+    "mutate only the declared Cloudflare tunnel and DNS route"
+  ],
+  "stopConditions": [
+    "required evidence is missing or stale",
+    "the result would cross the declared boundary"
+  ]
+}

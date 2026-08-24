@@ -1,0 +1,42 @@
+{
+  "schemaVersion": 6,
+  "id": "source/conversation-query",
+  "domain": "source",
+  "inputSchema": "input.schema.json",
+  "outputSchema": "output.schema.json",
+  "knowledgeRefs": [
+    "source.provenance"
+  ],
+  "sourceReferenceRefs": [],
+  "accepts": [
+    {
+      "stage": "source.conversation.query",
+      "status": "ready",
+      "allFacts": [],
+      "noneFacts": []
+    }
+  ],
+  "emits": [
+    {
+      "stage": "source.conversation.result",
+      "status": "complete",
+      "factsAdd": [
+        "conversation-results"
+      ],
+      "factsRemove": []
+    },
+    {
+      "stage": "source.conversation.result",
+      "status": "complete",
+      "factsAdd": [
+        "conversation-empty"
+      ],
+      "factsRemove": []
+    }
+  ],
+  "sideEffects": [],
+  "stopConditions": [
+    "required evidence is missing or stale",
+    "the result would cross the declared boundary"
+  ]
+}

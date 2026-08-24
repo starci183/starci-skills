@@ -3,7 +3,7 @@
 | Field | Value |
 | --- | --- |
 | Knowledge ID | `fe.product-seeding` |
-| Operations | `product-seed` |
+| Operators | `product-seed` |
 | Search tags | `seed, fixture, state, reproducible, business evidence` |
 | Dependencies | `fe.state-modeling` |
 

@@ -1,0 +1,36 @@
+{
+  "schemaVersion": 6,
+  "id": "source/conversation-record",
+  "domain": "source",
+  "inputSchema": "input.schema.json",
+  "outputSchema": "output.schema.json",
+  "knowledgeRefs": [
+    "source.provenance"
+  ],
+  "sourceReferenceRefs": [],
+  "accepts": [
+    {
+      "stage": "source.conversation.record",
+      "status": "ready",
+      "allFacts": [],
+      "noneFacts": []
+    }
+  ],
+  "emits": [
+    {
+      "stage": "source.conversation.recorded",
+      "status": "complete",
+      "factsAdd": [
+        "conversation-recorded"
+      ],
+      "factsRemove": []
+    }
+  ],
+  "sideEffects": [
+    "write durable provenance head and rebuildable search cache"
+  ],
+  "stopConditions": [
+    "required evidence is missing or stale",
+    "the result would cross the declared boundary"
+  ]
+}

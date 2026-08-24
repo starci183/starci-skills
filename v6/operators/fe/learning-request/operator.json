@@ -1,0 +1,44 @@
+{
+  "schemaVersion": 6,
+  "id": "fe/learning-request",
+  "domain": "fe",
+  "inputSchema": "input.schema.json",
+  "outputSchema": "output.schema.json",
+  "knowledgeRefs": [
+    "fe.design-maintenance"
+  ],
+  "sourceReferenceRefs": [],
+  "accepts": [
+    {
+      "stage": "fe.maintenance.learning-request",
+      "status": "ready",
+      "allFacts": [],
+      "noneFacts": []
+    }
+  ],
+  "emits": [
+    {
+      "stage": "fe.maintenance.learning-request.result",
+      "status": "complete",
+      "factsAdd": [
+        "fe-learning-request-complete"
+      ],
+      "factsRemove": []
+    },
+    {
+      "stage": "fe.maintenance.blocked",
+      "status": "blocked",
+      "factsAdd": [
+        "fe-learning-request-blocked"
+      ],
+      "factsRemove": []
+    }
+  ],
+  "sideEffects": [
+    "write only the approved design request or authority boundary"
+  ],
+  "stopConditions": [
+    "required evidence is missing or stale",
+    "the result would cross the declared boundary"
+  ]
+}

@@ -1,0 +1,85 @@
+{
+  "$id": "https://starci.dev/v6/operators/fe/learning-resolve/input.schema.json",
+  "title": "fe/learning-resolve operator input",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "runId",
+    "stage",
+    "status",
+    "facts",
+    "payload"
+  ],
+  "allOf": [
+    {
+      "oneOf": [
+        {
+          "properties": {
+            "stage": {
+              "const": "fe.maintenance.learning-resolve"
+            },
+            "status": {
+              "const": "ready"
+            }
+          },
+          "required": [
+            "stage",
+            "status"
+          ]
+        }
+      ]
+    }
+  ],
+  "properties": {
+    "schemaVersion": {
+      "const": 6
+    },
+    "runId": {
+      "type": "string",
+      "minLength": 1
+    },
+    "stage": {
+      "enum": [
+        "fe.maintenance.learning-resolve"
+      ]
+    },
+    "status": {
+      "enum": [
+        "ready"
+      ]
+    },
+    "facts": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "payload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "learningRequestRef",
+        "sourceProofRef",
+        "authorityContextRef"
+      ],
+      "properties": {
+        "learningRequestRef": {
+          "type": "string",
+          "minLength": 1
+        },
+        "sourceProofRef": {
+          "type": "string",
+          "minLength": 1
+        },
+        "authorityContextRef": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    }
+  }
+}

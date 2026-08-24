@@ -1,0 +1,36 @@
+{
+  "schemaVersion": 6,
+  "id": "workspace/route-verify",
+  "domain": "workspace",
+  "inputSchema": "input.schema.json",
+  "outputSchema": "output.schema.json",
+  "knowledgeRefs": [
+    "workspace.routing"
+  ],
+  "sourceReferenceRefs": [],
+  "accepts": [
+    {
+      "stage": "request.received",
+      "status": "ready",
+      "allFacts": [],
+      "noneFacts": []
+    }
+  ],
+  "emits": [
+    {
+      "stage": "business.evidence",
+      "status": "ready",
+      "factsAdd": [
+        "workspace-route-ready"
+      ],
+      "factsRemove": []
+    }
+  ],
+  "sideEffects": [
+    "write immutable route receipt below the run workspace"
+  ],
+  "stopConditions": [
+    "required evidence is missing or stale",
+    "the result would cross the declared boundary"
+  ]
+}

@@ -1,0 +1,62 @@
+{
+  "schemaVersion": 6,
+  "id": "deployment/recover",
+  "domain": "deployment",
+  "inputSchema": "input.schema.json",
+  "outputSchema": "output.schema.json",
+  "knowledgeRefs": [
+    "deployment.lifecycle"
+  ],
+  "sourceReferenceRefs": [],
+  "accepts": [
+    {
+      "stage": "deployment.recover",
+      "status": "ready",
+      "allFacts": [
+        "deployment-recovery-required"
+      ],
+      "noneFacts": []
+    }
+  ],
+  "emits": [
+    {
+      "stage": "deployment.retry",
+      "status": "ready",
+      "factsAdd": [
+        "deployment-retry-ready"
+      ],
+      "factsRemove": []
+    },
+    {
+      "stage": "deployment.rollback",
+      "status": "ready",
+      "factsAdd": [
+        "deployment-rollback-required"
+      ],
+      "factsRemove": []
+    },
+    {
+      "stage": "deployment.review",
+      "status": "pending",
+      "factsAdd": [
+        "deployment-approval-required"
+      ],
+      "factsRemove": []
+    },
+    {
+      "stage": "deployment.blocked",
+      "status": "blocked",
+      "factsAdd": [
+        "deployment-recovery-blocked"
+      ],
+      "factsRemove": []
+    }
+  ],
+  "sideEffects": [
+    "mutate only the declared smallest deployment-owned repair boundary"
+  ],
+  "stopConditions": [
+    "required evidence is missing or stale",
+    "the result would cross the declared boundary"
+  ]
+}

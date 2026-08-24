@@ -1,0 +1,90 @@
+{
+  "$id": "https://starci.dev/v6/operators/platform/mcp-config/input.schema.json",
+  "title": "platform/mcp-config operator input",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "runId",
+    "stage",
+    "status",
+    "facts",
+    "payload"
+  ],
+  "allOf": [
+    {
+      "oneOf": [
+        {
+          "properties": {
+            "stage": {
+              "const": "platform.mcp.config"
+            },
+            "status": {
+              "const": "ready"
+            }
+          },
+          "required": [
+            "stage",
+            "status"
+          ]
+        }
+      ]
+    }
+  ],
+  "properties": {
+    "schemaVersion": {
+      "const": 6
+    },
+    "runId": {
+      "type": "string",
+      "minLength": 1
+    },
+    "stage": {
+      "enum": [
+        "platform.mcp.config"
+      ]
+    },
+    "status": {
+      "enum": [
+        "ready"
+      ]
+    },
+    "facts": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "payload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "routeSetRef",
+        "collectionRef",
+        "modelRef",
+        "credentialRosterRef"
+      ],
+      "properties": {
+        "routeSetRef": {
+          "type": "string",
+          "minLength": 1
+        },
+        "collectionRef": {
+          "type": "string",
+          "minLength": 1
+        },
+        "modelRef": {
+          "type": "string",
+          "minLength": 1
+        },
+        "credentialRosterRef": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    }
+  }
+}

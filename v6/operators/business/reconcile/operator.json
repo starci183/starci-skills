@@ -1,0 +1,46 @@
+{
+  "schemaVersion": 6,
+  "id": "business/reconcile",
+  "domain": "business",
+  "inputSchema": "input.schema.json",
+  "outputSchema": "output.schema.json",
+  "knowledgeRefs": [
+    "business.authority-lifecycle"
+  ],
+  "sourceReferenceRefs": [],
+  "accepts": [
+    {
+      "stage": "delivery.proved",
+      "status": "ready",
+      "allFacts": [
+        "delivery-proof-ready"
+      ],
+      "noneFacts": []
+    }
+  ],
+  "emits": [
+    {
+      "stage": "business.complete",
+      "status": "complete",
+      "factsAdd": [
+        "business-reconciled"
+      ],
+      "factsRemove": []
+    },
+    {
+      "stage": "business.blocked",
+      "status": "blocked",
+      "factsAdd": [
+        "business-discrepancy"
+      ],
+      "factsRemove": []
+    }
+  ],
+  "sideEffects": [
+    "write and commit only the routed business worktree"
+  ],
+  "stopConditions": [
+    "required evidence is missing or stale",
+    "the result would cross the declared boundary"
+  ]
+}

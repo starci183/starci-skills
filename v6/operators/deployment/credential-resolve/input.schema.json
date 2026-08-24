@@ -1,0 +1,85 @@
+{
+  "$id": "https://starci.dev/v6/operators/deployment/credential-resolve/input.schema.json",
+  "title": "deployment/credential-resolve operator input",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "runId",
+    "stage",
+    "status",
+    "facts",
+    "payload"
+  ],
+  "allOf": [
+    {
+      "oneOf": [
+        {
+          "properties": {
+            "stage": {
+              "const": "deployment.credentials"
+            },
+            "status": {
+              "const": "ready"
+            }
+          },
+          "required": [
+            "stage",
+            "status"
+          ]
+        }
+      ]
+    }
+  ],
+  "properties": {
+    "schemaVersion": {
+      "const": 6
+    },
+    "runId": {
+      "type": "string",
+      "minLength": 1
+    },
+    "stage": {
+      "enum": [
+        "deployment.credentials"
+      ]
+    },
+    "status": {
+      "enum": [
+        "ready"
+      ]
+    },
+    "facts": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "payload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "executionPlanRef",
+        "credentialRosterRef",
+        "custodyPolicyRef"
+      ],
+      "properties": {
+        "executionPlanRef": {
+          "type": "string",
+          "minLength": 1
+        },
+        "credentialRosterRef": {
+          "type": "string",
+          "minLength": 1
+        },
+        "custodyPolicyRef": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    }
+  }
+}

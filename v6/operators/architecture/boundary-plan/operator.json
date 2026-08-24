@@ -1,0 +1,38 @@
+{
+  "schemaVersion": 6,
+  "id": "architecture/boundary-plan",
+  "domain": "architecture",
+  "inputSchema": "input.schema.json",
+  "outputSchema": "output.schema.json",
+  "knowledgeRefs": [
+    "be.boundary-planning"
+  ],
+  "sourceReferenceRefs": [],
+  "accepts": [
+    {
+      "stage": "architecture.boundary",
+      "status": "ready",
+      "allFacts": [
+        "backend-patterns-ready"
+      ],
+      "noneFacts": []
+    }
+  ],
+  "emits": [
+    {
+      "stage": "architecture.boundary.challenge",
+      "status": "ready",
+      "factsAdd": [
+        "backend-boundary-ready"
+      ],
+      "factsRemove": []
+    }
+  ],
+  "sideEffects": [
+    "write immutable canonical plan receipt below the run workspace"
+  ],
+  "stopConditions": [
+    "required evidence is missing or stale",
+    "the result would cross the declared boundary"
+  ]
+}

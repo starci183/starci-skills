@@ -1,0 +1,44 @@
+{
+  "schemaVersion": 6,
+  "id": "fe/consumer-align",
+  "domain": "fe",
+  "inputSchema": "input.schema.json",
+  "outputSchema": "output.schema.json",
+  "knowledgeRefs": [
+    "fe.design-maintenance"
+  ],
+  "sourceReferenceRefs": [],
+  "accepts": [
+    {
+      "stage": "fe.maintenance.consumer-align",
+      "status": "ready",
+      "allFacts": [],
+      "noneFacts": []
+    }
+  ],
+  "emits": [
+    {
+      "stage": "fe.maintenance.complete",
+      "status": "complete",
+      "factsAdd": [
+        "fe-consumer-align-complete"
+      ],
+      "factsRemove": []
+    },
+    {
+      "stage": "fe.maintenance.blocked",
+      "status": "blocked",
+      "factsAdd": [
+        "fe-consumer-align-blocked"
+      ],
+      "factsRemove": []
+    }
+  ],
+  "sideEffects": [
+    "mutate only approved frontend product-source paths"
+  ],
+  "stopConditions": [
+    "required evidence is missing or stale",
+    "the result would cross the declared boundary"
+  ]
+}

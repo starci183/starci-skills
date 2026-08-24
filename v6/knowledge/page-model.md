@@ -3,7 +3,7 @@
 | Field | Value |
 | --- | --- |
 | Knowledge ID | `fe.page-model` |
-| Operations | `page-model` |
+| Operators | `page-model` |
 | Search tags | `page model, block, global ref, reading order, normalized content` |
 | Dependencies | `fe.customer-journey` |
 

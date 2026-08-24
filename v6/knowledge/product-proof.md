@@ -3,7 +3,7 @@
 | Field | Value |
 | --- | --- |
 | Knowledge ID | `fe.product-proof` |
-| Operations | `product-proof` |
+| Operators | `product-proof` |
 | Search tags | `browser proof, accessibility, gates, responsive, repair, boundary drift` |
 | Dependencies | `fe.layout-composition, fe.product-seeding` |
 

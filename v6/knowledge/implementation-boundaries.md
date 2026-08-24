@@ -3,7 +3,7 @@
 | Field | Value |
 | --- | --- |
 | Knowledge ID | `fe.implementation-boundaries` |
-| Operations | `implementation` |
+| Operators | `implementation` |
 | Search tags | `implementation, source boundary, block upward, repair, grammar lock` |
 | Dependencies | `fe.source-fit, fe.request-lifecycle` |
 

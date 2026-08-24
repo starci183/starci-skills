@@ -1,0 +1,52 @@
+{
+  "schemaVersion": 6,
+  "id": "quality/debt-repay",
+  "domain": "quality",
+  "inputSchema": "input.schema.json",
+  "outputSchema": "output.schema.json",
+  "knowledgeRefs": [
+    "quality.readiness-repair"
+  ],
+  "sourceReferenceRefs": [],
+  "accepts": [
+    {
+      "stage": "quality.debt",
+      "status": "ready",
+      "allFacts": [],
+      "noneFacts": []
+    }
+  ],
+  "emits": [
+    {
+      "stage": "quality.debt.result",
+      "status": "complete",
+      "factsAdd": [
+        "debt-closed"
+      ],
+      "factsRemove": []
+    },
+    {
+      "stage": "quality.debt.result",
+      "status": "ready",
+      "factsAdd": [
+        "debt-progress"
+      ],
+      "factsRemove": []
+    },
+    {
+      "stage": "quality.blocked",
+      "status": "blocked",
+      "factsAdd": [
+        "debt-blocked"
+      ],
+      "factsRemove": []
+    }
+  ],
+  "sideEffects": [
+    "mutate approved debt scope and durable debt record"
+  ],
+  "stopConditions": [
+    "required evidence is missing or stale",
+    "the result would cross the declared boundary"
+  ]
+}

@@ -1,0 +1,162 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://starci.dev/v6/operators/test/e2e/output.schema.json",
+  "title": "E2E Test operator output",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "kind",
+    "schemaVersion",
+    "appId",
+    "runId",
+    "stage",
+    "status",
+    "facts",
+    "payload"
+  ],
+  "properties": {
+    "kind": {
+      "const": "test.e2e.output"
+    },
+    "schemaVersion": {
+      "const": 6
+    },
+    "appId": {
+      "const": "fe-design-layout"
+    },
+    "runId": {
+      "type": "string",
+      "minLength": 1
+    },
+    "stage": {
+      "enum": [
+        "test.ui",
+        "code.repair",
+        "test.review"
+      ]
+    },
+    "status": {
+      "enum": [
+        "ready",
+        "repair",
+        "blocked"
+      ]
+    },
+    "facts": {
+      "$ref": "#/$defs/strings"
+    },
+    "payload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "e2eEvidenceRef",
+        "e2eEvidenceHash",
+        "scenarioReceipts",
+        "selected",
+        "passed",
+        "failed",
+        "skipped",
+        "cleanupComplete",
+        "failedScenarioIds",
+        "stopReasons"
+      ],
+      "properties": {
+        "e2eEvidenceRef": {
+          "type": "string",
+          "minLength": 1
+        },
+        "e2eEvidenceHash": {
+          "type": "string",
+          "minLength": 1
+        },
+        "scenarioReceipts": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/scenarioReceipt"
+          }
+        },
+        "selected": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "passed": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "failed": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "skipped": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "cleanupComplete": {
+          "type": "boolean"
+        },
+        "failedScenarioIds": {
+          "$ref": "#/$defs/strings"
+        },
+        "stopReasons": {
+          "$ref": "#/$defs/strings"
+        }
+      }
+    }
+  },
+  "$defs": {
+    "strings": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      },
+      "uniqueItems": true
+    },
+    "scenarioReceipt": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "scenarioId",
+        "setupRef",
+        "actionRef",
+        "observableRef",
+        "resetRef",
+        "status",
+        "evidenceRefs"
+      ],
+      "properties": {
+        "scenarioId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "setupRef": {
+          "type": "string",
+          "minLength": 1
+        },
+        "actionRef": {
+          "type": "string",
+          "minLength": 1
+        },
+        "observableRef": {
+          "type": "string",
+          "minLength": 1
+        },
+        "resetRef": {
+          "type": "string",
+          "minLength": 1
+        },
+        "status": {
+          "enum": [
+            "pass",
+            "fail",
+            "blocked"
+          ]
+        },
+        "evidenceRefs": {
+          "$ref": "#/$defs/strings",
+          "minItems": 1
+        }
+      }
+    }
+  }
+}
