@@ -4,7 +4,7 @@
   "domain": "be",
   "inputSchema": "input.schema.json",
   "outputSchema": "output.schema.json",
-  "knowledgeRefs": ["be.boundary-planning"],
+  "knowledgeRefs": ["be.implementation"],
   "sourceReferenceRefs": ["starci-academy-be"],
   "accepts": [
     {

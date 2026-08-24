@@ -48,8 +48,9 @@ QUERY_EXPANSIONS = {
 }
 
 KIND_OPERATOR_KNOWLEDGE = "operator-knowledge"
+KIND_FRONTEND_CODING_CONTEXT = "frontend-coding-context"
 DEFAULT_KINDS = {KIND_OPERATOR_KNOWLEDGE}
-PUBLIC_KINDS = DEFAULT_KINDS
+PUBLIC_KINDS = {KIND_OPERATOR_KNOWLEDGE, KIND_FRONTEND_CODING_CONTEXT}
 INDEXED_KINDS = PUBLIC_KINDS
 
 
@@ -254,7 +255,8 @@ class SourceFile:
 
 def discover_source_files(source_root: Path) -> list[SourceFile]:
     source_root = source_root.resolve()
-    installed_root = source_root / ".claude" / "knowledge"
+    workspace_root = source_root.parent if source_root.name == ".claude" else source_root
+    installed_root = workspace_root / ".claude" / "knowledge"
     repository_root = source_root / "knowledge"
     operator_knowledge_root = installed_root if installed_root.is_dir() else repository_root
     if not operator_knowledge_root.is_dir():
@@ -264,13 +266,40 @@ def discover_source_files(source_root: Path) -> list[SourceFile]:
             exit_code=3,
         )
 
-    paths = set(operator_knowledge_root.glob("*.md"))
-
-    return [
-        SourceFile(path, f".claude/knowledge/{path.name}", file_hash(path))
-        for path in sorted(paths, key=lambda item: item.as_posix())
+    sources = [
+        SourceFile(path, f".claude/knowledge/{path.relative_to(operator_knowledge_root).as_posix()}", file_hash(path))
+        for path in sorted(set(operator_knowledge_root.rglob("*.md")), key=lambda item: item.as_posix())
         if not path.name.endswith(".schema.json")
     ]
+
+    for current_path in sorted((workspace_root / ".worktrees").glob("*/coding-context/frontend/current.json")):
+        try:
+            manifest = json.loads(current_path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError) as error:
+            raise KnowledgeRuntimeError(
+                f"Cannot read frontend coding-context manifest: {current_path}",
+                code="coding-context-manifest-invalid",
+                exit_code=3,
+            ) from error
+        project = str(manifest.get("project", ""))
+        generation_relative = str(manifest.get("generationPath", ""))
+        expected_prefix = f".worktrees/{project}/coding-context/frontend/generations/"
+        if not project or not generation_relative.startswith(expected_prefix):
+            raise KnowledgeRuntimeError(
+                f"Frontend coding-context manifest escapes its project: {current_path}",
+                code="coding-context-path-invalid",
+                exit_code=3,
+            )
+        generation_path = (workspace_root / generation_relative).resolve()
+        if not generation_path.is_file() or workspace_root not in generation_path.parents:
+            raise KnowledgeRuntimeError(
+                f"Frontend coding-context generation is missing: {generation_path}",
+                code="coding-context-generation-missing",
+                exit_code=3,
+            )
+        for path in (current_path, generation_path):
+            sources.append(SourceFile(path, path.relative_to(workspace_root).as_posix(), file_hash(path)))
+    return sorted(sources, key=lambda item: item.relative_path)
 
 
 def source_generation(files: Sequence[SourceFile]) -> str:
@@ -323,6 +352,70 @@ def operator_knowledge_record(source: SourceFile) -> dict[str, Any]:
     )
 
 
+def frontend_coding_context_records(source: SourceFile) -> list[dict[str, Any]]:
+    try:
+        snapshot = json.loads(read_text(source.path))
+    except json.JSONDecodeError as error:
+        raise KnowledgeRuntimeError(
+            f"Frontend coding-context JSON is invalid: {source.relative_path}",
+            code="coding-context-json-invalid",
+            exit_code=3,
+        ) from error
+    if snapshot.get("kind") != KIND_FRONTEND_CODING_CONTEXT or not isinstance(snapshot.get("components"), list):
+        raise KnowledgeRuntimeError(
+            f"Frontend coding-context schema is invalid: {source.relative_path}",
+            code="coding-context-schema-invalid",
+            exit_code=3,
+        )
+    project = str(snapshot.get("project", ""))
+    generation = str(snapshot.get("generation", {}).get("id", ""))
+    input_hash = str(snapshot.get("generation", {}).get("inputSha256", ""))
+    if not re.fullmatch(r"[a-z0-9][a-z0-9-]*", project) or not generation or not input_hash.startswith("sha256:"):
+        raise KnowledgeRuntimeError(
+            f"Frontend coding-context identity is invalid: {source.relative_path}",
+            code="coding-context-identity-invalid",
+            exit_code=3,
+        )
+    records: list[dict[str, Any]] = []
+    for component in snapshot["components"]:
+        if not isinstance(component, dict):
+            continue
+        name = str(component.get("name", ""))
+        component_source = str(component.get("source", ""))
+        content_hash = str(component.get("sourceSha256", ""))
+        if not name or not component_source or not content_hash.startswith("sha256:"):
+            raise KnowledgeRuntimeError(
+                f"Frontend component identity is invalid in {source.relative_path}",
+                code="coding-context-component-invalid",
+                exit_code=3,
+            )
+        description = compact_whitespace(str(component.get("description", "")))
+        payload = {
+            "project": project,
+            "generation": generation,
+            "generationInputSha256": input_hash,
+            "name": name,
+            "layer": component.get("layer"),
+            "description": description,
+            "props": component.get("props", {}),
+            "contracts": component.get("contracts", []),
+            "source": component_source,
+            "sourceSha256": content_hash,
+        }
+        records.append(make_record(
+            record_id=f"frontend-coding-context:{project}:{name}:{component_source}",
+            kind=KIND_FRONTEND_CODING_CONTEXT,
+            title=f"{name} ({component.get('layer', 'common')})",
+            search_text=f"{name} {component.get('layer', '')} {description} {flatten_json(payload)}",
+            summary=description or f"Generated frontend contract for {name}",
+            source=source,
+            metadata={"project": project, "generation": generation, "name": name, "layer": component.get("layer"), "contentSha256": content_hash},
+            payload=payload,
+            dependencies=[],
+        ))
+    return records
+
+
 def make_record(
     *,
     record_id: str,
@@ -358,8 +451,10 @@ def records_from_sources(files: Sequence[SourceFile], source_root: Path) -> list
     records: list[dict[str, Any]] = []
     for source in files:
         parts = Path(source.relative_path).parts
-        if len(parts) == 3 and parts[1] == "knowledge" and source.path.suffix == ".md":
+        if len(parts) >= 3 and parts[1] == "knowledge" and source.path.suffix == ".md":
             records.append(operator_knowledge_record(source))
+        elif source.relative_path.endswith("/components.json") and "/coding-context/frontend/generations/" in source.relative_path:
+            records.extend(frontend_coding_context_records(source))
     ids = [record["id"] for record in records]
     duplicates = sorted(record_id for record_id, count in Counter(ids).items() if count > 1)
     if duplicates:
@@ -423,9 +518,7 @@ def build_index(source_root: Path, index_path: Path, embedding_model: Path | Non
         "generation": source_generation(files),
         "sourceRoot": str(source_root),
         "builtAt": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
-        "sourceAuthority": [
-            ".claude/knowledge/*.md",
-        ],
+        "sourceAuthority": [".claude/knowledge/**/*.md", ".worktrees/*/coding-context/frontend/current.json"],
         "embedding": provider,
         "counts": dict(sorted(counts.items())),
         "sources": source_manifest,
@@ -734,8 +827,10 @@ def score_records(
             )
         )
         exact_bonus = 0.22 if normalized_query and normalized_query in identity else 0.0
+        record_name = normalize_text(str(record.get("metadata", {}).get("name", "")))
+        name_bonus = 0.55 if record_name and record_name in normalized_query else 0.0
         identity_overlap = len(query_set & set(identity.split())) / max(1, len(query_set))
-        combined = 0.70 * (lexical_score / maximum) + 0.18 * vector_score + 0.12 * identity_overlap + exact_bonus
+        combined = 0.70 * (lexical_score / maximum) + 0.18 * vector_score + 0.12 * identity_overlap + exact_bonus + name_bonus
         matched_terms = sorted(query_set & set(record.get("terms", {}).keys()))
         scored.append(
             {
@@ -798,10 +893,22 @@ def query_index(
     if not tokenize(expand_query_text(query_text)):
         raise KnowledgeRuntimeError("Query text has no searchable terms", code="query-empty", exit_code=2)
     selected_kinds = validate_kinds(kinds)
-    if project is not None or grammar is not None or profile is not None or route is not None:
+    if grammar is not None or profile is not None or route is not None:
         raise KnowledgeRuntimeError(
-            "Operator knowledge queries do not accept project, grammar, profile, or route filters",
+            "Knowledge queries do not accept grammar, profile, or route filters",
             code="filter-unsupported",
+            exit_code=2,
+        )
+    if project is not None and KIND_FRONTEND_CODING_CONTEXT not in selected_kinds:
+        raise KnowledgeRuntimeError(
+            "Project filtering is available only for frontend-coding-context queries",
+            code="filter-project-unsupported",
+            exit_code=2,
+        )
+    if KIND_FRONTEND_CODING_CONTEXT in selected_kinds and not project:
+        raise KnowledgeRuntimeError(
+            "frontend-coding-context queries require an exact project filter",
+            code="filter-project-required",
             exit_code=2,
         )
     records = index["records"]
@@ -833,13 +940,28 @@ def query_index(
         len(records),
     )
 
-    operator_candidates = [record for record in records if record["kind"] == KIND_OPERATOR_KNOWLEDGE]
-    operator_knowledge_hits = eligible_scores(
-        score_records(operator_candidates, query_text, vector_scores, vector_provider),
-        local_embeddings=query_local_vector is not None,
-    )[:top_k]
-    if not operator_knowledge_hits:
-        raise KnowledgeRuntimeError("No eligible operator knowledge record", code="no-eligible-result", exit_code=4)
+    operator_knowledge_hits: list[dict[str, Any]] = []
+    if KIND_OPERATOR_KNOWLEDGE in selected_kinds:
+        operator_candidates = [record for record in records if record["kind"] == KIND_OPERATOR_KNOWLEDGE]
+        operator_knowledge_hits = eligible_scores(
+            score_records(operator_candidates, query_text, vector_scores, vector_provider),
+            local_embeddings=query_local_vector is not None,
+        )[:top_k]
+
+    coding_context_hits: list[dict[str, Any]] = []
+    if KIND_FRONTEND_CODING_CONTEXT in selected_kinds:
+        coding_candidates = [
+            record for record in records
+            if record["kind"] == KIND_FRONTEND_CODING_CONTEXT and record.get("metadata", {}).get("project") == project
+        ]
+        coding_context_hits = eligible_scores(
+            score_records(coding_candidates, query_text, vector_scores, vector_provider),
+            local_embeddings=query_local_vector is not None,
+        )[:top_k]
+
+    all_hits = [*operator_knowledge_hits, *coding_context_hits]
+    if not all_hits:
+        raise KnowledgeRuntimeError("No eligible knowledge record", code="no-eligible-result", exit_code=4)
 
     return {
         "schemaVersion": SCHEMA_VERSION,
@@ -854,13 +976,14 @@ def query_index(
         },
         "selected": {
             "operatorKnowledge": [public_hit(hit) for hit in operator_knowledge_hits],
+            "frontendCodingContext": [public_hit(hit) for hit in coding_context_hits],
         },
         "provenance": {
             "generation": index["generation"],
             "sources": sorted(
                 {
                     (hit["record"]["source"]["path"], hit["record"]["source"]["sha256"])
-                    for hit in operator_knowledge_hits
+                    for hit in all_hits
                 }
             ),
         },

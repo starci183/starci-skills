@@ -36,6 +36,7 @@ function semantic(value) {
   const blocked = value.payload.state.status === 'blocked';
   if (!blocked && value.payload.produced.debtReceiptRef === null) errors.push('/payload/produced/debtReceiptRef: non-blocked output requires a session artifact');
   if (!blocked && value.payload.produced.durableWrites.length === 0) errors.push('/payload/produced/durableWrites: successful repair must name approved durable writes');
+  if (blocked && value.payload.produced.durableWrites.length !== 0) errors.push('/payload/produced/durableWrites: blocked debt iteration must leave no durable writes');
   if (value.payload.cleanup.retention !== 'until-skill-terminal' || value.payload.cleanup.purgeAt !== 'skill-terminal') errors.push('/payload/cleanup: terminal purge is mandatory');
   return errors;
 }

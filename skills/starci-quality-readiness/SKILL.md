@@ -15,6 +15,12 @@ Require the ephemeral global selection, read `input.md`, validate `input.schema.
 
 Execute `machine.json` through `execute.md`. Branches and loops are machine-owned; operators never invoke one another. Stop at waits for the exact displayed revision and finish only at a terminal. Purge all intermediates at every terminal while preserving approved durable mutations.
 
+## CONTEXT CONTRACT
+
+| State or phase | Allowed | Forbidden |
+| --- | --- | --- |
+| every state | current operator declaration only | undeclared context |
+
 ## LOADS
 
 | Alias | Target | Kind | Why |

@@ -19,7 +19,7 @@ function semanticErrors(value) {
   if (value.stage !== 'platform.mcp.config' || value.status !== 'ready') errors.push('$: undeclared input state');
   const { provided, loads, session } = value.payload;
   if (loads.business !== null) errors.push('$.payload.loads.business: must be null');
-  if (loads.knowledge.length !== 1 || loads.knowledge[0]?.id !== 'platform.operations') errors.push('$.payload.loads.knowledge: exact platform.operations binding required');
+  if (loads.knowledge.length !== 1 || loads.knowledge[0]?.id !== 'platform.mcp-publication') errors.push('$.payload.loads.knowledge: exact platform.mcp-publication binding required');
   if (loads.orchestration.profileRef !== profiles[loads.orchestration.mode]) errors.push('$.payload.loads.orchestration.profileRef: does not match mode');
   if (provided.approvalRef == null) errors.push('$.payload.provided.approvalRef: generated-config write requires approval');
 

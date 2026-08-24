@@ -47,25 +47,33 @@ const businessStates = {
 };
 
 const architectureStates = {
-  route: op('workspace/route-verify', decided({ ready: 'frame' })),
+  route: op('workspace/route-verify', decided({ ready: 'business-staleness' })),
+  'business-staleness': op('business/staleness-check', decided({ fresh: 'frame', 'initialize-required': 'business-evidence', blocked: 'blocked' })),
+  'business-evidence': op('business/evidence-normalize', decided({ ready: 'business-model' })),
+  'business-model': op('business/model', decided({ ready: 'business-approval' })),
+  'business-approval': wait('Approve the regenerated business authority before architecture analysis.', 'OK BUSINESS <hash>', 'REJECT BUSINESS <hash>', [e({ stage: 'business.model.review', status: 'approved' }, 'business-publish'), e({ stage: 'business.model.review', status: 'rejected' }, 'business-evidence')]),
+  'business-publish': op('business/publish', decided({ 'direct-plan': 'business-staleness', 'architecture-required': 'business-staleness', blocked: 'blocked' })),
   frame: op('architecture/decision-frame', decided({ ready: 'current' })),
   current: op('architecture/current-state', decided({ ready: 'alternatives' })),
   alternatives: op('architecture/alternatives', decided({ ready: 'challenge' })),
-  challenge: op('architecture/decision-challenge', decided({ ready: 'handoff', revise: 'alternatives', blocked: 'blocked' })),
+  challenge: op('architecture/decision-challenge', decided({ ready: 'decision-selection', revise: 'alternatives', blocked: 'blocked' })),
+  'decision-selection': wait('Approve the recommended architecture decision and exact option-set hash.', 'OK ARCHITECTURE <decision>', 'REJECT ARCHITECTURE <decision>', [e({ stage: 'architecture.decision.handoff', status: 'ready' }, 'handoff'), e({ stage: 'architecture.decision.alternatives', status: 'ready' }, 'alternatives')]),
   handoff: op('architecture/decision-handoff', decided({ ready: 'complete' })),
   complete: terminal('complete'), blocked: terminal('blocked')
 };
 
 const backendStates = {
-  route: op('workspace/route-verify', decided({ ready: 'business-evidence' })),
+  route: op('workspace/route-verify', decided({ ready: 'business-staleness' })),
+  'business-staleness': op('business/staleness-check', decided({ fresh: 'architecture-frame', 'initialize-required': 'business-evidence', blocked: 'blocked' })),
   'business-evidence': op('business/evidence-normalize', decided({ ready: 'business-model' })),
-  'business-model': op('business/model', decided({ ready: 'business-publish' })),
-  'business-publish': op('business/publish', decided({ 'direct-plan': 'architecture-choice', 'architecture-required': 'architecture-frame', blocked: 'blocked' })),
-  'architecture-choice': choice([e({ inputEquals: { 'options.architectureMode': 'required' } }, 'architecture-frame'), e({ inputEquals: { 'options.architectureMode': 'auto' } }, 'source-discovery'), e({ inputEquals: { 'options.architectureMode': 'skip' } }, 'source-discovery')]),
+  'business-model': op('business/model', decided({ ready: 'business-approval' })),
+  'business-approval': wait('Approve regenerated business authority before backend planning.', 'OK BUSINESS <hash>', 'REJECT BUSINESS <hash>', [e({ stage: 'business.model.review', status: 'approved' }, 'business-publish'), e({ stage: 'business.model.review', status: 'rejected' }, 'business-evidence')]),
+  'business-publish': op('business/publish', decided({ 'direct-plan': 'business-staleness', 'architecture-required': 'business-staleness', blocked: 'blocked' })),
   'architecture-frame': op('architecture/decision-frame', decided({ ready: 'architecture-current' })),
   'architecture-current': op('architecture/current-state', decided({ ready: 'architecture-alternatives' })),
   'architecture-alternatives': op('architecture/alternatives', decided({ ready: 'architecture-challenge' })),
-  'architecture-challenge': op('architecture/decision-challenge', decided({ ready: 'architecture-handoff', revise: 'architecture-alternatives', blocked: 'blocked' })),
+  'architecture-challenge': op('architecture/decision-challenge', decided({ ready: 'architecture-selection', revise: 'architecture-alternatives', blocked: 'blocked' })),
+  'architecture-selection': wait('Approve the recommended architecture decision and option-set hash.', 'OK ARCHITECTURE <decision>', 'REJECT ARCHITECTURE <decision>', [e({ stage: 'architecture.decision.handoff', status: 'ready' }, 'architecture-handoff'), e({ stage: 'architecture.decision.alternatives', status: 'ready' }, 'architecture-alternatives')]),
   'architecture-handoff': op('architecture/decision-handoff', decided({ ready: 'source-discovery' })),
   'source-discovery': op('architecture/source-discovery', decided({ ready: 'pattern-bind' })),
   'pattern-bind': op('architecture/pattern-bind', decided({ ready: 'boundary-plan' })),
@@ -84,18 +92,26 @@ const backendStates = {
 };
 
 const frontendStates = {
+  route: op('workspace/route-verify', decided({ ready: 'business-staleness' })),
+  'business-staleness': op('business/staleness-check', decided({ fresh: 'preflight', 'initialize-required': 'business-evidence', blocked: 'blocked' })),
+  'business-evidence': op('business/evidence-normalize', decided({ ready: 'business-model' })),
+  'business-model': op('business/model', decided({ ready: 'business-approval' })),
+  'business-approval': wait('Approve regenerated business authority before customer-journey work.', 'OK BUSINESS <hash>', 'REJECT BUSINESS <hash>', [e({ stage: 'business.model.review', status: 'approved' }, 'business-publish'), e({ stage: 'business.model.review', status: 'rejected' }, 'business-evidence')]),
+  'business-publish': op('business/publish', decided({ 'direct-plan': 'business-staleness', 'architecture-required': 'business-staleness', blocked: 'blocked' })),
   preflight: op('fe/preflight', [e({ stage: 'flow.generate', status: 'ready' }, 'journey')]),
-  journey: op('fe/customer-journey', [e({ stage: 'flow.review', status: 'pending' }, 'flow-approval')]),
+  journey: op('fe/customer-journey', [e({ stage: 'flow.review', status: 'pending' }, 'flow-approval'), e({ stage: 'flow.review', status: 'approved' }, 'page-model')]),
   'flow-approval': wait('Approve one exact customer-journey direction.', 'OK FLOW <id>', 'REJECT FLOW <id>', [e({ stage: 'flow.review', status: 'approved' }, 'page-model'), e({ stage: 'flow.review', status: 'rejected' }, 'journey')]),
   'page-model': op('fe/page-model', [e({ stage: 'state.generate', status: 'ready' }, 'state')]),
-  state: op('fe/state', [e({ stage: 'layout.generate', status: 'ready' }, 'layout'), e({ stage: 'state.result', status: 'blocked' }, 'blocked')]),
+  state: op('fe/state', [e({ stage: 'layout.generate', status: 'ready' }, 'context-sync'), e({ stage: 'state.result', status: 'blocked' }, 'blocked')]),
+  'context-sync': op('fe/context-sync', [e({ stage: 'source-fit.resolve', status: 'ready' }, 'source-fit'), e({ stage: 'source-fit.resolve', status: 'blocked' }, 'blocked')]),
+  'source-fit': op('fe/source-fit', [e({ stage: 'principles.compile', status: 'ready' }, 'principles')]),
+  principles: op('fe/principle-compile', [e({ stage: 'layout.generate', status: 'ready' }, 'layout'), e({ stage: 'layout.generate', status: 'blocked' }, 'blocked')]),
   layout: op('fe/layout', [e({ stage: 'layout.review', status: 'pending' }, 'layout-approval')]),
   'layout-approval': wait('Approve one exact layout direction and complete page set.', 'OK LAYOUT <id>', 'REJECT LAYOUT <id>', [e({ stage: 'layout.review', status: 'approved' }, 'grammar'), e({ stage: 'layout.review', status: 'rejected' }, 'layout')]),
-  grammar: op('fe/grammar-convergence', [e({ stage: 'source-fit.resolve', status: 'ready' }, 'source-fit'), e({ stage: 'source-fit.resolve', status: 'blocked' }, 'blocked')]),
-  'source-fit': op('fe/source-fit', [e({ stage: 'principles.compile', status: 'ready' }, 'principles')]),
-  principles: op('fe/principle-compile', [e({ stage: 'requests.review', status: 'ready' }, 'request-choice'), e({ stage: 'requests.review', status: 'blocked' }, 'blocked')]),
-  'request-choice': choice([e({ allFacts: ['grammar-gap'] }, 'requests'), e({ allFacts: ['create-required'], noneFacts: ['grammar-gap'] }, 'requests'), e({ noneFacts: ['grammar-gap', 'create-required'] }, 'implementation')]),
-  requests: op('fe/request-emission', [e({ stage: 'request.result', status: 'ready' }, 'implementation'), e({ stage: 'request.result', status: 'blocked' }, 'blocked')]),
+  grammar: op('fe/grammar-convergence', [e({ stage: 'source-fit.resolve', status: 'ready' }, 'request-choice'), e({ stage: 'source-fit.resolve', status: 'blocked' }, 'blocked')]),
+  'request-choice': choice([e({ allFacts: ['grammar-gap'] }, 'requests'), e({ allFacts: ['create-required'], noneFacts: ['grammar-gap'] }, 'requests'), e({ noneFacts: ['grammar-gap', 'create-required'] }, 'coding-scope')]),
+  requests: op('fe/request-emission', [e({ stage: 'request.result', status: 'ready' }, 'coding-scope'), e({ stage: 'request.result', status: 'blocked' }, 'blocked')]),
+  'coding-scope': op('fe/coding-scope-freeze', [e({ stage: 'code.implement', status: 'ready' }, 'implementation'), e({ stage: 'code.result', status: 'blocked' }, 'blocked')]),
   implementation: op('fe/implementation', [e({ stage: 'seed.materialize', status: 'ready' }, 'seed'), e({ stage: 'code.result', status: 'blocked' }, 'blocked')]),
   seed: op('fe/product-seed', [e({ stage: 'test.unit', status: 'ready' }, 'unit-test'), e({ stage: 'seed.result', status: 'blocked' }, 'blocked')]),
   'unit-test': op('test/unit', [e({ stage: 'test.e2e', status: 'ready' }, 'e2e-test'), e({ stage: 'code.repair', status: 'repair' }, 'implementation'), e({ stage: 'test.review', status: 'blocked' }, 'blocked')]),
@@ -114,12 +130,13 @@ const frontendStates = {
 };
 
 const qualityStates = {
-  diagnose: op('quality/workflow-diagnose', decided({ diagnosed: 'complete' })),
-  inventory: op('quality/readiness-inventory', decided({ green: 'complete', findings: 'repair-approval' })),
+  diagnose: op('quality/workflow-diagnose', decided({ diagnosed: 'complete', inconclusive: 'blocked', 'external-blocker': 'blocked' })),
+  inventory: op('quality/readiness-inventory', decided({ green: 'complete', findings: 'repair-approval', blocked: 'blocked' })),
   'repair-approval': wait('Approve one exact measured finding and repair boundary.', 'OK REPAIR <finding>', 'REJECT REPAIR <finding>', [e({ stage: 'quality.repair.review', status: 'approved' }, 'repair'), e({ stage: 'quality.repair.review', status: 'rejected' }, 'rejected')]),
-  repair: op('quality/finding-repair', decided({ repaired: 'inventory', 'boundary-drift': 'blocked' })),
+  repair: op('quality/finding-repair', decided({ repaired: 'inventory', 'stale-finding': 'inventory', 'boundary-drift': 'blocked', 'external-blocker': 'blocked' })),
   debt: op('quality/debt-repay', decided({ closed: 'complete', progress: 'debt', blocked: 'blocked' })),
-  bindings: op('quality/rule-binding-check', decided({ pass: 'complete', fail: 'blocked' })),
+  bindings: op('quality/rule-binding-check', decided({ pass: 'complete', fail: 'findings', blocked: 'blocked' })),
+  findings: terminal('complete'),
   complete: terminal('complete'), rejected: terminal('rejected'), blocked: terminal('blocked')
 };
 
@@ -178,7 +195,7 @@ const conversationStates = {
 };
 
 const deployOptions = { reconcileBusiness: { type: 'boolean', description: 'Reconcile final proof into the business head.' } };
-const backendOptions = { architectureMode: { enum: ['auto', 'required', 'skip'], description: 'Whether hard architecture analysis is required.' }, deploymentMode: { enum: ['none', 'handoff'], description: 'Stop after source proof or hand off to deployment.' } };
+const backendOptions = { deploymentMode: { enum: ['none', 'handoff'], description: 'Stop after source proof or hand off to deployment.' } };
 const repairOptions = { deploymentMode: backendOptions.deploymentMode };
 
 const flows = [
@@ -213,10 +230,24 @@ const flows = [
     checks: ['Resolve the approved plan hash, finding and current source baseline.', 'Confirm every write remains inside the approved backend boundary.', 'Route source or boundary drift back to planning.']
   },
   {
-    id: 'frontend-layout-delivery', display: 'StarCi Frontend Layout Delivery', short: 'Design and deliver complete frontend journeys', entry: 'preflight', states: frontendStates,
-    options: { brainstorm: { enum: ['default', 'multi-direction'], description: 'Default direction depth or explicit brainstorm.' } },
+    id: 'frontend-layout-delivery', display: 'StarCi Frontend Layout Delivery', short: 'Design and deliver complete frontend journeys', entry: 'route', states: frontendStates,
+    options: {
+      directionCount: { enum: [3, 4], description: 'Generate exactly three or four materially distinct customer journeys.' },
+      selectionPolicy: { enum: ['manual', 'auto-recommended'], description: 'Wait for explicit journey approval or bind the recommended direction automatically.' }
+    },
     description: 'Use to create or substantially redesign a complete frontend customer journey, page set, page models, layouts, implementation, and proof. Do not use for isolated blocks, approved maintenance, learning resolution, or cross-surface consistency.',
-    checks: ['Resolve the complete page set, journey boundary, source contract and Grammar lock.', 'Confirm this is journey-level work.', 'Identify creative approvals and permitted source paths.']
+    checks: ['Resolve the complete page set and project route without loading product context.', 'Confirm this is journey-level work and bind the selected Grammar package.', 'Identify creative approvals and permitted source roots.'],
+    contextMatrix: [
+      ['route + staleness', 'route, commit, revision, receipt and hash metadata', 'business body, Qdrant bodies, source files'],
+      ['business initialize', 'exact evidence and business lifecycle law only after stale decision', 'frontend knowledge and coding context'],
+      ['preflight', 'request, route and fresh-business receipt headers', 'all semantic bodies'],
+      ['customer journey', 'fresh business journey projection + fe.customer-journey', 'Principles, Grammar, coding context, raw source'],
+      ['page + state', 'selected journey + exact business slice + one operator law', 'other directions and source'],
+      ['context sync', 'metadata first; changed generated JSON/knowledge only on hash miss', 'unchanged bodies and model-visible raw source'],
+      ['source fit + Principles + layout + Grammar', 'approved session refs + exact Qdrant records + canonical JSON candidates', 'whole indexes, unrelated features, raw source'],
+      ['coding scope freeze', 'approved refs, canonical candidate records, exact file headers', 'file bodies and repository scans'],
+      ['implementation + proof', 'only frozen exact files, commands, seeds and receipts', 'undeclared files, broad Qdrant, unrelated business']
+    ]
   },
   {
     id: 'frontend-block-reconcile', display: 'StarCi Frontend Block Reconcile', short: 'Reconcile one frontend block and its consumers', entry: 'block-reconcile', states: frontendStates, options: {},
@@ -351,7 +382,7 @@ for (const flow of flows) {
   mkdirSync(agentDirectory, { recursive: true });
   const states = reachableSubgraph(flow.states, flow.entry);
   writeJson(path.join(directory, 'machine.json'), { $schema: '../machine.schema.json', schemaVersion: 6, id: flow.id, start: 'analyze-input', states });
-  const optionProperties = Object.fromEntries(Object.entries(flow.options).map(([name, spec]) => [name, spec.enum ? { type: 'string', enum: spec.enum } : { type: spec.type ?? 'string' }]));
+  const optionProperties = Object.fromEntries(Object.entries(flow.options).map(([name, spec]) => [name, spec.enum ? { type: typeof spec.enum[0], enum: spec.enum } : { type: spec.type ?? 'string' }]));
   const selectionSchema = { type: 'object', additionalProperties: false, required: ['analyzerVersion', 'skillId', 'confidence', 'activeInputRefs', 'passiveContextRefs'], properties: { analyzerVersion: { const: 1 }, skillId: { const: flow.id }, confidence: { enum: ['exact', 'clarified'] }, activeInputRefs: { type: 'array', uniqueItems: true, items: { type: 'string', minLength: 1 } }, passiveContextRefs: { type: 'array', uniqueItems: true, items: { type: 'string', minLength: 1 } } } };
   const inputSchema = { $schema: 'https://json-schema.org/draft/2020-12/schema', $id: `https://starci.dev/v6/skills/${flow.id}/input.schema.json`, type: 'object', additionalProperties: false, required: ['schemaVersion', 'runId', 'project', 'selection', 'requestRef', 'artifactRefs', 'evidenceRefs', 'scope', 'options'], properties: { schemaVersion: { const: 6 }, runId: { type: 'string', minLength: 1 }, project: { type: 'string', pattern: '^[a-z0-9][a-z0-9-]*$' }, selection: selectionSchema, requestRef: { type: 'string', minLength: 1 }, artifactRefs: { type: 'array', uniqueItems: true, items: { type: 'string', minLength: 1 } }, evidenceRefs: { type: 'array', uniqueItems: true, items: { type: 'string', minLength: 1 } }, scope: { type: 'object', additionalProperties: false, required: ['targetRefs', 'writeRoots', 'externalMutation', 'approvalRef'], properties: { targetRefs: { type: 'array', minItems: 1, uniqueItems: true, items: { type: 'string', minLength: 1 } }, writeRoots: { type: 'array', uniqueItems: true, items: { type: 'string', minLength: 1 } }, externalMutation: { type: 'boolean' }, approvalRef: { type: ['string', 'null'], minLength: 1 } } }, options: { type: 'object', additionalProperties: false, required: Object.keys(optionProperties), properties: optionProperties } } };
   const outputSchema = { $schema: 'https://json-schema.org/draft/2020-12/schema', $id: `https://starci.dev/v6/skills/${flow.id}/output.schema.json`, type: 'object', additionalProperties: false, required: ['schemaVersion', 'runId', 'skillId', 'result', 'finalState', 'receiptRefs', 'findings'], properties: { schemaVersion: { const: 6 }, runId: { type: 'string', minLength: 1 }, skillId: { const: flow.id }, result: { enum: ['complete', 'blocked', 'handoff', 'not-needed', 'rejected'] }, finalState: { type: 'string', minLength: 1 }, receiptRefs: { type: 'array', uniqueItems: true, items: { type: 'string', minLength: 1 } }, findings: { type: 'array', uniqueItems: true, items: { type: 'string', minLength: 1 } } } };
@@ -359,11 +390,12 @@ for (const flow of flows) {
   writeJson(path.join(directory, 'output.schema.json'), outputSchema);
   const checks = flow.checks.map((item, index) => `${index + 1}. ${item}`).join('\n');
   const optionRows = Object.entries(flow.options).map(([name, spec]) => `| \`${name}\` | ${spec.enum ? spec.enum.map((item) => `\`${item}\``).join(' / ') : `\`${spec.type}\``} | ${spec.description} |`).join('\n') || '| — | — | No additional option is loaded. |';
+  const contextRows = (flow.contextMatrix ?? []).map(([state, allowed, forbidden]) => `| \`${state}\` | ${allowed} | ${forbidden} |`).join('\n') || '| every state | current operator declaration only | undeclared context |';
   writeFileSync(path.join(directory, 'analyze-input.md'), `# Analyze ${flow.id} input\n\nGlobal \`@selection\` has already selected this one-flow skill from prompt intent. Before any operator or Qdrant retrieval, validate the invocation and verify \`selection.skillId\` equals \`${flow.id}\`. Then perform these local checks:\n\n${checks}\n\nReject stale or missing authority/evidence, an ambiguous target, a write root outside scope, external mutation without approval, or an option outside the closed schema. Do not reconsider other skills here; return to global analysis if selection is wrong.\n\nThe fixed first state is \`${flow.entry}\`. Emit only normalized scope and facts as task-session data; do not choose a second mode or copy operator knowledge into context.\n\n## Options\n\n| Option | Values | Decision effect |\n| --- | --- | --- |\n${optionRows}\n`);
   writeFileSync(path.join(directory, 'input.md'), `# ${flow.id} input\n\nProvide one closed invocation validated by \`input.schema.json\`. The required \`selection\` object is the ephemeral output of global \`/analyze-input.md\`; it selects this skill directly. This package owns one fixed-entry flow and accepts no secondary mode.\n`);
   writeFileSync(path.join(directory, 'output.md'), `# ${flow.id} output\n\nReturn the terminal result, final state, immutable receipt references and unresolved findings. A handoff is explicit and never mislabeled complete.\n`);
-  writeFileSync(path.join(directory, 'execute.md'), `# Execute ${flow.id}\n\n1. Accept only a validated global \`selection\` for this skill, validate the complete input, run local \`analyze-input\`, then enter fixed state \`${flow.entry}\`.\n2. Load only the current state's operator contract. That operator alone retrieves its declared Qdrant knowledge.\n3. Validate operator input, execute it, validate output, then route through exactly one matching edge.\n4. Keep selection, operator data, context, observations, plans and receipts in task-session memory only. On a loop, reuse approved identities and reload only the re-entered operator.\n5. Wait states stop before irreversible work and accept only the displayed revision or command.\n6. At every terminal, validate the result, return it, and purge all task-session intermediates. Preserve only approved product-source or external mutations.\n\n## LOADS\n\n| Alias | Target | Kind | Why |\n| --- | --- | --- | --- |\n| \`@selection\` | global \`/analyze-input.md\` output | task-session | prove why this one-flow skill was selected |\n| \`@machine\` | \`machine.json\` | file | state, guard, branch, loop, wait and terminal ownership |\n| \`@input-analysis\` | \`analyze-input.md\` | file | normalize this invocation before its fixed first state |\n\nNo Qdrant knowledge is loaded at skill scope.\n`);
-  writeFileSync(path.join(directory, 'SKILL.md'), `---\nname: ${flow.id}\ndescription: ${JSON.stringify(flow.description)}\n---\n\n# ${flow.id}\n\n${flow.description}\n\n## INPUT ANALYSIS\n\nRequire the ephemeral global selection, read \`input.md\`, validate \`input.schema.json\`, then follow local \`analyze-input.md\`. This skill owns one flow with fixed first state \`${flow.entry}\`; local analysis only validates and normalizes scope without loading operator knowledge.\n\n## STATE MACHINE\n\nExecute \`machine.json\` through \`execute.md\`. Branches and loops are machine-owned; operators never invoke one another. Stop at waits for the exact displayed revision and finish only at a terminal. Purge all intermediates at every terminal while preserving approved durable mutations.\n\n## LOADS\n\n| Alias | Target | Kind | Why |\n| --- | --- | --- | --- |\n| \`@selection\` | global \`/analyze-input.md\` output | task-session | bind prompt intent directly to this one-flow skill |\n| \`@machine\` | \`machine.json\` | file | executable state-machine graph |\n| \`@analysis\` | \`analyze-input.md\` | file | local validation and normalization before operator load |\n`);
+  writeFileSync(path.join(directory, 'execute.md'), `# Execute ${flow.id}\n\n1. Accept only a validated global \`selection\` for this skill, validate the complete input, run local \`analyze-input\`, then enter fixed state \`${flow.entry}\`.\n2. Load only the current state's operator contract. That operator alone retrieves its declared Qdrant knowledge.\n3. Validate operator input, execute it, validate output, then route through exactly one matching edge.\n4. Keep selection, operator data, context, observations, plans and receipts in task-session memory only. On a loop, compare the prior fingerprint, reuse approved identities and reload only the re-entered operator. Block repeated no-progress fingerprints.\n5. Wait states stop before irreversible work and accept only the displayed revision or command.\n6. At every terminal, validate the result, return it, and purge all task-session intermediates. Preserve only approved product-source or external mutations.\n\n## CONTEXT BY STATE\n\n| State or phase | Allowed | Forbidden |\n| --- | --- | --- |\n${contextRows}\n\n## LOADS\n\n| Alias | Target | Kind | Why |\n| --- | --- | --- | --- |\n| \`@selection\` | global \`/analyze-input.md\` output | task-session | prove why this one-flow skill was selected |\n| \`@machine\` | \`machine.json\` | file | state, guard, branch, loop, wait and terminal ownership |\n| \`@input-analysis\` | \`analyze-input.md\` | file | normalize this invocation before its fixed first state |\n\nNo Qdrant knowledge is loaded at skill scope.\n`);
+  writeFileSync(path.join(directory, 'SKILL.md'), `---\nname: ${flow.id}\ndescription: ${JSON.stringify(flow.description)}\n---\n\n# ${flow.id}\n\n${flow.description}\n\n## INPUT ANALYSIS\n\nRequire the ephemeral global selection, read \`input.md\`, validate \`input.schema.json\`, then follow local \`analyze-input.md\`. This skill owns one flow with fixed first state \`${flow.entry}\`; local analysis only validates and normalizes scope without loading operator knowledge.\n\n## STATE MACHINE\n\nExecute \`machine.json\` through \`execute.md\`. Branches and loops are machine-owned; operators never invoke one another. Stop at waits for the exact displayed revision and finish only at a terminal. Purge all intermediates at every terminal while preserving approved durable mutations.\n\n## CONTEXT CONTRACT\n\n| State or phase | Allowed | Forbidden |\n| --- | --- | --- |\n${contextRows}\n\n## LOADS\n\n| Alias | Target | Kind | Why |\n| --- | --- | --- | --- |\n| \`@selection\` | global \`/analyze-input.md\` output | task-session | bind prompt intent directly to this one-flow skill |\n| \`@machine\` | \`machine.json\` | file | executable state-machine graph |\n| \`@analysis\` | \`analyze-input.md\` | file | local validation and normalization before operator load |\n`);
   writeFileSync(path.join(agentDirectory, 'openai.yaml'), `interface:\n  display_name: ${yamlString(flow.display)}\n  short_description: ${yamlString(flow.short)}\n  default_prompt: ${yamlString(`Use $${flow.id} for this selected flow and execute its state machine.`)}\npolicy:\n  allow_implicit_invocation: true\n`);
   writeFileSync(path.join(directory, 'validate-input.mjs'), `import { validatorFor, runValidatorCli } from '../../operators/validation.mjs';\nexport const validateInput=validatorFor(new URL('./input.schema.json',import.meta.url));\nif(process.argv[1]?.endsWith('validate-input.mjs')) await runValidatorCli(validateInput,'node validate-input.mjs <artifact.json>');\n`);
   writeFileSync(path.join(directory, 'validate-output.mjs'), `import { validatorFor, runValidatorCli } from '../../operators/validation.mjs';\nexport const validateOutput=validatorFor(new URL('./output.schema.json',import.meta.url),(value)=>value.result==='complete'&&value.receiptRefs.length===0?['$.receiptRefs: completion requires evidence']:[]);\nif(process.argv[1]?.endsWith('validate-output.mjs')) await runValidatorCli(validateOutput,'node validate-output.mjs <artifact.json>');\n`);

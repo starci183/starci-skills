@@ -17,7 +17,7 @@ Invalid input stops at the boundary without side effects. Invalid output is neve
 
 Every operator input has three ownership sections: `provided` references from the previous state, `loads` resolved by the runtime, and `session` slots owned by the current task. Every output carries `state`, `produced`, `context`, `cleanup`, `evidenceRefs`, and `findings`. Inputs, outputs, loaded bindings, worker observations, receipts, and scratch objects are session-only and are purged at every parent-skill terminal. Operators never persist intermediate run folders.
 
-Broad repository source context is forbidden. Operators retrieve only their declared knowledge IDs; business authority comes from an exact `.worktrees/business/...` revision; source work opens only hash-pinned contract JSON or exact approved files. Workers are read/analyze-only unless an operator explicitly proves disjoint safe writes, and the coordinator owns joins and mutations.
+Broad repository source context is forbidden. Operators retrieve only their declared knowledge IDs; business authority comes from an exact `.worktrees/<project>/businesses/...` revision; source work opens only hash-pinned contract JSON or exact approved files. Workers are read/analyze-only unless an operator explicitly proves disjoint safe writes, and the coordinator owns joins and mutations.
 
 Input and output schemas are independent files. `operator.json` binds their exact filenames; validation refuses missing, extra, or cross-direction contract files.
 

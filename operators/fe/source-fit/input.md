@@ -23,7 +23,7 @@ These fields are references, not copied documents. The operator must not infer s
 
 ## Loaded by the runtime
 
-- `business`: load only the declared revision under `.worktrees/business/`; source code is never business authority.
+- `business`: load only the declared revision under `.worktrees/<project>/businesses/`; source code is never business authority.
 - `upstream`: resolve only the declared session references for Grammar convergence, approved layout Blocks, and pinned frontend contract generation.
 - `knowledge`: retrieve `fe.source-fit` from the pinned generation and content hash.
 - `frontendSource`: query only the hash-pinned plain-JSON frontend contract snapshot at its declared generation; the snapshot and generator hashes must match and `rawRepositoryContext` is always `false`.

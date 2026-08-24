@@ -13,7 +13,7 @@ Derive the complete user journey before deciding page layouts. A page is a check
 
 ## Method
 
-Start from the actor's trigger, desired outcome, verified business operations, consequential decisions, and terminal states. Preserve uncertainty as an open fact. Then propose two or three materially different paths; a direction is different only when it changes sequencing, decision timing, recovery, or page boundaries.
+Start from the actor's trigger, desired outcome, verified business operations, consequential decisions, and terminal states. Preserve uncertainty as an open fact. Then propose three or four materially different paths; a direction is different only when it changes sequencing, decision timing, recovery, or page boundaries.
 
 Each direction states:
 
@@ -31,4 +31,4 @@ Do not produce cosmetic variants of one flow. Do not invent prices, permissions,
 
 A linear multi-page process gets one journey-progress owner and one reference from each participating page. It is not copied into four page owners. Tabs are reserved for same-page peer panels where only one panel is visible; tabs do not represent progress across routes.
 
-Stop after emitting two or three directions. Continue only from an explicit selected-flow approval receipt.
+Recommend exactly one direction using evidenced fit, risk, recoverability, and implementation cost. Under `manual`, stop after emitting three or four directions and wait for an exact selected-flow approval receipt. Under `auto-recommended`, bind the recommendation to a selected-flow session receipt and continue without pretending that the other directions were approved. Never persist the batch outside the task session.

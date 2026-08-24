@@ -22,8 +22,35 @@
           "when": {
             "decision": "ready"
           },
-          "target": "frame",
+          "target": "business-staleness",
           "label": "ready"
+        }
+      ]
+    },
+    "business-staleness": {
+      "kind": "operator",
+      "ref": "business/staleness-check",
+      "on": [
+        {
+          "when": {
+            "decision": "fresh"
+          },
+          "target": "frame",
+          "label": "fresh"
+        },
+        {
+          "when": {
+            "decision": "initialize-required"
+          },
+          "target": "business-evidence",
+          "label": "initialize-required"
+        },
+        {
+          "when": {
+            "decision": "blocked"
+          },
+          "target": "blocked",
+          "label": "blocked"
         }
       ]
     },
@@ -40,6 +67,23 @@
         }
       ]
     },
+    "business-evidence": {
+      "kind": "operator",
+      "ref": "business/evidence-normalize",
+      "on": [
+        {
+          "when": {
+            "decision": "ready"
+          },
+          "target": "business-model",
+          "label": "ready"
+        }
+      ]
+    },
+    "blocked": {
+      "kind": "terminal",
+      "result": "blocked"
+    },
     "current": {
       "kind": "operator",
       "ref": "architecture/current-state",
@@ -49,6 +93,19 @@
             "decision": "ready"
           },
           "target": "alternatives",
+          "label": "ready"
+        }
+      ]
+    },
+    "business-model": {
+      "kind": "operator",
+      "ref": "business/model",
+      "on": [
+        {
+          "when": {
+            "decision": "ready"
+          },
+          "target": "business-approval",
           "label": "ready"
         }
       ]
@@ -66,6 +123,30 @@
         }
       ]
     },
+    "business-approval": {
+      "kind": "wait",
+      "approval": {
+        "prompt": "Approve the regenerated business authority before architecture analysis.",
+        "approve": "OK BUSINESS <hash>",
+        "reject": "REJECT BUSINESS <hash>"
+      },
+      "on": [
+        {
+          "when": {
+            "stage": "business.model.review",
+            "status": "approved"
+          },
+          "target": "business-publish"
+        },
+        {
+          "when": {
+            "stage": "business.model.review",
+            "status": "rejected"
+          },
+          "target": "business-evidence"
+        }
+      ]
+    },
     "challenge": {
       "kind": "operator",
       "ref": "architecture/decision-challenge",
@@ -74,7 +155,7 @@
           "when": {
             "decision": "ready"
           },
-          "target": "handoff",
+          "target": "decision-selection",
           "label": "ready"
         },
         {
@@ -93,6 +174,57 @@
         }
       ]
     },
+    "business-publish": {
+      "kind": "operator",
+      "ref": "business/publish",
+      "on": [
+        {
+          "when": {
+            "decision": "direct-plan"
+          },
+          "target": "business-staleness",
+          "label": "direct-plan"
+        },
+        {
+          "when": {
+            "decision": "architecture-required"
+          },
+          "target": "business-staleness",
+          "label": "architecture-required"
+        },
+        {
+          "when": {
+            "decision": "blocked"
+          },
+          "target": "blocked",
+          "label": "blocked"
+        }
+      ]
+    },
+    "decision-selection": {
+      "kind": "wait",
+      "approval": {
+        "prompt": "Approve the recommended architecture decision and exact option-set hash.",
+        "approve": "OK ARCHITECTURE <decision>",
+        "reject": "REJECT ARCHITECTURE <decision>"
+      },
+      "on": [
+        {
+          "when": {
+            "stage": "architecture.decision.handoff",
+            "status": "ready"
+          },
+          "target": "handoff"
+        },
+        {
+          "when": {
+            "stage": "architecture.decision.alternatives",
+            "status": "ready"
+          },
+          "target": "alternatives"
+        }
+      ]
+    },
     "handoff": {
       "kind": "operator",
       "ref": "architecture/decision-handoff",
@@ -105,10 +237,6 @@
           "label": "ready"
         }
       ]
-    },
-    "blocked": {
-      "kind": "terminal",
-      "result": "blocked"
     },
     "complete": {
       "kind": "terminal",

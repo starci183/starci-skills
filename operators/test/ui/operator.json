@@ -5,11 +5,7 @@
   "inputSchema": "input.schema.json",
   "outputSchema": "output.schema.json",
   "knowledgeRefs": [
-    "fe.ui-testing",
-    "fe.customer-journey",
-    "fe.layout-composition",
-    "fe.state-modeling",
-    "fe.product-seeding"
+    "fe.ui-testing"
   ],
   "sourceReferenceRefs": [
     "starci-academy-fe"

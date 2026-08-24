@@ -22,6 +22,6 @@ This operator reconciles delivery proof with business authority. The input is an
 - `artifacts`: resolve only references declared by `payload.provided` into task-session memory.
 - `knowledge`: retrieve only `business.authority-lifecycle` from the pinned Qdrant generation.
 - `orchestration`: resolve execution mode separately from provider/model mapping.
-- `business`: load the exact declared revision from `.worktrees/business/`; product source is not business authority.
+- `business`: load the exact declared revision from `.worktrees/<project>/businesses/`; product source is not business authority.
 
 Acceptance requires that every accepted outcome is proved by final source heads or reported as a discrepancy. Validate the whole envelope before any load or side effect. Loaded content and intermediate analysis remain session-only.

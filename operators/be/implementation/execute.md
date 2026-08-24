@@ -13,7 +13,7 @@ This operator converts one approved backend boundary into source changes. Its in
 ## Step 2 — Load business authority
 
 **Read:** `payload.loads.business`.
-**Context:** load exactly the declared revision from its `.worktrees/business/...` authority path into session memory. Do not load another business feature or infer business behavior from source.
+**Context:** load exactly the declared revision from its `.worktrees/<project>/businesses/...` authority path into session memory. Do not load another project or business feature, and do not infer business behavior from source.
 **Analysis:** compare its reference and revision with `provided.businessHeadRef`; record only match/mismatch evidence.
 **Session write:** one value-safe binding under `scratchPrefix/business`. Do not copy the full business document into output.
 **Stop:** emit `blocked` if the authority is missing, stale, rejected, or does not match the provided reference.
@@ -21,7 +21,7 @@ This operator converts one approved backend boundary into source changes. Its in
 ## Step 3 — Load boundary and operator knowledge
 
 **Read:** `payload.loads.boundary` and the single `payload.loads.knowledge` entry.
-**Context:** resolve the approved boundary from session memory; retrieve only `be.boundary-planning` from the pinned Qdrant generation and content hash.
+**Context:** resolve the approved boundary from session memory; retrieve only `be.implementation` from the pinned Qdrant generation and content hash.
 **Analysis:** verify approval identity, baseline commit, target set, allowed changes, exclusions, and knowledge generation. Record applied rules and evidence, never a reasoning transcript.
 **Session write:** normalized constraints at `scratchPrefix/constraints`.
 **Stop:** emit `blocked` if a required binding is missing; emit `boundary-drift` if the approved boundary and resolved target set disagree.
@@ -78,7 +78,7 @@ Workers write observations only to `scratchPrefix/source-checks/<worker-id>`. Wo
 | --- | --- | --- | --- |
 | `@business-head` | `payload.loads.business` | worktree-exact | bind the approved business revision without loading unrelated features |
 | `@approved-boundary` | `payload.loads.boundary` | session | bind the exact approved paths, responsibilities, and exclusions |
-| `@be-boundary-planning` | `be.boundary-planning` | qdrant | retrieve only the law required by this operator |
+| `@be-implementation` | `be.implementation` | qdrant | retrieve only the source-mutation law required by this operator |
 | `@target-files` | `payload.loads.source.targetFiles` | exact-source | open only approved checkout files after their hashes are pinned |
 | `@orchestration-profile` | `payload.loads.orchestration` | orchestration | choose sequential or read-only fan-out execution |
 

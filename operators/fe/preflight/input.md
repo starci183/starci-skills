@@ -1,32 +1,15 @@
 # `fe/preflight` input
 
-The input is a closed, ephemeral object owned by the current task session. It is never persisted to the repository, `.worktrees`, Qdrant, logs, or receipt files. The runtime purges it and all resolved values when the parent skill reaches any terminal state.
+Preflight freezes routing and scope. It does not analyze the product or load design context.
 
 ## JSON architecture
 
-| Section | Authored by | Purpose |
+| Section | Ownership | Purpose |
 | --- | --- | --- |
-| `schemaVersion`, `runId`, `stage`, `status`, `facts` | Skill state machine | Bind this invocation to one accepted route and its fact guards. |
-| `payload.provided` | Previous machine state | Supply immutable prior-state, business, authority, approval, and baseline references. |
-| `payload.loads` | Runtime resolver | Declare the exact values that this operator will load; callers and workers cannot populate or broaden them. |
-| `payload.session` | Session runtime | Name task-local input, output, and scratch slots with terminal cleanup. |
+| Route envelope | Skill machine | Require `business.freshness / ready`. |
+| `payload.provided` | Previous states | Bind project, request, route, fresh-business receipt, targets, and write roots. |
+| `payload.loads.receipts` | Runtime resolver | Resolve exactly three receipt headers in metadata-only mode. |
+| `payload.loads.orchestration` | Runtime resolver | Bind execution policy; coordinator-only remains mandatory. |
+| `payload.session` | Session runtime | Hold ephemeral input, frozen scope, receipt, and output. |
 
-## Provided by the previous state
-
-- `priorStateRef`: the accepted upstream state that authorizes freeze workspace, business, Grammar, frontend contract generation, and requested write boundaries before design work.
-- `businessHeadRef`: the selected business authority reference.
-- `authorityRefs`: the exact received request, verified workspace route, and selected business feature head references.
-- `approvalRef`: the approval binding when the transition requires one; otherwise `null`.
-- `baselineRef`: the immutable Git, SHA-256, or task-session baseline.
-
-These fields are references, not copied documents. The operator must not infer substitutes.
-
-## Loaded by the runtime
-
-- `business`: load only the declared revision under `.worktrees/business/`; source code is never business authority.
-- `upstream`: resolve only the declared session references for received request, verified workspace route, and selected business feature head.
-- `knowledge`: retrieve no knowledge record from the pinned generation and content hash.
-- `frontendSource`: query only the hash-pinned plain-JSON frontend contract snapshot at its declared generation; the snapshot and generator hashes must match and `rawRepositoryContext` is always `false`.
-- `orchestration`: resolve one provider-neutral mode and provider profile; it cannot change routing, approval, or boundaries.
-
-`payload.session` contains URI slots only. Inputs, outputs, loaded values, worker observations, drafts, and evidence are purged at every parent-skill terminal, including failure and rejection.
+Forbidden input includes business bodies, Qdrant knowledge, Principles, Grammar, FE contract JSON, and raw source.

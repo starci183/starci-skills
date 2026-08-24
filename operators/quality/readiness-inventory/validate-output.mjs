@@ -15,6 +15,13 @@ const routes = {
     "fact": "readiness-findings",
     "state": "completed",
     "code": "quality-readiness-inventory-findings"
+  },
+  "blocked": {
+    "stage": "quality.blocked",
+    "status": "blocked",
+    "fact": "readiness-inconclusive",
+    "state": "blocked",
+    "code": "quality-readiness-inventory-blocked"
   }
 };
 

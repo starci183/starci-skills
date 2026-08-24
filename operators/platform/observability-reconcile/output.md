@@ -20,4 +20,4 @@ This output is ephemeral task-session state. It is consumed by the parent machin
 | `proved` | `completed` | `platform.observability.proved / complete` | `platform-observability-proved` |
 | `blocked` | `blocked` | `platform.blocked / blocked` | `platform-observability-blocked` |
 
-A proved result requires a session receipt and at least one coordinator-applied mutation. Blocked results may report partial mutations, but workers never own mutations. All intermediates remain session-only until mandatory terminal cleanup.
+A proved result requires a session receipt. Its mutation list is empty when the declared stack already matches and all bounded probes pass; this is a successful idempotent no-op. Blocked results may report partial mutations, but workers never own mutations. All intermediates remain session-only until mandatory terminal cleanup.

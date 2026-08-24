@@ -24,9 +24,9 @@ The input is an ephemeral object owned by the current task session. It is never 
 
 `payload.loads` is produced by the runtime, not by the user or an implementation worker:
 
-- `business`: load the exact revision from `.worktrees/business/...` into session memory.
+- `business`: load the exact revision from `.worktrees/<project>/businesses/...` into session memory.
 - `boundary`: load the approved boundary object from session memory.
-- `knowledge`: retrieve only `be.boundary-planning` from the pinned Qdrant generation.
+- `knowledge`: retrieve only `be.implementation` from the pinned Qdrant generation; the approved boundary itself is loaded from session state.
 - `source`: open only `targetFiles`; repository-wide source context is forbidden.
 - `orchestration`: resolve one execution mode and one provider mapping.
 

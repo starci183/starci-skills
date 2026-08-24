@@ -14,7 +14,7 @@ This operator records redacted conversation and artifact lineage. The input is a
 ## Provided by the previous state
 
 - `providerRef`: exact `session://` reference; this operator cannot replace or broaden it.
-- `conversationSnapshotRef`: exact `session://` reference; this operator cannot replace or broaden it.
+- `conversationSnapshotRef`: exact `session://` reference to an already-redacted snapshot artifact; raw provider transcripts are invalid and are never loaded by this operator.
 - `artifactRefs`: exact `session://` reference; this operator cannot replace or broaden it.
 - `redactionReceiptRef`: exact `session://` reference; this operator cannot replace or broaden it.
 
@@ -24,4 +24,4 @@ This operator records redacted conversation and artifact lineage. The input is a
 - `knowledge`: retrieve only `source.provenance` from the pinned Qdrant generation.
 - `orchestration`: resolve execution mode separately from provider/model mapping.
 
-Acceptance requires that provider, redaction receipt, artifact hashes, and ownership are valid. Validate the whole envelope before any load or side effect. Loaded content and intermediate analysis remain session-only.
+Acceptance requires that provider, redaction receipt, artifact hashes, and ownership are valid. The redaction receipt must bind policy version, raw-input hash, redacted-output hash, scanner version, and a passing prohibited-category result; its output hash must equal the snapshot artifact revision. Validate the whole envelope before any load or side effect. Loaded content and intermediate analysis remain session-only.

@@ -23,7 +23,7 @@ This operator resolves exact backend files for the approved scope. The input is 
 - `artifacts`: resolve only references declared by `payload.provided` into task-session memory.
 - `knowledge`: retrieve only `be.boundary-planning` from the pinned Qdrant generation.
 - `orchestration`: resolve execution mode separately from provider/model mapping.
-- `business`: load the exact declared revision from `.worktrees/business/`; product source is not business authority.
+- `business`: load the exact declared revision from `.worktrees/<project>/businesses/`; product source is not business authority.
 - `source`: open only declared exact files and verify their hashes; broad repository context is forbidden.
 
 Acceptance requires that each selected file has role, hash, relevance reason, and partition provenance. Validate the whole envelope before any load or side effect. Loaded content and intermediate analysis remain session-only.

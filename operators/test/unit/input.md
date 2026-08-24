@@ -18,6 +18,7 @@ This closed JSON object is ephemeral task-session state and is purged on every p
 - `source`: exact hash-pinned files only; broad repository preloading is forbidden.
 - `commands`: declared argv, cwd, and environment-name allowlist only.
 - `external`: declared resources and opaque credential handles only.
+- `cache`: one exact fingerprint and optional session receipt candidate; it is validated before knowledge or source is loaded.
 - `orchestration`: one mode and provider profile.
 
 Validate before loading. Never persist input, loaded values, scratch, observations, or receipts.

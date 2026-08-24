@@ -17,5 +17,7 @@ The output is ephemeral task-session state and is purged with provider observati
 
 | Decision | State | Emitted route | Durable effect |
 | --- | --- | --- | --- |
-| `proved` | `completed` | `platform.sonar.proved / complete` | Declared Sonar service/project enforcement changes |
-| `blocked` | `blocked` | `platform.blocked / blocked` | None |
+| `proved` | `completed` | `platform.sonar.proved / complete` | Declared changes, or an empty mutation list when already converged |
+| `blocked` | `blocked` | `platform.blocked / blocked` | Any partial coordinator mutation is reported with before/after revisions |
+
+A proved result requires a fresh receipt, not a mutation. Re-running an already-converged plan is a successful idempotent no-op.

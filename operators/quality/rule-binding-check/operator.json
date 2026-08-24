@@ -26,10 +26,18 @@
       "factsRemove": []
     },
     {
+      "stage": "quality.rule-bindings.result",
+      "status": "ready",
+      "factsAdd": [
+        "rule-bindings-fail"
+      ],
+      "factsRemove": []
+    },
+    {
       "stage": "quality.blocked",
       "status": "blocked",
       "factsAdd": [
-        "rule-bindings-fail"
+        "rule-bindings-inconclusive"
       ],
       "factsRemove": []
     }

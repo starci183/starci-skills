@@ -13,9 +13,9 @@ This operator reconciles only the declared cAdvisor, Prometheus, Grafana, and re
 ## Step 2 — Resolve authority and provided artifacts
 
 **Read:** `payload.provided`, `payload.loads.artifacts`, and `payload.loads.knowledge`.
-**Context:** resolve exactly `stackRef`, `metricsDestinationRef`, and `credentialReceiptRef`; retrieve only the pinned `platform.operations` record.
+**Context:** resolve exactly `stackRef`, `metricsDestinationRef`, `credentialReceiptRef`, and `approvalRef`; retrieve only the pinned `platform.observability` record.
 **Session write:** write identities, revisions, and applied rule IDs to `payload.session.scratchPrefix/bindings`.
-**Stop:** stop on missing, stale, duplicate, mismatched, or undeclared bindings; never copy loaded values into observations.
+**Stop:** stop on missing, stale, duplicate, mismatched, undeclared, or plan-hash-mismatched approval bindings; never copy loaded values into observations.
 **Orchestration:** workers may verify disjoint revisions read-only; the coordinator joins them.
 
 ## Step 3 — Preflight exact files, commands, and external state
@@ -55,7 +55,7 @@ This operator reconciles only the declared cAdvisor, Prometheus, Grafana, and re
 | Alias | Target | Kind | Why |
 | --- | --- | --- | --- |
 | `@provided-artifacts` | `payload.loads.artifacts` | session-exact | bind the three provided receipts exactly |
-| `@platform-operations` | `platform.operations` | qdrant | retrieve the only knowledge authority |
+| `@platform-operations` | `platform.observability` | qdrant | retrieve the only knowledge authority |
 | `@exact-source` | `payload.loads.source.targetFiles` | exact-source | inspect only hash-pinned observability configuration |
 | `@declared-commands` | `payload.loads.commands.commandRefs` | declared-only | execute only pre-authorized command envelopes |
 | `@external-bindings` | `payload.loads.external` | external-exact | bind exact stack, destination, probe, and credential resources |

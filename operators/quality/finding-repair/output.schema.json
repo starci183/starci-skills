@@ -42,6 +42,20 @@
             "stage",
             "status"
           ]
+        },
+        {
+          "properties": {
+            "stage": {
+              "const": "quality.inventory"
+            },
+            "status": {
+              "const": "ready"
+            }
+          },
+          "required": [
+            "stage",
+            "status"
+          ]
         }
       ]
     }
@@ -57,13 +71,15 @@
     "stage": {
       "enum": [
         "quality.repair.result",
-        "quality.blocked"
+        "quality.blocked",
+        "quality.inventory"
       ]
     },
     "status": {
       "enum": [
         "complete",
-        "blocked"
+        "blocked",
+        "ready"
       ]
     },
     "facts": {
@@ -90,7 +106,9 @@
         "decision": {
           "enum": [
             "repaired",
-            "boundary-drift"
+            "boundary-drift",
+            "stale-finding",
+            "external-blocker"
           ]
         },
         "state": {
@@ -117,7 +135,9 @@
             "code": {
               "enum": [
                 "quality-finding-repair-repaired",
-                "quality-finding-repair-boundary-drift"
+                "quality-finding-repair-boundary-drift",
+                "quality-finding-repair-stale-finding",
+                "quality-finding-repair-external-blocker"
               ]
             },
             "retryable": {
@@ -135,13 +155,15 @@
                 "stage": {
                   "enum": [
                     "quality.repair.result",
-                    "quality.blocked"
+                    "quality.blocked",
+                    "quality.inventory"
                   ]
                 },
                 "status": {
                   "enum": [
                     "complete",
-                    "blocked"
+                    "blocked",
+                    "ready"
                   ]
                 },
                 "factsAdd": {

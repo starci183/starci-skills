@@ -14,5 +14,4 @@ The fixed first state is `route`. Emit only normalized scope and facts as task-s
 
 | Option | Values | Decision effect |
 | --- | --- | --- |
-| `architectureMode` | `auto` / `required` / `skip` | Whether hard architecture analysis is required. |
 | `deploymentMode` | `none` / `handoff` | Stop after source proof or hand off to deployment. |

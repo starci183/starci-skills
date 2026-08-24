@@ -51,10 +51,24 @@
         },
         {
           "when": {
+            "decision": "stale-finding"
+          },
+          "target": "inventory",
+          "label": "stale-finding"
+        },
+        {
+          "when": {
             "decision": "boundary-drift"
           },
           "target": "blocked",
           "label": "boundary-drift"
+        },
+        {
+          "when": {
+            "decision": "external-blocker"
+          },
+          "target": "blocked",
+          "label": "external-blocker"
         }
       ]
     },
@@ -79,6 +93,13 @@
           },
           "target": "repair-approval",
           "label": "findings"
+        },
+        {
+          "when": {
+            "decision": "blocked"
+          },
+          "target": "blocked",
+          "label": "blocked"
         }
       ]
     },

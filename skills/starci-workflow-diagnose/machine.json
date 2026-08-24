@@ -24,12 +24,30 @@
           },
           "target": "complete",
           "label": "diagnosed"
+        },
+        {
+          "when": {
+            "decision": "inconclusive"
+          },
+          "target": "blocked",
+          "label": "inconclusive"
+        },
+        {
+          "when": {
+            "decision": "external-blocker"
+          },
+          "target": "blocked",
+          "label": "external-blocker"
         }
       ]
     },
     "complete": {
       "kind": "terminal",
       "result": "complete"
+    },
+    "blocked": {
+      "kind": "terminal",
+      "result": "blocked"
     }
   }
 }

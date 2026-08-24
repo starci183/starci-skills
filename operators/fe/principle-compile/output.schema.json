@@ -18,7 +18,7 @@
         {
           "properties": {
             "stage": {
-              "const": "requests.review"
+              "const": "layout.generate"
             },
             "status": {
               "const": "ready"
@@ -32,7 +32,7 @@
         {
           "properties": {
             "stage": {
-              "const": "requests.review"
+              "const": "layout.generate"
             },
             "status": {
               "const": "blocked"
@@ -56,7 +56,7 @@
     },
     "stage": {
       "enum": [
-        "requests.review"
+        "layout.generate"
       ]
     },
     "status": {
@@ -133,7 +133,7 @@
               "properties": {
                 "stage": {
                   "enum": [
-                    "requests.review"
+                    "layout.generate"
                   ]
                 },
                 "status": {

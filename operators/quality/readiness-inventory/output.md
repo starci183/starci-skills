@@ -21,5 +21,6 @@ The output is an ephemeral task-session object consumed by the parent state mach
 | --- | --- | --- | --- |
 | `green` | `completed` | `quality.inventory.result / complete` | readiness-green |
 | `findings` | `completed` | `quality.inventory.result / ready` | readiness-findings |
+| `blocked` | `blocked` | `quality.blocked / blocked` | readiness-inconclusive |
 
 `inventoryReceiptRef`, command captures, evidence, diagnostics, and output use `session://`. Only the explicit repair/debt product effect declared by `operator.json` may survive the skill.

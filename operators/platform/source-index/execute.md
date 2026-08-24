@@ -6,14 +6,14 @@ This operator indexes business authority and generated frontend-contract JSON by
 
 **Read:** complete input only.
 **Context:** none before validation.
-**Action:** run `validate-input.mjs`; freeze route refs, business revisions, snapshot identities, partition, and orchestration profile.
+**Action:** run `validate-input.mjs`; freeze project identity, route refs, business revisions, snapshot identities, partition, and orchestration profile.
 **Session write:** `payload.session.inputRef`.
 **Stop:** stop before any body load or Qdrant access on invalid schema, route, facts, or task ownership.
 
 ## Step 2 — Resolve routing and indexing law
 
 **Read:** `payload.loads.artifacts` and `payload.loads.knowledge`.
-**Context:** exact MCP config, route set, exclusion policy, and pinned `platform.operations` only.
+**Context:** exact MCP config, route set, exclusion policy, and pinned `platform.source-index` only.
 **Analysis:** verify partition ownership, permitted document kinds, exclusions, chunking identity, and knowledge hash.
 **Session write:** `scratchPrefix/index-policy`.
 **Stop:** stop on ambiguous partition, stale routing, excluded authority, or missing indexing law.
@@ -22,7 +22,7 @@ This operator indexes business authority and generated frontend-contract JSON by
 
 **Read:** business and frontend-contract metadata plus `payload.loads.index.currentDocuments`.
 **Context:** hashes and identities only. Do not load document bodies yet and do not query source content from Qdrant.
-**Analysis:** compare by `documentId + contentSha256`. A frontend identity also compares `sourceFingerprint`, `schemaVersion`, `generatorVersion`, and `generatorConfigSha256`.
+**Analysis:** compare business by `documentId + contentSha256`. Compare frontend coding context by `documentId + sourceRevision + sourceFingerprint + contentSha256 + schemaVersion + generatorVersion + generatorSha256 + generatorConfigSha256`.
 **Session write:** `scratchPrefix/dedup-plan` with `unchanged`, `upsert`, and `remove` IDs.
 **Orchestration:** workers may compare disjoint metadata read-only; coordinator validates one duplicate-free join.
 **Stop:** stop on duplicate document IDs, inconsistent hashes, partition mismatch, or incomplete join.
@@ -30,7 +30,7 @@ This operator indexes business authority and generated frontend-contract JSON by
 ## Step 4 — Load and normalize changed documents only
 
 **Read:** exact refs marked `upsert` in the dedup plan.
-**Context:** load business only from declared `.worktrees/business/` revisions and frontend capability only from declared generated JSON snapshots. Repository files, source-Qdrant results, and unchanged bodies are forbidden.
+**Context:** load business only from declared `.worktrees/<project>/businesses/` revisions and frontend capability only from declared `.worktrees/<project>/coding-context/frontend/` JSON snapshots. Repository files, source-Qdrant results, unchanged bodies, and another project's artifacts are forbidden.
 **Analysis:** validate each document schema, apply exclusions, normalize deterministically, chunk with the pinned chunker identity, and hash every point payload before embedding.
 **Session write:** `scratchPrefix/changed-documents`, `scratchPrefix/chunks`, and `scratchPrefix/point-plan`.
 **Orchestration:** read/normalize work may fan out by document. Workers return session point plans; they never write Qdrant.
@@ -60,7 +60,7 @@ This operator indexes business authority and generated frontend-contract JSON by
 | Alias | Target | Kind | Why |
 | --- | --- | --- | --- |
 | `@provided-artifacts` | `payload.loads.artifacts` | session | resolve exact MCP routing refs |
-| `@platform-operations` | `platform.operations` | qdrant | retrieve only indexing operations law |
+| `@platform-operations` | `platform.source-index` | qdrant | retrieve only indexing operations law |
 | `@business-authority` | `payload.loads.business` | worktree-exact | load exact business heads only when hashes changed |
 | `@frontend-contract-json` | `payload.loads.frontendContracts` | generated-json | load generated contract JSON only when identity changed |
 | `@target-index-metadata` | `payload.loads.index` | qdrant-target | compare and commit one declared partition |

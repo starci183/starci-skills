@@ -5,7 +5,7 @@
 | Knowledge ID | `fe.design-maintenance` |
 | Operators | `block-reconcile, maintenance-apply, learning-request, learning-resolve, surface-audit, authority-reconcile, consumer-align` |
 | Search tags | `frontend, block, feedback, learning, audit, grammar, principle, reconcile` |
-| Dependencies | `fe.design-principles, fe.grammar-complex-cases` |
+| Dependencies | `fe.design-principles, fe.grammar-common-overview`, plus selected Grammar object/case guides |
 
 ## Record
 

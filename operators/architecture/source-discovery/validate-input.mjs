@@ -14,7 +14,7 @@ function semantic(value) {
   if (JSON.stringify(actualKnowledge) !== JSON.stringify([...knowledgeIds].sort())) errors.push('/payload/loads/knowledge: exact knowledge set required');
   const taskPrefix = `session://tasks/${value.payload.session.taskId}/`;
   for (const key of ['inputRef', 'outputRef', 'scratchPrefix']) if (!value.payload.session[key].startsWith(taskPrefix)) errors.push(`/payload/session/${key}: must belong to taskId`);
-  if (!value.payload.loads.business.authorityPath.startsWith('.worktrees/business/')) errors.push('/payload/loads/business/authorityPath: business authority must come from .worktrees/business');
+  if (!/^\.worktrees\/[a-z0-9][a-z0-9-]*\/businesses\//.test(value.payload.loads.business.authorityPath)) errors.push('/payload/loads/business/authorityPath: business authority must come from .worktrees/<project>/businesses');
   if (value.payload.loads.source.repositoryContext !== false || value.payload.loads.source.loadMode !== 'exact-files') errors.push('/payload/loads/source: only exact files are allowed');
   return errors;
 }

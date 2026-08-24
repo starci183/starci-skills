@@ -14,10 +14,11 @@ This closed JSON object is ephemeral task-session state and is purged on every p
 ## Runtime loads
 
 - `business`: must be `null`.
-- `knowledge`: exact pinned `fe.ui-testing`, `fe.customer-journey`, `fe.layout-composition`, `fe.state-modeling`, `fe.product-seeding`.
+- `knowledge`: exact pinned `fe.ui-testing` only. The approved test plan and seed receipt already project journey, layout, state, and fixture authority; reloading their source knowledge would duplicate context.
 - `source`: exact hash-pinned files only; broad repository preloading is forbidden.
 - `commands`: declared argv, cwd, and environment-name allowlist only.
 - `external`: declared resources and opaque credential handles only.
+- `cache`: one exact fingerprint and optional session receipt candidate; UI reuse is disabled unless the approved test plan explicitly declares a fresh immutable proof boundary.
 - `orchestration`: one mode and provider profile.
 
 Validate before loading. Never persist input, loaded values, scratch, observations, or receipts.

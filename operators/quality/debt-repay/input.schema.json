@@ -73,7 +73,8 @@
           "required": [
             "approvedDebtRef",
             "baselineRef",
-            "scopeRef"
+            "scopeRef",
+            "loopControlRef"
           ],
           "properties": {
             "approvedDebtRef": {
@@ -83,6 +84,9 @@
               "$ref": "#/$defs/sessionRef"
             },
             "scopeRef": {
+              "$ref": "#/$defs/sessionRef"
+            },
+            "loopControlRef": {
               "$ref": "#/$defs/sessionRef"
             }
           }

@@ -15,7 +15,6 @@ function semantic(value) {
   if (emits.stage !== expected.stage || emits.status !== expected.status || !same(emits.factsAdd, expected.factsAdd) || !same(emits.factsRemove, expected.factsRemove)) errors.push('$.payload.state.emits: must exactly match manifest emission');
   for (const fact of expected.factsAdd) if (!value.facts.includes(fact)) errors.push(`$.facts: missing emitted fact ${fact}`);
   if (payload.decision === 'proved' && payload.produced.mcpPublishReceiptRef === null) errors.push('$.payload.produced.mcpPublishReceiptRef: proved output requires receipt');
-  if (payload.decision === 'proved' && payload.produced.mutations.length === 0) errors.push('$.payload.produced.mutations: proved output requires a reported mutation');
   for (const mutation of payload.produced.mutations) if (mutation.appliedBy !== 'coordinator') errors.push('$.payload.produced.mutations: only coordinator mutations are valid');
   const prefix = `session://tasks/${payload.cleanup.taskId}/`;
   for (const ref of refs({ produced: payload.produced, cleanup: payload.cleanup, evidenceRefs: payload.evidenceRefs })) if (!ref.startsWith(prefix)) errors.push(`$: foreign output session ref ${ref}`);

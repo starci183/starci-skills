@@ -6,17 +6,17 @@ This operator reconciles declared Sonar service and project enforcement. All inp
 
 **Read:** complete input only.
 **Context:** none before validation.
-**Action:** run `validate-input.mjs`; freeze provided refs, resource revisions, credential handles, and orchestration profile.
+**Action:** run `validate-input.mjs`; freeze provided refs, exact approval and plan hash, resource revisions, credential handles, and orchestration profile.
 **Session write:** `payload.session.inputRef`.
 **Stop:** stop before provider access on invalid schema, route, or task ownership.
 
 ## Step 2 — Resolve policy and exact resources
 
 **Read:** `payload.loads.artifacts`, `payload.loads.knowledge`, and `payload.loads.external`.
-**Context:** exact project/profile refs, pinned `platform.operations`, declared Sonar resources, and opaque handles only. Raw credentials are forbidden.
+**Context:** exact project/profile refs, pinned `platform.sonar`, declared Sonar resources, and opaque handles only. Raw credentials are forbidden.
 **Analysis:** verify project keys, expected source revisions, profile/gate identities, service endpoint identity, handle capability, and current provider revisions.
 **Session write:** `scratchPrefix/bindings`.
-**Stop:** emit `blocked` on missing custody, stale revision, ambiguous project identity, or undeclared resource.
+**Stop:** emit `blocked` on missing custody, missing or stale approval, approval/plan mismatch, stale revision, ambiguous project identity, or undeclared resource.
 
 ## Step 3 — Inspect current Sonar state
 
@@ -51,7 +51,7 @@ This operator reconciles declared Sonar service and project enforcement. All inp
 | Alias | Target | Kind | Why |
 | --- | --- | --- | --- |
 | `@provided-artifacts` | `payload.loads.artifacts` | session | resolve exact previous-state refs |
-| `@platform-operations` | `platform.operations` | qdrant | retrieve only platform operations law |
+| `@platform-operations` | `platform.sonar` | qdrant | retrieve only platform operations law |
 | `@sonar-resources` | `payload.loads.external` | provider | bind declared resources and opaque handles |
 | `@orchestration-profile` | `payload.loads.orchestration` | orchestration | select strategy independently of provider/model |
 

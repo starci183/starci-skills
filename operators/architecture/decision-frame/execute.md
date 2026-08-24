@@ -13,7 +13,7 @@ This operator frames one architecture decision. Input, output, context bindings,
 ## Step 2 — Resolve exact bindings
 
 **Read:** `payload.loads.artifacts`, `payload.loads.knowledge`, and `payload.loads.business`.
-**Context:** resolve exact task-session artifacts and retrieve only `architecture.decision-analysis` from its pinned Qdrant generation. Load only the declared business revision under `.worktrees/business/`.
+**Context:** resolve exact task-session artifacts and retrieve only `architecture.decision-analysis` from its pinned Qdrant generation. Load only the declared business revision under `.worktrees/<project>/businesses/`.
 **Analysis:** verify identity, revision, freshness, and ownership. Record applied rule IDs and match/mismatch evidence, never hidden reasoning.
 **Session write:** `payload.session.scratchPrefix/bindings`.
 **Stop:** stop when a binding is missing, stale, ambiguous, or outside the accepted route.

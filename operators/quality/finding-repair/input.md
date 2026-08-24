@@ -14,6 +14,7 @@ This operator repairs one approved readiness finding. Its input is an ephemeral 
 ## Provided by the previous state
 
 - `approvedFindingRef`: exact `session://` reference; the operator cannot replace or broaden it.
+- `approvalReceiptRef`: exact `session://` approval over the finding fingerprint, target hashes, permitted writes, and approval revision.
 - `baselineRef`: exact `session://` reference; the operator cannot replace or broaden it.
 - `ownerBoundaryRef`: exact `session://` reference; the operator cannot replace or broaden it.
 

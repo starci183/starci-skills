@@ -35,22 +35,74 @@ class OperatorKnowledgeRuntimeTests(unittest.TestCase):
     def tearDownClass(cls) -> None:
         cls.temporary.cleanup()
 
-    def test_inventory_contains_only_root_operator_knowledge(self) -> None:
+    def test_inventory_contains_recursive_operator_knowledge(self) -> None:
         self.assertGreaterEqual(self.summary["counts"]["operator-knowledge"], 33)
-        self.assertEqual(set(self.summary["counts"]), {"operator-knowledge"})
+        self.assertTrue(set(self.summary["counts"]).issubset({"operator-knowledge", "frontend-coding-context"}))
         source_paths = [item.relative_path for item in discover_source_files(SOURCE_ROOT)]
-        self.assertTrue(all(path.startswith(".claude/knowledge/") for path in source_paths))
-        self.assertFalse(any(path.endswith("/en.md") or path.endswith("/vi.md") for path in source_paths))
-        self.assertIn(".claude/knowledge/grammar-complex-cases.md", source_paths)
+        knowledge_paths = [path for path in source_paths if path.startswith(".claude/knowledge/")]
+        self.assertFalse(any(path.endswith("/en.md") or path.endswith("/vi.md") for path in knowledge_paths))
+        self.assertIn(".claude/knowledge/grammar/common/overview.md", source_paths)
+        self.assertIn(".claude/knowledge/grammar/core/overview.md", source_paths)
+        self.assertIn(".claude/knowledge/grammar/offset-pop/overview.md", source_paths)
         self.assertEqual(self.summary["storage"]["engine"], "qdrant-edge")
         self.assertTrue((self.index_path / "shard").is_dir())
         manifest = json.loads((self.index_path / "manifest.json").read_text(encoding="utf-8"))
         self.assertNotIn("records", manifest)
 
-    def test_complex_case_query_selects_grammar_knowledge(self) -> None:
+    def test_project_scoped_frontend_context_is_indexed_and_queryable(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            workspace = Path(temporary)
+            knowledge = workspace / ".claude" / "knowledge"
+            knowledge.mkdir(parents=True)
+            (knowledge / "test.md").write_text(
+                "# Test law\n\n| Field | Value |\n| --- | --- |\n| Knowledge ID | `shared.test-law` |\n| Operators | `test` |\n| Search tags | `test` |\n| Dependencies | `none` |\n\n## Record\n\nTest only.\n",
+                encoding="utf-8",
+            )
+            generation = workspace / ".worktrees" / "demo" / "coding-context" / "frontend" / "generations" / "g1" / "components.json"
+            generation.parent.mkdir(parents=True)
+            generation.write_text(json.dumps({
+                "schemaVersion": 1,
+                "project": "demo",
+                "kind": "frontend-coding-context",
+                "generation": {"id": "g1", "inputSha256": "sha256:" + "1" * 64},
+                "components": [{
+                    "name": "SurfaceCard",
+                    "layer": "branches",
+                    "description": "Named safe surface with external label and nested list state.",
+                    "source": "src/components/branches/SurfaceCard/index.tsx",
+                    "sourceSha256": "sha256:" + "2" * 64,
+                    "props": {"type": "SurfaceCardProps", "fields": {"label": {"required": True, "type": "string", "description": ""}}},
+                    "contracts": ["surface-in-surface"],
+                }],
+            }), encoding="utf-8")
+            current = generation.parents[2] / "current.json"
+            current.write_text(json.dumps({
+                "schemaVersion": 1,
+                "project": "demo",
+                "kind": "frontend-coding-context",
+                "generationPath": ".worktrees/demo/coding-context/frontend/generations/g1/components.json",
+            }), encoding="utf-8")
+            index_path = workspace / "index"
+            build_index(workspace, index_path)
+            packet = query_index(
+                load_index(index_path),
+                query_text="SurfaceCard external label nested list safe surface",
+                kinds=["frontend-coding-context"],
+                top_k=3,
+                project="demo",
+                grammar=None,
+                profile=None,
+                route=None,
+                embedding_model=None,
+            )
+            hit = packet["selected"]["frontendCodingContext"][0]
+            self.assertEqual(hit["data"]["name"], "SurfaceCard")
+            self.assertEqual(hit["data"]["project"], "demo")
+
+    def test_named_grammar_case_query_selects_exact_case(self) -> None:
         packet = query_index(
             self.index,
-            query_text="nested surface neutral affirmative check treatment complex case",
+            query_text="grammar core SurfaceCard trustworthy list inside card affirmative rows nested surface",
             kinds=None,
             top_k=3,
             project=None,
@@ -60,7 +112,7 @@ class OperatorKnowledgeRuntimeTests(unittest.TestCase):
             embedding_model=None,
         )
         selected = [item["data"]["knowledgeId"] for item in packet["selected"]["operatorKnowledge"]]
-        self.assertEqual(selected[0], "fe.grammar-complex-cases")
+        self.assertEqual(selected[0], "fe.grammar-core-case-trust-list-in-card")
 
     def test_deployment_query_selects_lifecycle_knowledge(self) -> None:
         packet = query_index(
@@ -129,7 +181,7 @@ class OperatorKnowledgeRuntimeTests(unittest.TestCase):
                     str(script),
                     "query",
                     "--text",
-                    "nested surface neutral affirmative check",
+                    "grammar core SurfaceCard trustworthy list inside card affirmative rows nested surface",
                     "--index",
                     str(index_path),
                     "--top-k",
@@ -143,7 +195,7 @@ class OperatorKnowledgeRuntimeTests(unittest.TestCase):
             packet = json.loads(queried.stdout)
             self.assertEqual(
                 packet["selected"]["operatorKnowledge"][0]["data"]["knowledgeId"],
-                "fe.grammar-complex-cases",
+                "fe.grammar-core-case-trust-list-in-card",
             )
 
     def test_status_detects_fresh_index(self) -> None:

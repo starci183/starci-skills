@@ -19,7 +19,7 @@ The output is a closed, ephemeral task-session object consumed by the parent ski
 
 | Decision | Operator state | Emitted state | Required facts |
 | --- | --- | --- | --- |
-| `compiled` | `completed` | `requests.review / ready` | `principles-compiled` |
-| `blocked` | `blocked` | `requests.review / blocked` | `principle-boundary-failed` |
+| `compiled` | `completed` | `layout.generate / ready` | `principles-compiled` |
+| `blocked` | `blocked` | `layout.generate / blocked` | `principle-boundary-failed` |
 
 The parent state machine, not the operator or an orchestration worker, routes `payload.state.emits`. Successful results remain task-session artifacts and do not create durable intermediate files.

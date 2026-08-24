@@ -4,8 +4,9 @@ import { validatorFor, runValidatorCli } from '../../validation.mjs';
 const guards = {
   "source-fit.resolve\u0000ready": {
     "all": [
-      "grammar-converged",
-      "frontend-contract-generation-ready"
+      "grammar-pair-ready",
+      "frontend-coding-context-ready",
+      "design-knowledge-index-ready"
     ],
     "none": [
       "grammar-business-gate-failed"

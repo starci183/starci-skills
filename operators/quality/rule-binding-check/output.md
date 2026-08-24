@@ -20,6 +20,7 @@ The output is an ephemeral task-session object consumed by the parent state mach
 | Decision | State status | Emitted state | Facts added |
 | --- | --- | --- | --- |
 | `pass` | `completed` | `quality.rule-bindings.result / complete` | rule-bindings-pass |
-| `fail` | `blocked` | `quality.blocked / blocked` | rule-bindings-fail |
+| `fail` | `completed` | `quality.rule-bindings.result / ready` | rule-bindings-fail |
+| `blocked` | `blocked` | `quality.blocked / blocked` | rule-bindings-inconclusive |
 
 `ruleBindingReceiptRef`, command captures, evidence, diagnostics, and output use `session://`. Only the explicit repair/debt product effect declared by `operator.json` may survive the skill.

@@ -130,14 +130,22 @@
       "type": "object",
       "additionalProperties": false,
       "required": [
-        "brainstorm"
+        "directionCount",
+        "selectionPolicy"
       ],
       "properties": {
-        "brainstorm": {
+        "directionCount": {
+          "type": "number",
+          "enum": [
+            3,
+            4
+          ]
+        },
+        "selectionPolicy": {
           "type": "string",
           "enum": [
-            "default",
-            "multi-direction"
+            "manual",
+            "auto-recommended"
           ]
         }
       }

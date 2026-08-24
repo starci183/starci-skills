@@ -16,11 +16,12 @@ This operator reconciles the declared Sonar service, project set, and quality-pr
 - `projectSetRef`: approved Sonar project identities and expected source revisions.
 - `qualityProfileRef`: exact profile, quality-gate, and enforcement bindings.
 - `credentialReceiptRef`: custody-approved opaque credential receipt.
+- `approvalRef`: exact approval for the declared project/profile/gate delta and plan revision.
 
 ## Loaded by the runtime
 
-- `artifacts`: resolve only the three provided refs.
-- `knowledge`: retrieve only `platform.operations` from a pinned Qdrant generation.
+- `artifacts`: resolve only the four provided refs.
+- `knowledge`: retrieve only `platform.sonar` from a pinned Qdrant generation.
 - `external`: load only declared Sonar service/project resource identities and opaque credential handles; never secret values.
 - `orchestration`: resolve strategy independently from provider/model selection.
 

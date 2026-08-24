@@ -1,6 +1,6 @@
 # Execute `fe/customer-journey`
 
-This operator's responsibility is to derive two or three materially different end-to-end customer-flow directions from the approved business goal. Its input, output, loaded bindings, worker observations, drafts, and evidence exist only inside the current task session.
+This operator derives three or four materially different end-to-end customer journeys from a fresh, approved business projection, recommends exactly one, and applies the declared manual or auto-recommended selection policy. Everything remains inside the task session.
 
 ## Step 1 — Validate and freeze the invocation
 
@@ -16,10 +16,10 @@ This operator's responsibility is to derive two or three materially different en
 ## Step 2 — Load business authority
 
 **Read:** `payload.loads.business` and `payload.provided.businessHeadRef`.
-**Context:** load exactly the declared revision under `.worktrees/business/`; never infer business behavior from frontend source.
-**Decision evidence:** reference equality, revision hash, accepted business status, and the specific facts needed to derive two or three materially different end-to-end customer-flow directions from the approved business goal.
-**Action:** normalize only the applicable actor, outcome, rule, state, and constraint references.
-**Session write:** value-safe business bindings under `scratchPrefix/business`; do not copy the complete business document into output.
+**Context:** load only the journey projection at the declared revision under `.worktrees/<project>/businesses/`; never infer business behavior from frontend source.
+**Decision evidence:** fresh-receipt equality, projection revision, actor, trigger, terminal outcome, transitions, rules, and recovery constraints.
+**Action:** normalize only the applicable journey slice.
+**Session write:** projection bindings under `scratchPrefix/business-projection`; do not copy the complete business tree.
 **Durable write:** none.
 **Stop:** stop when the business head is missing, stale, rejected, or does not equal the provided reference.
 **Orchestration:** coordinator owns authority selection; workers cannot choose another business head.
@@ -27,7 +27,7 @@ This operator's responsibility is to derive two or three materially different en
 ## Step 3 — Resolve upstream, knowledge, and source capability
 
 **Read:** `payload.loads.upstream`, `payload.loads.knowledge`, and every source binding declared by this schema.
-**Context:** resolve only preflight result, actor goal, business outcomes, and known constraints. Retrieve only the listed knowledge IDs at their pinned content hashes. This operator has no frontend capability or repository-file binding.
+**Context:** resolve only preflight and business-freshness receipts plus optional flow feedback. Retrieve only `fe.customer-journey` at its pinned hash. This operator has no frontend capability or repository-file binding.
 **Decision evidence:** upstream identity and revision matches, knowledge generation matches, and every requested capability or exact target is inside the frozen boundary.
 **Action:** create a minimal constraint set containing IDs, revisions, applicable rules, target permissions, and required outcomes.
 **Session write:** normalized constraints at `scratchPrefix/constraints`.
@@ -39,19 +39,19 @@ This operator's responsibility is to derive two or three materially different en
 
 **Read:** normalized business and authority constraints plus only the exact source-capability records or targets declared above.
 **Context:** do not load another feature, knowledge record, contract generation, file, service, or provider target.
-**Decision evidence:** Normalize the actor, trigger, goal, ordered decisions, failure recovery, and terminal outcome. Produce two or three directions that differ in journey structure or decision timing, never cosmetic presentation.
+**Decision evidence:** normalize actor, trigger, goal, ordered decisions, failure recovery, and terminal outcome. Produce exactly the requested three or four directions that differ in sequencing, decision timing, recovery, or page boundaries—never cosmetic presentation.
 **Action:** execute that classification or preparation and attach evidence by stable input identity; record applied rules and observable conclusions, never hidden reasoning.
 **Session write:** a normalized draft at `scratchPrefix/customer-journey-draft`.
 **Durable write:** none at this step.
 **Stop:** stop when actor goal, terminal outcome, or a required business transition lacks authority.
-**Orchestration:** Workers may independently draft candidate journey directions from the same frozen business facts. The coordinator joins them, removes cosmetic duplicates, and retains only two or three materially distinct directions.
+**Orchestration:** in economical mode the coordinator drafts sequentially; in balanced or parallel mode workers may draft from the same minimal projection. The coordinator joins, deduplicates, and retains exactly three or four material directions.
 
 ## Step 5 — Verify and commit the accepted result
 
 **Read:** the normalized draft, joined worker observations, frozen constraints, and expected emitted facts.
 **Context:** no new context may be loaded during verification.
 **Decision evidence:** Trace every direction from entry to terminal outcome, prove all business rules and recovery points are covered, and reject any direction that compresses a genuine multi-page journey into tabs.
-**Action:** validate completeness, conflict freedom, boundary compliance, and decision-to-route mapping. The coordinator rejects missing worker IDs or conflicting observations before any effect.
+**Action:** validate completeness and rank all directions by evidenced fit, recoverability, risk, and implementation cost. Recommend exactly one. Under `manual`, emit pending with no selected ref. Under `auto-recommended`, bind only the recommendation to `selectedJourneyRef` and emit approved.
 **Session write:** accepted evidence and before/after descriptors under `scratchPrefix/accepted-result`.
 **Durable write:** None. The accepted result remains a task-session value.
 **Stop:** stop when actor goal, terminal outcome, or a required business transition lacks authority.
@@ -72,7 +72,7 @@ This operator's responsibility is to derive two or three materially different en
 
 | Alias | Target | Kind | Why |
 | --- | --- | --- | --- |
-| `@business-head` | `payload.loads.business` | worktree-exact | load the exact business revision without unrelated features |
-| `@upstream` | `payload.loads.upstream` | session | resolve only the accepted upstream artifacts |
+| `@business-projection` | `payload.loads.business` | worktree-projection | load only journey-relevant authority from `.worktrees/<project>/businesses/` |
+| `@upstream` | `payload.loads.upstream` | session | resolve preflight, freshness, and optional feedback only |
 | `@fe-customer-journey` | `fe.customer-journey` | qdrant | retrieve only this operator law from the pinned generation |
 | `@orchestration-profile` | `payload.loads.orchestration` | orchestration | select bounded sequential or read-only fan-out execution |

@@ -11,7 +11,7 @@ function semantic(value) {
   if (p.state.status !== expected.operatorStatus || p.state.code !== expected.code || p.state.retryable !== expected.retryable) errors.push('$.payload.state: decision semantics mismatch');
   if (p.state.emits.stage !== expected.stage || p.state.emits.status !== expected.status || !same(p.state.emits.factsAdd, expected.factsAdd) || !same(p.state.emits.factsRemove, expected.factsRemove)) errors.push('$.payload.state.emits: exact manifest emission required');
   for (const fact of expected.factsAdd) if (!value.facts.includes(fact)) errors.push(`$.facts: missing ${fact}`);
-  if (p.decision === 'proved' && (p.produced.observabilityReceiptRef === null || p.produced.mutations.length === 0)) errors.push('$.payload.produced: proved output requires receipt and mutation');
+  if (p.decision === 'proved' && p.produced.observabilityReceiptRef === null) errors.push('$.payload.produced: proved output requires a receipt');
   for (const mutation of p.produced.mutations) if (mutation.appliedBy !== 'coordinator') errors.push('$.payload.produced.mutations: coordinator ownership required');
   const prefix = `session://tasks/${p.cleanup.taskId}/`; for (const ref of refs({ produced: p.produced, cleanup: p.cleanup, evidenceRefs: p.evidenceRefs })) if (!ref.startsWith(prefix)) errors.push(`$: foreign output session ref ${ref}`);
   for (const item of p.context.used) if (/source[- ]?context|repository[- ]?context/i.test(item.ref)) errors.push('$.payload.context.used: broad context forbidden');

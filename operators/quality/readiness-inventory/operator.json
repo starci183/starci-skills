@@ -32,6 +32,14 @@
         "readiness-findings"
       ],
       "factsRemove": []
+    },
+    {
+      "stage": "quality.blocked",
+      "status": "blocked",
+      "factsAdd": [
+        "readiness-inconclusive"
+      ],
+      "factsRemove": []
     }
   ],
   "sideEffects": [

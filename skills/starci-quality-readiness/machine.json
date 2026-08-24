@@ -31,6 +31,13 @@
           },
           "target": "repair-approval",
           "label": "findings"
+        },
+        {
+          "when": {
+            "decision": "blocked"
+          },
+          "target": "blocked",
+          "label": "blocked"
         }
       ]
     },
@@ -62,6 +69,10 @@
         }
       ]
     },
+    "blocked": {
+      "kind": "terminal",
+      "result": "blocked"
+    },
     "repair": {
       "kind": "operator",
       "ref": "quality/finding-repair",
@@ -75,20 +86,30 @@
         },
         {
           "when": {
+            "decision": "stale-finding"
+          },
+          "target": "inventory",
+          "label": "stale-finding"
+        },
+        {
+          "when": {
             "decision": "boundary-drift"
           },
           "target": "blocked",
           "label": "boundary-drift"
+        },
+        {
+          "when": {
+            "decision": "external-blocker"
+          },
+          "target": "blocked",
+          "label": "external-blocker"
         }
       ]
     },
     "rejected": {
       "kind": "terminal",
       "result": "rejected"
-    },
-    "blocked": {
-      "kind": "terminal",
-      "result": "blocked"
     }
   }
 }

@@ -29,12 +29,23 @@
           "when": {
             "decision": "fail"
           },
-          "target": "blocked",
+          "target": "findings",
           "label": "fail"
+        },
+        {
+          "when": {
+            "decision": "blocked"
+          },
+          "target": "blocked",
+          "label": "blocked"
         }
       ]
     },
     "complete": {
+      "kind": "terminal",
+      "result": "complete"
+    },
+    "findings": {
       "kind": "terminal",
       "result": "complete"
     },

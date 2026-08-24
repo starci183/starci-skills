@@ -22,7 +22,13 @@ function closedRoot(rule, schema, seen = new Set()) {
 const domains = fs.readdirSync(root, { withFileTypes: true }).filter((item) => item.isDirectory()).map((item) => item.name);
 const operatorDirs = domains.flatMap((domain) => fs.readdirSync(path.join(root, domain), { withFileTypes: true }).filter((item) => item.isDirectory()).map((item) => path.join(root, domain, item.name)));
 
-const knowledgeIds = new Set(fs.readdirSync(path.join(releaseRoot, 'knowledge')).filter((name) => name.endsWith('.md')).map((name) => fs.readFileSync(path.join(releaseRoot, 'knowledge', name), 'utf8').match(/^\|\s*Knowledge ID\s*\|\s*`([^`]+)`\s*\|/mi)?.[1]).filter(Boolean));
+function walkFiles(directory) {
+  return fs.readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {
+    const target = path.join(directory, entry.name);
+    return entry.isDirectory() ? walkFiles(target) : [target];
+  });
+}
+const knowledgeIds = new Set(walkFiles(path.join(releaseRoot, 'knowledge')).filter((file) => file.endsWith('.md')).map((file) => fs.readFileSync(file, 'utf8').match(/^\|\s*Knowledge ID\s*\|\s*`([^`]+)`\s*\|/mi)?.[1]).filter(Boolean));
 const sourceRefs = new Set(readJson(path.join(releaseRoot, 'knowledge', 'references', 'catalog.json')).references.map((item) => item.id));
 
 for (const directory of operatorDirs) {

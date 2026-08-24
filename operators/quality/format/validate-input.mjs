@@ -15,6 +15,10 @@ function semantic(value) {
   const taskPrefix = `session://tasks/${value.payload.session.taskId}/`;
   for (const key of ['inputRef', 'outputRef', 'scratchPrefix']) if (!value.payload.session[key].startsWith(taskPrefix)) errors.push(`/payload/session/${key}: must belong to taskId`);
 
+  const cache = value.payload.loads.cache;
+  if (!cache.fingerprintRef.startsWith(taskPrefix)) errors.push('/payload/loads/cache/fingerprintRef: must belong to taskId');
+  if (cache.candidateReceiptRef !== null && !cache.candidateReceiptRef.startsWith(taskPrefix)) errors.push('/payload/loads/cache/candidateReceiptRef: must belong to taskId');
+
 
   if (value.payload.loads.execution.loadMode !== 'exact-command' || value.payload.loads.execution.capture !== 'session-only') errors.push('/payload/loads/execution: exact command with session-only capture required');
   return errors;

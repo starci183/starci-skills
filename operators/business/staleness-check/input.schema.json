@@ -1,0 +1,96 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://starci.dev/v6/operators/business/staleness-check/input.schema.json",
+  "title": "business/staleness-check operator input",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "runId", "stage", "status", "facts", "payload"],
+  "properties": {
+    "schemaVersion": { "const": 6 },
+    "runId": { "type": "string", "minLength": 1 },
+    "stage": { "enum": ["business.evidence", "architecture.decision.frame", "architecture.source"] },
+    "status": { "const": "ready" },
+    "facts": { "type": "array", "uniqueItems": true, "items": { "type": "string", "minLength": 1 } },
+    "payload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["provided", "loads", "session"],
+      "properties": {
+        "provided": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["project", "routeReceiptRef", "role", "purpose", "refreshAttempt", "maxRefreshAttempts"],
+          "properties": {
+            "project": { "type": "string", "pattern": "^[a-z0-9][a-z0-9-]*$" },
+            "routeReceiptRef": { "$ref": "#/$defs/sessionRef" },
+            "role": { "enum": ["frontend", "backend", "fullstack"] },
+            "purpose": { "const": "consumer-read" },
+            "refreshAttempt": { "type": "integer", "minimum": 0 },
+            "maxRefreshAttempts": { "type": "integer", "minimum": 1, "maximum": 3 }
+          }
+        },
+        "loads": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["businessMetadata", "sourceMetadata", "orchestration"],
+          "properties": {
+            "businessMetadata": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["authorityPath", "exists", "headRef", "status", "revision", "contentSha256", "baselineCommit", "loadMode"],
+              "properties": {
+                "authorityPath": { "type": "string", "pattern": "^\\.worktrees/[a-z0-9][a-z0-9-]*/businesses(?:/|$)" },
+                "exists": { "type": "boolean" },
+                "headRef": { "type": ["string", "null"], "minLength": 1 },
+                "status": { "enum": ["missing", "draft", "approved", "rejected", "invalid"] },
+                "revision": { "anyOf": [{ "$ref": "#/$defs/sha256" }, { "type": "null" }] },
+                "contentSha256": { "anyOf": [{ "$ref": "#/$defs/sha256" }, { "type": "null" }] },
+                "baselineCommit": { "anyOf": [{ "$ref": "#/$defs/gitCommit" }, { "type": "null" }] },
+                "loadMode": { "const": "metadata-only" }
+              }
+            },
+            "sourceMetadata": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["repositoryRef", "branch", "headCommit", "routeRevision", "loadMode"],
+              "properties": {
+                "repositoryRef": { "type": "string", "minLength": 1 },
+                "branch": { "type": "string", "minLength": 1 },
+                "headCommit": { "$ref": "#/$defs/gitCommit" },
+                "routeRevision": { "$ref": "#/$defs/sha256" },
+                "loadMode": { "const": "metadata-only" }
+              }
+            },
+            "orchestration": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["mode", "profileRef", "providerRef"],
+              "properties": {
+                "mode": { "enum": ["economical", "balanced", "parallel"] },
+                "profileRef": { "enum": ["orchestration/modes/economical.json", "orchestration/modes/balanced.json", "orchestration/modes/parallel.json"] },
+                "providerRef": { "type": "string", "pattern": "^orchestration/providers/[a-z0-9-]+\\.json$" }
+              }
+            }
+          }
+        },
+        "session": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["taskId", "inputRef", "outputRef", "scratchPrefix", "retention"],
+          "properties": {
+            "taskId": { "type": "string", "minLength": 1 },
+            "inputRef": { "$ref": "#/$defs/sessionRef" },
+            "outputRef": { "$ref": "#/$defs/sessionRef" },
+            "scratchPrefix": { "$ref": "#/$defs/sessionRef" },
+            "retention": { "const": "until-skill-terminal" }
+          }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "sha256": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
+    "gitCommit": { "type": "string", "pattern": "^[0-9a-f]{40,64}$" },
+    "sessionRef": { "type": "string", "pattern": "^session://tasks/[A-Za-z0-9._-]+/.+$" }
+  }
+}

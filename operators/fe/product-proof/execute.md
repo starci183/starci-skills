@@ -16,7 +16,7 @@ This operator's responsibility is to prove the implemented frontend journey thro
 ## Step 2 — Load business authority
 
 **Read:** `payload.loads.business` and `payload.provided.businessHeadRef`.
-**Context:** load exactly the declared revision under `.worktrees/business/`; never infer business behavior from frontend source.
+**Context:** load exactly the declared revision under `.worktrees/<project>/businesses/`; never infer business behavior from frontend source.
 **Decision evidence:** reference equality, revision hash, accepted business status, and the specific facts needed to prove the implemented frontend journey through declared static gates, seeded states, and browser scenarios.
 **Action:** normalize only the applicable actor, outcome, rule, state, and constraint references.
 **Session write:** value-safe business bindings under `scratchPrefix/business`; do not copy the complete business document into output.

@@ -151,7 +151,7 @@
                 },
                 "authorityPath": {
                   "type": "string",
-                  "pattern": "^\\.worktrees/business/"
+                  "pattern": "^\\.worktrees/[a-z0-9][a-z0-9-]*/businesses(?:/|$)"
                 },
                 "revision": {
                   "$ref": "#/$defs/sha256"
@@ -262,7 +262,7 @@
               "properties": {
                 "snapshotPath": {
                   "type": "string",
-                  "pattern": "^\\.worktrees/frontend-source/"
+                  "pattern": "^\\.worktrees/[a-z0-9][a-z0-9-]*/coding-context/frontend(?:/|$)"
                 },
                 "snapshotSha256": {
                   "$ref": "#/$defs/sha256"

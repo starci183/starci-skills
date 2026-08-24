@@ -23,7 +23,7 @@ This operator queries redacted conversation provenance. Input, output, context b
 **Read:** validated bindings, and accepted machine facts.
 **Context:** use no undeclared knowledge, business feature, artifact, or source file.
 **Decision criteria:** query, project role, generation, and redaction policy are bounded.
-**Analysis:** search only the declared provenance index and return found or empty. Record evidence, criteria, and conclusions only; never record chain-of-thought.
+**Analysis:** search only the declared provenance index, rebind every candidate to its current durable head hash, and return authorized head/artifact refs or empty. Never return a transcript body. Record evidence, criteria, and conclusions only; never record chain-of-thought.
 **Session write:** candidate `conversationQueryReceiptRef` at `payload.session.scratchPrefix/candidate`.
 **Orchestration:** economical mode is sequential. Balanced or parallel mode may delegate independent read-only comparisons. Each worker receives only assigned refs; the coordinator owns joining and the decision.
 **Stop:** emit only a declared decision when evidence is missing, contradictory, or outside scope.

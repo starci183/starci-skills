@@ -44,13 +44,13 @@ function walk(directory) {
 }
 
 const operatorManifests = walk(path.join(root, 'operators')).filter((file) => path.basename(file) === 'operator.json');
-if (operatorManifests.length !== 80) fail(`expected 80 operators, found ${operatorManifests.length}`);
+if (operatorManifests.length !== 83) fail(`expected 83 operators, found ${operatorManifests.length}`);
 
-const knowledgeFiles = fs.readdirSync(path.join(root, 'knowledge'))
-  .filter((name) => name.endsWith('.md'));
+const knowledgeFiles = walk(path.join(root, 'knowledge'))
+  .filter((file) => file.endsWith('.md'));
 if (knowledgeFiles.length < 33) fail(`expected at least 33 knowledge records, found ${knowledgeFiles.length}`);
-const knowledgeIds = new Set(knowledgeFiles.map((name) => {
-  const source = fs.readFileSync(path.join(root, 'knowledge', name), 'utf8');
+const knowledgeIds = new Set(knowledgeFiles.map((file) => {
+  const source = fs.readFileSync(file, 'utf8');
   return source.match(/^\|\s*Knowledge ID\s*\|\s*`([^`]+)`\s*\|/mi)?.[1];
 }).filter(Boolean));
 if (knowledgeIds.size !== knowledgeFiles.length) fail('knowledge files must have unique Knowledge ID rows');

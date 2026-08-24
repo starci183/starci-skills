@@ -32,6 +32,22 @@
         "repair-boundary-drift"
       ],
       "factsRemove": []
+    },
+    {
+      "stage": "quality.inventory",
+      "status": "ready",
+      "factsAdd": [
+        "finding-stale"
+      ],
+      "factsRemove": []
+    },
+    {
+      "stage": "quality.blocked",
+      "status": "blocked",
+      "factsAdd": [
+        "repair-external-blocker"
+      ],
+      "factsRemove": []
     }
   ],
   "sideEffects": [

@@ -21,5 +21,7 @@ The output is an ephemeral task-session object consumed by the parent state mach
 | --- | --- | --- | --- |
 | `repaired` | `completed` | `quality.repair.result / complete` | finding-repaired |
 | `boundary-drift` | `blocked` | `quality.blocked / blocked` | repair-boundary-drift |
+| `stale-finding` | `replan` | `quality.inventory / ready` | finding-stale |
+| `external-blocker` | `blocked` | `quality.blocked / blocked` | repair-external-blocker |
 
 `repairReceiptRef`, command captures, evidence, diagnostics, and output use `session://`. Only the explicit repair/debt product effect declared by `operator.json` may survive the skill.

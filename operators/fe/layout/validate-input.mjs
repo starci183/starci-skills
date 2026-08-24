@@ -6,7 +6,10 @@ const guards = {
     "all": [
       "flow-approved",
       "page-model-ready",
-      "state-model-ready"
+      "state-model-ready",
+      "principles-compiled",
+      "frontend-coding-context-ready",
+      "grammar-pair-ready"
     ],
     "none": []
   },

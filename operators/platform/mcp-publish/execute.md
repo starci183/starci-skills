@@ -13,9 +13,9 @@ This operator reconciles only the declared MCP and Qdrant runtime services, then
 ## Step 2 — Resolve exact authority and artifacts
 
 **Read:** `payload.provided`, `payload.loads.artifacts`, and `payload.loads.knowledge`.
-**Context:** resolve exactly `mcpConfigReceiptRef`, `sourceIndexReceiptRef`, and `tunnelReceiptRef`; retrieve only the pinned `platform.operations` Qdrant record.
+**Context:** resolve exactly `mcpConfigReceiptRef`, `sourceIndexReceiptRef`, non-null `tunnelReceiptRef` when the config requires it, and `approvalRef`; retrieve only the pinned `platform.mcp-publication` Qdrant record.
 **Session write:** record binding identities, revisions, and applied rule IDs under `payload.session.scratchPrefix/bindings`.
-**Stop:** stop on a missing, stale, duplicate, mismatched, or undeclared binding. Never copy loaded values into the analysis record.
+**Stop:** stop on a missing, stale, duplicate, mismatched, undeclared, or plan-hash-mismatched approval binding; also stop if tunnel presence does not match the frozen MCP config. Never copy loaded values into the analysis record.
 **Orchestration:** balanced and parallel modes may verify disjoint artifact revisions read-only; the coordinator joins the results.
 
 ## Step 3 — Preflight exact source, commands, and external handles
@@ -55,7 +55,7 @@ This operator reconciles only the declared MCP and Qdrant runtime services, then
 | Alias | Target | Kind | Why |
 | --- | --- | --- | --- |
 | `@provided-artifacts` | `payload.loads.artifacts` | session-exact | resolve exactly the three provided receipts |
-| `@platform-operations` | `platform.operations` | qdrant | retrieve the only operator knowledge binding |
+| `@platform-operations` | `platform.mcp-publication` | qdrant | retrieve the only operator knowledge binding |
 | `@exact-source` | `payload.loads.source.targetFiles` | exact-source | inspect only hash-pinned runtime configuration files |
 | `@declared-commands` | `payload.loads.commands.commandRefs` | declared-only | run only pre-authorized command envelopes |
 | `@external-bindings` | `payload.loads.external` | external-exact | bind exact MCP, Qdrant, HTTPS, and opaque credential resources |

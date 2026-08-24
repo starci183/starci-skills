@@ -23,9 +23,9 @@ function validInput() {
         baselineCommitRef: 'git:abcdef1'
       },
       loads: {
-        business: { ref: `${session}business`, authorityPath: '.worktrees/business/create-vps/model.json', revision: hash('a') },
+        business: { ref: `${session}business`, authorityPath: '.worktrees/starci-academy/businesses/create-vps/model.json', revision: hash('a') },
         boundary: { ref: `${session}boundary`, revision: hash('b') },
-        knowledge: [{ id: 'be.boundary-planning', generation: 'generation-1', contentSha256: hash('c'), loadMode: 'qdrant-exact' }],
+        knowledge: [{ id: 'be.implementation', generation: 'generation-1', contentSha256: hash('c'), loadMode: 'qdrant-exact' }],
         source: {
           loadMode: 'exact-files',
           repositoryContext: false,
@@ -89,6 +89,12 @@ test('refuses repository source context and session references from another task
   foreignSession.payload.provided.businessHeadRef = 'session://tasks/task-2/business';
   foreignSession.payload.loads.business.ref = foreignSession.payload.provided.businessHeadRef;
   assert.equal(validateInput(foreignSession).valid, false);
+});
+
+test('requires project-scoped business authority', () => {
+  const legacyAuthority = validInput();
+  legacyAuthority.payload.loads.business.authorityPath = '.worktrees/business/create-vps/model.json';
+  assert.equal(validateInput(legacyAuthority).valid, false);
 });
 
 test('refuses non-ready state that claims source mutations', () => {

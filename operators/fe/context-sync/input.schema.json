@@ -1,0 +1,117 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://starci.dev/v6/operators/fe/context-sync/input.schema.json",
+  "title": "fe/context-sync operator input",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "runId", "stage", "status", "facts", "payload"],
+  "properties": {
+    "schemaVersion": { "const": 6 },
+    "runId": { "type": "string", "minLength": 1 },
+    "stage": { "const": "layout.generate" },
+    "status": { "const": "ready" },
+    "facts": { "type": "array", "uniqueItems": true, "items": { "type": "string", "minLength": 1 } },
+    "payload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["provided", "loads", "session"],
+      "properties": {
+        "provided": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["project", "routeReceiptRef", "businessFreshnessReceiptRef", "stateModelRef", "commonGrammarPackage", "selectedGrammarPackage"],
+          "properties": {
+            "project": { "type": "string", "pattern": "^[a-z0-9][a-z0-9-]*$" },
+            "routeReceiptRef": { "$ref": "#/$defs/sessionRef" },
+            "businessFreshnessReceiptRef": { "$ref": "#/$defs/sessionRef" },
+            "stateModelRef": { "$ref": "#/$defs/sessionRef" },
+            "commonGrammarPackage": { "const": "@starci/grammar/common" },
+            "selectedGrammarPackage": { "type": "string", "pattern": "^@starci/grammar/(?!common$)[a-z0-9-]+$" }
+          }
+        },
+        "loads": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["source", "codingContext", "knowledgeIndex", "exporter", "orchestration"],
+          "properties": {
+            "source": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["repositoryRef", "branch", "headCommit", "routeRevision", "loadMode"],
+              "properties": {
+                "repositoryRef": { "type": "string", "minLength": 1 },
+                "branch": { "type": "string", "minLength": 1 },
+                "headCommit": { "$ref": "#/$defs/gitCommit" },
+                "routeRevision": { "$ref": "#/$defs/sha256" },
+                "loadMode": { "const": "metadata-until-export-required" }
+              }
+            },
+            "codingContext": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["currentManifestPath", "generationPathPattern", "currentGeneration", "currentInputSha256", "loadMode"],
+              "properties": {
+                "currentManifestPath": { "type": "string", "pattern": "^\\.worktrees/[a-z0-9][a-z0-9-]*/coding-context/frontend/current\\.json$" },
+                "generationPathPattern": { "type": "string", "pattern": "^\\.worktrees/[a-z0-9][a-z0-9-]*/coding-context/frontend/generations/" },
+                "currentGeneration": { "type": ["string", "null"], "minLength": 1 },
+                "currentInputSha256": { "anyOf": [{ "$ref": "#/$defs/sha256" }, { "type": "null" }] },
+                "loadMode": { "const": "metadata-first" }
+              }
+            },
+            "knowledgeIndex": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["projectId", "partitionId", "activeGeneration", "documentMetadata", "loadMode"],
+              "properties": {
+                "projectId": { "type": "string", "pattern": "^[a-z0-9][a-z0-9-]*$" },
+                "partitionId": { "type": "string", "minLength": 1 },
+                "activeGeneration": { "type": ["string", "null"], "minLength": 1 },
+                "documentMetadata": { "type": "array", "uniqueItems": true, "items": { "type": "object", "additionalProperties": false, "required": ["documentId", "kind", "contentSha256"], "properties": { "documentId": { "type": "string", "minLength": 1 }, "kind": { "enum": ["principle", "grammar-common", "grammar-selected", "frontend-coding-context"] }, "contentSha256": { "$ref": "#/$defs/sha256" } } } },
+                "loadMode": { "const": "metadata-only" }
+              }
+            },
+            "exporter": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["scriptPath", "generatorVersion", "generatorSha256", "schemaVersion", "configSha256"],
+              "properties": {
+                "scriptPath": { "const": ".claude/scripts/build-frontend-coding-context.mjs" },
+                "generatorVersion": { "type": "string", "minLength": 1 },
+                "generatorSha256": { "$ref": "#/$defs/sha256" },
+                "schemaVersion": { "type": "integer", "minimum": 1 },
+                "configSha256": { "$ref": "#/$defs/sha256" }
+              }
+            },
+            "orchestration": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["mode", "profileRef", "providerRef"],
+              "properties": {
+                "mode": { "enum": ["economical", "balanced", "parallel"] },
+                "profileRef": { "enum": ["orchestration/modes/economical.json", "orchestration/modes/balanced.json", "orchestration/modes/parallel.json"] },
+                "providerRef": { "type": "string", "pattern": "^orchestration/providers/[a-z0-9-]+\\.json$" }
+              }
+            }
+          }
+        },
+        "session": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["taskId", "inputRef", "outputRef", "scratchPrefix", "retention"],
+          "properties": {
+            "taskId": { "type": "string", "minLength": 1 },
+            "inputRef": { "$ref": "#/$defs/sessionRef" },
+            "outputRef": { "$ref": "#/$defs/sessionRef" },
+            "scratchPrefix": { "$ref": "#/$defs/sessionRef" },
+            "retention": { "const": "until-skill-terminal" }
+          }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "sha256": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
+    "gitCommit": { "type": "string", "pattern": "^[0-9a-f]{40,64}$" },
+    "sessionRef": { "type": "string", "pattern": "^session://tasks/[A-Za-z0-9._-]+/.+$" }
+  }
+}

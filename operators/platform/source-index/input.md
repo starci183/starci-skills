@@ -14,10 +14,12 @@ This operator indexes exact business authority and generated frontend-contract J
 ## Runtime-loaded data
 
 - `artifacts`: resolve only the three provided refs.
-- `knowledge`: retrieve only `platform.operations` from one pinned knowledge generation.
-- `business`: load exact revisions below `.worktrees/business/`.
-- `frontendContracts`: metadata-first bindings to plain JSON previously generated from frontend contracts below `.worktrees/frontend-contracts/`.
+- `knowledge`: retrieve only `platform.source-index` from one pinned knowledge generation.
+- `business`: load exact revisions below `.worktrees/<project>/businesses/`.
+- `frontendContracts`: metadata-first bindings to plain JSON previously generated from frontend contracts below `.worktrees/<project>/coding-context/frontend/`.
 - `index`: load only declared Qdrant partition metadata and current content hashes, never retrieved source context.
 - `orchestration`: resolve strategy independently from provider/model selection.
 
-A frontend snapshot identity includes source fingerprint, content hash, JSON-schema version, generator version, and generator-config hash. Matching identity means reuse: do not load the document body, rechunk, re-embed, or upsert it.
+A request may index business, frontend coding context, or both, but at least one exact document is required. Every path must belong to `payload.loads.index.projectId`; cross-project batches are invalid.
+
+A frontend snapshot identity includes source revision, source fingerprint, content hash, JSON-schema version, generator version, generator executable hash, and generator-config hash. Matching identity means reuse: do not load the document body, rechunk, re-embed, or upsert it.

@@ -14,8 +14,8 @@ The input is a closed, ephemeral object owned by the current task session. It is
 ## Provided by the previous state
 
 - `priorStateRef`: the accepted upstream state that authorizes bind an approved layout to the locked Grammar packages and refuse business semantics inside Grammar.
-- `businessHeadRef`: the selected business authority reference.
-- `authorityRefs`: the exact approved layout, neutral fact model, and Grammar lock references.
+- `grammarId`: the selected Grammar identity, exactly `core` or `offset-pop`.
+- `authorityRefs`: the exact approved layout, neutral fact model, npm Grammar lock, installed public export map, and applicable contract references.
 - `approvalRef`: the approval binding when the transition requires one; otherwise `null`.
 - `baselineRef`: the immutable Git, SHA-256, or task-session baseline.
 
@@ -23,10 +23,11 @@ These fields are references, not copied documents. The operator must not infer s
 
 ## Loaded by the runtime
 
-- `business`: load only the declared revision under `.worktrees/business/`; source code is never business authority.
-- `upstream`: resolve only the declared session references for approved layout, neutral fact model, and Grammar lock.
-- `knowledge`: retrieve `fe.grammar-complex-cases` from the pinned generation and content hash.
-- `frontendSource`: query only the hash-pinned plain-JSON frontend contract snapshot at its declared generation; the snapshot and generator hashes must match and `rawRepositoryContext` is always `false`.
+- `upstream`: resolve only the declared session references for the approved layout, neutral fact model, exact npm package lock, installed public export map, and applicable package-contract hashes.
+- `knowledge`: retrieve Common overview and contracts, the selected Grammar overview, and only the object or named-case guides triggered by the approved layout. Never retrieve any guide from the unselected Grammar. The guides explain when and how to use package capabilities; they are never implementation authority.
+- `frontendSource`: query only the hash-pinned plain-JSON effective application-contract snapshot under `.worktrees/<project>/coding-context/frontend/`; the snapshot and generator hashes must match and `rawRepositoryContext` is always `false`. It may locate consumers and declared extension points, but it cannot replace the installed npm package contract.
+
+No business document is loaded. The approved neutral fact model is the only presentation-state boundary; any business-named state or entity in Grammar is a refusal.
 - `orchestration`: resolve one provider-neutral mode and provider profile; it cannot change routing, approval, or boundaries.
 
 `payload.session` contains URI slots only. Inputs, outputs, loaded values, worker observations, drafts, and evidence are purged at every parent-skill terminal, including failure and rejection.

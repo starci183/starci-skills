@@ -10,13 +10,13 @@ This operator repairs one approved readiness finding. Input, output, loaded cont
 **Session write:** `payload.session.inputRef`.
 **Stop:** stop before loading context if schema, route, facts, or task ownership fails.
 
-## Step 2 — Resolve exact evidence and quality law
+## Step 2 — Revalidate finding and approval
 
 **Read:** `payload.loads.artifacts`, `payload.loads.knowledge`.
-**Context:** resolve exact session artifacts and retrieve only `quality.readiness-repair` from its pinned generation.
-**Analysis:** verify refs, revisions, ownership, and freshness. Record rule IDs and match/mismatch evidence only.
+**Context:** resolve only the approved finding, baseline, owner boundary, approval revision, and `quality.readiness-repair`.
+**Analysis:** verify the finding fingerprint still exists at the same baseline, approval names this exact finding and permitted writes, and owner/gate identities are unchanged.
 **Session write:** `payload.session.scratchPrefix/bindings`.
-**Stop:** stop when evidence is stale, ambiguous, incomplete, or belongs to another revision.
+**Stop:** a missing or changed finding is stale and must return to inventory without mutation. Missing approval, expired approval, ambiguous owner, or foreign revision blocks.
 
 ## Step 3 — Inspect the exact repair targets
 
@@ -25,15 +25,15 @@ This operator repairs one approved readiness finding. Input, output, loaded cont
 **Analysis:** verify each before hash, allowed repair, owner, and debt/finding relevance.
 **Session write:** `scratchPrefix/source-checks/<worker-id>`.
 **Orchestration:** read-only workers may inspect disjoint files; the coordinator validates and joins all observations. Workers never write source.
-**Stop:** emit boundary drift or blocked before mutation when a hash, owner, or target is invalid.
+**Stop:** do not mutate when a hash changed. Return stale to inventory if the finding was superseded; emit boundary drift only when the correct fix inherently needs a different approved owner or target.
 
-## Step 4 — Evaluate the result
+## Step 4 — Compile the minimal repair
 
 **Read:** validated bindings, joined source checks, and accepted machine facts.
 **Context:** load no undeclared knowledge, source, or business feature.
-**Decision criteria:** every changed file belongs to the owner boundary and directly clears the finding.
-**Analysis:** apply the smallest exact-source change and prove the finding is removed. Record applied criteria, structured diagnostics, and conclusions only; never record chain-of-thought.
-**Session write:** candidate `repairReceiptRef` at `scratchPrefix/candidate`.
+**Decision criteria:** every planned change belongs to the owner boundary and directly addresses the measured finding without weakening its proving gate.
+**Analysis:** create one exact patch plan with before hashes, expected after invariants, and the narrow gate that must remove the finding during the following inventory. Do not mutate in this step.
+**Session write:** candidate patch plan at `scratchPrefix/candidate`.
 **Orchestration:** economical mode is sequential. Balanced/parallel modes may classify independent evidence items read-only; the coordinator owns route classification and join.
 **Stop:** emit only one declared decision and never widen a repair boundary.
 
@@ -41,7 +41,7 @@ This operator repairs one approved readiness finding. Input, output, loaded cont
 
 **Read:** exact targets, validated candidate, and approved mutation scope.
 **Context:** coordinator only. Workers do not write source or durable authority.
-**Action:** mutate only declared exact files and permitted responsibilities, preserving unrelated changes.
+**Action:** recheck before hashes immediately before write, then mutate only declared exact files and permitted responsibilities, preserving unrelated changes. Produce `repairReceiptRef`; do not claim the finding is cleared until the parent reinventory confirms it.
 **Durable write:** approved product-source files and the declared durable debt record only.
 **Session write:** before/after hashes at `scratchPrefix/mutations`.
 **Stop:** emit boundary drift or blocked if correct repair needs another file, responsibility, or authority.

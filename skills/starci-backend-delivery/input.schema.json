@@ -130,18 +130,9 @@
       "type": "object",
       "additionalProperties": false,
       "required": [
-        "architectureMode",
         "deploymentMode"
       ],
       "properties": {
-        "architectureMode": {
-          "type": "string",
-          "enum": [
-            "auto",
-            "required",
-            "skip"
-          ]
-        },
         "deploymentMode": {
           "type": "string",
           "enum": [

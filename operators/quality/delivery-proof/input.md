@@ -21,7 +21,7 @@ This operator assembles final delivery proof. Its input is an ephemeral task-ses
 
 - `artifacts`: resolve only references listed by `payload.provided` into session memory.
 - `knowledge`: retrieve only `quality.source-gates` from the pinned Qdrant generation.
-- `business`: load the exact approved business revision under `.worktrees/business/`.
+- `business`: load the exact approved business revision under `.worktrees/<project>/businesses/`.
 - `orchestration`: resolve execution strategy separately from provider/model mapping.
 
 Acceptance requires that all required gate receipts match one source revision and the approved business head. Validate the complete envelope before any load, command, or mutation.

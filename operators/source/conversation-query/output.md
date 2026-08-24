@@ -9,7 +9,7 @@ The output is an ephemeral task-session object consumed by the parent state mach
 | Root route fields | State-machine compatibility envelope. |
 | `payload.decision` | Typed route key from this operator contract. |
 | `payload.state` | Explicit status, code, retryability, and emitted state. |
-| `payload.produced` | Session artifact `conversationQueryReceiptRef` plus explicitly approved durable effects only. |
+| `payload.produced` | Session `conversationQueryReceiptRef`; the receipt contains only authorized durable head/artifact refs and revisions, never transcript bodies. |
 | `payload.context` | Minimal refs and revisions actually used; never copied context or reasoning. |
 | `payload.cleanup` | Scratch refs and mandatory terminal purge. |
 | `payload.evidenceRefs` | Session-only evidence for the next state. |

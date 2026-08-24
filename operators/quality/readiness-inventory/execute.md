@@ -10,23 +10,23 @@ This operator inventories source readiness. Input, output, loaded context, comma
 **Session write:** `payload.session.inputRef`.
 **Stop:** stop before loading context if schema, route, facts, or task ownership fails.
 
-## Step 2 — Resolve exact evidence and quality law
+## Step 2 — Run deterministic inventory checks
 
-**Read:** `payload.loads.artifacts`, `payload.loads.knowledge`.
-**Context:** resolve exact session artifacts and retrieve only `quality.readiness-repair` from its pinned generation.
-**Analysis:** verify refs, revisions, ownership, and freshness. Record rule IDs and match/mismatch evidence only.
+**Read:** route, declared-gate, and stale-registry artifacts plus their revision headers.
+**Context:** registry entries, route IDs, gate IDs, owner IDs, receipt revisions, expiry, and evidence hashes only. Do not retrieve knowledge, source, or command logs.
+**Analysis:** verify registry integrity and freshness first; then check route coverage, exactly one owner per gate, required receipt presence, revision match, expiry, and independent evidence identity.
 **Session write:** `payload.session.scratchPrefix/bindings`.
-**Stop:** stop when evidence is stale, ambiguous, incomplete, or belongs to another revision.
+**Stop:** stale, unreadable, foreign-revision, or incomplete authority prevents a verdict and must route blocked/inconclusive; it is not a repairable product finding.
 
 ## Step 3 — Evaluate the result
 
 **Read:** validated bindings, and accepted machine facts.
-**Context:** load no undeclared knowledge, source, or business feature.
+**Context:** retrieve `quality.readiness-repair` only when deterministic checks produced measured candidates requiring ownership classification. Load no source, business body, command log, or unrelated quality record.
 **Decision criteria:** routes, gates, and stale records resolve to a complete green result or owned findings.
-**Analysis:** compare declared readiness evidence and classify every finding. Record applied criteria, structured diagnostics, and conclusions only; never record chain-of-thought.
+**Analysis:** classify every measured candidate as product-owned finding or non-verdict blocker, deduplicate by stable finding fingerprint, and preserve gate/owner/evidence lineage. Green requires zero findings and zero blockers. Record conclusions only; never record chain-of-thought.
 **Session write:** candidate `inventoryReceiptRef` at `scratchPrefix/candidate`.
 **Orchestration:** economical mode is sequential. Balanced/parallel modes may classify independent evidence items read-only; the coordinator owns route classification and join.
-**Stop:** emit only one declared decision and never widen a repair boundary.
+**Stop:** emit findings only when each has an exact owner, boundary and proving gate. Emit `blocked` for stale or unavailable authority; never disguise it as a finding or green result.
 
 ## Step 4 — Emit and register cleanup
 
@@ -42,7 +42,7 @@ This operator inventories source readiness. Input, output, loaded context, comma
 | Alias | Target | Kind | Why |
 | --- | --- | --- | --- |
 | `@provided-artifacts` | `payload.loads.artifacts` | session | resolve only previous-state refs |
-| `@knowledge-1` | `quality.readiness-repair` | qdrant | retrieve only this quality law |
+| `@knowledge-1` | `quality.readiness-repair` | qdrant | retrieve only to classify measured candidates after deterministic inventory |
 | `@orchestration-profile` | `payload.loads.orchestration` | orchestration | select strategy independently of provider/model |
 
 No repository source-context load exists for this operator.

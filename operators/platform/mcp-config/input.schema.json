@@ -119,7 +119,7 @@
                   ],
                   "properties": {
                     "id": {
-                      "const": "platform.operations"
+                      "const": "platform.mcp-publication"
                     },
                     "generation": {
                       "type": "string",

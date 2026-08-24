@@ -23,7 +23,7 @@ The operator cannot replace these references, infer substitutes, or broaden thei
 ## Loaded by the runtime
 
 - `business`: must be `null`; this technical operation does not load business authority.
-- `knowledge`: retrieve only `platform.operations` from its pinned generation and content hash.
+- `knowledge`: retrieve only `platform.mcp-publication` from its pinned generation and content hash.
 - `source`: open only declared hash-pinned platform plan, manifest, template, and config target files. Repository-wide preloading is forbidden.
 - `commands`: resolve only declared validation commands with exact argv, working directory, and allowed environment names.
 - `external`: must contain no external resources or credential values; config generation is local.

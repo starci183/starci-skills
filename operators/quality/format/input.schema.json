@@ -90,6 +90,7 @@
             "artifacts",
             "knowledge",
             "execution",
+            "cache",
             "orchestration"
           ],
           "properties": {
@@ -174,6 +175,9 @@
                 }
               }
             },
+            "cache": {
+              "$ref": "#/$defs/exactCache"
+            },
             "orchestration": {
               "type": "object",
               "additionalProperties": false,
@@ -238,6 +242,33 @@
     }
   },
   "$defs": {
+    "exactCache": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "lookupMode",
+        "fingerprintRef",
+        "candidateReceiptRef"
+      ],
+      "properties": {
+        "lookupMode": {
+          "const": "exact-only"
+        },
+        "fingerprintRef": {
+          "$ref": "#/$defs/sessionRef"
+        },
+        "candidateReceiptRef": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/sessionRef"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      }
+    },
     "sha256": {
       "type": "string",
       "pattern": "^sha256:[0-9a-f]{64}$"

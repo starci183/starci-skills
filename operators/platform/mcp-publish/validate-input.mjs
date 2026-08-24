@@ -6,10 +6,10 @@ function refs(value, found = []) { if (typeof value === 'string' && value.starts
 function semantic(value) {
   const errors = [];
   if (!value.facts.includes('platform-source-index-ready')) errors.push('$.facts: missing platform-source-index-ready');
-  const provided = Object.values(value.payload.provided).sort();
+  const provided = Object.values(value.payload.provided).filter((item) => item !== null).sort();
   const artifacts = value.payload.loads.artifacts.map((item) => item.ref).sort();
   if (JSON.stringify(provided) !== JSON.stringify(artifacts)) errors.push('$.payload.loads.artifacts: must bind every provided ref exactly once and no others');
-  if (JSON.stringify(value.payload.loads.knowledge.map((item) => item.id)) !== JSON.stringify(['platform.operations'])) errors.push('$.payload.loads.knowledge: exact ordered knowledge binding required');
+  if (JSON.stringify(value.payload.loads.knowledge.map((item) => item.id)) !== JSON.stringify(['platform.mcp-publication'])) errors.push('$.payload.loads.knowledge: exact ordered knowledge binding required');
   const { orchestration, source } = value.payload.loads;
   if (orchestration.profileRef !== profiles[orchestration.mode]) errors.push('$.payload.loads.orchestration.profileRef: must match mode');
   if (source.repositoryContext !== false || source.loadMode !== 'exact-files') errors.push('$.payload.loads.source: broad source context is forbidden');

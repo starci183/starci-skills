@@ -8,6 +8,20 @@ const routes = {
     "fact": "workflow-diagnosed",
     "state": "completed",
     "code": "quality-workflow-diagnose-diagnosed"
+  },
+  "inconclusive": {
+    "stage": "quality.diagnosed",
+    "status": "blocked",
+    "fact": "workflow-diagnosis-inconclusive",
+    "state": "blocked",
+    "code": "quality-workflow-diagnose-inconclusive"
+  },
+  "external-blocker": {
+    "stage": "quality.blocked",
+    "status": "blocked",
+    "fact": "workflow-diagnosis-external-blocker",
+    "state": "blocked",
+    "code": "quality-workflow-diagnose-external-blocker"
   }
 };
 

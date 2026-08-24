@@ -10,23 +10,23 @@ This operator diagnoses one workflow invocation without changing it. Input, outp
 **Session write:** `payload.session.inputRef`.
 **Stop:** stop before loading context if schema, route, facts, or task ownership fails.
 
-## Step 2 — Resolve exact evidence and quality law
+## Step 2 — Validate the trace deterministically
 
-**Read:** `payload.loads.artifacts`, `payload.loads.knowledge`.
-**Context:** resolve exact session artifacts and retrieve only `quality.readiness-repair` from its pinned generation.
-**Analysis:** verify refs, revisions, ownership, and freshness. Record rule IDs and match/mismatch evidence only.
+**Read:** only the three declared artifacts and their revision/lineage headers.
+**Context:** route events, state transitions, command exit metadata, environment identity, and evidence refs. Do not retrieve knowledge yet.
+**Analysis:** verify one invocation identity, monotonically ordered events, declared transitions, complete join points, exact environment revision, and evidence hashes.
 **Session write:** `payload.session.scratchPrefix/bindings`.
 **Stop:** stop when evidence is stale, ambiguous, incomplete, or belongs to another revision.
 
-## Step 3 — Evaluate the result
+## Step 3 — Explain the first proven divergence
 
 **Read:** validated bindings, and accepted machine facts.
-**Context:** load no undeclared knowledge, source, or business feature.
+**Context:** retrieve `quality.readiness-repair` only when the validated trace contains a divergence that needs quality classification. Load no source, indexed source summary, business body, unrelated run, or full log.
 **Decision criteria:** the trace explains state, route, environment, and failure evidence without mutating the observed workflow.
-**Analysis:** reconstruct the declared invocation path from session evidence. Record applied criteria, structured diagnostics, and conclusions only; never record chain-of-thought.
+**Analysis:** compare expected and observed state at each declared edge, stop at the earliest evidenced divergence, distinguish upstream cause from downstream symptom, and attach confidence plus competing-evidence refs. Record conclusions only; never invent missing events or record chain-of-thought.
 **Session write:** candidate `diagnosisReceiptRef` at `scratchPrefix/candidate`.
 **Orchestration:** economical mode is sequential. Balanced/parallel modes may classify independent evidence items read-only; the coordinator owns route classification and join.
-**Stop:** emit only one declared decision and never widen a repair boundary.
+**Stop:** emit `inconclusive` when the trace is stale, incomplete, or contradictory; emit `external-blocker` when a declared dependency prevents a verdict. Never fabricate `diagnosed`.
 
 ## Step 4 — Emit and register cleanup
 
@@ -42,7 +42,7 @@ This operator diagnoses one workflow invocation without changing it. Input, outp
 | Alias | Target | Kind | Why |
 | --- | --- | --- | --- |
 | `@provided-artifacts` | `payload.loads.artifacts` | session | resolve only previous-state refs |
-| `@knowledge-1` | `quality.readiness-repair` | qdrant | retrieve only this quality law |
+| `@knowledge-1` | `quality.readiness-repair` | qdrant | retrieve only after a proven divergence needs classification |
 | `@orchestration-profile` | `payload.loads.orchestration` | orchestration | select strategy independently of provider/model |
 
 No repository source-context load exists for this operator.

@@ -4,11 +4,21 @@
   "id": "parallel",
   "strategy": "bounded-parallel",
   "maxWorkers": 5,
+  "activation": {
+    "minIndependentItems": 4,
+    "requireDisjoint": true,
+    "downgradeWhenBelowMinimum": true
+  },
   "workerPermissions": {
     "read": true,
     "analyze": true,
     "writeSource": false,
     "externalMutation": false
+  },
+  "contextPolicy": {
+    "workerInput": "assigned-refs-only",
+    "reuse": "task-input-hash",
+    "joinPayload": "refs-revisions-findings-only"
   },
   "joinPolicy": "coordinator-validates-all",
   "retention": "until-skill-terminal"

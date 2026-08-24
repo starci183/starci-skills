@@ -13,7 +13,7 @@ This read-only operator resolves one exact Cloudflare account, tunnel, hostname,
 ## Step 2 — Resolve exact authority and artifacts
 
 **Read:** `payload.provided`, `payload.loads.artifacts`, and `payload.loads.knowledge`.
-**Context:** resolve exactly `routeReceiptRef`, `hostnameRef`, `originRef`, and `ownershipRef`; retrieve only pinned `platform.operations`.
+**Context:** resolve exactly `routeReceiptRef`, `hostnameRef`, `originRef`, and `ownershipRef`; retrieve only pinned `platform.tunnel`.
 **Session write:** record identities, revisions, and applied rule IDs at `payload.session.scratchPrefix/bindings`.
 **Stop:** stop on missing, stale, duplicate, mismatched, or undeclared bindings.
 **Orchestration:** workers may verify disjoint revisions read-only; the coordinator joins all results.
@@ -47,7 +47,7 @@ This read-only operator resolves one exact Cloudflare account, tunnel, hostname,
 | Alias | Target | Kind | Why |
 | --- | --- | --- | --- |
 | `@provided-artifacts` | `payload.loads.artifacts` | session-exact | bind exactly the four provided route facts |
-| `@platform-operations` | `platform.operations` | qdrant | retrieve the only knowledge authority |
+| `@platform-operations` | `platform.tunnel` | qdrant | retrieve the only knowledge authority |
 | `@exact-source` | `payload.loads.source.targetFiles` | exact-source | inspect only hash-pinned route declarations |
 | `@external-bindings` | `payload.loads.external` | external-exact | bind exact Cloudflare resources and opaque handle custody |
 | `@orchestration-profile` | `payload.loads.orchestration` | orchestration | choose read-only topology independently of provider mapping |

@@ -28,6 +28,20 @@
             "stage",
             "status"
           ]
+        },
+        {
+          "properties": {
+            "stage": { "const": "quality.diagnosed" },
+            "status": { "const": "blocked" }
+          },
+          "required": ["stage", "status"]
+        },
+        {
+          "properties": {
+            "stage": { "const": "quality.blocked" },
+            "status": { "const": "blocked" }
+          },
+          "required": ["stage", "status"]
         }
       ]
     }
@@ -42,12 +56,14 @@
     },
     "stage": {
       "enum": [
-        "quality.diagnosed"
+        "quality.diagnosed",
+        "quality.blocked"
       ]
     },
     "status": {
       "enum": [
-        "complete"
+        "complete",
+        "blocked"
       ]
     },
     "facts": {
@@ -73,7 +89,9 @@
       "properties": {
         "decision": {
           "enum": [
-            "diagnosed"
+            "diagnosed",
+            "inconclusive",
+            "external-blocker"
           ]
         },
         "state": {
@@ -99,7 +117,9 @@
             },
             "code": {
               "enum": [
-                "quality-workflow-diagnose-diagnosed"
+                "quality-workflow-diagnose-diagnosed",
+                "quality-workflow-diagnose-inconclusive",
+                "quality-workflow-diagnose-external-blocker"
               ]
             },
             "retryable": {
@@ -116,12 +136,14 @@
               "properties": {
                 "stage": {
                   "enum": [
-                    "quality.diagnosed"
+                    "quality.diagnosed",
+                    "quality.blocked"
                   ]
                 },
                 "status": {
                   "enum": [
-                    "complete"
+                    "complete",
+                    "blocked"
                   ]
                 },
                 "factsAdd": {

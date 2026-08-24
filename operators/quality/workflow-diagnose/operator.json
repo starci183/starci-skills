@@ -24,6 +24,22 @@
         "workflow-diagnosed"
       ],
       "factsRemove": []
+    },
+    {
+      "stage": "quality.diagnosed",
+      "status": "blocked",
+      "factsAdd": [
+        "workflow-diagnosis-inconclusive"
+      ],
+      "factsRemove": []
+    },
+    {
+      "stage": "quality.blocked",
+      "status": "blocked",
+      "factsAdd": [
+        "workflow-diagnosis-external-blocker"
+      ],
+      "factsRemove": []
     }
   ],
   "sideEffects": [

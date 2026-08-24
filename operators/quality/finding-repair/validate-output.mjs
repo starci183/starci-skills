@@ -15,6 +15,20 @@ const routes = {
     "fact": "repair-boundary-drift",
     "state": "blocked",
     "code": "quality-finding-repair-boundary-drift"
+  },
+  "stale-finding": {
+    "stage": "quality.inventory",
+    "status": "ready",
+    "fact": "finding-stale",
+    "state": "replan",
+    "code": "quality-finding-repair-stale-finding"
+  },
+  "external-blocker": {
+    "stage": "quality.blocked",
+    "status": "blocked",
+    "fact": "repair-external-blocker",
+    "state": "blocked",
+    "code": "quality-finding-repair-external-blocker"
   }
 };
 
@@ -26,9 +40,10 @@ function semantic(value) {
   if (value.payload.state.status !== route.state || value.payload.state.code !== route.code) errors.push('/payload/state: status or code does not match decision');
   if (value.payload.state.emits.stage !== value.stage || value.payload.state.emits.status !== value.status) errors.push('/payload/state/emits: must match root route');
   if (!value.facts.includes(route.fact) || !value.payload.state.emits.factsAdd.includes(route.fact)) errors.push(`/facts: missing emitted fact ${route.fact}`);
-  const blocked = value.payload.state.status === 'blocked';
-  if (!blocked && value.payload.produced.repairReceiptRef === null) errors.push('/payload/produced/repairReceiptRef: non-blocked output requires a session artifact');
-  if (!blocked && value.payload.produced.durableWrites.length === 0) errors.push('/payload/produced/durableWrites: successful repair must name approved durable writes');
+  const mutated = value.payload.decision === 'repaired';
+  if (mutated && value.payload.produced.repairReceiptRef === null) errors.push('/payload/produced/repairReceiptRef: repaired output requires a session artifact');
+  if (mutated && value.payload.produced.durableWrites.length === 0) errors.push('/payload/produced/durableWrites: successful repair must name approved durable writes');
+  if (!mutated && value.payload.produced.durableWrites.length !== 0) errors.push('/payload/produced/durableWrites: non-repair decisions cannot claim writes');
   if (value.payload.cleanup.retention !== 'until-skill-terminal' || value.payload.cleanup.purgeAt !== 'skill-terminal') errors.push('/payload/cleanup: terminal purge is mandatory');
   return errors;
 }

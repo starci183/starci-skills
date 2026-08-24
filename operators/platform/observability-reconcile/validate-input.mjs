@@ -5,7 +5,7 @@ function refs(value, found = []) { if (typeof value === 'string' && value.starts
 function semantic(value) {
   const errors = [], provided = Object.values(value.payload.provided).sort(), artifacts = value.payload.loads.artifacts.map((item) => item.ref).sort();
   if (JSON.stringify(provided) !== JSON.stringify(artifacts)) errors.push('$.payload.loads.artifacts: exact provided bindings required');
-  if (JSON.stringify(value.payload.loads.knowledge.map((item) => item.id)) !== JSON.stringify(['platform.operations'])) errors.push('$.payload.loads.knowledge: exact ordered knowledge binding required');
+  if (JSON.stringify(value.payload.loads.knowledge.map((item) => item.id)) !== JSON.stringify(['platform.observability'])) errors.push('$.payload.loads.knowledge: exact ordered knowledge binding required');
   const { orchestration, source } = value.payload.loads;
   if (orchestration.profileRef !== profiles[orchestration.mode]) errors.push('$.payload.loads.orchestration.profileRef: must match mode');
   const paths = source.targetFiles.map((item) => item.path.replaceAll('\\', '/'));

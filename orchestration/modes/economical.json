@@ -4,11 +4,21 @@
   "id": "economical",
   "strategy": "sequential",
   "maxWorkers": 0,
+  "activation": {
+    "minIndependentItems": 0,
+    "requireDisjoint": true,
+    "downgradeWhenBelowMinimum": true
+  },
   "workerPermissions": {
     "read": false,
     "analyze": false,
     "writeSource": false,
     "externalMutation": false
+  },
+  "contextPolicy": {
+    "workerInput": "assigned-refs-only",
+    "reuse": "task-input-hash",
+    "joinPayload": "refs-revisions-findings-only"
   },
   "joinPolicy": "coordinator-validates-all",
   "retention": "until-skill-terminal"

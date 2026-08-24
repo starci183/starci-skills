@@ -3,13 +3,23 @@
   "$id": "https://starci.dev/v6/orchestration/mode.schema.json",
   "type": "object",
   "additionalProperties": false,
-  "required": ["schemaVersion", "id", "strategy", "maxWorkers", "workerPermissions", "joinPolicy", "retention"],
+  "required": ["schemaVersion", "id", "strategy", "maxWorkers", "activation", "workerPermissions", "contextPolicy", "joinPolicy", "retention"],
   "properties": {
     "$schema": { "type": "string", "minLength": 1 },
     "schemaVersion": { "const": 6 },
     "id": { "enum": ["economical", "balanced", "parallel"] },
     "strategy": { "enum": ["sequential", "bounded-parallel"] },
     "maxWorkers": { "type": "integer", "minimum": 0, "maximum": 5 },
+    "activation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["minIndependentItems", "requireDisjoint", "downgradeWhenBelowMinimum"],
+      "properties": {
+        "minIndependentItems": { "type": "integer", "minimum": 0, "maximum": 5 },
+        "requireDisjoint": { "const": true },
+        "downgradeWhenBelowMinimum": { "const": true }
+      }
+    },
     "workerPermissions": {
       "type": "object",
       "additionalProperties": false,
@@ -19,6 +29,16 @@
         "analyze": { "type": "boolean" },
         "writeSource": { "const": false },
         "externalMutation": { "const": false }
+      }
+    },
+    "contextPolicy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["workerInput", "reuse", "joinPayload"],
+      "properties": {
+        "workerInput": { "const": "assigned-refs-only" },
+        "reuse": { "const": "task-input-hash" },
+        "joinPayload": { "const": "refs-revisions-findings-only" }
       }
     },
     "joinPolicy": { "enum": ["coordinator-validates-all"] },

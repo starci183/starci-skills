@@ -13,7 +13,7 @@ This operator binds routed business authority to one deployment target. All inte
 ## Step 2 — Resolve exact authority and law
 
 **Read:** `payload.loads.artifacts`, `payload.loads.knowledge`, and `payload.loads.business`.
-**Context:** exact refs and pinned `deployment.lifecycle` only. Load only the declared `.worktrees/business/` revision.
+**Context:** exact refs and pinned `deployment.lifecycle` only. Load only the declared `.worktrees/<project>/businesses/` revision.
 **Analysis:** verify identity, revision, ownership, approval, and freshness; record rules and evidence only.
 **Session write:** `scratchPrefix/bindings`.
 **Stop:** stop on missing, stale, ambiguous, rejected, or cross-release authority.

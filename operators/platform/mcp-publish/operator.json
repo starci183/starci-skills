@@ -5,7 +5,7 @@
   "inputSchema": "input.schema.json",
   "outputSchema": "output.schema.json",
   "knowledgeRefs": [
-    "platform.operations"
+    "platform.mcp-publication"
   ],
   "sourceReferenceRefs": [],
   "accepts": [

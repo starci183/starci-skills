@@ -73,7 +73,7 @@
           "additionalProperties": false,
           "required": [
             "priorStateRef",
-            "businessHeadRef",
+            "grammarId",
             "authorityRefs",
             "approvalRef",
             "baselineRef"
@@ -82,8 +82,11 @@
             "priorStateRef": {
               "$ref": "#/$defs/sessionRef"
             },
-            "businessHeadRef": {
-              "$ref": "#/$defs/sessionRef"
+            "grammarId": {
+              "enum": [
+                "core",
+                "offset-pop"
+              ]
             },
             "authorityRefs": {
               "type": "array",
@@ -114,34 +117,12 @@
           "description": "Runtime-resolved bindings. They identify exact values to load and never carry broad copied context.",
           "additionalProperties": false,
           "required": [
-            "business",
             "upstream",
             "knowledge",
             "frontendSource",
             "orchestration"
           ],
           "properties": {
-            "business": {
-              "type": "object",
-              "additionalProperties": false,
-              "required": [
-                "ref",
-                "authorityPath",
-                "revision"
-              ],
-              "properties": {
-                "ref": {
-                  "$ref": "#/$defs/sessionRef"
-                },
-                "authorityPath": {
-                  "type": "string",
-                  "pattern": "^\\.worktrees/business/"
-                },
-                "revision": {
-                  "$ref": "#/$defs/sha256"
-                }
-              }
-            },
             "upstream": {
               "type": "array",
               "minItems": 1,
@@ -170,8 +151,8 @@
             },
             "knowledge": {
               "type": "array",
-              "minItems": 1,
-              "maxItems": 1,
+              "minItems": 4,
+              "maxItems": 12,
               "uniqueItems": true,
               "items": {
                 "type": "object",
@@ -185,7 +166,40 @@
                 "properties": {
                   "id": {
                     "enum": [
-                      "fe.grammar-complex-cases"
+                      "fe.grammar-common-overview",
+                      "fe.grammar-common-contracts",
+                      "fe.grammar-common-states-accessibility",
+                      "fe.grammar-common-extension",
+                      "fe.grammar-common-case-surface-inside-surface",
+                      "fe.grammar-common-case-collection-cardinality",
+                      "fe.grammar-common-case-sticky-scroll-owner",
+                      "fe.grammar-common-case-responsive-flattening",
+                      "fe.grammar-core-overview",
+                      "fe.grammar-core-object-actions",
+                      "fe.grammar-core-object-fields",
+                      "fe.grammar-core-object-surface-card",
+                      "fe.grammar-core-object-collections",
+                      "fe.grammar-core-object-navigation",
+                      "fe.grammar-core-object-tabs",
+                      "fe.grammar-core-object-tables",
+                      "fe.grammar-core-object-overlays-feedback",
+                      "fe.grammar-core-case-primary-secondary-grid",
+                      "fe.grammar-core-case-trust-list-in-card",
+                      "fe.grammar-core-case-multi-step-form",
+                      "fe.grammar-core-case-sticky-summary",
+                      "fe.grammar-offset-pop-overview",
+                      "fe.grammar-offset-pop-object-actions",
+                      "fe.grammar-offset-pop-object-fields",
+                      "fe.grammar-offset-pop-object-surface-card",
+                      "fe.grammar-offset-pop-object-collections",
+                      "fe.grammar-offset-pop-object-navigation",
+                      "fe.grammar-offset-pop-object-tabs",
+                      "fe.grammar-offset-pop-object-tables",
+                      "fe.grammar-offset-pop-object-overlays-feedback",
+                      "fe.grammar-offset-pop-case-hero-collage",
+                      "fe.grammar-offset-pop-case-list-in-offset-card",
+                      "fe.grammar-offset-pop-case-dense-screen-simplification",
+                      "fe.grammar-offset-pop-case-mobile-accent-reduction"
                     ]
                   },
                   "generation": {
@@ -246,7 +260,7 @@
               "properties": {
                 "snapshotPath": {
                   "type": "string",
-                  "pattern": "^\\.worktrees/frontend-source/"
+                  "pattern": "^\\.worktrees/[a-z0-9][a-z0-9-]*/coding-context/frontend(?:/|$)"
                 },
                 "snapshotSha256": {
                   "$ref": "#/$defs/sha256"

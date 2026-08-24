@@ -10,6 +10,16 @@
   "sourceReferenceRefs": [],
   "accepts": [
     {
+      "stage": "code.implement",
+      "status": "ready",
+      "allFacts": [
+        "coding-scope-frozen"
+      ],
+      "noneFacts": [
+        "grammar-gap"
+      ]
+    },
+    {
       "stage": "requests.review",
       "status": "ready",
       "noneFacts": [

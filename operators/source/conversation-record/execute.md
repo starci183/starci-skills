@@ -13,17 +13,17 @@ This operator records redacted conversation and artifact lineage. Input, output,
 ## Step 2 — Resolve exact bindings
 
 **Read:** `payload.loads.artifacts`, `payload.loads.knowledge`.
-**Context:** resolve exact task-session artifacts and retrieve only `source.provenance` from its pinned Qdrant generation.
-**Analysis:** verify identity, revision, freshness, and ownership. Record applied rule IDs and match/mismatch evidence, never hidden reasoning.
+**Context:** resolve exact task-session artifacts and retrieve only `source.provenance` from its pinned Qdrant generation. The runtime exposes the already-redacted snapshot, never the raw provider transcript.
+**Analysis:** verify identity, revision, freshness, ownership, and that the redaction receipt output hash equals the snapshot revision. Record applied rule IDs and match/mismatch evidence, never hidden reasoning.
 **Session write:** `payload.session.scratchPrefix/bindings`.
-**Stop:** stop when a binding is missing, stale, ambiguous, or outside the accepted route.
+**Stop:** stop when a binding is missing, stale, ambiguous, outside the accepted route, lacks a passing prohibited-category result, or would expose raw transcript/prompt/secret content.
 
 ## Step 3 — Perform the operator decision
 
 **Read:** validated bindings, and accepted machine facts.
 **Context:** use no undeclared knowledge, business feature, artifact, or source file.
 **Decision criteria:** provider, redaction receipt, artifact hashes, and ownership are valid.
-**Analysis:** persist only the approved provenance head and rebuildable index. Record evidence, criteria, and conclusions only; never record chain-of-thought.
+**Analysis:** compare-and-set the provider-neutral identity. Persist only the approved provenance head and rebuildable index. An identical identity/hash is an idempotent no-op; a different hash at the same identity is a conflict and must not overwrite. Record evidence, criteria, and conclusions only; never record chain-of-thought.
 **Session write:** candidate `conversationHeadRef` at `payload.session.scratchPrefix/candidate`.
 **Orchestration:** economical mode is sequential. Balanced or parallel mode may delegate independent read-only comparisons. Each worker receives only assigned refs; the coordinator owns joining and the decision.
 **Stop:** emit only a declared decision when evidence is missing, contradictory, or outside scope.

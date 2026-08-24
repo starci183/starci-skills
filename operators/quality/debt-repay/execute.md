@@ -14,9 +14,9 @@ This operator repays one approved debt scope. Input, output, loaded context, com
 
 **Read:** `payload.loads.artifacts`, `payload.loads.knowledge`.
 **Context:** resolve exact session artifacts and retrieve only `quality.readiness-repair` from its pinned generation.
-**Analysis:** verify refs, revisions, ownership, and freshness. Record rule IDs and match/mismatch evidence only.
+**Analysis:** verify debt identity, owner approval, expiry, baseline metric, closure criterion, permitted writes, prior-iteration fingerprint, and remaining iteration budget.
 **Session write:** `payload.session.scratchPrefix/bindings`.
-**Stop:** stop when evidence is stale, ambiguous, incomplete, or belongs to another revision.
+**Stop:** block on stale/expired approval, ambiguous owner, foreign revision, repeated iteration fingerprint, or exhausted budget before reading source.
 
 ## Step 3 — Inspect the exact repair targets
 
@@ -32,7 +32,7 @@ This operator repays one approved debt scope. Input, output, loaded context, com
 **Read:** validated bindings, joined source checks, and accepted machine facts.
 **Context:** load no undeclared knowledge, source, or business feature.
 **Decision criteria:** each mutation is inside the debt scope and measured exit criteria prove closure or progress.
-**Analysis:** inspect exact target files, apply bounded repairs, and update only the durable debt authority. Record applied criteria, structured diagnostics, and conclusions only; never record chain-of-thought.
+**Analysis:** compile one bounded patch plan and predict its measured effect; do not mutate in this step. `progress` is legal only when the post-write metric will be strictly better or the declared remainder strictly smaller. Record conclusions only; never record chain-of-thought.
 **Session write:** candidate `debtReceiptRef` at `scratchPrefix/candidate`.
 **Orchestration:** economical mode is sequential. Balanced/parallel modes may classify independent evidence items read-only; the coordinator owns route classification and join.
 **Stop:** emit only one declared decision and never widen a repair boundary.
@@ -41,7 +41,7 @@ This operator repays one approved debt scope. Input, output, loaded context, com
 
 **Read:** exact targets, validated candidate, and approved mutation scope.
 **Context:** coordinator only. Workers do not write source or durable authority.
-**Action:** mutate only declared exact files and permitted responsibilities, preserving unrelated changes.
+**Action:** recheck before hashes, mutate only declared exact files and permitted responsibilities, measure the declared criterion, and update only the durable debt record. If the metric is unchanged, restore only this operator's own exact before-images after verifying no concurrent drift, emit blocked, and do not loop as progress. Never revert unrelated user work.
 **Durable write:** approved product-source files and the declared durable debt record only.
 **Session write:** before/after hashes at `scratchPrefix/mutations`.
 **Stop:** emit boundary drift or blocked if correct repair needs another file, responsibility, or authority.

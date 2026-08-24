@@ -20,4 +20,4 @@ This closed output is ephemeral task-session state consumed by the parent machin
 | `proved` | `completed` | `platform.tunnel.proved / complete` | `platform-tunnel-proved` |
 | `blocked` | `blocked` | `platform.blocked / blocked` | `platform-tunnel-blocked` |
 
-A proved output requires a receipt and at least one coordinator-applied Cloudflare mutation. Blocked output may report partial mutation revisions. Workers never mutate or receive credential handles; all intermediates are purged at terminal cleanup.
+A proved output always requires a receipt. Its mutation list is empty when the declared Cloudflare state already matches the plan; this is a successful idempotent no-op, not a failure. Blocked output may report partial mutation revisions. Workers never mutate or receive credential handles; all intermediates are purged at terminal cleanup.

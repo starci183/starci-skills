@@ -2,6 +2,14 @@ import path from 'node:path';
 import { validatorFor, runValidatorCli } from '../../validation.mjs';
 
 const guards = {
+  "code.implement\u0000ready": {
+    "all": [
+      "coding-scope-frozen"
+    ],
+    "none": [
+      "grammar-gap"
+    ]
+  },
   "requests.review\u0000ready": {
     "all": [],
     "none": [

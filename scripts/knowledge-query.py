@@ -42,7 +42,8 @@ def parser() -> argparse.ArgumentParser:
     query.add_argument("--source-root", type=Path, default=argparse.SUPPRESS)
     query.add_argument("--index", type=Path, default=argparse.SUPPRESS)
     query.add_argument("--text", required=True)
-    query.add_argument("--kind", action="append", choices=["operator-knowledge"])
+    query.add_argument("--kind", action="append", choices=["operator-knowledge", "frontend-coding-context"])
+    query.add_argument("--project", help="Required exact project id for frontend-coding-context queries")
     query.add_argument("--top-k", type=int, default=3)
     query.add_argument("--rebuild-if-stale", action="store_true")
     query.add_argument("--embedding-model", type=Path, help="Same optional local model used to build the index")
@@ -72,7 +73,7 @@ def main() -> int:
             query_text=args.text,
             kinds=args.kind,
             top_k=args.top_k,
-            project=None,
+            project=args.project,
             grammar=None,
             profile=None,
             route_path=None,

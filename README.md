@@ -51,7 +51,7 @@ request -> global analysis -> selected skill -> operator -> validated result
 | `starci-conversation-record` | Append one redacted provenance snapshot |
 | `starci-conversation-query` | Query one bounded provenance identity |
 
-The release currently contains 80 atomic operators across 10 domains and 33 operator-knowledge records.
+The release currently contains 83 atomic operators across 10 domains and 70 operator-knowledge records.
 
 ## Install
 
@@ -121,12 +121,32 @@ Every skill adds `SKILL.md`, `analyze-input.md`, `machine.json`, and `agents/ope
 
 ## Knowledge retrieval
 
+Frontend delivery uses two canonical, project-scoped sources before source files are opened:
+
+- approved business truth at `.worktrees/<project>/businesses/`;
+- deterministic component contracts at `.worktrees/<project>/coding-context/frontend/`.
+
+The frontend exporter hashes the source revision, exporter, schema, and configuration. An unchanged generation is reused; a changed generation is atomically published and indexed. Qdrant is a candidate cache only: every selected result is rebound to its canonical JSON record before use. Grammar retrieval loads `common` plus exactly one selected grammar (`core` or `offset-pop`) and never carries business semantics.
+
+Generate or reuse the frontend coding context:
+
+```bash
+node scripts/build-frontend-coding-context.mjs \
+  --project <project> \
+  --source <frontend-source> \
+  --output-root <host-repository>
+```
+
 Build and query the embedded index without a network service:
 
 ```bash
 python scripts/knowledge-query.py build
 python scripts/knowledge-query.py status
-python scripts/knowledge-query.py query --text "nested surface complex case" --top-k 3
+python scripts/knowledge-query.py query \
+  --kind frontend-coding-context \
+  --project <project> \
+  --text "SurfaceCard external label nested list state" \
+  --top-k 3
 ```
 
 The persisted index is local runtime state under `.workspaces/local/knowledge/` and is not committed.

@@ -9,7 +9,7 @@ The output is a closed, ephemeral task-session object consumed by the parent ski
 | `stage`, `status`, `facts` | Compatibility envelope for the existing skill route. |
 | `payload.decision` | Typed decision key selected from this operator's declared outcomes. |
 | `payload.state` | Explicit operator status, code, retryability, and exact emitted route. |
-| `payload.produced` | Session artifact references plus descriptors of approved durable mutations or external effects. |
+| `payload.produced` | Journey batch, recommendation, optional selected-journey session ref, direction count, and selection policy. |
 | `payload.context` | Minimal references and revisions actually used; never copied context or reasoning. |
 | `payload.cleanup` | Scratch references and mandatory `skill-terminal` purge policy. |
 | `payload.evidenceRefs` | Session-only evidence for the next state. |
@@ -20,5 +20,6 @@ The output is a closed, ephemeral task-session object consumed by the parent ski
 | Decision | Operator state | Emitted state | Required facts |
 | --- | --- | --- | --- |
 | `directions-ready` | `pending` | `flow.review / pending` | `flow-directions-ready` |
+| `recommended-selected` | `completed` | `flow.review / approved` | `flow-directions-ready`, `flow-approved`, `recommended-flow-auto-selected` |
 
-The parent state machine, not the operator or an orchestration worker, routes `payload.state.emits`. Successful results remain task-session artifacts and do not create durable intermediate files.
+Manual policy leaves `selectedJourneyRef` null and waits for exact approval. Auto policy selects only the recommended direction and emits a session ref. The parent state machine routes the result; nothing is persisted outside the task session.

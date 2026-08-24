@@ -23,7 +23,7 @@ These fields are references, not copied documents. The operator must not infer s
 
 ## Loaded by the runtime
 
-- `business`: load only the declared revision under `.worktrees/business/`; source code is never business authority.
+- `business`: load only the declared revision under `.worktrees/<project>/businesses/`; source code is never business authority.
 - `upstream`: resolve only the declared session references for page model, business state authority, and approved flow.
 - `knowledge`: retrieve `fe.state-modeling` from the pinned generation and content hash.
 - `source`: this operator loads no frontend source capability and no repository files.

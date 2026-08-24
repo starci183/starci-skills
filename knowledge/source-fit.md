@@ -5,7 +5,7 @@
 | Knowledge ID | `fe.source-fit` |
 | Operators | `source-fit` |
 | Search tags | `source contract, effective contract, reuse, extend, create, grammar gap` |
-| Dependencies | `fe.grammar-complex-cases` |
+| Dependencies | `fe.grammar-common-overview` plus the selected Grammar overview and exact object/case guides |
 
 ## Record
 

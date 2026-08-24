@@ -16,6 +16,7 @@ This operator repays one approved debt scope. Its input is an ephemeral task-ses
 - `approvedDebtRef`: exact `session://` reference; the operator cannot replace or broaden it.
 - `baselineRef`: exact `session://` reference; the operator cannot replace or broaden it.
 - `scopeRef`: exact `session://` reference; the operator cannot replace or broaden it.
+- `loopControlRef`: exact `session://` iteration budget, prior fingerprint, prior metric, and stop-policy reference owned by the parent machine.
 
 ## Loaded by the runtime
 

@@ -20,5 +20,7 @@ The output is an ephemeral task-session object consumed by the parent state mach
 | Decision | State status | Emitted state | Facts added |
 | --- | --- | --- | --- |
 | `diagnosed` | `completed` | `quality.diagnosed / complete` | workflow-diagnosed |
+| `inconclusive` | `blocked` | `quality.diagnosed / blocked` | workflow-diagnosis-inconclusive |
+| `external-blocker` | `blocked` | `quality.blocked / blocked` | workflow-diagnosis-external-blocker |
 
 `diagnosisReceiptRef`, command captures, evidence, diagnostics, and output use `session://`. Only the explicit repair/debt product effect declared by `operator.json` may survive the skill.

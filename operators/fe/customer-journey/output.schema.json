@@ -1,144 +1,46 @@
 {
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://starci.dev/v6/operators/fe/customer-journey/output.schema.json",
   "title": "fe/customer-journey operator output",
-  "$schema": "https://json-schema.org/draft/2020-12/schema",
   "type": "object",
   "additionalProperties": false,
-  "required": [
-    "schemaVersion",
-    "runId",
-    "stage",
-    "status",
-    "facts",
-    "payload"
-  ],
-  "allOf": [
-    {
-      "oneOf": [
-        {
-          "properties": {
-            "stage": {
-              "const": "flow.review"
-            },
-            "status": {
-              "const": "pending"
-            }
-          },
-          "required": [
-            "stage",
-            "status"
-          ]
-        }
-      ]
-    }
-  ],
+  "required": ["schemaVersion", "runId", "stage", "status", "facts", "payload"],
+  "allOf": [{
+    "oneOf": [
+      { "properties": { "stage": { "const": "flow.review" }, "status": { "const": "pending" }, "payload": { "properties": { "decision": { "const": "directions-ready" } } } }, "required": ["stage", "status", "payload"] },
+      { "properties": { "stage": { "const": "flow.review" }, "status": { "const": "approved" }, "payload": { "properties": { "decision": { "const": "recommended-selected" } } } }, "required": ["stage", "status", "payload"] }
+    ]
+  }],
   "properties": {
-    "schemaVersion": {
-      "const": 6
-    },
-    "runId": {
-      "type": "string",
-      "minLength": 1
-    },
-    "stage": {
-      "enum": [
-        "flow.review"
-      ]
-    },
-    "status": {
-      "enum": [
-        "pending"
-      ]
-    },
-    "facts": {
-      "type": "array",
-      "uniqueItems": true,
-      "items": {
-        "type": "string",
-        "minLength": 1
-      }
-    },
+    "schemaVersion": { "const": 6 },
+    "runId": { "type": "string", "minLength": 1 },
+    "stage": { "const": "flow.review" },
+    "status": { "enum": ["pending", "approved"] },
+    "facts": { "type": "array", "uniqueItems": true, "items": { "type": "string", "minLength": 1 } },
     "payload": {
       "type": "object",
       "additionalProperties": false,
-      "required": [
-        "decision",
-        "state",
-        "produced",
-        "context",
-        "cleanup",
-        "evidenceRefs",
-        "findings"
-      ],
+      "required": ["decision", "state", "produced", "context", "cleanup", "evidenceRefs", "findings"],
       "properties": {
-        "decision": {
-          "enum": [
-            "directions-ready"
-          ]
-        },
+        "decision": { "enum": ["directions-ready", "recommended-selected"] },
         "state": {
           "type": "object",
           "additionalProperties": false,
-          "required": [
-            "operator",
-            "status",
-            "code",
-            "retryable",
-            "emits"
-          ],
+          "required": ["operator", "status", "code", "retryable", "emits"],
           "properties": {
-            "operator": {
-              "const": "fe/customer-journey"
-            },
-            "status": {
-              "enum": [
-                "pending"
-              ]
-            },
-            "code": {
-              "enum": [
-                "fe-customer-journey-directions-ready"
-              ]
-            },
-            "retryable": {
-              "type": "boolean"
-            },
+            "operator": { "const": "fe/customer-journey" },
+            "status": { "enum": ["pending", "completed"] },
+            "code": { "enum": ["fe-customer-journey-directions-ready", "fe-customer-journey-recommended-selected"] },
+            "retryable": { "const": false },
             "emits": {
               "type": "object",
               "additionalProperties": false,
-              "required": [
-                "stage",
-                "status",
-                "factsAdd",
-                "factsRemove"
-              ],
+              "required": ["stage", "status", "factsAdd", "factsRemove"],
               "properties": {
-                "stage": {
-                  "enum": [
-                    "flow.review"
-                  ]
-                },
-                "status": {
-                  "enum": [
-                    "pending"
-                  ]
-                },
-                "factsAdd": {
-                  "type": "array",
-                  "uniqueItems": true,
-                  "items": {
-                    "type": "string",
-                    "minLength": 1
-                  }
-                },
-                "factsRemove": {
-                  "type": "array",
-                  "uniqueItems": true,
-                  "items": {
-                    "type": "string",
-                    "minLength": 1
-                  }
-                }
+                "stage": { "const": "flow.review" },
+                "status": { "enum": ["pending", "approved"] },
+                "factsAdd": { "type": "array", "minItems": 1, "uniqueItems": true, "items": { "type": "string", "minLength": 1 } },
+                "factsRemove": { "type": "array", "uniqueItems": true, "items": { "type": "string", "minLength": 1 } }
               }
             }
           }
@@ -146,114 +48,35 @@
         "produced": {
           "type": "object",
           "additionalProperties": false,
-          "required": [
-            "artifactRefs",
-            "mutations",
-            "externalEffects"
-          ],
+          "required": ["journeyBatchRef", "recommendedDirectionId", "selectedJourneyRef", "directionCount", "selectionPolicy", "mutations", "externalEffects"],
           "properties": {
-            "artifactRefs": {
-              "type": "array",
-              "uniqueItems": true,
-              "items": {
-                "$ref": "#/$defs/sessionRef"
-              }
-            },
-            "mutations": {
-              "type": "array",
-              "uniqueItems": true,
-              "items": {
-                "type": "object",
-                "additionalProperties": false,
-                "required": [
-                  "path",
-                  "beforeSha256",
-                  "afterSha256"
-                ],
-                "properties": {
-                  "path": {
-                    "type": "string",
-                    "minLength": 1
-                  },
-                  "beforeSha256": {
-                    "$ref": "#/$defs/sha256"
-                  },
-                  "afterSha256": {
-                    "$ref": "#/$defs/sha256"
-                  }
-                }
-              }
-            },
-            "externalEffects": {
-              "type": "array",
-              "uniqueItems": true,
-              "items": {
-                "type": "object",
-                "additionalProperties": false,
-                "required": [
-                  "target",
-                  "beforeRevision",
-                  "afterRevision",
-                  "evidenceRef"
-                ],
-                "properties": {
-                  "target": {
-                    "type": "string",
-                    "minLength": 1
-                  },
-                  "beforeRevision": {
-                    "type": "string",
-                    "minLength": 1
-                  },
-                  "afterRevision": {
-                    "type": "string",
-                    "minLength": 1
-                  },
-                  "evidenceRef": {
-                    "$ref": "#/$defs/sessionRef"
-                  }
-                }
-              }
-            }
+            "journeyBatchRef": { "$ref": "#/$defs/sessionRef" },
+            "recommendedDirectionId": { "type": "string", "minLength": 1 },
+            "selectedJourneyRef": { "anyOf": [{ "$ref": "#/$defs/sessionRef" }, { "type": "null" }] },
+            "directionCount": { "enum": [3, 4] },
+            "selectionPolicy": { "enum": ["manual", "auto-recommended"] },
+            "mutations": { "type": "array", "maxItems": 0 },
+            "externalEffects": { "type": "array", "maxItems": 0 }
           }
         },
         "context": {
           "type": "object",
           "additionalProperties": false,
-          "required": [
-            "used"
-          ],
+          "required": ["used"],
           "properties": {
             "used": {
               "type": "array",
-              "minItems": 1,
+              "minItems": 3,
+              "maxItems": 4,
               "uniqueItems": true,
               "items": {
                 "type": "object",
                 "additionalProperties": false,
-                "required": [
-                  "kind",
-                  "ref",
-                  "revision"
-                ],
+                "required": ["kind", "ref", "revision"],
                 "properties": {
-                  "kind": {
-                    "enum": [
-                      "worktree-business",
-                      "session-upstream",
-                      "qdrant-knowledge",
-                      "fe-contract-generation",
-                      "exact-source"
-                    ]
-                  },
-                  "ref": {
-                    "type": "string",
-                    "minLength": 1
-                  },
-                  "revision": {
-                    "type": "string",
-                    "minLength": 1
-                  }
+                  "kind": { "enum": ["business-projection", "business-freshness-receipt", "session-upstream", "qdrant-knowledge"] },
+                  "ref": { "type": "string", "minLength": 1 },
+                  "revision": { "type": "string", "minLength": 1 }
                 }
               }
             }
@@ -262,54 +85,17 @@
         "cleanup": {
           "type": "object",
           "additionalProperties": false,
-          "required": [
-            "scratchRefs",
-            "retention",
-            "purgeAt"
-          ],
+          "required": ["scratchRefs", "retention", "purgeAt"],
           "properties": {
-            "scratchRefs": {
-              "type": "array",
-              "uniqueItems": true,
-              "items": {
-                "$ref": "#/$defs/sessionRef"
-              }
-            },
-            "retention": {
-              "const": "until-skill-terminal"
-            },
-            "purgeAt": {
-              "const": "skill-terminal"
-            }
+            "scratchRefs": { "type": "array", "uniqueItems": true, "items": { "$ref": "#/$defs/sessionRef" } },
+            "retention": { "const": "until-skill-terminal" },
+            "purgeAt": { "const": "skill-terminal" }
           }
         },
-        "evidenceRefs": {
-          "type": "array",
-          "minItems": 1,
-          "uniqueItems": true,
-          "items": {
-            "$ref": "#/$defs/sessionRef"
-          }
-        },
-        "findings": {
-          "type": "array",
-          "uniqueItems": true,
-          "items": {
-            "type": "string",
-            "minLength": 1
-          }
-        }
+        "evidenceRefs": { "type": "array", "minItems": 1, "uniqueItems": true, "items": { "$ref": "#/$defs/sessionRef" } },
+        "findings": { "type": "array", "uniqueItems": true, "items": { "type": "string", "minLength": 1 } }
       }
     }
   },
-  "$defs": {
-    "sha256": {
-      "type": "string",
-      "pattern": "^sha256:[0-9a-f]{64}$"
-    },
-    "sessionRef": {
-      "type": "string",
-      "pattern": "^session://tasks/[A-Za-z0-9._-]+/.+$"
-    }
-  }
+  "$defs": { "sessionRef": { "type": "string", "pattern": "^session://tasks/[A-Za-z0-9._-]+/.+$" } }
 }

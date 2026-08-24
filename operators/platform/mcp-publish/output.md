@@ -21,4 +21,4 @@ This closed output is an ephemeral task-session object consumed by the parent st
 | `proved` | `completed` | `platform.mcp.proved / complete` | `platform-mcp-proved` |
 | `blocked` | `blocked` | `platform.blocked / blocked` | `platform-mcp-blocked` |
 
-All receipt, artifact, evidence, and cleanup refs use the current task's `session://` prefix. Successful publication reports at least one coordinator-applied mutation. A blocked result may report partial mutations, but every mutation carries exact revisions and coordinator ownership.
+All receipt, artifact, evidence, and cleanup refs use the current task's `session://` prefix. Successful publication requires a fresh receipt; an empty mutation list means the approved runtime was already converged and all publication probes passed. A blocked result may report partial mutations, but every mutation carries exact revisions and coordinator ownership.

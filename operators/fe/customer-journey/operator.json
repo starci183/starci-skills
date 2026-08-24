@@ -38,6 +38,18 @@
       "factsRemove": [
         "flow-feedback-recorded"
       ]
+    },
+    {
+      "stage": "flow.review",
+      "status": "approved",
+      "factsAdd": [
+        "flow-directions-ready",
+        "flow-approved",
+        "recommended-flow-auto-selected"
+      ],
+      "factsRemove": [
+        "flow-feedback-recorded"
+      ]
     }
   ],
   "sideEffects": [
@@ -46,7 +58,7 @@
   ],
   "stopConditions": [
     "actor goal or terminal outcome is not evidenced",
-    "the batch does not contain two or three directions",
+    "the batch does not contain the requested three or four directions",
     "directions differ only cosmetically",
     "a direction replaces a multi-page journey with tabs",
     "Stop when actor goal, terminal outcome, or a required business transition lacks authority.",

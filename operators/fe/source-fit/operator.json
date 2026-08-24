@@ -13,8 +13,9 @@
       "stage": "source-fit.resolve",
       "status": "ready",
       "allFacts": [
-        "grammar-converged",
-        "frontend-contract-generation-ready"
+        "grammar-pair-ready",
+        "frontend-coding-context-ready",
+        "design-knowledge-index-ready"
       ],
       "noneFacts": [
         "grammar-business-gate-failed"

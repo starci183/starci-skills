@@ -13,9 +13,9 @@ This operator idempotently applies only one approved Cloudflare tunnel ingress a
 ## Step 2 — Resolve plan authority and artifacts
 
 **Read:** `payload.provided`, `payload.loads.artifacts`, and `payload.loads.knowledge`.
-**Context:** resolve exactly `tunnelPlanRef` and `credentialReceiptRef`; retrieve only pinned `platform.operations`.
+**Context:** resolve exactly `tunnelPlanRef`, `credentialReceiptRef`, and `approvalRef`; retrieve only pinned `platform.tunnel`.
 **Session write:** record identities, revisions, and applied rule IDs at `payload.session.scratchPrefix/bindings`.
-**Stop:** stop on missing, stale, duplicate, mismatched, undeclared, or foreign-session bindings.
+**Stop:** stop on missing, stale, duplicate, mismatched, undeclared, foreign-session, or plan-hash-mismatched approval bindings.
 **Orchestration:** workers may verify disjoint revisions read-only; the coordinator joins results.
 
 ## Step 3 — Preflight exact source, command, and Cloudflare bindings
@@ -55,7 +55,7 @@ This operator idempotently applies only one approved Cloudflare tunnel ingress a
 | Alias | Target | Kind | Why |
 | --- | --- | --- | --- |
 | `@provided-artifacts` | `payload.loads.artifacts` | session-exact | bind exactly the approved plan and credential receipt |
-| `@platform-operations` | `platform.operations` | qdrant | retrieve the only knowledge authority |
+| `@platform-operations` | `platform.tunnel` | qdrant | retrieve the only knowledge authority |
 | `@exact-source` | `payload.loads.source.targetFiles` | exact-source | inspect only hash-pinned route files |
 | `@declared-commands` | `payload.loads.commands.commandRefs` | declared-only | invoke only approved shared-helper envelopes |
 | `@external-bindings` | `payload.loads.external` | external-exact | bind exact Cloudflare resources, probe, and opaque handles |

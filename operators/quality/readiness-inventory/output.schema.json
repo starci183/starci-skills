@@ -42,6 +42,13 @@
             "stage",
             "status"
           ]
+        },
+        {
+          "properties": {
+            "stage": { "const": "quality.blocked" },
+            "status": { "const": "blocked" }
+          },
+          "required": ["stage", "status"]
         }
       ]
     }
@@ -56,13 +63,15 @@
     },
     "stage": {
       "enum": [
-        "quality.inventory.result"
+        "quality.inventory.result",
+        "quality.blocked"
       ]
     },
     "status": {
       "enum": [
         "complete",
-        "ready"
+        "ready",
+        "blocked"
       ]
     },
     "facts": {
@@ -89,7 +98,8 @@
         "decision": {
           "enum": [
             "green",
-            "findings"
+            "findings",
+            "blocked"
           ]
         },
         "state": {
@@ -116,7 +126,8 @@
             "code": {
               "enum": [
                 "quality-readiness-inventory-green",
-                "quality-readiness-inventory-findings"
+                "quality-readiness-inventory-findings",
+                "quality-readiness-inventory-blocked"
               ]
             },
             "retryable": {
@@ -133,13 +144,15 @@
               "properties": {
                 "stage": {
                   "enum": [
-                    "quality.inventory.result"
+                    "quality.inventory.result",
+                    "quality.blocked"
                   ]
                 },
                 "status": {
                   "enum": [
                     "complete",
-                    "ready"
+                    "ready",
+                    "blocked"
                   ]
                 },
                 "factsAdd": {

@@ -99,6 +99,7 @@
             "source",
             "commands",
             "external",
+            "cache",
             "orchestration"
           ],
           "properties": {
@@ -120,106 +121,6 @@
                   "properties": {
                     "id": {
                       "const": "fe.ui-testing"
-                    },
-                    "generation": {
-                      "type": "string",
-                      "minLength": 1
-                    },
-                    "contentSha256": {
-                      "$ref": "#/$defs/sha256"
-                    },
-                    "loadMode": {
-                      "const": "qdrant-exact"
-                    }
-                  }
-                },
-                {
-                  "type": "object",
-                  "additionalProperties": false,
-                  "required": [
-                    "id",
-                    "generation",
-                    "contentSha256",
-                    "loadMode"
-                  ],
-                  "properties": {
-                    "id": {
-                      "const": "fe.customer-journey"
-                    },
-                    "generation": {
-                      "type": "string",
-                      "minLength": 1
-                    },
-                    "contentSha256": {
-                      "$ref": "#/$defs/sha256"
-                    },
-                    "loadMode": {
-                      "const": "qdrant-exact"
-                    }
-                  }
-                },
-                {
-                  "type": "object",
-                  "additionalProperties": false,
-                  "required": [
-                    "id",
-                    "generation",
-                    "contentSha256",
-                    "loadMode"
-                  ],
-                  "properties": {
-                    "id": {
-                      "const": "fe.layout-composition"
-                    },
-                    "generation": {
-                      "type": "string",
-                      "minLength": 1
-                    },
-                    "contentSha256": {
-                      "$ref": "#/$defs/sha256"
-                    },
-                    "loadMode": {
-                      "const": "qdrant-exact"
-                    }
-                  }
-                },
-                {
-                  "type": "object",
-                  "additionalProperties": false,
-                  "required": [
-                    "id",
-                    "generation",
-                    "contentSha256",
-                    "loadMode"
-                  ],
-                  "properties": {
-                    "id": {
-                      "const": "fe.state-modeling"
-                    },
-                    "generation": {
-                      "type": "string",
-                      "minLength": 1
-                    },
-                    "contentSha256": {
-                      "$ref": "#/$defs/sha256"
-                    },
-                    "loadMode": {
-                      "const": "qdrant-exact"
-                    }
-                  }
-                },
-                {
-                  "type": "object",
-                  "additionalProperties": false,
-                  "required": [
-                    "id",
-                    "generation",
-                    "contentSha256",
-                    "loadMode"
-                  ],
-                  "properties": {
-                    "id": {
-                      "const": "fe.product-seeding"
                     },
                     "generation": {
                       "type": "string",
@@ -329,6 +230,33 @@
                   "items": {
                     "$ref": "#/$defs/sessionRef"
                   }
+                }
+              }
+            },
+            "cache": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "lookupMode",
+                "fingerprintRef",
+                "candidateReceiptRef"
+              ],
+              "properties": {
+                "lookupMode": {
+                  "const": "exact-only"
+                },
+                "fingerprintRef": {
+                  "$ref": "#/$defs/sessionRef"
+                },
+                "candidateReceiptRef": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/$defs/sessionRef"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
                 }
               }
             },

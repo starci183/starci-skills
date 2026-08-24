@@ -10,11 +10,18 @@ const routes = {
     "code": "quality-rule-binding-check-pass"
   },
   "fail": {
+    "stage": "quality.rule-bindings.result",
+    "status": "ready",
+    "fact": "rule-bindings-fail",
+    "state": "completed",
+    "code": "quality-rule-binding-check-fail"
+  },
+  "blocked": {
     "stage": "quality.blocked",
     "status": "blocked",
-    "fact": "rule-bindings-fail",
+    "fact": "rule-bindings-inconclusive",
     "state": "blocked",
-    "code": "quality-rule-binding-check-fail"
+    "code": "quality-rule-binding-check-blocked"
   }
 };
 

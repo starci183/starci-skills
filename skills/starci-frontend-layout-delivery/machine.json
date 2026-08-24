@@ -9,8 +9,48 @@
       "on": [
         {
           "when": {},
+          "target": "route",
+          "label": "enter route"
+        }
+      ]
+    },
+    "route": {
+      "kind": "operator",
+      "ref": "workspace/route-verify",
+      "on": [
+        {
+          "when": {
+            "decision": "ready"
+          },
+          "target": "business-staleness",
+          "label": "ready"
+        }
+      ]
+    },
+    "business-staleness": {
+      "kind": "operator",
+      "ref": "business/staleness-check",
+      "on": [
+        {
+          "when": {
+            "decision": "fresh"
+          },
           "target": "preflight",
-          "label": "enter preflight"
+          "label": "fresh"
+        },
+        {
+          "when": {
+            "decision": "initialize-required"
+          },
+          "target": "business-evidence",
+          "label": "initialize-required"
+        },
+        {
+          "when": {
+            "decision": "blocked"
+          },
+          "target": "blocked",
+          "label": "blocked"
         }
       ]
     },
@@ -27,6 +67,23 @@
         }
       ]
     },
+    "business-evidence": {
+      "kind": "operator",
+      "ref": "business/evidence-normalize",
+      "on": [
+        {
+          "when": {
+            "decision": "ready"
+          },
+          "target": "business-model",
+          "label": "ready"
+        }
+      ]
+    },
+    "blocked": {
+      "kind": "terminal",
+      "result": "blocked"
+    },
     "journey": {
       "kind": "operator",
       "ref": "fe/customer-journey",
@@ -37,6 +94,26 @@
             "status": "pending"
           },
           "target": "flow-approval"
+        },
+        {
+          "when": {
+            "stage": "flow.review",
+            "status": "approved"
+          },
+          "target": "page-model"
+        }
+      ]
+    },
+    "business-model": {
+      "kind": "operator",
+      "ref": "business/model",
+      "on": [
+        {
+          "when": {
+            "decision": "ready"
+          },
+          "target": "business-approval",
+          "label": "ready"
         }
       ]
     },
@@ -77,6 +154,30 @@
         }
       ]
     },
+    "business-approval": {
+      "kind": "wait",
+      "approval": {
+        "prompt": "Approve regenerated business authority before customer-journey work.",
+        "approve": "OK BUSINESS <hash>",
+        "reject": "REJECT BUSINESS <hash>"
+      },
+      "on": [
+        {
+          "when": {
+            "stage": "business.model.review",
+            "status": "approved"
+          },
+          "target": "business-publish"
+        },
+        {
+          "when": {
+            "stage": "business.model.review",
+            "status": "rejected"
+          },
+          "target": "business-evidence"
+        }
+      ]
+    },
     "state": {
       "kind": "operator",
       "ref": "fe/state",
@@ -86,7 +187,7 @@
             "stage": "layout.generate",
             "status": "ready"
           },
-          "target": "layout"
+          "target": "context-sync"
         },
         {
           "when": {
@@ -97,50 +198,36 @@
         }
       ]
     },
-    "layout": {
+    "business-publish": {
       "kind": "operator",
-      "ref": "fe/layout",
+      "ref": "business/publish",
       "on": [
         {
           "when": {
-            "stage": "layout.review",
-            "status": "pending"
+            "decision": "direct-plan"
           },
-          "target": "layout-approval"
-        }
-      ]
-    },
-    "blocked": {
-      "kind": "terminal",
-      "result": "blocked"
-    },
-    "layout-approval": {
-      "kind": "wait",
-      "approval": {
-        "prompt": "Approve one exact layout direction and complete page set.",
-        "approve": "OK LAYOUT <id>",
-        "reject": "REJECT LAYOUT <id>"
-      },
-      "on": [
-        {
-          "when": {
-            "stage": "layout.review",
-            "status": "approved"
-          },
-          "target": "grammar"
+          "target": "business-staleness",
+          "label": "direct-plan"
         },
         {
           "when": {
-            "stage": "layout.review",
-            "status": "rejected"
+            "decision": "architecture-required"
           },
-          "target": "layout"
+          "target": "business-staleness",
+          "label": "architecture-required"
+        },
+        {
+          "when": {
+            "decision": "blocked"
+          },
+          "target": "blocked",
+          "label": "blocked"
         }
       ]
     },
-    "grammar": {
+    "context-sync": {
       "kind": "operator",
-      "ref": "fe/grammar-convergence",
+      "ref": "fe/context-sync",
       "on": [
         {
           "when": {
@@ -177,14 +264,71 @@
       "on": [
         {
           "when": {
-            "stage": "requests.review",
+            "stage": "layout.generate",
+            "status": "ready"
+          },
+          "target": "layout"
+        },
+        {
+          "when": {
+            "stage": "layout.generate",
+            "status": "blocked"
+          },
+          "target": "blocked"
+        }
+      ]
+    },
+    "layout": {
+      "kind": "operator",
+      "ref": "fe/layout",
+      "on": [
+        {
+          "when": {
+            "stage": "layout.review",
+            "status": "pending"
+          },
+          "target": "layout-approval"
+        }
+      ]
+    },
+    "layout-approval": {
+      "kind": "wait",
+      "approval": {
+        "prompt": "Approve one exact layout direction and complete page set.",
+        "approve": "OK LAYOUT <id>",
+        "reject": "REJECT LAYOUT <id>"
+      },
+      "on": [
+        {
+          "when": {
+            "stage": "layout.review",
+            "status": "approved"
+          },
+          "target": "grammar"
+        },
+        {
+          "when": {
+            "stage": "layout.review",
+            "status": "rejected"
+          },
+          "target": "layout"
+        }
+      ]
+    },
+    "grammar": {
+      "kind": "operator",
+      "ref": "fe/grammar-convergence",
+      "on": [
+        {
+          "when": {
+            "stage": "source-fit.resolve",
             "status": "ready"
           },
           "target": "request-choice"
         },
         {
           "when": {
-            "stage": "requests.review",
+            "stage": "source-fit.resolve",
             "status": "blocked"
           },
           "target": "blocked"
@@ -220,7 +364,7 @@
               "create-required"
             ]
           },
-          "target": "implementation"
+          "target": "coding-scope"
         }
       ]
     },
@@ -233,11 +377,31 @@
             "stage": "request.result",
             "status": "ready"
           },
-          "target": "implementation"
+          "target": "coding-scope"
         },
         {
           "when": {
             "stage": "request.result",
+            "status": "blocked"
+          },
+          "target": "blocked"
+        }
+      ]
+    },
+    "coding-scope": {
+      "kind": "operator",
+      "ref": "fe/coding-scope-freeze",
+      "on": [
+        {
+          "when": {
+            "stage": "code.implement",
+            "status": "ready"
+          },
+          "target": "implementation"
+        },
+        {
+          "when": {
+            "stage": "code.result",
             "status": "blocked"
           },
           "target": "blocked"

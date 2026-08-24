@@ -23,6 +23,6 @@ This operator compiles one canonical backend implementation boundary. The input 
 - `artifacts`: resolve only references declared by `payload.provided` into task-session memory.
 - `knowledge`: retrieve only `be.boundary-planning` from the pinned Qdrant generation.
 - `orchestration`: resolve execution mode separately from provider/model mapping.
-- `business`: load the exact declared revision from `.worktrees/business/`; product source is not business authority.
+- `business`: load the exact declared revision from `.worktrees/<project>/businesses/`; product source is not business authority.
 
 Acceptance requires that each target has owner, baseline hash, allowed change, exclusion, dependency, and proof. Validate the whole envelope before any load or side effect. Loaded content and intermediate analysis remain session-only.

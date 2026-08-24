@@ -64,7 +64,7 @@
               "required": ["ref", "authorityPath", "revision"],
               "properties": {
                 "ref": { "$ref": "#/$defs/sessionRef" },
-                "authorityPath": { "type": "string", "pattern": "^\\.worktrees/business/" },
+                "authorityPath": { "type": "string", "pattern": "^\\.worktrees/[a-z0-9][a-z0-9-]*/businesses/" },
                 "revision": { "$ref": "#/$defs/sha256" }
               }
             },
@@ -86,7 +86,7 @@
                 "additionalProperties": false,
                 "required": ["id", "generation", "contentSha256", "loadMode"],
                 "properties": {
-                  "id": { "const": "be.boundary-planning" },
+                  "id": { "const": "be.implementation" },
                   "generation": { "type": "string", "minLength": 1 },
                   "contentSha256": { "$ref": "#/$defs/sha256" },
                   "loadMode": { "const": "qdrant-exact" }

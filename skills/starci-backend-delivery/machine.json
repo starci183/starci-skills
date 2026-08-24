@@ -22,7 +22,47 @@
           "when": {
             "decision": "ready"
           },
+          "target": "business-staleness",
+          "label": "ready"
+        }
+      ]
+    },
+    "business-staleness": {
+      "kind": "operator",
+      "ref": "business/staleness-check",
+      "on": [
+        {
+          "when": {
+            "decision": "fresh"
+          },
+          "target": "architecture-frame",
+          "label": "fresh"
+        },
+        {
+          "when": {
+            "decision": "initialize-required"
+          },
           "target": "business-evidence",
+          "label": "initialize-required"
+        },
+        {
+          "when": {
+            "decision": "blocked"
+          },
+          "target": "blocked",
+          "label": "blocked"
+        }
+      ]
+    },
+    "architecture-frame": {
+      "kind": "operator",
+      "ref": "architecture/decision-frame",
+      "on": [
+        {
+          "when": {
+            "decision": "ready"
+          },
+          "target": "architecture-current",
           "label": "ready"
         }
       ]
@@ -40,104 +80,9 @@
         }
       ]
     },
-    "business-model": {
-      "kind": "operator",
-      "ref": "business/model",
-      "on": [
-        {
-          "when": {
-            "decision": "ready"
-          },
-          "target": "business-publish",
-          "label": "ready"
-        }
-      ]
-    },
-    "business-publish": {
-      "kind": "operator",
-      "ref": "business/publish",
-      "on": [
-        {
-          "when": {
-            "decision": "direct-plan"
-          },
-          "target": "architecture-choice",
-          "label": "direct-plan"
-        },
-        {
-          "when": {
-            "decision": "architecture-required"
-          },
-          "target": "architecture-frame",
-          "label": "architecture-required"
-        },
-        {
-          "when": {
-            "decision": "blocked"
-          },
-          "target": "blocked",
-          "label": "blocked"
-        }
-      ]
-    },
-    "architecture-choice": {
-      "kind": "choice",
-      "on": [
-        {
-          "when": {
-            "inputEquals": {
-              "options.architectureMode": "required"
-            }
-          },
-          "target": "architecture-frame"
-        },
-        {
-          "when": {
-            "inputEquals": {
-              "options.architectureMode": "auto"
-            }
-          },
-          "target": "source-discovery"
-        },
-        {
-          "when": {
-            "inputEquals": {
-              "options.architectureMode": "skip"
-            }
-          },
-          "target": "source-discovery"
-        }
-      ]
-    },
-    "architecture-frame": {
-      "kind": "operator",
-      "ref": "architecture/decision-frame",
-      "on": [
-        {
-          "when": {
-            "decision": "ready"
-          },
-          "target": "architecture-current",
-          "label": "ready"
-        }
-      ]
-    },
     "blocked": {
       "kind": "terminal",
       "result": "blocked"
-    },
-    "source-discovery": {
-      "kind": "operator",
-      "ref": "architecture/source-discovery",
-      "on": [
-        {
-          "when": {
-            "decision": "ready"
-          },
-          "target": "pattern-bind",
-          "label": "ready"
-        }
-      ]
     },
     "architecture-current": {
       "kind": "operator",
@@ -152,15 +97,15 @@
         }
       ]
     },
-    "pattern-bind": {
+    "business-model": {
       "kind": "operator",
-      "ref": "architecture/pattern-bind",
+      "ref": "business/model",
       "on": [
         {
           "when": {
             "decision": "ready"
           },
-          "target": "boundary-plan",
+          "target": "business-approval",
           "label": "ready"
         }
       ]
@@ -178,16 +123,27 @@
         }
       ]
     },
-    "boundary-plan": {
-      "kind": "operator",
-      "ref": "architecture/boundary-plan",
+    "business-approval": {
+      "kind": "wait",
+      "approval": {
+        "prompt": "Approve regenerated business authority before backend planning.",
+        "approve": "OK BUSINESS <hash>",
+        "reject": "REJECT BUSINESS <hash>"
+      },
       "on": [
         {
           "when": {
-            "decision": "ready"
+            "stage": "business.model.review",
+            "status": "approved"
           },
-          "target": "boundary-challenge",
-          "label": "ready"
+          "target": "business-publish"
+        },
+        {
+          "when": {
+            "stage": "business.model.review",
+            "status": "rejected"
+          },
+          "target": "business-evidence"
         }
       ]
     },
@@ -199,7 +155,7 @@
           "when": {
             "decision": "ready"
           },
-          "target": "architecture-handoff",
+          "target": "architecture-selection",
           "label": "ready"
         },
         {
@@ -215,6 +171,109 @@
           },
           "target": "blocked",
           "label": "blocked"
+        }
+      ]
+    },
+    "business-publish": {
+      "kind": "operator",
+      "ref": "business/publish",
+      "on": [
+        {
+          "when": {
+            "decision": "direct-plan"
+          },
+          "target": "business-staleness",
+          "label": "direct-plan"
+        },
+        {
+          "when": {
+            "decision": "architecture-required"
+          },
+          "target": "business-staleness",
+          "label": "architecture-required"
+        },
+        {
+          "when": {
+            "decision": "blocked"
+          },
+          "target": "blocked",
+          "label": "blocked"
+        }
+      ]
+    },
+    "architecture-selection": {
+      "kind": "wait",
+      "approval": {
+        "prompt": "Approve the recommended architecture decision and option-set hash.",
+        "approve": "OK ARCHITECTURE <decision>",
+        "reject": "REJECT ARCHITECTURE <decision>"
+      },
+      "on": [
+        {
+          "when": {
+            "stage": "architecture.decision.handoff",
+            "status": "ready"
+          },
+          "target": "architecture-handoff"
+        },
+        {
+          "when": {
+            "stage": "architecture.decision.alternatives",
+            "status": "ready"
+          },
+          "target": "architecture-alternatives"
+        }
+      ]
+    },
+    "architecture-handoff": {
+      "kind": "operator",
+      "ref": "architecture/decision-handoff",
+      "on": [
+        {
+          "when": {
+            "decision": "ready"
+          },
+          "target": "source-discovery",
+          "label": "ready"
+        }
+      ]
+    },
+    "source-discovery": {
+      "kind": "operator",
+      "ref": "architecture/source-discovery",
+      "on": [
+        {
+          "when": {
+            "decision": "ready"
+          },
+          "target": "pattern-bind",
+          "label": "ready"
+        }
+      ]
+    },
+    "pattern-bind": {
+      "kind": "operator",
+      "ref": "architecture/pattern-bind",
+      "on": [
+        {
+          "when": {
+            "decision": "ready"
+          },
+          "target": "boundary-plan",
+          "label": "ready"
+        }
+      ]
+    },
+    "boundary-plan": {
+      "kind": "operator",
+      "ref": "architecture/boundary-plan",
+      "on": [
+        {
+          "when": {
+            "decision": "ready"
+          },
+          "target": "boundary-challenge",
+          "label": "ready"
         }
       ]
     },
@@ -242,19 +301,6 @@
           },
           "target": "blocked",
           "label": "blocked"
-        }
-      ]
-    },
-    "architecture-handoff": {
-      "kind": "operator",
-      "ref": "architecture/decision-handoff",
-      "on": [
-        {
-          "when": {
-            "decision": "ready"
-          },
-          "target": "source-discovery",
-          "label": "ready"
         }
       ]
     },

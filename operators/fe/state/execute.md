@@ -16,7 +16,7 @@ This operator's responsibility is to derive complete business and Block states p
 ## Step 2 — Load business authority
 
 **Read:** `payload.loads.business` and `payload.provided.businessHeadRef`.
-**Context:** load exactly the declared revision under `.worktrees/business/`; never infer business behavior from frontend source.
+**Context:** load exactly the declared revision under `.worktrees/<project>/businesses/`; never infer business behavior from frontend source.
 **Decision evidence:** reference equality, revision hash, accepted business status, and the specific facts needed to derive complete business and Block states plus owned transitions for every page in the approved model.
 **Action:** normalize only the applicable actor, outcome, rule, state, and constraint references.
 **Session write:** value-safe business bindings under `scratchPrefix/business`; do not copy the complete business document into output.

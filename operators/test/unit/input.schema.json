@@ -99,6 +99,7 @@
             "source",
             "commands",
             "external",
+            "cache",
             "orchestration"
           ],
           "properties": {
@@ -229,6 +230,33 @@
                   "items": {
                     "$ref": "#/$defs/sessionRef"
                   }
+                }
+              }
+            },
+            "cache": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "lookupMode",
+                "fingerprintRef",
+                "candidateReceiptRef"
+              ],
+              "properties": {
+                "lookupMode": {
+                  "const": "exact-only"
+                },
+                "fingerprintRef": {
+                  "$ref": "#/$defs/sessionRef"
+                },
+                "candidateReceiptRef": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/$defs/sessionRef"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
                 }
               }
             },

@@ -3,7 +3,7 @@ import { validatorFor, runValidatorCli } from '../../validation.mjs';
 const outcomes = {
   "compiled": {
     "key": "compiled",
-    "stage": "requests.review",
+    "stage": "layout.generate",
     "status": "ready",
     "operatorStatus": "completed",
     "code": "fe-principle-compile-compiled",
@@ -15,7 +15,7 @@ const outcomes = {
   },
   "blocked": {
     "key": "blocked",
-    "stage": "requests.review",
+    "stage": "layout.generate",
     "status": "blocked",
     "operatorStatus": "blocked",
     "code": "fe-principle-compile-blocked",

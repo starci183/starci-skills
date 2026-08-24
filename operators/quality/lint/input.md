@@ -21,6 +21,7 @@ This operator runs the lint gate. Its input is an ephemeral task-session object.
 - `artifacts`: resolve only references listed by `payload.provided` into session memory.
 - `knowledge`: retrieve only `quality.source-gates` from the pinned Qdrant generation.
 - `execution`: bind one exact command and checkout; captured stdout, stderr, exit status, and diagnostics remain session-only.
+- `cache`: bind one exact fingerprint and optional session receipt candidate; validate it before retrieving knowledge or running the command.
 - `orchestration`: resolve execution strategy separately from provider/model mapping.
 
 Acceptance requires that the pinned lint machine reports no rule violation in the approved boundary. Validate the complete envelope before any load, command, or mutation.

@@ -10,23 +10,23 @@ This operator checks law-to-gate-to-machine bindings. Input, output, loaded cont
 **Session write:** `payload.session.inputRef`.
 **Stop:** stop before loading context if schema, route, facts, or task ownership fails.
 
-## Step 2 — Resolve exact evidence and quality law
+## Step 2 — Validate registry authority
 
 **Read:** `payload.loads.artifacts`, `payload.loads.knowledge`.
-**Context:** resolve exact session artifacts and retrieve only `quality.readiness-repair` from its pinned generation.
-**Analysis:** verify refs, revisions, ownership, and freshness. Record rule IDs and match/mismatch evidence only.
+**Context:** rule registry, gate catalog, and published-machine identities plus revisions only. Do not retrieve knowledge yet.
+**Analysis:** deterministically verify schema, hashes, shared release identity, freshness, and complete registry readability.
 **Session write:** `payload.session.scratchPrefix/bindings`.
-**Stop:** stop when evidence is stale, ambiguous, incomplete, or belongs to another revision.
+**Stop:** stale, unreadable, or foreign-release registries block the audit; they are not failed rule bindings.
 
 ## Step 3 — Evaluate the result
 
 **Read:** validated bindings, and accepted machine facts.
-**Context:** load no undeclared knowledge, source, or business feature.
+**Context:** retrieve `quality.readiness-repair` only if deterministic comparison produces a mismatch needing classification. Load no source or business feature.
 **Decision criteria:** each published rule has one governing law, gate situation, machine identity, and executable proof.
-**Analysis:** cross-check the three registries and report missing or conflicting bindings. Record applied criteria, structured diagnostics, and conclusions only; never record chain-of-thought.
+**Analysis:** prove for every rule exactly one accountable executable binding and classify missing, duplicate, orphaned, shadowed, and revision-mismatched bindings with exact rule/gate/machine refs. Record conclusions only; never record chain-of-thought.
 **Session write:** candidate `ruleBindingReceiptRef` at `scratchPrefix/candidate`.
 **Orchestration:** economical mode is sequential. Balanced/parallel modes may classify independent evidence items read-only; the coordinator owns route classification and join.
-**Stop:** emit only one declared decision and never widen a repair boundary.
+**Stop:** `fail` requires fresh complete authority and at least one measured binding defect. Emit `blocked` for stale or unavailable authority.
 
 ## Step 4 — Emit and register cleanup
 
@@ -42,7 +42,7 @@ This operator checks law-to-gate-to-machine bindings. Input, output, loaded cont
 | Alias | Target | Kind | Why |
 | --- | --- | --- | --- |
 | `@provided-artifacts` | `payload.loads.artifacts` | session | resolve only previous-state refs |
-| `@knowledge-1` | `quality.readiness-repair` | qdrant | retrieve only this quality law |
+| `@knowledge-1` | `quality.readiness-repair` | qdrant | retrieve only after deterministic comparison finds a mismatch |
 | `@orchestration-profile` | `payload.loads.orchestration` | orchestration | select strategy independently of provider/model |
 
 No repository source-context load exists for this operator.

@@ -13,7 +13,7 @@ This operator compiles one canonical backend implementation boundary. Input, out
 ## Step 2 — Resolve exact bindings
 
 **Read:** `payload.loads.artifacts`, `payload.loads.knowledge`, and `payload.loads.business`.
-**Context:** resolve exact task-session artifacts and retrieve only `be.boundary-planning` from its pinned Qdrant generation. Load only the declared business revision under `.worktrees/business/`.
+**Context:** resolve exact task-session artifacts and retrieve only `be.boundary-planning` from its pinned Qdrant generation. Load only the declared business revision under `.worktrees/<project>/businesses/`.
 **Analysis:** verify identity, revision, freshness, and ownership. Record applied rule IDs and match/mismatch evidence, never hidden reasoning.
 **Session write:** `payload.session.scratchPrefix/bindings`.
 **Stop:** stop when a binding is missing, stale, ambiguous, or outside the accepted route.

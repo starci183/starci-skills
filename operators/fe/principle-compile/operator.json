@@ -23,7 +23,7 @@
       "when": {
         "result": "compiled"
       },
-      "stage": "requests.review",
+      "stage": "layout.generate",
       "status": "ready",
       "factsAdd": [
         "principles-compiled"
@@ -34,7 +34,7 @@
       "when": {
         "result": "blocked"
       },
-      "stage": "requests.review",
+      "stage": "layout.generate",
       "status": "blocked",
       "factsAdd": [
         "principle-boundary-failed"

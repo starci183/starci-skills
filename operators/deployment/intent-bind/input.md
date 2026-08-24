@@ -21,7 +21,7 @@ This operator binds routed business authority to one deployment target. Its inpu
 
 - `artifacts`: resolve only provided refs into session memory.
 - `knowledge`: retrieve only `deployment.lifecycle` from the pinned Qdrant generation.
-- `business`: load the exact approved revision below `.worktrees/business/`; deployed source is not business authority.
+- `business`: load the exact approved revision below `.worktrees/<project>/businesses/`; deployed source is not business authority.
 - `orchestration`: resolve strategy independently of provider/model.
 
 Acceptance requires that route, business revision, release, environment, target, and imperative request identify one target. Validate before any load, command, provider call, or mutation.

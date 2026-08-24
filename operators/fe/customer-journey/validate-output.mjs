@@ -14,9 +14,25 @@ const outcomes = {
     "factsRemove": [
       "flow-feedback-recorded"
     ]
+  },
+  "recommended-selected": {
+    "key": "recommended-selected",
+    "stage": "flow.review",
+    "status": "approved",
+    "operatorStatus": "completed",
+    "code": "fe-customer-journey-recommended-selected",
+    "retryable": false,
+    "factsAdd": [
+      "flow-directions-ready",
+      "flow-approved",
+      "recommended-flow-auto-selected"
+    ],
+    "factsRemove": [
+      "flow-feedback-recorded"
+    ]
   }
 };
-const successfulDecisions = new Set(["directions-ready"]);
+const successfulDecisions = new Set(["directions-ready", "recommended-selected"]);
 
 function sameStrings(left, right) {
   const a = [...left].sort();
@@ -40,15 +56,16 @@ function semanticErrors(value) {
   const success = successfulDecisions.has(payload.decision);
   const produced = payload.produced;
   if (!success && (produced.mutations.length || produced.externalEffects.length)) errors.push('$.payload.produced: non-success output cannot claim a durable effect');
-
-
-  if (success && produced.artifactRefs.length === 0) errors.push('$.payload.produced.artifactRefs: successful analysis requires a session artifact reference');
+  if (payload.decision === 'directions-ready' && produced.selectedJourneyRef !== null) errors.push('$.payload.produced.selectedJourneyRef: manual selection must remain null');
+  if (payload.decision === 'recommended-selected' && !produced.selectedJourneyRef) errors.push('$.payload.produced.selectedJourneyRef: auto selection requires a selected journey ref');
+  if (payload.decision === 'directions-ready' && produced.selectionPolicy !== 'manual') errors.push('$.payload.produced.selectionPolicy: pending output requires manual policy');
+  if (payload.decision === 'recommended-selected' && produced.selectionPolicy !== 'auto-recommended') errors.push('$.payload.produced.selectionPolicy: approved output requires auto-recommended policy');
 
   const taskMatch = payload.evidenceRefs[0]?.match(/^session:\/\/tasks\/([^/]+)\//);
   if (!taskMatch) errors.push('$.payload.evidenceRefs: cannot determine task ownership');
   else {
     const prefix = `session://tasks/${taskMatch[1]}/`;
-    const refs = [...payload.evidenceRefs, ...payload.cleanup.scratchRefs, ...payload.produced.artifactRefs, ...payload.produced.externalEffects.map((item) => item.evidenceRef)];
+    const refs = [...payload.evidenceRefs, ...payload.cleanup.scratchRefs, payload.produced.journeyBatchRef, payload.produced.selectedJourneyRef].filter(Boolean);
     for (const ref of refs) if (!ref.startsWith(prefix)) errors.push(`$: session ref is outside output task: ${ref}`);
   }
   return errors;

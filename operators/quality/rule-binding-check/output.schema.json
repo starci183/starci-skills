@@ -32,6 +32,20 @@
         {
           "properties": {
             "stage": {
+              "const": "quality.rule-bindings.result"
+            },
+            "status": {
+              "const": "ready"
+            }
+          },
+          "required": [
+            "stage",
+            "status"
+          ]
+        },
+        {
+          "properties": {
+            "stage": {
               "const": "quality.blocked"
             },
             "status": {
@@ -63,7 +77,8 @@
     "status": {
       "enum": [
         "complete",
-        "blocked"
+        "blocked",
+        "ready"
       ]
     },
     "facts": {
@@ -90,7 +105,8 @@
         "decision": {
           "enum": [
             "pass",
-            "fail"
+            "fail",
+            "blocked"
           ]
         },
         "state": {
@@ -117,7 +133,8 @@
             "code": {
               "enum": [
                 "quality-rule-binding-check-pass",
-                "quality-rule-binding-check-fail"
+                "quality-rule-binding-check-fail",
+                "quality-rule-binding-check-blocked"
               ]
             },
             "retryable": {
@@ -141,7 +158,8 @@
                 "status": {
                   "enum": [
                     "complete",
-                    "blocked"
+                    "blocked",
+                    "ready"
                   ]
                 },
                 "factsAdd": {

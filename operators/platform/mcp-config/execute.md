@@ -6,7 +6,7 @@ Compile one approved MCP topology into one generated execution configuration. Al
 
 | Alias | Target | Kind | Why |
 | --- | --- | --- | --- |
-| `@platform-operations` | `platform.operations` | qdrant | retrieve only the platform execution law required by this operator |
+| `@platform-operations` | `platform.mcp-publication` | qdrant | retrieve only the platform execution law required by this operator |
 | `@platform-plan` | `payload.provided.platformPlanRef` | session | bind the exact approved MCP topology and proof requirements |
 | `@config-target` | `payload.provided.configTargetRef` | session | bind the only writable generated-config target and baseline |
 | `@target-files` | `payload.loads.source.targetFiles` | exact-source | open only declared plan, manifest, template, and config files |
@@ -26,7 +26,7 @@ Compile one approved MCP topology into one generated execution configuration. Al
 ## Step 2 — Resolve exact platform law
 
 **Read:** `payload.provided` and `payload.loads.knowledge`; confirm `payload.loads.business` is null.
-**Context:** retrieve only `platform.operations` at the declared generation and content hash. Do not infer platform configuration from product source.
+**Context:** retrieve only `platform.mcp-publication` at the declared generation and content hash. Do not infer platform configuration from product source.
 **Analysis record:** revision match and applicable MCP configuration rule identifiers only.
 **Action:** normalize the approved services, routes, partitions, ports, volumes, exclusions, and proof criteria.
 **Session write:** constraints below `payload.session.scratchPrefix/constraints`.

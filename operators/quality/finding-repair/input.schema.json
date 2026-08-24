@@ -72,11 +72,15 @@
           "additionalProperties": false,
           "required": [
             "approvedFindingRef",
+            "approvalReceiptRef",
             "baselineRef",
             "ownerBoundaryRef"
           ],
           "properties": {
             "approvedFindingRef": {
+              "$ref": "#/$defs/sessionRef"
+            },
+            "approvalReceiptRef": {
               "$ref": "#/$defs/sessionRef"
             },
             "baselineRef": {

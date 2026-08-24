@@ -5,7 +5,7 @@ function refs(value, found = []) { if (typeof value === 'string' && value.starts
 function semantic(value) {
   const errors = [], provided = Object.values(value.payload.provided).sort(), artifacts = value.payload.loads.artifacts.map((item) => item.ref).sort();
   if (JSON.stringify(provided) !== JSON.stringify(artifacts)) errors.push('$.payload.loads.artifacts: exact provided bindings required');
-  if (JSON.stringify(value.payload.loads.knowledge.map((item) => item.id)) !== JSON.stringify(['platform.operations'])) errors.push('$.payload.loads.knowledge: exact ordered knowledge binding required');
+  if (JSON.stringify(value.payload.loads.knowledge.map((item) => item.id)) !== JSON.stringify(['platform.tunnel'])) errors.push('$.payload.loads.knowledge: exact ordered knowledge binding required');
   const { orchestration, source } = value.payload.loads; if (orchestration.profileRef !== profiles[orchestration.mode]) errors.push('$.payload.loads.orchestration.profileRef: must match mode');
   const paths = source.targetFiles.map((item) => item.path.replaceAll('\\', '/')); if (source.repositoryContext !== false || source.loadMode !== 'exact-files') errors.push('$.payload.loads.source: broad context forbidden');
   if (new Set(paths).size !== paths.length) errors.push('$.payload.loads.source.targetFiles: duplicate normalized path'); paths.forEach((item, index) => { if (path.isAbsolute(item) || item === '..' || item.startsWith('../') || item.includes('/../')) errors.push(`$.payload.loads.source.targetFiles[${index}].path: unsafe path`); });

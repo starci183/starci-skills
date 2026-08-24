@@ -16,7 +16,7 @@ This operator's responsibility is to compare one approved Block contract with it
 ## Step 2 — Load business authority
 
 **Read:** `payload.loads.business` and `payload.provided.businessHeadRef`.
-**Context:** load exactly the declared revision under `.worktrees/business/`; never infer business behavior from frontend source.
+**Context:** load exactly the declared revision under `.worktrees/<project>/businesses/`; never infer business behavior from frontend source.
 **Decision evidence:** reference equality, revision hash, accepted business status, and the specific facts needed to compare one approved Block contract with its observed surfaces and produce the minimal reconciliation plan.
 **Action:** normalize only the applicable actor, outcome, rule, state, and constraint references.
 **Session write:** value-safe business bindings under `scratchPrefix/business`; do not copy the complete business document into output.

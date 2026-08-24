@@ -11,4 +11,4 @@ This closed input plans one value-free Cloudflare HTTP(S) ingress without mutati
 | `payload.loads` | Runtime resolver | Bind those refs plus exact knowledge, source, external resources, and orchestration. |
 | `payload.session` | Session runtime | Own ephemeral input, output, scratch, and retention. |
 
-Each provided ref has one exact artifact load. Knowledge is only `platform.operations`; source is exact-file and hash-pinned; Cloudflare bindings name exact resources and opaque credential custody. Validate before loading. Raw secrets, zone-wide discovery, and durable writes are forbidden.
+Each provided ref has one exact artifact load. Knowledge is only `platform.tunnel`; source is exact-file and hash-pinned; Cloudflare bindings name exact resources and opaque credential custody. Validate before loading. Raw secrets, zone-wide discovery, and durable writes are forbidden.

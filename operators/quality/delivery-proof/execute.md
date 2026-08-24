@@ -13,7 +13,7 @@ This operator assembles final delivery proof. Input, output, loaded context, com
 ## Step 2 — Resolve exact evidence and quality law
 
 **Read:** `payload.loads.artifacts`, `payload.loads.knowledge`, and `payload.loads.business`.
-**Context:** resolve exact session artifacts and retrieve only `quality.source-gates` from its pinned generation. Load only the declared `.worktrees/business/` revision.
+**Context:** resolve exact session artifacts and retrieve only `quality.source-gates` from its pinned generation. Load only the declared `.worktrees/<project>/businesses/` revision.
 **Analysis:** verify refs, revisions, ownership, and freshness. Record rule IDs and match/mismatch evidence only.
 **Session write:** `payload.session.scratchPrefix/bindings`.
 **Stop:** stop when evidence is stale, ambiguous, incomplete, or belongs to another revision.
