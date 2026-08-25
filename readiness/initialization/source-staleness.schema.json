@@ -1,0 +1,165 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://starci.dev/v6/readiness/initialization/source-staleness.schema.json",
+  "title": "StarCi Source staleness report",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "operation",
+    "status",
+    "sourceRoot",
+    "targetRuntimeVersion",
+    "modules",
+    "plannedChanges",
+    "appliedChanges"
+  ],
+  "properties": {
+    "schemaVersion": { "const": 6 },
+    "operation": { "enum": ["check", "upgrade-plan", "upgrade-apply"] },
+    "status": { "enum": ["ready", "stale", "blocked"] },
+    "sourceRoot": { "type": "string", "minLength": 1 },
+    "targetRuntimeVersion": { "const": 6 },
+    "modules": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["runtime", "bootstrap", "workspaces", "worktrees"],
+      "properties": {
+        "runtime": { "$ref": "#/$defs/runtimeModule" },
+        "bootstrap": { "$ref": "#/$defs/bootstrapModule" },
+        "workspaces": { "$ref": "#/$defs/workspacesModule" },
+        "worktrees": { "$ref": "#/$defs/worktreesModule" }
+      }
+    },
+    "plannedChanges": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": { "type": "string", "minLength": 1 }
+    },
+    "appliedChanges": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": { "type": "string", "minLength": 1 }
+    }
+  },
+  "$defs": {
+    "moduleStatus": {
+      "type": "object",
+      "required": ["status", "code", "evidence", "findings"],
+      "properties": {
+        "status": { "enum": ["ready", "initialize-required", "blocked"] },
+        "code": { "type": "string", "minLength": 1 },
+        "evidence": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "findings": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": { "type": "string", "minLength": 1 }
+        }
+      }
+    },
+    "runtimeModule": {
+      "unevaluatedProperties": false,
+      "allOf": [
+        { "$ref": "#/$defs/moduleStatus" },
+        {
+          "type": "object",
+          "properties": {
+            "detectedVersion": {
+              "oneOf": [
+                { "type": "string", "minLength": 1 },
+                { "type": "null" }
+              ]
+            }
+          },
+          "required": ["detectedVersion"]
+        }
+      ]
+    },
+    "bootstrapFile": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "status", "expectedSha256", "actualSha256"],
+      "properties": {
+        "path": { "enum": ["AGENTS.md", "CLAUDE.md"] },
+        "status": { "enum": ["ready", "missing", "stale"] },
+        "expectedSha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+        "actualSha256": {
+          "oneOf": [
+            { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+            { "type": "null" }
+          ]
+        }
+      }
+    },
+    "bootstrapModule": {
+      "unevaluatedProperties": false,
+      "allOf": [
+        { "$ref": "#/$defs/moduleStatus" },
+        {
+          "type": "object",
+          "properties": {
+            "files": {
+              "type": "array",
+              "minItems": 2,
+              "maxItems": 2,
+              "items": { "$ref": "#/$defs/bootstrapFile" }
+            }
+          },
+          "required": ["files"]
+        }
+      ]
+    },
+    "workspacesModule": {
+      "unevaluatedProperties": false,
+      "allOf": [
+        { "$ref": "#/$defs/moduleStatus" },
+        {
+          "type": "object",
+          "properties": {
+            "configVersion": {
+              "oneOf": [
+                { "type": "integer", "minimum": 1 },
+                { "type": "null" }
+              ]
+            },
+            "routeCount": { "type": "integer", "minimum": 0 },
+            "legacyRoutes": { "$ref": "#/$defs/pathList" },
+            "grammarMappingRequired": { "$ref": "#/$defs/pathList" },
+            "changedRoutes": { "$ref": "#/$defs/pathList" },
+            "commitPolicyId": { "type": "string", "minLength": 1 },
+            "portableUntracked": { "$ref": "#/$defs/pathList" },
+            "localStateTracked": { "$ref": "#/$defs/pathList" },
+            "missingIgnoreRules": { "$ref": "#/$defs/pathList" }
+          },
+          "required": ["configVersion", "routeCount", "legacyRoutes", "grammarMappingRequired", "changedRoutes", "commitPolicyId", "portableUntracked", "localStateTracked", "missingIgnoreRules"]
+        }
+      ]
+    },
+    "worktreesModule": {
+      "unevaluatedProperties": false,
+      "allOf": [
+        { "$ref": "#/$defs/moduleStatus" },
+        {
+          "type": "object",
+          "properties": {
+            "managedRootPresent": { "type": "boolean" },
+            "registeredManaged": { "$ref": "#/$defs/pathList" },
+            "registeredEphemeral": { "$ref": "#/$defs/pathList" },
+            "stalePaths": { "$ref": "#/$defs/pathList" },
+            "unregisteredPaths": { "$ref": "#/$defs/pathList" }
+          },
+          "required": ["managedRootPresent", "registeredManaged", "registeredEphemeral", "stalePaths", "unregisteredPaths"]
+        }
+      ]
+    },
+    "pathList": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": { "type": "string", "minLength": 1 }
+    }
+  }
+}

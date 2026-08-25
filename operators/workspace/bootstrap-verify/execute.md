@@ -22,8 +22,8 @@ This operator verifies bootstrap entry files and agent discovery before declarat
 
 **Read:** validated bindings, and accepted machine facts.
 **Context:** use no undeclared knowledge, business feature, artifact, or source file.
-**Decision criteria:** identity, bootstrap entry, and source index identify one workspace.
-**Analysis:** inspect every declared bootstrap entry and reject stale or cross-workspace bindings. Record evidence, criteria, and conclusions only; never record chain-of-thought.
+**Decision criteria:** identity, bootstrap entry, and source index identify one workspace; root `AGENTS.md` and `CLAUDE.md` both match the normalized SHA-256 of `readiness/initialization/bootstrap/agent-bootstrap.md`.
+**Analysis:** inspect both bootstrap copies and every declared source-index entry. Missing files, unequal copies, non-canonical hashes and cross-workspace bindings are stale evidence, never success. Record evidence, criteria, and conclusions only; never record chain-of-thought.
 **Route:** emit `ready` when all bootstrap entries and their hashes match; emit `initialize-required` for missing or stale rebuildable bootstrap/index declarations; emit `blocked` for cross-workspace identity, ambiguous ownership, unsafe paths, or corrupt authority.
 **Session write:** candidate `bootstrapReceiptRef` at `payload.session.scratchPrefix/candidate`.
 **Orchestration:** economical mode is sequential. Balanced or parallel mode may delegate independent read-only comparisons. Each worker receives only assigned refs; the coordinator owns joining and the decision.

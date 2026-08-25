@@ -95,6 +95,13 @@
           },
           "target": "worktree",
           "label": "ready"
+        },
+        {
+          "when": {
+            "decision": "blocked"
+          },
+          "target": "blocked",
+          "label": "blocked"
         }
       ]
     },
@@ -140,7 +147,7 @@
           "when": {
             "decision": "initialize-required"
           },
-          "target": "blocked",
+          "target": "routes",
           "label": "initialize-required"
         },
         {

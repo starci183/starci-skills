@@ -1,0 +1,5 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://starci.dev/v6/knowledge/contexts/workspaces/schema.json",
+  "$ref": "../../../readiness/initialization/workspaces/local-route.schema.json"
+}

@@ -6,3 +6,12 @@ __pycache__/
 .workspaces/local/
 .sessions/
 *.log
+
+# Per-device runtime and agent state. Portable policy, operators, schemas and
+# knowledge stay tracked; these are rebuilt after pull on each trusted device.
+/cache/
+/contexts/
+/worktrees/
+/launch.json
+/settings.local.json
+/scheduled_tasks.lock

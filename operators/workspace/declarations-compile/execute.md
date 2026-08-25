@@ -22,7 +22,7 @@ This operator compiles portable workspace declarations. Input, output, context b
 
 **Read:** validated bindings, and accepted machine facts.
 **Context:** use no undeclared knowledge, business feature, artifact, or source file.
-**Decision criteria:** the declaration set is closed, portable, and free of machine-local secrets.
+**Decision criteria:** the declaration set is closed, portable, free of machine-local secrets, and passes `workspace-multidevice-commit-boundary-v1`: every portable declaration is tracked while hydrated routes, worktree containers, references and session state are ignored by the Source repository.
 **Analysis:** normalize project, role, port, and route declarations. Record evidence, criteria, and conclusions only; never record chain-of-thought.
 **Session write:** candidate `compiledDeclarationsRef` at `payload.session.scratchPrefix/candidate`.
 **Orchestration:** economical mode is sequential. Balanced or parallel mode may delegate independent read-only comparisons. Each worker receives only assigned refs; the coordinator owns joining and the decision.

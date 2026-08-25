@@ -20,5 +20,6 @@ The output is an ephemeral task-session object consumed by the parent state mach
 | Decision | State status | Emitted state | Facts added |
 | --- | --- | --- | --- |
 | `ready` | `completed` | `workspace.worktree / ready` | workspace-routes-hydrated |
+| `blocked` | `blocked` | `workspace.blocked / blocked` | workspace-routes-hydrate-blocked |
 
 `hydrationReceiptRef`, evidence, receipts, observations, and output use `session://`. Only a product/worktree effect explicitly declared by `operator.json` may survive the skill.

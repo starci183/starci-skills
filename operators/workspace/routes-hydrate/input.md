@@ -15,6 +15,9 @@ This operator hydrates machine-local routes from portable declarations. The inpu
 
 - `compiledDeclarationsRef`: exact `session://` reference; this operator cannot replace or broaden it.
 - `localRepositoryMapRef`: exact `session://` reference; this operator cannot replace or broaden it.
+- `routeInitializationEvidenceRef`: required only when re-entering from `workspace.initialization / ready`; it binds the latest safely-hydratable `workspace/route-verify` evidence.
+
+The first pass enters through `workspace.routes.hydrate / ready`. A stale final route re-enters through `workspace.initialization / ready` and reuses the same-task compiled declarations and local repository map; it never recompiles or broadens them.
 
 ## Loaded by the runtime
 

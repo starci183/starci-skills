@@ -1,12 +1,15 @@
 import { runValidatorCli, validatorFor } from '../../validation.mjs';
 
 const schemaUrl = new URL('./input.schema.json', import.meta.url);
-const requiredFacts = ["workspace-declarations-ready"];
 const knowledgeIds = ["workspace.initialization"];
 
 function semantic(value) {
   const errors = [];
-  for (const fact of requiredFacts) if (!value.facts.includes(fact)) errors.push(`/facts: missing required fact ${fact}`);
+  if (!value.facts.includes('workspace-declarations-ready')) errors.push('/facts: missing required fact workspace-declarations-ready');
+  const reentry = value.stage === 'workspace.initialization';
+  if (reentry && !value.facts.includes('workspace-route-initialize-required')) errors.push('/facts: re-entry requires workspace-route-initialize-required');
+  if (reentry && !value.payload.provided.routeInitializationEvidenceRef) errors.push('/payload/provided/routeInitializationEvidenceRef: re-entry evidence is required');
+  if (!reentry && value.payload.provided.routeInitializationEvidenceRef) errors.push('/payload/provided/routeInitializationEvidenceRef: first pass must not provide route re-entry evidence');
   const providedRefs = Object.values(value.payload.provided).flat();
   const loadedRefs = value.payload.loads.artifacts.map((item) => item.ref);
   for (const ref of providedRefs) if (!loadedRefs.includes(ref)) errors.push(`/payload/loads/artifacts: missing exact binding for ${ref}`);

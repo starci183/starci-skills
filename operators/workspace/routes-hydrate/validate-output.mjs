@@ -8,6 +8,13 @@ const routes = {
     "fact": "workspace-routes-hydrated",
     "state": "completed",
     "code": "workspace-routes-hydrate-ready"
+  },
+  "blocked": {
+    "stage": "workspace.blocked",
+    "status": "blocked",
+    "fact": "workspace-routes-hydrate-blocked",
+    "state": "blocked",
+    "code": "workspace-routes-hydrate-blocked"
   }
 };
 
@@ -22,6 +29,8 @@ function semantic(value) {
   const blocked = value.payload.state.status === 'blocked';
   if (!blocked && value.payload.produced.hydrationReceiptRef === null) errors.push('/payload/produced/hydrationReceiptRef: successful output requires a session artifact');
   if (!blocked && value.payload.produced.durableWrites.length === 0) errors.push('/payload/produced/durableWrites: successful durable operator must name its approved effect');
+  if (blocked && value.payload.produced.hydrationReceiptRef !== null) errors.push('/payload/produced/hydrationReceiptRef: blocked output cannot claim a receipt');
+  if (blocked && value.payload.produced.durableWrites.length !== 0) errors.push('/payload/produced/durableWrites: blocked output cannot claim durable writes');
   if (value.payload.cleanup.retention !== 'until-skill-terminal' || value.payload.cleanup.purgeAt !== 'skill-terminal') errors.push('/payload/cleanup: terminal purge is mandatory');
   return errors;
 }

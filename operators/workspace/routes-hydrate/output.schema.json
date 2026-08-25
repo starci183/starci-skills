@@ -28,6 +28,28 @@
             "stage",
             "status"
           ]
+        },
+        {
+          "properties": {
+            "stage": {
+              "const": "workspace.blocked"
+            },
+            "status": {
+              "const": "blocked"
+            },
+            "payload": {
+              "properties": {
+                "decision": {
+                  "const": "blocked"
+                }
+              }
+            }
+          },
+          "required": [
+            "stage",
+            "status",
+            "payload"
+          ]
         }
       ]
     }
@@ -42,12 +64,14 @@
     },
     "stage": {
       "enum": [
-        "workspace.worktree"
+        "workspace.worktree",
+        "workspace.blocked"
       ]
     },
     "status": {
       "enum": [
-        "ready"
+        "ready",
+        "blocked"
       ]
     },
     "facts": {
@@ -73,7 +97,8 @@
       "properties": {
         "decision": {
           "enum": [
-            "ready"
+            "ready",
+            "blocked"
           ]
         },
         "state": {
@@ -99,7 +124,8 @@
             },
             "code": {
               "enum": [
-                "workspace-routes-hydrate-ready"
+                "workspace-routes-hydrate-ready",
+                "workspace-routes-hydrate-blocked"
               ]
             },
             "retryable": {
@@ -116,12 +142,14 @@
               "properties": {
                 "stage": {
                   "enum": [
-                    "workspace.worktree"
+                    "workspace.worktree",
+                    "workspace.blocked"
                   ]
                 },
                 "status": {
                   "enum": [
-                    "ready"
+                    "ready",
+                    "blocked"
                   ]
                 },
                 "factsAdd": {

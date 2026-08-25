@@ -1,0 +1,35 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://starci.dev/v6/readiness/initialization/workspaces/config.schema.json",
+  "title": "StarCi workspace defaults",
+  "oneOf": [
+    { "$ref": "#/$defs/v1" },
+    { "$ref": "#/$defs/v6" }
+  ],
+  "$defs": {
+    "languageTag": {
+      "type": "string",
+      "pattern": "^[A-Za-z]{2,3}(?:-[A-Za-z0-9]{2,8})*$"
+    },
+    "v1": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["version", "defaultLang"],
+      "properties": {
+        "$schema": { "type": "string" },
+        "version": { "const": 1 },
+        "defaultLang": { "$ref": "#/$defs/languageTag" }
+      }
+    },
+    "v6": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["schemaVersion", "defaultLang"],
+      "properties": {
+        "$schema": { "type": "string" },
+        "schemaVersion": { "const": 6 },
+        "defaultLang": { "$ref": "#/$defs/languageTag" }
+      }
+    }
+  }
+}

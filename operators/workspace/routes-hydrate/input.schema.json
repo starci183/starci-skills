@@ -28,8 +28,47 @@
             "stage",
             "status"
           ]
+        },
+        {
+          "properties": {
+            "stage": {
+              "const": "workspace.initialization"
+            },
+            "status": {
+              "const": "ready"
+            }
+          },
+          "required": [
+            "stage",
+            "status"
+          ]
         }
       ]
+    },
+    {
+      "if": {
+        "properties": {
+          "stage": {
+            "const": "workspace.initialization"
+          }
+        },
+        "required": ["stage"]
+      },
+      "then": {
+        "properties": {
+          "payload": {
+            "properties": {
+              "provided": {
+                "required": [
+                  "compiledDeclarationsRef",
+                  "localRepositoryMapRef",
+                  "routeInitializationEvidenceRef"
+                ]
+              }
+            }
+          }
+        }
+      }
     }
   ],
   "properties": {
@@ -42,7 +81,8 @@
     },
     "stage": {
       "enum": [
-        "workspace.routes.hydrate"
+        "workspace.routes.hydrate",
+        "workspace.initialization"
       ]
     },
     "status": {
@@ -79,6 +119,9 @@
               "$ref": "#/$defs/sessionRef"
             },
             "localRepositoryMapRef": {
+              "$ref": "#/$defs/sessionRef"
+            },
+            "routeInitializationEvidenceRef": {
               "$ref": "#/$defs/sessionRef"
             }
           }

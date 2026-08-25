@@ -16,6 +16,17 @@
         "workspace-declarations-ready"
       ],
       "noneFacts": []
+    },
+    {
+      "stage": "workspace.initialization",
+      "status": "ready",
+      "allFacts": [
+        "workspace-declarations-ready",
+        "workspace-route-initialize-required"
+      ],
+      "noneFacts": [
+        "workspace-route-blocked"
+      ]
     }
   ],
   "emits": [
@@ -24,6 +35,14 @@
       "status": "ready",
       "factsAdd": [
         "workspace-routes-hydrated"
+      ],
+      "factsRemove": []
+    },
+    {
+      "stage": "workspace.blocked",
+      "status": "blocked",
+      "factsAdd": [
+        "workspace-routes-hydrate-blocked"
       ],
       "factsRemove": []
     }
