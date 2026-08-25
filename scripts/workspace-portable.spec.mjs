@@ -11,7 +11,7 @@ import {
 } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import test from 'node:test';
 import { validatePortableRoute } from './workspace-portable.mjs';
 import { validateInput as validateHydrateInput } from '../operators/workspace/routes-hydrate/validate-input.mjs';
@@ -54,6 +54,8 @@ function fixture(t) {
   mkdirSync(join(source, '.claude', 'skills'), { recursive: true });
   mkdirSync(join(frontend, 'packages', 'ui', 'src', 'contracts'), { recursive: true });
   writeFileSync(join(frontend, 'packages', 'ui', 'src', 'contracts', 'index.ts'), 'export {};\n');
+  git(frontend, 'add', 'packages/ui/src/contracts/index.ts');
+  git(frontend, 'commit', '-m', 'contract');
   writeJson(join(source, '.workspaces', 'config.json'), {
     $schema: '../.claude/readiness/initialization/workspaces/config.schema.json',
     schemaVersion: 6,
@@ -93,6 +95,14 @@ function runScript(fixture, ...args) {
   });
 }
 
+function runScriptWithEnv(fixture, env, ...args) {
+  return spawnSync(process.execPath, [script, ...args, '--source', fixture.source, '--repositories-root', fixture.repositories], {
+    encoding: 'utf8',
+    env: { ...process.env, ...env },
+    windowsHide: true
+  });
+}
+
 test('hydrates V1 and V6 routes, refreshes stale heads, and preserves credentials', (t) => {
   const f = fixture(t);
   let result = runScript(f, 'hydrate', '--apply');
@@ -120,6 +130,29 @@ test('hydrates V1 and V6 routes, refreshes stale heads, and preserves credential
   assert.equal(result.status, 0, result.stderr);
   assert.equal(JSON.parse(readFileSync(v6Path, 'utf8')).repository.head, git(f.frontend, 'rev-parse', 'HEAD'));
   assert.equal(runScript(f, 'check').status, 0);
+});
+
+test('bootstrap clones a missing declared sibling and hydrates it without user-specific Git config', (t) => {
+  const f = fixture(t);
+  const bare = join(f.repositories, 'nivo-fe-origin.git');
+  execFileSync('git', ['clone', '--quiet', '--bare', f.frontend, bare], { windowsHide: true });
+  rmSync(f.frontend, { recursive: true, force: true });
+  const remote = 'https://github.com/starci-lab/nivo-fe.git';
+  const env = {
+    GIT_CONFIG_COUNT: '1',
+    GIT_CONFIG_KEY_0: `url.${pathToFileURL(bare).href}.insteadOf`,
+    GIT_CONFIG_VALUE_0: remote
+  };
+
+  const plan = runScriptWithEnv(f, env, 'bootstrap', '--plan', '--project', 'nivo');
+  assert.equal(plan.status, 0, plan.stderr);
+  assert.deepEqual(JSON.parse(plan.stdout).missingCheckouts, ['nivo-fe']);
+
+  const applied = runScriptWithEnv(f, env, 'bootstrap', '--apply', '--project', 'nivo');
+  assert.equal(applied.status, 0, applied.stderr);
+  assert.deepEqual(JSON.parse(applied.stdout).initializedCheckouts, ['nivo-fe']);
+  assert.equal(git(f.frontend, 'remote', 'get-url', 'origin'), remote);
+  assert.equal(runScript(f, 'check', '--project', 'nivo').status, 0);
 });
 
 test('V6 rejects legacy grammar fields, mixed versions, and non-FE grammar', () => {

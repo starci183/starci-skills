@@ -75,7 +75,7 @@
     "Pull the Source repository and its independent StarCi skills checkout.",
     "Prove the out-of-band master identity without printing its contents.",
     "Validate tracked portable declarations and the Git boundary.",
-    "Hydrate machine-local project-role routes.",
+    "Run workspace-portable.mjs bootstrap --apply to clone absent declared sibling checkouts and hydrate machine-local project-role routes.",
     "Create or verify declared worktrees and clean reference checkouts.",
     "Run npm run sync to decrypt local secret twins and reconstruct declared private gitmounts without per-device GitHub login.",
     "Rebuild Qdrant generations, Caddy and MCP state.",

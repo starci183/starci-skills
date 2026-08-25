@@ -23,7 +23,7 @@ This operator hydrates machine-local routes from portable declarations. Input, o
 **Read:** validated bindings, and accepted machine facts.
 **Context:** use no undeclared knowledge, business feature, artifact, or source file.
 **Decision criteria:** each local repository mapping resolves once within declared roots.
-**Analysis:** invoke `scripts/workspace-portable.mjs hydrate --plan` for the selected project, then materialize and verify approved local route bindings. A re-entry is allowed only when route evidence classifies the drift as safely hydratable. Record evidence, criteria, and conclusions only; never record chain-of-thought.
+**Analysis:** invoke `scripts/workspace-portable.mjs bootstrap --plan` for the selected project, then materialize and verify approved local route bindings. A missing declared sibling checkout is safely initializable; an existing path with mismatched Git identity is blocked. A re-entry is allowed only when route evidence classifies the drift as safely hydratable. Record evidence, criteria, and conclusions only; never record chain-of-thought.
 **Session write:** candidate `hydrationReceiptRef` at `payload.session.scratchPrefix/candidate`.
 **Orchestration:** economical mode is sequential. Balanced or parallel mode may delegate independent read-only comparisons. Each worker receives only assigned refs; the coordinator owns joining and the decision.
 **Stop:** emit `blocked` for missing checkout, root escape, origin mismatch, branch mismatch, missing context, or contradictory evidence. Never repair a declaration or checkout here.
@@ -41,7 +41,7 @@ This operator hydrates machine-local routes from portable declarations. Input, o
 **Read:** validated candidate and the exact authority/write boundary.
 **Context:** coordinator only; workers do not write source, worktrees, workspace declarations, or provenance heads.
 **Decision criteria:** the effect is required for a successful decision, remains inside the declared owner, and preserves unrelated changes.
-**Action:** run the exact helper with `hydrate --apply`, then `check`. Apply only this declared effect: atomically write changed ignored machine-local route state.
+**Action:** run the exact helper with `bootstrap --apply`, then `check`. The helper may clone only an absent declared sibling at its exact origin and branch, and may atomically write changed ignored machine-local route state; it never replaces an existing path.
 **Durable write:** approved authority/product result only. Never persist input, output, scratch, prompts, analysis, observations, or receipts.
 **Session write:** before/after durable refs at `scratchPrefix/durable-effect`.
 **Stop:** use `blocked` if identity, freshness, ownership, helper verification, or atomicity fails. No partial write is allowed.

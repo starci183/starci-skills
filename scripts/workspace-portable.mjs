@@ -182,7 +182,7 @@ function buildLocalRoute({ source, repositoriesRoot, workspaceRoot, declaration 
   }
   const gitRoot = realpathSync(git(repository, 'rev-parse', '--show-toplevel'));
   if (!samePath(gitRoot, repository)) fail(`${route.project}/${route.role} checkout is not its Git root`);
-  const observedRemote = git(repository, 'remote', 'get-url', 'origin');
+  const observedRemote = git(repository, 'config', '--get', 'remote.origin.url');
   if (normalizeRemote(observedRemote) !== normalizeRemote(route.repository.gitRepository)) {
     fail(`${route.project}/${route.role} origin mismatch`);
   }
@@ -255,12 +255,58 @@ function atomicWrite(target, value) {
   }
 }
 
+function checkoutPlans(repositoriesRoot, declarations) {
+  const byDirectory = new Map();
+  for (const { route } of declarations) {
+    if (route.repository.kind === 'source') continue;
+    const key = route.repository.directory;
+    const previous = byDirectory.get(key);
+    if (previous && (
+      normalizeRemote(previous.gitRepository) !== normalizeRemote(route.repository.gitRepository)
+      || previous.branch !== route.repository.branch
+    )) fail(`conflicting checkout declarations for ${key}`);
+    byDirectory.set(key, route.repository);
+  }
+  return [...byDirectory.values()].sort((left, right) => left.directory.localeCompare(right.directory)).map((repository) => {
+    const target = resolve(repositoriesRoot, repository.directory);
+    if (!inside(repositoriesRoot, target)) fail(`checkout target escapes repositories root: ${repository.directory}`);
+    return { ...repository, target };
+  });
+}
+
+function initializeCheckouts(plans) {
+  const initialized = [];
+  for (const plan of plans) {
+    if (existsSync(plan.target)) continue;
+    try {
+      execFileSync('git', [
+        'clone',
+        '--quiet',
+        '--single-branch',
+        '--branch',
+        plan.branch,
+        '--',
+        plan.gitRepository,
+        plan.target
+      ], { encoding: 'utf8', windowsHide: true });
+      execFileSync('git', ['-C', plan.target, 'remote', 'set-url', 'origin', plan.gitRepository], {
+        encoding: 'utf8',
+        windowsHide: true
+      });
+    } catch {
+      fail(`checkout initialization failed: ${plan.gitRepository} -> ${plan.target}`);
+    }
+    initialized.push(plan.target);
+  }
+  return initialized;
+}
+
 export function run(argv = process.argv.slice(2)) {
   const command = argv[0];
-  if (!['hydrate', 'check'].includes(command)) fail('Usage: workspace-portable.mjs <hydrate|check> --source <Source> [--repositories-root <path>] [--project <id>] [--plan|--apply]');
+  if (!['bootstrap', 'hydrate', 'check'].includes(command)) fail('Usage: workspace-portable.mjs <bootstrap|hydrate|check> --source <Source> [--repositories-root <path>] [--project <id>] [--plan|--apply]');
   const plan = argv.includes('--plan');
   const apply = argv.includes('--apply');
-  if (command === 'hydrate' && plan === apply) fail('hydrate requires exactly one of --plan or --apply');
+  if (['bootstrap', 'hydrate'].includes(command) && plan === apply) fail(`${command} requires exactly one of --plan or --apply`);
   if (command === 'check' && (plan || apply)) fail('check accepts neither --plan nor --apply');
 
   if (!existsSync(portableSchemaPath) || !existsSync(localSchemaPath) || !existsSync(configSchemaPath)) fail('V6 workspace schemas are incomplete');
@@ -271,12 +317,30 @@ export function run(argv = process.argv.slice(2)) {
   const selected = project ? declarations.filter((item) => item.route.project === project) : declarations;
   if (selected.length === 0) fail(`no workspace declarations selected${project ? ` for ${project}` : ''}`);
 
+  const checkoutPlan = command === 'bootstrap' ? checkoutPlans(repositoriesRoot, selected) : [];
+  const missingCheckouts = checkoutPlan.filter((item) => !existsSync(item.target));
+  if (command === 'bootstrap' && plan && missingCheckouts.length > 0) {
+    console.log(JSON.stringify({
+      status: 'initialize-required',
+      routeCount: selected.length,
+      missingCheckouts: missingCheckouts.map((item) => slash(relative(repositoriesRoot, item.target))),
+      changedRoutes: []
+    }));
+    return 0;
+  }
+  const initializedCheckouts = command === 'bootstrap' && apply
+    ? initializeCheckouts(checkoutPlan)
+    : [];
+
   const expected = selected.map((declaration) => buildLocalRoute({ source, repositoriesRoot, workspaceRoot, declaration }));
   const changes = expected.filter((item) => changed(item.target, item.value));
-  if (command === 'hydrate' && apply) changes.forEach((item) => atomicWrite(item.target, item.value));
+  if ((command === 'hydrate' || command === 'bootstrap') && apply) changes.forEach((item) => atomicWrite(item.target, item.value));
   const summary = {
     status: command === 'check' && changes.length > 0 ? 'stale' : 'ready',
     routeCount: expected.length,
+    ...(command === 'bootstrap' ? {
+      initializedCheckouts: initializedCheckouts.map((item) => slash(relative(repositoriesRoot, item)))
+    } : {}),
     changedRoutes: changes.map((item) => slash(relative(source, item.target)))
   };
   console.log(JSON.stringify(summary));
