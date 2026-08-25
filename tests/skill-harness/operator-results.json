@@ -1,9 +1,9 @@
 {
   "schemaVersion": 1,
   "summary": {
-    "operatorCount": 92,
-    "caseCount": 368,
-    "pass": 368,
+    "operatorCount": 93,
+    "caseCount": 372,
+    "pass": 372,
     "warning": 0,
     "fail": 0,
     "operatorsWithFailures": 0
@@ -6019,6 +6019,71 @@
             "$.allOf[0].oneOf[0]"
           ],
           "arrays": 7,
+          "unboundedArrays": [
+            "$.facts",
+            "$.payload.state.emits.factsAdd",
+            "$.payload.produced.durableWrites",
+            "$.payload.context.used",
+            "$.payload.cleanup.scratchRefs",
+            "$.payload.evidenceRefs",
+            "$.payload.findings"
+          ],
+          "unconstrainedRefs": [
+            "$.payload.context.used[].ref"
+          ],
+          "broadFields": []
+        }
+      }
+    },
+    {
+      "id": "workspace/device-checkpoint",
+      "cases": [
+        {
+          "id": "input-isolation",
+          "verdict": "pass",
+          "evidence": "closed envelope + provided/loads/session + terminal retention; broad fields=0"
+        },
+        {
+          "id": "output-isolation",
+          "verdict": "pass",
+          "evidence": "closed typed output + validator rejection + terminal cleanup"
+        },
+        {
+          "id": "decision-state-route-correlation",
+          "verdict": "pass",
+          "evidence": "2 outcome(s) are schema- or semantic-bound"
+        },
+        {
+          "id": "execute-context-discipline",
+          "verdict": "pass",
+          "evidence": "4 steps; missing markers: none; vague catch-all: false; unconstrained refs=1; unbounded arrays=8"
+        }
+      ],
+      "summary": {
+        "pass": 4,
+        "warning": 0,
+        "fail": 0
+      },
+      "metrics": {
+        "input": {
+          "objects": 7,
+          "openObjects": [],
+          "arrays": 4,
+          "unboundedArrays": [
+            "$.facts"
+          ],
+          "unconstrainedRefs": [],
+          "broadFields": []
+        },
+        "output": {
+          "objects": 12,
+          "openObjects": [
+            "$.allOf[0].oneOf[0]",
+            "$.allOf[0].oneOf[0].payload",
+            "$.allOf[0].oneOf[1]",
+            "$.allOf[0].oneOf[1].payload"
+          ],
+          "arrays": 8,
           "unboundedArrays": [
             "$.facts",
             "$.payload.state.emits.factsAdd",

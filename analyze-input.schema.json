@@ -17,6 +17,7 @@
     "skillId": {
       "enum": [
         "starci-workspace-ready",
+        "starci-device-checkpoint",
         "starci-business-authority",
         "starci-business-reconcile",
         "starci-architecture-decide",

@@ -35,7 +35,8 @@ export function inspectCommitPolicy({ sourceRoot = defaultSource } = {}) {
   const policy = JSON.parse(readFileSync(policyPath, 'utf8'));
   const tracked = new Set(git(source, ['ls-files', '-z']).split('\0').filter(Boolean).map((item) => item.replaceAll('\\', '/')));
   const portable = portableFiles(source);
-  const required = [...policy.sourceRepository.requiredTracked, ...portable];
+  const optionalPortable = ['.workspaces/device-state.json'].filter((path) => existsSync(join(source, ...path.split('/'))));
+  const required = [...policy.sourceRepository.requiredTracked, ...portable, ...optionalPortable];
   const portableUntracked = required.filter((path) => !tracked.has(path));
   const localStateTracked = [...tracked].filter((path) => policy.sourceRepository.forbiddenTrackedPrefixes.some((prefix) => path.startsWith(prefix)));
   const missingIgnoreRules = policy.sourceRepository.requiredIgnoredRoots.filter((path) => !ignored(source, path));

@@ -1,0 +1,83 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://starci.dev/v6/operators/workspace/device-checkpoint/input.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "runId", "stage", "status", "facts", "payload"],
+  "properties": {
+    "schemaVersion": { "const": 6 },
+    "runId": { "type": "string", "minLength": 1 },
+    "stage": { "const": "workspace.device-checkpoint" },
+    "status": { "const": "ready" },
+    "facts": { "type": "array", "uniqueItems": true, "items": { "type": "string", "minLength": 1 } },
+    "payload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["provided", "loads", "session"],
+      "properties": {
+        "provided": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["routeReceiptRef", "approvalRef", "touchedCheckoutRefs", "deviceStateContractRef"],
+          "properties": {
+            "routeReceiptRef": { "$ref": "#/$defs/sessionRef" },
+            "approvalRef": { "$ref": "#/$defs/reference" },
+            "touchedCheckoutRefs": { "type": "array", "minItems": 1, "maxItems": 32, "uniqueItems": true, "items": { "$ref": "#/$defs/sessionRef" } },
+            "deviceStateContractRef": { "$ref": "#/$defs/sessionRef" }
+          }
+        },
+        "loads": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["artifacts", "knowledge", "orchestration"],
+          "properties": {
+            "artifacts": {
+              "type": "array",
+              "minItems": 4,
+              "maxItems": 40,
+              "uniqueItems": true,
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["ref", "revision", "loadMode"],
+                "properties": {
+                  "ref": { "$ref": "#/$defs/reference" },
+                  "revision": { "$ref": "#/$defs/sha256" },
+                  "loadMode": { "const": "session-exact" }
+                }
+              }
+            },
+            "knowledge": { "type": "array", "maxItems": 0 },
+            "orchestration": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["mode", "profileRef", "providerRef"],
+              "properties": {
+                "mode": { "enum": ["economical", "balanced", "parallel"] },
+                "profileRef": { "enum": ["orchestration/modes/economical.json", "orchestration/modes/balanced.json", "orchestration/modes/parallel.json"] },
+                "providerRef": { "type": "string", "pattern": "^orchestration/providers/[a-z0-9-]+\\.json$" }
+              }
+            }
+          }
+        },
+        "session": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["taskId", "inputRef", "outputRef", "scratchPrefix", "retention"],
+          "properties": {
+            "taskId": { "type": "string", "minLength": 1 },
+            "inputRef": { "$ref": "#/$defs/sessionRef" },
+            "outputRef": { "$ref": "#/$defs/sessionRef" },
+            "scratchPrefix": { "$ref": "#/$defs/sessionRef" },
+            "retention": { "const": "until-skill-terminal" }
+          }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "sha256": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
+    "sessionRef": { "type": "string", "pattern": "^session://tasks/[A-Za-z0-9._-]+/.+$" },
+    "reference": { "type": "string", "pattern": "^(?:session://tasks/[A-Za-z0-9._-]+/.+|receipt:sha256:[0-9a-f]{64})$" }
+  }
+}

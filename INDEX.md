@@ -75,3 +75,5 @@ Run `npm test` before release. It validates operators, skills, source readiness,
 ## Multi-device reconstruction
 
 Git carries portable intent and encrypted authority only. After a pull, each trusted device proves its out-of-band master identity, then rebuilds routes, worktrees, reference checkouts, decrypted twins and indexing/runtime state locally. The complete commit/no-commit classification lives only in `readiness/initialization/workspaces/commit-policy.json`; run `node .claude/scripts/workspace-commit-policy.mjs check --source-root .` to enforce it. Never copy that classification into bootstrap files.
+
+When the user explicitly ends or checkpoints work, route to `starci-device-checkpoint`. That mission first requires every mission-owned checkout to be clean, proven and remote-current, then quiesces the Source-declared Docker volumes, streams compressed archives directly through age encryption, publishes checksum-bound chunks as private release assets, and proves the published manifest. Other devices fetch the checkpoint separately; restore never overwrites a non-empty volume without explicit replace approval.

@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "summary": {
-    "skillCount": 28,
+    "skillCount": 29,
     "hardFailureCount": 0,
     "averages": {
       "inputCleanliness": 100,
@@ -1394,6 +1394,135 @@
         "findings": [],
         "metrics": {
           "objects": 10,
+          "closedObjects": 4,
+          "arrays": 4,
+          "boundedArrays": 4,
+          "referenceFields": [
+            {
+              "at": "$.receiptRefs",
+              "constrained": true,
+              "bounded": true
+            },
+            {
+              "at": "$.receiptRefs[]",
+              "constrained": true,
+              "bounded": true
+            },
+            {
+              "at": "$.findings[].evidenceRefs",
+              "constrained": true,
+              "bounded": true
+            },
+            {
+              "at": "$.findings[].evidenceRefs[]",
+              "constrained": true,
+              "bounded": true
+            },
+            {
+              "at": "$.cleanup.scratchRefs",
+              "constrained": true,
+              "bounded": true
+            },
+            {
+              "at": "$.cleanup.scratchRefs[]",
+              "constrained": true,
+              "bounded": true
+            }
+          ],
+          "broadFields": []
+        }
+      },
+      "machine": {
+        "score": 100,
+        "findings": []
+      },
+      "hardFailures": []
+    },
+    {
+      "id": "starci-device-checkpoint",
+      "input": {
+        "score": 100,
+        "findings": [],
+        "metrics": {
+          "objects": 8,
+          "closedObjects": 4,
+          "arrays": 6,
+          "boundedArrays": 6,
+          "referenceFields": [
+            {
+              "at": "$.selection.activeInputRefs",
+              "constrained": true,
+              "bounded": true
+            },
+            {
+              "at": "$.selection.activeInputRefs[]",
+              "constrained": true,
+              "bounded": true
+            },
+            {
+              "at": "$.selection.passiveContextRefs",
+              "constrained": true,
+              "bounded": true
+            },
+            {
+              "at": "$.selection.passiveContextRefs[]",
+              "constrained": true,
+              "bounded": true
+            },
+            {
+              "at": "$.requestRef",
+              "constrained": true,
+              "bounded": true
+            },
+            {
+              "at": "$.artifactRefs",
+              "constrained": true,
+              "bounded": true
+            },
+            {
+              "at": "$.artifactRefs[]",
+              "constrained": true,
+              "bounded": true
+            },
+            {
+              "at": "$.evidenceRefs",
+              "constrained": true,
+              "bounded": true
+            },
+            {
+              "at": "$.evidenceRefs[]",
+              "constrained": true,
+              "bounded": true
+            },
+            {
+              "at": "$.scope.targetRefs",
+              "constrained": true,
+              "bounded": true
+            },
+            {
+              "at": "$.scope.targetRefs[]",
+              "constrained": true,
+              "bounded": true
+            },
+            {
+              "at": "$.scope.approvalRef",
+              "constrained": true,
+              "bounded": true
+            },
+            {
+              "at": "$.allOf[0].then.scope.approvalRef",
+              "constrained": true,
+              "bounded": true
+            }
+          ],
+          "broadFields": []
+        }
+      },
+      "output": {
+        "score": 100,
+        "findings": [],
+        "metrics": {
+          "objects": 8,
           "closedObjects": 4,
           "arrays": 4,
           "boundedArrays": 4,
@@ -3642,18 +3771,18 @@
         "pass": true,
         "selected": "starci-workspace-ready",
         "expectedScore": 12,
-        "margin": 9,
+        "margin": 3,
         "top": [
           {
             "id": "starci-workspace-ready",
             "score": 12
           },
           {
-            "id": "starci-frontend-block-reconcile",
-            "score": 3
+            "id": "starci-device-checkpoint",
+            "score": 9
           },
           {
-            "id": "starci-frontend-maintenance-apply",
+            "id": "starci-frontend-block-reconcile",
             "score": 3
           }
         ]
@@ -3906,8 +4035,8 @@
             "score": 6
           },
           {
-            "id": "starci-deployment-monitor",
-            "score": 3
+            "id": "starci-device-checkpoint",
+            "score": 4
           }
         ]
       },
@@ -4513,8 +4642,8 @@
   },
   "text": {
     "score": 100,
-    "files": 419,
-    "lines": 11736,
+    "files": 427,
+    "lines": 11877,
     "findings": []
   },
   "independent": {

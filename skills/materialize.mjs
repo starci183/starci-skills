@@ -38,6 +38,13 @@ const workspaceStates = {
   complete: terminal('complete'), blocked: terminal('blocked')
 };
 
+const deviceCheckpointStates = {
+  route: op('workspace/route-verify', routeEdges('checkpoint')),
+  checkpoint: op('workspace/device-checkpoint', decided({ published: 'complete', blocked: 'blocked' })),
+  complete: terminal('complete'),
+  blocked: terminal('blocked')
+};
+
 const businessStates = {
   route: op('workspace/route-verify', routeEdges('evidence')),
   evidence: op('business/evidence-normalize', decided({ ready: 'model' })),
@@ -512,6 +519,11 @@ const flows = [
     checks: ['Resolve Source identity and the exact workspace boundary.', 'Verify bootstrap, declarations, routes, worktree and final route as one readiness flow.', 'Reject undeclared paths or targets outside the workspace.']
   },
   {
+    id: 'device-checkpoint', display: 'StarCi Device Checkpoint', short: 'Push proven work and encrypted local service state', entry: 'route', states: deviceCheckpointStates, options: {},
+    description: 'Use when the user explicitly stops, ends, or checkpoints current StarCi work and wants proven source heads plus encrypted local Docker service state synchronized to another trusted device. Do not use for ordinary commits, deployment, unapproved external publication, or destructive restore.',
+    checks: ['Resolve one verified project-role route and the exact mission-owned checkout set.', 'Require explicit stop/checkpoint authority for source pushes and private release publication.', 'Block dirty, behind, diverged, detached or force-push source state.', 'Quiesce every Source-declared Docker volume, stream encrypted archives, restart containers and prove one complete private release manifest.']
+  },
+  {
     id: 'business-authority', display: 'StarCi Business Authority', short: 'Model and publish approved StarCi business truth', entry: 'route', states: businessStates, options: {},
     description: 'Use when evidence-backed business truth must be modeled, approved, and published as one feature head. Do not use to reconcile delivered source, implement product code, or make architecture decisions.',
     checks: ['Resolve one feature head, lifecycle state and immutable evidence set.', 'Confirm a new approved business revision is the requested outcome.', 'Reject product-source mutation or stale evidence.']
@@ -702,7 +714,7 @@ const flows = [
 for (const flow of flows) {
   flow.id = `starci-${flow.id}`;
   if (flow.contextMatrix) continue;
-  if (flow.id === 'starci-workspace-ready') flow.contextMatrix = domainContextMatrices.workspace;
+  if (['starci-workspace-ready', 'starci-device-checkpoint'].includes(flow.id)) flow.contextMatrix = domainContextMatrices.workspace;
   else if (['starci-business-authority', 'starci-business-reconcile'].includes(flow.id)) flow.contextMatrix = domainContextMatrices.business;
   else if (flow.id === 'starci-architecture-decide') flow.contextMatrix = domainContextMatrices.architecture;
   else if (['starci-backend-delivery', 'starci-backend-repair'].includes(flow.id)) flow.contextMatrix = domainContextMatrices.backend;

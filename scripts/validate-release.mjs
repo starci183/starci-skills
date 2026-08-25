@@ -33,7 +33,7 @@ const skills = fs.readdirSync(skillRoot, { withFileTypes: true })
   .filter((entry) => entry.isDirectory())
   .map((entry) => entry.name)
   .sort();
-if (skills.length !== 28) fail(`expected 28 skills, found ${skills.length}`);
+if (skills.length !== 29) fail(`expected 29 skills, found ${skills.length}`);
 for (const skill of skills) {
   if (!skill.startsWith('starci-')) fail(`skill lacks starci- prefix: ${skill}`);
   for (const required of ['SKILL.md', 'agents/openai.yaml', 'machine.json', 'input.schema.json', 'output.schema.json']) {
@@ -49,7 +49,7 @@ function walk(directory) {
 }
 
 const operatorManifests = walk(path.join(root, 'operators')).filter((file) => path.basename(file) === 'operator.json');
-if (operatorManifests.length !== 92) fail(`expected 92 operators, found ${operatorManifests.length}`);
+if (operatorManifests.length !== 93) fail(`expected 93 operators, found ${operatorManifests.length}`);
 
 const knowledgeFiles = walk(path.join(root, 'knowledge'))
   .filter((file) => file.endsWith('.md'));
