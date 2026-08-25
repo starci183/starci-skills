@@ -274,7 +274,22 @@ function checkoutPlans(repositoriesRoot, declarations) {
   });
 }
 
-function initializeCheckouts(plans) {
+function checkoutGitEnvironment(source, credentialFile) {
+  const env = { ...process.env, GIT_TERMINAL_PROMPT: '0' };
+  if (!credentialFile) return env;
+  const path = resolve(source, credentialFile);
+  if (!inside(source, path) || !existsSync(path)) fail(`checkout credential file is absent or outside Source: ${credentialFile}`);
+  const token = readFileSync(path, 'utf8').trim();
+  if (token === '') fail(`checkout credential file is empty: ${credentialFile}`);
+  const parsedCount = Number.parseInt(env.GIT_CONFIG_COUNT ?? '0', 10);
+  const index = Number.isSafeInteger(parsedCount) && parsedCount >= 0 ? parsedCount : 0;
+  env.GIT_CONFIG_COUNT = String(index + 1);
+  env[`GIT_CONFIG_KEY_${index}`] = 'http.https://github.com/.extraheader';
+  env[`GIT_CONFIG_VALUE_${index}`] = `Authorization: Basic ${Buffer.from(`x-access-token:${token}`, 'utf8').toString('base64')}`;
+  return env;
+}
+
+function initializeCheckouts(plans, env) {
   const initialized = [];
   for (const plan of plans) {
     if (existsSync(plan.target)) continue;
@@ -288,9 +303,10 @@ function initializeCheckouts(plans) {
         '--',
         plan.gitRepository,
         plan.target
-      ], { encoding: 'utf8', windowsHide: true });
+      ], { encoding: 'utf8', env, windowsHide: true });
       execFileSync('git', ['-C', plan.target, 'remote', 'set-url', 'origin', plan.gitRepository], {
         encoding: 'utf8',
+        env,
         windowsHide: true
       });
     } catch {
@@ -303,7 +319,7 @@ function initializeCheckouts(plans) {
 
 export function run(argv = process.argv.slice(2)) {
   const command = argv[0];
-  if (!['bootstrap', 'hydrate', 'check'].includes(command)) fail('Usage: workspace-portable.mjs <bootstrap|hydrate|check> --source <Source> [--repositories-root <path>] [--project <id>] [--plan|--apply]');
+  if (!['bootstrap', 'hydrate', 'check'].includes(command)) fail('Usage: workspace-portable.mjs <bootstrap|hydrate|check> --source <Source> [--repositories-root <path>] [--project <id>] [--credential-file <Source-relative path>] [--plan|--apply]');
   const plan = argv.includes('--plan');
   const apply = argv.includes('--apply');
   if (['bootstrap', 'hydrate'].includes(command) && plan === apply) fail(`${command} requires exactly one of --plan or --apply`);
@@ -313,6 +329,8 @@ export function run(argv = process.argv.slice(2)) {
   const source = realpathSync(resolve(value(argv, '--source') ?? defaultSource));
   const repositoriesRoot = realpathSync(resolve(value(argv, '--repositories-root') ?? dirname(source)));
   const project = value(argv, '--project');
+  const credentialFile = value(argv, '--credential-file');
+  if (credentialFile && command !== 'bootstrap') fail('--credential-file is accepted only by bootstrap');
   const { workspaceRoot, declarations } = loadDeclarations(source);
   const selected = project ? declarations.filter((item) => item.route.project === project) : declarations;
   if (selected.length === 0) fail(`no workspace declarations selected${project ? ` for ${project}` : ''}`);
@@ -329,7 +347,7 @@ export function run(argv = process.argv.slice(2)) {
     return 0;
   }
   const initializedCheckouts = command === 'bootstrap' && apply
-    ? initializeCheckouts(checkoutPlan)
+    ? initializeCheckouts(checkoutPlan, checkoutGitEnvironment(source, credentialFile))
     : [];
 
   const expected = selected.map((declaration) => buildLocalRoute({ source, repositoriesRoot, workspaceRoot, declaration }));

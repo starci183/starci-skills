@@ -41,7 +41,7 @@ This operator hydrates machine-local routes from portable declarations. Input, o
 **Read:** validated candidate and the exact authority/write boundary.
 **Context:** coordinator only; workers do not write source, worktrees, workspace declarations, or provenance heads.
 **Decision criteria:** the effect is required for a successful decision, remains inside the declared owner, and preserves unrelated changes.
-**Action:** run the exact helper with `bootstrap --apply`, then `check`. The helper may clone only an absent declared sibling at its exact origin and branch, and may atomically write changed ignored machine-local route state; it never replaces an existing path.
+**Action:** run the exact helper with `bootstrap --apply`, then `check`. When the Source exposes a decrypted local checkout token, bind it only through `--credential-file <Source-relative-path>`. The helper may clone only an absent declared sibling at its exact origin and branch, and may atomically write changed ignored machine-local route state; it never persists the token, writes an authenticated remote URL, or replaces an existing path.
 **Durable write:** approved authority/product result only. Never persist input, output, scratch, prompts, analysis, observations, or receipts.
 **Session write:** before/after durable refs at `scratchPrefix/durable-effect`.
 **Stop:** use `blocked` if identity, freshness, ownership, helper verification, or atomicity fails. No partial write is allowed.
