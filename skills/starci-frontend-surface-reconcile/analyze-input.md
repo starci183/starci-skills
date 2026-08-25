@@ -2,13 +2,14 @@
 
 Global `@selection` has already selected this one-flow skill from prompt intent. Before any operator or Qdrant retrieval, validate the invocation and verify `selection.skillId` equals `starci-frontend-surface-reconcile`. Then perform these local checks:
 
-1. Resolve the closed surface set and inconsistency evidence.
-2. Identify the smallest authority and all consumers.
-3. Require explicit authority approval before mutation.
+1. Capture the feedback session with explicit accepts and rejects in .claude/requests before reconciliation.
+2. Resolve the closed surface set, fresh business head, inconsistency evidence and complete acceptance proof matrix.
+3. Identify the smallest authority and classify role impact, with explicit authority and any required backend boundary approval before mutation.
+4. Require complete unit, E2E, UI-quality, browser, joined mission proof and business reconciliation before completion.
 
 Reject stale or missing authority/evidence, an ambiguous target, a write root outside scope, external mutation without approval, or an option outside the closed schema. Do not reconsider other skills here; return to global analysis if selection is wrong.
 
-The fixed first state is `surface-audit`. Emit only normalized scope and facts as task-session data; do not choose a second mode or copy operator knowledge into context.
+The fixed first state is `surface-feedback-request`. Emit only normalized scope and facts as task-session data; do not choose a second mode or copy operator knowledge into context.
 
 ## Options
 

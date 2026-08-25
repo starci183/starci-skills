@@ -1,6 +1,6 @@
 interface:
-  display_name: "StarCi Frontend Block Reconcile"
-  short_description: "Reconcile one frontend block and its consumers"
+  display_name: "StarCi Block Reconcile"
+  short_description: "Reconcile one product block across all roles"
   default_prompt: "Use $starci-frontend-block-reconcile for this selected flow and execute its state machine."
 policy:
   allow_implicit_invocation: true

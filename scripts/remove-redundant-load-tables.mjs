@@ -4,7 +4,7 @@ import path from 'node:path';
 const root = process.cwd();
 const write = process.argv.includes('--write');
 
-const excludedDirectories = new Set(['.git', '.worktrees', 'node_modules']);
+const excludedDirectories = new Set(['.git', '.worktrees', 'node_modules', 'worktrees']);
 
 function markdownFiles(parent) {
   return fs.readdirSync(parent, { withFileTypes: true }).flatMap((entry) => {

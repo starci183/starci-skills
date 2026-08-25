@@ -1,0 +1,26 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://starci.dev/v6/operators/delivery/mission-resume/input.schema.json",
+  "type": "object", "additionalProperties": false,
+  "required": ["schemaVersion", "runId", "stage", "status", "facts", "payload"],
+  "properties": {
+    "schemaVersion": { "const": 6 }, "runId": { "type": "string", "minLength": 1 },
+    "stage": { "const": "delivery.proved" }, "status": { "const": "ready" },
+    "facts": { "type": "array", "uniqueItems": true, "items": { "type": "string", "minLength": 1 } },
+    "payload": {
+      "type": "object", "additionalProperties": false,
+      "required": ["provided", "loads", "session"],
+      "properties": {
+        "provided": { "type": "object", "additionalProperties": false, "required": ["missionRef", "impactReceiptRef", "backendDeliveryProofRef"], "properties": { "missionRef": { "$ref": "#/$defs/sessionRef" }, "impactReceiptRef": { "$ref": "#/$defs/sessionRef" }, "backendDeliveryProofRef": { "$ref": "#/$defs/sessionRef" } } },
+        "loads": { "type": "object", "additionalProperties": false, "required": ["artifacts"], "properties": { "artifacts": { "type": "array", "minItems": 3, "maxItems": 3, "uniqueItems": true, "items": { "$ref": "#/$defs/binding" } } } },
+        "session": { "type": "object", "additionalProperties": false, "required": ["taskId", "inputRef", "outputRef", "scratchPrefix", "retention"], "properties": { "taskId": { "type": "string", "minLength": 1 }, "inputRef": { "$ref": "#/$defs/sessionRef" }, "outputRef": { "$ref": "#/$defs/sessionRef" }, "scratchPrefix": { "$ref": "#/$defs/sessionRef" }, "retention": { "const": "until-skill-terminal" } } }
+      }
+    }
+  },
+  "$defs": {
+    "sha256": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
+    "sessionRef": { "type": "string", "pattern": "^session://tasks/[A-Za-z0-9._-]+/.+$" },
+    "binding": { "type": "object", "additionalProperties": false, "required": ["ref", "revision", "loadMode"], "properties": { "ref": { "$ref": "#/$defs/sessionRef" }, "revision": { "$ref": "#/$defs/sha256" }, "loadMode": { "const": "session-exact" } } },
+    "session": { "type": "object", "additionalProperties": false, "required": ["taskId", "inputRef", "outputRef", "scratchPrefix", "retention"], "properties": { "taskId": { "type": "string", "minLength": 1 }, "inputRef": { "$ref": "#/$defs/sessionRef" }, "outputRef": { "$ref": "#/$defs/sessionRef" }, "scratchPrefix": { "$ref": "#/$defs/sessionRef" }, "retention": { "const": "until-skill-terminal" } } }
+  }
+}

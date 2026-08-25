@@ -27,23 +27,31 @@
     },
     {
       "id": "starci-frontend-layout-delivery",
-      "description": "Use to create or substantially redesign a complete frontend customer journey, page set, page models, layouts, implementation, and proof. Do not use for isolated blocks, approved maintenance, learning resolution, or cross-surface consistency."
+      "description": "Use to create or substantially redesign and ship one complete customer journey. Own every required business, backend, frontend and proof layer while skipping roles proven unaffected. Do not use for isolated blocks, approved maintenance, learning resolution, or cross-surface consistency."
+    },
+    {
+      "id": "starci-frontend-quality-audit",
+      "description": "Use to audit one verified frontend surface set against StarCi-owned product-neutral UI quality rules and return evidence-linked findings without changing source. Do not use for journey design, source repair, design-authority reconciliation, or delivery proof."
     },
     {
       "id": "starci-frontend-block-reconcile",
-      "description": "Use when one existing frontend block or component contract must be reconciled with its known consumers. Do not use for complete journey design, maintenance, learning resolution, or broad cross-surface authority changes."
+      "description": "Use when one existing product block or component contract must be reconciled across its closed consumers and every affected backend/frontend role, then proven end to end. Do not use for complete journey design, ordinary maintenance, learning resolution, or broad cross-surface authority changes."
     },
     {
       "id": "starci-frontend-maintenance-apply",
-      "description": "Use to apply one already approved source-first frontend maintenance change and record its durable learning request. Do not use for design exploration, unapproved feedback, or cross-surface authority selection."
+      "description": "Use to apply one already approved source-first product maintenance change across every affected backend/frontend role and prove the mission end to end. Do not use for design exploration, unapproved feedback, or cross-surface authority selection."
+    },
+    {
+      "id": "starci-frontend-request-review",
+      "description": "Use only to durably approve or reject one exact `.claude/requests/*.request.json` frontend feedback ledger with bounded priority before learning resolution. Do not use to resolve authority, mutate product source, or bypass evidence because a request is urgent."
     },
     {
       "id": "starci-frontend-learning-resolve",
-      "description": "Use to resolve one queued frontend design learning item into its declared durable authority. Do not use to apply ordinary feedback, redesign a journey, or reconcile consumers."
+      "description": "Use to resolve one durably approved frontend design learning request into its declared authority. Do not use to review requests, apply ordinary feedback, redesign a journey, or reconcile consumers."
     },
     {
       "id": "starci-frontend-surface-reconcile",
-      "description": "Use when a closed set of frontend pages or surfaces must converge on the smallest durable design authority. Do not use for a single block, isolated maintenance, or a new customer journey."
+      "description": "Use when a closed set of product surfaces must converge on the smallest durable authority and every affected backend/frontend consumer, then pass complete end-to-end proof. Do not use for a single block, isolated maintenance, or a new customer journey."
     },
     {
       "id": "starci-workflow-diagnose",

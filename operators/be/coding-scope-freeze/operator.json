@@ -1,22 +1,30 @@
 {
-  "schemaVersion":6,"id":"be/coding-scope-freeze","domain":"be",
-  "inputSchema":"input.schema.json","outputSchema":"output.schema.json",
-  "knowledgeRefs":[],"sourceReferenceRefs":[],
-  "accepts":[{"stage":"be.coding-scope","status":"ready","allFacts":["backend-repair-prerequisites-ready"],"noneFacts":[]}],
-  "emits":[
-    {"stage":"be.repair","status":"ready","factsAdd":["backend-coding-scope-frozen","backend-boundary-approved","in-boundary-repair"],"factsRemove":[]},
-    {"stage":"architecture.boundary","status":"ready","factsAdd":["backend-boundary-feedback","source-drift"],"factsRemove":["backend-boundary-approved"]},
-    {"stage":"architecture.boundary","status":"ready","factsAdd":["backend-boundary-feedback","boundary-drift"],"factsRemove":["backend-boundary-approved"]},
-    {"stage":"be.blocked","status":"blocked","factsAdd":["backend-coding-scope-blocked"],"factsRemove":[]}
+  "schemaVersion": 6,
+  "id": "be/coding-scope-freeze",
+  "domain": "be",
+  "inputSchema": "input.schema.json",
+  "outputSchema": "output.schema.json",
+  "knowledgeRefs": [],
+  "sourceReferenceRefs": [],
+  "accepts": [
+    { "stage": "architecture.boundary.review", "status": "approved", "allFacts": ["backend-boundary-approved"], "noneFacts": [] },
+    { "stage": "be.coding-scope", "status": "ready", "allFacts": ["backend-repair-prerequisites-ready"], "noneFacts": [] }
   ],
-  "sideEffects":[
+  "emits": [
+    { "stage": "architecture.boundary.review", "status": "approved", "factsAdd": ["backend-coding-scope-frozen", "backend-boundary-approved"], "factsRemove": [] },
+    { "stage": "be.repair", "status": "ready", "factsAdd": ["backend-coding-scope-frozen", "backend-boundary-approved", "in-boundary-repair"], "factsRemove": [] },
+    { "stage": "architecture.boundary", "status": "ready", "factsAdd": ["backend-boundary-feedback", "source-drift"], "factsRemove": ["backend-boundary-approved"] },
+    { "stage": "architecture.boundary", "status": "ready", "factsAdd": ["backend-boundary-feedback", "boundary-drift"], "factsRemove": ["backend-boundary-approved"] },
+    { "stage": "be.blocked", "status": "blocked", "factsAdd": ["backend-coding-scope-blocked"], "factsRemove": [] }
+  ],
+  "sideEffects": [
     "read source metadata and calculate declared target hashes without exposing file content to model context",
     "write only a task-session coding-scope receipt",
     "purge every intermediate session object at each parent-skill terminal"
   ],
-  "stopConditions":[
+  "stopConditions": [
     "source HEAD or an existing target hash differs from the approved baseline",
     "a target escapes the repository or approved boundary",
-    "file content would enter model, Qdrant, output, logs, or durable storage"
+    "file content would enter model, Qdrant, output, logs or durable storage"
   ]
 }

@@ -1,5 +1,7 @@
 # `be/coding-scope-freeze` output
 
+`ready` preserves the caller lane: a new delivery re-emits `architecture.boundary.review / approved`, while a repair emits `be.repair / ready`. Drift returns to architecture planning and never masquerades as an in-boundary repair.
+
 ## JSON architecture
 
 `payload.state` owns the typed decision and route. `produced` contains only frozen metadata and a session receipt, never source. `context` contains exact lineage and `cleanup` purges every intermediate at `skill-terminal`.

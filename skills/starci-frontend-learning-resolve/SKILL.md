@@ -1,11 +1,11 @@
 ---
 name: starci-frontend-learning-resolve
-description: "Use to resolve one queued frontend design learning item into its declared durable authority. Do not use to apply ordinary feedback, redesign a journey, or reconcile consumers."
+description: "Use to resolve one durably approved frontend design learning request into its declared authority. Do not use to review requests, apply ordinary feedback, redesign a journey, or reconcile consumers."
 ---
 
 # starci-frontend-learning-resolve
 
-Use to resolve one queued frontend design learning item into its declared durable authority. Do not use to apply ordinary feedback, redesign a journey, or reconcile consumers.
+Use to resolve one durably approved frontend design learning request into its declared authority. Do not use to review requests, apply ordinary feedback, redesign a journey, or reconcile consumers.
 
 ## INPUT ANALYSIS
 

@@ -1,0 +1,84 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://starci.dev/v6/operators/delivery/impact-classify/input.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "runId", "stage", "status", "facts", "payload"],
+  "allOf": [{
+    "oneOf": [
+      { "properties": { "stage": { "const": "layout.review" }, "status": { "const": "approved" } }, "required": ["stage", "status"] },
+      { "properties": { "stage": { "const": "fe.block.review" }, "status": { "const": "approved" } }, "required": ["stage", "status"] },
+      { "properties": { "stage": { "const": "fe.authority.review" }, "status": { "const": "approved" } }, "required": ["stage", "status"] },
+      { "properties": { "stage": { "const": "fe.feedback.request.result" }, "status": { "const": "complete" } }, "required": ["stage", "status"] },
+      { "properties": { "stage": { "const": "business.freshness" }, "status": { "const": "ready" } }, "required": ["stage", "status"] }
+    ]
+  }],
+  "properties": {
+    "schemaVersion": { "const": 6 },
+    "runId": { "type": "string", "minLength": 1 },
+    "stage": { "enum": ["layout.review", "fe.block.review", "fe.authority.review", "fe.feedback.request.result", "business.freshness"] },
+    "status": { "enum": ["approved", "complete", "ready"] },
+    "facts": { "type": "array", "uniqueItems": true, "items": { "type": "string", "minLength": 1 } },
+    "payload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["provided", "loads", "session"],
+      "properties": {
+        "provided": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["missionRef", "businessHeadRef", "routeReceiptSetRef"],
+          "properties": {
+            "missionRef": { "$ref": "#/$defs/sessionRef" },
+            "businessHeadRef": { "$ref": "#/$defs/sessionRef" },
+            "routeReceiptSetRef": { "$ref": "#/$defs/sessionRef" }
+          }
+        },
+        "loads": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["artifacts", "business", "knowledge", "sourceMetadata"],
+          "properties": {
+            "artifacts": { "type": "array", "minItems": 2, "uniqueItems": true, "items": { "$ref": "#/$defs/exactBinding" } },
+            "business": { "$ref": "#/$defs/exactBinding" },
+            "knowledge": { "type": "array", "minItems": 1, "maxItems": 1, "items": { "$ref": "#/$defs/knowledgeBinding" } },
+            "sourceMetadata": {
+              "type": "array", "minItems": 1, "maxItems": 4, "uniqueItems": true,
+              "items": {
+                "type": "object", "additionalProperties": false,
+                "required": ["role", "headCommitRef", "contentVisible", "loadMode"],
+                "properties": {
+                  "role": { "enum": ["fe", "be", "chart", "shared"] },
+                  "headCommitRef": { "$ref": "#/$defs/gitRef" },
+                  "contentVisible": { "const": false },
+                  "loadMode": { "const": "metadata-only" }
+                }
+              }
+            }
+          }
+        },
+        "session": { "type": "object", "additionalProperties": false, "required": ["taskId", "inputRef", "outputRef", "scratchPrefix", "retention"], "properties": { "taskId": { "type": "string", "minLength": 1 }, "inputRef": { "$ref": "#/$defs/sessionRef" }, "outputRef": { "$ref": "#/$defs/sessionRef" }, "scratchPrefix": { "$ref": "#/$defs/sessionRef" }, "retention": { "const": "until-skill-terminal" } } }
+      }
+    }
+  },
+  "$defs": {
+    "sha256": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
+    "gitRef": { "type": "string", "pattern": "^git:[0-9a-f]{7,64}$" },
+    "sessionRef": { "type": "string", "pattern": "^session://tasks/[A-Za-z0-9._-]+/.+$" },
+    "exactBinding": {
+      "type": "object", "additionalProperties": false,
+      "required": ["ref", "revision", "loadMode"],
+      "properties": { "ref": { "$ref": "#/$defs/sessionRef" }, "revision": { "$ref": "#/$defs/sha256" }, "loadMode": { "const": "session-exact" } }
+    },
+    "knowledgeBinding": {
+      "type": "object", "additionalProperties": false,
+      "required": ["id", "generation", "contentSha256", "loadMode"],
+      "properties": { "id": { "const": "architecture.decision-analysis" }, "generation": { "type": "string", "minLength": 1 }, "contentSha256": { "$ref": "#/$defs/sha256" }, "loadMode": { "const": "qdrant-exact" } }
+    },
+    "session": {
+      "type": "object", "additionalProperties": false,
+      "required": ["taskId", "inputRef", "outputRef", "scratchPrefix", "retention"],
+      "properties": { "taskId": { "type": "string", "minLength": 1 }, "inputRef": { "$ref": "#/$defs/sessionRef" }, "outputRef": { "$ref": "#/$defs/sessionRef" }, "scratchPrefix": { "$ref": "#/$defs/sessionRef" }, "retention": { "const": "until-skill-terminal" } }
+    }
+  }
+}

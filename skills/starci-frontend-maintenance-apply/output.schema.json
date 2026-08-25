@@ -57,6 +57,80 @@
         {
           "properties": {
             "result": {
+              "const": "handoff"
+            },
+            "finalState": {
+              "const": "maintenance-repair-handoff"
+            },
+            "state": {
+              "properties": {
+                "status": {
+                  "const": "handoff"
+                },
+                "code": {
+                  "const": "starci-frontend-maintenance-apply-maintenance-repair-handoff"
+                },
+                "retryable": {
+                  "const": false
+                },
+                "terminalState": {
+                  "const": "maintenance-repair-handoff"
+                }
+              },
+              "required": [
+                "status",
+                "code",
+                "retryable",
+                "terminalState"
+              ]
+            }
+          },
+          "required": [
+            "result",
+            "finalState",
+            "state"
+          ]
+        },
+        {
+          "properties": {
+            "result": {
+              "const": "handoff"
+            },
+            "finalState": {
+              "const": "maintenance-authority-handoff"
+            },
+            "state": {
+              "properties": {
+                "status": {
+                  "const": "handoff"
+                },
+                "code": {
+                  "const": "starci-frontend-maintenance-apply-maintenance-authority-handoff"
+                },
+                "retryable": {
+                  "const": false
+                },
+                "terminalState": {
+                  "const": "maintenance-authority-handoff"
+                }
+              },
+              "required": [
+                "status",
+                "code",
+                "retryable",
+                "terminalState"
+              ]
+            }
+          },
+          "required": [
+            "result",
+            "finalState",
+            "state"
+          ]
+        },
+        {
+          "properties": {
+            "result": {
               "const": "complete"
             },
             "finalState": {
@@ -109,12 +183,15 @@
     "result": {
       "enum": [
         "blocked",
+        "handoff",
         "complete"
       ]
     },
     "finalState": {
       "enum": [
         "blocked",
+        "maintenance-repair-handoff",
+        "maintenance-authority-handoff",
         "complete"
       ]
     },
@@ -131,12 +208,15 @@
         "status": {
           "enum": [
             "blocked",
+            "handoff",
             "completed"
           ]
         },
         "code": {
           "enum": [
             "starci-frontend-maintenance-apply-blocked",
+            "starci-frontend-maintenance-apply-maintenance-repair-handoff",
+            "starci-frontend-maintenance-apply-maintenance-authority-handoff",
             "starci-frontend-maintenance-apply-complete"
           ]
         },
@@ -146,6 +226,8 @@
         "terminalState": {
           "enum": [
             "blocked",
+            "maintenance-repair-handoff",
+            "maintenance-authority-handoff",
             "complete"
           ]
         }

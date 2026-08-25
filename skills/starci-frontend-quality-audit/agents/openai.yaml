@@ -1,0 +1,6 @@
+interface:
+  display_name: "StarCi Frontend Quality Audit"
+  short_description: "Audit bounded UI quality with executable evidence"
+  default_prompt: "Use $starci-frontend-quality-audit for this selected flow and execute its state machine."
+policy:
+  allow_implicit_invocation: true

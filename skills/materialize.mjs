@@ -11,6 +11,7 @@ const terminal = (result) => ({ kind: 'terminal', result });
 const decided = (routes) => Object.entries(routes).map(([decision, target]) => e({ decision }, target, decision));
 const qualityEdges = (pass) => decided({ pass, 'in-boundary': 'implement', 'boundary-drift': 'boundary-plan', 'external-blocker': 'blocked' });
 const repairQualityEdges = (pass) => decided({ pass, 'in-boundary': 'implement', 'boundary-drift': 'replan-handoff', 'external-blocker': 'blocked' });
+const missionQualityEdges = (pass) => decided({ pass, 'in-boundary': 'ship-implement', 'boundary-drift': 'ship-boundary-plan', 'external-blocker': 'blocked' });
 const routeEdges = (readyTarget, initializeTarget = 'blocked') => decided({ ready: readyTarget, 'initialize-required': initializeTarget, blocked: 'blocked' });
 
 function reachableSubgraph(states, entry) {
@@ -31,9 +32,9 @@ const workspaceStates = {
   identity: op('workspace/identity-verify', routeEdges('bootstrap')),
   bootstrap: op('workspace/bootstrap-verify', routeEdges('declarations')),
   declarations: op('workspace/declarations-compile', decided({ ready: 'routes' })),
-  routes: op('workspace/routes-hydrate', decided({ ready: 'worktree' })),
+  routes: op('workspace/routes-hydrate', decided({ ready: 'worktree', blocked: 'blocked' })),
   worktree: op('workspace/worktree-verify', routeEdges('route')),
-  route: op('workspace/route-verify', routeEdges('complete')),
+  route: op('workspace/route-verify', routeEdges('complete', 'routes')),
   complete: terminal('complete'), blocked: terminal('blocked')
 };
 
@@ -115,6 +116,11 @@ const backendRepairStates = {
 };
 
 const frontendStates = {
+  'request-review': op('fe/request-review', decided({ approved: 'complete', rejected: 'complete', blocked: 'blocked' })),
+  'layout-feedback-request': op('fe/feedback-request', decided({ recorded: 'route', blocked: 'blocked' })),
+  'block-feedback-request': op('fe/feedback-request', decided({ recorded: 'block-reconcile', blocked: 'blocked' })),
+  'maintenance-feedback-request': op('fe/feedback-request', decided({ recorded: 'maintenance-apply', blocked: 'blocked' })),
+  'surface-feedback-request': op('fe/feedback-request', decided({ recorded: 'surface-audit', blocked: 'blocked' })),
   route: op('workspace/route-verify', routeEdges('business-staleness')),
   'business-staleness': op('business/staleness-check', decided({ fresh: 'preflight', 'initialize-required': 'business-evidence', blocked: 'blocked' })),
   'business-evidence': op('business/evidence-normalize', decided({ ready: 'business-model' })),
@@ -138,18 +144,220 @@ const frontendStates = {
   implementation: op('fe/implementation', [e({ stage: 'seed.materialize', status: 'ready' }, 'seed'), e({ stage: 'code.result', status: 'blocked' }, 'blocked')]),
   seed: op('fe/product-seed', [e({ stage: 'test.unit', status: 'ready' }, 'unit-test'), e({ stage: 'seed.result', status: 'blocked' }, 'blocked')]),
   'unit-test': op('test/unit', [e({ stage: 'test.e2e', status: 'ready' }, 'e2e-test'), e({ stage: 'code.repair', status: 'repair' }, 'implementation'), e({ stage: 'test.review', status: 'blocked' }, 'blocked')]),
-  'e2e-test': op('test/e2e', [e({ stage: 'test.ui', status: 'ready' }, 'ui-test'), e({ stage: 'code.repair', status: 'repair' }, 'implementation'), e({ stage: 'test.review', status: 'blocked' }, 'blocked')]),
+  'e2e-test': op('test/e2e', [e({ stage: 'test.ui', status: 'ready' }, 'ui-quality-test'), e({ stage: 'code.repair', status: 'repair' }, 'implementation'), e({ stage: 'test.review', status: 'blocked' }, 'blocked')]),
+  'ui-quality-test': op('test/ui-quality-audit', decided({ 'delivery-pass': 'ui-test', 'delivery-in-boundary': 'implementation', 'delivery-boundary-drift': 'layout', 'audit-pass': 'blocked', 'audit-findings': 'blocked', blocked: 'blocked' })),
   'ui-test': op('test/ui', [e({ stage: 'proof.run', status: 'ready' }, 'product-proof'), e({ stage: 'code.repair', status: 'repair' }, 'implementation'), e({ stage: 'layout.review', status: 'rejected' }, 'layout'), e({ stage: 'test.review', status: 'blocked' }, 'blocked')]),
   'product-proof': op('fe/product-proof', [e({ stage: 'proof.review', status: 'complete' }, 'complete'), e({ stage: 'code.repair', status: 'repair' }, 'implementation'), e({ stage: 'layout.review', status: 'rejected' }, 'layout'), e({ stage: 'proof.review', status: 'blocked' }, 'blocked')]),
-  'block-reconcile': op('fe/block-reconcile', decided({ reconciled: 'complete', blocked: 'blocked' })),
-  'maintenance-apply': op('fe/maintenance-apply', decided({ applied: 'learning-request', blocked: 'blocked' })),
+  'block-reconcile': op('fe/block-reconcile', decided({ reconciled: 'block-approval', blocked: 'blocked' })),
+  'block-approval': wait('Approve the exact Block reconciliation and closed consumer boundary.', 'OK BLOCK <hash>', 'REJECT BLOCK <hash>', [
+    e({ stage: 'fe.block.review', status: 'approved' }, 'block-consumer-align'),
+    e({ stage: 'fe.block.review', status: 'rejected' }, 'rejected')
+  ]),
+  'block-consumer-align': op('fe/consumer-align', decided({ aligned: 'reconcile-seed', blocked: 'blocked' })),
+  'maintenance-apply': op('fe/maintenance-apply', decided({ applied: 'maintenance-seed', blocked: 'blocked' })),
+  'maintenance-seed': op('fe/product-seed', [
+    e({ stage: 'test.unit', status: 'ready' }, 'maintenance-unit-test'),
+    e({ stage: 'seed.result', status: 'blocked' }, 'blocked')
+  ]),
+  'maintenance-unit-test': op('test/unit', [
+    e({ stage: 'test.e2e', status: 'ready' }, 'maintenance-e2e-test'),
+    e({ stage: 'code.repair', status: 'repair' }, 'maintenance-repair-handoff'),
+    e({ stage: 'test.review', status: 'blocked' }, 'blocked')
+  ]),
+  'maintenance-e2e-test': op('test/e2e', [
+    e({ stage: 'test.ui', status: 'ready' }, 'maintenance-ui-quality-test'),
+    e({ stage: 'code.repair', status: 'repair' }, 'maintenance-repair-handoff'),
+    e({ stage: 'test.review', status: 'blocked' }, 'blocked')
+  ]),
+  'maintenance-ui-quality-test': op('test/ui-quality-audit', decided({
+    'delivery-pass': 'maintenance-ui-test',
+    'delivery-in-boundary': 'maintenance-repair-handoff',
+    'delivery-boundary-drift': 'maintenance-authority-handoff',
+    'audit-pass': 'blocked',
+    'audit-findings': 'blocked',
+    blocked: 'blocked'
+  })),
+  'maintenance-ui-test': op('test/ui', [
+    e({ stage: 'proof.run', status: 'ready' }, 'maintenance-product-proof'),
+    e({ stage: 'code.repair', status: 'repair' }, 'maintenance-repair-handoff'),
+    e({ stage: 'layout.review', status: 'rejected' }, 'maintenance-authority-handoff'),
+    e({ stage: 'test.review', status: 'blocked' }, 'blocked')
+  ]),
+  'maintenance-product-proof': op('fe/product-proof', [
+    e({ stage: 'proof.review', status: 'complete' }, 'learning-request'),
+    e({ stage: 'code.repair', status: 'repair' }, 'maintenance-repair-handoff'),
+    e({ stage: 'layout.review', status: 'rejected' }, 'maintenance-authority-handoff'),
+    e({ stage: 'proof.review', status: 'blocked' }, 'blocked')
+  ]),
+  'maintenance-repair-handoff': terminal('handoff'),
+  'maintenance-authority-handoff': terminal('handoff'),
   'learning-request': op('fe/learning-request', decided({ recorded: 'complete', blocked: 'blocked' })),
   'learning-resolve': op('fe/learning-resolve', decided({ resolved: 'complete', blocked: 'blocked' })),
   'surface-audit': op('fe/surface-audit', decided({ audited: 'authority-approval', blocked: 'blocked' })),
   'authority-approval': wait('Approve the smallest durable design authority and closed consumer set.', 'OK AUTHORITY <hash>', 'REJECT AUTHORITY <hash>', [e({ stage: 'fe.authority.review', status: 'approved' }, 'authority-reconcile'), e({ stage: 'fe.authority.review', status: 'rejected' }, 'surface-audit')]),
   'authority-reconcile': op('fe/authority-reconcile', decided({ reconciled: 'consumer-align', blocked: 'blocked' })),
-  'consumer-align': op('fe/consumer-align', decided({ aligned: 'complete', blocked: 'blocked' })),
-  complete: terminal('complete'), blocked: terminal('blocked')
+  'consumer-align': op('fe/consumer-align', decided({ aligned: 'reconcile-seed', blocked: 'blocked' })),
+  'reconcile-seed': op('fe/product-seed', [
+    e({ stage: 'test.unit', status: 'ready' }, 'reconcile-unit-test'),
+    e({ stage: 'seed.result', status: 'blocked' }, 'blocked')
+  ]),
+  'reconcile-unit-test': op('test/unit', [
+    e({ stage: 'test.e2e', status: 'ready' }, 'reconcile-e2e-test'),
+    e({ stage: 'code.repair', status: 'repair' }, 'reconcile-repair-handoff'),
+    e({ stage: 'test.review', status: 'blocked' }, 'blocked')
+  ]),
+  'reconcile-e2e-test': op('test/e2e', [
+    e({ stage: 'test.ui', status: 'ready' }, 'reconcile-ui-quality-test'),
+    e({ stage: 'code.repair', status: 'repair' }, 'reconcile-repair-handoff'),
+    e({ stage: 'test.review', status: 'blocked' }, 'blocked')
+  ]),
+  'reconcile-ui-quality-test': op('test/ui-quality-audit', decided({
+    'delivery-pass': 'reconcile-ui-test',
+    'delivery-in-boundary': 'reconcile-repair-handoff',
+    'delivery-boundary-drift': 'reconcile-authority-handoff',
+    'audit-pass': 'blocked',
+    'audit-findings': 'blocked',
+    blocked: 'blocked'
+  })),
+  'reconcile-ui-test': op('test/ui', [
+    e({ stage: 'proof.run', status: 'ready' }, 'reconcile-product-proof'),
+    e({ stage: 'code.repair', status: 'repair' }, 'reconcile-repair-handoff'),
+    e({ stage: 'layout.review', status: 'rejected' }, 'reconcile-authority-handoff'),
+    e({ stage: 'test.review', status: 'blocked' }, 'blocked')
+  ]),
+  'reconcile-product-proof': op('fe/product-proof', [
+    e({ stage: 'proof.review', status: 'complete' }, 'complete'),
+    e({ stage: 'code.repair', status: 'repair' }, 'reconcile-repair-handoff'),
+    e({ stage: 'layout.review', status: 'rejected' }, 'reconcile-authority-handoff'),
+    e({ stage: 'proof.review', status: 'blocked' }, 'blocked')
+  ]),
+  'reconcile-repair-handoff': terminal('handoff'),
+  'reconcile-authority-handoff': terminal('handoff'),
+  complete: terminal('complete'), rejected: terminal('rejected'), blocked: terminal('blocked')
+};
+
+const missionFreshnessStates = (freshTarget) => ({
+  'mission-route': op('workspace/route-verify', routeEdges('mission-business-staleness')),
+  'mission-business-staleness': op('business/staleness-check', decided({ fresh: freshTarget, 'initialize-required': 'mission-business-evidence', blocked: 'blocked' })),
+  'mission-business-evidence': op('business/evidence-normalize', decided({ ready: 'mission-business-model' })),
+  'mission-business-model': op('business/model', decided({ ready: 'mission-business-approval' })),
+  'mission-business-approval': wait('Approve regenerated business authority before mission delivery.', 'OK BUSINESS <hash>', 'REJECT BUSINESS <hash>', [
+    e({ stage: 'business.model.review', status: 'approved' }, 'mission-business-publish'),
+    e({ stage: 'business.model.review', status: 'rejected' }, 'mission-business-evidence')
+  ]),
+  'mission-business-publish': op('business/publish', decided({ 'direct-plan': 'mission-business-staleness', 'architecture-required': 'mission-business-staleness', blocked: 'blocked' }))
+});
+
+const missionBackendStates = (resumeTarget) => ({
+  'mission-impact': op('delivery/impact-classify', decided({ 'backend-required': 'ship-architecture-frame', 'frontend-only': resumeTarget, blocked: 'blocked' })),
+  'ship-architecture-frame': op('architecture/decision-frame', decided({ ready: 'ship-architecture-current' })),
+  'ship-architecture-current': op('architecture/current-state', decided({ ready: 'ship-architecture-alternatives' })),
+  'ship-architecture-alternatives': op('architecture/alternatives', decided({ ready: 'ship-architecture-challenge' })),
+  'ship-architecture-challenge': op('architecture/decision-challenge', decided({ ready: 'ship-architecture-selection', revise: 'ship-architecture-alternatives', blocked: 'blocked' })),
+  'ship-architecture-selection': wait('Approve the backend architecture required by this mission.', 'OK ARCHITECTURE <decision>', 'REJECT ARCHITECTURE <decision>', [
+    e({ stage: 'architecture.decision.handoff', status: 'ready' }, 'ship-architecture-handoff'),
+    e({ stage: 'architecture.decision.alternatives', status: 'ready' }, 'ship-architecture-alternatives')
+  ]),
+  'ship-architecture-handoff': op('architecture/decision-handoff', decided({ ready: 'ship-source-discovery' })),
+  'ship-source-discovery': op('architecture/source-discovery', decided({ ready: 'ship-pattern-bind' })),
+  'ship-pattern-bind': op('architecture/pattern-bind', decided({ ready: 'ship-boundary-plan' })),
+  'ship-boundary-plan': op('architecture/boundary-plan', decided({ ready: 'ship-boundary-challenge' })),
+  'ship-boundary-challenge': op('architecture/boundary-challenge', decided({ clean: 'ship-boundary-approval', revise: 'ship-boundary-plan', blocked: 'blocked' })),
+  'ship-boundary-approval': wait('Approve the exact backend plan required to complete this mission.', 'OK BACKEND <hash>', 'REJECT BACKEND <hash>', [
+    e({ stage: 'architecture.boundary.review', status: 'approved' }, 'ship-coding-scope'),
+    e({ stage: 'architecture.boundary.review', status: 'rejected' }, 'ship-boundary-plan')
+  ]),
+  'ship-coding-scope': op('be/coding-scope-freeze', decided({ ready: 'ship-implement', 'source-drift': 'ship-boundary-plan', 'boundary-drift': 'ship-boundary-plan', blocked: 'blocked' })),
+  'ship-implement': op('be/implementation', decided({ ready: 'ship-format', 'source-drift': 'ship-boundary-plan', 'boundary-drift': 'ship-boundary-plan', blocked: 'blocked' })),
+  'ship-format': op('quality/format', missionQualityEdges('ship-lint')),
+  'ship-lint': op('quality/lint', missionQualityEdges('ship-typecheck')),
+  'ship-typecheck': op('quality/typecheck', missionQualityEdges('ship-build')),
+  'ship-build': op('quality/build', missionQualityEdges('ship-unit')),
+  'ship-unit': op('quality/unit-coverage', missionQualityEdges('ship-integration')),
+  'ship-integration': op('quality/integration', missionQualityEdges('ship-e2e')),
+  'ship-e2e': op('quality/e2e', missionQualityEdges('ship-sonar')),
+  'ship-sonar': op('quality/sonar', missionQualityEdges('ship-source-proof')),
+  'ship-source-proof': op('quality/delivery-proof', decided({ pass: 'ship-resume', blocked: 'blocked' })),
+  'ship-resume': op('delivery/mission-resume', decided({ ready: resumeTarget, blocked: 'blocked' }))
+});
+
+const missionCompletionStates = {
+  'mission-proof': op('delivery/mission-proof', decided({ pass: 'mission-business-reconcile', blocked: 'blocked' })),
+  'mission-business-reconcile': op('business/reconcile', decided({ implemented: 'complete', discrepancy: 'blocked' }))
+};
+
+const layoutMissionStates = {
+  ...frontendStates,
+  ...missionBackendStates('grammar'),
+  ...missionCompletionStates,
+  'layout-approval': wait('Approve one exact layout direction and complete page set.', 'OK LAYOUT <id>', 'REJECT LAYOUT <id>', [
+    e({ stage: 'layout.review', status: 'approved' }, 'mission-impact'),
+    e({ stage: 'layout.review', status: 'rejected' }, 'layout')
+  ]),
+  'product-proof': op('fe/product-proof', [
+    e({ stage: 'proof.review', status: 'complete' }, 'mission-proof'),
+    e({ stage: 'code.repair', status: 'repair' }, 'implementation'),
+    e({ stage: 'layout.review', status: 'rejected' }, 'layout'),
+    e({ stage: 'proof.review', status: 'blocked' }, 'blocked')
+  ])
+};
+
+const blockMissionStates = {
+  ...frontendStates,
+  ...missionFreshnessStates('block-reconcile'),
+  ...missionBackendStates('block-consumer-align'),
+  ...missionCompletionStates,
+  'block-feedback-request': op('fe/feedback-request', decided({ recorded: 'mission-route', blocked: 'blocked' })),
+  'block-approval': wait('Approve the exact Block reconciliation and closed consumer boundary.', 'OK BLOCK <hash>', 'REJECT BLOCK <hash>', [
+    e({ stage: 'fe.block.review', status: 'approved' }, 'mission-impact'),
+    e({ stage: 'fe.block.review', status: 'rejected' }, 'rejected')
+  ]),
+  'reconcile-product-proof': op('fe/product-proof', [
+    e({ stage: 'proof.review', status: 'complete' }, 'mission-proof'),
+    e({ stage: 'code.repair', status: 'repair' }, 'reconcile-repair-handoff'),
+    e({ stage: 'layout.review', status: 'rejected' }, 'reconcile-authority-handoff'),
+    e({ stage: 'proof.review', status: 'blocked' }, 'blocked')
+  ])
+};
+
+const maintenanceMissionStates = {
+  ...frontendStates,
+  ...missionFreshnessStates('mission-impact'),
+  ...missionBackendStates('maintenance-apply'),
+  ...missionCompletionStates,
+  'mission-business-reconcile': op('business/reconcile', decided({ implemented: 'learning-request', discrepancy: 'blocked' })),
+  'maintenance-feedback-request': op('fe/feedback-request', decided({ recorded: 'mission-route', blocked: 'blocked' })),
+  'maintenance-product-proof': op('fe/product-proof', [
+    e({ stage: 'proof.review', status: 'complete' }, 'mission-proof'),
+    e({ stage: 'code.repair', status: 'repair' }, 'maintenance-repair-handoff'),
+    e({ stage: 'layout.review', status: 'rejected' }, 'maintenance-authority-handoff'),
+    e({ stage: 'proof.review', status: 'blocked' }, 'blocked')
+  ])
+};
+
+const surfaceMissionStates = {
+  ...frontendStates,
+  ...missionFreshnessStates('surface-audit'),
+  ...missionBackendStates('authority-reconcile'),
+  ...missionCompletionStates,
+  'surface-feedback-request': op('fe/feedback-request', decided({ recorded: 'mission-route', blocked: 'blocked' })),
+  'authority-approval': wait('Approve the smallest durable design authority and closed consumer set.', 'OK AUTHORITY <hash>', 'REJECT AUTHORITY <hash>', [
+    e({ stage: 'fe.authority.review', status: 'approved' }, 'mission-impact'),
+    e({ stage: 'fe.authority.review', status: 'rejected' }, 'surface-audit')
+  ]),
+  'reconcile-product-proof': op('fe/product-proof', [
+    e({ stage: 'proof.review', status: 'complete' }, 'mission-proof'),
+    e({ stage: 'code.repair', status: 'repair' }, 'reconcile-repair-handoff'),
+    e({ stage: 'layout.review', status: 'rejected' }, 'reconcile-authority-handoff'),
+    e({ stage: 'proof.review', status: 'blocked' }, 'blocked')
+  ])
+};
+
+const frontendQualityAuditStates = {
+  audit: op('test/ui-quality-audit', decided({ 'delivery-pass': 'blocked', 'delivery-in-boundary': 'blocked', 'delivery-boundary-drift': 'blocked', 'audit-pass': 'complete', 'audit-findings': 'findings', blocked: 'blocked' })),
+  findings: terminal('complete'),
+  complete: terminal('complete'),
+  blocked: terminal('blocked')
 };
 
 const qualityStates = {
@@ -231,7 +439,6 @@ const sourceIndexStates = {
   ]),
   'reference-reindex': op('platform/reference-reindex', decided({ ready: 'mcp-publish-choice', blocked: 'blocked' }))
 };
-
 
 const conversationStates = {
   record: op('source/conversation-record', decided({ recorded: 'complete' })),
@@ -330,13 +537,13 @@ const flows = [
     checks: ['Resolve the approved plan hash, finding and current source baseline.', 'Confirm every write remains inside the approved backend boundary.', 'Route source or boundary drift back to planning.']
   },
   {
-    id: 'frontend-layout-delivery', display: 'StarCi Frontend Layout Delivery', short: 'Design and deliver complete frontend journeys', entry: 'route', states: frontendStates,
+    id: 'frontend-layout-delivery', display: 'StarCi Journey Delivery', short: 'Ship complete cross-stack product journeys', entry: 'layout-feedback-request', states: layoutMissionStates,
     options: {
       directionCount: { enum: [3, 4], description: 'Generate exactly three or four materially distinct customer journeys.' },
       selectionPolicy: { enum: ['manual', 'auto-recommended'], description: 'Wait for explicit journey approval or bind the recommended direction automatically.' }
     },
-    description: 'Use to create or substantially redesign a complete frontend customer journey, page set, page models, layouts, implementation, and proof. Do not use for isolated blocks, approved maintenance, learning resolution, or cross-surface consistency.',
-    checks: ['Resolve the complete page set and project route without loading product context.', 'Confirm this is journey-level work and bind the selected Grammar package.', 'Identify creative approvals and permitted source roots.'],
+    description: 'Use to create or substantially redesign and ship one complete customer journey. Own every required business, backend, frontend and proof layer while skipping roles proven unaffected. Do not use for isolated blocks, approved maintenance, learning resolution, or cross-surface consistency.',
+    checks: ['Capture the feedback session with explicit accepts and rejects in .claude/requests before route work.', 'Resolve the complete page set and every routed source role without loading product context.', 'Confirm this is journey-level work, bind the selected Grammar package and classify backend impact from approved business behavior.', 'Require backend source proof when impacted plus seeded unit, E2E, UI-quality, real-browser acceptance, joined mission proof and business reconciliation before completion.'],
     contextMatrix: [
       ['route + staleness', 'route, commit, revision, receipt and hash metadata', 'business body, Qdrant bodies, source files'],
       ['business initialize', 'exact evidence and business lifecycle law only after stale decision', 'frontend knowledge and coding context'],
@@ -345,29 +552,64 @@ const flows = [
       ['page + state', 'selected journey + exact business slice + one operator law', 'other directions and source'],
       ['context sync', 'metadata first; changed generated JSON/knowledge only on hash miss', 'unchanged bodies and model-visible raw source'],
       ['source fit + Principles + layout + Grammar', 'approved session refs + exact Qdrant records + canonical JSON candidates', 'whole indexes, unrelated features, raw source'],
+      ['role impact + backend delivery', 'approved mission, fresh business head, route metadata, exact backend boundary and declared quality receipts', 'unaffected roles, broad source discovery and partial backend proof'],
       ['coding scope freeze', 'approved refs, canonical candidate records, exact file headers', 'file bodies and repository scans'],
-      ['implementation + proof', 'only frozen exact files, commands, seeds and receipts', 'undeclared files, broad Qdrant, unrelated business']
+      ['implementation + proof', 'only frozen exact files, complete proof matrix, deterministic seeds, declared commands, browser/account handles and sanitized receipts for every state and viewport', 'partial proof, skipped scenarios, raw credentials, undeclared files, broad Qdrant and unrelated business']
     ]
   },
   {
-    id: 'frontend-block-reconcile', display: 'StarCi Frontend Block Reconcile', short: 'Reconcile one frontend block and its consumers', entry: 'block-reconcile', states: frontendStates, options: {},
-    description: 'Use when one existing frontend block or component contract must be reconciled with its known consumers. Do not use for complete journey design, maintenance, learning resolution, or broad cross-surface authority changes.',
-    checks: ['Resolve exactly one block contract and its closed consumer set.', 'Require current source-contract and Grammar identities.', 'Reject journey redesign or unbounded consumer discovery.']
+    id: 'frontend-quality-audit', display: 'StarCi Frontend Quality Audit', short: 'Audit bounded UI quality with executable evidence', entry: 'audit', states: frontendQualityAuditStates, options: {},
+    description: 'Use to audit one verified frontend surface set against StarCi-owned product-neutral UI quality rules and return evidence-linked findings without changing source. Do not use for journey design, source repair, design-authority reconciliation, or delivery proof.',
+    checks: ['Resolve one verified frontend route and closed surface set.', 'Require an executable browser target and explicit viewport and state coverage.', 'Keep the audit check-only and reject implied source repair or business interpretation.'],
+    contextMatrix: [
+      ['audit', 'verified route receipt, closed surface refs, exact browser target, pinned fe.ui-quality-review knowledge and task-session evidence', 'business bodies, broad source context, external skill runtime and undeclared surfaces'],
+      ['terminal', 'quality receipt and evidence-linked rule findings only', 'screenshots, traces, raw observations and source mutations']
+    ]
   },
   {
-    id: 'frontend-maintenance-apply', display: 'StarCi Frontend Maintenance Apply', short: 'Apply approved frontend maintenance safely', entry: 'maintenance-apply', states: frontendStates, options: {},
-    description: 'Use to apply one already approved source-first frontend maintenance change and record its durable learning request. Do not use for design exploration, unapproved feedback, or cross-surface authority selection.',
-    checks: ['Resolve approved feedback, exact source boundary and expected evidence.', 'Confirm the design decision is already approved.', 'Identify the required durable learning record.']
+    id: 'frontend-block-reconcile', display: 'StarCi Block Reconcile', short: 'Reconcile one product block across all roles', entry: 'block-feedback-request', states: blockMissionStates, options: {},
+    description: 'Use when one existing product block or component contract must be reconciled across its closed consumers and every affected backend/frontend role, then proven end to end. Do not use for complete journey design, ordinary maintenance, learning resolution, or broad cross-surface authority changes.',
+    checks: ['Capture the feedback session with explicit accepts and rejects in .claude/requests before reconciliation.', 'Resolve exactly one block contract, its closed consumer set, fresh business head and complete acceptance proof matrix.', 'Classify role impact and require backend boundary approval and proof when the block changes persisted or server-owned behavior.', 'Require complete unit, E2E, UI-quality, browser, joined mission proof and business reconciliation; reject journey redesign or unbounded consumer discovery.'],
+    contextMatrix: [
+      ['block plan', 'one Block identity, current contract generation, closed consumers and proof-plan headers', 'unrelated blocks, broad source and raw business context'],
+      ['approval + consumer mutation', 'frozen reconciliation hash, exact consumer files, approval receipt and complete acceptance-plan identity', 'undeclared consumers, new design discovery and scope expansion'],
+      ['proof', 'change-set receipt, deterministic seed/reset, declared commands, UI-quality receipt, browser/account handles and complete state-and-viewport evidence', 'partial proof, skipped scenarios, raw credentials and unrelated design history']
+    ]
+  },
+  {
+    id: 'frontend-maintenance-apply', display: 'StarCi Product Maintenance', short: 'Apply approved maintenance across affected roles', entry: 'maintenance-feedback-request', states: maintenanceMissionStates, options: {},
+    description: 'Use to apply one already approved source-first product maintenance change across every affected backend/frontend role and prove the mission end to end. Do not use for design exploration, unapproved feedback, or cross-surface authority selection.',
+    checks: ['Capture the feedback session with explicit accepts and rejects in .claude/requests before source mutation.', 'Resolve approved feedback, fresh business head, exact routed role boundaries and a complete acceptance proof matrix.', 'Classify role impact before mutation and require backend planning and proof when server-owned behavior changes.', 'Require complete unit, E2E, UI-quality, browser, joined mission proof and business reconciliation before recording the durable learning request.'],
+    contextMatrix: [
+      ['route + target verification', 'project route, approved target refs, source/contract hashes and receipt headers', 'business bodies, broad Qdrant and repository scans'],
+      ['audit or reconcile', 'exact component/surface contracts, selected Grammar pair and closed consumer refs', 'other Grammar packages, unrelated consumers and raw business context'],
+      ['approval + mutation', 'frozen decision hash, exact files, approval receipt and complete acceptance-plan identity', 'new discovery, undeclared files and scope expansion'],
+      ['proof + learning', 'changed-file receipt, approved proof matrix, deterministic seed, declared unit/E2E commands, UI-quality receipt, browser/account handles, complete state-and-viewport proof and one durable learning request', 'partial proof, skipped scenarios, raw credentials, session scratch and unrelated design history']
+    ]
+  },
+  {
+    id: 'frontend-request-review', display: 'StarCi Frontend Request Review', short: 'Approve or reject one feedback ledger entry', entry: 'request-review', states: frontendStates, options: {},
+    description: 'Use only to durably approve or reject one exact `.claude/requests/*.request.json` frontend feedback ledger with bounded priority before learning resolution. Do not use to resolve authority, mutate product source, or bypass evidence because a request is urgent.',
+    checks: ['Resolve exactly one .claude/requests identity and current revision.', 'Require an explicit approve or reject decision, bounded owners, durable rationale and evidence hash.', 'Treat urgent as queue priority only; never relax proof or ownership.', 'Emit an approved request for learning resolution without mutating .claude, Grammar or product source.'],
+    contextMatrix: [
+      ['request review', 'one durable request, its feedback-session ledger, current proof status and explicit review evidence', 'other requests, raw transcripts and unrelated source'],
+      ['decision persistence', 'exact request target, bounded owners, priority, rationale and decision hash', 'authority mutation, product mutation and owner expansion']
+    ]
   },
   {
     id: 'frontend-learning-resolve', display: 'StarCi Frontend Learning Resolve', short: 'Resolve one queued frontend design learning', entry: 'learning-resolve', states: frontendStates, options: {},
-    description: 'Use to resolve one queued frontend design learning item into its declared durable authority. Do not use to apply ordinary feedback, redesign a journey, or reconcile consumers.',
-    checks: ['Resolve one queued learning identity and proposed authority.', 'Confirm evidence is current and bounded.', 'Reject ordinary maintenance or unrelated source work.']
+    description: 'Use to resolve one durably approved frontend design learning request into its declared authority. Do not use to review requests, apply ordinary feedback, redesign a journey, or reconcile consumers.',
+    checks: ['Require one request approved by starci-frontend-request-review and bind its exact revision.', 'Resolve the approved learning identity and proposed authority.', 'Confirm evidence is current and bounded.', 'Reject unreviewed requests, ordinary maintenance or unrelated source work.']
   },
   {
-    id: 'frontend-surface-reconcile', display: 'StarCi Frontend Surface Reconcile', short: 'Align a closed set of frontend surfaces', entry: 'surface-audit', states: frontendStates, options: {},
-    description: 'Use when a closed set of frontend pages or surfaces must converge on the smallest durable design authority. Do not use for a single block, isolated maintenance, or a new customer journey.',
-    checks: ['Resolve the closed surface set and inconsistency evidence.', 'Identify the smallest authority and all consumers.', 'Require explicit authority approval before mutation.']
+    id: 'frontend-surface-reconcile', display: 'StarCi Surface Reconcile', short: 'Align closed product surfaces across all roles', entry: 'surface-feedback-request', states: surfaceMissionStates, options: {},
+    description: 'Use when a closed set of product surfaces must converge on the smallest durable authority and every affected backend/frontend consumer, then pass complete end-to-end proof. Do not use for a single block, isolated maintenance, or a new customer journey.',
+    checks: ['Capture the feedback session with explicit accepts and rejects in .claude/requests before reconciliation.', 'Resolve the closed surface set, fresh business head, inconsistency evidence and complete acceptance proof matrix.', 'Identify the smallest authority and classify role impact, with explicit authority and any required backend boundary approval before mutation.', 'Require complete unit, E2E, UI-quality, browser, joined mission proof and business reconciliation before completion.'],
+    contextMatrix: [
+      ['surface audit + authority', 'closed surface IDs, current authority/consumer revisions, observed inconsistency and proof-plan headers', 'unrelated surfaces, broad source and raw business context'],
+      ['approval + reconcile', 'frozen authority hash, exact authority and consumer targets, approval receipt and complete acceptance-plan identity', 'undeclared consumers, new discovery and scope expansion'],
+      ['proof', 'joined authority/source change receipt, deterministic seed/reset, declared commands, UI-quality receipt, browser/account handles and complete state-and-viewport evidence', 'partial proof, skipped scenarios, raw credentials and unrelated design history']
+    ]
   },
   {
     id: 'workflow-diagnose', display: 'StarCi Workflow Diagnose', short: 'Trace one failing workflow without mutation', entry: 'diagnose', states: qualityStates, options: {},

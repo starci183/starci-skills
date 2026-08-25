@@ -3,7 +3,7 @@ import { validatorFor, runValidatorCli } from '../../validation.mjs';
 
 const guards = {
   "fe.maintenance.learning-resolve\u0000ready": {
-    "all": [],
+    "all": ["feedback-request-reviewed"],
     "none": []
   }
 };
@@ -24,9 +24,11 @@ function semanticErrors(value) {
   if (loads.orchestration.profileRef !== profileByMode[loads.orchestration.mode]) errors.push('$.payload.loads.orchestration.profileRef: does not match mode');
 
   const prefix = `session://tasks/${session.taskId}/`;
-  const refs = [provided.priorStateRef, provided.businessHeadRef, ...provided.authorityRefs, provided.approvalRef, ...loads.upstream.map((item) => item.ref), session.inputRef, session.outputRef, session.scratchPrefix].filter(Boolean);
+  const refs = [provided.priorStateRef, provided.requestRef, provided.businessHeadRef, ...provided.authorityRefs, provided.approvalRef, ...loads.upstream.map((item) => item.ref), session.inputRef, session.outputRef, session.scratchPrefix].filter(Boolean);
   for (const ref of refs) if (!ref.startsWith(prefix)) errors.push(`$: session ref is outside task ${session.taskId}: ${ref}`);
-  for (const item of loads.upstream) if (!provided.authorityRefs.includes(item.ref)) errors.push(`$.payload.loads.upstream: undeclared authority ref ${item.ref}`);
+  const declaredUpstreamRefs = new Set([provided.requestRef, ...provided.authorityRefs]);
+  for (const item of loads.upstream) if (!declaredUpstreamRefs.has(item.ref)) errors.push(`$.payload.loads.upstream: undeclared ref ${item.ref}`);
+  if (!loads.upstream.some((item) => item.role === 'approved-request' && item.ref === provided.requestRef)) errors.push('$.payload.loads.upstream: requestRef must be loaded as approved-request');
 
   const normalized = loads.exactTargets.map((target) => target.path.replaceAll('\\\\', '/'));
   if (new Set(normalized).size !== normalized.length) errors.push('$.payload.loads.exactTargets: duplicate path');

@@ -28,6 +28,13 @@
             "stage",
             "status"
           ]
+        },
+        {
+          "properties": {
+            "stage": { "const": "delivery.mission.resume" },
+            "status": { "const": "ready" }
+          },
+          "required": ["stage", "status"]
         }
       ]
     }
@@ -42,7 +49,8 @@
     },
     "stage": {
       "enum": [
-        "fe.maintenance.authority-reconcile"
+        "fe.maintenance.authority-reconcile",
+        "delivery.mission.resume"
       ]
     },
     "status": {

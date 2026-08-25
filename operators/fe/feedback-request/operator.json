@@ -1,0 +1,52 @@
+{
+  "schemaVersion": 6,
+  "id": "fe/feedback-request",
+  "domain": "fe",
+  "inputSchema": "input.schema.json",
+  "outputSchema": "output.schema.json",
+  "knowledgeRefs": [
+    "fe.request-lifecycle"
+  ],
+  "sourceReferenceRefs": [],
+  "accepts": [
+    {
+      "stage": "fe.feedback.request",
+      "status": "ready",
+      "allFacts": [
+        "feedback-received"
+      ],
+      "noneFacts": []
+    }
+  ],
+  "emits": [
+    {
+      "stage": "fe.feedback.request.result",
+      "status": "complete",
+      "factsAdd": [
+        "feedback-request-recorded"
+      ],
+      "factsRemove": []
+    },
+    {
+      "stage": "fe.feedback.request.blocked",
+      "status": "blocked",
+      "factsAdd": [
+        "feedback-request-blocked"
+      ],
+      "factsRemove": []
+    }
+  ],
+  "sideEffects": [
+    "coordinator upserts only the approved .claude/requests/<stable-id>.request.json target",
+    "emit a content-hash mutation descriptor for the durable feedback request",
+    "keep input, output, loaded context, drafts, evidence, and receipts in task-session storage only",
+    "purge every intermediate session object at every parent-skill terminal state"
+  ],
+  "stopConditions": [
+    "feedback evidence is missing or stale",
+    "the stable request path escapes .claude/requests",
+    "the same stable identity already contains conflicting feedback",
+    "target ownership is missing or broadens the approved upgrade boundary",
+    "runtime binding revision or session ownership is invalid"
+  ]
+}

@@ -20,43 +20,6 @@
         {
           "properties": {
             "result": {
-              "const": "complete"
-            },
-            "finalState": {
-              "const": "complete"
-            },
-            "state": {
-              "properties": {
-                "status": {
-                  "const": "completed"
-                },
-                "code": {
-                  "const": "starci-frontend-block-reconcile-complete"
-                },
-                "retryable": {
-                  "const": false
-                },
-                "terminalState": {
-                  "const": "complete"
-                }
-              },
-              "required": [
-                "status",
-                "code",
-                "retryable",
-                "terminalState"
-              ]
-            }
-          },
-          "required": [
-            "result",
-            "finalState",
-            "state"
-          ]
-        },
-        {
-          "properties": {
-            "result": {
               "const": "blocked"
             },
             "finalState": {
@@ -90,6 +53,154 @@
             "finalState",
             "state"
           ]
+        },
+        {
+          "properties": {
+            "result": {
+              "const": "rejected"
+            },
+            "finalState": {
+              "const": "rejected"
+            },
+            "state": {
+              "properties": {
+                "status": {
+                  "const": "rejected"
+                },
+                "code": {
+                  "const": "starci-frontend-block-reconcile-rejected"
+                },
+                "retryable": {
+                  "const": false
+                },
+                "terminalState": {
+                  "const": "rejected"
+                }
+              },
+              "required": [
+                "status",
+                "code",
+                "retryable",
+                "terminalState"
+              ]
+            }
+          },
+          "required": [
+            "result",
+            "finalState",
+            "state"
+          ]
+        },
+        {
+          "properties": {
+            "result": {
+              "const": "handoff"
+            },
+            "finalState": {
+              "const": "reconcile-repair-handoff"
+            },
+            "state": {
+              "properties": {
+                "status": {
+                  "const": "handoff"
+                },
+                "code": {
+                  "const": "starci-frontend-block-reconcile-reconcile-repair-handoff"
+                },
+                "retryable": {
+                  "const": false
+                },
+                "terminalState": {
+                  "const": "reconcile-repair-handoff"
+                }
+              },
+              "required": [
+                "status",
+                "code",
+                "retryable",
+                "terminalState"
+              ]
+            }
+          },
+          "required": [
+            "result",
+            "finalState",
+            "state"
+          ]
+        },
+        {
+          "properties": {
+            "result": {
+              "const": "handoff"
+            },
+            "finalState": {
+              "const": "reconcile-authority-handoff"
+            },
+            "state": {
+              "properties": {
+                "status": {
+                  "const": "handoff"
+                },
+                "code": {
+                  "const": "starci-frontend-block-reconcile-reconcile-authority-handoff"
+                },
+                "retryable": {
+                  "const": false
+                },
+                "terminalState": {
+                  "const": "reconcile-authority-handoff"
+                }
+              },
+              "required": [
+                "status",
+                "code",
+                "retryable",
+                "terminalState"
+              ]
+            }
+          },
+          "required": [
+            "result",
+            "finalState",
+            "state"
+          ]
+        },
+        {
+          "properties": {
+            "result": {
+              "const": "complete"
+            },
+            "finalState": {
+              "const": "complete"
+            },
+            "state": {
+              "properties": {
+                "status": {
+                  "const": "completed"
+                },
+                "code": {
+                  "const": "starci-frontend-block-reconcile-complete"
+                },
+                "retryable": {
+                  "const": false
+                },
+                "terminalState": {
+                  "const": "complete"
+                }
+              },
+              "required": [
+                "status",
+                "code",
+                "retryable",
+                "terminalState"
+              ]
+            }
+          },
+          "required": [
+            "result",
+            "finalState",
+            "state"
+          ]
         }
       ]
     }
@@ -108,14 +219,19 @@
     },
     "result": {
       "enum": [
-        "complete",
-        "blocked"
+        "blocked",
+        "rejected",
+        "handoff",
+        "complete"
       ]
     },
     "finalState": {
       "enum": [
-        "complete",
-        "blocked"
+        "blocked",
+        "rejected",
+        "reconcile-repair-handoff",
+        "reconcile-authority-handoff",
+        "complete"
       ]
     },
     "state": {
@@ -130,14 +246,19 @@
       "properties": {
         "status": {
           "enum": [
-            "completed",
-            "blocked"
+            "blocked",
+            "rejected",
+            "handoff",
+            "completed"
           ]
         },
         "code": {
           "enum": [
-            "starci-frontend-block-reconcile-complete",
-            "starci-frontend-block-reconcile-blocked"
+            "starci-frontend-block-reconcile-blocked",
+            "starci-frontend-block-reconcile-rejected",
+            "starci-frontend-block-reconcile-reconcile-repair-handoff",
+            "starci-frontend-block-reconcile-reconcile-authority-handoff",
+            "starci-frontend-block-reconcile-complete"
           ]
         },
         "retryable": {
@@ -145,8 +266,11 @@
         },
         "terminalState": {
           "enum": [
-            "complete",
-            "blocked"
+            "blocked",
+            "rejected",
+            "reconcile-repair-handoff",
+            "reconcile-authority-handoff",
+            "complete"
           ]
         }
       }

@@ -57,6 +57,80 @@
         {
           "properties": {
             "result": {
+              "const": "handoff"
+            },
+            "finalState": {
+              "const": "reconcile-repair-handoff"
+            },
+            "state": {
+              "properties": {
+                "status": {
+                  "const": "handoff"
+                },
+                "code": {
+                  "const": "starci-frontend-surface-reconcile-reconcile-repair-handoff"
+                },
+                "retryable": {
+                  "const": false
+                },
+                "terminalState": {
+                  "const": "reconcile-repair-handoff"
+                }
+              },
+              "required": [
+                "status",
+                "code",
+                "retryable",
+                "terminalState"
+              ]
+            }
+          },
+          "required": [
+            "result",
+            "finalState",
+            "state"
+          ]
+        },
+        {
+          "properties": {
+            "result": {
+              "const": "handoff"
+            },
+            "finalState": {
+              "const": "reconcile-authority-handoff"
+            },
+            "state": {
+              "properties": {
+                "status": {
+                  "const": "handoff"
+                },
+                "code": {
+                  "const": "starci-frontend-surface-reconcile-reconcile-authority-handoff"
+                },
+                "retryable": {
+                  "const": false
+                },
+                "terminalState": {
+                  "const": "reconcile-authority-handoff"
+                }
+              },
+              "required": [
+                "status",
+                "code",
+                "retryable",
+                "terminalState"
+              ]
+            }
+          },
+          "required": [
+            "result",
+            "finalState",
+            "state"
+          ]
+        },
+        {
+          "properties": {
+            "result": {
               "const": "complete"
             },
             "finalState": {
@@ -109,12 +183,15 @@
     "result": {
       "enum": [
         "blocked",
+        "handoff",
         "complete"
       ]
     },
     "finalState": {
       "enum": [
         "blocked",
+        "reconcile-repair-handoff",
+        "reconcile-authority-handoff",
         "complete"
       ]
     },
@@ -131,12 +208,15 @@
         "status": {
           "enum": [
             "blocked",
+            "handoff",
             "completed"
           ]
         },
         "code": {
           "enum": [
             "starci-frontend-surface-reconcile-blocked",
+            "starci-frontend-surface-reconcile-reconcile-repair-handoff",
+            "starci-frontend-surface-reconcile-reconcile-authority-handoff",
             "starci-frontend-surface-reconcile-complete"
           ]
         },
@@ -146,6 +226,8 @@
         "terminalState": {
           "enum": [
             "blocked",
+            "reconcile-repair-handoff",
+            "reconcile-authority-handoff",
             "complete"
           ]
         }

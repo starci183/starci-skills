@@ -1,9 +1,9 @@
 {
   "schemaVersion": 1,
   "summary": {
-    "operatorCount": 85,
-    "caseCount": 340,
-    "pass": 340,
+    "operatorCount": 92,
+    "caseCount": 368,
+    "pass": 368,
     "warning": 0,
     "fail": 0,
     "operatorsWithFailures": 0
@@ -632,8 +632,13 @@
       },
       "metrics": {
         "input": {
-          "objects": 9,
-          "openObjects": [],
+          "objects": 13,
+          "openObjects": [
+            "$.allOf[0].oneOf[0]",
+            "$.allOf[0].oneOf[0].payload",
+            "$.allOf[0].oneOf[1]",
+            "$.allOf[0].oneOf[1].payload"
+          ],
           "arrays": 3,
           "unboundedArrays": [
             "$.facts",
@@ -644,14 +649,16 @@
           "broadFields": []
         },
         "output": {
-          "objects": 15,
+          "objects": 17,
           "openObjects": [
             "$.allOf[0].oneOf[0]",
             "$.allOf[0].oneOf[0].payload",
             "$.allOf[0].oneOf[1]",
             "$.allOf[0].oneOf[1].payload",
             "$.allOf[0].oneOf[2]",
-            "$.allOf[0].oneOf[2].payload"
+            "$.allOf[0].oneOf[2].payload",
+            "$.allOf[0].oneOf[3]",
+            "$.allOf[0].oneOf[3].payload"
           ],
           "arrays": 8,
           "unboundedArrays": [
@@ -1139,6 +1146,222 @@
           "unconstrainedRefs": [
             "$.payload.context.used[].ref"
           ],
+          "broadFields": []
+        }
+      }
+    },
+    {
+      "id": "delivery/impact-classify",
+      "cases": [
+        {
+          "id": "input-isolation",
+          "verdict": "pass",
+          "evidence": "closed envelope + provided/loads/session + terminal retention; broad fields=0"
+        },
+        {
+          "id": "output-isolation",
+          "verdict": "pass",
+          "evidence": "closed typed output + validator rejection + terminal cleanup"
+        },
+        {
+          "id": "decision-state-route-correlation",
+          "verdict": "pass",
+          "evidence": "3 outcome(s) are schema- or semantic-bound"
+        },
+        {
+          "id": "execute-context-discipline",
+          "verdict": "pass",
+          "evidence": "2 steps; missing markers: none; vague catch-all: false; unconstrained refs=1; unbounded arrays=10"
+        }
+      ],
+      "summary": {
+        "pass": 4,
+        "warning": 0,
+        "fail": 0
+      },
+      "metrics": {
+        "input": {
+          "objects": 14,
+          "openObjects": [
+            "$.allOf[0].oneOf[0]",
+            "$.allOf[0].oneOf[1]",
+            "$.allOf[0].oneOf[2]",
+            "$.allOf[0].oneOf[3]",
+            "$.allOf[0].oneOf[4]"
+          ],
+          "arrays": 4,
+          "unboundedArrays": [
+            "$.facts",
+            "$.payload.loads.artifacts"
+          ],
+          "unconstrainedRefs": [],
+          "broadFields": []
+        },
+        "output": {
+          "objects": 21,
+          "openObjects": [
+            "$.allOf[0].oneOf[0]",
+            "$.allOf[0].oneOf[0].payload",
+            "$.allOf[0].oneOf[0].payload.state",
+            "$.allOf[0].oneOf[0].payload.state.emits",
+            "$.allOf[0].oneOf[1]",
+            "$.allOf[0].oneOf[1].payload",
+            "$.allOf[0].oneOf[1].payload.state",
+            "$.allOf[0].oneOf[1].payload.state.emits",
+            "$.allOf[0].oneOf[2]",
+            "$.allOf[0].oneOf[2].payload",
+            "$.allOf[0].oneOf[2].payload.state",
+            "$.allOf[0].oneOf[2].payload.state.emits"
+          ],
+          "arrays": 8,
+          "unboundedArrays": [
+            "$.facts",
+            "$.payload.state.emits.factsAdd",
+            "$.payload.produced.roles",
+            "$.payload.context.used",
+            "$.payload.cleanup.scratchRefs",
+            "$.payload.evidenceRefs",
+            "$.payload.findings",
+            "$.cleanup.scratchRefs"
+          ],
+          "unconstrainedRefs": [
+            "$.payload.context.used[].ref"
+          ],
+          "broadFields": []
+        }
+      }
+    },
+    {
+      "id": "delivery/mission-proof",
+      "cases": [
+        {
+          "id": "input-isolation",
+          "verdict": "pass",
+          "evidence": "closed envelope + provided/loads/session + terminal retention; broad fields=0"
+        },
+        {
+          "id": "output-isolation",
+          "verdict": "pass",
+          "evidence": "closed typed output + validator rejection + terminal cleanup"
+        },
+        {
+          "id": "decision-state-route-correlation",
+          "verdict": "pass",
+          "evidence": "2 outcome(s) are schema- or semantic-bound"
+        },
+        {
+          "id": "execute-context-discipline",
+          "verdict": "pass",
+          "evidence": "2 steps; missing markers: none; vague catch-all: false; unconstrained refs=1; unbounded arrays=8"
+        }
+      ],
+      "summary": {
+        "pass": 4,
+        "warning": 0,
+        "fail": 0
+      },
+      "metrics": {
+        "input": {
+          "objects": 8,
+          "openObjects": [],
+          "arrays": 3,
+          "unboundedArrays": [
+            "$.facts"
+          ],
+          "unconstrainedRefs": [],
+          "broadFields": []
+        },
+        "output": {
+          "objects": 17,
+          "openObjects": [
+            "$.allOf[0].oneOf[0]",
+            "$.allOf[0].oneOf[0].payload",
+            "$.allOf[0].oneOf[0].payload.state",
+            "$.allOf[0].oneOf[0].payload.state.emits",
+            "$.allOf[0].oneOf[1]",
+            "$.allOf[0].oneOf[1].payload",
+            "$.allOf[0].oneOf[1].payload.state",
+            "$.allOf[0].oneOf[1].payload.state.emits"
+          ],
+          "arrays": 7,
+          "unboundedArrays": [
+            "$.facts",
+            "$.payload.state.emits.factsAdd",
+            "$.payload.context.used",
+            "$.payload.cleanup.scratchRefs",
+            "$.payload.evidenceRefs",
+            "$.payload.findings",
+            "$.cleanup.scratchRefs"
+          ],
+          "unconstrainedRefs": [
+            "$.payload.context.used[].ref"
+          ],
+          "broadFields": []
+        }
+      }
+    },
+    {
+      "id": "delivery/mission-resume",
+      "cases": [
+        {
+          "id": "input-isolation",
+          "verdict": "pass",
+          "evidence": "closed envelope + provided/loads/session + terminal retention; broad fields=0"
+        },
+        {
+          "id": "output-isolation",
+          "verdict": "pass",
+          "evidence": "closed typed output + validator rejection + terminal cleanup"
+        },
+        {
+          "id": "decision-state-route-correlation",
+          "verdict": "pass",
+          "evidence": "2 outcome(s) are schema- or semantic-bound"
+        },
+        {
+          "id": "execute-context-discipline",
+          "verdict": "pass",
+          "evidence": "2 steps; missing markers: none; vague catch-all: false; unconstrained refs=0; unbounded arrays=7"
+        }
+      ],
+      "summary": {
+        "pass": 4,
+        "warning": 0,
+        "fail": 0
+      },
+      "metrics": {
+        "input": {
+          "objects": 7,
+          "openObjects": [],
+          "arrays": 2,
+          "unboundedArrays": [
+            "$.facts"
+          ],
+          "unconstrainedRefs": [],
+          "broadFields": []
+        },
+        "output": {
+          "objects": 17,
+          "openObjects": [
+            "$.allOf[0].oneOf[0]",
+            "$.allOf[0].oneOf[0].payload",
+            "$.allOf[0].oneOf[0].payload.state",
+            "$.allOf[0].oneOf[0].payload.state.emits",
+            "$.allOf[0].oneOf[1]",
+            "$.allOf[0].oneOf[1].payload",
+            "$.allOf[0].oneOf[1].payload.state",
+            "$.allOf[0].oneOf[1].payload.state.emits"
+          ],
+          "arrays": 7,
+          "unboundedArrays": [
+            "$.facts",
+            "$.payload.state.emits.factsAdd",
+            "$.payload.cleanup.scratchRefs",
+            "$.payload.evidenceRefs",
+            "$.payload.findings",
+            "$.cleanup.scratchRefs"
+          ],
+          "unconstrainedRefs": [],
           "broadFields": []
         }
       }
@@ -2206,9 +2429,10 @@
       },
       "metrics": {
         "input": {
-          "objects": 12,
+          "objects": 13,
           "openObjects": [
-            "$.allOf[0].oneOf[0]"
+            "$.allOf[0].oneOf[0]",
+            "$.allOf[0].oneOf[1]"
           ],
           "arrays": 7,
           "unboundedArrays": [
@@ -2279,9 +2503,10 @@
       },
       "metrics": {
         "input": {
-          "objects": 11,
+          "objects": 12,
           "openObjects": [
-            "$.allOf[0].oneOf[0]"
+            "$.allOf[0].oneOf[0]",
+            "$.allOf[0].oneOf[1]"
           ],
           "arrays": 5,
           "unboundedArrays": [
@@ -2421,9 +2646,10 @@
       },
       "metrics": {
         "input": {
-          "objects": 12,
+          "objects": 13,
           "openObjects": [
-            "$.allOf[0].oneOf[0]"
+            "$.allOf[0].oneOf[0]",
+            "$.allOf[0].oneOf[1]"
           ],
           "arrays": 7,
           "unboundedArrays": [
@@ -2615,6 +2841,65 @@
       }
     },
     {
+      "id": "fe/feedback-request",
+      "cases": [
+        {
+          "id": "input-isolation",
+          "verdict": "pass",
+          "evidence": "closed envelope + provided/loads/session + terminal retention; broad fields=0"
+        },
+        {
+          "id": "output-isolation",
+          "verdict": "pass",
+          "evidence": "closed typed output + validator rejection + terminal cleanup"
+        },
+        {
+          "id": "decision-state-route-correlation",
+          "verdict": "pass",
+          "evidence": "2 outcome(s) are schema- or semantic-bound"
+        },
+        {
+          "id": "execute-context-discipline",
+          "verdict": "pass",
+          "evidence": "5 steps; missing markers: none; vague catch-all: false; unconstrained refs=0; unbounded arrays=9"
+        }
+      ],
+      "summary": {
+        "pass": 4,
+        "warning": 0,
+        "fail": 0
+      },
+      "metrics": {
+        "input": {
+          "objects": 9,
+          "openObjects": [],
+          "arrays": 5,
+          "unboundedArrays": [
+            "$.facts"
+          ],
+          "unconstrainedRefs": [],
+          "broadFields": []
+        },
+        "output": {
+          "objects": 10,
+          "openObjects": [],
+          "arrays": 11,
+          "unboundedArrays": [
+            "$.facts",
+            "$.payload.state.emits.factsAdd",
+            "$.payload.state.emits.factsRemove",
+            "$.payload.produced.artifactRefs",
+            "$.payload.context.used",
+            "$.payload.cleanup.scratchRefs",
+            "$.payload.evidenceRefs",
+            "$.payload.findings"
+          ],
+          "unconstrainedRefs": [],
+          "broadFields": []
+        }
+      }
+    },
+    {
       "id": "fe/grammar-convergence",
       "cases": [
         {
@@ -2645,9 +2930,10 @@
       },
       "metrics": {
         "input": {
-          "objects": 10,
+          "objects": 11,
           "openObjects": [
-            "$.allOf[0].oneOf[0]"
+            "$.allOf[0].oneOf[0]",
+            "$.allOf[0].oneOf[1]"
           ],
           "arrays": 5,
           "unboundedArrays": [
@@ -3009,9 +3295,10 @@
       },
       "metrics": {
         "input": {
-          "objects": 12,
+          "objects": 13,
           "openObjects": [
-            "$.allOf[0].oneOf[0]"
+            "$.allOf[0].oneOf[0]",
+            "$.allOf[0].oneOf[1]"
           ],
           "arrays": 7,
           "unboundedArrays": [
@@ -3429,10 +3716,9 @@
       },
       "metrics": {
         "input": {
-          "objects": 13,
+          "objects": 12,
           "openObjects": [
-            "$.allOf[0].oneOf[0]",
-            "$.allOf[0].oneOf[1]"
+            "$.allOf[0].oneOf[0]"
           ],
           "arrays": 7,
           "unboundedArrays": [
@@ -3468,6 +3754,65 @@
           "unconstrainedRefs": [
             "$.payload.context.used[].ref"
           ],
+          "broadFields": []
+        }
+      }
+    },
+    {
+      "id": "fe/request-review",
+      "cases": [
+        {
+          "id": "input-isolation",
+          "verdict": "pass",
+          "evidence": "closed envelope + provided/loads/session + terminal retention; broad fields=0"
+        },
+        {
+          "id": "output-isolation",
+          "verdict": "pass",
+          "evidence": "closed typed output + validator rejection + terminal cleanup"
+        },
+        {
+          "id": "decision-state-route-correlation",
+          "verdict": "pass",
+          "evidence": "3 outcome(s) are schema- or semantic-bound"
+        },
+        {
+          "id": "execute-context-discipline",
+          "verdict": "pass",
+          "evidence": "5 steps; missing markers: none; vague catch-all: false; unconstrained refs=0; unbounded arrays=9"
+        }
+      ],
+      "summary": {
+        "pass": 4,
+        "warning": 0,
+        "fail": 0
+      },
+      "metrics": {
+        "input": {
+          "objects": 9,
+          "openObjects": [],
+          "arrays": 5,
+          "unboundedArrays": [
+            "$.facts"
+          ],
+          "unconstrainedRefs": [],
+          "broadFields": []
+        },
+        "output": {
+          "objects": 10,
+          "openObjects": [],
+          "arrays": 11,
+          "unboundedArrays": [
+            "$.facts",
+            "$.payload.state.emits.factsAdd",
+            "$.payload.state.emits.factsRemove",
+            "$.payload.produced.artifactRefs",
+            "$.payload.context.used",
+            "$.payload.cleanup.scratchRefs",
+            "$.payload.evidenceRefs",
+            "$.payload.findings"
+          ],
+          "unconstrainedRefs": [],
           "broadFields": []
         }
       }
@@ -3643,9 +3988,10 @@
       },
       "metrics": {
         "input": {
-          "objects": 11,
+          "objects": 12,
           "openObjects": [
-            "$.allOf[0].oneOf[0]"
+            "$.allOf[0].oneOf[0]",
+            "$.allOf[0].oneOf[1]"
           ],
           "arrays": 5,
           "unboundedArrays": [
@@ -3870,6 +4216,65 @@
             "$.payload.cleanup.scratchRefs",
             "$.payload.evidenceRefs"
           ],
+          "unconstrainedRefs": [
+            "$.payload.context.used[].ref"
+          ],
+          "broadFields": []
+        }
+      }
+    },
+    {
+      "id": "platform/reference-reindex",
+      "cases": [
+        {
+          "id": "input-isolation",
+          "verdict": "pass",
+          "evidence": "closed envelope + provided/loads/session + terminal retention; broad fields=0"
+        },
+        {
+          "id": "output-isolation",
+          "verdict": "pass",
+          "evidence": "closed typed output + validator rejection + terminal cleanup"
+        },
+        {
+          "id": "decision-state-route-correlation",
+          "verdict": "pass",
+          "evidence": "2 outcome(s) are schema- or semantic-bound"
+        },
+        {
+          "id": "execute-context-discipline",
+          "verdict": "pass",
+          "evidence": "5 steps; missing markers: none; vague catch-all: false; unconstrained refs=1; unbounded arrays=0"
+        }
+      ],
+      "summary": {
+        "pass": 4,
+        "warning": 0,
+        "fail": 0
+      },
+      "metrics": {
+        "input": {
+          "objects": 13,
+          "openObjects": [],
+          "arrays": 5,
+          "unboundedArrays": [],
+          "unconstrainedRefs": [],
+          "broadFields": []
+        },
+        "output": {
+          "objects": 20,
+          "openObjects": [
+            "$.allOf[0].oneOf[0]",
+            "$.allOf[0].oneOf[0].payload",
+            "$.allOf[0].oneOf[0].payload.state",
+            "$.allOf[0].oneOf[0].payload.state.emits",
+            "$.allOf[0].oneOf[1]",
+            "$.allOf[0].oneOf[1].payload",
+            "$.allOf[0].oneOf[1].payload.state",
+            "$.allOf[0].oneOf[1].payload.state.emits"
+          ],
+          "arrays": 6,
+          "unboundedArrays": [],
           "unconstrainedRefs": [
             "$.payload.context.used[].ref"
           ],
@@ -5354,6 +5759,79 @@
       }
     },
     {
+      "id": "test/ui-quality-audit",
+      "cases": [
+        {
+          "id": "input-isolation",
+          "verdict": "pass",
+          "evidence": "closed envelope + provided/loads/session + terminal retention; broad fields=0"
+        },
+        {
+          "id": "output-isolation",
+          "verdict": "pass",
+          "evidence": "closed typed output + validator rejection + terminal cleanup"
+        },
+        {
+          "id": "decision-state-route-correlation",
+          "verdict": "pass",
+          "evidence": "6 outcome(s) are schema- or semantic-bound"
+        },
+        {
+          "id": "execute-context-discipline",
+          "verdict": "pass",
+          "evidence": "6 steps; missing markers: none; vague catch-all: false; unconstrained refs=1; unbounded arrays=11"
+        }
+      ],
+      "summary": {
+        "pass": 4,
+        "warning": 0,
+        "fail": 0
+      },
+      "metrics": {
+        "input": {
+          "objects": 13,
+          "openObjects": [
+            "$.allOf[0].oneOf[0]",
+            "$.allOf[0].oneOf[1]"
+          ],
+          "arrays": 6,
+          "unboundedArrays": [
+            "$.facts",
+            "$.payload.loads.knowledge",
+            "$.payload.loads.source.targetFiles",
+            "$.payload.loads.commands.commandRefs",
+            "$.payload.loads.external.resourceRefs",
+            "$.payload.loads.external.credentialHandleRefs"
+          ],
+          "unconstrainedRefs": [],
+          "broadFields": []
+        },
+        "output": {
+          "objects": 16,
+          "openObjects": [
+            "$.allOf[0].oneOf[0]",
+            "$.allOf[0].oneOf[1]",
+            "$.allOf[0].oneOf[2]",
+            "$.allOf[0].oneOf[3]",
+            "$.allOf[0].oneOf[4]",
+            "$.allOf[0].oneOf[5]"
+          ],
+          "arrays": 8,
+          "unboundedArrays": [
+            "$.facts",
+            "$.payload.produced.artifacts",
+            "$.payload.context.used",
+            "$.payload.cleanup.scratchRefs",
+            "$.payload.evidenceRefs"
+          ],
+          "unconstrainedRefs": [
+            "$.payload.context.used[].ref"
+          ],
+          "broadFields": []
+        }
+      }
+    },
+    {
       "id": "test/unit",
       "cases": [
         {
@@ -5711,7 +6189,7 @@
         {
           "id": "decision-state-route-correlation",
           "verdict": "pass",
-          "evidence": "1 outcome(s) are schema- or semantic-bound"
+          "evidence": "2 outcome(s) are schema- or semantic-bound"
         },
         {
           "id": "execute-context-discipline",
@@ -5726,9 +6204,13 @@
       },
       "metrics": {
         "input": {
-          "objects": 9,
+          "objects": 13,
           "openObjects": [
-            "$.allOf[0].oneOf[0]"
+            "$.allOf[0].oneOf[0]",
+            "$.allOf[0].oneOf[1]",
+            "$.allOf[1].if",
+            "$.allOf[1].then",
+            "$.allOf[1].then.payload"
           ],
           "arrays": 3,
           "unboundedArrays": [
@@ -5739,9 +6221,11 @@
           "broadFields": []
         },
         "output": {
-          "objects": 9,
+          "objects": 11,
           "openObjects": [
-            "$.allOf[0].oneOf[0]"
+            "$.allOf[0].oneOf[0]",
+            "$.allOf[0].oneOf[1]",
+            "$.allOf[0].oneOf[1].payload"
           ],
           "arrays": 7,
           "unboundedArrays": [

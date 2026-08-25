@@ -1,35 +1,56 @@
 {
-  "$schema":"https://json-schema.org/draft/2020-12/schema","$id":"https://starci.dev/v6/operators/be/coding-scope-freeze/input.schema.json",
-  "title":"be/coding-scope-freeze operator input","type":"object","additionalProperties":false,
-  "required":["schemaVersion","runId","stage","status","facts","payload"],
-  "properties":{
-    "schemaVersion":{"const":6},"runId":{"type":"string","minLength":1},"stage":{"const":"be.coding-scope"},"status":{"const":"ready"},
-    "facts":{"type":"array","uniqueItems":true,"items":{"type":"string","minLength":1}},
-    "payload":{"type":"object","additionalProperties":false,"required":["provided","loads","session"],"properties":{
-      "provided":{"type":"object","additionalProperties":false,"required":["prerequisiteReceiptRef","approvedBoundaryRef","approvalReceiptRef","businessFreshnessReceiptRef","baselineCommitRef"],"properties":{
-        "prerequisiteReceiptRef":{"$ref":"#/$defs/sessionRef"},"approvedBoundaryRef":{"$ref":"#/$defs/sessionRef"},
-        "approvalReceiptRef":{"$ref":"#/$defs/sessionRef"},"businessFreshnessReceiptRef":{"$ref":"#/$defs/sessionRef"},"baselineCommitRef":{"$ref":"#/$defs/gitRef"}
-      }},
-      "loads":{"type":"object","additionalProperties":false,"required":["prerequisite","boundary","source"],"properties":{
-        "prerequisite":{"type":"object","additionalProperties":false,"required":["ref","revision","loadMode"],"properties":{"ref":{"$ref":"#/$defs/sessionRef"},"revision":{"$ref":"#/$defs/sha256"},"loadMode":{"const":"session-exact"}}},
-        "boundary":{"type":"object","additionalProperties":false,"required":["ref","revision","approvalReceiptRef","businessFreshnessReceiptRef","baselineCommitRef","targetSetSha256","loadMode"],"properties":{
-          "ref":{"$ref":"#/$defs/sessionRef"},"revision":{"$ref":"#/$defs/sha256"},"approvalReceiptRef":{"$ref":"#/$defs/sessionRef"},
-          "businessFreshnessReceiptRef":{"$ref":"#/$defs/sessionRef"},"baselineCommitRef":{"$ref":"#/$defs/gitRef"},"targetSetSha256":{"$ref":"#/$defs/sha256"},"loadMode":{"const":"session-exact"}
-        }},
-        "source":{"type":"object","additionalProperties":false,"required":["repositoryRootRef","headCommitRef","repositoryContext","contentVisible","loadMode","targetSetSha256","targets"],"properties":{
-          "repositoryRootRef":{"$ref":"#/$defs/sessionRef"},"headCommitRef":{"$ref":"#/$defs/gitRef"},"repositoryContext":{"const":false},"contentVisible":{"const":false},
-          "loadMode":{"const":"metadata-and-hash-only"},"targetSetSha256":{"$ref":"#/$defs/sha256"},
-          "targets":{"type":"array","minItems":1,"uniqueItems":true,"items":{"type":"object","additionalProperties":false,"required":["path","operation","expectedSha256","allowedChanges"],"properties":{
-            "path":{"type":"string","minLength":1},"operation":{"enum":["create","modify","delete"]},
-            "expectedSha256":{"anyOf":[{"$ref":"#/$defs/sha256"},{"type":"null"}]},
-            "allowedChanges":{"type":"array","minItems":1,"uniqueItems":true,"items":{"type":"string","minLength":1}}
-          }}}
-        }}
-      }},
-      "session":{"type":"object","additionalProperties":false,"required":["taskId","inputRef","outputRef","scratchPrefix","retention"],"properties":{
-        "taskId":{"type":"string","minLength":1},"inputRef":{"$ref":"#/$defs/sessionRef"},"outputRef":{"$ref":"#/$defs/sessionRef"},"scratchPrefix":{"$ref":"#/$defs/sessionRef"},"retention":{"const":"until-skill-terminal"}
-      }}
-    }}
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://starci.dev/v6/operators/be/coding-scope-freeze/input.schema.json",
+  "type": "object", "additionalProperties": false,
+  "required": ["schemaVersion", "runId", "stage", "status", "facts", "payload"],
+  "allOf": [{ "oneOf": [
+    { "properties": { "stage": { "const": "architecture.boundary.review" }, "status": { "const": "approved" }, "payload": { "properties": { "provided": { "required": ["approvedBoundaryRef", "approvalReceiptRef", "businessFreshnessReceiptRef", "baselineCommitRef"] } } } } },
+    { "properties": { "stage": { "const": "be.coding-scope" }, "status": { "const": "ready" }, "payload": { "properties": { "provided": { "required": ["prerequisiteReceiptRef", "approvedBoundaryRef", "approvalReceiptRef", "businessFreshnessReceiptRef", "baselineCommitRef"] }, "loads": { "required": ["prerequisite", "boundary", "source"] } } } } }
+  ] }],
+  "properties": {
+    "schemaVersion": { "const": 6 }, "runId": { "type": "string", "minLength": 1 },
+    "stage": { "enum": ["architecture.boundary.review", "be.coding-scope"] }, "status": { "enum": ["approved", "ready"] },
+    "facts": { "type": "array", "uniqueItems": true, "items": { "type": "string", "minLength": 1 } },
+    "payload": {
+      "type": "object", "additionalProperties": false, "required": ["provided", "loads", "session"],
+      "properties": {
+        "provided": {
+          "type": "object", "additionalProperties": false,
+          "properties": {
+            "prerequisiteReceiptRef": { "$ref": "#/$defs/sessionRef" }, "approvedBoundaryRef": { "$ref": "#/$defs/sessionRef" },
+            "approvalReceiptRef": { "$ref": "#/$defs/sessionRef" }, "businessFreshnessReceiptRef": { "$ref": "#/$defs/sessionRef" },
+            "baselineCommitRef": { "$ref": "#/$defs/gitRef" }
+          }
+        },
+        "loads": {
+          "type": "object", "additionalProperties": false, "required": ["boundary", "source"],
+          "properties": {
+            "prerequisite": { "$ref": "#/$defs/binding" },
+            "boundary": {
+              "type": "object", "additionalProperties": false,
+              "required": ["ref", "revision", "approvalReceiptRef", "businessFreshnessReceiptRef", "baselineCommitRef", "targetSetSha256", "loadMode"],
+              "properties": { "ref": { "$ref": "#/$defs/sessionRef" }, "revision": { "$ref": "#/$defs/sha256" }, "approvalReceiptRef": { "$ref": "#/$defs/sessionRef" }, "businessFreshnessReceiptRef": { "$ref": "#/$defs/sessionRef" }, "baselineCommitRef": { "$ref": "#/$defs/gitRef" }, "targetSetSha256": { "$ref": "#/$defs/sha256" }, "loadMode": { "const": "session-exact" } }
+            },
+            "source": {
+              "type": "object", "additionalProperties": false,
+              "required": ["repositoryRootRef", "headCommitRef", "repositoryContext", "contentVisible", "loadMode", "targetSetSha256", "targets"],
+              "properties": {
+                "repositoryRootRef": { "$ref": "#/$defs/sessionRef" }, "headCommitRef": { "$ref": "#/$defs/gitRef" },
+                "repositoryContext": { "const": false }, "contentVisible": { "const": false }, "loadMode": { "const": "metadata-and-hash-only" },
+                "targetSetSha256": { "$ref": "#/$defs/sha256" },
+                "targets": { "type": "array", "minItems": 1, "uniqueItems": true, "items": { "$ref": "#/$defs/target" } }
+              }
+            }
+          }
+        },
+        "session": { "type": "object", "additionalProperties": false, "required": ["taskId", "inputRef", "outputRef", "scratchPrefix", "retention"], "properties": { "taskId": { "type": "string", "minLength": 1 }, "inputRef": { "$ref": "#/$defs/sessionRef" }, "outputRef": { "$ref": "#/$defs/sessionRef" }, "scratchPrefix": { "$ref": "#/$defs/sessionRef" }, "retention": { "const": "until-skill-terminal" } } }
+      }
+    }
   },
-  "$defs":{"sha256":{"type":"string","pattern":"^sha256:[0-9a-f]{64}$"},"gitRef":{"type":"string","pattern":"^git:[0-9a-f]{7,64}$"},"sessionRef":{"type":"string","pattern":"^session://tasks/[A-Za-z0-9._-]+/.+$"}}
+  "$defs": {
+    "sha256": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" }, "gitRef": { "type": "string", "pattern": "^git:[0-9a-f]{7,64}$" },
+    "sessionRef": { "type": "string", "pattern": "^session://tasks/[A-Za-z0-9._-]+/.+$" },
+    "binding": { "type": "object", "additionalProperties": false, "required": ["ref", "revision", "loadMode"], "properties": { "ref": { "$ref": "#/$defs/sessionRef" }, "revision": { "$ref": "#/$defs/sha256" }, "loadMode": { "const": "session-exact" } } },
+    "target": { "type": "object", "additionalProperties": false, "required": ["path", "operation", "expectedSha256", "allowedChanges"], "properties": { "path": { "type": "string", "minLength": 1 }, "operation": { "enum": ["create", "modify", "delete"] }, "expectedSha256": { "anyOf": [{ "$ref": "#/$defs/sha256" }, { "type": "null" }] }, "allowedChanges": { "type": "array", "minItems": 1, "uniqueItems": true, "items": { "type": "string", "minLength": 1 } } } }
+  }
 }

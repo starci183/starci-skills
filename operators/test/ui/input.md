@@ -7,14 +7,14 @@ This closed JSON object is ephemeral task-session state and is purged on every p
 | Section | Owner | Meaning |
 | --- | --- | --- |
 | Root envelope | Skill machine | Accepted stage, status, and facts. |
-| `payload.provided` | Previous state | Immutable refs: `previousStateRef`, `testPlanRef`, `changeSetRef`, `seedEvidenceRef`. |
+| `payload.provided` | Previous state | Immutable refs: `previousStateRef`, `testPlanRef`, `changeSetRef`, `seedEvidenceRef`, `uiQualityEvidenceRef`. |
 | `payload.loads` | Runtime | Exact bindings to load. |
 | `payload.session` | Session runtime | Input, output, scratch, and cleanup lifetime. |
 
 ## Runtime loads
 
 - `business`: must be `null`.
-- `knowledge`: exact pinned `fe.ui-testing` only. The approved test plan and seed receipt already project journey, layout, state, and fixture authority; reloading their source knowledge would duplicate context.
+- `knowledge`: exact pinned `fe.ui-testing` only. The approved test plan, seed receipt, and UI-quality receipt already project journey, layout, state, fixture, and product-neutral quality authority; reloading their source knowledge would duplicate context.
 - `source`: exact hash-pinned files only; broad repository preloading is forbidden.
 - `commands`: declared argv, cwd, and environment-name allowlist only.
 - `external`: declared resources and opaque credential handles only.

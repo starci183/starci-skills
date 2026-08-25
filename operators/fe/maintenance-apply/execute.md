@@ -26,13 +26,13 @@ This operator's responsibility is to apply an approved frontend maintenance corr
 
 ## Step 3 — Resolve upstream, knowledge, and source capability
 
-**Read:** `payload.loads.upstream`, `payload.loads.knowledge`, and every source binding declared by this schema.
-**Context:** resolve only approved maintenance decision, source boundary, and acceptance proof. Retrieve only the listed knowledge IDs at their pinned content hashes. Resolve `payload.loads.frontendSource` only: the hash-pinned plain-JSON contract snapshot, generator fingerprint, selected query IDs, and pinned index generation. Never load raw repository material or broaden the contract query. Resolve only `exactTargets` after validating repository-relative paths and SHA-256 values.
-**Decision evidence:** upstream identity and revision matches, knowledge generation matches, and every requested capability or exact target is inside the frozen boundary.
-**Action:** create a minimal constraint set containing IDs, revisions, applicable rules, target permissions, and required outcomes.
+**Read:** `payload.provided.testPlanRef`, `payload.loads.upstream`, `payload.loads.knowledge`, and every source binding declared by this schema.
+**Context:** resolve only approved maintenance decision, source boundary, and the complete acceptance proof matrix. Retrieve only the listed knowledge IDs at their pinned content hashes. Resolve `payload.loads.frontendSource` only: the hash-pinned plain-JSON contract snapshot, generator fingerprint, selected query IDs, and pinned index generation. Never load raw repository material or broaden the contract query. Resolve only `exactTargets` after validating repository-relative paths and SHA-256 values.
+**Decision evidence:** upstream identity and revision matches, knowledge generation matches, every requested capability or exact target is inside the frozen boundary, and the plan declares deterministic seed/reset behavior, unit and E2E commands, UI-quality rules, browser journeys, wide/intermediate/compact viewports, approved account class, observables, and sanitization.
+**Action:** create a minimal constraint set containing IDs, revisions, applicable rules, target permissions, required outcomes, and the pinned test-plan identity handed to downstream proof operators.
 **Session write:** normalized constraints at `scratchPrefix/constraints`.
 **Durable write:** none.
-**Stop:** stop on stale targets, boundary expansion, owner substitution, missing acceptance criterion, or a correction that requires a new authority decision.
+**Stop:** stop on stale targets, boundary expansion, owner substitution, a missing or partial acceptance plan, a skipped required state or viewport, or a correction that requires a new authority decision.
 **Orchestration:** bindings are resolved once by the coordinator and passed to workers as minimal read-only slices.
 
 ## Step 4 — Perform the operator decision
@@ -50,11 +50,11 @@ This operator's responsibility is to apply an approved frontend maintenance corr
 
 **Read:** the normalized draft, joined worker observations, frozen constraints, and expected emitted facts.
 **Context:** no new context may be loaded during verification.
-**Decision evidence:** Recheck target hashes, apply the minimal patch, and verify the stated observable correction in every declared state and viewport.
-**Action:** validate completeness, conflict freedom, boundary compliance, and decision-to-route mapping. The coordinator rejects missing worker IDs or conflicting observations before any effect.
+**Decision evidence:** Recheck target hashes, apply the minimal patch, and bind the resulting change-set receipt to the approved test-plan revision. Focused checks may reject a bad patch but cannot certify acceptance or completion.
+**Action:** validate completeness, conflict freedom, boundary compliance, and decision-to-route mapping. The coordinator rejects missing worker IDs or conflicting observations before any effect, then emits `source-written` plus session references needed by the downstream seed and proof chain.
 **Session write:** accepted evidence and before/after descriptors under `scratchPrefix/accepted-result`.
 **Durable write:** The coordinator writes only the exact approved targets after a final hash check; no receipt or draft is durable.
-**Stop:** stop on stale targets, boundary expansion, owner substitution, missing acceptance criterion, or a correction that requires a new authority decision.
+**Stop:** stop on stale targets, boundary expansion, owner substitution, missing proof handoff references, or a correction that requires a new authority decision.
 **Orchestration:** coordinator-only join and commit; workers remain read/analyze-only and cannot mutate source or external systems.
 
 ## Step 6 — Emit output and register terminal cleanup

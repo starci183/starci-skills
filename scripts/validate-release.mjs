@@ -1,21 +1,26 @@
 import fs from 'node:fs';
 import path from 'node:path';
+import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const fail = (message) => { throw new Error(message); };
 const exists = (relative) => fs.existsSync(path.join(root, relative));
 const readJson = (relative) => JSON.parse(fs.readFileSync(path.join(root, relative), 'utf8'));
+const isTracked = (relative) => {
+  if (!exists('.git')) return exists(relative);
+  return execFileSync('git', ['-C', root, 'ls-files', '--', relative], { encoding: 'utf8' }).trim().length > 0;
+};
 
 for (const required of [
   'README.md', 'INDEX.md', 'analyze-input.md', 'analyze-input.schema.json', 'validate-analyze-input.mjs', 'LICENSE', 'CHANGELOG.md', 'CONTRIBUTING.md', 'SECURITY.md',
-  'package.json', 'skills', 'operators', 'orchestration', 'knowledge', 'runtime/knowledge-runtime', 'scripts/knowledge-query.py'
+  'package.json', 'skills', 'operators', 'orchestration', 'knowledge', 'requests/request.schema.json', 'requests/validate-requests.mjs', 'runtime/knowledge-runtime', 'scripts/knowledge-query.py'
 ]) {
   if (!exists(required)) fail(`release is missing ${required}`);
 }
 
 for (const retired of ['v6', 'operations', 'docs', 'platform', 'context-manifest.json', 'netlify.toml']) {
-  if (exists(retired)) fail(`retired release path is still present: ${retired}`);
+  if (isTracked(retired)) fail(`retired release path is still tracked: ${retired}`);
 }
 
 const packageJson = readJson('package.json');
@@ -28,7 +33,7 @@ const skills = fs.readdirSync(skillRoot, { withFileTypes: true })
   .filter((entry) => entry.isDirectory())
   .map((entry) => entry.name)
   .sort();
-if (skills.length !== 26) fail(`expected 26 skills, found ${skills.length}`);
+if (skills.length !== 28) fail(`expected 28 skills, found ${skills.length}`);
 for (const skill of skills) {
   if (!skill.startsWith('starci-')) fail(`skill lacks starci- prefix: ${skill}`);
   for (const required of ['SKILL.md', 'agents/openai.yaml', 'machine.json', 'input.schema.json', 'output.schema.json']) {
@@ -44,7 +49,7 @@ function walk(directory) {
 }
 
 const operatorManifests = walk(path.join(root, 'operators')).filter((file) => path.basename(file) === 'operator.json');
-if (operatorManifests.length !== 85) fail(`expected 85 operators, found ${operatorManifests.length}`);
+if (operatorManifests.length !== 92) fail(`expected 92 operators, found ${operatorManifests.length}`);
 
 const knowledgeFiles = walk(path.join(root, 'knowledge'))
   .filter((file) => file.endsWith('.md'));

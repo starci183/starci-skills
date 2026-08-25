@@ -1,9 +1,8 @@
-import path from 'node:path';
 import { validatorFor, runValidatorCli } from '../../validation.mjs';
 
 const guards = {
-  "request.received\u0000ready": {
-    "all": [],
+  "business.freshness\u0000ready": {
+    "all": ["business-fresh-receipt-ready"],
     "none": []
   }
 };
@@ -20,15 +19,29 @@ function semanticErrors(value) {
   for (const fact of guard.none) if (value.facts.includes(fact)) errors.push(`$.facts: forbidden ${fact}`);
 
   const { provided, loads, session } = value.payload;
-  if (provided.businessHeadRef !== loads.business.ref) errors.push('$.payload.loads.business.ref: must equal provided.businessHeadRef');
   if (loads.orchestration.profileRef !== profileByMode[loads.orchestration.mode]) errors.push('$.payload.loads.orchestration.profileRef: does not match mode');
 
+  const expectedReceipts = new Map([
+    ['request', provided.requestRef],
+    ['workspace-route', provided.routeReceiptRef],
+    ['business-freshness', provided.businessFreshnessReceiptRef]
+  ]);
+  const seenRoles = new Set();
+  for (const [index, receipt] of loads.receipts.entries()) {
+    if (seenRoles.has(receipt.role)) errors.push(`$.payload.loads.receipts[${index}].role: duplicate ${receipt.role}`);
+    seenRoles.add(receipt.role);
+    if (receipt.ref !== expectedReceipts.get(receipt.role)) errors.push(`$.payload.loads.receipts[${index}].ref: does not match provided ${receipt.role} receipt`);
+  }
+  for (const role of expectedReceipts.keys()) if (!seenRoles.has(role)) errors.push(`$.payload.loads.receipts: missing ${role} receipt`);
+
   const prefix = `session://tasks/${session.taskId}/`;
-  const refs = [provided.priorStateRef, provided.businessHeadRef, ...provided.authorityRefs, provided.approvalRef, ...loads.upstream.map((item) => item.ref), session.inputRef, session.outputRef, session.scratchPrefix].filter(Boolean);
+  const refs = [provided.requestRef, provided.routeReceiptRef, provided.businessFreshnessReceiptRef, ...loads.receipts.map((item) => item.ref), session.inputRef, session.outputRef, session.scratchPrefix];
   for (const ref of refs) if (!ref.startsWith(prefix)) errors.push(`$: session ref is outside task ${session.taskId}: ${ref}`);
-  for (const item of loads.upstream) if (!provided.authorityRefs.includes(item.ref)) errors.push(`$.payload.loads.upstream: undeclared authority ref ${item.ref}`);
 
-
+  for (const [index, root] of provided.writeRoots.entries()) {
+    const normalized = root.replaceAll('\\', '/');
+    if (/^[A-Za-z]:\//.test(normalized) || normalized.startsWith('/') || normalized === '..' || normalized.startsWith('../') || normalized.includes('/../')) errors.push(`$.payload.provided.writeRoots[${index}]: must be a safe repository-relative path`);
+  }
   return errors;
 }
 

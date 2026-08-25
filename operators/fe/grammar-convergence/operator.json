@@ -51,6 +51,17 @@
         "neutral-facts-ready"
       ],
       "noneFacts": []
+    },
+    {
+      "stage": "delivery.mission.resume",
+      "status": "ready",
+      "allFacts": [
+        "layout-approved",
+        "grammar-pair-ready",
+        "neutral-facts-ready",
+        "delivery-impact-classified"
+      ],
+      "noneFacts": []
     }
   ],
   "emits": [

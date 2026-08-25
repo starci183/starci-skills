@@ -12,13 +12,15 @@
   ],
   "accepts": [
     {
-      "stage": "test.ui",
+      "stage": "test.ui.journey",
       "status": "ready",
       "allFacts": [
         "unit-pass",
         "e2e-pass",
         "e2e-evidence",
-        "seed-evidence"
+        "seed-evidence",
+        "ui-quality-pass",
+        "ui-quality-evidence"
       ]
     }
   ],

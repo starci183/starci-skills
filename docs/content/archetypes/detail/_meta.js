@@ -1,0 +1,21 @@
+export default {
+  "index": "Overview",
+  "authored-analytical-briefing": "Authored-analytical-briefing",
+  "binary-structure-hex-inspector": "Binary-structure-hex-inspector",
+  "bitemporal-record-validity-detail": "Bitemporal-record-validity-detail",
+  "causal-root-analysis-dossier": "Causal-root-analysis-dossier",
+  "editable-record-with-summary-rail": "Editable-record-with-summary-rail",
+  "enterprise-record-home": "Enterprise-record-home",
+  "evidence-led-case-resolution-dossier": "Evidence-led-case-resolution-dossier",
+  "genomic-locus-read-evidence-inspector": "Genomic-locus-read-evidence-inspector",
+  "heap-dominator-path-explorer": "Heap-dominator-path-explorer",
+  "job-run-detail-timeline": "Job-run-detail-timeline",
+  "narrative-detail-with-decision-rail": "Narrative-detail-with-decision-rail",
+  "order-fulfillment-tracker": "Order-fulfillment-tracker",
+  "orthogonal-volume-slice-inspector": "Orthogonal-volume-slice-inspector",
+  "print-proof-preflight-review": "Print-proof-preflight-review",
+  "query-plan-hotspot-analyzer": "Query-plan-hotspot-analyzer",
+  "sampled-call-stack-profile-explorer": "Sampled-call-stack-profile-explorer",
+  "scientific-notebook-reproducibility-audit": "Scientific-notebook-reproducibility-audit",
+  "stream-window-join-debugger": "Stream-window-join-debugger"
+};

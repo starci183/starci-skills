@@ -14,6 +14,12 @@
       "status": "ready",
       "allFacts": [],
       "noneFacts": []
+    },
+    {
+      "stage": "delivery.mission.resume",
+      "status": "ready",
+      "allFacts": ["delivery-impact-classified"],
+      "noneFacts": []
     }
   ],
   "emits": [
@@ -21,7 +27,8 @@
       "stage": "fe.maintenance.maintenance-apply.result",
       "status": "complete",
       "factsAdd": [
-        "fe-maintenance-apply-complete"
+        "fe-maintenance-apply-complete",
+        "source-written"
       ],
       "factsRemove": []
     },
@@ -36,6 +43,7 @@
   ],
   "sideEffects": [
     "coordinator mutates only exact approved targets for fe/maintenance-apply",
+    "emit the pinned source-change and approved acceptance-test-plan references for downstream proof operators",
     "keep input, output, loaded context, worker observations, drafts, evidence, and receipts in task-session storage only",
     "purge every intermediate session object at every parent-skill terminal state"
   ],

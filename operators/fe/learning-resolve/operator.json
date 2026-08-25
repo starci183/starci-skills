@@ -12,7 +12,9 @@
     {
       "stage": "fe.maintenance.learning-resolve",
       "status": "ready",
-      "allFacts": [],
+      "allFacts": [
+        "feedback-request-reviewed"
+      ],
       "noneFacts": []
     }
   ],

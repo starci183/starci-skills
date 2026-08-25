@@ -14,6 +14,12 @@
       "status": "ready",
       "allFacts": [],
       "noneFacts": []
+    },
+    {
+      "stage": "delivery.mission.resume",
+      "status": "ready",
+      "allFacts": ["delivery-impact-classified"],
+      "noneFacts": []
     }
   ],
   "emits": [
@@ -21,7 +27,8 @@
       "stage": "fe.maintenance.complete",
       "status": "complete",
       "factsAdd": [
-        "fe-consumer-align-complete"
+        "fe-consumer-align-complete",
+        "source-written"
       ],
       "factsRemove": []
     },
@@ -36,6 +43,7 @@
   ],
   "sideEffects": [
     "coordinator mutates only exact approved targets for fe/consumer-align",
+    "emit the joined authority/source change-set and approved acceptance-test-plan references for downstream proof operators",
     "keep input, output, loaded context, worker observations, drafts, evidence, and receipts in task-session storage only",
     "purge every intermediate session object at every parent-skill terminal state"
   ],

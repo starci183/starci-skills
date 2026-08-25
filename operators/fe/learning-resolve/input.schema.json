@@ -53,6 +53,9 @@
     "facts": {
       "type": "array",
       "uniqueItems": true,
+      "contains": {
+        "const": "feedback-request-reviewed"
+      },
       "items": {
         "type": "string",
         "minLength": 1
@@ -73,6 +76,7 @@
           "additionalProperties": false,
           "required": [
             "priorStateRef",
+            "requestRef",
             "businessHeadRef",
             "authorityRefs",
             "approvalRef",
@@ -80,6 +84,9 @@
           ],
           "properties": {
             "priorStateRef": {
+              "$ref": "#/$defs/sessionRef"
+            },
+            "requestRef": {
               "$ref": "#/$defs/sessionRef"
             },
             "businessHeadRef": {
@@ -157,8 +164,11 @@
                 ],
                 "properties": {
                   "role": {
-                    "type": "string",
-                    "minLength": 1
+                    "enum": [
+                      "approved-request",
+                      "source-acceptance",
+                      "authority-approval"
+                    ]
                   },
                   "ref": {
                     "$ref": "#/$defs/sessionRef"

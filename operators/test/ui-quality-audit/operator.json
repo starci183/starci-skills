@@ -1,0 +1,86 @@
+{
+  "schemaVersion": 6,
+  "id": "test/ui-quality-audit",
+  "domain": "test",
+  "inputSchema": "input.schema.json",
+  "outputSchema": "output.schema.json",
+  "knowledgeRefs": [
+    "fe.ui-quality-review"
+  ],
+  "sourceReferenceRefs": [],
+  "accepts": [
+    {
+      "stage": "test.ui",
+      "status": "ready",
+      "allFacts": [
+        "unit-pass",
+        "e2e-pass",
+        "e2e-evidence",
+        "seed-evidence"
+      ],
+      "noneFacts": []
+    },
+    {
+      "stage": "ui.quality.audit",
+      "status": "ready",
+      "allFacts": [],
+      "noneFacts": []
+    }
+  ],
+  "emits": [
+    {
+      "when": { "decision": "delivery-pass" },
+      "stage": "test.ui.journey",
+      "status": "ready",
+      "factsAdd": ["ui-quality-pass", "ui-quality-evidence"],
+      "factsRemove": []
+    },
+    {
+      "when": { "decision": "delivery-in-boundary" },
+      "stage": "code.repair",
+      "status": "repair",
+      "factsAdd": ["ui-quality-failed", "in-boundary-repair"],
+      "factsRemove": []
+    },
+    {
+      "when": { "decision": "delivery-boundary-drift" },
+      "stage": "layout.review",
+      "status": "rejected",
+      "factsAdd": ["ui-quality-failed", "boundary-drift", "layout-feedback-recorded"],
+      "factsRemove": ["layout-approved"]
+    },
+    {
+      "when": { "decision": "audit-pass" },
+      "stage": "ui.quality.result",
+      "status": "complete",
+      "factsAdd": ["ui-quality-pass", "ui-quality-evidence"],
+      "factsRemove": []
+    },
+    {
+      "when": { "decision": "audit-findings" },
+      "stage": "ui.quality.result",
+      "status": "ready",
+      "factsAdd": ["ui-quality-findings", "ui-quality-evidence"],
+      "factsRemove": []
+    },
+    {
+      "when": { "decision": "blocked" },
+      "stage": "ui.quality.review",
+      "status": "blocked",
+      "factsAdd": ["ui-quality-blocked"],
+      "factsRemove": []
+    }
+  ],
+  "sideEffects": [
+    "control only the declared running application through a real browser",
+    "write sanitized screenshots, traces, measurements, rule results, and receipts to task-session storage only",
+    "never mutate product source, business authority, external providers, or the audited application state outside declared reversible interaction"
+  ],
+  "stopConditions": [
+    "route, target set, source revision, browser build, viewport set, state set, or knowledge generation is missing or stale",
+    "a required rule cannot be observed from the declared browser boundary",
+    "a secret or unsanitized artifact would be persisted",
+    "the audit would load broad repository context, invoke an external UI skill runtime, or cross the declared surface set",
+    "the operation would propose or apply source repair"
+  ]
+}

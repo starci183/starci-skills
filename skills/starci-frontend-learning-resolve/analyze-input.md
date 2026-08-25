@@ -2,9 +2,10 @@
 
 Global `@selection` has already selected this one-flow skill from prompt intent. Before any operator or Qdrant retrieval, validate the invocation and verify `selection.skillId` equals `starci-frontend-learning-resolve`. Then perform these local checks:
 
-1. Resolve one queued learning identity and proposed authority.
-2. Confirm evidence is current and bounded.
-3. Reject ordinary maintenance or unrelated source work.
+1. Require one request approved by starci-frontend-request-review and bind its exact revision.
+2. Resolve the approved learning identity and proposed authority.
+3. Confirm evidence is current and bounded.
+4. Reject unreviewed requests, ordinary maintenance or unrelated source work.
 
 Reject stale or missing authority/evidence, an ambiguous target, a write root outside scope, external mutation without approval, or an option outside the closed schema. Do not reconsider other skills here; return to global analysis if selection is wrong.
 

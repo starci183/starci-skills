@@ -9,8 +9,28 @@
       "on": [
         {
           "when": {},
+          "target": "layout-feedback-request",
+          "label": "enter layout-feedback-request"
+        }
+      ]
+    },
+    "layout-feedback-request": {
+      "kind": "operator",
+      "ref": "fe/feedback-request",
+      "on": [
+        {
+          "when": {
+            "decision": "recorded"
+          },
           "target": "route",
-          "label": "enter route"
+          "label": "recorded"
+        },
+        {
+          "when": {
+            "decision": "blocked"
+          },
+          "target": "blocked",
+          "label": "blocked"
         }
       ]
     },
@@ -41,6 +61,10 @@
         }
       ]
     },
+    "blocked": {
+      "kind": "terminal",
+      "result": "blocked"
+    },
     "business-staleness": {
       "kind": "operator",
       "ref": "business/staleness-check",
@@ -67,10 +91,6 @@
           "label": "blocked"
         }
       ]
-    },
-    "blocked": {
-      "kind": "terminal",
-      "result": "blocked"
     },
     "preflight": {
       "kind": "operator",
@@ -318,7 +338,7 @@
             "stage": "layout.review",
             "status": "approved"
           },
-          "target": "grammar"
+          "target": "mission-impact"
         },
         {
           "when": {
@@ -326,6 +346,46 @@
             "status": "rejected"
           },
           "target": "layout"
+        }
+      ]
+    },
+    "mission-impact": {
+      "kind": "operator",
+      "ref": "delivery/impact-classify",
+      "on": [
+        {
+          "when": {
+            "decision": "backend-required"
+          },
+          "target": "ship-architecture-frame",
+          "label": "backend-required"
+        },
+        {
+          "when": {
+            "decision": "frontend-only"
+          },
+          "target": "grammar",
+          "label": "frontend-only"
+        },
+        {
+          "when": {
+            "decision": "blocked"
+          },
+          "target": "blocked",
+          "label": "blocked"
+        }
+      ]
+    },
+    "ship-architecture-frame": {
+      "kind": "operator",
+      "ref": "architecture/decision-frame",
+      "on": [
+        {
+          "when": {
+            "decision": "ready"
+          },
+          "target": "ship-architecture-current",
+          "label": "ready"
         }
       ]
     },
@@ -346,6 +406,19 @@
             "status": "blocked"
           },
           "target": "blocked"
+        }
+      ]
+    },
+    "ship-architecture-current": {
+      "kind": "operator",
+      "ref": "architecture/current-state",
+      "on": [
+        {
+          "when": {
+            "decision": "ready"
+          },
+          "target": "ship-architecture-alternatives",
+          "label": "ready"
         }
       ]
     },
@@ -379,6 +452,19 @@
             ]
           },
           "target": "coding-scope"
+        }
+      ]
+    },
+    "ship-architecture-alternatives": {
+      "kind": "operator",
+      "ref": "architecture/alternatives",
+      "on": [
+        {
+          "when": {
+            "decision": "ready"
+          },
+          "target": "ship-architecture-challenge",
+          "label": "ready"
         }
       ]
     },
@@ -422,6 +508,33 @@
         }
       ]
     },
+    "ship-architecture-challenge": {
+      "kind": "operator",
+      "ref": "architecture/decision-challenge",
+      "on": [
+        {
+          "when": {
+            "decision": "ready"
+          },
+          "target": "ship-architecture-selection",
+          "label": "ready"
+        },
+        {
+          "when": {
+            "decision": "revise"
+          },
+          "target": "ship-architecture-alternatives",
+          "label": "revise"
+        },
+        {
+          "when": {
+            "decision": "blocked"
+          },
+          "target": "blocked",
+          "label": "blocked"
+        }
+      ]
+    },
     "implementation": {
       "kind": "operator",
       "ref": "fe/implementation",
@@ -442,6 +555,30 @@
         }
       ]
     },
+    "ship-architecture-selection": {
+      "kind": "wait",
+      "approval": {
+        "prompt": "Approve the backend architecture required by this mission.",
+        "approve": "OK ARCHITECTURE <decision>",
+        "reject": "REJECT ARCHITECTURE <decision>"
+      },
+      "on": [
+        {
+          "when": {
+            "stage": "architecture.decision.handoff",
+            "status": "ready"
+          },
+          "target": "ship-architecture-handoff"
+        },
+        {
+          "when": {
+            "stage": "architecture.decision.alternatives",
+            "status": "ready"
+          },
+          "target": "ship-architecture-alternatives"
+        }
+      ]
+    },
     "seed": {
       "kind": "operator",
       "ref": "fe/product-seed",
@@ -459,6 +596,19 @@
             "status": "blocked"
           },
           "target": "blocked"
+        }
+      ]
+    },
+    "ship-architecture-handoff": {
+      "kind": "operator",
+      "ref": "architecture/decision-handoff",
+      "on": [
+        {
+          "when": {
+            "decision": "ready"
+          },
+          "target": "ship-source-discovery",
+          "label": "ready"
         }
       ]
     },
@@ -489,6 +639,19 @@
         }
       ]
     },
+    "ship-source-discovery": {
+      "kind": "operator",
+      "ref": "architecture/source-discovery",
+      "on": [
+        {
+          "when": {
+            "decision": "ready"
+          },
+          "target": "ship-pattern-bind",
+          "label": "ready"
+        }
+      ]
+    },
     "e2e-test": {
       "kind": "operator",
       "ref": "test/e2e",
@@ -498,7 +661,7 @@
             "stage": "test.ui",
             "status": "ready"
           },
-          "target": "ui-test"
+          "target": "ui-quality-test"
         },
         {
           "when": {
@@ -513,6 +676,80 @@
             "status": "blocked"
           },
           "target": "blocked"
+        }
+      ]
+    },
+    "ship-pattern-bind": {
+      "kind": "operator",
+      "ref": "architecture/pattern-bind",
+      "on": [
+        {
+          "when": {
+            "decision": "ready"
+          },
+          "target": "ship-boundary-plan",
+          "label": "ready"
+        }
+      ]
+    },
+    "ui-quality-test": {
+      "kind": "operator",
+      "ref": "test/ui-quality-audit",
+      "on": [
+        {
+          "when": {
+            "decision": "delivery-pass"
+          },
+          "target": "ui-test",
+          "label": "delivery-pass"
+        },
+        {
+          "when": {
+            "decision": "delivery-in-boundary"
+          },
+          "target": "implementation",
+          "label": "delivery-in-boundary"
+        },
+        {
+          "when": {
+            "decision": "delivery-boundary-drift"
+          },
+          "target": "layout",
+          "label": "delivery-boundary-drift"
+        },
+        {
+          "when": {
+            "decision": "audit-pass"
+          },
+          "target": "blocked",
+          "label": "audit-pass"
+        },
+        {
+          "when": {
+            "decision": "audit-findings"
+          },
+          "target": "blocked",
+          "label": "audit-findings"
+        },
+        {
+          "when": {
+            "decision": "blocked"
+          },
+          "target": "blocked",
+          "label": "blocked"
+        }
+      ]
+    },
+    "ship-boundary-plan": {
+      "kind": "operator",
+      "ref": "architecture/boundary-plan",
+      "on": [
+        {
+          "when": {
+            "decision": "ready"
+          },
+          "target": "ship-boundary-challenge",
+          "label": "ready"
         }
       ]
     },
@@ -550,6 +787,33 @@
         }
       ]
     },
+    "ship-boundary-challenge": {
+      "kind": "operator",
+      "ref": "architecture/boundary-challenge",
+      "on": [
+        {
+          "when": {
+            "decision": "clean"
+          },
+          "target": "ship-boundary-approval",
+          "label": "clean"
+        },
+        {
+          "when": {
+            "decision": "revise"
+          },
+          "target": "ship-boundary-plan",
+          "label": "revise"
+        },
+        {
+          "when": {
+            "decision": "blocked"
+          },
+          "target": "blocked",
+          "label": "blocked"
+        }
+      ]
+    },
     "product-proof": {
       "kind": "operator",
       "ref": "fe/product-proof",
@@ -559,7 +823,7 @@
             "stage": "proof.review",
             "status": "complete"
           },
-          "target": "complete"
+          "target": "mission-proof"
         },
         {
           "when": {
@@ -584,9 +848,453 @@
         }
       ]
     },
+    "ship-boundary-approval": {
+      "kind": "wait",
+      "approval": {
+        "prompt": "Approve the exact backend plan required to complete this mission.",
+        "approve": "OK BACKEND <hash>",
+        "reject": "REJECT BACKEND <hash>"
+      },
+      "on": [
+        {
+          "when": {
+            "stage": "architecture.boundary.review",
+            "status": "approved"
+          },
+          "target": "ship-coding-scope"
+        },
+        {
+          "when": {
+            "stage": "architecture.boundary.review",
+            "status": "rejected"
+          },
+          "target": "ship-boundary-plan"
+        }
+      ]
+    },
+    "mission-proof": {
+      "kind": "operator",
+      "ref": "delivery/mission-proof",
+      "on": [
+        {
+          "when": {
+            "decision": "pass"
+          },
+          "target": "mission-business-reconcile",
+          "label": "pass"
+        },
+        {
+          "when": {
+            "decision": "blocked"
+          },
+          "target": "blocked",
+          "label": "blocked"
+        }
+      ]
+    },
+    "ship-coding-scope": {
+      "kind": "operator",
+      "ref": "be/coding-scope-freeze",
+      "on": [
+        {
+          "when": {
+            "decision": "ready"
+          },
+          "target": "ship-implement",
+          "label": "ready"
+        },
+        {
+          "when": {
+            "decision": "source-drift"
+          },
+          "target": "ship-boundary-plan",
+          "label": "source-drift"
+        },
+        {
+          "when": {
+            "decision": "boundary-drift"
+          },
+          "target": "ship-boundary-plan",
+          "label": "boundary-drift"
+        },
+        {
+          "when": {
+            "decision": "blocked"
+          },
+          "target": "blocked",
+          "label": "blocked"
+        }
+      ]
+    },
+    "mission-business-reconcile": {
+      "kind": "operator",
+      "ref": "business/reconcile",
+      "on": [
+        {
+          "when": {
+            "decision": "implemented"
+          },
+          "target": "complete",
+          "label": "implemented"
+        },
+        {
+          "when": {
+            "decision": "discrepancy"
+          },
+          "target": "blocked",
+          "label": "discrepancy"
+        }
+      ]
+    },
+    "ship-implement": {
+      "kind": "operator",
+      "ref": "be/implementation",
+      "on": [
+        {
+          "when": {
+            "decision": "ready"
+          },
+          "target": "ship-format",
+          "label": "ready"
+        },
+        {
+          "when": {
+            "decision": "source-drift"
+          },
+          "target": "ship-boundary-plan",
+          "label": "source-drift"
+        },
+        {
+          "when": {
+            "decision": "boundary-drift"
+          },
+          "target": "ship-boundary-plan",
+          "label": "boundary-drift"
+        },
+        {
+          "when": {
+            "decision": "blocked"
+          },
+          "target": "blocked",
+          "label": "blocked"
+        }
+      ]
+    },
     "complete": {
       "kind": "terminal",
       "result": "complete"
+    },
+    "ship-format": {
+      "kind": "operator",
+      "ref": "quality/format",
+      "on": [
+        {
+          "when": {
+            "decision": "pass"
+          },
+          "target": "ship-lint",
+          "label": "pass"
+        },
+        {
+          "when": {
+            "decision": "in-boundary"
+          },
+          "target": "ship-implement",
+          "label": "in-boundary"
+        },
+        {
+          "when": {
+            "decision": "boundary-drift"
+          },
+          "target": "ship-boundary-plan",
+          "label": "boundary-drift"
+        },
+        {
+          "when": {
+            "decision": "external-blocker"
+          },
+          "target": "blocked",
+          "label": "external-blocker"
+        }
+      ]
+    },
+    "ship-lint": {
+      "kind": "operator",
+      "ref": "quality/lint",
+      "on": [
+        {
+          "when": {
+            "decision": "pass"
+          },
+          "target": "ship-typecheck",
+          "label": "pass"
+        },
+        {
+          "when": {
+            "decision": "in-boundary"
+          },
+          "target": "ship-implement",
+          "label": "in-boundary"
+        },
+        {
+          "when": {
+            "decision": "boundary-drift"
+          },
+          "target": "ship-boundary-plan",
+          "label": "boundary-drift"
+        },
+        {
+          "when": {
+            "decision": "external-blocker"
+          },
+          "target": "blocked",
+          "label": "external-blocker"
+        }
+      ]
+    },
+    "ship-typecheck": {
+      "kind": "operator",
+      "ref": "quality/typecheck",
+      "on": [
+        {
+          "when": {
+            "decision": "pass"
+          },
+          "target": "ship-build",
+          "label": "pass"
+        },
+        {
+          "when": {
+            "decision": "in-boundary"
+          },
+          "target": "ship-implement",
+          "label": "in-boundary"
+        },
+        {
+          "when": {
+            "decision": "boundary-drift"
+          },
+          "target": "ship-boundary-plan",
+          "label": "boundary-drift"
+        },
+        {
+          "when": {
+            "decision": "external-blocker"
+          },
+          "target": "blocked",
+          "label": "external-blocker"
+        }
+      ]
+    },
+    "ship-build": {
+      "kind": "operator",
+      "ref": "quality/build",
+      "on": [
+        {
+          "when": {
+            "decision": "pass"
+          },
+          "target": "ship-unit",
+          "label": "pass"
+        },
+        {
+          "when": {
+            "decision": "in-boundary"
+          },
+          "target": "ship-implement",
+          "label": "in-boundary"
+        },
+        {
+          "when": {
+            "decision": "boundary-drift"
+          },
+          "target": "ship-boundary-plan",
+          "label": "boundary-drift"
+        },
+        {
+          "when": {
+            "decision": "external-blocker"
+          },
+          "target": "blocked",
+          "label": "external-blocker"
+        }
+      ]
+    },
+    "ship-unit": {
+      "kind": "operator",
+      "ref": "quality/unit-coverage",
+      "on": [
+        {
+          "when": {
+            "decision": "pass"
+          },
+          "target": "ship-integration",
+          "label": "pass"
+        },
+        {
+          "when": {
+            "decision": "in-boundary"
+          },
+          "target": "ship-implement",
+          "label": "in-boundary"
+        },
+        {
+          "when": {
+            "decision": "boundary-drift"
+          },
+          "target": "ship-boundary-plan",
+          "label": "boundary-drift"
+        },
+        {
+          "when": {
+            "decision": "external-blocker"
+          },
+          "target": "blocked",
+          "label": "external-blocker"
+        }
+      ]
+    },
+    "ship-integration": {
+      "kind": "operator",
+      "ref": "quality/integration",
+      "on": [
+        {
+          "when": {
+            "decision": "pass"
+          },
+          "target": "ship-e2e",
+          "label": "pass"
+        },
+        {
+          "when": {
+            "decision": "in-boundary"
+          },
+          "target": "ship-implement",
+          "label": "in-boundary"
+        },
+        {
+          "when": {
+            "decision": "boundary-drift"
+          },
+          "target": "ship-boundary-plan",
+          "label": "boundary-drift"
+        },
+        {
+          "when": {
+            "decision": "external-blocker"
+          },
+          "target": "blocked",
+          "label": "external-blocker"
+        }
+      ]
+    },
+    "ship-e2e": {
+      "kind": "operator",
+      "ref": "quality/e2e",
+      "on": [
+        {
+          "when": {
+            "decision": "pass"
+          },
+          "target": "ship-sonar",
+          "label": "pass"
+        },
+        {
+          "when": {
+            "decision": "in-boundary"
+          },
+          "target": "ship-implement",
+          "label": "in-boundary"
+        },
+        {
+          "when": {
+            "decision": "boundary-drift"
+          },
+          "target": "ship-boundary-plan",
+          "label": "boundary-drift"
+        },
+        {
+          "when": {
+            "decision": "external-blocker"
+          },
+          "target": "blocked",
+          "label": "external-blocker"
+        }
+      ]
+    },
+    "ship-sonar": {
+      "kind": "operator",
+      "ref": "quality/sonar",
+      "on": [
+        {
+          "when": {
+            "decision": "pass"
+          },
+          "target": "ship-source-proof",
+          "label": "pass"
+        },
+        {
+          "when": {
+            "decision": "in-boundary"
+          },
+          "target": "ship-implement",
+          "label": "in-boundary"
+        },
+        {
+          "when": {
+            "decision": "boundary-drift"
+          },
+          "target": "ship-boundary-plan",
+          "label": "boundary-drift"
+        },
+        {
+          "when": {
+            "decision": "external-blocker"
+          },
+          "target": "blocked",
+          "label": "external-blocker"
+        }
+      ]
+    },
+    "ship-source-proof": {
+      "kind": "operator",
+      "ref": "quality/delivery-proof",
+      "on": [
+        {
+          "when": {
+            "decision": "pass"
+          },
+          "target": "ship-resume",
+          "label": "pass"
+        },
+        {
+          "when": {
+            "decision": "blocked"
+          },
+          "target": "blocked",
+          "label": "blocked"
+        }
+      ]
+    },
+    "ship-resume": {
+      "kind": "operator",
+      "ref": "delivery/mission-resume",
+      "on": [
+        {
+          "when": {
+            "decision": "ready"
+          },
+          "target": "grammar",
+          "label": "ready"
+        },
+        {
+          "when": {
+            "decision": "blocked"
+          },
+          "target": "blocked",
+          "label": "blocked"
+        }
+      ]
     }
   }
 }

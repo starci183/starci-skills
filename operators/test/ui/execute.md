@@ -13,10 +13,10 @@ Execute only this operator's declared responsibility: control the running app in
 
 ## Step 2 — Resolve projected authority
 
-**Read:** `payload.provided.testPlanRef`, `changeSetRef`, `seedEvidenceRef`, then `fe.ui-testing` only.
+**Read:** `payload.provided.testPlanRef`, `changeSetRef`, `seedEvidenceRef`, `uiQualityEvidenceRef`, then `fe.ui-testing` only.
 **Context:** the approved test plan is the projection of journey, layout, responsive, and business-state authority for this step; `payload.loads.business` is `null`. Do not reload those upstream knowledge records.
-**Analysis record:** exact revisions, scenario/page/state/viewport IDs, required observables, seed identity, and the UI rule IDs actually applied.
-**Action:** verify every projected authority revision is fresh and mutually consistent without copying its body into downstream context.
+**Analysis record:** exact revisions, scenario/page/state/viewport IDs, required journey observables, seed identity, and the consumed UI-quality rule IDs.
+**Action:** verify every projected authority revision is fresh and mutually consistent without copying its body into downstream context. Require the UI-quality receipt to cover the same route, target set, viewports, browser build, source revision, and knowledge generation. This operator does not re-evaluate product-neutral UI quality rules.
 **Session write:** `scratchPrefix/constraints`.
 **Stop:** stop on partial journey coverage, a stale change/seed/test-plan revision, rejected authority, or mismatched project identity.
 
@@ -43,7 +43,7 @@ Execute only this operator's declared responsibility: control the running app in
 **Read:** joined preflight and resolved handles.
 **Context:** no new context.
 **Analysis record:** results, observables, and revision metadata only.
-**Action:** the coordinator alone controls the browser, authenticates through the ordinary user path, performs every declared journey at wide, intermediate, and compact viewports, and writes sanitized task-session screenshots, traces, and accessibility evidence. Workers never control the browser or account. Select one typed decision; success requires complete journey, interaction, responsive, visual, trace, console/network, and accessibility proof. If the declared confirmation policy permits a rerun, repeat only the failed scenario from a verified public entry state with identical source, browser, viewport, account class, seed, and environment. Contradictory outcomes are `blocked` with an explicit flaky-browser finding; they never become pass.
+**Action:** the coordinator alone controls the browser, authenticates through the ordinary user path, performs every declared journey at wide, intermediate, and compact viewports, and writes sanitized task-session screenshots and traces. Workers never control the browser or account. Select one typed decision; success requires complete journey, declared business-state transitions, recovery, persistence, trace, and console/network proof plus the already validated UI-quality receipt. If the declared confirmation policy permits a rerun, repeat only the failed scenario from a verified public entry state with identical source, browser, viewport, account class, seed, and environment. Contradictory outcomes are `blocked` with an explicit flaky-browser finding; they never become pass.
 **Session write:** `scratchPrefix/execution` and `scratchPrefix/decision`.
 **Stop:** stop on suppression, skip, stale revision, unsafe effect, scope expansion, failed reset, exhausted confirmation budget, or unexplained contradictory outcomes.
 

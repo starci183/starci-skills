@@ -19,7 +19,7 @@ The output is a closed, ephemeral task-session object consumed by the parent ski
 
 | Decision | Operator state | Emitted state | Required facts |
 | --- | --- | --- | --- |
-| `aligned` | `completed` | `fe.maintenance.complete / complete` | `fe-consumer-align-complete` |
+| `aligned` | `completed` | `fe.maintenance.complete / complete` | `fe-consumer-align-complete`, `source-written` |
 | `blocked` | `blocked` | `fe.maintenance.blocked / blocked` | `fe-consumer-align-blocked` |
 
-The parent state machine, not the operator or an orchestration worker, routes `payload.state.emits`. Only a successful source decision may report exact approved mutations.
+The parent state machine, not the operator or an orchestration worker, routes `payload.state.emits`. Only a successful source decision may report exact approved mutations. `aligned` is a source-write result, not delivery completion: its artifact refs must bind the joined authority/source change set and approved test plan consumed by the mandatory proof chain.

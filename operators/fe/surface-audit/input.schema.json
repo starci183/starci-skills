@@ -28,6 +28,13 @@
             "stage",
             "status"
           ]
+        },
+        {
+          "properties": {
+            "stage": { "const": "business.freshness" },
+            "status": { "const": "ready" }
+          },
+          "required": ["stage", "status"]
         }
       ]
     }
@@ -42,7 +49,8 @@
     },
     "stage": {
       "enum": [
-        "fe.maintenance.surface-audit"
+        "fe.maintenance.surface-audit",
+        "business.freshness"
       ]
     },
     "status": {

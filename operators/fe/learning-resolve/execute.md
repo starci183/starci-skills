@@ -26,13 +26,13 @@ This operator's responsibility is to resolve approved learning requests into the
 
 ## Step 3 — Resolve upstream, knowledge, and source capability
 
-**Read:** `payload.loads.upstream`, `payload.loads.knowledge`, and every source binding declared by this schema.
-**Context:** resolve only learning-request batch, source acceptance evidence, and approved authority boundary. Retrieve only the listed knowledge IDs at their pinned content hashes. Resolve `payload.loads.frontendSource` only: the hash-pinned plain-JSON contract snapshot, generator fingerprint, selected query IDs, and pinned index generation. Never load raw repository material or broaden the contract query. Resolve only `exactTargets` after validating repository-relative paths and SHA-256 values.
+**Read:** `payload.provided.requestRef`, `payload.loads.upstream`, `payload.loads.knowledge`, and every source binding declared by this schema.
+**Context:** resolve exactly one request carrying a durable approved review, source acceptance evidence, and approved authority boundary. Retrieve only the listed knowledge IDs at their pinned content hashes. Resolve `payload.loads.frontendSource` only: the hash-pinned plain-JSON contract snapshot, generator fingerprint, selected query IDs, and pinned index generation. Never load raw repository material or broaden the contract query. Resolve only `exactTargets` after validating repository-relative paths and SHA-256 values.
 **Decision evidence:** upstream identity and revision matches, knowledge generation matches, and every requested capability or exact target is inside the frozen boundary.
 **Action:** create a minimal constraint set containing IDs, revisions, applicable rules, target permissions, and required outcomes.
 **Session write:** normalized constraints at `scratchPrefix/constraints`.
 **Durable write:** none.
-**Stop:** stop on unresolved ownership, contradictory accepted evidence, stale authority hash, or a cross-boundary update.
+**Stop:** stop when the request is not durably approved, on unresolved ownership, contradictory accepted evidence, stale authority hash, or a cross-boundary update.
 **Orchestration:** bindings are resolved once by the coordinator and passed to workers as minimal read-only slices.
 
 ## Step 4 — Perform the operator decision

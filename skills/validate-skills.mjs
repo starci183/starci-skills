@@ -30,6 +30,12 @@ const cycleRequired = new Set([
   'starci-deployment-monitor',
   'starci-deployment-recover'
 ]);
+const productMissionSkills = new Set([
+  'starci-frontend-layout-delivery',
+  'starci-frontend-block-reconcile',
+  'starci-frontend-maintenance-apply',
+  'starci-frontend-surface-reconcile'
+]);
 
 const fail = (message) => { throw new Error(message); };
 const readJson = (file) => JSON.parse(readFileSync(file, 'utf8'));
@@ -144,6 +150,34 @@ function assertStructure(skillDir, machine, inputSchema, outputSchema) {
   if (inputSchema.properties.selection.properties.mode !== undefined) fail(`${skillId}: one-flow selection must not expose a secondary mode`);
   const target = nextState(machine, 'analyze-input', {}, { selection: { skillId }, options: {} });
   if (!machine.states[target]) fail(`${skillId}: fixed analysis selected an unknown target`);
+
+  if (productMissionSkills.has(skillId)) {
+    const refs = new Set(Object.values(machine.states).map((state) => state.ref).filter(Boolean));
+    for (const requiredRef of [
+      'delivery/impact-classify',
+      'architecture/decision-frame',
+      'architecture/boundary-plan',
+      'be/implementation',
+      'quality/delivery-proof',
+      'delivery/mission-resume',
+      'delivery/mission-proof',
+      'business/reconcile'
+    ]) {
+      if (!refs.has(requiredRef)) fail(`${skillId}: product mission is missing shared full-stack operator ${requiredRef}`);
+    }
+    const impact = machine.states['mission-impact'];
+    const decisions = new Map((impact?.on ?? []).map((edge) => [edge.when?.decision, edge.target]));
+    if (!decisions.has('frontend-only') || !decisions.has('backend-required')) {
+      fail(`${skillId}: product mission must classify frontend-only and backend-required impact`);
+    }
+    if (machine.states[decisions.get('backend-required')]?.ref !== 'architecture/decision-frame') {
+      fail(`${skillId}: backend-required impact must enter the shared architecture lane`);
+    }
+    const proof = machine.states['mission-proof'];
+    if (proof?.ref !== 'delivery/mission-proof') fail(`${skillId}: product mission must join cross-role proof`);
+    const reconcile = machine.states['mission-business-reconcile'];
+    if (reconcile?.ref !== 'business/reconcile') fail(`${skillId}: product mission must reconcile joined proof with business truth`);
+  }
 }
 
 async function assertValidators(skillDir) {

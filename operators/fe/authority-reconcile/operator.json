@@ -14,6 +14,12 @@
       "status": "ready",
       "allFacts": [],
       "noneFacts": []
+    },
+    {
+      "stage": "delivery.mission.resume",
+      "status": "ready",
+      "allFacts": ["delivery-impact-classified"],
+      "noneFacts": []
     }
   ],
   "emits": [

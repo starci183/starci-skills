@@ -1,0 +1,142 @@
+{
+  "$id": "https://starci.dev/v6/operators/test/ui-quality-audit/output.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "test/ui-quality-audit operator output",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "runId", "stage", "status", "facts", "payload"],
+  "allOf": [
+    {
+      "oneOf": [
+        { "properties": { "stage": { "const": "test.ui.journey" }, "status": { "const": "ready" } }, "required": ["stage", "status"] },
+        { "properties": { "stage": { "const": "code.repair" }, "status": { "const": "repair" } }, "required": ["stage", "status"] },
+        { "properties": { "stage": { "const": "layout.review" }, "status": { "const": "rejected" } }, "required": ["stage", "status"] },
+        { "properties": { "stage": { "const": "ui.quality.result" }, "status": { "const": "complete" } }, "required": ["stage", "status"] },
+        { "properties": { "stage": { "const": "ui.quality.result" }, "status": { "const": "ready" } }, "required": ["stage", "status"] },
+        { "properties": { "stage": { "const": "ui.quality.review" }, "status": { "const": "blocked" } }, "required": ["stage", "status"] }
+      ]
+    }
+  ],
+  "properties": {
+    "schemaVersion": { "const": 6 },
+    "runId": { "type": "string", "minLength": 1 },
+    "stage": { "enum": ["test.ui.journey", "code.repair", "layout.review", "ui.quality.result", "ui.quality.review"] },
+    "status": { "enum": ["ready", "repair", "rejected", "complete", "blocked"] },
+    "facts": { "$ref": "#/$defs/strings" },
+    "payload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["decision", "state", "produced", "context", "cleanup", "evidenceRefs", "findings"],
+      "properties": {
+        "decision": { "enum": ["delivery-pass", "delivery-in-boundary", "delivery-boundary-drift", "audit-pass", "audit-findings", "blocked"] },
+        "state": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["operator", "status", "code", "retryable", "emits"],
+          "properties": {
+            "operator": { "const": "test/ui-quality-audit" },
+            "status": { "enum": ["completed", "repair", "replan", "blocked"] },
+            "code": { "enum": ["test-ui-quality-audit-delivery-pass", "test-ui-quality-audit-delivery-in-boundary", "test-ui-quality-audit-delivery-boundary-drift", "test-ui-quality-audit-audit-pass", "test-ui-quality-audit-audit-findings", "test-ui-quality-audit-blocked"] },
+            "retryable": { "type": "boolean" },
+            "emits": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["stage", "status", "factsAdd", "factsRemove"],
+              "properties": {
+                "stage": { "enum": ["test.ui.journey", "code.repair", "layout.review", "ui.quality.result", "ui.quality.review"] },
+                "status": { "enum": ["ready", "repair", "rejected", "complete", "blocked"] },
+                "factsAdd": { "$ref": "#/$defs/strings" },
+                "factsRemove": { "$ref": "#/$defs/strings" }
+              }
+            }
+          }
+        },
+        "produced": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["receiptRef", "ruleResults", "artifacts", "mutations"],
+          "properties": {
+            "receiptRef": { "$ref": "#/$defs/sessionRef" },
+            "ruleResults": {
+              "type": "array",
+              "minItems": 1,
+              "maxItems": 64,
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["ruleId", "applicability", "result", "severity", "observation", "evidenceRefs"],
+                "properties": {
+                  "ruleId": { "type": "string", "pattern": "^uiq\\.[a-z0-9-]+(?:\\.[a-z0-9-]+)*$" },
+                  "applicability": { "enum": ["applicable", "not-applicable"] },
+                  "result": { "enum": ["pass", "fail", "blocked", "not-applicable"] },
+                  "severity": { "enum": ["warning", "error"] },
+                  "observation": { "type": "string", "minLength": 1, "maxLength": 500 },
+                  "evidenceRefs": { "type": "array", "maxItems": 16, "uniqueItems": true, "items": { "$ref": "#/$defs/sessionRef" } }
+                }
+              }
+            },
+            "artifacts": {
+              "type": "array",
+              "uniqueItems": true,
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["kind", "ref", "sha256"],
+                "properties": {
+                  "kind": { "enum": ["evidence", "report", "observation", "artifact"] },
+                  "ref": { "$ref": "#/$defs/sessionRef" },
+                  "sha256": { "anyOf": [{ "$ref": "#/$defs/sha256" }, { "type": "null" }] }
+                }
+              }
+            },
+            "mutations": {
+              "type": "array",
+              "maxItems": 0,
+              "items": false
+            }
+          }
+        },
+        "context": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["used"],
+          "properties": {
+            "used": {
+              "type": "array",
+              "minItems": 1,
+              "uniqueItems": true,
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["kind", "ref", "revision"],
+                "properties": {
+                  "kind": { "enum": ["session-artifact", "qdrant-knowledge", "exact-source", "exact-command", "external-resource", "credential-handle", "orchestration"] },
+                  "ref": { "type": "string", "minLength": 1 },
+                  "revision": { "type": "string", "minLength": 1 }
+                }
+              }
+            }
+          }
+        },
+        "cleanup": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["taskId", "scratchRefs", "retention", "purgeAt"],
+          "properties": {
+            "taskId": { "type": "string", "minLength": 1 },
+            "scratchRefs": { "type": "array", "uniqueItems": true, "items": { "$ref": "#/$defs/sessionRef" } },
+            "retention": { "const": "until-skill-terminal" },
+            "purgeAt": { "const": "skill-terminal" }
+          }
+        },
+        "evidenceRefs": { "type": "array", "minItems": 1, "uniqueItems": true, "items": { "$ref": "#/$defs/sessionRef" } },
+        "findings": { "$ref": "#/$defs/strings" }
+      }
+    }
+  },
+  "$defs": {
+    "sha256": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
+    "sessionRef": { "type": "string", "pattern": "^session://tasks/[A-Za-z0-9._-]+/.+$" },
+    "strings": { "type": "array", "uniqueItems": true, "items": { "type": "string", "minLength": 1 } }
+  }
+}

@@ -18,7 +18,7 @@
         {
           "properties": {
             "stage": {
-              "const": "test.ui"
+              "const": "test.ui.journey"
             },
             "status": {
               "const": "ready"
@@ -42,7 +42,7 @@
     },
     "stage": {
       "enum": [
-        "test.ui"
+        "test.ui.journey"
       ]
     },
     "status": {
@@ -69,7 +69,8 @@
             "previousStateRef",
             "testPlanRef",
             "changeSetRef",
-            "seedEvidenceRef"
+            "seedEvidenceRef",
+            "uiQualityEvidenceRef"
           ],
           "properties": {
             "previousStateRef": {
@@ -87,6 +88,10 @@
             "seedEvidenceRef": {
               "$ref": "#/$defs/sessionRef",
               "description": "isolated seed evidence"
+            },
+            "uiQualityEvidenceRef": {
+              "$ref": "#/$defs/sessionRef",
+              "description": "fresh test/ui-quality-audit receipt covering the same target boundary"
             }
           }
         },

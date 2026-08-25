@@ -28,20 +28,6 @@
             "stage",
             "status"
           ]
-        },
-        {
-          "properties": {
-            "stage": {
-              "const": "requests.review"
-            },
-            "status": {
-              "const": "ready"
-            }
-          },
-          "required": [
-            "stage",
-            "status"
-          ]
         }
       ]
     }

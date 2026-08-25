@@ -3,8 +3,8 @@
 | Field | Value |
 | --- | --- |
 | Knowledge ID | `fe.request-lifecycle` |
-| Operators | `request-emission` |
-| Search tags | `request, stable id, create, grammar gap, persistence` |
+| Operators | `request-emission, feedback-request, request-review` |
+| Search tags | `request, stable id, create, feedback, review, approval, priority, grammar gap, persistence` |
 | Dependencies | `fe.source-fit` |
 
 ## Record
@@ -16,3 +16,7 @@ Use `.claude/requests/<stable-id>.request.json`. The stable ID derives from owne
 `create-block-or-above` authorizes only application-owned Block/layout/page work. A declared lower-tier extension names its base/effective hashes and allowed axis. `grammar-gap` requests the routed Grammar lifecycle and blocks local reconstruction until resolved.
 
 Fail closed on path escape, unstable identity, conflicting existing content, missing evidence, or a request that silently broadens the approved boundary. Writing a request is an explicit side effect and must be followed by a content-hash receipt.
+
+Feedback requests are reviewed separately from resolution. Review accepts exactly one current request and an explicit `approved` or `rejected` decision. It preserves the per-session accepts/rejects ledger, records a bounded rationale, evidence hash, owner subset and `normal` or `urgent` priority, and updates only the request status and review fields. `urgent` changes queue order; it never weakens proof, permits owner expansion, or authorizes an authority mutation.
+
+Only an `approved` request may enter owner-specific learning resolution. Approval is not resolution: the review skill must not mutate `.claude`, Grammar, or product source beyond the request ledger itself.

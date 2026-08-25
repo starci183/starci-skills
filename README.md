@@ -2,7 +2,7 @@
 
 Release-grade agent skills composed as validated state machines.
 
-StarCi Skills turns one natural-language request into a small, explicit execution graph. Global input analysis selects one skill from cheap metadata; that skill normalizes its closed input, loads only the operators needed by the selected branch, retrieves operator knowledge lazily from local Qdrant Edge, validates every boundary, and follows declared choices, approvals, loops, or terminal states.
+StarCi Skills turns one natural-language request into a small, explicit execution graph. Global input analysis selects one outcome-oriented mission from cheap metadata; that skill owns every affected FE/BE/data role, loads only the operators needed by the selected branch, retrieves operator knowledge lazily from local Qdrant Edge, validates every boundary, and joins proof before completion.
 
 ```text
 request -> global analysis -> selected skill -> operator -> validated result
@@ -19,6 +19,7 @@ request -> global analysis -> selected skill -> operator -> validated result
 - **Typed boundaries:** every skill and operator has closed input/output schemas and fail-closed validators.
 - **Traceable decisions:** transitions use contract-owned decisions or stage/status emissions.
 - **Safe extension:** add an operator or machine branch without copying a second policy tree.
+- **Mission ownership:** one skill ships one outcome across the technical layers it actually affects; layer boundaries do not force a second skill.
 
 ## Included skills
 
@@ -30,11 +31,11 @@ request -> global analysis -> selected skill -> operator -> validated result
 | `starci-architecture-decide` | Analyze difficult cross-system choices without source writes |
 | `starci-backend-delivery` | Plan, approve, implement, test, and prove new backend work |
 | `starci-backend-repair` | Repair one approved backend boundary and rerun proof |
-| `starci-frontend-layout-delivery` | Design and deliver a complete customer journey and page set |
-| `starci-frontend-block-reconcile` | Reconcile one frontend block with its bounded consumers |
-| `starci-frontend-maintenance-apply` | Apply approved frontend maintenance and record learning |
-| `starci-frontend-learning-resolve` | Resolve one queued frontend design learning item |
-| `starci-frontend-surface-reconcile` | Align a closed surface set on durable design authority |
+| `starci-frontend-layout-delivery` | Ship a complete customer journey across required FE/BE/data roles and join acceptance proof |
+| `starci-frontend-block-reconcile` | Reconcile one block and its consumers across every affected role, then join proof |
+| `starci-frontend-maintenance-apply` | Apply one approved product correction across affected roles, join proof, then record learning |
+| `starci-frontend-learning-resolve` | Resolve one queued learning into durable authority; consumer application remains a reconcile delivery |
+| `starci-frontend-surface-reconcile` | Align a closed surface set and every affected contract on durable authority, then join proof |
 | `starci-workflow-diagnose` | Diagnose one workflow without mutation |
 | `starci-quality-readiness` | Inventory and close measured readiness findings |
 | `starci-quality-finding-repair` | Repair one approved quality finding |
@@ -51,7 +52,7 @@ request -> global analysis -> selected skill -> operator -> validated result
 | `starci-conversation-record` | Append one redacted provenance snapshot |
 | `starci-conversation-query` | Query one bounded provenance identity |
 
-The release currently contains 85 atomic operators across 10 domains and 70 operator-knowledge records.
+The release currently contains 92 atomic operators across 11 domains and 71 operator-knowledge records.
 
 ## Install
 

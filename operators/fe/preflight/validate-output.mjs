@@ -6,12 +6,11 @@ const outcomes = {
     "stage": "flow.generate",
     "status": "ready",
     "operatorStatus": "completed",
-    "code": "fe-preflight-preflight-ready",
+    "code": "fe-preflight-ready",
     "retryable": false,
     "factsAdd": [
       "preflight-complete",
-      "frontend-contract-generation-ready",
-      "grammar-lock-ready"
+      "business-fresh-receipt-ready"
     ],
     "factsRemove": []
   }
@@ -37,18 +36,18 @@ function semanticErrors(value) {
   for (const fact of expected.factsAdd) if (!value.facts.includes(fact)) errors.push(`$.facts: missing emitted fact ${fact}`);
   for (const fact of expected.factsRemove) if (value.facts.includes(fact)) errors.push(`$.facts: retained removed fact ${fact}`);
 
-  const success = successfulDecisions.has(payload.decision);
   const produced = payload.produced;
-  if (!success && (produced.mutations.length || produced.externalEffects.length)) errors.push('$.payload.produced: non-success output cannot claim a durable effect');
+  if (!successfulDecisions.has(payload.decision)) errors.push('$.payload.decision: output is not a successful preflight decision');
 
-
-  if (success && produced.artifactRefs.length === 0) errors.push('$.payload.produced.artifactRefs: successful analysis requires a session artifact reference');
+  const expectedKinds = ['business-freshness-receipt', 'request-receipt', 'workspace-route-receipt'];
+  const actualKinds = payload.context.used.map((item) => item.kind);
+  if (!sameStrings(actualKinds, expectedKinds)) errors.push('$.payload.context.used: exact receipt context set required');
 
   const taskMatch = payload.evidenceRefs[0]?.match(/^session:\/\/tasks\/([^/]+)\//);
   if (!taskMatch) errors.push('$.payload.evidenceRefs: cannot determine task ownership');
   else {
     const prefix = `session://tasks/${taskMatch[1]}/`;
-    const refs = [...payload.evidenceRefs, ...payload.cleanup.scratchRefs, ...payload.produced.artifactRefs, ...payload.produced.externalEffects.map((item) => item.evidenceRef)];
+    const refs = [...payload.evidenceRefs, ...payload.cleanup.scratchRefs, produced.preflightReceiptRef, produced.frozenScopeRef, ...payload.context.used.map((item) => item.ref)];
     for (const ref of refs) if (!ref.startsWith(prefix)) errors.push(`$: session ref is outside output task: ${ref}`);
   }
   return errors;

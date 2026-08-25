@@ -28,6 +28,13 @@
             "stage",
             "status"
           ]
+        },
+        {
+          "properties": {
+            "stage": { "const": "delivery.mission.resume" },
+            "status": { "const": "ready" }
+          },
+          "required": ["stage", "status"]
         }
       ]
     }
@@ -42,12 +49,14 @@
     },
     "stage": {
       "enum": [
-        "layout.review"
+        "layout.review",
+        "delivery.mission.resume"
       ]
     },
     "status": {
       "enum": [
-        "approved"
+        "approved",
+        "ready"
       ]
     },
     "facts": {

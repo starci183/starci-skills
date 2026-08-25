@@ -1,0 +1,18 @@
+{
+  "schemaVersion": 6,
+  "id": "delivery/mission-resume",
+  "domain": "delivery",
+  "inputSchema": "input.schema.json",
+  "outputSchema": "output.schema.json",
+  "knowledgeRefs": [],
+  "sourceReferenceRefs": [],
+  "accepts": [
+    { "stage": "delivery.proved", "status": "ready", "allFacts": ["delivery-proof-ready", "backend-impact-required"], "noneFacts": [] }
+  ],
+  "emits": [
+    { "stage": "delivery.mission.resume", "status": "ready", "factsAdd": ["backend-delivery-proved", "delivery-mission-resumed"], "factsRemove": [] },
+    { "stage": "delivery.blocked", "status": "blocked", "factsAdd": ["delivery-resume-blocked"], "factsRemove": [] }
+  ],
+  "sideEffects": ["join only session receipt identities", "purge all scratch at the parent-skill terminal"],
+  "stopConditions": ["backend proof or mission continuation identity is missing", "a source body or undeclared artifact would be loaded"]
+}

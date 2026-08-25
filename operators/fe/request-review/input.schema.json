@@ -1,0 +1,126 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://starci.dev/v6/operators/fe/request-review/input.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "runId", "stage", "status", "facts", "payload"],
+  "properties": {
+    "schemaVersion": { "const": 6 },
+    "runId": { "type": "string", "minLength": 1, "maxLength": 128 },
+    "stage": { "const": "fe.request.review" },
+    "status": { "const": "ready" },
+    "facts": {
+      "type": "array",
+      "uniqueItems": true,
+      "contains": { "const": "feedback-request-recorded" },
+      "items": { "type": "string", "minLength": 1 }
+    },
+    "payload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["provided", "loads", "session"],
+      "properties": {
+        "provided": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["priorStateRef", "requestRef", "reviewEvidenceRef", "project", "decision", "priority", "targetOwners"],
+          "properties": {
+            "priorStateRef": { "$ref": "#/$defs/sessionRef" },
+            "requestRef": { "$ref": "#/$defs/sessionRef" },
+            "reviewEvidenceRef": { "$ref": "#/$defs/sessionRef" },
+            "project": { "type": "string", "pattern": "^[a-z0-9][a-z0-9-]*$", "maxLength": 80 },
+            "decision": { "enum": ["approved", "rejected"] },
+            "priority": { "enum": ["normal", "urgent"] },
+            "targetOwners": {
+              "type": "array",
+              "minItems": 1,
+              "maxItems": 3,
+              "uniqueItems": true,
+              "items": { "enum": ["starci-runtime", "grammar", "local-only"] }
+            }
+          }
+        },
+        "loads": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["upstream", "knowledge", "exactTargets", "orchestration"],
+          "properties": {
+            "upstream": {
+              "type": "array",
+              "minItems": 2,
+              "maxItems": 4,
+              "uniqueItems": true,
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["role", "ref", "revision"],
+                "properties": {
+                  "role": { "enum": ["request", "review-evidence"] },
+                  "ref": { "$ref": "#/$defs/sessionRef" },
+                  "revision": { "$ref": "#/$defs/sha256" }
+                }
+              }
+            },
+            "knowledge": {
+              "type": "array",
+              "minItems": 1,
+              "maxItems": 1,
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["id", "generation", "contentSha256", "loadMode"],
+                "properties": {
+                  "id": { "const": "fe.request-lifecycle" },
+                  "generation": { "type": "string", "minLength": 1 },
+                  "contentSha256": { "$ref": "#/$defs/sha256" },
+                  "loadMode": { "const": "qdrant-exact" }
+                }
+              }
+            },
+            "exactTargets": {
+              "type": "array",
+              "minItems": 1,
+              "maxItems": 1,
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["path", "expectedSha256", "access"],
+                "properties": {
+                  "path": { "type": "string", "pattern": "^\\.claude/requests/[a-z0-9][a-z0-9._-]*\\.request\\.json$" },
+                  "expectedSha256": { "$ref": "#/$defs/sha256" },
+                  "access": { "const": "read-write" }
+                }
+              }
+            },
+            "orchestration": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["mode", "profileRef", "providerRef"],
+              "properties": {
+                "mode": { "enum": ["economical", "balanced", "parallel"] },
+                "profileRef": { "enum": ["orchestration/modes/economical.json", "orchestration/modes/balanced.json", "orchestration/modes/parallel.json"] },
+                "providerRef": { "type": "string", "pattern": "^orchestration/providers/[a-z0-9-]+\\.json$" }
+              }
+            }
+          }
+        },
+        "session": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["taskId", "inputRef", "outputRef", "scratchPrefix", "retention"],
+          "properties": {
+            "taskId": { "type": "string", "pattern": "^[A-Za-z0-9._-]+$" },
+            "inputRef": { "$ref": "#/$defs/sessionRef" },
+            "outputRef": { "$ref": "#/$defs/sessionRef" },
+            "scratchPrefix": { "$ref": "#/$defs/sessionRef" },
+            "retention": { "const": "until-skill-terminal" }
+          }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "sessionRef": { "type": "string", "pattern": "^session://tasks/[A-Za-z0-9._-]+/.+$" },
+    "sha256": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" }
+  }
+}
