@@ -222,6 +222,17 @@ const platformStates = {
   complete: terminal('complete'), blocked: terminal('blocked')
 };
 
+const sourceIndexStates = {
+  ...platformStates,
+  'mcp-config': op('platform/mcp-config', decided({ ready: 'index-kind-choice' })),
+  'index-kind-choice': choice([
+    e({ inputEquals: { 'options.indexReferences': true } }, 'reference-reindex'),
+    e({ inputEquals: { 'options.indexReferences': false } }, 'source-index')
+  ]),
+  'reference-reindex': op('platform/reference-reindex', decided({ ready: 'mcp-publish-choice', blocked: 'blocked' }))
+};
+
+
 const conversationStates = {
   record: op('source/conversation-record', decided({ recorded: 'complete' })),
   query: op('source/conversation-query', decided({ found: 'complete', empty: 'complete' })),
@@ -409,10 +420,20 @@ const flows = [
     checks: ['Resolve account, tunnel, hostname and service target.', 'Confirm one HTTP route is the full boundary.', 'Require authority for public DNS mutation.']
   },
   {
-    id: 'source-index-publish', display: 'StarCi Source Index Publish', short: 'Index and optionally publish StarCi context', entry: 'mcp-config', states: platformStates,
-    options: { publishPublic: { type: 'boolean', description: 'Publish MCP through the declared public boundary.' }, ensureTunnel: { type: 'boolean', description: 'Reconcile a tunnel before MCP publication.' } },
-    description: 'Use to configure and index StarCi business or generated-contract context, optionally publishing its MCP boundary. Do not use for product delivery, Sonar, observability, or a tunnel-only request.',
-    checks: ['Resolve project and declared context inputs.', 'Distinguish local indexing from public MCP mutation.', 'Evaluate tunnel work only for public publication.']
+    id: 'source-index-publish', display: 'StarCi Source Index Publish', short: 'Index and optionally publish StarCi context', entry: 'mcp-config', states: sourceIndexStates,
+    options: {
+      publishPublic: { type: 'boolean', description: 'Publish MCP through the declared public boundary.' },
+      ensureTunnel: { type: 'boolean', description: 'Reconcile a tunnel before MCP publication.' },
+      indexReferences: { type: 'boolean', description: 'Index clean local reference checkouts instead of business/generated-contract context.' }
+    },
+    description: 'Use to configure and index StarCi business, generated-contract, or clean .worktrees/references context, optionally publishing its MCP boundary. Do not use for product delivery, Sonar, observability, or a tunnel-only request.',
+    checks: [
+      'Resolve project and declared context inputs.',
+      'Distinguish local indexing from public MCP mutation.',
+      'Evaluate tunnel work only for public publication.',
+      'For reference mode, resolve portable routes into clean .worktrees/references checkouts and require a versioned adaptive drift policy, Python Qdrant Edge, full-text/path lookup, optional embeddings, loopback Caddy, and ignored machine-local runtime state.'
+    ],
+    inputBoundary: 'This package owns one fixed-entry flow. Set `options.indexReferences=true` to select clean local reference indexing; false retains business/generated-contract indexing. No undeclared mode is accepted.'
   },
   {
     id: 'sonar-service-reconcile', display: 'StarCi Sonar Service Reconcile', short: 'Reconcile shared Sonar quality enforcement', entry: 'sonar', states: platformStates, options: {},
@@ -502,7 +523,7 @@ for (const flow of flows) {
   const optionRows = Object.entries(flow.options).map(([name, spec]) => `| \`${name}\` | ${spec.enum ? spec.enum.map((item) => `\`${item}\``).join(' / ') : `\`${spec.type}\``} | ${spec.description} |`).join('\n') || '| — | — | No additional option is loaded. |';
   const contextRows = (flow.contextMatrix ?? []).map(([state, allowed, forbidden]) => `| \`${state}\` | ${allowed} | ${forbidden} |`).join('\n') || '| every state | current operator declaration only | undeclared context |';
   writeFileSync(path.join(directory, 'analyze-input.md'), `# Analyze ${flow.id} input\n\nGlobal \`@selection\` has already selected this one-flow skill from prompt intent. Before any operator or Qdrant retrieval, validate the invocation and verify \`selection.skillId\` equals \`${flow.id}\`. Then perform these local checks:\n\n${checks}\n\nReject stale or missing authority/evidence, an ambiguous target, a write root outside scope, external mutation without approval, or an option outside the closed schema. Do not reconsider other skills here; return to global analysis if selection is wrong.\n\nThe fixed first state is \`${flow.entry}\`. Emit only normalized scope and facts as task-session data; do not choose a second mode or copy operator knowledge into context.\n\n## Options\n\n| Option | Values | Decision effect |\n| --- | --- | --- |\n${optionRows}\n`);
-  writeFileSync(path.join(directory, 'input.md'), `# ${flow.id} input\n\nProvide one closed invocation validated by \`input.schema.json\`. The required \`selection\` object is the ephemeral output of global \`/analyze-input.md\`; it selects this skill directly. This package owns one fixed-entry flow and accepts no secondary mode.\n`);
+  writeFileSync(path.join(directory, 'input.md'), `# ${flow.id} input\n\nProvide one closed invocation validated by \`input.schema.json\`. The required \`selection\` object is the ephemeral output of global \`/analyze-input.md\`; it selects this skill directly. ${flow.inputBoundary ?? 'This package owns one fixed-entry flow and accepts no secondary mode.'}\n`);
   writeFileSync(path.join(directory, 'output.md'), `# ${flow.id} output\n\nReturn one terminal result bound to an exact machine terminal through \`state.status\`, \`state.code\`, and \`state.terminalState\`. Return only immutable receipt references and bounded evidence-linked findings. A handoff is explicit and never mislabeled complete. \`cleanup\` always purges task-session scratch at the skill terminal.\n`);
   writeFileSync(path.join(directory, 'execute.md'), `# Execute ${flow.id}\n\n1. Accept only a validated global \`selection\` for this skill, validate the complete input, run local \`analyze-input\`, then enter fixed state \`${flow.entry}\`.\n2. Load only the current state's operator contract. That operator alone retrieves its declared Qdrant knowledge.\n3. Validate operator input, execute it, validate output, then route through exactly one matching edge.\n4. Keep selection, operator data, context, observations, plans and receipts in task-session memory only. On a loop, compare the prior fingerprint, reuse approved identities and reload only the re-entered operator. Block repeated no-progress fingerprints.\n5. Wait states stop before irreversible work and accept only the displayed revision or command.\n6. At every terminal, validate the result, return it, and purge all task-session intermediates. Preserve only approved product-source or external mutations.\n\n## CONTEXT BY STATE\n\n| State or phase | Allowed | Forbidden |\n| --- | --- | --- |\n${contextRows}\n`);
   writeFileSync(path.join(directory, 'SKILL.md'), `---\nname: ${flow.id}\ndescription: ${JSON.stringify(flow.description)}\n---\n\n# ${flow.id}\n\n${flow.description}\n\n## INPUT ANALYSIS\n\nRequire the ephemeral global selection, read \`input.md\`, validate \`input.schema.json\`, then follow local \`analyze-input.md\`. This skill owns one flow with fixed first state \`${flow.entry}\`; local analysis only validates and normalizes scope without loading operator knowledge.\n\n## STATE MACHINE\n\nExecute \`machine.json\` through \`execute.md\`. Branches and loops are machine-owned; operators never invoke one another. Stop at waits for the exact displayed revision and finish only at a terminal. Purge all intermediates at every terminal while preserving approved durable mutations.\n\n## CONTEXT CONTRACT\n\n| State or phase | Allowed | Forbidden |\n| --- | --- | --- |\n${contextRows}\n`);

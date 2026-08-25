@@ -22,8 +22,49 @@
           "when": {
             "decision": "ready"
           },
-          "target": "source-index",
+          "target": "index-kind-choice",
           "label": "ready"
+        }
+      ]
+    },
+    "index-kind-choice": {
+      "kind": "choice",
+      "on": [
+        {
+          "when": {
+            "inputEquals": {
+              "options.indexReferences": true
+            }
+          },
+          "target": "reference-reindex"
+        },
+        {
+          "when": {
+            "inputEquals": {
+              "options.indexReferences": false
+            }
+          },
+          "target": "source-index"
+        }
+      ]
+    },
+    "reference-reindex": {
+      "kind": "operator",
+      "ref": "platform/reference-reindex",
+      "on": [
+        {
+          "when": {
+            "decision": "ready"
+          },
+          "target": "mcp-publish-choice",
+          "label": "ready"
+        },
+        {
+          "when": {
+            "decision": "blocked"
+          },
+          "target": "blocked",
+          "label": "blocked"
         }
       ]
     },

@@ -198,13 +198,17 @@
       "additionalProperties": false,
       "required": [
         "publishPublic",
-        "ensureTunnel"
+        "ensureTunnel",
+        "indexReferences"
       ],
       "properties": {
         "publishPublic": {
           "type": "boolean"
         },
         "ensureTunnel": {
+          "type": "boolean"
+        },
+        "indexReferences": {
           "type": "boolean"
         }
       }

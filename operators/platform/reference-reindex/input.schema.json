@@ -1,0 +1,187 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://starci.dev/v6/operators/platform/reference-reindex/input.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "runId", "stage", "status", "facts", "payload"],
+  "properties": {
+    "schemaVersion": { "const": 6 },
+    "runId": { "type": "string", "minLength": 1 },
+    "stage": { "const": "platform.mcp.index" },
+    "status": { "const": "ready" },
+    "facts": { "$ref": "#/$defs/strings" },
+    "payload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["provided", "loads", "session"],
+      "properties": {
+        "provided": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["mcpConfigReceiptRef", "portableRoutesRef", "driftPolicyRef"],
+          "properties": {
+            "mcpConfigReceiptRef": { "$ref": "#/$defs/sessionRef" },
+            "portableRoutesRef": { "$ref": "#/$defs/sessionRef" },
+            "driftPolicyRef": { "$ref": "#/$defs/sessionRef" }
+          }
+        },
+        "loads": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["artifacts", "references", "index", "policy", "runtime", "orchestration"],
+          "properties": {
+            "artifacts": {
+              "type": "array",
+              "minItems": 3,
+              "maxItems": 3,
+              "uniqueItems": true,
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["ref", "revision", "loadMode"],
+                "properties": {
+                  "ref": { "$ref": "#/$defs/sessionRef" },
+                  "revision": { "$ref": "#/$defs/sha256" },
+                  "loadMode": { "const": "session-exact" }
+                }
+              }
+            },
+            "references": {
+              "type": "array",
+              "minItems": 1,
+              "maxItems": 32,
+              "uniqueItems": true,
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["id", "project", "role", "path", "repository", "branch", "targetRevision", "checkoutRevision", "dirty", "historyComparable", "currentFiles", "loadMode"],
+                "properties": {
+                  "id": { "$ref": "#/$defs/referenceId" },
+                  "project": { "type": "string", "pattern": "^[a-z0-9][a-z0-9-]*$" },
+                  "role": { "type": "string", "pattern": "^[a-z0-9][a-z0-9-]*$" },
+                  "path": { "type": "string", "pattern": "^\\.worktrees/references/[A-Za-z0-9._-]+$" },
+                  "repository": { "type": "string", "pattern": "^https://[^\\s]+$" },
+                  "branch": { "type": "string", "minLength": 1 },
+                  "targetRevision": { "$ref": "#/$defs/gitRevision" },
+                  "checkoutRevision": { "$ref": "#/$defs/gitRevision" },
+                  "dirty": { "const": false },
+                  "historyComparable": { "type": "boolean" },
+                  "currentFiles": { "$ref": "#/$defs/files" },
+                  "loadMode": { "const": "metadata-first" }
+                }
+              }
+            },
+            "index": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["contractFingerprint", "partitions", "loadMode"],
+              "properties": {
+                "contractFingerprint": { "$ref": "#/$defs/sha256" },
+                "partitions": {
+                  "type": "array",
+                  "maxItems": 32,
+                  "uniqueItems": true,
+                  "items": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": ["referenceId", "generation", "revision", "contractFingerprint", "indexedFiles", "recordCount", "tombstoneCount"],
+                    "properties": {
+                      "referenceId": { "$ref": "#/$defs/referenceId" },
+                      "generation": { "type": ["string", "null"], "minLength": 1 },
+                      "revision": { "anyOf": [{ "$ref": "#/$defs/gitRevision" }, { "type": "null" }] },
+                      "contractFingerprint": { "anyOf": [{ "$ref": "#/$defs/sha256" }, { "type": "null" }] },
+                      "indexedFiles": { "$ref": "#/$defs/files" },
+                      "recordCount": { "type": "integer", "minimum": 0 },
+                      "tombstoneCount": { "type": "integer", "minimum": 0 }
+                    }
+                  }
+                },
+                "loadMode": { "const": "metadata-only" }
+              }
+            },
+            "policy": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["id", "revision", "strategy", "manualFull", "incrementalCostCeiling", "maxAffectedRecordRatio", "maxDeleteRatio", "loadMode"],
+              "properties": {
+                "id": { "type": "string", "pattern": "^reference-drift-[a-z0-9-]+$" },
+                "revision": { "$ref": "#/$defs/sha256" },
+                "strategy": { "const": "adaptive-budget" },
+                "manualFull": { "type": "boolean" },
+                "incrementalCostCeiling": { "type": "number", "exclusiveMinimum": 0, "maximum": 1 },
+                "maxAffectedRecordRatio": { "type": "number", "exclusiveMinimum": 0, "maximum": 1 },
+                "maxDeleteRatio": { "type": "number", "exclusiveMinimum": 0, "maximum": 1 },
+                "loadMode": { "const": "session-exact" }
+              }
+            },
+            "runtime": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["stateRoot", "referenceRoot", "pythonVersion", "qdrantEdgeVersion", "mcpSdkVersion", "caddyVersion", "qdrantHandleRef", "mcpHandleRef", "caddyHandleRef", "codexUrl", "queryMode", "embeddingMode", "loadMode"],
+              "properties": {
+                "stateRoot": { "const": ".workspaces/local/state/reference-context" },
+                "referenceRoot": { "const": ".worktrees/references" },
+                "pythonVersion": { "type": "string", "pattern": "^3\\.(?:1[0-9]|[2-9][0-9])(?:\\.[0-9]+)?$" },
+                "qdrantEdgeVersion": { "type": "string", "minLength": 1 },
+                "mcpSdkVersion": { "type": "string", "minLength": 1 },
+                "caddyVersion": { "type": "string", "minLength": 1 },
+                "qdrantHandleRef": { "$ref": "#/$defs/sessionRef" },
+                "mcpHandleRef": { "$ref": "#/$defs/sessionRef" },
+                "caddyHandleRef": { "$ref": "#/$defs/sessionRef" },
+                "codexUrl": { "type": "string", "pattern": "^http://(?:127\\.0\\.0\\.1|localhost):[0-9]+/mcp/?$" },
+                "queryMode": { "const": "full-text-and-path" },
+                "embeddingMode": { "enum": ["disabled", "optional"] },
+                "loadMode": { "const": "metadata-only" }
+              }
+            },
+            "orchestration": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["mode", "profileRef", "providerRef"],
+              "properties": {
+                "mode": { "enum": ["economical", "balanced", "parallel"] },
+                "profileRef": { "enum": ["orchestration/modes/economical.json", "orchestration/modes/balanced.json", "orchestration/modes/parallel.json"] },
+                "providerRef": { "type": "string", "pattern": "^orchestration/providers/[a-z0-9-]+\\.json$" }
+              }
+            }
+          }
+        },
+        "session": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["taskId", "inputRef", "outputRef", "scratchPrefix", "retention"],
+          "properties": {
+            "taskId": { "type": "string", "minLength": 1 },
+            "inputRef": { "$ref": "#/$defs/sessionRef" },
+            "outputRef": { "$ref": "#/$defs/sessionRef" },
+            "scratchPrefix": { "$ref": "#/$defs/sessionRef" },
+            "retention": { "const": "until-skill-terminal" }
+          }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "sessionRef": { "type": "string", "pattern": "^session://tasks/[A-Za-z0-9._-]+/.+$" },
+    "sha256": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
+    "gitRevision": { "type": "string", "pattern": "^[0-9a-f]{40,64}$" },
+    "referenceId": { "type": "string", "pattern": "^[a-z0-9][a-z0-9._-]*$" },
+    "strings": { "type": "array", "maxItems": 64, "uniqueItems": true, "items": { "type": "string", "minLength": 1 } },
+    "files": {
+      "type": "array",
+      "maxItems": 100000,
+      "uniqueItems": true,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["path", "blobSha256", "bytes", "recordCount"],
+        "properties": {
+          "path": { "type": "string", "minLength": 1, "pattern": "^(?![\\/]|[A-Za-z]:[\\/])(?!.*(?:^|[\\/])\\.\\.(?:[\\/]|$)).+$" },
+          "blobSha256": { "$ref": "#/$defs/sha256" },
+          "bytes": { "type": "integer", "minimum": 0 },
+          "recordCount": { "type": "integer", "minimum": 0 }
+        }
+      }
+    }
+  }
+}

@@ -1,11 +1,11 @@
 ---
 name: starci-source-index-publish
-description: "Use to configure and index StarCi business or generated-contract context, optionally publishing its MCP boundary. Do not use for product delivery, Sonar, observability, or a tunnel-only request."
+description: "Use to configure and index StarCi business, generated-contract, or clean .worktrees/references context, optionally publishing its MCP boundary. Do not use for product delivery, Sonar, observability, or a tunnel-only request."
 ---
 
 # starci-source-index-publish
 
-Use to configure and index StarCi business or generated-contract context, optionally publishing its MCP boundary. Do not use for product delivery, Sonar, observability, or a tunnel-only request.
+Use to configure and index StarCi business, generated-contract, or clean .worktrees/references context, optionally publishing its MCP boundary. Do not use for product delivery, Sonar, observability, or a tunnel-only request.
 
 ## INPUT ANALYSIS
 

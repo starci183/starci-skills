@@ -1,0 +1,2 @@
+mcp==2.0.0
+qdrant-edge-py==0.8.0

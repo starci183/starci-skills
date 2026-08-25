@@ -5,6 +5,7 @@ Global `@selection` has already selected this one-flow skill from prompt intent.
 1. Resolve project and declared context inputs.
 2. Distinguish local indexing from public MCP mutation.
 3. Evaluate tunnel work only for public publication.
+4. For reference mode, resolve portable routes into clean .worktrees/references checkouts and require a versioned adaptive drift policy, Python Qdrant Edge, full-text/path lookup, optional embeddings, loopback Caddy, and ignored machine-local runtime state.
 
 Reject stale or missing authority/evidence, an ambiguous target, a write root outside scope, external mutation without approval, or an option outside the closed schema. Do not reconsider other skills here; return to global analysis if selection is wrong.
 
@@ -16,3 +17,4 @@ The fixed first state is `mcp-config`. Emit only normalized scope and facts as t
 | --- | --- | --- |
 | `publishPublic` | `boolean` | Publish MCP through the declared public boundary. |
 | `ensureTunnel` | `boolean` | Reconcile a tunnel before MCP publication. |
+| `indexReferences` | `boolean` | Index clean local reference checkouts instead of business/generated-contract context. |
