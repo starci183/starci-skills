@@ -33,7 +33,8 @@
     "test:operator-harness": "node tests/skill-harness/operator-harness.mjs --write",
     "test:frontend-context": "node --test scripts/build-frontend-coding-context.spec.mjs",
     "test:node": "npm run check:orchestration && npm run check:operators && npm run check:skills && npm run test:routes && npm run test:source-readiness && npm run test:workspace-routes && npm run test:skill-harness && npm run test:operator-harness && npm run test:frontend-context && npm run check:release",
-    "test:python": "python -m unittest discover -s runtime/knowledge-runtime/tests -v",
+    "setup:python": "node scripts/python-setup.mjs",
+    "test:python": "node scripts/python-runtime.mjs -m unittest discover -s runtime/knowledge-runtime/tests -v",
     "test": "npm run test:node && npm run test:python",
     "test:all": "npm test"
   },
