@@ -15,12 +15,14 @@ This boundary keeps selection cheap. Route metadata may identify the target chec
 
 Apply this guard to every Git or source action, including an ad-hoc action for which no StarCi skill is selected:
 
-1. If the request names or unambiguously implies both a project and role, read only `<Source>/.workspaces/projects/<project>/<role>.json`.
-2. Validate that portable declaration, then read its matching hydrated route at `<Source>/.workspaces/local/routes/<project>/<role>/config.json`.
-3. If the local route is absent or stale, run the declared workspace initialization/hydration flow before touching Git or product source.
-4. Verify the resolved checkout's directory, origin and branch against the route. Use that checkout for the action.
-5. Never substitute the Source root, current working directory, a similarly named sibling repository or a Git worktree merely because it is nearby.
-6. If project, role or route identity remains ambiguous, stop and ask one focused clarification. Do not guess.
+1. Bind `<Source>` to the host-provided Source identity that owns the single `.claude` runtime. Never rebind it to the current working directory, a routed checkout or a Git worktree.
+2. Do not probe a routed checkout for `.claude/INDEX.md`. Its absence is expected and does not authorize a fallback Source, runtime copy or bootstrap repair.
+3. If the request names or unambiguously implies both a project and role, read only `<Source>/.workspaces/projects/<project>/<role>.json`.
+4. Validate that portable declaration, then read its matching hydrated route at `<Source>/.workspaces/local/routes/<project>/<role>/config.json`.
+5. If the local route is absent or stale, run the declared workspace initialization/hydration flow before touching Git or product source.
+6. Verify the resolved checkout's directory, origin and branch against the route. Use that checkout for the action.
+7. Never substitute the Source root, current working directory, a similarly named sibling repository or a Git worktree merely because it is nearby.
+8. If project, role or route identity remains ambiguous, stop and ask one focused clarification. Do not guess.
 
 Keep route resolution ephemeral. It constrains the selected skill's project/scope or the no-skill action; it is not added to the skill-selection envelope and does not authorize source loading by itself.
 

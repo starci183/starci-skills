@@ -15,6 +15,18 @@ These names are not interchangeable:
 | **repository checkout** | The actual directory selected by the resolved route. Git and source actions run here only after route identity is verified. | The hydrated route plus observed Git origin and branch |
 | **Git worktree** | An additional checkout created by `git worktree` that shares Git object storage with a repository but has its own working tree and checked-out branch. It is not a workspace, portable route or local route unless a portable route explicitly selects it. | `git worktree list --porcelain` for the resolved repository |
 
+## Single runtime invariant
+
+One declared workspace has exactly one Source that owns `.claude`, `AGENTS.md` and `CLAUDE.md`. A
+repository checkout or Git worktree reached through a workspace route follows that Source runtime; it
+does not become another Source merely because product work runs there.
+
+The absence of `<checkout>/.claude/INDEX.md` is therefore expected and is never evidence that the
+runtime, bootstrap or route is missing. Do not clone, copy or rediscover `.claude` inside a routed
+checkout. Resolve `<Source>` from the host-provided Source identity, then use its portable and hydrated
+routes to select the checkout. Never infer `<Source>` from the current working directory or by walking
+upward from the target checkout.
+
 The invariant is `project + role -> portable route -> hydrated local route -> verified checkout`. Similar directory names, a nearby clone, the Source root and the current working directory are never routing evidence. For example, a request for a project's `fe` role must resolve that project's `fe.json`; a sibling repository with the project name is not a substitute.
 
 ## Runtime route

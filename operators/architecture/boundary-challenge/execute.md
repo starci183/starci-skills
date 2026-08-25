@@ -22,17 +22,17 @@ This operator challenges a proposed backend boundary. Input, output, context bin
 
 **Read:** only `payload.loads.source.targetFiles`.
 **Context:** broad repository scans, undeclared paths, and indexed source summaries are forbidden.
-**Analysis:** verify each hash and extract only evidence required to challenge a proposed backend boundary.
+**Analysis:** verify each hash and extract only evidence required to challenge a proposed backend boundary. Re-walk the concrete flow across deployables and stores rather than trusting the plan's subsystem labels.
 **Session write:** `payload.session.scratchPrefix/source-observations/<worker-id>`.
 **Orchestration:** balanced or parallel mode may fan out disjoint read-only files. The coordinator validates and joins all observations. Workers never write source.
-**Stop:** stop on hash drift, unresolved ownership, or a need to inspect another file.
+**Stop:** stop on hash drift, unresolved ownership, an untraced runtime hop, or a need to inspect another file.
 
 ## Step 4 — Perform the operator decision
 
 **Read:** validated bindings, joined exact-source observations, and accepted machine facts.
 **Context:** use no undeclared knowledge, business feature, artifact, or source file.
-**Decision criteria:** ownership, dependencies, hashes, exclusions, and tests are consistent.
-**Analysis:** inspect boundary evidence and classify it as clean, revise, or blocked. Record evidence, criteria, and conclusions only; never record chain-of-thought.
+**Decision criteria:** repository ownership, deployable/runtime ownership, data ownership, transport direction, consistency, hashes, exclusions, and tests are consistent.
+**Analysis:** inspect boundary evidence and classify it as clean, revise, or blocked. Challenge specifically for central-service overreach, duplicated sources of truth, a missing per-instance controller path, reversed call direction, unowned retries/idempotency, and runtime data placed outside its owning store. Record evidence, criteria, and conclusions only; never record chain-of-thought.
 **Session write:** candidate `boundaryChallengeRef` at `payload.session.scratchPrefix/candidate`.
 **Orchestration:** economical mode is sequential. Balanced or parallel mode may delegate independent read-only comparisons. Each worker receives only assigned refs; the coordinator owns joining and the decision.
 **Stop:** emit only a declared decision when evidence is missing, contradictory, or outside scope.

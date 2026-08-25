@@ -99,7 +99,8 @@
         "context",
         "cleanup",
         "evidenceRefs",
-        "findings"
+        "findings",
+        "challengeSummary"
       ],
       "properties": {
         "decision": {
@@ -108,6 +109,156 @@
             "revise",
             "blocked"
           ]
+        },
+        "challengeSummary": {
+          "type": "object",
+          "description": "Structured falsification record proving that the option set was attacked rather than merely compared or presented.",
+          "additionalProperties": false,
+          "required": [
+            "stance",
+            "verdict",
+            "assumptionIds",
+            "counterexampleIds",
+            "rejectedOptionIds",
+            "failureModeIds",
+            "falsificationTestIds",
+            "operationalSurpriseIds",
+            "unresolvedCriticalIds",
+            "recommendationChanged"
+          ],
+          "properties": {
+            "stance": {
+              "const": "falsification-first"
+            },
+            "verdict": {
+              "enum": [
+                "ready",
+                "revise",
+                "blocked"
+              ]
+            },
+            "assumptionIds": {
+              "$ref": "#/$defs/nonEmptyIdSet"
+            },
+            "counterexampleIds": {
+              "$ref": "#/$defs/nonEmptyIdSet"
+            },
+            "rejectedOptionIds": {
+              "$ref": "#/$defs/nonEmptyIdSet"
+            },
+            "failureModeIds": {
+              "$ref": "#/$defs/nonEmptyIdSet"
+            },
+            "falsificationTestIds": {
+              "$ref": "#/$defs/nonEmptyIdSet"
+            },
+            "operationalSurpriseIds": {
+              "$ref": "#/$defs/nonEmptyIdSet"
+            },
+            "unresolvedCriticalIds": {
+              "type": "array",
+              "uniqueItems": true,
+              "items": {
+                "$ref": "#/$defs/id"
+              }
+            },
+            "recommendationChanged": {
+              "type": "boolean"
+            }
+          }
+        },
+        "reviewPreview": {
+          "type": "object",
+          "description": "Executable binding for the in-conversation interactive architecture review rendered before approval is requested.",
+          "additionalProperties": false,
+          "required": [
+            "renderer",
+            "mediaType",
+            "artifactRef",
+            "contentSha256",
+            "optionSetSha256",
+            "optionIds",
+            "recommendedOptionId",
+            "scenarioIds",
+            "approvalCommands",
+            "interactive"
+          ],
+          "properties": {
+            "renderer": {
+              "const": "visualize"
+            },
+            "mediaType": {
+              "const": "text/html"
+            },
+            "artifactRef": {
+              "$ref": "#/$defs/sessionRef"
+            },
+            "contentSha256": {
+              "$ref": "#/$defs/sha256"
+            },
+            "optionSetSha256": {
+              "$ref": "#/$defs/sha256"
+            },
+            "optionIds": {
+              "type": "array",
+              "minItems": 2,
+              "maxItems": 4,
+              "uniqueItems": true,
+              "items": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 120
+              }
+            },
+            "recommendedOptionId": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 120
+            },
+            "scenarioIds": {
+              "type": "array",
+              "minItems": 5,
+              "uniqueItems": true,
+              "items": {
+                "enum": [
+                  "normal",
+                  "retry",
+                  "concurrency",
+                  "outage",
+                  "rollback"
+                ]
+              }
+            },
+            "approvalCommands": {
+              "type": "array",
+              "minItems": 2,
+              "maxItems": 4,
+              "uniqueItems": true,
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "decisionId",
+                  "command"
+                ],
+                "properties": {
+                  "decisionId": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 120
+                  },
+                  "command": {
+                    "type": "string",
+                    "pattern": "^OK ARCHITECTURE .+@[0-9a-f]{64}$",
+                    "maxLength": 220
+                  }
+                }
+              }
+            },
+            "interactive": {
+              "const": true
+            }
+          }
         },
         "state": {
           "type": "object",
@@ -184,6 +335,16 @@
           ],
           "properties": {
             "challengeReceiptRef": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/sessionRef"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "reviewArtifactRef": {
               "anyOf": [
                 {
                   "$ref": "#/$defs/sessionRef"
@@ -288,6 +449,24 @@
     }
   },
   "$defs": {
+    "id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 160,
+      "pattern": "^[a-z0-9]+(?:[._-][a-z0-9]+)*$"
+    },
+    "nonEmptyIdSet": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "$ref": "#/$defs/id"
+      }
+    },
+    "sha256": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
     "sessionRef": {
       "type": "string",
       "pattern": "^session://tasks/[A-Za-z0-9._-]+/.+$"

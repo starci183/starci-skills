@@ -9,7 +9,8 @@ const outcomes = {
     "code": "fe-layout-directions-ready",
     "retryable": false,
     "factsAdd": [
-      "layout-directions-ready"
+      "layout-directions-ready",
+      "layout-visual-preview-ready"
     ],
     "factsRemove": [
       "layout-feedback-recorded"
@@ -44,11 +45,22 @@ function semanticErrors(value) {
 
   if (success && produced.artifactRefs.length === 0) errors.push('$.payload.produced.artifactRefs: successful analysis requires a session artifact reference');
 
+  const preview = payload.reviewPreview;
+  if (!sameStrings(preview.viewports, ['wide', 'intermediate', 'compact'])) errors.push('$.payload.reviewPreview.viewports: must cover wide, intermediate, and compact exactly');
+  if (!preview.directionIds.includes(preview.recommendedDirectionId)) errors.push('$.payload.reviewPreview.recommendedDirectionId: must identify one rendered direction');
+  if (!produced.artifactRefs.includes(preview.artifactRef)) errors.push('$.payload.reviewPreview.artifactRef: must be registered in produced.artifactRefs');
+  if (!payload.evidenceRefs.includes(preview.artifactRef)) errors.push('$.payload.reviewPreview.artifactRef: must be registered in evidenceRefs');
+  const commandIds = preview.approvalCommands.map((item) => item.directionId);
+  if (!sameStrings(commandIds, preview.directionIds)) errors.push('$.payload.reviewPreview.approvalCommands: must cover every rendered direction exactly once');
+  for (const item of preview.approvalCommands) {
+    if (item.command !== `OK LAYOUT ${item.directionId}`) errors.push(`$.payload.reviewPreview.approvalCommands: invalid exact approval command for ${item.directionId}`);
+  }
+
   const taskMatch = payload.evidenceRefs[0]?.match(/^session:\/\/tasks\/([^/]+)\//);
   if (!taskMatch) errors.push('$.payload.evidenceRefs: cannot determine task ownership');
   else {
     const prefix = `session://tasks/${taskMatch[1]}/`;
-    const refs = [...payload.evidenceRefs, ...payload.cleanup.scratchRefs, ...payload.produced.artifactRefs, ...payload.produced.externalEffects.map((item) => item.evidenceRef)];
+    const refs = [preview.artifactRef, ...payload.evidenceRefs, ...payload.cleanup.scratchRefs, ...payload.produced.artifactRefs, ...payload.produced.externalEffects.map((item) => item.evidenceRef)];
     for (const ref of refs) if (!ref.startsWith(prefix)) errors.push(`$: session ref is outside output task: ${ref}`);
   }
   return errors;

@@ -22,17 +22,17 @@ This operator captures decision-relevant current architecture. Input, output, co
 
 **Read:** only `payload.loads.source.targetFiles`.
 **Context:** broad repository scans, undeclared paths, and indexed source summaries are forbidden.
-**Analysis:** verify each hash and extract only evidence required to capture decision-relevant current architecture.
+**Analysis:** verify each hash and extract only evidence required to capture decision-relevant current architecture. For monorepos, follow concrete callers and transports across deployable apps; identify which process accepts ingress, which process executes the use case, which store it owns, which process performs external side effects, and how desired state and evidence cross boundaries.
 **Session write:** `payload.session.scratchPrefix/source-observations/<worker-id>`.
 **Orchestration:** balanced or parallel mode may fan out disjoint read-only files. The coordinator validates and joins all observations. Workers never write source.
-**Stop:** stop on hash drift, unresolved ownership, or a need to inspect another file.
+**Stop:** stop on hash drift, unresolved ownership, an untraced runtime hop, or a need to inspect another file.
 
 ## Step 4 — Perform the operator decision
 
 **Read:** validated bindings, joined exact-source observations, and accepted machine facts.
 **Context:** use no undeclared knowledge, business feature, artifact, or source file.
-**Decision criteria:** each included fact changes the decision and has exact artifact or file evidence.
-**Analysis:** summarize topology, constraints, dependencies, and failure evidence. Record evidence, criteria, and conclusions only; never record chain-of-thought.
+**Decision criteria:** each included fact changes the decision, has exact artifact or file evidence, and identifies the deployable and data owner rather than only a logical subsystem.
+**Analysis:** summarize topology as an ordered runtime flow with process, store, transport direction, trust boundary, side-effect owner and reconciliation path. Explicitly separate central desired-state/control responsibilities from per-instance execution responsibilities when both exist. Record evidence, criteria, and conclusions only; never record chain-of-thought.
 **Session write:** candidate `currentStateRef` at `payload.session.scratchPrefix/candidate`.
 **Orchestration:** economical mode is sequential. Balanced or parallel mode may delegate independent read-only comparisons. Each worker receives only assigned refs; the coordinator owns joining and the decision.
 **Stop:** emit only a declared decision when evidence is missing, contradictory, or outside scope.

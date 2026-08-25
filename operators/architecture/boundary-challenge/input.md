@@ -24,4 +24,4 @@ This operator challenges a proposed backend boundary. The input is an ephemeral 
 - `orchestration`: resolve execution mode separately from provider/model mapping.
 - `source`: open only declared exact files and verify their hashes; broad repository context is forbidden.
 
-Acceptance requires that ownership, dependencies, hashes, exclusions, and tests are consistent. Validate the whole envelope before any load or side effect. Loaded content and intermediate analysis remain session-only.
+Acceptance requires that repository, deployable/runtime and data ownership, transport direction, consistency, dependencies, hashes, exclusions and tests are consistent. The challenge must reject central-service overreach, duplicated sources of truth, missing instance-controller hops and reversed cross-process call directions. Validate the whole envelope before any load or side effect. Loaded content and intermediate analysis remain session-only.

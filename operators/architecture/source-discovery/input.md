@@ -26,4 +26,4 @@ This operator resolves exact backend files for the approved scope. The input is 
 - `business`: load the exact declared revision from `.worktrees/<project>/businesses/`; product source is not business authority.
 - `source`: open only declared exact files and verify their hashes; broad repository context is forbidden.
 
-Acceptance requires that each selected file has role, hash, relevance reason, and partition provenance. Validate the whole envelope before any load or side effect. Loaded content and intermediate analysis remain session-only.
+Acceptance requires that each selected file has role, hash, relevance reason, partition provenance, deployable owner and a proven place in the end-to-end flow. For a monorepo, the evidence must trace ingress, execution, local persistence or side effect, and every cross-process reconciliation/reporting edge; names and directory placement alone never prove ownership. Validate the whole envelope before any load or side effect. Loaded content and intermediate analysis remain session-only.

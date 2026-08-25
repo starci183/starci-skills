@@ -8,6 +8,20 @@ const routes = {
     "fact": "business-model-ready",
     "state": "completed",
     "code": "business-model-ready"
+  },
+  "revise": {
+    "stage": "business.model",
+    "status": "ready",
+    "fact": "business-model-feedback",
+    "state": "replan",
+    "code": "business-model-revise"
+  },
+  "blocked": {
+    "stage": "business.blocked",
+    "status": "blocked",
+    "fact": "business-model-blocked",
+    "state": "blocked",
+    "code": "business-model-blocked"
   }
 };
 
@@ -21,6 +35,10 @@ function semantic(value) {
   if (!value.facts.includes(route.fact) || !value.payload.state.emits.factsAdd.includes(route.fact)) errors.push(`/facts: missing emitted fact ${route.fact}`);
   const blocked = value.payload.state.status === 'blocked';
   if (!blocked && value.payload.produced.businessModelRef === null) errors.push('/payload/produced/businessModelRef: successful output requires a session artifact');
+  const challenge = value.payload.challengeSummary;
+  if (challenge.verdict !== value.payload.decision) errors.push('/payload/challengeSummary/verdict: must match payload.decision');
+  if (value.payload.decision === 'ready' && challenge.unresolvedCriticalIds.length !== 0) errors.push('/payload/challengeSummary/unresolvedCriticalIds: ready model cannot retain a critical challenge');
+  if (value.payload.decision !== 'ready' && challenge.unresolvedCriticalIds.length === 0) errors.push('/payload/challengeSummary/unresolvedCriticalIds: revise or blocked requires an explicit critical challenge');
   if (value.payload.produced.durableWrites.length !== 0) errors.push('/payload/produced/durableWrites: read-only operator cannot report durable writes');
   if (value.payload.cleanup.retention !== 'until-skill-terminal' || value.payload.cleanup.purgeAt !== 'skill-terminal') errors.push('/payload/cleanup: terminal purge is mandatory');
   return errors;

@@ -38,7 +38,8 @@
       "stage": "layout.review",
       "status": "pending",
       "factsAdd": [
-        "layout-directions-ready"
+        "layout-directions-ready",
+        "layout-visual-preview-ready"
       ],
       "factsRemove": [
         "layout-feedback-recorded"
@@ -47,12 +48,14 @@
   ],
   "sideEffects": [
     "keep input, output, loaded context, worker observations, drafts, evidence, and receipts in task-session storage only",
+    "create one task-session HTML review artifact that the host renders through visualize before requesting layout approval",
     "purge every intermediate session object at every parent-skill terminal state"
   ],
   "stopConditions": [
     "invalid-input",
     "missing-approved-flow",
     "missing-block-owner",
+    "missing-visualize-review-preview",
     "stale-artifact-hash",
     "fewer-than-two-material-directions",
     "Stop on a missing Block owner, stale approved hash, incomplete journey page, or fewer than two materially different requested directions.",

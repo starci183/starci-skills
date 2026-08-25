@@ -294,7 +294,7 @@
         {
           "id": "execute-context-discipline",
           "verdict": "pass",
-          "evidence": "5 steps; missing markers: none; vague catch-all: false; unconstrained refs=1; unbounded arrays=9"
+          "evidence": "5 steps; missing markers: none; vague catch-all: false; unconstrained refs=1; unbounded arrays=12"
         }
       ],
       "summary": {
@@ -317,15 +317,18 @@
           "broadFields": []
         },
         "output": {
-          "objects": 11,
+          "objects": 14,
           "openObjects": [
             "$.allOf[0].oneOf[0]",
             "$.allOf[0].oneOf[1]",
             "$.allOf[0].oneOf[2]"
           ],
-          "arrays": 7,
+          "arrays": 12,
           "unboundedArrays": [
             "$.facts",
+            "$.payload.challengeSummary.assumptionIds",
+            "$.payload.challengeSummary.unresolvedCriticalIds",
+            "$.payload.reviewPreview.scenarioIds",
             "$.payload.state.emits.factsAdd",
             "$.payload.produced.durableWrites",
             "$.payload.context.used",
@@ -896,12 +899,12 @@
         {
           "id": "decision-state-route-correlation",
           "verdict": "pass",
-          "evidence": "1 outcome(s) are schema- or semantic-bound"
+          "evidence": "3 outcome(s) are schema- or semantic-bound"
         },
         {
           "id": "execute-context-discipline",
           "verdict": "pass",
-          "evidence": "5 steps; missing markers: none; vague catch-all: false; unconstrained refs=1; unbounded arrays=9"
+          "evidence": "5 steps; missing markers: none; vague catch-all: false; unconstrained refs=1; unbounded arrays=12"
         }
       ],
       "summary": {
@@ -924,13 +927,18 @@
           "broadFields": []
         },
         "output": {
-          "objects": 9,
+          "objects": 12,
           "openObjects": [
-            "$.allOf[0].oneOf[0]"
+            "$.allOf[0].oneOf[0]",
+            "$.allOf[0].oneOf[1]",
+            "$.allOf[0].oneOf[2]"
           ],
-          "arrays": 7,
+          "arrays": 10,
           "unboundedArrays": [
             "$.facts",
+            "$.payload.challengeSummary.assumptionIds",
+            "$.payload.challengeSummary.stakeholderConflictIds",
+            "$.payload.challengeSummary.unresolvedCriticalIds",
             "$.payload.state.emits.factsAdd",
             "$.payload.produced.durableWrites",
             "$.payload.context.used",
@@ -3094,11 +3102,11 @@
           "broadFields": []
         },
         "output": {
-          "objects": 11,
+          "objects": 13,
           "openObjects": [
             "$.allOf[0].oneOf[0]"
           ],
-          "arrays": 10,
+          "arrays": 13,
           "unboundedArrays": [
             "$.facts",
             "$.payload.state.emits.factsAdd",

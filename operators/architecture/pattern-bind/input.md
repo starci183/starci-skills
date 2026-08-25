@@ -24,4 +24,4 @@ This operator binds backend patterns to discovered responsibilities. The input i
 - `orchestration`: resolve execution mode separately from provider/model mapping.
 - `business`: load the exact declared revision from `.worktrees/<project>/businesses/`; product source is not business authority.
 
-Acceptance requires that every pattern has responsibility, dependency direction, exception, and proof. Validate the whole envelope before any load or side effect. Loaded content and intermediate analysis remain session-only.
+Acceptance requires that every pattern has responsibility, deployable owner, data owner, dependency and transport direction, consistency model, exception, and proof. In a monorepo, configuration/control, runtime execution, persistence, external side effects and evidence reporting must be bound independently before any shared abstraction is selected. Validate the whole envelope before any load or side effect. Loaded content and intermediate analysis remain session-only.

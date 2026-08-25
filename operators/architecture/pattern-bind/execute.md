@@ -22,8 +22,8 @@ This operator binds backend patterns to discovered responsibilities. Input, outp
 
 **Read:** validated bindings, and accepted machine facts.
 **Context:** use no undeclared knowledge, business feature, artifact, or source file.
-**Decision criteria:** every pattern has responsibility, dependency direction, exception, and proof.
-**Analysis:** apply boundary knowledge to the exact source receipt. Record evidence, criteria, and conclusions only; never record chain-of-thought.
+**Decision criteria:** every pattern has responsibility, deployable owner, data owner, dependency and transport direction, consistency model, exception, and proof.
+**Analysis:** apply boundary knowledge to the exact source receipt. Bind desired-state/configuration, runtime execution, persistence, side effects and evidence reporting separately; do not collapse them into one owner merely because they share a feature name or repository. Record evidence, criteria, and conclusions only; never record chain-of-thought.
 **Session write:** candidate `patternBindingRef` at `payload.session.scratchPrefix/candidate`.
 **Orchestration:** economical mode is sequential. Balanced or parallel mode may delegate independent read-only comparisons. Each worker receives only assigned refs; the coordinator owns joining and the decision.
 **Stop:** emit only a declared decision when evidence is missing, contradictory, or outside scope.

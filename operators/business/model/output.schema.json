@@ -28,6 +28,34 @@
             "stage",
             "status"
           ]
+        },
+        {
+          "properties": {
+            "stage": {
+              "const": "business.model"
+            },
+            "status": {
+              "const": "ready"
+            }
+          },
+          "required": [
+            "stage",
+            "status"
+          ]
+        },
+        {
+          "properties": {
+            "stage": {
+              "const": "business.blocked"
+            },
+            "status": {
+              "const": "blocked"
+            }
+          },
+          "required": [
+            "stage",
+            "status"
+          ]
         }
       ]
     }
@@ -42,12 +70,15 @@
     },
     "stage": {
       "enum": [
-        "business.publish"
+        "business.publish",
+        "business.model",
+        "business.blocked"
       ]
     },
     "status": {
       "enum": [
-        "ready"
+        "ready",
+        "blocked"
       ]
     },
     "facts": {
@@ -68,13 +99,77 @@
         "context",
         "cleanup",
         "evidenceRefs",
-        "findings"
+        "findings",
+        "challengeSummary"
       ],
       "properties": {
         "decision": {
           "enum": [
-            "ready"
+            "ready",
+            "revise",
+            "blocked"
           ]
+        },
+        "challengeSummary": {
+          "type": "object",
+          "description": "Structured falsification record produced after the candidate model is frozen and before it may be presented for approval.",
+          "additionalProperties": false,
+          "required": [
+            "stance",
+            "verdict",
+            "assumptionIds",
+            "counterexampleIds",
+            "alternativeIds",
+            "failureModeIds",
+            "falsificationTestIds",
+            "stakeholderConflictIds",
+            "unresolvedCriticalIds",
+            "recommendationChanged"
+          ],
+          "properties": {
+            "stance": {
+              "const": "falsification-first"
+            },
+            "verdict": {
+              "enum": [
+                "ready",
+                "revise",
+                "blocked"
+              ]
+            },
+            "assumptionIds": {
+              "$ref": "#/$defs/nonEmptyIdSet"
+            },
+            "counterexampleIds": {
+              "$ref": "#/$defs/nonEmptyIdSet"
+            },
+            "alternativeIds": {
+              "$ref": "#/$defs/nonEmptyIdSet"
+            },
+            "failureModeIds": {
+              "$ref": "#/$defs/nonEmptyIdSet"
+            },
+            "falsificationTestIds": {
+              "$ref": "#/$defs/nonEmptyIdSet"
+            },
+            "stakeholderConflictIds": {
+              "type": "array",
+              "uniqueItems": true,
+              "items": {
+                "$ref": "#/$defs/id"
+              }
+            },
+            "unresolvedCriticalIds": {
+              "type": "array",
+              "uniqueItems": true,
+              "items": {
+                "$ref": "#/$defs/id"
+              }
+            },
+            "recommendationChanged": {
+              "type": "boolean"
+            }
+          }
         },
         "state": {
           "type": "object",
@@ -99,7 +194,9 @@
             },
             "code": {
               "enum": [
-                "business-model-ready"
+                "business-model-ready",
+                "business-model-revise",
+                "business-model-blocked"
               ]
             },
             "retryable": {
@@ -116,12 +213,15 @@
               "properties": {
                 "stage": {
                   "enum": [
-                    "business.publish"
+                    "business.publish",
+                    "business.model",
+                    "business.blocked"
                   ]
                 },
                 "status": {
                   "enum": [
-                    "ready"
+                    "ready",
+                    "blocked"
                   ]
                 },
                 "factsAdd": {
@@ -250,6 +350,20 @@
     }
   },
   "$defs": {
+    "id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 160,
+      "pattern": "^[a-z0-9]+(?:[._-][a-z0-9]+)*$"
+    },
+    "nonEmptyIdSet": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "$ref": "#/$defs/id"
+      }
+    },
     "sessionRef": {
       "type": "string",
       "pattern": "^session://tasks/[A-Za-z0-9._-]+/.+$"

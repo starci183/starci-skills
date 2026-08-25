@@ -68,6 +68,20 @@
           },
           "target": "model-approval",
           "label": "ready"
+        },
+        {
+          "when": {
+            "decision": "revise"
+          },
+          "target": "model",
+          "label": "revise"
+        },
+        {
+          "when": {
+            "decision": "blocked"
+          },
+          "target": "blocked",
+          "label": "blocked"
         }
       ]
     },

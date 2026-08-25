@@ -23,4 +23,4 @@ This operator builds a closed business model. The input is an ephemeral object o
 - `orchestration`: resolve execution mode separately from provider/model mapping.
 - `business`: load the exact declared revision from `.worktrees/<project>/businesses/`; product source is not business authority.
 
-Acceptance requires that actors, journeys, rules, states, operations, and acceptance evidence remain traceable. Validate the whole envelope before any load or side effect. Loaded content and intermediate analysis remain session-only.
+Acceptance requires that actors, journeys, rules, states, operations, and acceptance evidence remain traceable. Treat stakeholder wording, requested solutions and the previous head as claims to test, not conclusions to preserve. Validate the whole envelope before any load or side effect. Loaded content and intermediate analysis remain session-only.

@@ -40,18 +40,18 @@ This operator's responsibility is to compose approved journeys, pages, states, a
 **Read:** normalized business and authority constraints plus only the exact source-capability records or targets declared above.
 **Context:** do not load another feature, knowledge record, contract generation, file, service, or provider target.
 **Decision evidence:** For every page, order Blocks by user task and information weight; assign grid spans, density, sticky behavior, progressive disclosure, responsive transformation, and one global journey-progress owner when required.
-**Action:** execute that classification or preparation and attach evidence by stable input identity; record applied rules and observable conclusions, never hidden reasoning.
-**Session write:** a normalized draft at `scratchPrefix/layout-draft`.
+**Action:** execute that classification or preparation and attach evidence by stable input identity; record applied rules and observable conclusions, never hidden reasoning. Build one accessible interactive HTML comparison for every direction and all three responsive states, with the recommended direction useful on first render and each exact `OK LAYOUT <id>` command visible. Bind it to `payload.reviewPreview` with renderer `visualize`; a prose summary or static code block is not a preview.
+**Session write:** a normalized draft at `scratchPrefix/layout-draft` and the HTML review artifact at `scratchPrefix/layout-review.html`.
 **Durable write:** none at this step.
-**Stop:** stop on a missing Block owner, stale approved hash, incomplete journey page, or fewer than two materially different requested directions.
+**Stop:** stop on a missing Block owner, stale approved hash, incomplete journey page, fewer than two materially different requested directions, or inability to produce the interactive `visualize` review artifact.
 **Orchestration:** Workers may compose disjoint pages from the same journey and contract generation. The coordinator joins through global navigation, progress, shared Block ownership, and responsive invariants.
 
 ## Step 5 — Verify and commit the accepted result
 
 **Read:** the normalized draft, joined worker observations, frozen constraints, and expected emitted facts.
 **Context:** no new context may be loaded during verification.
-**Decision evidence:** Render a complete direction graph for wide, intermediate, and compact states; prove every Block has a purpose, data owner, state coverage, and source-capability verdict.
-**Action:** validate completeness, conflict freedom, boundary compliance, and decision-to-route mapping. The coordinator rejects missing worker IDs or conflicting observations before any effect.
+**Decision evidence:** Render a complete direction graph for wide, intermediate, and compact states; prove every Block has a purpose, data owner, state coverage, and source-capability verdict. Verify the HTML artifact renders all direction IDs, the recommended direction, responsive controls, and exact approval commands.
+**Action:** validate completeness, conflict freedom, boundary compliance, decision-to-route mapping, and the `reviewPreview` correlations enforced by `validate-output.mjs`. The coordinator rejects missing worker IDs, conflicting observations, or a missing/unrenderable preview before any effect.
 **Session write:** accepted evidence and before/after descriptors under `scratchPrefix/accepted-result`.
 **Durable write:** None. The accepted result remains a task-session value.
 **Stop:** stop on a missing Block owner, stale approved hash, incomplete journey page, or fewer than two materially different requested directions.
@@ -62,7 +62,7 @@ This operator's responsibility is to compose approved journeys, pages, states, a
 **Read:** accepted result, minimal context lineage, emitted facts, and all allocated scratch references.
 **Context:** references and revisions actually used only; omit copied documents, prompts, worker transcripts, and reasoning.
 **Decision evidence:** selected decision exactly matches one manifest emit, `payload.state`, root stage/status, and facts additions/removals.
-**Action:** construct `output.schema.json`, validate it with `validate-output.mjs`, and place it at `payload.session.outputRef`.
+**Action:** construct `output.schema.json`, validate it with `validate-output.mjs`, and place it at `payload.session.outputRef`. Render `payload.reviewPreview.artifactRef` through the host `visualize` capability in the same review response; only after that render may the parent display the exact layout approval command and enter its wait.
 **Session write:** output, evidence refs, and complete cleanup inventory.
 **Durable write:** none.
 **Stop:** do not emit an invalid or partially joined output.

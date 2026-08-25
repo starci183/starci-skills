@@ -9,6 +9,7 @@ The output is a closed, ephemeral task-session object consumed by the parent ski
 | `stage`, `status`, `facts` | Compatibility envelope for the existing skill route. |
 | `payload.decision` | Typed decision key selected from this operator's declared outcomes. |
 | `payload.state` | Explicit operator status, code, retryability, and exact emitted route. |
+| `payload.reviewPreview` | Required `visualize` HTML artifact, rendered direction IDs, responsive states, recommendation, and exact approval commands. |
 | `payload.produced` | Session artifact references plus descriptors of approved durable mutations or external effects. |
 | `payload.context` | Minimal references and revisions actually used; never copied context or reasoning. |
 | `payload.cleanup` | Scratch references and mandatory `skill-terminal` purge policy. |
@@ -19,6 +20,6 @@ The output is a closed, ephemeral task-session object consumed by the parent ski
 
 | Decision | Operator state | Emitted state | Required facts |
 | --- | --- | --- | --- |
-| `directions-ready` | `pending` | `layout.review / pending` | `layout-directions-ready` |
+| `directions-ready` | `pending` | `layout.review / pending` | `layout-directions-ready`, `layout-visual-preview-ready` |
 
-The parent state machine, not the operator or an orchestration worker, routes `payload.state.emits`. Successful results remain task-session artifacts and do not create durable intermediate files.
+The parent state machine, not the operator or an orchestration worker, routes `payload.state.emits`. `directions-ready` is invalid unless the preview artifact is registered in both `produced.artifactRefs` and `evidenceRefs`, covers every direction and responsive state, and carries exact `OK LAYOUT <id>` commands. Successful results remain task-session artifacts and do not create durable intermediate files.

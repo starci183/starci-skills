@@ -22,8 +22,8 @@ This operator compiles one canonical backend implementation boundary. Input, out
 
 **Read:** validated bindings, and accepted machine facts.
 **Context:** use no undeclared knowledge, business feature, artifact, or source file.
-**Decision criteria:** each target has owner, baseline hash, allowed change, exclusion, dependency, and proof.
-**Analysis:** assemble exact targets and proof obligations. Record evidence, criteria, and conclusions only; never record chain-of-thought.
+**Decision criteria:** each target has repository owner, deployable owner, state owner, baseline hash, allowed change, exclusion, dependency, runtime-flow edge, and proof.
+**Analysis:** assemble exact targets and proof obligations from the proven flow. The plan must cover ingress, execution, persistence, external side effects and reconciliation/reporting without assigning a hop to a central service when an instance controller owns it. For every cross-process edge, name caller, callee, transport direction, authentication/trust boundary, retry/idempotency rule and consistency expectation. Record evidence, criteria, and conclusions only; never record chain-of-thought.
 **Session write:** candidate `boundaryPlanRef` at `payload.session.scratchPrefix/candidate`.
 **Orchestration:** economical mode is sequential. Balanced or parallel mode may delegate independent read-only comparisons. Each worker receives only assigned refs; the coordinator owns joining and the decision.
 **Stop:** emit only a declared decision when evidence is missing, contradictory, or outside scope.

@@ -148,6 +148,20 @@
           },
           "target": "business-approval",
           "label": "ready"
+        },
+        {
+          "when": {
+            "decision": "revise"
+          },
+          "target": "business-model",
+          "label": "revise"
+        },
+        {
+          "when": {
+            "decision": "blocked"
+          },
+          "target": "blocked",
+          "label": "blocked"
         }
       ]
     },
@@ -558,7 +572,7 @@
     "ship-architecture-selection": {
       "kind": "wait",
       "approval": {
-        "prompt": "Approve the backend architecture required by this mission.",
+        "prompt": "Review the rendered visualize comparison, then approve the exact backend architecture required by this mission.",
         "approve": "OK ARCHITECTURE <decision>",
         "reject": "REJECT ARCHITECTURE <decision>"
       },
@@ -566,7 +580,10 @@
         {
           "when": {
             "stage": "architecture.decision.handoff",
-            "status": "ready"
+            "status": "ready",
+            "allFacts": [
+              "architecture-visual-preview-ready"
+            ]
           },
           "target": "ship-architecture-handoff"
         },

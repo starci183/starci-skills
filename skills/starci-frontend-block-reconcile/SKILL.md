@@ -13,7 +13,7 @@ Require the ephemeral global selection, read `input.md`, validate `input.schema.
 
 ## STATE MACHINE
 
-Execute `machine.json` through `execute.md`. Branches and loops are machine-owned; operators never invoke one another. Stop at waits for the exact displayed revision and finish only at a terminal. Purge all intermediates at every terminal while preserving approved durable mutations.
+Execute `machine.json` through `execute.md`. Branches and loops are machine-owned; operators never invoke one another. Before an architecture approval wait, read and apply `../../operators/architecture/review-widget.md`; `architecture/decision-challenge` must emit a validated HTML preview and the host must render it through `visualize` before requesting `OK ARCHITECTURE`. Stop at waits for the exact displayed revision and finish only at a terminal. Purge all intermediates at every terminal while preserving approved durable mutations.
 
 ## CONTEXT CONTRACT
 

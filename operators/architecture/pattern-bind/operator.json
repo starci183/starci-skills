@@ -34,6 +34,7 @@
   ],
   "stopConditions": [
     "required evidence is missing or stale",
+    "one responsibility is bound to a logical subsystem without a proven deployable owner, data owner, transport direction, and consistency contract",
     "the result would cross the declared boundary",
     "an intermediate input, output, scratch value, observation, analysis transcript, or receipt would be persisted outside the task session",
     "repository source context, indexed source summaries, or an undeclared source file would be loaded"

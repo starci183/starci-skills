@@ -64,6 +64,7 @@
       "required": [
         "decision",
         "state",
+        "reviewPreview",
         "produced",
         "context",
         "cleanup",
@@ -140,6 +141,94 @@
                   }
                 }
               }
+            }
+          }
+        },
+        "reviewPreview": {
+          "type": "object",
+          "description": "Executable binding for the in-conversation interactive layout review rendered before approval is requested.",
+          "additionalProperties": false,
+          "required": [
+            "renderer",
+            "mediaType",
+            "artifactRef",
+            "contentSha256",
+            "directionIds",
+            "recommendedDirectionId",
+            "viewports",
+            "approvalCommands",
+            "interactive"
+          ],
+          "properties": {
+            "renderer": {
+              "const": "visualize"
+            },
+            "mediaType": {
+              "const": "text/html"
+            },
+            "artifactRef": {
+              "$ref": "#/$defs/sessionRef"
+            },
+            "contentSha256": {
+              "$ref": "#/$defs/sha256"
+            },
+            "directionIds": {
+              "type": "array",
+              "minItems": 2,
+              "maxItems": 12,
+              "uniqueItems": true,
+              "items": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 120
+              }
+            },
+            "recommendedDirectionId": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 120
+            },
+            "viewports": {
+              "type": "array",
+              "minItems": 3,
+              "maxItems": 3,
+              "uniqueItems": true,
+              "items": {
+                "enum": [
+                  "wide",
+                  "intermediate",
+                  "compact"
+                ]
+              }
+            },
+            "approvalCommands": {
+              "type": "array",
+              "minItems": 2,
+              "maxItems": 12,
+              "uniqueItems": true,
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "directionId",
+                  "command"
+                ],
+                "properties": {
+                  "directionId": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 120
+                  },
+                  "command": {
+                    "type": "string",
+                    "pattern": "^OK LAYOUT .+$",
+                    "maxLength": 140
+                  }
+                }
+              }
+            },
+            "interactive": {
+              "const": true
             }
           }
         },

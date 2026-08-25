@@ -22,17 +22,29 @@ This operator builds a closed business model. Input, output, context bindings, a
 
 **Read:** validated bindings, and accepted machine facts.
 **Context:** use no undeclared knowledge, business feature, artifact, or source file.
-**Decision criteria:** actors, journeys, rules, states, operations, and acceptance evidence remain traceable.
-**Analysis:** transform evidence into a feature model without inferring behavior from product source. Record evidence, criteria, and conclusions only; never record chain-of-thought.
+**Decision criteria:** actors, journeys, rules, states, operations, acceptance evidence, incentives, value exchange, loss allocation and lifecycle transitions remain traceable and mutually consistent.
+**Analysis:** transform evidence into a feature model without inferring behavior from product source. Treat the user's preferred solution, current head, stakeholder confidence and repeated assertions as hypotheses rather than truth. Loyalty belongs to the evidenced outcome, not to consensus or the requester. Separate facts, assumptions, preferences and commitments; expose who benefits, who pays, who can abuse the rule, and which actor is missing from the happy-path framing. Record evidence, criteria, and conclusions only; never record chain-of-thought.
 **Session write:** candidate `businessModelRef` at `payload.session.scratchPrefix/candidate`.
-**Orchestration:** economical mode is sequential. Balanced or parallel mode may delegate independent read-only comparisons. Each worker receives only assigned refs; the coordinator owns joining and the decision.
+**Orchestration:** freeze the candidate before critique. Economical mode performs a second, explicitly adversarial pass. Balanced or parallel mode delegates a blind read-only critic that receives the evidence and frozen candidate but not the author's recommendation or rationale. The coordinator owns joining and the decision; popularity and agreement are not evidence.
 **Stop:** emit only a declared decision when evidence is missing, contradictory, or outside scope.
+
+The adversarial pass must attempt to falsify the candidate, not polish it. It must produce the structured `challengeSummary` and:
+
+- identify material hidden assumptions and the evidence that would disprove each one;
+- construct concrete counterexamples involving misuse, partial completion, refunds or reversals, delayed dependencies, concurrent actors and state recovery where applicable;
+- compare at least one credible alternative, including doing nothing or narrowing scope when either is viable;
+- run a pre-mortem across customer value, incentives, operational burden, support burden, compliance or trust, unit economics and irreversible commitments;
+- surface conflicts between stakeholder goals instead of averaging them away;
+- distinguish a real business requirement from a requested implementation or inherited behavior;
+- change or reject the recommendation when the evidence warrants it, even when that contradicts the requester.
+
+`ready` is allowed only when no critical challenge remains unresolved. Use `revise` when the model can be corrected within the frozen evidence and boundary. Use `blocked` when authority, evidence or stakeholder resolution is required. Never manufacture objections merely to fill the structure: every ID must bind to evidence in the challenge artifact.
 
 ## Step 4 — Validate the candidate
 
 **Read:** candidate artifact, decision evidence, and exact context lineage.
 **Context:** no new load is allowed.
-**Analysis:** prove the candidate is closed, traceable, route-compatible, and free of copied context or reasoning transcripts.
+**Analysis:** prove the candidate is closed, traceable, route-compatible, free of copied context or reasoning transcripts, and has survived the falsification-first pass. Confirm that `challengeSummary.verdict` matches the decision, every challenge ID resolves inside the challenge artifact, and a ready result contains no unresolved critical challenge.
 **Session write:** accepted artifact at `payload.session.scratchPrefix/businessModelRef` and evidence under `scratchPrefix/evidence`.
 **Stop:** do not invent evidence or broaden scope.
 

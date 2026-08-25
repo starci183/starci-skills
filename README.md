@@ -61,7 +61,7 @@ Requirements:
 - Node.js 20 or newer
 - Python 3.11 or newer
 
-Clone this repository as the target project's `.claude` directory:
+Clone this repository as the chosen Source host's `.claude` directory:
 
 ```bash
 git clone https://github.com/starci183/starci-skills.git .claude
@@ -70,7 +70,7 @@ npm ci
 python -m pip install -r runtime/knowledge-runtime/requirements.txt
 ```
 
-Point the host repository's `AGENTS.md` or equivalent bootstrap at `.claude/INDEX.md`. Codex discovers repo-local skills from `.claude/skills`; each `SKILL.md` contains concise selection instructions while its supporting files remain local to that skill.
+Point that Source repository's `AGENTS.md` or equivalent bootstrap at `.claude/INDEX.md`. One logical workspace has one Source-owned runtime; repositories and Git worktrees reached through its workspace routes follow this runtime and do not install their own `.claude`. Codex discovers Source-local skills from `.claude/skills`; each `SKILL.md` contains concise selection instructions while its supporting files remain local to that skill.
 
 ## Use
 

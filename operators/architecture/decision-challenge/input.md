@@ -23,4 +23,4 @@ This operator challenges the architecture option set. The input is an ephemeral 
 - `knowledge`: retrieve only `architecture.decision-analysis` from the pinned Qdrant generation.
 - `orchestration`: resolve execution mode separately from provider/model mapping.
 
-Acceptance requires that coupling, cost, migration risk, reversibility, and constraints are resolved. Validate the whole envelope before any load or side effect. Loaded content and intermediate analysis remain session-only.
+Acceptance requires that coupling, cost, migration risk, reversibility, constraints, deployable ownership, data ownership and cross-process consistency are resolved. In a monorepo, every affected runtime hop must name its owning deployable and transport direction; logical subsystem labels are insufficient. Validate the whole envelope before any load or side effect. Loaded content and intermediate analysis remain session-only.

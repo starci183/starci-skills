@@ -14,11 +14,14 @@ The output is an ephemeral task-session object consumed by the parent state mach
 | `payload.cleanup` | Scratch refs and mandatory terminal purge. |
 | `payload.evidenceRefs` | Session-only evidence for the next state. |
 | `payload.findings` | Concise unresolved facts, not an analysis transcript. |
+| `payload.challengeSummary` | Structured falsification record proving that approval is not based on agreement, preference, or an unchallenged first proposal. |
 
 ## State contract
 
 | Decision | State status | Emitted state | Facts added |
 | --- | --- | --- | --- |
 | `ready` | `completed` | `business.publish / ready` | business-model-ready |
+| `revise` | `replan` | `business.model / ready` | business-model-feedback |
+| `blocked` | `blocked` | `business.blocked / blocked` | business-model-blocked |
 
 `businessModelRef`, evidence, receipts, observations, and output use `session://`. Only a product/worktree effect explicitly declared by `operator.json` may survive the skill.

@@ -1,0 +1,40 @@
+{
+  "$schema": "./request.schema.json",
+  "schemaVersion": 1,
+  "id": "starci-academy-global-chat-user-journey",
+  "kind": "frontend-feedback-upgrade",
+  "status": "captured",
+  "project": "starci-academy",
+  "targetOwners": [
+    "local-only"
+  ],
+  "need": "Redesign Global Chat as one coherent end-to-end customer journey, from entry and orientation through conversation participation, recovery, and responsive continuation.",
+  "negativeBoundary": "Do not merge Global Chat with the Learn AI assistant, narrow the work to lesson or challenge chat, or treat the request as a cosmetic restyle of one isolated screen.",
+  "acceptanceCriteria": [
+    "The journey makes the next useful action clear from entry through active conversation.",
+    "Global Chat remains visibly distinct from the Learn AI assistant and other course-learning help flows.",
+    "The complete page and state set covers discovery, orientation, reading, participation, recovery, and responsive behavior.",
+    "The delivered interface is proven with deterministic states, UI quality checks, and real-browser acceptance across declared viewports."
+  ],
+  "feedbackSessions": [
+    {
+      "fingerprint": "sha256:839c9334542809aed1a4e3b665e64c9931737a07ee7305cb93389779ce7dd607",
+      "sourceSkillId": "starci-frontend-layout-delivery",
+      "evidenceSha256": "sha256:542a284e24c15305f7973cdbd9a9b5da2ffa995c88054adfc54a4d32bc3e6b4b",
+      "accepts": [
+        "A Global Chat redesign organized around the user's complete journey.",
+        "A course-community conversation experience with clear entry, orientation, participation, and recovery."
+      ],
+      "rejects": [
+        "A lesson-only or challenge-only chat experience.",
+        "Conflating Global Chat with AI translation or explanation inside Learn.",
+        "A visual-only restyle that leaves the journey and state model unchanged."
+      ],
+      "targetOwners": [
+        "local-only"
+      ],
+      "proofStatus": "captured"
+    }
+  ],
+  "review": null
+}

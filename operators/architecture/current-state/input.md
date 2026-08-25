@@ -24,4 +24,4 @@ This operator captures decision-relevant current architecture. The input is an e
 - `orchestration`: resolve execution mode separately from provider/model mapping.
 - `source`: open only declared exact files and verify their hashes; broad repository context is forbidden.
 
-Acceptance requires that each included fact changes the decision and has exact artifact or file evidence. Validate the whole envelope before any load or side effect. Loaded content and intermediate analysis remain session-only.
+Acceptance requires that each included fact changes the decision and has exact artifact or file evidence. A monorepo current-state artifact must name the actual deployable and data owner at every affected hop, including ingress, execution, persistence, external side effects and reconciliation; logical subsystem names alone are insufficient. Validate the whole envelope before any load or side effect. Loaded content and intermediate analysis remain session-only.

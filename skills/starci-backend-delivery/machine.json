@@ -121,6 +121,20 @@
           },
           "target": "business-approval",
           "label": "ready"
+        },
+        {
+          "when": {
+            "decision": "revise"
+          },
+          "target": "business-model",
+          "label": "revise"
+        },
+        {
+          "when": {
+            "decision": "blocked"
+          },
+          "target": "blocked",
+          "label": "blocked"
         }
       ]
     },
@@ -218,7 +232,7 @@
     "architecture-selection": {
       "kind": "wait",
       "approval": {
-        "prompt": "Approve the recommended architecture decision and option-set hash.",
+        "prompt": "Review the rendered visualize comparison, then approve one exact architecture decision and option-set hash.",
         "approve": "OK ARCHITECTURE <decision>",
         "reject": "REJECT ARCHITECTURE <decision>"
       },
@@ -226,7 +240,10 @@
         {
           "when": {
             "stage": "architecture.decision.handoff",
-            "status": "ready"
+            "status": "ready",
+            "allFacts": [
+              "architecture-visual-preview-ready"
+            ]
           },
           "target": "architecture-handoff"
         },

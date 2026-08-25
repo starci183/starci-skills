@@ -25,4 +25,4 @@ This operator compiles one canonical backend implementation boundary. The input 
 - `orchestration`: resolve execution mode separately from provider/model mapping.
 - `business`: load the exact declared revision from `.worktrees/<project>/businesses/`; product source is not business authority.
 
-Acceptance requires that each target has owner, baseline hash, allowed change, exclusion, dependency, and proof. Validate the whole envelope before any load or side effect. Loaded content and intermediate analysis remain session-only.
+Acceptance requires that each target has repository owner, deployable owner, state owner, baseline hash, allowed change, exclusion, dependency, runtime-flow edge and proof. The target set must close every affected ingress, execution, persistence, side-effect and reconciliation hop; cross-process edges must declare caller, callee, transport/auth direction, retry/idempotency and consistency. Validate the whole envelope before any load or side effect. Loaded content and intermediate analysis remain session-only.

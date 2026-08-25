@@ -1,0 +1,48 @@
+{
+  "$schema": "./request.schema.json",
+  "schemaVersion": 1,
+  "id": "nivo-agentos-kind-test-workbench",
+  "kind": "frontend-feedback-upgrade",
+  "status": "captured",
+  "project": "nivo",
+  "targetOwners": [
+    "local-only"
+  ],
+  "need": "Each installed AgentOS module exposes a kind-specific Test area after Setup so a business owner can prove the configured behavior before operating the module.",
+  "negativeBoundary": "Do not collapse every kind into one chat-only tester, reuse production Execute history as test data, perform external mutations, disclose credentials, close the kind registry in core, or introduce arbitrary HTML, script, ReactNode escape slots, or handwritten raw JSX trees outside Grammar.",
+  "acceptanceCriteria": [
+    "The persistent module shell exposes Test after Setup and resolves its test workbench from the installed kind registry contract.",
+    "A test run binds one explicit context version and remains separate from collaborative Execute sessions, messages, widgets, workbench state, and external side effects.",
+    "The customer-support kind provides a sandbox conversation tester with business-visible assertions and a pass, warning, or fail result.",
+    "The accounting kind tests fixture documents and expected calculations without changing live financial data.",
+    "The calendar-assistant kind tests against a fake calendar and never creates or modifies a live event.",
+    "The document-research kind tests questions, expected source coverage, and citation behavior against selected knowledge fixtures.",
+    "Test results visibly identify the kind contract version, bound context version, checked scenarios, warnings, failures, and the latest trusted run.",
+    "Adding a new kind and its test workbench does not require editing a closed enum or switch in the shared module core.",
+    "The Test journey is keyboard accessible, responsive, progressively disclosed, and implemented through approved Grammar ComponentType and Tree contracts."
+  ],
+  "feedbackSessions": [
+    {
+      "fingerprint": "sha256:4049c6ebea9b046b2495d236c76eb4f834216f690f368c43e0884b54abba728f",
+      "sourceSkillId": "starci-frontend-layout-delivery",
+      "evidenceSha256": "sha256:592659054d0ccac792b97345651c9c80fd5701c339b0d132f44b40405dbd81ac",
+      "accepts": [
+        "A versioned test workbench is registered per module kind.",
+        "The customer-support example is a sandbox test conversation.",
+        "Every test run produces evidence a business owner can inspect before operation.",
+        "Test runs bind a context version without rewriting Execute history."
+      ],
+      "rejects": [
+        "One universal chat-only tester for every module kind.",
+        "Using production Execute sessions or workbench state as test fixtures.",
+        "Calling external systems or exposing raw credentials during a test.",
+        "Adding a closed kind enum or core switch for test rendering."
+      ],
+      "targetOwners": [
+        "local-only"
+      ],
+      "proofStatus": "captured"
+    }
+  ],
+  "review": null
+}
