@@ -287,7 +287,10 @@ for (const skillDir of skillDirs) {
       'Framer Motion',
       'hero entrance',
       'staggered content',
-      'reduced-motion proof'
+      'reduced-motion proof',
+      'bound display type',
+      'purposeful route media',
+      'full available content grid'
     ]) {
       if (!analyzeInput.includes(requiredMotionPhrase)) {
         fail(`${skillId}: analyze-input.md must retain landing motion authority phrase: ${requiredMotionPhrase}`);

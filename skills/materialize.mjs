@@ -10319,6 +10319,7 @@ const flows = [
       "Resolve the closed surface set, fresh business head, inconsistency evidence and complete acceptance proof matrix.",
       "Identify the smallest authority and classify role impact, with explicit authority and any required backend boundary approval before mutation.",
       "When the closed surface set includes a landing page, require complete purposeful Framer Motion coverage for hero entrance, section reveal, staggered content and interactive feedback, plus deterministic reduced-motion proof; unspecified or decorative-only motion is incomplete.",
+      "When public child surfaces inherit a landing authority, bound display type so useful content remains visible near the first viewport, require purposeful route media, and prove primary lists, documents and reading regions use the full available content grid instead of leaving an unexplained empty column.",
       "Require complete unit, E2E, UI-quality, browser, joined mission proof and business reconciliation before completion."
     ],
     "contextMatrix": [

@@ -16,7 +16,10 @@
     "All motion preserves layout stability and has a deterministic prefers-reduced-motion path.",
     "The owning .claude frontend surface skill explicitly requires landing motion coverage and proof in its acceptance matrix.",
     "The three featured members on the landing page are selected from the same database-backed approved-member source as the public directory, with explicit loading, empty, and error states and no fabricated business fallback.",
-    "Desktop, tablet, and mobile screenshots and browser interaction checks prove visual continuity across the four public routes."
+    "Desktop, tablet, and mobile screenshots and browser interaction checks prove visual continuity across the four public routes.",
+    "Every public child-page masthead uses a restrained display scale and an image-bearing composition derived from the landing authority instead of an oversized text-only viewport.",
+    "Directory, article, and detail content regions use the full available desktop content width; no primary data list is arbitrarily constrained to half of its section.",
+    "All public routes reachable from the landing navigation and their public detail consumers share the same responsive spacing, media treatment, typography hierarchy, and motion primitives."
   ],
   "feedbackSessions": [
     {
@@ -49,6 +52,25 @@
       "rejects": [
         "Keep Công ty TNHH Sản xuất An Phát, Hợp tác xã Nông nghiệp Phú Phong, or Doanh nghiệp Dịch vụ Minh Long as hardcoded display data.",
         "Silently substitute invented companies when the API is loading, empty, or unavailable."
+      ],
+      "targetOwners": [
+        "starci-runtime"
+      ],
+      "proofStatus": "proven"
+    },
+    {
+      "fingerprint": "sha256:cae9e368e93a1302a8a026bc3a4be052621c17eaaffcaa128ff3f00763064bb6",
+      "sourceSkillId": "starci-frontend-surface-reconcile",
+      "evidenceSha256": "sha256:b88d90fe8cee01707d1498d2af18f28a254dfe2dba91ca5317ff55ef3622e3df",
+      "accepts": [
+        "Reduce oversized public child-page display typography so the masthead introduces rather than consumes the viewport.",
+        "Use relevant image-bearing mastheads and editorial media compositions derived from the landing page.",
+        "Let public lists and content bodies occupy the full available desktop grid width across every landing child route."
+      ],
+      "rejects": [
+        "Keep giant text-only mastheads that push useful content below the fold.",
+        "Constrain a primary directory or content list to an arbitrary half-width column while the remaining grid is empty.",
+        "Patch only the two reported screenshots while leaving other public child pages visually inconsistent."
       ],
       "targetOwners": [
         "starci-runtime"
