@@ -19,29 +19,29 @@ type Operator = (typeof catalog.operators)[number]
 
 const pipelines = {
   frontend: [
-    ['UI direction', '3–4 visual directions'],
-    ['Design critique', 'Independent challenge'],
-    ['UX flow', 'Navigation, state, recovery'],
-    ['Product potential', 'Business and UX opportunities'],
-    ['UI detail', 'Executable screen specification'],
-    ['Contract plan', 'Grammar and component boundaries'],
-    ['Implementation', 'Bounded source mutation'],
-    ['Visual fidelity', 'Render-to-baseline proof'],
-    ['Product UAT', 'Journey and outcome proof'],
+    ['UI direction', '3–4 visual directions', 'starci-frontend-ui-direction'],
+    ['Design critique', 'Independent challenge', 'starci-frontend-design-critique'],
+    ['UX flow', 'Navigation, state, recovery', 'starci-frontend-ux-flow'],
+    ['Product potential', 'Business and UX opportunities', 'starci-product-potential'],
+    ['UI detail', 'Executable screen specification', 'starci-frontend-ui-detail'],
+    ['Contract plan', 'Grammar and component boundaries', 'starci-frontend-contract-plan'],
+    ['Implementation', 'Bounded source mutation', 'starci-frontend-implementation'],
+    ['Visual fidelity', 'Render-to-baseline proof', 'starci-frontend-visual-fidelity'],
+    ['Product UAT', 'Journey and outcome proof', 'starci-product-uat'],
   ],
   architecture: [
-    ['Discover', 'Observed system model'],
-    ['Data ownership', 'Writes, stores, consistency'],
-    ['Option design', 'Material alternatives'],
-    ['Critique', 'Falsification before approval'],
-    ['Realization', 'Code and deployment binding'],
+    ['Discover', 'Observed system model', 'starci-architecture-discover'],
+    ['Data ownership', 'Writes, stores, consistency', 'starci-data-ownership-model'],
+    ['Option design', 'Material alternatives', 'starci-architecture-option-design'],
+    ['Critique', 'Falsification before approval', 'starci-architecture-critique'],
+    ['Realization', 'Code and deployment binding', 'starci-architecture-realization'],
   ],
   backend: [
-    ['Solution design', 'Behavior before code'],
-    ['Contract plan', 'API, event, transaction, data'],
-    ['Contract critique', 'Independent contradiction hunt'],
-    ['Implementation', 'Frozen boundary mutation'],
-    ['Proof', 'Semantic and architecture checks'],
+    ['Solution design', 'Behavior before code', 'starci-backend-solution-design'],
+    ['Contract plan', 'API, event, transaction, data', 'starci-backend-contract-plan'],
+    ['Contract critique', 'Independent contradiction hunt', 'starci-backend-contract-critique'],
+    ['Implementation', 'Frozen boundary mutation', 'starci-backend-implementation'],
+    ['Proof', 'Semantic and architecture checks', 'starci-backend-proof'],
   ],
 } as const
 
@@ -68,6 +68,7 @@ const labelFor = (domain: string) => domainLabels[domain] ?? domain.replaceAll('
 function App() {
   const [pipeline, setPipeline] = useState<keyof typeof pipelines>('frontend')
   const [skillQuery, setSkillQuery] = useState('')
+  const [showAllSkills, setShowAllSkills] = useState(false)
   const [operatorQuery, setOperatorQuery] = useState('')
   const [domain, setDomain] = useState('fe')
 
@@ -84,6 +85,8 @@ function App() {
       && (!query || `${operator.id} ${operator.accepts.join(' ')} ${operator.emits.join(' ')}`.toLowerCase().includes(query)),
     )
   }, [domain, operatorQuery])
+
+  const visibleSkills = skillQuery.trim() || showAllSkills ? skills : skills.slice(0, 12)
 
   return (
     <>
@@ -155,7 +158,7 @@ function App() {
           </div>
 
           <div className="pipeline-grid">
-            {pipelines[pipeline].map(([title, detail], index) => (
+            {pipelines[pipeline].map(([title, detail, skillId], index) => (
               <SurfaceCard
                 key={title}
                 label={`0${index + 1}`.slice(-2)}
@@ -164,7 +167,7 @@ function App() {
               >
                 <h3>{title}</h3>
                 <p>{detail}</p>
-                <code>{shortId(catalog.skills.find((skill) => skill.description.toLowerCase().includes(title.toLowerCase().split(' ')[0]))?.id ?? title)}</code>
+                <code>{shortId(skillId)}</code>
               </SurfaceCard>
             ))}
           </div>
@@ -202,7 +205,7 @@ function App() {
             </figcaption>
           </figure>
           <div className="skill-grid">
-            {skills.map((skill: Skill) => (
+            {visibleSkills.map((skill: Skill) => (
               <SurfaceCard key={skill.id} label={labelFor(skill.domain)} fact={skill.capability}>
                 <h3>{shortId(skill.id)}</h3>
                 <p>{skill.description}</p>
@@ -210,6 +213,16 @@ function App() {
               </SurfaceCard>
             ))}
           </div>
+          {!skillQuery.trim() && skills.length > 12 && (
+            <div className="catalog-actions">
+              <button className="button button-quiet" type="button" onClick={() => setShowAllSkills((current) => !current)}>
+                {showAllSkills ? 'Show fewer skills' : `Show all ${skills.length} skills`}
+              </button>
+            </div>
+          )}
+          <p className="sr-only" aria-live="polite">
+            Showing {visibleSkills.length} of {skills.length} skills.
+          </p>
           {skills.length === 0 && <p className="empty-state">No capability matches “{skillQuery}”.</p>}
         </section>
 
