@@ -1,0 +1,38 @@
+{
+  "$schema": "./request.schema.json",
+  "schemaVersion": 1,
+  "id": "tayson-public-member-directory-db-fetch",
+  "kind": "frontend-feedback-upgrade",
+  "status": "proven",
+  "project": "tayson",
+  "targetOwners": [
+    "local-only"
+  ],
+  "need": "The public Tay Son member directory must fetch approved enterprise records from the production database and render the returned list instead of showing the unavailable fallback when the GraphQL response is valid.",
+  "negativeBoundary": "Do not hardcode enterprise rows in the frontend, expose unpublished records, or change the publicMemberDirectory backend contract while its production response remains valid.",
+  "acceptanceCriteria": [
+    "The public member page renders enterprise names returned by the production publicMemberDirectory query.",
+    "A valid GraphQL response containing published members does not enter the unavailable error state.",
+    "The frontend keeps the backend as the source of truth and includes a regression test for the production response envelope."
+  ],
+  "feedbackSessions": [
+    {
+      "fingerprint": "sha256:b5ea06696b6dfae41324aff302a31fa92da8b41cfb19ceb78b200a6160974761",
+      "sourceSkillId": "starci-frontend-maintenance-apply",
+      "evidenceSha256": "sha256:7639a2e73fc57c86a73d6746faa7b13efb8fafcf38a681ad90fd68bc9f351886",
+      "accepts": [
+        "Fetch the enterprise directory from the production database through the public GraphQL contract.",
+        "Render the returned approved enterprise records on the public member page."
+      ],
+      "rejects": [
+        "Show the unavailable fallback when the API has returned a valid member collection.",
+        "Replace database-backed enterprise records with a frontend hardcoded list."
+      ],
+      "targetOwners": [
+        "local-only"
+      ],
+      "proofStatus": "proven"
+    }
+  ],
+  "review": null
+}
