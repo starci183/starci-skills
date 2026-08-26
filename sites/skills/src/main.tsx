@@ -1,13 +1,43 @@
 import { useMemo, useState } from 'react'
 import { createRoot } from 'react-dom/client'
 import {
+  ArrowCounterClockwise,
   ArrowRight,
+  ArrowsLeftRight,
+  Binoculars,
+  Briefcase,
+  Bug,
   CheckCircle,
+  Chats,
+  ClipboardText,
+  Code,
+  Cube,
+  Database,
+  Eye,
+  FlowArrow,
+  FolderOpen,
+  FrameCorners,
+  Gauge,
   GithubLogo,
   GitBranch,
+  HardDrives,
+  Lightbulb,
+  LinkSimple,
   MagnifyingGlass,
+  Palette,
+  Pulse,
+  RocketLaunch,
+  Scales,
+  SealCheck,
+  ShieldCheck,
+  ShieldWarning,
+  Sparkle,
+  SquaresFour,
   Stack,
+  TerminalWindow,
+  Wrench,
 } from '@phosphor-icons/react'
+import type { Icon } from '@phosphor-icons/react'
 import { Rail, SurfaceCard, SurfaceListCard } from '@starci/grammar/core'
 import '@starci/grammar/common.css'
 import '@starci/grammar/core.css'
@@ -64,6 +94,54 @@ const domainLabels: Record<string, string> = {
 
 const shortId = (id: string) => id.replace(/^starci-/, '')
 const labelFor = (domain: string) => domainLabels[domain] ?? domain.replaceAll('-', ' ')
+
+const skillIconRules: Array<[RegExp, Icon]> = [
+  [/workspace-ready$/, FolderOpen],
+  [/device-checkpoint$/, HardDrives],
+  [/business-/, Briefcase],
+  [/quality-audit$/, ShieldCheck],
+  [/block-reconcile$/, SquaresFour],
+  [/maintenance-apply$/, Wrench],
+  [/request-review$/, ClipboardText],
+  [/learning-resolve$/, Lightbulb],
+  [/surface-reconcile$/, FrameCorners],
+  [/workflow-diagnose$/, Bug],
+  [/quality-readiness$/, Gauge],
+  [/quality-finding-repair$/, Wrench],
+  [/quality-debt-repay$/, ArrowCounterClockwise],
+  [/rule-binding-audit$/, LinkSimple],
+  [/deployment-monitor$/, Pulse],
+  [/deployment-recover$/, ShieldCheck],
+  [/deployment-rollback$/, ArrowCounterClockwise],
+  [/deployment$/, RocketLaunch],
+  [/tunnel-reconcile$/, ArrowsLeftRight],
+  [/source-index-publish$/, Database],
+  [/sonar-service-reconcile$/, Pulse],
+  [/observability-reconcile$/, Eye],
+  [/conversation-/, Chats],
+  [/tech-stack$/, Stack],
+  [/ui-direction$/, Palette],
+  [/design-critique$/, Scales],
+  [/ux-flow$/, FlowArrow],
+  [/product-potential$/, Sparkle],
+  [/ui-detail$/, FrameCorners],
+  [/frontend-contract-plan$/, ClipboardText],
+  [/frontend-implementation$/, Code],
+  [/visual-fidelity$/, Eye],
+  [/product-uat$/, SealCheck],
+  [/architecture-discover$/, Binoculars],
+  [/data-ownership-model$/, Database],
+  [/architecture-option-design$/, FlowArrow],
+  [/architecture-critique$/, Scales],
+  [/architecture-realization$/, Cube],
+  [/backend-solution-design$/, Lightbulb],
+  [/backend-contract-plan$/, ClipboardText],
+  [/backend-contract-critique$/, ShieldWarning],
+  [/backend-implementation$/, TerminalWindow],
+  [/backend-proof$/, SealCheck],
+]
+
+const iconForSkill = (id: string) => skillIconRules.find(([pattern]) => pattern.test(id))?.[1] ?? Cube
 
 function App() {
   const [pipeline, setPipeline] = useState<keyof typeof pipelines>('frontend')
@@ -205,13 +283,19 @@ function App() {
             </figcaption>
           </figure>
           <div className="skill-grid">
-            {visibleSkills.map((skill: Skill) => (
-              <SurfaceCard key={skill.id} label={labelFor(skill.domain)} fact={skill.capability}>
-                <h3>{shortId(skill.id)}</h3>
-                <p>{skill.description}</p>
-                <div className="contract-line"><CheckCircle aria-hidden="true" /> Closed input · state machine · validated output</div>
-              </SurfaceCard>
-            ))}
+            {visibleSkills.map((skill: Skill) => {
+              const SkillIcon = iconForSkill(skill.id)
+              return (
+                <SurfaceCard key={skill.id} label={labelFor(skill.domain)} fact={skill.capability}>
+                  <div className="skill-card-heading">
+                    <h3>{shortId(skill.id)}</h3>
+                    <span className="skill-icon" aria-hidden="true"><SkillIcon size={24} weight="duotone" /></span>
+                  </div>
+                  <p>{skill.description}</p>
+                  <div className="contract-line"><CheckCircle aria-hidden="true" /> Closed input · state machine · validated output</div>
+                </SurfaceCard>
+              )
+            })}
           </div>
           {!skillQuery.trim() && skills.length > 12 && (
             <div className="catalog-actions">

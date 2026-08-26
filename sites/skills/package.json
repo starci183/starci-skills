@@ -7,9 +7,10 @@
     "generate:data": "node scripts/generate-data.mjs",
     "predev": "npm run generate:data",
     "dev": "vite",
-    "prebuild": "npm run generate:data",
+    "prebuild": "npm run generate:data && npm test",
     "build": "tsc -b && vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "test": "node --test scripts/site-regression.spec.mjs"
   },
   "dependencies": {
     "@phosphor-icons/react": "^2.1.10",

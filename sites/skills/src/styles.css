@@ -14,7 +14,7 @@
   --focus: #7248ff;
   --accent: #7547ff;
   --accent-soft: #eae3ff;
-  --lime: #d9ff63;
+  --lime: #f7c948;
   --ink: #171713;
   --starci-core-surface-radius: 18px;
   --starci-core-surface-shadow: 0 1px 0 rgba(18, 18, 15, .08), 0 18px 44px rgba(18, 18, 15, .06);
@@ -92,7 +92,7 @@ code { font-family: 'DM Mono', monospace; }
 .starci-core-static-row-copy > :first-child { font-weight: 700; }
 
 .catalog-heading { align-items: center; }
-.section-art { position: relative; margin: 0 0 32px; overflow: hidden; border: 1px solid var(--border); border-radius: 24px; background: white; }
+.section-art { position: relative; margin: 0 auto 32px; overflow: hidden; border: 1px solid var(--border); border-radius: 24px; background: white; }
 .section-art img { display: block; width: 100%; aspect-ratio: 2.2 / 1; object-fit: cover; }
 .section-art figcaption { position: absolute; display: flex; max-width: 520px; flex-direction: column; gap: 6px; left: 22px; bottom: 22px; padding: 15px 18px; border: 1px solid rgba(255,255,255,.5); border-radius: 14px; background: rgba(23,23,19,.88); color: white; backdrop-filter: blur(12px); }
 .section-art figcaption span { color: var(--lime); font-family: 'DM Mono', monospace; font-size: 9px; letter-spacing: .1em; text-transform: uppercase; }
@@ -106,6 +106,14 @@ code { font-family: 'DM Mono', monospace; }
 .skill-grid .starci-core-surface { height: 100%; }
 .skill-grid .starci-core-surface-content { display: flex; height: 100%; flex-direction: column; }
 .skill-grid p { flex: 1; }
+.skill-card-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 18px; }
+.skill-card-heading h3 { margin-top: 7px; }
+.skill-icon {
+  display: grid; width: 44px; height: 44px; flex: none; place-items: center;
+  border: 1px solid rgba(117,71,255,.25); border-radius: 14px;
+  background: linear-gradient(135deg, #fff1a8 0 50%, #eae3ff 50% 100%);
+  color: var(--accent); box-shadow: inset 0 0 0 4px rgba(255,255,255,.42), 0 8px 18px rgba(79,48,174,.1);
+}
 .contract-line { display: flex; align-items: center; gap: 8px; padding-top: 15px; border-top: 1px solid var(--separator); color: #55564f; font-size: 11px; font-weight: 600; }
 .contract-line svg { width: 17px; height: 17px; color: var(--success); }
 .catalog-actions { display: flex; justify-content: center; margin-top: 32px; }
@@ -129,6 +137,21 @@ code { font-family: 'DM Mono', monospace; }
 .search-box.compact { min-height: 44px; border-color: #41413a; background: #1c1c17; color: white; }
 .search-box.compact input { color: white; }
 .operator-list { max-height: 720px; overflow-y: auto; }
+.operator-section .starci-core-rail-body, .operator-list {
+  background:
+    linear-gradient(#24241e 30%, rgba(36,36,30,0)) center top,
+    linear-gradient(rgba(36,36,30,0), #24241e 70%) center bottom,
+    linear-gradient(rgba(0,0,0,.32), rgba(0,0,0,0)) center top,
+    linear-gradient(rgba(0,0,0,0), rgba(0,0,0,.32)) center bottom;
+  background-attachment: local, local, scroll, scroll;
+  background-repeat: no-repeat;
+  background-size: 100% 42px, 100% 42px, 100% 18px, 100% 18px;
+  scrollbar-color: var(--accent) #2e2e27;
+  scrollbar-width: thin;
+}
+.operator-section .starci-core-rail-body::-webkit-scrollbar, .operator-list::-webkit-scrollbar { width: 10px; }
+.operator-section .starci-core-rail-body::-webkit-scrollbar-track, .operator-list::-webkit-scrollbar-track { background: #2e2e27; }
+.operator-section .starci-core-rail-body::-webkit-scrollbar-thumb, .operator-list::-webkit-scrollbar-thumb { border: 2px solid #2e2e27; border-radius: 999px; background: var(--accent); }
 .operator-row { display: grid; grid-template-columns: minmax(170px, 1fr) minmax(170px, 1fr) 20px minmax(170px, 1fr) 56px; gap: 16px; align-items: center; min-height: 84px; padding: 16px 18px; border-bottom: 1px solid #34342e; }
 .operator-row:last-child { border-bottom: 0; }
 .operator-id, .operator-contract { display: flex; min-width: 0; flex-direction: column; gap: 5px; }
@@ -156,6 +179,7 @@ code { font-family: 'DM Mono', monospace; }
   .pipeline-grid, .skill-grid { grid-template-columns: repeat(2, 1fr); }
   .operator-layout { grid-template-columns: 1fr; }
   .operator-section .starci-core-rail-frame { position: static !important; max-height: none; }
+  .operator-section .starci-core-rail-body { background: none; }
   .domain-list { display: grid; grid-template-columns: repeat(3, 1fr); }
 }
 
