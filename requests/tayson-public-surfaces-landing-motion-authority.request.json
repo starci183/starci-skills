@@ -1,0 +1,60 @@
+{
+  "$schema": "./request.schema.json",
+  "schemaVersion": 1,
+  "id": "tayson-public-surfaces-landing-motion-authority",
+  "kind": "frontend-feedback-upgrade",
+  "status": "proven",
+  "project": "tayson",
+  "targetOwners": [
+    "starci-runtime"
+  ],
+  "need": "Public Tây Sơn pages must inherit the approved landing-page visual system and the frontend skill runtime must explicitly require complete, purposeful Framer Motion coverage for landing surfaces.",
+  "negativeBoundary": "Do not replace the landing authority with giant editorial-serif compositions, animate layout in a way that causes shifts or delays access, ignore reduced-motion preferences, or impose landing animation requirements on unrelated operational CRM surfaces.",
+  "acceptanceCriteria": [
+    "Giới thiệu, Hội viên, and Tin tức & Hoạt động use the landing page's sans typography, header, spacing rhythm, grid language, controls, and restrained green palette.",
+    "The landing page and its public consumers use Framer Motion for purposeful hero, section, staggered content, and interactive feedback instead of isolated decorative animation.",
+    "All motion preserves layout stability and has a deterministic prefers-reduced-motion path.",
+    "The owning .claude frontend surface skill explicitly requires landing motion coverage and proof in its acceptance matrix.",
+    "The three featured members on the landing page are selected from the same database-backed approved-member source as the public directory, with explicit loading, empty, and error states and no fabricated business fallback.",
+    "Desktop, tablet, and mobile screenshots and browser interaction checks prove visual continuity across the four public routes."
+  ],
+  "feedbackSessions": [
+    {
+      "fingerprint": "sha256:814469dbc054377952d599009ba95b5138e3b83015dc038cba5cca815e6756ee",
+      "sourceSkillId": "starci-frontend-surface-reconcile",
+      "evidenceSha256": "sha256:b7514254a3232e011d03fd6c3ffdd923c93079ae1fefbfa6bddd56da4cdefd6d",
+      "accepts": [
+        "Treat the current landing page as the smallest visual authority for all public Tây Sơn routes.",
+        "Require and implement full purposeful Framer Motion coverage, especially for the landing page.",
+        "Update the owning .claude skill contract and add a regression check for the landing motion requirement."
+      ],
+      "rejects": [
+        "Keep oversized serif hero treatments that make child pages look like a different product.",
+        "Add disconnected one-off animations without shared motion primitives or reduced-motion handling.",
+        "Apply landing animation rules to the operational CRM workspace."
+      ],
+      "targetOwners": [
+        "starci-runtime"
+      ],
+      "proofStatus": "proven"
+    },
+    {
+      "fingerprint": "sha256:ad04028bfaad210ef6d15cbaffd3aae783d2a5d79cb512f9cb1e3a53c24d2d5b",
+      "sourceSkillId": "starci-frontend-surface-reconcile",
+      "evidenceSha256": "sha256:fa21d52e8372e5b3a7fd22095c29d353872fae33fe4b342692f37f5fd5b22cba",
+      "accepts": [
+        "Populate the landing-page member preview from the approved-member API used by the public directory.",
+        "Use a deterministic three-record selection and preserve links to the real public dossier."
+      ],
+      "rejects": [
+        "Keep Công ty TNHH Sản xuất An Phát, Hợp tác xã Nông nghiệp Phú Phong, or Doanh nghiệp Dịch vụ Minh Long as hardcoded display data.",
+        "Silently substitute invented companies when the API is loading, empty, or unavailable."
+      ],
+      "targetOwners": [
+        "starci-runtime"
+      ],
+      "proofStatus": "proven"
+    }
+  ],
+  "review": null
+}

@@ -281,6 +281,19 @@ for (const skillDir of skillDirs) {
       fail(`${skillId}: ${document} duplicates canonical contracts in a LOADS table`);
     }
   }
+  if (skillId === 'starci-frontend-surface-reconcile') {
+    const analyzeInput = readFileSync(path.join(skillDir, 'analyze-input.md'), 'utf8');
+    for (const requiredMotionPhrase of [
+      'Framer Motion',
+      'hero entrance',
+      'staggered content',
+      'reduced-motion proof'
+    ]) {
+      if (!analyzeInput.includes(requiredMotionPhrase)) {
+        fail(`${skillId}: analyze-input.md must retain landing motion authority phrase: ${requiredMotionPhrase}`);
+      }
+    }
+  }
   assertStructure(skillDir, machine, inputSchema, outputSchema);
   assertOpenAiInterface(skillDir);
   await assertValidators(skillDir);
