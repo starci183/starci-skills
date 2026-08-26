@@ -1,0 +1,6 @@
+interface:
+  display_name: "StarCi Workflow Handoff"
+  short_description: "Pause work in Git and resume it on another device"
+  default_prompt: "Use $starci-workflow-handoff for this selected flow and execute its state machine."
+policy:
+  allow_implicit_invocation: true

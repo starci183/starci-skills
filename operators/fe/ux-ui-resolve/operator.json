@@ -1,0 +1,59 @@
+{
+  "schemaVersion": 6,
+  "id": "fe/ux-ui-resolve",
+  "domain": "fe",
+  "inputSchema": "input.schema.json",
+  "outputSchema": "output.schema.json",
+  "knowledgeRefs": [
+    "fe.product-proof",
+    "fe.ui-quality-review",
+    "fe.request-lifecycle",
+    "fe.grammar-common-states-accessibility"
+  ],
+  "sourceReferenceRefs": [],
+  "accepts": [
+    {
+      "stage": "product.uat.ux-ui-resolution",
+      "status": "ready",
+      "allFacts": ["product-uat-failed", "ux-ui-repair-required"],
+      "noneFacts": []
+    },
+    {
+      "stage": "product.uat.ux-ui-resolution",
+      "status": "verify",
+      "allFacts": ["product-uat-passed", "ux-ui-resolution-close-required"],
+      "noneFacts": []
+    }
+  ],
+  "emits": [
+    {
+      "stage": "product.uat.ux-ui-resolution.result",
+      "status": "repair-ready",
+      "factsAdd": ["ux-ui-repair-contract-ready", "feedback-requests-approved"],
+      "factsRemove": []
+    },
+    {
+      "stage": "product.uat.ux-ui-resolution.result",
+      "status": "resolved",
+      "factsAdd": ["ux-ui-feedback-resolved"],
+      "factsRemove": ["ux-ui-repair-required", "ux-ui-resolution-close-required"]
+    },
+    {
+      "stage": "product.uat.ux-ui-resolution.result",
+      "status": "blocked",
+      "factsAdd": [],
+      "factsRemove": []
+    }
+  ],
+  "sideEffects": [
+    "update only the exact declared UX/UI request ledgers",
+    "write the repair contract and proof receipt only to task-session storage"
+  ],
+  "stopConditions": [
+    "UAT evidence does not identify a visible UX/UI defect",
+    "request evidence or current hash is stale",
+    "repair contract does not name one owner capability per assertion",
+    "resolution is requested without passing rerun evidence for the same requests",
+    "any request mutation escapes the declared request ledger paths"
+  ]
+}

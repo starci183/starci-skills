@@ -12,6 +12,7 @@ Run `node materialize.mjs`, then `node validate-skills.mjs`. The validator prove
 | --- | --- |
 | `starci-workspace-ready` | Workspace initialization and route readiness |
 | `starci-device-checkpoint` | Proven multi-device checkpoint publication |
+| `starci-workflow-handoff` | Minimal cross-device Git continuation for one active mission |
 | `starci-tech-stack` | Operational stack discovery, challenge, and approval |
 | `starci-business-authority` | Model and publish one business feature head |
 | `starci-business-reconcile` | Reconcile delivery proof with business truth |

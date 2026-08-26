@@ -1,0 +1,37 @@
+{
+  "schemaVersion": 6,
+  "id": "fe/interaction-container-decision",
+  "domain": "fe",
+  "inputSchema": "input.schema.json",
+  "outputSchema": "output.schema.json",
+  "knowledgeRefs": ["fe.interaction-container-selection"],
+  "sourceReferenceRefs": [],
+  "accepts": [
+    {
+      "stage": "ux.flow.container-decision",
+      "status": "ready",
+      "allFacts": ["ux-flow-modeled", "business-authority-fresh"],
+      "noneFacts": []
+    }
+  ],
+  "emits": [
+    {
+      "stage": "ux.flow.review",
+      "status": "pending",
+      "factsAdd": ["ux-flow-ready", "interaction-containers-modeled"],
+      "factsRemove": []
+    },
+    {
+      "stage": "ux.flow.result",
+      "status": "blocked",
+      "factsAdd": [],
+      "factsRemove": []
+    }
+  ],
+  "sideEffects": ["write interaction-container decisions only to task-session storage"],
+  "stopConditions": [
+    "an interaction has no declared trigger or task role",
+    "a container is selected without rejecting every alternative",
+    "responsive transformation or focus return is unspecified"
+  ]
+}

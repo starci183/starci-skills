@@ -4,7 +4,8 @@ Global `@selection` has already selected this one-flow skill from prompt intent.
 
 1. Require a passed fidelity receipt.
 2. Exercise every required journey transition and recovery path.
-3. Separate product failure from implementation fidelity drift.
+3. Classify UX/UI failures separately from functional, backend-contract and business failures.
+4. Close a UX/UI request only when the repaired state, Grammar object and journey outcome all pass independent UAT.
 
 Reject stale or missing authority/evidence, an ambiguous target, a write root outside scope, external mutation without approval, or an option outside the closed schema. Do not reconsider other skills here; return to global analysis if selection is wrong.
 

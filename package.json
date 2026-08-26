@@ -1,6 +1,6 @@
 {
   "name": "starci-skills",
-  "version": "6.1.0",
+  "version": "6.1.1",
   "private": true,
   "description": "Composable StarCi agent skills built from validated state machines, atomic operators, and lazy knowledge retrieval.",
   "license": "MIT",
@@ -21,7 +21,7 @@
     "check:no-load-tables": "node scripts/remove-redundant-load-tables.mjs",
     "check:orchestration": "node orchestration/validate-orchestration.mjs",
     "check:requests": "node requests/validate-requests.mjs",
-    "check:operators": "npm run check:no-load-tables && npm run check:requests && node operators/validate-operators.mjs && node --test operators/architecture-visual-preview.spec.mjs operators/be-implementation.spec.mjs operators/business-model-challenge.spec.mjs operators/fe-layout-visual-preview.spec.mjs operators/fe-mutation-acceptance.spec.mjs operators/tech-stack-contracts.spec.mjs",
+    "check:operators": "npm run check:no-load-tables && npm run check:requests && node operators/validate-operators.mjs && node --test operators/architecture-visual-preview.spec.mjs operators/be-implementation.spec.mjs operators/business-model-challenge.spec.mjs operators/fe-interaction-container-decision.spec.mjs operators/fe-layout-visual-preview.spec.mjs operators/fe-mutation-acceptance.spec.mjs operators/fe-product-uat.spec.mjs operators/fe-ux-ui-resolve.spec.mjs operators/tech-stack-contracts.spec.mjs operators/workflow-handoff.spec.mjs",
     "check:skills": "node skills/validate-skills.mjs",
     "check:release": "node scripts/validate-release.mjs",
     "check:source-readiness": "node scripts/source-readiness.mjs check --source-root ..",

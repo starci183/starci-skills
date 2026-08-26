@@ -3,7 +3,7 @@
   "schemaVersion": 1,
   "id": "tayson-public-surfaces-landing-motion-authority",
   "kind": "frontend-feedback-upgrade",
-  "status": "proven",
+  "status": "captured",
   "project": "tayson",
   "targetOwners": [
     "starci-runtime"

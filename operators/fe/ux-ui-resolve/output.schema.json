@@ -1,0 +1,168 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://starci.dev/v6/operators/fe/ux-ui-resolve/output.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "runId", "stage", "status", "facts", "payload"],
+  "properties": {
+    "schemaVersion": { "const": 6 },
+    "runId": { "type": "string", "minLength": 1 },
+    "stage": { "const": "product.uat.ux-ui-resolution.result" },
+    "status": { "enum": ["repair-ready", "resolved", "blocked"] },
+    "facts": { "type": "array", "uniqueItems": true, "items": { "type": "string", "minLength": 1 } },
+    "payload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["decision", "state", "produced", "context", "cleanup", "evidenceRefs", "findings", "artifact"],
+      "properties": {
+        "decision": { "enum": ["repair-ready", "resolved", "blocked"] },
+        "state": { "$ref": "#/$defs/state" },
+        "produced": { "$ref": "#/$defs/produced" },
+        "context": { "$ref": "#/$defs/context" },
+        "cleanup": { "$ref": "#/$defs/cleanup" },
+        "evidenceRefs": { "type": "array", "minItems": 1, "uniqueItems": true, "items": { "$ref": "#/$defs/sessionRef" } },
+        "findings": { "type": "array", "uniqueItems": true, "items": { "type": "string", "minLength": 1 } },
+        "artifact": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["artifactType", "phase", "repairClass", "targetCapability", "requestActions", "assertions", "proof", "handoffRef"],
+          "properties": {
+            "artifactType": { "const": "ux-ui-resolution" },
+            "phase": { "enum": ["plan", "close"] },
+            "repairClass": { "enum": ["implementation-drift", "detail-defect", "flow-defect", "grammar-defect", "mixed"] },
+            "targetCapability": { "enum": ["frontend.implementation", "frontend.ui-detail", "frontend.ux-flow", "frontend.grammar-convergence"] },
+            "requestActions": {
+              "type": "array",
+              "minItems": 1,
+              "maxItems": 20,
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["path", "action", "evidenceRef"],
+                "properties": {
+                  "path": { "$ref": "#/$defs/requestPath" },
+                  "action": { "enum": ["approve", "resolve"] },
+                  "evidenceRef": { "$ref": "#/$defs/sessionRef" }
+                }
+              }
+            },
+            "assertions": {
+              "type": "array",
+              "minItems": 1,
+              "maxItems": 40,
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["id", "category", "defect", "requiredChange", "acceptanceClaim", "ownerCapability", "evidenceRefs"],
+                "properties": {
+                  "id": { "type": "string", "pattern": "^[a-z0-9]+(?:[.-][a-z0-9]+)*$" },
+                  "category": { "enum": ["hierarchy", "state-semantics", "grammar-object", "copy", "interaction", "accessibility", "responsive"] },
+                  "defect": { "type": "string", "minLength": 3, "maxLength": 500 },
+                  "requiredChange": { "type": "string", "minLength": 3, "maxLength": 500 },
+                  "acceptanceClaim": { "type": "string", "minLength": 3, "maxLength": 500 },
+                  "ownerCapability": { "enum": ["frontend.implementation", "frontend.ui-detail", "frontend.ux-flow", "frontend.grammar-convergence"] },
+                  "evidenceRefs": { "type": "array", "minItems": 1, "uniqueItems": true, "items": { "$ref": "#/$defs/sessionRef" } }
+                }
+              }
+            },
+            "proof": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["uatPassed", "sameRequestSet", "grammarObjectPassed", "stateMappingPassed", "noHardIssues"],
+              "properties": {
+                "uatPassed": { "type": "boolean" },
+                "sameRequestSet": { "type": "boolean" },
+                "grammarObjectPassed": { "type": "boolean" },
+                "stateMappingPassed": { "type": "boolean" },
+                "noHardIssues": { "type": "boolean" }
+              }
+            },
+            "handoffRef": { "anyOf": [{ "$ref": "#/$defs/sessionRef" }, { "type": "null" }] }
+          }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "sha256": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
+    "sessionRef": { "type": "string", "pattern": "^session://tasks/[A-Za-z0-9._-]+/.+$" },
+    "requestPath": { "type": "string", "pattern": "^\\.claude/requests/[a-z0-9][a-z0-9._-]*\\.request\\.json$" },
+    "state": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["operator", "status", "code", "retryable", "emits"],
+      "properties": {
+        "operator": { "const": "fe/ux-ui-resolve" },
+        "status": { "enum": ["repair-ready", "resolved", "blocked"] },
+        "code": { "enum": ["ux-ui-repair-ready", "ux-ui-feedback-resolved", "ux-ui-resolution-blocked"] },
+        "retryable": { "type": "boolean" },
+        "emits": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["stage", "status", "factsAdd", "factsRemove"],
+          "properties": {
+            "stage": { "const": "product.uat.ux-ui-resolution.result" },
+            "status": { "enum": ["repair-ready", "resolved", "blocked"] },
+            "factsAdd": { "type": "array", "uniqueItems": true, "items": { "type": "string" } },
+            "factsRemove": { "type": "array", "uniqueItems": true, "items": { "type": "string" } }
+          }
+        }
+      }
+    },
+    "produced": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["artifactRefs", "mutations", "externalEffects"],
+      "properties": {
+        "artifactRefs": { "type": "array", "minItems": 1, "uniqueItems": true, "items": { "$ref": "#/$defs/sessionRef" } },
+        "mutations": {
+          "type": "array",
+          "maxItems": 20,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["path", "operation", "contentSha256", "requestStatus"],
+            "properties": {
+              "path": { "$ref": "#/$defs/requestPath" },
+              "operation": { "const": "upsert" },
+              "contentSha256": { "$ref": "#/$defs/sha256" },
+              "requestStatus": { "enum": ["approved", "resolved"] }
+            }
+          }
+        },
+        "externalEffects": { "type": "array", "maxItems": 0 }
+      }
+    },
+    "context": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["used"],
+      "properties": {
+        "used": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["kind", "ref", "revision"],
+            "properties": {
+              "kind": { "enum": ["uat-report", "request", "prior-resolution", "repair-receipt", "knowledge"] },
+              "ref": { "type": "string", "minLength": 1 },
+              "revision": { "type": "string", "minLength": 1 }
+            }
+          }
+        }
+      }
+    },
+    "cleanup": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["scratchRefs", "retention", "purgeAt"],
+      "properties": {
+        "scratchRefs": { "type": "array", "items": { "$ref": "#/$defs/sessionRef" } },
+        "retention": { "const": "until-skill-terminal" },
+        "purgeAt": { "const": "skill-terminal" }
+      }
+    }
+  }
+}

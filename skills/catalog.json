@@ -1,6 +1,6 @@
 {
   "schemaVersion": 6,
-  "systemVersion": "6.1.0",
+  "systemVersion": "6.1.1",
   "skills": [
     {
       "id": "starci-workspace-ready",
@@ -11,6 +11,11 @@
       "id": "starci-device-checkpoint",
       "capability": "device.checkpoint",
       "description": "Use when the user explicitly stops, ends, or checkpoints current StarCi work and wants proven source heads plus encrypted local Docker service state synchronized to another trusted device. Do not use for ordinary commits, deployment, unapproved external publication, or destructive restore."
+    },
+    {
+      "id": "starci-workflow-handoff",
+      "capability": "workflow.handoff",
+      "description": "Use when the user explicitly wants to pause an active StarCi coding workflow, push a minimal continuation checkpoint to Git, or resume that exact checkpoint on another device. Do not use for ordinary commits, deployment, Docker-volume transfer, or storing prompts and reasoning."
     },
     {
       "id": "starci-business-authority",
@@ -145,7 +150,7 @@
     {
       "id": "starci-frontend-ux-flow",
       "capability": "frontend.ux.flow",
-      "description": "Model one approved UI direction as a complete user flow with entry, navigation, state, failure, resume, submission, and completion. Do not choose visual styling or edit source."
+      "description": "Model one approved UI direction as a complete user flow, then choose page, modal, drawer, popover, or inline placement for every meaningful interaction. Do not choose visual styling or edit source."
     },
     {
       "id": "starci-product-potential",
@@ -155,7 +160,7 @@
     {
       "id": "starci-frontend-ui-detail",
       "capability": "frontend.ui.detail",
-      "description": "Freeze an approved UI direction and UX flow into an executable screen specification covering breadcrumbs, surface tree, decoration, state, responsive behavior, and deterministic baselines. Do not implement source."
+      "description": "Freeze an approved UI direction, UX flow, and interaction-container plan into an executable screen specification covering breadcrumbs, surfaces, overlays, decoration, state, responsive behavior, and deterministic baselines. Do not implement source."
     },
     {
       "id": "starci-frontend-contract-plan",
@@ -175,7 +180,7 @@
     {
       "id": "starci-product-uat",
       "capability": "product.uat",
-      "description": "Prove that a running product completes one approved business journey after implementation fidelity has passed. Use for outcome-level UAT, not design matching or source repair."
+      "description": "Prove that a running product completes one approved business journey, turn UX/UI failures into a typed repair contract, and close exact feedback requests only after rerun proof passes."
     },
     {
       "id": "starci-architecture-discover",

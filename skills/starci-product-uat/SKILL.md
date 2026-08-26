@@ -1,11 +1,11 @@
 ---
 name: starci-product-uat
-description: "Prove that a running product completes one approved business journey after implementation fidelity has passed. Use for outcome-level UAT, not design matching or source repair."
+description: "Prove that a running product completes one approved business journey, turn UX/UI failures into a typed repair contract, and close exact feedback requests only after rerun proof passes."
 ---
 
 # starci-product-uat
 
-Prove that a running product completes one approved business journey after implementation fidelity has passed. Use for outcome-level UAT, not design matching or source repair.
+Prove that a running product completes one approved business journey, turn UX/UI failures into a typed repair contract, and close exact feedback requests only after rerun proof passes.
 
 ## INPUT ANALYSIS
 

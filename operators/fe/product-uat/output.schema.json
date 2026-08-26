@@ -1,1 +1,246 @@
-{"$schema":"https://json-schema.org/draft/2020-12/schema","$id":"https://starci.dev/v6/operators/fe/product-uat/output.schema.json","type":"object","additionalProperties":false,"required":["schemaVersion","runId","stage","status","facts","payload"],"properties":{"schemaVersion":{"const":6},"runId":{"type":"string","minLength":1},"stage":{"const":"product.uat.result"},"status":{"enum":["passed","repair","blocked"]},"facts":{"type":"array","uniqueItems":true,"items":{"type":"string"}},"payload":{"type":"object","additionalProperties":false,"required":["decision","state","produced","context","cleanup","evidenceRefs","findings","artifact"],"properties":{"decision":{"enum":["passed","repair","blocked"]},"state":{"$ref":"#/$defs/state"},"produced":{"$ref":"#/$defs/produced"},"context":{"$ref":"#/$defs/context"},"cleanup":{"$ref":"#/$defs/cleanup"},"evidenceRefs":{"type":"array","minItems":1,"items":{"$ref":"#/$defs/ref"}},"findings":{"type":"array","uniqueItems":true,"items":{"type":"string"}},"artifact":{"type":"object","additionalProperties":false,"required":["artifactType","journeyCoverage","outcomeStatus","issues","potentialSignals"],"properties":{"artifactType":{"const":"product-uat-report"},"journeyCoverage":{"type":"array","minItems":1,"items":{"type":"object","additionalProperties":false,"required":["stepId","status","evidenceRef"],"properties":{"stepId":{"type":"string","minLength":1},"status":{"enum":["passed","failed","blocked"]},"evidenceRef":{"$ref":"#/$defs/ref"}}}},"outcomeStatus":{"enum":["proved","failed","blocked"]},"issues":{"type":"array","uniqueItems":true,"items":{"type":"object","additionalProperties":false,"required":["ownerCapability","severity","evidenceRef"],"properties":{"ownerCapability":{"enum":["frontend.implementation","frontend.ui-detail","frontend.ux-flow","backend.contract-plan","business.potential"]},"severity":{"enum":["hard","soft"]},"evidenceRef":{"$ref":"#/$defs/ref"}}}},"potentialSignals":{"type":"array","uniqueItems":true,"items":{"type":"object","additionalProperties":false,"required":["capability","necessity","risk","reasonCode"],"properties":{"capability":{"type":"string","minLength":1},"necessity":{"enum":["required","recommended","optional"]},"risk":{"enum":["read-only","source-write","business-change","database-change"]},"reasonCode":{"type":"string","minLength":1}}}}}}}}},"$defs":{"ref":{"type":"string","minLength":1},"state":{"type":"object","additionalProperties":false,"required":["operator","status","code","retryable","emits"],"properties":{"operator":{"const":"fe/product-uat"},"status":{"enum":["passed","repair","blocked"]},"code":{"enum":["product-uat-passed","product-uat-repair","product-uat-blocked"]},"retryable":{"type":"boolean"},"emits":{"type":"object","additionalProperties":false,"required":["stage","status","factsAdd","factsRemove"],"properties":{"stage":{"const":"product.uat.result"},"status":{"enum":["passed","repair","blocked"]},"factsAdd":{"type":"array","items":{"type":"string"}},"factsRemove":{"type":"array","items":{"type":"string"}}}}}},"produced":{"type":"object","additionalProperties":false,"required":["artifactRefs","mutations","externalEffects"],"properties":{"artifactRefs":{"type":"array","minItems":1,"items":{"$ref":"#/$defs/ref"}},"mutations":{"type":"array","maxItems":0},"externalEffects":{"type":"array","maxItems":0}}},"context":{"type":"object","additionalProperties":false,"required":["used"],"properties":{"used":{"type":"array","minItems":1,"items":{"type":"object","additionalProperties":false,"required":["kind","ref","revision"],"properties":{"kind":{"enum":["business","approved-flow","fidelity-receipt","running-app","knowledge"]},"ref":{"$ref":"#/$defs/ref"},"revision":{"$ref":"#/$defs/ref"}}}}}},"cleanup":{"type":"object","additionalProperties":false,"required":["scratchRefs","retention","purgeAt"],"properties":{"scratchRefs":{"type":"array","items":{"$ref":"#/$defs/ref"}},"retention":{"const":"until-skill-terminal"},"purgeAt":{"const":"skill-terminal"}}}}}
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://starci.dev/v6/operators/fe/product-uat/output.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "runId", "stage", "status", "facts", "payload"],
+  "properties": {
+    "schemaVersion": { "const": 6 },
+    "runId": { "type": "string", "minLength": 1 },
+    "stage": { "const": "product.uat.result" },
+    "status": { "enum": ["passed", "ux-ui-repair", "repair", "blocked"] },
+    "facts": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": { "type": "string" }
+    },
+    "payload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "decision",
+        "state",
+        "produced",
+        "context",
+        "cleanup",
+        "evidenceRefs",
+        "findings",
+        "artifact"
+      ],
+      "properties": {
+        "decision": { "enum": ["passed", "ux-ui-repair", "repair", "blocked"] },
+        "state": { "$ref": "#/$defs/state" },
+        "produced": { "$ref": "#/$defs/produced" },
+        "context": { "$ref": "#/$defs/context" },
+        "cleanup": { "$ref": "#/$defs/cleanup" },
+        "evidenceRefs": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "#/$defs/ref" }
+        },
+        "findings": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": { "type": "string" }
+        },
+        "artifact": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "artifactType",
+            "journeyCoverage",
+            "semanticChecks",
+            "outcomeStatus",
+            "issues",
+            "potentialSignals",
+            "resolutionRequestRefs"
+          ],
+          "properties": {
+            "artifactType": { "const": "product-uat-report" },
+            "journeyCoverage": {
+              "type": "array",
+              "minItems": 1,
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["stepId", "status", "evidenceRef"],
+                "properties": {
+                  "stepId": { "type": "string", "minLength": 1 },
+                  "status": { "enum": ["passed", "failed", "blocked"] },
+                  "evidenceRef": { "$ref": "#/$defs/ref" }
+                }
+              }
+            },
+            "semanticChecks": {
+              "type": "array",
+              "minItems": 1,
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["kind", "claim", "variant", "status", "evidenceRef"],
+                "properties": {
+                  "kind": {
+                    "enum": [
+                      "grammar-object",
+                      "semantic-content",
+                      "state-mapping",
+                      "interaction-container",
+                      "control-prerequisite",
+                      "entitlement",
+                      "journey-outcome"
+                    ]
+                  },
+                  "claim": { "type": "string", "minLength": 1 },
+                  "variant": { "type": "string", "minLength": 1 },
+                  "status": { "enum": ["passed", "failed", "blocked"] },
+                  "evidenceRef": { "$ref": "#/$defs/ref" }
+                }
+              }
+            },
+            "outcomeStatus": { "enum": ["proved", "failed", "blocked"] },
+            "issues": {
+              "type": "array",
+              "uniqueItems": true,
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["domain", "ownerCapability", "severity", "evidenceRef"],
+                "properties": {
+                  "domain": { "enum": ["ux-ui", "functional", "backend-contract", "business"] },
+                  "ownerCapability": {
+                    "enum": [
+                      "frontend.implementation",
+                      "frontend.ui-detail",
+                      "frontend.ux-flow",
+                      "backend.contract-plan",
+                      "business.potential"
+                    ]
+                  },
+                  "severity": { "enum": ["hard", "soft"] },
+                  "evidenceRef": { "$ref": "#/$defs/ref" }
+                }
+              }
+            },
+            "resolutionRequestRefs": {
+              "type": "array",
+              "maxItems": 20,
+              "uniqueItems": true,
+              "items": { "$ref": "#/$defs/requestPath" }
+            },
+            "potentialSignals": {
+              "type": "array",
+              "uniqueItems": true,
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["capability", "necessity", "risk", "reasonCode"],
+                "properties": {
+                  "capability": { "type": "string", "minLength": 1 },
+                  "necessity": {
+                    "enum": ["required", "recommended", "optional"]
+                  },
+                  "risk": {
+                    "enum": [
+                      "read-only",
+                      "source-write",
+                      "business-change",
+                      "database-change"
+                    ]
+                  },
+                  "reasonCode": { "type": "string", "minLength": 1 }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "ref": { "type": "string", "minLength": 1 },
+    "state": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["operator", "status", "code", "retryable", "emits"],
+      "properties": {
+        "operator": { "const": "fe/product-uat" },
+        "status": { "enum": ["passed", "ux-ui-repair", "repair", "blocked"] },
+        "code": {
+          "enum": [
+            "product-uat-passed",
+            "product-uat-ux-ui-repair",
+            "product-uat-repair",
+            "product-uat-blocked"
+          ]
+        },
+        "retryable": { "type": "boolean" },
+        "emits": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["stage", "status", "factsAdd", "factsRemove"],
+          "properties": {
+            "stage": { "const": "product.uat.result" },
+            "status": { "enum": ["passed", "ux-ui-repair", "repair", "blocked"] },
+            "factsAdd": { "type": "array", "items": { "type": "string" } },
+            "factsRemove": { "type": "array", "items": { "type": "string" } }
+          }
+        }
+      }
+    },
+    "requestPath": { "type": "string", "pattern": "^\\.claude/requests/[a-z0-9][a-z0-9._-]*\\.request\\.json$" },
+    "produced": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["artifactRefs", "mutations", "externalEffects"],
+      "properties": {
+        "artifactRefs": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "#/$defs/ref" }
+        },
+        "mutations": { "type": "array", "maxItems": 0 },
+        "externalEffects": { "type": "array", "maxItems": 0 }
+      }
+    },
+    "context": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["used"],
+      "properties": {
+        "used": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["kind", "ref", "revision"],
+            "properties": {
+              "kind": {
+                "enum": [
+                  "business",
+                  "approved-flow",
+                  "approved-container-plan",
+                  "fidelity-receipt",
+                  "running-app",
+                  "knowledge"
+                ]
+              },
+              "ref": { "$ref": "#/$defs/ref" },
+              "revision": { "$ref": "#/$defs/ref" }
+            }
+          }
+        }
+      }
+    },
+    "cleanup": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["scratchRefs", "retention", "purgeAt"],
+      "properties": {
+        "scratchRefs": { "type": "array", "items": { "$ref": "#/$defs/ref" } },
+        "retention": { "const": "until-skill-terminal" },
+        "purgeAt": { "const": "skill-terminal" }
+      }
+    }
+  }
+}

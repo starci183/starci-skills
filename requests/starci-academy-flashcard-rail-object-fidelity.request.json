@@ -1,0 +1,57 @@
+{
+  "$schema": "./request.schema.json",
+  "schemaVersion": 1,
+  "id": "starci-academy-flashcard-rail-object-fidelity",
+  "kind": "frontend-feedback-upgrade",
+  "status": "resolved",
+  "project": "starci-academy",
+  "targetOwners": ["starci-runtime", "grammar"],
+  "need": "A flashcard session rail must use the Grammar object that matches each reading job: a state legend must demonstrate the exact treatments used by the question map, while repeated session facts must be rendered as one joined SurfaceListCard.",
+  "negativeBoundary": "Do not pass plain labels or an independent legend-only color system as proof of question state, do not omit a visually distinct selected-history state, do not substitute a generic SurfaceCard for a repeated label-value list, and do not accept surface count alone as proof of Grammar fidelity.",
+  "acceptanceCriteria": [
+    "Answered, selected-history, current-frontier and future each have an explicit visual treatment when those treatments are distinct in the question map.",
+    "Every legend sample uses the same treatment tokens as the corresponding question control; no legend-only semantic color is introduced.",
+    "The session-information region renders through SurfaceListCard with separate joined fact rows.",
+    "The state legend remains a compact legend rather than being misclassified as a data list.",
+    "UAT proves exact Grammar object identity, row anatomy and state-marker mapping in the DOM and rendered viewport."
+  ],
+  "feedbackSessions": [
+    {
+      "fingerprint": "sha256:138630b8f9aefb4d9c1f68aeb25d9e0153b48236f761fd324e800bdce7f60ee6",
+      "sourceSkillId": "starci-frontend-maintenance-apply",
+      "evidenceSha256": "sha256:dfe077357dcd5b06ef2a96606d819dff01484d70967c993a6ec86e5268b7b236",
+      "accepts": [
+        "A state key whose marks visibly correspond to the question-map treatments.",
+        "A joined SurfaceListCard for mode, deck and level facts."
+      ],
+      "rejects": [
+        "Three plain labels presented as if they explained three visually different states.",
+        "A generic card containing hand-spaced label-value rows."
+      ],
+      "targetOwners": ["starci-runtime", "grammar"],
+      "proofStatus": "proven"
+    },
+    {
+      "fingerprint": "sha256:15a3a79cc212b6bb3d442870b8cbdd4a7baadd03eaa0442abdb05e53532df12c",
+      "sourceSkillId": "starci-frontend-maintenance-apply",
+      "evidenceSha256": "sha256:cdf9a9a43ec2ecf7afd8a6666787a77dacd389cf97165026fdd72d5885c5a508",
+      "accepts": [
+        "Legend samples that visually match answered, selected-history, current-frontier and future controls.",
+        "A state model that distinguishes the viewed historical card from the persisted frontier."
+      ],
+      "rejects": [
+        "A green answered marker when no answered control uses green.",
+        "Three legend states for a question map that visibly renders four states."
+      ],
+      "targetOwners": ["starci-runtime", "grammar"],
+      "proofStatus": "proven"
+    }
+  ],
+  "review": {
+    "decision": "approved",
+    "priority": "urgent",
+    "evidenceSha256": "sha256:e3e9aca262ef3cd13a3a0a95d54f314859368b8a1825bbbb57aa1af0f453c771",
+    "targetOwners": ["starci-runtime", "grammar"],
+    "rationale": "Approved after DOM and rendered-viewport proof showed four exact question treatments and a joined SurfaceListCard for session facts on desktop and compact layouts."
+  }
+}

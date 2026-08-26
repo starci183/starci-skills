@@ -1,1 +1,30 @@
-{"$schema":"../machine.schema.json","schemaVersion":6,"id":"starci-frontend-ux-flow","start":"analyze-input","states":{"analyze-input":{"kind":"analysis","on":[{"when":{},"target":"model"}]},"model":{"kind":"operator","ref":"fe/ux-flow","on":[{"when":{"decision":"flow-ready"},"target":"review"},{"when":{"decision":"blocked"},"target":"blocked"}]},"review":{"kind":"terminal","result":"handoff"},"blocked":{"kind":"terminal","result":"blocked"}}}
+{
+  "$schema": "../machine.schema.json",
+  "schemaVersion": 6,
+  "id": "starci-frontend-ux-flow",
+  "start": "analyze-input",
+  "states": {
+    "analyze-input": {
+      "kind": "analysis",
+      "on": [{ "when": {}, "target": "model" }]
+    },
+    "model": {
+      "kind": "operator",
+      "ref": "fe/ux-flow",
+      "on": [
+        { "when": { "decision": "flow-ready" }, "target": "containers" },
+        { "when": { "decision": "blocked" }, "target": "blocked" }
+      ]
+    },
+    "containers": {
+      "kind": "operator",
+      "ref": "fe/interaction-container-decision",
+      "on": [
+        { "when": { "decision": "containers-ready" }, "target": "review" },
+        { "when": { "decision": "blocked" }, "target": "blocked" }
+      ]
+    },
+    "review": { "kind": "terminal", "result": "handoff" },
+    "blocked": { "kind": "terminal", "result": "blocked" }
+  }
+}

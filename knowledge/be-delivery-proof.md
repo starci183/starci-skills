@@ -15,4 +15,6 @@ Close a backend run by reconciling approved revision, final source boundary, mut
 
 Every planned path must appear with the expected change kind and final hash. Every approved test and gate must have a fresh passing receipt bound to the same revision and commit. No unapproved production path may appear. Product-facing work reconciles its exact business head; technical-only work leaves implemented authority unchanged.
 
+For a resumable product flow, proof must exercise both a newly created snapshot and a legacy or drifted snapshot. Verify that authorization and business filters agree at creation and rehydration, every returned member remains actionable, collection indexes still refer to the returned order, and an exhausted or inaccessible snapshot resolves to an explicit terminal path instead of a superficially successful but unusable screen.
+
 Any missing receipt, hash mismatch, stale source revision, boundary escape, unresolved external blocker, or business-head mismatch returns a blocked proof. Completion is emitted only when the evidence closure is exact.

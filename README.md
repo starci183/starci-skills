@@ -27,6 +27,7 @@ request -> global analysis -> selected skill -> operator -> validated result
 | --- | --- |
 | `starci-workspace-ready` | Initialize, hydrate, or verify workspace identity and routes |
 | `starci-device-checkpoint` | Checkpoint proven source and encrypted local service state for another trusted device |
+| `starci-workflow-handoff` | Pause one coding mission in Git and resume its exact continuation on another device |
 | `starci-tech-stack` | Define observed and target runtime, microservice, persistence, and operations topology |
 | `starci-business-authority` | Model, approve, and publish one business feature head |
 | `starci-business-reconcile` | Reconcile immutable delivery proof with business truth |

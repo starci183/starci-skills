@@ -1,1 +1,39 @@
-{"schemaVersion":6,"id":"fe/ux-flow","domain":"fe","inputSchema":"input.schema.json","outputSchema":"output.schema.json","knowledgeRefs":["fe.customer-journey","fe.state-modeling"],"sourceReferenceRefs":[],"accepts":[{"stage":"ux.flow.model","status":"ready","allFacts":["ui-direction-approved","business-authority-fresh"],"noneFacts":[]}],"emits":[{"stage":"ux.flow.review","status":"pending","factsAdd":["ux-flow-ready"],"factsRemove":[]},{"stage":"ux.flow.result","status":"blocked","factsAdd":[],"factsRemove":[]}],"sideEffects":["write UX model and potential signals only to task-session storage"],"stopConditions":["missing primary task","no recovery path","persistence need presented as approved behavior"]}
+{
+  "schemaVersion": 6,
+  "id": "fe/ux-flow",
+  "domain": "fe",
+  "inputSchema": "input.schema.json",
+  "outputSchema": "output.schema.json",
+  "knowledgeRefs": ["fe.customer-journey", "fe.state-modeling"],
+  "sourceReferenceRefs": [],
+  "accepts": [
+    {
+      "stage": "ux.flow.model",
+      "status": "ready",
+      "allFacts": ["ui-direction-approved", "business-authority-fresh"],
+      "noneFacts": []
+    }
+  ],
+  "emits": [
+    {
+      "stage": "ux.flow.container-decision",
+      "status": "ready",
+      "factsAdd": ["ux-flow-modeled"],
+      "factsRemove": []
+    },
+    {
+      "stage": "ux.flow.result",
+      "status": "blocked",
+      "factsAdd": [],
+      "factsRemove": []
+    }
+  ],
+  "sideEffects": [
+    "write UX model and potential signals only to task-session storage"
+  ],
+  "stopConditions": [
+    "missing primary task",
+    "no recovery path",
+    "persistence need presented as approved behavior"
+  ]
+}

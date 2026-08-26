@@ -24,7 +24,7 @@ for (const retired of ['v6', 'operations', 'docs', 'platform', 'context-manifest
 }
 
 const packageJson = readJson('package.json');
-if (packageJson.version !== '6.1.0') fail('package version must be 6.1.0');
+if (packageJson.version !== '6.1.1') fail('package version must be 6.1.1');
 if (packageJson.license !== 'MIT' || packageJson.private !== true) fail('release must declare MIT and remain private against accidental npm publish');
 if (!packageJson.repository?.url?.includes('starci183/starci-skills')) fail('repository metadata is missing');
 

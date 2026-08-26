@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "summary": {
-    "skillCount": 45,
+    "skillCount": 46,
     "hardFailureCount": 0,
     "averages": {
       "inputCleanliness": 98,
@@ -4650,8 +4650,10 @@
         }
       },
       "machine": {
-        "score": 100,
-        "findings": []
+        "score": 90,
+        "findings": [
+          "verify: decision routes do not equal fe/product-uat outcomes"
+        ]
       },
       "hardFailures": []
     },
@@ -5862,6 +5864,140 @@
       "hardFailures": []
     },
     {
+      "id": "starci-workflow-handoff",
+      "input": {
+        "score": 100,
+        "findings": [],
+        "metrics": {
+          "objects": 8,
+          "closedObjects": 4,
+          "arrays": 6,
+          "boundedArrays": 6,
+          "referenceFields": [
+            {
+              "at": "$.selection.activeInputRefs",
+              "constrained": true,
+              "bounded": true
+            },
+            {
+              "at": "$.selection.activeInputRefs[]",
+              "constrained": true,
+              "bounded": true
+            },
+            {
+              "at": "$.selection.passiveContextRefs",
+              "constrained": true,
+              "bounded": true
+            },
+            {
+              "at": "$.selection.passiveContextRefs[]",
+              "constrained": true,
+              "bounded": true
+            },
+            {
+              "at": "$.requestRef",
+              "constrained": true,
+              "bounded": true
+            },
+            {
+              "at": "$.artifactRefs",
+              "constrained": true,
+              "bounded": true
+            },
+            {
+              "at": "$.artifactRefs[]",
+              "constrained": true,
+              "bounded": true
+            },
+            {
+              "at": "$.evidenceRefs",
+              "constrained": true,
+              "bounded": true
+            },
+            {
+              "at": "$.evidenceRefs[]",
+              "constrained": true,
+              "bounded": true
+            },
+            {
+              "at": "$.scope.targetRefs",
+              "constrained": true,
+              "bounded": true
+            },
+            {
+              "at": "$.scope.targetRefs[]",
+              "constrained": true,
+              "bounded": true
+            },
+            {
+              "at": "$.scope.approvalRef",
+              "constrained": true,
+              "bounded": true
+            },
+            {
+              "at": "$.allOf[0].then.scope.approvalRef",
+              "constrained": true,
+              "bounded": true
+            }
+          ],
+          "broadFields": []
+        }
+      },
+      "output": {
+        "score": 100,
+        "findings": [],
+        "metrics": {
+          "objects": 8,
+          "closedObjects": 4,
+          "arrays": 4,
+          "boundedArrays": 4,
+          "referenceFields": [
+            {
+              "at": "$.handoffRef",
+              "constrained": true,
+              "bounded": true
+            },
+            {
+              "at": "$.receiptRefs",
+              "constrained": true,
+              "bounded": true
+            },
+            {
+              "at": "$.receiptRefs[]",
+              "constrained": true,
+              "bounded": true
+            },
+            {
+              "at": "$.findings[].evidenceRefs",
+              "constrained": true,
+              "bounded": true
+            },
+            {
+              "at": "$.findings[].evidenceRefs[]",
+              "constrained": true,
+              "bounded": true
+            },
+            {
+              "at": "$.cleanup.scratchRefs",
+              "constrained": true,
+              "bounded": true
+            },
+            {
+              "at": "$.cleanup.scratchRefs[]",
+              "constrained": true,
+              "bounded": true
+            }
+          ],
+          "broadFields": []
+        }
+      },
+      "machine": {
+        "score": 100,
+        "findings": []
+      },
+      "hardFailures": []
+    },
+    {
       "id": "starci-workspace-ready",
       "input": {
         "score": 100,
@@ -6109,8 +6245,8 @@
             "score": 12
           },
           {
-            "id": "starci-product-uat",
-            "score": 12
+            "id": "starci-architecture-realization",
+            "score": 9
           }
         ]
       },
@@ -6247,8 +6383,8 @@
             "score": 6
           },
           {
-            "id": "starci-product-uat",
-            "score": 6
+            "id": "starci-frontend-block-reconcile",
+            "score": 5
           }
         ]
       },
@@ -6788,18 +6924,18 @@
         "pass": true,
         "selected": "starci-backend-implementation",
         "expectedScore": 12,
-        "margin": 3,
+        "margin": 0,
         "top": [
           {
             "id": "starci-backend-implementation",
             "score": 12
           },
           {
-            "id": "starci-backend-proof",
-            "score": 9
+            "id": "starci-product-uat",
+            "score": 12
           },
           {
-            "id": "starci-frontend-implementation",
+            "id": "starci-backend-proof",
             "score": 9
           }
         ]
@@ -6877,8 +7013,8 @@
   },
   "text": {
     "score": 100,
-    "files": 591,
-    "lines": 14004,
+    "files": 605,
+    "lines": 14229,
     "findings": []
   },
   "independent": {

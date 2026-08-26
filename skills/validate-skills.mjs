@@ -83,6 +83,38 @@ function operatorOutcomes(operatorFile) {
   return { decisions, variants };
 }
 
+function conditionsAreProvablyDisjoint(left, right) {
+  const leftAll = new Set(left.allFacts ?? []);
+  const rightAll = new Set(right.allFacts ?? []);
+  const leftNone = new Set(left.noneFacts ?? []);
+  const rightNone = new Set(right.noneFacts ?? []);
+  if ([...leftAll].some((fact) => rightNone.has(fact))) return true;
+  if ([...rightAll].some((fact) => leftNone.has(fact))) return true;
+
+  const leftInputs = left.inputEquals ?? {};
+  const rightInputs = right.inputEquals ?? {};
+  return Object.keys(leftInputs).some(
+    (key) => Object.hasOwn(rightInputs, key) && leftInputs[key] !== rightInputs[key]
+  );
+}
+
+function assertDuplicateRoutesAreDisjoint(skillId, stateId, edges, routeKey) {
+  const groups = new Map();
+  for (const edge of edges) {
+    const route = routeKey(edge);
+    groups.set(route, [...(groups.get(route) ?? []), edge]);
+  }
+  for (const [route, duplicates] of groups) {
+    for (let left = 0; left < duplicates.length; left += 1) {
+      for (let right = left + 1; right < duplicates.length; right += 1) {
+        if (!conditionsAreProvablyDisjoint(duplicates[left].when, duplicates[right].when)) {
+          fail(`${skillId}/${stateId}: duplicate ${route} routes are not provably disjoint`);
+        }
+      }
+    }
+  }
+}
+
 function assertOperatorRoutes(skillId, stateId, state, operatorFile) {
   const { decisions, variants } = operatorOutcomes(operatorFile);
   const decisionEdges = state.on.filter((edge) => edge.when?.decision !== undefined);
@@ -92,9 +124,10 @@ function assertOperatorRoutes(skillId, stateId, state, operatorFile) {
     const routed = decisionEdges.map((edge) => edge.when.decision);
     const missing = decisions.filter((decision) => !routed.includes(decision));
     const unknown = routed.filter((decision) => !decisions.includes(decision));
-    if (new Set(routed).size !== routed.length || missing.length || unknown.length) {
+    if (missing.length || unknown.length) {
       fail(`${skillId}/${stateId}: decision routes differ from ${state.ref} contract; missing [${missing}], unknown [${unknown}]`);
     }
+    assertDuplicateRoutesAreDisjoint(skillId, stateId, decisionEdges, (edge) => `decision ${edge.when.decision}`);
     return;
   }
   if (stageEdges.length) {

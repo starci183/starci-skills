@@ -45,6 +45,13 @@ const deviceCheckpointStates = {
   blocked: terminal('blocked')
 };
 
+const workflowHandoffStates = {
+  route: op('workspace/route-verify', routeEdges('handoff')),
+  handoff: op('workspace/workflow-handoff', decided({ published: 'complete', resumed: 'complete', blocked: 'blocked' })),
+  complete: terminal('complete'),
+  blocked: terminal('blocked')
+};
+
 const businessStates = {
   route: op('workspace/route-verify', routeEdges('evidence')),
   evidence: op('business/evidence-normalize', decided({ ready: 'model' })),
@@ -747,6 +754,27 @@ const flows = [
       "Block dirty, behind, diverged, detached or force-push source state.",
       "Quiesce every Source-declared Docker volume, stream encrypted archives, restart containers and prove one complete private release manifest."
     ]
+  },
+  {
+    id: 'workflow-handoff',
+    display: 'StarCi Workflow Handoff',
+    short: 'Pause work in Git and resume it on another device',
+    entry: 'route',
+    states: workflowHandoffStates,
+    options: {
+      mode: {
+        enum: ['publish', 'resume'],
+        description: 'Publish a portable Git checkpoint or adopt one on the current device.'
+      }
+    },
+    description: 'Use when the user explicitly wants to pause an active StarCi coding workflow, push a minimal continuation checkpoint to Git, or resume that exact checkpoint on another device. Do not use for ordinary commits, deployment, Docker-volume transfer, or storing prompts and reasoning.',
+    checks: [
+      'Resolve the exact mission-owned project-role routes and reject adjacent checkouts.',
+      'Require explicit authority before creating commits, branches, tags, pushes, checkouts or worktrees.',
+      'Persist only Git heads, the next capability and durable artifact references; never persist prompts, reasoning, loaded context, credentials or session scratch.',
+      'On resume, verify the checkpoint tag, every repository identity and exact head before emitting the next capability.'
+    ],
+    inputBoundary: 'The mode is explicit: publish creates the portable checkpoint; resume verifies and adopts one exact checkpoint before emitting the next capability.'
   },
   {
     "id": "business-authority",
@@ -14342,9 +14370,9 @@ const flows = [
   {
     "id": "frontend-ux-flow",
     "display": "StarCi Frontend UX Flow",
-    "short": "Model one complete interactive user flow",
+    "short": "Model a flow and choose every interaction container",
     "handAuthored": true,
-    "description": "Model one approved UI direction as a complete user flow with entry, navigation, state, failure, resume, submission, and completion. Do not choose visual styling or edit source.",
+    "description": "Model one approved UI direction as a complete user flow, then choose page, modal, drawer, popover, or inline placement for every meaningful interaction. Do not choose visual styling or edit source.",
     "contextMatrix": [
       [
         "route + target verification",
@@ -14402,7 +14430,7 @@ const flows = [
     "display": "StarCi Frontend UI Detail",
     "short": "Freeze executable frontend design detail",
     "handAuthored": true,
-    "description": "Freeze an approved UI direction and UX flow into an executable screen specification covering breadcrumbs, surface tree, decoration, state, responsive behavior, and deterministic baselines. Do not implement source.",
+    "description": "Freeze an approved UI direction, UX flow, and interaction-container plan into an executable screen specification covering breadcrumbs, surfaces, overlays, decoration, state, responsive behavior, and deterministic baselines. Do not implement source.",
     "contextMatrix": [
       [
         "route + target verification",
@@ -14640,10 +14668,30 @@ const flows = [
         "on": [
           {
             "when": {
-              "decision": "passed"
+              "decision": "passed",
+              "allFacts": [
+                "ux-ui-resolution-close-required"
+              ]
+            },
+            "target": "resolve-ux-ui",
+            "label": "close proved UX/UI requests"
+          },
+          {
+            "when": {
+              "decision": "passed",
+              "noneFacts": [
+                "ux-ui-resolution-close-required"
+              ]
             },
             "target": "complete",
             "label": "passed"
+          },
+          {
+            "when": {
+              "decision": "ux-ui-repair"
+            },
+            "target": "resolve-ux-ui",
+            "label": "resolve UX/UI failure"
           },
           {
             "when": {
@@ -14651,6 +14699,33 @@ const flows = [
             },
             "target": "repair-handoff",
             "label": "repair"
+          },
+          {
+            "when": {
+              "decision": "blocked"
+            },
+            "target": "blocked",
+            "label": "blocked"
+          }
+        ]
+      },
+      "resolve-ux-ui": {
+        "kind": "operator",
+        "ref": "fe/ux-ui-resolve",
+        "on": [
+          {
+            "when": {
+              "decision": "repair-ready"
+            },
+            "target": "repair-handoff",
+            "label": "typed repair handoff"
+          },
+          {
+            "when": {
+              "decision": "resolved"
+            },
+            "target": "complete",
+            "label": "requests closed after proof"
           },
           {
             "when": {
@@ -14675,11 +14750,12 @@ const flows = [
       }
     },
     "options": {},
-    "description": "Prove that a running product completes one approved business journey after implementation fidelity has passed. Use for outcome-level UAT, not design matching or source repair.",
+    "description": "Prove that a running product completes one approved business journey, turn UX/UI failures into a typed repair contract, and close exact feedback requests only after rerun proof passes.",
     "checks": [
       "Require a passed fidelity receipt.",
       "Exercise every required journey transition and recovery path.",
-      "Separate product failure from implementation fidelity drift."
+      "Classify UX/UI failures separately from functional, backend-contract and business failures.",
+      "Close a UX/UI request only when the repaired state, Grammar object and journey outcome all pass independent UAT."
     ],
     "contextMatrix": [
       [
@@ -15632,7 +15708,7 @@ for (const flow of flows) {
     if (!decisions.has('blocked')) state.on.push(e({ decision: 'blocked' }, 'blocked', 'blocked'));
   }
   if (flow.contextMatrix) continue;
-  if (['starci-workspace-ready', 'starci-device-checkpoint'].includes(flow.id)) flow.contextMatrix = domainContextMatrices.workspace;
+  if (['starci-workspace-ready', 'starci-device-checkpoint', 'starci-workflow-handoff'].includes(flow.id)) flow.contextMatrix = domainContextMatrices.workspace;
   else if (['starci-business-authority', 'starci-business-reconcile'].includes(flow.id)) flow.contextMatrix = domainContextMatrices.business;
   else if (flow.id.startsWith('starci-frontend-')) flow.contextMatrix = domainContextMatrices.frontendMaintenance;
   else if (flow.id.startsWith('starci-quality-') || ['starci-workflow-diagnose', 'starci-rule-binding-audit'].includes(flow.id)) flow.contextMatrix = domainContextMatrices.quality;
@@ -15650,7 +15726,7 @@ const yamlString = (value) => JSON.stringify(value);
 
 writeJson(path.join(root, 'catalog.json'), {
   schemaVersion: 6,
-  systemVersion: '6.1.0',
+  systemVersion: '6.1.1',
   skills: flows.map(({ id, description }) => ({
     id,
     capability: id.replace(/^starci-/, '').replaceAll('-', '.'),

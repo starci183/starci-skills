@@ -1,0 +1,36 @@
+{
+  "$schema": "./request.schema.json",
+  "schemaVersion": 1,
+  "id": "starci-academy-flashcard-answer-integrity",
+  "kind": "frontend-feedback-upgrade",
+  "status": "resolved",
+  "project": "starci-academy",
+  "targetOwners": ["starci-runtime"],
+  "need": "A revealed flashcard answer must contain meaningful answer content or an explicit access state, and recall grading must remain unavailable until meaningful answer content exists.",
+  "negativeBoundary": "Do not render a label-only answer surface, silently treat withheld premium content as an empty answer, enable grading without answer evidence, or expose paid content to repair the presentation defect.",
+  "acceptanceCriteria": [
+    "A non-empty answer body is visibly rendered whenever the answer state is available.",
+    "A withheld or blank answer renders an explicit unavailable message instead of an empty answer surface.",
+    "Recall grading controls are absent until a meaningful non-whitespace answer body is visible.",
+    "A newly created trial review draw excludes premium cards whose answers the learner cannot access.",
+    "UAT proves payload-to-DOM content completeness and entitlement variants, not only the existence of the answer surface."
+  ],
+  "feedbackSessions": [
+    {
+      "fingerprint": "sha256:592a5ab03a184adde6a1536430c5e59dfad2db1f4dc245f563243da430c2f5e1",
+      "sourceSkillId": "starci-frontend-maintenance-apply",
+      "evidenceSha256": "sha256:de5ef9a18efa12034ec3865b56e042d101adcae24c6c801b4f771be1f0e4574c",
+      "accepts": ["A revealed answer includes visible semantic content before recall grading is offered."],
+      "rejects": ["A visible answer heading with an empty body while recall grading remains enabled."],
+      "targetOwners": ["starci-runtime"],
+      "proofStatus": "proven"
+    }
+  ],
+  "review": {
+    "decision": "approved",
+    "priority": "urgent",
+    "evidenceSha256": "sha256:e3e9aca262ef3cd13a3a0a95d54f314859368b8a1825bbbb57aa1af0f453c771",
+    "targetOwners": ["starci-runtime"],
+    "rationale": "Approved after payload-to-DOM tests and desktop/compact visual UAT proved an explicit unavailable-answer state and suppressed grading without meaningful answer content."
+  }
+}

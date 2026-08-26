@@ -1,0 +1,37 @@
+{
+  "$schema": "./request.schema.json",
+  "schemaVersion": 1,
+  "id": "starci-academy-flashcard-status-review-affordance",
+  "kind": "frontend-feedback-upgrade",
+  "status": "captured",
+  "project": "starci-academy",
+  "targetOwners": ["starci-runtime", "grammar"],
+  "need": "The flashcard question-state summary must present its four equal-status meanings as a legible two-by-two joined surface, and the session breadcrumb must expose the localized learning hierarchy as `Tên khóa học > Ôn > Học` rather than hiding the journey or misplacing `Ôn` inside an action button.",
+  "negativeBoundary": "Do not leave four equal meanings as a loose wrapping row, collapse them into an undifferentiated badge, use a color legend that differs from the question controls, collapse the session journey into a generic Back link, or use breadcrumb labels as deck action copy.",
+  "acceptanceCriteria": [
+    "Answered, reviewing, current, and upcoming states occupy four explicit cells in a two-by-two composition on desktop when the rail width supports it.",
+    "Each cell retains the exact visual treatment used by its corresponding question control.",
+    "A Vietnamese review session renders the full breadcrumb `Tên khóa học > Ôn > Học`; a quiz session renders the equivalent localized quiz hierarchy.",
+    "Deck actions retain direct verb labels such as `Bắt đầu` and `Trắc nghiệm` instead of carrying breadcrumb separators.",
+    "Compact viewports retain all four meanings without horizontal overflow or accidental merging.",
+    "Rendered-viewport UAT checks row and column anatomy, not merely the presence of four labels."
+  ],
+  "feedbackSessions": [
+    {
+      "fingerprint": "sha256:653aebea650d79db2a13e3b42f5b30bbffce4a9d6247b2eec1d380d2a566c1a0",
+      "sourceSkillId": "starci-frontend-maintenance-apply",
+      "evidenceSha256": "sha256:9d97a831c141ac19c74911a783120067f23e88fc8ef672868d6ff7d3176554f6",
+      "accepts": [
+        "A two-by-two state surface comparable in clarity to the weekly-goal grid.",
+        "A visible `Tên khóa học > Ôn > Học` breadcrumb in Vietnamese."
+      ],
+      "rejects": [
+        "A loose two-row wrap with no explicit four-cell anatomy.",
+        "An English difficulty token, unrelated badge, generic Back link, or action button standing in for the breadcrumb hierarchy."
+      ],
+      "targetOwners": ["starci-runtime", "grammar"],
+      "proofStatus": "captured"
+    }
+  ],
+  "review": null
+}

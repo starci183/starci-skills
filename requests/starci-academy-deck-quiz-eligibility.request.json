@@ -1,0 +1,36 @@
+{
+  "$schema": "./request.schema.json",
+  "schemaVersion": 1,
+  "id": "starci-academy-deck-quiz-eligibility",
+  "kind": "frontend-feedback-upgrade",
+  "status": "captured",
+  "project": "starci-academy",
+  "targetOwners": ["starci-runtime"],
+  "need": "Flashcard decks must expose quiz as a deck-specific capability: only eligible decks offer a quiz action, while every reviewable deck keeps its review action.",
+  "negativeBoundary": "Do not imply that quiz is only a course-wide global mode, show a quiz action on every deck without eligibility evidence, or hide review behind an ambiguous generic Start action.",
+  "acceptanceCriteria": [
+    "Each deck exposes an explicit review action labelled `> Ôn` in Vietnamese.",
+    "A deck exposes a quiz action only when the backend-proven or deterministically derived eligibility rule is satisfied.",
+    "Starting a deck quiz scopes the persisted card draw to that deck rather than silently mixing the whole course.",
+    "Ineligible decks remain reviewable and do not render a dead quiz control.",
+    "Tests cover at least one eligible and one ineligible deck and prove the submitted card IDs."
+  ],
+  "feedbackSessions": [
+    {
+      "fingerprint": "sha256:a73305dde18294663587f3f06be40ed6782e0276d7df6a1fffebb4083d8b1d1f",
+      "sourceSkillId": "starci-frontend-maintenance-apply",
+      "evidenceSha256": "sha256:a73305dde18294663587f3f06be40ed6782e0276d7df6a1fffebb4083d8b1d1f",
+      "accepts": [
+        "Review remains available on each reviewable deck.",
+        "Quiz appears only on decks that can produce a valid quiz draw."
+      ],
+      "rejects": [
+        "One generic deck action that hides the operation being started.",
+        "A course-wide quiz affordance presented as if it were deck-specific."
+      ],
+      "targetOwners": ["starci-runtime"],
+      "proofStatus": "captured"
+    }
+  ],
+  "review": null
+}

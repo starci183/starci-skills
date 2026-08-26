@@ -20,10 +20,30 @@
       "on": [
         {
           "when": {
-            "decision": "passed"
+            "decision": "passed",
+            "allFacts": [
+              "ux-ui-resolution-close-required"
+            ]
+          },
+          "target": "resolve-ux-ui",
+          "label": "close proved UX/UI requests"
+        },
+        {
+          "when": {
+            "decision": "passed",
+            "noneFacts": [
+              "ux-ui-resolution-close-required"
+            ]
           },
           "target": "complete",
           "label": "passed"
+        },
+        {
+          "when": {
+            "decision": "ux-ui-repair"
+          },
+          "target": "resolve-ux-ui",
+          "label": "resolve UX/UI failure"
         },
         {
           "when": {
@@ -31,6 +51,33 @@
           },
           "target": "repair-handoff",
           "label": "repair"
+        },
+        {
+          "when": {
+            "decision": "blocked"
+          },
+          "target": "blocked",
+          "label": "blocked"
+        }
+      ]
+    },
+    "resolve-ux-ui": {
+      "kind": "operator",
+      "ref": "fe/ux-ui-resolve",
+      "on": [
+        {
+          "when": {
+            "decision": "repair-ready"
+          },
+          "target": "repair-handoff",
+          "label": "typed repair handoff"
+        },
+        {
+          "when": {
+            "decision": "resolved"
+          },
+          "target": "complete",
+          "label": "requests closed after proof"
         },
         {
           "when": {

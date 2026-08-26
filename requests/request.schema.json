@@ -40,7 +40,8 @@
               "starci-frontend-layout-delivery",
               "starci-frontend-block-reconcile",
               "starci-frontend-maintenance-apply",
-              "starci-frontend-surface-reconcile"
+              "starci-frontend-surface-reconcile",
+              "starci-frontend-ux-flow"
             ]
           },
           "evidenceSha256": { "$ref": "#/$defs/sha256" },

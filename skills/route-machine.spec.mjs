@@ -8,16 +8,29 @@ const root = path.dirname(fileURLToPath(import.meta.url));
 const machine = (id) => JSON.parse(readFileSync(path.join(root, id, 'machine.json'), 'utf8'));
 const enter = (id) => nextState(machine(id), 'analyze-input', {}, { selection: { skillId: id }, options: {} });
 const decide = (id, state, decision) => nextState(machine(id), state, { payload: { decision } }, {});
+const globalAnalyzer = readFileSync(path.join(root, '..', 'analyze-input.md'), 'utf8');
+
+assert.match(globalAnalyzer, /explicit correction or blame from real product use/);
+assert.match(globalAnalyzer, /repair it, and add or strengthen a regression check/);
+assert.match(globalAnalyzer, /only when the correction concerns UX\/UI behavior/);
 
 assert.equal(enter('starci-frontend-ui-direction'), 'generate');
 assert.equal(decide('starci-frontend-ui-direction', 'generate', 'directions-ready'), 'review');
 assert.equal(decide('starci-frontend-design-critique', 'critique', 'revise'), 'revision-handoff');
-assert.equal(decide('starci-frontend-ux-flow', 'model', 'flow-ready'), 'review');
+assert.equal(decide('starci-frontend-ux-flow', 'model', 'flow-ready'), 'containers');
+assert.equal(decide('starci-frontend-ux-flow', 'containers', 'containers-ready'), 'review');
 assert.equal(decide('starci-frontend-ui-detail', 'freeze', 'detail-frozen'), 'review');
 assert.equal(decide('starci-frontend-contract-plan', 'plan', 'grammar-gap'), 'gap-handoff');
 assert.equal(decide('starci-frontend-implementation', 'implement', 'design-feasibility-conflict'), 'handoff');
 assert.equal(decide('starci-frontend-visual-fidelity', 'verify', 'repair'), 'repair-handoff');
 assert.equal(decide('starci-product-uat', 'verify', 'passed'), 'complete');
+assert.equal(nextState(machine('starci-product-uat'), 'verify', {
+  payload: { decision: 'passed' },
+  facts: ['ux-ui-resolution-close-required']
+}, {}), 'resolve-ux-ui');
+assert.equal(decide('starci-product-uat', 'verify', 'ux-ui-repair'), 'resolve-ux-ui');
+assert.equal(decide('starci-product-uat', 'resolve-ux-ui', 'repair-ready'), 'repair-handoff');
+assert.equal(decide('starci-product-uat', 'resolve-ux-ui', 'resolved'), 'complete');
 
 assert.equal(decide('starci-architecture-discover', 'evidence', 'ready'), 'model');
 assert.equal(decide('starci-architecture-discover', 'model', 'revise'), 'evidence');

@@ -1,1 +1,49 @@
-{"schemaVersion":6,"id":"fe/ui-detail-freeze","domain":"fe","inputSchema":"input.schema.json","outputSchema":"output.schema.json","knowledgeRefs":["fe.layout-composition","fe.grammar-common-contracts","fe.grammar-common-states-accessibility"],"sourceReferenceRefs":[],"accepts":[{"stage":"ui.detail.freeze","status":"ready","allFacts":["ui-direction-approved","ux-flow-approved"],"noneFacts":[]}],"emits":[{"stage":"ui.detail.review","status":"pending","factsAdd":["ui-detail-frozen"],"factsRemove":[]},{"stage":"ui.detail.result","status":"blocked","factsAdd":[],"factsRemove":[]}],"sideEffects":["write immutable detail artifact to task-session storage"],"stopConditions":["missing breadcrumb decision","unowned surface","implicit merge","unspecified icon or separator policy","missing deterministic baseline"]}
+{
+  "schemaVersion": 6,
+  "id": "fe/ui-detail-freeze",
+  "domain": "fe",
+  "inputSchema": "input.schema.json",
+  "outputSchema": "output.schema.json",
+  "knowledgeRefs": [
+    "fe.layout-composition",
+    "fe.grammar-common-contracts",
+    "fe.grammar-common-states-accessibility",
+    "fe.interaction-container-selection"
+  ],
+  "sourceReferenceRefs": [],
+  "accepts": [
+    {
+      "stage": "ui.detail.freeze",
+      "status": "ready",
+      "allFacts": [
+        "ui-direction-approved",
+        "ux-flow-approved",
+        "interaction-containers-approved"
+      ],
+      "noneFacts": []
+    }
+  ],
+  "emits": [
+    {
+      "stage": "ui.detail.review",
+      "status": "pending",
+      "factsAdd": ["ui-detail-frozen"],
+      "factsRemove": []
+    },
+    {
+      "stage": "ui.detail.result",
+      "status": "blocked",
+      "factsAdd": [],
+      "factsRemove": []
+    }
+  ],
+  "sideEffects": ["write immutable detail artifact to task-session storage"],
+  "stopConditions": [
+    "missing breadcrumb decision",
+    "unowned surface",
+    "implicit merge",
+    "unspecified icon or separator policy",
+    "missing interaction-container mapping",
+    "missing deterministic baseline"
+  ]
+}

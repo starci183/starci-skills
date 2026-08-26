@@ -1,5 +1,5 @@
 {
-  "version": "6.1.0",
+  "version": "6.1.1",
   "skills": [
     {
       "id": "starci-workspace-ready",
@@ -12,6 +12,12 @@
       "capability": "device.checkpoint",
       "description": "Use when the user explicitly stops, ends, or checkpoints current StarCi work and wants proven source heads plus encrypted local Docker service state synchronized to another trusted device. Do not use for ordinary commits, deployment, unapproved external publication, or destructive restore.",
       "domain": "device"
+    },
+    {
+      "id": "starci-workflow-handoff",
+      "capability": "workflow.handoff",
+      "description": "Use when the user explicitly wants to pause an active StarCi coding workflow, push a minimal continuation checkpoint to Git, or resume that exact checkpoint on another device. Do not use for ordinary commits, deployment, Docker-volume transfer, or storing prompts and reasoning.",
+      "domain": "workflow"
     },
     {
       "id": "starci-business-authority",
@@ -172,7 +178,7 @@
     {
       "id": "starci-frontend-ux-flow",
       "capability": "frontend.ux.flow",
-      "description": "Model one approved UI direction as a complete user flow with entry, navigation, state, failure, resume, submission, and completion. Do not choose visual styling or edit source.",
+      "description": "Model one approved UI direction as a complete user flow, then choose page, modal, drawer, popover, or inline placement for every meaningful interaction. Do not choose visual styling or edit source.",
       "domain": "frontend"
     },
     {
@@ -184,7 +190,7 @@
     {
       "id": "starci-frontend-ui-detail",
       "capability": "frontend.ui.detail",
-      "description": "Freeze an approved UI direction and UX flow into an executable screen specification covering breadcrumbs, surface tree, decoration, state, responsive behavior, and deterministic baselines. Do not implement source.",
+      "description": "Freeze an approved UI direction, UX flow, and interaction-container plan into an executable screen specification covering breadcrumbs, surfaces, overlays, decoration, state, responsive behavior, and deterministic baselines. Do not implement source.",
       "domain": "frontend"
     },
     {
@@ -208,7 +214,7 @@
     {
       "id": "starci-product-uat",
       "capability": "product.uat",
-      "description": "Prove that a running product completes one approved business journey after implementation fidelity has passed. Use for outcome-level UAT, not design matching or source repair.",
+      "description": "Prove that a running product completes one approved business journey, turn UX/UI failures into a typed repair contract, and close exact feedback requests only after rerun proof passes.",
       "domain": "product"
     },
     {
@@ -1309,6 +1315,21 @@
       ]
     },
     {
+      "id": "fe/interaction-container-decision",
+      "domain": "fe",
+      "knowledgeCount": 1,
+      "accepts": [
+        "ux.flow.container-decision · ready"
+      ],
+      "emits": [
+        "ux.flow.review · pending",
+        "ux.flow.result · blocked"
+      ],
+      "sideEffects": [
+        "write interaction-container decisions only to task-session storage"
+      ]
+    },
+    {
       "id": "fe/layout",
       "domain": "fe",
       "knowledgeCount": 1,
@@ -1483,6 +1504,7 @@
       ],
       "emits": [
         "product.uat.result · passed",
+        "product.uat.result · ux-ui-repair",
         "product.uat.result · repair",
         "product.uat.result · blocked"
       ],
@@ -1579,7 +1601,7 @@
     {
       "id": "fe/ui-detail-freeze",
       "domain": "fe",
-      "knowledgeCount": 3,
+      "knowledgeCount": 4,
       "accepts": [
         "ui.detail.freeze · ready"
       ],
@@ -1614,11 +1636,29 @@
         "ux.flow.model · ready"
       ],
       "emits": [
-        "ux.flow.review · pending",
+        "ux.flow.container-decision · ready",
         "ux.flow.result · blocked"
       ],
       "sideEffects": [
         "write UX model and potential signals only to task-session storage"
+      ]
+    },
+    {
+      "id": "fe/ux-ui-resolve",
+      "domain": "fe",
+      "knowledgeCount": 4,
+      "accepts": [
+        "product.uat.ux-ui-resolution · ready",
+        "product.uat.ux-ui-resolution · verify"
+      ],
+      "emits": [
+        "product.uat.ux-ui-resolution.result · repair-ready",
+        "product.uat.ux-ui-resolution.result · resolved",
+        "product.uat.ux-ui-resolution.result · blocked"
+      ],
+      "sideEffects": [
+        "update only the exact declared UX/UI request ledgers",
+        "write the repair contract and proof receipt only to task-session storage"
       ]
     },
     {
@@ -2305,6 +2345,25 @@
       ]
     },
     {
+      "id": "workspace/workflow-handoff",
+      "domain": "workspace",
+      "knowledgeCount": 0,
+      "accepts": [
+        "workspace.workflow-handoff · ready"
+      ],
+      "emits": [
+        "workspace.workflow-handoff.result · complete",
+        "workspace.workflow-handoff.result · complete",
+        "workspace.workflow-handoff.result · blocked"
+      ],
+      "sideEffects": [
+        "create mission-only checkpoint commits on dedicated branches when publish mode receives exclusively mission-owned changes",
+        "push checkpoint branches and one annotated continuation tag without force",
+        "fetch and adopt exact checkpoint heads in resume mode only after identity and cleanliness proof",
+        "keep prompts, reasoning, loaded context, observations and scratch outside Git and purge them at the parent-skill terminal"
+      ]
+    },
+    {
       "id": "workspace/worktree-verify",
       "domain": "workspace",
       "knowledgeCount": 1,
@@ -2325,7 +2384,7 @@
   "domains": [
     {
       "id": "fe",
-      "operatorCount": 32,
+      "operatorCount": 34,
       "skillCount": 0
     },
     {
@@ -2355,7 +2414,7 @@
     },
     {
       "id": "workspace",
-      "operatorCount": 7,
+      "operatorCount": 8,
       "skillCount": 1
     },
     {

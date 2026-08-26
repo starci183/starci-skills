@@ -11,6 +11,12 @@ Run this lightweight analysis before loading any `skills/<id>/SKILL.md`. It firs
 
 This boundary keeps selection cheap. Route metadata may identify the target checkout, but source bodies, business, Grammar, coding-context and knowledge retrieval belong to the selected skill or its current operator.
 
+## Experience-feedback guard
+
+Treat an explicit correction or blame from real product use as evidence that the active skill system missed a rule, branch, contract, or proof condition. During the same task, identify the narrow `.claude` owner of that miss, repair it, and add or strengthen a regression check; do not wait for a later release and do not broaden unrelated skills.
+
+Persist a `.claude/requests/*.request.json` feedback ledger only when the correction concerns UX/UI behavior, visual composition, interaction semantics, or a reusable frontend design rule. For backend, architecture, routing, tooling, test, or execution-process corrections, repair the owning `.claude` contract and its tests without creating a frontend request. Product-source repair and skill-system repair remain separately scoped and separately proved.
+
 ## Route-first guard
 
 Apply this guard to every Git or source action, including an ad-hoc action for which no StarCi skill is selected:
@@ -41,6 +47,7 @@ Keep route resolution ephemeral. It constrains the selected skill's project/scop
 | Intent or prerequisite | First capability |
 | --- | --- |
 | Missing or stale operational stack | `starci-tech-stack` |
+| Pause active coding work in Git or resume its exact cross-device continuation | `starci-workflow-handoff` |
 | New UI or substantial visual redesign | `starci-frontend-ui-direction` |
 | Challenge a frontend proposal | `starci-frontend-design-critique` |
 | Approved visual direction needs interaction behavior | `starci-frontend-ux-flow` |
