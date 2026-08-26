@@ -1,0 +1,6 @@
+interface:
+  display_name: "StarCi Frontend UI Direction"
+  short_description: "Create deep visual directions before UX design"
+  default_prompt: "Use $starci-frontend-ui-direction to create and visualize UI directions."
+policy:
+  allow_implicit_invocation: true

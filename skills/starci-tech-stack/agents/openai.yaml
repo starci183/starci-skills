@@ -1,0 +1,6 @@
+interface:
+  display_name: "StarCi Tech Stack"
+  short_description: "Define operational stack topology and ownership"
+  default_prompt: "Use $starci-tech-stack for this selected flow and execute its state machine."
+policy:
+  allow_implicit_invocation: true

@@ -1,0 +1,125 @@
+{
+  "$schema": "../machine.schema.json",
+  "schemaVersion": 6,
+  "id": "starci-backend-implementation",
+  "start": "analyze-input",
+  "states": {
+    "analyze-input": {
+      "kind": "analysis",
+      "on": [
+        {
+          "when": {},
+          "target": "scope",
+          "label": "enter scope"
+        }
+      ]
+    },
+    "scope": {
+      "kind": "operator",
+      "ref": "be/coding-scope-freeze",
+      "on": [
+        {
+          "when": {
+            "decision": "ready"
+          },
+          "target": "implement",
+          "label": "ready"
+        },
+        {
+          "when": {
+            "decision": "source-drift"
+          },
+          "target": "replan-handoff",
+          "label": "source-drift"
+        },
+        {
+          "when": {
+            "decision": "boundary-drift"
+          },
+          "target": "replan-handoff",
+          "label": "boundary-drift"
+        },
+        {
+          "when": {
+            "decision": "blocked"
+          },
+          "target": "blocked",
+          "label": "blocked"
+        }
+      ]
+    },
+    "implement": {
+      "kind": "operator",
+      "ref": "be/implementation",
+      "on": [
+        {
+          "when": {
+            "decision": "ready"
+          },
+          "target": "conformance",
+          "label": "ready"
+        },
+        {
+          "when": {
+            "decision": "source-drift"
+          },
+          "target": "replan-handoff",
+          "label": "source-drift"
+        },
+        {
+          "when": {
+            "decision": "boundary-drift"
+          },
+          "target": "replan-handoff",
+          "label": "boundary-drift"
+        },
+        {
+          "when": {
+            "decision": "blocked"
+          },
+          "target": "blocked",
+          "label": "blocked"
+        }
+      ]
+    },
+    "replan-handoff": {
+      "kind": "terminal",
+      "result": "handoff"
+    },
+    "blocked": {
+      "kind": "terminal",
+      "result": "blocked"
+    },
+    "conformance": {
+      "kind": "operator",
+      "ref": "be/implementation-conformance",
+      "on": [
+        {
+          "when": {
+            "decision": "ready"
+          },
+          "target": "complete",
+          "label": "ready"
+        },
+        {
+          "when": {
+            "decision": "revise"
+          },
+          "target": "scope",
+          "label": "revise"
+        },
+        {
+          "when": {
+            "decision": "blocked"
+          },
+          "target": "blocked",
+          "label": "blocked"
+        }
+      ]
+    },
+    "complete": {
+      "kind": "terminal",
+      "result": "complete"
+    }
+  }
+}

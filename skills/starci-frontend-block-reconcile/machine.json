@@ -164,7 +164,7 @@
           "when": {
             "decision": "revise"
           },
-          "target": "mission-business-model",
+          "target": "blocked",
           "label": "revise"
         },
         {

@@ -1,6 +1,0 @@
-interface:
-  display_name: "StarCi Backend Delivery"
-  short_description: "Plan, implement, and prove backend delivery"
-  default_prompt: "Use $starci-backend-delivery for this selected flow and execute its state machine."
-policy:
-  allow_implicit_invocation: true

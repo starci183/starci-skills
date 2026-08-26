@@ -1,0 +1,43 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://starci.dev/v6.1/architecture-backend/critique.schema.json",
+  "title": "Independent architecture or backend critique",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["critiqueId", "subjectRef", "independence", "challenges", "decision", "evidenceRefs"],
+  "properties": {
+    "critiqueId": { "type": "string", "minLength": 1 },
+    "subjectRef": { "type": "string", "minLength": 1 },
+    "independence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["freshContext", "authorExcluded", "assumptionsHidden"],
+      "properties": {
+        "freshContext": { "const": true },
+        "authorExcluded": { "const": true },
+        "assumptionsHidden": { "const": true }
+      }
+    },
+    "challenges": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["challengeId", "category", "claim", "counterEvidenceRefs", "severity", "status", "requiredAction"],
+        "properties": {
+          "challengeId": { "type": "string", "minLength": 1 },
+          "category": { "enum": ["ownership", "persistence-identity", "transaction", "deployment", "security", "compatibility", "migration", "failure-mode", "source-contradiction", "unproven-assumption"] },
+          "claim": { "type": "string", "minLength": 1 },
+          "counterEvidenceRefs": { "type": "array", "items": { "type": "string", "minLength": 1 }, "uniqueItems": true },
+          "severity": { "enum": ["blocking", "major", "minor"] },
+          "status": { "enum": ["open", "resolved", "accepted-risk", "invalid"] },
+          "requiredAction": { "type": "string", "minLength": 1 },
+          "resolutionRef": { "type": ["string", "null"] }
+        }
+      }
+    },
+    "decision": { "enum": ["accept", "revise", "reject", "blocked"] },
+    "evidenceRefs": { "type": "array", "minItems": 1, "items": { "type": "string", "minLength": 1 }, "uniqueItems": true }
+  }
+}

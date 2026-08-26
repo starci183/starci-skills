@@ -1,0 +1,38 @@
+{
+  "schemaVersion": 6,
+  "id": "architecture/independent-critique",
+  "domain": "architecture",
+  "inputSchema": "input.schema.json",
+  "outputSchema": "output.schema.json",
+  "knowledgeRefs": [
+    "architecture.decision-analysis"
+  ],
+  "sourceReferenceRefs": [],
+  "accepts": [
+    {
+      "stage": "architecture.v61.independent-critique",
+      "status": "ready",
+      "allFacts": [],
+      "noneFacts": []
+    }
+  ],
+  "emits": [
+    {
+      "stage": "architecture.v61.independent-critique.complete",
+      "status": "ready",
+      "factsAdd": [
+        "architecture-independent-critique-ready"
+      ],
+      "factsRemove": []
+    }
+  ],
+  "sideEffects": [
+    "keep artifacts and observations in task-session memory only",
+    "purge intermediate session objects at every parent-skill terminal state"
+  ],
+  "stopConditions": [
+    "required evidence is missing, stale or contradictory",
+    "The critic receives artifacts and counter-evidence only, never the author reasoning trace, and cannot accept open blockers.",
+    "source observations would be treated as target authority"
+  ]
+}

@@ -1,0 +1,52 @@
+{
+  "schemaVersion": 6,
+  "id": "tech-stack/compatibility-check",
+  "domain": "tech-stack",
+  "inputSchema": "input.schema.json",
+  "outputSchema": "output.schema.json",
+  "knowledgeRefs": [],
+  "sourceReferenceRefs": [],
+  "accepts": [
+    {
+      "stage": "tech-stack.compatibility",
+      "status": "ready",
+      "allFacts": [],
+      "noneFacts": []
+    }
+  ],
+  "emits": [
+    {
+      "stage": "tech-stack.compatibility",
+      "status": "ready",
+      "factsAdd": [
+        "compatibility-check-compatible"
+      ],
+      "factsRemove": []
+    },
+    {
+      "stage": "tech-stack.compatibility",
+      "status": "revise",
+      "factsAdd": [
+        "compatibility-check-revise"
+      ],
+      "factsRemove": []
+    },
+    {
+      "stage": "tech-stack.compatibility",
+      "status": "blocked",
+      "factsAdd": [
+        "compatibility-check-blocked"
+      ],
+      "factsRemove": []
+    }
+  ],
+  "sideEffects": [
+    "read only declared references",
+    "store intermediate artifacts in task-session memory only"
+  ],
+  "stopConditions": [
+    "identity or evidence mismatch",
+    "critical unresolved contradiction"
+  ]
+}
+

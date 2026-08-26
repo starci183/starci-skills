@@ -1,0 +1,52 @@
+{
+  "schemaVersion": 6,
+  "id": "tech-stack/topology-model",
+  "domain": "tech-stack",
+  "inputSchema": "input.schema.json",
+  "outputSchema": "output.schema.json",
+  "knowledgeRefs": [],
+  "sourceReferenceRefs": [],
+  "accepts": [
+    {
+      "stage": "tech-stack.model",
+      "status": "ready",
+      "allFacts": [],
+      "noneFacts": []
+    }
+  ],
+  "emits": [
+    {
+      "stage": "tech-stack.model",
+      "status": "ready",
+      "factsAdd": [
+        "topology-model-ready"
+      ],
+      "factsRemove": []
+    },
+    {
+      "stage": "tech-stack.model",
+      "status": "revise",
+      "factsAdd": [
+        "topology-model-revise"
+      ],
+      "factsRemove": []
+    },
+    {
+      "stage": "tech-stack.model",
+      "status": "blocked",
+      "factsAdd": [
+        "topology-model-blocked"
+      ],
+      "factsRemove": []
+    }
+  ],
+  "sideEffects": [
+    "read only declared references",
+    "store intermediate artifacts in task-session memory only"
+  ],
+  "stopConditions": [
+    "identity or evidence mismatch",
+    "critical unresolved contradiction"
+  ]
+}
+

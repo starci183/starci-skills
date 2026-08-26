@@ -1,0 +1,6 @@
+interface:
+  display_name: "StarCi Frontend Contract Plan"
+  short_description: "Bind approved UI to exact frontend contracts"
+  default_prompt: "Use $starci-frontend-contract-plan to map this UI detail to source contracts."
+policy:
+  allow_implicit_invocation: true

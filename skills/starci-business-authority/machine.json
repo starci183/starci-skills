@@ -73,7 +73,7 @@
           "when": {
             "decision": "revise"
           },
-          "target": "model",
+          "target": "blocked",
           "label": "revise"
         },
         {

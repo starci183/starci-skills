@@ -1,0 +1,53 @@
+{
+  "$schema": "../machine.schema.json",
+  "schemaVersion": 6,
+  "id": "starci-backend-solution-design",
+  "start": "analyze-input",
+  "states": {
+    "analyze-input": {
+      "kind": "analysis",
+      "on": [
+        {
+          "when": {},
+          "target": "design",
+          "label": "enter design"
+        }
+      ]
+    },
+    "design": {
+      "kind": "operator",
+      "ref": "be/solution-design",
+      "on": [
+        {
+          "when": {
+            "decision": "ready"
+          },
+          "target": "handoff",
+          "label": "ready"
+        },
+        {
+          "when": {
+            "decision": "revise"
+          },
+          "target": "design",
+          "label": "revise"
+        },
+        {
+          "when": {
+            "decision": "blocked"
+          },
+          "target": "blocked",
+          "label": "blocked"
+        }
+      ]
+    },
+    "handoff": {
+      "kind": "terminal",
+      "result": "handoff"
+    },
+    "blocked": {
+      "kind": "terminal",
+      "result": "blocked"
+    }
+  }
+}

@@ -1,0 +1,38 @@
+{
+  "schemaVersion": 6,
+  "id": "architecture/conformance",
+  "domain": "architecture",
+  "inputSchema": "input.schema.json",
+  "outputSchema": "output.schema.json",
+  "knowledgeRefs": [
+    "architecture.decision-analysis"
+  ],
+  "sourceReferenceRefs": [],
+  "accepts": [
+    {
+      "stage": "architecture.v61.conformance",
+      "status": "ready",
+      "allFacts": [],
+      "noneFacts": []
+    }
+  ],
+  "emits": [
+    {
+      "stage": "architecture.v61.conformance.complete",
+      "status": "ready",
+      "factsAdd": [
+        "architecture-conformance-ready"
+      ],
+      "factsRemove": []
+    }
+  ],
+  "sideEffects": [
+    "keep artifacts and observations in task-session memory only",
+    "purge intermediate session objects at every parent-skill terminal state"
+  ],
+  "stopConditions": [
+    "required evidence is missing, stale or contradictory",
+    "Actual source bindings, connection tokens, qualified resources and deployment wiring match approved artifacts.",
+    "source observations would be treated as target authority"
+  ]
+}

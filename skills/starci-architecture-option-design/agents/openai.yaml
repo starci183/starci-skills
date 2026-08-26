@@ -1,0 +1,6 @@
+interface:
+  display_name: "StarCi Architecture Option Design"
+  short_description: "Design and approve architecture alternatives"
+  default_prompt: "Use $starci-architecture-option-design for this selected flow and execute its state machine."
+policy:
+  allow_implicit_invocation: true

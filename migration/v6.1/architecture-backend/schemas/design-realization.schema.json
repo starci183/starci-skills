@@ -1,0 +1,32 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://starci.dev/v6.1/architecture-backend/design-realization.schema.json",
+  "title": "Architecture to implementation realization matrix",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["matrixId", "entries", "evidenceRefs"],
+  "properties": {
+    "matrixId": { "type": "string", "minLength": 1 },
+    "entries": {
+      "type": "array", "minItems": 1, "items": {
+        "type": "object", "additionalProperties": false,
+        "required": ["decisionId", "componentRef", "compositionRoot", "sourceTargets", "connectionTokens", "resourceRefs", "deployableRef", "configurationRefs", "secretRefs", "migrationAuthorityRefs", "proofRefs", "realizationState"],
+        "properties": {
+          "decisionId": { "type": "string", "minLength": 1 },
+          "componentRef": { "type": "string", "minLength": 1 },
+          "compositionRoot": { "type": "string", "minLength": 1 },
+          "sourceTargets": { "type": "array", "minItems": 1, "items": { "type": "string", "minLength": 1 }, "uniqueItems": true },
+          "connectionTokens": { "type": "array", "items": { "type": "string", "minLength": 1 }, "uniqueItems": true },
+          "resourceRefs": { "type": "array", "items": { "type": "string", "minLength": 1 }, "uniqueItems": true },
+          "deployableRef": { "type": "string", "minLength": 1 },
+          "configurationRefs": { "type": "array", "items": { "type": "string", "minLength": 1 }, "uniqueItems": true },
+          "secretRefs": { "type": "array", "items": { "type": "string", "minLength": 1 }, "uniqueItems": true },
+          "migrationAuthorityRefs": { "type": "array", "items": { "type": "string", "minLength": 1 }, "uniqueItems": true },
+          "proofRefs": { "type": "array", "minItems": 1, "items": { "type": "string", "minLength": 1 }, "uniqueItems": true },
+          "realizationState": { "enum": ["observed", "planned", "unrealized", "contradicted"] }
+        }
+      }
+    },
+    "evidenceRefs": { "type": "array", "minItems": 1, "items": { "type": "string", "minLength": 1 }, "uniqueItems": true }
+  }
+}

@@ -1,0 +1,135 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://starci.dev/v6.1/runtime/protocol.schema.json",
+  "title": "StarCi v6.1 session protocol",
+  "$defs": {
+    "sha256": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
+    "sessionRef": { "type": "string", "pattern": "^session://tasks/[A-Za-z0-9._-]+/.+$" },
+    "claim": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "kind", "statement", "evidenceRefs", "confidence", "status"],
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "kind": { "enum": ["observed-fact", "approved-intent", "constraint", "inference", "hypothesis", "proposed-target"] },
+        "statement": { "type": "string", "minLength": 1 },
+        "evidenceRefs": { "type": "array", "uniqueItems": true, "items": { "type": "string", "minLength": 1 } },
+        "confidence": { "enum": ["high", "medium", "low", "unknown"] },
+        "status": { "enum": ["active", "challenged", "superseded", "rejected"] }
+      }
+    },
+    "contradiction": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "leftClaimId", "rightClaimId", "severity", "disposition"],
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "leftClaimId": { "type": "string", "minLength": 1 },
+        "rightClaimId": { "type": "string", "minLength": 1 },
+        "severity": { "enum": ["informational", "material", "critical"] },
+        "disposition": { "enum": ["unresolved", "accepted-current", "accepted-target", "exception-approved", "invalidated"] },
+        "resolutionRef": { "type": ["string", "null"] }
+      }
+    },
+    "artifact": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["artifactId", "ref", "schemaId", "contentSha256", "producerCapability", "state"],
+      "properties": {
+        "artifactId": { "type": "string", "minLength": 1 },
+        "ref": { "$ref": "#/$defs/sessionRef" },
+        "schemaId": { "type": "string", "minLength": 1 },
+        "contentSha256": { "$ref": "#/$defs/sha256" },
+        "producerCapability": { "type": "string", "pattern": "^[a-z0-9]+(?:[.-][a-z0-9]+)*$" },
+        "state": { "enum": ["draft", "approved", "challenged", "superseded", "blocked"] }
+      }
+    },
+    "evidenceReceipt": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["receiptId", "taskId", "operatorId", "generation", "packetSha256", "bindings"],
+      "properties": {
+        "receiptId": { "$ref": "#/$defs/sessionRef" },
+        "taskId": { "type": "string", "minLength": 1 },
+        "operatorId": { "type": "string", "pattern": "^[a-z0-9-]+/[a-z0-9-]+$" },
+        "generation": { "$ref": "#/$defs/sha256" },
+        "packetSha256": { "$ref": "#/$defs/sha256" },
+        "bindings": {
+          "type": "array", "minItems": 1,
+          "items": {
+            "type": "object", "additionalProperties": false,
+            "required": ["evidenceId", "contentSha256", "ruleIds"],
+            "properties": {
+              "evidenceId": { "type": "string", "minLength": 1 },
+              "contentSha256": { "$ref": "#/$defs/sha256" },
+              "ruleIds": { "type": "array", "uniqueItems": true, "items": { "type": "string", "minLength": 1 } }
+            }
+          }
+        }
+      }
+    },
+    "contextReceipt": {
+      "type": "object", "additionalProperties": false,
+      "required": ["receiptId", "project", "contextKind", "sourceFingerprint", "generatorFingerprint", "schemaVersion", "artifactRef", "artifactSha256", "status"],
+      "properties": {
+        "receiptId": { "$ref": "#/$defs/sessionRef" },
+        "project": { "type": "string", "pattern": "^[a-z0-9][a-z0-9-]*$" },
+        "contextKind": { "enum": ["business", "frontend-coding", "backend-coding", "tech-stack", "deployment"] },
+        "sourceFingerprint": { "$ref": "#/$defs/sha256" },
+        "generatorFingerprint": { "$ref": "#/$defs/sha256" },
+        "schemaVersion": { "type": "integer", "minimum": 1 },
+        "artifactRef": { "type": "string", "minLength": 1 },
+        "artifactSha256": { "$ref": "#/$defs/sha256" },
+        "status": { "enum": ["fresh", "stale", "missing", "invalid"] }
+      }
+    },
+    "nextCandidate": {
+      "type": "object", "additionalProperties": false,
+      "required": ["capability", "necessity", "reasonCode", "risk", "transitionKind", "objectiveAuthorized", "requiresApproval", "inputRef", "resumeCapability"],
+      "properties": {
+        "capability": { "type": "string", "pattern": "^[a-z0-9]+(?:[.-][a-z0-9]+)*$" },
+        "necessity": { "enum": ["required", "recommended", "optional"] },
+        "reasonCode": { "type": "string", "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$" },
+        "risk": { "enum": ["read-only", "source-write", "business-change", "database-change", "external"] },
+        "transitionKind": { "enum": ["sequential", "side-branch"] },
+        "objectiveAuthorized": { "type": "boolean" },
+        "requiresApproval": { "type": "boolean" },
+        "inputRef": { "$ref": "#/$defs/sessionRef" },
+        "resumeCapability": { "type": ["string", "null"], "pattern": "^[a-z0-9]+(?:[.-][a-z0-9]+)*$" }
+      }
+    },
+    "handoff": {
+      "type": "object", "additionalProperties": false,
+      "required": ["objectiveId", "fromCapability", "terminalState", "artifacts", "potentialSignals", "nextCandidates", "cleanup"],
+      "properties": {
+        "objectiveId": { "type": "string", "minLength": 1 },
+        "fromCapability": { "type": "string", "pattern": "^[a-z0-9]+(?:[.-][a-z0-9]+)*$" },
+        "terminalState": {
+          "type": "object", "additionalProperties": false, "required": ["status", "code"],
+          "properties": { "status": { "enum": ["complete", "handoff", "blocked", "rejected"] }, "code": { "type": "string", "minLength": 1 } }
+        },
+        "artifacts": { "type": "array", "items": { "$ref": "#/$defs/artifact" } },
+        "potentialSignals": { "type": "array", "uniqueItems": true, "items": { "type": "string", "minLength": 1 } },
+        "nextCandidates": { "type": "array", "items": { "$ref": "#/$defs/nextCandidate" } },
+        "cleanup": {
+          "type": "object", "additionalProperties": false, "required": ["retainUntilAck", "purgeNow"],
+          "properties": {
+            "retainUntilAck": { "type": "array", "uniqueItems": true, "items": { "$ref": "#/$defs/sessionRef" } },
+            "purgeNow": { "type": "array", "uniqueItems": true, "items": { "$ref": "#/$defs/sessionRef" } }
+          }
+        }
+      }
+    },
+    "ack": {
+      "type": "object", "additionalProperties": false,
+      "required": ["objectiveId", "consumerCapability", "artifactRefs", "acceptedSha256", "status"],
+      "properties": {
+        "objectiveId": { "type": "string", "minLength": 1 },
+        "consumerCapability": { "type": "string", "pattern": "^[a-z0-9]+(?:[.-][a-z0-9]+)*$" },
+        "artifactRefs": { "type": "array", "minItems": 1, "uniqueItems": true, "items": { "$ref": "#/$defs/sessionRef" } },
+        "acceptedSha256": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/sha256" } },
+        "status": { "enum": ["accepted", "rejected"] }
+      }
+    }
+  }
+}

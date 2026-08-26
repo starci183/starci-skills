@@ -1,3 +1,0 @@
-import { validatorFor, runValidatorCli } from '../../operators/validation.mjs';
-export const validateOutput=validatorFor(new URL('./output.schema.json',import.meta.url),(value)=>{const errors=[];if(value.result==='complete'&&value.receiptRefs.length===0)errors.push('$.receiptRefs: completion requires evidence');if(value.finalState!==value.state.terminalState)errors.push('$.state.terminalState: must equal finalState');for(const finding of value.findings)if(finding.severity==='error'&&finding.evidenceRefs.length===0)errors.push('$.findings: error findings require evidence');return errors});
-if(process.argv[1]?.endsWith('validate-output.mjs')) await runValidatorCli(validateOutput,'node validate-output.mjs <artifact.json>');

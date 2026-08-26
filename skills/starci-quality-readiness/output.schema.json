@@ -10,6 +10,7 @@
     "result",
     "finalState",
     "state",
+    "handoffRef",
     "receiptRefs",
     "findings",
     "cleanup"
@@ -192,6 +193,13 @@
           ]
         }
       }
+    },
+    "handoffRef": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "pattern": "^session://tasks/[A-Za-z0-9._-]+/.+$"
     },
     "receiptRefs": {
       "type": "array",

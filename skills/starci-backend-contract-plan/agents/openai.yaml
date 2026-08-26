@@ -1,0 +1,6 @@
+interface:
+  display_name: "StarCi Backend Contract Plan"
+  short_description: "Freeze backend mutation contracts"
+  default_prompt: "Use $starci-backend-contract-plan for this selected flow and execute its state machine."
+policy:
+  allow_implicit_invocation: true

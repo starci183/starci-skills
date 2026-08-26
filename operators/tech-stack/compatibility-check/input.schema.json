@@ -1,0 +1,166 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://starci.dev/v6/operators/tech-stack/compatibility-check/input.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "runId",
+    "stage",
+    "status",
+    "facts",
+    "payload"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "const": 6
+    },
+    "runId": {
+      "type": "string",
+      "minLength": 1
+    },
+    "stage": {
+      "const": "tech-stack.compatibility"
+    },
+    "status": {
+      "const": "ready"
+    },
+    "facts": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "payload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "provided",
+        "loads",
+        "session"
+      ],
+      "properties": {
+        "provided": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "project",
+            "objectiveRef",
+            "stackModelRef"
+          ],
+          "properties": {
+            "project": {
+              "type": "string",
+              "pattern": "^[a-z0-9][a-z0-9-]*$"
+            },
+            "objectiveRef": {
+              "type": "string",
+              "minLength": 1
+            },
+            "stackModelRef": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        },
+        "loads": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "compatibilityEvidenceRefs",
+            "deploymentEvidenceRefs"
+          ],
+          "properties": {
+            "compatibilityEvidenceRefs": {
+              "type": "array",
+              "uniqueItems": true,
+              "items": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "deploymentEvidenceRefs": {
+              "type": "array",
+              "uniqueItems": true,
+              "items": {
+                "type": "string",
+                "minLength": 1
+              }
+            }
+          }
+        },
+        "session": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "taskId",
+            "inputRef",
+            "outputRef",
+            "scratchPrefix",
+            "retention"
+          ],
+          "properties": {
+            "taskId": {
+              "type": "string",
+              "minLength": 1
+            },
+            "inputRef": {
+              "$ref": "#/$defs/sessionRef"
+            },
+            "outputRef": {
+              "$ref": "#/$defs/sessionRef"
+            },
+            "scratchPrefix": {
+              "$ref": "#/$defs/sessionRef"
+            },
+            "retention": {
+              "const": "until-skill-terminal"
+            }
+          }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "sha256": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "sessionRef": {
+      "type": "string",
+      "pattern": "^session://tasks/[A-Za-z0-9._-]+/.+$"
+    },
+    "session": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "taskId",
+        "inputRef",
+        "outputRef",
+        "scratchPrefix",
+        "retention"
+      ],
+      "properties": {
+        "taskId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "inputRef": {
+          "$ref": "#/$defs/sessionRef"
+        },
+        "outputRef": {
+          "$ref": "#/$defs/sessionRef"
+        },
+        "scratchPrefix": {
+          "$ref": "#/$defs/sessionRef"
+        },
+        "retention": {
+          "const": "until-skill-terminal"
+        }
+      }
+    }
+  }
+}
+

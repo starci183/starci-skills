@@ -2,6 +2,21 @@
 
 All notable changes are documented here. This project follows Semantic Versioning.
 
+## 6.1.0 - 2026-08-26
+
+### Added
+
+- Specialized frontend direction, critique, UX-flow, UI-detail, contract, implementation, fidelity, and UAT skills.
+- Specialized architecture discovery, data-ownership, option, critique, and realization skills.
+- Specialized backend solution, contract, critique, implementation, and proof skills.
+- Operational tech-stack modeling and typed sequential or side-branch handoffs with acknowledgement and resume semantics.
+
+### Changed
+
+- Removed the legacy frontend-layout, architecture-decision, backend-delivery, and backend-repair lifecycle machines; global analysis now selects specialized capabilities directly.
+- Made source an observed claim rather than automatic design authority and added independent critique capabilities.
+- Accepted real-world v6.1 feedback as the evidence base for the completed v6.2 release.
+
 ## 6.0.0 - 2026-08-24
 
 ### Added

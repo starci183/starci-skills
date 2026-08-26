@@ -1,0 +1,101 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://starci.dev/v6.1/architecture-backend/backend-contract.schema.json",
+  "title": "Backend contract bundle",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["bundleId", "architectureRef", "dataOwnershipRef", "solution", "apiContracts", "eventContracts", "mutationContracts", "queryContracts", "transactionContracts", "proofCases", "evidenceRefs"],
+  "properties": {
+    "bundleId": { "type": "string", "minLength": 1 },
+    "architectureRef": { "type": "string", "minLength": 1 },
+    "dataOwnershipRef": { "type": "string", "minLength": 1 },
+    "solution": { "type": "object", "additionalProperties": false, "required": ["solutionId", "responsibilities", "invariants", "failureSemantics", "compatibility"], "properties": {
+      "solutionId": { "type": "string", "minLength": 1 },
+      "responsibilities": { "type": "array", "minItems": 1, "items": { "type": "string", "minLength": 1 } },
+      "invariants": { "type": "array", "minItems": 1, "items": { "type": "string", "minLength": 1 } },
+      "failureSemantics": { "type": "array", "minItems": 1, "items": { "type": "string", "minLength": 1 } },
+      "compatibility": { "type": "string", "minLength": 1 }
+    } },
+    "apiContracts": { "type": "array", "items": { "$ref": "#/$defs/api" } },
+    "eventContracts": { "type": "array", "items": { "$ref": "#/$defs/event" } },
+    "mutationContracts": { "type": "array", "items": { "$ref": "#/$defs/mutation" } },
+    "queryContracts": { "type": "array", "items": { "$ref": "#/$defs/query" } },
+    "transactionContracts": { "type": "array", "items": { "$ref": "#/$defs/transaction" } },
+    "proofCases": { "type": "array", "minItems": 1, "items": { "type": "string", "minLength": 1 }, "uniqueItems": true },
+    "evidenceRefs": { "type": "array", "minItems": 1, "items": { "type": "string", "minLength": 1 }, "uniqueItems": true }
+  },
+  "$defs": {
+    "storeAccess": {
+      "type": "object", "additionalProperties": false,
+      "required": ["resourceRef", "storeRef", "qualifiedName", "accessPath", "connectionToken", "componentRef"],
+      "properties": {
+        "resourceRef": { "type": "string", "minLength": 1 },
+        "storeRef": { "type": "string", "minLength": 1 },
+        "qualifiedName": { "type": "string", "minLength": 3 },
+        "accessPath": { "enum": ["repository", "entity-manager", "sql", "api", "event", "presigned", "vendor"] },
+        "connectionToken": { "type": ["string", "null"] },
+        "componentRef": { "type": "string", "minLength": 1 },
+        "fields": { "type": "array", "items": { "type": "string", "minLength": 1 }, "uniqueItems": true },
+        "transactionGroup": { "type": ["string", "null"] },
+        "idempotencyRef": { "type": ["string", "null"] }
+      }
+    },
+    "api": {
+      "type": "object", "additionalProperties": false,
+      "required": ["operationId", "transport", "requestRef", "responseRef", "authRef", "errorContractRef", "compatibilityRef"],
+      "properties": {
+        "operationId": { "type": "string", "minLength": 1 }, "transport": { "type": "string", "minLength": 1 },
+        "requestRef": { "type": "string", "minLength": 1 }, "responseRef": { "type": "string", "minLength": 1 },
+        "authRef": { "type": "string", "minLength": 1 }, "errorContractRef": { "type": "string", "minLength": 1 },
+        "compatibilityRef": { "type": "string", "minLength": 1 }
+      }
+    },
+    "event": {
+      "type": "object", "additionalProperties": false,
+      "required": ["eventId", "producerRef", "consumerRefs", "envelopeRef", "ordering", "delivery", "retryRef", "version"],
+      "properties": {
+        "eventId": { "type": "string", "minLength": 1 }, "producerRef": { "type": "string", "minLength": 1 },
+        "consumerRefs": { "type": "array", "minItems": 1, "items": { "type": "string", "minLength": 1 } },
+        "envelopeRef": { "type": "string", "minLength": 1 }, "ordering": { "type": "string", "minLength": 1 },
+        "delivery": { "type": "string", "minLength": 1 }, "retryRef": { "type": "string", "minLength": 1 },
+        "version": { "type": "string", "minLength": 1 }
+      }
+    },
+    "mutation": {
+      "type": "object", "additionalProperties": false,
+      "required": ["operationId", "owningComponent", "invariants", "reads", "writes", "crossBoundaryEffects", "migrationDependencies", "proofCases"],
+      "properties": {
+        "operationId": { "type": "string", "minLength": 1 }, "owningComponent": { "type": "string", "minLength": 1 },
+        "invariants": { "type": "array", "minItems": 1, "items": { "type": "string", "minLength": 1 } },
+        "reads": { "type": "array", "items": { "$ref": "#/$defs/storeAccess" } },
+        "writes": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/storeAccess" } },
+        "crossBoundaryEffects": { "type": "array", "items": { "type": "string", "minLength": 1 } },
+        "migrationDependencies": { "type": "array", "items": { "type": "string", "minLength": 1 } },
+        "proofCases": { "type": "array", "minItems": 1, "items": { "type": "string", "minLength": 1 } }
+      }
+    },
+    "query": {
+      "type": "object", "additionalProperties": false,
+      "required": ["operationId", "owningComponent", "reads", "consistency", "authorizationRef", "performanceProofRef"],
+      "properties": {
+        "operationId": { "type": "string", "minLength": 1 }, "owningComponent": { "type": "string", "minLength": 1 },
+        "reads": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/storeAccess" } },
+        "consistency": { "type": "string", "minLength": 1 }, "authorizationRef": { "type": "string", "minLength": 1 },
+        "performanceProofRef": { "type": "string", "minLength": 1 }
+      }
+    },
+    "transaction": {
+      "type": "object", "additionalProperties": false,
+      "required": ["transactionId", "operationRefs", "storeRefs", "mode", "atomicityBoundary", "retryRef", "compensationRef"],
+      "properties": {
+        "transactionId": { "type": "string", "minLength": 1 },
+        "operationRefs": { "type": "array", "minItems": 1, "items": { "type": "string", "minLength": 1 } },
+        "storeRefs": { "type": "array", "minItems": 1, "items": { "type": "string", "minLength": 1 }, "uniqueItems": true },
+        "mode": { "enum": ["local-acid", "outbox", "saga", "compensating", "none"] },
+        "atomicityBoundary": { "type": "string", "minLength": 1 },
+        "retryRef": { "type": "string", "minLength": 1 },
+        "compensationRef": { "type": ["string", "null"] }
+      }
+    }
+  }
+}

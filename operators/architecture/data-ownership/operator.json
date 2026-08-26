@@ -1,0 +1,38 @@
+{
+  "schemaVersion": 6,
+  "id": "architecture/data-ownership",
+  "domain": "architecture",
+  "inputSchema": "input.schema.json",
+  "outputSchema": "output.schema.json",
+  "knowledgeRefs": [
+    "architecture.decision-analysis"
+  ],
+  "sourceReferenceRefs": [],
+  "accepts": [
+    {
+      "stage": "architecture.v61.data-ownership",
+      "status": "ready",
+      "allFacts": [],
+      "noneFacts": []
+    }
+  ],
+  "emits": [
+    {
+      "stage": "architecture.v61.data-ownership.complete",
+      "status": "ready",
+      "factsAdd": [
+        "architecture-data-ownership-ready"
+      ],
+      "factsRemove": []
+    }
+  ],
+  "sideEffects": [
+    "keep artifacts and observations in task-session memory only",
+    "purge intermediate session objects at every parent-skill terminal state"
+  ],
+  "stopConditions": [
+    "required evidence is missing, stale or contradictory",
+    "Every relational resource names database.schema.resource and its actual connection token; observed and target bindings remain separate.",
+    "source observations would be treated as target authority"
+  ]
+}

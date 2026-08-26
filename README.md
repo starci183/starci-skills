@@ -2,7 +2,7 @@
 
 Release-grade agent skills composed as validated state machines.
 
-StarCi Skills turns one natural-language request into a small, explicit execution graph. Global input analysis selects one outcome-oriented mission from cheap metadata; that skill owns every affected FE/BE/data role, loads only the operators needed by the selected branch, retrieves operator knowledge lazily from local Qdrant Edge, validates every boundary, and joins proof before completion.
+StarCi Skills turns one natural-language request into a small, explicit execution graph. Global input analysis selects the earliest missing specialized capability from cheap metadata; typed handoffs advance or temporarily branch the objective without loading a lifecycle-sized skill. Each capability loads only the operators required by its current state, validates every boundary, and emits evidence before the next capability may run.
 
 ```text
 request -> global analysis -> selected skill -> operator -> validated result
@@ -19,19 +19,36 @@ request -> global analysis -> selected skill -> operator -> validated result
 - **Typed boundaries:** every skill and operator has closed input/output schemas and fail-closed validators.
 - **Traceable decisions:** transitions use contract-owned decisions or stage/status emissions.
 - **Safe extension:** add an operator or machine branch without copying a second policy tree.
-- **Mission ownership:** one skill ships one outcome across the technical layers it actually affects; layer boundaries do not force a second skill.
+- **Composable depth:** each skill does one capability deeply; typed sequential and side-branch handoffs compose the complete outcome.
 
 ## Included skills
 
 | Skill | Capability |
 | --- | --- |
 | `starci-workspace-ready` | Initialize, hydrate, or verify workspace identity and routes |
+| `starci-device-checkpoint` | Checkpoint proven source and encrypted local service state for another trusted device |
+| `starci-tech-stack` | Define observed and target runtime, microservice, persistence, and operations topology |
 | `starci-business-authority` | Model, approve, and publish one business feature head |
 | `starci-business-reconcile` | Reconcile immutable delivery proof with business truth |
-| `starci-architecture-decide` | Analyze difficult cross-system choices without source writes |
-| `starci-backend-delivery` | Plan, approve, implement, test, and prove new backend work |
-| `starci-backend-repair` | Repair one approved backend boundary and rerun proof |
-| `starci-frontend-layout-delivery` | Ship a complete customer journey across required FE/BE/data roles and join acceptance proof |
+| `starci-frontend-ui-direction` | Deeply brainstorm and visualize materially different UI directions |
+| `starci-frontend-design-critique` | Challenge a frontend proposal using fresh evidence |
+| `starci-frontend-ux-flow` | Define complete interaction, navigation, recovery, and completion flows |
+| `starci-product-potential` | Discover business and UX opportunities exposed by the proposed flow |
+| `starci-frontend-ui-detail` | Convert an approved direction and flow into implementation-level screen detail |
+| `starci-frontend-contract-plan` | Freeze component, Grammar, state, and responsive contracts |
+| `starci-frontend-implementation` | Implement only an approved frontend contract |
+| `starci-frontend-visual-fidelity` | Compare rendered source with approved visuals and route drift |
+| `starci-product-uat` | Prove the complete user journey and business outcome |
+| `starci-architecture-discover` | Build an evidence-backed current-system model |
+| `starci-data-ownership-model` | Bind data ownership, write authority, consistency, and migration boundaries |
+| `starci-architecture-option-design` | Produce materially different architecture options |
+| `starci-architecture-critique` | Falsify an architecture recommendation independently |
+| `starci-architecture-realization` | Bind approved architecture to code and deployment topology |
+| `starci-backend-solution-design` | Design backend behavior before contracts or code |
+| `starci-backend-contract-plan` | Specify exact API, event, transaction, and persistence contracts |
+| `starci-backend-contract-critique` | Challenge a backend contract before mutation |
+| `starci-backend-implementation` | Implement one frozen backend boundary with conformance checks |
+| `starci-backend-proof` | Prove backend semantics, quality, and architectural conformance |
 | `starci-frontend-block-reconcile` | Reconcile one block and its consumers across every affected role, then join proof |
 | `starci-frontend-maintenance-apply` | Apply one approved product correction across affected roles, join proof, then record learning |
 | `starci-frontend-learning-resolve` | Resolve one queued learning into durable authority; consumer application remains a reconcile delivery |
@@ -52,7 +69,9 @@ request -> global analysis -> selected skill -> operator -> validated result
 | `starci-conversation-record` | Append one redacted provenance snapshot |
 | `starci-conversation-query` | Query one bounded provenance identity |
 
-The release currently contains 92 atomic operators across 11 domains and 71 operator-knowledge records.
+The v6.1 release contains 45 small state-machine skills and 121 atomic operators. Lifecycle-sized frontend-layout, architecture-decide, backend-delivery, and backend-repair skills were removed; requests route directly to specialized capabilities.
+
+StarCi Skills accepts feedback from every real-world v6.1 experience; validated findings will drive the completed v6.2 release.
 
 ## Install
 

@@ -1,0 +1,6 @@
+interface:
+  display_name: "StarCi Architecture Critique"
+  short_description: "Challenge architecture with fresh evidence"
+  default_prompt: "Use $starci-architecture-critique for this selected flow and execute its state machine."
+policy:
+  allow_implicit_invocation: true

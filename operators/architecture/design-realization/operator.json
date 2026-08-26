@@ -1,0 +1,38 @@
+{
+  "schemaVersion": 6,
+  "id": "architecture/design-realization",
+  "domain": "architecture",
+  "inputSchema": "input.schema.json",
+  "outputSchema": "output.schema.json",
+  "knowledgeRefs": [
+    "architecture.decision-analysis"
+  ],
+  "sourceReferenceRefs": [],
+  "accepts": [
+    {
+      "stage": "architecture.v61.design-realization",
+      "status": "ready",
+      "allFacts": [],
+      "noneFacts": []
+    }
+  ],
+  "emits": [
+    {
+      "stage": "architecture.v61.design-realization.complete",
+      "status": "ready",
+      "factsAdd": [
+        "architecture-design-realization-ready"
+      ],
+      "factsRemove": []
+    }
+  ],
+  "sideEffects": [
+    "keep artifacts and observations in task-session memory only",
+    "purge intermediate session objects at every parent-skill terminal state"
+  ],
+  "stopConditions": [
+    "required evidence is missing, stale or contradictory",
+    "No approved decision remains diagram-only; every write and deployment has an exact realization and proof path.",
+    "source observations would be treated as target authority"
+  ]
+}

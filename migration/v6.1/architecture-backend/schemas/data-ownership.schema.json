@@ -1,0 +1,77 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://starci.dev/v6.1/architecture-backend/data-ownership.schema.json",
+  "title": "Qualified data ownership matrix",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["matrixId", "resources", "evidenceRefs"],
+  "properties": {
+    "matrixId": { "type": "string", "minLength": 1 },
+    "resources": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/resource" } },
+    "evidenceRefs": { "type": "array", "minItems": 1, "uniqueItems": true, "items": { "type": "string", "minLength": 1 } }
+  },
+  "$defs": {
+    "binding": {
+      "type": "object", "additionalProperties": false,
+      "required": ["storeRef", "database", "namespace", "qualifiedName"],
+      "properties": {
+        "storeRef": { "type": "string", "minLength": 1 },
+        "database": { "type": ["string", "null"] },
+        "namespace": { "type": ["string", "null"] },
+        "qualifiedName": { "type": "string", "minLength": 3 },
+        "connectionToken": { "type": ["string", "null"] }
+      }
+    },
+    "actor": {
+      "type": "object", "additionalProperties": false,
+      "required": ["componentRef", "operations", "accessPath", "connectionToken", "evidenceRefs"],
+      "properties": {
+        "componentRef": { "type": "string", "minLength": 1 },
+        "operations": { "type": "array", "minItems": 1, "items": { "type": "string", "minLength": 1 } },
+        "accessPath": { "enum": ["repository", "entity-manager", "sql", "api", "event", "presigned", "vendor"] },
+        "connectionToken": { "type": ["string", "null"] },
+        "evidenceRefs": { "type": "array", "minItems": 1, "items": { "type": "string", "minLength": 1 } }
+      }
+    },
+    "schemaAuthority": {
+      "type": "object", "additionalProperties": false,
+      "required": ["componentRef", "mechanism", "versionRef", "evidenceRefs"],
+      "properties": {
+        "componentRef": { "type": "string", "minLength": 1 },
+        "mechanism": { "enum": ["migration", "shared-migration", "shared-ddl", "synchronize", "vendor", "manual"] },
+        "versionRef": { "type": "string", "minLength": 1 },
+        "evidenceRefs": { "type": "array", "minItems": 1, "items": { "type": "string", "minLength": 1 } }
+      }
+    },
+    "resource": {
+      "type": "object", "additionalProperties": false,
+      "required": ["resourceId", "businessOwner", "runtimeOwner", "sourceOfTruth", "tenantBoundary", "observedBinding", "targetBinding", "writers", "readers", "schemaAuthorities", "transactionBoundary", "backupOwner", "restoreOwner", "claimState", "evidenceRefs"],
+      "properties": {
+        "resourceId": { "type": "string", "minLength": 1 },
+        "businessOwner": { "type": "string", "minLength": 1 },
+        "runtimeOwner": { "type": "string", "minLength": 1 },
+        "sourceOfTruth": { "type": "boolean" },
+        "tenantBoundary": {
+          "type": "object", "additionalProperties": false, "required": ["mode", "tenantKey"],
+          "properties": {
+            "mode": { "enum": ["physical", "database", "schema", "collection", "row", "none"] },
+            "tenantKey": { "type": ["string", "null"] }
+          }
+        },
+        "observedBinding": { "$ref": "#/$defs/binding" },
+        "targetBinding": { "$ref": "#/$defs/binding" },
+        "transitionRef": { "type": ["string", "null"] },
+        "writers": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/actor" } },
+        "readers": { "type": "array", "items": { "$ref": "#/$defs/actor" } },
+        "schemaAuthorities": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/schemaAuthority" } },
+        "transactionBoundary": { "type": "string", "minLength": 1 },
+        "retentionRef": { "type": ["string", "null"] },
+        "backupOwner": { "type": "string", "minLength": 1 },
+        "restoreOwner": { "type": "string", "minLength": 1 },
+        "encryptionRef": { "type": ["string", "null"] },
+        "claimState": { "enum": ["observed", "authorized", "target", "migration", "unknown", "contradicted"] },
+        "evidenceRefs": { "type": "array", "minItems": 1, "items": { "type": "string", "minLength": 1 } }
+      }
+    }
+  }
+}

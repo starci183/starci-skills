@@ -71,7 +71,7 @@ function canonicalOptions(inputSchema) {
   const properties = inputSchema.properties?.options?.properties ?? {};
   return Object.fromEntries(Object.entries(properties).map(([key, rule]) => {
     if (rule.enum) return [key, rule.enum[0]];
-    if (rule.type === 'boolean') return [key, false];
+    if (rule.type === 'boolean') return [key, true];
     if (rule.type === 'number' || rule.type === 'integer') return [key, rule.minimum ?? 0];
     return [key, 'value'];
   }));
@@ -90,9 +90,14 @@ function canonicalInput(skillId, schema) {
       passiveContextRefs: []
     },
     requestRef: 'request:harness',
-    artifactRefs: [],
+    artifactRefs: Array.from({ length: schema.properties.artifactRefs.minItems ?? 0 }, (_, index) => `artifact:${index + 1}`),
     evidenceRefs: ['evidence:harness'],
-    scope: { targetRefs: ['target:harness'], writeRoots: [], externalMutation: false, approvalRef: null },
+    scope: {
+      targetRefs: ['target:harness'],
+      writeRoots: Array.from({ length: schema.properties.scope.properties?.writeRoots?.minItems ?? 0 }, (_, index) => `src-${index + 1}`),
+      externalMutation: false,
+      approvalRef: null
+    },
     options: canonicalOptions(schema)
   };
 }
@@ -115,6 +120,7 @@ function canonicalOutput(skillId, schema) {
       retryable: stateRule.retryable?.const,
       terminalState: stateRule.terminalState?.const
     },
+    handoffRef: result === 'handoff' ? 'session://tasks/harness-run/handoff.json' : null,
     receiptRefs: [`receipt:sha256:${'a'.repeat(64)}`],
     findings: [],
     cleanup: { scratchRefs: [], retention: 'until-skill-terminal', purgeAt: 'skill-terminal' }
@@ -428,10 +434,12 @@ async function auditSkill(skillDir) {
     Object.assign(clone(output), { receiptRefs: ['invented:proof'] }),
     Object.assign(clone(output), { finalState: 'banana', state: { ...output.state, terminalState: 'banana' } })
   ];
-  const inputMutationPasses = inputMutations.every((value) => !inputModule.validateInput(value).valid);
-  const outputMutationPasses = outputMutations.every((value) => !outputModule.validateOutput(value).valid);
-  if (!inputMutationPasses) hardFailures.push('input validator accepted an adversarial mutation');
-  if (!outputMutationPasses) hardFailures.push('output validator accepted an adversarial mutation');
+  const acceptedInputMutations = inputMutations.flatMap((value, index) => inputModule.validateInput(value).valid ? [index] : []);
+  const acceptedOutputMutations = outputMutations.flatMap((value, index) => outputModule.validateOutput(value).valid ? [index] : []);
+  const inputMutationPasses = acceptedInputMutations.length === 0;
+  const outputMutationPasses = acceptedOutputMutations.length === 0;
+  if (!inputMutationPasses) hardFailures.push(`input validator accepted adversarial mutation(s): ${acceptedInputMutations.join(', ')}`);
+  if (!outputMutationPasses) hardFailures.push(`output validator accepted adversarial mutation(s): ${acceptedOutputMutations.join(', ')}`);
 
   return {
     id,

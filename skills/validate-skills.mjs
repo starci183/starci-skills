@@ -19,10 +19,6 @@ const requiredFiles = [
   'validate-output.mjs'
 ];
 const cycleRequired = new Set([
-  'starci-architecture-decide',
-  'starci-backend-delivery',
-  'starci-backend-repair',
-  'starci-frontend-layout-delivery',
   'starci-frontend-surface-reconcile',
   'starci-quality-readiness',
   'starci-quality-debt-repay',
@@ -31,7 +27,6 @@ const cycleRequired = new Set([
   'starci-deployment-recover'
 ]);
 const productMissionSkills = new Set([
-  'starci-frontend-layout-delivery',
   'starci-frontend-block-reconcile',
   'starci-frontend-maintenance-apply',
   'starci-frontend-surface-reconcile'
@@ -188,7 +183,7 @@ async function assertValidators(skillDir) {
   const outputValidator = await import(pathToFileURL(path.join(skillDir, 'validate-output.mjs')).href);
   const options = Object.fromEntries(Object.entries(inputSchema.properties.options.properties).map(([name, rule]) => [
     name,
-    rule.enum?.[0] ?? (rule.type === 'boolean' ? false : 'value')
+    rule.enum?.[0] ?? (rule.type === 'boolean' ? true : 'value')
   ]));
   const validInput = {
     schemaVersion: 6,
@@ -202,9 +197,14 @@ async function assertValidators(skillDir) {
       passiveContextRefs: []
     },
     requestRef: 'request:1',
-    artifactRefs: [],
+    artifactRefs: Array.from({ length: inputSchema.properties.artifactRefs.minItems ?? 0 }, (_, index) => `artifact:${index + 1}`),
     evidenceRefs: ['evidence:1'],
-    scope: { targetRefs: ['target:1'], writeRoots: [], externalMutation: false, approvalRef: null },
+    scope: {
+      targetRefs: ['target:1'],
+      writeRoots: Array.from({ length: inputSchema.properties.scope.properties?.writeRoots?.minItems ?? 0 }, (_, index) => `src-${index + 1}`),
+      externalMutation: false,
+      approvalRef: null
+    },
     options
   };
   const terminalBranch = outputSchema.allOf.flatMap((item) => item.oneOf ?? []).find((item) => item.properties?.result?.const === 'complete') ?? outputSchema.allOf[0].oneOf[0];
@@ -217,12 +217,15 @@ async function assertValidators(skillDir) {
     result: terminalBranch.properties.result.const,
     finalState,
     state: { status: terminalState.status.const, code: terminalState.code.const, retryable: false, terminalState: finalState },
+    handoffRef: terminalBranch.properties.result.const === 'handoff' ? 'session://tasks/run-1/handoff.json' : null,
     receiptRefs: [`receipt:sha256:${'a'.repeat(64)}`],
     findings: [],
     cleanup: { scratchRefs: [], retention: 'until-skill-terminal', purgeAt: 'skill-terminal' }
   };
-  if (!inputValidator.validateInput(validInput).valid) fail(`${skillId}: input validator rejects canonical input`);
-  if (!outputValidator.validateOutput(validOutput).valid) fail(`${skillId}: output validator rejects canonical output`);
+  const inputResult = inputValidator.validateInput(validInput);
+  if (!inputResult.valid) fail(`${skillId}: input validator rejects canonical input: ${JSON.stringify(inputResult.errors)}`);
+  const outputResult = outputValidator.validateOutput(validOutput);
+  if (!outputResult.valid) fail(`${skillId}: output validator rejects canonical output: ${JSON.stringify(outputResult.errors)}`);
   if (inputValidator.validateInput({ junk: true }).valid) fail(`${skillId}: input validator accepts junk`);
   if (outputValidator.validateOutput({ junk: true }).valid) fail(`${skillId}: output validator accepts junk`);
 }

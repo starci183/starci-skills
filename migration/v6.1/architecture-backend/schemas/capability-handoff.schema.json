@@ -1,0 +1,18 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://starci.dev/v6.1/architecture-backend/capability-handoff.schema.json",
+  "title": "Atomic capability handoff",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["handoffId", "capabilityId", "state", "inputRefs", "outputRefs", "decisionRefs", "openRisks", "cleanupRefs"],
+  "properties": {
+    "handoffId": { "type": "string", "minLength": 1 },
+    "capabilityId": { "type": "string", "minLength": 1 },
+    "state": { "enum": ["ready", "needs-input", "needs-approval", "revise", "blocked", "complete", "failed"] },
+    "inputRefs": { "type": "array", "items": { "type": "string", "minLength": 1 }, "uniqueItems": true },
+    "outputRefs": { "type": "array", "items": { "type": "string", "minLength": 1 }, "uniqueItems": true },
+    "decisionRefs": { "type": "array", "items": { "type": "string", "minLength": 1 }, "uniqueItems": true },
+    "openRisks": { "type": "array", "items": { "type": "string", "minLength": 1 }, "uniqueItems": true },
+    "cleanupRefs": { "type": "array", "items": { "type": "string", "minLength": 1 }, "uniqueItems": true }
+  }
+}

@@ -24,7 +24,7 @@ for (const retired of ['v6', 'operations', 'docs', 'platform', 'context-manifest
 }
 
 const packageJson = readJson('package.json');
-if (packageJson.version !== '6.0.0') fail('package version must be 6.0.0');
+if (packageJson.version !== '6.1.0') fail('package version must be 6.1.0');
 if (packageJson.license !== 'MIT' || packageJson.private !== true) fail('release must declare MIT and remain private against accidental npm publish');
 if (!packageJson.repository?.url?.includes('starci183/starci-skills')) fail('repository metadata is missing');
 
@@ -33,7 +33,7 @@ const skills = fs.readdirSync(skillRoot, { withFileTypes: true })
   .filter((entry) => entry.isDirectory())
   .map((entry) => entry.name)
   .sort();
-if (skills.length !== 29) fail(`expected 29 skills, found ${skills.length}`);
+if (skills.length < 45) fail(`release regressed below the v6.1 baseline of 45 skills: found ${skills.length}`);
 for (const skill of skills) {
   if (!skill.startsWith('starci-')) fail(`skill lacks starci- prefix: ${skill}`);
   for (const required of ['SKILL.md', 'agents/openai.yaml', 'machine.json', 'input.schema.json', 'output.schema.json']) {
@@ -49,11 +49,11 @@ function walk(directory) {
 }
 
 const operatorManifests = walk(path.join(root, 'operators')).filter((file) => path.basename(file) === 'operator.json');
-if (operatorManifests.length !== 93) fail(`expected 93 operators, found ${operatorManifests.length}`);
+if (operatorManifests.length < 121) fail(`release regressed below the v6.1 baseline of 121 operators: found ${operatorManifests.length}`);
 
 const knowledgeFiles = walk(path.join(root, 'knowledge'))
   .filter((file) => file.endsWith('.md'));
-if (knowledgeFiles.length < 33) fail(`expected at least 33 knowledge records, found ${knowledgeFiles.length}`);
+if (knowledgeFiles.length < 70) fail(`expected at least 70 knowledge records, found ${knowledgeFiles.length}`);
 const knowledgeIds = new Set(knowledgeFiles.map((file) => {
   const source = fs.readFileSync(file, 'utf8');
   return source.match(/^\|\s*Knowledge ID\s*\|\s*`([^`]+)`\s*\|/mi)?.[1];

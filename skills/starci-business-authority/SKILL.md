@@ -5,7 +5,7 @@ description: "Use when evidence-backed business truth must be modeled, approved,
 
 # starci-business-authority
 
-Use when evidence-backed business truth must be modeled, adversarially challenged, approved, and published as one feature head. Do not use to reconcile delivered source, implement product code, or make architecture decisions.
+Use when evidence-backed business truth must be modeled, approved, and published as one feature head. Do not use to reconcile delivered source, implement product code, or make architecture decisions.
 
 ## INPUT ANALYSIS
 
@@ -21,5 +21,5 @@ Execute `machine.json` through `execute.md`. Branches and loops are machine-owne
 | --- | --- | --- |
 | `route + freshness` | project route, source commit, business baseline and generator/schema hashes | business body, Qdrant bodies and product source |
 | `evidence normalization` | exact declared evidence only | frontend/backend implementation and unrelated feature evidence |
-| `model + adversarial review` | normalized evidence, lifecycle law, current feature head, frozen candidate and its structured falsification record | repository source, unrelated business heads, consensus as evidence and unchallenged requester preferences |
+| `model + review` | normalized evidence, lifecycle law and current feature head | repository source and unrelated business heads |
 | `publish or reconcile` | approved revision or frozen pre-delivery receipt plus delivery proof | mutable session plans and broad source scans |

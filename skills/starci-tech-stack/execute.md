@@ -1,0 +1,17 @@
+# Execute starci-tech-stack
+
+1. Accept only a validated global `selection` for this skill, validate the complete input, run local `analyze-input`, then enter fixed state `freshness`.
+2. Load only the current state's operator contract. That operator alone retrieves its declared Qdrant knowledge.
+3. Validate operator input, execute it, validate output, then route through exactly one matching edge.
+4. Keep selection, operator data, context, observations, plans and receipts in task-session memory only. On a loop, compare the prior fingerprint, reuse approved identities and reload only the re-entered operator. Block repeated no-progress fingerprints.
+5. Wait states stop before irreversible work and accept only the displayed revision or command.
+6. At every terminal, validate the result, return it, and purge all task-session intermediates. Preserve only approved product-source or external mutations.
+
+## CONTEXT BY STATE
+
+| State or phase | Allowed | Forbidden |
+| --- | --- | --- |
+| `freshness` | source, generator and schema hashes plus cached receipt metadata | source bodies and cached artifact body |
+| `discovery` | declared manifests, lockfiles, runtime configuration and deployment descriptors | feature source and unrelated documentation |
+| `model` | observed inventory plus approved business and architecture constraints | treating source conventions as target truth |
+| `compatibility + publish` | exact candidate, version, deployment and approval evidence | new broad discovery and unresolved critical contradictions |

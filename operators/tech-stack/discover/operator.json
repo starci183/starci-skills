@@ -1,0 +1,44 @@
+{
+  "schemaVersion": 6,
+  "id": "tech-stack/discover",
+  "domain": "tech-stack",
+  "inputSchema": "input.schema.json",
+  "outputSchema": "output.schema.json",
+  "knowledgeRefs": [],
+  "sourceReferenceRefs": [],
+  "accepts": [
+    {
+      "stage": "tech-stack.discovery",
+      "status": "ready",
+      "allFacts": [],
+      "noneFacts": []
+    }
+  ],
+  "emits": [
+    {
+      "stage": "tech-stack.discovery",
+      "status": "ready",
+      "factsAdd": [
+        "discover-ready"
+      ],
+      "factsRemove": []
+    },
+    {
+      "stage": "tech-stack.discovery",
+      "status": "blocked",
+      "factsAdd": [
+        "discover-blocked"
+      ],
+      "factsRemove": []
+    }
+  ],
+  "sideEffects": [
+    "read only declared references",
+    "store intermediate artifacts in task-session memory only"
+  ],
+  "stopConditions": [
+    "identity or evidence mismatch",
+    "critical unresolved contradiction"
+  ]
+}
+

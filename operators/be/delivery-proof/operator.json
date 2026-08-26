@@ -1,0 +1,38 @@
+{
+  "schemaVersion": 6,
+  "id": "be/delivery-proof",
+  "domain": "be",
+  "inputSchema": "input.schema.json",
+  "outputSchema": "output.schema.json",
+  "knowledgeRefs": [
+    "be.delivery-proof"
+  ],
+  "sourceReferenceRefs": [],
+  "accepts": [
+    {
+      "stage": "be.v61.delivery-proof",
+      "status": "ready",
+      "allFacts": [],
+      "noneFacts": []
+    }
+  ],
+  "emits": [
+    {
+      "stage": "be.v61.delivery-proof.complete",
+      "status": "ready",
+      "factsAdd": [
+        "be-delivery-proof-ready"
+      ],
+      "factsRemove": []
+    }
+  ],
+  "sideEffects": [
+    "keep artifacts and observations in task-session memory only",
+    "purge intermediate session objects at every parent-skill terminal state"
+  ],
+  "stopConditions": [
+    "required evidence is missing, stale or contradictory",
+    "Semantic conformance passes before lint, tests and build; migration changes include rollback proof.",
+    "source observations would be treated as target authority"
+  ]
+}

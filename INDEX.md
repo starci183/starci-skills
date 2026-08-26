@@ -49,7 +49,7 @@ request
 
 1. Read root `analyze-input.md`; inspect only the active request, the exact workspace route needed by that request and `skills/catalog.json` metadata.
 2. When the request names a project and role for any Git or source action, resolve and verify that exact route before selecting a skill or continuing without one.
-3. Emit and validate exactly one ephemeral skill selection. If selection is ambiguous, clarify before loading any skill.
+3. Emit and validate exactly one ephemeral skill selection. For multi-capability work, select only the earliest missing capability. If selection is ambiguous, clarify before loading any skill.
 4. Read only the selected `skills/<id>/SKILL.md`.
 5. Validate the closed input envelope and global selection with that skill's `validate-input.mjs`.
 6. Follow the selected skill's local `analyze-input.md` to validate and normalize scope, then enter its single fixed first state.
@@ -57,6 +57,7 @@ request
 8. For that operator, read `execute.md`; retrieve only its declared `knowledgeRefs` from Qdrant.
 9. Validate every operator result before routing on `decision`, `stage`, or `status`.
 10. Stop at waits and terminal states. Follow declared loops; do not invent implicit transitions.
+11. At a handoff terminal, resolve only the validated `handoffRef`. Sequential handoffs advance the objective; side branches must declare a resume capability. Acknowledge consumed artifacts before terminal cleanup.
 
 ## Authority
 

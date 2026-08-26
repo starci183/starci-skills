@@ -1,0 +1,38 @@
+{
+  "schemaVersion": 6,
+  "id": "be/mutation-contract",
+  "domain": "be",
+  "inputSchema": "input.schema.json",
+  "outputSchema": "output.schema.json",
+  "knowledgeRefs": [
+    "be.plan-compilation"
+  ],
+  "sourceReferenceRefs": [],
+  "accepts": [
+    {
+      "stage": "be.v61.mutation-contract",
+      "status": "ready",
+      "allFacts": [],
+      "noneFacts": []
+    }
+  ],
+  "emits": [
+    {
+      "stage": "be.v61.mutation-contract.complete",
+      "status": "ready",
+      "factsAdd": [
+        "be-mutation-contract-ready"
+      ],
+      "factsRemove": []
+    }
+  ],
+  "sideEffects": [
+    "keep artifacts and observations in task-session memory only",
+    "purge intermediate session objects at every parent-skill terminal state"
+  ],
+  "stopConditions": [
+    "required evidence is missing, stale or contradictory",
+    "Every write matches the target writer, physical store, database.schema.resource and connection token.",
+    "source observations would be treated as target authority"
+  ]
+}

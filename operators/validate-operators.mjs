@@ -19,6 +19,13 @@ function closedRoot(rule, schema, seen = new Set()) {
   if (rule.type === 'object' && rule.additionalProperties === false) return true;
   return Array.isArray(rule.allOf) && rule.allOf.some((item) => closedRoot(item, schema, seen));
 }
+function resolveLocalRule(rule, schema, seen = new Set(), context = 'schema') {
+  if (!rule?.$ref?.startsWith('#/')) return rule;
+  if (seen.has(rule.$ref)) fail(`${context}: cyclic local schema reference ${rule.$ref}`);
+  const target = rule.$ref.slice(2).split('/').reduce((value, key) => value?.[key.replaceAll('~1', '/').replaceAll('~0', '~')], schema);
+  if (!target) fail(`${context}: missing local schema reference ${rule.$ref}`);
+  return resolveLocalRule(target, schema, new Set([...seen, rule.$ref]), context);
+}
 const domains = fs.readdirSync(root, { withFileTypes: true }).filter((item) => item.isDirectory()).map((item) => item.name);
 const operatorDirs = domains.flatMap((domain) => fs.readdirSync(path.join(root, domain), { withFileTypes: true }).filter((item) => item.isDirectory()).map((item) => path.join(root, domain, item.name)));
 
@@ -52,15 +59,20 @@ for (const directory of operatorDirs) {
   }
   const inputSchema = readJson(path.join(directory, 'input.schema.json'));
   const outputSchema = readJson(path.join(directory, 'output.schema.json'));
-  const inputPayload = inputSchema.properties?.payload?.properties;
+  const inputPayload = resolveLocalRule(inputSchema.properties?.payload, inputSchema, new Set(), `${relative} input payload`)?.properties;
   for (const field of ['provided','loads','session']) if (!inputPayload?.[field]) fail(`${relative}: input payload must declare ${field}`);
-  if (inputPayload?.session?.properties?.retention?.const !== 'until-skill-terminal') fail(`${relative}: input session retention must end at the parent skill terminal`);
-  const outputPayload = outputSchema.properties?.payload?.properties;
+  const inputSession = resolveLocalRule(inputPayload?.session, inputSchema, new Set(), `${relative} input session`);
+  if (inputSession?.properties?.retention?.const !== 'until-skill-terminal') fail(`${relative}: input session retention must end at the parent skill terminal`);
+  const outputPayload = resolveLocalRule(outputSchema.properties?.payload, outputSchema, new Set(), `${relative} output payload`)?.properties;
   for (const field of ['decision','state','produced','context','cleanup','evidenceRefs','findings']) if (!outputPayload?.[field]) fail(`${relative}: output payload must declare ${field}`);
-  for (const field of ['status','code','retryable','emits']) if (!outputPayload?.state?.properties?.[field]) fail(`${relative}: output state must declare ${field}`);
-  if (outputPayload?.cleanup?.properties?.retention?.const !== 'until-skill-terminal' || outputPayload?.cleanup?.properties?.purgeAt?.const !== 'skill-terminal') {
-    fail(`${relative}: output cleanup must purge session intermediates at the parent skill terminal`);
-  }
+  const outputState = resolveLocalRule(outputPayload?.state, outputSchema, new Set(), `${relative} output state`);
+  const outputCleanup = resolveLocalRule(outputPayload?.cleanup, outputSchema, new Set(), `${relative} output cleanup`);
+  for (const field of ['status','code','retryable','emits']) if (!outputState?.properties?.[field]) fail(`${relative}: output state must declare ${field}`);
+  const retention = outputCleanup?.properties?.retention?.const;
+  const purgeAt = outputCleanup?.properties?.purgeAt?.const;
+  const legacyCleanup = retention === 'until-skill-terminal' && purgeAt === 'skill-terminal';
+  const acknowledgedHandoff = retention === 'until-consumer-ack' && purgeAt === 'consumer-ack';
+  if (!legacyCleanup && !acknowledgedHandoff) fail(`${relative}: output cleanup must use skill-terminal cleanup or an acknowledged handoff`);
   for (const ref of manifest.knowledgeRefs ?? []) if (!knowledgeIds.has(ref)) fail(`${relative}: missing Qdrant knowledge ${ref}`);
   for (const ref of manifest.sourceReferenceRefs ?? []) if (!sourceRefs.has(ref)) fail(`${relative}: missing source reference ${ref}`);
   const execute = fs.readFileSync(path.join(directory, 'execute.md'), 'utf8');

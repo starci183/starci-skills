@@ -1,0 +1,78 @@
+{
+  "$schema": "../machine.schema.json",
+  "schemaVersion": 6,
+  "id": "starci-frontend-implementation",
+  "start": "analyze-input",
+  "states": {
+    "analyze-input": {
+      "kind": "analysis",
+      "on": [
+        {
+          "when": {},
+          "target": "implement",
+          "label": "enter implement"
+        }
+      ]
+    },
+    "implement": {
+      "kind": "operator",
+      "ref": "fe/design-implementation",
+      "on": [
+        {
+          "when": {
+            "decision": "implemented"
+          },
+          "target": "complete",
+          "label": "implemented"
+        },
+        {
+          "when": {
+            "decision": "contract-gap"
+          },
+          "target": "handoff",
+          "label": "contract-gap"
+        },
+        {
+          "when": {
+            "decision": "grammar-gap"
+          },
+          "target": "handoff",
+          "label": "grammar-gap"
+        },
+        {
+          "when": {
+            "decision": "backend-gap"
+          },
+          "target": "handoff",
+          "label": "backend-gap"
+        },
+        {
+          "when": {
+            "decision": "design-feasibility-conflict"
+          },
+          "target": "handoff",
+          "label": "design-feasibility-conflict"
+        },
+        {
+          "when": {
+            "decision": "blocked"
+          },
+          "target": "blocked",
+          "label": "blocked"
+        }
+      ]
+    },
+    "complete": {
+      "kind": "terminal",
+      "result": "complete"
+    },
+    "handoff": {
+      "kind": "terminal",
+      "result": "handoff"
+    },
+    "blocked": {
+      "kind": "terminal",
+      "result": "blocked"
+    }
+  }
+}

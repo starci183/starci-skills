@@ -1,6 +1,6 @@
 # Global input analysis
 
-Run this lightweight analysis before loading any `skills/<id>/SKILL.md`. It first binds an explicitly named project and role to one verified Source route, then selects one single-flow skill from the user's natural-language request. The route vocabulary and authorities are defined once in `INDEX.md`.
+Run this lightweight analysis before loading any `skills/<id>/SKILL.md`. It first binds an explicitly named project and role to one verified Source route, then selects the first required specialized capability from the user's natural-language request or a validated v6.1 handoff. The route vocabulary and authorities are defined once in `INDEX.md`.
 
 ## Allowed context
 
@@ -31,16 +31,41 @@ Keep route resolution ephemeral. It constrains the selected skill's project/scop
 1. Normalize the requested outcome, project, role, target, lifecycle phase, mutation intent and approval boundary from active input.
 2. When project and role identify Git or source work, complete the route-first guard before skill selection.
 3. Compare the normalized intent with only the catalog metadata. Apply every positive trigger and exclusion in each description.
-4. Select exactly one skill. Every skill owns one fixed-entry mission, not one technical layer. A product mission may classify and deliver its required frontend, backend, data, shared-contract and proof work inside the same machine. Select a different skill only when the request starts a genuinely different mission (for example deployment, recovery or infrastructure reconciliation), never merely because execution crosses FE/BE boundaries.
+4. Select exactly one skill. Every skill owns one fixed-entry capability. For work spanning several capabilities, select the earliest missing capability whose output is required by the next; later capabilities are selected from typed handoffs, never preloaded from a lifecycle-sized skill.
 5. If no candidate matches, continue without a StarCi skill while preserving the verified route. If two candidates remain materially plausible, ask one focused clarification and do not load either skill yet.
-6. Validate the selection with `analyze-input.schema.json`, keep it and any route resolution only in task-session memory, then load the selected `SKILL.md`.
+6. For a handoff, validate its artifact hashes, next-candidate risk, authorization, transition kind, and optional resume capability. A sequential handoff advances the same objective; a side branch must declare where to resume.
+7. Validate the selection with `analyze-input.schema.json`, keep it and any route resolution only in task-session memory, then load the selected `SKILL.md`.
+
+## Capability routes
+
+| Intent or prerequisite | First capability |
+| --- | --- |
+| Missing or stale operational stack | `starci-tech-stack` |
+| New UI or substantial visual redesign | `starci-frontend-ui-direction` |
+| Challenge a frontend proposal | `starci-frontend-design-critique` |
+| Approved visual direction needs interaction behavior | `starci-frontend-ux-flow` |
+| Approved flow needs implementation-level screen detail | `starci-frontend-ui-detail` |
+| Approved detail needs component and Grammar contracts | `starci-frontend-contract-plan` |
+| Approved frontend contract needs source changes | `starci-frontend-implementation` |
+| Frontend implementation needs design comparison | `starci-frontend-visual-fidelity` |
+| A fidelity-passed product needs journey proof | `starci-product-uat` |
+| Current architecture is unknown or disputed | `starci-architecture-discover` |
+| Persistence ownership is unknown or material | `starci-data-ownership-model` |
+| Architecture needs alternatives | `starci-architecture-option-design` |
+| Architecture proposal needs independent challenge | `starci-architecture-critique` |
+| Approved architecture needs code/deployment binding | `starci-architecture-realization` |
+| Backend behavior needs a solution | `starci-backend-solution-design` |
+| Backend state changes need exact contracts | `starci-backend-contract-plan` |
+| Backend contract needs independent challenge | `starci-backend-contract-critique` |
+| Approved backend contract needs source changes | `starci-backend-implementation` |
+| Backend delivery needs final semantic proof | `starci-backend-proof` |
 
 ## Selection envelope
 
 ```json
 {
   "analyzerVersion": 1,
-  "skillId": "starci-frontend-layout-delivery",
+  "skillId": "starci-frontend-ui-direction",
   "confidence": "exact",
   "activeInputRefs": ["request:current"],
   "passiveContextRefs": ["skills/catalog.json"]

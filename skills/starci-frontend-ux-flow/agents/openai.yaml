@@ -1,0 +1,6 @@
+interface:
+  display_name: "StarCi Frontend UX Flow"
+  short_description: "Model full user flow and recovery behavior"
+  default_prompt: "Use $starci-frontend-ux-flow to model this approved direction."
+policy:
+  allow_implicit_invocation: true

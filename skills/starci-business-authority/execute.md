@@ -13,5 +13,5 @@
 | --- | --- | --- |
 | `route + freshness` | project route, source commit, business baseline and generator/schema hashes | business body, Qdrant bodies and product source |
 | `evidence normalization` | exact declared evidence only | frontend/backend implementation and unrelated feature evidence |
-| `model + adversarial review` | normalized evidence, lifecycle law, current feature head, frozen candidate and its structured falsification record | repository source, unrelated business heads, consensus as evidence and unchallenged requester preferences |
+| `model + review` | normalized evidence, lifecycle law and current feature head | repository source and unrelated business heads |
 | `publish or reconcile` | approved revision or frozen pre-delivery receipt plus delivery proof | mutable session plans and broad source scans |

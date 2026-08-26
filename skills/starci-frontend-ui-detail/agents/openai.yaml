@@ -1,0 +1,6 @@
+interface:
+  display_name: "StarCi Frontend UI Detail"
+  short_description: "Freeze exact UI anatomy before implementation"
+  default_prompt: "Use $starci-frontend-ui-detail to freeze this approved UI and UX."
+policy:
+  allow_implicit_invocation: true
