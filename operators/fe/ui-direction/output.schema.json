@@ -22,6 +22,56 @@
         "cleanup": {"$ref": "#/$defs/cleanup"},
         "evidenceRefs": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"$ref": "#/$defs/ref"}},
         "findings": {"type": "array", "uniqueItems": true, "items": {"type": "string"}},
+        "reviewPreview": {
+          "type": "object",
+          "description": "Executable binding for the in-conversation interactive UI-direction review rendered before handoff or approval is requested.",
+          "additionalProperties": false,
+          "required": ["renderer", "mediaType", "artifactRef", "contentSha256", "directionIds", "recommendedDirectionId", "surfaceRefs", "viewports", "approvalCommands", "interactive"],
+          "properties": {
+            "renderer": {"const": "visualize"},
+            "mediaType": {"const": "text/html"},
+            "artifactRef": {"$ref": "#/$defs/sessionRef"},
+            "contentSha256": {"$ref": "#/$defs/sha256"},
+            "directionIds": {
+              "type": "array",
+              "minItems": 3,
+              "maxItems": 4,
+              "uniqueItems": true,
+              "items": {"type": "string", "minLength": 1, "maxLength": 120}
+            },
+            "recommendedDirectionId": {"type": "string", "minLength": 1, "maxLength": 120},
+            "surfaceRefs": {
+              "type": "array",
+              "minItems": 1,
+              "maxItems": 24,
+              "uniqueItems": true,
+              "items": {"type": "string", "minLength": 1, "maxLength": 160}
+            },
+            "viewports": {
+              "type": "array",
+              "minItems": 3,
+              "maxItems": 3,
+              "uniqueItems": true,
+              "items": {"enum": ["wide", "intermediate", "compact"]}
+            },
+            "approvalCommands": {
+              "type": "array",
+              "minItems": 3,
+              "maxItems": 4,
+              "uniqueItems": true,
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["directionId", "command"],
+                "properties": {
+                  "directionId": {"type": "string", "minLength": 1, "maxLength": 120},
+                  "command": {"type": "string", "pattern": "^OK UI DIRECTION .+@[0-9a-f]{64}$", "maxLength": 240}
+                }
+              }
+            },
+            "interactive": {"const": true}
+          }
+        },
         "artifact": {
           "type": "object",
           "additionalProperties": false,
@@ -57,6 +107,8 @@
   },
   "$defs": {
     "ref": {"type": "string", "minLength": 1},
+    "sha256": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+    "sessionRef": {"type": "string", "pattern": "^session://tasks/[A-Za-z0-9._-]+/.+$"},
     "state": {
       "type": "object",
       "additionalProperties": false,

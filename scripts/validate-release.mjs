@@ -31,6 +31,15 @@ for (const required of [
   if (!normalizedIndexText.includes(required)) fail(`INDEX.md is missing shared-runtime binding: ${required}`);
 }
 
+for (const required of [
+  '## Visual preview delivery invariant',
+  'scripts/visualize-directive.mjs',
+  'Never handwrite or interpolate the directive JSON',
+  'until the preview is visibly rendered in that same response'
+]) {
+  if (!normalizedIndexText.includes(required)) fail(`INDEX.md is missing visual-preview delivery binding: ${required}`);
+}
+
 const analyzeInputText = fs.readFileSync(path.join(root, 'analyze-input.md'), 'utf8');
 const requestVocabularyText = fs.readFileSync(path.join(root, 'request-vocabulary.md'), 'utf8');
 for (const required of ['request-vocabulary.md', 'scopeUnit', 'targetSet', 'surfaceRoles', 'ambiguities']) {
@@ -45,7 +54,7 @@ for (const retired of ['v6', 'operations', 'docs', 'platform', 'context-manifest
 }
 
 const packageJson = readJson('package.json');
-if (packageJson.version !== '6.2.0') fail('package version must be 6.2.0');
+if (packageJson.version !== '6.2.1') fail('package version must be 6.2.1');
 if (packageJson.license !== 'MIT' || packageJson.private !== true) fail('release must declare MIT and remain private against accidental npm publish');
 if (!packageJson.repository?.url?.includes('starci183/starci-skills')) fail('repository metadata is missing');
 

@@ -5533,7 +5533,7 @@
         {
           "id": "decision-state-route-correlation",
           "verdict": "fail",
-          "evidence": "outcomes without deterministic decision/state/route binding: directions-ready, blocked"
+          "evidence": "outcomes without deterministic decision/state/route binding: blocked"
         },
         {
           "id": "execute-context-discipline",
@@ -5561,9 +5561,9 @@
           "broadFields": []
         },
         "output": {
-          "objects": 10,
+          "objects": 12,
           "openObjects": [],
-          "arrays": 14,
+          "arrays": 18,
           "unboundedArrays": [
             "$.facts",
             "$.payload.state.emits.factsAdd",

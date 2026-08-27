@@ -1,6 +1,6 @@
 {
   "schemaVersion": 6,
-  "systemVersion": "6.2.0",
+  "systemVersion": "6.2.1",
   "skills": [
     {
       "id": "starci-workspace-ready",

@@ -1,6 +1,6 @@
 {
   "name": "starci-skills",
-  "version": "6.2.0",
+  "version": "6.2.1",
   "private": true,
   "description": "Composable StarCi agent skills built from validated state machines, atomic operators, and lazy knowledge retrieval.",
   "license": "MIT",

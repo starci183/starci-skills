@@ -9,7 +9,7 @@ import { fileURLToPath } from 'node:url';
 import ts from 'typescript';
 
 const SCHEMA_VERSION = 1;
-const GENERATOR_VERSION = '6.2.0';
+const GENERATOR_VERSION = '6.2.1';
 const ownPath = fileURLToPath(import.meta.url);
 const sha = (value) => `sha256:${crypto.createHash('sha256').update(value).digest('hex')}`;
 const toPosix = (value) => value.replaceAll('\\', '/');

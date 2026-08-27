@@ -47,6 +47,18 @@ commands. One coordinator owns the mutation and the other tasks consume its resu
 `EADDRINUSE` is a coordination failure, not permission to kill the listener or launch another competing
 process. Diagnose the existing owner and reuse or coordinate it; never restart merely to obtain proof.
 
+## Visual preview delivery invariant
+
+Whenever a `.claude` workflow must render an HTML review through `visualize`, resolve the artifact to
+its absolute executor-side path and generate the content reference only with
+`node <Source>/.claude/scripts/visualize-directive.mjs <absolute-path>`. Paste stdout unchanged into
+the review response. Never handwrite or interpolate the directive JSON; on Windows, a backslash path
+can be parsed as JSON escapes and silently suppress the preview.
+
+A workflow cannot claim that a visual review was delivered, request its approval command, or enter an
+approval/review handoff until the preview is visibly rendered in that same response. If rendering is
+absent, regenerate the directive with the helper and re-emit the review before asking for approval.
+
 ## Runtime route
 
 ```text

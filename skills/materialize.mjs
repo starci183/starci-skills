@@ -15897,7 +15897,7 @@ const yamlString = (value) => JSON.stringify(value);
 
 writeJson(path.join(root, 'catalog.json'), {
   schemaVersion: 6,
-  systemVersion: '6.2.0',
+  systemVersion: '6.2.1',
   skills: flows.map(({ id, description }) => ({
     id,
     capability: id.replace(/^starci-/, '').replaceAll('-', '.'),

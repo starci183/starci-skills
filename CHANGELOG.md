@@ -2,6 +2,14 @@
 
 All notable changes are documented here. This project follows Semantic Versioning.
 
+## 6.2.1 - 2026-08-27
+
+### Fixed
+
+- Bound every HTML visual-review delivery to the portable `visualize-directive.mjs` helper so Windows paths are normalized to JSON-safe forward slashes instead of silently suppressing previews.
+- Made UI-direction review handoffs fail closed unless one validated interactive preview covers every direction, the closed surface set, all responsive states, and exact hash-bound approval commands.
+- Added regression checks that forbid handwritten visualize JSON and forbid requesting UI-direction approval before the preview is visibly rendered in the same response.
+
 ## 6.2.0 - 2026-08-27
 
 ### Added
