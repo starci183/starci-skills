@@ -86,6 +86,7 @@ function canonicalInput(skillId, schema) {
       analyzerVersion: 1,
       skillId,
       confidence: 'exact',
+      mode: 'gated',
       activeInputRefs: ['request:harness'],
       passiveContextRefs: []
     },
@@ -144,7 +145,7 @@ function cleanlinessInput(schema, mutationPasses) {
   score += ratioScore(referenceConstrained, i.referenceFields.length, 15);
   score += ratioScore(referenceBounded, i.referenceFields.length, 5);
   score += ratioScore(i.boundedArrays, i.arrays, 10);
-  score += selection?.additionalProperties === false && selection?.properties?.activeInputRefs && selection?.properties?.passiveContextRefs ? 10 : 0;
+  score += selection?.additionalProperties === false && selection?.properties?.activeInputRefs && selection?.properties?.passiveContextRefs && JSON.stringify([...(selection?.properties?.mode?.enum ?? [])].sort()) === JSON.stringify(['bypass', 'gated']) ? 10 : 0;
   score += scope?.additionalProperties === false && ['targetRefs', 'writeRoots', 'externalMutation', 'approvalRef'].every((field) => scope.required?.includes(field)) ? 10 : 0;
   score += options?.additionalProperties === false && Object.keys(options?.properties ?? {}).length <= 3 ? 5 : 0;
   score += mutationPasses ? 10 : 0;
@@ -325,6 +326,7 @@ function machineIntegrity(machine, inputSchema, outputSchema) {
     }
     if (state.kind === 'wait') {
       if (!state.approval?.approve || !state.approval?.reject || state.on?.length < 2) failures.push(`${id}: approval wait lacks explicit approve/reject routes`);
+      if (!state.approval?.bypassTarget || !state.on.some((edge) => edge.target === state.approval.bypassTarget)) failures.push(`${id}: approval wait lacks a declared bypass target`);
       for (const edge of state.on ?? []) if (matchingEdges(state, { ...edge.when, facts: edge.when?.allFacts ?? [] }, {}).length !== 1) failures.push(`${id}: wait route is ambiguous`);
     }
   }

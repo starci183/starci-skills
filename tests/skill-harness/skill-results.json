@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "summary": {
-    "skillCount": 46,
+    "skillCount": 48,
     "hardFailureCount": 0,
     "averages": {
       "inputCleanliness": 98,
@@ -1444,6 +1444,140 @@
         "findings": [],
         "metrics": {
           "objects": 8,
+          "closedObjects": 4,
+          "arrays": 4,
+          "boundedArrays": 4,
+          "referenceFields": [
+            {
+              "at": "$.handoffRef",
+              "constrained": true,
+              "bounded": true
+            },
+            {
+              "at": "$.receiptRefs",
+              "constrained": true,
+              "bounded": true
+            },
+            {
+              "at": "$.receiptRefs[]",
+              "constrained": true,
+              "bounded": true
+            },
+            {
+              "at": "$.findings[].evidenceRefs",
+              "constrained": true,
+              "bounded": true
+            },
+            {
+              "at": "$.findings[].evidenceRefs[]",
+              "constrained": true,
+              "bounded": true
+            },
+            {
+              "at": "$.cleanup.scratchRefs",
+              "constrained": true,
+              "bounded": true
+            },
+            {
+              "at": "$.cleanup.scratchRefs[]",
+              "constrained": true,
+              "bounded": true
+            }
+          ],
+          "broadFields": []
+        }
+      },
+      "machine": {
+        "score": 100,
+        "findings": []
+      },
+      "hardFailures": []
+    },
+    {
+      "id": "starci-coding-preflight",
+      "input": {
+        "score": 100,
+        "findings": [],
+        "metrics": {
+          "objects": 8,
+          "closedObjects": 4,
+          "arrays": 6,
+          "boundedArrays": 6,
+          "referenceFields": [
+            {
+              "at": "$.selection.activeInputRefs",
+              "constrained": true,
+              "bounded": true
+            },
+            {
+              "at": "$.selection.activeInputRefs[]",
+              "constrained": true,
+              "bounded": true
+            },
+            {
+              "at": "$.selection.passiveContextRefs",
+              "constrained": true,
+              "bounded": true
+            },
+            {
+              "at": "$.selection.passiveContextRefs[]",
+              "constrained": true,
+              "bounded": true
+            },
+            {
+              "at": "$.requestRef",
+              "constrained": true,
+              "bounded": true
+            },
+            {
+              "at": "$.artifactRefs",
+              "constrained": true,
+              "bounded": true
+            },
+            {
+              "at": "$.artifactRefs[]",
+              "constrained": true,
+              "bounded": true
+            },
+            {
+              "at": "$.evidenceRefs",
+              "constrained": true,
+              "bounded": true
+            },
+            {
+              "at": "$.evidenceRefs[]",
+              "constrained": true,
+              "bounded": true
+            },
+            {
+              "at": "$.scope.targetRefs",
+              "constrained": true,
+              "bounded": true
+            },
+            {
+              "at": "$.scope.targetRefs[]",
+              "constrained": true,
+              "bounded": true
+            },
+            {
+              "at": "$.scope.approvalRef",
+              "constrained": true,
+              "bounded": true
+            },
+            {
+              "at": "$.allOf[0].then.scope.approvalRef",
+              "constrained": true,
+              "bounded": true
+            }
+          ],
+          "broadFields": []
+        }
+      },
+      "output": {
+        "score": 100,
+        "findings": [],
+        "metrics": {
+          "objects": 10,
           "closedObjects": 4,
           "arrays": 4,
           "boundedArrays": 4,
@@ -5462,6 +5596,140 @@
       "hardFailures": []
     },
     {
+      "id": "starci-static-quality-gates",
+      "input": {
+        "score": 100,
+        "findings": [],
+        "metrics": {
+          "objects": 8,
+          "closedObjects": 4,
+          "arrays": 6,
+          "boundedArrays": 6,
+          "referenceFields": [
+            {
+              "at": "$.selection.activeInputRefs",
+              "constrained": true,
+              "bounded": true
+            },
+            {
+              "at": "$.selection.activeInputRefs[]",
+              "constrained": true,
+              "bounded": true
+            },
+            {
+              "at": "$.selection.passiveContextRefs",
+              "constrained": true,
+              "bounded": true
+            },
+            {
+              "at": "$.selection.passiveContextRefs[]",
+              "constrained": true,
+              "bounded": true
+            },
+            {
+              "at": "$.requestRef",
+              "constrained": true,
+              "bounded": true
+            },
+            {
+              "at": "$.artifactRefs",
+              "constrained": true,
+              "bounded": true
+            },
+            {
+              "at": "$.artifactRefs[]",
+              "constrained": true,
+              "bounded": true
+            },
+            {
+              "at": "$.evidenceRefs",
+              "constrained": true,
+              "bounded": true
+            },
+            {
+              "at": "$.evidenceRefs[]",
+              "constrained": true,
+              "bounded": true
+            },
+            {
+              "at": "$.scope.targetRefs",
+              "constrained": true,
+              "bounded": true
+            },
+            {
+              "at": "$.scope.targetRefs[]",
+              "constrained": true,
+              "bounded": true
+            },
+            {
+              "at": "$.scope.approvalRef",
+              "constrained": true,
+              "bounded": true
+            },
+            {
+              "at": "$.allOf[0].then.scope.approvalRef",
+              "constrained": true,
+              "bounded": true
+            }
+          ],
+          "broadFields": []
+        }
+      },
+      "output": {
+        "score": 100,
+        "findings": [],
+        "metrics": {
+          "objects": 10,
+          "closedObjects": 4,
+          "arrays": 4,
+          "boundedArrays": 4,
+          "referenceFields": [
+            {
+              "at": "$.handoffRef",
+              "constrained": true,
+              "bounded": true
+            },
+            {
+              "at": "$.receiptRefs",
+              "constrained": true,
+              "bounded": true
+            },
+            {
+              "at": "$.receiptRefs[]",
+              "constrained": true,
+              "bounded": true
+            },
+            {
+              "at": "$.findings[].evidenceRefs",
+              "constrained": true,
+              "bounded": true
+            },
+            {
+              "at": "$.findings[].evidenceRefs[]",
+              "constrained": true,
+              "bounded": true
+            },
+            {
+              "at": "$.cleanup.scratchRefs",
+              "constrained": true,
+              "bounded": true
+            },
+            {
+              "at": "$.cleanup.scratchRefs[]",
+              "constrained": true,
+              "bounded": true
+            }
+          ],
+          "broadFields": []
+        }
+      },
+      "machine": {
+        "score": 100,
+        "findings": []
+      },
+      "hardFailures": []
+    },
+    {
       "id": "starci-tech-stack",
       "input": {
         "score": 100,
@@ -6613,7 +6881,7 @@
             "score": 3
           },
           {
-            "id": "starci-conversation-query",
+            "id": "starci-coding-preflight",
             "score": 3
           }
         ]
@@ -6728,7 +6996,7 @@
             "score": 3
           },
           {
-            "id": "starci-deployment-monitor",
+            "id": "starci-coding-preflight",
             "score": 3
           }
         ]
@@ -6977,11 +7245,11 @@
             "score": 6
           },
           {
-            "id": "starci-conversation-query",
-            "score": 4
+            "id": "starci-coding-preflight",
+            "score": 6
           },
           {
-            "id": "starci-conversation-record",
+            "id": "starci-conversation-query",
             "score": 4
           }
         ]
@@ -7013,8 +7281,8 @@
   },
   "text": {
     "score": 100,
-    "files": 605,
-    "lines": 14229,
+    "files": 618,
+    "lines": 14465,
     "findings": []
   },
   "independent": {

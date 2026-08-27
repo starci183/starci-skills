@@ -22,7 +22,7 @@
           "when": {
             "decision": "ready"
           },
-          "target": "implement",
+          "target": "preflight",
           "label": "ready"
         },
         {
@@ -47,6 +47,41 @@
           "label": "blocked"
         }
       ]
+    },
+    "preflight": {
+      "kind": "operator",
+      "ref": "quality/coding-preflight",
+      "on": [
+        {
+          "when": {
+            "decision": "ready"
+          },
+          "target": "implement",
+          "label": "ready"
+        },
+        {
+          "when": {
+            "decision": "reference-gap"
+          },
+          "target": "replan-handoff",
+          "label": "reference-gap"
+        },
+        {
+          "when": {
+            "decision": "blocked"
+          },
+          "target": "blocked",
+          "label": "blocked"
+        }
+      ]
+    },
+    "replan-handoff": {
+      "kind": "terminal",
+      "result": "handoff"
+    },
+    "blocked": {
+      "kind": "terminal",
+      "result": "blocked"
     },
     "implement": {
       "kind": "operator",
@@ -81,14 +116,6 @@
           "label": "blocked"
         }
       ]
-    },
-    "replan-handoff": {
-      "kind": "terminal",
-      "result": "handoff"
-    },
-    "blocked": {
-      "kind": "terminal",
-      "result": "blocked"
     },
     "conformance": {
       "kind": "operator",

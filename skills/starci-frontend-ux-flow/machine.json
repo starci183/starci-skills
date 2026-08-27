@@ -6,25 +6,56 @@
   "states": {
     "analyze-input": {
       "kind": "analysis",
-      "on": [{ "when": {}, "target": "model" }]
+      "on": [
+        {
+          "when": {},
+          "target": "model"
+        }
+      ]
     },
     "model": {
       "kind": "operator",
       "ref": "fe/ux-flow",
       "on": [
-        { "when": { "decision": "flow-ready" }, "target": "containers" },
-        { "when": { "decision": "blocked" }, "target": "blocked" }
+        {
+          "when": {
+            "decision": "flow-ready"
+          },
+          "target": "containers"
+        },
+        {
+          "when": {
+            "decision": "blocked"
+          },
+          "target": "blocked"
+        }
       ]
     },
     "containers": {
       "kind": "operator",
       "ref": "fe/interaction-container-decision",
       "on": [
-        { "when": { "decision": "containers-ready" }, "target": "review" },
-        { "when": { "decision": "blocked" }, "target": "blocked" }
+        {
+          "when": {
+            "decision": "containers-ready"
+          },
+          "target": "review"
+        },
+        {
+          "when": {
+            "decision": "blocked"
+          },
+          "target": "blocked"
+        }
       ]
     },
-    "review": { "kind": "terminal", "result": "handoff" },
-    "blocked": { "kind": "terminal", "result": "blocked" }
+    "review": {
+      "kind": "terminal",
+      "result": "handoff"
+    },
+    "blocked": {
+      "kind": "terminal",
+      "result": "blocked"
+    }
   }
 }

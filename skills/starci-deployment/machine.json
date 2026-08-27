@@ -116,7 +116,8 @@
       "approval": {
         "prompt": "Approve only new host/domain/tenant/project/destructive/rotation deployment boundary.",
         "approve": "OK DEPLOY <hash>",
-        "reject": "REJECT DEPLOY <hash>"
+        "reject": "REJECT DEPLOY <hash>",
+        "bypassTarget": "execution-root"
       },
       "on": [
         {
@@ -476,7 +477,8 @@
       "approval": {
         "prompt": "Approve the exact recovery boundary.",
         "approve": "OK DEPLOY <hash>",
-        "reject": "REJECT DEPLOY <hash>"
+        "reject": "REJECT DEPLOY <hash>",
+        "bypassTarget": "recover"
       },
       "on": [
         {

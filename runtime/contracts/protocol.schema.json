@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://starci.dev/v6.1/runtime/protocol.schema.json",
-  "title": "StarCi v6.1 session protocol",
+  "$id": "https://starci.dev/v6.2/runtime/protocol.schema.json",
+  "title": "StarCi v6.2 session protocol",
   "$defs": {
     "sha256": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
     "sessionRef": { "type": "string", "pattern": "^session://tasks/[A-Za-z0-9._-]+/.+$" },
@@ -95,7 +95,9 @@
         "objectiveAuthorized": { "type": "boolean" },
         "requiresApproval": { "type": "boolean" },
         "inputRef": { "$ref": "#/$defs/sessionRef" },
-        "resumeCapability": { "type": ["string", "null"], "pattern": "^[a-z0-9]+(?:[.-][a-z0-9]+)*$" }
+        "resumeCapability": { "type": ["string", "null"], "pattern": "^[a-z0-9]+(?:[.-][a-z0-9]+)*$" },
+        "authorizationKind": { "enum": ["objective", "approval", "bypass"] },
+        "authorizationRef": { "$ref": "#/$defs/sessionRef" }
       }
     },
     "handoff": {

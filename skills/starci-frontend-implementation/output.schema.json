@@ -21,43 +21,6 @@
         {
           "properties": {
             "result": {
-              "const": "complete"
-            },
-            "finalState": {
-              "const": "complete"
-            },
-            "state": {
-              "properties": {
-                "status": {
-                  "const": "completed"
-                },
-                "code": {
-                  "const": "starci-frontend-implementation-complete"
-                },
-                "retryable": {
-                  "const": false
-                },
-                "terminalState": {
-                  "const": "complete"
-                }
-              },
-              "required": [
-                "status",
-                "code",
-                "retryable",
-                "terminalState"
-              ]
-            }
-          },
-          "required": [
-            "result",
-            "finalState",
-            "state"
-          ]
-        },
-        {
-          "properties": {
-            "result": {
               "const": "handoff"
             },
             "finalState": {
@@ -128,6 +91,43 @@
             "finalState",
             "state"
           ]
+        },
+        {
+          "properties": {
+            "result": {
+              "const": "complete"
+            },
+            "finalState": {
+              "const": "complete"
+            },
+            "state": {
+              "properties": {
+                "status": {
+                  "const": "completed"
+                },
+                "code": {
+                  "const": "starci-frontend-implementation-complete"
+                },
+                "retryable": {
+                  "const": false
+                },
+                "terminalState": {
+                  "const": "complete"
+                }
+              },
+              "required": [
+                "status",
+                "code",
+                "retryable",
+                "terminalState"
+              ]
+            }
+          },
+          "required": [
+            "result",
+            "finalState",
+            "state"
+          ]
         }
       ]
     }
@@ -146,16 +146,16 @@
     },
     "result": {
       "enum": [
-        "complete",
         "handoff",
-        "blocked"
+        "blocked",
+        "complete"
       ]
     },
     "finalState": {
       "enum": [
-        "complete",
         "handoff",
-        "blocked"
+        "blocked",
+        "complete"
       ]
     },
     "state": {
@@ -170,16 +170,16 @@
       "properties": {
         "status": {
           "enum": [
-            "completed",
             "handoff",
-            "blocked"
+            "blocked",
+            "completed"
           ]
         },
         "code": {
           "enum": [
-            "starci-frontend-implementation-complete",
             "starci-frontend-implementation-handoff",
-            "starci-frontend-implementation-blocked"
+            "starci-frontend-implementation-blocked",
+            "starci-frontend-implementation-complete"
           ]
         },
         "retryable": {
@@ -187,9 +187,9 @@
         },
         "terminalState": {
           "enum": [
-            "complete",
             "handoff",
-            "blocked"
+            "blocked",
+            "complete"
           ]
         }
       }

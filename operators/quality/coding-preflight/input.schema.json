@@ -1,0 +1,105 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://starci.dev/v6/operators/quality/coding-preflight/input.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "runId", "stage", "status", "facts", "payload"],
+  "properties": {
+    "schemaVersion": { "const": 6 },
+    "runId": { "type": "string", "minLength": 1 },
+    "stage": { "const": "quality.coding-preflight" },
+    "status": { "const": "ready" },
+    "facts": { "type": "array", "uniqueItems": true, "items": { "type": "string", "minLength": 1 } },
+    "payload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["provided", "loads", "session"],
+      "properties": {
+        "provided": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["codingScopeRef", "contractRef"],
+          "properties": {
+            "codingScopeRef": { "$ref": "#/$defs/sessionRef" },
+            "contractRef": { "$ref": "#/$defs/sessionRef" }
+          }
+        },
+        "loads": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["targetFiles", "referenceFiles", "lintFiles", "typescriptFiles", "knowledge", "orchestration"],
+          "properties": {
+            "targetFiles": { "$ref": "#/$defs/exactFiles" },
+            "referenceFiles": { "$ref": "#/$defs/exactFiles" },
+            "lintFiles": { "$ref": "#/$defs/exactFiles" },
+            "typescriptFiles": { "$ref": "#/$defs/exactFiles" },
+            "knowledge": {
+              "type": "array",
+              "minItems": 1,
+              "maxItems": 1,
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["id", "generation", "contentSha256", "loadMode"],
+                "properties": {
+                  "id": { "const": "quality.source-gates" },
+                  "generation": { "type": "string", "minLength": 1 },
+                  "contentSha256": { "$ref": "#/$defs/sha256" },
+                  "loadMode": { "const": "qdrant-exact" }
+                }
+              }
+            },
+            "orchestration": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["mode", "timeoutSeconds", "deferredChecks", "staticGateTrigger"],
+              "properties": {
+                "mode": { "enum": ["economical", "balanced", "parallel"] },
+                "timeoutSeconds": { "type": "integer", "minimum": 30, "maximum": 1800 },
+                "deferredChecks": {
+                  "type": "array",
+                  "minItems": 3,
+                  "maxItems": 3,
+                  "uniqueItems": true,
+                  "items": { "enum": ["lint", "typecheck", "sonar"] }
+                },
+                "staticGateTrigger": { "const": "commit-or-explicit-gate-request" }
+              }
+            }
+          }
+        },
+        "session": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["taskId", "inputRef", "outputRef", "retention"],
+          "properties": {
+            "taskId": { "type": "string", "minLength": 1 },
+            "inputRef": { "$ref": "#/$defs/sessionRef" },
+            "outputRef": { "$ref": "#/$defs/sessionRef" },
+            "retention": { "const": "until-skill-terminal" }
+          }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "sessionRef": { "type": "string", "pattern": "^session://tasks/[A-Za-z0-9._-]+/.+$" },
+    "sha256": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
+    "exactFiles": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 64,
+      "uniqueItems": true,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["path", "revision", "loadMode"],
+        "properties": {
+          "path": { "type": "string", "minLength": 1, "maxLength": 512 },
+          "revision": { "$ref": "#/$defs/sha256" },
+          "loadMode": { "const": "exact-file" }
+        }
+      }
+    }
+  }
+}

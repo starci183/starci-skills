@@ -1,6 +1,6 @@
 # Orchestration
 
-Orchestration controls how an operator executes; it never chooses the next skill state, changes business authority, widens a write boundary, or grants approval.
+Orchestration controls how an operator executes; it never chooses the next skill state, changes business authority, widens a write boundary, or grants approval. Task-scoped `selection.mode` (`gated` or `bypass`) is a separate machine-routing policy owned by `skills/route-machine.mjs`; it is not an orchestration concurrency mode.
 
 The operator input binds one mode from `modes/` and one provider mapping from `providers/`. Modes describe provider-neutral concurrency. Provider files map those limits to runtime model aliases. A runtime must reject an unavailable alias rather than silently substitute a stronger, more expensive, or differently capable model.
 

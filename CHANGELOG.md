@@ -2,6 +2,24 @@
 
 All notable changes are documented here. This project follows Semantic Versioning.
 
+## 6.2.0 - 2026-08-27
+
+### Added
+
+- Multilingual request vocabulary and normalized scope records for product branches, journeys, surfaces, blocks, components, cases, and common cross-domain ambiguities.
+- Rendered visual-evidence contracts and validation for substantial frontend UI-direction and architecture comparison approval gates.
+- Dedicated coding-preflight and static-quality-gates skills, including an atomic preflight operator and commit-or-explicit lint, typecheck, coverage, and Sonar activation.
+- Shared product-runtime coordination rules that reuse healthy listeners and prevent unrelated process restarts.
+- Portable visualize-directive generation with Windows-path normalization and regression tests.
+
+### Changed
+
+- Added explicit `gated` and `bypass` execution modes to global selection, skill schemas, machine waits, and protocol validation; bypass receipts remain ephemeral and are never represented as human approval.
+- Extended frontend direction, critique, UX-flow, UI-detail, contract, implementation, fidelity, and UAT machines to preserve closed feature-branch surface coverage from design through proof.
+- Inserted coding preflight before approved frontend and backend source mutation and strengthened exact-boundary, handoff, and no-progress behavior across delivery workflows.
+- Hardened local input analysis so material scope ambiguity returns for one focused clarification instead of silently collapsing to the current page or repository context.
+- Raised the release baseline to 48 skills, 125 operators, and 72 knowledge records.
+
 ## 6.1.0 - 2026-08-26
 
 ### Added
@@ -15,7 +33,7 @@ All notable changes are documented here. This project follows Semantic Versionin
 
 - Removed the legacy frontend-layout, architecture-decision, backend-delivery, and backend-repair lifecycle machines; global analysis now selects specialized capabilities directly.
 - Made source an observed claim rather than automatic design authority and added independent critique capabilities.
-- Accepted real-world v6.1 feedback as the evidence base for the completed v6.2 release.
+- Accepted real-world v6.1 feedback as the evidence base for the next minor release.
 
 ## 6.0.0 - 2026-08-24
 

@@ -1,0 +1,47 @@
+{
+  "schemaVersion": 6,
+  "id": "quality/coding-preflight",
+  "domain": "quality",
+  "inputSchema": "input.schema.json",
+  "outputSchema": "output.schema.json",
+  "knowledgeRefs": ["quality.source-gates"],
+  "sourceReferenceRefs": [],
+  "accepts": [
+    {
+      "stage": "quality.coding-preflight",
+      "status": "ready",
+      "allFacts": [],
+      "noneFacts": []
+    }
+  ],
+  "emits": [
+    {
+      "stage": "code.implement",
+      "status": "ready",
+      "factsAdd": ["coding-conventions-bound"],
+      "factsRemove": []
+    },
+    {
+      "stage": "architecture.boundary",
+      "status": "ready",
+      "factsAdd": ["coding-reference-gap"],
+      "factsRemove": []
+    },
+    {
+      "stage": "quality.blocked",
+      "status": "blocked",
+      "factsAdd": ["coding-preflight-blocked"],
+      "factsRemove": []
+    }
+  ],
+  "sideEffects": [
+    "read only the exact frozen targets, nearest declared implementation references, applicable lint configuration and TypeScript configuration",
+    "emit an ephemeral preflight receipt whose static gates activate before commit or by explicit standalone request; do not mutate product source or run lint, typecheck or Sonar",
+    "purge command captures, observations and receipts at the parent-skill terminal"
+  ],
+  "stopConditions": [
+    "the exact source boundary is not frozen",
+    "an applicable lint or TypeScript contract cannot be resolved without broad repository discovery",
+    "the nearest reference contradicts the approved contract or requires a boundary expansion"
+  ]
+}

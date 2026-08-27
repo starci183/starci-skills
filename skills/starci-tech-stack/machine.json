@@ -128,7 +128,8 @@
       "approval": {
         "prompt": "Approve the exact operational tech-stack model and hash.",
         "approve": "OK TECH STACK <hash>",
-        "reject": "REJECT TECH STACK <hash>"
+        "reject": "REJECT TECH STACK <hash>",
+        "bypassTarget": "publish"
       },
       "on": [
         {

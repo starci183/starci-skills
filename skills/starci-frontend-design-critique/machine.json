@@ -1,1 +1,53 @@
-{"$schema":"../machine.schema.json","schemaVersion":6,"id":"starci-frontend-design-critique","start":"analyze-input","states":{"analyze-input":{"kind":"analysis","on":[{"when":{},"target":"critique"}]},"critique":{"kind":"operator","ref":"fe/design-critique","on":[{"when":{"decision":"accepted"},"target":"complete"},{"when":{"decision":"revise"},"target":"revision-handoff"},{"when":{"decision":"blocked"},"target":"blocked"}]},"complete":{"kind":"terminal","result":"complete"},"revision-handoff":{"kind":"terminal","result":"handoff"},"blocked":{"kind":"terminal","result":"blocked"}}}
+{
+  "$schema": "../machine.schema.json",
+  "schemaVersion": 6,
+  "id": "starci-frontend-design-critique",
+  "start": "analyze-input",
+  "states": {
+    "analyze-input": {
+      "kind": "analysis",
+      "on": [
+        {
+          "when": {},
+          "target": "critique"
+        }
+      ]
+    },
+    "critique": {
+      "kind": "operator",
+      "ref": "fe/design-critique",
+      "on": [
+        {
+          "when": {
+            "decision": "accepted"
+          },
+          "target": "complete"
+        },
+        {
+          "when": {
+            "decision": "revise"
+          },
+          "target": "revision-handoff"
+        },
+        {
+          "when": {
+            "decision": "blocked"
+          },
+          "target": "blocked"
+        }
+      ]
+    },
+    "complete": {
+      "kind": "terminal",
+      "result": "complete"
+    },
+    "revision-handoff": {
+      "kind": "terminal",
+      "result": "handoff"
+    },
+    "blocked": {
+      "kind": "terminal",
+      "result": "blocked"
+    }
+  }
+}

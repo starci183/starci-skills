@@ -175,7 +175,10 @@ function assertStructure(skillDir, machine, inputSchema, outputSchema) {
 
   const analysisEdges = machine.states['analyze-input'].on;
   if (analysisEdges.length !== 1 || Object.keys(analysisEdges[0].when ?? {}).length !== 0) fail(`${skillId}: one-flow analysis must have one unconditional entry edge`);
-  if (inputSchema.properties.selection.properties.mode !== undefined) fail(`${skillId}: one-flow selection must not expose a secondary mode`);
+  const approvalModes = inputSchema.properties.selection.properties.mode?.enum ?? [];
+  if (JSON.stringify([...approvalModes].sort()) !== JSON.stringify(['bypass', 'gated'])) {
+    fail(`${skillId}: selection.mode must expose exactly gated and bypass`);
+  }
   const target = nextState(machine, 'analyze-input', {}, { selection: { skillId }, options: {} });
   if (!machine.states[target]) fail(`${skillId}: fixed analysis selected an unknown target`);
 
@@ -226,6 +229,7 @@ async function assertValidators(skillDir) {
       analyzerVersion: 1,
       skillId,
       confidence: 'exact',
+      mode: 'gated',
       activeInputRefs: ['request:1'],
       passiveContextRefs: []
     },
@@ -293,8 +297,9 @@ const directoryIds = skillDirs.map((skillDir) => path.basename(skillDir)).sort()
 if (JSON.stringify(catalogIds) !== JSON.stringify(directoryIds)) fail('global skill catalog differs from materialized skill directories');
 const globalAnalyzer = await import(pathToFileURL(path.join(repositoryRoot, 'validate-analyze-input.mjs')).href);
 for (const entry of catalog.skills) {
-  const selection = { analyzerVersion: 1, skillId: entry.id, confidence: 'exact', activeInputRefs: ['request:1'], passiveContextRefs: ['file:skills/catalog.json'] };
+  const selection = { analyzerVersion: 1, skillId: entry.id, confidence: 'exact', mode: 'gated', activeInputRefs: ['request:1'], passiveContextRefs: ['file:skills/catalog.json'] };
   if (!globalAnalyzer.validateAnalyzeInput(selection).valid) fail(`global analyzer rejects ${entry.id}`);
+  if (!globalAnalyzer.validateAnalyzeInput({ ...selection, mode: 'bypass' }).valid) fail(`global analyzer rejects bypass mode for ${entry.id}`);
 }
 if (globalAnalyzer.validateAnalyzeInput({ analyzerVersion: 1, skillId: 'starci-missing', confidence: 'exact', activeInputRefs: [], passiveContextRefs: [] }).valid) {
   fail('global analyzer accepts an unknown skill');

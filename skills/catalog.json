@@ -1,6 +1,6 @@
 {
   "schemaVersion": 6,
-  "systemVersion": "6.1.1",
+  "systemVersion": "6.2.0",
   "skills": [
     {
       "id": "starci-workspace-ready",
@@ -221,6 +221,16 @@
       "id": "starci-backend-contract-critique",
       "capability": "backend.contract.critique",
       "description": "Independently challenge one backend contract for wrong-store writes, authority drift, transaction gaps, failure handling, compatibility, and source overfitting. Do not mutate source."
+    },
+    {
+      "id": "starci-coding-preflight",
+      "capability": "coding.preflight",
+      "description": "Bind the nearest implementation template, applicable ESLint rules, TypeScript contracts, and a bounded lint/typecheck/Sonar plan that activates before commit or by explicit standalone request. Do not run static gates or mutate source."
+    },
+    {
+      "id": "starci-static-quality-gates",
+      "capability": "static.quality.gates",
+      "description": "Run lint, TypeScript typecheck and Sonar for one exact source revision automatically before commit or when explicitly requested as a standalone gate. Do not mutate or commit source."
     },
     {
       "id": "starci-backend-implementation",

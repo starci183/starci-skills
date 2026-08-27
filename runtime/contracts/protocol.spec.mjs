@@ -33,13 +33,19 @@ test('sequential source writes reuse objective authority without a redundant app
   assert.equal(validateHandoff(handoff).valid, false);
 });
 
-test('business, database and external changes always require explicit approval', () => {
+test('business, database and external changes require approval or exact bypass authorization', () => {
   for (const risk of ['business-change', 'database-change', 'external']) {
     const handoff = structuredClone(baseHandoff);
     handoff.nextCandidates = [{ capability: 'business.authority', necessity: 'required', reasonCode: 'authority-change', risk, transitionKind: 'sequential', objectiveAuthorized: true, requiresApproval: false, inputRef: artifactRef, resumeCapability: null }];
     assert.equal(validateHandoff(handoff).valid, false, risk);
     handoff.nextCandidates[0].requiresApproval = true;
     assert.equal(validateHandoff(handoff).valid, true, risk);
+    handoff.nextCandidates[0].requiresApproval = false;
+    handoff.nextCandidates[0].authorizationKind = 'bypass';
+    handoff.nextCandidates[0].authorizationRef = 'session://tasks/task-1/approvals/bypass/authority-change';
+    assert.equal(validateHandoff(handoff).valid, true, `${risk} bypass`);
+    handoff.nextCandidates[0].authorizationRef = 'session://tasks/task-1/receipts/fabricated';
+    assert.equal(validateHandoff(handoff).valid, false, `${risk} rejects non-bypass receipt`);
   }
 });
 

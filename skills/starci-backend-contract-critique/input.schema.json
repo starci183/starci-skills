@@ -86,6 +86,12 @@
             "clarified"
           ]
         },
+        "mode": {
+          "enum": [
+            "gated",
+            "bypass"
+          ]
+        },
         "activeInputRefs": {
           "type": "array",
           "minItems": 1,

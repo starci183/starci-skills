@@ -13,10 +13,31 @@ const isTracked = (relative) => {
 };
 
 for (const required of [
-  'README.md', 'INDEX.md', 'analyze-input.md', 'analyze-input.schema.json', 'validate-analyze-input.mjs', 'LICENSE', 'CHANGELOG.md', 'CONTRIBUTING.md', 'SECURITY.md',
+  'README.md', 'INDEX.md', 'analyze-input.md', 'request-vocabulary.md', 'analyze-input.schema.json', 'validate-analyze-input.mjs', 'LICENSE', 'CHANGELOG.md', 'CONTRIBUTING.md', 'SECURITY.md',
   'package.json', 'skills', 'operators', 'orchestration', 'knowledge', 'requests/request.schema.json', 'requests/validate-requests.mjs', 'runtime/knowledge-runtime', 'scripts/knowledge-query.py'
 ]) {
   if (!exists(required)) fail(`release is missing ${required}`);
+}
+
+const indexText = fs.readFileSync(path.join(root, 'INDEX.md'), 'utf8');
+const normalizedIndexText = indexText.replace(/\s+/g, ' ').trim();
+for (const required of [
+  '## Shared product runtime coordination',
+  'Reuse one healthy listener or watch process',
+  'Changes under `.claude` never require a product-runtime restart.',
+  'Only stop or restart a process tree created by the current task.',
+  '`EADDRINUSE` is a coordination failure'
+]) {
+  if (!normalizedIndexText.includes(required)) fail(`INDEX.md is missing shared-runtime binding: ${required}`);
+}
+
+const analyzeInputText = fs.readFileSync(path.join(root, 'analyze-input.md'), 'utf8');
+const requestVocabularyText = fs.readFileSync(path.join(root, 'request-vocabulary.md'), 'utf8');
+for (const required of ['request-vocabulary.md', 'scopeUnit', 'targetSet', 'surfaceRoles', 'ambiguities']) {
+  if (!analyzeInputText.includes(required)) fail(`analyze-input.md is missing request-scope binding: ${required}`);
+}
+for (const required of ['`nhánh` in product or UX context', '`lá`, `leaf`', 'Common cross-domain ambiguities', 'Normalized scope record']) {
+  if (!requestVocabularyText.includes(required)) fail(`request-vocabulary.md is missing scope vocabulary: ${required}`);
 }
 
 for (const retired of ['v6', 'operations', 'docs', 'platform', 'context-manifest.json', 'netlify.toml']) {
@@ -24,7 +45,7 @@ for (const retired of ['v6', 'operations', 'docs', 'platform', 'context-manifest
 }
 
 const packageJson = readJson('package.json');
-if (packageJson.version !== '6.1.1') fail('package version must be 6.1.1');
+if (packageJson.version !== '6.2.0') fail('package version must be 6.2.0');
 if (packageJson.license !== 'MIT' || packageJson.private !== true) fail('release must declare MIT and remain private against accidental npm publish');
 if (!packageJson.repository?.url?.includes('starci183/starci-skills')) fail('repository metadata is missing');
 
@@ -33,7 +54,7 @@ const skills = fs.readdirSync(skillRoot, { withFileTypes: true })
   .filter((entry) => entry.isDirectory())
   .map((entry) => entry.name)
   .sort();
-if (skills.length < 45) fail(`release regressed below the v6.1 baseline of 45 skills: found ${skills.length}`);
+if (skills.length < 48) fail(`release regressed below the v6.2 baseline of 48 skills: found ${skills.length}`);
 for (const skill of skills) {
   if (!skill.startsWith('starci-')) fail(`skill lacks starci- prefix: ${skill}`);
   for (const required of ['SKILL.md', 'agents/openai.yaml', 'machine.json', 'input.schema.json', 'output.schema.json']) {
@@ -49,11 +70,11 @@ function walk(directory) {
 }
 
 const operatorManifests = walk(path.join(root, 'operators')).filter((file) => path.basename(file) === 'operator.json');
-if (operatorManifests.length < 121) fail(`release regressed below the v6.1 baseline of 121 operators: found ${operatorManifests.length}`);
+if (operatorManifests.length < 125) fail(`release regressed below the v6.2 baseline of 125 operators: found ${operatorManifests.length}`);
 
 const knowledgeFiles = walk(path.join(root, 'knowledge'))
   .filter((file) => file.endsWith('.md'));
-if (knowledgeFiles.length < 70) fail(`expected at least 70 knowledge records, found ${knowledgeFiles.length}`);
+if (knowledgeFiles.length < 72) fail(`expected at least 72 knowledge records, found ${knowledgeFiles.length}`);
 const knowledgeIds = new Set(knowledgeFiles.map((file) => {
   const source = fs.readFileSync(file, 'utf8');
   return source.match(/^\|\s*Knowledge ID\s*\|\s*`([^`]+)`\s*\|/mi)?.[1];
@@ -70,6 +91,7 @@ for (const manifestFile of operatorManifests) {
 const releaseTextFiles = [
   path.join(root, 'INDEX.md'),
   path.join(root, 'analyze-input.md'),
+  path.join(root, 'request-vocabulary.md'),
   path.join(root, 'analyze-input.schema.json'),
   path.join(root, 'validate-analyze-input.mjs'),
   ...walk(path.join(root, 'skills')),

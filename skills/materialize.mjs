@@ -6,7 +6,11 @@ const root = path.dirname(fileURLToPath(import.meta.url));
 const e = (when, target, label) => ({ when, target, ...(label ? { label } : {}) });
 const op = (ref, on) => ({ kind: 'operator', ref, on });
 const choice = (on) => ({ kind: 'choice', on });
-const wait = (prompt, approve, reject, on) => ({ kind: 'wait', approval: { prompt, approve, reject }, on });
+const wait = (prompt, approve, reject, on) => ({
+  kind: 'wait',
+  approval: { prompt, approve, reject, bypassTarget: on[0].target },
+  on
+});
 const terminal = (result) => ({ kind: 'terminal', result });
 const decided = (routes) => Object.entries(routes).map(([decision, target]) => e({ decision }, target, decision));
 const qualityEdges = (pass) => decided({ pass, 'in-boundary': 'implement', 'boundary-drift': 'boundary-plan', 'external-blocker': 'blocked' });
@@ -97,7 +101,8 @@ const backendStates = {
   'boundary-plan': op('architecture/boundary-plan', decided({ ready: 'boundary-challenge' })),
   'boundary-challenge': op('architecture/boundary-challenge', decided({ clean: 'boundary-approval', revise: 'boundary-plan', blocked: 'blocked' })),
   'boundary-approval': wait('Approve the exact backend plan hash and file boundary.', 'OK BACKEND <hash>', 'REJECT BACKEND <hash>', [e({ stage: 'architecture.boundary.review', status: 'approved' }, 'coding-scope'), e({ stage: 'architecture.boundary.review', status: 'rejected' }, 'boundary-plan')]),
-  'coding-scope': op('be/coding-scope-freeze', decided({ ready: 'implement', 'source-drift': 'boundary-plan', 'boundary-drift': 'boundary-plan', blocked: 'blocked' })),
+  'coding-scope': op('be/coding-scope-freeze', decided({ ready: 'coding-preflight', 'source-drift': 'boundary-plan', 'boundary-drift': 'boundary-plan', blocked: 'blocked' })),
+  'coding-preflight': op('quality/coding-preflight', decided({ ready: 'implement', 'reference-gap': 'boundary-plan', blocked: 'blocked' })),
   implement: op('be/implementation', decided({ ready: 'format', 'source-drift': 'boundary-plan', 'boundary-drift': 'boundary-plan', blocked: 'blocked' })),
   format: op('quality/format', qualityEdges('lint')), lint: op('quality/lint', qualityEdges('typecheck')),
   typecheck: op('quality/typecheck', qualityEdges('build')), build: op('quality/build', qualityEdges('unit')),
@@ -117,7 +122,8 @@ const backendRepairStates = {
   'business-approval': wait('Approve regenerated business authority before resuming the backend repair.', 'OK BUSINESS <hash>', 'REJECT BUSINESS <hash>', [e({ stage: 'business.model.review', status: 'approved' }, 'business-publish'), e({ stage: 'business.model.review', status: 'rejected' }, 'business-evidence')]),
   'business-publish': op('business/publish', decided({ 'direct-plan': 'business-staleness', 'architecture-required': 'business-staleness', blocked: 'blocked' })),
   'repair-prerequisites': op('be/repair-prerequisite-check', decided({ ready: 'coding-scope', 'route-required': 'route', 'business-refresh-required': 'business-staleness', 'replan-required': 'replan-handoff', blocked: 'blocked' })),
-  'coding-scope': op('be/coding-scope-freeze', decided({ ready: 'implement', 'source-drift': 'replan-handoff', 'boundary-drift': 'replan-handoff', blocked: 'blocked' })),
+  'coding-scope': op('be/coding-scope-freeze', decided({ ready: 'coding-preflight', 'source-drift': 'replan-handoff', 'boundary-drift': 'replan-handoff', blocked: 'blocked' })),
+  'coding-preflight': op('quality/coding-preflight', decided({ ready: 'implement', 'reference-gap': 'replan-handoff', blocked: 'blocked' })),
   implement: op('be/implementation', decided({ ready: 'format', 'source-drift': 'replan-handoff', 'boundary-drift': 'replan-handoff', blocked: 'blocked' })),
   format: op('quality/format', repairQualityEdges('lint')), lint: op('quality/lint', repairQualityEdges('typecheck')),
   typecheck: op('quality/typecheck', repairQualityEdges('build')), build: op('quality/build', repairQualityEdges('unit')),
@@ -154,7 +160,8 @@ const frontendStates = {
   grammar: op('fe/grammar-convergence', [e({ stage: 'source-fit.resolve', status: 'ready' }, 'request-choice'), e({ stage: 'source-fit.resolve', status: 'blocked' }, 'blocked')]),
   'request-choice': choice([e({ allFacts: ['grammar-gap'] }, 'requests'), e({ allFacts: ['create-required'], noneFacts: ['grammar-gap'] }, 'requests'), e({ noneFacts: ['grammar-gap', 'create-required'] }, 'coding-scope')]),
   requests: op('fe/request-emission', [e({ stage: 'request.result', status: 'ready' }, 'coding-scope'), e({ stage: 'request.result', status: 'blocked' }, 'blocked')]),
-  'coding-scope': op('fe/coding-scope-freeze', [e({ stage: 'code.implement', status: 'ready' }, 'implementation'), e({ stage: 'code.result', status: 'blocked' }, 'blocked')]),
+  'coding-scope': op('fe/coding-scope-freeze', [e({ stage: 'code.implement', status: 'ready' }, 'coding-preflight'), e({ stage: 'code.result', status: 'blocked' }, 'blocked')]),
+  'coding-preflight': op('quality/coding-preflight', decided({ ready: 'implementation', 'reference-gap': 'blocked', blocked: 'blocked' })),
   implementation: op('fe/implementation', [e({ stage: 'seed.materialize', status: 'ready' }, 'seed'), e({ stage: 'code.result', status: 'blocked' }, 'blocked')]),
   seed: op('fe/product-seed', [e({ stage: 'test.unit', status: 'ready' }, 'unit-test'), e({ stage: 'seed.result', status: 'blocked' }, 'blocked')]),
   'unit-test': op('test/unit', [e({ stage: 'test.e2e', status: 'ready' }, 'e2e-test'), e({ stage: 'code.repair', status: 'repair' }, 'implementation'), e({ stage: 'test.review', status: 'blocked' }, 'blocked')]),
@@ -281,7 +288,8 @@ const missionBackendStates = (resumeTarget) => ({
     e({ stage: 'architecture.boundary.review', status: 'approved' }, 'ship-coding-scope'),
     e({ stage: 'architecture.boundary.review', status: 'rejected' }, 'ship-boundary-plan')
   ]),
-  'ship-coding-scope': op('be/coding-scope-freeze', decided({ ready: 'ship-implement', 'source-drift': 'ship-boundary-plan', 'boundary-drift': 'ship-boundary-plan', blocked: 'blocked' })),
+  'ship-coding-scope': op('be/coding-scope-freeze', decided({ ready: 'ship-coding-preflight', 'source-drift': 'ship-boundary-plan', 'boundary-drift': 'ship-boundary-plan', blocked: 'blocked' })),
+  'ship-coding-preflight': op('quality/coding-preflight', decided({ ready: 'ship-implement', 'reference-gap': 'ship-boundary-plan', blocked: 'blocked' })),
   'ship-implement': op('be/implementation', decided({ ready: 'ship-format', 'source-drift': 'ship-boundary-plan', 'boundary-drift': 'ship-boundary-plan', blocked: 'blocked' })),
   'ship-format': op('quality/format', missionQualityEdges('ship-lint')),
   'ship-lint': op('quality/lint', missionQualityEdges('ship-typecheck')),
@@ -14487,8 +14495,29 @@ const flows = [
     "id": "frontend-implementation",
     "display": "StarCi Frontend Implementation",
     "short": "Implement one frozen frontend contract",
-    "entry": "implement",
+    "entry": "preflight",
     "states": {
+      "preflight": {
+        "kind": "operator",
+        "ref": "quality/coding-preflight",
+        "on": [
+          {
+            "when": { "decision": "ready" },
+            "target": "implement",
+            "label": "ready"
+          },
+          {
+            "when": { "decision": "reference-gap" },
+            "target": "handoff",
+            "label": "reference-gap"
+          },
+          {
+            "when": { "decision": "blocked" },
+            "target": "blocked",
+            "label": "blocked"
+          }
+        ]
+      },
       "implement": {
         "kind": "operator",
         "ref": "fe/design-implementation",
@@ -15467,6 +15496,124 @@ const flows = [
     ]
   },
   {
+    "id": "coding-preflight",
+    "display": "StarCi Coding Preflight",
+    "short": "Bind templates and static contracts before coding",
+    "entry": "preflight",
+    "states": {
+      "preflight": {
+        "kind": "operator",
+        "ref": "quality/coding-preflight",
+        "on": [
+          {
+            "when": { "decision": "ready" },
+            "target": "complete",
+            "label": "ready"
+          },
+          {
+            "when": { "decision": "reference-gap" },
+            "target": "handoff",
+            "label": "reference-gap"
+          },
+          {
+            "when": { "decision": "blocked" },
+            "target": "blocked",
+            "label": "blocked"
+          }
+        ]
+      },
+      "complete": { "kind": "terminal", "result": "complete" },
+      "handoff": { "kind": "terminal", "result": "handoff" },
+      "blocked": { "kind": "terminal", "result": "blocked" }
+    },
+    "options": {},
+    "description": "Bind the nearest implementation template, applicable ESLint rules, TypeScript contracts, and a bounded lint/typecheck/Sonar plan that activates before commit or by explicit standalone request. Do not run static gates or mutate source.",
+    "checks": [
+      "Require one frozen exact source boundary.",
+      "Read the nearest maintained implementation reference before coding.",
+      "Read applicable ESLint and TypeScript contracts, then defer static gates until a commit request or explicit standalone gate request."
+    ],
+    "contextMatrix": [
+      [
+        "coding preflight",
+        "exact target hashes, nearest declared templates, governing ESLint rules and TypeScript contracts",
+        "whole-repository scans, unrelated references and product-source mutation"
+      ],
+      [
+        "commit-triggered quality plan",
+        "exact lint, typecheck and Sonar commands, commit or explicit activation, dependency order, parallel eligibility and time budgets",
+        "running gates during ordinary coding, unbounded waits, hidden check suppression and quality-gate weakening"
+      ]
+    ]
+  },
+  {
+    "id": "static-quality-gates",
+    "display": "StarCi Static Quality Gates",
+    "short": "Run lint, typecheck and Sonar before commit",
+    "entry": "lint",
+    "states": {
+      "lint": {
+        "kind": "operator",
+        "ref": "quality/lint",
+        "on": [
+          { "when": { "decision": "pass" }, "target": "typecheck", "label": "pass" },
+          { "when": { "decision": "in-boundary" }, "target": "handoff", "label": "in-boundary" },
+          { "when": { "decision": "boundary-drift" }, "target": "handoff", "label": "boundary-drift" },
+          { "when": { "decision": "external-blocker" }, "target": "blocked", "label": "external-blocker" }
+        ]
+      },
+      "typecheck": {
+        "kind": "operator",
+        "ref": "quality/typecheck",
+        "on": [
+          { "when": { "decision": "pass" }, "target": "sonar", "label": "pass" },
+          { "when": { "decision": "in-boundary" }, "target": "handoff", "label": "in-boundary" },
+          { "when": { "decision": "boundary-drift" }, "target": "handoff", "label": "boundary-drift" },
+          { "when": { "decision": "external-blocker" }, "target": "blocked", "label": "external-blocker" }
+        ]
+      },
+      "sonar": {
+        "kind": "operator",
+        "ref": "quality/sonar",
+        "on": [
+          { "when": { "decision": "pass" }, "target": "complete", "label": "pass" },
+          { "when": { "decision": "in-boundary" }, "target": "handoff", "label": "in-boundary" },
+          { "when": { "decision": "boundary-drift" }, "target": "handoff", "label": "boundary-drift" },
+          { "when": { "decision": "external-blocker" }, "target": "blocked", "label": "external-blocker" }
+        ]
+      },
+      "complete": { "kind": "terminal", "result": "complete" },
+      "handoff": { "kind": "terminal", "result": "handoff" },
+      "blocked": { "kind": "terminal", "result": "blocked" }
+    },
+    "options": {
+      "trigger": {
+        "enum": ["commit", "explicit"],
+        "description": "Record whether the gates were activated by a commit request or a standalone gate request."
+      }
+    },
+    "inputBoundary": "The trigger is evidence for activation only; both values execute the same fixed lint, typecheck and Sonar flow.",
+    "description": "Run lint, TypeScript typecheck and Sonar for one exact source revision automatically before commit or when explicitly requested as a standalone gate. Do not mutate or commit source.",
+    "checks": [
+      "Require one verified checkout, exact source revision and pinned commands before execution.",
+      "Activate automatically for a commit request, or directly for an explicit lint/typecheck/Sonar gate request.",
+      "Allow independent read-only preparation in parallel, but serialize Sonar after its required coverage artifact.",
+      "Block the commit on any non-green gate and hand repair findings back without mutating source."
+    ],
+    "contextMatrix": [
+      [
+        "gate binding",
+        "verified route, exact source revision, pinned commands, toolchain and timeout identities",
+        "business bodies, broad repository scans and unrelated source"
+      ],
+      [
+        "gate execution",
+        "structured lint, typecheck, coverage and Sonar evidence for the exact revision",
+        "source mutation, hidden suppression, commit creation and unbounded retries"
+      ]
+    ]
+  },
+  {
     "id": "backend-implementation",
     "display": "StarCi Backend Implementation",
     "short": "Implement one approved backend contract",
@@ -15480,7 +15627,7 @@ const flows = [
             "when": {
               "decision": "ready"
             },
-            "target": "implement",
+            "target": "preflight",
             "label": "ready"
           },
           {
@@ -15501,6 +15648,27 @@ const flows = [
             "when": {
               "decision": "blocked"
             },
+            "target": "blocked",
+            "label": "blocked"
+          }
+        ]
+      },
+      "preflight": {
+        "kind": "operator",
+        "ref": "quality/coding-preflight",
+        "on": [
+          {
+            "when": { "decision": "ready" },
+            "target": "implement",
+            "label": "ready"
+          },
+          {
+            "when": { "decision": "reference-gap" },
+            "target": "replan-handoff",
+            "label": "reference-gap"
+          },
+          {
+            "when": { "decision": "blocked" },
             "target": "blocked",
             "label": "blocked"
           }
@@ -15700,6 +15868,9 @@ const flows = [
 
 for (const flow of flows) {
   flow.id = `starci-${flow.id}`;
+  for (const state of Object.values(flow.states ?? {})) {
+    if (state.kind === 'wait') state.approval.bypassTarget = state.on[0].target;
+  }
   const businessEvidenceState = Object.entries(flow.states ?? {}).find(([, state]) => state.ref === 'business/evidence')?.[0] ?? 'blocked';
   for (const state of Object.values(flow.states ?? {})) {
     if (state.ref !== 'business/model') continue;
@@ -15726,7 +15897,7 @@ const yamlString = (value) => JSON.stringify(value);
 
 writeJson(path.join(root, 'catalog.json'), {
   schemaVersion: 6,
-  systemVersion: '6.1.1',
+  systemVersion: '6.2.0',
   skills: flows.map(({ id, description }) => ({
     id,
     capability: id.replace(/^starci-/, '').replaceAll('-', '.'),
@@ -15744,6 +15915,7 @@ writeJson(path.resolve(root, '..', 'analyze-input.schema.json'), {
     analyzerVersion: { const: 1 },
     skillId: { enum: flows.map(({ id }) => id) },
     confidence: { enum: ['exact', 'clarified'] },
+    mode: { enum: ['gated', 'bypass'] },
     activeInputRefs: { type: 'array', maxItems: 8, uniqueItems: true, items: { type: 'string', minLength: 3, maxLength: 512, pattern: '^(?![^:]+:(?:\\/\\/)?(?:entire-repository|whole-repository|all-history|all-source|\\*)$)[a-z][a-z0-9+.-]*:[^\\s]+$' } },
     passiveContextRefs: { type: 'array', maxItems: 8, uniqueItems: true, items: { type: 'string', minLength: 3, maxLength: 512, pattern: '^(?![^:]+:(?:\\/\\/)?(?:entire-repository|whole-repository|all-history|all-source|\\*)$)[a-z][a-z0-9+.-]*:[^\\s]+$' } }
   }
@@ -15760,6 +15932,11 @@ for (const flow of flows) {
       const rule = inputSchema.properties.selection.properties[key];
       Object.assign(rule, { maxItems: 8, uniqueItems: true, items: { ...boundedReference } });
     }
+    inputSchema.properties.selection.properties.mode = { enum: ['gated', 'bypass'] };
+    for (const state of Object.values(machine.states)) {
+      if (state.kind === 'wait') state.approval.bypassTarget = state.on[0].target;
+    }
+    writeJson(path.join(directory, 'machine.json'), machine);
     const writeRoots = inputSchema.properties.scope.properties?.writeRoots;
     if (writeRoots) {
       writeRoots.maxItems ??= 32;
@@ -15827,7 +16004,7 @@ for (const flow of flows) {
   const reference = { type: 'string', minLength: 3, maxLength: 512, pattern: '^(?![^:]+:(?:\\/\\/)?(?:entire-repository|whole-repository|all-history|all-source|\\*)$)[a-z][a-z0-9+.-]*:[^\\s]+$' };
   const receiptReference = { type: 'string', minLength: 3, maxLength: 512, pattern: '^(?:receipt:sha256:[0-9a-f]{64}|session://tasks/[A-Za-z0-9._-]+/.+)$' };
   const referenceArray = (maxItems, minItems = 0) => ({ type: 'array', minItems, maxItems, uniqueItems: true, items: { ...reference } });
-  const selectionSchema = { type: 'object', additionalProperties: false, required: ['analyzerVersion', 'skillId', 'confidence', 'activeInputRefs', 'passiveContextRefs'], properties: { analyzerVersion: { const: 1 }, skillId: { const: flow.id }, confidence: { enum: ['exact', 'clarified'] }, activeInputRefs: referenceArray(8, 1), passiveContextRefs: referenceArray(8) } };
+  const selectionSchema = { type: 'object', additionalProperties: false, required: ['analyzerVersion', 'skillId', 'confidence', 'activeInputRefs', 'passiveContextRefs'], properties: { analyzerVersion: { const: 1 }, skillId: { const: flow.id }, confidence: { enum: ['exact', 'clarified'] }, mode: { enum: ['gated', 'bypass'] }, activeInputRefs: referenceArray(8, 1), passiveContextRefs: referenceArray(8) } };
   const inputSchema = { $schema: 'https://json-schema.org/draft/2020-12/schema', $id: `https://starci.dev/v6/skills/${flow.id}/input.schema.json`, type: 'object', additionalProperties: false, required: ['schemaVersion', 'runId', 'project', 'selection', 'requestRef', 'artifactRefs', 'evidenceRefs', 'scope', 'options'], allOf: [{ if: { properties: { scope: { properties: { externalMutation: { const: true } }, required: ['externalMutation'] } }, required: ['scope'] }, then: { properties: { scope: { properties: { approvalRef: { ...receiptReference } } } } } }], properties: { schemaVersion: { const: 6 }, runId: { type: 'string', minLength: 1, maxLength: 128 }, project: { type: 'string', pattern: '^[a-z0-9][a-z0-9-]*$', maxLength: 80 }, selection: selectionSchema, requestRef: { ...reference }, artifactRefs: referenceArray(64), evidenceRefs: referenceArray(64), scope: { type: 'object', additionalProperties: false, required: ['targetRefs', 'writeRoots', 'externalMutation', 'approvalRef'], properties: { targetRefs: referenceArray(64, 1), writeRoots: { type: 'array', maxItems: 32, uniqueItems: true, items: { type: 'string', minLength: 1, maxLength: 512, pattern: '^(?![\\/]|[A-Za-z]:[\\/])(?!.*(?:^|[\\/])\\.\\.(?:[\\/]|$)).+$' } }, externalMutation: { type: 'boolean' }, approvalRef: { anyOf: [{ ...receiptReference }, { type: 'null' }] } } }, options: { type: 'object', additionalProperties: false, required: Object.keys(optionProperties), properties: optionProperties } } };
   const terminalEntries = Object.entries(states).filter(([, state]) => state.kind === 'terminal');
   const terminalResults = [...new Set(terminalEntries.map(([, state]) => state.result))];
@@ -15844,8 +16021,8 @@ for (const flow of flows) {
   writeFileSync(path.join(directory, 'analyze-input.md'), `# Analyze ${flow.id} input\n\nGlobal \`@selection\` has already selected this one-flow skill from prompt intent. Before any operator or Qdrant retrieval, validate the invocation and verify \`selection.skillId\` equals \`${flow.id}\`. Then perform these local checks:\n\n${checks}\n\nReject stale or missing authority/evidence, an ambiguous target, a write root outside scope, external mutation without approval, or an option outside the closed schema. Do not reconsider other skills here; return to global analysis if selection is wrong.\n\nThe fixed first state is \`${flow.entry}\`. Emit only normalized scope and facts as task-session data; do not choose a second mode or copy operator knowledge into context.\n\n## Options\n\n| Option | Values | Decision effect |\n| --- | --- | --- |\n${optionRows}\n`);
   writeFileSync(path.join(directory, 'input.md'), `# ${flow.id} input\n\nProvide one closed invocation validated by \`input.schema.json\`. The required \`selection\` object is the ephemeral output of global \`/analyze-input.md\`; it selects this skill directly. ${flow.inputBoundary ?? 'This package owns one fixed-entry flow and accepts no secondary mode.'}\n`);
   writeFileSync(path.join(directory, 'output.md'), `# ${flow.id} output\n\nReturn one terminal result bound to an exact machine terminal through \`state.status\`, \`state.code\`, and \`state.terminalState\`. Return only immutable receipt references and bounded evidence-linked findings. Set \`handoffRef\` to the validated session handoff artifact only for a handoff result; otherwise set it to \`null\`. \`cleanup\` always purges task-session scratch at the skill terminal.\n`);
-  writeFileSync(path.join(directory, 'execute.md'), `# Execute ${flow.id}\n\n1. Accept only a validated global \`selection\` for this skill, validate the complete input, run local \`analyze-input\`, then enter fixed state \`${flow.entry}\`.\n2. Load only the current state's operator contract. That operator alone retrieves its declared Qdrant knowledge.\n3. Validate operator input, execute it, validate output, then route through exactly one matching edge.\n4. Keep selection, operator data, context, observations, plans and receipts in task-session memory only. On a loop, compare the prior fingerprint, reuse approved identities and reload only the re-entered operator. Block repeated no-progress fingerprints.\n5. Wait states stop before irreversible work and accept only the displayed revision or command.${waitReviewRule ? ` ${waitReviewRule}` : ''}\n6. At every terminal, validate the result, return it, and purge all task-session intermediates. Preserve only approved product-source or external mutations.\n\n## CONTEXT BY STATE\n\n| State or phase | Allowed | Forbidden |\n| --- | --- | --- |\n${contextRows}\n`);
-  writeFileSync(path.join(directory, 'SKILL.md'), `---\nname: ${flow.id}\ndescription: ${JSON.stringify(flow.description)}\n---\n\n# ${flow.id}\n\n${flow.description}\n\n## INPUT ANALYSIS\n\nRequire the ephemeral global selection, read \`input.md\`, validate \`input.schema.json\`, then follow local \`analyze-input.md\`. This skill owns one flow with fixed first state \`${flow.entry}\`; local analysis only validates and normalizes scope without loading operator knowledge.\n\n## STATE MACHINE\n\nExecute \`machine.json\` through \`execute.md\`. Branches and loops are machine-owned; operators never invoke one another.${waitReviewRule ? ` ${waitReviewRule}` : ''} Stop at waits for the exact displayed revision and finish only at a terminal. Purge all intermediates at every terminal while preserving approved durable mutations.\n\n## CONTEXT CONTRACT\n\n| State or phase | Allowed | Forbidden |\n| --- | --- | --- |\n${contextRows}\n`);
+  writeFileSync(path.join(directory, 'execute.md'), `# Execute ${flow.id}\n\n1. Accept only a validated global \`selection\` for this skill, validate the complete input, run local \`analyze-input\`, then enter fixed state \`${flow.entry}\`. Treat an omitted \`selection.mode\` as \`gated\`.\n2. Load only the current state's operator contract. That operator alone retrieves its declared Qdrant knowledge.\n3. Validate operator input, execute it, validate output, then route through exactly one matching edge.\n4. Keep selection, operator data, context, observations, plans and receipts in task-session memory only. On a loop, compare the prior fingerprint, reuse approved identities and reload only the re-entered operator. Block repeated no-progress fingerprints.\n5. In \`gated\` mode, wait states stop before irreversible work and accept only the displayed revision or command. In \`bypass\` mode, do not pause: bind the currently displayed revision to an ephemeral bypass-authorization receipt and continue only to \`approval.bypassTarget\`; never describe that receipt as human approval.${waitReviewRule ? ` ${waitReviewRule}` : ''}\n6. At every terminal, validate the result, return it, and purge all task-session intermediates. Preserve only authorized product-source or external mutations.\n\n## CONTEXT BY STATE\n\n| State or phase | Allowed | Forbidden |\n| --- | --- | --- |\n${contextRows}\n`);
+  writeFileSync(path.join(directory, 'SKILL.md'), `---\nname: ${flow.id}\ndescription: ${JSON.stringify(flow.description)}\n---\n\n# ${flow.id}\n\n${flow.description}\n\n## INPUT ANALYSIS\n\nRequire the ephemeral global selection, read \`input.md\`, validate \`input.schema.json\`, then follow local \`analyze-input.md\`. This skill owns one flow with fixed first state \`${flow.entry}\`; local analysis only validates and normalizes scope without loading operator knowledge.\n\n## STATE MACHINE\n\nExecute \`machine.json\` through \`execute.md\`. Branches and loops are machine-owned; operators never invoke one another.${waitReviewRule ? ` ${waitReviewRule}` : ''} An omitted \`selection.mode\` is \`gated\`: stop at waits for the exact displayed revision. With explicit \`selection.mode=bypass\`, bind the displayed revision to an ephemeral bypass-authorization receipt and continue only to the wait state's declared \`approval.bypassTarget\`. Finish only at a terminal and purge all intermediates while preserving authorized durable mutations.\n\n## CONTEXT CONTRACT\n\n| State or phase | Allowed | Forbidden |\n| --- | --- | --- |\n${contextRows}\n`);
   writeFileSync(path.join(agentDirectory, 'openai.yaml'), `interface:\n  display_name: ${yamlString(flow.display)}\n  short_description: ${yamlString(flow.short)}\n  default_prompt: ${yamlString(`Use $${flow.id} for this selected flow and execute its state machine.`)}\npolicy:\n  allow_implicit_invocation: true\n`);
   writeFileSync(path.join(directory, 'validate-input.mjs'), `import { validatorFor, runValidatorCli } from '../../operators/validation.mjs';\nexport const validateInput=validatorFor(new URL('./input.schema.json',import.meta.url));\nif(process.argv[1]?.endsWith('validate-input.mjs')) await runValidatorCli(validateInput,'node validate-input.mjs <artifact.json>');\n`);
   writeFileSync(path.join(directory, 'validate-output.mjs'), `import { validatorFor, runValidatorCli } from '../../operators/validation.mjs';\nexport const validateOutput=validatorFor(new URL('./output.schema.json',import.meta.url),(value)=>{const errors=[];if(value.result==='complete'&&value.receiptRefs.length===0)errors.push('$.receiptRefs: completion requires evidence');if(value.finalState!==value.state.terminalState)errors.push('$.state.terminalState: must equal finalState');if(value.result==='handoff'&&!value.handoffRef)errors.push('$.handoffRef: handoff requires a typed session artifact');if(value.result!=='handoff'&&value.handoffRef!==null)errors.push('$.handoffRef: only handoff may expose a handoff artifact');for(const finding of value.findings)if(finding.severity==='error'&&finding.evidenceRefs.length===0)errors.push('$.findings: error findings require evidence');return errors});\nif(process.argv[1]?.endsWith('validate-output.mjs')) await runValidatorCli(validateOutput,'node validate-output.mjs <artifact.json>');\n`);

@@ -19,7 +19,8 @@
       "approval": {
         "prompt": "Approve one exact measured finding and repair boundary.",
         "approve": "OK REPAIR <finding>",
-        "reject": "REJECT REPAIR <finding>"
+        "reject": "REJECT REPAIR <finding>",
+        "bypassTarget": "repair"
       },
       "on": [
         {

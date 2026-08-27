@@ -1,12 +1,12 @@
 {
   "schemaVersion": 1,
   "summary": {
-    "operatorCount": 124,
-    "caseCount": 496,
-    "pass": 444,
+    "operatorCount": 125,
+    "caseCount": 500,
+    "pass": 447,
     "warning": 0,
-    "fail": 52,
-    "operatorsWithFailures": 30
+    "fail": 53,
+    "operatorsWithFailures": 31
   },
   "operators": [
     {
@@ -5538,7 +5538,7 @@
         {
           "id": "execute-context-discipline",
           "verdict": "pass",
-          "evidence": "3 steps; missing markers: none; vague catch-all: false; unconstrained refs=7; unbounded arrays=11"
+          "evidence": "3 steps; missing markers: none; vague catch-all: false; unconstrained refs=7; unbounded arrays=12"
         }
       ],
       "summary": {
@@ -5563,7 +5563,7 @@
         "output": {
           "objects": 10,
           "openObjects": [],
-          "arrays": 13,
+          "arrays": 14,
           "unboundedArrays": [
             "$.facts",
             "$.payload.state.emits.factsAdd",
@@ -5574,7 +5574,8 @@
             "$.payload.evidenceRefs",
             "$.payload.findings",
             "$.payload.artifact.directions[].tradeoffs",
-            "$.payload.artifact.directions[].materialDifferenceRefs"
+            "$.payload.artifact.directions[].materialDifferenceRefs",
+            "$.payload.artifact.comparisonAxes"
           ],
           "unconstrainedRefs": [
             "$.payload.produced.artifactRefs",
@@ -6362,6 +6363,72 @@
             "$.facts",
             "$.payload.state.emits.factsAdd",
             "$.payload.produced.durableWrites",
+            "$.payload.context.used",
+            "$.payload.cleanup.scratchRefs",
+            "$.payload.evidenceRefs",
+            "$.payload.findings"
+          ],
+          "unconstrainedRefs": [
+            "$.payload.context.used[].ref"
+          ],
+          "broadFields": []
+        }
+      }
+    },
+    {
+      "id": "quality/coding-preflight",
+      "cases": [
+        {
+          "id": "input-isolation",
+          "verdict": "pass",
+          "evidence": "closed envelope + provided/loads/session + terminal retention; broad fields=0"
+        },
+        {
+          "id": "output-isolation",
+          "verdict": "pass",
+          "evidence": "closed typed output + validator rejection + terminal cleanup"
+        },
+        {
+          "id": "decision-state-route-correlation",
+          "verdict": "fail",
+          "evidence": "outcomes without deterministic decision/state/route binding: ready, reference-gap, blocked"
+        },
+        {
+          "id": "execute-context-discipline",
+          "verdict": "pass",
+          "evidence": "4 steps; missing markers: none; vague catch-all: false; unconstrained refs=1; unbounded arrays=7"
+        }
+      ],
+      "summary": {
+        "pass": 3,
+        "warning": 0,
+        "fail": 1
+      },
+      "metrics": {
+        "input": {
+          "objects": 8,
+          "openObjects": [],
+          "arrays": 4,
+          "unboundedArrays": [
+            "$.facts"
+          ],
+          "unconstrainedRefs": [],
+          "broadFields": []
+        },
+        "output": {
+          "objects": 14,
+          "openObjects": [
+            "$.allOf[0].oneOf[0]",
+            "$.allOf[0].oneOf[0].payload",
+            "$.allOf[0].oneOf[1]",
+            "$.allOf[0].oneOf[1].payload",
+            "$.allOf[0].oneOf[2]",
+            "$.allOf[0].oneOf[2].payload"
+          ],
+          "arrays": 8,
+          "unboundedArrays": [
+            "$.facts",
+            "$.payload.state.emits.factsAdd",
             "$.payload.context.used",
             "$.payload.cleanup.scratchRefs",
             "$.payload.evidenceRefs",

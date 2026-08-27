@@ -29,12 +29,30 @@ upward from the target checkout.
 
 The invariant is `project + role -> portable route -> hydrated local route -> verified checkout`. Similar directory names, a nearby clone, the Source root and the current working directory are never routing evidence. For example, a request for a project's `fe` role must resolve that project's `fe.json`; a sibling repository with the project name is not a substitute.
 
+## Shared product runtime coordination
+
+Product-runtime processes and stateful dependencies are machine-local shared state scoped to the
+verified checkout. A task does not own them merely because it needs runtime proof.
+
+Before any product-runtime start, restart or stop, inventory the existing listeners, exact process
+command lines, working directories and owning task/session receipt when one exists. Reuse one healthy
+listener or watch process for the verified checkout; source changes must flow through that existing
+watcher. Changes under `.claude` never require a product-runtime restart.
+
+Only stop or restart a process tree created by the current task. Mutating an existing shared process
+requires exact user approval naming that runtime or coordination with its recorded owner. When tasks
+share one database or ORM connection boundary, they must not run competing lifecycle or migration
+commands. One coordinator owns the mutation and the other tasks consume its resulting health receipt.
+
+`EADDRINUSE` is a coordination failure, not permission to kill the listener or launch another competing
+process. Diagnose the existing owner and reuse or coordinate it; never restart merely to obtain proof.
+
 ## Runtime route
 
 ```text
 request
   -> resolve project + role route when the request names source
-  -> analyze-input.md
+  -> analyze-input.md + task-scoped approval mode
   -> skills/catalog.json metadata
   -> skills/<starci-skill>/SKILL.md
   -> validate-input.mjs
@@ -47,7 +65,8 @@ request
 
 ## Load order
 
-1. Read root `analyze-input.md`; inspect only the active request, the exact workspace route needed by that request and `skills/catalog.json` metadata.
+1. Read root `analyze-input.md` and its small `request-vocabulary.md`; inspect only the active request,
+   the exact workspace route needed by that request and `skills/catalog.json` metadata.
 2. When the request names a project and role for any Git or source action, resolve and verify that exact route before selecting a skill or continuing without one.
 3. Emit and validate exactly one ephemeral skill selection. For multi-capability work, select only the earliest missing capability. If selection is ambiguous, clarify before loading any skill.
 4. Read only the selected `skills/<id>/SKILL.md`.
@@ -56,7 +75,7 @@ request
 7. Execute only the operator named by the current state in `machine.json`.
 8. For that operator, read `execute.md`; retrieve only its declared `knowledgeRefs` from Qdrant.
 9. Validate every operator result before routing on `decision`, `stage`, or `status`.
-10. Stop at waits and terminal states. Follow declared loops; do not invent implicit transitions.
+10. In default `gated` mode, stop at waits and terminal states. With explicit task-scoped `mode=bypass`, a wait binds the currently displayed revision to an ephemeral bypass-authorization receipt and follows only its declared `approval.bypassTarget`; still stop at terminals. Follow declared loops and never invent implicit transitions.
 11. At a handoff terminal, resolve only the validated `handoffRef`. Sequential handoffs advance the objective; side branches must declare a resume capability. Acknowledge consumed artifacts before terminal cleanup.
 
 ## Authority
@@ -64,10 +83,12 @@ request
 | Path | Owns |
 | --- | --- |
 | `analyze-input.md` | Global natural-language intent analysis and one-skill selection |
+| `request-vocabulary.md` | Global multilingual request vocabulary, scope-unit normalization and material-ambiguity clarification rules |
 | `<Source>/.workspaces/projects/` | Portable project-and-role route authority |
 | `<Source>/.workspaces/local/routes/` | Derived machine-local route state; never portable authority |
 | `skills/catalog.json` | Cheap pre-load skill metadata generated from the skill source |
 | `skills/` | User-facing capability contracts and state-machine composition |
+| `skills/route-machine.mjs` | Machine routing plus the task-scoped `gated` / `bypass` wait policy |
 | `operators/` | Atomic, single-responsibility execution contracts |
 | `orchestration/` | Provider-neutral execution modes and provider model mappings |
 | `knowledge/` | Durable operator knowledge retrieved lazily through Qdrant |
@@ -75,7 +96,7 @@ request
 | `scripts/` | Repository-level validation and query entry points |
 | `readiness/initialization/workspaces/commit-policy.json` | Canonical multi-device Git boundary for portable workspace intent, local hydration, worktrees, references and master identity |
 
-Inputs and outputs are closed JSON Schema Draft 2020-12 contracts. Knowledge is advisory until an operator binds it to an evidenced decision. A skill may mutate source or external state only when its current operator and approval boundary explicitly allow that action.
+Inputs and outputs are closed JSON Schema Draft 2020-12 contracts. Knowledge is advisory until an operator binds it to an evidenced decision. A skill may mutate source or external state only when its current operator and authorization boundary explicitly allow that action. In `gated` mode that authority is an exact user approval; in explicitly selected `bypass` mode it is a task-session bypass authorization bound to the exact displayed revision. Bypass never widens scope or suppresses validation, evidence, safety, quality or blocker decisions.
 
 Operator inputs, outputs, loaded bindings, worker observations, patch plans, and receipts are ephemeral task-session objects. They are never written to a run directory and are purged when the parent skill reaches any terminal state. Only explicitly approved product-source or external mutations survive.
 

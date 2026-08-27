@@ -109,6 +109,12 @@
             "maxLength": 512,
             "pattern": "^(?![^:]+:(?:\\/\\/)?(?:entire-repository|whole-repository|all-history|all-source|\\*)$)[a-z][a-z0-9+.-]*:[^\\s]+$"
           }
+        },
+        "mode": {
+          "enum": [
+            "gated",
+            "bypass"
+          ]
         }
       }
     },

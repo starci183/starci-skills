@@ -90,7 +90,8 @@
       "approval": {
         "prompt": "Approve the displayed business model revision and lifecycle transition.",
         "approve": "OK BUSINESS <hash>",
-        "reject": "REJECT BUSINESS <hash>"
+        "reject": "REJECT BUSINESS <hash>",
+        "bypassTarget": "publish"
       },
       "on": [
         {

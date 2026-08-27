@@ -19,7 +19,8 @@
       "approval": {
         "prompt": "Approve the exact debt identity, baseline, closure criterion and bounded iteration budget.",
         "approve": "OK DEBT <hash>",
-        "reject": "REJECT DEBT <hash>"
+        "reject": "REJECT DEBT <hash>",
+        "bypassTarget": "debt"
       },
       "on": [
         {

@@ -62,7 +62,7 @@ This operator's responsibility is to compose approved journeys, pages, states, a
 **Read:** accepted result, minimal context lineage, emitted facts, and all allocated scratch references.
 **Context:** references and revisions actually used only; omit copied documents, prompts, worker transcripts, and reasoning.
 **Decision evidence:** selected decision exactly matches one manifest emit, `payload.state`, root stage/status, and facts additions/removals.
-**Action:** construct `output.schema.json`, validate it with `validate-output.mjs`, and place it at `payload.session.outputRef`. Render `payload.reviewPreview.artifactRef` through the host `visualize` capability in the same review response; only after that render may the parent display the exact layout approval command and enter its wait.
+**Action:** construct `output.schema.json`, validate it with `validate-output.mjs`, and place it at `payload.session.outputRef`. Resolve `payload.reviewPreview.artifactRef` to its absolute executor-side HTML path, generate the content reference only with `node <Source>/.claude/scripts/visualize-directive.mjs <absolute-path>`, and paste the helper's stdout unchanged into the same review response. Never handwrite or interpolate the `visualize` JSON. The helper must normalize Windows separators to `/`, reject control characters such as interpreted `\\n`, `\\r`, or `\\t`, and prove JSON round-trip safety. Stop if the helper fails or the rendered preview is not visible; only after a visible render may the parent display the exact layout approval command and enter its wait.
 **Session write:** output, evidence refs, and complete cleanup inventory.
 **Durable write:** none.
 **Stop:** do not emit an invalid or partially joined output.

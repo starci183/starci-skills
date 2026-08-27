@@ -1,5 +1,5 @@
 {
-  "version": "6.1.1",
+  "version": "6.2.0",
   "skills": [
     {
       "id": "starci-workspace-ready",
@@ -264,6 +264,18 @@
       "capability": "backend.contract.critique",
       "description": "Independently challenge one backend contract for wrong-store writes, authority drift, transaction gaps, failure handling, compatibility, and source overfitting. Do not mutate source.",
       "domain": "backend"
+    },
+    {
+      "id": "starci-coding-preflight",
+      "capability": "coding.preflight",
+      "description": "Bind the nearest implementation template, applicable ESLint rules, TypeScript contracts, and a bounded lint/typecheck/Sonar plan that activates before commit or by explicit standalone request. Do not run static gates or mutate source.",
+      "domain": "coding"
+    },
+    {
+      "id": "starci-static-quality-gates",
+      "capability": "static.quality.gates",
+      "description": "Run lint, TypeScript typecheck and Sonar for one exact source revision automatically before commit or when explicitly requested as a standalone gate. Do not mutate or commit source.",
+      "domain": "static"
     },
     {
       "id": "starci-backend-implementation",
@@ -1833,6 +1845,24 @@
       ]
     },
     {
+      "id": "quality/coding-preflight",
+      "domain": "quality",
+      "knowledgeCount": 1,
+      "accepts": [
+        "quality.coding-preflight · ready"
+      ],
+      "emits": [
+        "code.implement · ready",
+        "architecture.boundary · ready",
+        "quality.blocked · blocked"
+      ],
+      "sideEffects": [
+        "read only the exact frozen targets, nearest declared implementation references, applicable lint configuration and TypeScript configuration",
+        "emit an ephemeral preflight receipt whose static gates activate before commit or by explicit standalone request; do not mutate product source or run lint, typecheck or Sonar",
+        "purge command captures, observations and receipts at the parent-skill terminal"
+      ]
+    },
+    {
       "id": "quality/debt-repay",
       "domain": "quality",
       "knowledgeCount": 1,
@@ -2399,8 +2429,8 @@
     },
     {
       "id": "quality",
-      "operatorCount": 14,
-      "skillCount": 4
+      "operatorCount": 15,
+      "skillCount": 5
     },
     {
       "id": "be",

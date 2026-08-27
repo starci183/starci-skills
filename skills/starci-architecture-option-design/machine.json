@@ -32,7 +32,8 @@
       "approval": {
         "prompt": "Approve one architecture option and its exact option-set hash.",
         "approve": "OK ARCHITECTURE OPTION <hash>",
-        "reject": "REJECT ARCHITECTURE OPTION <hash>"
+        "reject": "REJECT ARCHITECTURE OPTION <hash>",
+        "bypassTarget": "handoff"
       },
       "on": [
         {

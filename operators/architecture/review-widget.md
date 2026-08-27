@@ -19,4 +19,4 @@ This file governs presentation only. Operator schemas, validated task-session ar
 - Do not invent architecture facts, business constraints or scores for presentation.
 - Do not use polished diagrams, consensus language or recommendation-first ordering to bury adverse evidence.
 - Keep the review task-session-only and register it as evidence and for terminal purge.
-- Normalize Windows separators to `/` in the `visualize` directive and emit the directive in the same response as the approval request.
+- Resolve the review artifact to its absolute executor-side HTML path, then generate the content reference only with `node <Source>/.claude/scripts/visualize-directive.mjs <absolute-path>` and paste stdout unchanged into the same response as the approval request. Never handwrite or interpolate the `visualize` JSON. The helper normalizes Windows separators to `/`, rejects control characters such as interpreted `\\n`, `\\r`, or `\\t`, and proves JSON round-trip safety. Stop before approval when the helper fails or the preview is not visibly rendered.

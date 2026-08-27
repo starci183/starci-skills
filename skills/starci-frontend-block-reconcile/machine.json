@@ -130,7 +130,8 @@
       "approval": {
         "prompt": "Approve the exact Block reconciliation and closed consumer boundary.",
         "approve": "OK BLOCK <hash>",
-        "reject": "REJECT BLOCK <hash>"
+        "reject": "REJECT BLOCK <hash>",
+        "bypassTarget": "mission-impact"
       },
       "on": [
         {
@@ -212,7 +213,8 @@
       "approval": {
         "prompt": "Approve regenerated business authority before mission delivery.",
         "approve": "OK BUSINESS <hash>",
-        "reject": "REJECT BUSINESS <hash>"
+        "reject": "REJECT BUSINESS <hash>",
+        "bypassTarget": "mission-business-publish"
       },
       "on": [
         {
@@ -427,7 +429,8 @@
       "approval": {
         "prompt": "Review the rendered visualize comparison, then approve the exact backend architecture required by this mission.",
         "approve": "OK ARCHITECTURE <decision>",
-        "reject": "REJECT ARCHITECTURE <decision>"
+        "reject": "REJECT ARCHITECTURE <decision>",
+        "bypassTarget": "ship-architecture-handoff"
       },
       "on": [
         {
@@ -697,7 +700,8 @@
       "approval": {
         "prompt": "Approve the exact backend plan required to complete this mission.",
         "approve": "OK BACKEND <hash>",
-        "reject": "REJECT BACKEND <hash>"
+        "reject": "REJECT BACKEND <hash>",
+        "bypassTarget": "ship-coding-scope"
       },
       "on": [
         {

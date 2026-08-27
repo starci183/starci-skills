@@ -60,6 +60,8 @@
         "starci-backend-solution-design",
         "starci-backend-contract-plan",
         "starci-backend-contract-critique",
+        "starci-coding-preflight",
+        "starci-static-quality-gates",
         "starci-backend-implementation",
         "starci-backend-proof"
       ]
@@ -68,6 +70,12 @@
       "enum": [
         "exact",
         "clarified"
+      ]
+    },
+    "mode": {
+      "enum": [
+        "gated",
+        "bypass"
       ]
     },
     "activeInputRefs": {

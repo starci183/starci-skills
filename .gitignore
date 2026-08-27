@@ -17,3 +17,5 @@ __pycache__/
 /scheduled_tasks.lock
 /docs/
 /.venv/
+/.tmp/
+/.tmp-*.json

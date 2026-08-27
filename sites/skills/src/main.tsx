@@ -189,7 +189,7 @@ function App() {
             <p className="eyebrow">A capability operating system for AI delivery</p>
             <h1>One request.<br /><span>Only the next skill loads.</span></h1>
             <p className="hero-lede">
-              StarCi v6.1 replaces giant lifecycle prompts with small, validated skills. Each skill does one job deeply,
+              StarCi v6.2 turns scoped requests into small, validated skills. Each skill does one job deeply,
               calls atomic operators, and hands the objective forward with typed state.
             </p>
             <div className="hero-actions">
@@ -364,11 +364,11 @@ function App() {
         </section>
 
         <section className="section-shell closing-section">
-          <SurfaceCard label="Release 6.1" fact="FEEDBACK-DRIVEN" state="affirmative">
+          <SurfaceCard label="Release 6.2" fact="SCOPE-AWARE" state="affirmative">
             <div className="closing-card">
               <div>
-                <h2>Use it. Challenge it. Make v6.2 complete.</h2>
-                <p>Every real-world experience is accepted as evidence. Validated findings become the upgrade path for the next release.</p>
+                <h2>Scope it. Visualize it. Prove it before commit.</h2>
+                <p>Multilingual scope normalization, visual design evidence, and bounded static gates keep each delivery on its intended branch.</p>
               </div>
               <a className="button button-primary" href="https://github.com/starci183/starci-skills/issues" target="_blank" rel="noreferrer">
                 Share feedback <ArrowRight aria-hidden="true" />

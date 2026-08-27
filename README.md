@@ -59,6 +59,8 @@ request -> global analysis -> selected skill -> operator -> validated result
 | `starci-quality-finding-repair` | Repair one approved quality finding |
 | `starci-quality-debt-repay` | Repay one declared quality-debt item |
 | `starci-rule-binding-audit` | Audit executable rule ownership and binding |
+| `starci-coding-preflight` | Bind implementation references and defer bounded static gates until commit |
+| `starci-static-quality-gates` | Run lint, typecheck, and Sonar for one exact revision |
 | `starci-deployment` | Adopt and deploy one immutable release |
 | `starci-deployment-monitor` | Monitor one existing rollout to proof |
 | `starci-deployment-recover` | Recover one observed failed rollout |
@@ -70,9 +72,9 @@ request -> global analysis -> selected skill -> operator -> validated result
 | `starci-conversation-record` | Append one redacted provenance snapshot |
 | `starci-conversation-query` | Query one bounded provenance identity |
 
-The v6.1 release contains 45 small state-machine skills and 121 atomic operators. Lifecycle-sized frontend-layout, architecture-decide, backend-delivery, and backend-repair skills were removed; requests route directly to specialized capabilities.
+The v6.2 release contains 48 small state-machine skills and 125 atomic operators. Requests are normalized against an explicit multilingual scope record, substantial UI directions require rendered evidence, and source mutation is preceded by coding preflight with commit-triggered static gates.
 
-StarCi Skills accepts feedback from every real-world v6.1 experience; validated findings will drive the completed v6.2 release.
+Approval waits remain the default. Explicit `bypass` mode binds the displayed revision to an ephemeral authorization receipt and continues only through the declared bypass target; it never masquerades as human approval.
 
 ## Install
 

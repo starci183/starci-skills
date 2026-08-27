@@ -135,7 +135,8 @@
       "approval": {
         "prompt": "Approve the exact recovery boundary.",
         "approve": "OK DEPLOY <hash>",
-        "reject": "REJECT DEPLOY <hash>"
+        "reject": "REJECT DEPLOY <hash>",
+        "bypassTarget": "recover"
       },
       "on": [
         {

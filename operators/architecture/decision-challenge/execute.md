@@ -55,7 +55,7 @@ For a `ready` decision, also build one accessible interactive HTML review of eve
 
 **Read:** accepted candidate, decision, evidence refs, lineage, and any durable-effect refs.
 **Context:** return refs and revisions only, not loaded content or worker prompts.
-**Action:** construct `output.schema.json`, align `payload.decision`, `payload.state`, root route, and emitted facts, then run `validate-output.mjs`. For `ready`, render `payload.reviewPreview.artifactRef` through the host `visualize` capability in the same review response; only after that render may the parent enter the architecture-selection wait.
+**Action:** construct `output.schema.json`, align `payload.decision`, `payload.state`, root route, and emitted facts, then run `validate-output.mjs`. For `ready`, follow `../review-widget.md`: resolve the artifact to an absolute executor-side HTML path and generate the content reference only with `.claude/scripts/visualize-directive.mjs`; never handwrite or interpolate its JSON. Render it in the same review response, stop if it is not visible, and only then allow the parent to enter the architecture-selection wait.
 **Session write:** `payload.session.outputRef`; list every scratch ref in `payload.cleanup.scratchRefs`.
 **Stop:** do not emit an invalid or partially joined result.
 **Orchestration:** coordinator validates the final output and purges all intermediate session objects when the parent skill terminates.

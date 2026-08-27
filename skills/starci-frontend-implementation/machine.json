@@ -9,8 +9,35 @@
       "on": [
         {
           "when": {},
+          "target": "preflight",
+          "label": "enter preflight"
+        }
+      ]
+    },
+    "preflight": {
+      "kind": "operator",
+      "ref": "quality/coding-preflight",
+      "on": [
+        {
+          "when": {
+            "decision": "ready"
+          },
           "target": "implement",
-          "label": "enter implement"
+          "label": "ready"
+        },
+        {
+          "when": {
+            "decision": "reference-gap"
+          },
+          "target": "handoff",
+          "label": "reference-gap"
+        },
+        {
+          "when": {
+            "decision": "blocked"
+          },
+          "target": "blocked",
+          "label": "blocked"
         }
       ]
     },
@@ -62,10 +89,6 @@
         }
       ]
     },
-    "complete": {
-      "kind": "terminal",
-      "result": "complete"
-    },
     "handoff": {
       "kind": "terminal",
       "result": "handoff"
@@ -73,6 +96,10 @@
     "blocked": {
       "kind": "terminal",
       "result": "blocked"
+    },
+    "complete": {
+      "kind": "terminal",
+      "result": "complete"
     }
   }
 }
