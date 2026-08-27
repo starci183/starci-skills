@@ -22,7 +22,7 @@ This operator evaluates the pinned Sonar quality gate. Input, output, loaded con
 
 **Read:** `payload.loads.execution` and the minimum validated refs required by that command.
 **Context:** execute the pinned command in the exact checkout on a cache miss. Do not retrieve knowledge or preload repository source into model context.
-**Action:** run once under the declared environment and capture exit code, structured diagnostics, and evidence hashes.
+**Action:** run once under the declared environment and capture exit code, structured diagnostics, and evidence hashes. For a Source-routed project, invoke `node <Source>/.claude/scripts/sonar-credential.mjs run --project <project> --role <role>` so the exact encrypted `.stacks` authority is resolved through the verified route and exposed only to the scanner child process. Never rely on ambient `SONAR_TOKEN` for local proof and never print or persist the decrypted value.
 **Session write:** `scratchPrefix/command-capture`; never write ignored gate evidence to disk.
 **Orchestration:** command execution has one coordinator owner. Independent post-run diagnostic classification may fan out read-only; the coordinator joins results deterministically.
 **Stop:** classify timeout, unavailable dependency, or environment failure as the declared external/blocking decision.
