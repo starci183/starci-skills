@@ -114,6 +114,26 @@ class OperatorKnowledgeRuntimeTests(unittest.TestCase):
         selected = [item["data"]["knowledgeId"] for item in packet["selected"]["operatorKnowledge"]]
         self.assertEqual(selected[0], "fe.grammar-core-case-trust-list-in-card")
 
+    def test_ui_authority_replaces_design_principles(self) -> None:
+        source_paths = [item.relative_path for item in discover_source_files(SOURCE_ROOT)]
+        self.assertIn(".claude/knowledge/ui.md", source_paths)
+        self.assertNotIn(".claude/knowledge/design-principles.md", source_paths)
+
+        packet = query_index(
+            self.index,
+            query_text="UI decision SUSPENSE no suspense Grammar Common selected Grammar render authority",
+            kinds=["operator-knowledge"],
+            top_k=3,
+            project=None,
+            grammar=None,
+            profile=None,
+            route=None,
+            embedding_model=None,
+        )
+        selected = [item["data"]["knowledgeId"] for item in packet["selected"]["operatorKnowledge"]]
+        self.assertEqual(selected[0], "fe.ui")
+        self.assertNotIn("fe.design-principles", selected)
+
     def test_deployment_query_selects_lifecycle_knowledge(self) -> None:
         packet = query_index(
             self.index,

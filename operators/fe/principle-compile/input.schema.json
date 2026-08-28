@@ -185,7 +185,7 @@
                 "properties": {
                   "id": {
                     "enum": [
-                      "fe.design-principles"
+                      "fe.ui"
                     ]
                   },
                   "generation": {

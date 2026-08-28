@@ -13,6 +13,11 @@ const globalAnalyzer = readFileSync(path.join(root, '..', 'analyze-input.md'), '
 assert.match(globalAnalyzer, /explicit correction or blame from real product use/);
 assert.match(globalAnalyzer, /repair it, and add or strengthen a regression check/);
 assert.match(globalAnalyzer, /only when the correction concerns UX\/UI behavior/);
+assert.match(globalAnalyzer, /frontend UAT journal write under `\.uat\/\*\*` to the verified project `fe` checkout/);
+assert.match(globalAnalyzer, /backend checkout may supply `\.v63`[\s\S]*never becomes the `\.uat` write owner/);
+assert.match(globalAnalyzer, /`<fe>\/\.uat\/accounts\.json` as a shared append-or-merge registry/);
+assert.match(globalAnalyzer, /merge only task-owned `case_id` entries[\s\S]*preserve every unrelated existing entry/);
+assert.match(globalAnalyzer, /Never replace the registry with a task-local projection/);
 
 assert.equal(enter('starci-frontend-ui-direction'), 'generate');
 assert.equal(decide('starci-frontend-ui-direction', 'generate', 'directions-ready'), 'review');

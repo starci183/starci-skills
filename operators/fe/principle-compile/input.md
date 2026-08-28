@@ -25,7 +25,7 @@ These fields are references, not copied documents. The operator must not infer s
 
 - `business`: load only the declared revision under `.worktrees/<project>/businesses/`; source code is never business authority.
 - `upstream`: resolve only the declared session references for source-fit verdicts, approved layout, and Grammar convergence.
-- `knowledge`: retrieve `fe.design-principles` from the pinned generation and content hash.
+- `knowledge`: retrieve `fe.ui` from the pinned generation and content hash.
 - `frontendSource`: query only the hash-pinned plain-JSON frontend contract snapshot at its declared generation; the snapshot and generator hashes must match and `rawRepositoryContext` is always `false`.
 - `orchestration`: resolve one provider-neutral mode and provider profile; it cannot change routing, approval, or boundaries.
 

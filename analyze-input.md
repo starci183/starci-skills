@@ -31,8 +31,10 @@ Apply this guard to every Git or source action, including an ad-hoc action for w
 4. Validate that portable declaration, then read its matching hydrated route at `<Source>/.workspaces/local/routes/<project>/<role>/config.json`.
 5. If the local route is absent or stale, run the declared workspace initialization/hydration flow before touching Git or product source.
 6. Verify the resolved checkout's directory, origin and branch against the route. Use that checkout for the action.
-7. Never substitute the Source root, current working directory, a similarly named sibling repository or a Git worktree merely because it is nearby.
-8. If project, role or route identity remains ambiguous, stop and ask one focused clarification. Do not guess.
+7. Bind every frontend UAT journal write under `.uat/**` to the verified project `fe` checkout. A Source or backend checkout may supply `.v63`, runtime, fixture or API authority, but it never becomes the `.uat` write owner.
+8. Treat `<fe>/.uat/accounts.json` as a shared append-or-merge registry: reread it immediately before every mutation, merge only task-owned `case_id` entries, preserve every unrelated existing entry, reject duplicate or conflicting `case_id` values, and verify the full union after writing. Never replace the registry with a task-local projection.
+9. Never substitute the Source root, current working directory, a similarly named sibling repository or a Git worktree merely because it is nearby.
+10. If project, role or route identity remains ambiguous, stop and ask one focused clarification. Do not guess.
 
 Keep route resolution ephemeral. It constrains the selected skill's project/scope or the no-skill action; it is not added to the skill-selection envelope and does not authorize source loading by itself.
 

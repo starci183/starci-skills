@@ -5,7 +5,7 @@
   "inputSchema": "input.schema.json",
   "outputSchema": "output.schema.json",
   "knowledgeRefs": [
-    "fe.design-principles"
+    "fe.ui"
   ],
   "sourceReferenceRefs": [],
   "accepts": [
