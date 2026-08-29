@@ -1,5 +1,6 @@
 # `fe/coding-scope-freeze` output
 
-## JSON architecture
-
-Return `frozen` with one session `codingScopeRef`, current source head, and exact path/hash/access tuples, or return `blocked`. `payload.state` is the only route. All refs and header observations are purged at skill-terminal.
+- `output.outcome`: Legacy semantic result consumed only by the Skill machine.
+- `output.result`: The atomic job result, or null when blocked.
+- `output.gaps`: Exact missing authority or evidence; empty when complete.
+- `output.evidenceRefs`: Exact evidence used to produce the result.

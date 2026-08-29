@@ -1,302 +1,62 @@
 {
-  "$id": "https://starci.dev/v6/operators/quality/finding-repair/input.schema.json",
-  "title": "quality/finding-repair operator input",
   "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://starci.dev/v7/operators/quality/finding-repair/input.schema.json",
   "type": "object",
   "additionalProperties": false,
   "required": [
     "schemaVersion",
-    "runId",
-    "stage",
-    "status",
-    "facts",
-    "payload"
-  ],
-  "allOf": [
-    {
-      "oneOf": [
-        {
-          "properties": {
-            "stage": {
-              "const": "quality.repair"
-            },
-            "status": {
-              "const": "ready"
-            }
-          },
-          "required": [
-            "stage",
-            "status"
-          ]
-        }
-      ]
-    }
+    "operatorId",
+    "context",
+    "input"
   ],
   "properties": {
     "schemaVersion": {
-      "const": 6
+      "const": 7
     },
-    "runId": {
-      "type": "string",
-      "minLength": 1
+    "operatorId": {
+      "const": "quality/finding-repair"
     },
-    "stage": {
-      "enum": [
-        "quality.repair"
-      ]
-    },
-    "status": {
-      "enum": [
-        "ready"
-      ]
-    },
-    "facts": {
-      "type": "array",
-      "uniqueItems": true,
-      "items": {
-        "type": "string",
-        "minLength": 1
-      }
-    },
-    "payload": {
+    "context": {
       "type": "object",
       "additionalProperties": false,
       "required": [
-        "provided",
-        "scope",
-        "loads",
-        "session"
+        "contextRefs",
+        "sourceRefs"
       ],
       "properties": {
-        "provided": {
-          "type": "object",
-          "additionalProperties": false,
-          "required": [
-            "approvedFindingRef",
-            "approvalReceiptRef",
-            "baselineRef",
-            "ownerBoundaryRef",
-            "proofPlanRef"
-          ],
-          "properties": {
-            "approvedFindingRef": {
-              "$ref": "#/$defs/sessionRef"
-            },
-            "approvalReceiptRef": {
-              "$ref": "#/$defs/sessionRef"
-            },
-            "baselineRef": {
-              "$ref": "#/$defs/sessionRef"
-            },
-            "ownerBoundaryRef": {
-              "$ref": "#/$defs/sessionRef"
-            },
-            "proofPlanRef": {
-              "$ref": "#/$defs/sessionRef"
-            }
-          }
+        "contextRefs": {
+          "description": "Exact canonical references resolved with default repository or file search.",
+          "$ref": "#/$defs/refs"
         },
-        "scope": {
-          "type": "object",
-          "additionalProperties": false,
-          "required": [
-            "findingId",
-            "findingFingerprint",
-            "approvalFingerprint",
-            "targetCount"
-          ],
-          "properties": {
-            "findingId": {
-              "type": "string",
-              "minLength": 1
-            },
-            "findingFingerprint": {
-              "$ref": "#/$defs/sha256"
-            },
-            "approvalFingerprint": {
-              "$ref": "#/$defs/sha256"
-            },
-            "targetCount": {
-              "type": "integer",
-              "minimum": 1
-            }
-          }
+        "sourceRefs": {
+          "description": "Exact routed source references allowed for this job.",
+          "$ref": "#/$defs/refs"
+        }
+      }
+    },
+    "input": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "project",
+        "objectiveRef",
+        "sourceFingerprint"
+      ],
+      "properties": {
+        "project": {
+          "description": "Verified project identity for this job.",
+          "type": "string",
+          "pattern": "^[a-z0-9][a-z0-9-]*$"
         },
-        "loads": {
-          "type": "object",
-          "additionalProperties": false,
-          "required": [
-            "artifacts",
-            "knowledge",
-            "source",
-            "orchestration"
-          ],
-          "properties": {
-            "artifacts": {
-              "type": "array",
-              "minItems": 1,
-              "uniqueItems": true,
-              "items": {
-                "type": "object",
-                "additionalProperties": false,
-                "required": [
-                  "ref",
-                  "revision",
-                  "loadMode"
-                ],
-                "properties": {
-                  "ref": {
-                    "$ref": "#/$defs/sessionRef"
-                  },
-                  "revision": {
-                    "$ref": "#/$defs/sha256"
-                  },
-                  "loadMode": {
-                    "const": "session-exact"
-                  }
-                }
-              }
-            },
-            "knowledge": {
-              "type": "array",
-              "minItems": 1,
-              "maxItems": 1,
-              "items": {
-                "type": "object",
-                "additionalProperties": false,
-                "required": [
-                  "id",
-                  "generation",
-                  "contentSha256",
-                  "loadMode"
-                ],
-                "properties": {
-                  "id": {
-                    "enum": [
-                      "quality.readiness-repair"
-                    ]
-                  },
-                  "generation": {
-                    "type": "string",
-                    "minLength": 1
-                  },
-                  "contentSha256": {
-                    "$ref": "#/$defs/sha256"
-                  },
-                  "loadMode": {
-                    "const": "qdrant-exact"
-                  }
-                }
-              }
-            },
-            "source": {
-              "type": "object",
-              "additionalProperties": false,
-              "required": [
-                "loadMode",
-                "repositoryContext",
-                "targetFiles"
-              ],
-              "properties": {
-                "loadMode": {
-                  "const": "exact-files"
-                },
-                "repositoryContext": {
-                  "const": false
-                },
-                "targetFiles": {
-                  "type": "array",
-                  "minItems": 1,
-                  "uniqueItems": true,
-                  "items": {
-                    "type": "object",
-                    "additionalProperties": false,
-                    "required": [
-                      "path",
-                      "beforeSha256",
-                      "allowedChanges"
-                    ],
-                    "properties": {
-                      "path": {
-                        "type": "string",
-                        "minLength": 1
-                      },
-                      "beforeSha256": {
-                        "$ref": "#/$defs/sha256"
-                      },
-                      "allowedChanges": {
-                        "type": "array",
-                        "minItems": 1,
-                        "uniqueItems": true,
-                        "items": {
-                          "type": "string",
-                          "minLength": 1
-                        }
-                      }
-                    }
-                  }
-                }
-              }
-            },
-            "orchestration": {
-              "type": "object",
-              "additionalProperties": false,
-              "required": [
-                "mode",
-                "profileRef",
-                "providerRef"
-              ],
-              "properties": {
-                "mode": {
-                  "enum": [
-                    "economical",
-                    "balanced",
-                    "parallel"
-                  ]
-                },
-                "profileRef": {
-                  "enum": [
-                    "orchestration/modes/economical.json",
-                    "orchestration/modes/balanced.json",
-                    "orchestration/modes/parallel.json"
-                  ]
-                },
-                "providerRef": {
-                  "type": "string",
-                  "pattern": "^orchestration/providers/[a-z0-9-]+\\.json$"
-                }
-              }
-            }
-          }
+        "objectiveRef": {
+          "description": "Exact bounded objective reference.",
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 1024
         },
-        "session": {
-          "type": "object",
-          "additionalProperties": false,
-          "required": [
-            "taskId",
-            "inputRef",
-            "outputRef",
-            "scratchPrefix",
-            "retention"
-          ],
-          "properties": {
-            "taskId": {
-              "type": "string",
-              "minLength": 1
-            },
-            "inputRef": {
-              "$ref": "#/$defs/sessionRef"
-            },
-            "outputRef": {
-              "$ref": "#/$defs/sessionRef"
-            },
-            "scratchPrefix": {
-              "$ref": "#/$defs/sessionRef"
-            },
-            "retention": {
-              "const": "until-skill-terminal"
-            }
-          }
+        "sourceFingerprint": {
+          "description": "Frozen fingerprint for the supplied source evidence.",
+          "$ref": "#/$defs/sha256"
         }
       }
     }
@@ -306,9 +66,15 @@
       "type": "string",
       "pattern": "^sha256:[0-9a-f]{64}$"
     },
-    "sessionRef": {
-      "type": "string",
-      "pattern": "^session://tasks/[A-Za-z0-9._-]+/.+$"
+    "refs": {
+      "type": "array",
+      "maxItems": 128,
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 1024
+      }
     }
   }
 }

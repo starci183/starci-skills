@@ -1,0 +1,77 @@
+{
+  "$schema": "../machine.schema.json",
+  "schemaVersion": 6,
+  "id": "starci-conversation-query",
+  "start": "analyze-input",
+  "states": {
+    "analyze-input": {
+      "kind": "analysis",
+      "on": [
+        {
+          "when": {},
+          "target": "query",
+          "label": "enter query"
+        }
+      ]
+    },
+    "query": {
+      "kind": "operator",
+      "ref": "source/conversation-query",
+      "on": [
+        {
+          "when": {
+            "outputEquals": {
+              "outcome": "found"
+            }
+          },
+          "target": "complete",
+          "label": "found"
+        },
+        {
+          "when": {
+            "outputEquals": {
+              "outcome": "empty"
+            }
+          },
+          "target": "complete",
+          "label": "empty"
+        },
+        {
+          "when": {
+            "outputEquals": {
+              "outcome": "forbidden"
+            }
+          },
+          "target": "blocked",
+          "label": "forbidden"
+        },
+        {
+          "when": {
+            "outputEquals": {
+              "outcome": "stale"
+            }
+          },
+          "target": "blocked",
+          "label": "stale"
+        },
+        {
+          "when": {
+            "outputEquals": {
+              "outcome": "ambiguous"
+            }
+          },
+          "target": "blocked",
+          "label": "ambiguous"
+        }
+      ]
+    },
+    "complete": {
+      "kind": "terminal",
+      "result": "complete"
+    },
+    "blocked": {
+      "kind": "terminal",
+      "result": "blocked"
+    }
+  }
+}

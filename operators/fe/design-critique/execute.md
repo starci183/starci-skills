@@ -1,13 +1,7 @@
 # Execute `fe/design-critique`
 
-## Step 1 — Derive an independent frame
+Critique one frontend design candidate against approved outcomes and laws without repairing it.
 
-**Read:** business outcome, constraints, and candidate identity; hide author reasoning. **Context:** use fresh critic context. **Session write:** success criteria and failure modes derived before candidate inspection. **Stop:** if the candidate hash cannot be frozen.
+Use only the closed `context` and `input`. Return one typed `output.outcome` plus this job's result, gaps, and evidence. Do not route, persist a session, or choose another operator.
 
-## Step 2 — Challenge the candidate
-
-**Read:** candidate, exact knowledge, then source observations. **Context:** orchestration may assign hierarchy, interaction, accessibility, and source-skeptic lenses independently. **Session write:** classified claims, contradictions, and one counterproposal when useful. **Stop:** if observation is presented as desired truth without authority.
-
-## Step 3 — Emit a bounded verdict
-
-**Read:** critic findings only. **Context:** distinguish revision from missing evidence or authority conflict. **Session write:** verdict and state. **Stop:** before editing design or source.
+Frontend creation follows `AI-first -> Rules-first -> Grammar-last`. UX synthesis, UI-direction synthesis, principle/law compilation, layout compilation, Grammar application, implementation, and audit are separate jobs. Audit jobs observe and report; they never repair source.

@@ -8,7 +8,7 @@
 | Search tags | `grammar, common, package, routing, business-free, object ownership` |
 | Dependencies | exact installed package version |
 
-Common is the business-free base shared by every StarCi Grammar. It defines stable object responsibilities, neutral state vocabulary, composition boundaries, and contract language. The selected Grammar supplies its own rendering treatment and complex-case rules.
+Common is the business-free base shared by every StarCi Grammar. It defines stable object responsibilities, neutral state vocabulary, composition boundaries, and interface language. The selected Grammar supplies its own rendering treatment and complex-case rules.
 
 Load Common with exactly one selected package:
 
@@ -17,11 +17,11 @@ Load Common with exactly one selected package:
 @starci/grammar/common + @starci/grammar/offset-pop
 ```
 
-Never mix Core and Offset Pop in one application Grammar decision. The installed package manifest, public exports, contracts, components, tokens, styles, and runtime behavior are authoritative; this guide only explains usage.
+Never mix Core and Offset Pop in one application Grammar decision. The installed package manifest, public exports, capabilities, components, tokens, styles, and runtime behavior are authoritative; this guide only explains usage.
 
 Route additional Common knowledge by need:
 
-- Contract or object identity: `fe.grammar-common-contracts`.
+- Interface or object identity: `fe.grammar-common-capabilities`.
 - Neutral states or interaction semantics: `fe.grammar-common-states-accessibility`.
 - Nested surfaces: `fe.grammar-common-case-surface-inside-surface`.
 - Collection size and repeated rows: `fe.grammar-common-case-collection-cardinality`.

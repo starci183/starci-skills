@@ -1,5 +1,11 @@
 # `fe/design-implementation` input
 
-## JSON architecture
+## Context
 
-Provided JSON contains the approved detail, contract, receipt, immutable structure hash, and authorized boundary. Runtime-loaded JSON contains only the exact source files and implementation-boundary binding. Session objects remain internal and purge at skill-terminal.
+- `context.evidenceRefs`: Exact canonical evidence references available to this atomic job.
+- `context.authorityRevision`: Exact approved authority revision binding this invocation.
+
+## Input
+
+- `input.targetRef`: The one target owned by this atomic invocation.
+- `input.constraints`: Closed constraints that bound this job without routing it.

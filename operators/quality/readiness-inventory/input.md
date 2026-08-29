@@ -1,26 +1,9 @@
 # `quality/readiness-inventory` input
 
-This operator inventories source readiness. Its input is an ephemeral task-session object. The runtime never writes the envelope, loaded values, command output, diagnostics, worker observations, or receipts outside the session and purges them at every parent-skill terminal.
+- `context.contextRefs`: exact canonical references resolved by default repository or file search.
+- `context.sourceRefs`: exact routed source files permitted for this job.
+- `input.project`: verified project identity.
+- `input.objectiveRef`: exact bounded objective reference.
+- `input.sourceFingerprint`: frozen fingerprint for supplied evidence.
 
-## JSON architecture
-
-| Section | Authored by | Purpose |
-| --- | --- | --- |
-| Root route fields | Skill state machine | Bind one accepted quality transition. |
-| `payload.provided` | Previous state | Supply immutable task-session references. |
-| `payload.loads` | Runtime resolver | Declare exact artifacts, law, execution/source boundary, and orchestration loaded after validation. |
-| `payload.session` | Session runtime | Name ephemeral input, output, and scratch slots. |
-
-## Provided by the previous state
-
-- `routeSetRef`: exact `session://` reference; the operator cannot replace or broaden it.
-- `declaredGateSetRef`: exact `session://` reference; the operator cannot replace or broaden it.
-- `staleRegistryRef`: exact `session://` reference; the operator cannot replace or broaden it.
-
-## Loaded by the runtime
-
-- `artifacts`: resolve only references listed by `payload.provided` into session memory.
-- `knowledge`: retrieve only `quality.readiness-repair` from the pinned Qdrant generation.
-- `orchestration`: resolve execution strategy separately from provider/model mapping.
-
-Acceptance requires that routes, gates, and stale records resolve to a complete green result or owned findings. Validate the complete envelope before any load, command, or mutation.
+The runtime Source resolves routes through `.claude/.workspaces`; project authority lives only in the verified backend Source under flat `.worktrees/<kind>`.

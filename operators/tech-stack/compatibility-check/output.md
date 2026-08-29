@@ -1,5 +1,9 @@
 # `tech-stack/compatibility-check` output
 
-## JSON architecture
-
-`state` is the machine-routing decision. `produced` returns compatibilityReceiptRef, checkedModelSha256 as immutable session references, with context lineage, evidence and findings. Scratch state is purged at the parent skill-terminal after any required handoff acknowledgement.
+| Field | Meaning |
+| --- | --- |
+| `output.outcome` | `compatible`, `revise`, or `blocked`; the Skill machine owns the route. |
+| `output.checkedModelSha256` | Exact stack-model hash evaluated. |
+| `output.receiptRef` | Completed evaluation receipt, or `null` when evidence blocked evaluation. |
+| `output.checks` | Typed status and evidence for every compatibility axis. |
+| `output.contradictions` | Structured evidence-backed incompatibilities. |

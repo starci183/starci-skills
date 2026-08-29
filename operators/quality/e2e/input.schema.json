@@ -1,285 +1,80 @@
 {
-  "$id": "https://starci.dev/v6/operators/quality/e2e/input.schema.json",
-  "title": "quality/e2e operator input",
   "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://starci.dev/v7/operators/quality/e2e/input.schema.json",
   "type": "object",
   "additionalProperties": false,
   "required": [
     "schemaVersion",
-    "runId",
-    "stage",
-    "status",
-    "facts",
-    "payload"
-  ],
-  "allOf": [
-    {
-      "oneOf": [
-        {
-          "properties": {
-            "stage": {
-              "const": "quality.e2e"
-            },
-            "status": {
-              "const": "ready"
-            }
-          },
-          "required": [
-            "stage",
-            "status"
-          ]
-        }
-      ]
-    }
+    "operatorId",
+    "context",
+    "input"
   ],
   "properties": {
     "schemaVersion": {
-      "const": 6
+      "const": 7
     },
-    "runId": {
-      "type": "string",
-      "minLength": 1
+    "operatorId": {
+      "const": "quality/e2e"
     },
-    "stage": {
-      "enum": [
-        "quality.e2e"
-      ]
-    },
-    "status": {
-      "enum": [
-        "ready"
-      ]
-    },
-    "facts": {
-      "type": "array",
-      "uniqueItems": true,
-      "items": {
-        "type": "string",
-        "minLength": 1
-      }
-    },
-    "payload": {
+    "context": {
       "type": "object",
       "additionalProperties": false,
       "required": [
-        "provided",
-        "loads",
-        "session"
+        "contextRefs",
+        "sourceRefs"
       ],
       "properties": {
-        "provided": {
-          "type": "object",
-          "additionalProperties": false,
-          "required": [
-            "changeReceiptRef",
-            "e2eCommandRef",
-            "seedReceiptRef"
-          ],
-          "properties": {
-            "changeReceiptRef": {
-              "$ref": "#/$defs/sessionRef"
-            },
-            "e2eCommandRef": {
-              "$ref": "#/$defs/sessionRef"
-            },
-            "seedReceiptRef": {
-              "$ref": "#/$defs/sessionRef"
-            }
-          }
+        "contextRefs": {
+          "description": "Exact canonical references resolved with default repository or file search.",
+          "$ref": "#/$defs/refs"
         },
-        "loads": {
-          "type": "object",
-          "additionalProperties": false,
-          "required": [
-            "artifacts",
-            "knowledge",
-            "execution",
-            "cache",
-            "orchestration"
-          ],
-          "properties": {
-            "artifacts": {
-              "type": "array",
-              "minItems": 1,
-              "uniqueItems": true,
-              "items": {
-                "type": "object",
-                "additionalProperties": false,
-                "required": [
-                  "ref",
-                  "revision",
-                  "loadMode"
-                ],
-                "properties": {
-                  "ref": {
-                    "$ref": "#/$defs/sessionRef"
-                  },
-                  "revision": {
-                    "$ref": "#/$defs/sha256"
-                  },
-                  "loadMode": {
-                    "const": "session-exact"
-                  }
-                }
-              }
-            },
-            "knowledge": {
-              "type": "array",
-              "minItems": 1,
-              "maxItems": 1,
-              "items": {
-                "type": "object",
-                "additionalProperties": false,
-                "required": [
-                  "id",
-                  "generation",
-                  "contentSha256",
-                  "loadMode"
-                ],
-                "properties": {
-                  "id": {
-                    "enum": [
-                      "quality.source-gates"
-                    ]
-                  },
-                  "generation": {
-                    "type": "string",
-                    "minLength": 1
-                  },
-                  "contentSha256": {
-                    "$ref": "#/$defs/sha256"
-                  },
-                  "loadMode": {
-                    "const": "qdrant-exact"
-                  }
-                }
-              }
-            },
-            "execution": {
-              "type": "object",
-              "additionalProperties": false,
-              "required": [
-                "commandRef",
-                "checkoutRef",
-                "loadMode",
-                "capture"
-              ],
-              "properties": {
-                "commandRef": {
-                  "$ref": "#/$defs/sessionRef"
-                },
-                "checkoutRef": {
-                  "$ref": "#/$defs/sessionRef"
-                },
-                "loadMode": {
-                  "const": "exact-command"
-                },
-                "capture": {
-                  "const": "session-only"
-                }
-              }
-            },
-            "cache": {
-              "$ref": "#/$defs/exactCache"
-            },
-            "orchestration": {
-              "type": "object",
-              "additionalProperties": false,
-              "required": [
-                "mode",
-                "profileRef",
-                "providerRef"
-              ],
-              "properties": {
-                "mode": {
-                  "enum": [
-                    "economical",
-                    "balanced",
-                    "parallel"
-                  ]
-                },
-                "profileRef": {
-                  "enum": [
-                    "orchestration/modes/economical.json",
-                    "orchestration/modes/balanced.json",
-                    "orchestration/modes/parallel.json"
-                  ]
-                },
-                "providerRef": {
-                  "type": "string",
-                  "pattern": "^orchestration/providers/[a-z0-9-]+\\.json$"
-                }
-              }
-            }
-          }
+        "sourceRefs": {
+          "description": "Exact routed source references allowed for this job.",
+          "$ref": "#/$defs/refs"
+        }
+      }
+    },
+    "input": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "project",
+        "objectiveRef",
+        "sourceFingerprint"
+      ],
+      "properties": {
+        "project": {
+          "description": "Verified project identity for this job.",
+          "type": "string",
+          "pattern": "^[a-z0-9][a-z0-9-]*$"
         },
-        "session": {
-          "type": "object",
-          "additionalProperties": false,
-          "required": [
-            "taskId",
-            "inputRef",
-            "outputRef",
-            "scratchPrefix",
-            "retention"
-          ],
-          "properties": {
-            "taskId": {
-              "type": "string",
-              "minLength": 1
-            },
-            "inputRef": {
-              "$ref": "#/$defs/sessionRef"
-            },
-            "outputRef": {
-              "$ref": "#/$defs/sessionRef"
-            },
-            "scratchPrefix": {
-              "$ref": "#/$defs/sessionRef"
-            },
-            "retention": {
-              "const": "until-skill-terminal"
-            }
-          }
+        "objectiveRef": {
+          "description": "Exact bounded objective reference.",
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 1024
+        },
+        "sourceFingerprint": {
+          "description": "Frozen fingerprint for the supplied source evidence.",
+          "$ref": "#/$defs/sha256"
         }
       }
     }
   },
   "$defs": {
-    "exactCache": {
-      "type": "object",
-      "additionalProperties": false,
-      "required": [
-        "lookupMode",
-        "fingerprintRef",
-        "candidateReceiptRef"
-      ],
-      "properties": {
-        "lookupMode": {
-          "const": "exact-only"
-        },
-        "fingerprintRef": {
-          "$ref": "#/$defs/sessionRef"
-        },
-        "candidateReceiptRef": {
-          "anyOf": [
-            {
-              "$ref": "#/$defs/sessionRef"
-            },
-            {
-              "type": "null"
-            }
-          ]
-        }
-      }
-    },
     "sha256": {
       "type": "string",
       "pattern": "^sha256:[0-9a-f]{64}$"
     },
-    "sessionRef": {
-      "type": "string",
-      "pattern": "^session://tasks/[A-Za-z0-9._-]+/.+$"
+    "refs": {
+      "type": "array",
+      "maxItems": 128,
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 1024
+      }
     }
   }
 }

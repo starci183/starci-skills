@@ -1,13 +1,21 @@
 # Execute `tech-stack/topology-model`
 
-## Step 1 — Bind inventory and approved constraints
+## Context
 
-**Read:** only the validated fields declared for this step. **Context:** exact refs and evidence required by the decision; do not scan adjacent source. **Session write:** step result under `payload.session.scratchPrefix`. **Stop:** identity, scope, or evidence drift. **Orchestration:** coordinator binds identities and validates output.
+Read `context.inventoryRef` only at `context.inventorySha256`, plus the exact `context.businessConstraintRefs` and `context.approvedDecisionRefs`.
 
-## Step 2 — Model observed and proposed-target claims separately
+## Input
 
-**Read:** only the validated fields declared for this step. **Context:** exact refs and evidence required by the decision; do not scan adjacent source. **Session write:** step result under `payload.session.scratchPrefix`. **Stop:** identity, scope, or evidence drift. **Orchestration:** independent evidence slices may run in parallel and the coordinator merges only typed findings.
+Bind the model to `input.project` and `input.objectiveRef`.
 
-## Step 3 — Detect contradictions and emit a typed stack model
+## Action
 
-**Read:** only the validated fields declared for this step. **Context:** exact refs and evidence required by the decision; do not scan adjacent source. **Session write:** step result under `payload.session.scratchPrefix`. **Stop:** do not emit success with unresolved critical contradictions. **Orchestration:** coordinator binds identities and validates output.
+Produce one operational topology that separates observed facts from proposed targets and assigns every runtime, communication path, store, deployment unit, credential boundary, migrator, backup, restore, and operational owner required by the supplied constraints.
+
+## Output
+
+Return `output.outcome`, `output.stackModelRef`, `output.stackModelSha256`, `output.evidenceRefs`, `output.contradictions`, and `output.reason`.
+
+## Stop
+
+Return `revise` for a bounded contradiction that can be resolved by remodelling. Return `blocked` when inventory identity is invalid or no coherent topology can be produced.

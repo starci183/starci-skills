@@ -1,5 +1,8 @@
 # `tech-stack/topology-model` input
 
-## JSON architecture
-
-`provided` actively supplies project, objectiveRef, inventoryRef. `loads` passively binds only businessConstraintRefs, approvedDecisionRefs at execution time. `session` owns ephemeral input, output and scratch references; bodies are never copied into the parent skill.
+- `context.inventoryRef`: exact observed inventory.
+- `context.inventorySha256`: inventory hash.
+- `context.businessConstraintRefs`: exact business constraints.
+- `context.approvedDecisionRefs`: exact approved decisions.
+- `input.project`: project owning the topology.
+- `input.objectiveRef`: objective the topology satisfies.

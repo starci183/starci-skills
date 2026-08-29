@@ -1,31 +1,21 @@
 # Execute `be/mutation-contract`
 
-Specify invariants, reads, qualified writes, connection tokens, cross-boundary effects and proof cases for every state change.
+## Context
 
-## Step 1 — Validate and freeze
+Resolve only `context.contextRefs` with default repository or file search and open only `context.sourceRefs`. Verify every source reference against `input.sourceFingerprint`. Resolve the project backend Source through the runtime Source `<Source>/.workspaces` route. Durable roots are flat `.worktrees/_templates/`, `.worktrees/businesses/`, `.worktrees/uat/`, `.worktrees/sessions/`, and `.worktrees/debts/`; never use `.worktrees/<project>/`. Search the verified routed source directly with default repository or file search; do not create a derived source cache or external index.
 
-**Read:** complete input envelope only.  
-**Context:** none before `validate-input.mjs` succeeds.  
-**Session write:** freeze route and refs at `payload.session.inputRef`.  
-**Stop:** reject junk, foreign task refs, missing revisions or undeclared loads.
+## Input
 
-## Step 2 — Resolve minimum evidence
+Bind all work to `input.project` and `input.objectiveRef`.
 
-**Read:** declared artifacts and one knowledge binding.  
-**Context:** load exact session refs plus `be.plan-compilation`; source, configuration, deployment and runtime evidence are observations, not authority.  
-**Session write:** evidence and unknowns under `payload.session.scratchPrefix/evidence`.  
-**Stop:** pause on stale evidence, contradictions or broadened scope.
+## Action
 
-## Step 3 — Decide and challenge
+Freeze one backend mutation contract with exact writer, store, transaction, migration, and proof boundaries. Do not route subsequent work, persist task-session material, broaden the source boundary, or perform another operator's job.
 
-**Read:** validated evidence only.  
-**Context:** apply only this capability law. Record criteria, conclusions and counter-evidence, never chain-of-thought.  
-**Session write:** typed candidate at `payload.session.scratchPrefix/candidate`.  
-**Stop:** Every write matches the target writer, physical store, database.schema.resource and connection token.
+## Output
 
-## Step 4 — Validate and emit
+Return only `output.outcome`, `output.resultRef`, `output.evidenceRefs`, `output.findings`, and `output.reason`.
 
-**Read:** candidate, evidence refs and lineage.  
-**Context:** no new load. Validate against `migration/v6.1/architecture-backend/schemas/backend-contract.schema.json`.  
-**Session write:** accepted artifact at `payload.session.outputRef`.  
-**Stop:** never emit partial or invalid output. Orchestration may parallelize independent evidence comparisons; one coordinator owns decision and cleanup.
+## Stop
+
+Return the applicable non-success outcome when exact evidence is missing, fingerprints drift, or completing the job would exceed its boundary.

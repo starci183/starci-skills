@@ -1,42 +1,16 @@
 {
-  "schemaVersion": 6,
+  "schemaVersion": 7,
   "id": "deployment/host-prepare",
   "domain": "deployment",
+  "job": "Prepares the declared host idempotently.",
   "inputSchema": "input.schema.json",
   "outputSchema": "output.schema.json",
-  "knowledgeRefs": [
-    "deployment.lifecycle"
-  ],
   "sourceReferenceRefs": [],
-  "accepts": [
-    {
-      "stage": "deployment.host",
-      "status": "ready",
-      "allFacts": [
-        "deployment-credentials-ready"
-      ],
-      "noneFacts": []
-    }
-  ],
-  "emits": [
-    {
-      "stage": "deployment.artifact.build",
-      "status": "ready",
-      "factsAdd": [
-        "deployment-host-ready"
-      ],
-      "factsRemove": []
-    }
-  ],
   "sideEffects": [
-    "apply only declared idempotent host setup",
-    "keep all intermediate data in task-session memory only",
-    "purge every intermediate session object at each parent-skill terminal state"
+    "apply only declared idempotent host setup"
   ],
   "stopConditions": [
-    "required evidence is missing or stale",
-    "the result would cross the declared boundary",
-    "intermediate data would persist outside the task session",
-    "broad source context, an undeclared command or resource, or a raw secret would be loaded"
+    "an exact reference is missing or its fingerprint differs",
+    "the requested work exceeds this operator job"
   ]
 }

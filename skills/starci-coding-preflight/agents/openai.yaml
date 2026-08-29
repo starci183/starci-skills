@@ -1,6 +1,0 @@
-interface:
-  display_name: "StarCi Coding Preflight"
-  short_description: "Bind templates and static contracts before coding"
-  default_prompt: "Use $starci-coding-preflight for this selected flow and execute its state machine."
-policy:
-  allow_implicit_invocation: true

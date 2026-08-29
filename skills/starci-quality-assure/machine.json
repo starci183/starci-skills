@@ -1,0 +1,182 @@
+{
+  "schemaVersion": 7,
+  "id": "starci-quality-assure",
+  "start": "analyze-input",
+  "states": {
+    "analyze-input": {
+      "kind": "analysis",
+      "on": [
+        {
+          "when": {},
+          "target": "inventory"
+        }
+      ]
+    },
+    "inventory": {
+      "kind": "operator",
+      "ref": "quality/readiness-inventory",
+      "on": [
+        {
+          "when": {
+            "outputEquals": {
+              "outcome": "green"
+            }
+          },
+          "target": "rules"
+        },
+        {
+          "when": {
+            "outputEquals": {
+              "outcome": "findings"
+            }
+          },
+          "target": "repair"
+        },
+        {
+          "when": {
+            "outputEquals": {
+              "outcome": "blocked"
+            }
+          },
+          "target": "blocked"
+        }
+      ]
+    },
+    "repair": {
+      "kind": "operator",
+      "ref": "quality/finding-repair",
+      "on": [
+        {
+          "when": {
+            "outputEquals": {
+              "outcome": "repaired"
+            }
+          },
+          "target": "inventory"
+        },
+        {
+          "when": {
+            "outputEquals": {
+              "outcome": "stale-finding"
+            }
+          },
+          "target": "inventory"
+        },
+        {
+          "when": {
+            "outputEquals": {
+              "outcome": "boundary-drift"
+            }
+          },
+          "target": "blocked"
+        },
+        {
+          "when": {
+            "outputEquals": {
+              "outcome": "external-blocker"
+            }
+          },
+          "target": "blocked"
+        }
+      ]
+    },
+    "rules": {
+      "kind": "operator",
+      "ref": "quality/rule-binding-check",
+      "on": [
+        {
+          "when": {
+            "outputEquals": {
+              "outcome": "pass"
+            }
+          },
+          "target": "debt"
+        },
+        {
+          "when": {
+            "outputEquals": {
+              "outcome": "fail"
+            }
+          },
+          "target": "repair"
+        },
+        {
+          "when": {
+            "outputEquals": {
+              "outcome": "blocked"
+            }
+          },
+          "target": "blocked"
+        }
+      ]
+    },
+    "debt": {
+      "kind": "operator",
+      "ref": "quality/debt-repay",
+      "on": [
+        {
+          "when": {
+            "outputEquals": {
+              "outcome": "closed"
+            }
+          },
+          "target": "proof"
+        },
+        {
+          "when": {
+            "outputEquals": {
+              "outcome": "closure-candidate"
+            }
+          },
+          "target": "proof"
+        },
+        {
+          "when": {
+            "outputEquals": {
+              "outcome": "progress"
+            }
+          },
+          "target": "debt"
+        },
+        {
+          "when": {
+            "outputEquals": {
+              "outcome": "blocked"
+            }
+          },
+          "target": "blocked"
+        }
+      ]
+    },
+    "proof": {
+      "kind": "operator",
+      "ref": "quality/delivery-proof",
+      "on": [
+        {
+          "when": {
+            "outputEquals": {
+              "outcome": "pass"
+            }
+          },
+          "target": "complete"
+        },
+        {
+          "when": {
+            "outputEquals": {
+              "outcome": "blocked"
+            }
+          },
+          "target": "blocked"
+        }
+      ]
+    },
+    "complete": {
+      "kind": "terminal",
+      "result": "complete"
+    },
+    "blocked": {
+      "kind": "terminal",
+      "result": "blocked"
+    }
+  }
+}

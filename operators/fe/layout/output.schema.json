@@ -1,139 +1,54 @@
 {
-  "$id": "https://starci.dev/v6/operators/fe/layout/output.schema.json",
-  "title": "fe/layout operator output",
   "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://starci.dev/v7.0/operators/fe/layout/output.schema.json",
   "type": "object",
   "additionalProperties": false,
   "required": [
     "schemaVersion",
-    "runId",
-    "stage",
-    "status",
-    "facts",
-    "payload"
-  ],
-  "allOf": [
-    {
-      "oneOf": [
-        {
-          "properties": {
-            "stage": {
-              "const": "layout.review"
-            },
-            "status": {
-              "const": "pending"
-            }
-          },
-          "required": [
-            "stage",
-            "status"
-          ]
-        }
-      ]
-    }
+    "operatorId",
+    "output"
   ],
   "properties": {
     "schemaVersion": {
-      "const": 6
+      "const": 7
     },
-    "runId": {
-      "type": "string",
-      "minLength": 1
+    "operatorId": {
+      "const": "fe/layout"
     },
-    "stage": {
-      "enum": [
-        "layout.review"
-      ]
-    },
-    "status": {
-      "enum": [
-        "pending"
-      ]
-    },
-    "facts": {
-      "type": "array",
-      "uniqueItems": true,
-      "items": {
-        "type": "string",
-        "minLength": 1
-      }
-    },
-    "payload": {
+    "output": {
       "type": "object",
       "additionalProperties": false,
       "required": [
-        "decision",
-        "state",
-        "reviewPreview",
-        "produced",
-        "context",
-        "cleanup",
-        "evidenceRefs",
-        "findings"
+        "outcome",
+        "result",
+        "gaps",
+        "evidenceRefs"
       ],
       "properties": {
-        "decision": {
+        "outcome": {
+          "description": "Legacy semantic result consumed only by the Skill machine.",
           "enum": [
             "directions-ready"
           ]
         },
-        "state": {
-          "type": "object",
-          "additionalProperties": false,
-          "required": [
-            "operator",
-            "status",
-            "code",
-            "retryable",
-            "emits"
-          ],
-          "properties": {
-            "operator": {
-              "const": "fe/layout"
-            },
-            "status": {
-              "enum": [
-                "pending"
-              ]
-            },
-            "code": {
-              "enum": [
-                "fe-layout-directions-ready"
-              ]
-            },
-            "retryable": {
-              "type": "boolean"
-            },
-            "emits": {
+        "result": {
+          "description": "The atomic job result, or null when blocked.",
+          "anyOf": [
+            {
               "type": "object",
               "additionalProperties": false,
               "required": [
-                "stage",
-                "status",
-                "factsAdd",
-                "factsRemove"
+                "summary",
+                "artifactRefs"
               ],
               "properties": {
-                "stage": {
-                  "enum": [
-                    "layout.review"
-                  ]
+                "summary": {
+                  "type": "string",
+                  "minLength": 1
                 },
-                "status": {
-                  "enum": [
-                    "pending"
-                  ]
-                },
-                "factsAdd": {
+                "artifactRefs": {
                   "type": "array",
-                  "uniqueItems": true,
-                  "items": {
-                    "type": "string",
-                    "minLength": 1
-                  }
-                },
-                "factsRemove": {
-                  "type": "array",
+                  "maxItems": 64,
                   "uniqueItems": true,
                   "items": {
                     "type": "string",
@@ -141,264 +56,34 @@
                   }
                 }
               }
+            },
+            {
+              "type": "null"
             }
-          }
+          ]
         },
-        "reviewPreview": {
-          "type": "object",
-          "description": "Executable binding for the in-conversation interactive layout review rendered before approval is requested.",
-          "additionalProperties": false,
-          "required": [
-            "renderer",
-            "mediaType",
-            "artifactRef",
-            "contentSha256",
-            "directionIds",
-            "recommendedDirectionId",
-            "viewports",
-            "approvalCommands",
-            "interactive"
-          ],
-          "properties": {
-            "renderer": {
-              "const": "visualize"
-            },
-            "mediaType": {
-              "const": "text/html"
-            },
-            "artifactRef": {
-              "$ref": "#/$defs/sessionRef"
-            },
-            "contentSha256": {
-              "$ref": "#/$defs/sha256"
-            },
-            "directionIds": {
-              "type": "array",
-              "minItems": 2,
-              "maxItems": 12,
-              "uniqueItems": true,
-              "items": {
-                "type": "string",
-                "minLength": 1,
-                "maxLength": 120
-              }
-            },
-            "recommendedDirectionId": {
-              "type": "string",
-              "minLength": 1,
-              "maxLength": 120
-            },
-            "viewports": {
-              "type": "array",
-              "minItems": 3,
-              "maxItems": 3,
-              "uniqueItems": true,
-              "items": {
-                "enum": [
-                  "wide",
-                  "intermediate",
-                  "compact"
-                ]
-              }
-            },
-            "approvalCommands": {
-              "type": "array",
-              "minItems": 2,
-              "maxItems": 12,
-              "uniqueItems": true,
-              "items": {
-                "type": "object",
-                "additionalProperties": false,
-                "required": [
-                  "directionId",
-                  "command"
-                ],
-                "properties": {
-                  "directionId": {
-                    "type": "string",
-                    "minLength": 1,
-                    "maxLength": 120
-                  },
-                  "command": {
-                    "type": "string",
-                    "pattern": "^OK LAYOUT .+$",
-                    "maxLength": 140
-                  }
-                }
-              }
-            },
-            "interactive": {
-              "const": true
-            }
-          }
-        },
-        "produced": {
-          "type": "object",
-          "additionalProperties": false,
-          "required": [
-            "artifactRefs",
-            "mutations",
-            "externalEffects"
-          ],
-          "properties": {
-            "artifactRefs": {
-              "type": "array",
-              "uniqueItems": true,
-              "items": {
-                "$ref": "#/$defs/sessionRef"
-              }
-            },
-            "mutations": {
-              "type": "array",
-              "uniqueItems": true,
-              "items": {
-                "type": "object",
-                "additionalProperties": false,
-                "required": [
-                  "path",
-                  "beforeSha256",
-                  "afterSha256"
-                ],
-                "properties": {
-                  "path": {
-                    "type": "string",
-                    "minLength": 1
-                  },
-                  "beforeSha256": {
-                    "$ref": "#/$defs/sha256"
-                  },
-                  "afterSha256": {
-                    "$ref": "#/$defs/sha256"
-                  }
-                }
-              }
-            },
-            "externalEffects": {
-              "type": "array",
-              "uniqueItems": true,
-              "items": {
-                "type": "object",
-                "additionalProperties": false,
-                "required": [
-                  "target",
-                  "beforeRevision",
-                  "afterRevision",
-                  "evidenceRef"
-                ],
-                "properties": {
-                  "target": {
-                    "type": "string",
-                    "minLength": 1
-                  },
-                  "beforeRevision": {
-                    "type": "string",
-                    "minLength": 1
-                  },
-                  "afterRevision": {
-                    "type": "string",
-                    "minLength": 1
-                  },
-                  "evidenceRef": {
-                    "$ref": "#/$defs/sessionRef"
-                  }
-                }
-              }
-            }
-          }
-        },
-        "context": {
-          "type": "object",
-          "additionalProperties": false,
-          "required": [
-            "used"
-          ],
-          "properties": {
-            "used": {
-              "type": "array",
-              "minItems": 1,
-              "uniqueItems": true,
-              "items": {
-                "type": "object",
-                "additionalProperties": false,
-                "required": [
-                  "kind",
-                  "ref",
-                  "revision"
-                ],
-                "properties": {
-                  "kind": {
-                    "enum": [
-                      "worktree-business",
-                      "session-upstream",
-                      "qdrant-knowledge",
-                      "fe-contract-generation",
-                      "exact-source"
-                    ]
-                  },
-                  "ref": {
-                    "type": "string",
-                    "minLength": 1
-                  },
-                  "revision": {
-                    "type": "string",
-                    "minLength": 1
-                  }
-                }
-              }
-            }
-          }
-        },
-        "cleanup": {
-          "type": "object",
-          "additionalProperties": false,
-          "required": [
-            "scratchRefs",
-            "retention",
-            "purgeAt"
-          ],
-          "properties": {
-            "scratchRefs": {
-              "type": "array",
-              "uniqueItems": true,
-              "items": {
-                "$ref": "#/$defs/sessionRef"
-              }
-            },
-            "retention": {
-              "const": "until-skill-terminal"
-            },
-            "purgeAt": {
-              "const": "skill-terminal"
-            }
-          }
-        },
-        "evidenceRefs": {
+        "gaps": {
+          "description": "Exact missing authority or evidence; empty when complete.",
           "type": "array",
-          "minItems": 1,
-          "uniqueItems": true,
-          "items": {
-            "$ref": "#/$defs/sessionRef"
-          }
-        },
-        "findings": {
-          "type": "array",
+          "maxItems": 32,
           "uniqueItems": true,
           "items": {
             "type": "string",
             "minLength": 1
           }
+        },
+        "evidenceRefs": {
+          "description": "Exact evidence used to produce the result.",
+          "type": "array",
+          "maxItems": 64,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "minItems": 1
         }
       }
-    }
-  },
-  "$defs": {
-    "sha256": {
-      "type": "string",
-      "pattern": "^sha256:[0-9a-f]{64}$"
-    },
-    "sessionRef": {
-      "type": "string",
-      "pattern": "^session://tasks/[A-Za-z0-9._-]+/.+$"
     }
   }
 }

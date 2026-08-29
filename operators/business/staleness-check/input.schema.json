@@ -1,96 +1,80 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://starci.dev/v6/operators/business/staleness-check/input.schema.json",
-  "title": "business/staleness-check operator input",
+  "$id": "https://starci.dev/v7/operators/business/staleness-check/input.schema.json",
   "type": "object",
   "additionalProperties": false,
-  "required": ["schemaVersion", "runId", "stage", "status", "facts", "payload"],
+  "required": [
+    "schemaVersion",
+    "operatorId",
+    "context",
+    "input"
+  ],
   "properties": {
-    "schemaVersion": { "const": 6 },
-    "runId": { "type": "string", "minLength": 1 },
-    "stage": { "enum": ["business.evidence", "architecture.decision.frame", "architecture.source"] },
-    "status": { "const": "ready" },
-    "facts": { "type": "array", "uniqueItems": true, "items": { "type": "string", "minLength": 1 } },
-    "payload": {
+    "schemaVersion": {
+      "const": 7
+    },
+    "operatorId": {
+      "const": "business/staleness-check"
+    },
+    "context": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["provided", "loads", "session"],
+      "required": [
+        "contextRefs",
+        "sourceRefs"
+      ],
       "properties": {
-        "provided": {
-          "type": "object",
-          "additionalProperties": false,
-          "required": ["project", "routeReceiptRef", "role", "purpose", "refreshAttempt", "maxRefreshAttempts"],
-          "properties": {
-            "project": { "type": "string", "pattern": "^[a-z0-9][a-z0-9-]*$" },
-            "routeReceiptRef": { "$ref": "#/$defs/sessionRef" },
-            "role": { "enum": ["frontend", "backend", "fullstack"] },
-            "purpose": { "const": "consumer-read" },
-            "refreshAttempt": { "type": "integer", "minimum": 0 },
-            "maxRefreshAttempts": { "type": "integer", "minimum": 1, "maximum": 3 }
-          }
+        "contextRefs": {
+          "description": "Exact canonical context references resolved with default repository or file search.",
+          "$ref": "#/$defs/refs"
         },
-        "loads": {
-          "type": "object",
-          "additionalProperties": false,
-          "required": ["businessMetadata", "sourceMetadata", "orchestration"],
-          "properties": {
-            "businessMetadata": {
-              "type": "object",
-              "additionalProperties": false,
-              "required": ["authorityPath", "exists", "headRef", "status", "revision", "contentSha256", "baselineCommit", "loadMode"],
-              "properties": {
-                "authorityPath": { "type": "string", "pattern": "^\\.worktrees/[a-z0-9][a-z0-9-]*/businesses(?:/|$)" },
-                "exists": { "type": "boolean" },
-                "headRef": { "anyOf": [{ "$ref": "#/$defs/sessionRef" }, { "type": "null" }] },
-                "status": { "enum": ["missing", "draft", "approved", "rejected", "invalid"] },
-                "revision": { "anyOf": [{ "$ref": "#/$defs/sha256" }, { "type": "null" }] },
-                "contentSha256": { "anyOf": [{ "$ref": "#/$defs/sha256" }, { "type": "null" }] },
-                "baselineCommit": { "anyOf": [{ "$ref": "#/$defs/gitCommit" }, { "type": "null" }] },
-                "loadMode": { "const": "metadata-only" }
-              }
-            },
-            "sourceMetadata": {
-              "type": "object",
-              "additionalProperties": false,
-              "required": ["repositoryRef", "branch", "headCommit", "routeRevision", "loadMode"],
-              "properties": {
-                "repositoryRef": { "type": "string", "pattern": "^(?:repository|source|session):[^\\s]+$" },
-                "branch": { "type": "string", "minLength": 1 },
-                "headCommit": { "$ref": "#/$defs/gitCommit" },
-                "routeRevision": { "$ref": "#/$defs/sha256" },
-                "loadMode": { "const": "metadata-only" }
-              }
-            },
-            "orchestration": {
-              "type": "object",
-              "additionalProperties": false,
-              "required": ["mode", "profileRef", "providerRef"],
-              "properties": {
-                "mode": { "enum": ["economical", "balanced", "parallel"] },
-                "profileRef": { "enum": ["orchestration/modes/economical.json", "orchestration/modes/balanced.json", "orchestration/modes/parallel.json"] },
-                "providerRef": { "type": "string", "pattern": "^orchestration/providers/[a-z0-9-]+\\.json$" }
-              }
-            }
-          }
+        "sourceRefs": {
+          "description": "Exact routed source references allowed for this job.",
+          "$ref": "#/$defs/refs"
+        }
+      }
+    },
+    "input": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "project",
+        "objectiveRef",
+        "sourceFingerprint"
+      ],
+      "properties": {
+        "project": {
+          "description": "Verified project identity for this job.",
+          "type": "string",
+          "pattern": "^[a-z0-9][a-z0-9-]*$"
         },
-        "session": {
-          "type": "object",
-          "additionalProperties": false,
-          "required": ["taskId", "inputRef", "outputRef", "scratchPrefix", "retention"],
-          "properties": {
-            "taskId": { "type": "string", "minLength": 1 },
-            "inputRef": { "$ref": "#/$defs/sessionRef" },
-            "outputRef": { "$ref": "#/$defs/sessionRef" },
-            "scratchPrefix": { "$ref": "#/$defs/sessionRef" },
-            "retention": { "const": "until-skill-terminal" }
-          }
+        "objectiveRef": {
+          "description": "Exact bounded objective reference.",
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 1024
+        },
+        "sourceFingerprint": {
+          "description": "Frozen fingerprint shared by supplied source references.",
+          "$ref": "#/$defs/sha256"
         }
       }
     }
   },
   "$defs": {
-    "sha256": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
-    "gitCommit": { "type": "string", "pattern": "^[0-9a-f]{40,64}$" },
-    "sessionRef": { "type": "string", "pattern": "^session://tasks/[A-Za-z0-9._-]+/.+$" }
+    "sha256": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "refs": {
+      "type": "array",
+      "maxItems": 128,
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 1024
+      }
+    }
   }
 }

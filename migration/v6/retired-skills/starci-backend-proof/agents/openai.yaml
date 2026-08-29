@@ -1,0 +1,6 @@
+interface:
+  display_name: "StarCi Backend Proof"
+  short_description: "Prove backend delivery against capabilities"
+  default_prompt: "Use $starci-backend-proof for this selected flow and execute its state machine."
+policy:
+  allow_implicit_invocation: true

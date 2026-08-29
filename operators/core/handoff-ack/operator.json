@@ -1,51 +1,11 @@
 {
-  "schemaVersion": 6,
+  "schemaVersion": 7,
   "id": "core/handoff-ack",
   "domain": "core",
+  "job": "Acknowledge one immutable handoff after verifying every accepted artifact identity.",
   "inputSchema": "input.schema.json",
   "outputSchema": "output.schema.json",
-  "knowledgeRefs": [],
   "sourceReferenceRefs": [],
-  "accepts": [
-    {
-      "stage": "core.handoff-ack",
-      "status": "ready",
-      "allFacts": [],
-      "noneFacts": []
-    }
-  ],
-  "emits": [
-    {
-      "stage": "core.handoff-ack",
-      "status": "ready",
-      "factsAdd": [
-        "handoff-ack-accepted"
-      ],
-      "factsRemove": []
-    },
-    {
-      "stage": "core.handoff-ack",
-      "status": "rejected",
-      "factsAdd": [
-        "handoff-ack-rejected"
-      ],
-      "factsRemove": []
-    },
-    {
-      "stage": "core.handoff-ack",
-      "status": "blocked",
-      "factsAdd": [
-        "handoff-ack-blocked"
-      ],
-      "factsRemove": []
-    }
-  ],
-  "sideEffects": [
-    "write one immutable task-session protocol object"
-  ],
-  "stopConditions": [
-    "objective or artifact identity mismatch",
-    "missing mutation approval or resume route"
-  ]
+  "sideEffects": ["write one immutable acknowledgement object"],
+  "stopConditions": ["objective or artifact hash mismatch", "the consumer accepts only a subset of the handoff"]
 }
-

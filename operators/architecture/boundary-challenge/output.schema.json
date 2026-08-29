@@ -1,298 +1,84 @@
 {
-  "$id": "https://starci.dev/v6/operators/architecture/boundary-challenge/output.schema.json",
-  "title": "architecture/boundary-challenge operator output",
   "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://starci.dev/v7/operators/architecture/boundary-challenge/output.schema.json",
   "type": "object",
   "additionalProperties": false,
   "required": [
     "schemaVersion",
-    "runId",
-    "stage",
-    "status",
-    "facts",
-    "payload"
-  ],
-  "allOf": [
-    {
-      "oneOf": [
-        {
-          "properties": {
-            "stage": {
-              "const": "architecture.boundary.review"
-            },
-            "status": {
-              "const": "pending"
-            }
-          },
-          "required": [
-            "stage",
-            "status"
-          ]
-        },
-        {
-          "properties": {
-            "stage": {
-              "const": "architecture.boundary"
-            },
-            "status": {
-              "const": "ready"
-            }
-          },
-          "required": [
-            "stage",
-            "status"
-          ]
-        },
-        {
-          "properties": {
-            "stage": {
-              "const": "architecture.blocked"
-            },
-            "status": {
-              "const": "blocked"
-            }
-          },
-          "required": [
-            "stage",
-            "status"
-          ]
-        }
-      ]
-    }
+    "operatorId",
+    "output"
   ],
   "properties": {
     "schemaVersion": {
-      "const": 6
+      "const": 7
     },
-    "runId": {
-      "type": "string",
-      "minLength": 1
+    "operatorId": {
+      "const": "architecture/boundary-challenge"
     },
-    "stage": {
-      "enum": [
-        "architecture.boundary.review",
-        "architecture.boundary",
-        "architecture.blocked"
-      ]
-    },
-    "status": {
-      "enum": [
-        "pending",
-        "ready",
-        "blocked"
-      ]
-    },
-    "facts": {
-      "type": "array",
-      "uniqueItems": true,
-      "items": {
-        "type": "string",
-        "minLength": 1
-      }
-    },
-    "payload": {
+    "output": {
       "type": "object",
       "additionalProperties": false,
       "required": [
-        "decision",
-        "state",
-        "produced",
-        "context",
-        "cleanup",
+        "outcome",
+        "resultRef",
         "evidenceRefs",
-        "findings"
+        "findings",
+        "reason"
       ],
       "properties": {
-        "decision": {
+        "outcome": {
+          "description": "Typed result consumed by the parent Skill machine.",
           "enum": [
             "clean",
             "revise",
             "blocked"
           ]
         },
-        "state": {
-          "type": "object",
-          "additionalProperties": false,
-          "required": [
-            "operator",
-            "status",
-            "code",
-            "retryable",
-            "emits"
+        "resultRef": {
+          "description": "Exact produced artifact reference, or null when no artifact was produced.",
+          "type": [
+            "string",
+            "null"
           ],
-          "properties": {
-            "operator": {
-              "const": "architecture/boundary-challenge"
-            },
-            "status": {
-              "enum": [
-                "completed",
-                "replan",
-                "blocked"
-              ]
-            },
-            "code": {
-              "enum": [
-                "architecture-boundary-challenge-clean",
-                "architecture-boundary-challenge-revise",
-                "architecture-boundary-challenge-blocked"
-              ]
-            },
-            "retryable": {
-              "type": "boolean"
-            },
-            "emits": {
-              "type": "object",
-              "additionalProperties": false,
-              "required": [
-                "stage",
-                "status",
-                "factsAdd"
-              ],
-              "properties": {
-                "stage": {
-                  "enum": [
-                    "architecture.boundary.review",
-                    "architecture.boundary",
-                    "architecture.blocked"
-                  ]
-                },
-                "status": {
-                  "enum": [
-                    "pending",
-                    "ready",
-                    "blocked"
-                  ]
-                },
-                "factsAdd": {
-                  "type": "array",
-                  "minItems": 1,
-                  "uniqueItems": true,
-                  "items": {
-                    "type": "string",
-                    "minLength": 1
-                  }
-                }
-              }
-            }
-          }
-        },
-        "produced": {
-          "type": "object",
-          "additionalProperties": false,
-          "required": [
-            "boundaryChallengeRef",
-            "durableWrites"
-          ],
-          "properties": {
-            "boundaryChallengeRef": {
-              "anyOf": [
-                {
-                  "$ref": "#/$defs/sessionRef"
-                },
-                {
-                  "type": "null"
-                }
-              ]
-            },
-            "durableWrites": {
-              "type": "array",
-              "uniqueItems": true,
-              "items": {
-                "type": "string",
-                "minLength": 1
-              }
-            }
-          }
-        },
-        "context": {
-          "type": "object",
-          "additionalProperties": false,
-          "required": [
-            "used"
-          ],
-          "properties": {
-            "used": {
-              "type": "array",
-              "minItems": 1,
-              "uniqueItems": true,
-              "items": {
-                "type": "object",
-                "additionalProperties": false,
-                "required": [
-                  "kind",
-                  "ref",
-                  "revision"
-                ],
-                "properties": {
-                  "kind": {
-                    "enum": [
-                      "session-artifact",
-                      "worktree-business",
-                      "qdrant-knowledge",
-                      "exact-source"
-                    ]
-                  },
-                  "ref": {
-                    "type": "string",
-                    "minLength": 1
-                  },
-                  "revision": {
-                    "type": "string",
-                    "minLength": 1
-                  }
-                }
-              }
-            }
-          }
-        },
-        "cleanup": {
-          "type": "object",
-          "additionalProperties": false,
-          "required": [
-            "scratchRefs",
-            "retention",
-            "purgeAt"
-          ],
-          "properties": {
-            "scratchRefs": {
-              "type": "array",
-              "uniqueItems": true,
-              "items": {
-                "$ref": "#/$defs/sessionRef"
-              }
-            },
-            "retention": {
-              "const": "until-skill-terminal"
-            },
-            "purgeAt": {
-              "const": "skill-terminal"
-            }
-          }
+          "minLength": 1,
+          "maxLength": 1024
         },
         "evidenceRefs": {
-          "type": "array",
-          "minItems": 1,
-          "uniqueItems": true,
-          "items": {
-            "$ref": "#/$defs/sessionRef"
-          }
+          "description": "Exact references supporting the result.",
+          "$ref": "#/$defs/refs"
         },
         "findings": {
+          "description": "Bounded observable findings produced by this job.",
           "type": "array",
-          "uniqueItems": true,
+          "maxItems": 128,
           "items": {
             "type": "string",
-            "minLength": 1
+            "minLength": 1,
+            "maxLength": 2048
           }
+        },
+        "reason": {
+          "description": "Bounded explanation when the result cannot be produced, otherwise null.",
+          "type": [
+            "string",
+            "null"
+          ],
+          "minLength": 1,
+          "maxLength": 2048
         }
       }
     }
   },
   "$defs": {
-    "sessionRef": {
-      "type": "string",
-      "pattern": "^session://tasks/[A-Za-z0-9._-]+/.+$"
+    "refs": {
+      "type": "array",
+      "maxItems": 128,
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 1024
+      }
     }
   }
 }

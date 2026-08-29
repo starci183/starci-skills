@@ -1,38 +1,16 @@
 {
-  "schemaVersion": 6,
+  "schemaVersion": 7,
   "id": "architecture/system-model",
   "domain": "architecture",
+  "job": "Model one target system boundary and its runtime interactions.",
   "inputSchema": "input.schema.json",
   "outputSchema": "output.schema.json",
-  "knowledgeRefs": [
-    "architecture.decision-analysis"
-  ],
   "sourceReferenceRefs": [],
-  "accepts": [
-    {
-      "stage": "architecture.v61.system-model",
-      "status": "ready",
-      "allFacts": [],
-      "noneFacts": []
-    }
-  ],
-  "emits": [
-    {
-      "stage": "architecture.v61.system-model.complete",
-      "status": "ready",
-      "factsAdd": [
-        "architecture-system-model-ready"
-      ],
-      "factsRemove": []
-    }
-  ],
   "sideEffects": [
-    "keep artifacts and observations in task-session memory only",
-    "purge intermediate session objects at every parent-skill terminal state"
+    "read only the supplied exact references"
   ],
   "stopConditions": [
-    "required evidence is missing, stale or contradictory",
-    "Every component maps to a deployable; every physical store and read, write or migrate edge is qualified.",
-    "source observations would be treated as target authority"
+    "an exact reference is missing or its fingerprint differs",
+    "the requested work exceeds this operator job"
   ]
 }

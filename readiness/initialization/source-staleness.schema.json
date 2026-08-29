@@ -19,7 +19,7 @@
     "operation": { "enum": ["check", "upgrade-plan", "upgrade-apply"] },
     "status": { "enum": ["ready", "stale", "blocked"] },
     "sourceRoot": { "type": "string", "minLength": 1 },
-    "targetRuntimeVersion": { "const": 6 },
+    "targetRuntimeVersion": { "const": 7 },
     "modules": {
       "type": "object",
       "additionalProperties": false,

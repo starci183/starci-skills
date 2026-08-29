@@ -1,5 +1,8 @@
 # `tech-stack/discover` output
 
-## JSON architecture
-
-`state` is the machine-routing decision. `produced` returns inventoryRef, inventorySha256 as immutable session references, with context lineage, evidence and findings. Scratch state is purged at the parent skill-terminal after any required handoff acknowledgement.
+- `output.outcome`: `ready` or `blocked`.
+- `output.inventoryRef`: observed inventory reference, else null.
+- `output.inventorySha256`: observed inventory hash, else null.
+- `output.evidenceRefs`: exact files supporting the inventory.
+- `output.contradictions`: structured conflicts found in the evidence.
+- `output.reason`: blocker explanation, else null.

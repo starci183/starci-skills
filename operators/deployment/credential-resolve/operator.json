@@ -1,41 +1,16 @@
 {
-  "schemaVersion": 6,
+  "schemaVersion": 7,
   "id": "deployment/credential-resolve",
   "domain": "deployment",
+  "job": "Resolves opaque credential handles for the approved execution plan.",
   "inputSchema": "input.schema.json",
   "outputSchema": "output.schema.json",
-  "knowledgeRefs": [
-    "deployment.lifecycle"
-  ],
   "sourceReferenceRefs": [],
-  "accepts": [
-    {
-      "stage": "deployment.credentials",
-      "status": "ready",
-      "allFacts": [
-        "deployment-execution-root-ready"
-      ],
-      "noneFacts": []
-    }
-  ],
-  "emits": [
-    {
-      "stage": "deployment.host",
-      "status": "ready",
-      "factsAdd": [
-        "deployment-credentials-ready"
-      ],
-      "factsRemove": []
-    }
-  ],
   "sideEffects": [
-    "keep all intermediate data in task-session memory only",
-    "purge every intermediate session object at each parent-skill terminal state"
+    "read only the supplied exact references"
   ],
   "stopConditions": [
-    "required evidence is missing or stale",
-    "the result would cross the declared boundary",
-    "intermediate data would persist outside the task session",
-    "broad source context, an undeclared command or resource, or a raw secret would be loaded"
+    "an exact reference is missing or its fingerprint differs",
+    "the requested work exceeds this operator job"
   ]
 }

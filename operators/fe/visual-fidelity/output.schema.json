@@ -1,1 +1,91 @@
-{"$schema":"https://json-schema.org/draft/2020-12/schema","$id":"https://starci.dev/v6/operators/fe/visual-fidelity/output.schema.json","type":"object","additionalProperties":false,"required":["schemaVersion","runId","stage","status","facts","payload"],"properties":{"schemaVersion":{"const":6},"runId":{"type":"string","minLength":1},"stage":{"const":"frontend.fidelity.result"},"status":{"enum":["passed","repair","blocked"]},"facts":{"type":"array","uniqueItems":true,"items":{"type":"string"}},"payload":{"type":"object","additionalProperties":false,"required":["decision","state","produced","context","cleanup","evidenceRefs","findings","artifact"],"properties":{"decision":{"enum":["passed","repair","blocked"]},"state":{"$ref":"#/$defs/state"},"produced":{"$ref":"#/$defs/produced"},"context":{"$ref":"#/$defs/context"},"cleanup":{"$ref":"#/$defs/cleanup"},"evidenceRefs":{"type":"array","minItems":1,"items":{"$ref":"#/$defs/ref"}},"findings":{"type":"array","uniqueItems":true,"items":{"type":"string"}},"artifact":{"type":"object","additionalProperties":false,"required":["artifactType","approvedStructureHash","observedStructureHash","checks","screenshots","failures"],"properties":{"artifactType":{"const":"frontend-fidelity-report"},"approvedStructureHash":{"$ref":"#/$defs/hash"},"observedStructureHash":{"$ref":"#/$defs/hash"},"checks":{"type":"array","minItems":9,"uniqueItems":true,"items":{"type":"object","additionalProperties":false,"required":["kind","status","expectedRef","observedRef"],"properties":{"kind":{"enum":["surface-count","surface-nesting","surface-order","breadcrumb","icon-policy","separator-policy","actions-state","sticky-scroll","responsive","visual","interaction","accessibility"]},"status":{"enum":["passed","failed","blocked"]},"expectedRef":{"$ref":"#/$defs/ref"},"observedRef":{"$ref":"#/$defs/ref"}}}},"screenshots":{"type":"array","minItems":1,"items":{"type":"object","additionalProperties":false,"required":["baselineRef","observedRef","viewport","stateId","seedRef"],"properties":{"baselineRef":{"$ref":"#/$defs/ref"},"observedRef":{"$ref":"#/$defs/ref"},"viewport":{"type":"string","minLength":1},"stateId":{"type":"string","minLength":1},"seedRef":{"$ref":"#/$defs/ref"}}}},"failures":{"type":"array","uniqueItems":true,"items":{"type":"object","additionalProperties":false,"required":["kind","targetId","severity","repairCapability"],"properties":{"kind":{"type":"string","minLength":1},"targetId":{"type":"string","minLength":1},"severity":{"enum":["hard","soft"]},"repairCapability":{"enum":["frontend.implementation","frontend.ui-detail"]}}}}}}}}},"$defs":{"ref":{"type":"string","minLength":1},"hash":{"type":"string","pattern":"^sha256:[0-9a-f]{64}$"},"state":{"type":"object","additionalProperties":false,"required":["operator","status","code","retryable","emits"],"properties":{"operator":{"const":"fe/visual-fidelity"},"status":{"enum":["passed","repair","blocked"]},"code":{"enum":["frontend-fidelity-passed","frontend-fidelity-repair","frontend-fidelity-blocked"]},"retryable":{"type":"boolean"},"emits":{"type":"object","additionalProperties":false,"required":["stage","status","factsAdd","factsRemove"],"properties":{"stage":{"const":"frontend.fidelity.result"},"status":{"enum":["passed","repair","blocked"]},"factsAdd":{"type":"array","items":{"type":"string"}},"factsRemove":{"type":"array","items":{"type":"string"}}}}}},"produced":{"type":"object","additionalProperties":false,"required":["artifactRefs","mutations","externalEffects"],"properties":{"artifactRefs":{"type":"array","minItems":1,"items":{"$ref":"#/$defs/ref"}},"mutations":{"type":"array","maxItems":0},"externalEffects":{"type":"array","maxItems":0}}},"context":{"type":"object","additionalProperties":false,"required":["used"],"properties":{"used":{"type":"array","minItems":1,"items":{"type":"object","additionalProperties":false,"required":["kind","ref","revision"],"properties":{"kind":{"enum":["approved-detail","implementation-receipt","running-app","baseline","knowledge"]},"ref":{"$ref":"#/$defs/ref"},"revision":{"$ref":"#/$defs/ref"}}}}}},"cleanup":{"type":"object","additionalProperties":false,"required":["scratchRefs","retention","purgeAt"],"properties":{"scratchRefs":{"type":"array","items":{"$ref":"#/$defs/ref"}},"retention":{"const":"until-skill-terminal"},"purgeAt":{"const":"skill-terminal"}}}}}
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://starci.dev/v7.0/operators/fe/visual-fidelity/output.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "operatorId",
+    "output"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "const": 7
+    },
+    "operatorId": {
+      "const": "fe/visual-fidelity"
+    },
+    "output": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "outcome",
+        "result",
+        "gaps",
+        "evidenceRefs"
+      ],
+      "properties": {
+        "outcome": {
+          "description": "Legacy semantic result consumed only by the Skill machine.",
+          "enum": [
+            "passed",
+            "repair",
+            "blocked"
+          ]
+        },
+        "result": {
+          "description": "The atomic job result, or null when blocked.",
+          "anyOf": [
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "summary",
+                "artifactRefs"
+              ],
+              "properties": {
+                "summary": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "artifactRefs": {
+                  "type": "array",
+                  "maxItems": 64,
+                  "uniqueItems": true,
+                  "items": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                }
+              }
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "gaps": {
+          "description": "Exact missing authority or evidence; empty when complete.",
+          "type": "array",
+          "maxItems": 32,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "evidenceRefs": {
+          "description": "Exact evidence used to produce the result.",
+          "type": "array",
+          "maxItems": 64,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "minItems": 1
+        }
+      }
+    }
+  }
+}

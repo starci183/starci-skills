@@ -28,7 +28,7 @@ function git(repository, ...args) {
 }
 
 function fixture(t, {
-  runtimeVersion = '6.0.0',
+  runtimeVersion = '7.0.0',
   configVersion = 6,
   routeVersion = 6,
   role = 'be',
@@ -72,15 +72,13 @@ function fixture(t, {
     ? {
         ...common,
         schemaVersion: 6,
-        context: { instructions: [], contract: null, contractSource: null, manifests: ['package.json'], grammarId: grammar }
+        context: { instructions: [], manifests: ['package.json'], grammarId: grammar }
       }
     : {
         ...common,
         version: 1,
         context: {
           instructions: [],
-          contract: null,
-          contractSource: null,
           manifests: ['package.json'],
           grammar,
           grammarProfile: grammar
@@ -150,12 +148,12 @@ test('blocks ambiguous legacy Grammar and unregistered worktrees without mutatin
   assert.equal(JSON.parse(readFileSync(join(grammarFixture.source, '.workspaces', 'projects', 'source', 'fe.json'), 'utf8')).version, 1);
 
   const worktreeFixture = fixture(t);
-  const foreign = join(worktreeFixture.source, '.worktrees', 'source', 'businesses');
+  const foreign = join(worktreeFixture.source, '.worktrees', 'businesses');
   mkdirSync(foreign, { recursive: true });
   execFileSync('git', ['init', '-b', 'main', foreign], { stdio: 'ignore', windowsHide: true });
   const worktreeReport = inspectSource({ sourceRoot: worktreeFixture.source, repositoriesRoot: worktreeFixture.repositories });
   assert.equal(worktreeReport.modules.worktrees.status, 'blocked');
-  assert.deepEqual(worktreeReport.modules.worktrees.unregisteredPaths, ['.worktrees/source/businesses']);
+  assert.deepEqual(worktreeReport.modules.worktrees.unregisteredPaths, ['.worktrees/businesses']);
 });
 
 test('does not confuse clean reference clones with Source-owned Git worktrees', (t) => {

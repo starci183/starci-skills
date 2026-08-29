@@ -1,0 +1,6 @@
+interface:
+  display_name: "StarCi Platform Operate"
+  short_description: "Operate one bounded shared platform service"
+  default_prompt: "Use $starci-platform-operate to reconcile this shared platform boundary."
+policy:
+  allow_implicit_invocation: true

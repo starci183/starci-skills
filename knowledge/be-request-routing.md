@@ -13,6 +13,6 @@ A backend run begins from verified authority, not remembered repository state. B
 
 ## Routing law
 
-The source partition is `/be/<project>/` in `starci-context-v1`. A Qdrant hit is discovery evidence only: open the exact authoritative file from the verified checkout before using its contents. Record query, point identity, virtual path, repository revision, file hash, and observation time in a source receipt.
+The source partition is `/be/<project>/` in `starci-context-v1`. A default-search hit is discovery evidence only: open the exact authoritative file from the verified checkout before using its contents. Record query, point identity, virtual path, repository revision, file hash, and observation time in a source receipt.
 
-Product-facing work requires a current accepted business capability. Purely technical work must bind an existing implemented authority and must not silently reopen it. Missing/stale routes, mixed repositories, ambiguous impact, unavailable Qdrant, or writes outside the declared roots stop before downstream knowledge is loaded.
+Product-facing work requires a current accepted business capability. Purely technical work must bind an existing implemented authority and must not silently reopen it. Missing/stale routes, mixed repositories, ambiguous impact, unavailable default search, or writes outside the declared roots stop before downstream knowledge is loaded.

@@ -1,5 +1,9 @@
 # `core/handoff-ack` input
 
-## JSON architecture
-
-`provided` actively supplies objectiveId, consumerCapability, handoffRef. `loads` passively binds artifactRefs, acceptedSha256 from the current task session. `session` owns closed ephemeral storage; no payload is persisted outside the task.
+- `context.handoffRef`: immutable handoff reference.
+- `context.handoffSha256`: immutable handoff hash.
+- `context.objectiveId`: handoff objective.
+- `context.artifacts`: complete handoff artifact set.
+- `input.objectiveId`: consumer-accepted objective.
+- `input.consumerCapability`: accepting capability.
+- `input.acceptedArtifacts`: complete consumer-accepted artifact set.

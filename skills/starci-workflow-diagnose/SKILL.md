@@ -1,25 +1,11 @@
 ---
 name: starci-workflow-diagnose
-description: "Use to find why one workflow fails and return a report-only diagnosis without changing source or external state. Do not use for readiness inventory, approved repair, quality debt, or rule-binding audit."
+description: "Diagnose one workflow failure without repairing source."
 ---
 
 # starci-workflow-diagnose
 
-Use to find why one workflow fails and return a report-only diagnosis without changing source or external state. Do not use for readiness inventory, approved repair, quality debt, or rule-binding audit.
+Diagnose one workflow failure without repairing source. Accept intent modes instead of phase-specific public skills. Own exactly one durable boundary: one immutable diagnosis report.
 
-## INPUT ANALYSIS
+Strongly challenge the requested method against evidence, ownership, reversibility, and simpler alternatives while preserving its outcome. Ask only at a genuine authority dead end. Read [peer contracts](references/peer-contracts.md) for typed CALL/RETURN/resume and no-progress rules.
 
-Require the ephemeral global selection, read `input.md`, validate `input.schema.json`, then follow local `analyze-input.md`. This skill owns one flow with fixed first state `diagnose`; local analysis only validates and normalizes scope without loading operator knowledge.
-
-## STATE MACHINE
-
-Execute `machine.json` through `execute.md`. Branches and loops are machine-owned; operators never invoke one another. An omitted `selection.mode` is `gated`: stop at waits for the exact displayed revision. With explicit `selection.mode=bypass`, bind the displayed revision to an ephemeral bypass-authorization receipt and continue only to the wait state's declared `approval.bypassTarget`. Finish only at a terminal and purge all intermediates while preserving authorized durable mutations.
-
-## CONTEXT CONTRACT
-
-| State or phase | Allowed | Forbidden |
-| --- | --- | --- |
-| `diagnosis or inventory` | declared command fingerprints, cached green receipts and exact failing evidence | unrelated source, broad Qdrant and speculative fixes |
-| `approval` | one finding/debt identity, baseline, boundary and approval hash | source bodies and other findings |
-| `repair` | only approved exact files and narrow repair law | scope expansion, unrelated findings and whole-repository scans |
-| `verification + loop` | independent proof, prior fingerprint, loop counter and residual identity | stale observations and reloaded unrelated context |

@@ -1,1 +1,16 @@
-{"schemaVersion":6,"id":"fe/product-potential","domain":"fe","inputSchema":"input.schema.json","outputSchema":"output.schema.json","knowledgeRefs":["fe.customer-journey","business.authority-lifecycle"],"sourceReferenceRefs":[],"accepts":[{"stage":"product.potential.assess","status":"ready","allFacts":["potential-signals-present"],"noneFacts":[]}],"emits":[{"stage":"product.potential.result","status":"ready","factsAdd":["potential-assessed"],"factsRemove":[]},{"stage":"product.potential.result","status":"blocked","factsAdd":[],"factsRemove":[]}],"sideEffects":["write assessment only to task-session storage"],"stopConditions":["potential is treated as approved business","missing evidence","mutation is executed"]}
+{
+  "schemaVersion": 7,
+  "id": "fe/product-potential",
+  "domain": "fe",
+  "job": "product potential one closed frontend target.",
+  "inputSchema": "input.schema.json",
+  "outputSchema": "output.schema.json",
+  "contextRefs": [],
+  "sourceReferenceRefs": [],
+  "sideEffects": [],
+  "stopConditions": [
+    "required authority or evidence is missing or stale",
+    "the closed target boundary is ambiguous",
+    "completion would require another operator job"
+  ]
+}

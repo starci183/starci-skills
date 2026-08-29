@@ -1,0 +1,20 @@
+{
+  "schemaVersion": 7,
+  "id": "fe/source-apply",
+  "domain": "fe",
+  "job": "Apply one frozen frontend contract to one exact source boundary.",
+  "inputSchema": "input.schema.json",
+  "outputSchema": "output.schema.json",
+  "contextRefs": [
+    "fe.ui"
+  ],
+  "sourceReferenceRefs": [],
+  "sideEffects": [
+    "mutate only the exact frozen frontend source boundary"
+  ],
+  "stopConditions": [
+    "required authority is missing or stale",
+    "the target boundary is ambiguous",
+    "the job would require internal routing"
+  ]
+}

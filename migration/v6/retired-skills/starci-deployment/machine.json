@@ -1,0 +1,585 @@
+{
+  "$schema": "../machine.schema.json",
+  "schemaVersion": 6,
+  "id": "starci-deployment",
+  "start": "analyze-input",
+  "states": {
+    "analyze-input": {
+      "kind": "analysis",
+      "on": [
+        {
+          "when": {},
+          "target": "route",
+          "label": "enter route"
+        }
+      ]
+    },
+    "route": {
+      "kind": "operator",
+      "ref": "workspace/route-verify",
+      "on": [
+        {
+          "when": {
+            "outputEquals": {
+              "outcome": "ready"
+            }
+          },
+          "target": "intent",
+          "label": "ready"
+        },
+        {
+          "when": {
+            "outputEquals": {
+              "outcome": "initialize-required"
+            }
+          },
+          "target": "blocked",
+          "label": "initialize-required"
+        },
+        {
+          "when": {
+            "outputEquals": {
+              "outcome": "blocked"
+            }
+          },
+          "target": "blocked",
+          "label": "blocked"
+        }
+      ]
+    },
+    "intent": {
+      "kind": "operator",
+      "ref": "deployment/intent-bind",
+      "on": [
+        {
+          "when": {
+            "outputEquals": {
+              "outcome": "ready"
+            }
+          },
+          "target": "manifest",
+          "label": "ready"
+        }
+      ]
+    },
+    "blocked": {
+      "kind": "terminal",
+      "result": "blocked"
+    },
+    "manifest": {
+      "kind": "operator",
+      "ref": "deployment/manifest-validate",
+      "on": [
+        {
+          "when": {
+            "outputEquals": {
+              "outcome": "ready"
+            }
+          },
+          "target": "plan",
+          "label": "ready"
+        }
+      ]
+    },
+    "plan": {
+      "kind": "operator",
+      "ref": "deployment/execution-plan",
+      "on": [
+        {
+          "when": {
+            "outputEquals": {
+              "outcome": "execute"
+            }
+          },
+          "target": "execution-root",
+          "label": "execute"
+        },
+        {
+          "when": {
+            "outputEquals": {
+              "outcome": "approval-required"
+            }
+          },
+          "target": "approval",
+          "label": "approval-required"
+        },
+        {
+          "when": {
+            "outputEquals": {
+              "outcome": "blocked"
+            }
+          },
+          "target": "blocked",
+          "label": "blocked"
+        }
+      ]
+    },
+    "execution-root": {
+      "kind": "operator",
+      "ref": "deployment/execution-root-init",
+      "on": [
+        {
+          "when": {
+            "outputEquals": {
+              "outcome": "ready"
+            }
+          },
+          "target": "credentials",
+          "label": "ready"
+        }
+      ]
+    },
+    "approval": {
+      "kind": "wait",
+      "approval": {
+        "prompt": "Approve only new host/domain/tenant/project/destructive/rotation deployment boundary.",
+        "approve": "OK DEPLOY <hash>",
+        "reject": "REJECT DEPLOY <hash>",
+        "bypassTarget": "execution-root"
+      },
+      "on": [
+        {
+          "when": {
+            "stage": "deployment.review",
+            "status": "approved"
+          },
+          "target": "execution-root"
+        },
+        {
+          "when": {
+            "stage": "deployment.review",
+            "status": "rejected"
+          },
+          "target": "rejected"
+        }
+      ]
+    },
+    "credentials": {
+      "kind": "operator",
+      "ref": "deployment/credential-resolve",
+      "on": [
+        {
+          "when": {
+            "outputEquals": {
+              "outcome": "ready"
+            }
+          },
+          "target": "host",
+          "label": "ready"
+        }
+      ]
+    },
+    "rejected": {
+      "kind": "terminal",
+      "result": "rejected"
+    },
+    "host": {
+      "kind": "operator",
+      "ref": "deployment/host-prepare",
+      "on": [
+        {
+          "when": {
+            "outputEquals": {
+              "outcome": "ready"
+            }
+          },
+          "target": "artifact-build",
+          "label": "ready"
+        }
+      ]
+    },
+    "artifact-build": {
+      "kind": "operator",
+      "ref": "deployment/artifact-build",
+      "on": [
+        {
+          "when": {
+            "outputEquals": {
+              "outcome": "ready"
+            }
+          },
+          "target": "artifact-publish",
+          "label": "ready"
+        }
+      ]
+    },
+    "artifact-publish": {
+      "kind": "operator",
+      "ref": "deployment/artifact-publish",
+      "on": [
+        {
+          "when": {
+            "outputEquals": {
+              "outcome": "ready"
+            }
+          },
+          "target": "migration",
+          "label": "ready"
+        }
+      ]
+    },
+    "migration": {
+      "kind": "operator",
+      "ref": "deployment/migration",
+      "on": [
+        {
+          "when": {
+            "outputEquals": {
+              "outcome": "applied"
+            }
+          },
+          "target": "domain",
+          "label": "applied"
+        },
+        {
+          "when": {
+            "outputEquals": {
+              "outcome": "not-applicable"
+            }
+          },
+          "target": "domain",
+          "label": "not-applicable"
+        },
+        {
+          "when": {
+            "outputEquals": {
+              "outcome": "rollback"
+            }
+          },
+          "target": "rollback",
+          "label": "rollback"
+        },
+        {
+          "when": {
+            "outputEquals": {
+              "outcome": "blocked"
+            }
+          },
+          "target": "blocked",
+          "label": "blocked"
+        }
+      ]
+    },
+    "domain": {
+      "kind": "operator",
+      "ref": "deployment/domain-reconcile",
+      "on": [
+        {
+          "when": {
+            "outputEquals": {
+              "outcome": "ready"
+            }
+          },
+          "target": "rollout",
+          "label": "ready"
+        }
+      ]
+    },
+    "rollback": {
+      "kind": "operator",
+      "ref": "deployment/rollback",
+      "on": [
+        {
+          "when": {
+            "outputEquals": {
+              "outcome": "rolled-back"
+            }
+          },
+          "target": "proof",
+          "label": "rolled-back"
+        },
+        {
+          "when": {
+            "outputEquals": {
+              "outcome": "partial"
+            }
+          },
+          "target": "blocked",
+          "label": "partial"
+        },
+        {
+          "when": {
+            "outputEquals": {
+              "outcome": "external-error"
+            }
+          },
+          "target": "blocked",
+          "label": "external-error"
+        },
+        {
+          "when": {
+            "outputEquals": {
+              "outcome": "blocked"
+            }
+          },
+          "target": "blocked",
+          "label": "blocked"
+        }
+      ]
+    },
+    "rollout": {
+      "kind": "operator",
+      "ref": "deployment/rollout",
+      "on": [
+        {
+          "when": {
+            "outputEquals": {
+              "outcome": "ready"
+            }
+          },
+          "target": "monitor",
+          "label": "ready"
+        },
+        {
+          "when": {
+            "outputEquals": {
+              "outcome": "partial"
+            }
+          },
+          "target": "blocked",
+          "label": "partial"
+        },
+        {
+          "when": {
+            "outputEquals": {
+              "outcome": "external-error"
+            }
+          },
+          "target": "blocked",
+          "label": "external-error"
+        },
+        {
+          "when": {
+            "outputEquals": {
+              "outcome": "blocked"
+            }
+          },
+          "target": "blocked",
+          "label": "blocked"
+        }
+      ]
+    },
+    "proof": {
+      "kind": "operator",
+      "ref": "deployment/proof",
+      "on": [
+        {
+          "when": {
+            "outputEquals": {
+              "outcome": "complete"
+            }
+          },
+          "target": "reconcile-choice",
+          "label": "complete"
+        },
+        {
+          "when": {
+            "outputEquals": {
+              "outcome": "rolled-back"
+            }
+          },
+          "target": "rolled-back",
+          "label": "rolled-back"
+        },
+        {
+          "when": {
+            "outputEquals": {
+              "outcome": "external-error"
+            }
+          },
+          "target": "blocked",
+          "label": "external-error"
+        },
+        {
+          "when": {
+            "outputEquals": {
+              "outcome": "blocked"
+            }
+          },
+          "target": "blocked",
+          "label": "blocked"
+        }
+      ]
+    },
+    "monitor": {
+      "kind": "operator",
+      "ref": "deployment/monitor",
+      "on": [
+        {
+          "when": {
+            "outputEquals": {
+              "outcome": "progressing"
+            }
+          },
+          "target": "monitor",
+          "label": "progressing"
+        },
+        {
+          "when": {
+            "outputEquals": {
+              "outcome": "external-error"
+            }
+          },
+          "target": "monitor",
+          "label": "external-error"
+        },
+        {
+          "when": {
+            "outputEquals": {
+              "outcome": "steady"
+            }
+          },
+          "target": "proof",
+          "label": "steady"
+        },
+        {
+          "when": {
+            "outputEquals": {
+              "outcome": "recover"
+            }
+          },
+          "target": "recover",
+          "label": "recover"
+        },
+        {
+          "when": {
+            "outputEquals": {
+              "outcome": "rollback"
+            }
+          },
+          "target": "rollback",
+          "label": "rollback"
+        },
+        {
+          "when": {
+            "outputEquals": {
+              "outcome": "blocked"
+            }
+          },
+          "target": "blocked",
+          "label": "blocked"
+        }
+      ]
+    },
+    "reconcile-choice": {
+      "kind": "choice",
+      "on": [
+        {
+          "when": {
+            "inputEquals": {
+              "options.reconcileBusiness": true
+            }
+          },
+          "target": "business-reconcile"
+        },
+        {
+          "when": {
+            "inputEquals": {
+              "options.reconcileBusiness": false
+            }
+          },
+          "target": "complete"
+        }
+      ]
+    },
+    "rolled-back": {
+      "kind": "terminal",
+      "result": "rolled-back"
+    },
+    "recover": {
+      "kind": "operator",
+      "ref": "deployment/recover",
+      "on": [
+        {
+          "when": {
+            "outputEquals": {
+              "outcome": "retry"
+            }
+          },
+          "target": "monitor",
+          "label": "retry"
+        },
+        {
+          "when": {
+            "outputEquals": {
+              "outcome": "rollback"
+            }
+          },
+          "target": "rollback",
+          "label": "rollback"
+        },
+        {
+          "when": {
+            "outputEquals": {
+              "outcome": "approval-required"
+            }
+          },
+          "target": "recovery-approval",
+          "label": "approval-required"
+        },
+        {
+          "when": {
+            "outputEquals": {
+              "outcome": "blocked"
+            }
+          },
+          "target": "blocked",
+          "label": "blocked"
+        }
+      ]
+    },
+    "business-reconcile": {
+      "kind": "operator",
+      "ref": "business/reconcile",
+      "on": [
+        {
+          "when": {
+            "outputEquals": {
+              "outcome": "implemented"
+            }
+          },
+          "target": "complete",
+          "label": "implemented"
+        },
+        {
+          "when": {
+            "outputEquals": {
+              "outcome": "discrepancy"
+            }
+          },
+          "target": "blocked",
+          "label": "discrepancy"
+        }
+      ]
+    },
+    "complete": {
+      "kind": "terminal",
+      "result": "complete"
+    },
+    "recovery-approval": {
+      "kind": "wait",
+      "approval": {
+        "prompt": "Approve the exact recovery boundary.",
+        "approve": "OK DEPLOY <hash>",
+        "reject": "REJECT DEPLOY <hash>",
+        "bypassTarget": "recover"
+      },
+      "on": [
+        {
+          "when": {
+            "stage": "deployment.review",
+            "status": "approved"
+          },
+          "target": "recover"
+        },
+        {
+          "when": {
+            "stage": "deployment.review",
+            "status": "rejected"
+          },
+          "target": "rejected"
+        }
+      ]
+    }
+  }
+}

@@ -1,27 +1,85 @@
 {
-  "$id": "https://starci.dev/v6/operators/platform/tunnel-plan/input.schema.json", "$schema": "https://json-schema.org/draft/2020-12/schema", "title": "platform/tunnel-plan operator input",
-  "type": "object", "additionalProperties": false, "required": ["schemaVersion", "runId", "stage", "status", "facts", "payload"],
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://starci.dev/v7.0/operators/platform/tunnel-plan/input.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "operatorId", "context", "input"],
   "properties": {
-    "schemaVersion": { "const": 6 }, "runId": { "type": "string", "minLength": 1 }, "stage": { "const": "platform.tunnel.plan" }, "status": { "const": "ready" }, "facts": { "$ref": "#/$defs/strings" },
-    "payload": { "type": "object", "additionalProperties": false, "required": ["provided", "loads", "session"], "properties": {
-      "provided": { "type": "object", "additionalProperties": false, "required": ["routeReceiptRef", "hostnameRef", "originRef", "ownershipRef"], "properties": { "routeReceiptRef": { "$ref": "#/$defs/sessionRef" }, "hostnameRef": { "$ref": "#/$defs/sessionRef" }, "originRef": { "$ref": "#/$defs/sessionRef" }, "ownershipRef": { "$ref": "#/$defs/sessionRef" } } },
-      "loads": { "type": "object", "additionalProperties": false, "required": ["artifacts", "knowledge", "source", "external", "orchestration"], "properties": {
-        "artifacts": { "type": "array", "minItems": 4, "maxItems": 4, "uniqueItems": true, "items": { "$ref": "#/$defs/artifactLoad" } },
-        "knowledge": { "type": "array", "minItems": 1, "maxItems": 1, "items": { "$ref": "#/$defs/knowledgeLoad" } }, "source": { "$ref": "#/$defs/sourceLoad" }, "external": { "$ref": "#/$defs/externalLoad" }, "orchestration": { "$ref": "#/$defs/orchestration" }
-      } },
-      "session": { "type": "object", "additionalProperties": false, "required": ["taskId", "inputRef", "outputRef", "scratchPrefix", "retention"], "properties": { "taskId": { "type": "string", "minLength": 1 }, "inputRef": { "$ref": "#/$defs/sessionRef" }, "outputRef": { "$ref": "#/$defs/sessionRef" }, "scratchPrefix": { "$ref": "#/$defs/sessionRef" }, "retention": { "const": "until-skill-terminal" } } }
-    } }
+    "schemaVersion": { "const": 7 },
+    "operatorId": { "const": "platform/tunnel-plan" },
+    "context": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["authority", "observedState"],
+      "properties": {
+        "authority": {
+          "description": "Exact account, zone, owner, route revision, and credential-custody authority for this ingress.",
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["accountId", "zoneId", "owner", "routeRevision", "credentialCustodyRef", "evidenceRef"],
+          "properties": {
+            "accountId": { "$ref": "#/$defs/id" },
+            "zoneId": { "$ref": "#/$defs/id" },
+            "owner": { "$ref": "#/$defs/id" },
+            "routeRevision": { "type": "string", "minLength": 1 },
+            "credentialCustodyRef": { "type": "string", "minLength": 1 },
+            "evidenceRef": { "type": "string", "minLength": 1 }
+          }
+        },
+        "observedState": {
+          "description": "Value-safe current metadata for only the declared tunnel, hostname, DNS record, and origin.",
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["tunnel", "dns", "route", "evidenceRefs"],
+          "properties": {
+            "tunnel": { "anyOf": [{ "$ref": "#/$defs/tunnel" }, { "type": "null" }] },
+            "dns": { "anyOf": [{ "$ref": "#/$defs/dns" }, { "type": "null" }] },
+            "route": { "anyOf": [{ "$ref": "#/$defs/route" }, { "type": "null" }] },
+            "evidenceRefs": { "$ref": "#/$defs/evidenceRefs" }
+          }
+        }
+      }
+    },
+    "input": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["requestedIngress"],
+      "properties": {
+        "requestedIngress": {
+          "description": "The single desired tunnel, hostname, origin, and protocol tuple to plan.",
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["tunnelId", "hostname", "origin", "protocol", "proxied"],
+          "properties": {
+            "tunnelId": { "$ref": "#/$defs/id" },
+            "hostname": { "$ref": "#/$defs/hostname" },
+            "origin": { "$ref": "#/$defs/origin" },
+            "protocol": { "enum": ["http", "https"] },
+            "proxied": { "const": true }
+          }
+        }
+      }
+    }
   },
   "$defs": {
-    "sha256": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" }, "sessionRef": { "type": "string", "pattern": "^session://tasks/[A-Za-z0-9._-]+/.+$" }, "strings": { "type": "array", "uniqueItems": true, "items": { "type": "string", "minLength": 1 } },
-    "artifactLoad": { "type": "object", "additionalProperties": false, "required": ["ref", "revision", "loadMode"], "properties": { "ref": { "$ref": "#/$defs/sessionRef" }, "revision": { "$ref": "#/$defs/sha256" }, "loadMode": { "const": "session-exact" } } },
-    "knowledgeLoad": { "type": "object", "additionalProperties": false, "required": ["id", "generation", "contentSha256", "loadMode"], "properties": { "id": { "const": "platform.tunnel" }, "generation": { "type": "string", "minLength": 1 }, "contentSha256": { "$ref": "#/$defs/sha256" }, "loadMode": { "const": "qdrant-exact" } } },
-    "sourceLoad": { "type": "object", "additionalProperties": false, "required": ["loadMode", "repositoryContext", "targetFiles"], "properties": { "loadMode": { "const": "exact-files" }, "repositoryContext": { "const": false }, "targetFiles": { "type": "array", "minItems": 1, "uniqueItems": true, "items": { "type": "object", "additionalProperties": false, "required": ["path", "beforeSha256", "access", "purpose"], "properties": { "path": { "type": "string", "minLength": 1 }, "beforeSha256": { "$ref": "#/$defs/sha256" }, "access": { "const": "read" }, "purpose": { "type": "string", "minLength": 1 } } } } } },
-    "externalLoad": { "type": "object", "additionalProperties": false, "required": ["loadMode", "resources", "credentialHandles"], "properties": {
-      "loadMode": { "const": "declared-only" },
-      "resources": { "type": "array", "minItems": 1, "uniqueItems": true, "items": { "type": "object", "additionalProperties": false, "required": ["ref", "revision", "kind", "access"], "properties": { "ref": { "$ref": "#/$defs/sessionRef" }, "revision": { "type": "string", "minLength": 1 }, "kind": { "enum": ["cloudflare-account", "cloudflare-tunnel", "dns-hostname", "origin", "ownership-record"] }, "access": { "const": "read" } } } },
-      "credentialHandles": { "type": "array", "minItems": 1, "uniqueItems": true, "items": { "type": "object", "additionalProperties": false, "required": ["ref", "provider", "access"], "properties": { "ref": { "$ref": "#/$defs/sessionRef" }, "provider": { "const": "cloudflare" }, "access": { "const": "opaque-read-handle" } } } }
-    } },
-    "orchestration": { "type": "object", "additionalProperties": false, "required": ["mode", "profileRef", "providerRef"], "properties": { "mode": { "enum": ["economical", "balanced", "parallel"] }, "profileRef": { "enum": ["orchestration/modes/economical.json", "orchestration/modes/balanced.json", "orchestration/modes/parallel.json"] }, "providerRef": { "type": "string", "pattern": "^orchestration/providers/[a-z0-9-]+\\.json$" } } }
+    "id": { "type": "string", "pattern": "^[A-Za-z0-9._-]+$" },
+    "hostname": { "type": "string", "pattern": "^[a-z0-9](?:[a-z0-9.-]*[a-z0-9])?$" },
+    "origin": { "type": "string", "pattern": "^https?://[^\\s]+$" },
+    "evidenceRefs": { "type": "array", "minItems": 1, "maxItems": 16, "uniqueItems": true, "items": { "type": "string", "minLength": 1 } },
+    "tunnel": {
+      "type": "object", "additionalProperties": false,
+      "required": ["tunnelId", "owner", "revision"],
+      "properties": { "tunnelId": { "$ref": "#/$defs/id" }, "owner": { "$ref": "#/$defs/id" }, "revision": { "type": "string", "minLength": 1 } }
+    },
+    "dns": {
+      "type": "object", "additionalProperties": false,
+      "required": ["hostname", "target", "proxied", "owner", "revision"],
+      "properties": { "hostname": { "$ref": "#/$defs/hostname" }, "target": { "type": "string", "minLength": 1 }, "proxied": { "type": "boolean" }, "owner": { "$ref": "#/$defs/id" }, "revision": { "type": "string", "minLength": 1 } }
+    },
+    "route": {
+      "type": "object", "additionalProperties": false,
+      "required": ["hostname", "origin", "owner", "revision"],
+      "properties": { "hostname": { "$ref": "#/$defs/hostname" }, "origin": { "$ref": "#/$defs/origin" }, "owner": { "$ref": "#/$defs/id" }, "revision": { "type": "string", "minLength": 1 } }
+    }
   }
 }

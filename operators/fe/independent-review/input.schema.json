@@ -1,0 +1,83 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://starci.dev/v7/operators/fe/independent-review/input.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "operatorId",
+    "context",
+    "input"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "const": 7
+    },
+    "operatorId": {
+      "const": "fe/independent-review"
+    },
+    "context": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "frozenAuthority",
+        "frozenEvidence",
+        "uiKnowledgeId"
+      ],
+      "properties": {
+        "frozenAuthority": {
+          "description": "Frozen authority visible to the independent reviewer.",
+          "type": "array",
+          "uniqueItems": true,
+          "maxItems": 64,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "minItems": 1
+        },
+        "frozenEvidence": {
+          "description": "Frozen render and source evidence visible to the independent reviewer.",
+          "type": "array",
+          "uniqueItems": true,
+          "maxItems": 64,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "minItems": 1
+        },
+        "uiKnowledgeId": {
+          "description": "Exact StarCi-native frontend UI knowledge binding.",
+          "const": "fe.ui"
+        }
+      }
+    },
+    "input": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "reviewTarget",
+        "reviewLenses"
+      ],
+      "properties": {
+        "reviewTarget": {
+          "description": "The one target under independent review.",
+          "type": "string",
+          "minLength": 1
+        },
+        "reviewLenses": {
+          "description": "Closed review lenses.",
+          "type": "array",
+          "uniqueItems": true,
+          "maxItems": 64,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "minItems": 1
+        }
+      }
+    }
+  }
+}

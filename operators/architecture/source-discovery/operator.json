@@ -1,44 +1,16 @@
 {
-  "schemaVersion": 6,
+  "schemaVersion": 7,
   "id": "architecture/source-discovery",
   "domain": "architecture",
+  "job": "Discover one bounded source topology from exact routed source references.",
   "inputSchema": "input.schema.json",
   "outputSchema": "output.schema.json",
-  "knowledgeRefs": [
-    "be.boundary-planning"
-  ],
-  "sourceReferenceRefs": [
-    "starci-academy-be"
-  ],
-  "accepts": [
-    {
-      "stage": "architecture.source",
-      "status": "ready",
-      "allFacts": [
-        "business-head-ready"
-      ],
-      "noneFacts": []
-    }
-  ],
-  "emits": [
-    {
-      "stage": "architecture.pattern",
-      "status": "ready",
-      "factsAdd": [
-        "backend-source-ready"
-      ],
-      "factsRemove": []
-    }
-  ],
+  "sourceReferenceRefs": [],
   "sideEffects": [
-    "keep input, output, loaded context, scratch values, worker observations, and receipts in task-session memory only",
-    "purge every intermediate session object at each parent-skill terminal state"
+    "read only the supplied exact references"
   ],
   "stopConditions": [
-    "required evidence is missing or stale",
-    "a monorepo flow is assigned to a repository-level or central component without tracing the owning deployable process, persistence boundary, ingress, egress, and reporting path",
-    "the result would cross the declared boundary",
-    "an intermediate input, output, scratch value, observation, analysis transcript, or receipt would be persisted outside the task session",
-    "repository source context, indexed source summaries, or an undeclared source file would be loaded"
+    "an exact reference is missing or its fingerprint differs",
+    "the requested work exceeds this operator job"
   ]
 }

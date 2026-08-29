@@ -1,0 +1,161 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "operatorId",
+    "context",
+    "input"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "const": 7
+    },
+    "operatorId": {
+      "const": "fe/return-consume"
+    },
+    "context": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "expectedMissionId",
+        "expectedChildId",
+        "expectedResumeState",
+        "expectedReceiptType"
+      ],
+      "properties": {
+        "expectedMissionId": {
+          "description": "Expected mission.",
+          "type": "string",
+          "minLength": 1
+        },
+        "expectedChildId": {
+          "description": "Expected child call.",
+          "type": "string",
+          "minLength": 1
+        },
+        "expectedResumeState": {
+          "description": "Exact FE state to resume.",
+          "type": "string",
+          "minLength": 1
+        },
+        "expectedReceiptType": {
+          "description": "Exact runtime receipt type expected for this continuation.",
+          "enum": [
+            "RETURN",
+            "RESUME"
+          ]
+        }
+      }
+    },
+    "input": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "receipt",
+        "requiredAuthorityRefs",
+        "requiredSourceHeads"
+      ],
+      "properties": {
+        "receipt": {
+          "description": "Typed runtime RETURN receipt to correlate and consume.",
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "version",
+            "receiptId",
+            "type",
+            "missionId",
+            "skillId",
+            "operatorId",
+            "parentId",
+            "childId",
+            "timestamp",
+            "progressFingerprint",
+            "trace"
+          ],
+          "properties": {
+            "version": {
+              "const": "7.0.0"
+            },
+            "receiptId": {
+              "type": "string",
+              "pattern": "^receipt:[A-Za-z0-9._-]+$"
+            },
+            "type": {
+              "enum": [
+                "CALL",
+                "RETURN",
+                "TRANSITION",
+                "WAIT",
+                "RESUME",
+                "SKIP",
+                "ERROR"
+              ]
+            },
+            "missionId": {
+              "type": "string",
+              "minLength": 1
+            },
+            "skillId": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "operatorId": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "parentId": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "childId": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "timestamp": {
+              "type": "string",
+              "format": "date-time"
+            },
+            "progressFingerprint": {
+              "type": "string",
+              "pattern": "^sha256:[0-9a-f]{64}$"
+            },
+            "trace": {
+              "type": "object"
+            }
+          }
+        },
+        "requiredAuthorityRefs": {
+          "description": "Required returned authority.",
+          "type": "array",
+          "uniqueItems": true,
+          "maxItems": 128,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "requiredSourceHeads": {
+          "description": "Required returned source heads.",
+          "type": "array",
+          "uniqueItems": true,
+          "maxItems": 128,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    }
+  }
+}

@@ -1,229 +1,99 @@
 {
-  "$id": "https://starci.dev/v6/operators/source/conversation-query/input.schema.json",
-  "title": "source/conversation-query operator input",
   "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://starci.dev/v7.0/operators/source/conversation-query/input.schema.json",
   "type": "object",
   "additionalProperties": false,
-  "required": [
-    "schemaVersion",
-    "runId",
-    "stage",
-    "status",
-    "facts",
-    "payload"
-  ],
-  "allOf": [
-    {
-      "oneOf": [
-        {
-          "properties": {
-            "stage": {
-              "const": "source.conversation.query"
-            },
-            "status": {
-              "const": "ready"
-            }
-          },
-          "required": [
-            "stage",
-            "status"
-          ]
-        }
-      ]
-    }
-  ],
+  "required": ["schemaVersion", "operatorId", "context", "input"],
   "properties": {
-    "schemaVersion": {
-      "const": 6
-    },
-    "runId": {
-      "type": "string",
-      "minLength": 1
-    },
-    "stage": {
-      "enum": [
-        "source.conversation.query"
-      ]
-    },
-    "status": {
-      "enum": [
-        "ready"
-      ]
-    },
-    "facts": {
-      "type": "array",
-      "uniqueItems": true,
-      "items": {
-        "type": "string",
-        "minLength": 1
-      }
-    },
-    "payload": {
+    "schemaVersion": { "const": 7 },
+    "operatorId": { "const": "source/conversation-query" },
+    "context": {
       "type": "object",
       "additionalProperties": false,
-      "required": [
-        "provided",
-        "loads",
-        "session"
-      ],
+      "required": ["policy", "index", "candidateHeads"],
       "properties": {
-        "provided": {
+        "policy": {
+          "description": "Revision-bound provenance policy governing authorization and data minimization.",
           "type": "object",
           "additionalProperties": false,
-          "required": [
-            "queryRef",
-            "projectRoleRef",
-            "provenanceIndexRef"
-          ],
+          "required": ["revision", "returnRawBodies"],
           "properties": {
-            "queryRef": {
-              "$ref": "#/$defs/sessionRef"
-            },
-            "projectRoleRef": {
-              "$ref": "#/$defs/sessionRef"
-            },
-            "provenanceIndexRef": {
-              "$ref": "#/$defs/sessionRef"
-            }
+            "revision": { "type": "string", "minLength": 1 },
+            "returnRawBodies": { "const": false }
           }
         },
-        "loads": {
+        "index": {
+          "description": "Exact default-search result generation from which the bounded candidates were resolved.",
           "type": "object",
           "additionalProperties": false,
-          "required": [
-            "artifacts",
-            "knowledge",
-            "orchestration"
-          ],
+          "required": ["generation", "status", "headsFingerprint", "evidenceRef"],
           "properties": {
-            "artifacts": {
-              "type": "array",
-              "minItems": 1,
-              "uniqueItems": true,
-              "items": {
-                "type": "object",
-                "additionalProperties": false,
-                "required": [
-                  "ref",
-                  "revision",
-                  "loadMode"
-                ],
-                "properties": {
-                  "ref": {
-                    "$ref": "#/$defs/sessionRef"
-                  },
-                  "revision": {
-                    "$ref": "#/$defs/sha256"
-                  },
-                  "loadMode": {
-                    "const": "session-exact"
-                  }
-                }
-              }
-            },
-            "knowledge": {
-              "type": "array",
-              "minItems": 1,
-              "maxItems": 1,
-              "items": {
-                "type": "object",
-                "additionalProperties": false,
-                "required": [
-                  "id",
-                  "generation",
-                  "contentSha256",
-                  "loadMode"
-                ],
-                "properties": {
-                  "id": {
-                    "enum": [
-                      "source.provenance"
-                    ]
-                  },
-                  "generation": {
-                    "type": "string",
-                    "minLength": 1
-                  },
-                  "contentSha256": {
-                    "$ref": "#/$defs/sha256"
-                  },
-                  "loadMode": {
-                    "const": "qdrant-exact"
-                  }
-                }
-              }
-            },
-            "orchestration": {
-              "type": "object",
-              "additionalProperties": false,
-              "required": [
-                "mode",
-                "profileRef",
-                "providerRef"
-              ],
-              "properties": {
-                "mode": {
-                  "enum": [
-                    "economical",
-                    "balanced",
-                    "parallel"
-                  ]
-                },
-                "profileRef": {
-                  "enum": [
-                    "orchestration/modes/economical.json",
-                    "orchestration/modes/balanced.json",
-                    "orchestration/modes/parallel.json"
-                  ]
-                },
-                "providerRef": {
-                  "type": "string",
-                  "pattern": "^orchestration/providers/[a-z0-9-]+\\.json$"
-                }
-              }
-            }
+            "generation": { "type": "string", "minLength": 1 },
+            "status": { "enum": ["current", "stale"] },
+            "headsFingerprint": { "$ref": "#/$defs/sha256" },
+            "evidenceRef": { "$ref": "#/$defs/evidenceRef" }
           }
         },
-        "session": {
+        "candidateHeads": {
+          "description": "Default-search candidate metadata for only the requested provider-neutral identity; transcript bodies are forbidden.",
+          "type": "array",
+          "maxItems": 8,
+          "uniqueItems": true,
+          "items": { "$ref": "#/$defs/head" }
+        }
+      }
+    },
+    "input": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["identity", "authorizedScope"],
+      "properties": {
+        "identity": {
+          "description": "The single provider-neutral conversation identity to resolve; it contains identifiers only, never query prose or transcript text.",
+          "$ref": "#/$defs/identity"
+        },
+        "authorizedScope": {
+          "description": "Exact project and role scope the caller is authorized to inspect.",
           "type": "object",
           "additionalProperties": false,
-          "required": [
-            "taskId",
-            "inputRef",
-            "outputRef",
-            "scratchPrefix",
-            "retention"
-          ],
+          "required": ["project", "role", "evidenceRef"],
           "properties": {
-            "taskId": {
-              "type": "string",
-              "minLength": 1
-            },
-            "inputRef": {
-              "$ref": "#/$defs/sessionRef"
-            },
-            "outputRef": {
-              "$ref": "#/$defs/sessionRef"
-            },
-            "scratchPrefix": {
-              "$ref": "#/$defs/sessionRef"
-            },
-            "retention": {
-              "const": "until-skill-terminal"
-            }
+            "project": { "type": "string", "pattern": "^[a-z0-9][a-z0-9-]*$" },
+            "role": { "type": "string", "pattern": "^[a-z0-9][a-z0-9-]*$" },
+            "evidenceRef": { "$ref": "#/$defs/evidenceRef" }
           }
         }
       }
     }
   },
   "$defs": {
-    "sha256": {
-      "type": "string",
-      "pattern": "^sha256:[0-9a-f]{64}$"
+    "sha256": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
+    "evidenceRef": { "type": "string", "minLength": 1 },
+    "artifactRef": { "type": "string", "minLength": 1 },
+    "identity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["provider", "conversationId", "project", "role"],
+      "properties": {
+        "provider": { "type": "string", "pattern": "^[a-z0-9][a-z0-9-]*$" },
+        "conversationId": { "type": "string", "pattern": "^[A-Za-z0-9._-]+$" },
+        "project": { "type": "string", "pattern": "^[a-z0-9][a-z0-9-]*$" },
+        "role": { "type": "string", "pattern": "^[a-z0-9][a-z0-9-]*$" }
+      }
     },
-    "sessionRef": {
-      "type": "string",
-      "pattern": "^session://tasks/[A-Za-z0-9._-]+/.+$"
+    "head": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["identity", "headRef", "headSha256", "snapshotSha256", "artifactRefs", "sourceRevision", "evidenceRef"],
+      "properties": {
+        "identity": { "$ref": "#/$defs/identity" },
+        "headRef": { "type": "string", "minLength": 1 },
+        "headSha256": { "$ref": "#/$defs/sha256" },
+        "snapshotSha256": { "$ref": "#/$defs/sha256" },
+        "artifactRefs": { "type": "array", "maxItems": 64, "uniqueItems": true, "items": { "$ref": "#/$defs/artifactRef" } },
+        "sourceRevision": { "type": "string", "minLength": 1 },
+        "evidenceRef": { "$ref": "#/$defs/evidenceRef" }
+      }
     }
   }
 }

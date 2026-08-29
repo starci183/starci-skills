@@ -1,0 +1,281 @@
+{
+  "schemaVersion": 7,
+  "id": "starci-workspace-manage",
+  "start": "analyze-input",
+  "states": {
+    "analyze-input": {
+      "kind": "analysis",
+      "on": [
+        {
+          "when": {},
+          "target": "select-intent"
+        }
+      ]
+    },
+    "select-intent": {
+      "kind": "choice",
+      "on": [
+        {
+          "when": {
+            "inputEquals": {
+              "mission.intent": "initialize"
+            }
+          },
+          "target": "bootstrap"
+        },
+        {
+          "when": {
+            "inputEquals": {
+              "mission.intent": "identity"
+            }
+          },
+          "target": "identity"
+        },
+        {
+          "when": {
+            "inputEquals": {
+              "mission.intent": "session"
+            }
+          },
+          "target": "route"
+        },
+        {
+          "when": {
+            "inputEquals": {
+              "mission.intent": "provenance-query"
+            }
+          },
+          "target": "query"
+        },
+        {
+          "when": {
+            "inputEquals": {
+              "mission.intent": "provenance-record"
+            }
+          },
+          "target": "record"
+        },
+        {
+          "when": {
+            "inputEquals": {
+              "mission.intent": "checkpoint"
+            }
+          },
+          "target": "checkpoint"
+        }
+      ]
+    },
+    "bootstrap": {
+      "kind": "operator",
+      "ref": "workspace/bootstrap-verify",
+      "on": [
+        {
+          "when": {
+            "outputEquals": {
+              "outcome": "ready"
+            }
+          },
+          "target": "complete"
+        },
+        {
+          "when": {
+            "outputEquals": {
+              "outcome": "initialize-required"
+            }
+          },
+          "target": "blocked"
+        },
+        {
+          "when": {
+            "outputEquals": {
+              "outcome": "blocked"
+            }
+          },
+          "target": "blocked"
+        }
+      ]
+    },
+    "identity": {
+      "kind": "operator",
+      "ref": "workspace/identity-verify",
+      "on": [
+        {
+          "when": {
+            "outputEquals": {
+              "outcome": "ready"
+            }
+          },
+          "target": "complete"
+        },
+        {
+          "when": {
+            "outputEquals": {
+              "outcome": "initialize-required"
+            }
+          },
+          "target": "blocked"
+        },
+        {
+          "when": {
+            "outputEquals": {
+              "outcome": "blocked"
+            }
+          },
+          "target": "blocked"
+        }
+      ]
+    },
+    "route": {
+      "kind": "operator",
+      "ref": "workspace/route-verify",
+      "on": [
+        {
+          "when": {
+            "outputEquals": {
+              "outcome": "ready"
+            }
+          },
+          "target": "complete"
+        },
+        {
+          "when": {
+            "outputEquals": {
+              "outcome": "initialize-required"
+            }
+          },
+          "target": "blocked"
+        },
+        {
+          "when": {
+            "outputEquals": {
+              "outcome": "blocked"
+            }
+          },
+          "target": "blocked"
+        }
+      ]
+    },
+    "query": {
+      "kind": "operator",
+      "ref": "source/conversation-query",
+      "on": [
+        {
+          "when": {
+            "outputEquals": {
+              "outcome": "found"
+            }
+          },
+          "target": "complete"
+        },
+        {
+          "when": {
+            "outputEquals": {
+              "outcome": "empty"
+            }
+          },
+          "target": "complete"
+        },
+        {
+          "when": {
+            "outputEquals": {
+              "outcome": "stale"
+            }
+          },
+          "target": "blocked"
+        },
+        {
+          "when": {
+            "outputEquals": {
+              "outcome": "ambiguous"
+            }
+          },
+          "target": "blocked"
+        },
+        {
+          "when": {
+            "outputEquals": {
+              "outcome": "forbidden"
+            }
+          },
+          "target": "blocked"
+        }
+      ]
+    },
+    "record": {
+      "kind": "operator",
+      "ref": "source/conversation-record",
+      "on": [
+        {
+          "when": {
+            "outputEquals": {
+              "outcome": "recorded"
+            }
+          },
+          "target": "complete"
+        },
+        {
+          "when": {
+            "outputEquals": {
+              "outcome": "idempotent"
+            }
+          },
+          "target": "complete"
+        },
+        {
+          "when": {
+            "outputEquals": {
+              "outcome": "conflict"
+            }
+          },
+          "target": "blocked"
+        },
+        {
+          "when": {
+            "outputEquals": {
+              "outcome": "blocked"
+            }
+          },
+          "target": "blocked"
+        }
+      ]
+    },
+    "checkpoint": {
+      "kind": "operator",
+      "ref": "workspace/workflow-handoff",
+      "on": [
+        {
+          "when": {
+            "outputEquals": {
+              "outcome": "published"
+            }
+          },
+          "target": "complete"
+        },
+        {
+          "when": {
+            "outputEquals": {
+              "outcome": "resumed"
+            }
+          },
+          "target": "complete"
+        },
+        {
+          "when": {
+            "outputEquals": {
+              "outcome": "blocked"
+            }
+          },
+          "target": "blocked"
+        }
+      ]
+    },
+    "complete": {
+      "kind": "terminal",
+      "result": "complete"
+    },
+    "blocked": {
+      "kind": "terminal",
+      "result": "blocked"
+    }
+  }
+}

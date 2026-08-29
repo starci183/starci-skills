@@ -1,0 +1,7 @@
+interface:
+  display_name: "Backend Process"
+  short_description: "Process one backend change inside a frozen mutation boundary."
+  default_prompt: "Use $starci-backend-process for one bounded mission intent."
+policy:
+  allow_implicit_invocation: true
+

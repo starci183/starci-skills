@@ -1,39 +1,16 @@
 {
-  "schemaVersion": 6,
+  "schemaVersion": 7,
   "id": "platform/tunnel-plan",
   "domain": "platform",
+  "job": "Derive one value-free Cloudflare HTTP(S) ingress plan from exact authority and observed resource state.",
   "inputSchema": "input.schema.json",
   "outputSchema": "output.schema.json",
-  "knowledgeRefs": [
-    "platform.tunnel"
-  ],
   "sourceReferenceRefs": [],
-  "accepts": [
-    {
-      "stage": "platform.tunnel.plan",
-      "status": "ready",
-      "allFacts": [],
-      "noneFacts": []
-    }
-  ],
-  "emits": [
-    {
-      "stage": "platform.tunnel.apply",
-      "status": "ready",
-      "factsAdd": [
-        "platform-tunnel-plan-ready"
-      ],
-      "factsRemove": []
-    }
-  ],
-  "sideEffects": [
-    "keep input, output, loads, observations, plans, and evidence in task-session memory only",
-    "purge every session object at each parent-skill terminal state"
-  ],
+  "sideEffects": [],
   "stopConditions": [
-    "required evidence is missing or stale",
-    "the result would cross the declared boundary",
-    "a source, provider, runtime, DNS, tunnel, or record mutation would occur",
-    "an intermediate session object would be persisted"
+    "the authority or observed resource revisions are missing or stale",
+    "the hostname or tunnel is owned by another declared principal",
+    "the requested ingress is not one bounded HTTP or HTTPS route",
+    "a credential value or zone-wide discovery would be required"
   ]
 }

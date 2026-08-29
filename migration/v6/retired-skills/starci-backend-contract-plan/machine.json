@@ -1,0 +1,59 @@
+{
+  "$schema": "../machine.schema.json",
+  "schemaVersion": 6,
+  "id": "starci-backend-contract-plan",
+  "start": "analyze-input",
+  "states": {
+    "analyze-input": {
+      "kind": "analysis",
+      "on": [
+        {
+          "when": {},
+          "target": "contract",
+          "label": "enter contract"
+        }
+      ]
+    },
+    "contract": {
+      "kind": "operator",
+      "ref": "be/mutation-contract",
+      "on": [
+        {
+          "when": {
+            "outputEquals": {
+              "outcome": "ready"
+            }
+          },
+          "target": "handoff",
+          "label": "ready"
+        },
+        {
+          "when": {
+            "outputEquals": {
+              "outcome": "revise"
+            }
+          },
+          "target": "contract",
+          "label": "revise"
+        },
+        {
+          "when": {
+            "outputEquals": {
+              "outcome": "blocked"
+            }
+          },
+          "target": "blocked",
+          "label": "blocked"
+        }
+      ]
+    },
+    "handoff": {
+      "kind": "terminal",
+      "result": "handoff"
+    },
+    "blocked": {
+      "kind": "terminal",
+      "result": "blocked"
+    }
+  }
+}

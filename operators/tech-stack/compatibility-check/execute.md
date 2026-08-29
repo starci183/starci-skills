@@ -1,13 +1,21 @@
 # Execute `tech-stack/compatibility-check`
 
-## Step 1 — Bind the exact stack-model hash
+## Context
 
-**Read:** only the validated fields declared for this step. **Context:** exact refs and evidence required by the decision; do not scan adjacent source. **Session write:** step result under `payload.session.scratchPrefix`. **Stop:** identity, scope, or evidence drift. **Orchestration:** coordinator binds identities and validates output.
+Open only the exact stack-model and evidence refs resolved by default file search. Do not query an index or scan adjacent source.
 
-## Step 2 — Check versions, deployment units, communication failures and datastore ownership
+## Input
 
-**Read:** only the validated fields declared for this step. **Context:** exact refs and evidence required by the decision; do not scan adjacent source. **Session write:** step result under `payload.session.scratchPrefix`. **Stop:** identity, scope, or evidence drift. **Orchestration:** independent evidence slices may run in parallel and the coordinator merges only typed findings.
+Bind the project, objective, and authorized stack-model hash.
 
-## Step 3 — Return compatible only when critical contradictions are resolved
+## Action
 
-**Read:** only the validated fields declared for this step. **Context:** exact refs and evidence required by the decision; do not scan adjacent source. **Session write:** step result under `payload.session.scratchPrefix`. **Stop:** do not emit success with unresolved critical contradictions. **Orchestration:** coordinator binds identities and validates output.
+Evaluate the one model against runtime versions, deployable units, communication failure policies, datastore ownership, and backup/restore evidence. Do not revise the model, design an alternative, or select another operator.
+
+## Output
+
+Return the evaluated hash, one outcome, one receipt when evaluation completed, typed checks, and structured contradictions.
+
+## Stop
+
+Reject identity drift. Return `blocked` when required evidence is absent or unreadable; do not manufacture compatibility.

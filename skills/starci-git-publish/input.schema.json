@@ -1,0 +1,196 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "skillId",
+    "selection",
+    "mission",
+    "receipts"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "const": 7
+    },
+    "skillId": {
+      "const": "starci-git-publish"
+    },
+    "mission": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "missionId",
+        "project",
+        "objectiveRef",
+        "intent",
+        "approvalRef",
+        "sourceHeads"
+      ],
+      "properties": {
+        "missionId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "project": {
+          "type": "string",
+          "pattern": "^[a-z0-9][a-z0-9-]*$"
+        },
+        "objectiveRef": {
+          "type": "string",
+          "minLength": 1
+        },
+        "intent": {
+          "enum": [
+            "publish",
+            "checkpoint",
+            "resume"
+          ]
+        },
+        "approvalRef": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "sourceHeads": {
+          "type": "array",
+          "maxItems": 32,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "pattern": "^(?:git:|refs/).+"
+          }
+        }
+      }
+    },
+    "receipts": {
+      "type": "array",
+      "maxItems": 128,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "version",
+          "receiptId",
+          "type",
+          "missionId",
+          "skillId",
+          "operatorId",
+          "parentId",
+          "childId",
+          "timestamp",
+          "progressFingerprint",
+          "trace"
+        ],
+        "properties": {
+          "version": {
+            "const": "7.0.0"
+          },
+          "receiptId": {
+            "type": "string",
+            "pattern": "^receipt:[A-Za-z0-9._-]+$"
+          },
+          "type": {
+            "enum": [
+              "CALL",
+              "RETURN",
+              "TRANSITION",
+              "WAIT",
+              "RESUME",
+              "SKIP",
+              "ERROR"
+            ]
+          },
+          "missionId": {
+            "type": "string"
+          },
+          "skillId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "operatorId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "parentId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "childId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "timestamp": {
+            "type": "string"
+          },
+          "progressFingerprint": {
+            "type": "string",
+            "pattern": "^sha256:[0-9a-f]{64}$"
+          },
+          "trace": {
+            "type": "object"
+          }
+        }
+      }
+    },
+    "selection": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "analyzerVersion",
+        "skillId",
+        "confidence",
+        "interactionPolicy",
+        "activeInputRefs",
+        "passiveContextRefs"
+      ],
+      "properties": {
+        "analyzerVersion": {
+          "const": 2
+        },
+        "skillId": {
+          "const": "starci-git-publish"
+        },
+        "confidence": {
+          "enum": [
+            "exact",
+            "clarified"
+          ]
+        },
+        "interactionPolicy": {
+          "const": "ask-only-when-stuck"
+        },
+        "activeInputRefs": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 64,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 1024
+          }
+        },
+        "passiveContextRefs": {
+          "type": "array",
+          "maxItems": 64,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 1024
+          }
+        }
+      }
+    }
+  }
+}

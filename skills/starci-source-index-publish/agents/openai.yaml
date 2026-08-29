@@ -1,6 +1,0 @@
-interface:
-  display_name: "StarCi Source Index Publish"
-  short_description: "Index and optionally publish StarCi context"
-  default_prompt: "Use $starci-source-index-publish for this selected flow and execute its state machine."
-policy:
-  allow_implicit_invocation: true

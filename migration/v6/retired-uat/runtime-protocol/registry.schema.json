@@ -1,0 +1,46 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://starci.dev/v7.0/uat/registry.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "features", "cases"],
+  "properties": {
+    "schemaVersion": { "const": 1 },
+    "features": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "status", "indexRef", "machineRef"],
+        "properties": {
+          "id": { "$ref": "#/$defs/id" },
+          "status": { "enum": ["planned", "active", "blocked", "ready-for-approval", "approved"] },
+          "indexRef": { "type": "string", "pattern": "^\\.worktrees/uat/reviews/[a-z0-9][a-z0-9._-]*/INDEX\\.md$" },
+          "machineRef": { "type": "string", "pattern": "^\\.worktrees/uat/reviews/[a-z0-9][a-z0-9._-]*/feature\\.json$" }
+        }
+      }
+    },
+    "cases": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "feature", "flow", "class", "status", "reviewRef"],
+        "properties": {
+          "id": { "$ref": "#/$defs/id" },
+          "feature": { "$ref": "#/$defs/id" },
+          "flow": { "$ref": "#/$defs/id" },
+          "class": { "enum": ["happy", "unhappy"] },
+          "status": { "enum": ["planned", "active", "require-user-action", "blocked", "retired"] },
+          "reviewRef": { "type": "string", "pattern": "^\\.worktrees/uat/reviews/[a-z0-9][a-z0-9._-]*/[a-z0-9][a-z0-9._-]*/review\\.md$" }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "id": { "type": "string", "pattern": "^[a-z0-9][a-z0-9._-]*$" }
+  }
+}

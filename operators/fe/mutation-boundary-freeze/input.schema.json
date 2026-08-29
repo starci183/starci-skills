@@ -1,0 +1,100 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "operatorId",
+    "context",
+    "input"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "const": 7
+    },
+    "operatorId": {
+      "const": "fe/mutation-boundary-freeze"
+    },
+    "context": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "verifiedFrontendRoute",
+        "approvedContractFingerprint"
+      ],
+      "properties": {
+        "verifiedFrontendRoute": {
+          "description": "Verified FE route.",
+          "type": "string",
+          "minLength": 1
+        },
+        "approvedContractFingerprint": {
+          "description": "Approved contract fingerprint.",
+          "type": "string",
+          "pattern": "^sha256:[0-9a-f]{64}$"
+        }
+      }
+    },
+    "input": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "intent",
+        "mutationAuthorizationRef",
+        "files",
+        "dominance"
+      ],
+      "properties": {
+        "intent": {
+          "description": "Mission intent.",
+          "enum": [
+            "create",
+            "audit",
+            "repair",
+            "redesign",
+            "debug",
+            "reconcile"
+          ]
+        },
+        "mutationAuthorizationRef": {
+          "description": "Explicit mutation authorization, nullable only for non-mutating outcomes.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "files": {
+          "description": "Exact files and before hashes.",
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "path",
+              "beforeSha256"
+            ],
+            "properties": {
+              "path": {
+                "type": "string",
+                "minLength": 1
+              },
+              "beforeSha256": {
+                "type": "string",
+                "pattern": "^sha256:[0-9a-f]{64}$"
+              }
+            }
+          }
+        },
+        "dominance": {
+          "description": "Whether authority proves one uniquely dominant mutation.",
+          "enum": [
+            "unique",
+            "none"
+          ]
+        }
+      }
+    }
+  }
+}

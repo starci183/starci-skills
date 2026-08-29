@@ -1,53 +1,16 @@
 {
-  "schemaVersion": 6,
+  "schemaVersion": 7,
   "id": "workspace/bootstrap-verify",
   "domain": "workspace",
+  "job": "Verifies bootstrap entry files and agent discovery before declaration compilation.",
   "inputSchema": "input.schema.json",
   "outputSchema": "output.schema.json",
-  "knowledgeRefs": [
-    "workspace.initialization"
-  ],
   "sourceReferenceRefs": [],
-  "accepts": [
-    {
-      "stage": "workspace.bootstrap",
-      "status": "ready",
-      "allFacts": [
-        "workspace-identity-ready"
-      ],
-      "noneFacts": []
-    }
-  ],
-  "emits": [
-    {
-      "stage": "workspace.declarations",
-      "status": "ready",
-      "factsAdd": [
-        "workspace-bootstrap-ready"
-      ],
-      "factsRemove": []
-    },
-    {
-      "stage": "workspace.initialization",
-      "status": "ready",
-      "factsAdd": ["workspace-bootstrap-initialize-required"],
-      "factsRemove": ["workspace-bootstrap-ready"]
-    },
-    {
-      "stage": "workspace.blocked",
-      "status": "blocked",
-      "factsAdd": ["workspace-bootstrap-blocked"],
-      "factsRemove": []
-    }
-  ],
   "sideEffects": [
-    "keep input, output, loaded context, scratch values, worker observations, and receipts in task-session memory only",
-    "purge every intermediate session object at each parent-skill terminal state"
+    "read only the supplied exact references"
   ],
   "stopConditions": [
-    "required evidence is missing or stale",
-    "the result would cross the declared boundary",
-    "an intermediate input, output, scratch value, observation, analysis transcript, or receipt would be persisted outside the task session",
-    "repository source context, indexed source summaries, or an undeclared source file would be loaded"
+    "an exact reference is missing or its fingerprint differs",
+    "the requested work exceeds this operator job"
   ]
 }

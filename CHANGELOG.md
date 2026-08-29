@@ -2,6 +2,50 @@
 
 All notable changes are documented here. This project follows Semantic Versioning.
 
+## 7.0.0 - 2026-08-29
+
+### Changed
+
+- Replaced the phase-sized public catalog with 12 mission-owning Skills that compose through typed
+  `CALL`, `RETURN`, and executable `RESUME` receipts.
+- Made every operator a strict one-job `(context + input) -> typed output` contract and retained 148
+  atomic operators across 14 domains.
+- Added the sole `.claude/config.yaml` runtime config with redacted full trace output under
+  `debug: true`; debug changes visibility without changing execution.
+- Replaced generated coding-context and Qdrant lookup with default search against exact routed source.
+- Made project backends own flat `.worktrees/{_templates,businesses,uat,sessions,debts}` authority, with
+  canonical UAT at `uat/<feature>/<flow>/{snapshot.json,result.json}`.
+- Added strong critical-agency and no-progress rules: continue with the dominant reversible action,
+  ask only when no valid next step exists, and render 3–4 choices only when selection is necessary.
+- Replaced state-by-state UAT inflation with product-level decision-branch coverage: loading and ordinary refresh normally remain happy-case checkpoints, while component-local empty, error, validation and render permutations delegate only with exact lower-level proof and no wiring or recovery risk.
+- Made visible Browser case execution sequential and predeclared. Every run now binds execution order, account or anonymous identity, fixture namespace, precondition, expected outcome, Browser session and declaration receipt before product action.
+- Added fixture constraint preflight and explicit support for run-namespaced related-table/service seeds needed for meaningful rendering before the journey; post-journey outcome manufacturing remains forbidden.
+- Decoupled Behavior and UX proof from missing UI detail, and made UI aggregate `fe.ui` and Grammar verdicts independently so one authority failure cannot be hidden by `SUSPENSE` in the other.
+- Scoped product readiness to the exact routed project; unrelated workspace and worktree findings remain diagnostics instead of blocking the active product target.
+
+### Breaking
+
+- The 49 prior public Skills are retired from discovery and preserved under `migration/v6/retired-skills/`.
+- The v6 UAT review tree and generated frontend coding-context are retired under `migration/v6/`.
+- UAT authority is now exactly one frozen `snapshot.json` plus one published `result.json` per
+  feature/flow.
+- Product UAT no longer uses conflict-aware parallel case groups for visible Browser execution.
+
+## 6.3.0 - 2026-08-29
+
+### Added
+
+- Four atomic UAT lenses: flow-coverage compiler, Behavior audit, UX journey audit, and UI render audit.
+- Canonical `.uat/reviews/<feature>/<flow>/review.md` structure with machine review schema, case template, immutable run evidence, screenshot checkpoints, user feedback, SUSPENSE and REQUIRE_USER_ACTION registers, root-cause index, and retest gate.
+- Conflict-aware parallel case-run isolation across fresh account, agent-bound browser-session lease, origin, mailbox/query namespace, fixture namespace, artifact directory, and resource locks.
+
+### Changed
+
+- Upgraded Product UAT to compile a separate happy case and equivalence-safe unhappy cases before independent Behavior, UX, and UI verdicts.
+- Restricted unhappy-case merging to a six-field recovery-equivalence signature and required recoverable failures to continue through success.
+- Made fixture verification read-only, forbade post-journey result manufacturing, and required cleanup by `is_uat=true` plus exact case namespace.
+- Restricted `SUSPENSE` to finite unresolved UI-authority questions and required user decision, authority promotion, repair, and fresh rerun before closure; added non-pass `REQUIRE_USER_ACTION` with exact browser/device handoff and resume evidence.
+
 ## 6.2.1 - 2026-08-27
 
 ### Fixed

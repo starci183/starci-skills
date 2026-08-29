@@ -1,68 +1,18 @@
 {
-  "schemaVersion": 6,
+  "schemaVersion": 7,
   "id": "test/e2e",
   "domain": "test",
+  "job": "Produce one bounded e2e result from exact supplied evidence.",
   "inputSchema": "input.schema.json",
   "outputSchema": "output.schema.json",
-  "knowledgeRefs": [
-    "fe.e2e-testing"
-  ],
-  "sourceReferenceRefs": [
-    "starci-academy-fe",
-    "starci-academy-be"
-  ],
-  "accepts": [
-    {
-      "stage": "test.e2e",
-      "status": "ready",
-      "allFacts": [
-        "unit-pass",
-        "unit-evidence",
-        "seed-evidence"
-      ]
-    }
-  ],
-  "emits": [
-    {
-      "when": "all connected journey scenarios pass and reset",
-      "stage": "test.ui",
-      "status": "ready",
-      "factsAdd": [
-        "e2e-pass",
-        "e2e-evidence"
-      ]
-    },
-    {
-      "when": "connected behavior fails inside the approved boundary",
-      "stage": "code.repair",
-      "status": "repair",
-      "factsAdd": [
-        "e2e-failed",
-        "in-boundary-repair"
-      ]
-    },
-    {
-      "when": "the environment or data boundary cannot produce a safe verdict",
-      "stage": "test.review",
-      "status": "blocked",
-      "factsAdd": [
-        "e2e-blocked"
-      ]
-    }
-  ],
+  "sourceReferenceRefs": [],
   "sideEffects": [
     "start declared test dependencies",
     "materialize and reset isolated test data",
-    "run connected scenarios",
-    "write task-session E2E evidence only"
+    "run connected scenarios"
   ],
   "stopConditions": [
-    "production or shared data target",
-    "raw credential in artifact",
-    "stale workspace route",
-    "skipped scenario",
-    "response-code-only proof",
-    "incomplete reset",
-    "unsanitized logs"
+    "an exact reference is missing or its fingerprint differs",
+    "the requested work exceeds this operator job"
   ]
 }

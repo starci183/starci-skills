@@ -1,3 +1,0 @@
-import { validatorFor, runValidatorCli } from '../../validation.mjs';
-export const validateOutput=validatorFor(new URL('./output.schema.json',import.meta.url),(v)=>{const a=v.payload.artifact,e=[];if(v.payload.decision==='contract-ready'&&a.gapRequests.length)e.push('$.payload.artifact.gapRequests: ready contract cannot retain gaps');const paths=a.sourceScope.map((s)=>s.path);if(new Set(paths).size!==paths.length)e.push('$.payload.artifact.sourceScope: duplicate paths');return e});
-if(process.argv[1]?.endsWith('validate-output.mjs')) await runValidatorCli(validateOutput,'node validate-output.mjs <artifact.json>');

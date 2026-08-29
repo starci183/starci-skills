@@ -1,57 +1,16 @@
 {
-  "schemaVersion": 6,
+  "schemaVersion": 7,
   "id": "fe/maintenance-apply",
   "domain": "fe",
+  "job": "maintenance apply one closed frontend target.",
   "inputSchema": "input.schema.json",
   "outputSchema": "output.schema.json",
-  "knowledgeRefs": [
-    "fe.design-maintenance"
-  ],
+  "contextRefs": [],
   "sourceReferenceRefs": [],
-  "accepts": [
-    {
-      "stage": "fe.maintenance.maintenance-apply",
-      "status": "ready",
-      "allFacts": [],
-      "noneFacts": []
-    },
-    {
-      "stage": "delivery.mission.resume",
-      "status": "ready",
-      "allFacts": ["delivery-impact-classified"],
-      "noneFacts": []
-    }
-  ],
-  "emits": [
-    {
-      "stage": "fe.maintenance.maintenance-apply.result",
-      "status": "complete",
-      "factsAdd": [
-        "fe-maintenance-apply-complete",
-        "source-written"
-      ],
-      "factsRemove": []
-    },
-    {
-      "stage": "fe.maintenance.blocked",
-      "status": "blocked",
-      "factsAdd": [
-        "fe-maintenance-apply-blocked"
-      ],
-      "factsRemove": []
-    }
-  ],
-  "sideEffects": [
-    "coordinator mutates only exact approved targets for fe/maintenance-apply",
-    "emit the pinned source-change and approved acceptance-test-plan references for downstream proof operators",
-    "keep input, output, loaded context, worker observations, drafts, evidence, and receipts in task-session storage only",
-    "purge every intermediate session object at every parent-skill terminal state"
-  ],
+  "sideEffects": [],
   "stopConditions": [
-    "required evidence is missing or stale",
-    "the result would cross the declared boundary",
-    "Stop on stale targets, boundary expansion, owner substitution, missing acceptance criterion, or a correction that requires a new authority decision.",
-    "runtime binding revision or session ownership is invalid",
-    "the operation would broaden its approved authority, source, or external boundary"
+    "required authority or evidence is missing or stale",
+    "the closed target boundary is ambiguous",
+    "completion would require another operator job"
   ]
 }

@@ -1,38 +1,16 @@
 {
-  "schemaVersion": 6,
+  "schemaVersion": 7,
   "id": "architecture/evidence-discovery",
   "domain": "architecture",
+  "job": "Collect one bounded architecture evidence inventory from exact source references.",
   "inputSchema": "input.schema.json",
   "outputSchema": "output.schema.json",
-  "knowledgeRefs": [
-    "source.provenance"
-  ],
   "sourceReferenceRefs": [],
-  "accepts": [
-    {
-      "stage": "architecture.v61.evidence-discovery",
-      "status": "ready",
-      "allFacts": [],
-      "noneFacts": []
-    }
-  ],
-  "emits": [
-    {
-      "stage": "architecture.v61.evidence-discovery.complete",
-      "status": "ready",
-      "factsAdd": [
-        "architecture-evidence-discovery-ready"
-      ],
-      "factsRemove": []
-    }
-  ],
   "sideEffects": [
-    "keep artifacts and observations in task-session memory only",
-    "purge intermediate session objects at every parent-skill terminal state"
+    "read only the supplied exact references"
   ],
   "stopConditions": [
-    "required evidence is missing, stale or contradictory",
-    "Every claim carries kind, claim state, revision and evidence location; unknowns remain explicit.",
-    "source observations would be treated as target authority"
+    "an exact reference is missing or its fingerprint differs",
+    "the requested work exceeds this operator job"
   ]
 }

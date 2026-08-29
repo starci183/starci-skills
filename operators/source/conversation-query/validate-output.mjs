@@ -1,40 +1,28 @@
-import { runValidatorCli, validatorFor } from '../../validation.mjs';
+import { validatorFor, runValidatorCli } from '../../validation.mjs';
 
-const schemaUrl = new URL('./output.schema.json', import.meta.url);
-const routes = {
-  "found": {
-    "stage": "source.conversation.result",
-    "status": "complete",
-    "fact": "conversation-results",
-    "state": "completed",
-    "code": "source-conversation-query-found"
-  },
-  "empty": {
-    "stage": "source.conversation.result",
-    "status": "complete",
-    "fact": "conversation-empty",
-    "state": "completed",
-    "code": "source-conversation-query-empty"
-  }
+const outcomes = {
+  found: { reason: 'current-match', hasHead: true },
+  empty: { reason: 'no-match', hasHead: false },
+  forbidden: { reason: 'scope-denied', hasHead: false },
+  stale: { reason: 'index-stale', hasHead: false },
+  ambiguous: { reason: 'multiple-current-heads', hasHead: false }
 };
 
-function semantic(value) {
-  const errors = [];
-  const route = routes[value.payload.decision];
-  if (!route) return ['/payload/decision: undeclared decision'];
-  if (value.stage !== route.stage || value.status !== route.status) errors.push('/stage: decision does not match emitted route');
-  if (value.payload.state.status !== route.state || value.payload.state.code !== route.code) errors.push('/payload/state: status or code does not match decision');
-  if (value.payload.state.emits.stage !== value.stage || value.payload.state.emits.status !== value.status) errors.push('/payload/state/emits: must match root route');
-  if (!value.facts.includes(route.fact) || !value.payload.state.emits.factsAdd.includes(route.fact)) errors.push(`/facts: missing emitted fact ${route.fact}`);
-  const blocked = value.payload.state.status === 'blocked';
-  if (!blocked && value.payload.produced.conversationQueryReceiptRef === null) errors.push('/payload/produced/conversationQueryReceiptRef: successful output requires a session artifact');
-  if (value.payload.produced.durableWrites.length !== 0) errors.push('/payload/produced/durableWrites: read-only operator cannot report durable writes');
-  if (value.payload.cleanup.retention !== 'until-skill-terminal' || value.payload.cleanup.purgeAt !== 'skill-terminal') errors.push('/payload/cleanup: terminal purge is mandatory');
-  return errors;
-}
+const semantic = (value) => {
+  const { outcome, reason, headRef, headSha256, snapshotSha256, artifactRefs } = value.output;
+  const expected = outcomes[outcome];
+  const hasAllHeadFields = headRef !== null && headSha256 !== null && snapshotSha256 !== null;
+  const hasAnyHeadField = headRef !== null || headSha256 !== null || snapshotSha256 !== null;
+  return [
+    ...(reason !== expected.reason ? [`/output/reason: ${reason} is invalid for ${outcome}`] : []),
+    ...(expected.hasHead && !hasAllHeadFields ? ['/output: found requires the complete current-head identity'] : []),
+    ...(!expected.hasHead && hasAnyHeadField ? [`/output: ${outcome} cannot expose head identity`] : []),
+    ...(!expected.hasHead && artifactRefs.length > 0 ? [`/output/artifactRefs: ${outcome} cannot expose artifacts`] : [])
+  ];
+};
 
-export const validateOutput = validatorFor(schemaUrl, semantic);
+export const validateOutput = validatorFor(new URL('./output.schema.json', import.meta.url), semantic);
 
-if (process.argv[1] && import.meta.url === new URL(`file:///${process.argv[1].replaceAll('\\\\', '/')}`).href) {
-  await runValidatorCli(validateOutput, 'usage: node validate-output.mjs <output.json>');
+if (process.argv[1]?.endsWith('validate-output.mjs')) {
+  await runValidatorCli(validateOutput, 'node validate-output.mjs <output.json>');
 }

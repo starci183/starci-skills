@@ -1,0 +1,123 @@
+{
+  "$schema": "../machine.schema.json",
+  "schemaVersion": 6,
+  "id": "starci-frontend-implementation",
+  "start": "analyze-input",
+  "states": {
+    "analyze-input": {
+      "kind": "analysis",
+      "on": [
+        {
+          "when": {},
+          "target": "preflight",
+          "label": "enter preflight"
+        }
+      ]
+    },
+    "preflight": {
+      "kind": "operator",
+      "ref": "quality/coding-preflight",
+      "on": [
+        {
+          "when": {
+            "outputEquals": {
+              "outcome": "ready"
+            }
+          },
+          "target": "implement",
+          "label": "ready"
+        },
+        {
+          "when": {
+            "outputEquals": {
+              "outcome": "reference-gap"
+            }
+          },
+          "target": "handoff",
+          "label": "reference-gap"
+        },
+        {
+          "when": {
+            "outputEquals": {
+              "outcome": "blocked"
+            }
+          },
+          "target": "blocked",
+          "label": "blocked"
+        }
+      ]
+    },
+    "implement": {
+      "kind": "operator",
+      "ref": "fe/design-implementation",
+      "on": [
+        {
+          "when": {
+            "outputEquals": {
+              "outcome": "implemented"
+            }
+          },
+          "target": "complete",
+          "label": "implemented"
+        },
+        {
+          "when": {
+            "outputEquals": {
+              "outcome": "interface-gap"
+            }
+          },
+          "target": "handoff",
+          "label": "interface-gap"
+        },
+        {
+          "when": {
+            "outputEquals": {
+              "outcome": "grammar-gap"
+            }
+          },
+          "target": "handoff",
+          "label": "grammar-gap"
+        },
+        {
+          "when": {
+            "outputEquals": {
+              "outcome": "backend-gap"
+            }
+          },
+          "target": "handoff",
+          "label": "backend-gap"
+        },
+        {
+          "when": {
+            "outputEquals": {
+              "outcome": "design-feasibility-conflict"
+            }
+          },
+          "target": "handoff",
+          "label": "design-feasibility-conflict"
+        },
+        {
+          "when": {
+            "outputEquals": {
+              "outcome": "blocked"
+            }
+          },
+          "target": "blocked",
+          "label": "blocked"
+        }
+      ]
+    },
+    "handoff": {
+      "kind": "terminal",
+      "result": "handoff"
+    },
+    "blocked": {
+      "kind": "terminal",
+      "result": "blocked"
+    },
+    "complete": {
+      "kind": "terminal",
+      "result": "complete"
+    }
+  }
+}

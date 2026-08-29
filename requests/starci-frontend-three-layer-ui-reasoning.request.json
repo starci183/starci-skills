@@ -1,0 +1,56 @@
+{
+  "$schema": "./request.schema.json",
+  "schemaVersion": 1,
+  "id": "starci-frontend-three-layer-ui-reasoning",
+  "kind": "frontend-feedback-upgrade",
+  "status": "resolved",
+  "project": "starci-academy",
+  "targetOwners": [
+    "starci-runtime",
+    "grammar"
+  ],
+  "need": "Frontend design, implementation, and UI audit must evaluate composition in the fixed order AI-first, Rules-first, then Grammar-last. AI-first establishes business-visible meaning, information priority, and whether dense evidence needs synthesis; Rules-first establishes hierarchy, surface ownership, nesting, responsive behavior, and semantic data presentation; Grammar-last maps that approved structure to exact components, tokens, spacing, padding, and typography. Grammar conformance alone must never make a semantically weak or visually incoherent UI pass.",
+  "negativeBoundary": "Do not require AI-generated content for simple data, turn AI-first into decorative summaries, let Grammar choose product hierarchy, encode one Profile screenshot as a universal layout, or accept arbitrary visual redesign outside an approved journey and surface boundary.",
+  "acceptanceCriteria": [
+    "Frontend UI direction, detail, implementation, visual-fidelity, and UI-audit contracts preserve the evaluation order AI-first, Rules-first, Grammar-last and issue an independent verdict for each layer.",
+    "AI-first requires explicit information priority and invokes synthesis only when data density or decision complexity materially benefits the user; simple label-content and short-list data remain direct.",
+    "Rules-first rejects contradictory metrics, redundant emphasis, weak hierarchy, ambiguous progress encoding, incorrect surface ownership, and responsive compositions that stop making sense before any Grammar mapping is accepted.",
+    "Grammar-last binds approved label-content structures to SurfaceCard, approved lists to SurfaceListCard, and surface-in-surface lists to the nested variant while enforcing the declared padding, gap rhythm, and type hierarchy.",
+    "Executable regression coverage proves that a Profile composition with an oversized readiness block, flat dense identity data, misleading skill progress bars, or Grammar-correct but semantically incoherent nesting cannot receive a passing UI verdict.",
+    "Product implementation can consume the resolved learning without copying the Profile example as a fixed page template or widening to unrelated Dashboard and navigation surfaces."
+  ],
+  "feedbackSessions": [
+    {
+      "fingerprint": "sha256:5b01fc1c58a32b3a0184a101f8ffb30173c87bdbe16baf594775928ef507c1b0",
+      "sourceSkillId": "starci-frontend-maintenance-apply",
+      "evidenceSha256": "sha256:cb01dcabb14dcb19cdc4c920bb58d1a815d02cb0b12c5ab848f46c127b0e9a68",
+      "accepts": [
+        "Use AI-first to decide content priority and synthesis need before choosing surfaces or visual treatments.",
+        "Use Rules-first to validate hierarchy, meaning, surface ownership, nesting, and responsive coherence.",
+        "Use Grammar-last to bind the approved composition to SurfaceCard, nested SurfaceListCard, spacing, padding, and typography contracts.",
+        "Treat the approved Profile visualization as bounded evidence of the reasoning order, not as a universal template."
+      ],
+      "rejects": [
+        "Pass a UI because Grammar components and class names are technically valid while the information architecture remains weak.",
+        "Place a large readiness surface above stronger identity and learning evidence merely because the block already exists.",
+        "Represent categorical skill counts as progress bars or present top 0 percent as a meaningful positive summary.",
+        "Apply uniform gaps and font sizes without considering semantic hierarchy, content density, and neighboring element scale."
+      ],
+      "targetOwners": [
+        "starci-runtime",
+        "grammar"
+      ],
+      "proofStatus": "proven"
+    }
+  ],
+  "review": {
+    "decision": "approved",
+    "priority": "urgent",
+    "evidenceSha256": "sha256:cb01dcabb14dcb19cdc4c920bb58d1a815d02cb0b12c5ab848f46c127b0e9a68",
+    "targetOwners": [
+      "starci-runtime",
+      "grammar"
+    ],
+    "rationale": "The visible Profile evidence and approved three-layer visualization prove a reusable failure mode: semantic priority and surface logic must be validated before Grammar mapping. Resolve the learning urgently while preserving the bounded negative rules against forced AI content, Profile-template overfitting, and unrelated surface redesign."
+  }
+}

@@ -1,165 +1,89 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://starci.dev/v6/operators/fe/interaction-container-decision/output.schema.json",
+  "$id": "https://starci.dev/v7.0/operators/fe/interaction-container-decision/output.schema.json",
   "type": "object",
   "additionalProperties": false,
-  "required": ["schemaVersion", "runId", "stage", "status", "facts", "payload"],
+  "required": [
+    "schemaVersion",
+    "operatorId",
+    "output"
+  ],
   "properties": {
-    "schemaVersion": { "const": 6 },
-    "runId": { "type": "string", "minLength": 1 },
-    "stage": { "enum": ["ux.flow.review", "ux.flow.result"] },
-    "status": { "enum": ["pending", "blocked"] },
-    "facts": { "type": "array", "uniqueItems": true, "items": { "type": "string" } },
-    "payload": {
+    "schemaVersion": {
+      "const": 7
+    },
+    "operatorId": {
+      "const": "fe/interaction-container-decision"
+    },
+    "output": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["decision", "state", "produced", "context", "cleanup", "evidenceRefs", "findings", "artifact"],
+      "required": [
+        "outcome",
+        "result",
+        "gaps",
+        "evidenceRefs"
+      ],
       "properties": {
-        "decision": { "enum": ["containers-ready", "blocked"] },
-        "state": { "$ref": "#/$defs/state" },
-        "produced": { "$ref": "#/$defs/produced" },
-        "context": { "$ref": "#/$defs/context" },
-        "cleanup": { "$ref": "#/$defs/cleanup" },
-        "evidenceRefs": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/ref" } },
-        "findings": { "type": "array", "uniqueItems": true, "items": { "type": "string" } },
-        "artifact": {
-          "type": "object",
-          "additionalProperties": false,
-          "required": ["artifactType", "flowRef", "decisions", "decisionHash"],
-          "properties": {
-            "artifactType": { "const": "frontend-interaction-container-plan" },
-            "flowRef": { "$ref": "#/$defs/ref" },
-            "decisions": {
-              "type": "array",
-              "minItems": 1,
-              "items": { "$ref": "#/$defs/containerDecision" }
+        "outcome": {
+          "description": "Legacy semantic result consumed only by the Skill machine.",
+          "enum": [
+            "containers-ready",
+            "blocked"
+          ]
+        },
+        "result": {
+          "description": "The atomic job result, or null when blocked.",
+          "anyOf": [
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "summary",
+                "artifactRefs"
+              ],
+              "properties": {
+                "summary": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "artifactRefs": {
+                  "type": "array",
+                  "maxItems": 64,
+                  "uniqueItems": true,
+                  "items": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                }
+              }
             },
-            "decisionHash": { "$ref": "#/$defs/hash" }
-          }
-        }
-      }
-    }
-  },
-  "$defs": {
-    "ref": { "type": "string", "minLength": 1 },
-    "hash": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
-    "container": { "enum": ["page", "modal", "drawer", "popover", "inline"] },
-    "containerDecision": {
-      "type": "object",
-      "additionalProperties": false,
-      "required": ["interactionId", "triggerRef", "taskRole", "considered", "selected", "rejections", "decisionBasis", "behavior", "responsive"],
-      "properties": {
-        "interactionId": { "type": "string", "minLength": 1 },
-        "triggerRef": { "$ref": "#/$defs/ref" },
-        "taskRole": { "enum": ["primary-task", "bounded-decision", "contextual-secondary", "anchored-micro-choice", "stable-region"] },
-        "considered": { "type": "array", "minItems": 5, "maxItems": 5, "uniqueItems": true, "items": { "$ref": "#/$defs/container" } },
-        "selected": { "$ref": "#/$defs/container" },
-        "rejections": {
-          "type": "array",
-          "minItems": 4,
-          "maxItems": 4,
-          "items": {
-            "type": "object",
-            "additionalProperties": false,
-            "required": ["container", "reason"],
-            "properties": {
-              "container": { "$ref": "#/$defs/container" },
-              "reason": { "type": "string", "minLength": 3 }
+            {
+              "type": "null"
             }
+          ]
+        },
+        "gaps": {
+          "description": "Exact missing authority or evidence; empty when complete.",
+          "type": "array",
+          "maxItems": 32,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1
           }
         },
-        "decisionBasis": { "type": "string", "minLength": 3 },
-        "behavior": {
-          "type": "object",
-          "additionalProperties": false,
-          "required": ["blocksBackground", "preservesPageContext", "mustCompleteOrCancel", "urlOwned", "resumable", "comparisonRequired", "stepCount", "longContent", "stableInlineOwnerRef", "focusReturnRef", "dismissal"],
-          "properties": {
-            "blocksBackground": { "type": "boolean" },
-            "preservesPageContext": { "type": "boolean" },
-            "mustCompleteOrCancel": { "type": "boolean" },
-            "urlOwned": { "type": "boolean" },
-            "resumable": { "type": "boolean" },
-            "comparisonRequired": { "type": "boolean" },
-            "stepCount": { "type": "integer", "minimum": 1 },
-            "longContent": { "type": "boolean" },
-            "stableInlineOwnerRef": { "anyOf": [{ "$ref": "#/$defs/ref" }, { "type": "null" }] },
-            "focusReturnRef": { "anyOf": [{ "$ref": "#/$defs/ref" }, { "type": "null" }] },
-            "dismissal": { "enum": ["route-back", "explicit-close", "confirm-or-cancel", "outside-or-escape", "not-applicable"] }
-          }
-        },
-        "responsive": {
-          "type": "object",
-          "additionalProperties": false,
-          "required": ["desktop", "mobile", "transformReason"],
-          "properties": {
-            "desktop": { "$ref": "#/$defs/container" },
-            "mobile": { "enum": ["page", "fullscreen-modal", "sheet", "bottom-sheet", "popover", "inline"] },
-            "transformReason": { "type": "string", "minLength": 3 }
-          }
-        }
-      }
-    },
-    "state": {
-      "type": "object",
-      "additionalProperties": false,
-      "required": ["operator", "status", "code", "retryable", "emits"],
-      "properties": {
-        "operator": { "const": "fe/interaction-container-decision" },
-        "status": { "enum": ["pending", "blocked"] },
-        "code": { "enum": ["interaction-containers-ready", "interaction-containers-blocked"] },
-        "retryable": { "type": "boolean" },
-        "emits": {
-          "type": "object",
-          "additionalProperties": false,
-          "required": ["stage", "status", "factsAdd", "factsRemove"],
-          "properties": {
-            "stage": { "enum": ["ux.flow.review", "ux.flow.result"] },
-            "status": { "enum": ["pending", "blocked"] },
-            "factsAdd": { "type": "array", "items": { "type": "string" } },
-            "factsRemove": { "type": "array", "items": { "type": "string" } }
-          }
-        }
-      }
-    },
-    "produced": {
-      "type": "object",
-      "additionalProperties": false,
-      "required": ["artifactRefs", "mutations", "externalEffects"],
-      "properties": {
-        "artifactRefs": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/ref" } },
-        "mutations": { "type": "array", "maxItems": 0 },
-        "externalEffects": { "type": "array", "maxItems": 0 }
-      }
-    },
-    "context": {
-      "type": "object",
-      "additionalProperties": false,
-      "required": ["used"],
-      "properties": {
-        "used": {
+        "evidenceRefs": {
+          "description": "Exact evidence used to produce the result.",
           "type": "array",
-          "minItems": 1,
+          "maxItems": 64,
+          "uniqueItems": true,
           "items": {
-            "type": "object",
-            "additionalProperties": false,
-            "required": ["kind", "ref", "revision"],
-            "properties": {
-              "kind": { "enum": ["approved-direction", "ux-flow", "knowledge"] },
-              "ref": { "$ref": "#/$defs/ref" },
-              "revision": { "$ref": "#/$defs/ref" }
-            }
-          }
+            "type": "string",
+            "minLength": 1
+          },
+          "minItems": 1
         }
-      }
-    },
-    "cleanup": {
-      "type": "object",
-      "additionalProperties": false,
-      "required": ["scratchRefs", "retention", "purgeAt"],
-      "properties": {
-        "scratchRefs": { "type": "array", "items": { "$ref": "#/$defs/ref" } },
-        "retention": { "const": "until-skill-terminal" },
-        "purgeAt": { "const": "skill-terminal" }
       }
     }
   }

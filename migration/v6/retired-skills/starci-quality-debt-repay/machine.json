@@ -1,0 +1,172 @@
+{
+  "$schema": "../machine.schema.json",
+  "schemaVersion": 6,
+  "id": "starci-quality-debt-repay",
+  "start": "analyze-input",
+  "states": {
+    "analyze-input": {
+      "kind": "analysis",
+      "on": [
+        {
+          "when": {},
+          "target": "debt-approval",
+          "label": "enter debt-approval"
+        }
+      ]
+    },
+    "debt-approval": {
+      "kind": "wait",
+      "approval": {
+        "prompt": "Approve the exact debt identity, baseline, closure criterion and bounded iteration budget.",
+        "approve": "OK DEBT <hash>",
+        "reject": "REJECT DEBT <hash>",
+        "bypassTarget": "debt"
+      },
+      "on": [
+        {
+          "when": {
+            "stage": "quality.debt.review",
+            "status": "approved"
+          },
+          "target": "debt"
+        },
+        {
+          "when": {
+            "stage": "quality.debt.review",
+            "status": "rejected"
+          },
+          "target": "rejected"
+        }
+      ]
+    },
+    "debt": {
+      "kind": "operator",
+      "ref": "quality/debt-repay",
+      "on": [
+        {
+          "when": {
+            "outputEquals": {
+              "outcome": "closed"
+            }
+          },
+          "target": "complete",
+          "label": "closed"
+        },
+        {
+          "when": {
+            "outputEquals": {
+              "outcome": "progress"
+            }
+          },
+          "target": "debt",
+          "label": "progress"
+        },
+        {
+          "when": {
+            "outputEquals": {
+              "outcome": "closure-candidate"
+            }
+          },
+          "target": "debt-proof",
+          "label": "closure-candidate"
+        },
+        {
+          "when": {
+            "outputEquals": {
+              "outcome": "blocked"
+            }
+          },
+          "target": "blocked",
+          "label": "blocked"
+        }
+      ]
+    },
+    "rejected": {
+      "kind": "terminal",
+      "result": "rejected"
+    },
+    "complete": {
+      "kind": "terminal",
+      "result": "complete"
+    },
+    "debt-proof": {
+      "kind": "operator",
+      "ref": "quality/readiness-inventory",
+      "on": [
+        {
+          "when": {
+            "outputEquals": {
+              "outcome": "green"
+            }
+          },
+          "target": "debt-close",
+          "label": "green"
+        },
+        {
+          "when": {
+            "outputEquals": {
+              "outcome": "findings"
+            }
+          },
+          "target": "debt-approval",
+          "label": "findings"
+        },
+        {
+          "when": {
+            "outputEquals": {
+              "outcome": "blocked"
+            }
+          },
+          "target": "blocked",
+          "label": "blocked"
+        }
+      ]
+    },
+    "blocked": {
+      "kind": "terminal",
+      "result": "blocked"
+    },
+    "debt-close": {
+      "kind": "operator",
+      "ref": "quality/debt-repay",
+      "on": [
+        {
+          "when": {
+            "outputEquals": {
+              "outcome": "closed"
+            }
+          },
+          "target": "complete",
+          "label": "closed"
+        },
+        {
+          "when": {
+            "outputEquals": {
+              "outcome": "progress"
+            }
+          },
+          "target": "blocked",
+          "label": "progress"
+        },
+        {
+          "when": {
+            "outputEquals": {
+              "outcome": "closure-candidate"
+            }
+          },
+          "target": "blocked",
+          "label": "closure-candidate"
+        },
+        {
+          "when": {
+            "outputEquals": {
+              "outcome": "blocked"
+            }
+          },
+          "target": "blocked",
+          "label": "blocked"
+        }
+      ]
+    }
+  }
+}

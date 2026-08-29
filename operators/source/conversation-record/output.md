@@ -1,24 +1,11 @@
 # `source/conversation-record` output
 
-The output is an ephemeral task-session object consumed by the parent state machine. It is not a durable artifact and is purged with its input, loaded bindings, observations, and scratch values at every `skill-terminal`.
+The operator returns only `output`.
 
-## JSON architecture
+- `output.outcome`: `recorded`, `idempotent`, `conflict`, or `blocked`.
+- `output.headRef` and `output.headSha256`: durable head identity only for recorded or idempotent success.
+- `output.writeApplied`: true only when this invocation appended the head.
+- `output.reason`: the one reason corresponding to the outcome.
+- `output.evidenceRefs`: redaction, authority, prior-head, and durable-write evidence.
 
-| Section | Purpose |
-| --- | --- |
-| Root route fields | State-machine compatibility envelope. |
-| `payload.decision` | Typed route key from this operator contract. |
-| `payload.state` | Explicit status, code, retryability, and emitted state. |
-| `payload.produced` | Session artifact `conversationHeadRef` plus explicitly approved durable effects only. |
-| `payload.context` | Minimal refs and revisions actually used; never copied context or reasoning. |
-| `payload.cleanup` | Scratch refs and mandatory terminal purge. |
-| `payload.evidenceRefs` | Session-only evidence for the next state. |
-| `payload.findings` | Concise unresolved facts, not an analysis transcript. |
-
-## State contract
-
-| Decision | State status | Emitted state | Facts added |
-| --- | --- | --- | --- |
-| `recorded` | `completed` | `source.conversation.recorded / complete` | conversation-recorded |
-
-`conversationHeadRef`, evidence, receipts, observations, and output use `session://`. Only a product/worktree effect explicitly declared by `operator.json` may survive the skill.
+The parent Skill machine owns the next state and the runtime owns cleanup.

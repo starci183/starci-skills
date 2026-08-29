@@ -1,0 +1,7 @@
+interface:
+  display_name: "Business Process"
+  short_description: "Process one business feature and its backend-owned business auth"
+  default_prompt: "Use $starci-business-process for one bounded mission intent."
+policy:
+  allow_implicit_invocation: true
+

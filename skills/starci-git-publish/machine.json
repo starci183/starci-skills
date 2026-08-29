@@ -1,0 +1,83 @@
+{
+  "schemaVersion": 7,
+  "id": "starci-git-publish",
+  "start": "analyze-input",
+  "states": {
+    "analyze-input": {
+      "kind": "analysis",
+      "on": [
+        {
+          "when": {},
+          "target": "select-intent"
+        }
+      ]
+    },
+    "select-intent": {
+      "kind": "choice",
+      "on": [
+        {
+          "when": {
+            "inputEquals": {
+              "mission.intent": "publish"
+            }
+          },
+          "target": "checkpoint"
+        },
+        {
+          "when": {
+            "inputEquals": {
+              "mission.intent": "checkpoint"
+            }
+          },
+          "target": "checkpoint"
+        },
+        {
+          "when": {
+            "inputEquals": {
+              "mission.intent": "resume"
+            }
+          },
+          "target": "checkpoint"
+        }
+      ]
+    },
+    "checkpoint": {
+      "kind": "operator",
+      "ref": "workspace/workflow-handoff",
+      "on": [
+        {
+          "when": {
+            "outputEquals": {
+              "outcome": "published"
+            }
+          },
+          "target": "complete"
+        },
+        {
+          "when": {
+            "outputEquals": {
+              "outcome": "resumed"
+            }
+          },
+          "target": "complete"
+        },
+        {
+          "when": {
+            "outputEquals": {
+              "outcome": "blocked"
+            }
+          },
+          "target": "blocked"
+        }
+      ]
+    },
+    "complete": {
+      "kind": "terminal",
+      "result": "complete"
+    },
+    "blocked": {
+      "kind": "terminal",
+      "result": "blocked"
+    }
+  }
+}

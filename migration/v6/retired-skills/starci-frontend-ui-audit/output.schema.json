@@ -1,0 +1,332 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://starci.dev/v6/skills/starci-frontend-ui-audit/output.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "runId",
+    "skillId",
+    "result",
+    "finalState",
+    "state",
+    "handoffRef",
+    "receiptRefs",
+    "findings",
+    "cleanup"
+  ],
+  "allOf": [
+    {
+      "oneOf": [
+        {
+          "properties": {
+            "result": {
+              "const": "complete"
+            },
+            "finalState": {
+              "const": "complete"
+            },
+            "state": {
+              "properties": {
+                "status": {
+                  "const": "completed"
+                },
+                "code": {
+                  "const": "starci-frontend-ui-audit-complete"
+                },
+                "retryable": {
+                  "const": false
+                },
+                "terminalState": {
+                  "const": "complete"
+                }
+              },
+              "required": [
+                "status",
+                "code",
+                "retryable",
+                "terminalState"
+              ]
+            }
+          },
+          "required": [
+            "result",
+            "finalState",
+            "state"
+          ]
+        },
+        {
+          "properties": {
+            "result": {
+              "const": "complete"
+            },
+            "finalState": {
+              "const": "findings"
+            },
+            "state": {
+              "properties": {
+                "status": {
+                  "const": "completed"
+                },
+                "code": {
+                  "const": "starci-frontend-ui-audit-findings"
+                },
+                "retryable": {
+                  "const": false
+                },
+                "terminalState": {
+                  "const": "findings"
+                }
+              },
+              "required": [
+                "status",
+                "code",
+                "retryable",
+                "terminalState"
+              ]
+            }
+          },
+          "required": [
+            "result",
+            "finalState",
+            "state"
+          ]
+        },
+        {
+          "properties": {
+            "result": {
+              "const": "require-user-action"
+            },
+            "finalState": {
+              "const": "user-action-required"
+            },
+            "state": {
+              "properties": {
+                "status": {
+                  "const": "require-user-action"
+                },
+                "code": {
+                  "const": "starci-frontend-ui-audit-user-action-required"
+                },
+                "retryable": {
+                  "const": false
+                },
+                "terminalState": {
+                  "const": "user-action-required"
+                }
+              },
+              "required": [
+                "status",
+                "code",
+                "retryable",
+                "terminalState"
+              ]
+            }
+          },
+          "required": [
+            "result",
+            "finalState",
+            "state"
+          ]
+        },
+        {
+          "properties": {
+            "result": {
+              "const": "blocked"
+            },
+            "finalState": {
+              "const": "blocked"
+            },
+            "state": {
+              "properties": {
+                "status": {
+                  "const": "blocked"
+                },
+                "code": {
+                  "const": "starci-frontend-ui-audit-blocked"
+                },
+                "retryable": {
+                  "const": false
+                },
+                "terminalState": {
+                  "const": "blocked"
+                }
+              },
+              "required": [
+                "status",
+                "code",
+                "retryable",
+                "terminalState"
+              ]
+            }
+          },
+          "required": [
+            "result",
+            "finalState",
+            "state"
+          ]
+        }
+      ]
+    }
+  ],
+  "properties": {
+    "schemaVersion": {
+      "const": 6
+    },
+    "runId": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128
+    },
+    "skillId": {
+      "const": "starci-frontend-ui-audit"
+    },
+    "result": {
+      "enum": [
+        "complete",
+        "require-user-action",
+        "blocked"
+      ]
+    },
+    "finalState": {
+      "enum": [
+        "complete",
+        "findings",
+        "user-action-required",
+        "blocked"
+      ]
+    },
+    "state": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "status",
+        "code",
+        "retryable",
+        "terminalState"
+      ],
+      "properties": {
+        "status": {
+          "enum": [
+            "completed",
+            "require-user-action",
+            "blocked"
+          ]
+        },
+        "code": {
+          "enum": [
+            "starci-frontend-ui-audit-complete",
+            "starci-frontend-ui-audit-findings",
+            "starci-frontend-ui-audit-user-action-required",
+            "starci-frontend-ui-audit-blocked"
+          ]
+        },
+        "retryable": {
+          "const": false
+        },
+        "terminalState": {
+          "enum": [
+            "complete",
+            "findings",
+            "user-action-required",
+            "blocked"
+          ]
+        }
+      }
+    },
+    "handoffRef": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "pattern": "^session://tasks/[A-Za-z0-9._-]+/.+$"
+    },
+    "receiptRefs": {
+      "type": "array",
+      "minItems": 0,
+      "maxItems": 64,
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "minLength": 3,
+        "maxLength": 512,
+        "pattern": "^(?:receipt:sha256:[0-9a-f]{64}|session://tasks/[A-Za-z0-9._-]+/.+)$"
+      }
+    },
+    "findings": {
+      "type": "array",
+      "maxItems": 20,
+      "uniqueItems": true,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "code",
+          "severity",
+          "message",
+          "evidenceRefs"
+        ],
+        "properties": {
+          "code": {
+            "type": "string",
+            "pattern": "^[a-z0-9]+(?:[.-][a-z0-9]+)*$",
+            "maxLength": 120
+          },
+          "severity": {
+            "enum": [
+              "info",
+              "warning",
+              "error"
+            ]
+          },
+          "message": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 500
+          },
+          "evidenceRefs": {
+            "type": "array",
+            "minItems": 0,
+            "maxItems": 8,
+            "uniqueItems": true,
+            "items": {
+              "type": "string",
+              "minLength": 3,
+              "maxLength": 512,
+              "pattern": "^(?:receipt:sha256:[0-9a-f]{64}|session://tasks/[A-Za-z0-9._-]+/.+)$"
+            }
+          }
+        }
+      }
+    },
+    "cleanup": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "scratchRefs",
+        "retention",
+        "purgeAt"
+      ],
+      "properties": {
+        "scratchRefs": {
+          "type": "array",
+          "minItems": 0,
+          "maxItems": 64,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 3,
+            "maxLength": 512,
+            "pattern": "^(?:receipt:sha256:[0-9a-f]{64}|session://tasks/[A-Za-z0-9._-]+/.+)$"
+          }
+        },
+        "retention": {
+          "const": "until-skill-terminal"
+        },
+        "purgeAt": {
+          "const": "skill-terminal"
+        }
+      }
+    }
+  }
+}

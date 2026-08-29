@@ -6,7 +6,7 @@
 | Package | `@starci/grammar/offset-pop` |
 | Operators | `grammar-convergence` |
 | Search tags | `SurfaceCard, contour, offset shadow, rotation, accent, peer cards` |
-| Dependencies | `fe.grammar-offset-pop-overview, fe.grammar-common-contracts` |
+| Dependencies | `fe.grammar-offset-pop-overview, fe.grammar-common-capabilities` |
 
 SurfaceCard owns one block responsibility and applies contour, radius, background, and offset depth as one package-defined system.
 

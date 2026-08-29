@@ -1,205 +1,51 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://starci.dev/v6/operators/context/freshness-check/input.schema.json",
+  "$id": "https://starci.dev/v7.0/operators/context/freshness-check/input.schema.json",
   "type": "object",
   "additionalProperties": false,
-  "required": [
-    "schemaVersion",
-    "runId",
-    "stage",
-    "status",
-    "facts",
-    "payload"
-  ],
+  "required": ["schemaVersion", "operatorId", "context", "input"],
   "properties": {
-    "schemaVersion": {
-      "const": 6
-    },
-    "runId": {
-      "type": "string",
-      "minLength": 1
-    },
-    "stage": {
-      "const": "context.freshness"
-    },
-    "status": {
-      "const": "ready"
-    },
-    "facts": {
-      "type": "array",
-      "uniqueItems": true,
-      "items": {
-        "type": "string",
-        "minLength": 1
-      }
-    },
-    "payload": {
+    "schemaVersion": { "const": 7 },
+    "operatorId": { "const": "context/freshness-check" },
+    "context": {
       "type": "object",
       "additionalProperties": false,
-      "required": [
-        "provided",
-        "loads",
-        "session"
-      ],
+      "required": ["currentReceipt"],
       "properties": {
-        "provided": {
-          "type": "object",
+        "currentReceipt": {
+          "description": "The revision-bound metadata receipt currently cached by the runtime, or null when no generation exists.",
+          "type": ["object", "null"],
           "additionalProperties": false,
-          "required": [
-            "project",
-            "contextKind",
-            "sourceFingerprint",
-            "generatorFingerprint",
-            "schemaVersion"
-          ],
+          "required": ["receiptRef", "project", "contextKind", "sourceFingerprint", "generatorFingerprint", "contractVersion", "artifactSha256", "status"],
           "properties": {
-            "project": {
-              "type": "string",
-              "pattern": "^[a-z0-9][a-z0-9-]*$"
-            },
-            "contextKind": {
-              "enum": [
-                "business",
-                "frontend-coding",
-                "backend-coding",
-                "tech-stack",
-                "deployment"
-              ]
-            },
-            "sourceFingerprint": {
-              "$ref": "#/$defs/sha256"
-            },
-            "generatorFingerprint": {
-              "$ref": "#/$defs/sha256"
-            },
-            "schemaVersion": {
-              "type": "integer",
-              "minimum": 1
-            }
-          }
-        },
-        "loads": {
-          "type": "object",
-          "additionalProperties": false,
-          "required": [
-            "currentReceipt"
-          ],
-          "properties": {
-            "currentReceipt": {
-              "type": [
-                "object",
-                "null"
-              ],
-              "additionalProperties": false,
-              "required": [
-                "project",
-                "contextKind",
-                "sourceFingerprint",
-                "generatorFingerprint",
-                "schemaVersion",
-                "artifactSha256",
-                "status"
-              ],
-              "properties": {
-                "project": {
-                  "type": "string"
-                },
-                "contextKind": {
-                  "type": "string"
-                },
-                "sourceFingerprint": {
-                  "type": "string"
-                },
-                "generatorFingerprint": {
-                  "type": "string"
-                },
-                "schemaVersion": {
-                  "type": "integer"
-                },
-                "artifactSha256": {
-                  "type": "string"
-                },
-                "status": {
-                  "enum": [
-                    "fresh",
-                    "stale",
-                    "invalid"
-                  ]
-                }
-              }
-            }
-          }
-        },
-        "session": {
-          "type": "object",
-          "additionalProperties": false,
-          "required": [
-            "taskId",
-            "inputRef",
-            "outputRef",
-            "scratchPrefix",
-            "retention"
-          ],
-          "properties": {
-            "taskId": {
-              "type": "string",
-              "minLength": 1
-            },
-            "inputRef": {
-              "$ref": "#/$defs/sessionRef"
-            },
-            "outputRef": {
-              "$ref": "#/$defs/sessionRef"
-            },
-            "scratchPrefix": {
-              "$ref": "#/$defs/sessionRef"
-            },
-            "retention": {
-              "const": "until-skill-terminal"
-            }
+            "receiptRef": { "$ref": "#/$defs/sessionRef" },
+            "project": { "type": "string", "pattern": "^[a-z0-9][a-z0-9-]*$" },
+            "contextKind": { "$ref": "#/$defs/contextKind" },
+            "sourceFingerprint": { "$ref": "#/$defs/sha256" },
+            "generatorFingerprint": { "$ref": "#/$defs/sha256" },
+            "contractVersion": { "type": "integer", "minimum": 1 },
+            "artifactSha256": { "$ref": "#/$defs/sha256" },
+            "status": { "enum": ["fresh", "stale", "invalid"] }
           }
         }
+      }
+    },
+    "input": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["project", "contextKind", "sourceFingerprint", "generatorFingerprint", "contractVersion"],
+      "properties": {
+        "project": { "type": "string", "pattern": "^[a-z0-9][a-z0-9-]*$", "description": "Project identity whose cached context is being checked." },
+        "contextKind": { "$ref": "#/$defs/contextKind", "description": "Kind of generated context expected by the caller." },
+        "sourceFingerprint": { "$ref": "#/$defs/sha256", "description": "Fingerprint of the exact source inputs used by the expected generation." },
+        "generatorFingerprint": { "$ref": "#/$defs/sha256", "description": "Fingerprint of the exact generator implementation and configuration." },
+        "contractVersion": { "type": "integer", "minimum": 1, "description": "Schema contract version expected by the caller." }
       }
     }
   },
   "$defs": {
-    "sha256": {
-      "type": "string",
-      "pattern": "^sha256:[0-9a-f]{64}$"
-    },
-    "sessionRef": {
-      "type": "string",
-      "pattern": "^session://tasks/[A-Za-z0-9._-]+/.+$"
-    },
-    "session": {
-      "type": "object",
-      "additionalProperties": false,
-      "required": [
-        "taskId",
-        "inputRef",
-        "outputRef",
-        "scratchPrefix",
-        "retention"
-      ],
-      "properties": {
-        "taskId": {
-          "type": "string",
-          "minLength": 1
-        },
-        "inputRef": {
-          "$ref": "#/$defs/sessionRef"
-        },
-        "outputRef": {
-          "$ref": "#/$defs/sessionRef"
-        },
-        "scratchPrefix": {
-          "$ref": "#/$defs/sessionRef"
-        },
-        "retention": {
-          "const": "until-skill-terminal"
-        }
-      }
-    }
+    "sha256": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
+    "sessionRef": { "type": "string", "pattern": "^session://tasks/[A-Za-z0-9._-]+/.+$" },
+    "contextKind": { "enum": ["business", "frontend-coding", "backend-coding", "tech-stack", "deployment"] }
   }
 }
-

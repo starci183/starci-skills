@@ -1,12 +1,12 @@
 {
-  "schemaVersion": 6,
+  "schemaVersion": 7,
   "references": [
     { "id": "starci-academy-fe", "role": "fe", "path": "./starci-academy-fe.json" },
     { "id": "starci-academy-be", "role": "be", "path": "./starci-academy-be.json" }
   ],
   "rules": [
     "Resolve the role before reading a reference.",
-    "Require the declared Qdrant virtual root and immutable commit.",
+    "Resolve the clean reference checkout at the declared immutable commit and search only its declared source root.",
     "Inspect the smallest relevant source slice.",
     "Target business truth and live contracts outrank precedent.",
     "Never copy credentials, product data, or business behavior from a reference."

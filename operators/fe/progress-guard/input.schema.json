@@ -1,0 +1,60 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "operatorId",
+    "context",
+    "input"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "const": 7
+    },
+    "operatorId": {
+      "const": "fe/progress-guard"
+    },
+    "context": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "history"
+      ],
+      "properties": {
+        "history": {
+          "description": "Prior progress fingerprints.",
+          "type": "array",
+          "uniqueItems": true,
+          "maxItems": 256,
+          "items": {
+            "type": "string",
+            "pattern": "^sha256:[0-9a-f]{64}$"
+          }
+        }
+      }
+    },
+    "input": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "candidateFingerprint",
+        "cycleKind"
+      ],
+      "properties": {
+        "candidateFingerprint": {
+          "description": "Candidate receipt progress fingerprint.",
+          "type": "string",
+          "pattern": "^sha256:[0-9a-f]{64}$"
+        },
+        "cycleKind": {
+          "description": "Guarded cycle kind.",
+          "enum": [
+            "repair",
+            "peer-call"
+          ]
+        }
+      }
+    }
+  }
+}

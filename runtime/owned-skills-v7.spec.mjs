@@ -1,0 +1,18 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import { validatorFor } from '../operators/validation.mjs';
+import { nextState } from '../skills/route-machine.mjs';
+import { createReceipt } from './trace.mjs';
+import { validateInput as validateGit } from '../skills/starci-git-publish/validate-input.mjs';
+
+const ids=['starci-quality-assure','starci-release-manage','starci-platform-operate','starci-workspace-manage','starci-git-publish'];
+const load=(id)=>JSON.parse(fs.readFileSync(new URL(`../skills/${id}/machine.json`,import.meta.url)));
+test('all owned machines are v7 and start with analyze-input',()=>{const validate=validatorFor(new URL('../skills/machine.schema.json',import.meta.url));for(const id of ids){const m=load(id);assert.equal(m.start,'analyze-input');assert.deepEqual(validate(m),{valid:true,errors:[]});}});
+test('platform intents discriminate operators and emitted outcomes',()=>{const m=load('starci-platform-operate');assert.equal(nextState(m,'select-intent',{}, {mission:{intent:'sonar'}}),'sonar');assert.equal(nextState(m,'sonar',{output:{outcome:'proved'}},{}),'complete');assert.equal(nextState(m,'tunnel-plan',{output:{outcome:'ready'}},{}),'complete');});
+test('release recovery and rollback execute instead of terminal blocking',()=>{const m=load('starci-release-manage');assert.equal(nextState(m,'monitor',{output:{outcome:'recover'}},{}),'recover');assert.equal(nextState(m,'recover',{output:{outcome:'rollback'}},{}),'rollback');assert.equal(nextState(m,'rollback',{output:{outcome:'rolled-back'}},{}),'proof');});
+test('quality findings, rules, and debt are measured loops',()=>{const m=load('starci-quality-assure');assert.equal(nextState(m,'inventory',{output:{outcome:'findings'}},{}),'repair');assert.equal(nextState(m,'repair',{output:{outcome:'repaired'}},{}),'inventory');assert.equal(nextState(m,'debt',{output:{outcome:'progress'}},{}),'debt');});
+test('workspace routes provenance and checkpoint intents',()=>{const m=load('starci-workspace-manage');assert.equal(nextState(m,'select-intent',{}, {mission:{intent:'provenance-query'}}),'query');assert.equal(nextState(m,'select-intent',{}, {mission:{intent:'checkpoint'}}),'checkpoint');});
+const selection=(skillId)=>({analyzerVersion:2,skillId,confidence:'exact',interactionPolicy:'ask-only-when-stuck',activeInputRefs:['request:1'],passiveContextRefs:[]});
+test('git publication requires approved exact heads and canonical progressing receipts',()=>{const receipt=createReceipt('CALL',{receiptId:'receipt:g1',missionId:'m1',skillId:'starci-git-publish',operatorId:'workspace/workflow-handoff',parentId:null,childId:'c1'},{debug:false});const value={schemaVersion:7,skillId:'starci-git-publish',selection:selection('starci-git-publish'),mission:{missionId:'m1',project:'starci',objectiveRef:'request:1',intent:'publish',approvalRef:'approval:1',sourceHeads:['git:abc']},receipts:[receipt]};assert.deepEqual(validateGit(value),{valid:true,errors:[]});value.mission.approvalRef=null;assert.match(validateGit(value).errors.join('\n'),/approval/);});
+test('selection envelope is exact and unresolved WAIT is rejected',()=>{const wait=createReceipt('WAIT',{receiptId:'receipt:w1',missionId:'m1',skillId:'starci-git-publish',operatorId:null,parentId:null,childId:null},{debug:true});const value={schemaVersion:7,skillId:'starci-git-publish',selection:selection('starci-git-publish'),mission:{missionId:'m1',project:'starci',objectiveRef:'request:1',intent:'publish',approvalRef:'approval:1',sourceHeads:['git:abc']},receipts:[wait]};assert.match(validateGit(value).errors.join('\n'),/typed user authority/);value.selection.interactionPolicy='automatic';assert.equal(validateGit(value).valid,false);});

@@ -1,47 +1,19 @@
 {
-  "schemaVersion": 6,
+  "schemaVersion": 7,
   "id": "workspace/device-checkpoint",
   "domain": "workspace",
+  "job": "Produce one bounded device checkpoint result from exact supplied evidence.",
   "inputSchema": "input.schema.json",
   "outputSchema": "output.schema.json",
-  "knowledgeRefs": [],
   "sourceReferenceRefs": [],
-  "accepts": [
-    {
-      "stage": "workspace.device-checkpoint",
-      "status": "ready",
-      "allFacts": ["workspace-route-ready", "checkpoint-explicitly-authorized"],
-      "noneFacts": []
-    }
-  ],
-  "emits": [
-    {
-      "stage": "workspace.device-checkpoint.result",
-      "status": "complete",
-      "factsAdd": ["device-checkpoint-published"],
-      "factsRemove": []
-    },
-    {
-      "stage": "workspace.device-checkpoint.result",
-      "status": "blocked",
-      "factsAdd": ["device-checkpoint-blocked"],
-      "factsRemove": []
-    }
-  ],
   "sideEffects": [
     "push already approved mission-owned commits after proving clean ahead-only checkout state",
     "quiesce and restart containers attached to Source-declared Docker volumes",
     "stream compressed volume archives through age encryption without a plaintext archive",
-    "publish checksum-bound chunks and a manifest as a private release only after every upload succeeds",
-    "keep input, output, loaded context, scratch values, worker observations, and receipts in task-session memory only",
-    "purge every intermediate session object at each parent-skill terminal state"
+    "publish checksum-bound chunks and a manifest as a private release only after every upload succeeds"
   ],
   "stopConditions": [
-    "the stop/checkpoint request does not explicitly authorize external publication",
-    "a touched checkout contains unrelated or uncommitted changes, is behind, diverged, or targets an undeclared upstream",
-    "the portable device-state contract, master identity, encrypted credential handle, Docker volume, or helper runtime is missing",
-    "any container cannot be restarted after quiescing",
-    "an archive, chunk, checksum, manifest, upload, or remote proof is incomplete",
-    "plaintext backup data, decrypted credentials, master identity, or raw service data would enter Git, logs, Qdrant, or a receipt"
+    "an exact reference is missing or its fingerprint differs",
+    "the requested work exceeds this operator job"
   ]
 }

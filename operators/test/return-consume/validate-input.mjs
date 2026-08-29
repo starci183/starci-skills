@@ -1,0 +1,3 @@
+import { validatorFor,runValidatorCli } from '../../validation.mjs';
+const semantic=(value)=>{const e=[];const r=value.input.receipt;if(r.type!=='RETURN')e.push('/input/receipt/type: expected RETURN');if(r.missionId!==value.context.expectedMissionId)e.push('/input/receipt/missionId: correlation mismatch');if(r.parentId!==value.context.expectedChildId)e.push('/input/receipt/parentId: child correlation mismatch');return e};
+export const validateInput=validatorFor(new URL('./input.schema.json',import.meta.url),semantic);if(process.argv[1]?.endsWith('validate-input.mjs'))await runValidatorCli(validateInput,'node validate-input.mjs <input.json>');

@@ -1,0 +1,85 @@
+{
+  "$schema": "../machine.schema.json",
+  "schemaVersion": 6,
+  "id": "starci-frontend-ui-audit",
+  "start": "analyze-input",
+  "states": {
+    "analyze-input": {
+      "kind": "analysis",
+      "on": [
+        {
+          "when": {},
+          "target": "audit",
+          "label": "enter audit"
+        }
+      ]
+    },
+    "audit": {
+      "kind": "operator",
+      "ref": "test/ui-audit",
+      "on": [
+        {
+          "when": {
+            "outputEquals": {
+              "outcome": "passed"
+            }
+          },
+          "target": "complete",
+          "label": "passed"
+        },
+        {
+          "when": {
+            "outputEquals": {
+              "outcome": "failed"
+            }
+          },
+          "target": "findings",
+          "label": "failed"
+        },
+        {
+          "when": {
+            "outputEquals": {
+              "outcome": "require-user-action"
+            }
+          },
+          "target": "user-action-required",
+          "label": "require-user-action"
+        },
+        {
+          "when": {
+            "outputEquals": {
+              "outcome": "blocked"
+            }
+          },
+          "target": "blocked",
+          "label": "blocked"
+        },
+        {
+          "when": {
+            "outputEquals": {
+              "outcome": "suspense"
+            }
+          },
+          "target": "findings",
+          "label": "suspense"
+        }
+      ]
+    },
+    "complete": {
+      "kind": "terminal",
+      "result": "complete"
+    },
+    "findings": {
+      "kind": "terminal",
+      "result": "complete"
+    },
+    "user-action-required": {
+      "kind": "terminal",
+      "result": "require-user-action"
+    },
+    "blocked": {
+      "kind": "terminal",
+      "result": "blocked"
+    }
+  }
+}

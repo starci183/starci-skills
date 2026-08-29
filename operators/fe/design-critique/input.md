@@ -1,5 +1,11 @@
 # `fe/design-critique` input
 
-## JSON architecture
+## Context
 
-`payload.provided` freezes one candidate, its business outcome, and source observations. `payload.loads` is runtime-owned knowledge plus a fresh-context orchestration binding. `payload.session` is ephemeral and retained only until the parent skill terminal.
+- `context.evidenceRefs`: Exact canonical evidence references available to this atomic job.
+- `context.authorityRevision`: Exact approved authority revision binding this invocation.
+
+## Input
+
+- `input.targetRef`: The one target owned by this atomic invocation.
+- `input.constraints`: Closed constraints that bound this job without routing it.

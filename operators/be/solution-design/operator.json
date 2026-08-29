@@ -1,38 +1,16 @@
 {
-  "schemaVersion": 6,
+  "schemaVersion": 7,
   "id": "be/solution-design",
   "domain": "be",
+  "job": "Design one bounded backend solution from approved authority and architecture references.",
   "inputSchema": "input.schema.json",
   "outputSchema": "output.schema.json",
-  "knowledgeRefs": [
-    "be.demand-modeling"
-  ],
   "sourceReferenceRefs": [],
-  "accepts": [
-    {
-      "stage": "be.v61.solution-design",
-      "status": "ready",
-      "allFacts": [],
-      "noneFacts": []
-    }
-  ],
-  "emits": [
-    {
-      "stage": "be.v61.solution-design.complete",
-      "status": "ready",
-      "factsAdd": [
-        "be-solution-design-ready"
-      ],
-      "factsRemove": []
-    }
-  ],
   "sideEffects": [
-    "keep artifacts and observations in task-session memory only",
-    "purge intermediate session objects at every parent-skill terminal state"
+    "read only the supplied exact references"
   ],
   "stopConditions": [
-    "required evidence is missing, stale or contradictory",
-    "Responsibilities, invariants, failure semantics, compatibility and owned resources are explicit.",
-    "source observations would be treated as target authority"
+    "an exact reference is missing or its fingerprint differs",
+    "the requested work exceeds this operator job"
   ]
 }

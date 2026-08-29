@@ -1,0 +1,258 @@
+{
+  "$schema": "../machine.schema.json",
+  "schemaVersion": 7,
+  "id": "starci-architecture-design",
+  "start": "analyze-input",
+  "states": {
+    "analyze-input": {
+      "kind": "analysis",
+      "on": [
+        {
+          "when": {},
+          "target": "select-intent",
+          "label": "validate authority and runtime receipts"
+        }
+      ]
+    },
+    "select-intent": {
+      "kind": "choice",
+      "on": [
+        {
+          "when": {
+            "inputEquals": {
+              "options.intentMode": "discover"
+            }
+          },
+          "target": "bind-discover",
+          "label": "bind discover prerequisites"
+        },
+        {
+          "when": {
+            "inputEquals": {
+              "options.intentMode": "design"
+            }
+          },
+          "target": "bind-design",
+          "label": "bind design prerequisites"
+        },
+        {
+          "when": {
+            "inputEquals": {
+              "options.intentMode": "challenge"
+            }
+          },
+          "target": "bind-challenge",
+          "label": "bind challenge prerequisites"
+        },
+        {
+          "when": {
+            "inputEquals": {
+              "options.intentMode": "realize"
+            }
+          },
+          "target": "bind-realize",
+          "label": "bind realize prerequisites"
+        },
+        {
+          "when": {
+            "inputEquals": {
+              "options.intentMode": "resume"
+            }
+          },
+          "target": "resume-select",
+          "label": "consume RETURN through RESUME"
+        }
+      ]
+    },
+    "resume-select": {
+      "kind": "choice",
+      "on": [
+        {
+          "when": {
+            "inputEquals": {
+              "options.resumeTarget": "discover"
+            }
+          },
+          "target": "bind-discover",
+          "label": "resume discover"
+        },
+        {
+          "when": {
+            "inputEquals": {
+              "options.resumeTarget": "design"
+            }
+          },
+          "target": "bind-design",
+          "label": "resume design"
+        },
+        {
+          "when": {
+            "inputEquals": {
+              "options.resumeTarget": "challenge"
+            }
+          },
+          "target": "bind-challenge",
+          "label": "resume challenge"
+        },
+        {
+          "when": {
+            "inputEquals": {
+              "options.resumeTarget": "realize"
+            }
+          },
+          "target": "bind-realize",
+          "label": "resume realize"
+        }
+      ]
+    },
+    "complete": {
+      "kind": "terminal",
+      "result": "complete"
+    },
+    "peer-call": {
+      "kind": "terminal",
+      "result": "handoff"
+    },
+    "blocked": {
+      "kind": "terminal",
+      "result": "blocked"
+    },
+    "bind-discover": {
+      "kind": "analysis",
+      "on": [
+        {
+          "when": {},
+          "target": "discover",
+          "label": "prerequisites bound"
+        }
+      ]
+    },
+    "discover": {
+      "kind": "operator",
+      "ref": "architecture/source-discovery",
+      "on": [
+        {
+          "when": {
+            "outputEquals": {
+              "outcome": "ready"
+            }
+          },
+          "target": "complete",
+          "label": "ready"
+        }
+      ]
+    },
+    "bind-design": {
+      "kind": "analysis",
+      "on": [
+        {
+          "when": {},
+          "target": "design",
+          "label": "prerequisites bound"
+        }
+      ]
+    },
+    "design": {
+      "kind": "operator",
+      "ref": "architecture/alternatives",
+      "on": [
+        {
+          "when": {
+            "outputEquals": {
+              "outcome": "ready"
+            }
+          },
+          "target": "complete",
+          "label": "ready"
+        }
+      ]
+    },
+    "bind-challenge": {
+      "kind": "analysis",
+      "on": [
+        {
+          "when": {},
+          "target": "challenge",
+          "label": "prerequisites bound"
+        }
+      ]
+    },
+    "challenge": {
+      "kind": "operator",
+      "ref": "architecture/independent-critique",
+      "on": [
+        {
+          "when": {
+            "outputEquals": {
+              "outcome": "ready"
+            }
+          },
+          "target": "complete",
+          "label": "ready"
+        },
+        {
+          "when": {
+            "outputEquals": {
+              "outcome": "revise"
+            }
+          },
+          "target": "peer-call",
+          "label": "revise"
+        },
+        {
+          "when": {
+            "outputEquals": {
+              "outcome": "blocked"
+            }
+          },
+          "target": "blocked",
+          "label": "blocked"
+        }
+      ]
+    },
+    "bind-realize": {
+      "kind": "analysis",
+      "on": [
+        {
+          "when": {},
+          "target": "realize",
+          "label": "prerequisites bound"
+        }
+      ]
+    },
+    "realize": {
+      "kind": "operator",
+      "ref": "architecture/design-realization",
+      "on": [
+        {
+          "when": {
+            "outputEquals": {
+              "outcome": "ready"
+            }
+          },
+          "target": "peer-call",
+          "label": "ready"
+        },
+        {
+          "when": {
+            "outputEquals": {
+              "outcome": "revise"
+            }
+          },
+          "target": "peer-call",
+          "label": "revise"
+        },
+        {
+          "when": {
+            "outputEquals": {
+              "outcome": "blocked"
+            }
+          },
+          "target": "blocked",
+          "label": "blocked"
+        }
+      ]
+    }
+  }
+}
+

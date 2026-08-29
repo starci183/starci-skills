@@ -1,0 +1,156 @@
+{
+  "$schema": "../machine.schema.json",
+  "schemaVersion": 6,
+  "id": "starci-static-quality-gates",
+  "start": "analyze-input",
+  "states": {
+    "analyze-input": {
+      "kind": "analysis",
+      "on": [
+        {
+          "when": {},
+          "target": "lint",
+          "label": "enter lint"
+        }
+      ]
+    },
+    "lint": {
+      "kind": "operator",
+      "ref": "quality/lint",
+      "on": [
+        {
+          "when": {
+            "outputEquals": {
+              "outcome": "pass"
+            }
+          },
+          "target": "typecheck",
+          "label": "pass"
+        },
+        {
+          "when": {
+            "outputEquals": {
+              "outcome": "in-boundary"
+            }
+          },
+          "target": "handoff",
+          "label": "in-boundary"
+        },
+        {
+          "when": {
+            "outputEquals": {
+              "outcome": "boundary-drift"
+            }
+          },
+          "target": "handoff",
+          "label": "boundary-drift"
+        },
+        {
+          "when": {
+            "outputEquals": {
+              "outcome": "external-blocker"
+            }
+          },
+          "target": "blocked",
+          "label": "external-blocker"
+        }
+      ]
+    },
+    "typecheck": {
+      "kind": "operator",
+      "ref": "quality/typecheck",
+      "on": [
+        {
+          "when": {
+            "outputEquals": {
+              "outcome": "pass"
+            }
+          },
+          "target": "sonar",
+          "label": "pass"
+        },
+        {
+          "when": {
+            "outputEquals": {
+              "outcome": "in-boundary"
+            }
+          },
+          "target": "handoff",
+          "label": "in-boundary"
+        },
+        {
+          "when": {
+            "outputEquals": {
+              "outcome": "boundary-drift"
+            }
+          },
+          "target": "handoff",
+          "label": "boundary-drift"
+        },
+        {
+          "when": {
+            "outputEquals": {
+              "outcome": "external-blocker"
+            }
+          },
+          "target": "blocked",
+          "label": "external-blocker"
+        }
+      ]
+    },
+    "handoff": {
+      "kind": "terminal",
+      "result": "handoff"
+    },
+    "blocked": {
+      "kind": "terminal",
+      "result": "blocked"
+    },
+    "sonar": {
+      "kind": "operator",
+      "ref": "quality/sonar",
+      "on": [
+        {
+          "when": {
+            "outputEquals": {
+              "outcome": "pass"
+            }
+          },
+          "target": "complete",
+          "label": "pass"
+        },
+        {
+          "when": {
+            "outputEquals": {
+              "outcome": "in-boundary"
+            }
+          },
+          "target": "handoff",
+          "label": "in-boundary"
+        },
+        {
+          "when": {
+            "outputEquals": {
+              "outcome": "boundary-drift"
+            }
+          },
+          "target": "handoff",
+          "label": "boundary-drift"
+        },
+        {
+          "when": {
+            "outputEquals": {
+              "outcome": "external-blocker"
+            }
+          },
+          "target": "blocked",
+          "label": "external-blocker"
+        }
+      ]
+    },
+    "complete": {
+      "kind": "terminal",
+      "result": "complete"
+    }
+  }
+}

@@ -1,5 +1,8 @@
 # `context/freshness-check` output
 
-## JSON architecture
-
-`state` emits `fresh`, `initialize-required`, or `blocked`; `produced` contains the metadata-only receipt decision. All operator state remains ephemeral and is purged at the parent skill-terminal.
+| Field | Meaning |
+| --- | --- |
+| `output.outcome` | `fresh`, `initialize-required`, or `blocked`. This is data; only the Skill machine selects the next state. |
+| `output.receiptRef` | Exact current receipt for `fresh`; otherwise `null`. |
+| `output.reason` | `current`, `missing`, `identity-drift`, or `invalid`. |
+| `output.evidenceRefs` | Metadata evidence used by the comparison. |

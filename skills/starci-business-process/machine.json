@@ -1,0 +1,224 @@
+{
+  "$schema": "../machine.schema.json",
+  "schemaVersion": 7,
+  "id": "starci-business-process",
+  "start": "analyze-input",
+  "states": {
+    "analyze-input": {
+      "kind": "analysis",
+      "on": [
+        {
+          "when": {},
+          "target": "select-intent",
+          "label": "validate authority and runtime receipts"
+        }
+      ]
+    },
+    "select-intent": {
+      "kind": "choice",
+      "on": [
+        {
+          "when": {
+            "inputEquals": {
+              "options.intentMode": "model"
+            }
+          },
+          "target": "bind-model",
+          "label": "bind model prerequisites"
+        },
+        {
+          "when": {
+            "inputEquals": {
+              "options.intentMode": "publish"
+            }
+          },
+          "target": "bind-publish",
+          "label": "bind publish prerequisites"
+        },
+        {
+          "when": {
+            "inputEquals": {
+              "options.intentMode": "reconcile"
+            }
+          },
+          "target": "bind-reconcile",
+          "label": "bind reconcile prerequisites"
+        },
+        {
+          "when": {
+            "inputEquals": {
+              "options.intentMode": "resume"
+            }
+          },
+          "target": "resume-select",
+          "label": "consume RETURN through RESUME"
+        }
+      ]
+    },
+    "resume-select": {
+      "kind": "choice",
+      "on": [
+        {
+          "when": {
+            "inputEquals": {
+              "options.resumeTarget": "model"
+            }
+          },
+          "target": "bind-model",
+          "label": "resume model"
+        },
+        {
+          "when": {
+            "inputEquals": {
+              "options.resumeTarget": "publish"
+            }
+          },
+          "target": "bind-publish",
+          "label": "resume publish"
+        },
+        {
+          "when": {
+            "inputEquals": {
+              "options.resumeTarget": "reconcile"
+            }
+          },
+          "target": "bind-reconcile",
+          "label": "resume reconcile"
+        }
+      ]
+    },
+    "complete": {
+      "kind": "terminal",
+      "result": "complete"
+    },
+    "peer-call": {
+      "kind": "terminal",
+      "result": "handoff"
+    },
+    "blocked": {
+      "kind": "terminal",
+      "result": "blocked"
+    },
+    "bind-model": {
+      "kind": "analysis",
+      "on": [
+        {
+          "when": {},
+          "target": "model",
+          "label": "prerequisites bound"
+        }
+      ]
+    },
+    "model": {
+      "kind": "operator",
+      "ref": "business/model",
+      "on": [
+        {
+          "when": {
+            "outputEquals": {
+              "outcome": "ready"
+            }
+          },
+          "target": "complete",
+          "label": "ready"
+        },
+        {
+          "when": {
+            "outputEquals": {
+              "outcome": "revise"
+            }
+          },
+          "target": "peer-call",
+          "label": "revise"
+        },
+        {
+          "when": {
+            "outputEquals": {
+              "outcome": "blocked"
+            }
+          },
+          "target": "blocked",
+          "label": "blocked"
+        }
+      ]
+    },
+    "bind-publish": {
+      "kind": "analysis",
+      "on": [
+        {
+          "when": {},
+          "target": "publish",
+          "label": "prerequisites bound"
+        }
+      ]
+    },
+    "publish": {
+      "kind": "operator",
+      "ref": "business/publish",
+      "on": [
+        {
+          "when": {
+            "outputEquals": {
+              "outcome": "architecture-required"
+            }
+          },
+          "target": "peer-call",
+          "label": "architecture-required"
+        },
+        {
+          "when": {
+            "outputEquals": {
+              "outcome": "direct-plan"
+            }
+          },
+          "target": "peer-call",
+          "label": "direct-plan"
+        },
+        {
+          "when": {
+            "outputEquals": {
+              "outcome": "blocked"
+            }
+          },
+          "target": "blocked",
+          "label": "blocked"
+        }
+      ]
+    },
+    "bind-reconcile": {
+      "kind": "analysis",
+      "on": [
+        {
+          "when": {},
+          "target": "reconcile",
+          "label": "prerequisites bound"
+        }
+      ]
+    },
+    "reconcile": {
+      "kind": "operator",
+      "ref": "business/reconcile",
+      "on": [
+        {
+          "when": {
+            "outputEquals": {
+              "outcome": "implemented"
+            }
+          },
+          "target": "complete",
+          "label": "implemented"
+        },
+        {
+          "when": {
+            "outputEquals": {
+              "outcome": "discrepancy"
+            }
+          },
+          "target": "peer-call",
+          "label": "discrepancy"
+        }
+      ]
+    }
+  }
+}
+

@@ -1,90 +1,16 @@
 {
-  "schemaVersion": 6,
+  "schemaVersion": 7,
   "id": "fe/implementation",
   "domain": "fe",
+  "job": "implementation one closed frontend target.",
   "inputSchema": "input.schema.json",
   "outputSchema": "output.schema.json",
-  "knowledgeRefs": [
-    "fe.implementation-boundaries"
-  ],
+  "contextRefs": [],
   "sourceReferenceRefs": [],
-  "accepts": [
-    {
-      "stage": "code.implement",
-      "status": "ready",
-      "allFacts": [
-        "coding-scope-frozen"
-      ],
-      "noneFacts": [
-        "grammar-gap"
-      ]
-    },
-    {
-      "stage": "requests.review",
-      "status": "ready",
-      "noneFacts": [
-        "create-required",
-        "grammar-gap"
-      ]
-    },
-    {
-      "stage": "request.result",
-      "status": "ready",
-      "allFacts": [
-        "create-required",
-        "requests-emitted"
-      ],
-      "noneFacts": [
-        "grammar-gap"
-      ]
-    },
-    {
-      "stage": "code.repair",
-      "status": "repair",
-      "allFacts": [
-        "in-boundary-repair"
-      ],
-      "noneFacts": [
-        "boundary-drift",
-        "grammar-gap"
-      ]
-    }
-  ],
-  "emits": [
-    {
-      "when": "source writes and focused static checks succeed",
-      "stage": "seed.materialize",
-      "status": "ready",
-      "factsAdd": [
-        "source-written"
-      ]
-    },
-    {
-      "when": "an implementation stop condition is reached",
-      "stage": "code.result",
-      "status": "blocked",
-      "factsAdd": [
-        "implementation-blocked"
-      ]
-    }
-  ],
-  "sideEffects": [
-    "coordinator mutates only exact approved targets for fe/implementation",
-    "keep input, output, loaded context, worker observations, drafts, evidence, and receipts in task-session storage only",
-    "purge every intermediate session object at every parent-skill terminal state"
-  ],
+  "sideEffects": [],
   "stopConditions": [
-    "Grammar gap",
-    "approved layout hash or source boundary mismatch",
-    "write outside exact source boundary",
-    "undeclared lower-tier extension",
-    "closed contract invariant change",
-    "local reconstruction of package-owned Grammar capability",
-    "non-color structural change in global.css",
-    "failed static check",
-    "boundary drift",
-    "Stop on Grammar gap, stale layout or source fingerprint, undeclared target, closed invariant change, non-color structural global CSS change, or failed focused check.",
-    "runtime binding revision or session ownership is invalid",
-    "the operation would broaden its approved authority, source, or external boundary"
+    "required authority or evidence is missing or stale",
+    "the closed target boundary is ambiguous",
+    "completion would require another operator job"
   ]
 }

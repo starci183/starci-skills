@@ -1,27 +1,14 @@
 # `source/conversation-record` input
 
-This operator records redacted conversation and artifact lineage. The input is an ephemeral object owned by the current task session. It is never written to the repository, a worktree, a log, an index, or a receipt file. The runtime purges it at every parent-skill terminal state.
+The operator accepts only `context + input`.
 
-## JSON architecture
+- `context.policy`: active redaction policy, scanner version, and evidence.
+- `context.writeAuthority`: exact project and role write authority.
+- `context.currentHead`: current durable head for the identity, or null.
+- `input.identity`: one provider, conversation id, project, and role tuple.
+- `input.snapshot`: an already-redacted snapshot reference and hash.
+- `input.redactionReceipt`: policy, input hash, output hash, scanner, and prohibited-category proof.
+- `input.artifactRefs`: bounded immutable artifact links.
+- `input.sourceRevision`: exact source revision associated with the snapshot.
 
-| Section | Authored by | Purpose |
-| --- | --- | --- |
-| Root route fields | Skill state machine | Bind one accepted transition. |
-| `payload.provided` | Previous state | Supply immutable task-session references. |
-| `payload.loads` | Runtime resolver | Declare exact bindings loaded only after validation. |
-| `payload.session` | Session runtime | Name ephemeral input, output, and scratch slots. |
-
-## Provided by the previous state
-
-- `providerRef`: exact `session://` reference; this operator cannot replace or broaden it.
-- `conversationSnapshotRef`: exact `session://` reference to an already-redacted snapshot artifact; raw provider transcripts are invalid and are never loaded by this operator.
-- `artifactRefs`: exact `session://` reference; this operator cannot replace or broaden it.
-- `redactionReceiptRef`: exact `session://` reference; this operator cannot replace or broaden it.
-
-## Loaded by the runtime
-
-- `artifacts`: resolve only references declared by `payload.provided` into task-session memory.
-- `knowledge`: retrieve only `source.provenance` from the pinned Qdrant generation.
-- `orchestration`: resolve execution mode separately from provider/model mapping.
-
-Acceptance requires that provider, redaction receipt, artifact hashes, and ownership are valid. The redaction receipt must bind policy version, raw-input hash, redacted-output hash, scanner version, and a passing prohibited-category result; its output hash must equal the snapshot artifact revision. Validate the whole envelope before any load or side effect. Loaded content and intermediate analysis remain session-only.
+Raw transcript text, prompts, secrets, workflow routing, and session lifecycle are outside this contract.

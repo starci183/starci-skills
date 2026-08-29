@@ -1,42 +1,16 @@
 {
-  "schemaVersion": 6,
+  "schemaVersion": 7,
   "id": "delivery/impact-classify",
   "domain": "delivery",
+  "job": "Perform one impact classify job and return its typed result.",
   "inputSchema": "input.schema.json",
   "outputSchema": "output.schema.json",
-  "knowledgeRefs": ["architecture.decision-analysis"],
+  "contextRefs": [
+    "architecture.decision-analysis"
+  ],
   "sourceReferenceRefs": [],
-  "accepts": [
-    { "stage": "layout.review", "status": "approved", "allFacts": ["layout-approved"], "noneFacts": [] },
-    { "stage": "fe.block.review", "status": "approved", "allFacts": [], "noneFacts": [] },
-    { "stage": "fe.authority.review", "status": "approved", "allFacts": [], "noneFacts": [] },
-    { "stage": "fe.feedback.request.result", "status": "complete", "allFacts": ["feedback-request-recorded"], "noneFacts": [] },
-    { "stage": "business.freshness", "status": "ready", "allFacts": ["business-fresh-receipt-ready", "feedback-request-recorded"], "noneFacts": [] }
-  ],
-  "emits": [
-    {
-      "stage": "architecture.decision.frame",
-      "status": "ready",
-      "factsAdd": ["backend-impact-required", "architecture-analysis-required", "delivery-impact-classified"],
-      "factsRemove": ["backend-impact-none"]
-    },
-    {
-      "stage": "delivery.mission.resume",
-      "status": "ready",
-      "factsAdd": ["backend-impact-none", "delivery-impact-classified"],
-      "factsRemove": ["backend-impact-required"]
-    },
-    {
-      "stage": "delivery.blocked",
-      "status": "blocked",
-      "factsAdd": ["delivery-impact-blocked"],
-      "factsRemove": []
-    }
-  ],
   "sideEffects": [
-    "classify role impact from approved mission, business and route metadata without reading product source",
-    "keep all inputs, evidence and receipts in task-session memory only",
-    "purge every intermediate session object at each parent-skill terminal"
+    "classify role impact from approved mission, business and route metadata without reading product source"
   ],
   "stopConditions": [
     "the approved mission or business head is missing or stale",

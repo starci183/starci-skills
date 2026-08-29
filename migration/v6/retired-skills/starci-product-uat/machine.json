@@ -1,0 +1,334 @@
+{
+  "$schema": "../machine.schema.json",
+  "schemaVersion": 6,
+  "id": "starci-product-uat",
+  "start": "analyze-input",
+  "states": {
+    "analyze-input": {
+      "kind": "analysis",
+      "on": [
+        {
+          "when": {},
+          "target": "coverage",
+          "label": "enter coverage"
+        }
+      ]
+    },
+    "coverage": {
+      "kind": "operator",
+      "ref": "test/flow-coverage-audit",
+      "on": [
+        {
+          "when": {
+            "outputEquals": {
+              "outcome": "ready"
+            }
+          },
+          "target": "behavior",
+          "label": "ready"
+        },
+        {
+          "when": {
+            "outputEquals": {
+              "outcome": "findings"
+            }
+          },
+          "target": "coverage-handoff",
+          "label": "findings"
+        },
+        {
+          "when": {
+            "outputEquals": {
+              "outcome": "require-user-action"
+            }
+          },
+          "target": "user-action-required",
+          "label": "require-user-action"
+        },
+        {
+          "when": {
+            "outputEquals": {
+              "outcome": "blocked"
+            }
+          },
+          "target": "blocked",
+          "label": "blocked"
+        }
+      ]
+    },
+    "behavior": {
+      "kind": "operator",
+      "ref": "test/behavior-audit",
+      "on": [
+        {
+          "when": {
+            "outputEquals": {
+              "outcome": "passed"
+            }
+          },
+          "target": "ux",
+          "label": "passed"
+        },
+        {
+          "when": {
+            "outputEquals": {
+              "outcome": "failed"
+            }
+          },
+          "target": "repair-handoff",
+          "label": "failed"
+        },
+        {
+          "when": {
+            "outputEquals": {
+              "outcome": "require-user-action"
+            }
+          },
+          "target": "user-action-required",
+          "label": "require-user-action"
+        },
+        {
+          "when": {
+            "outputEquals": {
+              "outcome": "blocked"
+            }
+          },
+          "target": "blocked",
+          "label": "blocked"
+        }
+      ]
+    },
+    "coverage-handoff": {
+      "kind": "terminal",
+      "result": "handoff"
+    },
+    "user-action-required": {
+      "kind": "terminal",
+      "result": "require-user-action"
+    },
+    "blocked": {
+      "kind": "terminal",
+      "result": "blocked"
+    },
+    "ux": {
+      "kind": "operator",
+      "ref": "test/ux-audit",
+      "on": [
+        {
+          "when": {
+            "outputEquals": {
+              "outcome": "passed"
+            }
+          },
+          "target": "ui",
+          "label": "passed"
+        },
+        {
+          "when": {
+            "outputEquals": {
+              "outcome": "failed"
+            }
+          },
+          "target": "resolve-ux-ui",
+          "label": "failed"
+        },
+        {
+          "when": {
+            "outputEquals": {
+              "outcome": "require-user-action"
+            }
+          },
+          "target": "user-action-required",
+          "label": "require-user-action"
+        },
+        {
+          "when": {
+            "outputEquals": {
+              "outcome": "blocked"
+            }
+          },
+          "target": "blocked",
+          "label": "blocked"
+        }
+      ]
+    },
+    "repair-handoff": {
+      "kind": "terminal",
+      "result": "handoff"
+    },
+    "ui": {
+      "kind": "operator",
+      "ref": "test/ui-audit",
+      "on": [
+        {
+          "when": {
+            "outputEquals": {
+              "outcome": "passed"
+            }
+          },
+          "target": "verify",
+          "label": "passed"
+        },
+        {
+          "when": {
+            "outputEquals": {
+              "outcome": "failed"
+            }
+          },
+          "target": "resolve-ux-ui",
+          "label": "failed"
+        },
+        {
+          "when": {
+            "outputEquals": {
+              "outcome": "suspense"
+            }
+          },
+          "target": "suspense-handoff",
+          "label": "suspense"
+        },
+        {
+          "when": {
+            "outputEquals": {
+              "outcome": "require-user-action"
+            }
+          },
+          "target": "user-action-required",
+          "label": "require-user-action"
+        },
+        {
+          "when": {
+            "outputEquals": {
+              "outcome": "blocked"
+            }
+          },
+          "target": "blocked",
+          "label": "blocked"
+        }
+      ]
+    },
+    "resolve-ux-ui": {
+      "kind": "operator",
+      "ref": "fe/ux-ui-resolve",
+      "on": [
+        {
+          "when": {
+            "outputEquals": {
+              "outcome": "repair-ready"
+            }
+          },
+          "target": "repair-handoff",
+          "label": "typed repair handoff"
+        },
+        {
+          "when": {
+            "outputEquals": {
+              "outcome": "resolved"
+            }
+          },
+          "target": "user-approval",
+          "label": "requests closed after proof"
+        },
+        {
+          "when": {
+            "outputEquals": {
+              "outcome": "blocked"
+            }
+          },
+          "target": "blocked",
+          "label": "blocked"
+        }
+      ]
+    },
+    "verify": {
+      "kind": "operator",
+      "ref": "fe/product-uat",
+      "on": [
+        {
+          "when": {
+            "outputEquals": {
+              "outcome": "passed"
+            },
+            "allFacts": [
+              "ux-ui-resolution-close-required"
+            ]
+          },
+          "target": "resolve-ux-ui",
+          "label": "close proved UX/UI requests"
+        },
+        {
+          "when": {
+            "outputEquals": {
+              "outcome": "passed"
+            },
+            "noneFacts": [
+              "ux-ui-resolution-close-required"
+            ]
+          },
+          "target": "user-approval",
+          "label": "passed"
+        },
+        {
+          "when": {
+            "outputEquals": {
+              "outcome": "ux-ui-repair"
+            }
+          },
+          "target": "resolve-ux-ui",
+          "label": "resolve UX/UI failure"
+        },
+        {
+          "when": {
+            "outputEquals": {
+              "outcome": "repair"
+            }
+          },
+          "target": "repair-handoff",
+          "label": "repair"
+        },
+        {
+          "when": {
+            "outputEquals": {
+              "outcome": "blocked"
+            }
+          },
+          "target": "blocked",
+          "label": "blocked"
+        }
+      ]
+    },
+    "suspense-handoff": {
+      "kind": "terminal",
+      "result": "handoff"
+    },
+    "user-approval": {
+      "kind": "wait",
+      "approval": {
+        "prompt": "Review the hash-bound UAT review, case results, screenshots, open findings, SUSPENSE register, and retest receipts.",
+        "approve": "USER APPROVE UAT <review-hash>",
+        "reject": "USER CORRECT UAT <finding-id>",
+        "bypassTarget": "complete"
+      },
+      "on": [
+        {
+          "when": {
+            "stage": "product.uat.review",
+            "status": "approved"
+          },
+          "target": "complete"
+        },
+        {
+          "when": {
+            "stage": "product.uat.review",
+            "status": "rejected"
+          },
+          "target": "repair-handoff"
+        }
+      ]
+    },
+    "complete": {
+      "kind": "terminal",
+      "result": "complete"
+    }
+  }
+}

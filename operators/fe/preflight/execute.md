@@ -1,25 +1,7 @@
 # Execute `fe/preflight`
 
-## Step 1 — Validate and freeze
+preflight one closed frontend target.
 
-**Read:** complete input only.
-**Context:** none before validation.
-**Session write:** validated envelope at `payload.session.inputRef`.
-**Stop:** reject wrong route, task ownership, or an undeclared field.
-**Orchestration:** coordinator only.
+Use only the closed `context` and `input`. Return one typed `output.outcome` plus this job's result, gaps, and evidence. Do not route, persist a session, or choose another operator.
 
-## Step 2 — Join receipt metadata
-
-**Read:** exactly `payload.loads.receipts`.
-**Context:** receipt headers and revisions only; never resolve semantic bodies, Qdrant knowledge, generated coding context, or source files.
-**Session write:** equality proof at `scratchPrefix/receipt-join`.
-**Stop:** stop on project, route, business revision, source commit, ownership, or revision mismatch.
-**Orchestration:** no worker fan-out because three metadata joins are cheaper locally.
-
-## Step 3 — Freeze scope and emit
-
-**Read:** joined receipts plus target and write-root declarations.
-**Context:** normalized paths and immutable identities only.
-**Session write:** `frozenScopeRef`, `preflightReceiptRef`, and validated output.
-**Stop:** reject an ambiguous target or a write root outside the routed workspace.
-**Orchestration:** coordinator registers all refs for terminal cleanup.
+Frontend creation follows `AI-first -> Rules-first -> Grammar-last`. UX synthesis, UI-direction synthesis, principle/law compilation, layout compilation, Grammar application, implementation, and audit are separate jobs. Audit jobs observe and report; they never repair source.

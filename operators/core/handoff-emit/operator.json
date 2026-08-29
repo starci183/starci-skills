@@ -1,43 +1,11 @@
 {
-  "schemaVersion": 6,
+  "schemaVersion": 7,
   "id": "core/handoff-emit",
   "domain": "core",
+  "job": "Emit one immutable handoff for one completed capability and one objective.",
   "inputSchema": "input.schema.json",
   "outputSchema": "output.schema.json",
-  "knowledgeRefs": [],
   "sourceReferenceRefs": [],
-  "accepts": [
-    {
-      "stage": "core.handoff",
-      "status": "ready",
-      "allFacts": [],
-      "noneFacts": []
-    }
-  ],
-  "emits": [
-    {
-      "stage": "core.handoff",
-      "status": "ready",
-      "factsAdd": [
-        "handoff-emit-ready"
-      ],
-      "factsRemove": []
-    },
-    {
-      "stage": "core.handoff",
-      "status": "blocked",
-      "factsAdd": [
-        "handoff-emit-blocked"
-      ],
-      "factsRemove": []
-    }
-  ],
-  "sideEffects": [
-    "write one immutable task-session protocol object"
-  ],
-  "stopConditions": [
-    "objective or artifact identity mismatch",
-    "missing mutation approval or resume route"
-  ]
+  "sideEffects": ["write one immutable task-session handoff object"],
+  "stopConditions": ["artifact identity mismatch", "a mutation resume candidate lacks approval"]
 }
-

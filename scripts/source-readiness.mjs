@@ -23,7 +23,7 @@ const defaultSource = resolve(starciRoot, '..');
 const bootstrapTemplatePath = join(starciRoot, 'readiness', 'initialization', 'bootstrap', 'agent-bootstrap.md');
 const portableScriptPath = join(scriptRoot, 'workspace-portable.mjs');
 const validateReport = validatorFor(new URL('../readiness/initialization/source-staleness.schema.json', import.meta.url));
-const targetRuntimeVersion = 6;
+const targetRuntimeVersion = 7;
 
 const slash = (path) => path.split(sep).join('/');
 const stableJson = (value) => `${JSON.stringify(value, null, 2)}\n`;
@@ -58,7 +58,7 @@ function inspectRuntime(source) {
   const packagePath = join(source, '.claude', 'package.json');
   if (!existsSync(packagePath)) {
     return {
-      ...moduleStatus('blocked', 'runtime-missing', [], ['.claude/package.json is missing; install or pull the V6 runtime before Source initialization']),
+      ...moduleStatus('blocked', 'runtime-missing', [], ['.claude/package.json is missing; install or pull the V7 runtime before Source initialization']),
       detectedVersion: null
     };
   }
@@ -68,12 +68,12 @@ function inspectRuntime(source) {
     if (!detectedVersion || !Number.isInteger(major)) throw new Error('version is absent or invalid');
     if (major !== targetRuntimeVersion) {
       return {
-        ...moduleStatus('blocked', 'runtime-upgrade-required', [`runtime-version:${detectedVersion}`], [`V${major} runtime cannot declare V6 Source readiness; upgrade .claude first`]),
+        ...moduleStatus('blocked', 'runtime-upgrade-required', [`runtime-version:${detectedVersion}`], [`V${major} runtime cannot declare V7 Source readiness; upgrade .claude first`]),
         detectedVersion
       };
     }
     return {
-      ...moduleStatus('ready', 'runtime-v6-ready', [`runtime-version:${detectedVersion}`]),
+      ...moduleStatus('ready', 'runtime-v7-ready', [`runtime-version:${detectedVersion}`]),
       detectedVersion
     };
   } catch (error) {
@@ -99,7 +99,7 @@ function inspectBootstrap(source) {
       stale.length === 0 ? 'ready' : 'initialize-required',
       stale.length === 0 ? 'bootstrap-ready' : 'bootstrap-refresh-required',
       files.map((file) => `${file.path}:${file.status}`),
-      stale.map((path) => `${path} does not match the canonical V6 bootstrap`)
+      stale.map((path) => `${path} does not match the canonical V7 bootstrap`)
     ),
     files
   };
@@ -132,8 +132,6 @@ function migrateLegacyRoute(route, label) {
     repository: route.repository,
     context: {
       instructions: route.context.instructions,
-      contract: route.context.contract,
-      contractSource: route.context.contractSource,
       manifests: route.context.manifests,
       grammarId
     }
@@ -270,16 +268,10 @@ function parseWorktrees(output) {
 
 function discoverManagedCheckouts(root) {
   if (!existsSync(root)) return [];
-  const found = [];
-  for (const project of readdirSync(root, { withFileTypes: true }).filter((entry) => entry.isDirectory())) {
-    if (project.name === 'references') continue;
-    const projectRoot = join(root, project.name);
-    for (const kind of readdirSync(projectRoot, { withFileTypes: true }).filter((entry) => entry.isDirectory())) {
-      const candidate = join(projectRoot, kind.name);
-      if (existsSync(join(candidate, '.git'))) found.push(candidate);
-    }
-  }
-  return found;
+  return readdirSync(root, { withFileTypes: true })
+    .filter((entry) => entry.isDirectory() && entry.name !== 'references')
+    .map((entry) => join(root, entry.name))
+    .filter((candidate) => existsSync(join(candidate, '.git')));
 }
 
 function discoverEphemeralCheckouts(root) {

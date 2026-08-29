@@ -1,0 +1,15 @@
+{
+  "schemaVersion": 7,
+  "id": "test/return-consume",
+  "domain": "test",
+  "job": "Consume one typed domain RETURN receipt and correlate mission, call identity, resume state, authority heads, and source heads.",
+  "inputSchema": "input.schema.json",
+  "outputSchema": "output.schema.json",
+  "contextRefs": [],
+  "sourceReferenceRefs": [],
+  "sideEffects": [],
+  "stopConditions": [
+    "identity or authority correlation fails",
+    "progress fingerprint repeats without changed evidence"
+  ]
+}

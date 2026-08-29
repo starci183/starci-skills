@@ -1,0 +1,7 @@
+interface:
+  display_name: "Architecture Design"
+  short_description: "Design one architecture with tech-stack and data-ownership autho"
+  default_prompt: "Use $starci-architecture-design for one bounded mission intent."
+policy:
+  allow_implicit_invocation: true
+

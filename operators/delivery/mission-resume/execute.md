@@ -1,17 +1,21 @@
-# Execute `delivery/mission-resume`
+# Execute delivery/mission-resume
 
-## Step 1 — Bind completed backend work
+## Context
 
-**Read:** Validate the exact mission, impact and backend-proof receipts from the current task session.
+Read only the closed context fields and declared context references.
 
-**Context:** Verify one run, project, business head and routed source identity without reloading product source.
+## Input
 
-## Step 2 — Resume the owning mission
+Use the exact closed input for this one job.
 
-Emit one generic `delivery.mission.resume` transition carrying the proven backend role back to the mission-specific UI lane.
+## Action
 
-**Session write:** Keep the resume receipt and bound proof refs session-only.
+Perform exactly one mission resume job. Do not route, loop, wait, branch to another operator, or retain session state.
 
-**Stop:** Block on any run, route, authority or proof identity mismatch.
+## Output
 
-Orchestration may verify independent receipt hashes concurrently, but it may not fork or replace the owning mission.
+Return one typed output.outcome and bounded evidence. The parent Skill machine owns routing.
+
+## Stop
+
+Stop on a declared condition or before exceeding the exact mutation boundary.

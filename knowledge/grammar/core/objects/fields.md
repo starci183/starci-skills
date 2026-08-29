@@ -15,7 +15,7 @@ A field owns one value interaction, its persistent label, support text, validati
 ## Render rules
 
 - Keep labels outside the entered value and programmatically associated.
-- Reserve one stable supporting region for help, counter, or validation according to contract.
+- Reserve one stable supporting region for help, counter, or validation according to interface.
 - Distinguish required, optional, invalid, disabled, read-only, pending, and loading.
 - Align peer fields when comparison or scanning benefits; allow full width for long or consequential values.
 - Keep prefixes, suffixes, units, reveal controls, and clear actions under one interaction owner.

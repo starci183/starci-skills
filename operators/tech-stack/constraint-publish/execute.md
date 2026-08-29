@@ -1,13 +1,21 @@
 # Execute `tech-stack/constraint-publish`
 
-## Step 1 — Bind the approved stack and compatibility receipt
+## Context
 
-**Read:** only the validated fields declared for this step. **Context:** exact refs and evidence required by the decision; do not scan adjacent source. **Session write:** step result under `payload.session.scratchPrefix`. **Stop:** identity, scope, or evidence drift. **Orchestration:** coordinator binds identities and validates output.
+Read `context.stackModelRef` only at `context.stackModelSha256`. Require `context.compatibility` and `context.approval` to bind that same hash.
 
-## Step 2 — Verify no critical unresolved contradiction remains
+## Input
 
-**Read:** only the validated fields declared for this step. **Context:** exact refs and evidence required by the decision; do not scan adjacent source. **Session write:** step result under `payload.session.scratchPrefix`. **Stop:** identity, scope, or evidence drift. **Orchestration:** independent evidence slices may run in parallel and the coordinator merges only typed findings.
+Bind the publication to `input.project`, `input.objectiveRef`, and the exact `input.techStackHeadRef` target.
 
-## Step 3 — Publish the immutable head and handoff-safe artifact receipt
+## Action
 
-**Read:** only the validated fields declared for this step. **Context:** exact refs and evidence required by the decision; do not scan adjacent source. **Session write:** step result under `payload.session.scratchPrefix`. **Stop:** do not emit success with unresolved critical contradictions. **Orchestration:** coordinator binds identities and validates output.
+Write the approved compatible stack model as the declared immutable project tech-stack head, then read it back and hash the published bytes.
+
+## Output
+
+Return `output.outcome`, `output.techStackHeadRef`, `output.techStackHeadSha256`, `output.evidenceRefs`, and `output.reason`.
+
+## Stop
+
+Return `blocked` before writing when any model hash differs or the target is outside the project. Return `blocked` after a failed verified restore if publication cannot be proved.

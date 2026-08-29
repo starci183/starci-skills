@@ -1,5 +1,7 @@
 # `core/handoff-ack` output
 
-## JSON architecture
-
-`state` routes the protocol decision. `produced` returns ackRef, purgeRefs. Ordinary scratch is purged at skill-terminal; handoff artifacts use exact consumer acknowledgement before their declared purge point.
+- `output.outcome`: `accepted`, `rejected`, or `blocked`.
+- `output.ackRef`: immutable acknowledgement reference, else null.
+- `output.purgeRefs`: retained refs the runtime may purge after acceptance.
+- `output.evidenceRefs`: exact comparison evidence.
+- `output.reason`: rejection or blocker explanation, otherwise null.

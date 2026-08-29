@@ -1,63 +1,16 @@
 {
-  "schemaVersion": 6,
+  "schemaVersion": 7,
   "id": "quality/build",
   "domain": "quality",
+  "job": "Runs the declared production build gate.",
   "inputSchema": "input.schema.json",
   "outputSchema": "output.schema.json",
-  "knowledgeRefs": [
-    "quality.source-gates"
-  ],
   "sourceReferenceRefs": [],
-  "accepts": [
-    {
-      "stage": "quality.build",
-      "status": "ready",
-      "allFacts": [],
-      "noneFacts": []
-    }
-  ],
-  "emits": [
-    {
-      "stage": "quality.unit",
-      "status": "ready",
-      "factsAdd": [
-        "quality-build-pass"
-      ],
-      "factsRemove": []
-    },
-    {
-      "stage": "be.repair",
-      "status": "ready",
-      "factsAdd": [
-        "in-boundary-repair"
-      ],
-      "factsRemove": []
-    },
-    {
-      "stage": "architecture.boundary",
-      "status": "ready",
-      "factsAdd": [
-        "backend-boundary-feedback"
-      ],
-      "factsRemove": []
-    },
-    {
-      "stage": "quality.blocked",
-      "status": "blocked",
-      "factsAdd": [
-        "quality-external-blocker"
-      ],
-      "factsRemove": []
-    }
-  ],
   "sideEffects": [
-    "keep input, output, loaded context, command captures, diagnostics, worker observations, and receipts in task-session memory only",
-    "purge every intermediate session object at each parent-skill terminal state"
+    "read only the supplied exact references"
   ],
   "stopConditions": [
-    "required evidence is missing or stale",
-    "the result would cross the declared boundary",
-    "an intermediate input, output, command capture, diagnostic, observation, analysis transcript, or receipt would be persisted outside the task session",
-    "repository source context, indexed source summaries, or an undeclared source file would be loaded"
+    "an exact reference is missing or its fingerprint differs",
+    "the requested work exceeds this operator job"
   ]
 }

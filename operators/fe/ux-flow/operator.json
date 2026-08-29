@@ -1,39 +1,20 @@
 {
-  "schemaVersion": 6,
+  "schemaVersion": 7,
   "id": "fe/ux-flow",
   "domain": "fe",
+  "job": "Synthesize one complete UX flow graph for one target outcome from exact business authority, journey evidence, and UX laws.",
   "inputSchema": "input.schema.json",
   "outputSchema": "output.schema.json",
-  "knowledgeRefs": ["fe.customer-journey", "fe.state-modeling"],
+  "contextRefs": [
+    "fe.customer-journey",
+    "fe.state-modeling"
+  ],
   "sourceReferenceRefs": [],
-  "accepts": [
-    {
-      "stage": "ux.flow.model",
-      "status": "ready",
-      "allFacts": ["ui-direction-approved", "business-authority-fresh"],
-      "noneFacts": []
-    }
-  ],
-  "emits": [
-    {
-      "stage": "ux.flow.container-decision",
-      "status": "ready",
-      "factsAdd": ["ux-flow-modeled"],
-      "factsRemove": []
-    },
-    {
-      "stage": "ux.flow.result",
-      "status": "blocked",
-      "factsAdd": [],
-      "factsRemove": []
-    }
-  ],
-  "sideEffects": [
-    "write UX model and potential signals only to task-session storage"
-  ],
+  "sideEffects": [],
   "stopConditions": [
-    "missing primary task",
-    "no recovery path",
-    "persistence need presented as approved behavior"
+    "the project backend route or business revision is missing or stale",
+    "the target outcome, actor, entry condition, or surface boundary is ambiguous",
+    "validation, failure, recovery, refresh, resume, or async continuity cannot be modeled from authority",
+    "a proposed transition invents business policy or persistence behavior"
   ]
 }

@@ -1,4 +1,9 @@
-import {runValidatorCli,validatorFor} from '../../validation.mjs';
-const schemaUrl=new URL('./output.schema.json',import.meta.url),routes={"ready":{"stage":"deployment.host","status":"ready","fact":"deployment-credentials-ready","state":"completed","code":"deployment-credential-resolve-ready","durable":false}};
-function semantic(v){const e=[],r=routes[v.payload.decision];if(!r)return ['/payload/decision: undeclared'];if(v.stage!==r.stage||v.status!==r.status)e.push('/stage: route mismatch');if(v.payload.state.status!==r.state||v.payload.state.code!==r.code)e.push('/payload/state: mismatch');if(v.payload.state.emits.stage!==v.stage||v.payload.state.emits.status!==v.status)e.push('/payload/state/emits: mismatch');if(!v.facts.includes(r.fact)||!v.payload.state.emits.factsAdd.includes(r.fact))e.push(`/facts: missing ${r.fact}`);if(v.payload.state.status!=='blocked'&&v.payload.produced.credentialReceiptRef===null)e.push('/payload/produced/credentialReceiptRef: required');if(r.durable&&v.payload.produced.durableWrites.length===0)e.push('/payload/produced/durableWrites: required');if(!r.durable&&v.payload.produced.durableWrites.length)e.push('/payload/produced/durableWrites: forbidden');if(v.payload.cleanup.retention!=='until-skill-terminal'||v.payload.cleanup.purgeAt!=='skill-terminal')e.push('/payload/cleanup: invalid');return e}
-export const validateOutput=validatorFor(schemaUrl,semantic);if(process.argv[1]&&import.meta.url===new URL(`file:///${process.argv[1].replaceAll('\\\\','/')}`).href)await runValidatorCli(validateOutput,'usage: node validate-output.mjs <output.json>');
+import { validatorFor, runValidatorCli } from '../../validation.mjs';
+
+export const validateOutput = validatorFor(new URL('./output.schema.json', import.meta.url), (value) => {
+  const issues = [];
+  if (value.output.resultRef === null && value.output.reason === null) issues.push('resultRef and reason cannot both be null');
+  return issues;
+});
+
+if (process.argv[1]?.endsWith('validate-output.mjs')) await runValidatorCli(validateOutput, 'node validate-output.mjs <artifact.json>');

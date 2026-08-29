@@ -16,7 +16,7 @@ A prominent introductory region combines heading, supporting text, actions, and 
 
 Name one primary reading anchor and one visual anchor. Decorative cards may rotate or overlap only through declared variants. Their DOM order follows meaning; visual coordinates remain presentation. Reserve clear space around the main action and heading. Use one dominant depth direction and a bounded accent palette.
 
-Decorative cards are non-interactive unless their contract explicitly makes them controls. Any information required to complete the task must also exist in a stable readable region.
+Decorative cards are non-interactive unless their interface explicitly makes them controls. Any information required to complete the task must also exist in a stable readable region.
 
 ## Responsive
 

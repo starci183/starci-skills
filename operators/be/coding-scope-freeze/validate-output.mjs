@@ -1,4 +1,9 @@
-import { runValidatorCli, validatorFor } from '../../validation.mjs';
-const outcomes={ready:['be.repair','ready','completed','coding-scope-frozen','backend-coding-scope-frozen',false],'source-drift':['architecture.boundary','ready','replan','coding-scope-source-drift','source-drift',true],'boundary-drift':['architecture.boundary','ready','replan','coding-scope-boundary-drift','boundary-drift',true],blocked:['be.blocked','blocked','blocked','coding-scope-blocked','backend-coding-scope-blocked',false]};
-function semantic(v){const e=[],x=outcomes[v.payload.decision];if(!x)return['$.payload.decision: undeclared decision'];const[stage,status,state,code,fact,retry]=x;if(v.stage!==stage||v.status!==status)e.push('$: route mismatch');if(v.payload.state.status!==state||v.payload.state.code!==code||v.payload.state.retryable!==retry)e.push('$.payload.state: semantics mismatch');if(v.payload.state.emits.stage!==stage||v.payload.state.emits.status!==status)e.push('$.payload.state.emits: route mismatch');if(!v.facts.includes(fact)||!v.payload.state.emits.factsAdd.includes(fact))e.push(`$.facts: missing ${fact}`);const ready=v.payload.decision==='ready';if(ready&&(v.payload.produced.codingScopeRef===null||v.payload.produced.targets.length===0))e.push('$.payload.produced: ready scope required');if(!ready&&(v.payload.produced.codingScopeRef!==null||v.payload.produced.targets.length!==0))e.push('$.payload.produced: non-ready cannot claim scope');return e}
-export const validateOutput=validatorFor(new URL('./output.schema.json',import.meta.url),semantic);if(process.argv[1]?.endsWith('validate-output.mjs'))await runValidatorCli(validateOutput,'node validate-output.mjs <artifact.json>');
+import { validatorFor, runValidatorCli } from '../../validation.mjs';
+
+export const validateOutput = validatorFor(new URL('./output.schema.json', import.meta.url), (value) => {
+  const issues = [];
+  if (value.output.resultRef === null && value.output.reason === null) issues.push('resultRef and reason cannot both be null');
+  return issues;
+});
+
+if (process.argv[1]?.endsWith('validate-output.mjs')) await runValidatorCli(validateOutput, 'node validate-output.mjs <artifact.json>');

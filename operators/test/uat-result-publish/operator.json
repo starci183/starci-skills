@@ -1,0 +1,15 @@
+{
+  "schemaVersion": 7,
+  "id": "test/uat-result-publish",
+  "domain": "test",
+  "job": "Publish canonical UAT authority only after all three independent proofs, with any failure dominating.",
+  "inputSchema": "input.schema.json",
+  "outputSchema": "output.schema.json",
+  "contextRefs": [],
+  "sourceReferenceRefs": [],
+  "sideEffects": [],
+  "stopConditions": [
+    "identity or authority correlation fails",
+    "progress fingerprint repeats without changed evidence"
+  ]
+}

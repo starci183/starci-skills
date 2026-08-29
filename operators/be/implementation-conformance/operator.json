@@ -1,38 +1,16 @@
 {
-  "schemaVersion": 6,
+  "schemaVersion": 7,
   "id": "be/implementation-conformance",
   "domain": "be",
+  "job": "Compare one backend implementation with its approved contract and source boundary.",
   "inputSchema": "input.schema.json",
   "outputSchema": "output.schema.json",
-  "knowledgeRefs": [
-    "be.verification"
-  ],
   "sourceReferenceRefs": [],
-  "accepts": [
-    {
-      "stage": "be.v61.implementation-conformance",
-      "status": "ready",
-      "allFacts": [],
-      "noneFacts": []
-    }
-  ],
-  "emits": [
-    {
-      "stage": "be.v61.implementation-conformance.complete",
-      "status": "ready",
-      "factsAdd": [
-        "be-implementation-conformance-ready"
-      ],
-      "factsRemove": []
-    }
-  ],
   "sideEffects": [
-    "keep artifacts and observations in task-session memory only",
-    "purge intermediate session objects at every parent-skill terminal state"
+    "read only the supplied exact references"
   ],
   "stopConditions": [
-    "required evidence is missing, stale or contradictory",
-    "Actual component, physical store, qualified resource and connection token match the approved contract and ownership matrix.",
-    "source observations would be treated as target authority"
+    "an exact reference is missing or its fingerprint differs",
+    "the requested work exceeds this operator job"
   ]
 }

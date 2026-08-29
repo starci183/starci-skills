@@ -1,0 +1,725 @@
+{
+  "$schema": "../machine.schema.json",
+  "schemaVersion": 7,
+  "id": "starci-fe-process",
+  "start": "analyze-input",
+  "states": {
+    "compile": {
+      "kind": "operator",
+      "ref": "fe/request-compile",
+      "on": [
+        {
+          "when": {
+            "outputEquals": {
+              "outcome": "compiled"
+            }
+          },
+          "target": "resolve"
+        },
+        {
+          "when": {
+            "outputEquals": {
+              "outcome": "blocked"
+            }
+          },
+          "target": "blocked"
+        }
+      ]
+    },
+    "resolve": {
+      "kind": "operator",
+      "ref": "fe/target-resolve",
+      "on": [
+        {
+          "when": {
+            "outputEquals": {
+              "outcome": "resolved"
+            }
+          },
+          "target": "business-bind"
+        },
+        {
+          "when": {
+            "outputEquals": {
+              "outcome": "blocked"
+            }
+          },
+          "target": "blocked"
+        }
+      ]
+    },
+    "business-bind": {
+      "kind": "operator",
+      "ref": "fe/business-bind",
+      "on": [
+        {
+          "when": {
+            "outputEquals": {
+              "outcome": "bound"
+            }
+          },
+          "target": "observe"
+        },
+        {
+          "when": {
+            "outputEquals": {
+              "outcome": "business-required"
+            }
+          },
+          "target": "business-handoff"
+        },
+        {
+          "when": {
+            "outputEquals": {
+              "outcome": "blocked"
+            }
+          },
+          "target": "blocked"
+        }
+      ]
+    },
+    "observe": {
+      "kind": "operator",
+      "ref": "fe/runtime-observe",
+      "on": [
+        {
+          "when": {
+            "outputEquals": {
+              "outcome": "observed"
+            }
+          },
+          "target": "semantic-audit"
+        },
+        {
+          "when": {
+            "outputEquals": {
+              "outcome": "backend-required"
+            }
+          },
+          "target": "backend-handoff"
+        },
+        {
+          "when": {
+            "outputEquals": {
+              "outcome": "blocked"
+            }
+          },
+          "target": "blocked"
+        }
+      ]
+    },
+    "semantic-audit": {
+      "kind": "operator",
+      "ref": "fe/semantic-audit",
+      "on": [
+        {
+          "when": {
+            "outputEquals": {
+              "outcome": "passed"
+            }
+          },
+          "target": "ux-audit"
+        },
+        {
+          "when": {
+            "outputEquals": {
+              "outcome": "findings"
+            }
+          },
+          "target": "ux-audit"
+        },
+        {
+          "when": {
+            "outputEquals": {
+              "outcome": "authority-gap"
+            }
+          },
+          "target": "classify"
+        }
+      ]
+    },
+    "ux-audit": {
+      "kind": "operator",
+      "ref": "fe/ux-audit",
+      "on": [
+        {
+          "when": {
+            "outputEquals": {
+              "outcome": "passed"
+            }
+          },
+          "target": "ui-audit"
+        },
+        {
+          "when": {
+            "outputEquals": {
+              "outcome": "findings"
+            }
+          },
+          "target": "ui-audit"
+        },
+        {
+          "when": {
+            "outputEquals": {
+              "outcome": "authority-gap"
+            }
+          },
+          "target": "classify"
+        }
+      ]
+    },
+    "ui-audit": {
+      "kind": "operator",
+      "ref": "fe/ui-audit",
+      "on": [
+        {
+          "when": {
+            "outputEquals": {
+              "outcome": "passed"
+            }
+          },
+          "target": "classify"
+        },
+        {
+          "when": {
+            "outputEquals": {
+              "outcome": "findings"
+            }
+          },
+          "target": "classify"
+        },
+        {
+          "when": {
+            "outputEquals": {
+              "outcome": "authority-gap"
+            }
+          },
+          "target": "classify"
+        }
+      ]
+    },
+    "classify": {
+      "kind": "operator",
+      "ref": "fe/authority-gap-classify",
+      "on": [
+        {
+          "when": {
+            "outputEquals": {
+              "outcome": "dominant"
+            }
+          },
+          "target": "freeze"
+        },
+        {
+          "when": {
+            "outputEquals": {
+              "outcome": "choice-required"
+            }
+          },
+          "target": "generate"
+        },
+        {
+          "when": {
+            "outputEquals": {
+              "outcome": "business-required"
+            }
+          },
+          "target": "business-handoff"
+        },
+        {
+          "when": {
+            "outputEquals": {
+              "outcome": "backend-required"
+            }
+          },
+          "target": "backend-handoff"
+        },
+        {
+          "when": {
+            "outputEquals": {
+              "outcome": "no-change"
+            }
+          },
+          "target": "quality-handoff"
+        },
+        {
+          "when": {
+            "outputEquals": {
+              "outcome": "blocked"
+            }
+          },
+          "target": "blocked"
+        }
+      ]
+    },
+    "generate": {
+      "kind": "operator",
+      "ref": "fe/direction-generate",
+      "on": [
+        {
+          "when": {
+            "outputEquals": {
+              "outcome": "generated"
+            }
+          },
+          "target": "rank"
+        },
+        {
+          "when": {
+            "outputEquals": {
+              "outcome": "blocked"
+            }
+          },
+          "target": "blocked"
+        }
+      ]
+    },
+    "rank": {
+      "kind": "operator",
+      "ref": "fe/direction-rank",
+      "on": [
+        {
+          "when": {
+            "outputEquals": {
+              "outcome": "ranked"
+            }
+          },
+          "target": "direction-choice"
+        },
+        {
+          "when": {
+            "outputEquals": {
+              "outcome": "blocked"
+            }
+          },
+          "target": "blocked"
+        }
+      ]
+    },
+    "direction-choice": {
+      "kind": "wait",
+      "approval": {
+        "prompt": "Choose one visibly rendered frontend direction.",
+        "approve": "Use the selected direction.",
+        "reject": "Reject the direction set.",
+        "resumeTarget": "analyze-input"
+      },
+      "on": [
+        {
+          "when": {},
+          "target": "analyze-input"
+        }
+      ]
+    },
+    "freeze": {
+      "kind": "operator",
+      "ref": "fe/contract-freeze",
+      "on": [
+        {
+          "when": {
+            "outputEquals": {
+              "outcome": "frozen"
+            }
+          },
+          "target": "mutation-freeze"
+        },
+        {
+          "when": {
+            "outputEquals": {
+              "outcome": "blocked"
+            }
+          },
+          "target": "blocked"
+        }
+      ]
+    },
+    "apply": {
+      "kind": "operator",
+      "ref": "fe/source-apply",
+      "on": [
+        {
+          "when": {
+            "outputEquals": {
+              "outcome": "applied"
+            }
+          },
+          "target": "capture"
+        },
+        {
+          "when": {
+            "outputEquals": {
+              "outcome": "backend-required"
+            }
+          },
+          "target": "backend-handoff"
+        },
+        {
+          "when": {
+            "outputEquals": {
+              "outcome": "blocked"
+            }
+          },
+          "target": "blocked"
+        }
+      ]
+    },
+    "capture": {
+      "kind": "operator",
+      "ref": "fe/render-capture",
+      "on": [
+        {
+          "when": {
+            "outputEquals": {
+              "outcome": "captured"
+            }
+          },
+          "target": "independent-review"
+        },
+        {
+          "when": {
+            "outputEquals": {
+              "outcome": "blocked"
+            }
+          },
+          "target": "blocked"
+        }
+      ]
+    },
+    "independent-review": {
+      "kind": "operator",
+      "ref": "fe/independent-review",
+      "on": [
+        {
+          "when": {
+            "outputEquals": {
+              "outcome": "passed"
+            }
+          },
+          "target": "quality-handoff"
+        },
+        {
+          "when": {
+            "outputEquals": {
+              "outcome": "findings"
+            }
+          },
+          "target": "finding-classify"
+        },
+        {
+          "when": {
+            "outputEquals": {
+              "outcome": "blocked"
+            }
+          },
+          "target": "blocked"
+        }
+      ]
+    },
+    "finding-classify": {
+      "kind": "operator",
+      "ref": "fe/finding-classify",
+      "on": [
+        {
+          "when": {
+            "outputEquals": {
+              "outcome": "clean"
+            }
+          },
+          "target": "quality-handoff"
+        },
+        {
+          "when": {
+            "outputEquals": {
+              "outcome": "repair"
+            }
+          },
+          "target": "repair"
+        },
+        {
+          "when": {
+            "outputEquals": {
+              "outcome": "business-required"
+            }
+          },
+          "target": "business-handoff"
+        },
+        {
+          "when": {
+            "outputEquals": {
+              "outcome": "backend-required"
+            }
+          },
+          "target": "backend-handoff"
+        },
+        {
+          "when": {
+            "outputEquals": {
+              "outcome": "blocked"
+            }
+          },
+          "target": "blocked"
+        }
+      ]
+    },
+    "repair": {
+      "kind": "operator",
+      "ref": "fe/source-repair",
+      "on": [
+        {
+          "when": {
+            "outputEquals": {
+              "outcome": "repaired"
+            }
+          },
+          "target": "capture"
+        },
+        {
+          "when": {
+            "outputEquals": {
+              "outcome": "backend-required"
+            }
+          },
+          "target": "backend-handoff"
+        },
+        {
+          "when": {
+            "outputEquals": {
+              "outcome": "blocked"
+            }
+          },
+          "target": "blocked"
+        }
+      ]
+    },
+    "business-handoff": {
+      "kind": "terminal",
+      "result": "handoff"
+    },
+    "backend-handoff": {
+      "kind": "terminal",
+      "result": "handoff"
+    },
+    "quality-handoff": {
+      "kind": "terminal",
+      "result": "handoff"
+    },
+    "blocked": {
+      "kind": "terminal",
+      "result": "blocked"
+    },
+    "analyze-input": {
+      "kind": "analysis",
+      "on": [
+        {
+          "when": {
+            "inputEquals": {
+              "receiptType": "RETURN"
+            }
+          },
+          "target": "consume-return"
+        },
+        {
+          "when": {
+            "inputEquals": {
+              "receiptType": "RESUME"
+            }
+          },
+          "target": "consume-choice-resume"
+        },
+        {
+          "when": {
+            "inputEquals": {
+              "receiptType": "NONE"
+            }
+          },
+          "target": "compile"
+        }
+      ]
+    },
+    "consume-return": {
+      "kind": "operator",
+      "ref": "fe/return-consume",
+      "on": [
+        {
+          "when": {
+            "outputEquals": {
+              "outcome": "consumed"
+            }
+          },
+          "target": "peer-guard"
+        },
+        {
+          "when": {
+            "outputEquals": {
+              "outcome": "blocked"
+            }
+          },
+          "target": "blocked"
+        }
+      ]
+    },
+    "peer-guard": {
+      "kind": "operator",
+      "ref": "fe/progress-guard",
+      "on": [
+        {
+          "when": {
+            "outputEquals": {
+              "outcome": "progress"
+            }
+          },
+          "target": "resume-route"
+        },
+        {
+          "when": {
+            "outputEquals": {
+              "outcome": "cycle"
+            }
+          },
+          "target": "blocked"
+        }
+      ]
+    },
+    "resume-route": {
+      "kind": "choice",
+      "on": [
+        {
+          "when": {
+            "inputEquals": {
+              "resume.resumeState": "business-bind"
+            }
+          },
+          "target": "business-bind"
+        },
+        {
+          "when": {
+            "inputEquals": {
+              "resume.resumeState": "observe"
+            }
+          },
+          "target": "observe"
+        },
+        {
+          "when": {
+            "inputEquals": {
+              "resume.resumeState": "apply"
+            }
+          },
+          "target": "apply"
+        },
+        {
+          "when": {
+            "inputEquals": {
+              "resume.resumeState": "quality-return"
+            }
+          },
+          "target": "uat-handoff"
+        },
+        {
+          "when": {
+            "inputEquals": {
+              "resume.resumeState": "uat-return"
+            }
+          },
+          "target": "complete"
+        }
+      ]
+    },
+    "mutation-freeze": {
+      "kind": "operator",
+      "ref": "fe/mutation-boundary-freeze",
+      "on": [
+        {
+          "when": {
+            "outputEquals": {
+              "outcome": "frozen"
+            }
+          },
+          "target": "apply"
+        },
+        {
+          "when": {
+            "outputEquals": {
+              "outcome": "authorization-required"
+            }
+          },
+          "target": "mutation-choice"
+        },
+        {
+          "when": {
+            "outputEquals": {
+              "outcome": "blocked"
+            }
+          },
+          "target": "blocked"
+        }
+      ]
+    },
+    "mutation-choice": {
+      "kind": "wait",
+      "approval": {
+        "prompt": "Authorize this exact frontend mutation boundary.",
+        "approve": "Authorize the frozen files and before hashes.",
+        "reject": "Do not mutate source.",
+        "resumeTarget": "analyze-input"
+      },
+      "on": [
+        {
+          "when": {},
+          "target": "analyze-input"
+        }
+      ]
+    },
+    "uat-handoff": {
+      "kind": "terminal",
+      "result": "handoff"
+    },
+    "complete": {
+      "kind": "terminal",
+      "result": "complete"
+    },
+    "consume-choice-resume": {
+      "kind": "operator",
+      "ref": "fe/return-consume",
+      "on": [
+        {
+          "when": {
+            "outputEquals": {
+              "outcome": "consumed"
+            }
+          },
+          "target": "choice-resume-route"
+        },
+        {
+          "when": {
+            "outputEquals": {
+              "outcome": "blocked"
+            }
+          },
+          "target": "blocked"
+        }
+      ]
+    },
+    "choice-resume-route": {
+      "kind": "choice",
+      "on": [
+        {
+          "when": {
+            "inputEquals": {
+              "resume.resumeState": "direction-choice"
+            }
+          },
+          "target": "freeze"
+        },
+        {
+          "when": {
+            "inputEquals": {
+              "resume.resumeState": "mutation-choice"
+            }
+          },
+          "target": "apply"
+        }
+      ]
+    }
+  }
+}

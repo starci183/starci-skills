@@ -152,8 +152,15 @@ code { font-family: 'DM Mono', monospace; }
 .operator-section .starci-core-rail-body::-webkit-scrollbar, .operator-list::-webkit-scrollbar { width: 10px; }
 .operator-section .starci-core-rail-body::-webkit-scrollbar-track, .operator-list::-webkit-scrollbar-track { background: #2e2e27; }
 .operator-section .starci-core-rail-body::-webkit-scrollbar-thumb, .operator-list::-webkit-scrollbar-thumb { border: 2px solid #2e2e27; border-radius: 999px; background: var(--accent); }
-.operator-row { display: grid; grid-template-columns: minmax(170px, 1fr) minmax(170px, 1fr) 20px minmax(170px, 1fr) 56px; gap: 16px; align-items: center; min-height: 84px; padding: 16px 18px; border-bottom: 1px solid #34342e; }
+.operator-row { display: grid; grid-template-columns: 44px minmax(160px, 1fr) minmax(160px, 1fr) 20px minmax(160px, 1fr) 56px; gap: 14px; align-items: center; min-height: 84px; padding: 16px 18px; border-bottom: 1px solid #34342e; }
 .operator-row:last-child { border-bottom: 0; }
+.operator-icon {
+  display: grid; width: 44px; height: 44px; place-items: center; overflow: hidden;
+  border: 1px solid rgba(117,71,255,.42); border-radius: 14px;
+  background: linear-gradient(135deg, rgba(247,201,72,.2), rgba(117,71,255,.2)); color: #a98fff;
+}
+.operator-icon-custom { border-color: rgba(247,201,72,.64); background: #181813; box-shadow: 0 8px 20px rgba(0,0,0,.22); }
+.operator-icon-art { display: block; width: 40px; height: 40px; }
 .operator-id, .operator-contract { display: flex; min-width: 0; flex-direction: column; gap: 5px; }
 .operator-id span, .operator-contract span { color: #8f8f84; font-family: 'DM Mono', monospace; font-size: 9px; letter-spacing: .08em; text-transform: uppercase; }
 .operator-id strong { overflow: hidden; text-overflow: ellipsis; font-size: 13px; white-space: nowrap; }
@@ -204,7 +211,7 @@ code { font-family: 'DM Mono', monospace; }
   .section-art img { aspect-ratio: 1.4 / 1; }
   .section-art figcaption { position: static; max-width: none; border: 0; border-radius: 0; background: var(--ink); }
   .operator-toolbar { align-items: stretch; flex-direction: column; }
-  .operator-row { grid-template-columns: 1fr auto; gap: 9px; }
+  .operator-row { grid-template-columns: 44px minmax(0, 1fr) auto; gap: 9px; }
   .operator-contract, .operator-row > svg { display: none; }
   .closing-card { align-items: flex-start; flex-direction: column; gap: 30px; }
   .site-footer { align-items: flex-start; flex-direction: column; justify-content: center; gap: 8px; }

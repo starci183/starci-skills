@@ -1,6 +1,0 @@
-interface:
-  display_name: "StarCi Product UAT"
-  short_description: "Prove an approved user journey end to end"
-  default_prompt: "Use $starci-product-uat for this selected flow and execute its state machine."
-policy:
-  allow_implicit_invocation: true

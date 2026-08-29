@@ -1,40 +1,16 @@
 {
-  "schemaVersion": 6,
+  "schemaVersion": 7,
   "id": "deployment/domain-reconcile",
   "domain": "deployment",
+  "job": "Reconciles declared domain and TLS state with the provider.",
   "inputSchema": "input.schema.json",
   "outputSchema": "output.schema.json",
-  "knowledgeRefs": [
-    "deployment.lifecycle"
-  ],
   "sourceReferenceRefs": [],
-  "accepts": [
-    {
-      "stage": "deployment.domain",
-      "status": "ready",
-      "allFacts": [],
-      "noneFacts": []
-    }
-  ],
-  "emits": [
-    {
-      "stage": "deployment.rollout",
-      "status": "ready",
-      "factsAdd": [
-        "deployment-domain-ready"
-      ],
-      "factsRemove": []
-    }
-  ],
   "sideEffects": [
-    "reconcile declared domain and TLS provider state",
-    "keep all intermediate data in task-session memory only",
-    "purge every intermediate session object at each parent-skill terminal state"
+    "reconcile declared domain and TLS provider state"
   ],
   "stopConditions": [
-    "required evidence is missing or stale",
-    "the result would cross the declared boundary",
-    "intermediate data would persist outside the task session",
-    "broad source context, an undeclared command or resource, or a raw secret would be loaded"
+    "an exact reference is missing or its fingerprint differs",
+    "the requested work exceeds this operator job"
   ]
 }

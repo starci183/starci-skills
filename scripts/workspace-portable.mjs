@@ -193,8 +193,6 @@ function buildLocalRoute({ source, repositoriesRoot, workspaceRoot, declaration 
   const absoluteList = (paths, label) => paths.map((path, index) => resolveContextFile(repository, path, `${route.project}/${route.role} ${label}[${index}]`));
   const commonContext = {
     instructions: absoluteList(context.instructions, 'instruction'),
-    contract: context.contract === null ? null : resolveContextFile(repository, context.contract, `${route.project}/${route.role} contract`),
-    contractSource: context.contractSource,
     manifests: absoluteList(context.manifests, 'manifest')
   };
   const v6 = route.schemaVersion === 6;

@@ -1,9 +1,21 @@
 # Execute `context/freshness-check`
 
-## Step 1 — Bind expected identities
+## Context
 
-**Read:** validated `provided` fingerprints. **Context:** hash metadata only. **Session write:** expected identity tuple. **Stop:** malformed identity. **Orchestration:** coordinator-only deterministic comparison.
+Read only `context.currentReceipt` metadata.
 
-## Step 2 — Decide cache reuse
+## Input
 
-**Read:** `loads.currentReceipt`. **Context:** receipt metadata only. **Session write:** freshness decision and receipt ref. **Stop:** invalid or forged receipt. **Orchestration:** emit `fresh` only for exact equality; missing or drifted metadata emits `initialize-required`.
+Use the exact project, context kind, source fingerprint, generator fingerprint, and contract version in `input`.
+
+## Action
+
+Compare the five-field expected identity tuple with the cached receipt once. Do not load source, regenerate context, mutate the cache, or select another operator.
+
+## Output
+
+Return the observed outcome, its one reason, the current receipt only when reusable, and the metadata evidence inspected.
+
+## Stop
+
+Reject malformed expected identities. Report an invalid cached identity as `blocked`; do not repair it here.

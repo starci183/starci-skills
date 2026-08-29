@@ -13,6 +13,7 @@ const contractFiles = [
   'validate-input.mjs',
   'validate-output.mjs'
 ].sort();
+const allowedContracts = [contractFiles, [...contractFiles, 'icon.svg'].sort()];
 
 const domains = fs.readdirSync(root, { withFileTypes: true })
   .filter((entry) => entry.isDirectory())
@@ -25,8 +26,8 @@ const operators = domains.flatMap((domain) => fs.readdirSync(path.join(root, dom
 
 for (const operator of operators) {
   const files = fs.readdirSync(operator.directory).sort();
-  if (JSON.stringify(files) !== JSON.stringify(contractFiles)) {
-    throw new Error(`${operator.id}: operator must keep the exact hand-authored eight-file contract`);
+  if (!allowedContracts.some((contract) => JSON.stringify(files) === JSON.stringify(contract))) {
+    throw new Error(`${operator.id}: operator must keep the exact hand-authored eight-file contract plus optional icon.svg`);
   }
 }
 

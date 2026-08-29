@@ -1,51 +1,18 @@
 {
-  "schemaVersion": 6,
+  "schemaVersion": 7,
   "id": "workspace/workflow-handoff",
   "domain": "workspace",
+  "job": "Produce one bounded workflow handoff result from exact supplied evidence.",
   "inputSchema": "input.schema.json",
   "outputSchema": "output.schema.json",
-  "knowledgeRefs": [],
   "sourceReferenceRefs": [],
-  "accepts": [
-    {
-      "stage": "workspace.workflow-handoff",
-      "status": "ready",
-      "allFacts": ["workspace-route-ready", "workflow-handoff-explicitly-authorized"],
-      "noneFacts": []
-    }
-  ],
-  "emits": [
-    {
-      "stage": "workspace.workflow-handoff.result",
-      "status": "complete",
-      "factsAdd": ["workflow-checkpoint-published"],
-      "factsRemove": []
-    },
-    {
-      "stage": "workspace.workflow-handoff.result",
-      "status": "complete",
-      "factsAdd": ["workflow-checkpoint-resumed"],
-      "factsRemove": []
-    },
-    {
-      "stage": "workspace.workflow-handoff.result",
-      "status": "blocked",
-      "factsAdd": ["workflow-handoff-blocked"],
-      "factsRemove": []
-    }
-  ],
   "sideEffects": [
     "create mission-only checkpoint commits on dedicated branches when publish mode receives exclusively mission-owned changes",
     "push checkpoint branches and one annotated continuation tag without force",
-    "fetch and adopt exact checkpoint heads in resume mode only after identity and cleanliness proof",
-    "keep prompts, reasoning, loaded context, observations and scratch outside Git and purge them at the parent-skill terminal"
+    "fetch and adopt exact checkpoint heads in resume mode only after identity and cleanliness proof"
   ],
   "stopConditions": [
-    "the publish or resume request does not explicitly authorize the required Git mutations",
-    "a checkout identity, route, branch, upstream or head is ambiguous",
-    "dirty or staged files include work outside the declared mission boundary",
-    "a push would overwrite history, target a protected delivery branch directly or require force",
-    "the continuation manifest contains source bodies, prompts, reasoning, credentials, absolute paths or session-only references",
-    "a resume target is dirty, the tag is missing or invalid, or any declared repository head cannot be reproduced"
+    "an exact reference is missing or its fingerprint differs",
+    "the requested work exceeds this operator job"
   ]
 }

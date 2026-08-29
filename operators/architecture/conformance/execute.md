@@ -1,31 +1,21 @@
 # Execute `architecture/conformance`
 
-Prove implementation and deployment realize approved architecture and persistence ownership before deterministic checks.
+## Context
 
-## Step 1 — Validate and freeze
+Resolve only `context.contextRefs` with default repository or file search and open only `context.sourceRefs`. Verify every source reference against `input.sourceFingerprint`. Resolve routed source identity through the runtime Source `.claude/.workspaces`. Any project authority reference uses the verified backend Source and its flat `.worktrees/` roots.
 
-**Read:** complete input envelope only.  
-**Context:** none before `validate-input.mjs` succeeds.  
-**Session write:** freeze route and refs at `payload.session.inputRef`.  
-**Stop:** reject junk, foreign task refs, missing revisions or undeclared loads.
+## Input
 
-## Step 2 — Resolve minimum evidence
+Bind all work to `input.project` and `input.objectiveRef`.
 
-**Read:** declared artifacts and one knowledge binding.  
-**Context:** load exact session refs plus `architecture.decision-analysis`; source, configuration, deployment and runtime evidence are observations, not authority.  
-**Session write:** evidence and unknowns under `payload.session.scratchPrefix/evidence`.  
-**Stop:** pause on stale evidence, contradictions or broadened scope.
+## Action
 
-## Step 3 — Decide and challenge
+Compare one realized architecture against its approved architecture contract. Do not route subsequent work, persist task-session material, broaden the source boundary, or perform another operator's job.
 
-**Read:** validated evidence only.  
-**Context:** apply only this capability law. Record criteria, conclusions and counter-evidence, never chain-of-thought.  
-**Session write:** typed candidate at `payload.session.scratchPrefix/candidate`.  
-**Stop:** Actual source bindings, connection tokens, qualified resources and deployment wiring match approved artifacts.
+## Output
 
-## Step 4 — Validate and emit
+Return only `output.outcome`, `output.resultRef`, `output.evidenceRefs`, `output.findings`, and `output.reason`.
 
-**Read:** candidate, evidence refs and lineage.  
-**Context:** no new load. Validate against `migration/v6.1/architecture-backend/schemas/conformance.schema.json`.  
-**Session write:** accepted artifact at `payload.session.outputRef`.  
-**Stop:** never emit partial or invalid output. Orchestration may parallelize independent evidence comparisons; one coordinator owns decision and cleanup.
+## Stop
+
+Return the applicable non-success outcome when exact evidence is missing, fingerprints drift, or completing the job would exceed its boundary.

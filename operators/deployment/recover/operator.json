@@ -1,64 +1,16 @@
 {
-  "schemaVersion": 6,
+  "schemaVersion": 7,
   "id": "deployment/recover",
   "domain": "deployment",
+  "job": "Produce one bounded recover result from exact supplied evidence.",
   "inputSchema": "input.schema.json",
   "outputSchema": "output.schema.json",
-  "knowledgeRefs": [
-    "deployment.lifecycle"
-  ],
   "sourceReferenceRefs": [],
-  "accepts": [
-    {
-      "stage": "deployment.recover",
-      "status": "ready",
-      "allFacts": [
-        "deployment-recovery-required"
-      ],
-      "noneFacts": []
-    }
-  ],
-  "emits": [
-    {
-      "stage": "deployment.retry",
-      "status": "ready",
-      "factsAdd": [
-        "deployment-retry-ready"
-      ],
-      "factsRemove": []
-    },
-    {
-      "stage": "deployment.rollback",
-      "status": "ready",
-      "factsAdd": [
-        "deployment-rollback-required"
-      ],
-      "factsRemove": []
-    },
-    {
-      "stage": "deployment.review",
-      "status": "pending",
-      "factsAdd": [
-        "deployment-approval-required"
-      ],
-      "factsRemove": []
-    },
-    {
-      "stage": "deployment.blocked",
-      "status": "blocked",
-      "factsAdd": [
-        "deployment-recovery-blocked"
-      ],
-      "factsRemove": []
-    }
-  ],
   "sideEffects": [
-    "mutate only the declared smallest deployment-owned repair boundary",
-    "keep input, output, context, observations, and receipts in task-session memory only",
-    "purge all intermediate session objects at every parent-skill terminal state"
+    "mutate only the declared smallest deployment-owned repair boundary"
   ],
   "stopConditions": [
-    "required evidence is missing or stale",
-    "the result would cross the declared boundary"
+    "an exact reference is missing or its fingerprint differs",
+    "the requested work exceeds this operator job"
   ]
 }

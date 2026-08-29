@@ -1,115 +1,70 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://starci.dev/v6/operators/fe/ux-ui-resolve/input.schema.json",
+  "$id": "https://starci.dev/v7.0/operators/fe/ux-ui-resolve/input.schema.json",
   "type": "object",
   "additionalProperties": false,
-  "required": ["schemaVersion", "runId", "stage", "status", "facts", "payload"],
+  "required": [
+    "schemaVersion",
+    "operatorId",
+    "context",
+    "input"
+  ],
   "properties": {
-    "schemaVersion": { "const": 6 },
-    "runId": { "type": "string", "minLength": 1, "maxLength": 128 },
-    "stage": { "const": "product.uat.ux-ui-resolution" },
-    "status": { "enum": ["ready", "verify"] },
-    "facts": { "type": "array", "uniqueItems": true, "items": { "type": "string", "minLength": 1 } },
-    "payload": {
+    "schemaVersion": {
+      "const": 7
+    },
+    "operatorId": {
+      "const": "fe/ux-ui-resolve"
+    },
+    "context": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["provided", "loads", "session"],
+      "required": [
+        "evidenceRefs",
+        "authorityRevision"
+      ],
       "properties": {
-        "provided": {
-          "type": "object",
-          "additionalProperties": false,
-          "required": ["phase", "uatReportRef", "uatReportSha256", "requestRefs", "priorResolutionRef", "repairReceiptRefs"],
-          "properties": {
-            "phase": { "enum": ["plan", "close"] },
-            "uatReportRef": { "$ref": "#/$defs/sessionRef" },
-            "uatReportSha256": { "$ref": "#/$defs/sha256" },
-            "requestRefs": { "type": "array", "minItems": 1, "maxItems": 20, "uniqueItems": true, "items": { "$ref": "#/$defs/requestPath" } },
-            "priorResolutionRef": { "anyOf": [{ "$ref": "#/$defs/sessionRef" }, { "type": "null" }] },
-            "repairReceiptRefs": { "type": "array", "maxItems": 32, "uniqueItems": true, "items": { "$ref": "#/$defs/sessionRef" } }
-          }
+        "evidenceRefs": {
+          "description": "Exact canonical evidence references available to this atomic job.",
+          "type": "array",
+          "maxItems": 64,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "minItems": 1
         },
-        "loads": {
-          "type": "object",
-          "additionalProperties": false,
-          "required": ["upstream", "knowledge", "exactTargets", "orchestration"],
-          "properties": {
-            "upstream": {
-              "type": "array",
-              "minItems": 1,
-              "maxItems": 34,
-              "items": {
-                "type": "object",
-                "additionalProperties": false,
-                "required": ["role", "ref", "revision"],
-                "properties": {
-                  "role": { "enum": ["uat-report", "prior-resolution", "repair-receipt"] },
-                  "ref": { "$ref": "#/$defs/sessionRef" },
-                  "revision": { "$ref": "#/$defs/sha256" }
-                }
-              }
-            },
-            "knowledge": {
-              "type": "array",
-              "minItems": 4,
-              "maxItems": 4,
-              "items": { "$ref": "#/$defs/binding" }
-            },
-            "exactTargets": {
-              "type": "array",
-              "minItems": 1,
-              "maxItems": 20,
-              "items": {
-                "type": "object",
-                "additionalProperties": false,
-                "required": ["path", "expectedSha256", "currentStatus", "access"],
-                "properties": {
-                  "path": { "$ref": "#/$defs/requestPath" },
-                  "expectedSha256": { "$ref": "#/$defs/sha256" },
-                  "currentStatus": { "enum": ["captured", "proven", "approved"] },
-                  "access": { "const": "read-write" }
-                }
-              }
-            },
-            "orchestration": {
-              "type": "object",
-              "additionalProperties": false,
-              "required": ["mode", "profileRef", "providerRef"],
-              "properties": {
-                "mode": { "enum": ["economical", "balanced", "parallel"] },
-                "profileRef": { "enum": ["orchestration/modes/economical.json", "orchestration/modes/balanced.json", "orchestration/modes/parallel.json"] },
-                "providerRef": { "type": "string", "pattern": "^orchestration/providers/[a-z0-9-]+\\.json$" }
-              }
-            }
-          }
-        },
-        "session": { "$ref": "#/$defs/session" }
-      }
-    }
-  },
-  "$defs": {
-    "sha256": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
-    "sessionRef": { "type": "string", "pattern": "^session://tasks/[A-Za-z0-9._-]+/.+$" },
-    "requestPath": { "type": "string", "pattern": "^\\.claude/requests/[a-z0-9][a-z0-9._-]*\\.request\\.json$" },
-    "binding": {
-      "type": "object",
-      "additionalProperties": false,
-      "required": ["id", "generation", "contentSha256"],
-      "properties": {
-        "id": { "enum": ["fe.product-proof", "fe.ui-quality-review", "fe.request-lifecycle", "fe.grammar-common-states-accessibility"] },
-        "generation": { "type": "string", "minLength": 1 },
-        "contentSha256": { "$ref": "#/$defs/sha256" }
+        "authorityRevision": {
+          "description": "Exact approved authority revision binding this invocation.",
+          "type": "string",
+          "minLength": 1
+        }
       }
     },
-    "session": {
+    "input": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["taskId", "inputRef", "outputRef", "scratchPrefix", "retention"],
+      "required": [
+        "targetRef",
+        "constraints"
+      ],
       "properties": {
-        "taskId": { "type": "string", "pattern": "^[A-Za-z0-9._-]+$" },
-        "inputRef": { "$ref": "#/$defs/sessionRef" },
-        "outputRef": { "$ref": "#/$defs/sessionRef" },
-        "scratchPrefix": { "$ref": "#/$defs/sessionRef" },
-        "retention": { "const": "until-skill-terminal" }
+        "targetRef": {
+          "description": "The one target owned by this atomic invocation.",
+          "type": "string",
+          "minLength": 1
+        },
+        "constraints": {
+          "description": "Closed constraints that bound this job without routing it.",
+          "type": "array",
+          "maxItems": 64,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
       }
     }
   }

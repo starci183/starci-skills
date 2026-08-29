@@ -1,159 +1,55 @@
 {
-  "$id": "https://starci.dev/v6/operators/fe/product-seed/output.schema.json",
-  "title": "fe/product-seed operator output",
   "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://starci.dev/v7.0/operators/fe/product-seed/output.schema.json",
   "type": "object",
   "additionalProperties": false,
   "required": [
     "schemaVersion",
-    "runId",
-    "stage",
-    "status",
-    "facts",
-    "payload"
-  ],
-  "allOf": [
-    {
-      "oneOf": [
-        {
-          "properties": {
-            "stage": {
-              "const": "test.unit"
-            },
-            "status": {
-              "const": "ready"
-            }
-          },
-          "required": [
-            "stage",
-            "status"
-          ]
-        },
-        {
-          "properties": {
-            "stage": {
-              "const": "seed.result"
-            },
-            "status": {
-              "const": "blocked"
-            }
-          },
-          "required": [
-            "stage",
-            "status"
-          ]
-        }
-      ]
-    }
+    "operatorId",
+    "output"
   ],
   "properties": {
     "schemaVersion": {
-      "const": 6
+      "const": 7
     },
-    "runId": {
-      "type": "string",
-      "minLength": 1
+    "operatorId": {
+      "const": "fe/product-seed"
     },
-    "stage": {
-      "enum": [
-        "test.unit",
-        "seed.result"
-      ]
-    },
-    "status": {
-      "enum": [
-        "ready",
-        "blocked"
-      ]
-    },
-    "facts": {
-      "type": "array",
-      "uniqueItems": true,
-      "items": {
-        "type": "string",
-        "minLength": 1
-      }
-    },
-    "payload": {
+    "output": {
       "type": "object",
       "additionalProperties": false,
       "required": [
-        "decision",
-        "state",
-        "produced",
-        "context",
-        "cleanup",
-        "evidenceRefs",
-        "findings"
+        "outcome",
+        "result",
+        "gaps",
+        "evidenceRefs"
       ],
       "properties": {
-        "decision": {
+        "outcome": {
+          "description": "Legacy semantic result consumed only by the Skill machine.",
           "enum": [
             "materialized",
             "blocked"
           ]
         },
-        "state": {
-          "type": "object",
-          "additionalProperties": false,
-          "required": [
-            "operator",
-            "status",
-            "code",
-            "retryable",
-            "emits"
-          ],
-          "properties": {
-            "operator": {
-              "const": "fe/product-seed"
-            },
-            "status": {
-              "enum": [
-                "completed",
-                "blocked"
-              ]
-            },
-            "code": {
-              "enum": [
-                "fe-product-seed-materialized",
-                "fe-product-seed-blocked"
-              ]
-            },
-            "retryable": {
-              "type": "boolean"
-            },
-            "emits": {
+        "result": {
+          "description": "The atomic job result, or null when blocked.",
+          "anyOf": [
+            {
               "type": "object",
               "additionalProperties": false,
               "required": [
-                "stage",
-                "status",
-                "factsAdd",
-                "factsRemove"
+                "summary",
+                "artifactRefs"
               ],
               "properties": {
-                "stage": {
-                  "enum": [
-                    "test.unit",
-                    "seed.result"
-                  ]
+                "summary": {
+                  "type": "string",
+                  "minLength": 1
                 },
-                "status": {
-                  "enum": [
-                    "ready",
-                    "blocked"
-                  ]
-                },
-                "factsAdd": {
+                "artifactRefs": {
                   "type": "array",
-                  "uniqueItems": true,
-                  "items": {
-                    "type": "string",
-                    "minLength": 1
-                  }
-                },
-                "factsRemove": {
-                  "type": "array",
+                  "maxItems": 64,
                   "uniqueItems": true,
                   "items": {
                     "type": "string",
@@ -161,176 +57,34 @@
                   }
                 }
               }
-            }
-          }
-        },
-        "produced": {
-          "type": "object",
-          "additionalProperties": false,
-          "required": [
-            "artifactRefs",
-            "mutations",
-            "externalEffects"
-          ],
-          "properties": {
-            "artifactRefs": {
-              "type": "array",
-              "uniqueItems": true,
-              "items": {
-                "$ref": "#/$defs/sessionRef"
-              }
             },
-            "mutations": {
-              "type": "array",
-              "uniqueItems": true,
-              "items": {
-                "type": "object",
-                "additionalProperties": false,
-                "required": [
-                  "path",
-                  "beforeSha256",
-                  "afterSha256"
-                ],
-                "properties": {
-                  "path": {
-                    "type": "string",
-                    "minLength": 1
-                  },
-                  "beforeSha256": {
-                    "$ref": "#/$defs/sha256"
-                  },
-                  "afterSha256": {
-                    "$ref": "#/$defs/sha256"
-                  }
-                }
-              }
-            },
-            "externalEffects": {
-              "type": "array",
-              "uniqueItems": true,
-              "items": {
-                "type": "object",
-                "additionalProperties": false,
-                "required": [
-                  "target",
-                  "beforeRevision",
-                  "afterRevision",
-                  "evidenceRef"
-                ],
-                "properties": {
-                  "target": {
-                    "type": "string",
-                    "minLength": 1
-                  },
-                  "beforeRevision": {
-                    "type": "string",
-                    "minLength": 1
-                  },
-                  "afterRevision": {
-                    "type": "string",
-                    "minLength": 1
-                  },
-                  "evidenceRef": {
-                    "$ref": "#/$defs/sessionRef"
-                  }
-                }
-              }
+            {
+              "type": "null"
             }
-          }
+          ]
         },
-        "context": {
-          "type": "object",
-          "additionalProperties": false,
-          "required": [
-            "used"
-          ],
-          "properties": {
-            "used": {
-              "type": "array",
-              "minItems": 1,
-              "uniqueItems": true,
-              "items": {
-                "type": "object",
-                "additionalProperties": false,
-                "required": [
-                  "kind",
-                  "ref",
-                  "revision"
-                ],
-                "properties": {
-                  "kind": {
-                    "enum": [
-                      "worktree-business",
-                      "session-upstream",
-                      "qdrant-knowledge",
-                      "fe-contract-generation",
-                      "exact-source"
-                    ]
-                  },
-                  "ref": {
-                    "type": "string",
-                    "minLength": 1
-                  },
-                  "revision": {
-                    "type": "string",
-                    "minLength": 1
-                  }
-                }
-              }
-            }
-          }
-        },
-        "cleanup": {
-          "type": "object",
-          "additionalProperties": false,
-          "required": [
-            "scratchRefs",
-            "retention",
-            "purgeAt"
-          ],
-          "properties": {
-            "scratchRefs": {
-              "type": "array",
-              "uniqueItems": true,
-              "items": {
-                "$ref": "#/$defs/sessionRef"
-              }
-            },
-            "retention": {
-              "const": "until-skill-terminal"
-            },
-            "purgeAt": {
-              "const": "skill-terminal"
-            }
-          }
-        },
-        "evidenceRefs": {
+        "gaps": {
+          "description": "Exact missing authority or evidence; empty when complete.",
           "type": "array",
-          "minItems": 1,
-          "uniqueItems": true,
-          "items": {
-            "$ref": "#/$defs/sessionRef"
-          }
-        },
-        "findings": {
-          "type": "array",
+          "maxItems": 32,
           "uniqueItems": true,
           "items": {
             "type": "string",
             "minLength": 1
           }
+        },
+        "evidenceRefs": {
+          "description": "Exact evidence used to produce the result.",
+          "type": "array",
+          "maxItems": 64,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "minItems": 1
         }
       }
-    }
-  },
-  "$defs": {
-    "sha256": {
-      "type": "string",
-      "pattern": "^sha256:[0-9a-f]{64}$"
-    },
-    "sessionRef": {
-      "type": "string",
-      "pattern": "^session://tasks/[A-Za-z0-9._-]+/.+$"
     }
   }
 }

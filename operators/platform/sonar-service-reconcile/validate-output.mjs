@@ -1,4 +1,20 @@
-import {runValidatorCli,validatorFor} from '../../validation.mjs';
-const schemaUrl=new URL('./output.schema.json',import.meta.url),routes={proved:{stage:'platform.sonar.proved',status:'complete',fact:'platform-sonar-proved',state:'completed',code:'platform-sonar-service-reconcile-proved'},blocked:{stage:'platform.blocked',status:'blocked',fact:'platform-sonar-blocked',state:'blocked',code:'platform-sonar-service-reconcile-blocked'}};
-function semantic(v){const e=[],r=routes[v.payload.decision];if(!r)return ['/payload/decision: undeclared'];if(v.stage!==r.stage||v.status!==r.status)e.push('/stage: route mismatch');if(v.payload.state.status!==r.state||v.payload.state.code!==r.code)e.push('/payload/state: mismatch');if(v.payload.state.emits.stage!==v.stage||v.payload.state.emits.status!==v.status)e.push('/payload/state/emits: mismatch');if(!v.facts.includes(r.fact)||!v.payload.state.emits.factsAdd.includes(r.fact))e.push(`/facts: missing ${r.fact}`);if(v.payload.decision==='proved'&&v.payload.produced.sonarServiceReceiptRef===null)e.push('/payload/produced/sonarServiceReceiptRef: proved output requires a receipt');for(const mutation of v.payload.produced.durableWrites)if(mutation.appliedBy!=='coordinator')e.push('/payload/produced/durableWrites: coordinator ownership required');if(v.payload.cleanup.retention!=='until-skill-terminal'||v.payload.cleanup.purgeAt!=='skill-terminal')e.push('/payload/cleanup: invalid');return e}
-export const validateOutput=validatorFor(schemaUrl,semantic);if(process.argv[1]&&import.meta.url===new URL(`file:///${process.argv[1].replaceAll('\\\\','/')}`).href)await runValidatorCli(validateOutput,'usage: node validate-output.mjs <output.json>');
+import { validatorFor, runValidatorCli } from '../../validation.mjs';
+
+const semantic = (value) => {
+  const { outcome, receiptRef, checks, reason } = value.output;
+  const passed = checks.every(({ status }) => status === 'passed');
+  const requiredKinds = ['enforcement-active', 'gate-assigned', 'profile-assigned', 'project-exists', 'service-available', 'source-revision'];
+  const actualKinds = new Set(checks.map(({ kind }) => kind));
+  const completeKinds = requiredKinds.every((kind) => actualKinds.has(kind));
+  return [
+    ...(!completeKinds ? ['/output/checks: every required Sonar postcondition kind must be proved'] : []),
+    ...(outcome === 'proved' && receiptRef === null ? ['/output/receiptRef: proved requires a fresh receipt'] : []),
+    ...(outcome === 'proved' && !passed ? ['/output/checks: proved cannot contain failed checks'] : []),
+    ...(outcome === 'proved' && reason !== null ? ['/output/reason: proved cannot carry a failure reason'] : []),
+    ...(outcome === 'blocked' && receiptRef !== null ? ['/output/receiptRef: blocked cannot claim convergence proof'] : []),
+    ...(outcome === 'blocked' && reason === null ? ['/output/reason: blocked requires one bounded reason'] : [])
+  ];
+};
+
+export const validateOutput = validatorFor(new URL('./output.schema.json', import.meta.url), semantic);
+if (process.argv[1]?.endsWith('validate-output.mjs')) await runValidatorCli(validateOutput, 'node validate-output.mjs <output.json>');

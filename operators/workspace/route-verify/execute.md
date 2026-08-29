@@ -1,47 +1,21 @@
 # Execute `workspace/route-verify`
 
-This operator resolves one request to one project-role route. Input, output, context bindings, analysis evidence, worker observations, and receipts remain in task-session memory and are purged at every parent-skill terminal.
+## Context
 
-## Step 1 — Validate and freeze input
+Resolve only the supplied exact references with default repository or file search. Verify their frozen fingerprint and routed project identity.
 
-**Read:** the complete input envelope only.
-**Context:** none; resolve no binding before validation succeeds.
-**Action:** run `validate-input.mjs` and freeze the route, provided refs, load declarations, and session slots.
-**Session write:** `payload.session.inputRef`.
-**Stop:** stop before loading context if the schema, accepted route, facts, or session ownership fails.
+## Input
 
-## Step 2 — Resolve exact bindings
+Bind all work to the verified project and one bounded objective.
 
-**Read:** `payload.loads.artifacts`, `payload.loads.knowledge`.
-**Context:** resolve exact task-session artifacts and retrieve only `workspace.routing` from its pinned Qdrant generation.
-**Analysis:** verify identity, revision, freshness, and ownership. Record applied rule IDs and match/mismatch evidence, never hidden reasoning.
-**Session write:** `payload.session.scratchPrefix/bindings`.
-**Stop:** stop when a binding is missing, stale, ambiguous, or outside the accepted route.
+## Action
 
-## Step 3 — Perform the operator decision
+Resolves one request to one project-role route. Do not route later work, own workflow state, broaden source scope, or perform another operator's job.
 
-**Read:** validated bindings, and accepted machine facts.
-**Context:** use no undeclared knowledge, business feature, artifact, or source file.
-**Decision criteria:** project, role, request, and checkout identity produce exactly one route.
-**Analysis:** match request evidence to declared route evidence. Record evidence, criteria, and conclusions only; never record chain-of-thought.
-**Route:** emit `ready` for exactly one current route; emit `initialize-required` when the declared machine-local route is missing or stale but safely hydratable; emit `blocked` for ambiguous, foreign, root-escaping, cross-role, or unauthorized routes.
-**Session write:** candidate `routeReceiptRef` at `payload.session.scratchPrefix/candidate`.
-**Orchestration:** economical mode is sequential. Balanced or parallel mode may delegate independent read-only comparisons. Each worker receives only assigned refs; the coordinator owns joining and the decision.
-**Stop:** this verifier never hydrates or rewrites routes.
+## Output
 
-## Step 4 — Validate the candidate
+Return only one atomic result: `outcome`, `resultRef`, `evidenceRefs`, `findings`, and `reason`.
 
-**Read:** candidate artifact, decision evidence, and exact context lineage.
-**Context:** no new load is allowed.
-**Analysis:** prove the candidate is closed, traceable, route-compatible, and free of copied context or reasoning transcripts.
-**Session write:** accepted artifact at `payload.session.scratchPrefix/routeReceiptRef` and evidence under `scratchPrefix/evidence`.
-**Stop:** do not invent evidence or broaden scope.
+## Stop
 
-## Step 5 — Emit and register cleanup
-
-**Read:** accepted candidate, decision, evidence refs, lineage, and any durable-effect refs.
-**Context:** return refs and revisions only, not loaded content or worker prompts.
-**Action:** construct `output.schema.json`, align `payload.decision`, `payload.state`, root route, and emitted facts, then run `validate-output.mjs`.
-**Session write:** `payload.session.outputRef`; list every scratch ref in `payload.cleanup.scratchRefs`.
-**Stop:** do not emit an invalid or partially joined result.
-**Orchestration:** coordinator validates the final output and purges all intermediate session objects when the parent skill terminates.
+Return the applicable non-success outcome when evidence is missing, fingerprints drift, or the requested work exceeds this single job.

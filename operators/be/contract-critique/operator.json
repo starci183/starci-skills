@@ -1,38 +1,16 @@
 {
-  "schemaVersion": 6,
+  "schemaVersion": 7,
   "id": "be/contract-critique",
   "domain": "be",
+  "job": "Challenge one backend mutation contract against ownership and failure evidence.",
   "inputSchema": "input.schema.json",
   "outputSchema": "output.schema.json",
-  "knowledgeRefs": [
-    "be.plan-challenge"
-  ],
   "sourceReferenceRefs": [],
-  "accepts": [
-    {
-      "stage": "be.v61.contract-critique",
-      "status": "ready",
-      "allFacts": [],
-      "noneFacts": []
-    }
-  ],
-  "emits": [
-    {
-      "stage": "be.v61.contract-critique.complete",
-      "status": "ready",
-      "factsAdd": [
-        "be-contract-critique-ready"
-      ],
-      "factsRemove": []
-    }
-  ],
   "sideEffects": [
-    "keep artifacts and observations in task-session memory only",
-    "purge intermediate session objects at every parent-skill terminal state"
+    "read only the supplied exact references"
   ],
   "stopConditions": [
-    "required evidence is missing, stale or contradictory",
-    "Fresh-context critique includes a wrong-store counterexample and never accepts lint or types as semantic proof.",
-    "source observations would be treated as target authority"
+    "an exact reference is missing or its fingerprint differs",
+    "the requested work exceeds this operator job"
   ]
 }

@@ -1,13 +1,7 @@
 # Execute `fe/product-potential`
 
-## Step 1 — Bind hypotheses
+product potential one closed frontend target.
 
-**Read:** exact signal refs and fresh business revision. **Context:** a potential is not approved behavior. **Session write:** normalized hypotheses and evidence gaps. **Stop:** if the origin or resume capability is absent.
+Use only the closed `context` and `input`. Return one typed `output.outcome` plus this job's result, gaps, and evidence. Do not route, persist a session, or choose another operator.
 
-## Step 2 — Assess value and consequence
-
-**Read:** journey and business-authority knowledge. **Context:** orchestration may separate product-value and implementation-consequence lenses. **Session write:** classification, value, confidence, authority status, and action. **Stop:** before any business, source, or database mutation.
-
-## Step 3 — Emit routing candidates
-
-**Read:** assessments only. **Context:** required changes route; optional ideas do not block the original objective. **Session write:** typed next candidates and resume capability. **Stop:** when a risky route lacks approval metadata.
+Frontend creation follows `AI-first -> Rules-first -> Grammar-last`. UX synthesis, UI-direction synthesis, principle/law compilation, layout compilation, Grammar application, implementation, and audit are separate jobs. Audit jobs observe and report; they never repair source.

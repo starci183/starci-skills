@@ -1,64 +1,16 @@
 {
-  "schemaVersion": 6,
+  "schemaVersion": 7,
   "id": "deployment/migration",
   "domain": "deployment",
+  "job": "Produce one bounded migration result from exact supplied evidence.",
   "inputSchema": "input.schema.json",
   "outputSchema": "output.schema.json",
-  "knowledgeRefs": [
-    "deployment.lifecycle"
-  ],
   "sourceReferenceRefs": [],
-  "accepts": [
-    {
-      "stage": "deployment.migration",
-      "status": "ready",
-      "allFacts": [
-        "deployment-artifacts-published"
-      ],
-      "noneFacts": []
-    }
-  ],
-  "emits": [
-    {
-      "stage": "deployment.domain",
-      "status": "ready",
-      "factsAdd": [
-        "deployment-migration-ready"
-      ],
-      "factsRemove": []
-    },
-    {
-      "stage": "deployment.domain",
-      "status": "ready",
-      "factsAdd": [
-        "deployment-migration-na"
-      ],
-      "factsRemove": []
-    },
-    {
-      "stage": "deployment.rollback",
-      "status": "ready",
-      "factsAdd": [
-        "deployment-rollback-required"
-      ],
-      "factsRemove": []
-    },
-    {
-      "stage": "deployment.blocked",
-      "status": "blocked",
-      "factsAdd": [
-        "deployment-migration-blocked"
-      ],
-      "factsRemove": []
-    }
-  ],
   "sideEffects": [
-    "apply declared migration or initialization job",
-    "keep input, output, context, observations, and receipts in task-session memory only",
-    "purge all intermediate session objects at every parent-skill terminal state"
+    "apply declared migration or initialization job"
   ],
   "stopConditions": [
-    "required evidence is missing or stale",
-    "the result would cross the declared boundary"
+    "an exact reference is missing or its fingerprint differs",
+    "the requested work exceeds this operator job"
   ]
 }

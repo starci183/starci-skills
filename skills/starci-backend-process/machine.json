@@ -1,0 +1,303 @@
+{
+  "$schema": "../machine.schema.json",
+  "schemaVersion": 7,
+  "id": "starci-backend-process",
+  "start": "analyze-input",
+  "states": {
+    "analyze-input": {
+      "kind": "analysis",
+      "on": [
+        {
+          "when": {},
+          "target": "select-intent",
+          "label": "validate authority and runtime receipts"
+        }
+      ]
+    },
+    "select-intent": {
+      "kind": "choice",
+      "on": [
+        {
+          "when": {
+            "inputEquals": {
+              "options.intentMode": "plan"
+            }
+          },
+          "target": "bind-plan",
+          "label": "bind plan prerequisites"
+        },
+        {
+          "when": {
+            "inputEquals": {
+              "options.intentMode": "challenge"
+            }
+          },
+          "target": "bind-challenge",
+          "label": "bind challenge prerequisites"
+        },
+        {
+          "when": {
+            "inputEquals": {
+              "options.intentMode": "implement"
+            }
+          },
+          "target": "bind-implement",
+          "label": "bind implement prerequisites"
+        },
+        {
+          "when": {
+            "inputEquals": {
+              "options.intentMode": "prove"
+            }
+          },
+          "target": "bind-prove",
+          "label": "bind prove prerequisites"
+        },
+        {
+          "when": {
+            "inputEquals": {
+              "options.intentMode": "resume"
+            }
+          },
+          "target": "resume-select",
+          "label": "consume RETURN through RESUME"
+        }
+      ]
+    },
+    "resume-select": {
+      "kind": "choice",
+      "on": [
+        {
+          "when": {
+            "inputEquals": {
+              "options.resumeTarget": "plan"
+            }
+          },
+          "target": "bind-plan",
+          "label": "resume plan"
+        },
+        {
+          "when": {
+            "inputEquals": {
+              "options.resumeTarget": "challenge"
+            }
+          },
+          "target": "bind-challenge",
+          "label": "resume challenge"
+        },
+        {
+          "when": {
+            "inputEquals": {
+              "options.resumeTarget": "implement"
+            }
+          },
+          "target": "bind-implement",
+          "label": "resume implement"
+        },
+        {
+          "when": {
+            "inputEquals": {
+              "options.resumeTarget": "prove"
+            }
+          },
+          "target": "bind-prove",
+          "label": "resume prove"
+        }
+      ]
+    },
+    "complete": {
+      "kind": "terminal",
+      "result": "complete"
+    },
+    "peer-call": {
+      "kind": "terminal",
+      "result": "handoff"
+    },
+    "blocked": {
+      "kind": "terminal",
+      "result": "blocked"
+    },
+    "bind-plan": {
+      "kind": "analysis",
+      "on": [
+        {
+          "when": {},
+          "target": "plan",
+          "label": "prerequisites bound"
+        }
+      ]
+    },
+    "plan": {
+      "kind": "operator",
+      "ref": "be/solution-design",
+      "on": [
+        {
+          "when": {
+            "outputEquals": {
+              "outcome": "ready"
+            }
+          },
+          "target": "complete",
+          "label": "ready"
+        },
+        {
+          "when": {
+            "outputEquals": {
+              "outcome": "revise"
+            }
+          },
+          "target": "peer-call",
+          "label": "revise"
+        },
+        {
+          "when": {
+            "outputEquals": {
+              "outcome": "blocked"
+            }
+          },
+          "target": "blocked",
+          "label": "blocked"
+        }
+      ]
+    },
+    "bind-challenge": {
+      "kind": "analysis",
+      "on": [
+        {
+          "when": {},
+          "target": "challenge",
+          "label": "prerequisites bound"
+        }
+      ]
+    },
+    "challenge": {
+      "kind": "operator",
+      "ref": "be/contract-critique",
+      "on": [
+        {
+          "when": {
+            "outputEquals": {
+              "outcome": "ready"
+            }
+          },
+          "target": "complete",
+          "label": "ready"
+        },
+        {
+          "when": {
+            "outputEquals": {
+              "outcome": "revise"
+            }
+          },
+          "target": "peer-call",
+          "label": "revise"
+        },
+        {
+          "when": {
+            "outputEquals": {
+              "outcome": "blocked"
+            }
+          },
+          "target": "blocked",
+          "label": "blocked"
+        }
+      ]
+    },
+    "bind-implement": {
+      "kind": "analysis",
+      "on": [
+        {
+          "when": {},
+          "target": "implement",
+          "label": "prerequisites bound"
+        }
+      ]
+    },
+    "implement": {
+      "kind": "operator",
+      "ref": "be/implementation",
+      "on": [
+        {
+          "when": {
+            "outputEquals": {
+              "outcome": "ready"
+            }
+          },
+          "target": "complete",
+          "label": "ready"
+        },
+        {
+          "when": {
+            "outputEquals": {
+              "outcome": "source-drift"
+            }
+          },
+          "target": "peer-call",
+          "label": "source-drift"
+        },
+        {
+          "when": {
+            "outputEquals": {
+              "outcome": "boundary-drift"
+            }
+          },
+          "target": "peer-call",
+          "label": "boundary-drift"
+        },
+        {
+          "when": {
+            "outputEquals": {
+              "outcome": "blocked"
+            }
+          },
+          "target": "blocked",
+          "label": "blocked"
+        }
+      ]
+    },
+    "bind-prove": {
+      "kind": "analysis",
+      "on": [
+        {
+          "when": {},
+          "target": "prove",
+          "label": "prerequisites bound"
+        }
+      ]
+    },
+    "prove": {
+      "kind": "operator",
+      "ref": "be/delivery-proof",
+      "on": [
+        {
+          "when": {
+            "outputEquals": {
+              "outcome": "ready"
+            }
+          },
+          "target": "peer-call",
+          "label": "ready"
+        },
+        {
+          "when": {
+            "outputEquals": {
+              "outcome": "revise"
+            }
+          },
+          "target": "peer-call",
+          "label": "revise"
+        },
+        {
+          "when": {
+            "outputEquals": {
+              "outcome": "blocked"
+            }
+          },
+          "target": "blocked",
+          "label": "blocked"
+        }
+      ]
+    }
+  }
+}
+

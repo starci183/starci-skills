@@ -1,284 +1,84 @@
 {
-  "$id": "https://starci.dev/v6/operators/workspace/route-verify/output.schema.json",
-  "title": "workspace/route-verify operator output",
   "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://starci.dev/v7/operators/workspace/route-verify/output.schema.json",
   "type": "object",
   "additionalProperties": false,
   "required": [
     "schemaVersion",
-    "runId",
-    "stage",
-    "status",
-    "facts",
-    "payload"
-  ],
-  "allOf": [
-    {
-      "oneOf": [
-        {
-          "properties": {
-            "stage": {
-              "const": "business.evidence"
-            },
-            "status": {
-              "const": "ready"
-            }
-          },
-          "required": [
-            "stage",
-            "status"
-          ]
-        },
-        {
-          "properties": {
-            "stage": { "const": "workspace.initialization" },
-            "status": { "const": "ready" },
-            "payload": { "properties": { "decision": { "const": "initialize-required" } } }
-          },
-          "required": ["stage", "status", "payload"]
-        },
-        {
-          "properties": {
-            "stage": { "const": "workspace.blocked" },
-            "status": { "const": "blocked" },
-            "payload": { "properties": { "decision": { "const": "blocked" } } }
-          },
-          "required": ["stage", "status", "payload"]
-        }
-      ]
-    }
+    "operatorId",
+    "output"
   ],
   "properties": {
     "schemaVersion": {
-      "const": 6
+      "const": 7
     },
-    "runId": {
-      "type": "string",
-      "minLength": 1
+    "operatorId": {
+      "const": "workspace/route-verify"
     },
-    "stage": {
-      "enum": [
-        "business.evidence",
-        "workspace.initialization",
-        "workspace.blocked"
-      ]
-    },
-    "status": {
-      "enum": [
-        "ready",
-        "blocked"
-      ]
-    },
-    "facts": {
-      "type": "array",
-      "uniqueItems": true,
-      "items": {
-        "type": "string",
-        "minLength": 1
-      }
-    },
-    "payload": {
+    "output": {
       "type": "object",
       "additionalProperties": false,
       "required": [
-        "decision",
-        "state",
-        "produced",
-        "context",
-        "cleanup",
+        "outcome",
+        "resultRef",
         "evidenceRefs",
-        "findings"
+        "findings",
+        "reason"
       ],
       "properties": {
-        "decision": {
+        "outcome": {
+          "description": "Typed atomic result consumed by the parent Skill machine.",
           "enum": [
-            "ready",
+            "blocked",
             "initialize-required",
-            "blocked"
+            "ready"
           ]
         },
-        "state": {
-          "type": "object",
-          "additionalProperties": false,
-          "required": [
-            "operator",
-            "status",
-            "code",
-            "retryable",
-            "emits"
+        "resultRef": {
+          "description": "Exact produced artifact or receipt reference, or null.",
+          "type": [
+            "string",
+            "null"
           ],
-          "properties": {
-            "operator": {
-              "const": "workspace/route-verify"
-            },
-            "status": {
-              "enum": [
-                "completed",
-                "replan",
-                "blocked"
-              ]
-            },
-            "code": {
-              "enum": [
-                "workspace-route-verify-ready",
-                "workspace-route-verify-initialize-required",
-                "workspace-route-verify-blocked"
-              ]
-            },
-            "retryable": {
-              "type": "boolean"
-            },
-            "emits": {
-              "type": "object",
-              "additionalProperties": false,
-              "required": [
-                "stage",
-                "status",
-                "factsAdd"
-              ],
-              "properties": {
-                "stage": {
-                  "enum": [
-                    "business.evidence",
-                    "workspace.initialization",
-                    "workspace.blocked"
-                  ]
-                },
-                "status": {
-                  "enum": [
-                    "ready",
-                    "blocked"
-                  ]
-                },
-                "factsAdd": {
-                  "type": "array",
-                  "minItems": 1,
-                  "uniqueItems": true,
-                  "items": {
-                    "type": "string",
-                    "minLength": 1
-                  }
-                }
-              }
-            }
-          }
-        },
-        "produced": {
-          "type": "object",
-          "additionalProperties": false,
-          "required": [
-            "routeReceiptRef",
-            "durableWrites"
-          ],
-          "properties": {
-            "routeReceiptRef": {
-              "anyOf": [
-                {
-                  "$ref": "#/$defs/sessionRef"
-                },
-                {
-                  "type": "null"
-                }
-              ]
-            },
-            "durableWrites": {
-              "type": "array",
-              "uniqueItems": true,
-              "items": {
-                "type": "string",
-                "minLength": 1
-              }
-            }
-          }
-        },
-        "context": {
-          "type": "object",
-          "additionalProperties": false,
-          "required": [
-            "used"
-          ],
-          "properties": {
-            "used": {
-              "type": "array",
-              "minItems": 1,
-              "uniqueItems": true,
-              "items": {
-                "type": "object",
-                "additionalProperties": false,
-                "required": [
-                  "kind",
-                  "ref",
-                  "revision"
-                ],
-                "properties": {
-                  "kind": {
-                    "enum": [
-                      "session-artifact",
-                      "worktree-business",
-                      "qdrant-knowledge",
-                      "exact-source"
-                    ]
-                  },
-                  "ref": {
-                    "type": "string",
-                    "minLength": 1
-                  },
-                  "revision": {
-                    "type": "string",
-                    "minLength": 1
-                  }
-                }
-              }
-            }
-          }
-        },
-        "cleanup": {
-          "type": "object",
-          "additionalProperties": false,
-          "required": [
-            "scratchRefs",
-            "retention",
-            "purgeAt"
-          ],
-          "properties": {
-            "scratchRefs": {
-              "type": "array",
-              "uniqueItems": true,
-              "items": {
-                "$ref": "#/$defs/sessionRef"
-              }
-            },
-            "retention": {
-              "const": "until-skill-terminal"
-            },
-            "purgeAt": {
-              "const": "skill-terminal"
-            }
-          }
+          "minLength": 1,
+          "maxLength": 1024
         },
         "evidenceRefs": {
-          "type": "array",
-          "minItems": 1,
-          "uniqueItems": true,
-          "items": {
-            "$ref": "#/$defs/sessionRef"
-          }
+          "description": "Exact references supporting the result.",
+          "$ref": "#/$defs/refs"
         },
         "findings": {
+          "description": "Bounded observable findings produced by this job.",
           "type": "array",
-          "uniqueItems": true,
+          "maxItems": 128,
           "items": {
             "type": "string",
-            "minLength": 1
+            "minLength": 1,
+            "maxLength": 2048
           }
+        },
+        "reason": {
+          "description": "Bounded explanation when no result is produced, otherwise null.",
+          "type": [
+            "string",
+            "null"
+          ],
+          "minLength": 1,
+          "maxLength": 2048
         }
       }
     }
   },
   "$defs": {
-    "sessionRef": {
-      "type": "string",
-      "pattern": "^session://tasks/[A-Za-z0-9._-]+/.+$"
+    "refs": {
+      "type": "array",
+      "maxItems": 128,
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 1024
+      }
     }
   }
 }

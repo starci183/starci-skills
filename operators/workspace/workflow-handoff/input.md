@@ -1,13 +1,15 @@
 # `workspace/workflow-handoff` input
 
-This operator transfers one active coding mission through Git without transferring conversational context. Its closed input remains task-session-only.
+Provide exact route, approval, and checkout receipts plus one publish or resume request. Durable artifact references must be portable authority references, never `session://` values or conversational content.
 
-## JSON architecture
+## Contract fields
 
-| Section | Ownership |
-| --- | --- |
-| `payload.provided` | Explicit publish/resume mode, verified route, mutation approval, mission identity, checkpoint tag or next-capability contract, and the closed checkout/artifact refs. |
-| `payload.loads` | Exact session bindings for the provided refs plus one orchestration profile; no knowledge body is loaded. |
-| `payload.session` | Task-owned input, output and scratch slots retained only until the parent skill terminal. |
-
-In `publish` mode, `checkpointTag` is null and `resumeCapability` plus `resumeStage` are required. In `resume` mode, `checkpointTag` is required and the resume target is read from its signed-by-hash annotated manifest. Durable artifact refs may identify committed request, design, contract or proof artifacts; they may not be `session://` refs.
+- `context.routeReceiptRef`: Exact routed-checkout receipt.
+- `context.approvalRef`: Exact explicit-authorization receipt.
+- `context.touchedCheckoutRefs`: Exact mission-owned checkout receipts.
+- `input.operation`: One portable checkpoint operation.
+- `input.missionId`: Stable mission identity.
+- `input.checkpointTag`: Exact continuation tag for resume, null for publish.
+- `input.resumeCapability`: Capability that continues the mission.
+- `input.resumePoint`: Portable next-work marker without conversation content.
+- `input.durableArtifactRefs`: Minimal durable references; session-only references are forbidden.

@@ -1,5 +1,10 @@
 # `tech-stack/compatibility-check` input
 
-## JSON architecture
-
-`provided` actively supplies project, objectiveRef, stackModelRef. `loads` passively binds only compatibilityEvidenceRefs, deploymentEvidenceRefs at execution time. `session` owns ephemeral input, output and scratch references; bodies are never copied into the parent skill.
+| Field | Owner | Meaning |
+| --- | --- | --- |
+| `context.stackModel` | Default search resolver | Exact stack-model artifact ref, revision, and content hash. |
+| `context.compatibilityEvidence` | Default search resolver | Exact compatibility files and revisions. |
+| `context.deploymentEvidence` | Default search resolver | Exact deployment files and revisions. |
+| `input.project` | Caller | Project identity. |
+| `input.objectiveRef` | Caller | Operational objective whose compatibility must be proved. |
+| `input.expectedModelSha256` | Caller | Authorized stack-model hash. |

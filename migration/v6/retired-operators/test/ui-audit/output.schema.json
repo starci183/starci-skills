@@ -1,0 +1,407 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://starci.dev/v7/operators/test/ui-audit/output.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "operatorId",
+    "output"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "const": 7
+    },
+    "operatorId": {
+      "const": "test/ui-audit"
+    },
+    "output": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "outcome",
+        "resultRef",
+        "evidenceRefs",
+        "findings",
+        "caseResults",
+        "coverageSummary",
+        "suspenseQuestions",
+        "userActions",
+        "authorityVerdicts",
+        "reason"
+      ],
+      "properties": {
+        "outcome": {
+          "description": "Typed audit result consumed by the parent Skill machine.",
+          "enum": [
+            "passed",
+            "failed",
+            "suspense",
+            "require-user-action",
+            "blocked"
+          ]
+        },
+        "resultRef": {
+          "description": "Exact immutable audit artifact reference, or null.",
+          "type": [
+            "string",
+            "null"
+          ],
+          "minLength": 1
+        },
+        "evidenceRefs": {
+          "description": "Exact read-only evidence supporting the audit.",
+          "$ref": "#/$defs/refs"
+        },
+        "findings": {
+          "description": "Structured observable audit findings.",
+          "type": "array",
+          "maxItems": 128,
+          "items": {
+            "$ref": "#/$defs/finding"
+          }
+        },
+        "caseResults": {
+          "description": "Predeclared visible Browser executions in contiguous order.",
+          "type": "array",
+          "maxItems": 128,
+          "items": {
+            "$ref": "#/$defs/caseResult"
+          }
+        },
+        "coverageSummary": {
+          "description": "Flow coverage compilation, or null outside flow coverage.",
+          "oneOf": [
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "selectedCaseCount",
+                "delegatedPermutationCount",
+                "uncoveredTransitionCount",
+                "delegationRefs",
+                "overflowReasons",
+                "mergeCandidateRefs"
+              ],
+              "properties": {
+                "selectedCaseCount": {
+                  "description": "Selected UAT case count.",
+                  "type": "integer",
+                  "minimum": 1
+                },
+                "delegatedPermutationCount": {
+                  "description": "Lower-level delegated permutations.",
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "uncoveredTransitionCount": {
+                  "description": "Reachable transitions without coverage.",
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "delegationRefs": {
+                  "description": "Exact lower-level test delegations.",
+                  "$ref": "#/$defs/refs"
+                },
+                "overflowReasons": {
+                  "description": "Reasons the case set exceeds the minimum.",
+                  "type": "array",
+                  "uniqueItems": true,
+                  "items": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 1024
+                  }
+                },
+                "mergeCandidateRefs": {
+                  "description": "Equivalent sibling flows that should merge.",
+                  "$ref": "#/$defs/refs"
+                }
+              }
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "suspenseQuestions": {
+          "description": "Finite UI authority questions; empty for every non-UI or non-suspense result.",
+          "type": "array",
+          "maxItems": 16,
+          "items": {
+            "$ref": "#/$defs/question"
+          }
+        },
+        "userActions": {
+          "description": "Exact resumable user actions when user control is required.",
+          "type": "array",
+          "maxItems": 8,
+          "items": {
+            "$ref": "#/$defs/action"
+          }
+        },
+        "authorityVerdicts": {
+          "description": "Independent UI-principles and Grammar verdicts, or null outside UI audit.",
+          "oneOf": [
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "uiPrinciples",
+                "grammar",
+                "conflict",
+                "evidenceRefs"
+              ],
+              "properties": {
+                "uiPrinciples": {
+                  "description": "UI-principles verdict.",
+                  "enum": [
+                    "passed",
+                    "failed",
+                    "suspense"
+                  ]
+                },
+                "grammar": {
+                  "description": "Grammar verdict.",
+                  "enum": [
+                    "passed",
+                    "failed",
+                    "suspense"
+                  ]
+                },
+                "conflict": {
+                  "description": "Whether authorities conflict.",
+                  "type": "boolean"
+                },
+                "evidenceRefs": {
+                  "description": "Evidence for both independent verdicts.",
+                  "type": "array",
+                  "minItems": 2,
+                  "uniqueItems": true,
+                  "items": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 1024
+                  }
+                }
+              }
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "reason": {
+          "description": "Bounded blocker explanation, otherwise null.",
+          "type": [
+            "string",
+            "null"
+          ],
+          "minLength": 1
+        }
+      }
+    }
+  },
+  "$defs": {
+    "refs": {
+      "type": "array",
+      "maxItems": 128,
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 1024
+      }
+    },
+    "finding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "severity",
+        "claim",
+        "evidenceRefs"
+      ],
+      "properties": {
+        "id": {
+          "description": "Stable finding identity.",
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "severity": {
+          "description": "Observed impact.",
+          "enum": [
+            "note",
+            "soft",
+            "hard"
+          ]
+        },
+        "claim": {
+          "description": "Observable claim.",
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 2048
+        },
+        "evidenceRefs": {
+          "description": "Exact evidence for the claim.",
+          "$ref": "#/$defs/refs"
+        }
+      }
+    },
+    "caseResult": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "caseId",
+        "executionOrder",
+        "declaredBeforeExecute",
+        "browserRef",
+        "accountProvisioning",
+        "accountRef",
+        "result",
+        "recoveryComplete",
+        "terminalProved",
+        "evidenceRefs"
+      ],
+      "properties": {
+        "caseId": {
+          "description": "Predeclared case identity.",
+          "type": "string",
+          "pattern": "^[a-z0-9][a-z0-9._-]*$"
+        },
+        "executionOrder": {
+          "description": "One-based visible Browser execution order.",
+          "type": "integer",
+          "minimum": 1
+        },
+        "declaredBeforeExecute": {
+          "description": "Whether declaration preceded execution.",
+          "const": true
+        },
+        "browserRef": {
+          "description": "Visible Browser run reference.",
+          "type": "string",
+          "pattern": "^browser://.+"
+        },
+        "accountProvisioning": {
+          "description": "Account isolation mode.",
+          "const": "fresh-isolated"
+        },
+        "accountRef": {
+          "description": "Fresh account identity.",
+          "type": "string",
+          "minLength": 1
+        },
+        "result": {
+          "description": "Observed case result.",
+          "enum": [
+            "covered",
+            "passed",
+            "failed"
+          ]
+        },
+        "recoveryComplete": {
+          "description": "Whether declared recovery completed.",
+          "type": "boolean"
+        },
+        "terminalProved": {
+          "description": "Whether terminal outcome was proved read-only.",
+          "type": "boolean"
+        },
+        "evidenceRefs": {
+          "description": "Exact case evidence.",
+          "$ref": "#/$defs/refs"
+        }
+      }
+    },
+    "question": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "situation",
+        "authoritiesChecked",
+        "question",
+        "owner"
+      ],
+      "properties": {
+        "id": {
+          "description": "Finite question identity.",
+          "type": "string",
+          "minLength": 1
+        },
+        "situation": {
+          "description": "Exact unresolved UI situation.",
+          "type": "string",
+          "minLength": 1
+        },
+        "authoritiesChecked": {
+          "description": "Authorities already checked.",
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 1024
+          }
+        },
+        "question": {
+          "description": "One finite authority question.",
+          "type": "string",
+          "minLength": 1
+        },
+        "owner": {
+          "description": "Authority owner able to answer.",
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "action": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "reason",
+        "controlRef",
+        "exactAction",
+        "completionEvidence",
+        "resumeCommand"
+      ],
+      "properties": {
+        "id": {
+          "description": "Action identity.",
+          "type": "string",
+          "minLength": 1
+        },
+        "reason": {
+          "description": "Why user control is required.",
+          "type": "string",
+          "minLength": 1
+        },
+        "controlRef": {
+          "description": "Exact user-controlled surface.",
+          "type": "string",
+          "minLength": 1
+        },
+        "exactAction": {
+          "description": "One exact action for the user.",
+          "type": "string",
+          "minLength": 1
+        },
+        "completionEvidence": {
+          "description": "Observable completion evidence.",
+          "type": "string",
+          "minLength": 1
+        },
+        "resumeCommand": {
+          "description": "Exact resume command.",
+          "type": "string",
+          "pattern": "^USER ACTION COMPLETE .+"
+        }
+      }
+    }
+  }
+}

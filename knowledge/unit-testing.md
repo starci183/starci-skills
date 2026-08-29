@@ -4,7 +4,7 @@
 | --- | --- |
 | Knowledge ID | `fe.unit-testing` |
 | Operators | `test/unit` |
-| Search tags | `unit test, isolated behavior, deterministic test, branch coverage, component contract` |
+| Search tags | `unit test, isolated behavior, deterministic test, branch coverage, component interface` |
 | Dependencies | `fe.implementation-boundaries` |
 
 ## Record

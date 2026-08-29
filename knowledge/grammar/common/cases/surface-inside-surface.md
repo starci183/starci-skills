@@ -6,7 +6,7 @@
 | Package | `@starci/grammar/common` |
 | Operators | `grammar-convergence` |
 | Search tags | `nested surface, surface card, list inside card, padding owner, boundary` |
-| Dependencies | `fe.grammar-common-contracts` |
+| Dependencies | `fe.grammar-common-capabilities` |
 
 ## Trigger
 
@@ -24,7 +24,9 @@ Create a trustworthy nested boundary without decorative card-in-card noise or co
 
 ## Render decision
 
-Use an inner surface only when it owns a distinct collection, focus, selection, scrolling, or interaction responsibility. Give padding, border, radius, shadow, and background one owner at each boundary. Keep the inner treatment visually subordinate according to the selected Grammar.
+Reach this Grammar decision only after the approved information priority and composition rules establish that the child has a real semantic owner. Grammar never creates nesting to repair a weak hierarchy.
+
+Use an inner surface only when it owns a distinct collection, focus, selection, scrolling, or interaction responsibility. When the child is a repeated label-value collection, bind the selected Grammar's nested collection interface rather than reconstructing rows inside a generic surface. Give padding, border, radius, shadow, and background one owner at each boundary. Keep the inner treatment visually subordinate according to the selected Grammar.
 
 ## Required states
 
@@ -36,7 +38,7 @@ The inner visual boundary may flatten on narrow screens only when grouping, row 
 
 ## Reject
 
-Reject decorative nesting, duplicate padding, two dominant shadows, two objects owning the same label, card-per-row without a peer-card contract, or a nested surface that exists only to add color.
+Reject Grammar-first nesting, decorative nesting, duplicate padding, two dominant shadows, two objects owning the same label, card-per-row without a peer-card interface, or a nested surface that exists only to add color.
 
 ## Proof
 

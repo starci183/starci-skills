@@ -12,7 +12,7 @@ Tabs switch peer content in one task context. The selected tab may use the exact
 
 - Keep labels unobscured and mutually exclusive.
 - Unselected tabs remain clearly interactive without competing with selected.
-- Focus, keyboard movement, activation, panel association, and overflow follow contract.
+- Focus, keyboard movement, activation, panel association, and overflow follow interface.
 - Decorative underlines/circles cannot create a false second selection.
 - Long labels reduce decorative gesture before losing readability.
 - Unsaved-panel transitions remain application policy.

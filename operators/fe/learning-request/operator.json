@@ -1,49 +1,16 @@
 {
-  "schemaVersion": 6,
+  "schemaVersion": 7,
   "id": "fe/learning-request",
   "domain": "fe",
+  "job": "learning request one closed frontend target.",
   "inputSchema": "input.schema.json",
   "outputSchema": "output.schema.json",
-  "knowledgeRefs": [
-    "fe.design-maintenance"
-  ],
+  "contextRefs": [],
   "sourceReferenceRefs": [],
-  "accepts": [
-    {
-      "stage": "fe.maintenance.learning-request",
-      "status": "ready",
-      "allFacts": [],
-      "noneFacts": []
-    }
-  ],
-  "emits": [
-    {
-      "stage": "fe.maintenance.learning-request.result",
-      "status": "complete",
-      "factsAdd": [
-        "fe-learning-request-complete"
-      ],
-      "factsRemove": []
-    },
-    {
-      "stage": "fe.maintenance.blocked",
-      "status": "blocked",
-      "factsAdd": [
-        "fe-learning-request-blocked"
-      ],
-      "factsRemove": []
-    }
-  ],
-  "sideEffects": [
-    "coordinator mutates only exact approved targets for fe/learning-request",
-    "keep input, output, loaded context, worker observations, drafts, evidence, and receipts in task-session storage only",
-    "purge every intermediate session object at every parent-skill terminal state"
-  ],
+  "sideEffects": [],
   "stopConditions": [
-    "required evidence is missing or stale",
-    "the result would cross the declared boundary",
-    "Stop when evidence is incomplete, identity collides with different content, or the approved request path changed.",
-    "runtime binding revision or session ownership is invalid",
-    "the operation would broaden its approved authority, source, or external boundary"
+    "required authority or evidence is missing or stale",
+    "the closed target boundary is ambiguous",
+    "completion would require another operator job"
   ]
 }

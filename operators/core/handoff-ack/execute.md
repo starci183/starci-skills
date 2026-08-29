@@ -1,13 +1,21 @@
 # Execute `core/handoff-ack`
 
-## Step 1 — Bind the objective, consumer and handoff identity
+## Context
 
-**Read:** only validated declared fields. **Context:** objective, artifact and hash identities only. **Session write:** typed result under the declared output or scratch ref. **Stop:** reject identity, approval, resume, or hash mismatch. **Orchestration:** coordinator-only protocol transition; workers cannot acknowledge or purge artifacts.
+Read only `context.handoffRef` at `context.handoffSha256`, `context.objectiveId`, and the complete `context.artifacts` identity set.
 
-## Step 2 — Compare every artifact ref and content hash
+## Input
 
-**Read:** only validated declared fields. **Context:** objective, artifact and hash identities only. **Session write:** typed result under the declared output or scratch ref. **Stop:** reject identity, approval, resume, or hash mismatch. **Orchestration:** coordinator-only protocol transition; workers cannot acknowledge or purge artifacts.
+Bind acknowledgement to `input.objectiveId`, `input.consumerCapability`, and `input.acceptedArtifacts`.
 
-## Step 3 — Emit ACK and the exact purge set, or reject without purging
+## Action
 
-**Read:** only validated declared fields. **Context:** objective, artifact and hash identities only. **Session write:** typed result under the declared output or scratch ref. **Stop:** reject identity, approval, resume, or hash mismatch. **Orchestration:** coordinator-only protocol transition; workers cannot acknowledge or purge artifacts.
+Compare the consumer objective and every accepted artifact ref/hash with the immutable handoff. Emit one acknowledgement only for an exact complete match and name the retained refs that the runtime may purge.
+
+## Output
+
+Return `output.outcome`, `output.ackRef`, `output.purgeRefs`, `output.evidenceRefs`, and `output.reason`.
+
+## Stop
+
+Return `rejected` without purge authority for a consumer-declared mismatch. Return `blocked` without purge authority when the handoff cannot be read or verified.

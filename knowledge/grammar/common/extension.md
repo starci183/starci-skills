@@ -6,15 +6,15 @@
 | Package | `@starci/grammar/common` |
 | Operators | `grammar-convergence` |
 | Search tags | `reuse, extend, grammar gap, package request, global css, forbidden` |
-| Dependencies | `fe.grammar-common-contracts` |
+| Dependencies | `fe.grammar-common-capabilities` |
 
 Classify every required capability:
 
-- `reuse`: an exact public export and effective contract already satisfy it.
-- `extend`: the contract explicitly opens the required axis.
+- `reuse`: an exact public export and effective interface already satisfy it.
+- `extend`: the interface explicitly opens the required axis.
 - `grammar-gap`: the capability, anatomy, state, or extension axis is absent.
 
-An extension names its base package/export, base contract hash, allowed axis, consumer set, and proof that all closed invariants remain unchanged. A Grammar gap blocks local reconstruction and creates a package request.
+An extension names its base package/export, base interface hash, allowed axis, consumer set, and proof that all closed invariants remain unchanged. A Grammar gap blocks local reconstruction and creates a package request.
 
 Forbidden:
 
@@ -25,4 +25,4 @@ Forbidden:
 - structural overrides in application `global.css`;
 - treating example markup, screenshots, or this guide as implementation source.
 
-Application `global.css` may change only color-token values explicitly opened by the selected package contract. Structural change belongs in the Grammar package.
+Application `global.css` may change only color-token values explicitly opened by the selected package interface. Structural change belongs in the Grammar package.

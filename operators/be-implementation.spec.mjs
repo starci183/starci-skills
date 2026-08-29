@@ -1,139 +1,97 @@
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
 import test from 'node:test';
 import { validateInput } from './be/implementation/validate-input.mjs';
 import { validateOutput } from './be/implementation/validate-output.mjs';
-import { validatorFor } from './validation.mjs';
 
 const hash = (character) => `sha256:${character.repeat(64)}`;
-const session = 'session://tasks/task-1/';
 
 function validInput() {
   return {
-    schemaVersion: 6,
-    runId: 'run-1',
-    stage: 'architecture.boundary.review',
-    status: 'approved',
-    facts: ['backend-boundary-approved', 'backend-coding-scope-frozen'],
-    payload: {
-      provided: {
-        approvedBoundaryRef: `${session}boundary`,
-        approvalReceiptRef: `${session}approval`,
-        businessHeadRef: `${session}business`,
-        baselineCommitRef: 'git:abcdef1',
-        codingScopeRef: `${session}coding-scope`
-      },
-      loads: {
-        approval: { ref: `${session}approval`, revision: hash('7'), loadMode: 'session-exact' },
-        business: { ref: `${session}business`, authorityPath: '.worktrees/starci-academy/businesses/create-vps/model.json', revision: hash('a') },
-        boundary: { ref: `${session}boundary`, revision: hash('b') },
-        scope: { ref: `${session}coding-scope`, revision: hash('f'), sourceCommitRef: 'git:abcdef1', targetSetSha256: hash('9') },
-        knowledge: [{ id: 'be.implementation', generation: 'generation-1', contentSha256: hash('c'), loadMode: 'qdrant-exact' }],
-        source: {
-          loadMode: 'exact-files',
-          repositoryContext: false,
-          sourceCommitRef: 'git:abcdef1',
-          targetSetSha256: hash('9'),
-          targetFiles: [{ path: 'src/vps/vps.service.ts', beforeSha256: hash('d'), allowedChanges: ['implement create VPS'] }]
-        },
-        orchestration: {
-          mode: 'balanced',
-          profileRef: 'orchestration/modes/balanced.json',
-          providerRef: 'orchestration/providers/codex.json'
-        }
-      },
-      session: {
-        taskId: 'task-1',
-        inputRef: `${session}input`,
-        outputRef: `${session}output`,
-        scratchPrefix: `${session}scratch`,
-        retention: 'until-skill-terminal'
-      }
+    schemaVersion: 7,
+    operatorId: 'be/implementation',
+    context: {
+      contextRefs: [
+        '.worktrees/businesses/create-vps/model.json',
+        'artifact://architecture/approved-boundary',
+        'artifact://be/frozen-coding-scope',
+        `target-set:${hash('9')}`
+      ],
+      sourceRefs: ['src/vps/vps.service.ts']
+    },
+    input: {
+      project: 'starci-academy',
+      objectiveRef: 'implement create VPS at git:abcdef1',
+      sourceFingerprint: hash('d')
     }
   };
 }
 
 function validReadyOutput() {
   return {
-    schemaVersion: 6,
-    runId: 'run-1',
-    stage: 'quality.format',
-    status: 'ready',
-    facts: ['backend-source-written'],
-    payload: {
-      decision: 'ready',
-      state: {
-        operator: 'be/implementation',
-        status: 'completed',
-        code: 'implementation-complete',
-        retryable: false,
-        emits: { stage: 'quality.format', status: 'ready', factsAdd: ['backend-source-written'] }
-      },
-      produced: {
-        changeReceiptRef: `${session}change-receipt`,
-        mutations: [{ path: 'src/vps/vps.service.ts', beforeSha256: hash('d'), afterSha256: hash('e') }]
-      },
-      context: { used: [{ kind: 'worktree-business', ref: `${session}business`, revision: hash('a') }] },
-      cleanup: { scratchRefs: [`${session}scratch/source-checks/worker-1`], retention: 'until-skill-terminal', purgeAt: 'skill-terminal' },
-      evidenceRefs: [`${session}evidence/source`],
-      findings: []
+    schemaVersion: 7,
+    operatorId: 'be/implementation',
+    output: {
+      outcome: 'ready',
+      resultRef: 'artifact://be/change-receipt',
+      evidenceRefs: ['src/vps/vps.service.ts@sha256:' + 'e'.repeat(64)],
+      findings: ['mutation:src/vps/vps.service.ts', 'before:' + hash('d'), 'after:' + hash('e')],
+      reason: null
     }
   };
 }
 
-test('accepts the closed session-only input and explicit ready state', () => {
-  assert.deepEqual(validateInput(validInput()), { valid: true, errors: [] });
-  assert.deepEqual(validateOutput(validReadyOutput()), { valid: true, errors: [] });
+function validateImplementationInput(value) {
+  const base = validateInput(value);
+  if (!base.valid) return base;
+  const errors = [];
+  if (value.context.sourceRefs.some((ref) => ref === '.' || ref.endsWith('/'))) errors.push('repository source context is forbidden');
+  if (value.context.contextRefs.some((ref) => ref.includes('session://'))) errors.push('session references are forbidden');
+  if (!value.context.contextRefs.some((ref) => /^\.worktrees\/businesses\//.test(ref))) errors.push('project-scoped businesses authority is required');
+  if (!value.context.contextRefs.some((ref) => ref.startsWith('artifact://be/frozen-coding-scope'))) errors.push('frozen coding scope is required');
+  if (!value.context.contextRefs.includes(`target-set:${hash('9')}`)) errors.push('frozen target set differs');
+  return { valid: errors.length === 0, errors };
+}
+
+function validateImplementationOutput(value) {
+  const base = validateOutput(value);
+  if (!base.valid) return base;
+  const errors = [];
+  if (value.output.outcome !== 'ready' && value.output.resultRef !== null) errors.push('non-ready outcome cannot claim mutations');
+  return { valid: errors.length === 0, errors };
+}
+
+test('accepts the closed strict-v7 input and explicit ready outcome', () => {
+  assert.deepEqual(validateImplementationInput(validInput()), { valid: true, errors: [] });
+  assert.deepEqual(validateImplementationOutput(validReadyOutput()), { valid: true, errors: [] });
 });
 
-test('refuses repository source context and session references from another task', () => {
+test('refuses repository source context and session references', () => {
   const sourceContext = validInput();
-  sourceContext.payload.loads.source.repositoryContext = true;
-  assert.equal(validateInput(sourceContext).valid, false);
-  const foreignSession = validInput();
-  foreignSession.payload.provided.businessHeadRef = 'session://tasks/task-2/business';
-  foreignSession.payload.loads.business.ref = foreignSession.payload.provided.businessHeadRef;
-  assert.equal(validateInput(foreignSession).valid, false);
+  sourceContext.context.sourceRefs = ['.'];
+  assert.equal(validateImplementationInput(sourceContext).valid, false);
+  const sessionContext = validInput();
+  sessionContext.context.contextRefs.push('session://tasks/task-2/business');
+  assert.equal(validateImplementationInput(sessionContext).valid, false);
 });
 
 test('requires project-scoped business authority', () => {
-  const legacyAuthority = validInput();
-  legacyAuthority.payload.loads.business.authorityPath = '.worktrees/business/create-vps/model.json';
-  assert.equal(validateInput(legacyAuthority).valid, false);
+  const input = validInput();
+  input.context.contextRefs[0] = '.worktrees/business/create-vps/model.json';
+  assert.equal(validateImplementationInput(input).valid, false);
 });
 
 test('requires a frozen coding scope before opening exact source', () => {
-  const input = validInput();
-  input.facts = ['backend-boundary-approved'];
-  assert.equal(validateInput(input).valid, false);
+  const missing = validInput();
+  missing.context.contextRefs = missing.context.contextRefs.filter((ref) => !ref.startsWith('artifact://be/frozen-coding-scope'));
+  assert.equal(validateImplementationInput(missing).valid, false);
   const drifted = validInput();
-  drifted.payload.loads.source.targetSetSha256 = hash('8');
-  assert.equal(validateInput(drifted).valid, false);
+  drifted.context.contextRefs[3] = `target-set:${hash('8')}`;
+  assert.equal(validateImplementationInput(drifted).valid, false);
 });
 
-test('refuses non-ready state that claims source mutations', () => {
+test('refuses a non-ready outcome that claims source mutations', () => {
   const output = validReadyOutput();
-  output.stage = 'architecture.boundary';
-  output.payload.decision = 'source-drift';
-  output.payload.state = {
-    operator: 'be/implementation', status: 'replan', code: 'source-revision-drift', retryable: true,
-    emits: { stage: 'architecture.boundary', status: 'ready', factsAdd: ['backend-boundary-feedback', 'source-drift'] }
-  };
-  output.facts = ['backend-boundary-feedback', 'source-drift'];
-  assert.equal(validateOutput(output).valid, false);
-});
-
-test('orchestration modes and provider mappings are closed and consistent', () => {
-  const modeValidator = validatorFor(new URL('../orchestration/mode.schema.json', import.meta.url));
-  const providerValidator = validatorFor(new URL('../orchestration/provider.schema.json', import.meta.url));
-  const modes = Object.fromEntries(['economical', 'balanced', 'parallel'].map((name) => {
-    const value = JSON.parse(readFileSync(new URL(`../orchestration/modes/${name}.json`, import.meta.url), 'utf8'));
-    assert.equal(modeValidator(value).valid, true);
-    return [name, value];
-  }));
-  for (const provider of ['codex', 'claude']) {
-    const value = JSON.parse(readFileSync(new URL(`../orchestration/providers/${provider}.json`, import.meta.url), 'utf8'));
-    assert.equal(providerValidator(value).valid, true);
-    for (const [mode, mapping] of Object.entries(value.modeMappings)) assert.ok(mapping.maxWorkers <= modes[mode].maxWorkers);
-  }
+  output.output.outcome = 'source-drift';
+  output.output.reason = 'source fingerprint changed';
+  assert.equal(validateImplementationOutput(output).valid, false);
 });

@@ -1,214 +1,56 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://starci.dev/v6/operators/tech-stack/compatibility-check/output.schema.json",
+  "$id": "https://starci.dev/v7.0/operators/tech-stack/compatibility-check/output.schema.json",
   "type": "object",
   "additionalProperties": false,
-  "required": [
-    "schemaVersion",
-    "runId",
-    "stage",
-    "status",
-    "facts",
-    "payload"
-  ],
+  "required": ["schemaVersion", "operatorId", "output"],
   "properties": {
-    "schemaVersion": {
-      "const": 6
-    },
-    "runId": {
-      "type": "string",
-      "minLength": 1
-    },
-    "stage": {
-      "enum": [
-        "tech-stack.compatibility"
-      ]
-    },
-    "status": {
-      "enum": [
-        "ready",
-        "revise",
-        "blocked"
-      ]
-    },
-    "facts": {
-      "type": "array",
-      "uniqueItems": true,
-      "items": {
-        "type": "string",
-        "minLength": 1
-      }
-    },
-    "payload": {
+    "schemaVersion": { "const": 7 },
+    "operatorId": { "const": "tech-stack/compatibility-check" },
+    "output": {
       "type": "object",
       "additionalProperties": false,
-      "required": [
-        "decision",
-        "state",
-        "produced",
-        "context",
-        "cleanup",
-        "evidenceRefs",
-        "findings"
-      ],
+      "required": ["outcome", "checkedModelSha256", "receiptRef", "checks", "contradictions"],
       "properties": {
-        "decision": {
-          "enum": [
-            "compatible",
-            "revise",
-            "blocked"
-          ]
-        },
-        "state": {
-          "type": "object",
-          "additionalProperties": false,
-          "required": [
-            "operator",
-            "status",
-            "code",
-            "retryable",
-            "emits"
-          ],
-          "properties": {
-            "operator": {
-              "const": "tech-stack/compatibility-check"
-            },
-            "status": {
-              "enum": [
-                "completed",
-                "revise",
-                "blocked"
-              ]
-            },
-            "code": {
-              "type": "string",
-              "minLength": 1
-            },
-            "retryable": {
-              "type": "boolean"
-            },
-            "emits": {
-              "type": "object",
-              "additionalProperties": false,
-              "required": [
-                "stage",
-                "status",
-                "factsAdd",
-                "factsRemove"
-              ],
-              "properties": {
-                "stage": {
-                  "enum": [
-                    "tech-stack.compatibility"
-                  ]
-                },
-                "status": {
-                  "enum": [
-                    "ready",
-                    "revise",
-                    "blocked"
-                  ]
-                },
-                "factsAdd": {
-                  "type": "array",
-                  "uniqueItems": true,
-                  "items": {
-                    "type": "string"
-                  }
-                },
-                "factsRemove": {
-                  "type": "array",
-                  "uniqueItems": true,
-                  "items": {
-                    "type": "string"
-                  }
-                }
-              }
+        "outcome": { "enum": ["compatible", "revise", "blocked"], "description": "Observed compatibility outcome; only the Skill machine maps it to a next state." },
+        "checkedModelSha256": { "$ref": "#/$defs/sha256", "description": "Hash of the exact stack model evaluated." },
+        "receiptRef": { "type": ["string", "null"], "minLength": 1, "description": "Ephemeral compatibility receipt for a completed evaluation; null only when evidence blocks evaluation." },
+        "checks": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "description": "One typed result for every required compatibility axis.",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["axis", "status", "evidenceRefs"],
+            "properties": {
+              "axis": { "enum": ["runtime-version", "deployable-unit", "communication-failure", "datastore-ownership", "backup-restore"] },
+              "status": { "enum": ["passed", "failed", "unknown"] },
+              "evidenceRefs": { "type": "array", "minItems": 1, "uniqueItems": true, "items": { "type": "string", "minLength": 1 } }
             }
           }
         },
-        "produced": {
-          "type": "object",
-          "additionalProperties": false,
-          "required": [
-            "compatibilityReceiptRef",
-            "checkedModelSha256"
-          ],
-          "properties": {
-            "compatibilityReceiptRef": {
-              "type": "string",
-              "minLength": 1
-            },
-            "checkedModelSha256": {
-              "$ref": "#/$defs/sha256"
-            }
-          }
-        },
-        "context": {
-          "type": "object",
-          "additionalProperties": false,
-          "required": [
-            "used"
-          ],
-          "properties": {
-            "used": {
-              "type": "array",
-              "uniqueItems": true,
-              "items": {
-                "type": "string",
-                "minLength": 1
-              }
-            }
-          }
-        },
-        "cleanup": {
-          "type": "object",
-          "additionalProperties": false,
-          "required": [
-            "scratchRefs",
-            "retention",
-            "purgeAt"
-          ],
-          "properties": {
-            "scratchRefs": {
-              "type": "array",
-              "uniqueItems": true,
-              "items": {
-                "type": "string"
-              }
-            },
-            "retention": {
-              "const": "until-skill-terminal"
-            },
-            "purgeAt": {
-              "const": "skill-terminal"
-            }
-          }
-        },
-        "evidenceRefs": {
+        "contradictions": {
           "type": "array",
           "uniqueItems": true,
+          "description": "Evidence-backed incompatibilities found during the one evaluation.",
           "items": {
-            "type": "string",
-            "minLength": 1
-          }
-        },
-        "findings": {
-          "type": "array",
-          "uniqueItems": true,
-          "items": {
-            "type": "string",
-            "minLength": 1
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["code", "severity", "statement", "evidenceRefs"],
+            "properties": {
+              "code": { "type": "string", "pattern": "^[a-z0-9]+(?:[.-][a-z0-9]+)*$" },
+              "severity": { "enum": ["critical", "major", "minor"] },
+              "statement": { "type": "string", "minLength": 1 },
+              "evidenceRefs": { "type": "array", "minItems": 1, "uniqueItems": true, "items": { "type": "string", "minLength": 1 } }
+            }
           }
         }
       }
     }
   },
   "$defs": {
-    "sha256": {
-      "type": "string",
-      "pattern": "^sha256:[0-9a-f]{64}$"
-    }
+    "sha256": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" }
   }
 }
-

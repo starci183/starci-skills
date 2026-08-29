@@ -1,7 +1,11 @@
 # `fe/interaction-container-decision` input
 
-## JSON architecture
+## Context
 
-`payload.provided` actively supplies the objective, approved direction, modeled UX-flow artifact, and exact interaction references to classify. `payload.loads` passively retrieves only the interaction-container decision knowledge and selected orchestration mode. `payload.session` keeps every candidate comparison ephemeral until skill-terminal cleanup.
+- `context.evidenceRefs`: Exact canonical evidence references available to this atomic job.
+- `context.authorityRevision`: Exact approved authority revision binding this invocation.
 
-The operator receives no product source and must not infer a container from whichever component already exists.
+## Input
+
+- `input.targetRef`: The one target owned by this atomic invocation.
+- `input.constraints`: Closed constraints that bound this job without routing it.

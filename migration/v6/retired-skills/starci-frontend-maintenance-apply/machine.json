@@ -1,0 +1,1269 @@
+{
+  "$schema": "../machine.schema.json",
+  "schemaVersion": 6,
+  "id": "starci-frontend-maintenance-apply",
+  "start": "analyze-input",
+  "states": {
+    "analyze-input": {
+      "kind": "analysis",
+      "on": [
+        {
+          "when": {},
+          "target": "maintenance-feedback-request",
+          "label": "enter maintenance-feedback-request"
+        }
+      ]
+    },
+    "maintenance-feedback-request": {
+      "kind": "operator",
+      "ref": "fe/feedback-request",
+      "on": [
+        {
+          "when": {
+            "outputEquals": {
+              "outcome": "recorded"
+            }
+          },
+          "target": "mission-route",
+          "label": "recorded"
+        },
+        {
+          "when": {
+            "outputEquals": {
+              "outcome": "blocked"
+            }
+          },
+          "target": "blocked",
+          "label": "blocked"
+        }
+      ]
+    },
+    "mission-route": {
+      "kind": "operator",
+      "ref": "workspace/route-verify",
+      "on": [
+        {
+          "when": {
+            "outputEquals": {
+              "outcome": "ready"
+            }
+          },
+          "target": "mission-business-staleness",
+          "label": "ready"
+        },
+        {
+          "when": {
+            "outputEquals": {
+              "outcome": "initialize-required"
+            }
+          },
+          "target": "blocked",
+          "label": "initialize-required"
+        },
+        {
+          "when": {
+            "outputEquals": {
+              "outcome": "blocked"
+            }
+          },
+          "target": "blocked",
+          "label": "blocked"
+        }
+      ]
+    },
+    "blocked": {
+      "kind": "terminal",
+      "result": "blocked"
+    },
+    "mission-business-staleness": {
+      "kind": "operator",
+      "ref": "business/staleness-check",
+      "on": [
+        {
+          "when": {
+            "outputEquals": {
+              "outcome": "fresh"
+            }
+          },
+          "target": "mission-impact",
+          "label": "fresh"
+        },
+        {
+          "when": {
+            "outputEquals": {
+              "outcome": "initialize-required"
+            }
+          },
+          "target": "mission-business-evidence",
+          "label": "initialize-required"
+        },
+        {
+          "when": {
+            "outputEquals": {
+              "outcome": "blocked"
+            }
+          },
+          "target": "blocked",
+          "label": "blocked"
+        }
+      ]
+    },
+    "mission-impact": {
+      "kind": "operator",
+      "ref": "delivery/impact-classify",
+      "on": [
+        {
+          "when": {
+            "outputEquals": {
+              "outcome": "backend-required"
+            }
+          },
+          "target": "ship-architecture-frame",
+          "label": "backend-required"
+        },
+        {
+          "when": {
+            "outputEquals": {
+              "outcome": "frontend-only"
+            }
+          },
+          "target": "maintenance-apply",
+          "label": "frontend-only"
+        },
+        {
+          "when": {
+            "outputEquals": {
+              "outcome": "blocked"
+            }
+          },
+          "target": "blocked",
+          "label": "blocked"
+        }
+      ]
+    },
+    "mission-business-evidence": {
+      "kind": "operator",
+      "ref": "business/evidence-normalize",
+      "on": [
+        {
+          "when": {
+            "outputEquals": {
+              "outcome": "ready"
+            }
+          },
+          "target": "mission-business-model",
+          "label": "ready"
+        }
+      ]
+    },
+    "ship-architecture-frame": {
+      "kind": "operator",
+      "ref": "architecture/decision-frame",
+      "on": [
+        {
+          "when": {
+            "outputEquals": {
+              "outcome": "ready"
+            }
+          },
+          "target": "ship-architecture-current",
+          "label": "ready"
+        }
+      ]
+    },
+    "maintenance-apply": {
+      "kind": "operator",
+      "ref": "fe/maintenance-apply",
+      "on": [
+        {
+          "when": {
+            "outputEquals": {
+              "outcome": "applied"
+            }
+          },
+          "target": "maintenance-seed",
+          "label": "applied"
+        },
+        {
+          "when": {
+            "outputEquals": {
+              "outcome": "blocked"
+            }
+          },
+          "target": "blocked",
+          "label": "blocked"
+        }
+      ]
+    },
+    "mission-business-model": {
+      "kind": "operator",
+      "ref": "business/model",
+      "on": [
+        {
+          "when": {
+            "outputEquals": {
+              "outcome": "ready"
+            }
+          },
+          "target": "mission-business-approval",
+          "label": "ready"
+        },
+        {
+          "when": {
+            "outputEquals": {
+              "outcome": "revise"
+            }
+          },
+          "target": "blocked",
+          "label": "revise"
+        },
+        {
+          "when": {
+            "outputEquals": {
+              "outcome": "blocked"
+            }
+          },
+          "target": "blocked",
+          "label": "blocked"
+        }
+      ]
+    },
+    "ship-architecture-current": {
+      "kind": "operator",
+      "ref": "architecture/current-state",
+      "on": [
+        {
+          "when": {
+            "outputEquals": {
+              "outcome": "ready"
+            }
+          },
+          "target": "ship-architecture-alternatives",
+          "label": "ready"
+        }
+      ]
+    },
+    "maintenance-seed": {
+      "kind": "operator",
+      "ref": "fe/product-seed",
+      "on": [
+        {
+          "when": {
+            "outputEquals": {
+              "outcome": "materialized"
+            }
+          },
+          "target": "maintenance-unit-test"
+        },
+        {
+          "when": {
+            "outputEquals": {
+              "outcome": "blocked"
+            }
+          },
+          "target": "blocked"
+        }
+      ]
+    },
+    "mission-business-approval": {
+      "kind": "wait",
+      "approval": {
+        "prompt": "Approve regenerated business authority before mission delivery.",
+        "approve": "OK BUSINESS <hash>",
+        "reject": "REJECT BUSINESS <hash>",
+        "bypassTarget": "mission-business-publish"
+      },
+      "on": [
+        {
+          "when": {
+            "stage": "business.model.review",
+            "status": "approved"
+          },
+          "target": "mission-business-publish"
+        },
+        {
+          "when": {
+            "stage": "business.model.review",
+            "status": "rejected"
+          },
+          "target": "mission-business-evidence"
+        }
+      ]
+    },
+    "ship-architecture-alternatives": {
+      "kind": "operator",
+      "ref": "architecture/alternatives",
+      "on": [
+        {
+          "when": {
+            "outputEquals": {
+              "outcome": "ready"
+            }
+          },
+          "target": "ship-architecture-challenge",
+          "label": "ready"
+        }
+      ]
+    },
+    "maintenance-unit-test": {
+      "kind": "operator",
+      "ref": "test/unit",
+      "on": [
+        {
+          "when": {
+            "outputEquals": {
+              "outcome": "pass"
+            }
+          },
+          "target": "maintenance-e2e-test"
+        },
+        {
+          "when": {
+            "outputEquals": {
+              "outcome": "in-boundary"
+            }
+          },
+          "target": "maintenance-repair-handoff"
+        },
+        {
+          "when": {
+            "outputEquals": {
+              "outcome": "blocked"
+            }
+          },
+          "target": "blocked"
+        }
+      ]
+    },
+    "mission-business-publish": {
+      "kind": "operator",
+      "ref": "business/publish",
+      "on": [
+        {
+          "when": {
+            "outputEquals": {
+              "outcome": "direct-plan"
+            }
+          },
+          "target": "mission-business-staleness",
+          "label": "direct-plan"
+        },
+        {
+          "when": {
+            "outputEquals": {
+              "outcome": "architecture-required"
+            }
+          },
+          "target": "mission-business-staleness",
+          "label": "architecture-required"
+        },
+        {
+          "when": {
+            "outputEquals": {
+              "outcome": "blocked"
+            }
+          },
+          "target": "blocked",
+          "label": "blocked"
+        }
+      ]
+    },
+    "ship-architecture-challenge": {
+      "kind": "operator",
+      "ref": "architecture/decision-challenge",
+      "on": [
+        {
+          "when": {
+            "outputEquals": {
+              "outcome": "ready"
+            }
+          },
+          "target": "ship-architecture-selection",
+          "label": "ready"
+        },
+        {
+          "when": {
+            "outputEquals": {
+              "outcome": "revise"
+            }
+          },
+          "target": "ship-architecture-alternatives",
+          "label": "revise"
+        },
+        {
+          "when": {
+            "outputEquals": {
+              "outcome": "blocked"
+            }
+          },
+          "target": "blocked",
+          "label": "blocked"
+        }
+      ]
+    },
+    "maintenance-e2e-test": {
+      "kind": "operator",
+      "ref": "test/e2e",
+      "on": [
+        {
+          "when": {
+            "outputEquals": {
+              "outcome": "pass"
+            }
+          },
+          "target": "maintenance-ui-quality-test"
+        },
+        {
+          "when": {
+            "outputEquals": {
+              "outcome": "in-boundary"
+            }
+          },
+          "target": "maintenance-repair-handoff"
+        },
+        {
+          "when": {
+            "outputEquals": {
+              "outcome": "blocked"
+            }
+          },
+          "target": "blocked"
+        }
+      ]
+    },
+    "maintenance-repair-handoff": {
+      "kind": "terminal",
+      "result": "handoff"
+    },
+    "ship-architecture-selection": {
+      "kind": "wait",
+      "approval": {
+        "prompt": "Review the rendered visualize comparison, then approve the exact backend architecture required by this mission.",
+        "approve": "OK ARCHITECTURE <decision>",
+        "reject": "REJECT ARCHITECTURE <decision>",
+        "bypassTarget": "ship-architecture-handoff"
+      },
+      "on": [
+        {
+          "when": {
+            "stage": "architecture.decision.handoff",
+            "status": "ready",
+            "allFacts": [
+              "architecture-visual-preview-ready"
+            ]
+          },
+          "target": "ship-architecture-handoff"
+        },
+        {
+          "when": {
+            "stage": "architecture.decision.alternatives",
+            "status": "ready"
+          },
+          "target": "ship-architecture-alternatives"
+        }
+      ]
+    },
+    "maintenance-ui-quality-test": {
+      "kind": "operator",
+      "ref": "test/ui-quality-audit",
+      "on": [
+        {
+          "when": {
+            "outputEquals": {
+              "outcome": "delivery-pass"
+            }
+          },
+          "target": "maintenance-ui-test",
+          "label": "delivery-pass"
+        },
+        {
+          "when": {
+            "outputEquals": {
+              "outcome": "delivery-in-boundary"
+            }
+          },
+          "target": "maintenance-repair-handoff",
+          "label": "delivery-in-boundary"
+        },
+        {
+          "when": {
+            "outputEquals": {
+              "outcome": "delivery-boundary-drift"
+            }
+          },
+          "target": "maintenance-authority-handoff",
+          "label": "delivery-boundary-drift"
+        },
+        {
+          "when": {
+            "outputEquals": {
+              "outcome": "audit-pass"
+            }
+          },
+          "target": "blocked",
+          "label": "audit-pass"
+        },
+        {
+          "when": {
+            "outputEquals": {
+              "outcome": "audit-findings"
+            }
+          },
+          "target": "blocked",
+          "label": "audit-findings"
+        },
+        {
+          "when": {
+            "outputEquals": {
+              "outcome": "blocked"
+            }
+          },
+          "target": "blocked",
+          "label": "blocked"
+        }
+      ]
+    },
+    "ship-architecture-handoff": {
+      "kind": "operator",
+      "ref": "architecture/decision-handoff",
+      "on": [
+        {
+          "when": {
+            "outputEquals": {
+              "outcome": "ready"
+            }
+          },
+          "target": "ship-source-discovery",
+          "label": "ready"
+        }
+      ]
+    },
+    "maintenance-ui-test": {
+      "kind": "operator",
+      "ref": "test/ui",
+      "on": [
+        {
+          "when": {
+            "outputEquals": {
+              "outcome": "pass"
+            }
+          },
+          "target": "maintenance-product-proof"
+        },
+        {
+          "when": {
+            "outputEquals": {
+              "outcome": "in-boundary"
+            }
+          },
+          "target": "maintenance-repair-handoff"
+        },
+        {
+          "when": {
+            "outputEquals": {
+              "outcome": "boundary-drift"
+            }
+          },
+          "target": "maintenance-authority-handoff"
+        },
+        {
+          "when": {
+            "outputEquals": {
+              "outcome": "blocked"
+            }
+          },
+          "target": "blocked"
+        }
+      ]
+    },
+    "maintenance-authority-handoff": {
+      "kind": "terminal",
+      "result": "handoff"
+    },
+    "ship-source-discovery": {
+      "kind": "operator",
+      "ref": "architecture/source-discovery",
+      "on": [
+        {
+          "when": {
+            "outputEquals": {
+              "outcome": "ready"
+            }
+          },
+          "target": "ship-pattern-bind",
+          "label": "ready"
+        }
+      ]
+    },
+    "maintenance-product-proof": {
+      "kind": "operator",
+      "ref": "fe/product-proof",
+      "on": [
+        {
+          "when": {
+            "outputEquals": {
+              "outcome": "passed"
+            }
+          },
+          "target": "mission-proof"
+        },
+        {
+          "when": {
+            "outputEquals": {
+              "outcome": "repair"
+            }
+          },
+          "target": "maintenance-repair-handoff"
+        },
+        {
+          "when": {
+            "outputEquals": {
+              "outcome": "boundary-drift"
+            }
+          },
+          "target": "maintenance-authority-handoff"
+        },
+        {
+          "when": {
+            "outputEquals": {
+              "outcome": "blocked"
+            }
+          },
+          "target": "blocked"
+        }
+      ]
+    },
+    "ship-pattern-bind": {
+      "kind": "operator",
+      "ref": "architecture/pattern-bind",
+      "on": [
+        {
+          "when": {
+            "outputEquals": {
+              "outcome": "ready"
+            }
+          },
+          "target": "ship-boundary-plan",
+          "label": "ready"
+        }
+      ]
+    },
+    "mission-proof": {
+      "kind": "operator",
+      "ref": "delivery/mission-proof",
+      "on": [
+        {
+          "when": {
+            "outputEquals": {
+              "outcome": "pass"
+            }
+          },
+          "target": "mission-business-reconcile",
+          "label": "pass"
+        },
+        {
+          "when": {
+            "outputEquals": {
+              "outcome": "blocked"
+            }
+          },
+          "target": "blocked",
+          "label": "blocked"
+        }
+      ]
+    },
+    "ship-boundary-plan": {
+      "kind": "operator",
+      "ref": "architecture/boundary-plan",
+      "on": [
+        {
+          "when": {
+            "outputEquals": {
+              "outcome": "ready"
+            }
+          },
+          "target": "ship-boundary-challenge",
+          "label": "ready"
+        }
+      ]
+    },
+    "mission-business-reconcile": {
+      "kind": "operator",
+      "ref": "business/reconcile",
+      "on": [
+        {
+          "when": {
+            "outputEquals": {
+              "outcome": "implemented"
+            }
+          },
+          "target": "learning-request",
+          "label": "implemented"
+        },
+        {
+          "when": {
+            "outputEquals": {
+              "outcome": "discrepancy"
+            }
+          },
+          "target": "blocked",
+          "label": "discrepancy"
+        }
+      ]
+    },
+    "ship-boundary-challenge": {
+      "kind": "operator",
+      "ref": "architecture/boundary-challenge",
+      "on": [
+        {
+          "when": {
+            "outputEquals": {
+              "outcome": "clean"
+            }
+          },
+          "target": "ship-boundary-approval",
+          "label": "clean"
+        },
+        {
+          "when": {
+            "outputEquals": {
+              "outcome": "revise"
+            }
+          },
+          "target": "ship-boundary-plan",
+          "label": "revise"
+        },
+        {
+          "when": {
+            "outputEquals": {
+              "outcome": "blocked"
+            }
+          },
+          "target": "blocked",
+          "label": "blocked"
+        }
+      ]
+    },
+    "learning-request": {
+      "kind": "operator",
+      "ref": "fe/learning-request",
+      "on": [
+        {
+          "when": {
+            "outputEquals": {
+              "outcome": "recorded"
+            }
+          },
+          "target": "complete",
+          "label": "recorded"
+        },
+        {
+          "when": {
+            "outputEquals": {
+              "outcome": "blocked"
+            }
+          },
+          "target": "blocked",
+          "label": "blocked"
+        }
+      ]
+    },
+    "ship-boundary-approval": {
+      "kind": "wait",
+      "approval": {
+        "prompt": "Approve the exact backend plan required to complete this mission.",
+        "approve": "OK BACKEND <hash>",
+        "reject": "REJECT BACKEND <hash>",
+        "bypassTarget": "ship-coding-scope"
+      },
+      "on": [
+        {
+          "when": {
+            "stage": "architecture.boundary.review",
+            "status": "approved"
+          },
+          "target": "ship-coding-scope"
+        },
+        {
+          "when": {
+            "stage": "architecture.boundary.review",
+            "status": "rejected"
+          },
+          "target": "ship-boundary-plan"
+        }
+      ]
+    },
+    "complete": {
+      "kind": "terminal",
+      "result": "complete"
+    },
+    "ship-coding-scope": {
+      "kind": "operator",
+      "ref": "be/coding-scope-freeze",
+      "on": [
+        {
+          "when": {
+            "outputEquals": {
+              "outcome": "ready"
+            }
+          },
+          "target": "ship-implement",
+          "label": "ready"
+        },
+        {
+          "when": {
+            "outputEquals": {
+              "outcome": "source-drift"
+            }
+          },
+          "target": "ship-boundary-plan",
+          "label": "source-drift"
+        },
+        {
+          "when": {
+            "outputEquals": {
+              "outcome": "boundary-drift"
+            }
+          },
+          "target": "ship-boundary-plan",
+          "label": "boundary-drift"
+        },
+        {
+          "when": {
+            "outputEquals": {
+              "outcome": "blocked"
+            }
+          },
+          "target": "blocked",
+          "label": "blocked"
+        }
+      ]
+    },
+    "ship-implement": {
+      "kind": "operator",
+      "ref": "be/implementation",
+      "on": [
+        {
+          "when": {
+            "outputEquals": {
+              "outcome": "ready"
+            }
+          },
+          "target": "ship-format",
+          "label": "ready"
+        },
+        {
+          "when": {
+            "outputEquals": {
+              "outcome": "source-drift"
+            }
+          },
+          "target": "ship-boundary-plan",
+          "label": "source-drift"
+        },
+        {
+          "when": {
+            "outputEquals": {
+              "outcome": "boundary-drift"
+            }
+          },
+          "target": "ship-boundary-plan",
+          "label": "boundary-drift"
+        },
+        {
+          "when": {
+            "outputEquals": {
+              "outcome": "blocked"
+            }
+          },
+          "target": "blocked",
+          "label": "blocked"
+        }
+      ]
+    },
+    "ship-format": {
+      "kind": "operator",
+      "ref": "quality/format",
+      "on": [
+        {
+          "when": {
+            "outputEquals": {
+              "outcome": "pass"
+            }
+          },
+          "target": "ship-lint",
+          "label": "pass"
+        },
+        {
+          "when": {
+            "outputEquals": {
+              "outcome": "in-boundary"
+            }
+          },
+          "target": "ship-implement",
+          "label": "in-boundary"
+        },
+        {
+          "when": {
+            "outputEquals": {
+              "outcome": "boundary-drift"
+            }
+          },
+          "target": "ship-boundary-plan",
+          "label": "boundary-drift"
+        },
+        {
+          "when": {
+            "outputEquals": {
+              "outcome": "external-blocker"
+            }
+          },
+          "target": "blocked",
+          "label": "external-blocker"
+        }
+      ]
+    },
+    "ship-lint": {
+      "kind": "operator",
+      "ref": "quality/lint",
+      "on": [
+        {
+          "when": {
+            "outputEquals": {
+              "outcome": "pass"
+            }
+          },
+          "target": "ship-typecheck",
+          "label": "pass"
+        },
+        {
+          "when": {
+            "outputEquals": {
+              "outcome": "in-boundary"
+            }
+          },
+          "target": "ship-implement",
+          "label": "in-boundary"
+        },
+        {
+          "when": {
+            "outputEquals": {
+              "outcome": "boundary-drift"
+            }
+          },
+          "target": "ship-boundary-plan",
+          "label": "boundary-drift"
+        },
+        {
+          "when": {
+            "outputEquals": {
+              "outcome": "external-blocker"
+            }
+          },
+          "target": "blocked",
+          "label": "external-blocker"
+        }
+      ]
+    },
+    "ship-typecheck": {
+      "kind": "operator",
+      "ref": "quality/typecheck",
+      "on": [
+        {
+          "when": {
+            "outputEquals": {
+              "outcome": "pass"
+            }
+          },
+          "target": "ship-build",
+          "label": "pass"
+        },
+        {
+          "when": {
+            "outputEquals": {
+              "outcome": "in-boundary"
+            }
+          },
+          "target": "ship-implement",
+          "label": "in-boundary"
+        },
+        {
+          "when": {
+            "outputEquals": {
+              "outcome": "boundary-drift"
+            }
+          },
+          "target": "ship-boundary-plan",
+          "label": "boundary-drift"
+        },
+        {
+          "when": {
+            "outputEquals": {
+              "outcome": "external-blocker"
+            }
+          },
+          "target": "blocked",
+          "label": "external-blocker"
+        }
+      ]
+    },
+    "ship-build": {
+      "kind": "operator",
+      "ref": "quality/build",
+      "on": [
+        {
+          "when": {
+            "outputEquals": {
+              "outcome": "pass"
+            }
+          },
+          "target": "ship-unit",
+          "label": "pass"
+        },
+        {
+          "when": {
+            "outputEquals": {
+              "outcome": "in-boundary"
+            }
+          },
+          "target": "ship-implement",
+          "label": "in-boundary"
+        },
+        {
+          "when": {
+            "outputEquals": {
+              "outcome": "boundary-drift"
+            }
+          },
+          "target": "ship-boundary-plan",
+          "label": "boundary-drift"
+        },
+        {
+          "when": {
+            "outputEquals": {
+              "outcome": "external-blocker"
+            }
+          },
+          "target": "blocked",
+          "label": "external-blocker"
+        }
+      ]
+    },
+    "ship-unit": {
+      "kind": "operator",
+      "ref": "quality/unit-coverage",
+      "on": [
+        {
+          "when": {
+            "outputEquals": {
+              "outcome": "pass"
+            }
+          },
+          "target": "ship-integration",
+          "label": "pass"
+        },
+        {
+          "when": {
+            "outputEquals": {
+              "outcome": "in-boundary"
+            }
+          },
+          "target": "ship-implement",
+          "label": "in-boundary"
+        },
+        {
+          "when": {
+            "outputEquals": {
+              "outcome": "boundary-drift"
+            }
+          },
+          "target": "ship-boundary-plan",
+          "label": "boundary-drift"
+        },
+        {
+          "when": {
+            "outputEquals": {
+              "outcome": "external-blocker"
+            }
+          },
+          "target": "blocked",
+          "label": "external-blocker"
+        }
+      ]
+    },
+    "ship-integration": {
+      "kind": "operator",
+      "ref": "quality/integration",
+      "on": [
+        {
+          "when": {
+            "outputEquals": {
+              "outcome": "pass"
+            }
+          },
+          "target": "ship-e2e",
+          "label": "pass"
+        },
+        {
+          "when": {
+            "outputEquals": {
+              "outcome": "in-boundary"
+            }
+          },
+          "target": "ship-implement",
+          "label": "in-boundary"
+        },
+        {
+          "when": {
+            "outputEquals": {
+              "outcome": "boundary-drift"
+            }
+          },
+          "target": "ship-boundary-plan",
+          "label": "boundary-drift"
+        },
+        {
+          "when": {
+            "outputEquals": {
+              "outcome": "external-blocker"
+            }
+          },
+          "target": "blocked",
+          "label": "external-blocker"
+        }
+      ]
+    },
+    "ship-e2e": {
+      "kind": "operator",
+      "ref": "quality/e2e",
+      "on": [
+        {
+          "when": {
+            "outputEquals": {
+              "outcome": "pass"
+            }
+          },
+          "target": "ship-sonar",
+          "label": "pass"
+        },
+        {
+          "when": {
+            "outputEquals": {
+              "outcome": "in-boundary"
+            }
+          },
+          "target": "ship-implement",
+          "label": "in-boundary"
+        },
+        {
+          "when": {
+            "outputEquals": {
+              "outcome": "boundary-drift"
+            }
+          },
+          "target": "ship-boundary-plan",
+          "label": "boundary-drift"
+        },
+        {
+          "when": {
+            "outputEquals": {
+              "outcome": "external-blocker"
+            }
+          },
+          "target": "blocked",
+          "label": "external-blocker"
+        }
+      ]
+    },
+    "ship-sonar": {
+      "kind": "operator",
+      "ref": "quality/sonar",
+      "on": [
+        {
+          "when": {
+            "outputEquals": {
+              "outcome": "pass"
+            }
+          },
+          "target": "ship-source-proof",
+          "label": "pass"
+        },
+        {
+          "when": {
+            "outputEquals": {
+              "outcome": "in-boundary"
+            }
+          },
+          "target": "ship-implement",
+          "label": "in-boundary"
+        },
+        {
+          "when": {
+            "outputEquals": {
+              "outcome": "boundary-drift"
+            }
+          },
+          "target": "ship-boundary-plan",
+          "label": "boundary-drift"
+        },
+        {
+          "when": {
+            "outputEquals": {
+              "outcome": "external-blocker"
+            }
+          },
+          "target": "blocked",
+          "label": "external-blocker"
+        }
+      ]
+    },
+    "ship-source-proof": {
+      "kind": "operator",
+      "ref": "quality/delivery-proof",
+      "on": [
+        {
+          "when": {
+            "outputEquals": {
+              "outcome": "pass"
+            }
+          },
+          "target": "ship-resume",
+          "label": "pass"
+        },
+        {
+          "when": {
+            "outputEquals": {
+              "outcome": "blocked"
+            }
+          },
+          "target": "blocked",
+          "label": "blocked"
+        }
+      ]
+    },
+    "ship-resume": {
+      "kind": "operator",
+      "ref": "delivery/mission-resume",
+      "on": [
+        {
+          "when": {
+            "outputEquals": {
+              "outcome": "ready"
+            }
+          },
+          "target": "maintenance-apply",
+          "label": "ready"
+        },
+        {
+          "when": {
+            "outputEquals": {
+              "outcome": "blocked"
+            }
+          },
+          "target": "blocked",
+          "label": "blocked"
+        }
+      ]
+    }
+  }
+}

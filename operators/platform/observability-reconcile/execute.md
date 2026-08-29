@@ -1,51 +1,21 @@
 # Execute `platform/observability-reconcile`
 
-This operator reconciles only the declared cAdvisor, Prometheus, Grafana, and remote-write boundary. Inputs, loads, observations, receipts, evidence, and output are task-session objects purged at every parent-skill terminal.
+## Context
 
-## Step 1 — Validate and freeze
+Read only the exact approval, opaque remote-write capability, and current fingerprint/resource metadata in `context`.
 
-**Read:** the complete input envelope only.
-**Context:** none before validation.
-**Session write:** freeze the accepted envelope at `payload.session.inputRef`.
-**Stop:** run `validate-input.mjs`; stop on route, binding, session-ownership, path, or orchestration failure.
-**Orchestration:** the coordinator validates; workers receive nothing until validation passes.
+## Input
 
-## Step 2 — Resolve authority and provided artifacts
+Use one `input.desiredState` containing exactly cAdvisor, Prometheus, Grafana, bounded scrape targets and dashboards, one remote-write destination, one sensitive-data policy, and approved effects.
 
-**Read:** `payload.provided`, `payload.loads.artifacts`, and `payload.loads.knowledge`.
-**Context:** resolve exactly `stackRef`, `metricsDestinationRef`, `credentialReceiptRef`, and `approvalRef`; retrieve only the pinned `platform.observability` record.
-**Session write:** write identities, revisions, and applied rule IDs to `payload.session.scratchPrefix/bindings`.
-**Stop:** stop on missing, stale, duplicate, mismatched, undeclared, or plan-hash-mismatched approval bindings; never copy loaded values into observations.
-**Orchestration:** workers may verify disjoint revisions read-only; the coordinator joins them.
+## Action
 
-## Step 3 — Preflight exact files, commands, and external state
+Recheck the fingerprint, apply only the approved delta through the coordinator, and prove all seven declared postconditions. Treat an already-converged stack as success. Do not discover adjacent services or destinations, expose credentials, diagnose product behavior, route the workflow, or manage cleanup.
 
-**Read:** `payload.loads.source.targetFiles`, `payload.loads.commands.commandRefs`, and `payload.loads.external`.
-**Context:** open only hash-pinned configuration files, declared command envelopes, declared observability resources, and opaque credential handles. Broad repository context and raw secrets are forbidden.
-**Session write:** write hashes, declared targets, resource revisions, and value-safe observations to `payload.session.scratchPrefix/preflight`.
-**Stop:** stop on source drift, traversal, target expansion, credential exposure, undeclared remote-write destination, or conflicting ownership.
-**Orchestration:** workers may inspect disjoint files and health resources read-only; they cannot run commands, use credentials, or mutate state.
+## Output
 
-## Step 4 — Reconcile the observability boundary
+Return `proved` with a fresh receipt and seven passing checks, or `blocked` with one reason. Report every partial mutation with before and after revisions.
 
-**Read:** the complete joined preflight and exact command/resource handles.
-**Context:** no new file, service, target, dashboard, destination, or credential may be discovered.
-**Session write:** record command receipts and before/after revisions under `payload.session.scratchPrefix/execution`.
-**Stop:** stop before an unsafe or stale effect, and stop if rollback would cross the declared stack or destination.
-**Orchestration:** the coordinator alone applies configuration and records filesystem, runtime, provider, or record mutations.
+## Stop
 
-## Step 5 — Prove health and decide
-
-**Read:** execution receipts and only the declared scrape, dashboard, and remote-write probes.
-**Context:** no adjacent service or provider enumeration.
-**Session write:** write bounded target health, credential protection, and remote-write evidence to `payload.session.scratchPrefix/evidence`.
-**Stop:** choose `blocked` on missing/stale proof, target leakage, unhealthy required service, or failed remote write. Choose `proved` only when every declared check passes.
-**Orchestration:** workers may perform disjoint read-only probes; the coordinator validates the join and owns the decision.
-
-## Step 6 — Emit and register cleanup
-
-**Read:** decision, receipt, mutation revisions, used-context lineage, evidence refs, findings, and scratch inventory.
-**Context:** emit refs and revisions only; never emit loaded values, secrets, logs, prompts, or reasoning.
-**Session write:** write to `payload.session.outputRef` and list every intermediate in `payload.cleanup.scratchRefs`.
-**Stop:** align root route, state, and manifest facts; run `validate-output.mjs`; never emit invalid output.
-**Orchestration:** the coordinator emits; the parent skill purges all session objects at every terminal.
+Stop before mutation on authority or concurrency drift. A green dashboard alone never proves the remote-write and data-boundary postconditions.

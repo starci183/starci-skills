@@ -1,5 +1,6 @@
 # `fe/design-implementation` output
 
-## JSON architecture
-
-The output state is implemented, a typed gap/conflict, or blocked. The receipt records approved and observed structure hashes, exact mutations, deviations, and verification commands. It cannot declare success with an unapproved structural deviation. Scratch data purges at skill-terminal.
+- `output.outcome`: Legacy semantic result consumed only by the Skill machine.
+- `output.result`: The atomic job result, or null when blocked.
+- `output.gaps`: Exact missing authority or evidence; empty when complete.
+- `output.evidenceRefs`: Exact evidence used to produce the result.

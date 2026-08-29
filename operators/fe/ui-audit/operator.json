@@ -1,0 +1,18 @@
+{
+  "schemaVersion": 7,
+  "id": "fe/ui-audit",
+  "domain": "fe",
+  "job": "Audit one target for UI composition, accessibility, responsive behavior, and Grammar fidelity without repairing it.",
+  "inputSchema": "input.schema.json",
+  "outputSchema": "output.schema.json",
+  "contextRefs": [
+    "fe.ui"
+  ],
+  "sourceReferenceRefs": [],
+  "sideEffects": [],
+  "stopConditions": [
+    "required authority is missing or stale",
+    "the target boundary is ambiguous",
+    "the job would require internal routing"
+  ]
+}

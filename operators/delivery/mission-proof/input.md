@@ -1,9 +1,10 @@
 # `delivery/mission-proof` input
 
-Join the complete frontend product proof with the backend delivery proof when `backend-impact-required` is present. A frontend-only mission must carry the signed impact receipt proving that no backend contract changed.
-
-## JSON architecture
-
-- `provided` carries the mission, impact, FE product-proof and optional backend-proof refs.
-- `loads` resolves each declared proof and routed head at runtime.
-- `session` keeps joined evidence private until the parent skill terminal.
+- `context.artifacts`: exact mission, product, backend, business, and source-head bindings.
+- `context.knowledge`: one pinned mission-proof law binding resolved by default search.
+- `input.missionRef`: exact bounded mission reference.
+- `input.impactReceiptRef`: exact impact-classification receipt.
+- `input.frontendProductProofRef`: exact frontend product proof.
+- `input.backendDeliveryProofRef`: exact backend delivery proof.
+- `input.businessHeadRef`: exact published business head.
+- `input.finalSourceHeadsRef`: exact final source-head set.

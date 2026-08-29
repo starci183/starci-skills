@@ -1,21 +1,20 @@
-import { runValidatorCli, validatorFor } from '../../validation.mjs';
-const outcomes = {
-  proved: { stage: 'platform.observability.proved', status: 'complete', operatorStatus: 'completed', code: 'platform-observability-reconcile-proved', retryable: false, factsAdd: ['platform-observability-proved'], factsRemove: [] },
-  blocked: { stage: 'platform.blocked', status: 'blocked', operatorStatus: 'blocked', code: 'platform-observability-reconcile-blocked', retryable: true, factsAdd: ['platform-observability-blocked'], factsRemove: [] }
+import { validatorFor, runValidatorCli } from '../../validation.mjs';
+
+const requiredChecks = ['label-boundary', 'remote-write-delivery', 'retry-backoff', 'sample-ordering', 'sensitive-data-filter', 'service-health', 'target-boundary'];
+const semantic = (value) => {
+  const { outcome, receiptRef, checks, reason } = value.output;
+  const names = checks.map(({ name }) => name).sort();
+  const complete = JSON.stringify(names) === JSON.stringify(requiredChecks);
+  const passed = checks.every(({ status }) => status === 'passed');
+  return [
+    ...(!complete ? ['/output/checks: exact seven observability postconditions are required'] : []),
+    ...(outcome === 'proved' && receiptRef === null ? ['/output/receiptRef: proved requires a fresh receipt'] : []),
+    ...(outcome === 'proved' && !passed ? ['/output/checks: proved cannot contain failed checks'] : []),
+    ...(outcome === 'proved' && reason !== null ? ['/output/reason: proved cannot carry a failure reason'] : []),
+    ...(outcome === 'blocked' && receiptRef !== null ? ['/output/receiptRef: blocked cannot claim convergence proof'] : []),
+    ...(outcome === 'blocked' && reason === null ? ['/output/reason: blocked requires one bounded reason'] : [])
+  ];
 };
-const same = (a, b) => JSON.stringify([...a].sort()) === JSON.stringify([...b].sort());
-function refs(value, found = []) { if (typeof value === 'string' && value.startsWith('session://')) found.push(value); else if (Array.isArray(value)) for (const item of value) refs(item, found); else if (value && typeof value === 'object') for (const item of Object.values(value)) refs(item, found); return found; }
-function semantic(value) {
-  const errors = [], p = value.payload, expected = outcomes[p.decision]; if (!expected) return ['$.payload.decision: undeclared decision'];
-  if (value.stage !== expected.stage || value.status !== expected.status) errors.push('$: decision route mismatch');
-  if (p.state.status !== expected.operatorStatus || p.state.code !== expected.code || p.state.retryable !== expected.retryable) errors.push('$.payload.state: decision semantics mismatch');
-  if (p.state.emits.stage !== expected.stage || p.state.emits.status !== expected.status || !same(p.state.emits.factsAdd, expected.factsAdd) || !same(p.state.emits.factsRemove, expected.factsRemove)) errors.push('$.payload.state.emits: exact manifest emission required');
-  for (const fact of expected.factsAdd) if (!value.facts.includes(fact)) errors.push(`$.facts: missing ${fact}`);
-  if (p.decision === 'proved' && p.produced.observabilityReceiptRef === null) errors.push('$.payload.produced: proved output requires a receipt');
-  for (const mutation of p.produced.mutations) if (mutation.appliedBy !== 'coordinator') errors.push('$.payload.produced.mutations: coordinator ownership required');
-  const prefix = `session://tasks/${p.cleanup.taskId}/`; for (const ref of refs({ produced: p.produced, cleanup: p.cleanup, evidenceRefs: p.evidenceRefs })) if (!ref.startsWith(prefix)) errors.push(`$: foreign output session ref ${ref}`);
-  for (const item of p.context.used) if (/source[- ]?context|repository[- ]?context/i.test(item.ref)) errors.push('$.payload.context.used: broad context forbidden');
-  return errors;
-}
+
 export const validateOutput = validatorFor(new URL('./output.schema.json', import.meta.url), semantic);
-if (process.argv[1]?.endsWith('validate-output.mjs')) await runValidatorCli(validateOutput, 'node validate-output.mjs <artifact.json>');
+if (process.argv[1]?.endsWith('validate-output.mjs')) await runValidatorCli(validateOutput, 'node validate-output.mjs <output.json>');

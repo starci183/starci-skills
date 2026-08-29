@@ -1,18 +1,18 @@
 {
-  "schemaVersion": 6,
+  "schemaVersion": 7,
   "id": "delivery/mission-proof",
   "domain": "delivery",
+  "job": "Perform one mission proof job and return its typed result.",
   "inputSchema": "input.schema.json",
   "outputSchema": "output.schema.json",
-  "knowledgeRefs": ["quality.source-gates"],
+  "contextRefs": [
+    "quality.source-gates"
+  ],
   "sourceReferenceRefs": [],
-  "accepts": [
-    { "stage": "proof.review", "status": "complete", "allFacts": [], "noneFacts": [] }
-  ],
-  "emits": [
-    { "stage": "delivery.proved", "status": "ready", "factsAdd": ["delivery-proof-ready", "mission-delivery-proved"], "factsRemove": [] },
-    { "stage": "delivery.blocked", "status": "blocked", "factsAdd": ["mission-delivery-proof-blocked"], "factsRemove": [] }
-  ],
-  "sideEffects": ["join FE product proof and any required backend delivery proof in task-session memory", "purge all scratch at the parent-skill terminal"],
-  "stopConditions": ["a required role lacks proof", "proof identities do not share one mission, business head and source route", "partial proof would be presented as complete"]
+  "sideEffects": [],
+  "stopConditions": [
+    "a required role lacks proof",
+    "proof identities do not share one mission, business head and source route",
+    "partial proof would be presented as complete"
+  ]
 }

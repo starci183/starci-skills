@@ -1,33 +1,27 @@
-import { runValidatorCli, validatorFor } from '../../validation.mjs';
+import { validatorFor, runValidatorCli } from '../../validation.mjs';
 
-const schemaUrl = new URL('./output.schema.json', import.meta.url);
-const routes = {
-  "recorded": {
-    "stage": "source.conversation.recorded",
-    "status": "complete",
-    "fact": "conversation-recorded",
-    "state": "completed",
-    "code": "source-conversation-record-recorded"
-  }
+const outcomes = {
+  recorded: { reason: 'appended', hasHead: true, writeApplied: true },
+  idempotent: { reason: 'already-current', hasHead: true, writeApplied: false },
+  conflict: { reason: 'identity-conflict', hasHead: false, writeApplied: false },
+  blocked: { reason: 'authority-denied', hasHead: false, writeApplied: false }
 };
 
-function semantic(value) {
-  const errors = [];
-  const route = routes[value.payload.decision];
-  if (!route) return ['/payload/decision: undeclared decision'];
-  if (value.stage !== route.stage || value.status !== route.status) errors.push('/stage: decision does not match emitted route');
-  if (value.payload.state.status !== route.state || value.payload.state.code !== route.code) errors.push('/payload/state: status or code does not match decision');
-  if (value.payload.state.emits.stage !== value.stage || value.payload.state.emits.status !== value.status) errors.push('/payload/state/emits: must match root route');
-  if (!value.facts.includes(route.fact) || !value.payload.state.emits.factsAdd.includes(route.fact)) errors.push(`/facts: missing emitted fact ${route.fact}`);
-  const blocked = value.payload.state.status === 'blocked';
-  if (!blocked && value.payload.produced.conversationHeadRef === null) errors.push('/payload/produced/conversationHeadRef: successful output requires a session artifact');
-  if (!blocked && value.payload.produced.durableWrites.length === 0) errors.push('/payload/produced/durableWrites: successful durable operator must name its approved effect');
-  if (value.payload.cleanup.retention !== 'until-skill-terminal' || value.payload.cleanup.purgeAt !== 'skill-terminal') errors.push('/payload/cleanup: terminal purge is mandatory');
-  return errors;
-}
+const semantic = (value) => {
+  const { outcome, reason, headRef, headSha256, writeApplied } = value.output;
+  const expected = outcomes[outcome];
+  const hasAllHeadFields = headRef !== null && headSha256 !== null;
+  const hasAnyHeadField = headRef !== null || headSha256 !== null;
+  return [
+    ...(reason !== expected.reason ? [`/output/reason: ${reason} is invalid for ${outcome}`] : []),
+    ...(writeApplied !== expected.writeApplied ? [`/output/writeApplied: invalid for ${outcome}`] : []),
+    ...(expected.hasHead && !hasAllHeadFields ? [`/output: ${outcome} requires the durable head identity`] : []),
+    ...(!expected.hasHead && hasAnyHeadField ? [`/output: ${outcome} cannot claim a published head`] : [])
+  ];
+};
 
-export const validateOutput = validatorFor(schemaUrl, semantic);
+export const validateOutput = validatorFor(new URL('./output.schema.json', import.meta.url), semantic);
 
-if (process.argv[1] && import.meta.url === new URL(`file:///${process.argv[1].replaceAll('\\\\', '/')}`).href) {
-  await runValidatorCli(validateOutput, 'usage: node validate-output.mjs <output.json>');
+if (process.argv[1]?.endsWith('validate-output.mjs')) {
+  await runValidatorCli(validateOutput, 'node validate-output.mjs <output.json>');
 }

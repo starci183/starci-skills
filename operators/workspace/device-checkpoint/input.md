@@ -1,13 +1,9 @@
-# workspace/device-checkpoint input
+# `workspace/device-checkpoint` input
 
-The input is a closed, task-session envelope for one explicitly authorized stop-time checkpoint. It never embeds source bodies, credentials, database values, volume bytes, or master-identity material.
+- `context.contextRefs`: exact canonical references resolved by default repository or file search.
+- `context.sourceRefs`: exact routed source files permitted for this job.
+- `input.project`: verified project identity.
+- `input.objectiveRef`: exact bounded objective reference.
+- `input.sourceFingerprint`: frozen fingerprint for supplied evidence.
 
-## JSON architecture
-
-| Section | Ownership |
-| --- | --- |
-| `payload.provided` | Exact route receipt, external-mutation approval, touched-checkout set and portable device-state contract reference supplied by the parent skill. |
-| `payload.loads` | Exact session artifacts and orchestration profile resolved by the runtime; no Qdrant knowledge body is loaded. |
-| `payload.session` | Task-owned input, output and scratch slots retained only until the parent skill terminal. |
-
-Every provided reference must have one exact runtime-loaded artifact binding. The touched-checkout set is closed before Git inspection; adjacent repositories and working trees are forbidden.
+The runtime Source resolves routes through `.claude/.workspaces`; project authority lives only in the verified backend Source under flat `.worktrees/<kind>`.

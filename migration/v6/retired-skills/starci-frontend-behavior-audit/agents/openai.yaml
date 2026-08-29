@@ -1,0 +1,6 @@
+interface:
+  display_name: "StarCi Frontend Behavior Audit"
+  short_description: "Prove business outcomes without fixture masking"
+  default_prompt: "Use $starci-frontend-behavior-audit for this selected flow and execute its state machine."
+policy:
+  allow_implicit_invocation: true

@@ -1,62 +1,16 @@
 {
-  "schemaVersion": 6,
+  "schemaVersion": 7,
   "id": "fe/principle-compile",
   "domain": "fe",
+  "job": "Compile approved frontend principles and laws into explicit design constraints.",
   "inputSchema": "input.schema.json",
   "outputSchema": "output.schema.json",
-  "knowledgeRefs": [
-    "fe.ui"
-  ],
+  "contextRefs": [],
   "sourceReferenceRefs": [],
-  "accepts": [
-    {
-      "stage": "principles.compile",
-      "status": "ready",
-      "allFacts": [
-        "source-fit-ready"
-      ],
-      "noneFacts": []
-    }
-  ],
-  "emits": [
-    {
-      "when": {
-        "result": "compiled"
-      },
-      "stage": "layout.generate",
-      "status": "ready",
-      "factsAdd": [
-        "principles-compiled"
-      ],
-      "factsRemove": []
-    },
-    {
-      "when": {
-        "result": "blocked"
-      },
-      "stage": "layout.generate",
-      "status": "blocked",
-      "factsAdd": [
-        "principle-boundary-failed"
-      ],
-      "factsRemove": []
-    }
-  ],
-  "sideEffects": [
-    "keep input, output, loaded context, worker observations, drafts, evidence, and receipts in task-session storage only",
-    "purge every intermediate session object at every parent-skill terminal state"
-  ],
+  "sideEffects": [],
   "stopConditions": [
-    "invalid-input",
-    "closed-axis-requested",
-    "owner-substitution",
-    "missing-situation",
-    "missing-negative-boundary",
-    "unprovable-decision",
-    "product-semantic-leak",
-    "grammar-authority-leak",
-    "Stop on a closed-axis request, owner substitution, missing situation, product semantic leak, or an unprovable decision.",
-    "runtime binding revision or session ownership is invalid",
-    "the operation would broaden its approved authority, source, or external boundary"
+    "required authority or evidence is missing or stale",
+    "the closed target boundary is ambiguous",
+    "completion would require another operator job"
   ]
 }

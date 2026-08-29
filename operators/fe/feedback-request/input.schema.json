@@ -1,150 +1,71 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://starci.dev/v6/operators/fe/feedback-request/input.schema.json",
+  "$id": "https://starci.dev/v7.0/operators/fe/feedback-request/input.schema.json",
   "type": "object",
   "additionalProperties": false,
-  "required": ["schemaVersion", "runId", "stage", "status", "facts", "payload"],
+  "required": [
+    "schemaVersion",
+    "operatorId",
+    "context",
+    "input"
+  ],
   "properties": {
-    "schemaVersion": { "const": 6 },
-    "runId": { "type": "string", "minLength": 1, "maxLength": 128 },
-    "stage": { "const": "fe.feedback.request" },
-    "status": { "const": "ready" },
-    "facts": {
-      "type": "array",
-      "uniqueItems": true,
-      "contains": { "const": "feedback-received" },
-      "items": { "type": "string", "minLength": 1 }
+    "schemaVersion": {
+      "const": 7
     },
-    "payload": {
+    "operatorId": {
+      "const": "fe/feedback-request"
+    },
+    "context": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["provided", "loads", "session"],
+      "required": [
+        "evidenceRefs",
+        "authorityRevision"
+      ],
       "properties": {
-        "provided": {
-          "type": "object",
-          "additionalProperties": false,
-          "required": ["priorStateRef", "feedbackRef", "feedbackRecordRef", "sourceSkillId", "project", "targetOwners", "negativeBoundary"],
-          "properties": {
-            "priorStateRef": { "$ref": "#/$defs/sessionRef" },
-            "feedbackRef": { "$ref": "#/$defs/sessionRef" },
-            "feedbackRecordRef": { "$ref": "#/$defs/sessionRef" },
-            "sourceSkillId": {
-              "enum": [
-                "starci-frontend-layout-delivery",
-                "starci-frontend-block-reconcile",
-                "starci-frontend-maintenance-apply",
-                "starci-frontend-surface-reconcile"
-              ]
-            },
-            "project": { "type": "string", "pattern": "^[a-z0-9][a-z0-9-]*$", "maxLength": 80 },
-            "targetOwners": {
-              "type": "array",
-              "minItems": 1,
-              "maxItems": 3,
-              "uniqueItems": true,
-              "items": { "enum": ["starci-runtime", "grammar", "local-only"] }
-            },
-            "negativeBoundary": { "type": "string", "minLength": 3, "maxLength": 512 }
-          }
+        "evidenceRefs": {
+          "description": "Exact canonical evidence references available to this atomic job.",
+          "type": "array",
+          "maxItems": 64,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "minItems": 1
         },
-        "loads": {
-          "type": "object",
-          "additionalProperties": false,
-          "required": ["upstream", "knowledge", "exactTargets", "orchestration"],
-          "properties": {
-            "upstream": {
-              "type": "array",
-              "minItems": 1,
-              "maxItems": 8,
-              "uniqueItems": true,
-              "items": {
-                "type": "object",
-                "additionalProperties": false,
-                "required": ["role", "ref", "revision"],
-                "properties": {
-                  "role": { "enum": ["feedback", "feedback-record", "artifact", "approval"] },
-                  "ref": { "$ref": "#/$defs/sessionRef" },
-                  "revision": { "$ref": "#/$defs/sha256" }
-                }
-              }
-            },
-            "knowledge": {
-              "type": "array",
-              "minItems": 1,
-              "maxItems": 1,
-              "items": {
-                "type": "object",
-                "additionalProperties": false,
-                "required": ["id", "generation", "contentSha256", "loadMode"],
-                "properties": {
-                  "id": { "const": "fe.request-lifecycle" },
-                  "generation": { "type": "string", "minLength": 1 },
-                  "contentSha256": { "$ref": "#/$defs/sha256" },
-                  "loadMode": { "const": "qdrant-exact" }
-                }
-              }
-            },
-            "exactTargets": {
-              "type": "array",
-              "minItems": 1,
-              "maxItems": 1,
-              "items": {
-                "type": "object",
-                "additionalProperties": false,
-                "required": ["path", "expectedSha256", "access"],
-                "properties": {
-                  "path": { "type": "string", "pattern": "^\\.claude/requests/[a-z0-9][a-z0-9._-]*\\.request\\.json$" },
-                  "expectedSha256": {
-                    "anyOf": [
-                      { "$ref": "#/$defs/sha256" },
-                      { "const": "absent" }
-                    ]
-                  },
-                  "access": { "const": "read-write" }
-                }
-              }
-            },
-            "orchestration": {
-              "type": "object",
-              "additionalProperties": false,
-              "required": ["mode", "profileRef", "providerRef"],
-              "properties": {
-                "mode": { "enum": ["economical", "balanced", "parallel"] },
-                "profileRef": {
-                  "enum": [
-                    "orchestration/modes/economical.json",
-                    "orchestration/modes/balanced.json",
-                    "orchestration/modes/parallel.json"
-                  ]
-                },
-                "providerRef": { "type": "string", "pattern": "^orchestration/providers/[a-z0-9-]+\\.json$" }
-              }
-            }
-          }
+        "authorityRevision": {
+          "description": "Exact approved authority revision binding this invocation.",
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "input": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "targetRef",
+        "constraints"
+      ],
+      "properties": {
+        "targetRef": {
+          "description": "The one target owned by this atomic invocation.",
+          "type": "string",
+          "minLength": 1
         },
-        "session": {
-          "type": "object",
-          "additionalProperties": false,
-          "required": ["taskId", "inputRef", "outputRef", "scratchPrefix", "retention"],
-          "properties": {
-            "taskId": { "type": "string", "pattern": "^[A-Za-z0-9._-]+$" },
-            "inputRef": { "$ref": "#/$defs/sessionRef" },
-            "outputRef": { "$ref": "#/$defs/sessionRef" },
-            "scratchPrefix": { "$ref": "#/$defs/sessionRef" },
-            "retention": { "const": "until-skill-terminal" }
+        "constraints": {
+          "description": "Closed constraints that bound this job without routing it.",
+          "type": "array",
+          "maxItems": 64,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1
           }
         }
       }
-    }
-  },
-  "$defs": {
-    "sessionRef": {
-      "type": "string",
-      "pattern": "^session://tasks/[A-Za-z0-9._-]+/.+$"
-    },
-    "sha256": {
-      "type": "string",
-      "pattern": "^sha256:[0-9a-f]{64}$"
     }
   }
 }

@@ -1,20 +1,28 @@
 {
-  "$id": "https://starci.dev/v6/operators/platform/tunnel-plan/output.schema.json", "$schema": "https://json-schema.org/draft/2020-12/schema", "title": "platform/tunnel-plan operator output",
-  "type": "object", "additionalProperties": false, "required": ["schemaVersion", "runId", "stage", "status", "facts", "payload"],
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://starci.dev/v7.0/operators/platform/tunnel-plan/output.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "operatorId", "output"],
   "properties": {
-    "schemaVersion": { "const": 6 }, "runId": { "type": "string", "minLength": 1 }, "stage": { "const": "platform.tunnel.apply" }, "status": { "const": "ready" }, "facts": { "$ref": "#/$defs/strings" },
-    "payload": { "type": "object", "additionalProperties": false, "required": ["decision", "state", "produced", "context", "cleanup", "evidenceRefs", "findings"], "properties": {
-      "decision": { "const": "ready" },
-      "state": { "type": "object", "additionalProperties": false, "required": ["operator", "status", "code", "retryable", "emits"], "properties": { "operator": { "const": "platform/tunnel-plan" }, "status": { "const": "completed" }, "code": { "const": "platform-tunnel-plan-ready" }, "retryable": { "const": false }, "emits": { "type": "object", "additionalProperties": false, "required": ["stage", "status", "factsAdd", "factsRemove"], "properties": { "stage": { "const": "platform.tunnel.apply" }, "status": { "const": "ready" }, "factsAdd": { "$ref": "#/$defs/strings" }, "factsRemove": { "$ref": "#/$defs/strings" } } } } },
-      "produced": { "type": "object", "additionalProperties": false, "required": ["tunnelPlanRef", "artifacts", "mutations"], "properties": { "tunnelPlanRef": { "$ref": "#/$defs/sessionRef" }, "artifacts": { "$ref": "#/$defs/artifacts" }, "mutations": { "type": "array", "maxItems": 0 } } },
-      "context": { "type": "object", "additionalProperties": false, "required": ["used"], "properties": { "used": { "type": "array", "minItems": 1, "uniqueItems": true, "items": { "$ref": "#/$defs/contextUse" } } } },
-      "cleanup": { "type": "object", "additionalProperties": false, "required": ["taskId", "scratchRefs", "retention", "purgeAt"], "properties": { "taskId": { "type": "string", "minLength": 1 }, "scratchRefs": { "type": "array", "uniqueItems": true, "items": { "$ref": "#/$defs/sessionRef" } }, "retention": { "const": "until-skill-terminal" }, "purgeAt": { "const": "skill-terminal" } } },
-      "evidenceRefs": { "type": "array", "minItems": 1, "uniqueItems": true, "items": { "$ref": "#/$defs/sessionRef" } }, "findings": { "$ref": "#/$defs/strings" }
-    } }
+    "schemaVersion": { "const": 7 },
+    "operatorId": { "const": "platform/tunnel-plan" },
+    "output": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["outcome", "planRef", "planSha256", "effects", "conflicts", "evidenceRefs"],
+      "properties": {
+        "outcome": { "enum": ["ready", "blocked"], "description": "Whether one closed value-free plan was derived; only the Skill machine routes this result." },
+        "planRef": { "type": ["string", "null"], "pattern": "^session://tasks/[A-Za-z0-9._-]+/.+$", "description": "Ephemeral exact plan reference when ready; otherwise null." },
+        "planSha256": { "anyOf": [{ "$ref": "#/$defs/sha256" }, { "type": "null" }], "description": "Hash binding the exact requested and observed resource tuple when ready; otherwise null." },
+        "effects": { "type": "array", "maxItems": 3, "uniqueItems": true, "items": { "enum": ["create-tunnel", "update-tunnel-route", "upsert-proxied-dns"] }, "description": "Minimal Cloudflare effects required for convergence; empty when already converged or blocked." },
+        "conflicts": { "type": "array", "maxItems": 8, "uniqueItems": true, "items": { "type": "string", "minLength": 1 }, "description": "Value-safe ownership or revision conflicts; empty when ready." },
+        "evidenceRefs": { "$ref": "#/$defs/evidenceRefs", "description": "Authority and exact resource evidence used to derive the plan." }
+      }
+    }
   },
   "$defs": {
-    "sha256": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" }, "sessionRef": { "type": "string", "pattern": "^session://tasks/[A-Za-z0-9._-]+/.+$" }, "strings": { "type": "array", "uniqueItems": true, "items": { "type": "string", "minLength": 1 } },
-    "contextUse": { "type": "object", "additionalProperties": false, "required": ["kind", "ref", "revision"], "properties": { "kind": { "enum": ["session-artifact", "qdrant-knowledge", "exact-source", "external-resource", "credential-handle", "orchestration"] }, "ref": { "type": "string", "minLength": 1 }, "revision": { "type": "string", "minLength": 1 } } },
-    "artifacts": { "type": "array", "uniqueItems": true, "items": { "type": "object", "additionalProperties": false, "required": ["kind", "ref", "sha256"], "properties": { "kind": { "enum": ["plan", "evidence", "report"] }, "ref": { "$ref": "#/$defs/sessionRef" }, "sha256": { "$ref": "#/$defs/sha256" } } } }
+    "sha256": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
+    "evidenceRefs": { "type": "array", "minItems": 1, "maxItems": 16, "uniqueItems": true, "items": { "type": "string", "minLength": 1 } }
   }
 }

@@ -1,0 +1,6 @@
+interface:
+  display_name: "StarCi UAT Verify"
+  short_description: "Verify one product-decision flow with evidence"
+  default_prompt: "Use $starci-uat-verify to verify this feature flow and publish its canonical result."
+policy:
+  allow_implicit_invocation: true

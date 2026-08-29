@@ -1,7 +1,11 @@
 # `fe/coding-scope-freeze` input
 
-## JSON architecture
+## Context
 
-`payload.provided` actively supplies approved layout, source-fit, Principle, Grammar, and optional package-request refs. `payload.loads` passively names only those session artifacts, canonical coding-context records, current source metadata, exact file headers, and orchestration policy. File bodies are forbidden.
+- `context.evidenceRefs`: Exact canonical evidence references available to this atomic job.
+- `context.authorityRevision`: Exact approved authority revision binding this invocation.
 
-The scope freeze must rebind Qdrant candidates to the canonical `.worktrees/<project>/coding-context/frontend` generation before naming exact read/write paths.
+## Input
+
+- `input.targetRef`: The one target owned by this atomic invocation.
+- `input.constraints`: Closed constraints that bound this job without routing it.

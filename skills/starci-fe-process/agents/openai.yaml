@@ -1,0 +1,6 @@
+interface:
+  display_name: "StarCi Frontend Process"
+  short_description: "Create, audit, repair, or redesign frontend"
+  default_prompt: "Use $starci-fe-process to process this frontend outcome through independent proof."
+policy:
+  allow_implicit_invocation: true

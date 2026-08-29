@@ -1,27 +1,21 @@
 # Execute `be/coding-scope-freeze`
 
-## Step 1 — Validate and freeze
+## Context
 
-**Read:** complete input envelope. **Context:** none. Validate and freeze without resolving bindings. **Session write:** validated input ref. **Stop:** invalid or foreign task input.
+Resolve only `context.contextRefs` with default repository or file search and open only `context.sourceRefs`. Verify every source reference against `input.sourceFingerprint`. Resolve the project backend Source through the runtime Source `<Source>/.workspaces` route. Durable roots are flat `.worktrees/_templates/`, `.worktrees/businesses/`, `.worktrees/uat/`, `.worktrees/sessions/`, and `.worktrees/debts/`; never use `.worktrees/<project>/`. Search the verified routed source directly with default repository or file search; do not create a derived source cache or external index.
 
-## Step 2 — Resolve session authority
+## Input
 
-Resolve the exact prerequisite and approved boundary from task-session state.
+Bind all work to `input.project` and `input.objectiveRef`.
 
-## Step 3 — Verify source identity
+## Action
 
-Compare repository HEAD with the approved baseline.
+Freeze one exact backend implementation boundary against routed source evidence. Do not route subsequent work, persist task-session material, broaden the source boundary, or perform another operator's job.
 
-## Step 4 — Hash declared targets
+## Output
 
-For each declared target, calculate existence/hash through a deterministic hash-only reader. Never place bytes or text in model, worker, Qdrant, logs, output or scratch context.
+Return only `output.outcome`, `output.resultRef`, `output.evidenceRefs`, `output.findings`, and `output.reason`.
 
-## Step 5 — Freeze the boundary
+## Stop
 
-Verify target-set hash, repository-relative paths, operations and allowed changes.
-
-## Step 6 — Validate output and cleanup
-
-Emit and validate one typed result; register all scratch metadata for terminal purge.
-
-**Context:** no source body or undeclared binding is allowed. **Session write:** output, hash observations and evidence refs only. **Stop:** invalid or partially joined output. Orchestration is deterministic and sequential; no model or worker receives source bytes.
+Return the applicable non-success outcome when exact evidence is missing, fingerprints drift, or completing the job would exceed its boundary.

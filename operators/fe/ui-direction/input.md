@@ -1,11 +1,11 @@
 # `fe/ui-direction` input
 
-## JSON architecture
+## Context
 
-| Section | Source | Meaning |
-| --- | --- | --- |
-| `payload.provided` | Caller | Objective, fresh business outcome, optional current-experience evidence, and required candidate count. |
-| `payload.loads` | Runtime | Exact business revision, two knowledge bindings, and orchestration profile. |
-| `payload.session` | Runtime | Ephemeral task slots with `until-skill-terminal` retention. |
+- `context.evidenceRefs`: Exact canonical evidence references available to this atomic job.
+- `context.authorityRevision`: Exact approved authority revision binding this invocation.
 
-Provided references authorize ideation only. Loaded knowledge changes composition decisions but may not silently turn current source conventions into requirements.
+## Input
+
+- `input.targetRef`: The one target owned by this atomic invocation.
+- `input.constraints`: Closed constraints that bound this job without routing it.

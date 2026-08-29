@@ -1,8 +1,0 @@
-{
-  "schemaVersion": 1,
-  "id": "reference-drift-balanced-v1",
-  "strategy": "adaptive-budget",
-  "incrementalCostCeiling": 0.65,
-  "maxAffectedRecordRatio": 0.35,
-  "maxDeleteRatio": 0.25
-}

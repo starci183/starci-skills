@@ -1,65 +1,16 @@
 {
-  "schemaVersion": 6,
+  "schemaVersion": 7,
   "id": "fe/layout",
   "domain": "fe",
+  "job": "Compile one approved UI direction and laws into responsive layout geometry.",
   "inputSchema": "input.schema.json",
   "outputSchema": "output.schema.json",
-  "knowledgeRefs": [
-    "fe.layout-composition"
-  ],
+  "contextRefs": [],
   "sourceReferenceRefs": [],
-  "accepts": [
-    {
-      "stage": "layout.generate",
-      "status": "ready",
-      "allFacts": [
-        "flow-approved",
-        "page-model-ready",
-        "state-model-ready",
-        "principles-compiled",
-        "frontend-coding-context-ready",
-        "grammar-pair-ready"
-      ],
-      "noneFacts": []
-    },
-    {
-      "stage": "layout.review",
-      "status": "rejected",
-      "allFacts": [
-        "layout-feedback-recorded"
-      ],
-      "noneFacts": [
-        "layout-approved"
-      ]
-    }
-  ],
-  "emits": [
-    {
-      "stage": "layout.review",
-      "status": "pending",
-      "factsAdd": [
-        "layout-directions-ready",
-        "layout-visual-preview-ready"
-      ],
-      "factsRemove": [
-        "layout-feedback-recorded"
-      ]
-    }
-  ],
-  "sideEffects": [
-    "keep input, output, loaded context, worker observations, drafts, evidence, and receipts in task-session storage only",
-    "create one task-session HTML review artifact that the host renders through visualize before requesting layout approval",
-    "purge every intermediate session object at every parent-skill terminal state"
-  ],
+  "sideEffects": [],
   "stopConditions": [
-    "invalid-input",
-    "missing-approved-flow",
-    "missing-block-owner",
-    "missing-visualize-review-preview",
-    "stale-artifact-hash",
-    "fewer-than-two-material-directions",
-    "Stop on a missing Block owner, stale approved hash, incomplete journey page, or fewer than two materially different requested directions.",
-    "runtime binding revision or session ownership is invalid",
-    "the operation would broaden its approved authority, source, or external boundary"
+    "required authority or evidence is missing or stale",
+    "the closed target boundary is ambiguous",
+    "completion would require another operator job"
   ]
 }

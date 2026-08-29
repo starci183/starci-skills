@@ -1,166 +1,35 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://starci.dev/v6/operators/tech-stack/topology-model/input.schema.json",
+  "$id": "https://starci.dev/v7/operators/tech-stack/topology-model/input.schema.json",
   "type": "object",
   "additionalProperties": false,
-  "required": [
-    "schemaVersion",
-    "runId",
-    "stage",
-    "status",
-    "facts",
-    "payload"
-  ],
+  "required": ["schemaVersion", "operatorId", "context", "input"],
   "properties": {
-    "schemaVersion": {
-      "const": 6
-    },
-    "runId": {
-      "type": "string",
-      "minLength": 1
-    },
-    "stage": {
-      "const": "tech-stack.model"
-    },
-    "status": {
-      "const": "ready"
-    },
-    "facts": {
-      "type": "array",
-      "uniqueItems": true,
-      "items": {
-        "type": "string",
-        "minLength": 1
-      }
-    },
-    "payload": {
+    "schemaVersion": { "const": 7 },
+    "operatorId": { "const": "tech-stack/topology-model" },
+    "context": {
       "type": "object",
       "additionalProperties": false,
-      "required": [
-        "provided",
-        "loads",
-        "session"
-      ],
+      "required": ["inventoryRef", "inventorySha256", "businessConstraintRefs", "approvedDecisionRefs"],
       "properties": {
-        "provided": {
-          "type": "object",
-          "additionalProperties": false,
-          "required": [
-            "project",
-            "objectiveRef",
-            "inventoryRef"
-          ],
-          "properties": {
-            "project": {
-              "type": "string",
-              "pattern": "^[a-z0-9][a-z0-9-]*$"
-            },
-            "objectiveRef": {
-              "type": "string",
-              "minLength": 1
-            },
-            "inventoryRef": {
-              "type": "string",
-              "minLength": 1
-            }
-          }
-        },
-        "loads": {
-          "type": "object",
-          "additionalProperties": false,
-          "required": [
-            "businessConstraintRefs",
-            "approvedDecisionRefs"
-          ],
-          "properties": {
-            "businessConstraintRefs": {
-              "type": "array",
-              "uniqueItems": true,
-              "items": {
-                "type": "string",
-                "minLength": 1
-              }
-            },
-            "approvedDecisionRefs": {
-              "type": "array",
-              "uniqueItems": true,
-              "items": {
-                "type": "string",
-                "minLength": 1
-              }
-            }
-          }
-        },
-        "session": {
-          "type": "object",
-          "additionalProperties": false,
-          "required": [
-            "taskId",
-            "inputRef",
-            "outputRef",
-            "scratchPrefix",
-            "retention"
-          ],
-          "properties": {
-            "taskId": {
-              "type": "string",
-              "minLength": 1
-            },
-            "inputRef": {
-              "$ref": "#/$defs/sessionRef"
-            },
-            "outputRef": {
-              "$ref": "#/$defs/sessionRef"
-            },
-            "scratchPrefix": {
-              "$ref": "#/$defs/sessionRef"
-            },
-            "retention": {
-              "const": "until-skill-terminal"
-            }
-          }
-        }
+        "inventoryRef": { "description": "Exact observed inventory produced by discovery.", "type": "string", "minLength": 1, "maxLength": 1024 },
+        "inventorySha256": { "description": "Hash of the observed inventory.", "$ref": "#/$defs/sha256" },
+        "businessConstraintRefs": { "description": "Exact approved business constraints applicable to the topology.", "$ref": "#/$defs/refs" },
+        "approvedDecisionRefs": { "description": "Exact approved architecture or operational decisions applicable to the topology.", "$ref": "#/$defs/refs" }
+      }
+    },
+    "input": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["project", "objectiveRef"],
+      "properties": {
+        "project": { "description": "Project that owns the target topology.", "type": "string", "pattern": "^[a-z0-9][a-z0-9-]*$" },
+        "objectiveRef": { "description": "Objective the target topology must satisfy.", "type": "string", "minLength": 1, "maxLength": 512 }
       }
     }
   },
   "$defs": {
-    "sha256": {
-      "type": "string",
-      "pattern": "^sha256:[0-9a-f]{64}$"
-    },
-    "sessionRef": {
-      "type": "string",
-      "pattern": "^session://tasks/[A-Za-z0-9._-]+/.+$"
-    },
-    "session": {
-      "type": "object",
-      "additionalProperties": false,
-      "required": [
-        "taskId",
-        "inputRef",
-        "outputRef",
-        "scratchPrefix",
-        "retention"
-      ],
-      "properties": {
-        "taskId": {
-          "type": "string",
-          "minLength": 1
-        },
-        "inputRef": {
-          "$ref": "#/$defs/sessionRef"
-        },
-        "outputRef": {
-          "$ref": "#/$defs/sessionRef"
-        },
-        "scratchPrefix": {
-          "$ref": "#/$defs/sessionRef"
-        },
-        "retention": {
-          "const": "until-skill-terminal"
-        }
-      }
-    }
+    "sha256": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
+    "refs": { "type": "array", "maxItems": 64, "uniqueItems": true, "items": { "type": "string", "minLength": 1, "maxLength": 1024 } }
   }
 }
-

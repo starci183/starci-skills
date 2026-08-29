@@ -1,80 +1,16 @@
 {
-  "schemaVersion": 6,
+  "schemaVersion": 7,
   "id": "fe/source-fit",
   "domain": "fe",
+  "job": "source fit one closed frontend target.",
   "inputSchema": "input.schema.json",
   "outputSchema": "output.schema.json",
-  "knowledgeRefs": [
-    "fe.source-fit"
-  ],
+  "contextRefs": [],
   "sourceReferenceRefs": [],
-  "accepts": [
-    {
-      "stage": "source-fit.resolve",
-      "status": "ready",
-      "allFacts": [
-        "grammar-pair-ready",
-        "frontend-coding-context-ready",
-        "design-knowledge-index-ready"
-      ],
-      "noneFacts": [
-        "grammar-business-gate-failed"
-      ]
-    }
-  ],
-  "emits": [
-    {
-      "when": {
-        "hasGrammarGap": false,
-        "hasCreate": false
-      },
-      "stage": "principles.compile",
-      "status": "ready",
-      "factsAdd": [
-        "source-fit-ready"
-      ],
-      "factsRemove": []
-    },
-    {
-      "when": {
-        "hasGrammarGap": false,
-        "hasCreate": true
-      },
-      "stage": "principles.compile",
-      "status": "ready",
-      "factsAdd": [
-        "source-fit-ready",
-        "create-required"
-      ],
-      "factsRemove": []
-    },
-    {
-      "when": {
-        "hasGrammarGap": true
-      },
-      "stage": "principles.compile",
-      "status": "ready",
-      "factsAdd": [
-        "source-fit-ready",
-        "grammar-gap"
-      ],
-      "factsRemove": []
-    }
-  ],
-  "sideEffects": [
-    "keep input, output, loaded context, worker observations, drafts, evidence, and receipts in task-session storage only",
-    "purge every intermediate session object at every parent-skill terminal state"
-  ],
+  "sideEffects": [],
   "stopConditions": [
-    "invalid-input",
-    "stale-contract-generation",
-    "unresolved-effective-contract",
-    "ambiguous-verdict",
-    "ai-merged-contract",
-    "closed-invariant-mutation",
-    "implicit-package-substitute",
-    "Stop on stale generation, ambiguous verdict, unresolved effective contract, closed invariant mutation, or implicit package substitution.",
-    "runtime binding revision or session ownership is invalid",
-    "the operation would broaden its approved authority, source, or external boundary"
+    "required authority or evidence is missing or stale",
+    "the closed target boundary is ambiguous",
+    "completion would require another operator job"
   ]
 }

@@ -1,59 +1,16 @@
 {
-  "schemaVersion": 6,
+  "schemaVersion": 7,
   "id": "business/publish",
   "domain": "business",
+  "job": "Publish one approved business feature head to the backend-owned businesses worktree.",
   "inputSchema": "input.schema.json",
   "outputSchema": "output.schema.json",
-  "knowledgeRefs": [
-    "business.authority-lifecycle"
-  ],
   "sourceReferenceRefs": [],
-  "accepts": [
-    {
-      "stage": "business.publish",
-      "status": "ready",
-      "allFacts": [
-        "business-model-ready"
-      ],
-      "noneFacts": []
-    }
-  ],
-  "emits": [
-    {
-      "stage": "architecture.decision.frame",
-      "status": "ready",
-      "factsAdd": [
-        "business-head-ready",
-        "architecture-analysis-required"
-      ],
-      "factsRemove": []
-    },
-    {
-      "stage": "architecture.source",
-      "status": "ready",
-      "factsAdd": [
-        "business-head-ready"
-      ],
-      "factsRemove": []
-    },
-    {
-      "stage": "business.blocked",
-      "status": "blocked",
-      "factsAdd": [
-        "business-publication-blocked"
-      ],
-      "factsRemove": []
-    }
-  ],
   "sideEffects": [
-    "write and commit only the routed business worktree",
-    "keep input, output, loaded context, scratch values, worker observations, and receipts in task-session memory only",
-    "purge every intermediate session object at each parent-skill terminal state"
+    "write only the approved feature head under the supplied businesses authority root"
   ],
   "stopConditions": [
-    "required evidence is missing or stale",
-    "the result would cross the declared boundary",
-    "an intermediate input, output, scratch value, observation, analysis transcript, or receipt would be persisted outside the task session",
-    "repository source context, indexed source summaries, or an undeclared source file would be loaded"
+    "an exact reference is missing or its fingerprint differs",
+    "the requested work exceeds this operator job"
   ]
 }

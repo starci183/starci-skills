@@ -1,0 +1,6 @@
+interface:
+  display_name: "StarCi Frontend UX Audit"
+  short_description: "Prove journey recovery and continuity"
+  default_prompt: "Use $starci-frontend-ux-audit for this selected flow and execute its state machine."
+policy:
+  allow_implicit_invocation: true

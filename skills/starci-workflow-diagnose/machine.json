@@ -1,6 +1,6 @@
 {
   "$schema": "../machine.schema.json",
-  "schemaVersion": 6,
+  "schemaVersion": 7,
   "id": "starci-workflow-diagnose",
   "start": "analyze-input",
   "states": {
@@ -9,35 +9,45 @@
       "on": [
         {
           "when": {},
-          "target": "diagnose",
-          "label": "enter diagnose"
+          "target": "select-intent",
+          "label": "validate authority and runtime receipts"
         }
       ]
     },
-    "diagnose": {
-      "kind": "operator",
-      "ref": "quality/workflow-diagnose",
+    "select-intent": {
+      "kind": "choice",
       "on": [
         {
           "when": {
-            "decision": "diagnosed"
+            "inputEquals": {
+              "options.intentMode": "diagnose"
+            }
           },
-          "target": "complete",
-          "label": "diagnosed"
+          "target": "bind-diagnose",
+          "label": "bind diagnose prerequisites"
         },
         {
           "when": {
-            "decision": "inconclusive"
+            "inputEquals": {
+              "options.intentMode": "resume"
+            }
           },
-          "target": "blocked",
-          "label": "inconclusive"
-        },
+          "target": "resume-select",
+          "label": "consume RETURN through RESUME"
+        }
+      ]
+    },
+    "resume-select": {
+      "kind": "choice",
+      "on": [
         {
           "when": {
-            "decision": "external-blocker"
+            "inputEquals": {
+              "options.resumeTarget": "diagnose"
+            }
           },
-          "target": "blocked",
-          "label": "external-blocker"
+          "target": "bind-diagnose",
+          "label": "resume diagnose"
         }
       ]
     },
@@ -48,6 +58,49 @@
     "blocked": {
       "kind": "terminal",
       "result": "blocked"
+    },
+    "bind-diagnose": {
+      "kind": "analysis",
+      "on": [
+        {
+          "when": {},
+          "target": "diagnose",
+          "label": "prerequisites bound"
+        }
+      ]
+    },
+    "diagnose": {
+      "kind": "operator",
+      "ref": "quality/workflow-diagnose",
+      "on": [
+        {
+          "when": {
+            "outputEquals": {
+              "outcome": "diagnosed"
+            }
+          },
+          "target": "complete",
+          "label": "diagnosed"
+        },
+        {
+          "when": {
+            "outputEquals": {
+              "outcome": "inconclusive"
+            }
+          },
+          "target": "blocked",
+          "label": "inconclusive"
+        },
+        {
+          "when": {
+            "outputEquals": {
+              "outcome": "external-blocker"
+            }
+          },
+          "target": "blocked",
+          "label": "external-blocker"
+        }
+      ]
     }
   }
 }

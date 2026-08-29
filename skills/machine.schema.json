@@ -1,12 +1,12 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://starci.dev/v6/skills/machine.schema.json",
+  "$id": "https://starci.dev/v7/skills/machine.schema.json",
   "type": "object",
   "additionalProperties": false,
   "required": ["schemaVersion", "id", "start", "states"],
   "properties": {
     "$schema": { "type": "string", "minLength": 1 },
-    "schemaVersion": { "const": 6 },
+    "schemaVersion": { "const": 7 },
     "id": { "type": "string", "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$" },
     "start": { "type": "string", "minLength": 1 },
     "states": {
@@ -22,7 +22,8 @@
         "stage": { "type": "string" }, "status": { "type": "string" }, "decision": { "type": "string" },
         "allFacts": { "type": "array", "uniqueItems": true, "items": { "type": "string" } },
         "noneFacts": { "type": "array", "uniqueItems": true, "items": { "type": "string" } },
-        "inputEquals": { "type": "object", "additionalProperties": { "type": ["string", "boolean", "number"] } }
+        "inputEquals": { "type": "object", "additionalProperties": { "type": ["string", "boolean", "number"] } },
+        "outputEquals": { "type": "object", "additionalProperties": { "type": ["string", "boolean", "number", "null"] } }
       }
     },
     "edge": {
@@ -35,12 +36,12 @@
         "kind": { "enum": ["analysis", "operator", "choice", "wait", "terminal"] },
         "ref": { "type": "string", "pattern": "^[a-z0-9-]+/[a-z0-9-]+$" },
         "on": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/edge" } },
-        "approval": { "type": "object", "additionalProperties": false, "required": ["prompt", "approve", "reject", "bypassTarget"],
+        "approval": { "type": "object", "additionalProperties": false, "required": ["prompt", "approve", "reject", "resumeTarget"],
           "properties": {
             "prompt": { "type": "string", "minLength": 1 },
             "approve": { "type": "string", "minLength": 1 },
             "reject": { "type": "string", "minLength": 1 },
-            "bypassTarget": { "type": "string", "minLength": 1 }
+            "resumeTarget": { "type": "string", "minLength": 1 }
           }
         },
         "result": { "enum": ["complete", "rolled-back", "blocked", "handoff", "not-needed", "rejected"] }

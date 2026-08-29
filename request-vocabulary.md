@@ -50,7 +50,8 @@ user wording or authorize a broader task.
 
 | Wording | Normalized meaning |
 | --- | --- |
-| `phân tích`, `xem thử`, `audit` | Read-only diagnosis or comparison unless mutation is separately requested. |
+| `phân tích`, `xem thử`, `diagnose`, `report only` | Read-only diagnosis or comparison unless mutation is separately requested. |
+| `audit <frontend target>` | Route to `starci-fe-process` with `intent=audit`; observe critically, repair inside the verified mission boundary, independently review, and close quality/UAT unless the request explicitly says report-only. |
 | `sửa`, `làm`, `implement`, `code` | Mutate the authorized source boundary and verify proportionally. |
 | `redesign` for a page | Rework both UX behavior and visual composition of that page, with a rendered design artifact before implementation when direction is not approved. |
 | `redesign` for a feature or `nhánh` | Rework the closed journey and its applicable surface family, not merely the currently visible screen. Render the important surfaces and transitions before implementation. |

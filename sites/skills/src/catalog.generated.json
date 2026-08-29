@@ -1,2444 +1,1619 @@
 {
-  "version": "6.2.1",
+  "version": "7.0.0",
   "skills": [
     {
-      "id": "starci-workspace-ready",
-      "capability": "workspace.ready",
-      "description": "Use when a StarCi Source must be initialized or brought to one fully verified workspace-ready state before product work. Do not use for business modeling, implementation, quality repair, or deployment.",
+      "id": "starci-feature-deliver",
+      "capability": "feature.deliver",
+      "description": "Coordinate one cross-domain product outcome through typed domain-skill calls, exact returns, joined proof, and resume; never implement or self-certify.",
+      "domain": "feature"
+    },
+    {
+      "id": "starci-business-process",
+      "capability": "business.process",
+      "description": "Process one evidence-backed business feature through modeling, challenge, publication, reconciliation, and durable backend-owned authority.",
+      "domain": "business"
+    },
+    {
+      "id": "starci-architecture-design",
+      "capability": "architecture.design",
+      "description": "Design and challenge one architecture with observed-state, tech-stack, data-ownership, realization, and proof boundaries.",
+      "domain": "architecture"
+    },
+    {
+      "id": "starci-backend-process",
+      "capability": "backend.process",
+      "description": "Process one backend outcome through prerequisite binding, contract and solution design, implementation, repair, and proof in a frozen source boundary.",
+      "domain": "backend"
+    },
+    {
+      "id": "starci-fe-process",
+      "capability": "fe.process",
+      "description": "Process one frontend outcome for create, audit, repair, redesign, debug, or reconciliation through native UX/UI operators, code, independent review, quality, and UAT.",
+      "domain": "fe"
+    },
+    {
+      "id": "starci-quality-assure",
+      "capability": "quality.assure",
+      "description": "Assure one bounded delivery through measured readiness, executable rule binding, approved repairs or debt, and exact static quality proof.",
+      "domain": "quality"
+    },
+    {
+      "id": "starci-uat-verify",
+      "capability": "uat.verify",
+      "description": "Verify one product-decision flow from frozen inputs and independent Behavior, UX, and UI evidence, then publish its canonical UAT snapshot and result pair.",
+      "domain": "uat"
+    },
+    {
+      "id": "starci-release-manage",
+      "capability": "release.manage",
+      "description": "Manage one immutable release through deploy, monitor, recover, rollback, and public steady-state proof under exact authorization.",
+      "domain": "release"
+    },
+    {
+      "id": "starci-platform-operate",
+      "capability": "platform.operate",
+      "description": "Operate one bounded shared observability, Sonar, or tunnel service without taking product deployment ownership.",
+      "domain": "platform"
+    },
+    {
+      "id": "starci-workspace-manage",
+      "capability": "workspace.manage",
+      "description": "Manage one runtime workspace identity, routed source set, task session, provenance record, or portable checkpoint without becoming product authority.",
       "domain": "workspace"
     },
     {
-      "id": "starci-device-checkpoint",
-      "capability": "device.checkpoint",
-      "description": "Use when the user explicitly stops, ends, or checkpoints current StarCi work and wants proven source heads plus encrypted local Docker service state synchronized to another trusted device. Do not use for ordinary commits, deployment, unapproved external publication, or destructive restore.",
-      "domain": "device"
-    },
-    {
-      "id": "starci-workflow-handoff",
-      "capability": "workflow.handoff",
-      "description": "Use when the user explicitly wants to pause an active StarCi coding workflow, push a minimal continuation checkpoint to Git, or resume that exact checkpoint on another device. Do not use for ordinary commits, deployment, Docker-volume transfer, or storing prompts and reasoning.",
-      "domain": "workflow"
-    },
-    {
-      "id": "starci-business-authority",
-      "capability": "business.authority",
-      "description": "Use when evidence-backed business truth must be modeled, approved, and published as one feature head. Do not use to reconcile delivered source, implement product code, or make architecture decisions.",
-      "domain": "business"
-    },
-    {
-      "id": "starci-business-reconcile",
-      "capability": "business.reconcile",
-      "description": "Use when immutable delivery evidence must be reconciled against one published business feature head. Do not use to create a business model or implement source.",
-      "domain": "business"
-    },
-    {
-      "id": "starci-frontend-quality-audit",
-      "capability": "frontend.quality.audit",
-      "description": "Use to audit one verified frontend surface set against StarCi-owned product-neutral UI quality rules and return evidence-linked findings without changing source. Do not use for journey design, source repair, design-authority reconciliation, or delivery proof.",
-      "domain": "frontend"
-    },
-    {
-      "id": "starci-frontend-block-reconcile",
-      "capability": "frontend.block.reconcile",
-      "description": "Use when one existing product block or component contract must be reconciled across its closed consumers and every affected backend/frontend role, then proven end to end. Do not use for complete journey design, ordinary maintenance, learning resolution, or broad cross-surface authority changes.",
-      "domain": "frontend"
-    },
-    {
-      "id": "starci-frontend-maintenance-apply",
-      "capability": "frontend.maintenance.apply",
-      "description": "Use to apply one already approved source-first product maintenance change across every affected backend/frontend role and prove the mission end to end. Do not use for design exploration, unapproved feedback, or cross-surface authority selection.",
-      "domain": "frontend"
-    },
-    {
-      "id": "starci-frontend-request-review",
-      "capability": "frontend.request.review",
-      "description": "Use only to durably approve or reject one exact `.claude/requests/*.request.json` frontend feedback ledger with bounded priority before learning resolution. Do not use to resolve authority, mutate product source, or bypass evidence because a request is urgent.",
-      "domain": "frontend"
-    },
-    {
-      "id": "starci-frontend-learning-resolve",
-      "capability": "frontend.learning.resolve",
-      "description": "Use to resolve one durably approved frontend design learning request into its declared authority. Do not use to review requests, apply ordinary feedback, redesign a journey, or reconcile consumers.",
-      "domain": "frontend"
-    },
-    {
-      "id": "starci-frontend-surface-reconcile",
-      "capability": "frontend.surface.reconcile",
-      "description": "Use when a closed set of product surfaces must converge on the smallest durable authority and every affected backend/frontend consumer, then pass complete end-to-end proof. Do not use for a single block, isolated maintenance, or a new customer journey.",
-      "domain": "frontend"
+      "id": "starci-git-publish",
+      "capability": "git.publish",
+      "description": "Publish one approved Git boundary or portable continuation checkpoint from exact mission-owned source heads without force semantics.",
+      "domain": "git"
     },
     {
       "id": "starci-workflow-diagnose",
       "capability": "workflow.diagnose",
-      "description": "Use to find why one workflow fails and return a report-only diagnosis without changing source or external state. Do not use for readiness inventory, approved repair, quality debt, or rule-binding audit.",
+      "description": "Diagnose one failed workflow from immutable evidence and return a report without repairing source or mutating external state.",
       "domain": "workflow"
-    },
-    {
-      "id": "starci-quality-readiness",
-      "capability": "quality.readiness",
-      "description": "Use to inventory one delivery boundary and loop through explicitly approved measured repairs until readiness is green. Do not use for diagnosis-only work, debt repayment, or rule-binding audit.",
-      "domain": "quality"
-    },
-    {
-      "id": "starci-quality-finding-repair",
-      "capability": "quality.finding.repair",
-      "description": "Use to repair one already measured quality finding after confirming its exact approval boundary, then re-inventory the target. Do not use for broad readiness assessment, diagnosis, or debt repayment.",
-      "domain": "quality"
-    },
-    {
-      "id": "starci-quality-debt-repay",
-      "capability": "quality.debt.repay",
-      "description": "Use to repay one declared and approved quality-debt item through a measured progress loop. Do not use for ordinary findings, diagnosis, readiness inventory, or feature delivery.",
-      "domain": "quality"
-    },
-    {
-      "id": "starci-rule-binding-audit",
-      "capability": "rule.binding.audit",
-      "description": "Use to audit whether declared rules have one accountable executable binding. Do not use to repair source, inventory readiness, diagnose a workflow, or repay debt.",
-      "domain": "rule"
-    },
-    {
-      "id": "starci-deployment",
-      "capability": "deployment",
-      "description": "Use to adopt deployment intent when needed and execute one immutable release through public steady-state proof. Do not use merely to monitor, recover, or roll back an existing rollout.",
-      "domain": "deployment"
-    },
-    {
-      "id": "starci-deployment-monitor",
-      "capability": "deployment.monitor",
-      "description": "Use to watch one release that is already rolling out until steady state when observation is the starting action, continuing to recovery, rollback, or a bounded blocker only if evidence requires it. Do not use when recovery is already approved or to initiate a new deployment.",
-      "domain": "deployment"
-    },
-    {
-      "id": "starci-deployment-recover",
-      "capability": "deployment.recover",
-      "description": "Use when recovery is the approved starting action for one observed failed rollout before any rollback, then monitor the same release to proof. Do not use for a new deployment or a speculative failure.",
-      "domain": "deployment"
-    },
-    {
-      "id": "starci-deployment-rollback",
-      "capability": "deployment.rollback",
-      "description": "Use to roll back one declared failed or rejected release identity and prove the resulting state. Do not use to deploy, monitor, or attempt recovery first.",
-      "domain": "deployment"
-    },
-    {
-      "id": "starci-tunnel-reconcile",
-      "capability": "tunnel.reconcile",
-      "description": "Use to reconcile one bounded HTTP tunnel and DNS route. Do not use for source indexing, Sonar, observability, product deployment, or unrelated Cloudflare work.",
-      "domain": "tunnel"
-    },
-    {
-      "id": "starci-source-index-publish",
-      "capability": "source.index.publish",
-      "description": "Use to configure and index StarCi business, generated-contract, or clean .worktrees/references context, optionally publishing its MCP boundary. Do not use for product delivery, Sonar, observability, or a tunnel-only request.",
-      "domain": "source"
-    },
-    {
-      "id": "starci-sonar-service-reconcile",
-      "capability": "sonar.service.reconcile",
-      "description": "Use to reconcile the shared Sonar service and its quality-enforcement boundary. Do not use to fix product findings, deploy releases, index context, or configure observability.",
-      "domain": "sonar"
-    },
-    {
-      "id": "starci-observability-reconcile",
-      "capability": "observability.reconcile",
-      "description": "Use to reconcile shared metrics collection and remote-write boundaries. Do not use for product diagnosis, deployment monitoring, Sonar, or context indexing.",
-      "domain": "observability"
-    },
-    {
-      "id": "starci-conversation-record",
-      "capability": "conversation.record",
-      "description": "Use only to append one provider-neutral redacted conversation-provenance snapshot head. Do not use to query provenance, store raw transcripts, or analyze product work.",
-      "domain": "conversation"
-    },
-    {
-      "id": "starci-conversation-query",
-      "capability": "conversation.query",
-      "description": "Use only to query one bounded provider-neutral conversation-provenance identity. Do not use to record a snapshot, retrieve raw transcripts, or analyze product work.",
-      "domain": "conversation"
-    },
-    {
-      "id": "starci-tech-stack",
-      "capability": "tech.stack",
-      "description": "Discover, challenge, approve, and publish one project operational tech-stack contract. Use when a stack is missing, stale, disputed, or must define microservice runtime, communication, persistence, deployment, and ownership; do not use to implement product code or make feature architecture decisions.",
-      "domain": "tech"
-    },
-    {
-      "id": "starci-frontend-ui-direction",
-      "capability": "frontend.ui.direction",
-      "description": "Create and visualize three or four materially different UI directions before UX-flow or implementation work. Use for new UI or substantial visual redesign, not for an already approved direction.",
-      "domain": "frontend"
-    },
-    {
-      "id": "starci-frontend-design-critique",
-      "capability": "frontend.design.critique",
-      "description": "Challenge one UI direction, UX flow, UI-detail artifact, or frontend contract with fresh context. Use before approval or when source convention may be wrong; do not implement source.",
-      "domain": "frontend"
-    },
-    {
-      "id": "starci-frontend-ux-flow",
-      "capability": "frontend.ux.flow",
-      "description": "Model one approved UI direction as a complete user flow, then choose page, modal, drawer, popover, or inline placement for every meaningful interaction. Do not choose visual styling or edit source.",
-      "domain": "frontend"
-    },
-    {
-      "id": "starci-product-potential",
-      "capability": "product.potential",
-      "description": "Assess one typed product potential discovered by another capability, separate evidence from hypothesis, and route any approved business, backend, or database branch before resuming the parent objective.",
-      "domain": "product"
-    },
-    {
-      "id": "starci-frontend-ui-detail",
-      "capability": "frontend.ui.detail",
-      "description": "Freeze an approved UI direction, UX flow, and interaction-container plan into an executable screen specification covering breadcrumbs, surfaces, overlays, decoration, state, responsive behavior, and deterministic baselines. Do not implement source.",
-      "domain": "frontend"
-    },
-    {
-      "id": "starci-frontend-contract-plan",
-      "capability": "frontend.contract.plan",
-      "description": "Compile one approved UI-detail artifact into exact Grammar, component, consumer, and source-boundary contracts. Route Grammar or backend gaps explicitly; do not approximate or implement.",
-      "domain": "frontend"
-    },
-    {
-      "id": "starci-frontend-implementation",
-      "capability": "frontend.implementation",
-      "description": "Implement one approved and frozen frontend contract inside its exact source boundary. Do not redesign surfaces, navigation, decoration, state, or responsive behavior.",
-      "domain": "frontend"
-    },
-    {
-      "id": "starci-frontend-visual-fidelity",
-      "capability": "frontend.visual.fidelity",
-      "description": "Verify structural, visual, responsive, and interaction fidelity against approved deterministic frontend baselines. Use after implementation and before product UAT; do not repair source.",
-      "domain": "frontend"
-    },
-    {
-      "id": "starci-product-uat",
-      "capability": "product.uat",
-      "description": "Prove that a running product completes one approved business journey, turn UX/UI failures into a typed repair contract, and close exact feedback requests only after rerun proof passes.",
-      "domain": "product"
-    },
-    {
-      "id": "starci-architecture-discover",
-      "capability": "architecture.discover",
-      "description": "Discover and classify the observed architecture and deployment model without treating source as target authority. Use before architecture option or data-ownership work.",
-      "domain": "architecture"
-    },
-    {
-      "id": "starci-data-ownership-model",
-      "capability": "data.ownership.model",
-      "description": "Model exact physical stores, logical resources, readers, writers, migrators, transaction boundaries, isolation, backup, and restore ownership. Use before approving state-changing architecture or backend contracts.",
-      "domain": "data"
-    },
-    {
-      "id": "starci-architecture-option-design",
-      "capability": "architecture.option.design",
-      "description": "Produce and approve materially different target architecture options from frozen constraints, observed state, and ownership evidence. Do not implement or silently copy source precedent.",
-      "domain": "architecture"
-    },
-    {
-      "id": "starci-architecture-critique",
-      "capability": "architecture.critique",
-      "description": "Independently challenge one architecture proposal across business value, data ownership, consistency, deployment, recovery, and adversarial source precedent. Do not mutate source or approve its own revision.",
-      "domain": "architecture"
-    },
-    {
-      "id": "starci-architecture-realization",
-      "capability": "architecture.realization",
-      "description": "Map an approved architecture to composition roots, modules, connections, qualified resources, deployment units, migrations, credentials, and proof paths. Use before backend source mutation.",
-      "domain": "architecture"
-    },
-    {
-      "id": "starci-backend-solution-design",
-      "capability": "backend.solution.design",
-      "description": "Design one bounded backend solution from approved business, tech-stack, architecture, ownership, and realization artifacts. Do not edit source or reopen unrelated architecture.",
-      "domain": "backend"
-    },
-    {
-      "id": "starci-backend-contract-plan",
-      "capability": "backend.contract.plan",
-      "description": "Freeze one backend state-change contract with exact writer, physical store, database, schema or collection, resource, transaction behavior, migration owner, and proof. Do not implement source.",
-      "domain": "backend"
-    },
-    {
-      "id": "starci-backend-contract-critique",
-      "capability": "backend.contract.critique",
-      "description": "Independently challenge one backend contract for wrong-store writes, authority drift, transaction gaps, failure handling, compatibility, and source overfitting. Do not mutate source.",
-      "domain": "backend"
-    },
-    {
-      "id": "starci-coding-preflight",
-      "capability": "coding.preflight",
-      "description": "Bind the nearest implementation template, applicable ESLint rules, TypeScript contracts, and a bounded lint/typecheck/Sonar plan that activates before commit or by explicit standalone request. Do not run static gates or mutate source.",
-      "domain": "coding"
-    },
-    {
-      "id": "starci-static-quality-gates",
-      "capability": "static.quality.gates",
-      "description": "Run lint, TypeScript typecheck and Sonar for one exact source revision automatically before commit or when explicitly requested as a standalone gate. Do not mutate or commit source.",
-      "domain": "static"
-    },
-    {
-      "id": "starci-backend-implementation",
-      "capability": "backend.implementation",
-      "description": "Implement one approved backend contract in a frozen exact source boundary, then run semantic architecture and data-placement conformance before generic quality checks.",
-      "domain": "backend"
-    },
-    {
-      "id": "starci-backend-proof",
-      "capability": "backend.proof",
-      "description": "Close one backend delivery with contract, implementation, migration, runtime, and semantic conformance evidence. Use after implementation conformance; do not repair source.",
-      "domain": "backend"
     }
   ],
   "operators": [
     {
       "id": "architecture/alternatives",
       "domain": "architecture",
-      "knowledgeCount": 1,
-      "accepts": [
-        "architecture.decision.alternatives · ready"
-      ],
-      "emits": [
-        "architecture.decision.challenge · ready"
-      ],
+      "iconUrl": null,
+      "knowledgeCount": 0,
+      "accepts": [],
+      "emits": [],
       "sideEffects": [
-        "keep input, output, loaded context, scratch values, worker observations, and receipts in task-session memory only",
-        "purge every intermediate session object at each parent-skill terminal state"
+        "read only the supplied exact references"
       ]
     },
     {
       "id": "architecture/boundary-challenge",
       "domain": "architecture",
-      "knowledgeCount": 1,
-      "accepts": [
-        "architecture.boundary.challenge · ready"
-      ],
-      "emits": [
-        "architecture.boundary.review · pending",
-        "architecture.boundary · ready",
-        "architecture.blocked · blocked"
-      ],
+      "iconUrl": null,
+      "knowledgeCount": 0,
+      "accepts": [],
+      "emits": [],
       "sideEffects": [
-        "keep input, output, loaded context, scratch values, worker observations, and receipts in task-session memory only",
-        "purge every intermediate session object at each parent-skill terminal state"
+        "read only the supplied exact references"
       ]
     },
     {
       "id": "architecture/boundary-plan",
       "domain": "architecture",
-      "knowledgeCount": 1,
-      "accepts": [
-        "architecture.boundary · ready"
-      ],
-      "emits": [
-        "architecture.boundary.challenge · ready"
-      ],
+      "iconUrl": null,
+      "knowledgeCount": 0,
+      "accepts": [],
+      "emits": [],
       "sideEffects": [
-        "keep input, output, loaded context, scratch values, worker observations, and receipts in task-session memory only",
-        "purge every intermediate session object at each parent-skill terminal state"
+        "read only the supplied exact references"
       ]
     },
     {
       "id": "architecture/conformance",
       "domain": "architecture",
-      "knowledgeCount": 1,
-      "accepts": [
-        "architecture.v61.conformance · ready"
-      ],
-      "emits": [
-        "architecture.v61.conformance.complete · ready"
-      ],
+      "iconUrl": null,
+      "knowledgeCount": 0,
+      "accepts": [],
+      "emits": [],
       "sideEffects": [
-        "keep artifacts and observations in task-session memory only",
-        "purge intermediate session objects at every parent-skill terminal state"
+        "read only the supplied exact references"
       ]
     },
     {
       "id": "architecture/contradiction-analysis",
       "domain": "architecture",
-      "knowledgeCount": 1,
-      "accepts": [
-        "architecture.v61.contradiction-analysis · ready"
-      ],
-      "emits": [
-        "architecture.v61.contradiction-analysis.complete · ready"
-      ],
+      "iconUrl": null,
+      "knowledgeCount": 0,
+      "accepts": [],
+      "emits": [],
       "sideEffects": [
-        "keep artifacts and observations in task-session memory only",
-        "purge intermediate session objects at every parent-skill terminal state"
+        "read only the supplied exact references"
       ]
     },
     {
       "id": "architecture/current-state",
       "domain": "architecture",
-      "knowledgeCount": 1,
-      "accepts": [
-        "architecture.decision.current · ready"
-      ],
-      "emits": [
-        "architecture.decision.alternatives · ready"
-      ],
+      "iconUrl": null,
+      "knowledgeCount": 0,
+      "accepts": [],
+      "emits": [],
       "sideEffects": [
-        "keep input, output, loaded context, scratch values, worker observations, and receipts in task-session memory only",
-        "purge every intermediate session object at each parent-skill terminal state"
+        "read only the supplied exact references"
       ]
     },
     {
       "id": "architecture/data-ownership",
       "domain": "architecture",
-      "knowledgeCount": 1,
-      "accepts": [
-        "architecture.v61.data-ownership · ready"
-      ],
-      "emits": [
-        "architecture.v61.data-ownership.complete · ready"
-      ],
+      "iconUrl": null,
+      "knowledgeCount": 0,
+      "accepts": [],
+      "emits": [],
       "sideEffects": [
-        "keep artifacts and observations in task-session memory only",
-        "purge intermediate session objects at every parent-skill terminal state"
+        "read only the supplied exact references"
       ]
     },
     {
       "id": "architecture/decision-challenge",
       "domain": "architecture",
-      "knowledgeCount": 1,
-      "accepts": [
-        "architecture.decision.challenge · ready"
-      ],
-      "emits": [
-        "architecture.decision.handoff · ready",
-        "architecture.decision.alternatives · ready",
-        "architecture.blocked · blocked"
-      ],
+      "iconUrl": null,
+      "knowledgeCount": 0,
+      "accepts": [],
+      "emits": [],
       "sideEffects": [
-        "keep input, output, loaded context, scratch values, worker observations, and receipts in task-session memory only",
-        "create one task-session HTML architecture review artifact that the host renders through visualize before requesting approval",
-        "purge every intermediate session object at each parent-skill terminal state"
+        "read only the supplied exact references"
       ]
     },
     {
       "id": "architecture/decision-frame",
       "domain": "architecture",
-      "knowledgeCount": 1,
-      "accepts": [
-        "architecture.decision.frame · ready"
-      ],
-      "emits": [
-        "architecture.decision.current · ready"
-      ],
+      "iconUrl": null,
+      "knowledgeCount": 0,
+      "accepts": [],
+      "emits": [],
       "sideEffects": [
-        "keep input, output, loaded context, scratch values, worker observations, and receipts in task-session memory only",
-        "purge every intermediate session object at each parent-skill terminal state"
+        "read only the supplied exact references"
       ]
     },
     {
       "id": "architecture/decision-handoff",
       "domain": "architecture",
-      "knowledgeCount": 1,
-      "accepts": [
-        "architecture.decision.handoff · ready"
-      ],
-      "emits": [
-        "architecture.source · ready"
-      ],
+      "iconUrl": null,
+      "knowledgeCount": 0,
+      "accepts": [],
+      "emits": [],
       "sideEffects": [
-        "keep input, output, loaded context, scratch values, worker observations, and receipts in task-session memory only",
-        "purge every intermediate session object at each parent-skill terminal state"
+        "read only the supplied exact references"
       ]
     },
     {
       "id": "architecture/design-realization",
       "domain": "architecture",
-      "knowledgeCount": 1,
-      "accepts": [
-        "architecture.v61.design-realization · ready"
-      ],
-      "emits": [
-        "architecture.v61.design-realization.complete · ready"
-      ],
+      "iconUrl": null,
+      "knowledgeCount": 0,
+      "accepts": [],
+      "emits": [],
       "sideEffects": [
-        "keep artifacts and observations in task-session memory only",
-        "purge intermediate session objects at every parent-skill terminal state"
+        "read only the supplied exact references"
       ]
     },
     {
       "id": "architecture/evidence-discovery",
       "domain": "architecture",
-      "knowledgeCount": 1,
-      "accepts": [
-        "architecture.v61.evidence-discovery · ready"
-      ],
-      "emits": [
-        "architecture.v61.evidence-discovery.complete · ready"
-      ],
+      "iconUrl": null,
+      "knowledgeCount": 0,
+      "accepts": [],
+      "emits": [],
       "sideEffects": [
-        "keep artifacts and observations in task-session memory only",
-        "purge intermediate session objects at every parent-skill terminal state"
+        "read only the supplied exact references"
       ]
     },
     {
       "id": "architecture/independent-critique",
       "domain": "architecture",
-      "knowledgeCount": 1,
-      "accepts": [
-        "architecture.v61.independent-critique · ready"
-      ],
-      "emits": [
-        "architecture.v61.independent-critique.complete · ready"
-      ],
+      "iconUrl": null,
+      "knowledgeCount": 0,
+      "accepts": [],
+      "emits": [],
       "sideEffects": [
-        "keep artifacts and observations in task-session memory only",
-        "purge intermediate session objects at every parent-skill terminal state"
+        "read only the supplied exact references"
       ]
     },
     {
       "id": "architecture/pattern-bind",
       "domain": "architecture",
-      "knowledgeCount": 1,
-      "accepts": [
-        "architecture.pattern · ready"
-      ],
-      "emits": [
-        "architecture.boundary · ready"
-      ],
+      "iconUrl": null,
+      "knowledgeCount": 0,
+      "accepts": [],
+      "emits": [],
       "sideEffects": [
-        "keep input, output, loaded context, scratch values, worker observations, and receipts in task-session memory only",
-        "purge every intermediate session object at each parent-skill terminal state"
+        "read only the supplied exact references"
       ]
     },
     {
       "id": "architecture/source-discovery",
       "domain": "architecture",
-      "knowledgeCount": 1,
-      "accepts": [
-        "architecture.source · ready"
-      ],
-      "emits": [
-        "architecture.pattern · ready"
-      ],
+      "iconUrl": null,
+      "knowledgeCount": 0,
+      "accepts": [],
+      "emits": [],
       "sideEffects": [
-        "keep input, output, loaded context, scratch values, worker observations, and receipts in task-session memory only",
-        "purge every intermediate session object at each parent-skill terminal state"
+        "read only the supplied exact references"
       ]
     },
     {
       "id": "architecture/system-model",
       "domain": "architecture",
-      "knowledgeCount": 1,
-      "accepts": [
-        "architecture.v61.system-model · ready"
-      ],
-      "emits": [
-        "architecture.v61.system-model.complete · ready"
-      ],
+      "iconUrl": null,
+      "knowledgeCount": 0,
+      "accepts": [],
+      "emits": [],
       "sideEffects": [
-        "keep artifacts and observations in task-session memory only",
-        "purge intermediate session objects at every parent-skill terminal state"
+        "read only the supplied exact references"
       ]
     },
     {
       "id": "be/coding-scope-freeze",
       "domain": "be",
+      "iconUrl": null,
       "knowledgeCount": 0,
-      "accepts": [
-        "architecture.boundary.review · approved",
-        "be.coding-scope · ready"
-      ],
-      "emits": [
-        "architecture.boundary.review · approved",
-        "be.repair · ready",
-        "architecture.boundary · ready",
-        "architecture.boundary · ready",
-        "be.blocked · blocked"
-      ],
+      "accepts": [],
+      "emits": [],
       "sideEffects": [
-        "read source metadata and calculate declared target hashes without exposing file content to model context",
-        "write only a task-session coding-scope receipt",
-        "purge every intermediate session object at each parent-skill terminal"
+        "read only the supplied exact references"
       ]
     },
     {
       "id": "be/contract-critique",
       "domain": "be",
-      "knowledgeCount": 1,
-      "accepts": [
-        "be.v61.contract-critique · ready"
-      ],
-      "emits": [
-        "be.v61.contract-critique.complete · ready"
-      ],
+      "iconUrl": null,
+      "knowledgeCount": 0,
+      "accepts": [],
+      "emits": [],
       "sideEffects": [
-        "keep artifacts and observations in task-session memory only",
-        "purge intermediate session objects at every parent-skill terminal state"
+        "read only the supplied exact references"
       ]
     },
     {
       "id": "be/delivery-proof",
       "domain": "be",
-      "knowledgeCount": 1,
-      "accepts": [
-        "be.v61.delivery-proof · ready"
-      ],
-      "emits": [
-        "be.v61.delivery-proof.complete · ready"
-      ],
+      "iconUrl": null,
+      "knowledgeCount": 0,
+      "accepts": [],
+      "emits": [],
       "sideEffects": [
-        "keep artifacts and observations in task-session memory only",
-        "purge intermediate session objects at every parent-skill terminal state"
+        "read only the supplied exact references"
       ]
     },
     {
       "id": "be/implementation",
       "domain": "be",
-      "knowledgeCount": 1,
-      "accepts": [
-        "architecture.boundary.review · approved",
-        "be.repair · ready"
-      ],
-      "emits": [
-        "quality.format · ready",
-        "architecture.boundary · ready",
-        "architecture.boundary · ready",
-        "be.blocked · blocked"
-      ],
+      "iconUrl": null,
+      "knowledgeCount": 0,
+      "accepts": [],
+      "emits": [],
       "sideEffects": [
-        "write only approved backend product-source paths",
-        "keep operator input, output, context, observations, and receipts in task-session memory only",
-        "purge all intermediate session objects at every parent-skill terminal state"
+        "write only inside the supplied frozen source boundary"
       ]
     },
     {
       "id": "be/implementation-conformance",
       "domain": "be",
-      "knowledgeCount": 1,
-      "accepts": [
-        "be.v61.implementation-conformance · ready"
-      ],
-      "emits": [
-        "be.v61.implementation-conformance.complete · ready"
-      ],
+      "iconUrl": null,
+      "knowledgeCount": 0,
+      "accepts": [],
+      "emits": [],
       "sideEffects": [
-        "keep artifacts and observations in task-session memory only",
-        "purge intermediate session objects at every parent-skill terminal state"
+        "read only the supplied exact references"
       ]
     },
     {
       "id": "be/mutation-contract",
       "domain": "be",
-      "knowledgeCount": 1,
-      "accepts": [
-        "be.v61.mutation-contract · ready"
-      ],
-      "emits": [
-        "be.v61.mutation-contract.complete · ready"
-      ],
+      "iconUrl": null,
+      "knowledgeCount": 0,
+      "accepts": [],
+      "emits": [],
       "sideEffects": [
-        "keep artifacts and observations in task-session memory only",
-        "purge intermediate session objects at every parent-skill terminal state"
+        "read only the supplied exact references"
       ]
     },
     {
       "id": "be/repair-prerequisite-check",
       "domain": "be",
+      "iconUrl": null,
       "knowledgeCount": 0,
-      "accepts": [
-        "be.repair.prerequisite · ready"
-      ],
-      "emits": [
-        "be.coding-scope · ready",
-        "request.received · ready",
-        "business.freshness · ready",
-        "architecture.boundary · ready",
-        "be.blocked · blocked"
-      ],
+      "accepts": [],
+      "emits": [],
       "sideEffects": [
-        "read task-session receipts and metadata only",
-        "never load source content, Qdrant knowledge, or repository context",
-        "purge every intermediate session object at each parent-skill terminal"
+        "read only the supplied exact references"
       ]
     },
     {
       "id": "be/solution-design",
       "domain": "be",
-      "knowledgeCount": 1,
-      "accepts": [
-        "be.v61.solution-design · ready"
-      ],
-      "emits": [
-        "be.v61.solution-design.complete · ready"
-      ],
+      "iconUrl": null,
+      "knowledgeCount": 0,
+      "accepts": [],
+      "emits": [],
       "sideEffects": [
-        "keep artifacts and observations in task-session memory only",
-        "purge intermediate session objects at every parent-skill terminal state"
+        "read only the supplied exact references"
       ]
     },
     {
       "id": "business/evidence-normalize",
       "domain": "business",
-      "knowledgeCount": 1,
-      "accepts": [
-        "business.evidence · ready"
-      ],
-      "emits": [
-        "business.model · ready"
-      ],
+      "iconUrl": null,
+      "knowledgeCount": 0,
+      "accepts": [],
+      "emits": [],
       "sideEffects": [
-        "keep input, output, loaded context, scratch values, worker observations, and receipts in task-session memory only",
-        "purge every intermediate session object at each parent-skill terminal state"
+        "read only the supplied exact references"
       ]
     },
     {
       "id": "business/model",
       "domain": "business",
-      "knowledgeCount": 1,
-      "accepts": [
-        "business.model · ready"
-      ],
-      "emits": [
-        "business.publish · ready",
-        "business.model · ready",
-        "business.blocked · blocked"
-      ],
+      "iconUrl": null,
+      "knowledgeCount": 0,
+      "accepts": [],
+      "emits": [],
       "sideEffects": [
-        "keep input, output, loaded context, scratch values, worker observations, and receipts in task-session memory only",
-        "purge every intermediate session object at each parent-skill terminal state"
+        "read only the supplied exact references"
       ]
     },
     {
       "id": "business/publish",
       "domain": "business",
-      "knowledgeCount": 1,
-      "accepts": [
-        "business.publish · ready"
-      ],
-      "emits": [
-        "architecture.decision.frame · ready",
-        "architecture.source · ready",
-        "business.blocked · blocked"
-      ],
+      "iconUrl": null,
+      "knowledgeCount": 0,
+      "accepts": [],
+      "emits": [],
       "sideEffects": [
-        "write and commit only the routed business worktree",
-        "keep input, output, loaded context, scratch values, worker observations, and receipts in task-session memory only",
-        "purge every intermediate session object at each parent-skill terminal state"
+        "write only the approved feature head under the supplied businesses authority root"
       ]
     },
     {
       "id": "business/reconcile",
       "domain": "business",
-      "knowledgeCount": 1,
-      "accepts": [
-        "delivery.proved · ready"
-      ],
-      "emits": [
-        "business.complete · complete",
-        "business.blocked · blocked"
-      ],
+      "iconUrl": null,
+      "knowledgeCount": 0,
+      "accepts": [],
+      "emits": [],
       "sideEffects": [
-        "write and commit only the routed business worktree",
-        "keep input, output, loaded context, scratch values, worker observations, and receipts in task-session memory only",
-        "purge every intermediate session object at each parent-skill terminal state"
+        "read only the supplied exact references"
       ]
     },
     {
       "id": "business/staleness-check",
       "domain": "business",
+      "iconUrl": null,
       "knowledgeCount": 0,
-      "accepts": [
-        "business.evidence · ready",
-        "architecture.decision.frame · ready",
-        "architecture.source · ready"
-      ],
-      "emits": [
-        "business.freshness · ready",
-        "business.evidence · ready",
-        "business.freshness · blocked"
-      ],
+      "accepts": [],
+      "emits": [],
       "sideEffects": [
-        "read receipt and hash metadata only",
-        "keep the freshness receipt in task-session storage only",
-        "purge all intermediate metadata and receipts at every parent-skill terminal"
+        "read only the supplied exact references"
       ]
     },
     {
       "id": "context/freshness-check",
       "domain": "context",
+      "iconUrl": null,
       "knowledgeCount": 0,
-      "accepts": [
-        "context.freshness · ready"
-      ],
-      "emits": [
-        "context.freshness · ready",
-        "context.initialize · ready",
-        "context.freshness · blocked"
-      ],
-      "sideEffects": [
-        "read hash metadata only",
-        "store the receipt in task-session memory"
-      ]
+      "accepts": [],
+      "emits": [],
+      "sideEffects": []
     },
     {
       "id": "core/handoff-ack",
       "domain": "core",
+      "iconUrl": null,
       "knowledgeCount": 0,
-      "accepts": [
-        "core.handoff-ack · ready"
-      ],
-      "emits": [
-        "core.handoff-ack · ready",
-        "core.handoff-ack · rejected",
-        "core.handoff-ack · blocked"
-      ],
+      "accepts": [],
+      "emits": [],
       "sideEffects": [
-        "write one immutable task-session protocol object"
+        "write one immutable acknowledgement object"
       ]
     },
     {
       "id": "core/handoff-emit",
       "domain": "core",
+      "iconUrl": null,
       "knowledgeCount": 0,
-      "accepts": [
-        "core.handoff · ready"
-      ],
-      "emits": [
-        "core.handoff · ready",
-        "core.handoff · blocked"
-      ],
+      "accepts": [],
+      "emits": [],
       "sideEffects": [
-        "write one immutable task-session protocol object"
+        "write one immutable task-session handoff object"
       ]
     },
     {
       "id": "delivery/impact-classify",
       "domain": "delivery",
+      "iconUrl": null,
       "knowledgeCount": 1,
-      "accepts": [
-        "layout.review · approved",
-        "fe.block.review · approved",
-        "fe.authority.review · approved",
-        "fe.feedback.request.result · complete",
-        "business.freshness · ready"
-      ],
-      "emits": [
-        "architecture.decision.frame · ready",
-        "delivery.mission.resume · ready",
-        "delivery.blocked · blocked"
-      ],
+      "accepts": [],
+      "emits": [],
       "sideEffects": [
-        "classify role impact from approved mission, business and route metadata without reading product source",
-        "keep all inputs, evidence and receipts in task-session memory only",
-        "purge every intermediate session object at each parent-skill terminal"
+        "classify role impact from approved mission, business and route metadata without reading product source"
       ]
     },
     {
       "id": "delivery/mission-proof",
       "domain": "delivery",
+      "iconUrl": null,
       "knowledgeCount": 1,
-      "accepts": [
-        "proof.review · complete"
-      ],
-      "emits": [
-        "delivery.proved · ready",
-        "delivery.blocked · blocked"
-      ],
-      "sideEffects": [
-        "join FE product proof and any required backend delivery proof in task-session memory",
-        "purge all scratch at the parent-skill terminal"
-      ]
+      "accepts": [],
+      "emits": [],
+      "sideEffects": []
     },
     {
       "id": "delivery/mission-resume",
       "domain": "delivery",
+      "iconUrl": null,
       "knowledgeCount": 0,
-      "accepts": [
-        "delivery.proved · ready"
-      ],
-      "emits": [
-        "delivery.mission.resume · ready",
-        "delivery.blocked · blocked"
-      ],
-      "sideEffects": [
-        "join only session receipt identities",
-        "purge all scratch at the parent-skill terminal"
-      ]
+      "accepts": [],
+      "emits": [],
+      "sideEffects": []
     },
     {
       "id": "deployment/artifact-build",
       "domain": "deployment",
-      "knowledgeCount": 1,
-      "accepts": [
-        "deployment.artifact.build · ready"
-      ],
-      "emits": [
-        "deployment.artifact.publish · ready"
-      ],
+      "iconUrl": null,
+      "knowledgeCount": 0,
+      "accepts": [],
+      "emits": [],
       "sideEffects": [
-        "write ignored build outputs and immutable local artifacts declared by the execution plan",
-        "keep input, output, loaded source, command captures, worker observations, diagnostics, and receipts in task-session memory only",
-        "purge every intermediate session object at each parent-skill terminal state"
+        "write ignored build outputs and immutable local artifacts declared by the execution plan"
       ]
     },
     {
       "id": "deployment/artifact-publish",
       "domain": "deployment",
-      "knowledgeCount": 1,
-      "accepts": [
-        "deployment.artifact.publish · ready"
-      ],
-      "emits": [
-        "deployment.migration · ready"
-      ],
+      "iconUrl": null,
+      "knowledgeCount": 0,
+      "accepts": [],
+      "emits": [],
       "sideEffects": [
-        "publish declared immutable artifacts",
-        "keep all intermediate data in task-session memory only",
-        "purge every intermediate session object at each parent-skill terminal state"
+        "publish declared immutable artifacts"
       ]
     },
     {
       "id": "deployment/credential-resolve",
       "domain": "deployment",
-      "knowledgeCount": 1,
-      "accepts": [
-        "deployment.credentials · ready"
-      ],
-      "emits": [
-        "deployment.host · ready"
-      ],
+      "iconUrl": null,
+      "knowledgeCount": 0,
+      "accepts": [],
+      "emits": [],
       "sideEffects": [
-        "keep all intermediate data in task-session memory only",
-        "purge every intermediate session object at each parent-skill terminal state"
+        "read only the supplied exact references"
       ]
     },
     {
       "id": "deployment/domain-reconcile",
       "domain": "deployment",
-      "knowledgeCount": 1,
-      "accepts": [
-        "deployment.domain · ready"
-      ],
-      "emits": [
-        "deployment.rollout · ready"
-      ],
+      "iconUrl": null,
+      "knowledgeCount": 0,
+      "accepts": [],
+      "emits": [],
       "sideEffects": [
-        "reconcile declared domain and TLS provider state",
-        "keep all intermediate data in task-session memory only",
-        "purge every intermediate session object at each parent-skill terminal state"
+        "reconcile declared domain and TLS provider state"
       ]
     },
     {
       "id": "deployment/execution-plan",
       "domain": "deployment",
-      "knowledgeCount": 1,
-      "accepts": [
-        "deployment.plan · ready"
-      ],
-      "emits": [
-        "deployment.execute · ready",
-        "deployment.review · pending",
-        "deployment.blocked · blocked"
-      ],
+      "iconUrl": null,
+      "knowledgeCount": 0,
+      "accepts": [],
+      "emits": [],
       "sideEffects": [
-        "keep all intermediate data in task-session memory only",
-        "purge every intermediate session object at each parent-skill terminal state"
+        "read only the supplied exact references"
       ]
     },
     {
       "id": "deployment/execution-root-init",
       "domain": "deployment",
-      "knowledgeCount": 1,
-      "accepts": [
-        "deployment.execute · ready",
-        "deployment.review · approved"
-      ],
-      "emits": [
-        "deployment.credentials · ready"
-      ],
+      "iconUrl": null,
+      "knowledgeCount": 0,
+      "accepts": [],
+      "emits": [],
       "sideEffects": [
-        "initialize ignored rebuildable .infra execution root",
-        "keep all intermediate data in task-session memory only",
-        "purge every intermediate session object at each parent-skill terminal state"
+        "initialize ignored rebuildable .infra execution root"
       ]
     },
     {
       "id": "deployment/host-prepare",
       "domain": "deployment",
-      "knowledgeCount": 1,
-      "accepts": [
-        "deployment.host · ready"
-      ],
-      "emits": [
-        "deployment.artifact.build · ready"
-      ],
+      "iconUrl": null,
+      "knowledgeCount": 0,
+      "accepts": [],
+      "emits": [],
       "sideEffects": [
-        "apply only declared idempotent host setup",
-        "keep all intermediate data in task-session memory only",
-        "purge every intermediate session object at each parent-skill terminal state"
+        "apply only declared idempotent host setup"
       ]
     },
     {
       "id": "deployment/intent-bind",
       "domain": "deployment",
-      "knowledgeCount": 1,
-      "accepts": [
-        "deployment.intent · ready"
-      ],
-      "emits": [
-        "deployment.manifest · ready"
-      ],
+      "iconUrl": null,
+      "knowledgeCount": 0,
+      "accepts": [],
+      "emits": [],
       "sideEffects": [
-        "keep all intermediate data in task-session memory only",
-        "purge every intermediate session object at each parent-skill terminal state"
+        "read only the supplied exact references"
       ]
     },
     {
       "id": "deployment/manifest-validate",
       "domain": "deployment",
-      "knowledgeCount": 1,
-      "accepts": [
-        "deployment.manifest · ready"
-      ],
-      "emits": [
-        "deployment.plan · ready"
-      ],
+      "iconUrl": null,
+      "knowledgeCount": 0,
+      "accepts": [],
+      "emits": [],
       "sideEffects": [
-        "keep input, output, context, observations, and receipts in task-session memory only",
-        "purge all intermediate session objects at every parent-skill terminal state"
+        "read only the supplied exact references"
       ]
     },
     {
       "id": "deployment/migration",
       "domain": "deployment",
-      "knowledgeCount": 1,
-      "accepts": [
-        "deployment.migration · ready"
-      ],
-      "emits": [
-        "deployment.domain · ready",
-        "deployment.domain · ready",
-        "deployment.rollback · ready",
-        "deployment.blocked · blocked"
-      ],
+      "iconUrl": null,
+      "knowledgeCount": 0,
+      "accepts": [],
+      "emits": [],
       "sideEffects": [
-        "apply declared migration or initialization job",
-        "keep input, output, context, observations, and receipts in task-session memory only",
-        "purge all intermediate session objects at every parent-skill terminal state"
+        "apply declared migration or initialization job"
       ]
     },
     {
       "id": "deployment/monitor",
       "domain": "deployment",
-      "knowledgeCount": 1,
-      "accepts": [
-        "deployment.monitor · ready"
-      ],
-      "emits": [
-        "deployment.monitor · ready",
-        "deployment.monitor · ready",
-        "deployment.proof · ready",
-        "deployment.recover · ready",
-        "deployment.rollback · ready",
-        "deployment.blocked · blocked"
-      ],
+      "iconUrl": null,
+      "knowledgeCount": 0,
+      "accepts": [],
+      "emits": [],
       "sideEffects": [
-        "write value-free monitor observations below ignored execution root",
-        "keep input, output, context, observations, and receipts in task-session memory only",
-        "purge all intermediate session objects at every parent-skill terminal state"
+        "read only the supplied exact references"
       ]
     },
     {
       "id": "deployment/proof",
       "domain": "deployment",
-      "knowledgeCount": 1,
-      "accepts": [
-        "deployment.proof · ready",
-        "deployment.proof · ready"
-      ],
-      "emits": [
-        "delivery.proved · ready",
-        "deployment.rolled-back · complete",
-        "deployment.blocked · blocked",
-        "deployment.blocked · blocked"
-      ],
+      "iconUrl": null,
+      "knowledgeCount": 0,
+      "accepts": [],
+      "emits": [],
       "sideEffects": [
-        "keep input, output, context, observations, and receipts in task-session memory only",
-        "purge all intermediate session objects at every parent-skill terminal state"
+        "read only the supplied exact references"
       ]
     },
     {
       "id": "deployment/recover",
       "domain": "deployment",
-      "knowledgeCount": 1,
-      "accepts": [
-        "deployment.recover · ready"
-      ],
-      "emits": [
-        "deployment.retry · ready",
-        "deployment.rollback · ready",
-        "deployment.review · pending",
-        "deployment.blocked · blocked"
-      ],
+      "iconUrl": null,
+      "knowledgeCount": 0,
+      "accepts": [],
+      "emits": [],
       "sideEffects": [
-        "mutate only the declared smallest deployment-owned repair boundary",
-        "keep input, output, context, observations, and receipts in task-session memory only",
-        "purge all intermediate session objects at every parent-skill terminal state"
+        "mutate only the declared smallest deployment-owned repair boundary"
       ]
     },
     {
       "id": "deployment/rollback",
       "domain": "deployment",
-      "knowledgeCount": 1,
-      "accepts": [
-        "deployment.rollback · ready"
-      ],
-      "emits": [
-        "deployment.proof · ready",
-        "deployment.blocked · blocked",
-        "deployment.blocked · blocked",
-        "deployment.blocked · blocked"
-      ],
+      "iconUrl": null,
+      "knowledgeCount": 0,
+      "accepts": [],
+      "emits": [],
       "sideEffects": [
-        "apply declared rollback to provider and runtime state",
-        "keep input, output, context, observations, and receipts in task-session memory only",
-        "purge all intermediate session objects at every parent-skill terminal state"
+        "apply declared rollback to provider and runtime state"
       ]
     },
     {
       "id": "deployment/rollout",
       "domain": "deployment",
-      "knowledgeCount": 1,
-      "accepts": [
-        "deployment.rollout · ready"
-      ],
-      "emits": [
-        "deployment.monitor · ready",
-        "deployment.blocked · blocked",
-        "deployment.blocked · blocked",
-        "deployment.blocked · blocked"
-      ],
+      "iconUrl": null,
+      "knowledgeCount": 0,
+      "accepts": [],
+      "emits": [],
       "sideEffects": [
-        "mutate declared remote runtime and release workflow state",
-        "keep input, output, context, observations, and receipts in task-session memory only",
-        "purge all intermediate session objects at every parent-skill terminal state"
+        "mutate declared remote runtime and release workflow state"
       ]
+    },
+    {
+      "id": "fe/authority-gap-classify",
+      "domain": "fe",
+      "iconUrl": null,
+      "knowledgeCount": 1,
+      "accepts": [],
+      "emits": [],
+      "sideEffects": []
     },
     {
       "id": "fe/authority-reconcile",
       "domain": "fe",
-      "knowledgeCount": 1,
-      "accepts": [
-        "fe.maintenance.authority-reconcile · ready",
-        "delivery.mission.resume · ready"
-      ],
-      "emits": [
-        "fe.maintenance.authority-reconcile.result · complete",
-        "fe.maintenance.blocked · blocked"
-      ],
-      "sideEffects": [
-        "coordinator mutates only exact approved targets for fe/authority-reconcile",
-        "keep input, output, loaded context, worker observations, drafts, evidence, and receipts in task-session storage only",
-        "purge every intermediate session object at every parent-skill terminal state"
-      ]
+      "iconUrl": null,
+      "knowledgeCount": 0,
+      "accepts": [],
+      "emits": [],
+      "sideEffects": []
     },
     {
       "id": "fe/block-reconcile",
       "domain": "fe",
+      "iconUrl": null,
+      "knowledgeCount": 0,
+      "accepts": [],
+      "emits": [],
+      "sideEffects": []
+    },
+    {
+      "id": "fe/business-bind",
+      "domain": "fe",
+      "iconUrl": null,
       "knowledgeCount": 1,
-      "accepts": [
-        "fe.maintenance.block-reconcile · ready",
-        "business.freshness · ready"
-      ],
-      "emits": [
-        "fe.maintenance.block-reconcile.result · complete",
-        "fe.maintenance.blocked · blocked"
-      ],
-      "sideEffects": [
-        "keep input, output, loaded context, worker observations, drafts, evidence, and receipts in task-session storage only",
-        "purge every intermediate session object at every parent-skill terminal state"
-      ]
+      "accepts": [],
+      "emits": [],
+      "sideEffects": []
     },
     {
       "id": "fe/coding-scope-freeze",
       "domain": "fe",
+      "iconUrl": null,
       "knowledgeCount": 0,
-      "accepts": [
-        "source-fit.resolve · ready",
-        "request.result · ready"
-      ],
-      "emits": [
-        "code.implement · ready",
-        "code.result · blocked"
-      ],
-      "sideEffects": [
-        "freeze exact read/write file paths and pre-change hashes in task-session storage only"
-      ]
+      "accepts": [],
+      "emits": [],
+      "sideEffects": []
     },
     {
       "id": "fe/consumer-align",
       "domain": "fe",
-      "knowledgeCount": 1,
-      "accepts": [
-        "fe.maintenance.consumer-align · ready",
-        "delivery.mission.resume · ready"
-      ],
-      "emits": [
-        "fe.maintenance.complete · complete",
-        "fe.maintenance.blocked · blocked"
-      ],
-      "sideEffects": [
-        "coordinator mutates only exact approved targets for fe/consumer-align",
-        "emit the joined authority/source change-set and approved acceptance-test-plan references for downstream proof operators",
-        "keep input, output, loaded context, worker observations, drafts, evidence, and receipts in task-session storage only",
-        "purge every intermediate session object at every parent-skill terminal state"
-      ]
+      "iconUrl": null,
+      "knowledgeCount": 0,
+      "accepts": [],
+      "emits": [],
+      "sideEffects": []
     },
     {
       "id": "fe/context-sync",
       "domain": "fe",
+      "iconUrl": null,
       "knowledgeCount": 0,
-      "accepts": [
-        "layout.generate · ready"
-      ],
-      "emits": [
-        "source-fit.resolve · ready",
-        "source-fit.resolve · blocked"
-      ],
-      "sideEffects": [
-        "publish one canonical generated JSON snapshot below .worktrees/<project>/coding-context/frontend only when its generation hash changes",
-        "upsert only changed Principles, Common Grammar, selected Grammar, and frontend coding-context records to one project-scoped Qdrant generation",
-        "never index raw source or treat Qdrant as canonical authority"
-      ]
+      "accepts": [],
+      "emits": [],
+      "sideEffects": []
     },
     {
-      "id": "fe/contract-plan",
+      "id": "fe/contract-freeze",
       "domain": "fe",
-      "knowledgeCount": 2,
-      "accepts": [
-        "frontend.contract.plan · ready"
-      ],
-      "emits": [
-        "frontend.contract.result · ready",
-        "frontend.contract.result · blocked"
-      ],
-      "sideEffects": [
-        "write contract plan only to task-session storage"
-      ]
+      "iconUrl": null,
+      "knowledgeCount": 1,
+      "accepts": [],
+      "emits": [],
+      "sideEffects": []
     },
     {
       "id": "fe/customer-journey",
       "domain": "fe",
-      "knowledgeCount": 1,
-      "accepts": [
-        "flow.generate · ready",
-        "flow.review · rejected"
-      ],
-      "emits": [
-        "flow.review · pending",
-        "flow.review · approved"
-      ],
-      "sideEffects": [
-        "keep input, output, loaded context, worker observations, drafts, evidence, and receipts in task-session storage only",
-        "purge every intermediate session object at every parent-skill terminal state"
-      ]
+      "iconUrl": null,
+      "knowledgeCount": 0,
+      "accepts": [],
+      "emits": [],
+      "sideEffects": []
     },
     {
       "id": "fe/design-critique",
       "domain": "fe",
-      "knowledgeCount": 2,
-      "accepts": [
-        "ui.critique · ready"
-      ],
-      "emits": [
-        "ui.critique.result · accepted",
-        "ui.critique.result · revise",
-        "ui.critique.result · blocked"
-      ],
-      "sideEffects": [
-        "write critique only to task-session storage"
-      ]
+      "iconUrl": null,
+      "knowledgeCount": 0,
+      "accepts": [],
+      "emits": [],
+      "sideEffects": []
     },
     {
       "id": "fe/design-implementation",
       "domain": "fe",
+      "iconUrl": null,
+      "knowledgeCount": 0,
+      "accepts": [],
+      "emits": [],
+      "sideEffects": []
+    },
+    {
+      "id": "fe/direction-generate",
+      "domain": "fe",
+      "iconUrl": null,
       "knowledgeCount": 1,
-      "accepts": [
-        "frontend.implement · ready"
-      ],
-      "emits": [
-        "frontend.implementation.result · ready",
-        "frontend.implementation.result · blocked"
-      ],
-      "sideEffects": [
-        "mutate only exact approved source paths",
-        "record before and after hashes"
-      ]
+      "accepts": [],
+      "emits": [],
+      "sideEffects": []
+    },
+    {
+      "id": "fe/direction-rank",
+      "domain": "fe",
+      "iconUrl": null,
+      "knowledgeCount": 1,
+      "accepts": [],
+      "emits": [],
+      "sideEffects": []
     },
     {
       "id": "fe/feedback-request",
       "domain": "fe",
+      "iconUrl": null,
+      "knowledgeCount": 0,
+      "accepts": [],
+      "emits": [],
+      "sideEffects": []
+    },
+    {
+      "id": "fe/finding-classify",
+      "domain": "fe",
+      "iconUrl": null,
       "knowledgeCount": 1,
-      "accepts": [
-        "fe.feedback.request · ready"
-      ],
-      "emits": [
-        "fe.feedback.request.result · complete",
-        "fe.feedback.request.blocked · blocked"
-      ],
-      "sideEffects": [
-        "coordinator upserts only the approved .claude/requests/<stable-id>.request.json target",
-        "emit a content-hash mutation descriptor for the durable feedback request",
-        "keep input, output, loaded context, drafts, evidence, and receipts in task-session storage only",
-        "purge every intermediate session object at every parent-skill terminal state"
-      ]
+      "accepts": [],
+      "emits": [],
+      "sideEffects": []
     },
     {
       "id": "fe/grammar-convergence",
       "domain": "fe",
-      "knowledgeCount": 34,
-      "accepts": [
-        "layout.review · approved",
-        "delivery.mission.resume · ready"
-      ],
-      "emits": [
-        "source-fit.resolve · ready",
-        "source-fit.resolve · blocked"
-      ],
-      "sideEffects": [
-        "keep input, output, loaded context, worker observations, drafts, evidence, and receipts in task-session storage only",
-        "purge every intermediate session object at every parent-skill terminal state"
-      ]
+      "iconUrl": null,
+      "knowledgeCount": 0,
+      "accepts": [],
+      "emits": [],
+      "sideEffects": []
     },
     {
       "id": "fe/implementation",
       "domain": "fe",
+      "iconUrl": null,
+      "knowledgeCount": 0,
+      "accepts": [],
+      "emits": [],
+      "sideEffects": []
+    },
+    {
+      "id": "fe/independent-review",
+      "domain": "fe",
+      "iconUrl": null,
       "knowledgeCount": 1,
-      "accepts": [
-        "code.implement · ready",
-        "requests.review · ready",
-        "request.result · ready",
-        "code.repair · repair"
-      ],
-      "emits": [
-        "seed.materialize · ready",
-        "code.result · blocked"
-      ],
-      "sideEffects": [
-        "coordinator mutates only exact approved targets for fe/implementation",
-        "keep input, output, loaded context, worker observations, drafts, evidence, and receipts in task-session storage only",
-        "purge every intermediate session object at every parent-skill terminal state"
-      ]
+      "accepts": [],
+      "emits": [],
+      "sideEffects": []
     },
     {
       "id": "fe/interaction-container-decision",
       "domain": "fe",
-      "knowledgeCount": 1,
-      "accepts": [
-        "ux.flow.container-decision · ready"
-      ],
-      "emits": [
-        "ux.flow.review · pending",
-        "ux.flow.result · blocked"
-      ],
-      "sideEffects": [
-        "write interaction-container decisions only to task-session storage"
-      ]
+      "iconUrl": null,
+      "knowledgeCount": 0,
+      "accepts": [],
+      "emits": [],
+      "sideEffects": []
     },
     {
       "id": "fe/layout",
       "domain": "fe",
-      "knowledgeCount": 1,
-      "accepts": [
-        "layout.generate · ready",
-        "layout.review · rejected"
-      ],
-      "emits": [
-        "layout.review · pending"
-      ],
-      "sideEffects": [
-        "keep input, output, loaded context, worker observations, drafts, evidence, and receipts in task-session storage only",
-        "create one task-session HTML review artifact that the host renders through visualize before requesting layout approval",
-        "purge every intermediate session object at every parent-skill terminal state"
-      ]
+      "iconUrl": null,
+      "knowledgeCount": 0,
+      "accepts": [],
+      "emits": [],
+      "sideEffects": []
     },
     {
       "id": "fe/learning-request",
       "domain": "fe",
-      "knowledgeCount": 1,
-      "accepts": [
-        "fe.maintenance.learning-request · ready"
-      ],
-      "emits": [
-        "fe.maintenance.learning-request.result · complete",
-        "fe.maintenance.blocked · blocked"
-      ],
-      "sideEffects": [
-        "coordinator mutates only exact approved targets for fe/learning-request",
-        "keep input, output, loaded context, worker observations, drafts, evidence, and receipts in task-session storage only",
-        "purge every intermediate session object at every parent-skill terminal state"
-      ]
+      "iconUrl": null,
+      "knowledgeCount": 0,
+      "accepts": [],
+      "emits": [],
+      "sideEffects": []
     },
     {
       "id": "fe/learning-resolve",
       "domain": "fe",
-      "knowledgeCount": 1,
-      "accepts": [
-        "fe.maintenance.learning-resolve · ready"
-      ],
-      "emits": [
-        "fe.maintenance.learning-resolve.result · complete",
-        "fe.maintenance.blocked · blocked"
-      ],
-      "sideEffects": [
-        "coordinator mutates only exact approved targets for fe/learning-resolve",
-        "keep input, output, loaded context, worker observations, drafts, evidence, and receipts in task-session storage only",
-        "purge every intermediate session object at every parent-skill terminal state"
-      ]
+      "iconUrl": null,
+      "knowledgeCount": 0,
+      "accepts": [],
+      "emits": [],
+      "sideEffects": []
     },
     {
       "id": "fe/maintenance-apply",
       "domain": "fe",
-      "knowledgeCount": 1,
-      "accepts": [
-        "fe.maintenance.maintenance-apply · ready",
-        "delivery.mission.resume · ready"
-      ],
-      "emits": [
-        "fe.maintenance.maintenance-apply.result · complete",
-        "fe.maintenance.blocked · blocked"
-      ],
-      "sideEffects": [
-        "coordinator mutates only exact approved targets for fe/maintenance-apply",
-        "emit the pinned source-change and approved acceptance-test-plan references for downstream proof operators",
-        "keep input, output, loaded context, worker observations, drafts, evidence, and receipts in task-session storage only",
-        "purge every intermediate session object at every parent-skill terminal state"
-      ]
+      "iconUrl": null,
+      "knowledgeCount": 0,
+      "accepts": [],
+      "emits": [],
+      "sideEffects": []
+    },
+    {
+      "id": "fe/mutation-boundary-freeze",
+      "domain": "fe",
+      "iconUrl": null,
+      "knowledgeCount": 0,
+      "accepts": [],
+      "emits": [],
+      "sideEffects": []
     },
     {
       "id": "fe/page-model",
       "domain": "fe",
-      "knowledgeCount": 1,
-      "accepts": [
-        "flow.review · approved"
-      ],
-      "emits": [
-        "state.generate · ready"
-      ],
-      "sideEffects": [
-        "keep input, output, loaded context, worker observations, drafts, evidence, and receipts in task-session storage only",
-        "purge every intermediate session object at every parent-skill terminal state"
-      ]
+      "iconUrl": null,
+      "knowledgeCount": 0,
+      "accepts": [],
+      "emits": [],
+      "sideEffects": []
     },
     {
       "id": "fe/preflight",
       "domain": "fe",
+      "iconUrl": null,
       "knowledgeCount": 0,
-      "accepts": [
-        "business.freshness · ready"
-      ],
-      "emits": [
-        "flow.generate · ready"
-      ],
-      "sideEffects": [
-        "freeze request, route, fresh business receipt, and declared write boundary in task-session storage only",
-        "purge every intermediate at every parent-skill terminal"
-      ]
+      "accepts": [],
+      "emits": [],
+      "sideEffects": []
     },
     {
       "id": "fe/principle-compile",
       "domain": "fe",
-      "knowledgeCount": 1,
-      "accepts": [
-        "principles.compile · ready"
-      ],
-      "emits": [
-        "layout.generate · ready",
-        "layout.generate · blocked"
-      ],
-      "sideEffects": [
-        "keep input, output, loaded context, worker observations, drafts, evidence, and receipts in task-session storage only",
-        "purge every intermediate session object at every parent-skill terminal state"
-      ]
+      "iconUrl": null,
+      "knowledgeCount": 0,
+      "accepts": [],
+      "emits": [],
+      "sideEffects": []
     },
     {
       "id": "fe/product-potential",
       "domain": "fe",
-      "knowledgeCount": 2,
-      "accepts": [
-        "product.potential.assess · ready"
-      ],
-      "emits": [
-        "product.potential.result · ready",
-        "product.potential.result · blocked"
-      ],
-      "sideEffects": [
-        "write assessment only to task-session storage"
-      ]
+      "iconUrl": null,
+      "knowledgeCount": 0,
+      "accepts": [],
+      "emits": [],
+      "sideEffects": []
     },
     {
       "id": "fe/product-proof",
       "domain": "fe",
-      "knowledgeCount": 1,
-      "accepts": [
-        "proof.run · ready"
-      ],
-      "emits": [
-        "proof.review · complete",
-        "code.repair · repair",
-        "layout.review · rejected",
-        "proof.review · blocked"
-      ],
-      "sideEffects": [
-        "keep input, output, loaded context, worker observations, drafts, evidence, and receipts in task-session storage only",
-        "purge every intermediate session object at every parent-skill terminal state"
-      ]
+      "iconUrl": null,
+      "knowledgeCount": 0,
+      "accepts": [],
+      "emits": [],
+      "sideEffects": []
     },
     {
       "id": "fe/product-seed",
       "domain": "fe",
-      "knowledgeCount": 1,
-      "accepts": [
-        "seed.materialize · ready"
-      ],
-      "emits": [
-        "test.unit · ready",
-        "seed.result · blocked"
-      ],
-      "sideEffects": [
-        "coordinator performs only declared isolated external effects for fe/product-seed",
-        "keep input, output, loaded context, worker observations, drafts, evidence, and receipts in task-session storage only",
-        "purge every intermediate session object at every parent-skill terminal state"
-      ]
+      "iconUrl": null,
+      "knowledgeCount": 0,
+      "accepts": [],
+      "emits": [],
+      "sideEffects": []
     },
     {
-      "id": "fe/product-uat",
+      "id": "fe/progress-guard",
       "domain": "fe",
-      "knowledgeCount": 2,
-      "accepts": [
-        "product.uat · ready"
-      ],
-      "emits": [
-        "product.uat.result · passed",
-        "product.uat.result · ux-ui-repair",
-        "product.uat.result · repair",
-        "product.uat.result · blocked"
-      ],
-      "sideEffects": [
-        "write UAT evidence only to task-session storage"
-      ]
+      "iconUrl": null,
+      "knowledgeCount": 0,
+      "accepts": [],
+      "emits": [],
+      "sideEffects": []
+    },
+    {
+      "id": "fe/render-capture",
+      "domain": "fe",
+      "iconUrl": null,
+      "knowledgeCount": 1,
+      "accepts": [],
+      "emits": [],
+      "sideEffects": []
+    },
+    {
+      "id": "fe/request-compile",
+      "domain": "fe",
+      "iconUrl": null,
+      "knowledgeCount": 1,
+      "accepts": [],
+      "emits": [],
+      "sideEffects": []
     },
     {
       "id": "fe/request-emission",
       "domain": "fe",
-      "knowledgeCount": 1,
-      "accepts": [
-        "requests.review · ready",
-        "requests.review · ready"
-      ],
-      "emits": [
-        "request.result · ready",
-        "request.result · blocked"
-      ],
-      "sideEffects": [
-        "coordinator mutates only exact approved targets for fe/request-emission",
-        "keep input, output, loaded context, worker observations, drafts, evidence, and receipts in task-session storage only",
-        "purge every intermediate session object at every parent-skill terminal state"
-      ]
+      "iconUrl": null,
+      "knowledgeCount": 0,
+      "accepts": [],
+      "emits": [],
+      "sideEffects": []
     },
     {
       "id": "fe/request-review",
       "domain": "fe",
+      "iconUrl": null,
+      "knowledgeCount": 0,
+      "accepts": [],
+      "emits": [],
+      "sideEffects": []
+    },
+    {
+      "id": "fe/return-consume",
+      "domain": "fe",
+      "iconUrl": null,
+      "knowledgeCount": 0,
+      "accepts": [],
+      "emits": [],
+      "sideEffects": []
+    },
+    {
+      "id": "fe/runtime-observe",
+      "domain": "fe",
+      "iconUrl": null,
       "knowledgeCount": 1,
-      "accepts": [
-        "fe.request.review · ready"
-      ],
-      "emits": [
-        "fe.request.review.result · complete",
-        "fe.request.review.blocked · blocked"
-      ],
+      "accepts": [],
+      "emits": [],
+      "sideEffects": []
+    },
+    {
+      "id": "fe/semantic-audit",
+      "domain": "fe",
+      "iconUrl": null,
+      "knowledgeCount": 1,
+      "accepts": [],
+      "emits": [],
+      "sideEffects": []
+    },
+    {
+      "id": "fe/source-apply",
+      "domain": "fe",
+      "iconUrl": null,
+      "knowledgeCount": 1,
+      "accepts": [],
+      "emits": [],
       "sideEffects": [
-        "coordinator updates only the approved .claude/requests/<stable-id>.request.json review and status fields",
-        "emit a content-hash mutation descriptor for the durable review decision",
-        "keep request bodies, approval evidence, drafts, and receipts in task-session storage only",
-        "purge every intermediate session object at every parent-skill terminal state"
+        "mutate only the exact frozen frontend source boundary"
       ]
     },
     {
       "id": "fe/source-fit",
       "domain": "fe",
+      "iconUrl": null,
+      "knowledgeCount": 0,
+      "accepts": [],
+      "emits": [],
+      "sideEffects": []
+    },
+    {
+      "id": "fe/source-repair",
+      "domain": "fe",
+      "iconUrl": null,
       "knowledgeCount": 1,
-      "accepts": [
-        "source-fit.resolve · ready"
-      ],
-      "emits": [
-        "principles.compile · ready",
-        "principles.compile · ready",
-        "principles.compile · ready"
-      ],
+      "accepts": [],
+      "emits": [],
       "sideEffects": [
-        "keep input, output, loaded context, worker observations, drafts, evidence, and receipts in task-session storage only",
-        "purge every intermediate session object at every parent-skill terminal state"
+        "mutate only the exact frozen frontend source boundary"
       ]
     },
     {
       "id": "fe/state",
       "domain": "fe",
-      "knowledgeCount": 1,
-      "accepts": [
-        "state.generate · ready"
-      ],
-      "emits": [
-        "layout.generate · ready",
-        "state.result · blocked"
-      ],
-      "sideEffects": [
-        "keep input, output, loaded context, worker observations, drafts, evidence, and receipts in task-session storage only",
-        "purge every intermediate session object at every parent-skill terminal state"
-      ]
+      "iconUrl": null,
+      "knowledgeCount": 0,
+      "accepts": [],
+      "emits": [],
+      "sideEffects": []
     },
     {
       "id": "fe/surface-audit",
       "domain": "fe",
+      "iconUrl": null,
+      "knowledgeCount": 0,
+      "accepts": [],
+      "emits": [],
+      "sideEffects": []
+    },
+    {
+      "id": "fe/target-resolve",
+      "domain": "fe",
+      "iconUrl": null,
       "knowledgeCount": 1,
-      "accepts": [
-        "fe.maintenance.surface-audit · ready",
-        "business.freshness · ready"
-      ],
-      "emits": [
-        "fe.maintenance.surface-audit.result · complete",
-        "fe.maintenance.blocked · blocked"
-      ],
-      "sideEffects": [
-        "keep input, output, loaded context, worker observations, drafts, evidence, and receipts in task-session storage only",
-        "purge every intermediate session object at every parent-skill terminal state"
-      ]
+      "accepts": [],
+      "emits": [],
+      "sideEffects": []
+    },
+    {
+      "id": "fe/ui-audit",
+      "domain": "fe",
+      "iconUrl": null,
+      "knowledgeCount": 1,
+      "accepts": [],
+      "emits": [],
+      "sideEffects": []
     },
     {
       "id": "fe/ui-detail-freeze",
       "domain": "fe",
-      "knowledgeCount": 4,
-      "accepts": [
-        "ui.detail.freeze · ready"
-      ],
-      "emits": [
-        "ui.detail.review · pending",
-        "ui.detail.result · blocked"
-      ],
-      "sideEffects": [
-        "write immutable detail artifact to task-session storage"
-      ]
+      "iconUrl": null,
+      "knowledgeCount": 0,
+      "accepts": [],
+      "emits": [],
+      "sideEffects": []
     },
     {
       "id": "fe/ui-direction",
       "domain": "fe",
-      "knowledgeCount": 2,
-      "accepts": [
-        "ui.direction.generate · ready"
-      ],
-      "emits": [
-        "ui.direction.review · pending",
-        "ui.direction.result · blocked"
-      ],
-      "sideEffects": [
-        "write direction artifacts only to task-session storage"
-      ]
+      "iconUrl": null,
+      "knowledgeCount": 0,
+      "accepts": [],
+      "emits": [],
+      "sideEffects": []
+    },
+    {
+      "id": "fe/ux-audit",
+      "domain": "fe",
+      "iconUrl": null,
+      "knowledgeCount": 1,
+      "accepts": [],
+      "emits": [],
+      "sideEffects": []
     },
     {
       "id": "fe/ux-flow",
       "domain": "fe",
+      "iconUrl": null,
       "knowledgeCount": 2,
-      "accepts": [
-        "ux.flow.model · ready"
-      ],
-      "emits": [
-        "ux.flow.container-decision · ready",
-        "ux.flow.result · blocked"
-      ],
-      "sideEffects": [
-        "write UX model and potential signals only to task-session storage"
-      ]
+      "accepts": [],
+      "emits": [],
+      "sideEffects": []
     },
     {
       "id": "fe/ux-ui-resolve",
       "domain": "fe",
-      "knowledgeCount": 4,
-      "accepts": [
-        "product.uat.ux-ui-resolution · ready",
-        "product.uat.ux-ui-resolution · verify"
-      ],
-      "emits": [
-        "product.uat.ux-ui-resolution.result · repair-ready",
-        "product.uat.ux-ui-resolution.result · resolved",
-        "product.uat.ux-ui-resolution.result · blocked"
-      ],
-      "sideEffects": [
-        "update only the exact declared UX/UI request ledgers",
-        "write the repair contract and proof receipt only to task-session storage"
-      ]
+      "iconUrl": null,
+      "knowledgeCount": 0,
+      "accepts": [],
+      "emits": [],
+      "sideEffects": []
     },
     {
       "id": "fe/visual-fidelity",
       "domain": "fe",
-      "knowledgeCount": 2,
-      "accepts": [
-        "frontend.fidelity.verify · ready"
-      ],
-      "emits": [
-        "frontend.fidelity.result · passed",
-        "frontend.fidelity.result · repair",
-        "frontend.fidelity.result · blocked"
-      ],
-      "sideEffects": [
-        "write screenshots and comparison receipts only to task-session storage"
-      ]
-    },
-    {
-      "id": "platform/mcp-config",
-      "domain": "platform",
-      "knowledgeCount": 1,
-      "accepts": [
-        "platform.mcp.config · ready"
-      ],
-      "emits": [
-        "platform.mcp.index · ready"
-      ],
-      "sideEffects": [
-        "write only the approved ignored generated MCP execution config",
-        "keep input, output, context, observations, and receipts in task-session memory only",
-        "purge all intermediate session objects at every parent-skill terminal state"
-      ]
-    },
-    {
-      "id": "platform/mcp-publish",
-      "domain": "platform",
-      "knowledgeCount": 1,
-      "accepts": [
-        "platform.mcp.publish · ready"
-      ],
-      "emits": [
-        "platform.mcp.proved · complete",
-        "platform.blocked · blocked"
-      ],
-      "sideEffects": [
-        "reconcile declared MCP/Qdrant runtime services through coordinator-owned commands",
-        "keep inputs, outputs, loads, observations, receipts, and evidence in task-session memory only",
-        "purge every session object at each parent-skill terminal state"
-      ]
+      "iconUrl": null,
+      "knowledgeCount": 0,
+      "accepts": [],
+      "emits": [],
+      "sideEffects": []
     },
     {
       "id": "platform/observability-reconcile",
       "domain": "platform",
-      "knowledgeCount": 1,
-      "accepts": [
-        "platform.observability.reconcile · ready"
-      ],
-      "emits": [
-        "platform.observability.proved · complete",
-        "platform.blocked · blocked"
-      ],
-      "sideEffects": [
-        "mutate declared observability stack and provider configuration through the coordinator only",
-        "keep all runtime inputs, loads, observations, receipts, evidence, and outputs in task-session memory",
-        "purge every session object at each parent-skill terminal state"
-      ]
-    },
-    {
-      "id": "platform/reference-reindex",
-      "domain": "platform",
+      "iconUrl": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2NCA2NCIgZmlsbD0ibm9uZSI+CiAgPHBhdGggZmlsbD0iI0Y3Qzk0OCIgZD0iTTUgMzJTMTUgMTUgMzIgMTVzMjcgMTcgMjcgMTctMTAgMTctMjcgMTdTNSAzMiA1IDMyWiIvPgogIDxwYXRoIHN0cm9rZT0iIzc1NDdGRiIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIiBzdHJva2UtbGluZWpvaW49InJvdW5kIiBzdHJva2Utd2lkdGg9IjMiIGQ9Ik01IDMyUzE1IDE1IDMyIDE1czI3IDE3IDI3IDE3LTEwIDE3LTI3IDE3UzUgMzIgNSAzMloiLz4KICA8Y2lyY2xlIGN4PSIzMiIgY3k9IjMyIiByPSIxMCIgZmlsbD0iIzc1NDdGRiIvPgogIDxwYXRoIHN0cm9rZT0iI0Y3Qzk0OCIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIiBzdHJva2UtbGluZWpvaW49InJvdW5kIiBzdHJva2Utd2lkdGg9IjMiIGQ9Ik0xNSAzM2g4bDMtNyA2IDE0IDUtMTEgNCA0aDgiLz4KPC9zdmc+Cg==",
       "knowledgeCount": 0,
-      "accepts": [
-        "platform.mcp.index · ready"
-      ],
-      "emits": [
-        "platform.mcp.publish · ready",
-        "platform.mcp.publish · blocked"
-      ],
+      "accepts": [],
+      "emits": [],
       "sideEffects": [
-        "bootstrap the pinned Python Qdrant Edge and MCP runtime plus loopback Caddy when machine-local readiness is absent",
-        "merge only the named Codex user MCP entry without replacing unrelated settings",
-        "apply noop, incremental, or full indexing only to the declared local reference partition after complete proof",
-        "write generated runtime state only below ignored machine-local state roots",
-        "never mutate a reference checkout or any Git index",
-        "purge task-session inventories, catalogs, candidate points, and receipts at the parent-skill terminal"
+        "apply only the approved observability configuration, service, dashboard, and remote-write delta"
       ]
     },
     {
       "id": "platform/sonar-service-reconcile",
       "domain": "platform",
-      "knowledgeCount": 1,
-      "accepts": [
-        "platform.sonar.reconcile · ready"
-      ],
-      "emits": [
-        "platform.sonar.proved · complete",
-        "platform.blocked · blocked"
-      ],
+      "iconUrl": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2NCA2NCIgZmlsbD0ibm9uZSI+CiAgPGNpcmNsZSBjeD0iMjciIGN5PSIzMSIgcj0iMjIiIGZpbGw9IiNGN0M5NDgiLz4KICA8cGF0aCBzdHJva2U9IiM3NTQ3RkYiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgc3Ryb2tlLXdpZHRoPSIzIiBkPSJNMjcgMTlhMTIgMTIgMCAwIDEgMTIgMTJNMjcgMTJhMTkgMTkgMCAwIDEgMTkgMTlNMjcgMjZhNSA1IDAgMCAxIDUgNSIvPgogIDxjaXJjbGUgY3g9IjI3IiBjeT0iMzEiIHI9IjMuNSIgZmlsbD0iIzc1NDdGRiIvPgogIDxwYXRoIGZpbGw9IiNGN0M5NDgiIHN0cm9rZT0iIzc1NDdGRiIgc3Ryb2tlLWxpbmVqb2luPSJyb3VuZCIgc3Ryb2tlLXdpZHRoPSIzIiBkPSJtMzkgMzkgOC0zIDggM3Y3YzAgNi0zLjYgMTAtOCAxMi00LjQtMi04LTYtOC0xMnYtN1oiLz4KICA8cGF0aCBzdHJva2U9IiM3NTQ3RkYiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgc3Ryb2tlLWxpbmVqb2luPSJyb3VuZCIgc3Ryb2tlLXdpZHRoPSIzIiBkPSJtNDMuNSA0NiAyLjUgMi41IDUtNSIvPgo8L3N2Zz4K",
+      "knowledgeCount": 0,
+      "accepts": [],
+      "emits": [],
       "sideEffects": [
-        "mutate declared Sonar service/project enforcement state",
-        "keep all inputs, outputs, provider observations, worker results, and receipts in task-session memory only",
-        "purge every intermediate session object at each parent-skill terminal state"
-      ]
-    },
-    {
-      "id": "platform/source-index",
-      "domain": "platform",
-      "knowledgeCount": 1,
-      "accepts": [
-        "platform.mcp.index · ready"
-      ],
-      "emits": [
-        "platform.mcp.publish · ready",
-        "platform.mcp.publish · blocked"
-      ],
-      "sideEffects": [
-        "replace only declared Qdrant source partitions",
-        "skip unchanged documents by complete content/generator identity",
-        "keep loaded bodies, chunks, embeddings, observations, and receipts in task-session memory only",
-        "purge every intermediate session object at each parent-skill terminal state"
+        "apply only the approved Sonar project, profile, gate, and enforcement delta"
       ]
     },
     {
       "id": "platform/tunnel-apply",
       "domain": "platform",
-      "knowledgeCount": 1,
-      "accepts": [
-        "platform.tunnel.apply · ready"
-      ],
-      "emits": [
-        "platform.tunnel.proved · complete",
-        "platform.blocked · blocked"
-      ],
+      "iconUrl": null,
+      "knowledgeCount": 0,
+      "accepts": [],
+      "emits": [],
       "sideEffects": [
-        "mutate only the declared Cloudflare tunnel and DNS route through the coordinator",
-        "keep all inputs, loads, observations, receipts, evidence, and outputs in task-session memory",
-        "purge every session object at each parent-skill terminal state"
+        "apply only the approved tunnel-route and proxied-DNS delta through the coordinator"
       ]
     },
     {
       "id": "platform/tunnel-plan",
       "domain": "platform",
-      "knowledgeCount": 1,
-      "accepts": [
-        "platform.tunnel.plan · ready"
-      ],
-      "emits": [
-        "platform.tunnel.apply · ready"
-      ],
-      "sideEffects": [
-        "keep input, output, loads, observations, plans, and evidence in task-session memory only",
-        "purge every session object at each parent-skill terminal state"
-      ]
+      "iconUrl": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2NCA2NCIgZmlsbD0ibm9uZSI+CiAgPHBhdGggZmlsbD0iI0Y3Qzk0OCIgZD0iTTEzIDEwaDMxbDggOHYzNGE0IDQgMCAwIDEtNCA0SDEzYTQgNCAwIDAgMS00LTRWMTRhNCA0IDAgMCAxIDQtNFoiLz4KICA8cGF0aCBzdHJva2U9IiM3NTQ3RkYiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgc3Ryb2tlLWxpbmVqb2luPSJyb3VuZCIgc3Ryb2tlLXdpZHRoPSIzIiBkPSJNNDQgMTB2OGg4TTE4IDQzYzctMTUgMTctMTUgMjgtNCIvPgogIDxjaXJjbGUgY3g9IjE4IiBjeT0iNDMiIHI9IjQiIGZpbGw9IiNGN0M5NDgiIHN0cm9rZT0iIzc1NDdGRiIgc3Ryb2tlLXdpZHRoPSIzIi8+CiAgPGNpcmNsZSBjeD0iMzEiIGN5PSIyOSIgcj0iNCIgZmlsbD0iI0Y3Qzk0OCIgc3Ryb2tlPSIjNzU0N0ZGIiBzdHJva2Utd2lkdGg9IjMiLz4KICA8Y2lyY2xlIGN4PSI0NiIgY3k9IjM5IiByPSI0IiBmaWxsPSIjRjdDOTQ4IiBzdHJva2U9IiM3NTQ3RkYiIHN0cm9rZS13aWR0aD0iMyIvPgogIDxwYXRoIHN0cm9rZT0iIzc1NDdGRiIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIiBzdHJva2Utd2lkdGg9IjMiIGQ9Ik0xNyAxOWgxNyIvPgo8L3N2Zz4K",
+      "knowledgeCount": 0,
+      "accepts": [],
+      "emits": [],
+      "sideEffects": []
     },
     {
       "id": "quality/build",
       "domain": "quality",
-      "knowledgeCount": 1,
-      "accepts": [
-        "quality.build · ready"
-      ],
-      "emits": [
-        "quality.unit · ready",
-        "be.repair · ready",
-        "architecture.boundary · ready",
-        "quality.blocked · blocked"
-      ],
+      "iconUrl": null,
+      "knowledgeCount": 0,
+      "accepts": [],
+      "emits": [],
       "sideEffects": [
-        "keep input, output, loaded context, command captures, diagnostics, worker observations, and receipts in task-session memory only",
-        "purge every intermediate session object at each parent-skill terminal state"
+        "read only the supplied exact references"
       ]
     },
     {
       "id": "quality/coding-preflight",
       "domain": "quality",
-      "knowledgeCount": 1,
-      "accepts": [
-        "quality.coding-preflight · ready"
-      ],
-      "emits": [
-        "code.implement · ready",
-        "architecture.boundary · ready",
-        "quality.blocked · blocked"
-      ],
+      "iconUrl": null,
+      "knowledgeCount": 0,
+      "accepts": [],
+      "emits": [],
       "sideEffects": [
-        "read only the exact frozen targets, nearest declared implementation references, applicable lint configuration and TypeScript configuration",
-        "emit an ephemeral preflight receipt whose static gates activate before commit or by explicit standalone request; do not mutate product source or run lint, typecheck or Sonar",
-        "purge command captures, observations and receipts at the parent-skill terminal"
+        "read only the exact frozen targets, nearest declared implementation references, applicable lint configuration and TypeScript configuration"
       ]
     },
     {
       "id": "quality/debt-repay",
       "domain": "quality",
-      "knowledgeCount": 1,
-      "accepts": [
-        "quality.debt · ready"
-      ],
-      "emits": [
-        "quality.debt.result · complete",
-        "quality.debt.result · ready",
-        "quality.debt.proof · ready",
-        "quality.blocked · blocked"
-      ],
+      "iconUrl": null,
+      "knowledgeCount": 0,
+      "accepts": [],
+      "emits": [],
       "sideEffects": [
         "mutate only the exactly approved debt scope",
-        "finalize closed debt inventory only from an independent green closure proof",
-        "keep input, output, loaded context, command captures, diagnostics, worker observations, and receipts in task-session memory only",
-        "purge every intermediate session object at each parent-skill terminal state"
+        "finalize closed debt inventory only from an independent green closure proof"
       ]
     },
     {
       "id": "quality/delivery-proof",
       "domain": "quality",
-      "knowledgeCount": 1,
-      "accepts": [
-        "quality.proof · ready"
-      ],
-      "emits": [
-        "delivery.proved · ready",
-        "quality.blocked · blocked"
-      ],
+      "iconUrl": null,
+      "knowledgeCount": 0,
+      "accepts": [],
+      "emits": [],
       "sideEffects": [
-        "keep input, output, loaded context, command captures, diagnostics, worker observations, and receipts in task-session memory only",
-        "purge every intermediate session object at each parent-skill terminal state"
+        "read only the supplied exact references"
       ]
     },
     {
       "id": "quality/e2e",
       "domain": "quality",
-      "knowledgeCount": 1,
-      "accepts": [
-        "quality.e2e · ready"
-      ],
-      "emits": [
-        "quality.sonar · ready",
-        "be.repair · ready",
-        "architecture.boundary · ready",
-        "quality.blocked · blocked"
-      ],
+      "iconUrl": null,
+      "knowledgeCount": 0,
+      "accepts": [],
+      "emits": [],
       "sideEffects": [
-        "keep input, output, loaded context, command captures, diagnostics, worker observations, and receipts in task-session memory only",
-        "purge every intermediate session object at each parent-skill terminal state"
+        "read only the supplied exact references"
       ]
     },
     {
       "id": "quality/finding-repair",
       "domain": "quality",
-      "knowledgeCount": 1,
-      "accepts": [
-        "quality.repair · ready"
-      ],
-      "emits": [
-        "quality.repair.result · complete",
-        "quality.blocked · blocked",
-        "quality.inventory · ready",
-        "quality.blocked · blocked"
-      ],
+      "iconUrl": null,
+      "knowledgeCount": 0,
+      "accepts": [],
+      "emits": [],
       "sideEffects": [
-        "mutate only one exact approved finding boundary and emit a typed decision proof",
-        "keep input, output, loaded context, command captures, diagnostics, worker observations, and receipts in task-session memory only",
-        "purge every intermediate session object at each parent-skill terminal state"
+        "mutate only one exact approved finding boundary and emit a typed decision proof"
       ]
     },
     {
       "id": "quality/format",
       "domain": "quality",
-      "knowledgeCount": 1,
-      "accepts": [
-        "quality.format · ready"
-      ],
-      "emits": [
-        "quality.lint · ready",
-        "be.repair · ready",
-        "architecture.boundary · ready",
-        "quality.blocked · blocked"
-      ],
+      "iconUrl": null,
+      "knowledgeCount": 0,
+      "accepts": [],
+      "emits": [],
       "sideEffects": [
-        "keep input, output, loaded context, command captures, diagnostics, worker observations, and receipts in task-session memory only",
-        "purge every intermediate session object at each parent-skill terminal state"
+        "read only the supplied exact references"
       ]
     },
     {
       "id": "quality/integration",
       "domain": "quality",
-      "knowledgeCount": 1,
-      "accepts": [
-        "quality.integration · ready"
-      ],
-      "emits": [
-        "quality.e2e · ready",
-        "be.repair · ready",
-        "architecture.boundary · ready",
-        "quality.blocked · blocked"
-      ],
+      "iconUrl": null,
+      "knowledgeCount": 0,
+      "accepts": [],
+      "emits": [],
       "sideEffects": [
-        "keep input, output, loaded context, command captures, diagnostics, worker observations, and receipts in task-session memory only",
-        "purge every intermediate session object at each parent-skill terminal state"
+        "read only the supplied exact references"
       ]
     },
     {
       "id": "quality/lint",
       "domain": "quality",
-      "knowledgeCount": 1,
-      "accepts": [
-        "quality.lint · ready"
-      ],
-      "emits": [
-        "quality.typecheck · ready",
-        "be.repair · ready",
-        "architecture.boundary · ready",
-        "quality.blocked · blocked"
-      ],
+      "iconUrl": null,
+      "knowledgeCount": 0,
+      "accepts": [],
+      "emits": [],
       "sideEffects": [
-        "keep input, output, loaded context, command captures, diagnostics, worker observations, and receipts in task-session memory only",
-        "purge every intermediate session object at each parent-skill terminal state"
+        "read only the supplied exact references"
       ]
     },
     {
       "id": "quality/readiness-inventory",
       "domain": "quality",
-      "knowledgeCount": 1,
-      "accepts": [
-        "quality.inventory · ready"
-      ],
-      "emits": [
-        "quality.inventory.result · complete",
-        "quality.inventory.result · ready",
-        "quality.blocked · blocked"
-      ],
+      "iconUrl": null,
+      "knowledgeCount": 0,
+      "accepts": [],
+      "emits": [],
       "sideEffects": [
-        "keep input, output, loaded context, command captures, diagnostics, worker observations, and receipts in task-session memory only",
-        "purge every intermediate session object at each parent-skill terminal state"
+        "read only the supplied exact references"
       ]
     },
     {
       "id": "quality/rule-binding-check",
       "domain": "quality",
-      "knowledgeCount": 1,
-      "accepts": [
-        "quality.rule-bindings · ready"
-      ],
-      "emits": [
-        "quality.rule-bindings.result · complete",
-        "quality.rule-bindings.result · ready",
-        "quality.blocked · blocked"
-      ],
+      "iconUrl": null,
+      "knowledgeCount": 0,
+      "accepts": [],
+      "emits": [],
       "sideEffects": [
-        "keep input, output, loaded context, command captures, diagnostics, worker observations, and receipts in task-session memory only",
-        "purge every intermediate session object at each parent-skill terminal state"
+        "read only the supplied exact references"
       ]
     },
     {
       "id": "quality/sonar",
       "domain": "quality",
-      "knowledgeCount": 1,
-      "accepts": [
-        "quality.sonar · ready"
-      ],
-      "emits": [
-        "deployment.intent · ready",
-        "be.repair · ready",
-        "architecture.boundary · ready",
-        "quality.blocked · blocked"
-      ],
+      "iconUrl": null,
+      "knowledgeCount": 0,
+      "accepts": [],
+      "emits": [],
       "sideEffects": [
-        "keep input, output, loaded context, command captures, diagnostics, worker observations, and receipts in task-session memory only",
-        "purge every intermediate session object at each parent-skill terminal state"
+        "read only the supplied exact references"
       ]
     },
     {
       "id": "quality/typecheck",
       "domain": "quality",
-      "knowledgeCount": 1,
-      "accepts": [
-        "quality.typecheck · ready"
-      ],
-      "emits": [
-        "quality.build · ready",
-        "be.repair · ready",
-        "architecture.boundary · ready",
-        "quality.blocked · blocked"
-      ],
+      "iconUrl": null,
+      "knowledgeCount": 0,
+      "accepts": [],
+      "emits": [],
       "sideEffects": [
-        "keep input, output, loaded context, command captures, diagnostics, worker observations, and receipts in task-session memory only",
-        "purge every intermediate session object at each parent-skill terminal state"
+        "read only the supplied exact references"
       ]
     },
     {
       "id": "quality/unit-coverage",
       "domain": "quality",
-      "knowledgeCount": 1,
-      "accepts": [
-        "quality.unit · ready"
-      ],
-      "emits": [
-        "quality.integration · ready",
-        "be.repair · ready",
-        "architecture.boundary · ready",
-        "quality.blocked · blocked"
-      ],
+      "iconUrl": null,
+      "knowledgeCount": 0,
+      "accepts": [],
+      "emits": [],
       "sideEffects": [
-        "keep input, output, loaded context, command captures, diagnostics, worker observations, and receipts in task-session memory only",
-        "purge every intermediate session object at each parent-skill terminal state"
+        "read only the supplied exact references"
       ]
     },
     {
       "id": "quality/workflow-diagnose",
       "domain": "quality",
-      "knowledgeCount": 1,
-      "accepts": [
-        "quality.diagnose · ready"
-      ],
-      "emits": [
-        "quality.diagnosed · complete",
-        "quality.diagnosed · blocked",
-        "quality.blocked · blocked"
-      ],
+      "iconUrl": null,
+      "knowledgeCount": 0,
+      "accepts": [],
+      "emits": [],
       "sideEffects": [
-        "keep input, output, loaded context, command captures, diagnostics, worker observations, and receipts in task-session memory only",
-        "purge every intermediate session object at each parent-skill terminal state"
+        "read only the supplied exact references"
       ]
     },
     {
       "id": "source/conversation-query",
       "domain": "source",
-      "knowledgeCount": 1,
-      "accepts": [
-        "source.conversation.query · ready"
-      ],
-      "emits": [
-        "source.conversation.result · complete",
-        "source.conversation.result · complete"
-      ],
-      "sideEffects": [
-        "keep input, output, loaded context, scratch values, worker observations, and receipts in task-session memory only",
-        "purge every intermediate session object at each parent-skill terminal state"
-      ]
+      "iconUrl": null,
+      "knowledgeCount": 0,
+      "accepts": [],
+      "emits": [],
+      "sideEffects": []
     },
     {
       "id": "source/conversation-record",
       "domain": "source",
-      "knowledgeCount": 1,
-      "accepts": [
-        "source.conversation.record · ready"
-      ],
-      "emits": [
-        "source.conversation.recorded · complete"
-      ],
+      "iconUrl": null,
+      "knowledgeCount": 0,
+      "accepts": [],
+      "emits": [],
       "sideEffects": [
-        "write durable provenance head and rebuildable search cache",
-        "keep input, output, loaded context, scratch values, worker observations, and receipts in task-session memory only",
-        "purge every intermediate session object at each parent-skill terminal state"
+        "append one immutable provenance head when compare-and-set succeeds"
       ]
     },
     {
       "id": "tech-stack/compatibility-check",
       "domain": "tech-stack",
+      "iconUrl": null,
       "knowledgeCount": 0,
-      "accepts": [
-        "tech-stack.compatibility · ready"
-      ],
-      "emits": [
-        "tech-stack.compatibility · ready",
-        "tech-stack.compatibility · revise",
-        "tech-stack.compatibility · blocked"
-      ],
-      "sideEffects": [
-        "read only declared references",
-        "store intermediate artifacts in task-session memory only"
-      ]
+      "accepts": [],
+      "emits": [],
+      "sideEffects": []
     },
     {
       "id": "tech-stack/constraint-publish",
       "domain": "tech-stack",
+      "iconUrl": null,
       "knowledgeCount": 0,
-      "accepts": [
-        "tech-stack.constraint · ready"
-      ],
-      "emits": [
-        "tech-stack.constraint · ready",
-        "tech-stack.constraint · blocked"
-      ],
+      "accepts": [],
+      "emits": [],
       "sideEffects": [
-        "read only declared references",
-        "store intermediate artifacts in task-session memory only"
+        "write only the declared immutable tech-stack head"
       ]
     },
     {
       "id": "tech-stack/discover",
       "domain": "tech-stack",
+      "iconUrl": null,
       "knowledgeCount": 0,
-      "accepts": [
-        "tech-stack.discovery · ready"
-      ],
-      "emits": [
-        "tech-stack.discovery · ready",
-        "tech-stack.discovery · blocked"
-      ],
+      "accepts": [],
+      "emits": [],
       "sideEffects": [
-        "read only declared references",
-        "store intermediate artifacts in task-session memory only"
+        "read only the supplied evidence references"
       ]
     },
     {
       "id": "tech-stack/topology-model",
       "domain": "tech-stack",
+      "iconUrl": null,
       "knowledgeCount": 0,
-      "accepts": [
-        "tech-stack.model · ready"
-      ],
-      "emits": [
-        "tech-stack.model · ready",
-        "tech-stack.model · revise",
-        "tech-stack.model · blocked"
-      ],
+      "accepts": [],
+      "emits": [],
       "sideEffects": [
-        "read only declared references",
-        "store intermediate artifacts in task-session memory only"
+        "write only the candidate stack model to task-session storage"
       ]
+    },
+    {
+      "id": "test/domain-call-plan",
+      "domain": "test",
+      "iconUrl": null,
+      "knowledgeCount": 0,
+      "accepts": [],
+      "emits": [],
+      "sideEffects": []
     },
     {
       "id": "test/e2e",
       "domain": "test",
-      "knowledgeCount": 1,
-      "accepts": [
-        "test.e2e · ready"
-      ],
-      "emits": [
-        "test.ui · ready",
-        "code.repair · repair",
-        "test.review · blocked"
-      ],
+      "iconUrl": null,
+      "knowledgeCount": 0,
+      "accepts": [],
+      "emits": [],
       "sideEffects": [
         "start declared test dependencies",
         "materialize and reset isolated test data",
-        "run connected scenarios",
-        "write task-session E2E evidence only"
+        "run connected scenarios"
       ]
+    },
+    {
+      "id": "test/proof-join",
+      "domain": "test",
+      "iconUrl": null,
+      "knowledgeCount": 0,
+      "accepts": [],
+      "emits": [],
+      "sideEffects": []
+    },
+    {
+      "id": "test/return-consume",
+      "domain": "test",
+      "iconUrl": null,
+      "knowledgeCount": 0,
+      "accepts": [],
+      "emits": [],
+      "sideEffects": []
+    },
+    {
+      "id": "test/uat-behavior-proof",
+      "domain": "test",
+      "iconUrl": null,
+      "knowledgeCount": 0,
+      "accepts": [],
+      "emits": [],
+      "sideEffects": []
+    },
+    {
+      "id": "test/uat-case-freeze",
+      "domain": "test",
+      "iconUrl": null,
+      "knowledgeCount": 0,
+      "accepts": [],
+      "emits": [],
+      "sideEffects": []
+    },
+    {
+      "id": "test/uat-result-prove",
+      "domain": "test",
+      "iconUrl": null,
+      "knowledgeCount": 0,
+      "accepts": [],
+      "emits": [],
+      "sideEffects": []
+    },
+    {
+      "id": "test/uat-result-publish",
+      "domain": "test",
+      "iconUrl": null,
+      "knowledgeCount": 0,
+      "accepts": [],
+      "emits": [],
+      "sideEffects": []
+    },
+    {
+      "id": "test/uat-snapshot-freeze",
+      "domain": "test",
+      "iconUrl": null,
+      "knowledgeCount": 0,
+      "accepts": [],
+      "emits": [],
+      "sideEffects": [
+        "write only .worktrees/uat/<feature>/<flow>/ in the verified backend Source"
+      ]
+    },
+    {
+      "id": "test/uat-ui-proof",
+      "domain": "test",
+      "iconUrl": null,
+      "knowledgeCount": 0,
+      "accepts": [],
+      "emits": [],
+      "sideEffects": []
+    },
+    {
+      "id": "test/uat-ux-proof",
+      "domain": "test",
+      "iconUrl": null,
+      "knowledgeCount": 0,
+      "accepts": [],
+      "emits": [],
+      "sideEffects": []
     },
     {
       "id": "test/ui",
       "domain": "test",
-      "knowledgeCount": 1,
-      "accepts": [
-        "test.ui.journey · ready"
-      ],
-      "emits": [
-        "proof.run · ready",
-        "code.repair · repair",
-        "layout.review · rejected",
-        "test.review · blocked"
-      ],
+      "iconUrl": null,
+      "knowledgeCount": 0,
+      "accepts": [],
+      "emits": [],
       "sideEffects": [
         "open and control the running app in a real browser",
-        "authenticate with an approved test account",
-        "write sanitized task-session UI evidence only"
+        "authenticate with an approved test account"
       ]
     },
     {
       "id": "test/ui-quality-audit",
       "domain": "test",
-      "knowledgeCount": 1,
-      "accepts": [
-        "test.ui · ready",
-        "ui.quality.audit · ready"
-      ],
-      "emits": [
-        "test.ui.journey · ready",
-        "code.repair · repair",
-        "layout.review · rejected",
-        "ui.quality.result · complete",
-        "ui.quality.result · ready",
-        "ui.quality.review · blocked"
-      ],
+      "iconUrl": null,
+      "knowledgeCount": 0,
+      "accepts": [],
+      "emits": [],
       "sideEffects": [
         "control only the declared running application through a real browser",
-        "write sanitized screenshots, traces, measurements, rule results, and receipts to task-session storage only",
         "never mutate product source, business authority, external providers, or the audited application state outside declared reversible interaction"
       ]
     },
     {
       "id": "test/unit",
       "domain": "test",
-      "knowledgeCount": 1,
-      "accepts": [
-        "test.unit · ready"
-      ],
-      "emits": [
-        "test.e2e · ready",
-        "code.repair · repair",
-        "test.review · blocked"
-      ],
+      "iconUrl": null,
+      "knowledgeCount": 0,
+      "accepts": [],
+      "emits": [],
       "sideEffects": [
-        "run manifest-owned focused unit commands",
-        "write task-session unit evidence only"
+        "run manifest-owned focused unit commands"
       ]
     },
     {
       "id": "workspace/bootstrap-verify",
       "domain": "workspace",
-      "knowledgeCount": 1,
-      "accepts": [
-        "workspace.bootstrap · ready"
-      ],
-      "emits": [
-        "workspace.declarations · ready",
-        "workspace.initialization · ready",
-        "workspace.blocked · blocked"
-      ],
+      "iconUrl": null,
+      "knowledgeCount": 0,
+      "accepts": [],
+      "emits": [],
       "sideEffects": [
-        "keep input, output, loaded context, scratch values, worker observations, and receipts in task-session memory only",
-        "purge every intermediate session object at each parent-skill terminal state"
+        "read only the supplied exact references"
       ]
     },
     {
       "id": "workspace/declarations-compile",
       "domain": "workspace",
-      "knowledgeCount": 1,
-      "accepts": [
-        "workspace.declarations · ready"
-      ],
-      "emits": [
-        "workspace.routes.hydrate · ready"
-      ],
+      "iconUrl": null,
+      "knowledgeCount": 0,
+      "accepts": [],
+      "emits": [],
       "sideEffects": [
-        "write tracked portable workspace declarations only",
-        "keep input, output, loaded context, scratch values, worker observations, and receipts in task-session memory only",
-        "purge every intermediate session object at each parent-skill terminal state"
+        "write tracked portable workspace declarations only"
       ]
     },
     {
       "id": "workspace/device-checkpoint",
       "domain": "workspace",
+      "iconUrl": null,
       "knowledgeCount": 0,
-      "accepts": [
-        "workspace.device-checkpoint · ready"
-      ],
-      "emits": [
-        "workspace.device-checkpoint.result · complete",
-        "workspace.device-checkpoint.result · blocked"
-      ],
+      "accepts": [],
+      "emits": [],
       "sideEffects": [
         "push already approved mission-owned commits after proving clean ahead-only checkout state",
         "quiesce and restart containers attached to Source-declared Docker volumes",
         "stream compressed volume archives through age encryption without a plaintext archive",
-        "publish checksum-bound chunks and a manifest as a private release only after every upload succeeds",
-        "keep input, output, loaded context, scratch values, worker observations, and receipts in task-session memory only",
-        "purge every intermediate session object at each parent-skill terminal state"
+        "publish checksum-bound chunks and a manifest as a private release only after every upload succeeds"
       ]
     },
     {
       "id": "workspace/identity-verify",
       "domain": "workspace",
-      "knowledgeCount": 1,
-      "accepts": [
-        "workspace.identity · ready"
-      ],
-      "emits": [
-        "workspace.bootstrap · ready",
-        "workspace.initialization · ready",
-        "workspace.blocked · blocked"
-      ],
+      "iconUrl": null,
+      "knowledgeCount": 0,
+      "accepts": [],
+      "emits": [],
       "sideEffects": [
-        "keep input, output, loaded context, scratch values, worker observations, and receipts in task-session memory only",
-        "purge every intermediate session object at each parent-skill terminal state"
+        "read only the supplied exact references"
       ]
     },
     {
       "id": "workspace/route-verify",
       "domain": "workspace",
-      "knowledgeCount": 1,
-      "accepts": [
-        "request.received · ready"
-      ],
-      "emits": [
-        "business.evidence · ready",
-        "workspace.initialization · ready",
-        "workspace.blocked · blocked"
-      ],
+      "iconUrl": null,
+      "knowledgeCount": 0,
+      "accepts": [],
+      "emits": [],
       "sideEffects": [
-        "keep input, output, loaded context, scratch values, worker observations, and receipts in task-session memory only",
-        "purge every intermediate session object at each parent-skill terminal state"
+        "read only the supplied exact references"
       ]
     },
     {
       "id": "workspace/routes-hydrate",
       "domain": "workspace",
-      "knowledgeCount": 1,
-      "accepts": [
-        "workspace.routes.hydrate · ready",
-        "workspace.initialization · ready"
-      ],
-      "emits": [
-        "workspace.worktree · ready",
-        "workspace.blocked · blocked"
-      ],
+      "iconUrl": null,
+      "knowledgeCount": 0,
+      "accepts": [],
+      "emits": [],
       "sideEffects": [
-        "write ignored machine-local route state",
-        "keep input, output, loaded context, scratch values, worker observations, and receipts in task-session memory only",
-        "purge every intermediate session object at each parent-skill terminal state"
+        "write ignored machine-local route state"
       ]
     },
     {
       "id": "workspace/workflow-handoff",
       "domain": "workspace",
+      "iconUrl": null,
       "knowledgeCount": 0,
-      "accepts": [
-        "workspace.workflow-handoff · ready"
-      ],
-      "emits": [
-        "workspace.workflow-handoff.result · complete",
-        "workspace.workflow-handoff.result · complete",
-        "workspace.workflow-handoff.result · blocked"
-      ],
+      "accepts": [],
+      "emits": [],
       "sideEffects": [
         "create mission-only checkpoint commits on dedicated branches when publish mode receives exclusively mission-owned changes",
         "push checkpoint branches and one annotated continuation tag without force",
-        "fetch and adopt exact checkpoint heads in resume mode only after identity and cleanliness proof",
-        "keep prompts, reasoning, loaded context, observations and scratch outside Git and purge them at the parent-skill terminal"
+        "fetch and adopt exact checkpoint heads in resume mode only after identity and cleanliness proof"
       ]
     },
     {
       "id": "workspace/worktree-verify",
       "domain": "workspace",
-      "knowledgeCount": 1,
-      "accepts": [
-        "workspace.worktree · ready"
-      ],
-      "emits": [
-        "workspace.ready · ready",
-        "workspace.initialization · ready",
-        "workspace.blocked · blocked"
-      ],
+      "iconUrl": null,
+      "knowledgeCount": 0,
+      "accepts": [],
+      "emits": [],
       "sideEffects": [
-        "keep input, output, loaded context, scratch values, worker observations, and receipts in task-session memory only",
-        "purge every intermediate session object at each parent-skill terminal state"
+        "read only the supplied exact references"
       ]
     }
   ],
   "domains": [
     {
       "id": "fe",
-      "operatorCount": 34,
-      "skillCount": 0
+      "operatorCount": 51,
+      "skillCount": 1
     },
     {
       "id": "architecture",
       "operatorCount": 16,
-      "skillCount": 4
+      "skillCount": 1
     },
     {
       "id": "deployment",
       "operatorCount": 15,
-      "skillCount": 4
+      "skillCount": 0
     },
     {
       "id": "quality",
       "operatorCount": 15,
-      "skillCount": 5
+      "skillCount": 1
     },
     {
-      "id": "be",
-      "operatorCount": 8,
+      "id": "test",
+      "operatorCount": 14,
       "skillCount": 0
     },
     {
-      "id": "platform",
+      "id": "be",
       "operatorCount": 8,
       "skillCount": 0
     },
@@ -2450,15 +1625,15 @@
     {
       "id": "business",
       "operatorCount": 5,
-      "skillCount": 2
+      "skillCount": 1
+    },
+    {
+      "id": "platform",
+      "operatorCount": 4,
+      "skillCount": 1
     },
     {
       "id": "tech-stack",
-      "operatorCount": 4,
-      "skillCount": 0
-    },
-    {
-      "id": "test",
       "operatorCount": 4,
       "skillCount": 0
     },
@@ -2475,7 +1650,7 @@
     {
       "id": "source",
       "operatorCount": 2,
-      "skillCount": 1
+      "skillCount": 0
     },
     {
       "id": "context",

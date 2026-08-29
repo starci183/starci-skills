@@ -1,475 +1,84 @@
 {
-  "$id": "https://starci.dev/v6/operators/architecture/decision-challenge/output.schema.json",
-  "title": "architecture/decision-challenge operator output",
   "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://starci.dev/v7/operators/architecture/decision-challenge/output.schema.json",
   "type": "object",
   "additionalProperties": false,
   "required": [
     "schemaVersion",
-    "runId",
-    "stage",
-    "status",
-    "facts",
-    "payload"
-  ],
-  "allOf": [
-    {
-      "oneOf": [
-        {
-          "properties": {
-            "stage": {
-              "const": "architecture.decision.handoff"
-            },
-            "status": {
-              "const": "ready"
-            }
-          },
-          "required": [
-            "stage",
-            "status"
-          ]
-        },
-        {
-          "properties": {
-            "stage": {
-              "const": "architecture.decision.alternatives"
-            },
-            "status": {
-              "const": "ready"
-            }
-          },
-          "required": [
-            "stage",
-            "status"
-          ]
-        },
-        {
-          "properties": {
-            "stage": {
-              "const": "architecture.blocked"
-            },
-            "status": {
-              "const": "blocked"
-            }
-          },
-          "required": [
-            "stage",
-            "status"
-          ]
-        }
-      ]
-    }
+    "operatorId",
+    "output"
   ],
   "properties": {
     "schemaVersion": {
-      "const": 6
+      "const": 7
     },
-    "runId": {
-      "type": "string",
-      "minLength": 1
+    "operatorId": {
+      "const": "architecture/decision-challenge"
     },
-    "stage": {
-      "enum": [
-        "architecture.decision.handoff",
-        "architecture.decision.alternatives",
-        "architecture.blocked"
-      ]
-    },
-    "status": {
-      "enum": [
-        "ready",
-        "blocked"
-      ]
-    },
-    "facts": {
-      "type": "array",
-      "uniqueItems": true,
-      "items": {
-        "type": "string",
-        "minLength": 1
-      }
-    },
-    "payload": {
+    "output": {
       "type": "object",
       "additionalProperties": false,
       "required": [
-        "decision",
-        "state",
-        "produced",
-        "context",
-        "cleanup",
+        "outcome",
+        "resultRef",
         "evidenceRefs",
         "findings",
-        "challengeSummary"
+        "reason"
       ],
       "properties": {
-        "decision": {
+        "outcome": {
+          "description": "Typed result consumed by the parent Skill machine.",
           "enum": [
             "ready",
             "revise",
             "blocked"
           ]
         },
-        "challengeSummary": {
-          "type": "object",
-          "description": "Structured falsification record proving that the option set was attacked rather than merely compared or presented.",
-          "additionalProperties": false,
-          "required": [
-            "stance",
-            "verdict",
-            "assumptionIds",
-            "counterexampleIds",
-            "rejectedOptionIds",
-            "failureModeIds",
-            "falsificationTestIds",
-            "operationalSurpriseIds",
-            "unresolvedCriticalIds",
-            "recommendationChanged"
+        "resultRef": {
+          "description": "Exact produced artifact reference, or null when no artifact was produced.",
+          "type": [
+            "string",
+            "null"
           ],
-          "properties": {
-            "stance": {
-              "const": "falsification-first"
-            },
-            "verdict": {
-              "enum": [
-                "ready",
-                "revise",
-                "blocked"
-              ]
-            },
-            "assumptionIds": {
-              "$ref": "#/$defs/nonEmptyIdSet"
-            },
-            "counterexampleIds": {
-              "$ref": "#/$defs/nonEmptyIdSet"
-            },
-            "rejectedOptionIds": {
-              "$ref": "#/$defs/nonEmptyIdSet"
-            },
-            "failureModeIds": {
-              "$ref": "#/$defs/nonEmptyIdSet"
-            },
-            "falsificationTestIds": {
-              "$ref": "#/$defs/nonEmptyIdSet"
-            },
-            "operationalSurpriseIds": {
-              "$ref": "#/$defs/nonEmptyIdSet"
-            },
-            "unresolvedCriticalIds": {
-              "type": "array",
-              "uniqueItems": true,
-              "items": {
-                "$ref": "#/$defs/id"
-              }
-            },
-            "recommendationChanged": {
-              "type": "boolean"
-            }
-          }
-        },
-        "reviewPreview": {
-          "type": "object",
-          "description": "Executable binding for the in-conversation interactive architecture review rendered before approval is requested.",
-          "additionalProperties": false,
-          "required": [
-            "renderer",
-            "mediaType",
-            "artifactRef",
-            "contentSha256",
-            "optionSetSha256",
-            "optionIds",
-            "recommendedOptionId",
-            "scenarioIds",
-            "approvalCommands",
-            "interactive"
-          ],
-          "properties": {
-            "renderer": {
-              "const": "visualize"
-            },
-            "mediaType": {
-              "const": "text/html"
-            },
-            "artifactRef": {
-              "$ref": "#/$defs/sessionRef"
-            },
-            "contentSha256": {
-              "$ref": "#/$defs/sha256"
-            },
-            "optionSetSha256": {
-              "$ref": "#/$defs/sha256"
-            },
-            "optionIds": {
-              "type": "array",
-              "minItems": 2,
-              "maxItems": 4,
-              "uniqueItems": true,
-              "items": {
-                "type": "string",
-                "minLength": 1,
-                "maxLength": 120
-              }
-            },
-            "recommendedOptionId": {
-              "type": "string",
-              "minLength": 1,
-              "maxLength": 120
-            },
-            "scenarioIds": {
-              "type": "array",
-              "minItems": 5,
-              "uniqueItems": true,
-              "items": {
-                "enum": [
-                  "normal",
-                  "retry",
-                  "concurrency",
-                  "outage",
-                  "rollback"
-                ]
-              }
-            },
-            "approvalCommands": {
-              "type": "array",
-              "minItems": 2,
-              "maxItems": 4,
-              "uniqueItems": true,
-              "items": {
-                "type": "object",
-                "additionalProperties": false,
-                "required": [
-                  "decisionId",
-                  "command"
-                ],
-                "properties": {
-                  "decisionId": {
-                    "type": "string",
-                    "minLength": 1,
-                    "maxLength": 120
-                  },
-                  "command": {
-                    "type": "string",
-                    "pattern": "^OK ARCHITECTURE .+@[0-9a-f]{64}$",
-                    "maxLength": 220
-                  }
-                }
-              }
-            },
-            "interactive": {
-              "const": true
-            }
-          }
-        },
-        "state": {
-          "type": "object",
-          "additionalProperties": false,
-          "required": [
-            "operator",
-            "status",
-            "code",
-            "retryable",
-            "emits"
-          ],
-          "properties": {
-            "operator": {
-              "const": "architecture/decision-challenge"
-            },
-            "status": {
-              "enum": [
-                "completed",
-                "replan",
-                "blocked"
-              ]
-            },
-            "code": {
-              "enum": [
-                "architecture-decision-challenge-ready",
-                "architecture-decision-challenge-revise",
-                "architecture-decision-challenge-blocked"
-              ]
-            },
-            "retryable": {
-              "type": "boolean"
-            },
-            "emits": {
-              "type": "object",
-              "additionalProperties": false,
-              "required": [
-                "stage",
-                "status",
-                "factsAdd"
-              ],
-              "properties": {
-                "stage": {
-                  "enum": [
-                    "architecture.decision.handoff",
-                    "architecture.decision.alternatives",
-                    "architecture.blocked"
-                  ]
-                },
-                "status": {
-                  "enum": [
-                    "ready",
-                    "blocked"
-                  ]
-                },
-                "factsAdd": {
-                  "type": "array",
-                  "minItems": 1,
-                  "uniqueItems": true,
-                  "items": {
-                    "type": "string",
-                    "minLength": 1
-                  }
-                }
-              }
-            }
-          }
-        },
-        "produced": {
-          "type": "object",
-          "additionalProperties": false,
-          "required": [
-            "challengeReceiptRef",
-            "durableWrites"
-          ],
-          "properties": {
-            "challengeReceiptRef": {
-              "anyOf": [
-                {
-                  "$ref": "#/$defs/sessionRef"
-                },
-                {
-                  "type": "null"
-                }
-              ]
-            },
-            "reviewArtifactRef": {
-              "anyOf": [
-                {
-                  "$ref": "#/$defs/sessionRef"
-                },
-                {
-                  "type": "null"
-                }
-              ]
-            },
-            "durableWrites": {
-              "type": "array",
-              "uniqueItems": true,
-              "items": {
-                "type": "string",
-                "minLength": 1
-              }
-            }
-          }
-        },
-        "context": {
-          "type": "object",
-          "additionalProperties": false,
-          "required": [
-            "used"
-          ],
-          "properties": {
-            "used": {
-              "type": "array",
-              "minItems": 1,
-              "uniqueItems": true,
-              "items": {
-                "type": "object",
-                "additionalProperties": false,
-                "required": [
-                  "kind",
-                  "ref",
-                  "revision"
-                ],
-                "properties": {
-                  "kind": {
-                    "enum": [
-                      "session-artifact",
-                      "worktree-business",
-                      "qdrant-knowledge",
-                      "exact-source"
-                    ]
-                  },
-                  "ref": {
-                    "type": "string",
-                    "minLength": 1
-                  },
-                  "revision": {
-                    "type": "string",
-                    "minLength": 1
-                  }
-                }
-              }
-            }
-          }
-        },
-        "cleanup": {
-          "type": "object",
-          "additionalProperties": false,
-          "required": [
-            "scratchRefs",
-            "retention",
-            "purgeAt"
-          ],
-          "properties": {
-            "scratchRefs": {
-              "type": "array",
-              "uniqueItems": true,
-              "items": {
-                "$ref": "#/$defs/sessionRef"
-              }
-            },
-            "retention": {
-              "const": "until-skill-terminal"
-            },
-            "purgeAt": {
-              "const": "skill-terminal"
-            }
-          }
+          "minLength": 1,
+          "maxLength": 1024
         },
         "evidenceRefs": {
-          "type": "array",
-          "minItems": 1,
-          "uniqueItems": true,
-          "items": {
-            "$ref": "#/$defs/sessionRef"
-          }
+          "description": "Exact references supporting the result.",
+          "$ref": "#/$defs/refs"
         },
         "findings": {
+          "description": "Bounded observable findings produced by this job.",
           "type": "array",
-          "uniqueItems": true,
+          "maxItems": 128,
           "items": {
             "type": "string",
-            "minLength": 1
+            "minLength": 1,
+            "maxLength": 2048
           }
+        },
+        "reason": {
+          "description": "Bounded explanation when the result cannot be produced, otherwise null.",
+          "type": [
+            "string",
+            "null"
+          ],
+          "minLength": 1,
+          "maxLength": 2048
         }
       }
     }
   },
   "$defs": {
-    "id": {
-      "type": "string",
-      "minLength": 1,
-      "maxLength": 160,
-      "pattern": "^[a-z0-9]+(?:[._-][a-z0-9]+)*$"
-    },
-    "nonEmptyIdSet": {
+    "refs": {
       "type": "array",
-      "minItems": 1,
+      "maxItems": 128,
       "uniqueItems": true,
       "items": {
-        "$ref": "#/$defs/id"
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 1024
       }
-    },
-    "sha256": {
-      "type": "string",
-      "pattern": "^sha256:[0-9a-f]{64}$"
-    },
-    "sessionRef": {
-      "type": "string",
-      "pattern": "^session://tasks/[A-Za-z0-9._-]+/.+$"
     }
   }
 }

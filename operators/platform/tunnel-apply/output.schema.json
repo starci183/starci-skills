@@ -1,21 +1,45 @@
 {
-  "$id": "https://starci.dev/v6/operators/platform/tunnel-apply/output.schema.json", "$schema": "https://json-schema.org/draft/2020-12/schema", "title": "platform/tunnel-apply operator output",
-  "type": "object", "additionalProperties": false, "required": ["schemaVersion", "runId", "stage", "status", "facts", "payload"],
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://starci.dev/v7.0/operators/platform/tunnel-apply/output.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "operatorId", "output"],
   "properties": {
-    "schemaVersion": { "const": 6 }, "runId": { "type": "string", "minLength": 1 }, "stage": { "enum": ["platform.tunnel.proved", "platform.blocked"] }, "status": { "enum": ["complete", "blocked"] }, "facts": { "$ref": "#/$defs/strings" },
-    "payload": { "type": "object", "additionalProperties": false, "required": ["decision", "state", "produced", "context", "cleanup", "evidenceRefs", "findings"], "properties": {
-      "decision": { "enum": ["proved", "blocked"] },
-      "state": { "type": "object", "additionalProperties": false, "required": ["operator", "status", "code", "retryable", "emits"], "properties": { "operator": { "const": "platform/tunnel-apply" }, "status": { "enum": ["completed", "blocked"] }, "code": { "enum": ["platform-tunnel-apply-proved", "platform-tunnel-apply-blocked"] }, "retryable": { "type": "boolean" }, "emits": { "type": "object", "additionalProperties": false, "required": ["stage", "status", "factsAdd", "factsRemove"], "properties": { "stage": { "enum": ["platform.tunnel.proved", "platform.blocked"] }, "status": { "enum": ["complete", "blocked"] }, "factsAdd": { "$ref": "#/$defs/strings" }, "factsRemove": { "$ref": "#/$defs/strings" } } } } },
-      "produced": { "type": "object", "additionalProperties": false, "required": ["tunnelReceiptRef", "artifacts", "mutations"], "properties": { "tunnelReceiptRef": { "anyOf": [{ "$ref": "#/$defs/sessionRef" }, { "type": "null" }] }, "artifacts": { "$ref": "#/$defs/artifacts" }, "mutations": { "$ref": "#/$defs/mutations" } } },
-      "context": { "type": "object", "additionalProperties": false, "required": ["used"], "properties": { "used": { "type": "array", "minItems": 1, "uniqueItems": true, "items": { "$ref": "#/$defs/contextUse" } } } },
-      "cleanup": { "type": "object", "additionalProperties": false, "required": ["taskId", "scratchRefs", "retention", "purgeAt"], "properties": { "taskId": { "type": "string", "minLength": 1 }, "scratchRefs": { "type": "array", "uniqueItems": true, "items": { "$ref": "#/$defs/sessionRef" } }, "retention": { "const": "until-skill-terminal" }, "purgeAt": { "const": "skill-terminal" } } },
-      "evidenceRefs": { "type": "array", "minItems": 1, "uniqueItems": true, "items": { "$ref": "#/$defs/sessionRef" } }, "findings": { "$ref": "#/$defs/strings" }
-    } }
+    "schemaVersion": { "const": 7 },
+    "operatorId": { "const": "platform/tunnel-apply" },
+    "output": {
+      "type": "object", "additionalProperties": false,
+      "required": ["outcome", "receiptRef", "mutations", "checks", "reason", "evidenceRefs"],
+      "properties": {
+        "outcome": { "enum": ["proved", "blocked"], "description": "Observed convergence result; only the Skill machine chooses the next state." },
+        "receiptRef": { "type": ["string", "null"], "pattern": "^session://tasks/[A-Za-z0-9._-]+/.+$", "description": "Fresh convergence proof when proved; otherwise null." },
+        "mutations": { "type": "array", "maxItems": 3, "uniqueItems": true, "items": { "$ref": "#/$defs/mutation" }, "description": "Every coordinator-owned Cloudflare mutation with before and after revisions; empty for an idempotent no-op." },
+        "checks": { "type": "array", "minItems": 4, "maxItems": 4, "uniqueItems": true, "items": { "$ref": "#/$defs/check" }, "description": "Exactly the DNS target, tunnel route, TLS, and public HTTPS postcondition checks." },
+        "reason": { "type": ["string", "null"], "enum": [null, "authority-drift", "concurrent-drift", "execution-failed", "proof-failed"], "description": "One bounded failure reason when blocked; null when proved." },
+        "evidenceRefs": { "$ref": "#/$defs/evidenceRefs", "description": "Approval, execution, resource revision, and postcondition evidence." }
+      }
+    }
   },
   "$defs": {
-    "sha256": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" }, "sessionRef": { "type": "string", "pattern": "^session://tasks/[A-Za-z0-9._-]+/.+$" }, "strings": { "type": "array", "uniqueItems": true, "items": { "type": "string", "minLength": 1 } },
-    "contextUse": { "type": "object", "additionalProperties": false, "required": ["kind", "ref", "revision"], "properties": { "kind": { "enum": ["session-artifact", "qdrant-knowledge", "exact-source", "exact-command", "external-resource", "credential-handle", "orchestration"] }, "ref": { "type": "string", "minLength": 1 }, "revision": { "type": "string", "minLength": 1 } } },
-    "artifacts": { "type": "array", "uniqueItems": true, "items": { "type": "object", "additionalProperties": false, "required": ["kind", "ref", "sha256"], "properties": { "kind": { "enum": ["receipt", "evidence", "report"] }, "ref": { "$ref": "#/$defs/sessionRef" }, "sha256": { "$ref": "#/$defs/sha256" } } } },
-    "mutations": { "type": "array", "uniqueItems": true, "items": { "type": "object", "additionalProperties": false, "required": ["target", "kind", "beforeRevision", "afterRevision", "appliedBy"], "properties": { "target": { "type": "string", "minLength": 1 }, "kind": { "enum": ["provider", "record"] }, "beforeRevision": { "anyOf": [{ "type": "string", "minLength": 1 }, { "type": "null" }] }, "afterRevision": { "type": "string", "minLength": 1 }, "appliedBy": { "const": "coordinator" } } } }
+    "mutation": {
+      "type": "object", "additionalProperties": false,
+      "required": ["effect", "resourceRef", "beforeRevision", "afterRevision"],
+      "properties": {
+        "effect": { "enum": ["create-tunnel", "update-tunnel-route", "upsert-proxied-dns"] },
+        "resourceRef": { "type": "string", "minLength": 1 },
+        "beforeRevision": { "type": ["string", "null"], "minLength": 1 },
+        "afterRevision": { "type": "string", "minLength": 1 }
+      }
+    },
+    "check": {
+      "type": "object", "additionalProperties": false,
+      "required": ["name", "status", "evidenceRef"],
+      "properties": {
+        "name": { "enum": ["dns-target", "tunnel-route", "tls", "public-https"] },
+        "status": { "enum": ["passed", "failed"] },
+        "evidenceRef": { "type": "string", "minLength": 1 }
+      }
+    },
+    "evidenceRefs": { "type": "array", "minItems": 1, "maxItems": 32, "uniqueItems": true, "items": { "type": "string", "minLength": 1 } }
   }
 }

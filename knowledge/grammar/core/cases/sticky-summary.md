@@ -16,7 +16,7 @@ A compact summary or consequential action must remain visible beside a long prim
 
 Use the narrow secondary column. The summary owns only derived facts and its declared action; the primary region owns editing and validation. Sticky begins below the stable page header, stops at the layout boundary, and never introduces a second page scroll.
 
-Update summary values without stealing focus. Surface unresolved or invalid values neutrally and link recovery to the owning primary field when the package contract permits.
+Update summary values without stealing focus. Surface unresolved or invalid values neutrally and link recovery to the owning primary field when the package interface permits.
 
 ## Responsive
 

@@ -1,32 +1,16 @@
 {
-  "schemaVersion": 6,
+  "schemaVersion": 7,
   "id": "be/repair-prerequisite-check",
   "domain": "be",
+  "job": "Check whether one backend repair has the exact route, business authority, and replanning prerequisites.",
   "inputSchema": "input.schema.json",
   "outputSchema": "output.schema.json",
-  "knowledgeRefs": [],
   "sourceReferenceRefs": [],
-  "accepts": [{
-    "stage": "be.repair.prerequisite",
-    "status": "ready",
-    "allFacts": ["in-boundary-repair"],
-    "noneFacts": []
-  }],
-  "emits": [
-    {"stage":"be.coding-scope","status":"ready","factsAdd":["backend-repair-prerequisites-ready"],"factsRemove":[]},
-    {"stage":"request.received","status":"ready","factsAdd":["workspace-route-required"],"factsRemove":["workspace-route-ready"]},
-    {"stage":"business.freshness","status":"ready","factsAdd":["business-refresh-required"],"factsRemove":["business-fresh-receipt-ready"]},
-    {"stage":"architecture.boundary","status":"ready","factsAdd":["backend-boundary-feedback","repair-approval-stale"],"factsRemove":["backend-boundary-approved"]},
-    {"stage":"be.blocked","status":"blocked","factsAdd":["backend-repair-prerequisite-blocked"],"factsRemove":[]}
-  ],
   "sideEffects": [
-    "read task-session receipts and metadata only",
-    "never load source content, Qdrant knowledge, or repository context",
-    "purge every intermediate session object at each parent-skill terminal"
+    "read only the supplied exact references"
   ],
   "stopConditions": [
-    "project, task, route, business, boundary, approval, or finding identity is ambiguous",
-    "business authority points outside .worktrees/<project>/businesses",
-    "a prerequisite cannot be repaired by an explicitly declared machine edge"
+    "an exact reference is missing or its fingerprint differs",
+    "the requested work exceeds this operator job"
   ]
 }

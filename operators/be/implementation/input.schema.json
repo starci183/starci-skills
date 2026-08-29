@@ -1,187 +1,80 @@
 {
-  "$id": "https://starci.dev/v6/operators/be/implementation/input.schema.json",
-  "title": "be/implementation operator input",
   "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://starci.dev/v7/operators/be/implementation/input.schema.json",
   "type": "object",
   "additionalProperties": false,
-  "required": ["schemaVersion", "runId", "stage", "status", "facts", "payload"],
-  "allOf": [
-    {
-      "oneOf": [
-        {
-          "properties": {
-            "stage": { "const": "architecture.boundary.review" },
-            "status": { "const": "approved" }
-          },
-          "required": ["stage", "status"]
-        },
-        {
-          "properties": {
-            "stage": { "const": "be.repair" },
-            "status": { "const": "ready" }
-          },
-          "required": ["stage", "status"]
-        }
-      ]
-    }
+  "required": [
+    "schemaVersion",
+    "operatorId",
+    "context",
+    "input"
   ],
   "properties": {
-    "schemaVersion": { "const": 6 },
-    "runId": { "type": "string", "minLength": 1 },
-    "stage": { "enum": ["architecture.boundary.review", "be.repair"] },
-    "status": { "enum": ["approved", "ready"] },
-    "facts": {
-      "type": "array",
-      "uniqueItems": true,
-      "items": { "type": "string", "minLength": 1 }
+    "schemaVersion": {
+      "const": 7
     },
-    "payload": {
+    "operatorId": {
+      "const": "be/implementation"
+    },
+    "context": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["provided", "loads", "session"],
+      "required": [
+        "contextRefs",
+        "sourceRefs"
+      ],
       "properties": {
-        "provided": {
-          "type": "object",
-          "description": "References supplied by the previous machine state. The operator must not replace or broaden them.",
-          "additionalProperties": false,
-          "required": ["approvedBoundaryRef", "approvalReceiptRef", "businessHeadRef", "baselineCommitRef", "codingScopeRef"],
-          "properties": {
-            "approvedBoundaryRef": { "$ref": "#/$defs/sessionRef" },
-            "approvalReceiptRef": { "$ref": "#/$defs/sessionRef" },
-            "businessHeadRef": { "$ref": "#/$defs/sessionRef" },
-            "baselineCommitRef": { "type": "string", "pattern": "^git:[0-9a-f]{7,64}$" },
-            "codingScopeRef": { "$ref": "#/$defs/sessionRef" }
-          }
+        "contextRefs": {
+          "description": "Exact canonical context references resolved with default repository or file search.",
+          "$ref": "#/$defs/refs"
         },
-        "loads": {
-          "type": "object",
-          "description": "Bindings resolved by the runtime. These fields declare what will be loaded; they are not caller-controlled content.",
-          "additionalProperties": false,
-          "required": ["approval", "business", "boundary", "scope", "knowledge", "source", "orchestration"],
-          "properties": {
-            "approval": {
-              "type": "object",
-              "additionalProperties": false,
-              "required": ["ref", "revision", "loadMode"],
-              "properties": {
-                "ref": { "$ref": "#/$defs/sessionRef" },
-                "revision": { "$ref": "#/$defs/sha256" },
-                "loadMode": { "const": "session-exact" }
-              }
-            },
-            "business": {
-              "type": "object",
-              "additionalProperties": false,
-              "required": ["ref", "authorityPath", "revision"],
-              "properties": {
-                "ref": { "$ref": "#/$defs/sessionRef" },
-                "authorityPath": { "type": "string", "pattern": "^\\.worktrees/[a-z0-9][a-z0-9-]*/businesses/" },
-                "revision": { "$ref": "#/$defs/sha256" }
-              }
-            },
-            "boundary": {
-              "type": "object",
-              "additionalProperties": false,
-              "required": ["ref", "revision"],
-              "properties": {
-                "ref": { "$ref": "#/$defs/sessionRef" },
-                "revision": { "$ref": "#/$defs/sha256" }
-              }
-            },
-            "scope": {
-              "type": "object",
-              "additionalProperties": false,
-              "required": ["ref", "revision", "sourceCommitRef", "targetSetSha256"],
-              "properties": {
-                "ref": { "$ref": "#/$defs/sessionRef" },
-                "revision": { "$ref": "#/$defs/sha256" },
-                "sourceCommitRef": { "type": "string", "pattern": "^git:[0-9a-f]{7,64}$" },
-                "targetSetSha256": { "$ref": "#/$defs/sha256" }
-              }
-            },
-            "knowledge": {
-              "type": "array",
-              "minItems": 1,
-              "maxItems": 1,
-              "items": {
-                "type": "object",
-                "additionalProperties": false,
-                "required": ["id", "generation", "contentSha256", "loadMode"],
-                "properties": {
-                  "id": { "const": "be.implementation" },
-                  "generation": { "type": "string", "minLength": 1 },
-                  "contentSha256": { "$ref": "#/$defs/sha256" },
-                  "loadMode": { "const": "qdrant-exact" }
-                }
-              }
-            },
-            "source": {
-              "type": "object",
-              "additionalProperties": false,
-              "required": ["loadMode", "repositoryContext", "sourceCommitRef", "targetSetSha256", "targetFiles"],
-              "properties": {
-                "loadMode": { "const": "exact-files" },
-                "repositoryContext": { "const": false },
-                "sourceCommitRef": { "type": "string", "pattern": "^git:[0-9a-f]{7,64}$" },
-                "targetSetSha256": { "$ref": "#/$defs/sha256" },
-                "targetFiles": {
-                  "type": "array",
-                  "minItems": 1,
-                  "uniqueItems": true,
-                  "items": {
-                    "type": "object",
-                    "additionalProperties": false,
-                    "required": ["path", "beforeSha256", "allowedChanges"],
-                    "properties": {
-                      "path": { "type": "string", "minLength": 1 },
-                      "beforeSha256": { "$ref": "#/$defs/sha256" },
-                      "allowedChanges": {
-                        "type": "array",
-                        "minItems": 1,
-                        "uniqueItems": true,
-                        "items": { "type": "string", "minLength": 1 }
-                      }
-                    }
-                  }
-                }
-              }
-            },
-            "orchestration": {
-              "type": "object",
-              "additionalProperties": false,
-              "required": ["mode", "profileRef", "providerRef"],
-              "properties": {
-                "mode": { "enum": ["economical", "balanced", "parallel"] },
-                "profileRef": {
-                  "enum": [
-                    "orchestration/modes/economical.json",
-                    "orchestration/modes/balanced.json",
-                    "orchestration/modes/parallel.json"
-                  ]
-                },
-                "providerRef": { "type": "string", "pattern": "^orchestration/providers/[a-z0-9-]+\\.json$" }
-              }
-            }
-          }
+        "sourceRefs": {
+          "description": "Exact routed source references allowed for this job.",
+          "$ref": "#/$defs/refs"
+        }
+      }
+    },
+    "input": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "project",
+        "objectiveRef",
+        "sourceFingerprint"
+      ],
+      "properties": {
+        "project": {
+          "description": "Verified project identity for this job.",
+          "type": "string",
+          "pattern": "^[a-z0-9][a-z0-9-]*$"
         },
-        "session": {
-          "type": "object",
-          "description": "Ephemeral task-local storage. No value in this object is a filesystem persistence path.",
-          "additionalProperties": false,
-          "required": ["taskId", "inputRef", "outputRef", "scratchPrefix", "retention"],
-          "properties": {
-            "taskId": { "type": "string", "minLength": 1 },
-            "inputRef": { "$ref": "#/$defs/sessionRef" },
-            "outputRef": { "$ref": "#/$defs/sessionRef" },
-            "scratchPrefix": { "$ref": "#/$defs/sessionRef" },
-            "retention": { "const": "until-skill-terminal" }
-          }
+        "objectiveRef": {
+          "description": "Exact bounded objective reference.",
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 1024
+        },
+        "sourceFingerprint": {
+          "description": "Frozen fingerprint shared by supplied source references.",
+          "$ref": "#/$defs/sha256"
         }
       }
     }
   },
   "$defs": {
-    "sha256": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
-    "sessionRef": { "type": "string", "pattern": "^session://tasks/[A-Za-z0-9._-]+/.+$" }
+    "sha256": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "refs": {
+      "type": "array",
+      "maxItems": 128,
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 1024
+      }
+    }
   }
 }

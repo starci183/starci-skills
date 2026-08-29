@@ -1,5 +1,11 @@
 # `fe/visual-fidelity` input
 
-## JSON architecture
+## Context
 
-Provided data freezes approved detail, implementation receipt, structure hash, and baselines. Runtime loads the running app, deterministic fixture revision, exact testing knowledge, and orchestration. Session screenshots and reports purge at skill-terminal.
+- `context.evidenceRefs`: Exact canonical evidence references available to this atomic job.
+- `context.authorityRevision`: Exact approved authority revision binding this invocation.
+
+## Input
+
+- `input.targetRef`: The one target owned by this atomic invocation.
+- `input.constraints`: Closed constraints that bound this job without routing it.

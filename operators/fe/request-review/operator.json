@@ -1,51 +1,16 @@
 {
-  "schemaVersion": 6,
+  "schemaVersion": 7,
   "id": "fe/request-review",
   "domain": "fe",
+  "job": "request review one closed frontend target.",
   "inputSchema": "input.schema.json",
   "outputSchema": "output.schema.json",
-  "knowledgeRefs": [
-    "fe.request-lifecycle"
-  ],
+  "contextRefs": [],
   "sourceReferenceRefs": [],
-  "accepts": [
-    {
-      "stage": "fe.request.review",
-      "status": "ready",
-      "allFacts": [
-        "feedback-request-recorded"
-      ],
-      "noneFacts": []
-    }
-  ],
-  "emits": [
-    {
-      "stage": "fe.request.review.result",
-      "status": "complete",
-      "factsAdd": [
-        "feedback-request-reviewed"
-      ],
-      "factsRemove": []
-    },
-    {
-      "stage": "fe.request.review.blocked",
-      "status": "blocked",
-      "factsAdd": [
-        "feedback-request-review-blocked"
-      ],
-      "factsRemove": []
-    }
-  ],
-  "sideEffects": [
-    "coordinator updates only the approved .claude/requests/<stable-id>.request.json review and status fields",
-    "emit a content-hash mutation descriptor for the durable review decision",
-    "keep request bodies, approval evidence, drafts, and receipts in task-session storage only",
-    "purge every intermediate session object at every parent-skill terminal state"
-  ],
+  "sideEffects": [],
   "stopConditions": [
-    "the request is missing, stale, already reviewed with a conflicting decision, or lacks proof required by the reviewer",
-    "the review owner broadens the request targetOwners boundary",
-    "the target path escapes .claude/requests",
-    "approval evidence or session ownership is invalid"
+    "required authority or evidence is missing or stale",
+    "the closed target boundary is ambiguous",
+    "completion would require another operator job"
   ]
 }

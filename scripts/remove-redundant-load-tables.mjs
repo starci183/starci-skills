@@ -16,6 +16,7 @@ function markdownFiles(parent) {
 }
 
 function removeLoadsSections(source) {
+  if (!/^## LOADS\s*$/m.test(source)) return source;
   const lines = source.replaceAll('\r\n', '\n').split('\n');
 
   for (let index = lines.length - 1; index >= 0; index -= 1) {

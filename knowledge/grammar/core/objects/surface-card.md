@@ -6,7 +6,7 @@
 | Package | `@starci/grammar/core` |
 | Operators | `grammar-convergence` |
 | Search tags | `SurfaceCard, surface, header, body, footer, density, sticky` |
-| Dependencies | `fe.grammar-core-overview, fe.grammar-common-contracts` |
+| Dependencies | `fe.grammar-core-overview, fe.grammar-common-capabilities` |
 
 ## Responsibility
 
@@ -14,8 +14,8 @@ SurfaceCard owns one coherent block-level boundary. It may coordinate its declar
 
 ## Render rules
 
-- Use Core's exact radius, border, elevation, background, and spacing contract.
-- External section labels stay outside unless the card contract explicitly owns them.
+- Use Core's exact radius, border, elevation, background, and spacing interface.
+- External section labels stay outside unless the card interface explicitly owns them.
 - Keep header, content, facts, and actions in stable regions.
 - Use whitespace before adding an internal boundary.
 - Equal card height is required only when comparison or action alignment materially benefits.

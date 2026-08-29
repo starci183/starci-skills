@@ -1,258 +1,27 @@
 {
-  "$id": "https://starci.dev/v6/operators/source/conversation-record/output.schema.json",
-  "title": "source/conversation-record operator output",
   "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://starci.dev/v7.0/operators/source/conversation-record/output.schema.json",
   "type": "object",
   "additionalProperties": false,
-  "required": [
-    "schemaVersion",
-    "runId",
-    "stage",
-    "status",
-    "facts",
-    "payload"
-  ],
-  "allOf": [
-    {
-      "oneOf": [
-        {
-          "properties": {
-            "stage": {
-              "const": "source.conversation.recorded"
-            },
-            "status": {
-              "const": "complete"
-            }
-          },
-          "required": [
-            "stage",
-            "status"
-          ]
-        }
-      ]
-    }
-  ],
+  "required": ["schemaVersion", "operatorId", "output"],
   "properties": {
-    "schemaVersion": {
-      "const": 6
-    },
-    "runId": {
-      "type": "string",
-      "minLength": 1
-    },
-    "stage": {
-      "enum": [
-        "source.conversation.recorded"
-      ]
-    },
-    "status": {
-      "enum": [
-        "complete"
-      ]
-    },
-    "facts": {
-      "type": "array",
-      "uniqueItems": true,
-      "items": {
-        "type": "string",
-        "minLength": 1
-      }
-    },
-    "payload": {
+    "schemaVersion": { "const": 7 },
+    "operatorId": { "const": "source/conversation-record" },
+    "output": {
       "type": "object",
       "additionalProperties": false,
-      "required": [
-        "decision",
-        "state",
-        "produced",
-        "context",
-        "cleanup",
-        "evidenceRefs",
-        "findings"
-      ],
+      "required": ["outcome", "headRef", "headSha256", "writeApplied", "reason", "evidenceRefs"],
       "properties": {
-        "decision": {
-          "enum": [
-            "recorded"
-          ]
-        },
-        "state": {
-          "type": "object",
-          "additionalProperties": false,
-          "required": [
-            "operator",
-            "status",
-            "code",
-            "retryable",
-            "emits"
-          ],
-          "properties": {
-            "operator": {
-              "const": "source/conversation-record"
-            },
-            "status": {
-              "enum": [
-                "completed",
-                "replan",
-                "blocked"
-              ]
-            },
-            "code": {
-              "enum": [
-                "source-conversation-record-recorded"
-              ]
-            },
-            "retryable": {
-              "type": "boolean"
-            },
-            "emits": {
-              "type": "object",
-              "additionalProperties": false,
-              "required": [
-                "stage",
-                "status",
-                "factsAdd"
-              ],
-              "properties": {
-                "stage": {
-                  "enum": [
-                    "source.conversation.recorded"
-                  ]
-                },
-                "status": {
-                  "enum": [
-                    "complete"
-                  ]
-                },
-                "factsAdd": {
-                  "type": "array",
-                  "minItems": 1,
-                  "uniqueItems": true,
-                  "items": {
-                    "type": "string",
-                    "minLength": 1
-                  }
-                }
-              }
-            }
-          }
-        },
-        "produced": {
-          "type": "object",
-          "additionalProperties": false,
-          "required": [
-            "conversationHeadRef",
-            "durableWrites"
-          ],
-          "properties": {
-            "conversationHeadRef": {
-              "anyOf": [
-                {
-                  "$ref": "#/$defs/sessionRef"
-                },
-                {
-                  "type": "null"
-                }
-              ]
-            },
-            "durableWrites": {
-              "type": "array",
-              "uniqueItems": true,
-              "items": {
-                "type": "string",
-                "minLength": 1
-              }
-            }
-          }
-        },
-        "context": {
-          "type": "object",
-          "additionalProperties": false,
-          "required": [
-            "used"
-          ],
-          "properties": {
-            "used": {
-              "type": "array",
-              "minItems": 1,
-              "uniqueItems": true,
-              "items": {
-                "type": "object",
-                "additionalProperties": false,
-                "required": [
-                  "kind",
-                  "ref",
-                  "revision"
-                ],
-                "properties": {
-                  "kind": {
-                    "enum": [
-                      "session-artifact",
-                      "worktree-business",
-                      "qdrant-knowledge",
-                      "exact-source"
-                    ]
-                  },
-                  "ref": {
-                    "type": "string",
-                    "minLength": 1
-                  },
-                  "revision": {
-                    "type": "string",
-                    "minLength": 1
-                  }
-                }
-              }
-            }
-          }
-        },
-        "cleanup": {
-          "type": "object",
-          "additionalProperties": false,
-          "required": [
-            "scratchRefs",
-            "retention",
-            "purgeAt"
-          ],
-          "properties": {
-            "scratchRefs": {
-              "type": "array",
-              "uniqueItems": true,
-              "items": {
-                "$ref": "#/$defs/sessionRef"
-              }
-            },
-            "retention": {
-              "const": "until-skill-terminal"
-            },
-            "purgeAt": {
-              "const": "skill-terminal"
-            }
-          }
-        },
-        "evidenceRefs": {
-          "type": "array",
-          "minItems": 1,
-          "uniqueItems": true,
-          "items": {
-            "$ref": "#/$defs/sessionRef"
-          }
-        },
-        "findings": {
-          "type": "array",
-          "uniqueItems": true,
-          "items": {
-            "type": "string",
-            "minLength": 1
-          }
-        }
+        "outcome": { "enum": ["recorded", "idempotent", "conflict", "blocked"], "description": "Observed compare-and-set result; only the Skill machine maps it to a next state." },
+        "headRef": { "type": ["string", "null"], "minLength": 1, "description": "New or already-current durable head for successful outcomes; otherwise null." },
+        "headSha256": { "anyOf": [{ "$ref": "#/$defs/sha256" }, { "type": "null" }], "description": "Hash of the successful durable head; otherwise null." },
+        "writeApplied": { "type": "boolean", "description": "Whether this invocation appended the immutable head." },
+        "reason": { "enum": ["appended", "already-current", "identity-conflict", "authority-denied"], "description": "Single evidence-backed reason for the compare-and-set outcome." },
+        "evidenceRefs": { "type": "array", "minItems": 1, "maxItems": 16, "uniqueItems": true, "items": { "type": "string", "minLength": 1 }, "description": "Policy, redaction, authority, prior-head, and durable-write evidence used." }
       }
     }
   },
   "$defs": {
-    "sessionRef": {
-      "type": "string",
-      "pattern": "^session://tasks/[A-Za-z0-9._-]+/.+$"
-    }
+    "sha256": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" }
   }
 }

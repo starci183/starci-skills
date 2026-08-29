@@ -12,7 +12,7 @@ Navigation owns destination selection, hierarchy disclosure, and access to desti
 
 - Keep destination identity primary; counts and neutral states are secondary.
 - Distinguish current, hover, focus, expanded, disabled, and parent-containing-current states.
-- Group labels structure destinations and are not clickable unless the contract declares it.
+- Group labels structure destinations and are not clickable unless the interface declares it.
 - Collapse only when every destination remains identifiable and accessible.
 - Deep hierarchy uses controlled disclosure rather than rendering every level.
 - Sticky Sidebar names one scroll owner and avoids a competing page scroll.

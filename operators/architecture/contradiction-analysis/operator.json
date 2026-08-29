@@ -1,38 +1,16 @@
 {
-  "schemaVersion": 6,
+  "schemaVersion": 7,
   "id": "architecture/contradiction-analysis",
   "domain": "architecture",
+  "job": "Classify contradictions in one architecture evidence set.",
   "inputSchema": "input.schema.json",
   "outputSchema": "output.schema.json",
-  "knowledgeRefs": [
-    "architecture.decision-analysis"
-  ],
   "sourceReferenceRefs": [],
-  "accepts": [
-    {
-      "stage": "architecture.v61.contradiction-analysis",
-      "status": "ready",
-      "allFacts": [],
-      "noneFacts": []
-    }
-  ],
-  "emits": [
-    {
-      "stage": "architecture.v61.contradiction-analysis.complete",
-      "status": "ready",
-      "factsAdd": [
-        "architecture-contradiction-analysis-ready"
-      ],
-      "factsRemove": []
-    }
-  ],
   "sideEffects": [
-    "keep artifacts and observations in task-session memory only",
-    "purge intermediate session objects at every parent-skill terminal state"
+    "read only the supplied exact references"
   ],
   "stopConditions": [
-    "required evidence is missing, stale or contradictory",
-    "No conflict is silently resolved by trusting source; blocking contradictions name the missing authority or decision.",
-    "source observations would be treated as target authority"
+    "an exact reference is missing or its fingerprint differs",
+    "the requested work exceeds this operator job"
   ]
 }

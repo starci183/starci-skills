@@ -1,19 +1,16 @@
 {
-  "schemaVersion": 6,
+  "schemaVersion": 7,
   "id": "fe/coding-scope-freeze",
   "domain": "fe",
+  "job": "coding scope freeze one closed frontend target.",
   "inputSchema": "input.schema.json",
   "outputSchema": "output.schema.json",
-  "knowledgeRefs": [],
+  "contextRefs": [],
   "sourceReferenceRefs": [],
-  "accepts": [
-    { "stage": "source-fit.resolve", "status": "ready", "allFacts": ["grammar-converged", "principles-compiled", "layout-approved"], "noneFacts": ["grammar-gap", "create-required"] },
-    { "stage": "request.result", "status": "ready", "allFacts": ["create-required", "requests-emitted"], "noneFacts": ["grammar-gap"] }
-  ],
-  "emits": [
-    { "stage": "code.implement", "status": "ready", "factsAdd": ["coding-scope-frozen"], "factsRemove": [] },
-    { "stage": "code.result", "status": "blocked", "factsAdd": ["coding-scope-blocked"], "factsRemove": [] }
-  ],
-  "sideEffects": ["freeze exact read/write file paths and pre-change hashes in task-session storage only"],
-  "stopConditions": ["source head differs from the approved coding-context generation", "candidate cannot be rebound to canonical JSON", "target is ambiguous, outside the workspace, or outside the approved layout/request boundary"]
+  "sideEffects": [],
+  "stopConditions": [
+    "required authority or evidence is missing or stale",
+    "the closed target boundary is ambiguous",
+    "completion would require another operator job"
+  ]
 }

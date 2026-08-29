@@ -1,243 +1,62 @@
 {
-  "$id": "https://starci.dev/v6/operators/business/publish/input.schema.json",
-  "title": "business/publish operator input",
   "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://starci.dev/v7/operators/business/publish/input.schema.json",
   "type": "object",
   "additionalProperties": false,
   "required": [
     "schemaVersion",
-    "runId",
-    "stage",
-    "status",
-    "facts",
-    "payload"
-  ],
-  "allOf": [
-    {
-      "oneOf": [
-        {
-          "properties": {
-            "stage": {
-              "const": "business.publish"
-            },
-            "status": {
-              "const": "ready"
-            }
-          },
-          "required": [
-            "stage",
-            "status"
-          ]
-        }
-      ]
-    }
+    "operatorId",
+    "context",
+    "input"
   ],
   "properties": {
     "schemaVersion": {
-      "const": 6
+      "const": 7
     },
-    "runId": {
-      "type": "string",
-      "minLength": 1
+    "operatorId": {
+      "const": "business/publish"
     },
-    "stage": {
-      "enum": [
-        "business.publish"
-      ]
-    },
-    "status": {
-      "enum": [
-        "ready"
-      ]
-    },
-    "facts": {
-      "type": "array",
-      "uniqueItems": true,
-      "items": {
-        "type": "string",
-        "minLength": 1
-      }
-    },
-    "payload": {
+    "context": {
       "type": "object",
       "additionalProperties": false,
       "required": [
-        "provided",
-        "loads",
-        "session"
+        "contextRefs",
+        "sourceRefs"
       ],
       "properties": {
-        "provided": {
-          "type": "object",
-          "additionalProperties": false,
-          "required": [
-            "businessModelRef",
-            "previousHeadRef",
-            "requestedTransitionRef"
-          ],
-          "properties": {
-            "businessModelRef": {
-              "$ref": "#/$defs/sessionRef"
-            },
-            "previousHeadRef": {
-              "$ref": "#/$defs/sessionRef"
-            },
-            "requestedTransitionRef": {
-              "$ref": "#/$defs/sessionRef"
-            }
-          }
+        "contextRefs": {
+          "description": "Exact canonical context references resolved with default repository or file search.",
+          "$ref": "#/$defs/refs"
         },
-        "loads": {
-          "type": "object",
-          "additionalProperties": false,
-          "required": [
-            "artifacts",
-            "knowledge",
-            "business",
-            "orchestration"
-          ],
-          "properties": {
-            "artifacts": {
-              "type": "array",
-              "minItems": 1,
-              "uniqueItems": true,
-              "items": {
-                "type": "object",
-                "additionalProperties": false,
-                "required": [
-                  "ref",
-                  "revision",
-                  "loadMode"
-                ],
-                "properties": {
-                  "ref": {
-                    "$ref": "#/$defs/sessionRef"
-                  },
-                  "revision": {
-                    "$ref": "#/$defs/sha256"
-                  },
-                  "loadMode": {
-                    "const": "session-exact"
-                  }
-                }
-              }
-            },
-            "knowledge": {
-              "type": "array",
-              "minItems": 1,
-              "maxItems": 1,
-              "items": {
-                "type": "object",
-                "additionalProperties": false,
-                "required": [
-                  "id",
-                  "generation",
-                  "contentSha256",
-                  "loadMode"
-                ],
-                "properties": {
-                  "id": {
-                    "enum": [
-                      "business.authority-lifecycle"
-                    ]
-                  },
-                  "generation": {
-                    "type": "string",
-                    "minLength": 1
-                  },
-                  "contentSha256": {
-                    "$ref": "#/$defs/sha256"
-                  },
-                  "loadMode": {
-                    "const": "qdrant-exact"
-                  }
-                }
-              }
-            },
-            "orchestration": {
-              "type": "object",
-              "additionalProperties": false,
-              "required": [
-                "mode",
-                "profileRef",
-                "providerRef"
-              ],
-              "properties": {
-                "mode": {
-                  "enum": [
-                    "economical",
-                    "balanced",
-                    "parallel"
-                  ]
-                },
-                "profileRef": {
-                  "enum": [
-                    "orchestration/modes/economical.json",
-                    "orchestration/modes/balanced.json",
-                    "orchestration/modes/parallel.json"
-                  ]
-                },
-                "providerRef": {
-                  "type": "string",
-                  "pattern": "^orchestration/providers/[a-z0-9-]+\\.json$"
-                }
-              }
-            },
-            "business": {
-              "type": "object",
-              "additionalProperties": false,
-              "required": [
-                "ref",
-                "authorityPath",
-                "revision",
-                "loadMode"
-              ],
-              "properties": {
-                "ref": {
-                  "$ref": "#/$defs/sessionRef"
-                },
-                "authorityPath": {
-                  "type": "string",
-                  "pattern": "^\\.worktrees/[a-z0-9][a-z0-9-]*/businesses(?:/|$)"
-                },
-                "revision": {
-                  "$ref": "#/$defs/sha256"
-                },
-                "loadMode": {
-                  "const": "worktree-exact"
-                }
-              }
-            }
-          }
+        "sourceRefs": {
+          "description": "Exact routed source references allowed for this job.",
+          "$ref": "#/$defs/refs"
+        }
+      }
+    },
+    "input": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "project",
+        "objectiveRef",
+        "sourceFingerprint"
+      ],
+      "properties": {
+        "project": {
+          "description": "Verified project identity for this job.",
+          "type": "string",
+          "pattern": "^[a-z0-9][a-z0-9-]*$"
         },
-        "session": {
-          "type": "object",
-          "additionalProperties": false,
-          "required": [
-            "taskId",
-            "inputRef",
-            "outputRef",
-            "scratchPrefix",
-            "retention"
-          ],
-          "properties": {
-            "taskId": {
-              "type": "string",
-              "minLength": 1
-            },
-            "inputRef": {
-              "$ref": "#/$defs/sessionRef"
-            },
-            "outputRef": {
-              "$ref": "#/$defs/sessionRef"
-            },
-            "scratchPrefix": {
-              "$ref": "#/$defs/sessionRef"
-            },
-            "retention": {
-              "const": "until-skill-terminal"
-            }
-          }
+        "objectiveRef": {
+          "description": "Exact bounded objective reference.",
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 1024
+        },
+        "sourceFingerprint": {
+          "description": "Frozen fingerprint shared by supplied source references.",
+          "$ref": "#/$defs/sha256"
         }
       }
     }
@@ -247,9 +66,15 @@
       "type": "string",
       "pattern": "^sha256:[0-9a-f]{64}$"
     },
-    "sessionRef": {
-      "type": "string",
-      "pattern": "^session://tasks/[A-Za-z0-9._-]+/.+$"
+    "refs": {
+      "type": "array",
+      "maxItems": 128,
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 1024
+      }
     }
   }
 }

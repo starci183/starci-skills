@@ -1,15 +1,9 @@
 # `be/mutation-contract` input
 
-Specify invariants, reads, qualified writes, connection tokens, cross-boundary effects and proof cases for every state change.
+- `context.contextRefs`: exact canonical references resolved by default repository or file search.
+- `context.sourceRefs`: exact routed source files permitted for this job.
+- `input.project`: verified project identity.
+- `input.objectiveRef`: exact bounded objective reference.
+- `input.sourceFingerprint`: frozen fingerprint for the supplied source evidence.
 
-## JSON architecture
-
-| Section | Authored by | Purpose |
-| --- | --- | --- |
-| Root route | Parent state machine | Select this atomic capability. |
-| `payload.provided.artifactRefs` | Previous state | Supply immutable session refs; source remains observation. |
-| `payload.loads.artifacts` | Runtime | Resolve only revision-pinned refs after validation. |
-| `payload.loads.knowledge` | Runtime | Retrieve only `be.plan-compilation`. |
-| `payload.session` | Runtime | Own ephemeral input, output and scratch slots. |
-
-Validation precedes every load. No undeclared source or adjacent capability context is accepted.
+Resolve the project backend Source through the runtime Source `<Source>/.workspaces` route. Durable roots are flat `.worktrees/_templates/`, `.worktrees/businesses/`, `.worktrees/uat/`, `.worktrees/sessions/`, and `.worktrees/debts/`; never use `.worktrees/<project>/`. Search the verified routed source directly with default repository or file search; do not create a derived source cache or external index.

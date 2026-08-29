@@ -130,7 +130,7 @@ function contractHygiene(value) {
   const project = value.payload?.provided?.project;
   const expectedProfile = { economical: 'orchestration/modes/economical.json', balanced: 'orchestration/modes/balanced.json', parallel: 'orchestration/modes/parallel.json' };
   const orchestration = value.payload?.loads?.orchestration;
-  if (orchestration && expectedProfile[orchestration.mode] !== orchestration.profileRef) errors.push('$.payload.loads.orchestration.profileRef: must match mode');
+  if (orchestration?.profileRef !== undefined && expectedProfile[orchestration.mode] !== orchestration.profileRef) errors.push('$.payload.loads.orchestration.profileRef: must match mode');
   const visit = (current, at) => {
     if (typeof current === 'string') {
       if (current.length > 4096) errors.push(`${at}: string exceeds the task-contract limit`);

@@ -6,7 +6,7 @@
 | Package | `@starci/grammar/common` |
 | Operators | `grammar-convergence` |
 | Search tags | `neutral state, loading, empty, error, focus, keyboard, accessibility` |
-| Dependencies | `fe.grammar-common-contracts` |
+| Dependencies | `fe.grammar-common-capabilities` |
 
 Grammar renders neutral presentation state. The application owns the mapping from business state.
 

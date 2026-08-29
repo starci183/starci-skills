@@ -1,110 +1,16 @@
 {
-  "schemaVersion": 6,
+  "schemaVersion": 7,
   "id": "fe/grammar-convergence",
   "domain": "fe",
+  "job": "Apply approved Grammar tokens last to one already compiled layout.",
   "inputSchema": "input.schema.json",
   "outputSchema": "output.schema.json",
-  "knowledgeRefs": [
-    "fe.grammar-common-overview",
-    "fe.grammar-common-contracts",
-    "fe.grammar-common-states-accessibility",
-    "fe.grammar-common-extension",
-    "fe.grammar-common-case-surface-inside-surface",
-    "fe.grammar-common-case-collection-cardinality",
-    "fe.grammar-common-case-sticky-scroll-owner",
-    "fe.grammar-common-case-responsive-flattening",
-    "fe.grammar-core-overview",
-    "fe.grammar-core-object-actions",
-    "fe.grammar-core-object-fields",
-    "fe.grammar-core-object-surface-card",
-    "fe.grammar-core-object-collections",
-    "fe.grammar-core-object-navigation",
-    "fe.grammar-core-object-tabs",
-    "fe.grammar-core-object-tables",
-    "fe.grammar-core-object-overlays-feedback",
-    "fe.grammar-core-case-primary-secondary-grid",
-    "fe.grammar-core-case-trust-list-in-card",
-    "fe.grammar-core-case-multi-step-form",
-    "fe.grammar-core-case-sticky-summary",
-    "fe.grammar-offset-pop-overview",
-    "fe.grammar-offset-pop-object-actions",
-    "fe.grammar-offset-pop-object-fields",
-    "fe.grammar-offset-pop-object-surface-card",
-    "fe.grammar-offset-pop-object-collections",
-    "fe.grammar-offset-pop-object-navigation",
-    "fe.grammar-offset-pop-object-tabs",
-    "fe.grammar-offset-pop-object-tables",
-    "fe.grammar-offset-pop-object-overlays-feedback",
-    "fe.grammar-offset-pop-case-hero-collage",
-    "fe.grammar-offset-pop-case-list-in-offset-card",
-    "fe.grammar-offset-pop-case-dense-screen-simplification",
-    "fe.grammar-offset-pop-case-mobile-accent-reduction"
-  ],
+  "contextRefs": [],
   "sourceReferenceRefs": [],
-  "accepts": [
-    {
-      "stage": "layout.review",
-      "status": "approved",
-      "allFacts": [
-        "layout-approved",
-        "grammar-pair-ready",
-        "neutral-facts-ready"
-      ],
-      "noneFacts": []
-    },
-    {
-      "stage": "delivery.mission.resume",
-      "status": "ready",
-      "allFacts": [
-        "layout-approved",
-        "grammar-pair-ready",
-        "neutral-facts-ready",
-        "delivery-impact-classified"
-      ],
-      "noneFacts": []
-    }
-  ],
-  "emits": [
-    {
-      "when": {
-        "gate": "pass"
-      },
-      "stage": "source-fit.resolve",
-      "status": "ready",
-      "factsAdd": [
-        "grammar-converged"
-      ],
-      "factsRemove": []
-    },
-    {
-      "when": {
-        "gate": "refused"
-      },
-      "stage": "source-fit.resolve",
-      "status": "blocked",
-      "factsAdd": [
-        "grammar-business-gate-failed"
-      ],
-      "factsRemove": []
-    }
-  ],
-  "sideEffects": [
-    "keep input, output, loaded context, worker observations, drafts, evidence, and receipts in task-session storage only",
-    "purge every intermediate session object at every parent-skill terminal state"
-  ],
+  "sideEffects": [],
   "stopConditions": [
-    "invalid-input",
-    "non-neutral-fact",
-    "non-neutral-state",
-    "copy-semantic-branch",
-    "ambiguous-rule",
-    "unlocked-package",
-    "undeclared-package-dependency",
-    "usage-guide-stale",
-    "invented-or-non-public-export",
-    "undeclared-contract-extension-axis",
-    "Refuse on business-specific Grammar content, an unlocked package, a missing neutral owner, or an undeclared package dependency.",
-    "runtime binding revision or session ownership is invalid",
-    "the operation would broaden its approved authority, source, or external boundary"
+    "required authority or evidence is missing or stale",
+    "the closed target boundary is ambiguous",
+    "completion would require another operator job"
   ]
 }

@@ -1,17 +1,21 @@
-# Execute `delivery/impact-classify`
+# Execute delivery/impact-classify
 
-## Step 1 — Bind mission authority
+## Context
 
-**Read:** Validate the closed input, then resolve only the exact approved mission, fresh business revision, route receipts and `architecture.decision-analysis` knowledge.
+Read only the closed context fields and declared context references.
 
-**Context:** Keep approved authority and route identities; do not inspect product-source bodies or infer a server contract from UI code.
+## Input
 
-## Step 2 — Classify affected roles
+Use the exact closed input for this one job.
 
-Compare mission states and operations with the declared FE/BE boundary. Emit `backend-required` when a server-owned contract, invariant or persisted behavior changes. Emit `frontend-only` only when behavior, persistence and transport stay unchanged.
+## Action
 
-**Session write:** Store the rule matches, evidence refs and impact receipt under the current task session.
+Perform exactly one impact classify job. Do not route, loop, wait, branch to another operator, or retain session state.
 
-**Stop:** Block when authority is stale, role evidence conflicts or impact cannot be classified deterministically.
+## Output
 
-Use the selected orchestration profile only for independent evidence checks; the final classification remains one deterministic operator decision. Validate the output and register every scratch ref for terminal purge.
+Return one typed output.outcome and bounded evidence. The parent Skill machine owns routing.
+
+## Stop
+
+Stop on a declared condition or before exceeding the exact mutation boundary.

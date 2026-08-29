@@ -1,52 +1,11 @@
 {
-  "schemaVersion": 6,
+  "schemaVersion": 7,
   "id": "tech-stack/topology-model",
   "domain": "tech-stack",
+  "job": "Model one operational target topology from one observed inventory and its approved constraints.",
   "inputSchema": "input.schema.json",
   "outputSchema": "output.schema.json",
-  "knowledgeRefs": [],
   "sourceReferenceRefs": [],
-  "accepts": [
-    {
-      "stage": "tech-stack.model",
-      "status": "ready",
-      "allFacts": [],
-      "noneFacts": []
-    }
-  ],
-  "emits": [
-    {
-      "stage": "tech-stack.model",
-      "status": "ready",
-      "factsAdd": [
-        "topology-model-ready"
-      ],
-      "factsRemove": []
-    },
-    {
-      "stage": "tech-stack.model",
-      "status": "revise",
-      "factsAdd": [
-        "topology-model-revise"
-      ],
-      "factsRemove": []
-    },
-    {
-      "stage": "tech-stack.model",
-      "status": "blocked",
-      "factsAdd": [
-        "topology-model-blocked"
-      ],
-      "factsRemove": []
-    }
-  ],
-  "sideEffects": [
-    "read only declared references",
-    "store intermediate artifacts in task-session memory only"
-  ],
-  "stopConditions": [
-    "identity or evidence mismatch",
-    "critical unresolved contradiction"
-  ]
+  "sideEffects": ["write only the candidate stack model to task-session storage"],
+  "stopConditions": ["inventory identity mismatch", "a critical contradiction has no bounded revision"]
 }
-

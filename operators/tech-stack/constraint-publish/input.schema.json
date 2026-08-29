@@ -1,158 +1,37 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://starci.dev/v6/operators/tech-stack/constraint-publish/input.schema.json",
+  "$id": "https://starci.dev/v7/operators/tech-stack/constraint-publish/input.schema.json",
   "type": "object",
   "additionalProperties": false,
-  "required": [
-    "schemaVersion",
-    "runId",
-    "stage",
-    "status",
-    "facts",
-    "payload"
-  ],
+  "required": ["schemaVersion", "operatorId", "context", "input"],
   "properties": {
-    "schemaVersion": {
-      "const": 6
-    },
-    "runId": {
-      "type": "string",
-      "minLength": 1
-    },
-    "stage": {
-      "const": "tech-stack.constraint"
-    },
-    "status": {
-      "const": "ready"
-    },
-    "facts": {
-      "type": "array",
-      "uniqueItems": true,
-      "items": {
-        "type": "string",
-        "minLength": 1
-      }
-    },
-    "payload": {
+    "schemaVersion": { "const": 7 },
+    "operatorId": { "const": "tech-stack/constraint-publish" },
+    "context": {
       "type": "object",
       "additionalProperties": false,
-      "required": [
-        "provided",
-        "loads",
-        "session"
-      ],
+      "required": ["stackModelRef", "stackModelSha256", "compatibility", "approval"],
       "properties": {
-        "provided": {
-          "type": "object",
-          "additionalProperties": false,
-          "required": [
-            "project",
-            "objectiveRef",
-            "stackModelRef"
-          ],
-          "properties": {
-            "project": {
-              "type": "string",
-              "pattern": "^[a-z0-9][a-z0-9-]*$"
-            },
-            "objectiveRef": {
-              "type": "string",
-              "minLength": 1
-            },
-            "stackModelRef": {
-              "type": "string",
-              "minLength": 1
-            }
-          }
-        },
-        "loads": {
-          "type": "object",
-          "additionalProperties": false,
-          "required": [
-            "compatibilityReceiptRef",
-            "approvalReceiptRef"
-          ],
-          "properties": {
-            "compatibilityReceiptRef": {
-              "type": "string",
-              "minLength": 1
-            },
-            "approvalReceiptRef": {
-              "type": "string",
-              "minLength": 1
-            }
-          }
-        },
-        "session": {
-          "type": "object",
-          "additionalProperties": false,
-          "required": [
-            "taskId",
-            "inputRef",
-            "outputRef",
-            "scratchPrefix",
-            "retention"
-          ],
-          "properties": {
-            "taskId": {
-              "type": "string",
-              "minLength": 1
-            },
-            "inputRef": {
-              "$ref": "#/$defs/sessionRef"
-            },
-            "outputRef": {
-              "$ref": "#/$defs/sessionRef"
-            },
-            "scratchPrefix": {
-              "$ref": "#/$defs/sessionRef"
-            },
-            "retention": {
-              "const": "until-skill-terminal"
-            }
-          }
-        }
+        "stackModelRef": { "description": "Exact stack model selected for publication.", "type": "string", "minLength": 1, "maxLength": 1024 },
+        "stackModelSha256": { "description": "Hash of the selected stack model.", "$ref": "#/$defs/sha256" },
+        "compatibility": { "description": "Compatibility receipt bound to the selected model hash.", "$ref": "#/$defs/compatibility" },
+        "approval": { "description": "Approval receipt bound to the selected model hash.", "$ref": "#/$defs/approval" }
+      }
+    },
+    "input": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["project", "objectiveRef", "techStackHeadRef"],
+      "properties": {
+        "project": { "description": "Project that owns the published head.", "type": "string", "pattern": "^[a-z0-9][a-z0-9-]*$" },
+        "objectiveRef": { "description": "Objective completed by publication.", "type": "string", "minLength": 1, "maxLength": 512 },
+        "techStackHeadRef": { "description": "Exact immutable-head target to write.", "type": "string", "minLength": 1, "maxLength": 1024 }
       }
     }
   },
   "$defs": {
-    "sha256": {
-      "type": "string",
-      "pattern": "^sha256:[0-9a-f]{64}$"
-    },
-    "sessionRef": {
-      "type": "string",
-      "pattern": "^session://tasks/[A-Za-z0-9._-]+/.+$"
-    },
-    "session": {
-      "type": "object",
-      "additionalProperties": false,
-      "required": [
-        "taskId",
-        "inputRef",
-        "outputRef",
-        "scratchPrefix",
-        "retention"
-      ],
-      "properties": {
-        "taskId": {
-          "type": "string",
-          "minLength": 1
-        },
-        "inputRef": {
-          "$ref": "#/$defs/sessionRef"
-        },
-        "outputRef": {
-          "$ref": "#/$defs/sessionRef"
-        },
-        "scratchPrefix": {
-          "$ref": "#/$defs/sessionRef"
-        },
-        "retention": {
-          "const": "until-skill-terminal"
-        }
-      }
-    }
+    "sha256": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
+    "compatibility": { "type": "object", "additionalProperties": false, "required": ["receiptRef", "modelSha256", "outcome"], "properties": { "receiptRef": { "type": "string", "minLength": 1, "maxLength": 1024 }, "modelSha256": { "$ref": "#/$defs/sha256" }, "outcome": { "const": "compatible" } } },
+    "approval": { "type": "object", "additionalProperties": false, "required": ["receiptRef", "modelSha256", "decision"], "properties": { "receiptRef": { "type": "string", "minLength": 1, "maxLength": 1024 }, "modelSha256": { "$ref": "#/$defs/sha256" }, "decision": { "const": "approved" } } }
   }
 }
-

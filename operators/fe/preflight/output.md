@@ -1,7 +1,6 @@
 # `fe/preflight` output
 
-Return one frozen-scope receipt and one preflight receipt.
-
-## JSON architecture
-
-`payload.state` emits `flow.generate / ready`; `payload.produced` holds session refs only; `payload.context.used` lists exactly the request, route, and fresh-business receipts. All scratch and receipts are purged at skill-terminal.
+- `output.outcome`: Legacy semantic result consumed only by the Skill machine.
+- `output.result`: The atomic job result, or null when blocked.
+- `output.gaps`: Exact missing authority or evidence; empty when complete.
+- `output.evidenceRefs`: Exact evidence used to produce the result.

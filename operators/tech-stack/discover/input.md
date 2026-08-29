@@ -1,5 +1,8 @@
 # `tech-stack/discover` input
 
-## JSON architecture
-
-`provided` actively supplies project, objectiveRef, sourceFingerprint. `loads` passively binds only manifestRefs, configurationRefs, deploymentRefs at execution time. `session` owns ephemeral input, output and scratch references; bodies are never copied into the parent skill.
+- `context.manifestRefs`: exact manifest files at the frozen fingerprint.
+- `context.configurationRefs`: exact configuration files at the frozen fingerprint.
+- `context.deploymentRefs`: exact deployment files at the frozen fingerprint.
+- `input.project`: project being inventoried.
+- `input.objectiveRef`: objective requiring the inventory.
+- `input.sourceFingerprint`: shared immutable source fingerprint.

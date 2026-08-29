@@ -1,1 +1,16 @@
-{"schemaVersion":6,"id":"fe/visual-fidelity","domain":"fe","inputSchema":"input.schema.json","outputSchema":"output.schema.json","knowledgeRefs":["fe.ui-testing","fe.grammar-common-states-accessibility"],"sourceReferenceRefs":[],"accepts":[{"stage":"frontend.fidelity.verify","status":"ready","allFacts":["frontend-implementation-ready","deterministic-baselines-present"],"noneFacts":[]}],"emits":[{"stage":"frontend.fidelity.result","status":"passed","factsAdd":["frontend-fidelity-passed"],"factsRemove":[]},{"stage":"frontend.fidelity.result","status":"repair","factsAdd":["frontend-fidelity-failed"],"factsRemove":[]},{"stage":"frontend.fidelity.result","status":"blocked","factsAdd":[],"factsRemove":[]}],"sideEffects":["write screenshots and comparison receipts only to task-session storage"],"stopConditions":["missing baseline","non-deterministic fixture","structure mismatch","unapproved decoration or composition drift"]}
+{
+  "schemaVersion": 7,
+  "id": "fe/visual-fidelity",
+  "domain": "fe",
+  "job": "Verify one frontend implementation against approved deterministic visual baselines without repairing source.",
+  "inputSchema": "input.schema.json",
+  "outputSchema": "output.schema.json",
+  "contextRefs": [],
+  "sourceReferenceRefs": [],
+  "sideEffects": [],
+  "stopConditions": [
+    "required authority or evidence is missing or stale",
+    "the closed target boundary is ambiguous",
+    "completion would require another operator job"
+  ]
+}

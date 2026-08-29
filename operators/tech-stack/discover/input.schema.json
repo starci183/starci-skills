@@ -1,174 +1,35 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://starci.dev/v6/operators/tech-stack/discover/input.schema.json",
+  "$id": "https://starci.dev/v7/operators/tech-stack/discover/input.schema.json",
   "type": "object",
   "additionalProperties": false,
-  "required": [
-    "schemaVersion",
-    "runId",
-    "stage",
-    "status",
-    "facts",
-    "payload"
-  ],
+  "required": ["schemaVersion", "operatorId", "context", "input"],
   "properties": {
-    "schemaVersion": {
-      "const": 6
-    },
-    "runId": {
-      "type": "string",
-      "minLength": 1
-    },
-    "stage": {
-      "const": "tech-stack.discovery"
-    },
-    "status": {
-      "const": "ready"
-    },
-    "facts": {
-      "type": "array",
-      "uniqueItems": true,
-      "items": {
-        "type": "string",
-        "minLength": 1
-      }
-    },
-    "payload": {
+    "schemaVersion": { "const": 7 },
+    "operatorId": { "const": "tech-stack/discover" },
+    "context": {
       "type": "object",
       "additionalProperties": false,
-      "required": [
-        "provided",
-        "loads",
-        "session"
-      ],
+      "required": ["manifestRefs", "configurationRefs", "deploymentRefs"],
       "properties": {
-        "provided": {
-          "type": "object",
-          "additionalProperties": false,
-          "required": [
-            "project",
-            "objectiveRef",
-            "sourceFingerprint"
-          ],
-          "properties": {
-            "project": {
-              "type": "string",
-              "pattern": "^[a-z0-9][a-z0-9-]*$"
-            },
-            "objectiveRef": {
-              "type": "string",
-              "minLength": 1
-            },
-            "sourceFingerprint": {
-              "$ref": "#/$defs/sha256"
-            }
-          }
-        },
-        "loads": {
-          "type": "object",
-          "additionalProperties": false,
-          "required": [
-            "manifestRefs",
-            "configurationRefs",
-            "deploymentRefs"
-          ],
-          "properties": {
-            "manifestRefs": {
-              "type": "array",
-              "uniqueItems": true,
-              "items": {
-                "type": "string",
-                "minLength": 1
-              }
-            },
-            "configurationRefs": {
-              "type": "array",
-              "uniqueItems": true,
-              "items": {
-                "type": "string",
-                "minLength": 1
-              }
-            },
-            "deploymentRefs": {
-              "type": "array",
-              "uniqueItems": true,
-              "items": {
-                "type": "string",
-                "minLength": 1
-              }
-            }
-          }
-        },
-        "session": {
-          "type": "object",
-          "additionalProperties": false,
-          "required": [
-            "taskId",
-            "inputRef",
-            "outputRef",
-            "scratchPrefix",
-            "retention"
-          ],
-          "properties": {
-            "taskId": {
-              "type": "string",
-              "minLength": 1
-            },
-            "inputRef": {
-              "$ref": "#/$defs/sessionRef"
-            },
-            "outputRef": {
-              "$ref": "#/$defs/sessionRef"
-            },
-            "scratchPrefix": {
-              "$ref": "#/$defs/sessionRef"
-            },
-            "retention": {
-              "const": "until-skill-terminal"
-            }
-          }
-        }
+        "manifestRefs": { "description": "Exact manifest files resolved by default search at the frozen source fingerprint.", "$ref": "#/$defs/refs" },
+        "configurationRefs": { "description": "Exact configuration files resolved by default search at the frozen source fingerprint.", "$ref": "#/$defs/refs" },
+        "deploymentRefs": { "description": "Exact deployment files resolved by default search at the frozen source fingerprint.", "$ref": "#/$defs/refs" }
+      }
+    },
+    "input": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["project", "objectiveRef", "sourceFingerprint"],
+      "properties": {
+        "project": { "description": "Project whose observed stack is inventoried.", "type": "string", "pattern": "^[a-z0-9][a-z0-9-]*$" },
+        "objectiveRef": { "description": "Exact objective that requires the inventory.", "type": "string", "minLength": 1, "maxLength": 512 },
+        "sourceFingerprint": { "description": "Frozen fingerprint shared by every context reference.", "$ref": "#/$defs/sha256" }
       }
     }
   },
   "$defs": {
-    "sha256": {
-      "type": "string",
-      "pattern": "^sha256:[0-9a-f]{64}$"
-    },
-    "sessionRef": {
-      "type": "string",
-      "pattern": "^session://tasks/[A-Za-z0-9._-]+/.+$"
-    },
-    "session": {
-      "type": "object",
-      "additionalProperties": false,
-      "required": [
-        "taskId",
-        "inputRef",
-        "outputRef",
-        "scratchPrefix",
-        "retention"
-      ],
-      "properties": {
-        "taskId": {
-          "type": "string",
-          "minLength": 1
-        },
-        "inputRef": {
-          "$ref": "#/$defs/sessionRef"
-        },
-        "outputRef": {
-          "$ref": "#/$defs/sessionRef"
-        },
-        "scratchPrefix": {
-          "$ref": "#/$defs/sessionRef"
-        },
-        "retention": {
-          "const": "until-skill-terminal"
-        }
-      }
-    }
+    "sha256": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
+    "refs": { "type": "array", "maxItems": 64, "uniqueItems": true, "items": { "type": "string", "minLength": 1, "maxLength": 1024 } }
   }
 }
-

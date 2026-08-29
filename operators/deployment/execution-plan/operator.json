@@ -1,57 +1,16 @@
 {
-  "schemaVersion": 6,
+  "schemaVersion": 7,
   "id": "deployment/execution-plan",
   "domain": "deployment",
+  "job": "Compiles deployment intent and observed state into an executable plan.",
   "inputSchema": "input.schema.json",
   "outputSchema": "output.schema.json",
-  "knowledgeRefs": [
-    "deployment.lifecycle"
-  ],
   "sourceReferenceRefs": [],
-  "accepts": [
-    {
-      "stage": "deployment.plan",
-      "status": "ready",
-      "allFacts": [
-        "deployment-manifest-valid"
-      ],
-      "noneFacts": []
-    }
-  ],
-  "emits": [
-    {
-      "stage": "deployment.execute",
-      "status": "ready",
-      "factsAdd": [
-        "deployment-plan-ready"
-      ],
-      "factsRemove": []
-    },
-    {
-      "stage": "deployment.review",
-      "status": "pending",
-      "factsAdd": [
-        "deployment-approval-required"
-      ],
-      "factsRemove": []
-    },
-    {
-      "stage": "deployment.blocked",
-      "status": "blocked",
-      "factsAdd": [
-        "deployment-plan-blocked"
-      ],
-      "factsRemove": []
-    }
-  ],
   "sideEffects": [
-    "keep all intermediate data in task-session memory only",
-    "purge every intermediate session object at each parent-skill terminal state"
+    "read only the supplied exact references"
   ],
   "stopConditions": [
-    "required evidence is missing or stale",
-    "the result would cross the declared boundary",
-    "intermediate data would persist outside the task session",
-    "broad source context, an undeclared command or resource, or a raw secret would be loaded"
+    "an exact reference is missing or its fingerprint differs",
+    "the requested work exceeds this operator job"
   ]
 }

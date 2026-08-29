@@ -1,59 +1,16 @@
 {
-  "schemaVersion": 6,
+  "schemaVersion": 7,
   "id": "be/implementation",
   "domain": "be",
+  "job": "Apply one approved backend contract inside one frozen source boundary.",
   "inputSchema": "input.schema.json",
   "outputSchema": "output.schema.json",
-  "knowledgeRefs": ["be.implementation"],
-  "sourceReferenceRefs": ["starci-academy-be"],
-  "accepts": [
-    {
-      "stage": "architecture.boundary.review",
-      "status": "approved",
-      "allFacts": ["backend-boundary-approved", "backend-coding-scope-frozen"],
-      "noneFacts": []
-    },
-    {
-      "stage": "be.repair",
-      "status": "ready",
-      "allFacts": ["backend-boundary-approved", "backend-coding-scope-frozen", "in-boundary-repair"],
-      "noneFacts": []
-    }
-  ],
-  "emits": [
-    {
-      "stage": "quality.format",
-      "status": "ready",
-      "factsAdd": ["backend-source-written"],
-      "factsRemove": []
-    },
-    {
-      "stage": "architecture.boundary",
-      "status": "ready",
-      "factsAdd": ["backend-boundary-feedback", "source-drift"],
-      "factsRemove": []
-    },
-    {
-      "stage": "architecture.boundary",
-      "status": "ready",
-      "factsAdd": ["backend-boundary-feedback", "boundary-drift"],
-      "factsRemove": []
-    },
-    {
-      "stage": "be.blocked",
-      "status": "blocked",
-      "factsAdd": ["backend-implementation-blocked"],
-      "factsRemove": []
-    }
-  ],
+  "sourceReferenceRefs": [],
   "sideEffects": [
-    "write only approved backend product-source paths",
-    "keep operator input, output, context, observations, and receipts in task-session memory only",
-    "purge all intermediate session objects at every parent-skill terminal state"
+    "write only inside the supplied frozen source boundary"
   ],
   "stopConditions": [
-    "a required business, boundary, knowledge, approval, or source binding is missing or stale",
-    "a current source hash differs from the approved baseline",
-    "correct implementation would cross the approved boundary"
+    "an exact reference is missing or its fingerprint differs",
+    "the requested work exceeds this operator job"
   ]
 }

@@ -1,127 +1,173 @@
-# StarCi Skills
+# StarCi v7 runtime
 
-This repository is an executable skill system. Resolve the requested Source route first, then start with the selected skill; do not preload the full tree.
-
-## Workspace and worktree vocabulary
-
-These names are not interchangeable:
-
-| Term | Meaning | Authority |
-| --- | --- | --- |
-| **Source** | The repository that owns this `.claude` runtime and the root bootstrap files. It is the routing host, not automatically the repository named by a request. | The host-provided Source root |
-| **workspace** | The logical set of project-and-role routes known to one Source. A workspace is not a Git checkout and is not synonymous with the current working directory. | `<Source>/.workspaces/config.json` |
-| **portable workspace route** | The committed, machine-independent declaration for exactly one `project + role`. It identifies the intended directory, origin, branch and optional Grammar. | `<Source>/.workspaces/projects/<project>/<role>.json` |
-| **hydrated local route** | The machine-local resolution of one portable route to an absolute checkout root and observed Git state. It is derived state and never replaces portable authority. | `<Source>/.workspaces/local/routes/<project>/<role>/config.json` |
-| **repository checkout** | The actual directory selected by the resolved route. Git and source actions run here only after route identity is verified. | The hydrated route plus observed Git origin and branch |
-| **Git worktree** | An additional checkout created by `git worktree` that shares Git object storage with a repository but has its own working tree and checked-out branch. It is not a workspace, portable route or local route unless a portable route explicitly selects it. | `git worktree list --porcelain` for the resolved repository |
-
-## Single runtime invariant
-
-One declared workspace has exactly one Source that owns `.claude`, `AGENTS.md` and `CLAUDE.md`. A
-repository checkout or Git worktree reached through a workspace route follows that Source runtime; it
-does not become another Source merely because product work runs there.
-
-The absence of `<checkout>/.claude/INDEX.md` is therefore expected and is never evidence that the
-runtime, bootstrap or route is missing. Do not clone, copy or rediscover `.claude` inside a routed
-checkout. Resolve `<Source>` from the host-provided Source identity, then use its portable and hydrated
-routes to select the checkout. Never infer `<Source>` from the current working directory or by walking
-upward from the target checkout.
-
-The invariant is `project + role -> portable route -> hydrated local route -> verified checkout`. Similar directory names, a nearby clone, the Source root and the current working directory are never routing evidence. For example, a request for a project's `fe` role must resolve that project's `fe.json`; a sibling repository with the project name is not a substitute.
-
-## Shared product runtime coordination
-
-Product-runtime processes and stateful dependencies are machine-local shared state scoped to the
-verified checkout. A task does not own them merely because it needs runtime proof.
-
-Before any product-runtime start, restart or stop, inventory the existing listeners, exact process
-command lines, working directories and owning task/session receipt when one exists. Reuse one healthy
-listener or watch process for the verified checkout; source changes must flow through that existing
-watcher. Changes under `.claude` never require a product-runtime restart.
-
-Only stop or restart a process tree created by the current task. Mutating an existing shared process
-requires exact user approval naming that runtime or coordination with its recorded owner. When tasks
-share one database or ORM connection boundary, they must not run competing lifecycle or migration
-commands. One coordinator owns the mutation and the other tasks consume its resulting health receipt.
-
-`EADDRINUSE` is a coordination failure, not permission to kill the listener or launch another competing
-process. Diagnose the existing owner and reuse or coordinate it; never restart merely to obtain proof.
-
-## Visual preview delivery invariant
-
-Whenever a `.claude` workflow must render an HTML review through `visualize`, resolve the artifact to
-its absolute executor-side path and generate the content reference only with
-`node <Source>/.claude/scripts/visualize-directive.mjs <absolute-path>`. Paste stdout unchanged into
-the review response. Never handwrite or interpolate the directive JSON; on Windows, a backslash path
-can be parsed as JSON escapes and silently suppress the preview.
-
-A workflow cannot claim that a visual review was delivered, request its approval command, or enter an
-approval/review handoff until the preview is visibly rendered in that same response. If rendering is
-absent, regenerate the directive with the helper and re-emit the review before asking for approval.
-
-## Runtime route
-
-```text
-request
-  -> resolve project + role route when the request names source
-  -> analyze-input.md + task-scoped approval mode
-  -> skills/catalog.json metadata
-  -> skills/<starci-skill>/SKILL.md
-  -> validate-input.mjs
-  -> analyze-input.md
-  -> machine.json
-  -> operators/<domain>/<operation>/
-  -> validate-output.mjs
-  -> choice | wait | loop | terminal
-```
+This Source owns one composable StarCi runtime. Resolve the requested project routes, select one
+mission-owning Skill, and let that Skill call peer Skills and atomic operators until the requested
+outcome is proven or a genuine authority decision is unavailable.
 
 ## Load order
 
-1. Read root `analyze-input.md` and its small `request-vocabulary.md`; inspect only the active request,
-   the exact workspace route needed by that request and `skills/catalog.json` metadata.
-2. When the request names a project and role for any Git or source action, resolve and verify that exact route before selecting a skill or continuing without one.
-3. Emit and validate exactly one ephemeral skill selection. For multi-capability work, select only the earliest missing capability. If selection is ambiguous, clarify before loading any skill.
-4. Read only the selected `skills/<id>/SKILL.md`.
-5. Validate the closed input envelope and global selection with that skill's `validate-input.mjs`.
-6. Follow the selected skill's local `analyze-input.md` to validate and normalize scope, then enter its single fixed first state.
-7. Execute only the operator named by the current state in `machine.json`.
-8. For that operator, read `execute.md`; retrieve only its declared `knowledgeRefs` from Qdrant.
-9. Validate every operator result before routing on `decision`, `stage`, or `status`.
-10. In default `gated` mode, stop at waits and terminal states. With explicit task-scoped `mode=bypass`, a wait binds the currently displayed revision to an ephemeral bypass-authorization receipt and follows only its declared `approval.bypassTarget`; still stop at terminals. Follow declared loops and never invent implicit transitions.
-11. At a handoff terminal, resolve only the validated `handoffRef`. Sequential handoffs advance the objective; side branches must declare a resume capability. Acknowledge consumed artifacts before terminal cleanup.
+1. Read `.claude/config.yaml` and apply its runtime visibility settings.
+2. Read `.claude/analyze-input.md` and `.claude/request-vocabulary.md` against only the active request.
+3. Resolve the exact project and role through `<Source>/.workspaces/`; never guess a nearby checkout.
+4. Select one mission owner from `.claude/skills/catalog.json` and read only that Skill's `SKILL.md`,
+   input/output contracts, machine, and references required by its active intent.
+5. Validate the normalized Skill input, enter its declared start state, and execute only the operator
+   named by the current state.
+6. Validate every operator output before the Skill machine chooses the next transition.
+7. When the mission crosses a durable capability boundary, emit a typed Skill `CALL`; consume the
+   exact typed `RETURN`, emit `RESUME`, and continue from the recorded state instead of restarting.
+8. Finish only at a validated terminal whose output contains the required source heads and evidence.
 
-## Authority
+Do not preload the entire runtime. Default repository/file search reads canonical routed source and
+Markdown directly. Qdrant, a generated source index, and `.worktrees/coding-context/` are not part of
+v7.
 
-| Path | Owns |
+## Source routing
+
+`<Source>` is the host repository that owns `.claude`, `AGENTS.md`, and `.workspaces`. A routed
+repository or Git worktree follows this runtime; it does not become a second Source and does not need
+another `.claude/INDEX.md`.
+
+The routing invariant is:
+
+```text
+project + role
+  -> portable route in <Source>/.workspaces/projects/<project>/<role>.json
+  -> hydrated local route
+  -> verified checkout identity and source head
+```
+
+Similar names, sibling directories, the current working directory, and a browser URL are hints, not
+route authority. Source mutation starts only after route verification freezes the exact checkout and
+allowed boundary.
+
+## Backend-owned worktrees
+
+Each project's verified backend Source owns one flat container:
+
+```text
+<project-backend>/.worktrees/
+  _templates/
+  businesses/
+  uat/
+    <feature>/
+      <flow>/
+        snapshot.json
+        result.json
+  sessions/
+    <session-id>/
+      session.json
+      calls.ndjson
+      receipts/
+  debts/
+```
+
+There is no `.worktrees/<project>/` layer. Frontend and other routed sources provide implementation
+and runtime evidence but do not own business, UAT, session, or debt authority.
+
+`businesses/` publishes approved business heads. `uat/` contains only the canonical frozen input and
+result pair for one feature flow. `sessions/` contains resumable execution state and normalized call
+receipts, never hidden reasoning. `debts/` contains explicitly declared quality debt. Runtime schemas
+and copyable templates live under `.claude/templates/`; the backend `_templates/` directory is their
+version-bound project instance.
+
+## Skills and composition
+
+Public Skill identity is authoritative only in `.claude/skills/catalog.json`. A Skill name follows
+`starci-<owned-object>-<action>` and owns one durable authority, mutation, proof, or risk boundary.
+Broad verbs such as audit, create, repair, redesign, debug, reconcile, recover, and rollback are input
+intents when they share that boundary; they are not reasons to create phase Skills.
+
+Exactly one Skill owns the active mission. A child Skill may freely make reversible source changes
+inside the inherited, verified mission boundary. It must return a typed result to its caller and may
+not replace the parent objective, widen scope, or self-certify work owned by another boundary.
+
+Every Skill call records:
+
+```text
+mission context + exact input + expected output
+  -> CALL child
+  -> validated output + evidence + source heads
+  -> RETURN
+  -> RESUME exact parent state
+```
+
+Cycles such as frontend -> backend -> frontend are valid only when the normalized progress
+fingerprint changes. Repeated fingerprints or repeated material findings terminate the loop and route
+to a better direction, declared debt, blocker, or genuine user authority choice.
+
+## Operator law
+
+An operator performs one job:
+
+```text
+(context + input) -> typed output
+```
+
+It does not call another operator or Skill, own state-machine branching, hide alternative workflows,
+or return free-form control instructions. Its closed schema, validator, executable guidance, side
+effects, and two-color StarCi `icon.svg` define the contract. The parent Skill alone maps validated
+output fields to transitions.
+
+## Critical agency and user interaction
+
+Preserve the user's outcome, not a weak literal method. Challenge source precedent and the requested
+approach against business value, authority, evidence, reversibility, and stronger alternatives. Make
+the best reversible decision and continue when one action materially dominates.
+
+Wait for the user only when no valid next action dominates, product authority is genuinely missing,
+or a destructive/external mutation needs new authorization. When a product or visual direction must
+be selected, visibly render three or four materially different choices, explain their tradeoffs,
+recommend one, and resume the same mission after selection. Do not ask for approval between routine
+analysis, implementation, repair, rendering, quality, and proof states already inside mission scope.
+
+## Runtime trace
+
+`.claude/config.yaml` is the single runtime configuration authority. With `debug: true`, render every
+normalized Skill/operator `CALL`, `RETURN`, `TRANSITION`, `WAIT`, `RESUME`, `SKIP`, and `ERROR` with
+parent/child identity, context, exact input, expected and actual output, evidence, source heads,
+transition rule, resume state, and progress fingerprint.
+
+Debug changes visibility only. Receipts remain available when debug is false. Always redact secrets,
+credentials, authorization values, sensitive URL parameters, and hidden reasoning. Never persist or
+display chain-of-thought.
+
+## Proof and authority
+
+| Authority | Canonical owner |
 | --- | --- |
-| `analyze-input.md` | Global natural-language intent analysis and one-skill selection |
-| `request-vocabulary.md` | Global multilingual request vocabulary, scope-unit normalization and material-ambiguity clarification rules |
-| `<Source>/.workspaces/projects/` | Portable project-and-role route authority |
-| `<Source>/.workspaces/local/routes/` | Derived machine-local route state; never portable authority |
-| `skills/catalog.json` | Cheap pre-load skill metadata generated from the skill source |
-| `skills/` | User-facing capability contracts and state-machine composition |
-| `skills/route-machine.mjs` | Machine routing plus the task-scoped `gated` / `bypass` wait policy |
-| `operators/` | Atomic, single-responsibility execution contracts |
-| `orchestration/` | Provider-neutral execution modes and provider model mappings |
-| `knowledge/` | Durable operator knowledge retrieved lazily through Qdrant |
-| `runtime/knowledge-runtime/` | Local knowledge indexing and retrieval |
-| `scripts/` | Repository-level validation and query entry points |
-| `readiness/initialization/workspaces/commit-policy.json` | Canonical multi-device Git boundary for portable workspace intent, local hydration, worktrees, references and master identity |
+| Runtime configuration | `<Source>/.claude/config.yaml` |
+| Public Skill discovery | `<Source>/.claude/skills/catalog.json` |
+| Workspace routing | `<Source>/.workspaces/` |
+| Operator contracts | `<Source>/.claude/operators/` |
+| Business heads | `<project-backend>/.worktrees/businesses/` |
+| UAT snapshot/result | `<project-backend>/.worktrees/uat/<feature>/<flow>/` |
+| Session trace | `<project-backend>/.worktrees/sessions/<session-id>/` |
+| Declared quality debt | `<project-backend>/.worktrees/debts/` |
+| UI principles and reusable Grammar | `<Source>/.claude/knowledge/` |
 
-Inputs and outputs are closed JSON Schema Draft 2020-12 contracts. Knowledge is advisory until an operator binds it to an evidenced decision. A skill may mutate source or external state only when its current operator and authorization boundary explicitly allow that action. In `gated` mode that authority is an exact user approval; in explicitly selected `bypass` mode it is a task-session bypass authorization bound to the exact displayed revision. Bypass never widens scope or suppresses validation, evidence, safety, quality or blocker decisions.
+Tests, lint, screenshots, and prior PASS text are evidence, not business authority. UAT freezes its
+inputs before execution, evaluates independent Behavior, UX, and UI evidence, and publishes a result
+only after proof. Post-journey mutation cannot manufacture a passing result.
 
-Operator inputs, outputs, loaded bindings, worker observations, patch plans, and receipts are ephemeral task-session objects. They are never written to a run directory and are purged when the parent skill reaches any terminal state. Only explicitly approved product-source or external mutations survive.
+## Mutation boundaries
 
-## Repository checks
+The active task authorizes reversible mutations required to complete its bounded outcome. External
+publication, deployment, destructive replacement, secret rotation, and force Git operations require
+their exact declared authority. A child Skill inherits only the parent's verified mutation boundary.
+Read-only diagnosis never receives write roots or external mutation authority.
 
-From the Source root, run `npm --prefix .claude run check:source-readiness` before product work. It reports `runtime`, `bootstrap`, `workspaces` and `worktrees` independently and returns ready only when every module is current. Use `npm --prefix .claude run upgrade:source-readiness` for a read-only upgrade plan; an actual mutation requires `node .claude/scripts/source-readiness.mjs upgrade --source-root . --apply`.
+Before changing a shared product runtime, inventory its listener, command, working directory, and
+session owner. Reuse a healthy verified runtime. `EADDRINUSE` is a coordination finding, not permission
+to kill another process.
 
-Run `npm test` before release. It validates operators, skills, source readiness, routes, release structure, and the Qdrant knowledge runtime.
+## Validation
 
-## Multi-device reconstruction
+Focused Skill/operator tests must pass before integration. The Source-wide release then validates the
+12-skill catalog, v7 machines, operator contracts, nested call/resume traces, flat worktree topology,
+UAT templates, default-search boundary, site materialization, and realistic forward tests including:
 
-Git carries portable intent and encrypted authority only. After a pull, each trusted device proves its out-of-band master identity, then rebuilds routes, worktrees, reference checkouts, decrypted twins and indexing/runtime state locally. The complete commit/no-commit classification lives only in `readiness/initialization/workspaces/commit-policy.json`; run `node .claude/scripts/workspace-commit-policy.mjs check --source-root .` to enforce it. Never copy that classification into bootstrap files.
-
-When the user explicitly pauses an active coding mission to continue on another device, route to `starci-workflow-handoff`. It pushes only mission-owned Git heads and an annotated continuation tag containing the next capability and durable artifact refs; it never persists prompts, reasoning, generated context or session scratch. Resume verifies the exact tag, routes and heads before continuing.
-
-When the user explicitly needs local Docker service state transferred too, route instead to `starci-device-checkpoint`. That heavier mission first requires every mission-owned checkout to be clean, proven and remote-current, then quiesces the Source-declared Docker volumes, streams encrypted archives, publishes checksum-bound chunks as private release assets, and proves the manifest. Restore never overwrites a non-empty volume without explicit replace approval.
+```text
+audit Profile -> business/backend dependency -> resume frontend -> independent review -> quality -> UAT
+create page X -> direction decision only when necessary -> implementation -> proof
+```

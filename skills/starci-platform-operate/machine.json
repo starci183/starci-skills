@@ -1,0 +1,149 @@
+{
+  "schemaVersion": 7,
+  "id": "starci-platform-operate",
+  "start": "analyze-input",
+  "states": {
+    "analyze-input": {
+      "kind": "analysis",
+      "on": [
+        {
+          "when": {},
+          "target": "select-intent"
+        }
+      ]
+    },
+    "select-intent": {
+      "kind": "choice",
+      "on": [
+        {
+          "when": {
+            "inputEquals": {
+              "mission.intent": "observability"
+            }
+          },
+          "target": "observability"
+        },
+        {
+          "when": {
+            "inputEquals": {
+              "mission.intent": "sonar"
+            }
+          },
+          "target": "sonar"
+        },
+        {
+          "when": {
+            "inputEquals": {
+              "mission.intent": "tunnel-plan"
+            }
+          },
+          "target": "tunnel-plan"
+        },
+        {
+          "when": {
+            "inputEquals": {
+              "mission.intent": "tunnel-apply"
+            }
+          },
+          "target": "tunnel-apply"
+        }
+      ]
+    },
+    "observability": {
+      "kind": "operator",
+      "ref": "platform/observability-reconcile",
+      "on": [
+        {
+          "when": {
+            "outputEquals": {
+              "outcome": "proved"
+            }
+          },
+          "target": "complete"
+        },
+        {
+          "when": {
+            "outputEquals": {
+              "outcome": "blocked"
+            }
+          },
+          "target": "blocked"
+        }
+      ]
+    },
+    "sonar": {
+      "kind": "operator",
+      "ref": "platform/sonar-service-reconcile",
+      "on": [
+        {
+          "when": {
+            "outputEquals": {
+              "outcome": "proved"
+            }
+          },
+          "target": "complete"
+        },
+        {
+          "when": {
+            "outputEquals": {
+              "outcome": "blocked"
+            }
+          },
+          "target": "blocked"
+        }
+      ]
+    },
+    "tunnel-plan": {
+      "kind": "operator",
+      "ref": "platform/tunnel-plan",
+      "on": [
+        {
+          "when": {
+            "outputEquals": {
+              "outcome": "ready"
+            }
+          },
+          "target": "complete"
+        },
+        {
+          "when": {
+            "outputEquals": {
+              "outcome": "blocked"
+            }
+          },
+          "target": "blocked"
+        }
+      ]
+    },
+    "tunnel-apply": {
+      "kind": "operator",
+      "ref": "platform/tunnel-apply",
+      "on": [
+        {
+          "when": {
+            "outputEquals": {
+              "outcome": "proved"
+            }
+          },
+          "target": "complete"
+        },
+        {
+          "when": {
+            "outputEquals": {
+              "outcome": "blocked"
+            }
+          },
+          "target": "blocked"
+        }
+      ]
+    },
+    "complete": {
+      "kind": "terminal",
+      "result": "complete"
+    },
+    "blocked": {
+      "kind": "terminal",
+      "result": "blocked"
+    }
+  }
+}

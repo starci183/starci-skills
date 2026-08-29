@@ -1,79 +1,16 @@
 {
-  "schemaVersion": 6,
+  "schemaVersion": 7,
   "id": "fe/product-proof",
   "domain": "fe",
+  "job": "product proof one closed frontend target.",
   "inputSchema": "input.schema.json",
   "outputSchema": "output.schema.json",
-  "knowledgeRefs": [
-    "fe.product-proof"
-  ],
+  "contextRefs": [],
   "sourceReferenceRefs": [],
-  "accepts": [
-    {
-      "stage": "proof.run",
-      "status": "ready",
-      "allFacts": [
-        "seed-evidence",
-        "unit-pass",
-        "unit-evidence",
-        "e2e-pass",
-        "e2e-evidence",
-        "ui-pass",
-        "ui-evidence"
-      ]
-    }
-  ],
-  "emits": [
-    {
-      "when": "all gates and browser scenarios pass",
-      "stage": "proof.review",
-      "status": "complete",
-      "factsAdd": [
-        "proof-pass"
-      ]
-    },
-    {
-      "when": "failures can be fixed inside the approved direction and source boundary",
-      "stage": "code.repair",
-      "status": "repair",
-      "factsAdd": [
-        "in-boundary-repair"
-      ]
-    },
-    {
-      "when": "a fix changes approved structure, ownership, responsive transformation or source boundary",
-      "stage": "layout.review",
-      "status": "rejected",
-      "factsAdd": [
-        "boundary-drift",
-        "layout-feedback-recorded"
-      ],
-      "factsRemove": [
-        "layout-approved"
-      ]
-    },
-    {
-      "when": "environment, evidence or safety prevents a valid verdict",
-      "stage": "proof.review",
-      "status": "blocked",
-      "factsAdd": [
-        "proof-blocked"
-      ]
-    }
-  ],
-  "sideEffects": [
-    "keep input, output, loaded context, worker observations, drafts, evidence, and receipts in task-session storage only",
-    "purge every intermediate session object at every parent-skill terminal state"
-  ],
+  "sideEffects": [],
   "stopConditions": [
-    "change outside exact approved source boundary",
-    "missing or stale seed evidence",
-    "approved hash mismatch",
-    "missing required gate or browser scenario",
-    "unsafe or unavailable proof environment",
-    "partial proof coverage",
-    "Stop on stale seed or source hashes, missing required scenario, unsafe environment, partial coverage, or any undeclared source change.",
-    "runtime binding revision or session ownership is invalid",
-    "the operation would broaden its approved authority, source, or external boundary"
+    "required authority or evidence is missing or stale",
+    "the closed target boundary is ambiguous",
+    "completion would require another operator job"
   ]
 }

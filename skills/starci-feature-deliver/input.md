@@ -1,0 +1,3 @@
+# Input
+
+Closed mission input.

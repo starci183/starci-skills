@@ -1,0 +1,4 @@
+import { validatorFor, runValidatorCli } from '../../operators/validation.mjs';
+export const validateOutput=validatorFor(new URL('./output.schema.json',import.meta.url),(v)=>{const e=[];if(v.finalState!==v.state.terminalState)e.push('terminal mismatch');if(v.result==='handoff'&&v.handoffReceipt?.type!=='CALL')e.push('handoff requires canonical CALL receipt');if(v.result==='complete'&&v.handoffReceipt?.type!=='RETURN')e.push('completion requires canonical RETURN receipt');if(v.result==='blocked'&&v.handoffReceipt!==null)e.push('blocked cannot expose handoff receipt');if(v.handoffReceipt&&v.handoffReceipt.skillId!=='starci-architecture-design')e.push('receipt skillId must identify producer');return e});
+if(process.argv[1]?.endsWith('validate-output.mjs'))await runValidatorCli(validateOutput,'node validate-output.mjs <artifact.json>');
+

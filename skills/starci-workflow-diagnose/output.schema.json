@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://starci.dev/v6/skills/starci-workflow-diagnose/output.schema.json",
+  "$id": "https://starci.dev/v7/skills/starci-workflow-diagnose/output.schema.json",
   "type": "object",
   "additionalProperties": false,
   "required": [
@@ -10,99 +10,19 @@
     "result",
     "finalState",
     "state",
-    "handoffRef",
+    "handoffReceipt",
     "receiptRefs",
     "findings",
     "cleanup"
   ],
-  "allOf": [
-    {
-      "oneOf": [
-        {
-          "properties": {
-            "result": {
-              "const": "complete"
-            },
-            "finalState": {
-              "const": "complete"
-            },
-            "state": {
-              "properties": {
-                "status": {
-                  "const": "completed"
-                },
-                "code": {
-                  "const": "starci-workflow-diagnose-complete"
-                },
-                "retryable": {
-                  "const": false
-                },
-                "terminalState": {
-                  "const": "complete"
-                }
-              },
-              "required": [
-                "status",
-                "code",
-                "retryable",
-                "terminalState"
-              ]
-            }
-          },
-          "required": [
-            "result",
-            "finalState",
-            "state"
-          ]
-        },
-        {
-          "properties": {
-            "result": {
-              "const": "blocked"
-            },
-            "finalState": {
-              "const": "blocked"
-            },
-            "state": {
-              "properties": {
-                "status": {
-                  "const": "blocked"
-                },
-                "code": {
-                  "const": "starci-workflow-diagnose-blocked"
-                },
-                "retryable": {
-                  "const": false
-                },
-                "terminalState": {
-                  "const": "blocked"
-                }
-              },
-              "required": [
-                "status",
-                "code",
-                "retryable",
-                "terminalState"
-              ]
-            }
-          },
-          "required": [
-            "result",
-            "finalState",
-            "state"
-          ]
-        }
-      ]
-    }
-  ],
   "properties": {
     "schemaVersion": {
-      "const": 6
+      "const": 7
     },
     "runId": {
       "type": "string",
       "minLength": 1,
-      "maxLength": 128
+      "maxLength": 1024
     },
     "skillId": {
       "const": "starci-workflow-diagnose"
@@ -110,12 +30,14 @@
     "result": {
       "enum": [
         "complete",
+        "handoff",
         "blocked"
       ]
     },
     "finalState": {
       "enum": [
         "complete",
+        "peer-call",
         "blocked"
       ]
     },
@@ -132,14 +54,14 @@
         "status": {
           "enum": [
             "completed",
+            "handoff",
             "blocked"
           ]
         },
         "code": {
-          "enum": [
-            "starci-workflow-diagnose-complete",
-            "starci-workflow-diagnose-blocked"
-          ]
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 1024
         },
         "retryable": {
           "const": false
@@ -147,34 +69,107 @@
         "terminalState": {
           "enum": [
             "complete",
+            "peer-call",
             "blocked"
           ]
         }
       }
     },
-    "handoffRef": {
-      "type": [
-        "string",
-        "null"
-      ],
-      "pattern": "^session://tasks/[A-Za-z0-9._-]+/.+$"
+    "handoffReceipt": {
+      "oneOf": [
+        {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "version",
+                  "receiptId",
+                  "type",
+                  "missionId",
+                  "skillId",
+                  "operatorId",
+                  "parentId",
+                  "childId",
+                  "timestamp",
+                  "progressFingerprint",
+                  "trace"
+                ],
+                "properties": {
+                  "version": {
+                    "const": "7.0.0"
+                  },
+                  "receiptId": {
+                    "type": "string",
+                    "pattern": "^receipt:[A-Za-z0-9._-]+$"
+                  },
+                  "type": {
+                    "enum": [
+                      "CALL",
+                      "RETURN",
+                      "TRANSITION",
+                      "WAIT",
+                      "RESUME",
+                      "SKIP",
+                      "ERROR"
+                    ]
+                  },
+                  "missionId": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "skillId": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "operatorId": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "parentId": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "childId": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "timestamp": {
+                    "type": "string",
+                    "format": "date-time"
+                  },
+                  "progressFingerprint": {
+                    "type": "string",
+                    "pattern": "^sha256:[0-9a-f]{64}$"
+                  },
+                  "trace": {
+                    "type": "object"
+                  }
+                }
+            },
+        {
+          "type": "null"
+        }
+      ]
     },
     "receiptRefs": {
       "type": "array",
-      "minItems": 0,
-      "maxItems": 64,
       "uniqueItems": true,
+      "maxItems": 128,
       "items": {
         "type": "string",
-        "minLength": 3,
-        "maxLength": 512,
-        "pattern": "^(?:receipt:sha256:[0-9a-f]{64}|session://tasks/[A-Za-z0-9._-]+/.+)$"
+        "minLength": 1,
+        "maxLength": 1024
       }
     },
     "findings": {
       "type": "array",
-      "maxItems": 20,
-      "uniqueItems": true,
       "items": {
         "type": "object",
         "additionalProperties": false,
@@ -187,8 +182,8 @@
         "properties": {
           "code": {
             "type": "string",
-            "pattern": "^[a-z0-9]+(?:[.-][a-z0-9]+)*$",
-            "maxLength": 120
+            "minLength": 1,
+            "maxLength": 1024
           },
           "severity": {
             "enum": [
@@ -200,18 +195,16 @@
           "message": {
             "type": "string",
             "minLength": 1,
-            "maxLength": 500
+            "maxLength": 1024
           },
           "evidenceRefs": {
             "type": "array",
-            "minItems": 0,
-            "maxItems": 8,
             "uniqueItems": true,
+            "maxItems": 128,
             "items": {
               "type": "string",
-              "minLength": 3,
-              "maxLength": 512,
-              "pattern": "^(?:receipt:sha256:[0-9a-f]{64}|session://tasks/[A-Za-z0-9._-]+/.+)$"
+              "minLength": 1,
+              "maxLength": 1024
             }
           }
         }
@@ -228,14 +221,12 @@
       "properties": {
         "scratchRefs": {
           "type": "array",
-          "minItems": 0,
-          "maxItems": 64,
           "uniqueItems": true,
+          "maxItems": 128,
           "items": {
             "type": "string",
-            "minLength": 3,
-            "maxLength": 512,
-            "pattern": "^(?:receipt:sha256:[0-9a-f]{64}|session://tasks/[A-Za-z0-9._-]+/.+)$"
+            "minLength": 1,
+            "maxLength": 1024
           }
         },
         "retention": {

@@ -1,0 +1,83 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://starci.dev/v7/skills/starci-uat-verify/output.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "skillId",
+    "outcome",
+    "missionRef",
+    "artifactRefs",
+    "handoff"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "const": 7
+    },
+    "skillId": {
+      "const": "starci-uat-verify"
+    },
+    "outcome": {
+      "enum": [
+        "complete",
+        "handoff",
+        "waiting-choice",
+        "blocked"
+      ]
+    },
+    "missionRef": {
+      "type": "string",
+      "minLength": 1
+    },
+    "artifactRefs": {
+      "type": "array",
+      "uniqueItems": true,
+      "maxItems": 64,
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "handoff": {
+      "anyOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "skillId",
+            "inputRef",
+            "resumeSkillId",
+            "resumeState",
+            "missionRef"
+          ],
+          "properties": {
+            "skillId": {
+              "type": "string",
+              "minLength": 1
+            },
+            "inputRef": {
+              "type": "string",
+              "minLength": 1
+            },
+            "resumeSkillId": {
+              "type": "string",
+              "minLength": 1
+            },
+            "resumeState": {
+              "type": "string",
+              "minLength": 1
+            },
+            "missionRef": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        },
+        {
+          "type": "null"
+        }
+      ]
+    }
+  }
+}

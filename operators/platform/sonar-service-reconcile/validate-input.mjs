@@ -1,4 +1,20 @@
-import {runValidatorCli,validatorFor} from '../../validation.mjs';
-const schemaUrl=new URL('./input.schema.json',import.meta.url);
-function semantic(v){const e=[],p=Object.values(v.payload.provided),a=v.payload.loads.artifacts.map(x=>x.ref);for(const r of p)if(!a.includes(r))e.push(`/payload/loads/artifacts: missing ${r}`);if(v.payload.loads.knowledge.length!==1||v.payload.loads.knowledge[0].id!=='platform.sonar')e.push('/payload/loads/knowledge: exact platform.sonar required');if(!v.payload.loads.external.credentialHandleRefs.length)e.push('/payload/loads/external: opaque credential handle required');const q=`session://tasks/${v.payload.session.taskId}/`;for(const k of ['inputRef','outputRef','scratchPrefix'])if(!v.payload.session[k].startsWith(q))e.push(`/payload/session/${k}: wrong task`);return e}
-export const validateInput=validatorFor(schemaUrl,semantic);if(process.argv[1]&&import.meta.url===new URL(`file:///${process.argv[1].replaceAll('\\\\','/')}`).href)await runValidatorCli(validateInput,'usage: node validate-input.mjs <input.json>');
+import { validatorFor, runValidatorCli } from '../../validation.mjs';
+
+const exactSet = (left, right) => JSON.stringify([...new Set(left)].sort()) === JSON.stringify([...new Set(right)].sort());
+const duplicateKeys = (items) => items.length !== new Set(items.map(({ projectKey }) => projectKey)).size;
+
+const semantic = (value) => {
+  const errors = [];
+  const { authority, observedState } = value.context;
+  const desired = value.input.desiredState;
+  if (authority.planSha256 !== desired.planSha256) errors.push('/input/desiredState/planSha256: must equal approved plan hash');
+  if (!exactSet(authority.allowedEffects, desired.effects)) errors.push('/context/authority/allowedEffects: must equal desired effect classes');
+  if (duplicateKeys(desired.projects)) errors.push('/input/desiredState/projects: projectKey must be unique');
+  if (duplicateKeys(observedState.projects)) errors.push('/context/observedState/projects: projectKey must be unique');
+  const desiredKeys = new Set(desired.projects.map(({ projectKey }) => projectKey));
+  for (const project of observedState.projects) if (!desiredKeys.has(project.projectKey)) errors.push(`/context/observedState/projects: undeclared project ${project.projectKey}`);
+  return errors;
+};
+
+export const validateInput = validatorFor(new URL('./input.schema.json', import.meta.url), semantic);
+if (process.argv[1]?.endsWith('validate-input.mjs')) await runValidatorCli(validateInput, 'node validate-input.mjs <input.json>');

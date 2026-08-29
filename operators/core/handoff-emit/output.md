@@ -1,5 +1,8 @@
 # `core/handoff-emit` output
 
-## JSON architecture
-
-`state` routes the protocol decision. `produced` returns handoffRef, handoffSha256. Ordinary scratch is purged at skill-terminal; handoff artifacts use exact consumer acknowledgement before their declared purge point.
+- `output.outcome`: `emitted` or `blocked`.
+- `output.handoffRef`: immutable handoff reference, else null.
+- `output.handoffSha256`: immutable handoff hash, else null.
+- `output.retainedArtifactRefs`: refs retained by the runtime until acknowledgement.
+- `output.evidenceRefs`: exact emission evidence.
+- `output.reason`: blocker explanation, else null.

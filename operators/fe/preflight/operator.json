@@ -1,20 +1,16 @@
 {
-  "schemaVersion": 6,
+  "schemaVersion": 7,
   "id": "fe/preflight",
   "domain": "fe",
+  "job": "preflight one closed frontend target.",
   "inputSchema": "input.schema.json",
   "outputSchema": "output.schema.json",
-  "knowledgeRefs": [],
+  "contextRefs": [],
   "sourceReferenceRefs": [],
-  "accepts": [{ "stage": "business.freshness", "status": "ready", "allFacts": ["business-fresh-receipt-ready"], "noneFacts": [] }],
-  "emits": [{ "stage": "flow.generate", "status": "ready", "factsAdd": ["preflight-complete", "business-fresh-receipt-ready"], "factsRemove": [] }],
-  "sideEffects": [
-    "freeze request, route, fresh business receipt, and declared write boundary in task-session storage only",
-    "purge every intermediate at every parent-skill terminal"
-  ],
+  "sideEffects": [],
   "stopConditions": [
-    "freshness receipt does not bind the same project, route, business revision, and source commit",
-    "target or write root is ambiguous or outside the verified workspace",
-    "semantic business, design knowledge, coding context, or raw source is attached to preflight"
+    "required authority or evidence is missing or stale",
+    "the closed target boundary is ambiguous",
+    "completion would require another operator job"
   ]
 }

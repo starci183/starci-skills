@@ -1,64 +1,16 @@
 {
-  "schemaVersion": 6,
+  "schemaVersion": 7,
   "id": "deployment/rollback",
   "domain": "deployment",
+  "job": "Produce one bounded rollback result from exact supplied evidence.",
   "inputSchema": "input.schema.json",
   "outputSchema": "output.schema.json",
-  "knowledgeRefs": [
-    "deployment.lifecycle"
-  ],
   "sourceReferenceRefs": [],
-  "accepts": [
-    {
-      "stage": "deployment.rollback",
-      "status": "ready",
-      "allFacts": [
-        "deployment-rollback-required"
-      ],
-      "noneFacts": []
-    }
-  ],
-  "emits": [
-    {
-      "stage": "deployment.proof",
-      "status": "ready",
-      "factsAdd": [
-        "deployment-rolled-back"
-      ],
-      "factsRemove": []
-    },
-    {
-      "stage": "deployment.blocked",
-      "status": "blocked",
-      "factsAdd": [
-        "deployment-rollback-partial"
-      ],
-      "factsRemove": []
-    },
-    {
-      "stage": "deployment.blocked",
-      "status": "blocked",
-      "factsAdd": [
-        "deployment-rollback-external-error"
-      ],
-      "factsRemove": []
-    },
-    {
-      "stage": "deployment.blocked",
-      "status": "blocked",
-      "factsAdd": [
-        "deployment-rollback-blocked"
-      ],
-      "factsRemove": []
-    }
-  ],
   "sideEffects": [
-    "apply declared rollback to provider and runtime state",
-    "keep input, output, context, observations, and receipts in task-session memory only",
-    "purge all intermediate session objects at every parent-skill terminal state"
+    "apply declared rollback to provider and runtime state"
   ],
   "stopConditions": [
-    "required evidence is missing or stale",
-    "the result would cross the declared boundary"
+    "an exact reference is missing or its fingerprint differs",
+    "the requested work exceeds this operator job"
   ]
 }

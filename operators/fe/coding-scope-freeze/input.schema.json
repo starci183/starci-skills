@@ -1,48 +1,71 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://starci.dev/v6/operators/fe/coding-scope-freeze/input.schema.json",
-  "title": "fe/coding-scope-freeze operator input",
+  "$id": "https://starci.dev/v7.0/operators/fe/coding-scope-freeze/input.schema.json",
   "type": "object",
   "additionalProperties": false,
-  "required": ["schemaVersion", "runId", "stage", "status", "facts", "payload"],
+  "required": [
+    "schemaVersion",
+    "operatorId",
+    "context",
+    "input"
+  ],
   "properties": {
-    "schemaVersion": { "const": 6 },
-    "runId": { "type": "string", "minLength": 1 },
-    "stage": { "enum": ["source-fit.resolve", "request.result"] },
-    "status": { "const": "ready" },
-    "facts": { "type": "array", "uniqueItems": true, "items": { "type": "string", "minLength": 1 } },
-    "payload": {
+    "schemaVersion": {
+      "const": 7
+    },
+    "operatorId": {
+      "const": "fe/coding-scope-freeze"
+    },
+    "context": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["provided", "loads", "session"],
+      "required": [
+        "evidenceRefs",
+        "authorityRevision"
+      ],
       "properties": {
-        "provided": {
-          "type": "object",
-          "additionalProperties": false,
-          "required": ["project", "approvedLayoutRef", "sourceFitRef", "principleRef", "grammarReceiptRef", "requestReceiptRef"],
-          "properties": {
-            "project": { "type": "string", "pattern": "^[a-z0-9][a-z0-9-]*$" },
-            "approvedLayoutRef": { "$ref": "#/$defs/sessionRef" },
-            "sourceFitRef": { "$ref": "#/$defs/sessionRef" },
-            "principleRef": { "$ref": "#/$defs/sessionRef" },
-            "grammarReceiptRef": { "$ref": "#/$defs/sessionRef" },
-            "requestReceiptRef": { "anyOf": [{ "$ref": "#/$defs/sessionRef" }, { "type": "null" }] }
-          }
+        "evidenceRefs": {
+          "description": "Exact canonical evidence references available to this atomic job.",
+          "type": "array",
+          "maxItems": 64,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "minItems": 1
         },
-        "loads": {
-          "type": "object",
-          "additionalProperties": false,
-          "required": ["artifacts", "codingContext", "sourceMetadata", "orchestration"],
-          "properties": {
-            "artifacts": { "type": "array", "minItems": 4, "maxItems": 5, "uniqueItems": true, "items": { "type": "object", "additionalProperties": false, "required": ["role", "ref", "revision"], "properties": { "role": { "enum": ["layout", "source-fit", "principles", "grammar", "request"] }, "ref": { "$ref": "#/$defs/sessionRef" }, "revision": { "$ref": "#/$defs/sha256" } } } },
-            "codingContext": { "type": "object", "additionalProperties": false, "required": ["manifestPath", "generation", "snapshotSha256", "candidateIds", "loadMode"], "properties": { "manifestPath": { "type": "string", "pattern": "^\\.worktrees/[a-z0-9][a-z0-9-]*/coding-context/frontend/current\\.json$" }, "generation": { "type": "string", "minLength": 1 }, "snapshotSha256": { "$ref": "#/$defs/sha256" }, "candidateIds": { "type": "array", "minItems": 1, "uniqueItems": true, "items": { "type": "string", "minLength": 1 } }, "loadMode": { "const": "canonical-json-records-only" } } },
-            "sourceMetadata": { "type": "object", "additionalProperties": false, "required": ["headCommit", "fileHeaders", "loadMode"], "properties": { "headCommit": { "$ref": "#/$defs/gitCommit" }, "fileHeaders": { "type": "array", "minItems": 1, "uniqueItems": true, "items": { "type": "object", "additionalProperties": false, "required": ["path", "sha256", "exists", "access"], "properties": { "path": { "type": "string", "minLength": 1 }, "sha256": { "anyOf": [{ "$ref": "#/$defs/sha256" }, { "type": "null" }] }, "exists": { "type": "boolean" }, "access": { "enum": ["read", "write", "read-write", "create"] } } } }, "loadMode": { "const": "headers-only" } } },
-            "orchestration": { "type": "object", "additionalProperties": false, "required": ["mode", "profileRef", "providerRef"], "properties": { "mode": { "enum": ["economical", "balanced", "parallel"] }, "profileRef": { "enum": ["orchestration/modes/economical.json", "orchestration/modes/balanced.json", "orchestration/modes/parallel.json"] }, "providerRef": { "type": "string", "pattern": "^orchestration/providers/[a-z0-9-]+\\.json$" } } }
-          }
+        "authorityRevision": {
+          "description": "Exact approved authority revision binding this invocation.",
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "input": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "targetRef",
+        "constraints"
+      ],
+      "properties": {
+        "targetRef": {
+          "description": "The one target owned by this atomic invocation.",
+          "type": "string",
+          "minLength": 1
         },
-        "session": { "type": "object", "additionalProperties": false, "required": ["taskId", "inputRef", "outputRef", "scratchPrefix", "retention"], "properties": { "taskId": { "type": "string", "minLength": 1 }, "inputRef": { "$ref": "#/$defs/sessionRef" }, "outputRef": { "$ref": "#/$defs/sessionRef" }, "scratchPrefix": { "$ref": "#/$defs/sessionRef" }, "retention": { "const": "until-skill-terminal" } } }
+        "constraints": {
+          "description": "Closed constraints that bound this job without routing it.",
+          "type": "array",
+          "maxItems": 64,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
       }
     }
-  },
-  "$defs": { "sha256": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" }, "gitCommit": { "type": "string", "pattern": "^[0-9a-f]{40,64}$" }, "sessionRef": { "type": "string", "pattern": "^session://tasks/[A-Za-z0-9._-]+/.+$" } }
+  }
 }

@@ -1,0 +1,147 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://starci.dev/v7/operators/fe/direction-generate/output.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "operatorId",
+    "output"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "const": 7
+    },
+    "operatorId": {
+      "const": "fe/direction-generate"
+    },
+    "output": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "outcome",
+        "result",
+        "gaps",
+        "evidenceRefs",
+        "handoff"
+      ],
+      "properties": {
+        "outcome": {
+          "description": "Typed result routed only by the parent Skill machine.",
+          "enum": [
+            "generated",
+            "blocked"
+          ]
+        },
+        "result": {
+          "description": "This operator atomic product, or null when incomplete.",
+          "anyOf": [
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "summary",
+                "artifactRefs",
+                "directionCount",
+                "materialDifferences"
+              ],
+              "properties": {
+                "summary": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "artifactRefs": {
+                  "type": "array",
+                  "uniqueItems": true,
+                  "maxItems": 64,
+                  "items": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                },
+                "directionCount": {
+                  "type": "integer",
+                  "minimum": 3,
+                  "maximum": 4
+                },
+                "materialDifferences": {
+                  "type": "array",
+                  "minItems": 3,
+                  "maxItems": 4,
+                  "uniqueItems": true,
+                  "items": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                }
+              }
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "gaps": {
+          "description": "Exact blockers or authority gaps.",
+          "type": "array",
+          "uniqueItems": true,
+          "maxItems": 64,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "evidenceRefs": {
+          "description": "Exact evidence used.",
+          "type": "array",
+          "uniqueItems": true,
+          "maxItems": 64,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "handoff": {
+          "description": "Typed cross-domain continuation, only when the outcome requires it.",
+          "anyOf": [
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "skillId",
+                "missionRef",
+                "resumeState",
+                "inputRef"
+              ],
+              "properties": {
+                "skillId": {
+                  "enum": [
+                    "starci-business-process",
+                    "starci-backend-process",
+                    "starci-quality-assure",
+                    "starci-uat-verify"
+                  ]
+                },
+                "missionRef": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "resumeState": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "inputRef": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              }
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      }
+    }
+  }
+}

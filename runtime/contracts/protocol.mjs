@@ -6,7 +6,7 @@ const capability = /^[a-z0-9]+(?:[.-][a-z0-9]+)*$/;
 const kinds = new Set(['observed-fact', 'approved-intent', 'constraint', 'inference', 'hypothesis', 'proposed-target']);
 const risks = new Set(['read-only', 'source-write', 'business-change', 'database-change', 'external']);
 const necessities = new Set(['required', 'recommended', 'optional']);
-const authorizationKinds = new Set(['objective', 'approval', 'bypass']);
+const authorizationKinds = new Set(['objective', 'approval']);
 
 export const stableFingerprint = (value) => {
   const normalize = (item) => Array.isArray(item)
@@ -39,13 +39,11 @@ export function validateHandoff(value) {
     if (!['sequential', 'side-branch'].includes(candidate.transitionKind)) errors.push(`nextCandidates[${index}].transitionKind is invalid`);
     if (typeof candidate.objectiveAuthorized !== 'boolean') errors.push(`nextCandidates[${index}].objectiveAuthorized is required`);
     if (candidate.authorizationKind !== undefined && !authorizationKinds.has(candidate.authorizationKind)) errors.push(`nextCandidates[${index}].authorizationKind is invalid`);
-    if (['approval', 'bypass'].includes(candidate.authorizationKind) && !session.test(candidate.authorizationRef ?? '')) errors.push(`nextCandidates[${index}].authorizationRef is invalid`);
-    if (candidate.authorizationKind === 'bypass' && !candidate.authorizationRef?.includes('/approvals/bypass/')) errors.push(`nextCandidates[${index}].bypass authorization must use the bypass receipt namespace`);
+    if (candidate.authorizationKind === 'approval' && !session.test(candidate.authorizationRef ?? '')) errors.push(`nextCandidates[${index}].authorizationRef is invalid`);
     if (!session.test(candidate.inputRef ?? '')) errors.push(`nextCandidates[${index}].inputRef is invalid`);
     const authorityChanging = ['business-change', 'database-change', 'external'].includes(candidate.risk);
-    const bypassAuthorized = candidate.authorizationKind === 'bypass' && session.test(candidate.authorizationRef ?? '');
-    if (authorityChanging && candidate.requiresApproval !== true && !bypassAuthorized) errors.push(`nextCandidates[${index}] authority-changing mutation requires approval or bypass authorization`);
-    if (candidate.risk === 'source-write' && !candidate.objectiveAuthorized && candidate.requiresApproval !== true && !bypassAuthorized) errors.push(`nextCandidates[${index}] unauthorized source write requires approval or bypass authorization`);
+    if (authorityChanging && candidate.requiresApproval !== true) errors.push(`nextCandidates[${index}] authority-changing mutation requires approval`);
+    if (candidate.risk === 'source-write' && !candidate.objectiveAuthorized && candidate.requiresApproval !== true) errors.push(`nextCandidates[${index}] unauthorized source write requires approval`);
     if (candidate.transitionKind === 'side-branch' && !candidate.resumeCapability) errors.push(`nextCandidates[${index}] side branch requires resumeCapability`);
     if (candidate.transitionKind === 'sequential' && candidate.resumeCapability !== null) errors.push(`nextCandidates[${index}] sequential transition cannot declare resumeCapability`);
   }

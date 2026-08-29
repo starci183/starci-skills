@@ -1,33 +1,16 @@
 {
-  "schemaVersion": 6,
+  "schemaVersion": 7,
   "id": "deployment/artifact-build",
   "domain": "deployment",
+  "job": "Builds immutable release artifacts from pinned source revisions.",
   "inputSchema": "input.schema.json",
   "outputSchema": "output.schema.json",
-  "knowledgeRefs": ["deployment.lifecycle"],
   "sourceReferenceRefs": [],
-  "accepts": [{
-    "stage": "deployment.artifact.build",
-    "status": "ready",
-    "allFacts": ["deployment-host-ready"],
-    "noneFacts": []
-  }],
-  "emits": [{
-    "stage": "deployment.artifact.publish",
-    "status": "ready",
-    "factsAdd": ["deployment-artifacts-built"],
-    "factsRemove": []
-  }],
   "sideEffects": [
-    "write ignored build outputs and immutable local artifacts declared by the execution plan",
-    "keep input, output, loaded source, command captures, worker observations, diagnostics, and receipts in task-session memory only",
-    "purge every intermediate session object at each parent-skill terminal state"
+    "write ignored build outputs and immutable local artifacts declared by the execution plan"
   ],
   "stopConditions": [
-    "a required execution-plan, source, knowledge, command, or artifact binding is missing or stale",
-    "a current source hash differs from the approved build revision",
-    "a build command or output crosses the declared boundary",
-    "an intermediate input, output, command capture, observation, diagnostic, analysis transcript, or receipt would be persisted outside the task session",
-    "repository source context, indexed source summaries, or an undeclared file or command would be loaded"
+    "an exact reference is missing or its fingerprint differs",
+    "the requested work exceeds this operator job"
   ]
 }

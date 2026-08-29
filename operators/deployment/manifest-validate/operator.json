@@ -1,39 +1,16 @@
 {
-  "schemaVersion": 6,
+  "schemaVersion": 7,
   "id": "deployment/manifest-validate",
   "domain": "deployment",
+  "job": "Validate one exact deployment manifest against pinned release intent.",
   "inputSchema": "input.schema.json",
   "outputSchema": "output.schema.json",
-  "knowledgeRefs": [
-    "deployment.lifecycle"
-  ],
   "sourceReferenceRefs": [],
-  "accepts": [
-    {
-      "stage": "deployment.manifest",
-      "status": "ready",
-      "allFacts": [
-        "deployment-target-bound"
-      ],
-      "noneFacts": []
-    }
-  ],
-  "emits": [
-    {
-      "stage": "deployment.plan",
-      "status": "ready",
-      "factsAdd": [
-        "deployment-manifest-valid"
-      ],
-      "factsRemove": []
-    }
-  ],
   "sideEffects": [
-    "keep input, output, context, observations, and receipts in task-session memory only",
-    "purge all intermediate session objects at every parent-skill terminal state"
+    "read only the supplied exact references"
   ],
   "stopConditions": [
-    "required evidence is missing or stale",
-    "the result would cross the declared boundary"
+    "an exact reference is missing or its fingerprint differs",
+    "the requested work exceeds this operator job"
   ]
 }

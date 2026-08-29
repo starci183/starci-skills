@@ -1,4 +1,4 @@
-import { readdirSync, readFileSync, writeFileSync } from 'node:fs'
+import { existsSync, readdirSync, readFileSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 
@@ -17,13 +17,24 @@ const skills = catalog.skills.map((skill) => ({
   domain: skill.capability.split('.')[0],
 }))
 
+const operatorIconUrl = (manifestFile) => {
+  const iconFile = path.join(path.dirname(manifestFile), 'icon.svg')
+  if (!existsSync(iconFile)) return null
+  const svg = readFileSync(iconFile, 'utf8')
+  const colors = [...new Set(svg.match(/#[0-9a-f]{6}/gi)?.map((color) => color.toUpperCase()) ?? [])]
+  if (!/^\s*<svg[\s>]/.test(svg) || /<script\b|\bon[a-z]+\s*=|\b(?:href|src)\s*=/i.test(svg)) throw new Error(`${iconFile}: icon must be a self-contained inert SVG`)
+  if (colors.some((color) => !['#7547FF', '#F7C948'].includes(color)) || colors.length !== 2) throw new Error(`${iconFile}: icon must use exactly StarCi purple and yellow`)
+  return `data:image/svg+xml;base64,${Buffer.from(svg).toString('base64')}`
+}
+
 const operators = walk(path.join(repoRoot, 'operators'))
   .filter((file) => path.basename(file) === 'operator.json')
-  .map(readJson)
-  .map((operator) => ({
+  .map((manifestFile) => ({ manifestFile, operator: readJson(manifestFile) }))
+  .map(({ manifestFile, operator }) => ({
     id: operator.id,
     domain: operator.domain,
-    knowledgeCount: operator.knowledgeRefs?.length ?? 0,
+    iconUrl: operatorIconUrl(manifestFile),
+    knowledgeCount: operator.contextRefs?.length ?? 0,
     accepts: operator.accepts?.map(({ stage, status }) => `${stage} · ${status}`) ?? [],
     emits: operator.emits?.map(({ stage, status }) => `${stage} · ${status}`) ?? [],
     sideEffects: operator.sideEffects ?? [],

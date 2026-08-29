@@ -1,0 +1,241 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://starci.dev/v7/skills/starci-backend-process/output.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "runId",
+    "skillId",
+    "result",
+    "finalState",
+    "state",
+    "handoffReceipt",
+    "receiptRefs",
+    "findings",
+    "cleanup"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "const": 7
+    },
+    "runId": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 1024
+    },
+    "skillId": {
+      "const": "starci-backend-process"
+    },
+    "result": {
+      "enum": [
+        "complete",
+        "handoff",
+        "blocked"
+      ]
+    },
+    "finalState": {
+      "enum": [
+        "complete",
+        "peer-call",
+        "blocked"
+      ]
+    },
+    "state": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "status",
+        "code",
+        "retryable",
+        "terminalState"
+      ],
+      "properties": {
+        "status": {
+          "enum": [
+            "completed",
+            "handoff",
+            "blocked"
+          ]
+        },
+        "code": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 1024
+        },
+        "retryable": {
+          "const": false
+        },
+        "terminalState": {
+          "enum": [
+            "complete",
+            "peer-call",
+            "blocked"
+          ]
+        }
+      }
+    },
+    "handoffReceipt": {
+      "oneOf": [
+        {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "version",
+                  "receiptId",
+                  "type",
+                  "missionId",
+                  "skillId",
+                  "operatorId",
+                  "parentId",
+                  "childId",
+                  "timestamp",
+                  "progressFingerprint",
+                  "trace"
+                ],
+                "properties": {
+                  "version": {
+                    "const": "7.0.0"
+                  },
+                  "receiptId": {
+                    "type": "string",
+                    "pattern": "^receipt:[A-Za-z0-9._-]+$"
+                  },
+                  "type": {
+                    "enum": [
+                      "CALL",
+                      "RETURN",
+                      "TRANSITION",
+                      "WAIT",
+                      "RESUME",
+                      "SKIP",
+                      "ERROR"
+                    ]
+                  },
+                  "missionId": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "skillId": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "operatorId": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "parentId": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "childId": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "timestamp": {
+                    "type": "string",
+                    "format": "date-time"
+                  },
+                  "progressFingerprint": {
+                    "type": "string",
+                    "pattern": "^sha256:[0-9a-f]{64}$"
+                  },
+                  "trace": {
+                    "type": "object"
+                  }
+                }
+            },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "receiptRefs": {
+      "type": "array",
+      "uniqueItems": true,
+      "maxItems": 128,
+      "items": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 1024
+      }
+    },
+    "findings": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "code",
+          "severity",
+          "message",
+          "evidenceRefs"
+        ],
+        "properties": {
+          "code": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 1024
+          },
+          "severity": {
+            "enum": [
+              "info",
+              "warning",
+              "error"
+            ]
+          },
+          "message": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 1024
+          },
+          "evidenceRefs": {
+            "type": "array",
+            "uniqueItems": true,
+            "maxItems": 128,
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 1024
+            }
+          }
+        }
+      }
+    },
+    "cleanup": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "scratchRefs",
+        "retention",
+        "purgeAt"
+      ],
+      "properties": {
+        "scratchRefs": {
+          "type": "array",
+          "uniqueItems": true,
+          "maxItems": 128,
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 1024
+          }
+        },
+        "retention": {
+          "const": "until-skill-terminal"
+        },
+        "purgeAt": {
+          "const": "skill-terminal"
+        }
+      }
+    }
+  }
+}

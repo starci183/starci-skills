@@ -1,81 +1,16 @@
 {
-  "schemaVersion": 6,
+  "schemaVersion": 7,
   "id": "deployment/monitor",
   "domain": "deployment",
+  "job": "Observe one rolling release and classify its current rollout condition.",
   "inputSchema": "input.schema.json",
   "outputSchema": "output.schema.json",
-  "knowledgeRefs": [
-    "deployment.lifecycle"
-  ],
   "sourceReferenceRefs": [],
-  "accepts": [
-    {
-      "stage": "deployment.monitor",
-      "status": "ready",
-      "allFacts": [
-        "deployment-rollout-ready"
-      ],
-      "noneFacts": []
-    }
-  ],
-  "emits": [
-    {
-      "stage": "deployment.monitor",
-      "status": "ready",
-      "factsAdd": [
-        "deployment-progressing"
-      ],
-      "factsRemove": []
-    },
-    {
-      "stage": "deployment.monitor",
-      "status": "ready",
-      "factsAdd": [
-        "deployment-monitor-external-error"
-      ],
-      "factsRemove": []
-    },
-    {
-      "stage": "deployment.proof",
-      "status": "ready",
-      "factsAdd": [
-        "deployment-steady"
-      ],
-      "factsRemove": []
-    },
-    {
-      "stage": "deployment.recover",
-      "status": "ready",
-      "factsAdd": [
-        "deployment-recovery-required"
-      ],
-      "factsRemove": []
-    },
-    {
-      "stage": "deployment.rollback",
-      "status": "ready",
-      "factsAdd": [
-        "deployment-rollback-required"
-      ],
-      "factsRemove": []
-    },
-    {
-      "stage": "deployment.blocked",
-      "status": "blocked",
-      "factsAdd": [
-        "deployment-monitor-blocked"
-      ],
-      "factsRemove": []
-    }
-  ],
   "sideEffects": [
-    "write value-free monitor observations below ignored execution root",
-    "keep input, output, context, observations, and receipts in task-session memory only",
-    "purge all intermediate session objects at every parent-skill terminal state"
+    "read only the supplied exact references"
   ],
   "stopConditions": [
-    "required evidence is missing or stale",
-    "the result would cross the declared boundary",
-    "the bounded monitor attempt or deadline budget is exhausted"
+    "an exact reference is missing or its fingerprint differs",
+    "the requested work exceeds this operator job"
   ]
 }

@@ -6,7 +6,7 @@
 | Package | `@starci/grammar/common` |
 | Operators | `grammar-convergence` |
 | Search tags | `sticky, scroll container, collision, summary, action bar, focus` |
-| Dependencies | `fe.grammar-common-contracts, fe.grammar-common-states-accessibility` |
+| Dependencies | `fe.grammar-common-capabilities, fe.grammar-common-states-accessibility` |
 
 ## Trigger
 

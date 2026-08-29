@@ -1,13 +1,21 @@
 # Execute `tech-stack/discover`
 
-## Step 1 — Bind the approved project and source fingerprint
+## Context
 
-**Read:** only the validated fields declared for this step. **Context:** exact refs and evidence required by the decision; do not scan adjacent source. **Session write:** step result under `payload.session.scratchPrefix`. **Stop:** identity, scope, or evidence drift. **Orchestration:** coordinator binds identities and validates output.
+Read only `context.manifestRefs`, `context.configurationRefs`, and `context.deploymentRefs`. Each reference must resolve to the fingerprint in `input.sourceFingerprint`; do not widen the search.
 
-## Step 2 — Inspect only declared manifests, configuration and deployment evidence
+## Input
 
-**Read:** only the validated fields declared for this step. **Context:** exact refs and evidence required by the decision; do not scan adjacent source. **Session write:** step result under `payload.session.scratchPrefix`. **Stop:** identity, scope, or evidence drift. **Orchestration:** independent evidence slices may run in parallel and the coordinator merges only typed findings.
+Bind the inventory to `input.project`, `input.objectiveRef`, and `input.sourceFingerprint`.
 
-## Step 3 — Emit an observed inventory with evidence for every fact
+## Action
 
-**Read:** only the validated fields declared for this step. **Context:** exact refs and evidence required by the decision; do not scan adjacent source. **Session write:** step result under `payload.session.scratchPrefix`. **Stop:** do not emit success with unresolved critical contradictions. **Orchestration:** coordinator binds identities and validates output.
+Collect the runtimes, frameworks, persistence, communication, build, deployment, and operational ownership explicitly evidenced by the supplied files into one observed inventory. Classify conflicting observations without proposing a target stack.
+
+## Output
+
+Return `output.outcome`, `output.inventoryRef`, `output.inventorySha256`, `output.evidenceRefs`, `output.contradictions`, and `output.reason`.
+
+## Stop
+
+Return `blocked` when the fingerprint drifts, no evidence file is readable, or a critical contradiction prevents one observed inventory.

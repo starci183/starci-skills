@@ -1,24 +1,7 @@
 # `architecture/current-state` output
 
-The output is an ephemeral task-session object consumed by the parent state machine. It is not a durable artifact and is purged with its input, loaded bindings, observations, and scratch values at every `skill-terminal`.
-
-## JSON architecture
-
-| Section | Purpose |
-| --- | --- |
-| Root route fields | State-machine compatibility envelope. |
-| `payload.decision` | Typed route key from this operator contract. |
-| `payload.state` | Explicit status, code, retryability, and emitted state. |
-| `payload.produced` | Session artifact `currentStateRef` plus explicitly approved durable effects only. |
-| `payload.context` | Minimal refs and revisions actually used; never copied context or reasoning. |
-| `payload.cleanup` | Scratch refs and mandatory terminal purge. |
-| `payload.evidenceRefs` | Session-only evidence for the next state. |
-| `payload.findings` | Concise unresolved facts, not an analysis transcript. |
-
-## State contract
-
-| Decision | State status | Emitted state | Facts added |
-| --- | --- | --- | --- |
-| `ready` | `completed` | `architecture.decision.alternatives / ready` | architecture-current-state-ready |
-
-`currentStateRef`, evidence, receipts, observations, and output use `session://`. Only a product/worktree effect explicitly declared by `operator.json` may survive the skill.
+- `output.outcome`: one of `ready`.
+- `output.resultRef`: exact produced artifact reference, or null.
+- `output.evidenceRefs`: exact supporting references.
+- `output.findings`: bounded observable findings.
+- `output.reason`: bounded explanation when work cannot complete, otherwise null.

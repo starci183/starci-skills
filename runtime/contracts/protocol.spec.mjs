@@ -33,7 +33,7 @@ test('sequential source writes reuse objective authority without a redundant app
   assert.equal(validateHandoff(handoff).valid, false);
 });
 
-test('business, database and external changes require approval or exact bypass authorization', () => {
+test('business, database and external changes require explicit approval', () => {
   for (const risk of ['business-change', 'database-change', 'external']) {
     const handoff = structuredClone(baseHandoff);
     handoff.nextCandidates = [{ capability: 'business.authority', necessity: 'required', reasonCode: 'authority-change', risk, transitionKind: 'sequential', objectiveAuthorized: true, requiresApproval: false, inputRef: artifactRef, resumeCapability: null }];
@@ -41,11 +41,8 @@ test('business, database and external changes require approval or exact bypass a
     handoff.nextCandidates[0].requiresApproval = true;
     assert.equal(validateHandoff(handoff).valid, true, risk);
     handoff.nextCandidates[0].requiresApproval = false;
-    handoff.nextCandidates[0].authorizationKind = 'bypass';
-    handoff.nextCandidates[0].authorizationRef = 'session://tasks/task-1/approvals/bypass/authority-change';
-    assert.equal(validateHandoff(handoff).valid, true, `${risk} bypass`);
-    handoff.nextCandidates[0].authorizationRef = 'session://tasks/task-1/receipts/fabricated';
-    assert.equal(validateHandoff(handoff).valid, false, `${risk} rejects non-bypass receipt`);
+    handoff.nextCandidates[0].authorizationKind = 'objective';
+    assert.equal(validateHandoff(handoff).valid, false, `${risk} rejects objective-only authority`);
   }
 });
 
@@ -57,7 +54,7 @@ test('consumer ACK must bind exact artifact hashes', () => {
 
 test('context cache reuses only an exact source, generator and schema fingerprint', () => {
   const expected = { project: 'nivo', contextKind: 'tech-stack', sourceFingerprint: hash, generatorFingerprint: hash, schemaVersion: 1 };
-  const receipt = { ...expected, receiptId: 'session://tasks/task-1/receipts/context', artifactRef: '.worktrees/nivo/tech-stack/current.json', artifactSha256: hash, status: 'fresh' };
+  const receipt = { ...expected, receiptId: 'session://tasks/task-1/receipts/context', artifactRef: '.worktrees/sessions/task-1/receipts/tech-stack.json', artifactSha256: hash, status: 'fresh' };
   assert.deepEqual(contextFreshness(receipt, expected), { decision: 'fresh', reason: 'current' });
   assert.equal(contextFreshness(null, expected).decision, 'initialize-required');
   assert.equal(contextFreshness({ ...receipt, schemaVersion: 2 }, expected).decision, 'initialize-required');

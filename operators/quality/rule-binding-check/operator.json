@@ -1,55 +1,16 @@
 {
-  "schemaVersion": 6,
+  "schemaVersion": 7,
   "id": "quality/rule-binding-check",
   "domain": "quality",
+  "job": "Checks law-to-gate-to-machine bindings.",
   "inputSchema": "input.schema.json",
   "outputSchema": "output.schema.json",
-  "knowledgeRefs": [
-    "quality.readiness-repair"
-  ],
   "sourceReferenceRefs": [],
-  "accepts": [
-    {
-      "stage": "quality.rule-bindings",
-      "status": "ready",
-      "allFacts": [],
-      "noneFacts": []
-    }
-  ],
-  "emits": [
-    {
-      "stage": "quality.rule-bindings.result",
-      "status": "complete",
-      "factsAdd": [
-        "rule-bindings-pass"
-      ],
-      "factsRemove": []
-    },
-    {
-      "stage": "quality.rule-bindings.result",
-      "status": "ready",
-      "factsAdd": [
-        "rule-bindings-fail"
-      ],
-      "factsRemove": []
-    },
-    {
-      "stage": "quality.blocked",
-      "status": "blocked",
-      "factsAdd": [
-        "rule-bindings-inconclusive"
-      ],
-      "factsRemove": []
-    }
-  ],
   "sideEffects": [
-    "keep input, output, loaded context, command captures, diagnostics, worker observations, and receipts in task-session memory only",
-    "purge every intermediate session object at each parent-skill terminal state"
+    "read only the supplied exact references"
   ],
   "stopConditions": [
-    "required evidence is missing or stale",
-    "the result would cross the declared boundary",
-    "an intermediate input, output, command capture, diagnostic, observation, analysis transcript, or receipt would be persisted outside the task session",
-    "repository source context, indexed source summaries, or an undeclared source file would be loaded"
+    "an exact reference is missing or its fingerprint differs",
+    "the requested work exceeds this operator job"
   ]
 }

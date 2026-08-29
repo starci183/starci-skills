@@ -1,13 +1,9 @@
 # Execute `fe/visual-fidelity`
 
-## Step 1 — Reproduce approved states
+Verify one frontend implementation against approved deterministic visual baselines without repairing source.
 
-**Read:** approved detail, baselines, deterministic seed, and running app. **Context:** use the same viewport, theme, state, and data seed. **Session write:** observed screenshots and DOM anatomy. **Stop:** on missing or non-reproducible baseline.
+Use only the closed `context` and `input`. Return one typed `output.outcome` plus this job's result, gaps, and evidence. Do not route, persist a session, or choose another operator.
 
-## Step 2 — Compare structure before pixels
+Frontend creation follows `AI-first -> Rules-first -> Grammar-last`. UX synthesis, UI-direction synthesis, principle/law compilation, layout compilation, Grammar application, implementation, and audit are separate jobs. Audit jobs observe and report; they never repair source.
 
-**Read:** approved and observed anatomy. **Context:** orchestration may parallelize viewports and states. Compare the exact Grammar object chosen for every region before comparing appearance: branch identity, contract identity, surface ownership, repeated-row ownership, separators, state marks, labels, and actions. **Session write:** Grammar object/contract identity, surface count/nesting/order, breadcrumb, icon, separator, state-marker mapping, action, sticky/scroll, responsive, interaction, and accessibility checks. **Stop:** any structural deviation, generic-object substitution, label-only legend, or missing state distinction is hard failure regardless of lint or pixel similarity.
-
-## Step 3 — Route the owner of failure
-
-**Read:** comparison findings only. **Context:** implementation drift routes to implementation; approved-detail defects route to UI detail. **Session write:** typed failures and state. **Stop:** before UAT unless all hard checks pass.
+Browser proof must show native link semantics with the same real non-null href across hover, focus, keyboard, and click; a visible progress presentation for every contract-declared progress datum; and computed typography that keeps each compact numeric fact below its section title. Any contradiction is `FAIL`; this audit never repairs it.

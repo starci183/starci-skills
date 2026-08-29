@@ -1,55 +1,16 @@
 {
-  "schemaVersion": 6,
+  "schemaVersion": 7,
   "id": "quality/readiness-inventory",
   "domain": "quality",
+  "job": "Inventories source readiness.",
   "inputSchema": "input.schema.json",
   "outputSchema": "output.schema.json",
-  "knowledgeRefs": [
-    "quality.readiness-repair"
-  ],
   "sourceReferenceRefs": [],
-  "accepts": [
-    {
-      "stage": "quality.inventory",
-      "status": "ready",
-      "allFacts": [],
-      "noneFacts": []
-    }
-  ],
-  "emits": [
-    {
-      "stage": "quality.inventory.result",
-      "status": "complete",
-      "factsAdd": [
-        "readiness-green"
-      ],
-      "factsRemove": []
-    },
-    {
-      "stage": "quality.inventory.result",
-      "status": "ready",
-      "factsAdd": [
-        "readiness-findings"
-      ],
-      "factsRemove": []
-    },
-    {
-      "stage": "quality.blocked",
-      "status": "blocked",
-      "factsAdd": [
-        "readiness-inconclusive"
-      ],
-      "factsRemove": []
-    }
-  ],
   "sideEffects": [
-    "keep input, output, loaded context, command captures, diagnostics, worker observations, and receipts in task-session memory only",
-    "purge every intermediate session object at each parent-skill terminal state"
+    "read only the supplied exact references"
   ],
   "stopConditions": [
-    "required evidence is missing or stale",
-    "the result would cross the declared boundary",
-    "an intermediate input, output, command capture, diagnostic, observation, analysis transcript, or receipt would be persisted outside the task session",
-    "repository source context, indexed source summaries, or an undeclared source file would be loaded"
+    "an exact reference is missing or its fingerprint differs",
+    "the requested work exceeds this operator job"
   ]
 }

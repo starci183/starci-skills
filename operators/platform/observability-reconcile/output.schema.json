@@ -1,25 +1,44 @@
 {
-  "$id": "https://starci.dev/v6/operators/platform/observability-reconcile/output.schema.json", "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "title": "platform/observability-reconcile operator output", "type": "object", "additionalProperties": false,
-  "required": ["schemaVersion", "runId", "stage", "status", "facts", "payload"],
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://starci.dev/v7.0/operators/platform/observability-reconcile/output.schema.json",
+  "type": "object", "additionalProperties": false,
+  "required": ["schemaVersion", "operatorId", "output"],
   "properties": {
-    "schemaVersion": { "const": 6 }, "runId": { "type": "string", "minLength": 1 }, "stage": { "enum": ["platform.observability.proved", "platform.blocked"] }, "status": { "enum": ["complete", "blocked"] }, "facts": { "$ref": "#/$defs/strings" },
-    "payload": {
-      "type": "object", "additionalProperties": false, "required": ["decision", "state", "produced", "context", "cleanup", "evidenceRefs", "findings"],
+    "schemaVersion": { "const": 7 },
+    "operatorId": { "const": "platform/observability-reconcile" },
+    "output": {
+      "type": "object", "additionalProperties": false,
+      "required": ["outcome", "receiptRef", "mutations", "checks", "reason", "evidenceRefs"],
       "properties": {
-        "decision": { "enum": ["proved", "blocked"] },
-        "state": { "type": "object", "additionalProperties": false, "required": ["operator", "status", "code", "retryable", "emits"], "properties": { "operator": { "const": "platform/observability-reconcile" }, "status": { "enum": ["completed", "blocked"] }, "code": { "enum": ["platform-observability-reconcile-proved", "platform-observability-reconcile-blocked"] }, "retryable": { "type": "boolean" }, "emits": { "type": "object", "additionalProperties": false, "required": ["stage", "status", "factsAdd", "factsRemove"], "properties": { "stage": { "enum": ["platform.observability.proved", "platform.blocked"] }, "status": { "enum": ["complete", "blocked"] }, "factsAdd": { "$ref": "#/$defs/strings" }, "factsRemove": { "$ref": "#/$defs/strings" } } } } },
-        "produced": { "type": "object", "additionalProperties": false, "required": ["observabilityReceiptRef", "artifacts", "mutations"], "properties": { "observabilityReceiptRef": { "anyOf": [{ "$ref": "#/$defs/sessionRef" }, { "type": "null" }] }, "artifacts": { "$ref": "#/$defs/artifacts" }, "mutations": { "$ref": "#/$defs/mutations" } } },
-        "context": { "type": "object", "additionalProperties": false, "required": ["used"], "properties": { "used": { "type": "array", "minItems": 1, "uniqueItems": true, "items": { "$ref": "#/$defs/contextUse" } } } },
-        "cleanup": { "type": "object", "additionalProperties": false, "required": ["taskId", "scratchRefs", "retention", "purgeAt"], "properties": { "taskId": { "type": "string", "minLength": 1 }, "scratchRefs": { "type": "array", "uniqueItems": true, "items": { "$ref": "#/$defs/sessionRef" } }, "retention": { "const": "until-skill-terminal" }, "purgeAt": { "const": "skill-terminal" } } },
-        "evidenceRefs": { "type": "array", "minItems": 1, "uniqueItems": true, "items": { "$ref": "#/$defs/sessionRef" } }, "findings": { "$ref": "#/$defs/strings" }
+        "outcome": { "enum": ["proved", "blocked"], "description": "Observed stack convergence result; only the Skill machine routes it." },
+        "receiptRef": { "type": ["string", "null"], "pattern": "^session://tasks/[A-Za-z0-9._-]+/.+$", "description": "Fresh bounded proof when every required postcondition passes; otherwise null." },
+        "mutations": { "type": "array", "maxItems": 128, "uniqueItems": true, "items": { "$ref": "#/$defs/mutation" }, "description": "Every coordinator-owned configuration, runtime, dashboard, or destination mutation." },
+        "checks": { "type": "array", "minItems": 7, "maxItems": 7, "uniqueItems": true, "items": { "$ref": "#/$defs/check" }, "description": "Exactly the seven required health, boundary, delivery, ordering, retry, and filtering checks." },
+        "reason": { "type": ["string", "null"], "enum": [null, "authority-drift", "concurrent-drift", "execution-failed", "health-failed", "remote-write-failed", "data-boundary-failed"], "description": "One bounded failure reason when blocked; null when proved." },
+        "evidenceRefs": { "$ref": "#/$defs/evidenceRefs", "description": "Approval, mutation, health, remote-write, and sensitive-data evidence." }
       }
     }
   },
   "$defs": {
-    "sha256": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" }, "sessionRef": { "type": "string", "pattern": "^session://tasks/[A-Za-z0-9._-]+/.+$" }, "strings": { "type": "array", "uniqueItems": true, "items": { "type": "string", "minLength": 1 } },
-    "contextUse": { "type": "object", "additionalProperties": false, "required": ["kind", "ref", "revision"], "properties": { "kind": { "enum": ["session-artifact", "qdrant-knowledge", "exact-source", "exact-command", "external-resource", "credential-handle", "orchestration"] }, "ref": { "type": "string", "minLength": 1 }, "revision": { "type": "string", "minLength": 1 } } },
-    "artifacts": { "type": "array", "uniqueItems": true, "items": { "type": "object", "additionalProperties": false, "required": ["kind", "ref", "sha256"], "properties": { "kind": { "enum": ["receipt", "evidence", "report"] }, "ref": { "$ref": "#/$defs/sessionRef" }, "sha256": { "$ref": "#/$defs/sha256" } } } },
-    "mutations": { "type": "array", "uniqueItems": true, "items": { "type": "object", "additionalProperties": false, "required": ["target", "kind", "beforeRevision", "afterRevision", "appliedBy"], "properties": { "target": { "type": "string", "minLength": 1 }, "kind": { "enum": ["filesystem", "runtime", "provider", "record"] }, "beforeRevision": { "anyOf": [{ "type": "string", "minLength": 1 }, { "type": "null" }] }, "afterRevision": { "type": "string", "minLength": 1 }, "appliedBy": { "const": "coordinator" } } } }
+    "mutation": {
+      "type": "object", "additionalProperties": false,
+      "required": ["effect", "resourceRef", "beforeRevision", "afterRevision"],
+      "properties": {
+        "effect": { "enum": ["update-config", "restart-service", "upsert-dashboard", "update-remote-write"] },
+        "resourceRef": { "type": "string", "minLength": 1 },
+        "beforeRevision": { "type": ["string", "null"], "minLength": 1 },
+        "afterRevision": { "type": "string", "minLength": 1 }
+      }
+    },
+    "check": {
+      "type": "object", "additionalProperties": false,
+      "required": ["name", "status", "evidenceRef"],
+      "properties": {
+        "name": { "enum": ["service-health", "target-boundary", "label-boundary", "remote-write-delivery", "sample-ordering", "retry-backoff", "sensitive-data-filter"] },
+        "status": { "enum": ["passed", "failed"] },
+        "evidenceRef": { "type": "string", "minLength": 1 }
+      }
+    },
+    "evidenceRefs": { "type": "array", "minItems": 1, "maxItems": 64, "uniqueItems": true, "items": { "type": "string", "minLength": 1 } }
   }
 }

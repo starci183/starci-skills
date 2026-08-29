@@ -1,0 +1,62 @@
+{
+  "$schema": "../machine.schema.json",
+  "schemaVersion": 6,
+  "id": "starci-architecture-option-design",
+  "start": "analyze-input",
+  "states": {
+    "analyze-input": {
+      "kind": "analysis",
+      "on": [
+        {
+          "when": {},
+          "target": "options",
+          "label": "enter options"
+        }
+      ]
+    },
+    "options": {
+      "kind": "operator",
+      "ref": "architecture/alternatives",
+      "on": [
+        {
+          "when": {
+            "outputEquals": {
+              "outcome": "ready"
+            }
+          },
+          "target": "approval",
+          "label": "ready"
+        }
+      ]
+    },
+    "approval": {
+      "kind": "wait",
+      "approval": {
+        "prompt": "Approve one architecture option and its exact option-set hash.",
+        "approve": "OK ARCHITECTURE OPTION <hash>",
+        "reject": "REJECT ARCHITECTURE OPTION <hash>",
+        "bypassTarget": "handoff"
+      },
+      "on": [
+        {
+          "when": {
+            "stage": "architecture.option.review",
+            "status": "approved"
+          },
+          "target": "handoff"
+        },
+        {
+          "when": {
+            "stage": "architecture.option.review",
+            "status": "rejected"
+          },
+          "target": "options"
+        }
+      ]
+    },
+    "handoff": {
+      "kind": "terminal",
+      "result": "handoff"
+    }
+  }
+}

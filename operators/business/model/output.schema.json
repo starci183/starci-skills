@@ -1,372 +1,84 @@
 {
-  "$id": "https://starci.dev/v6/operators/business/model/output.schema.json",
-  "title": "business/model operator output",
   "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://starci.dev/v7/operators/business/model/output.schema.json",
   "type": "object",
   "additionalProperties": false,
   "required": [
     "schemaVersion",
-    "runId",
-    "stage",
-    "status",
-    "facts",
-    "payload"
-  ],
-  "allOf": [
-    {
-      "oneOf": [
-        {
-          "properties": {
-            "stage": {
-              "const": "business.publish"
-            },
-            "status": {
-              "const": "ready"
-            }
-          },
-          "required": [
-            "stage",
-            "status"
-          ]
-        },
-        {
-          "properties": {
-            "stage": {
-              "const": "business.model"
-            },
-            "status": {
-              "const": "ready"
-            }
-          },
-          "required": [
-            "stage",
-            "status"
-          ]
-        },
-        {
-          "properties": {
-            "stage": {
-              "const": "business.blocked"
-            },
-            "status": {
-              "const": "blocked"
-            }
-          },
-          "required": [
-            "stage",
-            "status"
-          ]
-        }
-      ]
-    }
+    "operatorId",
+    "output"
   ],
   "properties": {
     "schemaVersion": {
-      "const": 6
+      "const": 7
     },
-    "runId": {
-      "type": "string",
-      "minLength": 1
+    "operatorId": {
+      "const": "business/model"
     },
-    "stage": {
-      "enum": [
-        "business.publish",
-        "business.model",
-        "business.blocked"
-      ]
-    },
-    "status": {
-      "enum": [
-        "ready",
-        "blocked"
-      ]
-    },
-    "facts": {
-      "type": "array",
-      "uniqueItems": true,
-      "items": {
-        "type": "string",
-        "minLength": 1
-      }
-    },
-    "payload": {
+    "output": {
       "type": "object",
       "additionalProperties": false,
       "required": [
-        "decision",
-        "state",
-        "produced",
-        "context",
-        "cleanup",
+        "outcome",
+        "resultRef",
         "evidenceRefs",
         "findings",
-        "challengeSummary"
+        "reason"
       ],
       "properties": {
-        "decision": {
+        "outcome": {
+          "description": "Typed result consumed by the parent Skill machine.",
           "enum": [
             "ready",
             "revise",
             "blocked"
           ]
         },
-        "challengeSummary": {
-          "type": "object",
-          "description": "Structured falsification record produced after the candidate model is frozen and before it may be presented for approval.",
-          "additionalProperties": false,
-          "required": [
-            "stance",
-            "verdict",
-            "assumptionIds",
-            "counterexampleIds",
-            "alternativeIds",
-            "failureModeIds",
-            "falsificationTestIds",
-            "stakeholderConflictIds",
-            "unresolvedCriticalIds",
-            "recommendationChanged"
+        "resultRef": {
+          "description": "Exact produced artifact reference, or null when no artifact was produced.",
+          "type": [
+            "string",
+            "null"
           ],
-          "properties": {
-            "stance": {
-              "const": "falsification-first"
-            },
-            "verdict": {
-              "enum": [
-                "ready",
-                "revise",
-                "blocked"
-              ]
-            },
-            "assumptionIds": {
-              "$ref": "#/$defs/nonEmptyIdSet"
-            },
-            "counterexampleIds": {
-              "$ref": "#/$defs/nonEmptyIdSet"
-            },
-            "alternativeIds": {
-              "$ref": "#/$defs/nonEmptyIdSet"
-            },
-            "failureModeIds": {
-              "$ref": "#/$defs/nonEmptyIdSet"
-            },
-            "falsificationTestIds": {
-              "$ref": "#/$defs/nonEmptyIdSet"
-            },
-            "stakeholderConflictIds": {
-              "type": "array",
-              "uniqueItems": true,
-              "items": {
-                "$ref": "#/$defs/id"
-              }
-            },
-            "unresolvedCriticalIds": {
-              "type": "array",
-              "uniqueItems": true,
-              "items": {
-                "$ref": "#/$defs/id"
-              }
-            },
-            "recommendationChanged": {
-              "type": "boolean"
-            }
-          }
-        },
-        "state": {
-          "type": "object",
-          "additionalProperties": false,
-          "required": [
-            "operator",
-            "status",
-            "code",
-            "retryable",
-            "emits"
-          ],
-          "properties": {
-            "operator": {
-              "const": "business/model"
-            },
-            "status": {
-              "enum": [
-                "completed",
-                "replan",
-                "blocked"
-              ]
-            },
-            "code": {
-              "enum": [
-                "business-model-ready",
-                "business-model-revise",
-                "business-model-blocked"
-              ]
-            },
-            "retryable": {
-              "type": "boolean"
-            },
-            "emits": {
-              "type": "object",
-              "additionalProperties": false,
-              "required": [
-                "stage",
-                "status",
-                "factsAdd"
-              ],
-              "properties": {
-                "stage": {
-                  "enum": [
-                    "business.publish",
-                    "business.model",
-                    "business.blocked"
-                  ]
-                },
-                "status": {
-                  "enum": [
-                    "ready",
-                    "blocked"
-                  ]
-                },
-                "factsAdd": {
-                  "type": "array",
-                  "minItems": 1,
-                  "uniqueItems": true,
-                  "items": {
-                    "type": "string",
-                    "minLength": 1
-                  }
-                }
-              }
-            }
-          }
-        },
-        "produced": {
-          "type": "object",
-          "additionalProperties": false,
-          "required": [
-            "businessModelRef",
-            "durableWrites"
-          ],
-          "properties": {
-            "businessModelRef": {
-              "anyOf": [
-                {
-                  "$ref": "#/$defs/sessionRef"
-                },
-                {
-                  "type": "null"
-                }
-              ]
-            },
-            "durableWrites": {
-              "type": "array",
-              "uniqueItems": true,
-              "items": {
-                "type": "string",
-                "minLength": 1
-              }
-            }
-          }
-        },
-        "context": {
-          "type": "object",
-          "additionalProperties": false,
-          "required": [
-            "used"
-          ],
-          "properties": {
-            "used": {
-              "type": "array",
-              "minItems": 1,
-              "uniqueItems": true,
-              "items": {
-                "type": "object",
-                "additionalProperties": false,
-                "required": [
-                  "kind",
-                  "ref",
-                  "revision"
-                ],
-                "properties": {
-                  "kind": {
-                    "enum": [
-                      "session-artifact",
-                      "worktree-business",
-                      "qdrant-knowledge",
-                      "exact-source"
-                    ]
-                  },
-                  "ref": {
-                    "type": "string",
-                    "minLength": 1
-                  },
-                  "revision": {
-                    "type": "string",
-                    "minLength": 1
-                  }
-                }
-              }
-            }
-          }
-        },
-        "cleanup": {
-          "type": "object",
-          "additionalProperties": false,
-          "required": [
-            "scratchRefs",
-            "retention",
-            "purgeAt"
-          ],
-          "properties": {
-            "scratchRefs": {
-              "type": "array",
-              "uniqueItems": true,
-              "items": {
-                "$ref": "#/$defs/sessionRef"
-              }
-            },
-            "retention": {
-              "const": "until-skill-terminal"
-            },
-            "purgeAt": {
-              "const": "skill-terminal"
-            }
-          }
+          "minLength": 1,
+          "maxLength": 1024
         },
         "evidenceRefs": {
-          "type": "array",
-          "minItems": 1,
-          "uniqueItems": true,
-          "items": {
-            "$ref": "#/$defs/sessionRef"
-          }
+          "description": "Exact references supporting the result.",
+          "$ref": "#/$defs/refs"
         },
         "findings": {
+          "description": "Bounded observable findings produced by this job.",
           "type": "array",
-          "uniqueItems": true,
+          "maxItems": 128,
           "items": {
             "type": "string",
-            "minLength": 1
+            "minLength": 1,
+            "maxLength": 2048
           }
+        },
+        "reason": {
+          "description": "Bounded explanation when the result cannot be produced, otherwise null.",
+          "type": [
+            "string",
+            "null"
+          ],
+          "minLength": 1,
+          "maxLength": 2048
         }
       }
     }
   },
   "$defs": {
-    "id": {
-      "type": "string",
-      "minLength": 1,
-      "maxLength": 160,
-      "pattern": "^[a-z0-9]+(?:[._-][a-z0-9]+)*$"
-    },
-    "nonEmptyIdSet": {
+    "refs": {
       "type": "array",
-      "minItems": 1,
+      "maxItems": 128,
       "uniqueItems": true,
       "items": {
-        "$ref": "#/$defs/id"
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 1024
       }
-    },
-    "sessionRef": {
-      "type": "string",
-      "pattern": "^session://tasks/[A-Za-z0-9._-]+/.+$"
     }
   }
 }

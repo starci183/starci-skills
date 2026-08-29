@@ -1,7 +1,18 @@
 {
-  "schemaVersion":6,"id":"platform/sonar-service-reconcile","domain":"platform","inputSchema":"input.schema.json","outputSchema":"output.schema.json","knowledgeRefs":["platform.sonar"],"sourceReferenceRefs":[],
-  "accepts":[{"stage":"platform.sonar.reconcile","status":"ready","allFacts":[],"noneFacts":[]}],
-  "emits":[{"stage":"platform.sonar.proved","status":"complete","factsAdd":["platform-sonar-proved"],"factsRemove":[]},{"stage":"platform.blocked","status":"blocked","factsAdd":["platform-sonar-blocked"],"factsRemove":[]}],
-  "sideEffects":["mutate declared Sonar service/project enforcement state","keep all inputs, outputs, provider observations, worker results, and receipts in task-session memory only","purge every intermediate session object at each parent-skill terminal state"],
-  "stopConditions":["required evidence is missing or stale","the result would cross the declared boundary","a raw credential or undeclared Sonar resource would be loaded","intermediate data would persist outside the task session"]
+  "schemaVersion": 7,
+  "id": "platform/sonar-service-reconcile",
+  "domain": "platform",
+  "job": "Converge one approved Sonar project set to its exact profile, gate, and enforcement bindings.",
+  "inputSchema": "input.schema.json",
+  "outputSchema": "output.schema.json",
+  "sourceReferenceRefs": [],
+  "sideEffects": [
+    "apply only the approved Sonar project, profile, gate, and enforcement delta"
+  ],
+  "stopConditions": [
+    "the approval, provider revision, or credential capability is stale or mismatched",
+    "a project, profile, gate, or setting outside the desired set would be accessed",
+    "a concurrent provider revision would be overwritten",
+    "post-apply associations cannot be reread and proved"
+  ]
 }

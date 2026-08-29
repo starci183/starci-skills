@@ -1,0 +1,5 @@
+import { validatorFor, runValidatorCli } from '../../operators/validation.mjs';
+import { assertProgress } from '../../runtime/trace.mjs';
+const schemaValidate = validatorFor(new URL('./input.schema.json', import.meta.url));
+export function validateInput(value) { const result=schemaValidate(value); if(!result.valid)return result; const errors=[]; if(value.receipts.some((r)=>r.missionId!==value.mission.missionId))errors.push('receipt mission identity mismatch'); try{assertProgress(value.receipts)}catch(error){errors.push(error.message)}  const waitIndex=value.receipts.findLastIndex((r)=>r.type==='WAIT'); if(waitIndex>=0){const resolution=value.receipts.slice(waitIndex+1).find((r)=>r.type==='RESUME'); if(!resolution||typeof resolution.trace?.resumeState?.authorityResolutionRef!=='string')errors.push('WAIT resumes only from a typed user authority resolution');} return {valid:errors.length===0,errors}; }
+if(process.argv[1]?.endsWith('validate-input.mjs'))await runValidatorCli(validateInput,'node validate-input.mjs <input.json>');

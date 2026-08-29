@@ -1,14 +1,9 @@
 # `platform/tunnel-apply` input
 
-This closed input applies one approved Cloudflare tunnel and DNS route. It and all loaded values are task-session state purged at every parent-skill terminal.
+- `context.approvedPlan`: exact plan hash, resource identities, origin, protocol, and effect list.
+- `context.approval`: authorization for precisely that plan and effect set.
+- `context.credentialCapability`: opaque handle and minimum write capabilities; never credential values.
+- `context.observedState`: exact pre-mutation resource fingerprint.
+- `input.execution`: expected plan hash, bounded helper reference, and public HTTPS probe URL.
 
-## JSON architecture
-
-| Section | Owner | Purpose |
-| --- | --- | --- |
-| Root route | Skill machine | Accept only `platform.tunnel.apply / ready` with `platform-tunnel-plan-ready`. |
-| `payload.provided` | Previous state | Supply immutable `tunnelPlanRef`, `credentialReceiptRef`, and exact `approvalRef`. |
-| `payload.loads` | Runtime resolver | Bind exact artifacts, knowledge, source, commands, Cloudflare resources, credential handles, and orchestration. |
-| `payload.session` | Session runtime | Own ephemeral input, output, scratch, and retention. |
-
-Every provided ref has exactly one session artifact binding. `approvalRef` binds the exact account, tunnel, hostname, origin, DNS record, plan hash, and allowed effect classes; a broad or stale approval is invalid. Knowledge is only `platform.tunnel`; source access is exact-file and hash-pinned; commands and external resources are declared-only. Credential material arrives only as opaque handles. Validate before resolving loads or mutating Cloudflare.
+No discovery, workflow routing, orchestration, or session lifecycle belongs in this contract.

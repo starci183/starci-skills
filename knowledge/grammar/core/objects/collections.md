@@ -16,9 +16,10 @@ The collection owner controls repeated-row anatomy, separators, local state plac
 
 - Keep primary identity, supporting copy, neutral state, and row action in predictable positions.
 - Render repeated label-value facts that share one reading job through `SurfaceListCard`; the list owns one labelled shell, joined rows, and their separators. A generic `SurfaceCard` with hand-spaced rows is not the same object.
+- When that list lives inside an approved `SurfaceCard`, use `SurfaceListCard`'s `nested` interface. Core's outer card body keeps its `p-4` inset while the nested list must not add a second full card inset or compete for elevation; its row padding and separators remain owned by the collection.
 - Keep a compact state legend as a legend, not a data list. Every state needs a visible semantic mark attached to its text label; labels alone name states but do not demonstrate how to recognize them in the controlled object.
 - Make legend marks correspond to the actual controlled states. If answered, current, and future controls do not remain distinguishable without reading the legend text, the state mapping is incomplete.
-- Use dividers or spacing from the package contract; remove orphan first/last separators.
+- Use dividers or spacing from the package interface; remove orphan first/last separators.
 - Render `affirmative`, `negative`, `pending`, and selected treatments only after application mapping.
 - Separate static and interactive rows unless a mixed-row variant exists.
 - Use a stable empty treatment owned by the collection.
@@ -34,8 +35,8 @@ Wrap secondary copy while maintaining state/action alignment. Move secondary met
 
 ## Proof
 
-Verify zero, one, many, long row, mixed states, interactive/static, expanded, loading, partial, error, selected, keyboard, and narrow-screen fixtures. Prove the exact branch and contract identity in the DOM, then confirm the owned anatomy and state distinctions in a rendered viewport.
+Verify zero, one, many, long row, mixed states, interactive/static, expanded, loading, partial, error, selected, keyboard, and narrow-screen fixtures. Prove the exact branch and interface identity in the DOM, then confirm the owned anatomy and state distinctions in a rendered viewport.
 
 ## Reject
 
-Reject card-per-row decoration, a generic surface substituted for a joined collection, label-only legends, unstable status position, unlimited rendering without an owner, and hidden essential row actions.
+Reject card-per-row decoration, a generic surface substituted for a joined collection, a non-nested list interface inside an owning card, duplicated full-card padding, label-only legends, unstable status position, unlimited rendering without an owner, and hidden essential row actions.

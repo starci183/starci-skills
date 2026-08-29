@@ -12,7 +12,7 @@ Tabs switch mutually exclusive peer content within one task context.
 
 - Labels stay short, distinct, and stable.
 - Selected, hover, focus, and disabled remain visually and semantically distinct.
-- Keyboard movement, activation model, panel association, and focus behavior follow the exact contract.
+- Keyboard movement, activation model, panel association, and focus behavior follow the exact interface.
 - Overflow uses only the declared scrolling, menu, or alternate treatment.
 - Hidden panels cannot retain accidental focus or announce irrelevant updates.
 - Unsaved transitions are application policy and must be explicit.

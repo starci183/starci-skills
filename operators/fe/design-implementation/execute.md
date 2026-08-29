@@ -1,13 +1,7 @@
 # Execute `fe/design-implementation`
 
-## Step 1 — Reverify immutable authority
+design implementation one closed frontend target.
 
-**Read:** approved detail, contract, receipt, structure hash, and exact file hashes. **Context:** no broad repository scan or design rediscovery. **Session write:** verified mutation plan. **Stop:** on stale hashes, missing approval, or scope drift.
+Use only the closed `context` and `input`. Return one typed `output.outcome` plus this job's result, gaps, and evidence. Do not route, persist a session, or choose another operator.
 
-## Step 2 — Implement without composition invention
-
-**Read:** exact approved files and implementation-boundary knowledge. **Context:** orchestration may parallelize only disjoint files; shared ownership stays serial. **Session write:** patches and before/after receipts. **Stop:** emit a typed gap instead of adding/removing/merging surfaces or changing breadcrumb, icon, separator, sticky, navigation, responsive, or state policy.
-
-## Step 3 — Measure structure
-
-**Read:** changed files and approved detail. **Context:** compute observed structure independently of lint. **Session write:** observed hash, deviations, and focused verification commands. **Stop:** success when any deviation is conflict.
+Frontend creation follows `AI-first -> Rules-first -> Grammar-last`. UX synthesis, UI-direction synthesis, principle/law compilation, layout compilation, Grammar application, implementation, and audit are separate jobs. Audit jobs observe and report; they never repair source.

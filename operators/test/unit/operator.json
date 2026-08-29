@@ -1,64 +1,16 @@
 {
-  "schemaVersion": 6,
+  "schemaVersion": 7,
   "id": "test/unit",
   "domain": "test",
+  "job": "Produce one bounded unit result from exact supplied evidence.",
   "inputSchema": "input.schema.json",
   "outputSchema": "output.schema.json",
-  "knowledgeRefs": [
-    "fe.unit-testing"
-  ],
-  "sourceReferenceRefs": [
-    "starci-academy-fe",
-    "starci-academy-be"
-  ],
-  "accepts": [
-    {
-      "stage": "test.unit",
-      "status": "ready",
-      "allFacts": [
-        "seed-evidence"
-      ]
-    }
-  ],
-  "emits": [
-    {
-      "when": "all focused unit tests pass",
-      "stage": "test.e2e",
-      "status": "ready",
-      "factsAdd": [
-        "unit-pass",
-        "unit-evidence"
-      ]
-    },
-    {
-      "when": "a unit assertion or changed-owner coverage fails",
-      "stage": "code.repair",
-      "status": "repair",
-      "factsAdd": [
-        "unit-failed",
-        "in-boundary-repair"
-      ]
-    },
-    {
-      "when": "the unit harness or environment cannot produce a verdict",
-      "stage": "test.review",
-      "status": "blocked",
-      "factsAdd": [
-        "unit-blocked"
-      ]
-    }
-  ],
+  "sourceReferenceRefs": [],
   "sideEffects": [
-    "run manifest-owned focused unit commands",
-    "write task-session unit evidence only"
+    "run manifest-owned focused unit commands"
   ],
   "stopConditions": [
-    "zero selected tests",
-    "skipped target test",
-    "missing manifest command",
-    "stale workspace route",
-    "failed assertion",
-    "suppressed failure",
-    "unsanitized secret"
+    "an exact reference is missing or its fingerprint differs",
+    "the requested work exceeds this operator job"
   ]
 }

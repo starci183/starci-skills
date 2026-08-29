@@ -1,50 +1,18 @@
 {
-  "schemaVersion": 6,
+  "schemaVersion": 7,
   "id": "platform/tunnel-apply",
   "domain": "platform",
+  "job": "Converge one approved Cloudflare HTTP(S) ingress to its exact plan and prove the resulting public route.",
   "inputSchema": "input.schema.json",
   "outputSchema": "output.schema.json",
-  "knowledgeRefs": [
-    "platform.tunnel"
-  ],
   "sourceReferenceRefs": [],
-  "accepts": [
-    {
-      "stage": "platform.tunnel.apply",
-      "status": "ready",
-      "allFacts": [
-        "platform-tunnel-plan-ready"
-      ],
-      "noneFacts": []
-    }
-  ],
-  "emits": [
-    {
-      "stage": "platform.tunnel.proved",
-      "status": "complete",
-      "factsAdd": [
-        "platform-tunnel-proved"
-      ],
-      "factsRemove": []
-    },
-    {
-      "stage": "platform.blocked",
-      "status": "blocked",
-      "factsAdd": [
-        "platform-tunnel-blocked"
-      ],
-      "factsRemove": []
-    }
-  ],
   "sideEffects": [
-    "mutate only the declared Cloudflare tunnel and DNS route through the coordinator",
-    "keep all inputs, loads, observations, receipts, evidence, and outputs in task-session memory",
-    "purge every session object at each parent-skill terminal state"
+    "apply only the approved tunnel-route and proxied-DNS delta through the coordinator"
   ],
   "stopConditions": [
-    "required evidence is missing or stale",
-    "the result would cross the declared boundary",
-    "a worker would mutate Cloudflare or receive an opaque credential handle",
-    "an intermediate session object would be persisted"
+    "the plan, approval, observed revision, or credential capability does not match",
+    "a requested effect is outside the approved ingress",
+    "a concurrent Cloudflare revision appears before mutation",
+    "the bounded DNS, route, TLS, or public HTTPS proof fails"
   ]
 }

@@ -1,1 +1,90 @@
-{"$schema":"https://json-schema.org/draft/2020-12/schema","$id":"https://starci.dev/v6/operators/fe/product-potential/output.schema.json","type":"object","additionalProperties":false,"required":["schemaVersion","runId","stage","status","facts","payload"],"properties":{"schemaVersion":{"const":6},"runId":{"type":"string","minLength":1},"stage":{"const":"product.potential.result"},"status":{"enum":["ready","blocked"]},"facts":{"type":"array","uniqueItems":true,"items":{"type":"string"}},"payload":{"type":"object","additionalProperties":false,"required":["decision","state","produced","context","cleanup","evidenceRefs","findings","artifact","nextCandidates"],"properties":{"decision":{"enum":["assessed","blocked"]},"state":{"$ref":"#/$defs/state"},"produced":{"$ref":"#/$defs/produced"},"context":{"$ref":"#/$defs/context"},"cleanup":{"$ref":"#/$defs/cleanup"},"evidenceRefs":{"type":"array","minItems":1,"items":{"$ref":"#/$defs/ref"}},"findings":{"type":"array","uniqueItems":true,"items":{"type":"string"}},"artifact":{"type":"object","additionalProperties":false,"required":["artifactType","assessments"],"properties":{"artifactType":{"const":"product-potential-assessment"},"assessments":{"type":"array","minItems":1,"items":{"type":"object","additionalProperties":false,"required":["signalRef","classification","expectedValue","confidence","authorityStatus","recommendedAction"],"properties":{"signalRef":{"$ref":"#/$defs/ref"},"classification":{"enum":["ux-only","business-capability","backend-contract","data-model","architecture"]},"expectedValue":{"type":"string","minLength":1},"confidence":{"enum":["high","medium","low"]},"authorityStatus":{"enum":["approved","hypothesis","conflict","missing-evidence"]},"recommendedAction":{"enum":["continue","route-required","route-recommended","report-only","reject"]}}}}}},"nextCandidates":{"type":"array","uniqueItems":true,"items":{"type":"object","additionalProperties":false,"required":["capability","necessity","reasonCode","risk","requiresApproval","inputRef","resumeCapability"],"properties":{"capability":{"type":"string","minLength":1},"necessity":{"enum":["required","recommended","optional"]},"reasonCode":{"type":"string","minLength":1},"risk":{"enum":["read-only","source-write","business-change","database-change"]},"requiresApproval":{"type":"boolean"},"inputRef":{"$ref":"#/$defs/ref"},"resumeCapability":{"type":"string","minLength":1}}}}}}},"$defs":{"ref":{"type":"string","minLength":1},"state":{"type":"object","additionalProperties":false,"required":["operator","status","code","retryable","emits"],"properties":{"operator":{"const":"fe/product-potential"},"status":{"enum":["ready","blocked"]},"code":{"enum":["potential-assessed","potential-blocked"]},"retryable":{"type":"boolean"},"emits":{"type":"object","additionalProperties":false,"required":["stage","status","factsAdd","factsRemove"],"properties":{"stage":{"const":"product.potential.result"},"status":{"enum":["ready","blocked"]},"factsAdd":{"type":"array","items":{"type":"string"}},"factsRemove":{"type":"array","items":{"type":"string"}}}}}},"produced":{"type":"object","additionalProperties":false,"required":["artifactRefs","mutations","externalEffects"],"properties":{"artifactRefs":{"type":"array","minItems":1,"items":{"$ref":"#/$defs/ref"}},"mutations":{"type":"array","maxItems":0},"externalEffects":{"type":"array","maxItems":0}}},"context":{"type":"object","additionalProperties":false,"required":["used"],"properties":{"used":{"type":"array","minItems":1,"items":{"type":"object","additionalProperties":false,"required":["kind","ref","revision"],"properties":{"kind":{"enum":["business","potential-signal","knowledge"]},"ref":{"$ref":"#/$defs/ref"},"revision":{"$ref":"#/$defs/ref"}}}}}},"cleanup":{"type":"object","additionalProperties":false,"required":["scratchRefs","retention","purgeAt"],"properties":{"scratchRefs":{"type":"array","items":{"$ref":"#/$defs/ref"}},"retention":{"const":"until-skill-terminal"},"purgeAt":{"const":"skill-terminal"}}}}}
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://starci.dev/v7.0/operators/fe/product-potential/output.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "operatorId",
+    "output"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "const": 7
+    },
+    "operatorId": {
+      "const": "fe/product-potential"
+    },
+    "output": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "outcome",
+        "result",
+        "gaps",
+        "evidenceRefs"
+      ],
+      "properties": {
+        "outcome": {
+          "description": "Legacy semantic result consumed only by the Skill machine.",
+          "enum": [
+            "assessed",
+            "blocked"
+          ]
+        },
+        "result": {
+          "description": "The atomic job result, or null when blocked.",
+          "anyOf": [
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "summary",
+                "artifactRefs"
+              ],
+              "properties": {
+                "summary": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "artifactRefs": {
+                  "type": "array",
+                  "maxItems": 64,
+                  "uniqueItems": true,
+                  "items": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                }
+              }
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "gaps": {
+          "description": "Exact missing authority or evidence; empty when complete.",
+          "type": "array",
+          "maxItems": 32,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "evidenceRefs": {
+          "description": "Exact evidence used to produce the result.",
+          "type": "array",
+          "maxItems": 64,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "minItems": 1
+        }
+      }
+    }
+  }
+}

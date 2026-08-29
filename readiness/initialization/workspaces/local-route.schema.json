@@ -52,18 +52,6 @@
           "uniqueItems": true,
           "items": { "$ref": "#/$defs/absolutePath" }
         },
-        "contract": {
-          "oneOf": [
-            { "$ref": "#/$defs/absolutePath" },
-            { "type": "null" }
-          ]
-        },
-        "contractSource": {
-          "oneOf": [
-            { "type": "string", "minLength": 1, "maxLength": 512 },
-            { "type": "null" }
-          ]
-        },
         "manifests": {
           "type": "array",
           "uniqueItems": true,
@@ -74,11 +62,9 @@
     "v1Context": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["instructions", "contract", "contractSource", "manifests", "grammar", "grammarProfile"],
+      "required": ["instructions", "manifests", "grammar", "grammarProfile"],
       "properties": {
         "instructions": { "$ref": "#/$defs/commonContext/properties/instructions" },
-        "contract": { "$ref": "#/$defs/commonContext/properties/contract" },
-        "contractSource": { "$ref": "#/$defs/commonContext/properties/contractSource" },
         "manifests": { "$ref": "#/$defs/commonContext/properties/manifests" },
         "grammar": {
           "oneOf": [
@@ -95,11 +81,6 @@
       },
       "allOf": [
         {
-          "if": { "properties": { "contract": { "type": "null" } }, "required": ["contract"] },
-          "then": { "properties": { "contractSource": { "type": "null" } } },
-          "else": { "properties": { "contractSource": { "type": "string" } } }
-        },
-        {
           "if": { "properties": { "grammar": { "type": "null" } }, "required": ["grammar"] },
           "then": { "properties": { "grammarProfile": { "type": "null" } } },
           "else": { "properties": { "grammarProfile": { "$ref": "#/$defs/slug" } } }
@@ -109,21 +90,12 @@
     "v6Context": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["instructions", "contract", "contractSource", "manifests", "grammarId"],
+      "required": ["instructions", "manifests", "grammarId"],
       "properties": {
         "instructions": { "$ref": "#/$defs/commonContext/properties/instructions" },
-        "contract": { "$ref": "#/$defs/commonContext/properties/contract" },
-        "contractSource": { "$ref": "#/$defs/commonContext/properties/contractSource" },
         "manifests": { "$ref": "#/$defs/commonContext/properties/manifests" },
         "grammarId": { "enum": ["core", "offset-pop", null] }
-      },
-      "allOf": [
-        {
-          "if": { "properties": { "contract": { "type": "null" } }, "required": ["contract"] },
-          "then": { "properties": { "contractSource": { "type": "null" } } },
-          "else": { "properties": { "contractSource": { "type": "string" } } }
-        }
-      ]
+      }
     },
     "v1": {
       "type": "object",

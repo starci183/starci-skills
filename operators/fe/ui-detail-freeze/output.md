@@ -1,5 +1,6 @@
 # `fe/ui-detail-freeze` output
 
-## JSON architecture
-
-The state is pending approval or blocked. The frozen artifact is the executable design contract: breadcrumb ownership, exact surface tree, interaction-container mappings, merge/sticky/scroll decisions, icon and separator policies, state and responsive matrices, deterministic baselines, and `structureHash`. Session intermediates purge at skill-terminal after handoff acknowledgement.
+- `output.outcome`: Legacy semantic result consumed only by the Skill machine.
+- `output.result`: The atomic job result, or null when blocked.
+- `output.gaps`: Exact missing authority or evidence; empty when complete.
+- `output.evidenceRefs`: Exact evidence used to produce the result.

@@ -1,0 +1,198 @@
+{
+  "$schema": "../machine.schema.json",
+  "schemaVersion": 6,
+  "id": "starci-tech-stack",
+  "start": "analyze-input",
+  "states": {
+    "analyze-input": {
+      "kind": "analysis",
+      "on": [
+        {
+          "when": {},
+          "target": "freshness",
+          "label": "enter freshness"
+        }
+      ]
+    },
+    "freshness": {
+      "kind": "operator",
+      "ref": "context/freshness-check",
+      "on": [
+        {
+          "when": {
+            "outputEquals": {
+              "outcome": "fresh"
+            }
+          },
+          "target": "complete",
+          "label": "fresh"
+        },
+        {
+          "when": {
+            "outputEquals": {
+              "outcome": "initialize-required"
+            }
+          },
+          "target": "discover",
+          "label": "initialize-required"
+        },
+        {
+          "when": {
+            "outputEquals": {
+              "outcome": "blocked"
+            }
+          },
+          "target": "blocked",
+          "label": "blocked"
+        }
+      ]
+    },
+    "complete": {
+      "kind": "terminal",
+      "result": "complete"
+    },
+    "discover": {
+      "kind": "operator",
+      "ref": "tech-stack/discover",
+      "on": [
+        {
+          "when": {
+            "outputEquals": {
+              "outcome": "ready"
+            }
+          },
+          "target": "model",
+          "label": "ready"
+        },
+        {
+          "when": {
+            "outputEquals": {
+              "outcome": "blocked"
+            }
+          },
+          "target": "blocked",
+          "label": "blocked"
+        }
+      ]
+    },
+    "blocked": {
+      "kind": "terminal",
+      "result": "blocked"
+    },
+    "model": {
+      "kind": "operator",
+      "ref": "tech-stack/topology-model",
+      "on": [
+        {
+          "when": {
+            "outputEquals": {
+              "outcome": "ready"
+            }
+          },
+          "target": "compatibility",
+          "label": "ready"
+        },
+        {
+          "when": {
+            "outputEquals": {
+              "outcome": "revise"
+            }
+          },
+          "target": "model",
+          "label": "revise"
+        },
+        {
+          "when": {
+            "outputEquals": {
+              "outcome": "blocked"
+            }
+          },
+          "target": "blocked",
+          "label": "blocked"
+        }
+      ]
+    },
+    "compatibility": {
+      "kind": "operator",
+      "ref": "tech-stack/compatibility-check",
+      "on": [
+        {
+          "when": {
+            "outputEquals": {
+              "outcome": "compatible"
+            }
+          },
+          "target": "approval",
+          "label": "compatible"
+        },
+        {
+          "when": {
+            "outputEquals": {
+              "outcome": "revise"
+            }
+          },
+          "target": "model",
+          "label": "revise"
+        },
+        {
+          "when": {
+            "outputEquals": {
+              "outcome": "blocked"
+            }
+          },
+          "target": "blocked",
+          "label": "blocked"
+        }
+      ]
+    },
+    "approval": {
+      "kind": "wait",
+      "approval": {
+        "prompt": "Approve the exact operational tech-stack model and hash.",
+        "approve": "OK TECH STACK <hash>",
+        "reject": "REJECT TECH STACK <hash>",
+        "bypassTarget": "publish"
+      },
+      "on": [
+        {
+          "when": {
+            "stage": "tech-stack.review",
+            "status": "approved"
+          },
+          "target": "publish"
+        },
+        {
+          "when": {
+            "stage": "tech-stack.review",
+            "status": "rejected"
+          },
+          "target": "model"
+        }
+      ]
+    },
+    "publish": {
+      "kind": "operator",
+      "ref": "tech-stack/constraint-publish",
+      "on": [
+        {
+          "when": {
+            "outputEquals": {
+              "outcome": "published"
+            }
+          },
+          "target": "complete",
+          "label": "published"
+        },
+        {
+          "when": {
+            "outputEquals": {
+              "outcome": "blocked"
+            }
+          },
+          "target": "blocked",
+          "label": "blocked"
+        }
+      ]
+    }
+  }
+}

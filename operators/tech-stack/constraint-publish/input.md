@@ -1,5 +1,9 @@
 # `tech-stack/constraint-publish` input
 
-## JSON architecture
-
-`provided` actively supplies project, objectiveRef, stackModelRef. `loads` passively binds only compatibilityReceiptRef, approvalReceiptRef at execution time. `session` owns ephemeral input, output and scratch references; bodies are never copied into the parent skill.
+- `context.stackModelRef`: exact approved stack model.
+- `context.stackModelSha256`: selected model hash.
+- `context.compatibility`: compatible receipt for that hash.
+- `context.approval`: approval receipt for that hash.
+- `input.project`: project owning the head.
+- `input.objectiveRef`: objective completed by publication.
+- `input.techStackHeadRef`: exact immutable-head target.

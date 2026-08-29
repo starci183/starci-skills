@@ -1,60 +1,16 @@
 {
-  "schemaVersion": 6,
+  "schemaVersion": 7,
   "id": "business/staleness-check",
   "domain": "business",
+  "job": "Check whether one published business feature head remains current for an objective.",
   "inputSchema": "input.schema.json",
   "outputSchema": "output.schema.json",
-  "knowledgeRefs": [],
   "sourceReferenceRefs": [],
-  "accepts": [
-    {
-      "stage": "business.evidence",
-      "status": "ready",
-      "allFacts": ["workspace-route-ready"],
-      "noneFacts": []
-    },
-    {
-      "stage": "architecture.decision.frame",
-      "status": "ready",
-      "allFacts": ["business-head-ready"],
-      "noneFacts": []
-    },
-    {
-      "stage": "architecture.source",
-      "status": "ready",
-      "allFacts": ["business-head-ready"],
-      "noneFacts": []
-    }
-  ],
-  "emits": [
-    {
-      "stage": "business.freshness",
-      "status": "ready",
-      "factsAdd": ["business-fresh-receipt-ready"],
-      "factsRemove": ["business-initialize-required"]
-    },
-    {
-      "stage": "business.evidence",
-      "status": "ready",
-      "factsAdd": ["workspace-route-ready", "business-initialize-required"],
-      "factsRemove": ["business-fresh-receipt-ready"]
-    },
-    {
-      "stage": "business.freshness",
-      "status": "blocked",
-      "factsAdd": ["business-freshness-blocked"],
-      "factsRemove": []
-    }
-  ],
   "sideEffects": [
-    "read receipt and hash metadata only",
-    "keep the freshness receipt in task-session storage only",
-    "purge all intermediate metadata and receipts at every parent-skill terminal"
+    "read only the supplied exact references"
   ],
   "stopConditions": [
-    "project or route identity is ambiguous",
-    "business metadata points outside .worktrees/<project>/businesses",
-    "hash or commit identities are malformed",
-    "the same post-initialize drift repeats beyond the declared refresh limit"
+    "an exact reference is missing or its fingerprint differs",
+    "the requested work exceeds this operator job"
   ]
 }

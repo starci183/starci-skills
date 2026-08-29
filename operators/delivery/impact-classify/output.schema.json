@@ -1,57 +1,48 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://starci.dev/v6/operators/delivery/impact-classify/output.schema.json",
+  "$id": "https://starci.dev/v7.0/operators/delivery/impact-classify/output.schema.json",
   "type": "object",
   "additionalProperties": false,
-  "required": ["schemaVersion", "runId", "stage", "status", "facts", "payload"],
-  "allOf": [{
-    "oneOf": [
-      { "properties": { "stage": { "const": "architecture.decision.frame" }, "status": { "const": "ready" }, "payload": { "properties": { "decision": { "const": "backend-required" }, "state": { "properties": { "status": { "const": "completed" }, "code": { "const": "delivery-impact-backend-required" }, "emits": { "properties": { "stage": { "const": "architecture.decision.frame" }, "status": { "const": "ready" } } } } } } } } },
-      { "properties": { "stage": { "const": "delivery.mission.resume" }, "status": { "const": "ready" }, "payload": { "properties": { "decision": { "const": "frontend-only" }, "state": { "properties": { "status": { "const": "completed" }, "code": { "const": "delivery-impact-frontend-only" }, "emits": { "properties": { "stage": { "const": "delivery.mission.resume" }, "status": { "const": "ready" } } } } } } } } },
-      { "properties": { "stage": { "const": "delivery.blocked" }, "status": { "const": "blocked" }, "payload": { "properties": { "decision": { "const": "blocked" }, "state": { "properties": { "status": { "const": "blocked" }, "code": { "const": "delivery-impact-blocked" }, "emits": { "properties": { "stage": { "const": "delivery.blocked" }, "status": { "const": "blocked" } } } } } } } } }
-    ]
-  }],
+  "required": [
+    "schemaVersion",
+    "operatorId",
+    "output"
+  ],
   "properties": {
-    "schemaVersion": { "const": 6 },
-    "runId": { "type": "string", "minLength": 1 },
-    "stage": { "enum": ["architecture.decision.frame", "delivery.mission.resume", "delivery.blocked"] },
-    "status": { "enum": ["ready", "blocked"] },
-    "facts": { "type": "array", "uniqueItems": true, "items": { "type": "string", "minLength": 1 } },
-    "payload": {
-      "type": "object", "additionalProperties": false,
-      "required": ["decision", "state", "produced", "context", "cleanup", "evidenceRefs", "findings"],
+    "schemaVersion": {
+      "const": 7
+    },
+    "operatorId": {
+      "const": "delivery/impact-classify"
+    },
+    "output": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "outcome",
+        "evidenceRefs"
+      ],
       "properties": {
-        "decision": { "enum": ["backend-required", "frontend-only", "blocked"] },
-        "state": {
-          "type": "object", "additionalProperties": false,
-          "required": ["operator", "status", "code", "retryable", "emits"],
-          "properties": {
-            "operator": { "const": "delivery/impact-classify" },
-            "status": { "enum": ["completed", "blocked"] },
-            "code": { "enum": ["delivery-impact-backend-required", "delivery-impact-frontend-only", "delivery-impact-blocked"] },
-            "retryable": { "type": "boolean" },
-            "emits": {
-              "type": "object", "additionalProperties": false,
-              "required": ["stage", "status", "factsAdd"],
-              "properties": { "stage": { "enum": ["architecture.decision.frame", "delivery.mission.resume", "delivery.blocked"] }, "status": { "enum": ["ready", "blocked"] }, "factsAdd": { "type": "array", "minItems": 1, "uniqueItems": true, "items": { "type": "string", "minLength": 1 } } }
-            }
-          }
+        "outcome": {
+          "enum": [
+            "backend-required",
+            "frontend-only",
+            "blocked"
+          ],
+          "description": "Typed atomic result consumed only by the parent Skill machine."
         },
-        "produced": {
-          "type": "object", "additionalProperties": false,
-          "required": ["impactReceiptRef", "roles"],
-          "properties": { "impactReceiptRef": { "anyOf": [{ "$ref": "#/$defs/sessionRef" }, { "type": "null" }] }, "roles": { "type": "array", "uniqueItems": true, "items": { "enum": ["fe", "be", "chart", "shared"] } } }
-        },
-        "context": { "type": "object", "additionalProperties": false, "required": ["used"], "properties": { "used": { "type": "array", "minItems": 2, "uniqueItems": true, "items": { "$ref": "#/$defs/contextRef" } } } },
-        "cleanup": { "type": "object", "additionalProperties": false, "required": ["scratchRefs", "retention", "purgeAt"], "properties": { "scratchRefs": { "type": "array", "uniqueItems": true, "items": { "$ref": "#/$defs/sessionRef" } }, "retention": { "const": "until-skill-terminal" }, "purgeAt": { "const": "skill-terminal" } } },
-        "evidenceRefs": { "type": "array", "minItems": 1, "uniqueItems": true, "items": { "$ref": "#/$defs/sessionRef" } },
-        "findings": { "type": "array", "uniqueItems": true, "items": { "type": "string", "minLength": 1 } }
+        "evidenceRefs": {
+          "type": "array",
+          "maxItems": 128,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 2048
+          },
+          "description": "Evidence references supporting this result."
+        }
       }
     }
-  },
-  "$defs": {
-    "sessionRef": { "type": "string", "pattern": "^session://tasks/[A-Za-z0-9._-]+/.+$" },
-    "contextRef": { "type": "object", "additionalProperties": false, "required": ["kind", "ref", "revision"], "properties": { "kind": { "enum": ["session-artifact", "worktree-business", "qdrant-knowledge", "source-metadata"] }, "ref": { "type": "string", "minLength": 1 }, "revision": { "type": "string", "minLength": 1 } } },
-    "cleanup": { "type": "object", "additionalProperties": false, "required": ["scratchRefs", "retention", "purgeAt"], "properties": { "scratchRefs": { "type": "array", "uniqueItems": true, "items": { "$ref": "#/$defs/sessionRef" } }, "retention": { "const": "until-skill-terminal" }, "purgeAt": { "const": "skill-terminal" } } }
   }
 }

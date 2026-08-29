@@ -1,85 +1,39 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://starci.dev/v6/analyze-input.schema.json",
+  "$id": "https://starci.dev/v7/analyze-input.schema.json",
   "type": "object",
   "additionalProperties": false,
   "required": [
     "analyzerVersion",
     "skillId",
     "confidence",
+    "interactionPolicy",
     "activeInputRefs",
     "passiveContextRefs"
   ],
   "properties": {
-    "analyzerVersion": {
-      "const": 1
-    },
+    "analyzerVersion": { "const": 2 },
     "skillId": {
       "enum": [
-        "starci-workspace-ready",
-        "starci-device-checkpoint",
-        "starci-workflow-handoff",
-        "starci-business-authority",
-        "starci-business-reconcile",
-        "starci-frontend-quality-audit",
-        "starci-frontend-block-reconcile",
-        "starci-frontend-maintenance-apply",
-        "starci-frontend-request-review",
-        "starci-frontend-learning-resolve",
-        "starci-frontend-surface-reconcile",
-        "starci-workflow-diagnose",
-        "starci-quality-readiness",
-        "starci-quality-finding-repair",
-        "starci-quality-debt-repay",
-        "starci-rule-binding-audit",
-        "starci-deployment",
-        "starci-deployment-monitor",
-        "starci-deployment-recover",
-        "starci-deployment-rollback",
-        "starci-tunnel-reconcile",
-        "starci-source-index-publish",
-        "starci-sonar-service-reconcile",
-        "starci-observability-reconcile",
-        "starci-conversation-record",
-        "starci-conversation-query",
-        "starci-tech-stack",
-        "starci-frontend-ui-direction",
-        "starci-frontend-design-critique",
-        "starci-frontend-ux-flow",
-        "starci-product-potential",
-        "starci-frontend-ui-detail",
-        "starci-frontend-contract-plan",
-        "starci-frontend-implementation",
-        "starci-frontend-visual-fidelity",
-        "starci-product-uat",
-        "starci-architecture-discover",
-        "starci-data-ownership-model",
-        "starci-architecture-option-design",
-        "starci-architecture-critique",
-        "starci-architecture-realization",
-        "starci-backend-solution-design",
-        "starci-backend-contract-plan",
-        "starci-backend-contract-critique",
-        "starci-coding-preflight",
-        "starci-static-quality-gates",
-        "starci-backend-implementation",
-        "starci-backend-proof"
+        "starci-feature-deliver",
+        "starci-business-process",
+        "starci-architecture-design",
+        "starci-backend-process",
+        "starci-fe-process",
+        "starci-quality-assure",
+        "starci-uat-verify",
+        "starci-release-manage",
+        "starci-platform-operate",
+        "starci-workspace-manage",
+        "starci-git-publish",
+        "starci-workflow-diagnose"
       ]
     },
-    "confidence": {
-      "enum": [
-        "exact",
-        "clarified"
-      ]
-    },
-    "mode": {
-      "enum": [
-        "gated",
-        "bypass"
-      ]
-    },
+    "confidence": { "enum": ["exact", "clarified"] },
+    "interactionPolicy": { "const": "ask-only-when-stuck" },
     "activeInputRefs": {
       "type": "array",
+      "minItems": 1,
       "maxItems": 8,
       "uniqueItems": true,
       "items": {

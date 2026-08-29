@@ -1,260 +1,28 @@
 {
-  "$id": "https://starci.dev/v6/operators/source/conversation-query/output.schema.json",
-  "title": "source/conversation-query operator output",
   "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://starci.dev/v7.0/operators/source/conversation-query/output.schema.json",
   "type": "object",
   "additionalProperties": false,
-  "required": [
-    "schemaVersion",
-    "runId",
-    "stage",
-    "status",
-    "facts",
-    "payload"
-  ],
-  "allOf": [
-    {
-      "oneOf": [
-        {
-          "properties": {
-            "stage": {
-              "const": "source.conversation.result"
-            },
-            "status": {
-              "const": "complete"
-            }
-          },
-          "required": [
-            "stage",
-            "status"
-          ]
-        }
-      ]
-    }
-  ],
+  "required": ["schemaVersion", "operatorId", "output"],
   "properties": {
-    "schemaVersion": {
-      "const": 6
-    },
-    "runId": {
-      "type": "string",
-      "minLength": 1
-    },
-    "stage": {
-      "enum": [
-        "source.conversation.result"
-      ]
-    },
-    "status": {
-      "enum": [
-        "complete"
-      ]
-    },
-    "facts": {
-      "type": "array",
-      "uniqueItems": true,
-      "items": {
-        "type": "string",
-        "minLength": 1
-      }
-    },
-    "payload": {
+    "schemaVersion": { "const": 7 },
+    "operatorId": { "const": "source/conversation-query" },
+    "output": {
       "type": "object",
       "additionalProperties": false,
-      "required": [
-        "decision",
-        "state",
-        "produced",
-        "context",
-        "cleanup",
-        "evidenceRefs",
-        "findings"
-      ],
+      "required": ["outcome", "headRef", "headSha256", "snapshotSha256", "artifactRefs", "reason", "evidenceRefs"],
       "properties": {
-        "decision": {
-          "enum": [
-            "found",
-            "empty"
-          ]
-        },
-        "state": {
-          "type": "object",
-          "additionalProperties": false,
-          "required": [
-            "operator",
-            "status",
-            "code",
-            "retryable",
-            "emits"
-          ],
-          "properties": {
-            "operator": {
-              "const": "source/conversation-query"
-            },
-            "status": {
-              "enum": [
-                "completed",
-                "replan",
-                "blocked"
-              ]
-            },
-            "code": {
-              "enum": [
-                "source-conversation-query-found",
-                "source-conversation-query-empty"
-              ]
-            },
-            "retryable": {
-              "type": "boolean"
-            },
-            "emits": {
-              "type": "object",
-              "additionalProperties": false,
-              "required": [
-                "stage",
-                "status",
-                "factsAdd"
-              ],
-              "properties": {
-                "stage": {
-                  "enum": [
-                    "source.conversation.result"
-                  ]
-                },
-                "status": {
-                  "enum": [
-                    "complete"
-                  ]
-                },
-                "factsAdd": {
-                  "type": "array",
-                  "minItems": 1,
-                  "uniqueItems": true,
-                  "items": {
-                    "type": "string",
-                    "minLength": 1
-                  }
-                }
-              }
-            }
-          }
-        },
-        "produced": {
-          "type": "object",
-          "additionalProperties": false,
-          "required": [
-            "conversationQueryReceiptRef",
-            "durableWrites"
-          ],
-          "properties": {
-            "conversationQueryReceiptRef": {
-              "anyOf": [
-                {
-                  "$ref": "#/$defs/sessionRef"
-                },
-                {
-                  "type": "null"
-                }
-              ]
-            },
-            "durableWrites": {
-              "type": "array",
-              "uniqueItems": true,
-              "items": {
-                "type": "string",
-                "minLength": 1
-              }
-            }
-          }
-        },
-        "context": {
-          "type": "object",
-          "additionalProperties": false,
-          "required": [
-            "used"
-          ],
-          "properties": {
-            "used": {
-              "type": "array",
-              "minItems": 1,
-              "uniqueItems": true,
-              "items": {
-                "type": "object",
-                "additionalProperties": false,
-                "required": [
-                  "kind",
-                  "ref",
-                  "revision"
-                ],
-                "properties": {
-                  "kind": {
-                    "enum": [
-                      "session-artifact",
-                      "worktree-business",
-                      "qdrant-knowledge",
-                      "exact-source"
-                    ]
-                  },
-                  "ref": {
-                    "type": "string",
-                    "minLength": 1
-                  },
-                  "revision": {
-                    "type": "string",
-                    "minLength": 1
-                  }
-                }
-              }
-            }
-          }
-        },
-        "cleanup": {
-          "type": "object",
-          "additionalProperties": false,
-          "required": [
-            "scratchRefs",
-            "retention",
-            "purgeAt"
-          ],
-          "properties": {
-            "scratchRefs": {
-              "type": "array",
-              "uniqueItems": true,
-              "items": {
-                "$ref": "#/$defs/sessionRef"
-              }
-            },
-            "retention": {
-              "const": "until-skill-terminal"
-            },
-            "purgeAt": {
-              "const": "skill-terminal"
-            }
-          }
-        },
-        "evidenceRefs": {
-          "type": "array",
-          "minItems": 1,
-          "uniqueItems": true,
-          "items": {
-            "$ref": "#/$defs/sessionRef"
-          }
-        },
-        "findings": {
-          "type": "array",
-          "uniqueItems": true,
-          "items": {
-            "type": "string",
-            "minLength": 1
-          }
-        }
+        "outcome": { "enum": ["found", "empty", "forbidden", "stale", "ambiguous"], "description": "Observed resolution result; only the Skill machine maps it to a terminal." },
+        "headRef": { "type": ["string", "null"], "minLength": 1, "description": "Current durable head reference when exactly one authorized current match was found; otherwise null." },
+        "headSha256": { "anyOf": [{ "$ref": "#/$defs/sha256" }, { "type": "null" }], "description": "Current durable head hash when found; otherwise null." },
+        "snapshotSha256": { "anyOf": [{ "$ref": "#/$defs/sha256" }, { "type": "null" }], "description": "Redacted snapshot hash when found; never a transcript body." },
+        "artifactRefs": { "type": "array", "maxItems": 64, "uniqueItems": true, "items": { "type": "string", "minLength": 1 }, "description": "Authorized artifact references from the current head; empty unless found." },
+        "reason": { "enum": ["current-match", "no-match", "scope-denied", "index-stale", "multiple-current-heads"], "description": "Single evidence-backed reason for the outcome." },
+        "evidenceRefs": { "type": "array", "minItems": 1, "maxItems": 16, "uniqueItems": true, "items": { "type": "string", "minLength": 1 }, "description": "Policy, scope, index, and head evidence used for this resolution." }
       }
     }
   },
   "$defs": {
-    "sessionRef": {
-      "type": "string",
-      "pattern": "^session://tasks/[A-Za-z0-9._-]+/.+$"
-    }
+    "sha256": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" }
   }
 }

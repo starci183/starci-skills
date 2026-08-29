@@ -1,46 +1,21 @@
 # Execute `business/evidence-normalize`
 
-This operator normalizes product-owner evidence. Input, output, context bindings, analysis evidence, worker observations, and receipts remain in task-session memory and are purged at every parent-skill terminal.
+## Context
 
-## Step 1 — Validate and freeze input
+Resolve only `context.contextRefs` with default repository or file search and open only `context.sourceRefs`. Verify every source reference against `input.sourceFingerprint`. For durable business authority, references must use the verified project backend Source flat `.worktrees/businesses/` root. The runtime Source owns `.claude/.workspaces`; never add a project segment below `.worktrees/`.
 
-**Read:** the complete input envelope only.
-**Context:** none; resolve no binding before validation succeeds.
-**Action:** run `validate-input.mjs` and freeze the route, provided refs, load declarations, and session slots.
-**Session write:** `payload.session.inputRef`.
-**Stop:** stop before loading context if the schema, accepted route, facts, or session ownership fails.
+## Input
 
-## Step 2 — Resolve exact bindings
+Bind all work to `input.project` and `input.objectiveRef`.
 
-**Read:** `payload.loads.artifacts`, `payload.loads.knowledge`, and `payload.loads.business`.
-**Context:** resolve exact task-session artifacts and retrieve only `business.authority-lifecycle` from its pinned Qdrant generation. Load only the declared business revision under `.worktrees/<project>/businesses/`.
-**Analysis:** verify identity, revision, freshness, and ownership. Record applied rule IDs and match/mismatch evidence, never hidden reasoning.
-**Session write:** `payload.session.scratchPrefix/bindings`.
-**Stop:** stop when a binding is missing, stale, ambiguous, or outside the accepted route.
+## Action
 
-## Step 3 — Perform the operator decision
+Normalize one bounded business evidence set into traceable claims. Do not route subsequent work, persist task-session material, broaden the source boundary, or perform another operator's job.
 
-**Read:** validated bindings, and accepted machine facts.
-**Context:** use no undeclared knowledge, business feature, artifact, or source file.
-**Decision criteria:** each fact carries owner, source, revision, confidence, and conflict status.
-**Analysis:** deduplicate facts, separate assumptions, and expose contradictions. Record evidence, criteria, and conclusions only; never record chain-of-thought.
-**Session write:** candidate `evidencePackRef` at `payload.session.scratchPrefix/candidate`.
-**Orchestration:** economical mode is sequential. Balanced or parallel mode may delegate independent read-only comparisons. Each worker receives only assigned refs; the coordinator owns joining and the decision.
-**Stop:** emit only a declared decision when evidence is missing, contradictory, or outside scope.
+## Output
 
-## Step 4 — Validate the candidate
+Return only `output.outcome`, `output.resultRef`, `output.evidenceRefs`, `output.findings`, and `output.reason`.
 
-**Read:** candidate artifact, decision evidence, and exact context lineage.
-**Context:** no new load is allowed.
-**Analysis:** prove the candidate is closed, traceable, route-compatible, and free of copied context or reasoning transcripts.
-**Session write:** accepted artifact at `payload.session.scratchPrefix/evidencePackRef` and evidence under `scratchPrefix/evidence`.
-**Stop:** do not invent evidence or broaden scope.
+## Stop
 
-## Step 5 — Emit and register cleanup
-
-**Read:** accepted candidate, decision, evidence refs, lineage, and any durable-effect refs.
-**Context:** return refs and revisions only, not loaded content or worker prompts.
-**Action:** construct `output.schema.json`, align `payload.decision`, `payload.state`, root route, and emitted facts, then run `validate-output.mjs`.
-**Session write:** `payload.session.outputRef`; list every scratch ref in `payload.cleanup.scratchRefs`.
-**Stop:** do not emit an invalid or partially joined result.
-**Orchestration:** coordinator validates the final output and purges all intermediate session objects when the parent skill terminates.
+Return the applicable non-success outcome when exact evidence is missing, fingerprints drift, or completing the job would exceed its boundary.

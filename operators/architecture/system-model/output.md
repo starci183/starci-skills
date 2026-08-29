@@ -1,16 +1,7 @@
 # `architecture/system-model` output
 
-The output is an ephemeral typed artifact governed by `migration/v6.1/architecture-backend/schemas/system-model.schema.json`.
-
-## JSON architecture
-
-| Section | Purpose |
-| --- | --- |
-| `payload.decision` | Route `ready`, `revise`, or `blocked`. |
-| `payload.state` | Expose status, code, retryability and emitted state. |
-| `payload.produced` | Hold the typed artifact and session ref; no durable write. |
-| `payload.context.used` | Preserve only refs and revisions actually used. |
-| `payload.cleanup` | Purge scratch data at every `skill-terminal`. |
-| `payload.evidenceRefs` | Keep inspectable evidence, never reasoning traces. |
-
-Gate: Every component maps to a deployable; every physical store and read, write or migrate edge is qualified.
+- `output.outcome`: one of `ready`, `revise`, `blocked`.
+- `output.resultRef`: exact produced artifact reference, or null.
+- `output.evidenceRefs`: exact supporting references.
+- `output.findings`: bounded observable findings.
+- `output.reason`: bounded explanation when work cannot complete, otherwise null.

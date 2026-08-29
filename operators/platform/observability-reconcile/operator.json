@@ -1,48 +1,18 @@
 {
-  "schemaVersion": 6,
+  "schemaVersion": 7,
   "id": "platform/observability-reconcile",
   "domain": "platform",
+  "job": "Converge one approved metrics stack to its exact scrape, dashboard, filtering, and remote-write boundary.",
   "inputSchema": "input.schema.json",
   "outputSchema": "output.schema.json",
-  "knowledgeRefs": [
-    "platform.observability"
-  ],
   "sourceReferenceRefs": [],
-  "accepts": [
-    {
-      "stage": "platform.observability.reconcile",
-      "status": "ready",
-      "allFacts": [],
-      "noneFacts": []
-    }
-  ],
-  "emits": [
-    {
-      "stage": "platform.observability.proved",
-      "status": "complete",
-      "factsAdd": [
-        "platform-observability-proved"
-      ],
-      "factsRemove": []
-    },
-    {
-      "stage": "platform.blocked",
-      "status": "blocked",
-      "factsAdd": [
-        "platform-observability-blocked"
-      ],
-      "factsRemove": []
-    }
-  ],
   "sideEffects": [
-    "mutate declared observability stack and provider configuration through the coordinator only",
-    "keep all runtime inputs, loads, observations, receipts, evidence, and outputs in task-session memory",
-    "purge every session object at each parent-skill terminal state"
+    "apply only the approved observability configuration, service, dashboard, and remote-write delta"
   ],
   "stopConditions": [
-    "required evidence is missing or stale",
-    "the result would cross the declared boundary",
-    "a worker would mutate runtime or receive a credential handle",
-    "an intermediate session object would be persisted"
+    "the approval, configuration fingerprint, or credential capability is stale or mismatched",
+    "an undeclared service, scrape target, dashboard, label, or destination would be accessed",
+    "a concurrent revision would be overwritten",
+    "health, delivery, ordering, retry, or sensitive-data proof fails"
   ]
 }

@@ -1,38 +1,21 @@
 # Execute `quality/delivery-proof`
 
-This operator assembles final delivery proof. Input, output, loaded context, command captures, diagnostics, observations, and receipts remain session-only and are purged at every parent-skill terminal.
+## Context
 
-## Step 1 — Validate and freeze input
+Resolve only the supplied exact references with default repository or file search. Verify their frozen fingerprint and routed project identity.
 
-**Read:** the complete input envelope only.
-**Context:** none; resolve no binding before validation succeeds.
-**Action:** run `validate-input.mjs` and freeze route, provided refs, load declarations, and session slots.
-**Session write:** `payload.session.inputRef`.
-**Stop:** stop before loading context if schema, route, facts, or task ownership fails.
+## Input
 
-## Step 2 — Resolve exact evidence and quality law
+Bind all work to the verified project and one bounded objective.
 
-**Read:** `payload.loads.artifacts`, `payload.loads.knowledge`, and `payload.loads.business`.
-**Context:** resolve exact session artifacts and retrieve only `quality.source-gates` from its pinned generation. Load only the declared `.worktrees/<project>/businesses/` revision.
-**Analysis:** verify refs, revisions, ownership, and freshness. Record rule IDs and match/mismatch evidence only.
-**Session write:** `payload.session.scratchPrefix/bindings`.
-**Stop:** stop when evidence is stale, ambiguous, incomplete, or belongs to another revision.
+## Action
 
-## Step 3 — Evaluate the result
+Assembles final delivery proof. Do not route later work, own workflow state, broaden source scope, or perform another operator's job.
 
-**Read:** validated bindings, and accepted machine facts.
-**Context:** load no undeclared knowledge, source, or business feature.
-**Decision criteria:** all required gate receipts match one source revision and the approved business head.
-**Analysis:** join gate evidence into one traceable delivery proof. Record applied criteria, structured diagnostics, and conclusions only; never record chain-of-thought.
-**Session write:** candidate `sourceDeliveryProofRef` at `scratchPrefix/candidate`.
-**Orchestration:** economical mode is sequential. Balanced/parallel modes may classify independent evidence items read-only; the coordinator owns route classification and join.
-**Stop:** emit only one declared decision and never widen a repair boundary.
+## Output
 
-## Step 4 — Emit and register cleanup
+Return only one atomic result: `outcome`, `resultRef`, `evidenceRefs`, `findings`, and `reason`.
 
-**Read:** candidate, decision evidence, lineage.
-**Context:** return refs and revisions only, not loaded content, full command logs, prompts, or observations.
-**Action:** construct `output.schema.json`; align decision, state, root route, and emitted facts; run `validate-output.mjs`.
-**Session write:** `payload.session.outputRef`; list all scratch refs in `payload.cleanup.scratchRefs`.
-**Stop:** do not emit an invalid or partially joined output.
-**Orchestration:** coordinator validates output and purges all intermediate session objects at the parent terminal.
+## Stop
+
+Return the applicable non-success outcome when evidence is missing, fingerprints drift, or the requested work exceeds this single job.

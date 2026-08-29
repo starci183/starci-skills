@@ -1,1 +1,212 @@
-{"$schema":"https://json-schema.org/draft/2020-12/schema","$id":"https://starci.dev/v6/operators/fe/ux-flow/input.schema.json","type":"object","additionalProperties":false,"required":["schemaVersion","runId","stage","status","facts","payload"],"properties":{"schemaVersion":{"const":6},"runId":{"type":"string","minLength":1},"stage":{"const":"ux.flow.model"},"status":{"const":"ready"},"facts":{"type":"array","uniqueItems":true,"items":{"type":"string"}},"payload":{"type":"object","additionalProperties":false,"required":["provided","loads","session"],"properties":{"provided":{"type":"object","additionalProperties":false,"required":["objectiveRef","approvedDirectionRef","businessCapabilityRefs","knownStateRefs"],"properties":{"objectiveRef":{"$ref":"#/$defs/ref"},"approvedDirectionRef":{"$ref":"#/$defs/ref"},"businessCapabilityRefs":{"type":"array","minItems":1,"uniqueItems":true,"items":{"$ref":"#/$defs/ref"}},"knownStateRefs":{"type":"array","uniqueItems":true,"items":{"$ref":"#/$defs/ref"}}}},"loads":{"type":"object","additionalProperties":false,"required":["knowledge","orchestration"],"properties":{"knowledge":{"type":"array","minItems":2,"maxItems":2,"items":{"$ref":"#/$defs/binding"}},"orchestration":{"$ref":"#/$defs/orchestration"}}},"session":{"$ref":"#/$defs/session"}}}},"$defs":{"ref":{"type":"string","minLength":1},"hash":{"type":"string","pattern":"^sha256:[0-9a-f]{64}$"},"binding":{"type":"object","additionalProperties":false,"required":["id","generation","contentSha256"],"properties":{"id":{"enum":["fe.customer-journey","fe.state-modeling"]},"generation":{"type":"string","minLength":1},"contentSha256":{"$ref":"#/$defs/hash"}}},"orchestration":{"type":"object","additionalProperties":false,"required":["mode","workerCount"],"properties":{"mode":{"enum":["economical","balanced","parallel","deep"]},"workerCount":{"type":"integer","minimum":1,"maximum":5}}},"session":{"type":"object","additionalProperties":false,"required":["taskId","inputRef","outputRef","scratchPrefix","retention"],"properties":{"taskId":{"$ref":"#/$defs/ref"},"inputRef":{"$ref":"#/$defs/ref"},"outputRef":{"$ref":"#/$defs/ref"},"scratchPrefix":{"$ref":"#/$defs/ref"},"retention":{"const":"until-skill-terminal"}}}}}
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://starci.dev/v7.0/operators/fe/ux-flow/input.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "operatorId",
+    "context",
+    "input"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "const": 7
+    },
+    "operatorId": {
+      "const": "fe/ux-flow"
+    },
+    "context": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "projectRoute",
+        "businessHead",
+        "journeyEvidence",
+        "uxLaws"
+      ],
+      "properties": {
+        "projectRoute": {
+          "description": "Verified project and backend Source identity that owns the flat worktree authorities.",
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "project",
+            "backendRouteRef",
+            "backendSourceRevision"
+          ],
+          "properties": {
+            "project": {
+              "$ref": "#/$defs/id"
+            },
+            "backendRouteRef": {
+              "type": "string",
+              "pattern": "^\\.workspaces/projects/[a-z0-9][a-z0-9._-]*/be\\.json$"
+            },
+            "backendSourceRevision": {
+              "$ref": "#/$defs/revision"
+            }
+          }
+        },
+        "businessHead": {
+          "description": "Approved business-visible outcome and constraints from the routed backend Source's business worktree.",
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "ref",
+            "revision",
+            "outcome",
+            "constraints"
+          ],
+          "properties": {
+            "ref": {
+              "type": "string",
+              "pattern": "^\\.worktrees/businesses/.+$"
+            },
+            "revision": {
+              "$ref": "#/$defs/revision"
+            },
+            "outcome": {
+              "$ref": "#/$defs/text"
+            },
+            "constraints": {
+              "$ref": "#/$defs/texts"
+            }
+          }
+        },
+        "journeyEvidence": {
+          "description": "Observed or approved journey facts available to synthesis without treating current source as target authority.",
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 32,
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/evidence"
+          }
+        },
+        "uxLaws": {
+          "description": "Exact UX and state-model laws constraining validation, recovery, continuity, and completion.",
+          "type": "array",
+          "minItems": 2,
+          "maxItems": 16,
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/law"
+          }
+        }
+      }
+    },
+    "input": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "targetOutcome",
+        "actor",
+        "entryCondition",
+        "surfaceSet",
+        "continuityRequirements"
+      ],
+      "properties": {
+        "targetOutcome": {
+          "$ref": "#/$defs/text",
+          "description": "The one business-visible outcome this flow must reach or safely terminate."
+        },
+        "actor": {
+          "$ref": "#/$defs/text",
+          "description": "The single actor whose decisions and recovery are modeled."
+        },
+        "entryCondition": {
+          "$ref": "#/$defs/text",
+          "description": "The recognizable state from which the actor enters the flow."
+        },
+        "surfaceSet": {
+          "$ref": "#/$defs/texts",
+          "description": "Closed surface boundary allowed in the synthesized graph."
+        },
+        "continuityRequirements": {
+          "description": "The complete continuity dimensions the graph must cover.",
+          "type": "array",
+          "minItems": 6,
+          "maxItems": 6,
+          "uniqueItems": true,
+          "items": {
+            "enum": [
+              "validation",
+              "failure",
+              "recovery",
+              "refresh",
+              "resume",
+              "async"
+            ]
+          }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "id": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9._-]+$"
+    },
+    "text": {
+      "type": "string",
+      "minLength": 1
+    },
+    "texts": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 32,
+      "uniqueItems": true,
+      "items": {
+        "$ref": "#/$defs/text"
+      }
+    },
+    "revision": {
+      "type": "string",
+      "minLength": 1
+    },
+    "evidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "ref",
+        "revision",
+        "claim"
+      ],
+      "properties": {
+        "ref": {
+          "$ref": "#/$defs/text"
+        },
+        "revision": {
+          "$ref": "#/$defs/revision"
+        },
+        "claim": {
+          "$ref": "#/$defs/text"
+        }
+      }
+    },
+    "law": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "ref",
+        "revision"
+      ],
+      "properties": {
+        "id": {
+          "enum": [
+            "fe.customer-journey",
+            "fe.state-modeling"
+          ]
+        },
+        "ref": {
+          "$ref": "#/$defs/text"
+        },
+        "revision": {
+          "$ref": "#/$defs/revision"
+        }
+      }
+    }
+  }
+}

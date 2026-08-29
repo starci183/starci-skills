@@ -1,77 +1,16 @@
 {
-  "schemaVersion": 6,
+  "schemaVersion": 7,
   "id": "deployment/proof",
   "domain": "deployment",
+  "job": "Prove one release's final public steady state from exact evidence.",
   "inputSchema": "input.schema.json",
   "outputSchema": "output.schema.json",
-  "knowledgeRefs": [
-    "deployment.lifecycle"
-  ],
   "sourceReferenceRefs": [],
-  "accepts": [
-    {
-      "stage": "deployment.proof",
-      "status": "ready",
-      "allFacts": [
-        "deployment-steady"
-      ],
-      "noneFacts": [
-        "deployment-rolled-back"
-      ]
-    },
-    {
-      "stage": "deployment.proof",
-      "status": "ready",
-      "allFacts": [
-        "deployment-rolled-back"
-      ],
-      "noneFacts": [
-        "deployment-steady"
-      ]
-    }
-  ],
-  "emits": [
-    {
-      "stage": "delivery.proved",
-      "status": "ready",
-      "factsAdd": [
-        "delivery-proof-ready"
-      ],
-      "factsRemove": []
-    },
-    {
-      "stage": "deployment.rolled-back",
-      "status": "complete",
-      "factsAdd": [
-        "deployment-rollback-proved"
-      ],
-      "factsRemove": [
-        "deployment-rollback-required"
-      ]
-    },
-    {
-      "stage": "deployment.blocked",
-      "status": "blocked",
-      "factsAdd": [
-        "deployment-proof-external-error"
-      ],
-      "factsRemove": []
-    },
-    {
-      "stage": "deployment.blocked",
-      "status": "blocked",
-      "factsAdd": [
-        "deployment-proof-blocked"
-      ],
-      "factsRemove": []
-    }
-  ],
   "sideEffects": [
-    "keep input, output, context, observations, and receipts in task-session memory only",
-    "purge all intermediate session objects at every parent-skill terminal state"
+    "read only the supplied exact references"
   ],
   "stopConditions": [
-    "required evidence is missing or stale",
-    "the result would cross the declared boundary"
+    "an exact reference is missing or its fingerprint differs",
+    "the requested work exceeds this operator job"
   ]
 }

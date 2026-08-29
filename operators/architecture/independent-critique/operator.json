@@ -1,38 +1,16 @@
 {
-  "schemaVersion": 6,
+  "schemaVersion": 7,
   "id": "architecture/independent-critique",
   "domain": "architecture",
+  "job": "Independently critique one architecture proposal using exact evidence.",
   "inputSchema": "input.schema.json",
   "outputSchema": "output.schema.json",
-  "knowledgeRefs": [
-    "architecture.decision-analysis"
-  ],
   "sourceReferenceRefs": [],
-  "accepts": [
-    {
-      "stage": "architecture.v61.independent-critique",
-      "status": "ready",
-      "allFacts": [],
-      "noneFacts": []
-    }
-  ],
-  "emits": [
-    {
-      "stage": "architecture.v61.independent-critique.complete",
-      "status": "ready",
-      "factsAdd": [
-        "architecture-independent-critique-ready"
-      ],
-      "factsRemove": []
-    }
-  ],
   "sideEffects": [
-    "keep artifacts and observations in task-session memory only",
-    "purge intermediate session objects at every parent-skill terminal state"
+    "read only the supplied exact references"
   ],
   "stopConditions": [
-    "required evidence is missing, stale or contradictory",
-    "The critic receives artifacts and counter-evidence only, never the author reasoning trace, and cannot accept open blockers.",
-    "source observations would be treated as target authority"
+    "an exact reference is missing or its fingerprint differs",
+    "the requested work exceeds this operator job"
   ]
 }

@@ -1,25 +1,16 @@
 {
-  "schemaVersion": 6,
+  "schemaVersion": 7,
   "id": "fe/context-sync",
   "domain": "fe",
+  "job": "context sync one closed frontend target.",
   "inputSchema": "input.schema.json",
   "outputSchema": "output.schema.json",
-  "knowledgeRefs": [],
+  "contextRefs": [],
   "sourceReferenceRefs": [],
-  "accepts": [{ "stage": "layout.generate", "status": "ready", "allFacts": ["state-model-ready", "business-fresh-receipt-ready"], "noneFacts": [] }],
-  "emits": [
-    { "stage": "source-fit.resolve", "status": "ready", "factsAdd": ["frontend-coding-context-ready", "design-knowledge-index-ready", "grammar-pair-ready"], "factsRemove": [] },
-    { "stage": "source-fit.resolve", "status": "blocked", "factsAdd": ["frontend-context-sync-blocked"], "factsRemove": [] }
-  ],
-  "sideEffects": [
-    "publish one canonical generated JSON snapshot below .worktrees/<project>/coding-context/frontend only when its generation hash changes",
-    "upsert only changed Principles, Common Grammar, selected Grammar, and frontend coding-context records to one project-scoped Qdrant generation",
-    "never index raw source or treat Qdrant as canonical authority"
-  ],
+  "sideEffects": [],
   "stopConditions": [
-    "Common and exactly one selected Grammar are not pinned",
-    "exporter, schema, config, route, or source identities are invalid",
-    "generated JSON validation or atomic publication fails",
-    "Qdrant activation would expose a mixed or cross-project generation"
+    "required authority or evidence is missing or stale",
+    "the closed target boundary is ambiguous",
+    "completion would require another operator job"
   ]
 }

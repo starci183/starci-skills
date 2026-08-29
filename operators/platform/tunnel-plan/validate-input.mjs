@@ -1,15 +1,18 @@
-import path from 'node:path';
-import { runValidatorCli, validatorFor } from '../../validation.mjs';
-const profiles = { economical: 'orchestration/modes/economical.json', balanced: 'orchestration/modes/balanced.json', parallel: 'orchestration/modes/parallel.json' };
-function refs(value, found = []) { if (typeof value === 'string' && value.startsWith('session://')) found.push(value); else if (Array.isArray(value)) for (const item of value) refs(item, found); else if (value && typeof value === 'object') for (const item of Object.values(value)) refs(item, found); return found; }
-function semantic(value) {
-  const errors = [], provided = Object.values(value.payload.provided).sort(), artifacts = value.payload.loads.artifacts.map((item) => item.ref).sort();
-  if (JSON.stringify(provided) !== JSON.stringify(artifacts)) errors.push('$.payload.loads.artifacts: exact provided bindings required');
-  if (JSON.stringify(value.payload.loads.knowledge.map((item) => item.id)) !== JSON.stringify(['platform.tunnel'])) errors.push('$.payload.loads.knowledge: exact ordered knowledge binding required');
-  const { orchestration, source } = value.payload.loads; if (orchestration.profileRef !== profiles[orchestration.mode]) errors.push('$.payload.loads.orchestration.profileRef: must match mode');
-  const paths = source.targetFiles.map((item) => item.path.replaceAll('\\', '/')); if (source.repositoryContext !== false || source.loadMode !== 'exact-files') errors.push('$.payload.loads.source: broad context forbidden');
-  if (new Set(paths).size !== paths.length) errors.push('$.payload.loads.source.targetFiles: duplicate normalized path'); paths.forEach((item, index) => { if (path.isAbsolute(item) || item === '..' || item.startsWith('../') || item.includes('/../')) errors.push(`$.payload.loads.source.targetFiles[${index}].path: unsafe path`); });
-  const prefix = `session://tasks/${value.payload.session.taskId}/`; for (const ref of refs(value.payload)) if (!ref.startsWith(prefix)) errors.push(`$: foreign session ref ${ref}`); return errors;
-}
+import { validatorFor, runValidatorCli } from '../../validation.mjs';
+
+const semantic = (value) => {
+  const errors = [];
+  const { authority, observedState } = value.context;
+  const requested = value.input.requestedIngress;
+  for (const [name, resource] of [['tunnel', observedState.tunnel], ['dns', observedState.dns], ['route', observedState.route]]) {
+    if (resource && resource.owner !== authority.owner) errors.push(`/context/observedState/${name}/owner: conflicts with declared authority`);
+  }
+  if (observedState.tunnel && observedState.tunnel.tunnelId !== requested.tunnelId) errors.push('/context/observedState/tunnel/tunnelId: exceeds requested tunnel');
+  if (observedState.dns && observedState.dns.hostname !== requested.hostname) errors.push('/context/observedState/dns/hostname: exceeds requested hostname');
+  if (observedState.route && observedState.route.hostname !== requested.hostname) errors.push('/context/observedState/route/hostname: exceeds requested hostname');
+  return errors;
+};
+
 export const validateInput = validatorFor(new URL('./input.schema.json', import.meta.url), semantic);
-if (process.argv[1]?.endsWith('validate-input.mjs')) await runValidatorCli(validateInput, 'node validate-input.mjs <artifact.json>');
+
+if (process.argv[1]?.endsWith('validate-input.mjs')) await runValidatorCli(validateInput, 'node validate-input.mjs <input.json>');

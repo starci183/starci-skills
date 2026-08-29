@@ -37,7 +37,7 @@
     },
     "durableWorktree": {
       "commit": "inside-own-checkout-only",
-      "paths": [".worktrees/<project>/<kind>/**"],
+      "paths": [".worktrees/<kind>/**"],
       "rule": "The Source repository never tracks the container. Approved product or authority changes are committed by the worktree's own Git repository and branch."
     },
     "ephemeralWorktree": {
@@ -58,7 +58,7 @@
     "runtimeState": {
       "commit": false,
       "paths": [".sessions/**", ".workspaces/local/state/**", ".workspaces/local/routes/**"],
-      "rule": "Qdrant generations, Caddy config, virtual environments, PIDs, receipts, caches and absolute routes are local-only."
+      "rule": "Generated runtime config, virtual environments, PIDs, receipts, caches and absolute routes are local-only."
     },
     "encryptedDeviceState": {
       "commit": false,
@@ -85,7 +85,7 @@
     "Create or verify declared worktrees and clean reference checkouts.",
     "Run npm run sync to decrypt local secret twins and reconstruct declared private gitmounts without per-device GitHub login.",
     "Fetch the latest compatible encrypted device-state release; restore only into absent or explicitly approved replaceable Docker volumes.",
-    "Rebuild Qdrant generations, Caddy and MCP state.",
-    "Run Source readiness and reference_search proof before product work."
+    "Rebuild declared runtime state without a derived search index.",
+    "Run Source readiness and prove default search against one exact canonical reference before product work."
   ]
 }

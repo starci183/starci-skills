@@ -1,5 +1,11 @@
 # `fe/ui-detail-freeze` input
 
-## JSON architecture
+## Context
 
-`payload.provided` binds one approved direction, one approved flow, its approved interaction-container plan, page identities, and Grammar package. `payload.loads` binds only the generated frontend-context revision and exact composition, Grammar, and container knowledge. `payload.session` is task-internal and purged at skill-terminal.
+- `context.evidenceRefs`: Exact canonical evidence references available to this atomic job.
+- `context.authorityRevision`: Exact approved authority revision binding this invocation.
+
+## Input
+
+- `input.targetRef`: The one target owned by this atomic invocation.
+- `input.constraints`: Closed constraints that bound this job without routing it.

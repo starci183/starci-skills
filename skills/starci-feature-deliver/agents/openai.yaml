@@ -1,0 +1,6 @@
+interface:
+  display_name: "StarCi Feature Deliver"
+  short_description: "Coordinate a proven cross-domain feature"
+  default_prompt: "Use $starci-feature-deliver to deliver this product outcome across its required domains."
+policy:
+  allow_implicit_invocation: true

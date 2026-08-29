@@ -1,0 +1,64 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "operatorId",
+    "context",
+    "input"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "const": 7
+    },
+    "operatorId": {
+      "const": "test/uat-ux-proof"
+    },
+    "context": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "snapshotRef"
+      ],
+      "properties": {
+        "snapshotRef": {
+          "description": "Frozen canonical snapshot.",
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "input": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "evidenceRefs",
+        "browserSessionRef",
+        "accountRef"
+      ],
+      "properties": {
+        "evidenceRefs": {
+          "description": "Exact browser, account, behavior, UX, or UI evidence.",
+          "type": "array",
+          "uniqueItems": true,
+          "maxItems": 128,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "browserSessionRef": {
+          "description": "Exact visible-browser session.",
+          "type": "string",
+          "minLength": 1
+        },
+        "accountRef": {
+          "description": "Fresh isolated account or explicit anonymous identity.",
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    }
+  }
+}

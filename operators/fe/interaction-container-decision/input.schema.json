@@ -1,76 +1,70 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://starci.dev/v6/operators/fe/interaction-container-decision/input.schema.json",
+  "$id": "https://starci.dev/v7.0/operators/fe/interaction-container-decision/input.schema.json",
   "type": "object",
   "additionalProperties": false,
-  "required": ["schemaVersion", "runId", "stage", "status", "facts", "payload"],
+  "required": [
+    "schemaVersion",
+    "operatorId",
+    "context",
+    "input"
+  ],
   "properties": {
-    "schemaVersion": { "const": 6 },
-    "runId": { "type": "string", "minLength": 1 },
-    "stage": { "const": "ux.flow.container-decision" },
-    "status": { "const": "ready" },
-    "facts": { "type": "array", "uniqueItems": true, "items": { "type": "string" } },
-    "payload": {
+    "schemaVersion": {
+      "const": 7
+    },
+    "operatorId": {
+      "const": "fe/interaction-container-decision"
+    },
+    "context": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["provided", "loads", "session"],
+      "required": [
+        "evidenceRefs",
+        "authorityRevision"
+      ],
       "properties": {
-        "provided": {
-          "type": "object",
-          "additionalProperties": false,
-          "required": ["objectiveRef", "approvedDirectionRef", "uxFlowRef", "interactionRefs"],
-          "properties": {
-            "objectiveRef": { "$ref": "#/$defs/ref" },
-            "approvedDirectionRef": { "$ref": "#/$defs/ref" },
-            "uxFlowRef": { "$ref": "#/$defs/ref" },
-            "interactionRefs": { "type": "array", "minItems": 1, "uniqueItems": true, "items": { "$ref": "#/$defs/ref" } }
-          }
+        "evidenceRefs": {
+          "description": "Exact canonical evidence references available to this atomic job.",
+          "type": "array",
+          "maxItems": 64,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "minItems": 1
         },
-        "loads": {
-          "type": "object",
-          "additionalProperties": false,
-          "required": ["knowledge", "orchestration"],
-          "properties": {
-            "knowledge": { "type": "array", "minItems": 1, "maxItems": 1, "items": { "$ref": "#/$defs/binding" } },
-            "orchestration": { "$ref": "#/$defs/orchestration" }
-          }
-        },
-        "session": { "$ref": "#/$defs/session" }
-      }
-    }
-  },
-  "$defs": {
-    "ref": { "type": "string", "minLength": 1 },
-    "hash": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
-    "binding": {
-      "type": "object",
-      "additionalProperties": false,
-      "required": ["id", "generation", "contentSha256"],
-      "properties": {
-        "id": { "const": "fe.interaction-container-selection" },
-        "generation": { "type": "string", "minLength": 1 },
-        "contentSha256": { "$ref": "#/$defs/hash" }
+        "authorityRevision": {
+          "description": "Exact approved authority revision binding this invocation.",
+          "type": "string",
+          "minLength": 1
+        }
       }
     },
-    "orchestration": {
+    "input": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["mode", "workerCount"],
+      "required": [
+        "targetRef",
+        "constraints"
+      ],
       "properties": {
-        "mode": { "enum": ["economical", "balanced", "parallel", "deep"] },
-        "workerCount": { "type": "integer", "minimum": 1, "maximum": 5 }
-      }
-    },
-    "session": {
-      "type": "object",
-      "additionalProperties": false,
-      "required": ["taskId", "inputRef", "outputRef", "scratchPrefix", "retention"],
-      "properties": {
-        "taskId": { "$ref": "#/$defs/ref" },
-        "inputRef": { "$ref": "#/$defs/ref" },
-        "outputRef": { "$ref": "#/$defs/ref" },
-        "scratchPrefix": { "$ref": "#/$defs/ref" },
-        "retention": { "const": "until-skill-terminal" }
+        "targetRef": {
+          "description": "The one target owned by this atomic invocation.",
+          "type": "string",
+          "minLength": 1
+        },
+        "constraints": {
+          "description": "Closed constraints that bound this job without routing it.",
+          "type": "array",
+          "maxItems": 64,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
       }
     }
   }

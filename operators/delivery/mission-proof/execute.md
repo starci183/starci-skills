@@ -1,17 +1,21 @@
-# Execute `delivery/mission-proof`
+# Execute delivery/mission-proof
 
-## Step 1 — Bind role proofs
+## Context
 
-**Read:** Validate the mission, impact, product-proof and optional backend-proof receipts.
+Read only the closed context fields and declared context references.
 
-**Context:** Require backend proof exactly when the impact receipt names the backend role; reject unrelated or extra role claims.
+## Input
 
-## Step 2 — Join delivery evidence
+Use the exact closed input for this one job.
 
-Verify final routed source heads, approved business identity and proof coverage, then emit one immutable mission-delivery proof for business reconciliation.
+## Action
 
-**Session write:** Store the joined proof receipt and exact contributing evidence refs until the parent skill terminates.
+Perform exactly one mission proof job. Do not route, loop, wait, branch to another operator, or retain session state.
 
-**Stop:** Block on a missing required proof, stale source head, conflicting authority or unclassified role.
+## Output
 
-The orchestration profile may parallelize independent proof verification; joining and emitting the mission result remains deterministic.
+Return one typed output.outcome and bounded evidence. The parent Skill machine owns routing.
+
+## Stop
+
+Stop on a declared condition or before exceeding the exact mutation boundary.

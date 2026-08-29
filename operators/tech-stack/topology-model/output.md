@@ -1,5 +1,8 @@
 # `tech-stack/topology-model` output
 
-## JSON architecture
-
-`state` is the machine-routing decision. `produced` returns stackModelRef, stackModelSha256 as immutable session references, with context lineage, evidence and findings. Scratch state is purged at the parent skill-terminal after any required handoff acknowledgement.
+- `output.outcome`: `ready`, `revise`, or `blocked`.
+- `output.stackModelRef`: candidate model reference, else null.
+- `output.stackModelSha256`: candidate model hash, else null.
+- `output.evidenceRefs`: exact evidence used by the model.
+- `output.contradictions`: structured model contradictions.
+- `output.reason`: revision or blocker explanation, otherwise null.

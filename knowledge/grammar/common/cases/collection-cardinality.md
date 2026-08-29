@@ -6,7 +6,7 @@
 | Package | `@starci/grammar/common` |
 | Operators | `grammar-convergence` |
 | Search tags | `collection, zero one many, repeated rows, long content, mixed rows` |
-| Dependencies | `fe.grammar-common-contracts, fe.grammar-common-states-accessibility` |
+| Dependencies | `fe.grammar-common-capabilities, fe.grammar-common-states-accessibility` |
 
 ## Trigger
 
@@ -24,7 +24,7 @@ For unbounded data, use only the package-declared pagination, virtualization, cl
 
 ## Required states
 
-Cover loading, empty, one, many, partial, stale, and error. Preserve already usable rows during partial resolution when the contract supports it.
+Cover loading, empty, one, many, partial, stale, and error. Preserve already usable rows during partial resolution when the interface supports it.
 
 ## Responsive behavior
 

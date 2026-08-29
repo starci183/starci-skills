@@ -1,50 +1,16 @@
 {
-  "schemaVersion": 6,
+  "schemaVersion": 7,
   "id": "deployment/execution-root-init",
   "domain": "deployment",
+  "job": "Initializes the ignored rebuildable deployment execution root.",
   "inputSchema": "input.schema.json",
   "outputSchema": "output.schema.json",
-  "knowledgeRefs": [
-    "deployment.lifecycle"
-  ],
   "sourceReferenceRefs": [],
-  "accepts": [
-    {
-      "stage": "deployment.execute",
-      "status": "ready",
-      "allFacts": [
-        "deployment-plan-ready"
-      ],
-      "noneFacts": []
-    },
-    {
-      "stage": "deployment.review",
-      "status": "approved",
-      "allFacts": [
-        "deployment-plan-approved"
-      ],
-      "noneFacts": []
-    }
-  ],
-  "emits": [
-    {
-      "stage": "deployment.credentials",
-      "status": "ready",
-      "factsAdd": [
-        "deployment-execution-root-ready"
-      ],
-      "factsRemove": []
-    }
-  ],
   "sideEffects": [
-    "initialize ignored rebuildable .infra execution root",
-    "keep all intermediate data in task-session memory only",
-    "purge every intermediate session object at each parent-skill terminal state"
+    "initialize ignored rebuildable .infra execution root"
   ],
   "stopConditions": [
-    "required evidence is missing or stale",
-    "the result would cross the declared boundary",
-    "intermediate data would persist outside the task session",
-    "broad source context, an undeclared command or resource, or a raw secret would be loaded"
+    "an exact reference is missing or its fingerprint differs",
+    "the requested work exceeds this operator job"
   ]
 }

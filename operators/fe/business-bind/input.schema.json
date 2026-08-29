@@ -1,0 +1,81 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://starci.dev/v7/operators/fe/business-bind/input.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "operatorId",
+    "context",
+    "input"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "const": 7
+    },
+    "operatorId": {
+      "const": "fe/business-bind"
+    },
+    "context": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "authorityRefs",
+        "evidenceRefs",
+        "uiKnowledgeId"
+      ],
+      "properties": {
+        "authorityRefs": {
+          "description": "Exact frozen authority references for this job.",
+          "type": "array",
+          "uniqueItems": true,
+          "maxItems": 64,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "minItems": 1
+        },
+        "evidenceRefs": {
+          "description": "Exact evidence references for this job.",
+          "type": "array",
+          "uniqueItems": true,
+          "maxItems": 64,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "uiKnowledgeId": {
+          "description": "Exact StarCi-native frontend UI knowledge binding.",
+          "const": "fe.ui"
+        }
+      }
+    },
+    "input": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "targetRef",
+        "constraints"
+      ],
+      "properties": {
+        "targetRef": {
+          "description": "The one target owned by this invocation.",
+          "type": "string",
+          "minLength": 1
+        },
+        "constraints": {
+          "description": "Closed constraints for this atomic job.",
+          "type": "array",
+          "uniqueItems": true,
+          "maxItems": 64,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    }
+  }
+}

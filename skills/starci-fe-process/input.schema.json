@@ -1,0 +1,298 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://starci.dev/v7/skills/starci-fe-process/input.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "runId",
+    "project",
+    "selection",
+    "intent",
+    "objective",
+    "targetHints",
+    "authorityRefs",
+    "resume",
+    "returnReceipt",
+    "progressHistory",
+    "mutationAuthorizationRef",
+    "verifiedFrontendRoute",
+    "exactFiles",
+    "approvedContractFingerprint",
+    "receiptType"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "const": 7
+    },
+    "runId": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9._-]+$"
+    },
+    "project": {
+      "type": "string",
+      "pattern": "^[a-z0-9][a-z0-9-]*$"
+    },
+    "selection": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "analyzerVersion",
+        "skillId",
+        "confidence",
+        "interactionPolicy",
+        "activeInputRefs",
+        "passiveContextRefs"
+      ],
+      "properties": {
+        "analyzerVersion": {
+          "const": 2
+        },
+        "skillId": {
+          "const": "starci-fe-process"
+        },
+        "confidence": {
+          "enum": [
+            "exact",
+            "clarified"
+          ]
+        },
+        "interactionPolicy": {
+          "const": "ask-only-when-stuck"
+        },
+        "activeInputRefs": {
+          "type": "array",
+          "uniqueItems": true,
+          "maxItems": 16,
+          "items": {
+            "type": "string",
+            "minLength": 3,
+            "maxLength": 512
+          }
+        },
+        "passiveContextRefs": {
+          "type": "array",
+          "uniqueItems": true,
+          "maxItems": 16,
+          "items": {
+            "type": "string",
+            "minLength": 3,
+            "maxLength": 512
+          }
+        }
+      }
+    },
+    "intent": {
+      "enum": [
+        "create",
+        "audit",
+        "repair",
+        "redesign",
+        "debug",
+        "reconcile"
+      ]
+    },
+    "objective": {
+      "type": "string",
+      "minLength": 1
+    },
+    "targetHints": {
+      "type": "array",
+      "uniqueItems": true,
+      "maxItems": 64,
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "authorityRefs": {
+      "type": "array",
+      "uniqueItems": true,
+      "maxItems": 64,
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "resume": {
+      "anyOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "missionRef",
+            "fromSkillId",
+            "receiptRef",
+            "resumeState"
+          ],
+          "properties": {
+            "missionRef": {
+              "type": "string",
+              "minLength": 1
+            },
+            "fromSkillId": {
+              "enum": [
+                "starci-business-process",
+                "starci-backend-process",
+                "starci-quality-assure",
+                "starci-uat-verify",
+                "user-choice"
+              ]
+            },
+            "receiptRef": {
+              "type": "string",
+              "minLength": 1
+            },
+            "resumeState": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "returnReceipt": {
+      "description": "Typed runtime RETURN receipt for executable resume.",
+      "anyOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "version",
+            "receiptId",
+            "type",
+            "missionId",
+            "skillId",
+            "operatorId",
+            "parentId",
+            "childId",
+            "timestamp",
+            "progressFingerprint",
+            "trace"
+          ],
+          "properties": {
+            "version": {
+              "const": "7.0.0"
+            },
+            "receiptId": {
+              "type": "string",
+              "pattern": "^receipt:[A-Za-z0-9._-]+$"
+            },
+            "type": {
+              "enum": [
+                "CALL",
+                "RETURN",
+                "TRANSITION",
+                "WAIT",
+                "RESUME",
+                "SKIP",
+                "ERROR"
+              ]
+            },
+            "missionId": {
+              "type": "string",
+              "minLength": 1
+            },
+            "skillId": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "operatorId": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "parentId": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "childId": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "timestamp": {
+              "type": "string",
+              "format": "date-time"
+            },
+            "progressFingerprint": {
+              "type": "string",
+              "pattern": "^sha256:[0-9a-f]{64}$"
+            },
+            "trace": {
+              "type": "object"
+            }
+          }
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "progressHistory": {
+      "description": "Closed history used to reject no-progress cycles.",
+      "type": "array",
+      "uniqueItems": true,
+      "maxItems": 256,
+      "items": {
+        "type": "string",
+        "pattern": "^sha256:[0-9a-f]{64}$"
+      }
+    },
+    "mutationAuthorizationRef": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "verifiedFrontendRoute": {
+      "type": "string",
+      "minLength": 1
+    },
+    "exactFiles": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "path",
+          "beforeSha256"
+        ],
+        "properties": {
+          "path": {
+            "type": "string",
+            "minLength": 1
+          },
+          "beforeSha256": {
+            "type": "string",
+            "pattern": "^sha256:[0-9a-f]{64}$"
+          }
+        }
+      }
+    },
+    "approvedContractFingerprint": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "receiptType": {
+      "enum": [
+        "NONE",
+        "RETURN",
+        "RESUME"
+      ]
+    }
+  }
+}

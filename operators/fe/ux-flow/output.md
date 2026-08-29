@@ -1,5 +1,3 @@
 # `fe/ux-flow` output
 
-## JSON architecture
-
-The output state is ready for interaction-container classification or blocked. The artifact records navigable nodes, guarded transitions, recovery, and state behavior without assuming that every node is a page or inline surface. `potentialSignals` marks unapproved persistence or backend needs for typed routing; it never silently changes business or data storage. All session intermediates purge at skill-terminal.
+`output.outcome` states whether synthesis modeled the flow or found a closed blocker. `output.uxFlowGraph` is the one complete graph and is null when blocked. `output.gaps` names exact missing authority and is empty when modeled. `output.evidenceRefs` binds every business, journey, and law source used. The operator never selects another operator, approval step, loop, or terminal.

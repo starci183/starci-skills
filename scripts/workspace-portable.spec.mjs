@@ -52,10 +52,6 @@ function fixture(t) {
     copyFileSync(join(schemaRoot, name), join(source, '.claude', 'readiness', 'initialization', 'workspaces', name));
   }
   mkdirSync(join(source, '.claude', 'skills'), { recursive: true });
-  mkdirSync(join(frontend, 'packages', 'ui', 'src', 'contracts'), { recursive: true });
-  writeFileSync(join(frontend, 'packages', 'ui', 'src', 'contracts', 'index.ts'), 'export {};\n');
-  git(frontend, 'add', 'packages/ui/src/contracts/index.ts');
-  git(frontend, 'commit', '-m', 'contract');
   writeJson(join(source, '.workspaces', 'config.json'), {
     $schema: '../.claude/readiness/initialization/workspaces/config.schema.json',
     schemaVersion: 6,
@@ -67,7 +63,7 @@ function fixture(t) {
     project: 'source',
     role: 'be',
     repository: { kind: 'source', directory: null, gitRepository: 'https://github.com/starci-lab/source.git', branch: 'main' },
-    context: { instructions: [], contract: null, contractSource: null, manifests: ['package.json'], grammar: null, grammarProfile: null }
+    context: { instructions: [], manifests: ['package.json'], grammar: null, grammarProfile: null }
   });
   writeJson(join(source, '.workspaces', 'projects', 'nivo', 'fe.json'), {
     $schema: '../../../.claude/readiness/initialization/workspaces/portable-route.schema.json',
@@ -77,8 +73,6 @@ function fixture(t) {
     repository: { kind: 'sibling', directory: 'nivo-fe', gitRepository: 'https://github.com/starci-lab/nivo-fe.git', branch: 'main' },
     context: {
       instructions: [],
-      contract: 'packages/ui/src/contracts/index.ts',
-      contractSource: 'declared:packages/ui/src/contracts/index.ts',
       manifests: ['package.json'],
       grammarId: 'core'
     }
@@ -162,7 +156,7 @@ test('V6 rejects legacy grammar fields, mixed versions, and non-FE grammar', () 
     project: 'nivo',
     role: 'fe',
     repository: { kind: 'sibling', directory: 'nivo-fe', gitRepository: 'https://github.com/starci-lab/nivo-fe.git', branch: 'main' },
-    context: { instructions: [], contract: null, contractSource: null, manifests: ['package.json'], grammarId: 'core' }
+    context: { instructions: [], manifests: ['package.json'], grammarId: 'core' }
   };
   assert.throws(() => validatePortableRoute({ ...base, version: 1 }), /invalid/);
   assert.throws(() => validatePortableRoute({ ...base, context: { ...base.context, grammar: 'starci' } }), /invalid/);
@@ -184,58 +178,30 @@ test('a failing declaration produces no partial local route writes', (t) => {
 });
 
 test('routes-hydrate accepts safe re-entry and models hard blocks', () => {
-  const prefix = 'session://tasks/workspace-v6/';
   const hash = `sha256:${'0'.repeat(64)}`;
   const input = {
-    schemaVersion: 6,
-    runId: 'workspace-v6',
-    stage: 'workspace.initialization',
-    status: 'ready',
-    facts: ['workspace-declarations-ready', 'workspace-route-initialize-required'],
-    payload: {
-      provided: {
-        compiledDeclarationsRef: `${prefix}compiled`,
-        localRepositoryMapRef: `${prefix}repositories`,
-        routeInitializationEvidenceRef: `${prefix}route-evidence`
-      },
-      loads: {
-        artifacts: ['compiled', 'repositories', 'route-evidence'].map((name) => ({ ref: `${prefix}${name}`, revision: hash, loadMode: 'session-exact' })),
-        knowledge: [{ id: 'workspace.initialization', generation: 'test', contentSha256: hash, loadMode: 'qdrant-exact' }],
-        orchestration: { mode: 'economical', profileRef: 'orchestration/modes/economical.json', providerRef: 'orchestration/providers/openai.json' }
-      },
-      session: {
-        taskId: 'workspace-v6',
-        inputRef: `${prefix}input`,
-        outputRef: `${prefix}output`,
-        scratchPrefix: `${prefix}scratch`,
-        retention: 'until-skill-terminal'
-      }
-    }
+    schemaVersion: 7,
+    operatorId: 'workspace/routes-hydrate',
+    context: {
+      contextRefs: ['.workspaces/projects/source/be.json', '.workspaces/config.json'],
+      sourceRefs: ['D:/Repositories/source']
+    },
+    input: { project: 'source', objectiveRef: 'hydrate verified project-role routes', sourceFingerprint: hash }
   };
   assert.equal(validateHydrateInput(input).valid, true);
   assert.equal(validateHydrateInput({ ...input, stage: 'workspace.routes.hydrate' }).valid, false);
 
   const output = {
-    schemaVersion: 6,
-    runId: 'workspace-v6',
-    stage: 'workspace.blocked',
-    status: 'blocked',
-    facts: ['workspace-routes-hydrate-blocked'],
-    payload: {
-      decision: 'blocked',
-      state: {
-        operator: 'workspace/routes-hydrate',
-        status: 'blocked',
-        code: 'workspace-routes-hydrate-blocked',
-        retryable: false,
-        emits: { stage: 'workspace.blocked', status: 'blocked', factsAdd: ['workspace-routes-hydrate-blocked'] }
-      },
-      produced: { hydrationReceiptRef: null, durableWrites: [] },
-      context: { used: [{ kind: 'session-artifact', ref: `${prefix}route-evidence`, revision: hash }] },
-      cleanup: { scratchRefs: [`${prefix}scratch`], retention: 'until-skill-terminal', purgeAt: 'skill-terminal' },
-      evidenceRefs: [`${prefix}route-evidence`],
-      findings: ['origin mismatch']
+    schemaVersion: 7,
+    operatorId: 'workspace/routes-hydrate',
+    output: {
+      outcome: 'blocked',
+      resultRef: null,
+      evidenceRefs: ['.workspaces/projects/source/be.json'],
+      findings: ['origin mismatch'],
+      reason: 'declared origin does not match the hydrated checkout'
     }
   };
   assert.equal(validateHydrateOutput(output).valid, true);
+  assert.equal(validateHydrateOutput({ ...output, stage: 'workspace.blocked' }).valid, false);
 });

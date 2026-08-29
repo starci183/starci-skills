@@ -1,13 +1,21 @@
 # Execute `core/handoff-emit`
 
-## Step 1 — Bind the objective and producer capability
+## Context
 
-**Read:** only validated declared fields. **Context:** objective, artifact and hash identities only. **Session write:** typed result under the declared output or scratch ref. **Stop:** reject identity, approval, resume, or hash mismatch. **Orchestration:** coordinator-only protocol transition; workers cannot acknowledge or purge artifacts.
+Read only `context.artifacts` and `context.nextCandidates`. Treat every ref and hash as immutable.
 
-## Step 2 — Validate artifacts, candidates, mutation approvals and resume routes
+## Input
 
-**Read:** only validated declared fields. **Context:** objective, artifact and hash identities only. **Session write:** typed result under the declared output or scratch ref. **Stop:** reject identity, approval, resume, or hash mismatch. **Orchestration:** coordinator-only protocol transition; workers cannot acknowledge or purge artifacts.
+Bind the handoff to `input.objectiveId`, `input.fromCapability`, and `input.terminalCode`.
 
-## Step 3 — Emit the immutable handoff and register ACK-bound retention
+## Action
 
-**Read:** only validated declared fields. **Context:** objective, artifact and hash identities only. **Session write:** typed result under the declared output or scratch ref. **Stop:** reject identity, approval, resume, or hash mismatch. **Orchestration:** coordinator-only protocol transition; workers cannot acknowledge or purge artifacts.
+Serialize one immutable handoff containing the objective, producer terminal, exact artifacts, and allowed continuation candidates. Register the artifact refs for runtime retention until acknowledgement.
+
+## Output
+
+Return `output.outcome`, `output.handoffRef`, `output.handoffSha256`, `output.retainedArtifactRefs`, `output.evidenceRefs`, and `output.reason`.
+
+## Stop
+
+Return `blocked` before emission on an artifact mismatch, duplicate identity, missing resume identity, or missing mutation approval.

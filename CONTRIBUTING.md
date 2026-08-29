@@ -6,7 +6,6 @@ Requires Node.js 20 or newer and Python 3.11 or newer.
 
 ```bash
 npm ci
-python -m pip install -r runtime/knowledge-runtime/requirements.txt
 npm test
 ```
 

@@ -1,38 +1,16 @@
 {
-  "schemaVersion": 6,
+  "schemaVersion": 7,
   "id": "be/mutation-contract",
   "domain": "be",
+  "job": "Freeze one backend mutation contract with exact writer, store, transaction, migration, and proof boundaries.",
   "inputSchema": "input.schema.json",
   "outputSchema": "output.schema.json",
-  "knowledgeRefs": [
-    "be.plan-compilation"
-  ],
   "sourceReferenceRefs": [],
-  "accepts": [
-    {
-      "stage": "be.v61.mutation-contract",
-      "status": "ready",
-      "allFacts": [],
-      "noneFacts": []
-    }
-  ],
-  "emits": [
-    {
-      "stage": "be.v61.mutation-contract.complete",
-      "status": "ready",
-      "factsAdd": [
-        "be-mutation-contract-ready"
-      ],
-      "factsRemove": []
-    }
-  ],
   "sideEffects": [
-    "keep artifacts and observations in task-session memory only",
-    "purge intermediate session objects at every parent-skill terminal state"
+    "read only the supplied exact references"
   ],
   "stopConditions": [
-    "required evidence is missing, stale or contradictory",
-    "Every write matches the target writer, physical store, database.schema.resource and connection token.",
-    "source observations would be treated as target authority"
+    "an exact reference is missing or its fingerprint differs",
+    "the requested work exceeds this operator job"
   ]
 }

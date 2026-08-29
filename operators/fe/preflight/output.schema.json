@@ -1,90 +1,90 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://starci.dev/v6/operators/fe/preflight/output.schema.json",
-  "title": "fe/preflight operator output",
+  "$id": "https://starci.dev/v7.0/operators/fe/preflight/output.schema.json",
   "type": "object",
   "additionalProperties": false,
-  "required": ["schemaVersion", "runId", "stage", "status", "facts", "payload"],
+  "required": [
+    "schemaVersion",
+    "operatorId",
+    "output"
+  ],
   "properties": {
-    "schemaVersion": { "const": 6 },
-    "runId": { "type": "string", "minLength": 1 },
-    "stage": { "const": "flow.generate" },
-    "status": { "const": "ready" },
-    "facts": { "type": "array", "uniqueItems": true, "items": { "type": "string", "minLength": 1 } },
-    "payload": {
+    "schemaVersion": {
+      "const": 7
+    },
+    "operatorId": {
+      "const": "fe/preflight"
+    },
+    "output": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["decision", "state", "produced", "context", "cleanup", "evidenceRefs", "findings"],
+      "required": [
+        "outcome",
+        "result",
+        "gaps",
+        "evidenceRefs"
+      ],
       "properties": {
-        "decision": { "const": "preflight-ready" },
-        "state": {
-          "type": "object",
-          "additionalProperties": false,
-          "required": ["operator", "status", "code", "retryable", "emits"],
-          "properties": {
-            "operator": { "const": "fe/preflight" },
-            "status": { "const": "completed" },
-            "code": { "const": "fe-preflight-ready" },
-            "retryable": { "const": false },
-            "emits": {
+        "outcome": {
+          "description": "Legacy semantic result consumed only by the Skill machine.",
+          "enum": [
+            "completed",
+            "blocked"
+          ]
+        },
+        "result": {
+          "description": "The atomic job result, or null when blocked.",
+          "anyOf": [
+            {
               "type": "object",
               "additionalProperties": false,
-              "required": ["stage", "status", "factsAdd", "factsRemove"],
+              "required": [
+                "summary",
+                "artifactRefs"
+              ],
               "properties": {
-                "stage": { "const": "flow.generate" },
-                "status": { "const": "ready" },
-                "factsAdd": { "type": "array", "minItems": 2, "uniqueItems": true, "items": { "type": "string", "minLength": 1 } },
-                "factsRemove": { "type": "array", "maxItems": 0 }
-              }
-            }
-          }
-        },
-        "produced": {
-          "type": "object",
-          "additionalProperties": false,
-          "required": ["preflightReceiptRef", "frozenScopeRef"],
-          "properties": {
-            "preflightReceiptRef": { "$ref": "#/$defs/sessionRef" },
-            "frozenScopeRef": { "$ref": "#/$defs/sessionRef" }
-          }
-        },
-        "context": {
-          "type": "object",
-          "additionalProperties": false,
-          "required": ["used"],
-          "properties": {
-            "used": {
-              "type": "array",
-              "minItems": 3,
-              "maxItems": 3,
-              "uniqueItems": true,
-              "items": {
-                "type": "object",
-                "additionalProperties": false,
-                "required": ["kind", "ref", "revision"],
-                "properties": {
-                  "kind": { "enum": ["request-receipt", "workspace-route-receipt", "business-freshness-receipt"] },
-                  "ref": { "type": "string", "minLength": 1 },
-                  "revision": { "type": "string", "minLength": 1 }
+                "summary": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "artifactRefs": {
+                  "type": "array",
+                  "maxItems": 64,
+                  "uniqueItems": true,
+                  "items": {
+                    "type": "string",
+                    "minLength": 1
+                  }
                 }
               }
+            },
+            {
+              "type": "null"
             }
+          ]
+        },
+        "gaps": {
+          "description": "Exact missing authority or evidence; empty when complete.",
+          "type": "array",
+          "maxItems": 32,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1
           }
         },
-        "cleanup": {
-          "type": "object",
-          "additionalProperties": false,
-          "required": ["scratchRefs", "retention", "purgeAt"],
-          "properties": {
-            "scratchRefs": { "type": "array", "uniqueItems": true, "items": { "$ref": "#/$defs/sessionRef" } },
-            "retention": { "const": "until-skill-terminal" },
-            "purgeAt": { "const": "skill-terminal" }
-          }
-        },
-        "evidenceRefs": { "type": "array", "minItems": 3, "uniqueItems": true, "items": { "$ref": "#/$defs/sessionRef" } },
-        "findings": { "type": "array", "maxItems": 0 }
+        "evidenceRefs": {
+          "description": "Exact evidence used to produce the result.",
+          "type": "array",
+          "maxItems": 64,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "minItems": 1
+        }
       }
     }
-  },
-  "$defs": { "sessionRef": { "type": "string", "pattern": "^session://tasks/[A-Za-z0-9._-]+/.+$" } }
+  }
 }

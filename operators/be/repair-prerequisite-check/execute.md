@@ -1,23 +1,21 @@
 # Execute `be/repair-prerequisite-check`
 
-## Step 1 — Validate and freeze
+## Context
 
-**Read:** complete input envelope. **Context:** none. Validate before resolving any reference. **Session write:** validated input ref. **Stop:** invalid or foreign task input.
+Resolve only `context.contextRefs` with default repository or file search and open only `context.sourceRefs`. Verify every source reference against `input.sourceFingerprint`. Resolve the project backend Source through the runtime Source `<Source>/.workspaces` route. Durable roots are flat `.worktrees/_templates/`, `.worktrees/businesses/`, `.worktrees/uat/`, `.worktrees/sessions/`, and `.worktrees/debts/`; never use `.worktrees/<project>/`. Search the verified routed source directly with default repository or file search; do not create a derived source cache or external index.
 
-## Step 2 — Resolve metadata
+## Input
 
-Resolve exactly the declared route, business, boundary and repair-finding metadata into task-session scratch storage.
+Bind all work to `input.project` and `input.objectiveRef`.
 
-## Step 3 — Compare prerequisite identities
+## Action
 
-Compare project/role/route identity, business authority and revision, boundary/approval plan hashes, baseline commit and finding boundary revision.
+Check whether one backend repair has the exact route, business authority, and replanning prerequisites. Do not route subsequent work, persist task-session material, broaden the source boundary, or perform another operator's job.
 
-## Step 4 — Classify
+## Output
 
-Emit exactly one typed decision. Do not repair or broaden any prerequisite here.
+Return only `output.outcome`, `output.resultRef`, `output.evidenceRefs`, `output.findings`, and `output.reason`.
 
-## Step 5 — Validate output and cleanup
+## Stop
 
-Validate the output and register all scratch references for terminal purge.
-
-**Context:** no undeclared binding is allowed. **Session write:** output and evidence refs only. **Stop:** invalid or partially joined output. Orchestration is deterministic and sequential; no worker or model fan-out is permitted.
+Return the applicable non-success outcome when exact evidence is missing, fingerprints drift, or completing the job would exceed its boundary.

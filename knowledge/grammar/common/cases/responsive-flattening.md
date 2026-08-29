@@ -6,7 +6,7 @@
 | Package | `@starci/grammar/common` |
 | Operators | `grammar-convergence` |
 | Search tags | `responsive, flatten surface, mobile, reading order, focus order, reflow` |
-| Dependencies | `fe.grammar-common-contracts, fe.grammar-common-states-accessibility` |
+| Dependencies | `fe.grammar-common-capabilities, fe.grammar-common-states-accessibility` |
 
 ## Trigger
 

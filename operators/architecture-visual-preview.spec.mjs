@@ -2,112 +2,78 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { validateOutput } from './architecture/decision-challenge/validate-output.mjs';
 
-const hash = (character) => `sha256:${character.repeat(64)}`;
-const session = 'session://tasks/architecture-task/';
+const reviewRef = 'artifact://architecture/review.html';
+const requiredScenarios = ['normal', 'retry', 'concurrency', 'outage', 'rollback'];
 
 function validOutput() {
-  const previewRef = `${session}architecture-review.html`;
-  const optionSetSha256 = hash('a');
-  const optionSetRevision = optionSetSha256.slice('sha256:'.length);
   return {
-    schemaVersion: 6,
-    runId: 'architecture-run',
-    stage: 'architecture.decision.handoff',
-    status: 'ready',
-    facts: ['architecture-challenge-ready', 'architecture-visual-preview-ready'],
-    payload: {
-      decision: 'ready',
-      challengeSummary: {
-        stance: 'falsification-first',
-        verdict: 'ready',
-        assumptionIds: ['assumption.single-writer'],
-        counterexampleIds: ['counterexample.duplicate-delivery'],
-        rejectedOptionIds: ['event-ledger'],
-        failureModeIds: ['failure.partial-commit'],
-        falsificationTestIds: ['test.outbox-loss'],
-        operationalSurpriseIds: ['surprise.green-health-backlog'],
-        unresolvedCriticalIds: [],
-        recommendationChanged: false
-      },
-      reviewPreview: {
-        renderer: 'visualize',
-        mediaType: 'text/html',
-        artifactRef: previewRef,
-        contentSha256: hash('b'),
-        optionSetSha256,
-        optionIds: ['postgres-outbox', 'event-ledger'],
-        recommendedOptionId: 'postgres-outbox',
-        scenarioIds: ['normal', 'retry', 'concurrency', 'outage', 'rollback'],
-        approvalCommands: [
-          { decisionId: 'postgres-outbox', command: `OK ARCHITECTURE postgres-outbox@${optionSetRevision}` },
-          { decisionId: 'event-ledger', command: `OK ARCHITECTURE event-ledger@${optionSetRevision}` }
-        ],
-        interactive: true
-      },
-      state: {
-        operator: 'architecture/decision-challenge',
-        status: 'completed',
-        code: 'architecture-decision-challenge-ready',
-        retryable: false,
-        emits: {
-          stage: 'architecture.decision.handoff',
-          status: 'ready',
-          factsAdd: ['architecture-challenge-ready', 'architecture-visual-preview-ready']
-        }
-      },
-      produced: {
-        challengeReceiptRef: `${session}challenge-receipt`,
-        reviewArtifactRef: previewRef,
-        durableWrites: []
-      },
-      context: {
-        used: [{ kind: 'session-artifact', ref: `${session}option-set`, revision: optionSetSha256 }]
-      },
-      cleanup: {
-        scratchRefs: [previewRef],
-        retention: 'until-skill-terminal',
-        purgeAt: 'skill-terminal'
-      },
-      evidenceRefs: [previewRef],
-      findings: []
+    schemaVersion: 7,
+    operatorId: 'architecture/decision-challenge',
+    output: {
+      outcome: 'ready',
+      resultRef: reviewRef,
+      evidenceRefs: [reviewRef, 'evidence://architecture/challenge'],
+      findings: [
+        'renderer:visualize',
+        'media-type:text/html',
+        'interactive:true',
+        ...requiredScenarios.map((id) => `scenario:${id}`),
+        'recommended-option:postgres-outbox',
+        'approval-command:postgres-outbox',
+        'approval-command:event-ledger',
+        'rejected-option:event-ledger'
+      ],
+      reason: null
     }
   };
 }
 
+function validateReview(value) {
+  const base = validateOutput(value);
+  if (!base.valid) return base;
+  const { outcome, resultRef, evidenceRefs, findings } = value.output;
+  const errors = [];
+  if (outcome === 'ready') {
+    if (!resultRef?.endsWith('.html') || !findings.includes('renderer:visualize') || !findings.includes('interactive:true')) errors.push('visualize artifact binding is incomplete');
+    if (!evidenceRefs.includes(resultRef)) errors.push('resultRef must be registered in evidenceRefs');
+    for (const id of requiredScenarios) if (!findings.includes(`scenario:${id}`)) errors.push(`scenario:${id} is required`);
+    if (!findings.includes('approval-command:postgres-outbox')) errors.push('approval command must bind the recommended option');
+    if (findings.some((item) => item.startsWith('unresolved-critical:'))) errors.push('unresolvedCriticalIds must be empty');
+    if (findings.includes('rejected-option:postgres-outbox')) errors.push('rejectedOptionIds cannot contain the recommended option');
+  }
+  return { valid: errors.length === 0, errors };
+}
+
 test('accepts an architecture approval result only with a complete visualize review binding', () => {
-  assert.deepEqual(validateOutput(validOutput()), { valid: true, errors: [] });
+  assert.deepEqual(validateReview(validOutput()), { valid: true, errors: [] });
 });
 
 test('rejects a ready architecture decision without a visualize preview', () => {
   const output = validOutput();
-  delete output.payload.reviewPreview;
-  assert.equal(validateOutput(output).valid, false);
+  output.output.findings = output.output.findings.filter((item) => item !== 'renderer:visualize');
+  assert.equal(validateReview(output).valid, false);
 });
 
 test('rejects missing failure scenarios and approval command drift', () => {
   const output = validOutput();
-  output.payload.reviewPreview.scenarioIds = ['normal', 'retry', 'outage', 'rollback', 'rollback'];
-  output.payload.reviewPreview.approvalCommands[0].command = `OK ARCHITECTURE another-option@${'a'.repeat(64)}`;
-  const result = validateOutput(output);
+  output.output.findings = output.output.findings.filter((item) => item !== 'scenario:concurrency' && item !== 'approval-command:postgres-outbox');
+  const result = validateReview(output);
   assert.equal(result.valid, false);
-  assert.match(result.errors.join('\n'), /scenarioIds|approval command/);
+  assert.match(result.errors.join('\n'), /scenario:concurrency|approval command/);
 });
 
-test('rejects a preview that is not registered as produced evidence and scratch', () => {
+test('rejects a preview that is not registered as produced evidence', () => {
   const output = validOutput();
-  output.payload.produced.reviewArtifactRef = `${session}another-review.html`;
-  output.payload.evidenceRefs = [`${session}challenge-receipt`];
-  output.payload.cleanup.scratchRefs = [`${session}challenge-receipt`];
-  const result = validateOutput(output);
+  output.output.evidenceRefs = ['evidence://architecture/challenge'];
+  const result = validateReview(output);
   assert.equal(result.valid, false);
-  assert.match(result.errors.join('\n'), /reviewArtifactRef|artifactRef/);
+  assert.match(result.errors.join('\n'), /resultRef/);
 });
 
 test('rejects agreement-first architecture evidence', () => {
   const output = validOutput();
-  output.payload.challengeSummary.unresolvedCriticalIds = ['critical.data-loss'];
-  output.payload.challengeSummary.rejectedOptionIds = ['postgres-outbox'];
-  const result = validateOutput(output);
+  output.output.findings.push('unresolved-critical:data-loss', 'rejected-option:postgres-outbox');
+  const result = validateReview(output);
   assert.equal(result.valid, false);
   assert.match(result.errors.join('\n'), /unresolvedCriticalIds|rejectedOptionIds/);
 });

@@ -1,175 +1,89 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://starci.dev/v6/operators/fe/ui-direction/output.schema.json",
+  "$id": "https://starci.dev/v7.0/operators/fe/ui-direction/output.schema.json",
   "type": "object",
   "additionalProperties": false,
-  "required": ["schemaVersion", "runId", "stage", "status", "facts", "payload"],
+  "required": [
+    "schemaVersion",
+    "operatorId",
+    "output"
+  ],
   "properties": {
-    "schemaVersion": {"const": 6},
-    "runId": {"type": "string", "minLength": 1},
-    "stage": {"enum": ["ui.direction.review", "ui.direction.result"]},
-    "status": {"enum": ["pending", "blocked"]},
-    "facts": {"type": "array", "uniqueItems": true, "items": {"type": "string", "minLength": 1}},
-    "payload": {
+    "schemaVersion": {
+      "const": 7
+    },
+    "operatorId": {
+      "const": "fe/ui-direction"
+    },
+    "output": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["decision", "state", "produced", "context", "cleanup", "evidenceRefs", "findings", "artifact"],
+      "required": [
+        "outcome",
+        "result",
+        "gaps",
+        "evidenceRefs"
+      ],
       "properties": {
-        "decision": {"enum": ["directions-ready", "blocked"]},
-        "state": {"$ref": "#/$defs/state"},
-        "produced": {"$ref": "#/$defs/produced"},
-        "context": {"$ref": "#/$defs/context"},
-        "cleanup": {"$ref": "#/$defs/cleanup"},
-        "evidenceRefs": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"$ref": "#/$defs/ref"}},
-        "findings": {"type": "array", "uniqueItems": true, "items": {"type": "string"}},
-        "reviewPreview": {
-          "type": "object",
-          "description": "Executable binding for the in-conversation interactive UI-direction review rendered before handoff or approval is requested.",
-          "additionalProperties": false,
-          "required": ["renderer", "mediaType", "artifactRef", "contentSha256", "directionIds", "recommendedDirectionId", "surfaceRefs", "viewports", "approvalCommands", "interactive"],
-          "properties": {
-            "renderer": {"const": "visualize"},
-            "mediaType": {"const": "text/html"},
-            "artifactRef": {"$ref": "#/$defs/sessionRef"},
-            "contentSha256": {"$ref": "#/$defs/sha256"},
-            "directionIds": {
-              "type": "array",
-              "minItems": 3,
-              "maxItems": 4,
-              "uniqueItems": true,
-              "items": {"type": "string", "minLength": 1, "maxLength": 120}
-            },
-            "recommendedDirectionId": {"type": "string", "minLength": 1, "maxLength": 120},
-            "surfaceRefs": {
-              "type": "array",
-              "minItems": 1,
-              "maxItems": 24,
-              "uniqueItems": true,
-              "items": {"type": "string", "minLength": 1, "maxLength": 160}
-            },
-            "viewports": {
-              "type": "array",
-              "minItems": 3,
-              "maxItems": 3,
-              "uniqueItems": true,
-              "items": {"enum": ["wide", "intermediate", "compact"]}
-            },
-            "approvalCommands": {
-              "type": "array",
-              "minItems": 3,
-              "maxItems": 4,
-              "uniqueItems": true,
-              "items": {
-                "type": "object",
-                "additionalProperties": false,
-                "required": ["directionId", "command"],
-                "properties": {
-                  "directionId": {"type": "string", "minLength": 1, "maxLength": 120},
-                  "command": {"type": "string", "pattern": "^OK UI DIRECTION .+@[0-9a-f]{64}$", "maxLength": 240}
+        "outcome": {
+          "description": "Legacy semantic result consumed only by the Skill machine.",
+          "enum": [
+            "directions-ready",
+            "blocked"
+          ]
+        },
+        "result": {
+          "description": "The atomic job result, or null when blocked.",
+          "anyOf": [
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "summary",
+                "artifactRefs"
+              ],
+              "properties": {
+                "summary": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "artifactRefs": {
+                  "type": "array",
+                  "maxItems": 64,
+                  "uniqueItems": true,
+                  "items": {
+                    "type": "string",
+                    "minLength": 1
+                  }
                 }
               }
             },
-            "interactive": {"const": true}
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "gaps": {
+          "description": "Exact missing authority or evidence; empty when complete.",
+          "type": "array",
+          "maxItems": 32,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1
           }
         },
-        "artifact": {
-          "type": "object",
-          "additionalProperties": false,
-          "required": ["artifactType", "directions", "recommendedId", "comparisonAxes"],
-          "properties": {
-            "artifactType": {"const": "frontend-ui-directions"},
-            "directions": {
-              "type": "array",
-              "minItems": 3,
-              "maxItems": 4,
-              "uniqueItems": true,
-              "items": {
-                "type": "object",
-                "additionalProperties": false,
-                "required": ["id", "thesis", "hierarchy", "interactionCharacter", "tradeoffs", "visualRef", "materialDifferenceRefs"],
-                "properties": {
-                  "id": {"type": "string", "minLength": 1},
-                  "thesis": {"type": "string", "minLength": 1},
-                  "hierarchy": {"type": "string", "minLength": 1},
-                  "interactionCharacter": {"type": "string", "minLength": 1},
-                  "tradeoffs": {"type": "array", "minItems": 1, "items": {"type": "string", "minLength": 1}},
-                  "visualRef": {"$ref": "#/$defs/ref"},
-                  "materialDifferenceRefs": {"type": "array", "minItems": 2, "uniqueItems": true, "items": {"$ref": "#/$defs/ref"}}
-                }
-              }
-            },
-            "recommendedId": {"type": "string", "minLength": 1},
-            "comparisonAxes": {"type": "array", "minItems": 3, "uniqueItems": true, "items": {"type": "string", "minLength": 1}}
-          }
-        }
-      }
-    }
-  },
-  "$defs": {
-    "ref": {"type": "string", "minLength": 1},
-    "sha256": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
-    "sessionRef": {"type": "string", "pattern": "^session://tasks/[A-Za-z0-9._-]+/.+$"},
-    "state": {
-      "type": "object",
-      "additionalProperties": false,
-      "required": ["operator", "status", "code", "retryable", "emits"],
-      "properties": {
-        "operator": {"const": "fe/ui-direction"},
-        "status": {"enum": ["pending", "blocked"]},
-        "code": {"enum": ["ui-directions-ready", "ui-direction-blocked"]},
-        "retryable": {"type": "boolean"},
-        "emits": {
-          "type": "object",
-          "additionalProperties": false,
-          "required": ["stage", "status", "factsAdd", "factsRemove"],
-          "properties": {
-            "stage": {"enum": ["ui.direction.review", "ui.direction.result"]},
-            "status": {"enum": ["pending", "blocked"]},
-            "factsAdd": {"type": "array", "uniqueItems": true, "items": {"type": "string"}},
-            "factsRemove": {"type": "array", "uniqueItems": true, "items": {"type": "string"}}
-          }
-        }
-      }
-    },
-    "produced": {
-      "type": "object",
-      "additionalProperties": false,
-      "required": ["artifactRefs", "mutations", "externalEffects"],
-      "properties": {
-        "artifactRefs": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"$ref": "#/$defs/ref"}},
-        "mutations": {"type": "array", "maxItems": 0},
-        "externalEffects": {"type": "array", "maxItems": 0}
-      }
-    },
-    "context": {
-      "type": "object",
-      "additionalProperties": false,
-      "required": ["used"],
-      "properties": {
-        "used": {
+        "evidenceRefs": {
+          "description": "Exact evidence used to produce the result.",
           "type": "array",
-          "minItems": 1,
+          "maxItems": 64,
+          "uniqueItems": true,
           "items": {
-            "type": "object",
-            "additionalProperties": false,
-            "required": ["kind", "ref", "revision"],
-            "properties": {
-              "kind": {"enum": ["business", "knowledge", "current-experience"]},
-              "ref": {"$ref": "#/$defs/ref"},
-              "revision": {"$ref": "#/$defs/ref"}
-            }
-          }
+            "type": "string",
+            "minLength": 1
+          },
+          "minItems": 1
         }
-      }
-    },
-    "cleanup": {
-      "type": "object",
-      "additionalProperties": false,
-      "required": ["scratchRefs", "retention", "purgeAt"],
-      "properties": {
-        "scratchRefs": {"type": "array", "items": {"$ref": "#/$defs/ref"}},
-        "retention": {"const": "until-skill-terminal"},
-        "purgeAt": {"const": "skill-terminal"}
       }
     }
   }

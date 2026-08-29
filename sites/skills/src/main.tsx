@@ -38,7 +38,7 @@ import {
   Wrench,
 } from '@phosphor-icons/react'
 import type { Icon } from '@phosphor-icons/react'
-import { Rail, SurfaceCard, SurfaceListCard } from '@starci/grammar/core'
+import { Rail, StaticStateRow, SurfaceCard, SurfaceListCard } from '@starci/grammar/core'
 import '@starci/grammar/common.css'
 import '@starci/grammar/core.css'
 import './styles.css'
@@ -49,29 +49,19 @@ type Operator = (typeof catalog.operators)[number]
 
 const pipelines = {
   frontend: [
-    ['UI direction', '3–4 visual directions', 'starci-frontend-ui-direction'],
-    ['Design critique', 'Independent challenge', 'starci-frontend-design-critique'],
-    ['UX flow', 'Navigation, state, recovery', 'starci-frontend-ux-flow'],
-    ['Product potential', 'Business and UX opportunities', 'starci-product-potential'],
-    ['UI detail', 'Executable screen specification', 'starci-frontend-ui-detail'],
-    ['Contract plan', 'Grammar and component boundaries', 'starci-frontend-contract-plan'],
-    ['Implementation', 'Bounded source mutation', 'starci-frontend-implementation'],
-    ['Visual fidelity', 'Render-to-baseline proof', 'starci-frontend-visual-fidelity'],
-    ['Product UAT', 'Journey and outcome proof', 'starci-product-uat'],
+    ['Frontend mission', 'Create, audit, repair, redesign', 'starci-fe-process'],
+    ['Quality assurance', 'Measured independent gates', 'starci-quality-assure'],
+    ['UAT verification', 'Behavior, UX, and UI proof', 'starci-uat-verify'],
   ],
   architecture: [
-    ['Discover', 'Observed system model', 'starci-architecture-discover'],
-    ['Data ownership', 'Writes, stores, consistency', 'starci-data-ownership-model'],
-    ['Option design', 'Material alternatives', 'starci-architecture-option-design'],
-    ['Critique', 'Falsification before approval', 'starci-architecture-critique'],
-    ['Realization', 'Code and deployment binding', 'starci-architecture-realization'],
+    ['Business authority', 'Outcome, rules, and evidence', 'starci-business-process'],
+    ['Architecture design', 'Alternatives, critique, realization', 'starci-architecture-design'],
+    ['Feature delivery', 'Join every required domain proof', 'starci-feature-deliver'],
   ],
   backend: [
-    ['Solution design', 'Behavior before code', 'starci-backend-solution-design'],
-    ['Contract plan', 'API, event, transaction, data', 'starci-backend-contract-plan'],
-    ['Contract critique', 'Independent contradiction hunt', 'starci-backend-contract-critique'],
-    ['Implementation', 'Frozen boundary mutation', 'starci-backend-implementation'],
-    ['Proof', 'Semantic and architecture checks', 'starci-backend-proof'],
+    ['Backend mission', 'Design, implement, repair, prove', 'starci-backend-process'],
+    ['Git publication', 'Approved exact source heads', 'starci-git-publish'],
+    ['Release management', 'Deploy, monitor, recover, rollback', 'starci-release-manage'],
   ],
 } as const
 
@@ -96,6 +86,17 @@ const shortId = (id: string) => id.replace(/^starci-/, '')
 const labelFor = (domain: string) => domainLabels[domain] ?? domain.replaceAll('-', ' ')
 
 const skillIconRules: Array<[RegExp, Icon]> = [
+  [/feature-deliver$/, FlowArrow],
+  [/business-process$/, Briefcase],
+  [/architecture-design$/, Cube],
+  [/backend-process$/, TerminalWindow],
+  [/fe-process$/, Palette],
+  [/quality-assure$/, ShieldCheck],
+  [/uat-verify$/, SealCheck],
+  [/release-manage$/, RocketLaunch],
+  [/platform-operate$/, Pulse],
+  [/workspace-manage$/, FolderOpen],
+  [/git-publish$/, GitBranch],
   [/workspace-ready$/, FolderOpen],
   [/device-checkpoint$/, HardDrives],
   [/business-/, Briefcase],
@@ -115,7 +116,6 @@ const skillIconRules: Array<[RegExp, Icon]> = [
   [/deployment-rollback$/, ArrowCounterClockwise],
   [/deployment$/, RocketLaunch],
   [/tunnel-reconcile$/, ArrowsLeftRight],
-  [/source-index-publish$/, Database],
   [/sonar-service-reconcile$/, Pulse],
   [/observability-reconcile$/, Eye],
   [/conversation-/, Chats],
@@ -189,7 +189,7 @@ function App() {
             <p className="eyebrow">A capability operating system for AI delivery</p>
             <h1>One request.<br /><span>Only the next skill loads.</span></h1>
             <p className="hero-lede">
-              StarCi v6.2 turns scoped requests into small, validated skills. Each skill does one job deeply,
+              StarCi v7.0 turns scoped requests into small, validated skills. Each skill does one job deeply,
               calls atomic operators, and hands the objective forward with typed state.
             </p>
             <div className="hero-actions">
@@ -254,13 +254,14 @@ function App() {
             label="Every transition is explicit"
             fact="STATE CONTRACT"
             depth="top"
-            items={[
+          >
+            {[
               { id: 'input', label: 'Closed input', description: 'Active facts and passive references are separated before execution.', state: 'affirmative' },
               { id: 'branch', label: 'Machine-owned branch', description: 'If, else, wait, loop, and side branch live in machine.json.', state: 'affirmative' },
               { id: 'output', label: 'Typed output state', description: 'Receipts, findings, terminal code, and handoff reference are validated.', state: 'affirmative' },
               { id: 'cleanup', label: 'Terminal cleanup', description: 'Task-session scratch is purged after completion, rejection, or failure.', state: 'affirmative' },
-            ]}
-          />
+            ].map((item) => <StaticStateRow key={item.id} item={{ ...item, state: 'affirmative' }} />)}
+          </SurfaceListCard>
         </section>
 
         <section id="skills" className="section-shell section-block">
@@ -272,7 +273,7 @@ function App() {
             <label className="search-box">
               <MagnifyingGlass aria-hidden="true" />
               <span className="sr-only">Search skills</span>
-              <input value={skillQuery} onChange={(event) => setSkillQuery(event.target.value)} placeholder="Search 45 skills" />
+              <input value={skillQuery} onChange={(event) => setSkillQuery(event.target.value)} placeholder={`Search ${catalog.skills.length} skills`} />
             </label>
           </div>
           <figure className="section-art capability-art">
@@ -316,7 +317,7 @@ function App() {
               <p className="eyebrow">Operator registry</p>
               <h2>Atomic work, inspectable contracts</h2>
             </div>
-            <p>Operators never call each other. The current skill state selects one operator, validates its input and output, then routes on an emitted decision.</p>
+            <p>Operators never call each other. The current skill state supplies exact context and input, validates one typed output, then the machine routes on that output.</p>
           </div>
           <figure className="section-shell section-art operator-art">
             <img src="./operator-gates.png" alt="Atomic modules moving one by one through deterministic validation gates" />
@@ -347,13 +348,18 @@ function App() {
               <div className="operator-list">
                 {operators.map((operator: Operator) => (
                   <article key={operator.id} className="operator-row">
+                    <span className={`operator-icon${operator.iconUrl ? ' operator-icon-custom' : ''}`} aria-hidden="true">
+                      {operator.iconUrl
+                        ? <img className="operator-icon-art" src={operator.iconUrl} alt="" />
+                        : <Cube size={22} weight="duotone" />}
+                    </span>
                     <div className="operator-id"><span>{operator.domain}</span><strong>{operator.id.split('/').slice(1).join('/')}</strong></div>
                     <div className="operator-contract">
-                      <span>accepts</span><code>{operator.accepts[0] ?? 'closed input'}</code>
+                      <span>context + input</span><code>{operator.accepts[0] ?? 'closed boundary'}</code>
                     </div>
                     <ArrowRight aria-hidden="true" />
                     <div className="operator-contract">
-                      <span>emits</span><code>{operator.emits[0] ?? 'validated state'}</code>
+                      <span>output</span><code>{operator.emits[0] ?? 'validated result'}</code>
                     </div>
                     <div className="knowledge-pill"><Stack aria-hidden="true" /> {operator.knowledgeCount}</div>
                   </article>
@@ -364,11 +370,11 @@ function App() {
         </section>
 
         <section className="section-shell closing-section">
-          <SurfaceCard label="Release 6.2" fact="SCOPE-AWARE" state="affirmative">
+          <SurfaceCard label="Release 7.0" fact="ATOMIC OPERATORS" state="affirmative">
             <div className="closing-card">
               <div>
-                <h2>Scope it. Visualize it. Prove it before commit.</h2>
-                <p>Multilingual scope normalization, visual design evidence, and bounded static gates keep each delivery on its intended branch.</p>
+                <h2>One job. Exact context + input. One validated output.</h2>
+                <p>The Skill machine owns branching, waits, loops, and handoffs; each operator stays atomic and inspectable.</p>
               </div>
               <a className="button button-primary" href="https://github.com/starci183/starci-skills/issues" target="_blank" rel="noreferrer">
                 Share feedback <ArrowRight aria-hidden="true" />
