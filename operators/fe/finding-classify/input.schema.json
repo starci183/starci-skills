@@ -57,7 +57,9 @@
       "additionalProperties": false,
       "required": [
         "targetRef",
-        "constraints"
+        "constraints",
+        "reviewStage",
+        "findingSetRef"
       ],
       "properties": {
         "targetRef": {
@@ -74,6 +76,15 @@
             "type": "string",
             "minLength": 1
           }
+        },
+        "reviewStage": {
+          "description": "The visual gate that produced the finding set.",
+          "enum": ["visual-fidelity", "independent-review"]
+        },
+        "findingSetRef": {
+          "description": "Exact validated visual or independent finding product to classify.",
+          "type": "string",
+          "minLength": 1
         }
       }
     }

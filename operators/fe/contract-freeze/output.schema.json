@@ -41,7 +41,9 @@
               "additionalProperties": false,
               "required": [
                 "summary",
-                "artifactRefs"
+                "artifactRefs",
+                "mediaDecision",
+                "behaviorContract"
               ],
               "properties": {
                 "summary": {
@@ -55,6 +57,173 @@
                   "items": {
                     "type": "string",
                     "minLength": 1
+                  }
+                },
+                "mediaDecision": {
+                  "description": "Frozen decision for whether this contract needs no media, reuses an approved asset, or produces one purpose-built bitmap.",
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "mode",
+                    "purpose",
+                    "placementRef",
+                    "responsiveTreatment",
+                    "assetBriefRef",
+                    "altIntent"
+                  ],
+                  "properties": {
+                    "mode": {
+                      "enum": [
+                        "none",
+                        "reuse",
+                        "generate"
+                      ]
+                    },
+                    "purpose": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "placementRef": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "minLength": 1
+                    },
+                    "responsiveTreatment": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "assetBriefRef": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "minLength": 1
+                    },
+                    "altIntent": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "minLength": 1
+                    }
+                  },
+                  "allOf": [
+                    {
+                      "if": {
+                        "properties": {
+                          "mode": {
+                            "const": "none"
+                          }
+                        },
+                        "required": [
+                          "mode"
+                        ]
+                      },
+                      "then": {
+                        "properties": {
+                          "placementRef": {
+                            "type": "null"
+                          },
+                          "assetBriefRef": {
+                            "type": "null"
+                          },
+                          "altIntent": {
+                            "type": "null"
+                          }
+                        }
+                      }
+                    },
+                    {
+                      "if": {
+                        "properties": {
+                          "mode": {
+                            "enum": [
+                              "reuse",
+                              "generate"
+                            ]
+                          }
+                        },
+                        "required": [
+                          "mode"
+                        ]
+                      },
+                      "then": {
+                        "properties": {
+                          "placementRef": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "assetBriefRef": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "altIntent": {
+                            "type": "string",
+                            "minLength": 1
+                          }
+                        }
+                      }
+                    }
+                  ]
+                },
+                "behaviorContract": {
+                  "description": "Executable preservation contract carried into mutation and proof.",
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["observedInteractionRefs", "interactionDecisions", "surfaceOwnerRefs", "grammarBindingRefs", "responsiveStates"],
+                  "properties": {
+                    "observedInteractionRefs": {
+                      "type": "array",
+                      "uniqueItems": true,
+                      "maxItems": 128,
+                      "items": { "type": "string", "minLength": 1 }
+                    },
+                    "interactionDecisions": {
+                      "type": "array",
+                      "maxItems": 128,
+                      "items": {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "required": ["interactionRef", "decision", "authorityRef", "rationale", "replacementRef"],
+                        "properties": {
+                          "interactionRef": { "type": "string", "minLength": 1 },
+                          "decision": { "enum": ["preserve", "remove", "replace"] },
+                          "authorityRef": { "type": ["string", "null"], "minLength": 1 },
+                          "rationale": { "type": ["string", "null"], "minLength": 1 },
+                          "replacementRef": { "type": ["string", "null"], "minLength": 1 }
+                        }
+                      }
+                    },
+                    "surfaceOwnerRefs": {
+                      "type": "array",
+                      "minItems": 1,
+                      "maxItems": 128,
+                      "uniqueItems": true,
+                      "items": { "type": "string", "minLength": 1 }
+                    },
+                    "grammarBindingRefs": {
+                      "type": "array",
+                      "minItems": 1,
+                      "maxItems": 128,
+                      "uniqueItems": true,
+                      "items": { "type": "string", "minLength": 1 }
+                    },
+                    "responsiveStates": {
+                      "type": "array",
+                      "minItems": 3,
+                      "maxItems": 3,
+                      "items": {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "required": ["viewport", "stateRef"],
+                        "properties": {
+                          "viewport": { "enum": ["wide", "intermediate", "compact"] },
+                          "stateRef": { "type": "string", "minLength": 1 }
+                        }
+                      }
+                    }
                   }
                 }
               }

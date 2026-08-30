@@ -11,3 +11,5 @@
 
 - `input.targetRef`: The one target owned by this invocation.
 - `input.constraints`: Closed constraints for this atomic job.
+- `input.behaviorContractRef`: Exact frozen behavior-preservation contract implemented by this mutation.
+- `input.behaviorContractFingerprint`: Immutable fingerprint binding the mutation to that contract.

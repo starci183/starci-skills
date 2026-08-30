@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://starci.dev/v7.0/operators/fe/visual-fidelity/output.schema.json",
+  "$id": "https://starci.dev/v7.2/operators/fe/visual-fidelity/output.schema.json",
   "type": "object",
   "additionalProperties": false,
   "required": [
@@ -41,7 +41,20 @@
               "additionalProperties": false,
               "required": [
                 "summary",
-                "artifactRefs"
+                "artifactRefs",
+                "reviewMode",
+                "packetFingerprint",
+                "packetRasterRefs",
+                "reviewerExecutionRef",
+                "reviewerModel",
+                "reviewerCount",
+                "contextIsolation",
+                "forkTurns",
+                "lastScreenshotRef",
+                "lastScreenshotVerdict",
+                "uncertainty",
+                "inspectionRecords",
+                "probeRecords"
               ],
               "properties": {
                 "summary": {
@@ -55,6 +68,168 @@
                   "items": {
                     "type": "string",
                     "minLength": 1
+                  }
+                },
+                "reviewMode": {
+                  "description": "The AI must attack the raster before consulting implementation or authority.",
+                  "const": "ai-adversarial-pixel"
+                },
+                "packetFingerprint": {
+                  "description": "Exact raster-only packet reviewed by the fresh Sol execution.",
+                  "type": "string",
+                  "pattern": "^sha256:[0-9a-f]{64}$"
+                },
+                "packetRasterRefs": {
+                  "description": "Exact raster set supplied by the blind packet; every item requires one inspection record.",
+                  "type": "array",
+                  "minItems": 3,
+                  "maxItems": 96,
+                  "uniqueItems": true,
+                  "items": { "type": "string", "pattern": "\\.(png|jpg|jpeg|webp)$" }
+                },
+                "reviewerExecutionRef": { "type": "string", "minLength": 1 },
+                "reviewerModel": { "const": "gpt-5.6-sol" },
+                "reviewerCount": { "const": 1 },
+                "contextIsolation": { "const": "fresh" },
+                "forkTurns": { "const": "none" },
+                "lastScreenshotRef": {
+                  "description": "The single post-mutation raster whose inspection controls visual closure.",
+                  "type": "string",
+                  "pattern": "\\.(png|jpg|jpeg|webp)$"
+                },
+                "lastScreenshotVerdict": { "enum": ["passed", "repair"] },
+                "uncertainty": {
+                  "description": "True means the reviewer could not safely close and aggregate PASS is forbidden.",
+                  "type": "boolean"
+                },
+                "inspectionRecords": {
+                  "description": "One pixel-observation record for every inspected screenshot cell.",
+                  "type": "array",
+                  "minItems": 3,
+                  "maxItems": 64,
+                  "items": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": [
+                      "imageRef",
+                      "pageInset",
+                      "surfaceOpacity",
+                      "contentPadding",
+                      "alignment",
+                      "verticalRhythm",
+                      "hierarchy",
+                      "visualOwnership",
+                      "pinnedBoundaryClearance",
+                      "wrapping",
+                      "clipping",
+                      "occlusion",
+                      "semanticUtility",
+                      "contentCoherence",
+                      "affordance",
+                      "responsiveComposition",
+                      "visualConsistency",
+                      "emptySpaceBalance",
+                      "lensVerdicts",
+                      "challengeRecords",
+                      "verdict"
+                    ],
+                    "properties": {
+                      "imageRef": { "type": "string", "pattern": "\\.(png|jpg|jpeg|webp)$" },
+                      "pageInset": { "type": "string", "minLength": 1 },
+                      "surfaceOpacity": { "type": "string", "minLength": 1 },
+                      "contentPadding": { "type": "string", "minLength": 1 },
+                      "alignment": { "type": "string", "minLength": 1 },
+                      "verticalRhythm": { "type": "string", "minLength": 1 },
+                      "hierarchy": { "type": "string", "minLength": 1 },
+                      "visualOwnership": { "type": "string", "minLength": 1 },
+                      "pinnedBoundaryClearance": { "type": "string", "minLength": 1 },
+                      "wrapping": { "type": "string", "minLength": 1 },
+                      "clipping": { "type": "string", "minLength": 1 },
+                      "occlusion": { "type": "string", "minLength": 1 },
+                      "semanticUtility": { "type": "string", "minLength": 1 },
+                      "contentCoherence": { "type": "string", "minLength": 1 },
+                      "affordance": { "type": "string", "minLength": 1 },
+                      "responsiveComposition": { "type": "string", "minLength": 1 },
+                      "visualConsistency": { "type": "string", "minLength": 1 },
+                      "emptySpaceBalance": { "type": "string", "minLength": 1 },
+                      "lensVerdicts": {
+                        "description": "A separate falsification verdict for every required visual lens; one problem forces this image to repair.",
+                        "type": "array",
+                        "minItems": 18,
+                        "maxItems": 18,
+                        "items": {
+                          "type": "object",
+                          "additionalProperties": false,
+                          "required": ["lens", "verdict", "observation"],
+                          "properties": {
+                            "lens": {
+                              "enum": [
+                                "page-inset",
+                                "surface-opacity",
+                                "content-padding",
+                                "alignment",
+                                "vertical-rhythm",
+                                "hierarchy",
+                                "visual-ownership",
+                                "pinned-boundary-clearance",
+                                "wrapping",
+                                "clipping",
+                                "occlusion",
+                                "semantic-utility",
+                                "content-coherence",
+                                "affordance",
+                                "responsive-composition",
+                                "visual-consistency",
+                                "empty-space-balance",
+                                "task-scanability"
+                              ]
+                            },
+                            "verdict": { "enum": ["passed", "problem"] },
+                            "observation": { "type": "string", "minLength": 20 }
+                          }
+                        }
+                      },
+                      "challengeRecords": {
+                        "description": "Potential problems the AI deliberately tried to expose in this raster, including rejected candidates.",
+                        "type": "array",
+                        "minItems": 3,
+                        "maxItems": 24,
+                        "items": {
+                          "type": "object",
+                          "additionalProperties": false,
+                          "required": ["challengeRef", "family", "suspectedProblem", "pixelObservation", "disposition"],
+                          "properties": {
+                            "challengeRef": { "type": "string", "minLength": 1 },
+                            "family": { "enum": ["purpose-content", "composition-spacing", "interaction-responsive"] },
+                            "suspectedProblem": { "type": "string", "minLength": 12 },
+                            "pixelObservation": { "type": "string", "minLength": 20 },
+                            "disposition": { "enum": ["confirmed", "not-observed"] }
+                          }
+                        }
+                      },
+                      "verdict": { "enum": ["passed", "repair"] }
+                    }
+                  }
+                },
+                "probeRecords": {
+                  "description": "One adversarial verdict for every supplied probe; no applicable attack may disappear during aggregation.",
+                  "type": "array",
+                  "minItems": 10,
+                  "maxItems": 64,
+                  "items": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": ["probeId", "category", "phase", "imageRef", "verdict", "observation"],
+                    "properties": {
+                      "probeId": { "type": "string", "minLength": 1 },
+                      "category": {
+                        "enum": ["viewport", "zoom", "page-scroll", "bounded-scroll", "content-stress", "state-transition", "sticky-fixed-overlay", "drag", "keyboard-focus", "composition-neighbors"]
+                      },
+                      "phase": { "enum": ["baseline", "start", "middle", "end", "terminal", "zoom-in", "zoom-out", "restored", "skeleton", "loading", "steady", "expanded", "collapsed", "focus", "drag-limit", "overlay-open", "content-long", "content-short", "breakpoint-edge"] },
+                      "imageRef": { "type": ["string", "null"], "pattern": "\\.(png|jpg|jpeg|webp)$" },
+                      "verdict": { "enum": ["survived", "contradiction", "not-applicable"] },
+                      "observation": { "type": "string", "minLength": 1 }
+                    }
                   }
                 }
               }

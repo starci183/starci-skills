@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://starci.dev/v7.0/operators/fe/product-potential/input.schema.json",
+  "$id": "https://starci.dev/v7.2/operators/fe/product-potential/input.schema.json",
   "type": "object",
   "additionalProperties": false,
   "required": [
@@ -47,7 +47,9 @@
       "additionalProperties": false,
       "required": [
         "targetRef",
-        "constraints"
+        "constraints",
+        "requiredOutcomeRefs",
+        "observedCapabilityRefs"
       ],
       "properties": {
         "targetRef": {
@@ -59,6 +61,28 @@
           "description": "Closed constraints that bound this job without routing it.",
           "type": "array",
           "maxItems": 64,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "requiredOutcomeRefs": {
+          "description": "Authority-backed user outcomes that the target must complete.",
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 64,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "observedCapabilityRefs": {
+          "description": "Complete runtime-observed capability and interaction inventory for the target.",
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 128,
           "uniqueItems": true,
           "items": {
             "type": "string",

@@ -10,11 +10,11 @@ Bind all work to the verified project and one bounded objective.
 
 ## Action
 
-Assembles final delivery proof. Do not route later work, own workflow state, broaden source scope, or perform another operator's job.
+Assembles final delivery proof. Before PASS, independently test whether adding, changing, or removing capability would better satisfy the bounded objective; record an evidence-backed disposition for all three even when rejected or not applicable. Do not route later work, own workflow state, broaden source scope, or perform another operator's job.
 
 ## Output
 
-Return only one atomic result: `outcome`, `resultRef`, `evidenceRefs`, `findings`, and `reason`.
+Return only one atomic result: `outcome`, `resultRef`, `evidenceRefs`, `findings`, `reason`, and `adversarialDecision`.
 
 ## Stop
 

@@ -23,7 +23,8 @@
         "resultRef",
         "evidenceRefs",
         "findings",
-        "reason"
+        "reason",
+        "adversarialDecision"
       ],
       "properties": {
         "outcome": {
@@ -64,11 +65,39 @@
           ],
           "minLength": 1,
           "maxLength": 2048
+        },
+        "adversarialDecision": {
+          "description": "Evidence-backed neutral consideration of adding, changing, and removing capability before terminal quality PASS.",
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["add", "change", "remove"],
+          "properties": {
+            "add": { "$ref": "#/$defs/adversarialDirection" },
+            "change": { "$ref": "#/$defs/adversarialDirection" },
+            "remove": { "$ref": "#/$defs/adversarialDirection" }
+          }
         }
       }
     }
   },
   "$defs": {
+    "adversarialDirection": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["disposition", "rationale", "evidenceRefs"],
+      "properties": {
+        "disposition": { "enum": ["adopt", "reject", "not-applicable"] },
+        "rationale": { "type": "string", "minLength": 1, "maxLength": 2048 },
+        "evidenceRefs": { "$ref": "#/$defs/nonEmptyRefs" }
+      }
+    },
+    "nonEmptyRefs": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 128,
+      "uniqueItems": true,
+      "items": { "type": "string", "minLength": 1, "maxLength": 1024 }
+    },
     "refs": {
       "type": "array",
       "maxItems": 128,

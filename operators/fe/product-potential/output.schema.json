@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://starci.dev/v7.0/operators/fe/product-potential/output.schema.json",
+  "$id": "https://starci.dev/v7.2/operators/fe/product-potential/output.schema.json",
   "type": "object",
   "additionalProperties": false,
   "required": [
@@ -40,7 +40,9 @@
               "additionalProperties": false,
               "required": [
                 "summary",
-                "artifactRefs"
+                "artifactRefs",
+                "capabilityDecisions",
+                "flowRelations"
               ],
               "properties": {
                 "summary": {
@@ -54,6 +56,70 @@
                   "items": {
                     "type": "string",
                     "minLength": 1
+                  }
+                },
+                "capabilityDecisions": {
+                  "description": "Exhaustive decisions for observed and missing capabilities.",
+                  "type": "array",
+                  "minItems": 1,
+                  "maxItems": 128,
+                  "items": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": [
+                      "capabilityRef",
+                      "decision",
+                      "userOutcomeRef",
+                      "owner",
+                      "rationale",
+                      "evidenceRefs"
+                    ],
+                    "properties": {
+                      "capabilityRef": { "type": "string", "minLength": 1 },
+                      "decision": { "enum": ["ADD", "CHANGE", "REMOVE", "KEEP"] },
+                      "userOutcomeRef": { "type": "string", "minLength": 1 },
+                      "owner": { "enum": ["frontend", "business", "backend", "cross-domain"] },
+                      "rationale": { "type": "string", "minLength": 1 },
+                      "evidenceRefs": {
+                        "type": "array",
+                        "minItems": 1,
+                        "maxItems": 32,
+                        "uniqueItems": true,
+                        "items": { "type": "string", "minLength": 1 }
+                      }
+                    }
+                  }
+                },
+                "flowRelations": {
+                  "description": "Required nodes and transitions, including missing or contradictory links.",
+                  "type": "array",
+                  "minItems": 1,
+                  "maxItems": 128,
+                  "items": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": [
+                      "fromRef",
+                      "toRef",
+                      "status",
+                      "owner",
+                      "userOutcomeRef",
+                      "evidenceRefs"
+                    ],
+                    "properties": {
+                      "fromRef": { "type": "string", "minLength": 1 },
+                      "toRef": { "type": "string", "minLength": 1 },
+                      "status": { "enum": ["present", "missing", "contradictory", "redundant"] },
+                      "owner": { "enum": ["frontend", "business", "backend", "cross-domain"] },
+                      "userOutcomeRef": { "type": "string", "minLength": 1 },
+                      "evidenceRefs": {
+                        "type": "array",
+                        "minItems": 1,
+                        "maxItems": 32,
+                        "uniqueItems": true,
+                        "items": { "type": "string", "minLength": 1 }
+                      }
+                    }
                   }
                 }
               }

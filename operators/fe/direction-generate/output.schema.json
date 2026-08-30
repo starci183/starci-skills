@@ -20,12 +20,26 @@
       "additionalProperties": false,
       "required": [
         "outcome",
+        "aiExecution",
         "result",
         "gaps",
         "evidenceRefs",
         "handoff"
       ],
       "properties": {
+        "aiExecution": {
+          "description": "Runtime-attested single fresh Sol execution provenance.",
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["model", "count", "isolation", "forkTurns", "executionRef"],
+          "properties": {
+            "model": { "const": "gpt-5.6-sol" },
+            "count": { "const": 1 },
+            "isolation": { "const": "fresh" },
+            "forkTurns": { "const": "none" },
+            "executionRef": { "type": "string", "pattern": "^execution://[0-9a-f]{64}$" }
+          }
+        },
         "outcome": {
           "description": "Typed result routed only by the parent Skill machine.",
           "enum": [
@@ -42,7 +56,9 @@
               "required": [
                 "summary",
                 "artifactRefs",
+                "comparisonArtifactRef",
                 "directionCount",
+                "directions",
                 "materialDifferences"
               ],
               "properties": {
@@ -53,16 +69,51 @@
                 "artifactRefs": {
                   "type": "array",
                   "uniqueItems": true,
+                  "minItems": 1,
                   "maxItems": 64,
                   "items": {
                     "type": "string",
                     "minLength": 1
                   }
                 },
+                "comparisonArtifactRef": {
+                  "description": "Inspectable HTML comparison rendered through visualize before choice.",
+                  "type": "string",
+                  "pattern": "\\.html$"
+                },
                 "directionCount": {
                   "type": "integer",
                   "minimum": 3,
                   "maximum": 4
+                },
+                "directions": {
+                  "description": "Three or four materially distinct directions, each visibly addressable inside the comparison.",
+                  "type": "array",
+                  "minItems": 3,
+                  "maxItems": 4,
+                  "uniqueItems": true,
+                  "items": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": [
+                      "id",
+                      "title",
+                      "visualPanelRef",
+                      "wideStateRef",
+                      "compactStateRef",
+                      "materialStateRef",
+                      "tradeoff"
+                    ],
+                    "properties": {
+                      "id": { "type": "string", "pattern": "^[a-z0-9][a-z0-9-]*$" },
+                      "title": { "type": "string", "minLength": 1 },
+                      "visualPanelRef": { "type": "string", "minLength": 1 },
+                      "wideStateRef": { "type": "string", "minLength": 1 },
+                      "compactStateRef": { "type": "string", "minLength": 1 },
+                      "materialStateRef": { "type": "string", "minLength": 1 },
+                      "tradeoff": { "type": "string", "minLength": 1 }
+                    }
+                  }
                 },
                 "materialDifferences": {
                   "type": "array",

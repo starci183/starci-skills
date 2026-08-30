@@ -155,11 +155,12 @@ function contractHygiene(value) {
 
 export function validatorFor(schemaUrl, semantic = () => []) {
   const schema = JSON.parse(readFileSync(schemaUrl, 'utf8'));
-  return (value) => {
+  const validate = (value) => {
     const errors = [];
     inspectSchema(schema, schema, value, '$', errors);
     if (errors.length === 0) errors.push(...contractHygiene(value));
     if (errors.length === 0) errors.push(...semantic(value));
     return { valid: errors.length === 0, errors };
   };
+  return validate;
 }

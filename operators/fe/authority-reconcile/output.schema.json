@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://starci.dev/v7.0/operators/fe/authority-reconcile/output.schema.json",
+  "$id": "https://starci.dev/v7.2/operators/fe/authority-reconcile/output.schema.json",
   "type": "object",
   "additionalProperties": false,
   "required": [
@@ -40,7 +40,10 @@
               "additionalProperties": false,
               "required": [
                 "summary",
-                "artifactRefs"
+                "artifactRefs",
+                "owner",
+                "changedAuthorityRefs",
+                "consumerImpactRefs"
               ],
               "properties": {
                 "summary": {
@@ -55,6 +58,22 @@
                     "type": "string",
                     "minLength": 1
                   }
+                },
+                "owner": {
+                  "enum": ["grammar", "ui-knowledge"]
+                },
+                "changedAuthorityRefs": {
+                  "type": "array",
+                  "minItems": 1,
+                  "maxItems": 16,
+                  "uniqueItems": true,
+                  "items": { "type": "string", "minLength": 1 }
+                },
+                "consumerImpactRefs": {
+                  "type": "array",
+                  "maxItems": 64,
+                  "uniqueItems": true,
+                  "items": { "type": "string", "minLength": 1 }
                 }
               }
             },

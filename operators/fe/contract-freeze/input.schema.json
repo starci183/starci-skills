@@ -57,13 +57,23 @@
       "additionalProperties": false,
       "required": [
         "targetRef",
-        "constraints"
+        "uxUiChangeLevel",
+        "constraints",
+        "preservationContract"
       ],
       "properties": {
         "targetRef": {
           "description": "The one target owned by this invocation.",
           "type": "string",
           "minLength": 1
+        },
+        "uxUiChangeLevel": {
+          "description": "Projection of the frozen frontend.ux-ui.change-level scope dimension carried into the executable contract.",
+          "enum": [
+            "refine",
+            "reconstruct",
+            "new"
+          ]
         },
         "constraints": {
           "description": "Closed constraints for this atomic job.",
@@ -73,6 +83,64 @@
           "items": {
             "type": "string",
             "minLength": 1
+          }
+        },
+        "preservationContract": {
+          "description": "Closed reconciliation of observed interactions, visible owners, Grammar bindings, and responsive states.",
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["observedInteractionRefs", "interactionDecisions", "surfaceOwnerRefs", "grammarBindingRefs", "responsiveStates"],
+          "properties": {
+            "observedInteractionRefs": {
+              "type": "array",
+              "uniqueItems": true,
+              "maxItems": 128,
+              "items": { "type": "string", "minLength": 1 }
+            },
+            "interactionDecisions": {
+              "type": "array",
+              "maxItems": 128,
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["interactionRef", "decision", "authorityRef", "rationale", "replacementRef"],
+                "properties": {
+                  "interactionRef": { "type": "string", "minLength": 1 },
+                  "decision": { "enum": ["preserve", "remove", "replace"] },
+                  "authorityRef": { "type": ["string", "null"], "minLength": 1 },
+                  "rationale": { "type": ["string", "null"], "minLength": 1 },
+                  "replacementRef": { "type": ["string", "null"], "minLength": 1 }
+                }
+              }
+            },
+            "surfaceOwnerRefs": {
+              "type": "array",
+              "minItems": 1,
+              "maxItems": 128,
+              "uniqueItems": true,
+              "items": { "type": "string", "minLength": 1 }
+            },
+            "grammarBindingRefs": {
+              "type": "array",
+              "minItems": 1,
+              "maxItems": 128,
+              "uniqueItems": true,
+              "items": { "type": "string", "minLength": 1 }
+            },
+            "responsiveStates": {
+              "type": "array",
+              "minItems": 3,
+              "maxItems": 3,
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["viewport", "stateRef"],
+                "properties": {
+                  "viewport": { "enum": ["wide", "intermediate", "compact"] },
+                  "stateRef": { "type": "string", "minLength": 1 }
+                }
+              }
+            }
           }
         }
       }

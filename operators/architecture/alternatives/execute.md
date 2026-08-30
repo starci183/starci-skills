@@ -10,11 +10,16 @@ Bind all work to `input.project` and `input.objectiveRef`.
 
 ## Action
 
-Produce materially different architecture alternatives from one frozen architecture snapshot. Do not route subsequent work, persist task-session material, broaden the source boundary, or perform another operator's job.
+Produce three or four materially different architecture alternatives from one frozen architecture
+snapshot. Apply `knowledge/direction-visualization.md` and render them in one inspectable `visualize`
+HTML comparison. Expose boundaries, ownership, data/control flow, normal operation, and applicable
+retry, concurrency, outage, recovery, migration, and rollback behavior. Do not route subsequent work,
+persist task-session material, broaden the source boundary, or perform another operator's job.
 
 ## Output
 
-Return only `output.outcome`, `output.resultRef`, `output.evidenceRefs`, `output.findings`, and `output.reason`.
+Return only `output.outcome`, `output.resultRef`, `output.directionCount`,
+`output.visualPanelRefs`, `output.evidenceRefs`, `output.findings`, and `output.reason`.
 
 ## Stop
 

@@ -22,7 +22,8 @@
       "required": [
         "authorityRefs",
         "evidenceRefs",
-        "uiKnowledgeId"
+        "uiKnowledgeId",
+        "scopeKnowledgeId"
       ],
       "properties": {
         "authorityRefs": {
@@ -49,6 +50,10 @@
         "uiKnowledgeId": {
           "description": "Exact StarCi-native frontend UI knowledge binding.",
           "const": "fe.ui"
+        },
+        "scopeKnowledgeId": {
+          "description": "Exact UX/UI change-level scope knowledge binding.",
+          "const": "fe.ux-ui-change-levels"
         }
       }
     },
@@ -57,6 +62,7 @@
       "additionalProperties": false,
       "required": [
         "targetRef",
+        "uxUiChangeLevel",
         "constraints"
       ],
       "properties": {
@@ -64,6 +70,14 @@
           "description": "The one target owned by this invocation.",
           "type": "string",
           "minLength": 1
+        },
+        "uxUiChangeLevel": {
+          "description": "Projection of the frozen frontend.ux-ui.change-level scope dimension.",
+          "enum": [
+            "refine",
+            "reconstruct",
+            "new"
+          ]
         },
         "constraints": {
           "description": "Closed constraints for this atomic job.",

@@ -11,3 +11,6 @@
 
 - `input.targetRef`: The one target owned by this invocation.
 - `input.constraints`: Closed constraints for this atomic job.
+- `input.behaviorContractRef`: Exact frozen behavior-preservation contract that remains binding.
+- `input.behaviorContractFingerprint`: Immutable fingerprint binding repair to that contract.
+- `input.failedEvidenceRefs`: Exact latest-source inspection or probe contradictions repaired now.

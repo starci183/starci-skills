@@ -51,10 +51,11 @@ user wording or authorize a broader task.
 | Wording | Normalized meaning |
 | --- | --- |
 | `phân tích`, `xem thử`, `diagnose`, `report only` | Read-only diagnosis or comparison unless mutation is separately requested. |
-| `audit <frontend target>` | Route to `starci-fe-process` with `intent=audit`; observe critically, repair inside the verified mission boundary, independently review, and close quality/UAT unless the request explicitly says report-only. |
+| `audit <frontend target>` | Route to `starci-fe-process` with `intent=audit` only after exactly one UX/UI change level is frozen; observe critically, repair inside that level, independently review, and close quality/UAT unless the request explicitly says report-only. |
 | `sửa`, `làm`, `implement`, `code` | Mutate the authorized source boundary and verify proportionally. |
-| `redesign` for a page | Rework both UX behavior and visual composition of that page, with a rendered design artifact before implementation when direction is not approved. |
-| `redesign` for a feature or `nhánh` | Rework the closed journey and its applicable surface family, not merely the currently visible screen. Render the important surfaces and transitions before implementation. |
+| `redesign` for a page | Does not determine the UX/UI change level alone. If the request authorizes structural rebuilding of an existing page, bind `reconstruct`; if layout may be locked, ask. When the direction is not already approved, render three or four materially different realistic UI directions through `visualize` before asking for selection. |
+| `redesign` for a feature or `nhánh` | Does not determine the UX/UI change level alone. After `reconstruct` is authorized, rework the closed journey and applicable surface family; otherwise ask before widening beyond element-level work. An unresolved direction choice requires three or four rendered journey/surface directions, not prose-only options. |
+| `redesign` for architecture, workflow or another technical boundary | Preserve approved outcomes and authority, generate three or four material alternatives, and render the decision-relevant boundaries, flows, failure/recovery and trade-offs through `visualize` before selection. |
 | `render`, `vẽ`, `cho xem UI`, `in ra UX UI` | Produce an inspectable visual; prose or a contract alone is insufficient. |
 | `hoàn thiện`, `đóng`, `đóng luôn`, `finish` | Carry the declared scope through its required workflow and proof gates; it does not waive gates or widen authority. |
 | `tiếp tục` | Resume the latest unfinished objective unless the newest message narrows, replaces or cancels it. |
@@ -63,6 +64,21 @@ user wording or authorize a broader task.
 | `bỏ phần trên`, `kệ phần trước` | Supersede the earlier active objective; stop carrying its scope into later work. |
 | `như X`, `giống X`, `theo cách X` | Use X as an outcome or quality benchmark, not as permission to copy its implementation blindly. |
 | `legacy` | Observed precedent and migration evidence, not target authority unless the user explicitly requires preservation. |
+
+## UX/UI change levels
+
+Every frontend UX/UI request must resolve exactly one `frontend.ux-ui.change-level` scope dimension before Skill selection or target-source
+inspection. The complete authority is `knowledge/ux-ui-change-levels.md`.
+
+| Wording | Normalized level | Mutation boundary |
+| --- | --- | --- |
+| `refine`, `layout chốt rồi`, `giữ nguyên layout`, `chỉ sửa element` | `refine` | Preserve regions, order, flow, containers, and responsive structure; audit or repair elements only. |
+| `reconstruct`, `build lại`, `dựng lại cấu trúc` | `reconstruct` | Rebuild an existing experience's UX/UI structure while preserving approved business and backend authority. |
+| `new`, `tạo mới`, `trang/flow chưa có` | `new` | Create an approved target experience that does not yet exist. |
+
+`audit`, `redesign`, `improve`, `fix UI`, `update page`, and `làm lại` are ambiguous without evidence
+that excludes the other levels. Ask one focused question naming the plausible boundaries rather than
+silently choosing.
 
 ## Common cross-domain ambiguities
 
@@ -81,10 +97,11 @@ user wording or authorize a broader task.
 Keep the following task-session-only facts before selecting a skill or doing unskilled work:
 
 - `scopeUnit`: umbrella, domain, feature, branch, journey, flow, surface, block, component, state or case;
+- `dimensions`: every material conditional scope dimension; for frontend UX/UI this includes `frontend.ux-ui.change-level=refine|reconstruct|new`;
 - `targetSet`: exact named targets and the minimal closed related set;
 - `surfaceRoles`: applicable entry, task, pending/recovery, result, history/retry/resume and exit roles;
 - `exclusions`: explicit replacements, deferrals and out-of-scope areas;
-- `ambiguities`: only unresolved alternatives that can materially change the work;
+- `ambiguities`: only unresolved alternatives that can materially change the work; a Skill input is forbidden until this set is empty;
 - `interpretationEvidence`: the active words that selected the meaning.
 
 When `ambiguities` is non-empty, stop before skill selection, planning or mutation and ask one focused

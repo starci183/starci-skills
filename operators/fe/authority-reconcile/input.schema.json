@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://starci.dev/v7.0/operators/fe/authority-reconcile/input.schema.json",
+  "$id": "https://starci.dev/v7.2/operators/fe/authority-reconcile/input.schema.json",
   "type": "object",
   "additionalProperties": false,
   "required": [
@@ -47,7 +47,10 @@
       "additionalProperties": false,
       "required": [
         "targetRef",
-        "constraints"
+        "constraints",
+        "findingRef",
+        "owner",
+        "authorityRef"
       ],
       "properties": {
         "targetRef": {
@@ -64,6 +67,20 @@
             "type": "string",
             "minLength": 1
           }
+        },
+        "findingRef": {
+          "description": "Exact classified visual finding whose reusable authority owner is being reconciled.",
+          "type": "string",
+          "minLength": 1
+        },
+        "owner": {
+          "description": "The proven reusable frontend authority owner.",
+          "enum": ["grammar", "ui-knowledge"]
+        },
+        "authorityRef": {
+          "description": "Exact routed Grammar or shared UI-knowledge record allowed to change.",
+          "type": "string",
+          "minLength": 1
         }
       }
     }

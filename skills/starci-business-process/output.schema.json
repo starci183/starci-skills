@@ -95,7 +95,7 @@
                 ],
                 "properties": {
                   "version": {
-                    "const": "7.0.0"
+                    "const": "7.2.0"
                   },
                   "receiptId": {
                     "type": "string",

@@ -1,5 +1,5 @@
 {
-  "version": "7.0.0",
+  "version": "7.2.0",
   "skills": [
     {
       "id": "starci-feature-deliver",
@@ -28,7 +28,7 @@
     {
       "id": "starci-fe-process",
       "capability": "fe.process",
-      "description": "Process one frontend outcome for create, audit, repair, redesign, debug, or reconciliation through native UX/UI operators, code, independent review, quality, and UAT.",
+      "description": "Process one frontend outcome for create, audit, repair, redesign, debug, or reconciliation through native UX/UI operators, code, one blind Sol visual review, quality, and UAT.",
       "domain": "fe"
     },
     {

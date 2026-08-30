@@ -29,8 +29,8 @@
         "outcome": {
           "description": "Typed result routed only by the parent Skill machine.",
           "enum": [
-            "clean",
             "repair",
+            "authority-repair",
             "business-required",
             "backend-required",
             "blocked"
@@ -44,7 +44,9 @@
               "additionalProperties": false,
               "required": [
                 "summary",
-                "artifactRefs"
+                "artifactRefs",
+                "reviewStage",
+                "ownerAssessments"
               ],
               "properties": {
                 "summary": {
@@ -58,6 +60,28 @@
                   "items": {
                     "type": "string",
                     "minLength": 1
+                  }
+                },
+                "reviewStage": {
+                  "enum": ["visual-fidelity", "independent-review"]
+                },
+                "ownerAssessments": {
+                  "description": "Exactly one smallest owner for every input finding.",
+                  "type": "array",
+                  "maxItems": 128,
+                  "items": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": ["findingRef", "owner", "counterevidenceRef", "authorityRef", "rationale"],
+                    "properties": {
+                      "findingRef": { "type": "string", "minLength": 1 },
+                      "owner": {
+                        "enum": ["implementation", "grammar", "ui-knowledge", "product-authority", "business", "backend"]
+                      },
+                      "counterevidenceRef": { "type": "string", "minLength": 1 },
+                      "authorityRef": { "type": ["string", "null"] },
+                      "rationale": { "type": "string", "minLength": 20 }
+                    }
                   }
                 }
               }

@@ -22,7 +22,8 @@
       "required": [
         "authorityRefs",
         "evidenceRefs",
-        "uiKnowledgeId"
+        "uiKnowledgeId",
+        "sourceFingerprint"
       ],
       "properties": {
         "authorityRefs": {
@@ -49,6 +50,11 @@
         "uiKnowledgeId": {
           "description": "Exact StarCi-native frontend UI knowledge binding.",
           "const": "fe.ui"
+        },
+        "sourceFingerprint": {
+          "description": "Fingerprint of the latest source revision that every captured image must render.",
+          "type": "string",
+          "pattern": "^sha256:[0-9a-f]{64}$"
         }
       }
     },
@@ -57,7 +63,12 @@
       "additionalProperties": false,
       "required": [
         "targetRef",
-        "constraints"
+        "constraints",
+        "adversarialProbes",
+        "renderStates",
+        "viewports",
+        "handoffStateRef",
+        "handoffViewport"
       ],
       "properties": {
         "targetRef": {
@@ -73,6 +84,92 @@
           "items": {
             "type": "string",
             "minLength": 1
+          }
+        },
+        "adversarialProbes": {
+          "description": "Frozen attacks that try to falsify the UI before any visual verdict.",
+          "type": "array",
+          "minItems": 10,
+          "maxItems": 64,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["probeId", "category", "phase", "stateRef", "attempt", "expectedFailure"],
+            "properties": {
+              "probeId": { "type": "string", "minLength": 1 },
+              "category": {
+                "enum": [
+                  "viewport",
+                  "zoom",
+                  "page-scroll",
+                  "bounded-scroll",
+                  "content-stress",
+                  "state-transition",
+                  "sticky-fixed-overlay",
+                  "drag",
+                  "keyboard-focus",
+                  "composition-neighbors"
+                ]
+              },
+              "phase": { "enum": ["baseline", "start", "middle", "end", "terminal", "zoom-in", "zoom-out", "restored", "skeleton", "loading", "steady", "expanded", "collapsed", "focus", "drag-limit", "overlay-open", "content-long", "content-short", "breakpoint-edge"] },
+              "stateRef": { "type": "string", "minLength": 1 },
+              "attempt": { "type": "string", "minLength": 1 },
+              "expectedFailure": { "type": "string", "minLength": 1 }
+            }
+          },
+          "allOf": [
+            { "contains": { "properties": { "category": { "const": "viewport" } }, "required": ["category"] } },
+            { "contains": { "properties": { "category": { "const": "zoom" } }, "required": ["category"] } },
+            { "contains": { "properties": { "category": { "const": "page-scroll" } }, "required": ["category"] } },
+            { "contains": { "properties": { "category": { "const": "bounded-scroll" } }, "required": ["category"] } },
+            { "contains": { "properties": { "category": { "const": "content-stress" } }, "required": ["category"] } },
+            { "contains": { "properties": { "category": { "const": "state-transition" } }, "required": ["category"] } },
+            { "contains": { "properties": { "category": { "const": "sticky-fixed-overlay" } }, "required": ["category"] } },
+            { "contains": { "properties": { "category": { "const": "drag" } }, "required": ["category"] } },
+            { "contains": { "properties": { "category": { "const": "keyboard-focus" } }, "required": ["category"] } },
+            { "contains": { "properties": { "category": { "const": "composition-neighbors" } }, "required": ["category"] } }
+          ]
+        },
+        "renderStates": {
+          "description": "Frozen in-scope entry, task, pending, recovery, result, exit, and other visible states to capture.",
+          "type": "array",
+          "uniqueItems": true,
+          "minItems": 1,
+          "maxItems": 32,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "viewports": {
+          "description": "The mandatory responsive viewport set.",
+          "type": "array",
+          "uniqueItems": true,
+          "minItems": 3,
+          "maxItems": 3,
+          "items": {
+            "enum": [
+              "wide",
+              "intermediate",
+              "compact"
+            ]
+          }
+        },
+        "handoffStateRef": {
+          "description": "Exact visible state that will be handed to the user after completion.",
+          "type": "string",
+          "minLength": 1
+        },
+        "handoffViewport": {
+          "description": "Exact host browser surface and content viewport visible to the user at handoff; viewport emulation is forbidden for this proof.",
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["surfaceRef", "widthPx", "heightPx", "viewportOverride"],
+          "properties": {
+            "surfaceRef": { "type": "string", "minLength": 1 },
+            "widthPx": { "type": "integer", "minimum": 1 },
+            "heightPx": { "type": "integer", "minimum": 1 },
+            "viewportOverride": { "const": false }
           }
         }
       }

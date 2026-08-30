@@ -40,6 +40,7 @@
       "additionalProperties": false,
       "required": [
         "intent",
+        "uxUiChangeLevel",
         "mutationAuthorizationRef",
         "files",
         "dominance"
@@ -54,6 +55,14 @@
             "redesign",
             "debug",
             "reconcile"
+          ]
+        },
+        "uxUiChangeLevel": {
+          "description": "Projection of the frozen frontend.ux-ui.change-level scope dimension enforced by the file boundary.",
+          "enum": [
+            "refine",
+            "reconstruct",
+            "new"
           ]
         },
         "mutationAuthorizationRef": {

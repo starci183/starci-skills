@@ -1,68 +1,97 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://starci.dev/v7.0/operators/fe/visual-fidelity/input.schema.json",
+  "$id": "https://starci.dev/v7.2/operators/fe/visual-fidelity/input.schema.json",
   "type": "object",
   "additionalProperties": false,
-  "required": [
-    "schemaVersion",
-    "operatorId",
-    "context",
-    "input"
-  ],
+  "required": ["schemaVersion", "operatorId", "context", "input"],
   "properties": {
-    "schemaVersion": {
-      "const": 7
-    },
-    "operatorId": {
-      "const": "fe/visual-fidelity"
-    },
+    "schemaVersion": { "const": 7 },
+    "operatorId": { "const": "fe/visual-fidelity" },
     "context": {
+      "description": "Execution provenance owned by the parent Skill. The blind reviewer receives no source, DOM, authority, producer rationale, prior verdict, or intended answer.",
       "type": "object",
       "additionalProperties": false,
-      "required": [
-        "evidenceRefs",
-        "authorityRevision"
-      ],
+      "required": ["implementerExecutionRef", "reviewerExecutionRef", "implementerPrincipalFingerprint", "reviewerPrincipalFingerprint", "reviewerContextFingerprint", "reviewerModel", "reviewerCount", "contextIsolation", "forkTurns", "debug"],
       "properties": {
-        "evidenceRefs": {
-          "description": "Exact canonical evidence references available to this atomic job.",
-          "type": "array",
-          "maxItems": 64,
-          "uniqueItems": true,
-          "items": {
-            "type": "string",
-            "minLength": 1
-          },
-          "minItems": 1
-        },
-        "authorityRevision": {
-          "description": "Exact approved authority revision binding this invocation.",
-          "type": "string",
-          "minLength": 1
-        }
+        "implementerExecutionRef": { "description": "Opaque runtime execution identity that produced the latest mutation; it may not issue the blind visual verdict.", "type": "string", "pattern": "^execution://[0-9a-f]{64}$" },
+        "reviewerExecutionRef": { "description": "Opaque fresh reviewer execution identity, distinct from the implementer execution.", "type": "string", "pattern": "^execution://[0-9a-f]{64}$" },
+        "implementerPrincipalFingerprint": { "description": "Runtime-attested principal fingerprint for the implementer.", "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
+        "reviewerPrincipalFingerprint": { "description": "Runtime-attested principal fingerprint for the blind reviewer; it must differ from the implementer principal.", "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
+        "reviewerContextFingerprint": { "description": "Fingerprint of the fresh raster-only context delivered to the reviewer.", "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
+        "reviewerModel": { "description": "Single allowed model for blind visual review.", "const": "gpt-5.6-sol" },
+        "reviewerCount": { "description": "Exactly one fresh Sol execution completes the review end to end.", "const": 1 },
+        "contextIsolation": { "description": "Reviewer starts without inherited conversation or implementation context.", "const": "fresh" },
+        "forkTurns": { "description": "No prior turns are forked into the reviewer context.", "const": "none" },
+        "debug": { "description": "Emit normalized AI calls, returns, transitions, findings, and verdicts to the terminal.", "const": true }
       }
     },
     "input": {
       "type": "object",
       "additionalProperties": false,
-      "required": [
-        "targetRef",
-        "constraints"
-      ],
+      "required": ["blindReviewPacket"],
       "properties": {
-        "targetRef": {
-          "description": "The one target owned by this atomic invocation.",
-          "type": "string",
-          "minLength": 1
-        },
-        "constraints": {
-          "description": "Closed constraints that bound this job without routing it.",
-          "type": "array",
-          "maxItems": 64,
-          "uniqueItems": true,
-          "items": {
-            "type": "string",
-            "minLength": 1
+        "blindReviewPacket": {
+          "description": "Raster-only packet. Cell labels are opaque execution labels, never producer intent or a suspected answer.",
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["packetRef", "packetFingerprint", "captureReceiptId", "latestMutationFingerprint", "capturedSourceFingerprint", "latestMutationAt", "capturedAt", "rasterCells", "probeCells", "lastScreenshotRef"],
+          "properties": {
+            "packetRef": { "type": "string", "pattern": "^packet://[0-9a-f]{64}$" },
+            "packetFingerprint": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
+            "captureReceiptId": { "description": "Opaque identity of the validated render-capture RETURN that froze this packet.", "type": "string", "pattern": "^receipt:[a-z0-9][a-z0-9:-]*$" },
+            "latestMutationFingerprint": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
+            "capturedSourceFingerprint": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
+            "latestMutationAt": { "type": "string", "format": "date-time" },
+            "capturedAt": { "type": "string", "format": "date-time" },
+            "rasterCells": {
+              "type": "array",
+              "minItems": 3,
+              "maxItems": 96,
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["cellRef", "imageRef", "viewKind", "viewport", "lastScreenshot"],
+                "properties": {
+                  "cellRef": { "type": "string", "pattern": "^cell-[0-9]{3}$" },
+                  "imageRef": { "type": "string", "pattern": "\\.(png|jpg|jpeg|webp)$" },
+                  "viewKind": { "enum": ["host-context", "viewport", "surface-focus", "scroll-start", "scroll-middle", "scroll-terminal", "lifecycle", "overlay"] },
+                  "viewport": { "enum": ["host", "wide", "intermediate", "compact"] },
+                  "lastScreenshot": { "type": "boolean" }
+                }
+              },
+              "allOf": [
+                { "contains": { "properties": { "viewKind": { "const": "host-context" } }, "required": ["viewKind"] } },
+                { "contains": { "properties": { "viewKind": { "const": "surface-focus" } }, "required": ["viewKind"] } },
+                { "contains": { "properties": { "viewport": { "const": "wide" } }, "required": ["viewport"] } },
+                { "contains": { "properties": { "viewport": { "const": "intermediate" } }, "required": ["viewport"] } },
+                { "contains": { "properties": { "viewport": { "const": "compact" } }, "required": ["viewport"] } },
+                { "contains": { "properties": { "viewKind": { "const": "lifecycle" } }, "required": ["viewKind"] } },
+                { "contains": { "properties": { "lastScreenshot": { "const": true } }, "required": ["lastScreenshot"] }, "minContains": 1, "maxContains": 1 }
+              ]
+            },
+            "probeCells": {
+              "type": "array",
+              "minItems": 10,
+              "maxItems": 96,
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["probeId", "category", "phase", "applicable", "imageRef", "reason"],
+                "properties": {
+                  "probeId": { "type": "string", "pattern": "^probe-[a-z0-9-]+$" },
+                  "category": { "enum": ["viewport", "zoom", "page-scroll", "bounded-scroll", "content-stress", "state-transition", "sticky-fixed-overlay", "drag", "keyboard-focus", "composition-neighbors"] },
+                  "phase": { "enum": ["baseline", "start", "middle", "end", "terminal", "zoom-in", "zoom-out", "restored", "skeleton", "loading", "steady", "expanded", "collapsed", "focus", "drag-limit", "overlay-open", "content-long", "content-short", "breakpoint-edge"] },
+                  "applicable": { "type": "boolean" },
+                  "imageRef": { "type": ["string", "null"], "pattern": "\\.(png|jpg|jpeg|webp)$" },
+                  "reason": { "enum": [null, "not-owned-by-target", "interaction-not-present", "container-not-present", "overlay-not-present", "lifecycle-not-present"] }
+                },
+                "allOf": [
+                  { "if": { "properties": { "applicable": { "const": true } } }, "then": { "properties": { "imageRef": { "type": "string" }, "reason": { "type": "null" } } } },
+                  { "if": { "properties": { "applicable": { "const": false } } }, "then": { "properties": { "imageRef": { "type": "null" }, "reason": { "enum": ["not-owned-by-target", "interaction-not-present", "container-not-present", "overlay-not-present", "lifecycle-not-present"] } } } }
+                ]
+              }
+            },
+            "lastScreenshotRef": { "type": "string", "pattern": "\\.(png|jpg|jpeg|webp)$" }
           }
         }
       }

@@ -10,13 +10,13 @@
     },
     "balanced": {
       "coordinatorModel": "inherit",
-      "workerModel": "luna",
-      "maxWorkers": 3
+      "workerModel": "gpt-5.6-sol",
+      "maxWorkers": 1
     },
     "parallel": {
       "coordinatorModel": "inherit",
-      "workerModel": "luna",
-      "maxWorkers": 5
+      "workerModel": "gpt-5.6-sol",
+      "maxWorkers": 1
     }
   }
 }

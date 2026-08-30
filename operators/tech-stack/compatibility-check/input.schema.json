@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://starci.dev/v7.0/operators/tech-stack/compatibility-check/input.schema.json",
+  "$id": "https://starci.dev/v7.2/operators/tech-stack/compatibility-check/input.schema.json",
   "type": "object",
   "additionalProperties": false,
   "required": ["schemaVersion", "operatorId", "context", "input"],

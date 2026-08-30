@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://starci.dev/v7.0/operators/fe/design-critique/output.schema.json",
+  "$id": "https://starci.dev/v7.2/operators/fe/design-critique/output.schema.json",
   "type": "object",
   "additionalProperties": false,
   "required": [
@@ -20,11 +20,25 @@
       "additionalProperties": false,
       "required": [
         "outcome",
+        "aiExecution",
         "result",
         "gaps",
         "evidenceRefs"
       ],
       "properties": {
+        "aiExecution": {
+          "description": "Runtime-attested single fresh Sol execution provenance.",
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["model", "count", "isolation", "forkTurns", "executionRef"],
+          "properties": {
+            "model": { "const": "gpt-5.6-sol" },
+            "count": { "const": 1 },
+            "isolation": { "const": "fresh" },
+            "forkTurns": { "const": "none" },
+            "executionRef": { "type": "string", "pattern": "^execution://[0-9a-f]{64}$" }
+          }
+        },
         "outcome": {
           "description": "Legacy semantic result consumed only by the Skill machine.",
           "enum": [

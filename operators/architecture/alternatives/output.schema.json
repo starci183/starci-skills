@@ -20,12 +20,28 @@
       "additionalProperties": false,
       "required": [
         "outcome",
+        "aiExecution",
         "resultRef",
+        "directionCount",
+        "visualPanelRefs",
         "evidenceRefs",
         "findings",
         "reason"
       ],
       "properties": {
+        "aiExecution": {
+          "description": "Runtime-attested single fresh Sol execution provenance.",
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["model", "count", "isolation", "forkTurns", "executionRef"],
+          "properties": {
+            "model": { "const": "gpt-5.6-sol" },
+            "count": { "const": 1 },
+            "isolation": { "const": "fresh" },
+            "forkTurns": { "const": "none" },
+            "executionRef": { "type": "string", "pattern": "^execution://[0-9a-f]{64}$" }
+          }
+        },
         "outcome": {
           "description": "Typed result consumed by the parent Skill machine.",
           "enum": [
@@ -33,13 +49,29 @@
           ]
         },
         "resultRef": {
-          "description": "Exact produced artifact reference, or null when no artifact was produced.",
-          "type": [
-            "string",
-            "null"
-          ],
+          "description": "Exact inspectable visualize HTML comparison artifact.",
+          "type": "string",
+          "pattern": "\\.html$",
           "minLength": 1,
           "maxLength": 1024
+        },
+        "directionCount": {
+          "description": "Number of materially different architecture directions rendered.",
+          "type": "integer",
+          "minimum": 3,
+          "maximum": 4
+        },
+        "visualPanelRefs": {
+          "description": "One exact visible panel reference for every rendered architecture direction.",
+          "type": "array",
+          "minItems": 3,
+          "maxItems": 4,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 1024
+          }
         },
         "evidenceRefs": {
           "description": "Exact references supporting the result.",

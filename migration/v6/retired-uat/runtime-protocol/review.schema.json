@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://starci.dev/v7.0/uat/review.schema.json",
+  "$id": "https://starci.dev/v7.1/uat/review.schema.json",
   "type": "object",
   "additionalProperties": false,
   "required": ["schemaVersion", "feature", "flow", "sourceRevision", "authorityRevision", "flowIdentity", "coverage", "cases", "resources", "runs", "findings", "feedback", "suspense", "userActions"],

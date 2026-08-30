@@ -57,6 +57,8 @@
       "additionalProperties": false,
       "required": [
         "targetRef",
+        "directionSetRef",
+        "visualArtifactRefs",
         "constraints"
       ],
       "properties": {
@@ -64,6 +66,19 @@
           "description": "The one target owned by this invocation.",
           "type": "string",
           "minLength": 1
+        },
+        "directionSetRef": {
+          "description": "Exact generated direction-set reference being ranked.",
+          "type": "string",
+          "minLength": 1
+        },
+        "visualArtifactRefs": {
+          "description": "Inspectable visualize HTML comparison artifacts that render every ranked direction.",
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "maxItems": 4,
+          "items": { "type": "string", "pattern": "\\.html$" }
         },
         "constraints": {
           "description": "Closed constraints for this atomic job.",

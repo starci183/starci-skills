@@ -30,9 +30,9 @@ for (const file of providers) {
   if (`${value.provider}.json` !== file) fail(`${file}: provider/file mismatch`);
   for (const [mode, mapping] of Object.entries(value.modeMappings)) {
     if (mapping.maxWorkers > modes[mode].maxWorkers) fail(`${file}/${mode}: provider exceeds mode worker limit`);
-    if (mapping.maxWorkers > 0 && mapping.maxWorkers < modes[mode].activation.minIndependentItems) fail(`${file}/${mode}: provider cannot satisfy mode activation threshold`);
     if (mapping.maxWorkers === 0 && mapping.workerModel !== null) fail(`${file}/${mode}: zero-worker mode cannot select a worker model`);
     if (mapping.maxWorkers > 0 && mapping.workerModel === null) fail(`${file}/${mode}: worker mode needs a runtime model alias`);
+    if (mode !== 'economical' && (mapping.workerModel !== 'gpt-5.6-sol' || mapping.maxWorkers !== 1)) fail(`${file}/${mode}: material AI review/brainstorm orchestration requires exactly one Sol worker for every provider`);
   }
 }
 

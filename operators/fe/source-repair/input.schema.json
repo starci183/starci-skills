@@ -57,7 +57,10 @@
       "additionalProperties": false,
       "required": [
         "targetRef",
-        "constraints"
+        "constraints",
+        "behaviorContractRef",
+        "behaviorContractFingerprint",
+        "failedEvidenceRefs"
       ],
       "properties": {
         "targetRef": {
@@ -74,6 +77,24 @@
             "type": "string",
             "minLength": 1
           }
+        },
+        "behaviorContractRef": {
+          "description": "Exact frozen behavior-preservation contract that remains binding during repair.",
+          "type": "string",
+          "minLength": 1
+        },
+        "behaviorContractFingerprint": {
+          "description": "Immutable fingerprint of the frozen behavior-preservation contract.",
+          "type": "string",
+          "pattern": "^sha256:[0-9a-f]{64}$"
+        },
+        "failedEvidenceRefs": {
+          "description": "Exact latest-source inspection or probe contradictions repaired by this invocation.",
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 128,
+          "uniqueItems": true,
+          "items": { "type": "string", "minLength": 1 }
         }
       }
     }

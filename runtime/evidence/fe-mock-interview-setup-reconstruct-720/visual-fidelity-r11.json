@@ -1,0 +1,2971 @@
+{
+  "schemaVersion": 7,
+  "operatorId": "fe/visual-fidelity",
+  "output": {
+    "outcome": "repair",
+    "result": {
+      "summary": "Adversarial raster review requires repair in 6 captures: the initial host-loading cell shows a steady page, keyboard-focus and resume captures clip left-side shell context, recovery and 125% zoom lose breadcrumb content, and the long-English start capture substitutes skeletons for the content under test. The final host-context raster itself passed.",
+      "artifactRefs": [
+        "final-r11-host-context.png",
+        "final-r11-wide.png",
+        "final-r11-1024.png",
+        "final-r11-1023.png",
+        "final-r11-compact-top.png",
+        "final-r11-compact-middle-selected.png",
+        "final-r11-compact-terminal.png",
+        "final-r11-history.png",
+        "final-r11-stats.png",
+        "final-r11-keyboard-focus.png",
+        "final-r11-recovery-compact.png",
+        "final-r11-resume-compact.png",
+        "final-r11-content-stress-en-start.png",
+        "final-r11-content-stress-en-terminal.png",
+        "final-r11-course-drawer-open.png",
+        "final-r11-course-drawer-restored.png",
+        "final-r11-zoom-in-effective-125.png",
+        "final-r11-zoom-out-effective-80.png",
+        "final-r11-zoom-restored.png",
+        "final-r11-host-context-last.png"
+      ],
+      "reviewMode": "ai-adversarial-pixel",
+      "packetFingerprint": "sha256:7bf87cd6b9c15748e8225715faa8554c1b50a61b604b22c93deab18b82457837",
+      "packetRasterRefs": [
+        "final-r11-host-context.png",
+        "final-r11-wide.png",
+        "final-r11-1024.png",
+        "final-r11-1023.png",
+        "final-r11-compact-top.png",
+        "final-r11-compact-middle-selected.png",
+        "final-r11-compact-terminal.png",
+        "final-r11-history.png",
+        "final-r11-stats.png",
+        "final-r11-keyboard-focus.png",
+        "final-r11-recovery-compact.png",
+        "final-r11-resume-compact.png",
+        "final-r11-content-stress-en-start.png",
+        "final-r11-content-stress-en-terminal.png",
+        "final-r11-course-drawer-open.png",
+        "final-r11-course-drawer-restored.png",
+        "final-r11-zoom-in-effective-125.png",
+        "final-r11-zoom-out-effective-80.png",
+        "final-r11-zoom-restored.png",
+        "final-r11-host-context-last.png"
+      ],
+      "reviewerExecutionRef": "execution://9cc727aa4198083932d416860aa007f7667b5b58d867f0403da2797a75114185",
+      "reviewerModel": "gpt-5.6-sol",
+      "reviewerCount": 1,
+      "contextIsolation": "fresh",
+      "forkTurns": "none",
+      "lastScreenshotRef": "final-r11-host-context-last.png",
+      "lastScreenshotVerdict": "passed",
+      "uncertainty": false,
+      "inspectionRecords": [
+        {
+          "imageRef": "final-r11-host-context.png",
+          "pageInset": "The page has generous left and right gutters, but this designated loading capture visibly shows the fully populated steady interface.",
+          "surfaceOpacity": "Opaque white cards remain distinct from the pale gray page and the header has a clean solid background.",
+          "contentPadding": "The setup card, tabs, and lower empty-state cards show even internal padding without edge collisions.",
+          "alignment": "Breadcrumb, title, tabs, setup card, and lower grid share stable vertical alignment lines.",
+          "verticalRhythm": "Section gaps move evenly from breadcrumb through title, tabs, setup, and lower summaries.",
+          "hierarchy": "The page title, section label, setup heading, and purple primary action create a clear reading order.",
+          "visualOwnership": "The two-column setup card clearly separates configuration controls from the session summary.",
+          "pinnedBoundaryClearance": "The visible right scrollbar does not cover the header, cards, tabs, or purple action.",
+          "wrapping": "Vietnamese labels and helper copy wrap naturally inside their columns with no stray orphan line.",
+          "clipping": "No populated control or label is cut by a card edge; lower cards continue below the viewport normally.",
+          "occlusion": "No overlay is present and no visible content is hidden behind another surface.",
+          "semanticUtility": "The pixels present a usable steady setup screen, not the loading state named for this capture.",
+          "contentCoherence": "Controls, summary values, history, and statistics all form a coherent interview-preparation page.",
+          "affordance": "Segmented controls, tabs, history link, and purple start button are visibly actionable.",
+          "responsiveComposition": "The wide layout uses a centered content column, persistent rail, and balanced two-column cards.",
+          "visualConsistency": "Purple accents, rounded surfaces, muted helper text, and icon containers are visually consistent.",
+          "emptySpaceBalance": "Wide gutters and the denser central setup area produce a balanced desktop composition.",
+          "lensVerdicts": [
+            {
+              "lens": "page-inset",
+              "verdict": "passed",
+              "observation": "The page has generous left and right gutters, but this designated loading capture visibly shows the fully populated steady interface."
+            },
+            {
+              "lens": "surface-opacity",
+              "verdict": "passed",
+              "observation": "Opaque white cards remain distinct from the pale gray page and the header has a clean solid background."
+            },
+            {
+              "lens": "content-padding",
+              "verdict": "passed",
+              "observation": "The setup card, tabs, and lower empty-state cards show even internal padding without edge collisions."
+            },
+            {
+              "lens": "alignment",
+              "verdict": "passed",
+              "observation": "Breadcrumb, title, tabs, setup card, and lower grid share stable vertical alignment lines."
+            },
+            {
+              "lens": "vertical-rhythm",
+              "verdict": "passed",
+              "observation": "Section gaps move evenly from breadcrumb through title, tabs, setup, and lower summaries."
+            },
+            {
+              "lens": "hierarchy",
+              "verdict": "passed",
+              "observation": "The page title, section label, setup heading, and purple primary action create a clear reading order."
+            },
+            {
+              "lens": "visual-ownership",
+              "verdict": "passed",
+              "observation": "The two-column setup card clearly separates configuration controls from the session summary."
+            },
+            {
+              "lens": "pinned-boundary-clearance",
+              "verdict": "passed",
+              "observation": "The visible right scrollbar does not cover the header, cards, tabs, or purple action."
+            },
+            {
+              "lens": "wrapping",
+              "verdict": "passed",
+              "observation": "Vietnamese labels and helper copy wrap naturally inside their columns with no stray orphan line."
+            },
+            {
+              "lens": "clipping",
+              "verdict": "passed",
+              "observation": "No populated control or label is cut by a card edge; lower cards continue below the viewport normally."
+            },
+            {
+              "lens": "occlusion",
+              "verdict": "passed",
+              "observation": "No overlay is present and no visible content is hidden behind another surface."
+            },
+            {
+              "lens": "semantic-utility",
+              "verdict": "problem",
+              "observation": "The pixels present a usable steady setup screen, not the loading state named for this capture."
+            },
+            {
+              "lens": "content-coherence",
+              "verdict": "problem",
+              "observation": "Controls, summary values, history, and statistics all form a coherent interview-preparation page."
+            },
+            {
+              "lens": "affordance",
+              "verdict": "passed",
+              "observation": "Segmented controls, tabs, history link, and purple start button are visibly actionable."
+            },
+            {
+              "lens": "responsive-composition",
+              "verdict": "passed",
+              "observation": "The wide layout uses a centered content column, persistent rail, and balanced two-column cards."
+            },
+            {
+              "lens": "visual-consistency",
+              "verdict": "passed",
+              "observation": "Purple accents, rounded surfaces, muted helper text, and icon containers are visually consistent."
+            },
+            {
+              "lens": "empty-space-balance",
+              "verdict": "passed",
+              "observation": "Wide gutters and the denser central setup area produce a balanced desktop composition."
+            },
+            {
+              "lens": "task-scanability",
+              "verdict": "passed",
+              "observation": "A user can scan setup choices and the start action quickly, although the required loading state is absent."
+            }
+          ],
+          "challengeRecords": [
+            {
+              "challengeRef": "final-r11-host-context.png:purpose-content",
+              "family": "purpose-content",
+              "suspectedProblem": "The requested host loading state may be absent.",
+              "pixelObservation": "The raster shows real headings, selected controls, summary values, and empty-state copy; no loading placeholder or progress treatment is visible.",
+              "disposition": "confirmed"
+            },
+            {
+              "challengeRef": "final-r11-host-context.png:composition-spacing",
+              "family": "composition-spacing",
+              "suspectedProblem": "The wide host composition may have uneven structural spacing.",
+              "pixelObservation": "The central column, rail, card split, and lower grid remain aligned with stable gutters and no crowding.",
+              "disposition": "not-observed"
+            },
+            {
+              "challengeRef": "final-r11-host-context.png:interaction-responsive",
+              "family": "interaction-responsive",
+              "suspectedProblem": "The host shell may cover page actions at this width.",
+              "pixelObservation": "Header controls, tabs, segmented options, history link, and start button are all fully visible and unobscured.",
+              "disposition": "not-observed"
+            }
+          ],
+          "verdict": "repair"
+        },
+        {
+          "imageRef": "final-r11-wide.png",
+          "pageInset": "The main content sits within broad, even desktop gutters beside the narrow navigation rail.",
+          "surfaceOpacity": "White setup and empty-state cards are opaque and clearly separated from the light gray canvas.",
+          "contentPadding": "Card headings, segmented controls, summary copy, and actions retain consistent internal spacing.",
+          "alignment": "Breadcrumb, title, tabs, setup card, history card, and statistics card align to a stable grid.",
+          "verticalRhythm": "Vertical gaps between page identity, tabs, setup, and lower sections are regular and readable.",
+          "hierarchy": "The title and setup decision dominate, with the purple start button serving as the strongest action.",
+          "visualOwnership": "Configuration occupies the larger left card region while readiness details own the right region.",
+          "pinnedBoundaryClearance": "The right scrollbar and left rail remain outside the content surfaces and do not collide with them.",
+          "wrapping": "All visible Vietnamese strings fit their intended columns and helper text wraps at sensible points.",
+          "clipping": "Only below-viewport continuation is cropped; no in-viewport label, control, or action is clipped.",
+          "occlusion": "No content is covered by header, rail, scrollbar, or another panel.",
+          "semanticUtility": "The page exposes configuration, readiness, history, and progress in a useful preparation flow.",
+          "contentCoherence": "Selected technical format and intermediate level agree with the summary at the right.",
+          "affordance": "Tabs, segmented choices, history link, and purple button have clear interactive styling.",
+          "responsiveComposition": "The desktop viewport uses space efficiently without stretching the main card excessively.",
+          "visualConsistency": "Typography, radii, shadows, dividers, icons, and purple emphasis follow one visual system.",
+          "emptySpaceBalance": "The setup card mass and the two lower panels balance the broad surrounding whitespace.",
+          "lensVerdicts": [
+            {
+              "lens": "page-inset",
+              "verdict": "passed",
+              "observation": "The main content sits within broad, even desktop gutters beside the narrow navigation rail."
+            },
+            {
+              "lens": "surface-opacity",
+              "verdict": "passed",
+              "observation": "White setup and empty-state cards are opaque and clearly separated from the light gray canvas."
+            },
+            {
+              "lens": "content-padding",
+              "verdict": "passed",
+              "observation": "Card headings, segmented controls, summary copy, and actions retain consistent internal spacing."
+            },
+            {
+              "lens": "alignment",
+              "verdict": "passed",
+              "observation": "Breadcrumb, title, tabs, setup card, history card, and statistics card align to a stable grid."
+            },
+            {
+              "lens": "vertical-rhythm",
+              "verdict": "passed",
+              "observation": "Vertical gaps between page identity, tabs, setup, and lower sections are regular and readable."
+            },
+            {
+              "lens": "hierarchy",
+              "verdict": "passed",
+              "observation": "The title and setup decision dominate, with the purple start button serving as the strongest action."
+            },
+            {
+              "lens": "visual-ownership",
+              "verdict": "passed",
+              "observation": "Configuration occupies the larger left card region while readiness details own the right region."
+            },
+            {
+              "lens": "pinned-boundary-clearance",
+              "verdict": "passed",
+              "observation": "The right scrollbar and left rail remain outside the content surfaces and do not collide with them."
+            },
+            {
+              "lens": "wrapping",
+              "verdict": "passed",
+              "observation": "All visible Vietnamese strings fit their intended columns and helper text wraps at sensible points."
+            },
+            {
+              "lens": "clipping",
+              "verdict": "passed",
+              "observation": "Only below-viewport continuation is cropped; no in-viewport label, control, or action is clipped."
+            },
+            {
+              "lens": "occlusion",
+              "verdict": "passed",
+              "observation": "No content is covered by header, rail, scrollbar, or another panel."
+            },
+            {
+              "lens": "semantic-utility",
+              "verdict": "passed",
+              "observation": "The page exposes configuration, readiness, history, and progress in a useful preparation flow."
+            },
+            {
+              "lens": "content-coherence",
+              "verdict": "passed",
+              "observation": "Selected technical format and intermediate level agree with the summary at the right."
+            },
+            {
+              "lens": "affordance",
+              "verdict": "passed",
+              "observation": "Tabs, segmented choices, history link, and purple button have clear interactive styling."
+            },
+            {
+              "lens": "responsive-composition",
+              "verdict": "passed",
+              "observation": "The desktop viewport uses space efficiently without stretching the main card excessively."
+            },
+            {
+              "lens": "visual-consistency",
+              "verdict": "passed",
+              "observation": "Typography, radii, shadows, dividers, icons, and purple emphasis follow one visual system."
+            },
+            {
+              "lens": "empty-space-balance",
+              "verdict": "passed",
+              "observation": "The setup card mass and the two lower panels balance the broad surrounding whitespace."
+            },
+            {
+              "lens": "task-scanability",
+              "verdict": "passed",
+              "observation": "Headings, selected pills, summary labels, and primary action support fast task scanning."
+            }
+          ],
+          "challengeRecords": [
+            {
+              "challengeRef": "final-r11-wide.png:purpose-content",
+              "family": "purpose-content",
+              "suspectedProblem": "The page may lack enough information to begin an interview.",
+              "pixelObservation": "Visible format, level, readiness summary, explanatory copy, and a primary start action answer the core task.",
+              "disposition": "not-observed"
+            },
+            {
+              "challengeRef": "final-r11-wide.png:composition-spacing",
+              "family": "composition-spacing",
+              "suspectedProblem": "The wide two-column composition may drift out of alignment.",
+              "pixelObservation": "Card split, lower grid, section labels, and action link line up cleanly across the centered content area.",
+              "disposition": "not-observed"
+            },
+            {
+              "challengeRef": "final-r11-wide.png:interaction-responsive",
+              "family": "interaction-responsive",
+              "suspectedProblem": "Desktop controls may be visually ambiguous.",
+              "pixelObservation": "Selected pills are white, active tabs use a purple rule, and the start button is strongly emphasized.",
+              "disposition": "not-observed"
+            }
+          ],
+          "verdict": "passed"
+        },
+        {
+          "imageRef": "final-r11-1024.png",
+          "pageInset": "Content keeps usable 32-pixel-like side gutters while the desktop rail collapses into a course-navigation row.",
+          "surfaceOpacity": "Opaque white cards stay distinct from the gray background with subtle borders and shadows.",
+          "contentPadding": "Both setup columns maintain comfortable padding at this narrower breakpoint.",
+          "alignment": "Header rows, breadcrumb, page identity, tabs, setup card, and lower grid align without visible jumps.",
+          "verticalRhythm": "The added course-navigation row fits into the vertical sequence without crushing adjacent content.",
+          "hierarchy": "Title, active overview tab, setup heading, and start button remain visually prioritized.",
+          "visualOwnership": "The setup card preserves a clear divider between choices and readiness details.",
+          "pinnedBoundaryClearance": "The right scrollbar is clear of content and the navigation row does not overlap the breadcrumb.",
+          "wrapping": "Helper text and summary copy wrap inside their columns without escaping the card.",
+          "clipping": "The bottom of lower cards continues beyond the viewport, but visible content is not internally clipped.",
+          "occlusion": "No header, navigation row, or scrollbar covers interactive page content.",
+          "semanticUtility": "All preparation choices, summary facts, and the start action remain available at the breakpoint.",
+          "contentCoherence": "The selected technical and intermediate choices match the right-hand summary.",
+          "affordance": "Tabs, segmented controls, course navigation, history link, and CTA remain visually actionable.",
+          "responsiveComposition": "At exactly 1024 the shell changes cleanly while the main card still supports two columns.",
+          "visualConsistency": "Typography and purple active treatments remain consistent with the wide viewport.",
+          "emptySpaceBalance": "The narrower two-column card and lower grid remain proportionate rather than cramped.",
+          "lensVerdicts": [
+            {
+              "lens": "page-inset",
+              "verdict": "passed",
+              "observation": "Content keeps usable 32-pixel-like side gutters while the desktop rail collapses into a course-navigation row."
+            },
+            {
+              "lens": "surface-opacity",
+              "verdict": "passed",
+              "observation": "Opaque white cards stay distinct from the gray background with subtle borders and shadows."
+            },
+            {
+              "lens": "content-padding",
+              "verdict": "passed",
+              "observation": "Both setup columns maintain comfortable padding at this narrower breakpoint."
+            },
+            {
+              "lens": "alignment",
+              "verdict": "passed",
+              "observation": "Header rows, breadcrumb, page identity, tabs, setup card, and lower grid align without visible jumps."
+            },
+            {
+              "lens": "vertical-rhythm",
+              "verdict": "passed",
+              "observation": "The added course-navigation row fits into the vertical sequence without crushing adjacent content."
+            },
+            {
+              "lens": "hierarchy",
+              "verdict": "passed",
+              "observation": "Title, active overview tab, setup heading, and start button remain visually prioritized."
+            },
+            {
+              "lens": "visual-ownership",
+              "verdict": "passed",
+              "observation": "The setup card preserves a clear divider between choices and readiness details."
+            },
+            {
+              "lens": "pinned-boundary-clearance",
+              "verdict": "passed",
+              "observation": "The right scrollbar is clear of content and the navigation row does not overlap the breadcrumb."
+            },
+            {
+              "lens": "wrapping",
+              "verdict": "passed",
+              "observation": "Helper text and summary copy wrap inside their columns without escaping the card."
+            },
+            {
+              "lens": "clipping",
+              "verdict": "passed",
+              "observation": "The bottom of lower cards continues beyond the viewport, but visible content is not internally clipped."
+            },
+            {
+              "lens": "occlusion",
+              "verdict": "passed",
+              "observation": "No header, navigation row, or scrollbar covers interactive page content."
+            },
+            {
+              "lens": "semantic-utility",
+              "verdict": "passed",
+              "observation": "All preparation choices, summary facts, and the start action remain available at the breakpoint."
+            },
+            {
+              "lens": "content-coherence",
+              "verdict": "passed",
+              "observation": "The selected technical and intermediate choices match the right-hand summary."
+            },
+            {
+              "lens": "affordance",
+              "verdict": "passed",
+              "observation": "Tabs, segmented controls, course navigation, history link, and CTA remain visually actionable."
+            },
+            {
+              "lens": "responsive-composition",
+              "verdict": "passed",
+              "observation": "At exactly 1024 the shell changes cleanly while the main card still supports two columns."
+            },
+            {
+              "lens": "visual-consistency",
+              "verdict": "passed",
+              "observation": "Typography and purple active treatments remain consistent with the wide viewport."
+            },
+            {
+              "lens": "empty-space-balance",
+              "verdict": "passed",
+              "observation": "The narrower two-column card and lower grid remain proportionate rather than cramped."
+            },
+            {
+              "lens": "task-scanability",
+              "verdict": "passed",
+              "observation": "The setup task and next action can still be located quickly at this breakpoint."
+            }
+          ],
+          "challengeRecords": [
+            {
+              "challengeRef": "final-r11-1024.png:purpose-content",
+              "family": "purpose-content",
+              "suspectedProblem": "Breakpoint compression may remove required setup information.",
+              "pixelObservation": "Format, level, readiness details, helper copy, history link, and the start action remain visible.",
+              "disposition": "not-observed"
+            },
+            {
+              "challengeRef": "final-r11-1024.png:composition-spacing",
+              "family": "composition-spacing",
+              "suspectedProblem": "The 1024 shell transition may create crowding or overlap.",
+              "pixelObservation": "Navigation, breadcrumb, tabs, card columns, and lower panels remain separated with visible gutters.",
+              "disposition": "not-observed"
+            },
+            {
+              "challengeRef": "final-r11-1024.png:interaction-responsive",
+              "family": "interaction-responsive",
+              "suspectedProblem": "Controls may become too narrow at the breakpoint edge.",
+              "pixelObservation": "Segmented labels and the purple start button retain full text and generous hit-area shapes.",
+              "disposition": "not-observed"
+            }
+          ],
+          "verdict": "passed"
+        },
+        {
+          "imageRef": "final-r11-1023.png",
+          "pageInset": "The page keeps compact but visible outer gutters and no content touches the viewport edges.",
+          "surfaceOpacity": "The white setup and history surfaces remain opaque against the light gray page.",
+          "contentPadding": "Card content retains even padding after the header reorganizes into two rows.",
+          "alignment": "Breadcrumb, title, tabs, and card grid maintain consistent left edges.",
+          "verticalRhythm": "The two-row header, navigation control, breadcrumb, and page content have orderly spacing.",
+          "hierarchy": "The page title and purple call to action remain easy to distinguish from secondary labels.",
+          "visualOwnership": "The split setup card continues to separate configuration from readiness information.",
+          "pinnedBoundaryClearance": "The scrollbar stays at the far right and does not intrude into the card or header.",
+          "wrapping": "Summary copy wraps to additional lines without colliding with the CTA or card border.",
+          "clipping": "No visible navigation label, breadcrumb item, or card control is cut at 1023 pixels.",
+          "occlusion": "The reorganized header does not cover the course-navigation row or page body.",
+          "semanticUtility": "The full preparation task remains usable immediately below the breakpoint.",
+          "contentCoherence": "Selected choices remain consistent with the summary values shown beside them.",
+          "affordance": "Purple active states and pill controls continue to communicate interaction.",
+          "responsiveComposition": "The shell stacks navigation beneath the logo row while preserving the two-column work area.",
+          "visualConsistency": "Color, typography, radii, and spacing remain consistent across the breakpoint change.",
+          "emptySpaceBalance": "The stacked header adds height but the content below remains visually balanced.",
+          "lensVerdicts": [
+            {
+              "lens": "page-inset",
+              "verdict": "passed",
+              "observation": "The page keeps compact but visible outer gutters and no content touches the viewport edges."
+            },
+            {
+              "lens": "surface-opacity",
+              "verdict": "passed",
+              "observation": "The white setup and history surfaces remain opaque against the light gray page."
+            },
+            {
+              "lens": "content-padding",
+              "verdict": "passed",
+              "observation": "Card content retains even padding after the header reorganizes into two rows."
+            },
+            {
+              "lens": "alignment",
+              "verdict": "passed",
+              "observation": "Breadcrumb, title, tabs, and card grid maintain consistent left edges."
+            },
+            {
+              "lens": "vertical-rhythm",
+              "verdict": "passed",
+              "observation": "The two-row header, navigation control, breadcrumb, and page content have orderly spacing."
+            },
+            {
+              "lens": "hierarchy",
+              "verdict": "passed",
+              "observation": "The page title and purple call to action remain easy to distinguish from secondary labels."
+            },
+            {
+              "lens": "visual-ownership",
+              "verdict": "passed",
+              "observation": "The split setup card continues to separate configuration from readiness information."
+            },
+            {
+              "lens": "pinned-boundary-clearance",
+              "verdict": "passed",
+              "observation": "The scrollbar stays at the far right and does not intrude into the card or header."
+            },
+            {
+              "lens": "wrapping",
+              "verdict": "passed",
+              "observation": "Summary copy wraps to additional lines without colliding with the CTA or card border."
+            },
+            {
+              "lens": "clipping",
+              "verdict": "passed",
+              "observation": "No visible navigation label, breadcrumb item, or card control is cut at 1023 pixels."
+            },
+            {
+              "lens": "occlusion",
+              "verdict": "passed",
+              "observation": "The reorganized header does not cover the course-navigation row or page body."
+            },
+            {
+              "lens": "semantic-utility",
+              "verdict": "passed",
+              "observation": "The full preparation task remains usable immediately below the breakpoint."
+            },
+            {
+              "lens": "content-coherence",
+              "verdict": "passed",
+              "observation": "Selected choices remain consistent with the summary values shown beside them."
+            },
+            {
+              "lens": "affordance",
+              "verdict": "passed",
+              "observation": "Purple active states and pill controls continue to communicate interaction."
+            },
+            {
+              "lens": "responsive-composition",
+              "verdict": "passed",
+              "observation": "The shell stacks navigation beneath the logo row while preserving the two-column work area."
+            },
+            {
+              "lens": "visual-consistency",
+              "verdict": "passed",
+              "observation": "Color, typography, radii, and spacing remain consistent across the breakpoint change."
+            },
+            {
+              "lens": "empty-space-balance",
+              "verdict": "passed",
+              "observation": "The stacked header adds height but the content below remains visually balanced."
+            },
+            {
+              "lens": "task-scanability",
+              "verdict": "passed",
+              "observation": "Tabs, setup choices, and the primary action retain an obvious scan path."
+            }
+          ],
+          "challengeRecords": [
+            {
+              "challengeRef": "final-r11-1023.png:purpose-content",
+              "family": "purpose-content",
+              "suspectedProblem": "The lower breakpoint may hide a required interview choice.",
+              "pixelObservation": "Both segmented choices and all readiness facts are fully visible in the setup card.",
+              "disposition": "not-observed"
+            },
+            {
+              "challengeRef": "final-r11-1023.png:composition-spacing",
+              "family": "composition-spacing",
+              "suspectedProblem": "The stacked header may collide with the course navigation.",
+              "pixelObservation": "A separator and clear vertical gap keep the header, course-navigation row, and breadcrumb distinct.",
+              "disposition": "not-observed"
+            },
+            {
+              "challengeRef": "final-r11-1023.png:interaction-responsive",
+              "family": "interaction-responsive",
+              "suspectedProblem": "Breakpoint-edge actions may be clipped or overlapped.",
+              "pixelObservation": "Cart, notification, profile, tabs, segmented controls, and start action remain unobscured.",
+              "disposition": "not-observed"
+            }
+          ],
+          "verdict": "passed"
+        },
+        {
+          "imageRef": "final-r11-compact-top.png",
+          "pageInset": "The compact page maintains roughly sixteen-pixel side gutters around the main card and text.",
+          "surfaceOpacity": "The white setup card is clearly separated from the pale page with rounded corners.",
+          "contentPadding": "Heading and first segmented control have comfortable internal padding without edge contact.",
+          "alignment": "Logo, header icons, navigation, breadcrumb, title, tabs, and card share deliberate alignment.",
+          "verticalRhythm": "Header rows and page sections are vertically spaced consistently before the setup card.",
+          "hierarchy": "The page title, active tab, section label, and purple session eyebrow establish clear levels.",
+          "visualOwnership": "The setup card reads as the owned workspace for choosing interview configuration.",
+          "pinnedBoundaryClearance": "The vertical scrollbar sits outside the card and does not cover the visible control.",
+          "wrapping": "Vietnamese subtitle and setup description wrap into compact lines without awkward single words.",
+          "clipping": "The card continues below the viewport by scrolling; no visible text is cut by its surface.",
+          "occlusion": "No sticky element or overlay covers the title, tabs, section label, or card.",
+          "semanticUtility": "The start view supplies course context and immediately introduces the next interview task.",
+          "contentCoherence": "Breadcrumb, title, active overview tab, and preparation card describe the same task.",
+          "affordance": "Course navigation, tabs, and segmented control have clear button-like or active styling.",
+          "responsiveComposition": "Desktop columns have stacked into one compact card while retaining readable widths.",
+          "visualConsistency": "The compact header and content reuse the same typography, purple accent, and rounded surfaces.",
+          "emptySpaceBalance": "Dense header context is followed by a spacious card, avoiding a top-heavy composition.",
+          "lensVerdicts": [
+            {
+              "lens": "page-inset",
+              "verdict": "passed",
+              "observation": "The compact page maintains roughly sixteen-pixel side gutters around the main card and text."
+            },
+            {
+              "lens": "surface-opacity",
+              "verdict": "passed",
+              "observation": "The white setup card is clearly separated from the pale page with rounded corners."
+            },
+            {
+              "lens": "content-padding",
+              "verdict": "passed",
+              "observation": "Heading and first segmented control have comfortable internal padding without edge contact."
+            },
+            {
+              "lens": "alignment",
+              "verdict": "passed",
+              "observation": "Logo, header icons, navigation, breadcrumb, title, tabs, and card share deliberate alignment."
+            },
+            {
+              "lens": "vertical-rhythm",
+              "verdict": "passed",
+              "observation": "Header rows and page sections are vertically spaced consistently before the setup card."
+            },
+            {
+              "lens": "hierarchy",
+              "verdict": "passed",
+              "observation": "The page title, active tab, section label, and purple session eyebrow establish clear levels."
+            },
+            {
+              "lens": "visual-ownership",
+              "verdict": "passed",
+              "observation": "The setup card reads as the owned workspace for choosing interview configuration."
+            },
+            {
+              "lens": "pinned-boundary-clearance",
+              "verdict": "passed",
+              "observation": "The vertical scrollbar sits outside the card and does not cover the visible control."
+            },
+            {
+              "lens": "wrapping",
+              "verdict": "passed",
+              "observation": "Vietnamese subtitle and setup description wrap into compact lines without awkward single words."
+            },
+            {
+              "lens": "clipping",
+              "verdict": "passed",
+              "observation": "The card continues below the viewport by scrolling; no visible text is cut by its surface."
+            },
+            {
+              "lens": "occlusion",
+              "verdict": "passed",
+              "observation": "No sticky element or overlay covers the title, tabs, section label, or card."
+            },
+            {
+              "lens": "semantic-utility",
+              "verdict": "passed",
+              "observation": "The start view supplies course context and immediately introduces the next interview task."
+            },
+            {
+              "lens": "content-coherence",
+              "verdict": "passed",
+              "observation": "Breadcrumb, title, active overview tab, and preparation card describe the same task."
+            },
+            {
+              "lens": "affordance",
+              "verdict": "passed",
+              "observation": "Course navigation, tabs, and segmented control have clear button-like or active styling."
+            },
+            {
+              "lens": "responsive-composition",
+              "verdict": "passed",
+              "observation": "Desktop columns have stacked into one compact card while retaining readable widths."
+            },
+            {
+              "lens": "visual-consistency",
+              "verdict": "passed",
+              "observation": "The compact header and content reuse the same typography, purple accent, and rounded surfaces."
+            },
+            {
+              "lens": "empty-space-balance",
+              "verdict": "passed",
+              "observation": "Dense header context is followed by a spacious card, avoiding a top-heavy composition."
+            },
+            {
+              "lens": "task-scanability",
+              "verdict": "passed",
+              "observation": "The sequence from course context to overview to preparation is easy to scan."
+            }
+          ],
+          "challengeRecords": [
+            {
+              "challengeRef": "final-r11-compact-top.png:purpose-content",
+              "family": "purpose-content",
+              "suspectedProblem": "The compact start may obscure the primary task.",
+              "pixelObservation": "The visible section label and session card clearly state that the user is preparing the next interview.",
+              "disposition": "not-observed"
+            },
+            {
+              "challengeRef": "final-r11-compact-top.png:composition-spacing",
+              "family": "composition-spacing",
+              "suspectedProblem": "Multiple compact header rows may become crowded.",
+              "pixelObservation": "Logo row, primary navigation, course navigation, breadcrumb, title, and tabs retain separate bands.",
+              "disposition": "not-observed"
+            },
+            {
+              "challengeRef": "final-r11-compact-top.png:interaction-responsive",
+              "family": "interaction-responsive",
+              "suspectedProblem": "The first compact control may be too narrow to use.",
+              "pixelObservation": "The technical-question segmented option is fully visible with a broad rounded hit area.",
+              "disposition": "not-observed"
+            }
+          ],
+          "verdict": "passed"
+        },
+        {
+          "imageRef": "final-r11-compact-middle-selected.png",
+          "pageInset": "The visible card and lower history section keep consistent compact side gutters.",
+          "surfaceOpacity": "The setup summary and lower history card remain opaque against the pale gray page.",
+          "contentPadding": "Summary labels, explanation, and CTA have comfortable internal padding.",
+          "alignment": "Summary values align on one left axis and the history heading aligns with the card below.",
+          "verticalRhythm": "Fact groups, explanation, saved-session note, CTA, and history section use clear vertical spacing.",
+          "hierarchy": "The selected advanced level, system-design summary, and purple CTA remain visually prominent.",
+          "visualOwnership": "The summary portion of the stacked setup card clearly owns the readiness and launch information.",
+          "pinnedBoundaryClearance": "The right scrollbar does not cover the CTA, card edge, or history link.",
+          "wrapping": "Long Vietnamese explanation wraps within the card without spilling or isolated fragments.",
+          "clipping": "The top control is intentionally continued from above during middle scroll; in-card content is not clipped.",
+          "occlusion": "No overlay hides the selected state, summary facts, or primary action.",
+          "semanticUtility": "The pixels confirm the changed selections and preserve a direct path to start the interview.",
+          "contentCoherence": "Visible Cao cấp and Thiết kế hệ thống selections agree with the summary values below.",
+          "affordance": "The white selected pill and purple launch button provide clear state and action cues.",
+          "responsiveComposition": "The desktop card regions stack vertically while retaining a coherent selected-state summary.",
+          "visualConsistency": "Selected controls, purple headings, CTA, and rounded card styling remain visually consistent.",
+          "emptySpaceBalance": "The summary density and the following history section are balanced without excessive dead space.",
+          "lensVerdicts": [
+            {
+              "lens": "page-inset",
+              "verdict": "passed",
+              "observation": "The visible card and lower history section keep consistent compact side gutters."
+            },
+            {
+              "lens": "surface-opacity",
+              "verdict": "passed",
+              "observation": "The setup summary and lower history card remain opaque against the pale gray page."
+            },
+            {
+              "lens": "content-padding",
+              "verdict": "passed",
+              "observation": "Summary labels, explanation, and CTA have comfortable internal padding."
+            },
+            {
+              "lens": "alignment",
+              "verdict": "passed",
+              "observation": "Summary values align on one left axis and the history heading aligns with the card below."
+            },
+            {
+              "lens": "vertical-rhythm",
+              "verdict": "passed",
+              "observation": "Fact groups, explanation, saved-session note, CTA, and history section use clear vertical spacing."
+            },
+            {
+              "lens": "hierarchy",
+              "verdict": "passed",
+              "observation": "The selected advanced level, system-design summary, and purple CTA remain visually prominent."
+            },
+            {
+              "lens": "visual-ownership",
+              "verdict": "passed",
+              "observation": "The summary portion of the stacked setup card clearly owns the readiness and launch information."
+            },
+            {
+              "lens": "pinned-boundary-clearance",
+              "verdict": "passed",
+              "observation": "The right scrollbar does not cover the CTA, card edge, or history link."
+            },
+            {
+              "lens": "wrapping",
+              "verdict": "passed",
+              "observation": "Long Vietnamese explanation wraps within the card without spilling or isolated fragments."
+            },
+            {
+              "lens": "clipping",
+              "verdict": "passed",
+              "observation": "The top control is intentionally continued from above during middle scroll; in-card content is not clipped."
+            },
+            {
+              "lens": "occlusion",
+              "verdict": "passed",
+              "observation": "No overlay hides the selected state, summary facts, or primary action."
+            },
+            {
+              "lens": "semantic-utility",
+              "verdict": "passed",
+              "observation": "The pixels confirm the changed selections and preserve a direct path to start the interview."
+            },
+            {
+              "lens": "content-coherence",
+              "verdict": "passed",
+              "observation": "Visible Cao cấp and Thiết kế hệ thống selections agree with the summary values below."
+            },
+            {
+              "lens": "affordance",
+              "verdict": "passed",
+              "observation": "The white selected pill and purple launch button provide clear state and action cues."
+            },
+            {
+              "lens": "responsive-composition",
+              "verdict": "passed",
+              "observation": "The desktop card regions stack vertically while retaining a coherent selected-state summary."
+            },
+            {
+              "lens": "visual-consistency",
+              "verdict": "passed",
+              "observation": "Selected controls, purple headings, CTA, and rounded card styling remain visually consistent."
+            },
+            {
+              "lens": "empty-space-balance",
+              "verdict": "passed",
+              "observation": "The summary density and the following history section are balanced without excessive dead space."
+            },
+            {
+              "lens": "task-scanability",
+              "verdict": "passed",
+              "observation": "Users can scan selected level, format, focus, and launch action in a short vertical path."
+            }
+          ],
+          "challengeRecords": [
+            {
+              "challengeRef": "final-r11-compact-middle-selected.png:purpose-content",
+              "family": "purpose-content",
+              "suspectedProblem": "The changed selection may not propagate into the summary.",
+              "pixelObservation": "Cao cấp and Thiết kế hệ thống appear both in the selected controls and the summary text.",
+              "disposition": "not-observed"
+            },
+            {
+              "challengeRef": "final-r11-compact-middle-selected.png:composition-spacing",
+              "family": "composition-spacing",
+              "suspectedProblem": "The stacked summary may become overly dense in the middle viewport.",
+              "pixelObservation": "Labels, values, explanatory copy, CTA, and next section are separated by readable gaps.",
+              "disposition": "not-observed"
+            },
+            {
+              "challengeRef": "final-r11-compact-middle-selected.png:interaction-responsive",
+              "family": "interaction-responsive",
+              "suspectedProblem": "Selected controls may lack visible state feedback.",
+              "pixelObservation": "The Cao cấp segment is a raised white pill while adjacent choices remain on the gray track.",
+              "disposition": "not-observed"
+            }
+          ],
+          "verdict": "passed"
+        },
+        {
+          "imageRef": "final-r11-compact-terminal.png",
+          "pageInset": "History and progress sections keep consistent sixteen-pixel-like gutters at the page end.",
+          "surfaceOpacity": "Both empty-state cards are opaque white with subtle borders or shadows against gray.",
+          "contentPadding": "Icons and centered messages have generous internal breathing room.",
+          "alignment": "Section headings and card edges align vertically across the terminal composition.",
+          "verticalRhythm": "CTA tail, history heading and link, history card, progress heading, and progress card are evenly spaced.",
+          "hierarchy": "Section headings lead into muted empty-state messages with the CTA tail still visible above.",
+          "visualOwnership": "Each empty-state message is contained in its correctly labeled card surface.",
+          "pinnedBoundaryClearance": "The scrollbar thumb and terminal arrow remain outside content and reveal true page end.",
+          "wrapping": "Both Vietnamese empty-state messages wrap into centered, balanced lines.",
+          "clipping": "No card or message is clipped at the terminal position; the blank footer area is fully visible.",
+          "occlusion": "No sticky footer, overlay, or scrollbar covers the terminal content.",
+          "semanticUtility": "The page clearly explains why history and progress are empty after setup.",
+          "contentCoherence": "History and practice-progress labels match their respective bookmark and chart icons.",
+          "affordance": "The history link remains visibly actionable while empty cards correctly avoid fake actions.",
+          "responsiveComposition": "Both desktop lower panels stack cleanly into full-width compact cards.",
+          "visualConsistency": "Matching card shapes, icon tiles, centered copy, and spacing unify the two empty states.",
+          "emptySpaceBalance": "The remaining blank viewport below the final card is natural terminal space, not a layout gap.",
+          "lensVerdicts": [
+            {
+              "lens": "page-inset",
+              "verdict": "passed",
+              "observation": "History and progress sections keep consistent sixteen-pixel-like gutters at the page end."
+            },
+            {
+              "lens": "surface-opacity",
+              "verdict": "passed",
+              "observation": "Both empty-state cards are opaque white with subtle borders or shadows against gray."
+            },
+            {
+              "lens": "content-padding",
+              "verdict": "passed",
+              "observation": "Icons and centered messages have generous internal breathing room."
+            },
+            {
+              "lens": "alignment",
+              "verdict": "passed",
+              "observation": "Section headings and card edges align vertically across the terminal composition."
+            },
+            {
+              "lens": "vertical-rhythm",
+              "verdict": "passed",
+              "observation": "CTA tail, history heading and link, history card, progress heading, and progress card are evenly spaced."
+            },
+            {
+              "lens": "hierarchy",
+              "verdict": "passed",
+              "observation": "Section headings lead into muted empty-state messages with the CTA tail still visible above."
+            },
+            {
+              "lens": "visual-ownership",
+              "verdict": "passed",
+              "observation": "Each empty-state message is contained in its correctly labeled card surface."
+            },
+            {
+              "lens": "pinned-boundary-clearance",
+              "verdict": "passed",
+              "observation": "The scrollbar thumb and terminal arrow remain outside content and reveal true page end."
+            },
+            {
+              "lens": "wrapping",
+              "verdict": "passed",
+              "observation": "Both Vietnamese empty-state messages wrap into centered, balanced lines."
+            },
+            {
+              "lens": "clipping",
+              "verdict": "passed",
+              "observation": "No card or message is clipped at the terminal position; the blank footer area is fully visible."
+            },
+            {
+              "lens": "occlusion",
+              "verdict": "passed",
+              "observation": "No sticky footer, overlay, or scrollbar covers the terminal content."
+            },
+            {
+              "lens": "semantic-utility",
+              "verdict": "passed",
+              "observation": "The page clearly explains why history and progress are empty after setup."
+            },
+            {
+              "lens": "content-coherence",
+              "verdict": "passed",
+              "observation": "History and practice-progress labels match their respective bookmark and chart icons."
+            },
+            {
+              "lens": "affordance",
+              "verdict": "passed",
+              "observation": "The history link remains visibly actionable while empty cards correctly avoid fake actions."
+            },
+            {
+              "lens": "responsive-composition",
+              "verdict": "passed",
+              "observation": "Both desktop lower panels stack cleanly into full-width compact cards."
+            },
+            {
+              "lens": "visual-consistency",
+              "verdict": "passed",
+              "observation": "Matching card shapes, icon tiles, centered copy, and spacing unify the two empty states."
+            },
+            {
+              "lens": "empty-space-balance",
+              "verdict": "passed",
+              "observation": "The remaining blank viewport below the final card is natural terminal space, not a layout gap."
+            },
+            {
+              "lens": "task-scanability",
+              "verdict": "passed",
+              "observation": "The two empty sections can be distinguished and understood immediately."
+            }
+          ],
+          "challengeRecords": [
+            {
+              "challengeRef": "final-r11-compact-terminal.png:purpose-content",
+              "family": "purpose-content",
+              "suspectedProblem": "Terminal empty states may fail to explain missing data.",
+              "pixelObservation": "Each card explicitly states when completed interviews or statistics will appear.",
+              "disposition": "not-observed"
+            },
+            {
+              "challengeRef": "final-r11-compact-terminal.png:composition-spacing",
+              "family": "composition-spacing",
+              "suspectedProblem": "Stacked terminal cards may collide or leave uneven gaps.",
+              "pixelObservation": "History and progress cards have equal gutters, clear headings, and a consistent vertical gap.",
+              "disposition": "not-observed"
+            },
+            {
+              "challengeRef": "final-r11-compact-terminal.png:interaction-responsive",
+              "family": "interaction-responsive",
+              "suspectedProblem": "The terminal page may trap the user without navigation.",
+              "pixelObservation": "The history link and visible page scrollbar provide an obvious route away or back through content.",
+              "disposition": "not-observed"
+            }
+          ],
+          "verdict": "passed"
+        },
+        {
+          "imageRef": "final-r11-history.png",
+          "pageInset": "The history view maintains consistent compact gutters around tabs, text, and the empty-state card.",
+          "surfaceOpacity": "The large white history card contrasts clearly with the light gray background.",
+          "contentPadding": "The bookmark icon and centered explanatory copy have ample padding inside the card.",
+          "alignment": "Breadcrumb, title, active tab, history heading, count, and card share consistent left alignment.",
+          "verticalRhythm": "Title block, tabs, section metadata, and empty-state card have clear vertical separation.",
+          "hierarchy": "The active History tab leads to the section heading and count before the empty-state explanation.",
+          "visualOwnership": "The history card clearly owns the zero-history message and bookmark icon.",
+          "pinnedBoundaryClearance": "No fixed boundary or scrollbar overlaps the tabs or visible card content.",
+          "wrapping": "The Vietnamese empty-state sentence wraps into centered lines without clipping.",
+          "clipping": "The card continues below the viewport, but all visible pixels remain cleanly contained.",
+          "occlusion": "No header or overlay covers the active tab, history count, or card.",
+          "semanticUtility": "The page identifies zero completed sessions and explains where future history will appear.",
+          "contentCoherence": "History tab, breadcrumb endpoint, section heading, zero count, and bookmark icon agree.",
+          "affordance": "The active purple underline clearly identifies History while the other tabs remain available.",
+          "responsiveComposition": "The compact single-column history view fits without horizontal overflow.",
+          "visualConsistency": "Tab styling, headings, card radius, icon tile, and muted copy match the overview surfaces.",
+          "emptySpaceBalance": "A concise metadata block and a large centered empty state use the compact width well.",
+          "lensVerdicts": [
+            {
+              "lens": "page-inset",
+              "verdict": "passed",
+              "observation": "The history view maintains consistent compact gutters around tabs, text, and the empty-state card."
+            },
+            {
+              "lens": "surface-opacity",
+              "verdict": "passed",
+              "observation": "The large white history card contrasts clearly with the light gray background."
+            },
+            {
+              "lens": "content-padding",
+              "verdict": "passed",
+              "observation": "The bookmark icon and centered explanatory copy have ample padding inside the card."
+            },
+            {
+              "lens": "alignment",
+              "verdict": "passed",
+              "observation": "Breadcrumb, title, active tab, history heading, count, and card share consistent left alignment."
+            },
+            {
+              "lens": "vertical-rhythm",
+              "verdict": "passed",
+              "observation": "Title block, tabs, section metadata, and empty-state card have clear vertical separation."
+            },
+            {
+              "lens": "hierarchy",
+              "verdict": "passed",
+              "observation": "The active History tab leads to the section heading and count before the empty-state explanation."
+            },
+            {
+              "lens": "visual-ownership",
+              "verdict": "passed",
+              "observation": "The history card clearly owns the zero-history message and bookmark icon."
+            },
+            {
+              "lens": "pinned-boundary-clearance",
+              "verdict": "passed",
+              "observation": "No fixed boundary or scrollbar overlaps the tabs or visible card content."
+            },
+            {
+              "lens": "wrapping",
+              "verdict": "passed",
+              "observation": "The Vietnamese empty-state sentence wraps into centered lines without clipping."
+            },
+            {
+              "lens": "clipping",
+              "verdict": "passed",
+              "observation": "The card continues below the viewport, but all visible pixels remain cleanly contained."
+            },
+            {
+              "lens": "occlusion",
+              "verdict": "passed",
+              "observation": "No header or overlay covers the active tab, history count, or card."
+            },
+            {
+              "lens": "semantic-utility",
+              "verdict": "passed",
+              "observation": "The page identifies zero completed sessions and explains where future history will appear."
+            },
+            {
+              "lens": "content-coherence",
+              "verdict": "passed",
+              "observation": "History tab, breadcrumb endpoint, section heading, zero count, and bookmark icon agree."
+            },
+            {
+              "lens": "affordance",
+              "verdict": "passed",
+              "observation": "The active purple underline clearly identifies History while the other tabs remain available."
+            },
+            {
+              "lens": "responsive-composition",
+              "verdict": "passed",
+              "observation": "The compact single-column history view fits without horizontal overflow."
+            },
+            {
+              "lens": "visual-consistency",
+              "verdict": "passed",
+              "observation": "Tab styling, headings, card radius, icon tile, and muted copy match the overview surfaces."
+            },
+            {
+              "lens": "empty-space-balance",
+              "verdict": "passed",
+              "observation": "A concise metadata block and a large centered empty state use the compact width well."
+            },
+            {
+              "lens": "task-scanability",
+              "verdict": "passed",
+              "observation": "The zero-result status and its explanation are immediately scannable."
+            }
+          ],
+          "challengeRecords": [
+            {
+              "challengeRef": "final-r11-history.png:purpose-content",
+              "family": "purpose-content",
+              "suspectedProblem": "The empty history view may not communicate the result count.",
+              "pixelObservation": "The pixels show “0 phiên hoàn thành” directly above the explanatory empty-state card.",
+              "disposition": "not-observed"
+            },
+            {
+              "challengeRef": "final-r11-history.png:composition-spacing",
+              "family": "composition-spacing",
+              "suspectedProblem": "The history card may crowd the active tab.",
+              "pixelObservation": "A section heading and count create a clear buffer between the tab rule and card.",
+              "disposition": "not-observed"
+            },
+            {
+              "challengeRef": "final-r11-history.png:interaction-responsive",
+              "family": "interaction-responsive",
+              "suspectedProblem": "The active tab may be visually unclear.",
+              "pixelObservation": "Lịch sử uses dark text and a purple underline while neighboring tabs are muted.",
+              "disposition": "not-observed"
+            }
+          ],
+          "verdict": "passed"
+        },
+        {
+          "imageRef": "final-r11-stats.png",
+          "pageInset": "The statistics view uses consistent compact side gutters from tabs through the card.",
+          "surfaceOpacity": "The white statistics card is clearly separated from the pale gray page.",
+          "contentPadding": "The chart icon, explanatory text, and preparation action have generous interior padding.",
+          "alignment": "Breadcrumb, title, active tab, statistics heading, and card align to stable page axes.",
+          "verticalRhythm": "The title block, tabs, section heading, and empty-state content have consistent vertical gaps.",
+          "hierarchy": "The active Statistics tab and section heading frame the empty-state explanation and next action.",
+          "visualOwnership": "The statistics card contains the chart icon, explanation, and related preparation action.",
+          "pinnedBoundaryClearance": "Visible content stays clear of viewport edges and no pinned element covers the card.",
+          "wrapping": "The empty-state explanation wraps into two centered lines without awkward breaks.",
+          "clipping": "The bottom action is partly beyond the viewport due normal page continuation, not card-edge clipping.",
+          "occlusion": "No overlay hides the active tab, section heading, or visible empty-state message.",
+          "semanticUtility": "The view explains when statistics appear and offers a related preparation action.",
+          "contentCoherence": "Statistics labels, chart icon, explanatory copy, and prepare-interview action align semantically.",
+          "affordance": "The purple-underlined active tab and pale action pill are recognizable controls.",
+          "responsiveComposition": "The compact card and centered content fit the viewport with no horizontal overflow.",
+          "visualConsistency": "Card, icon tile, typography, and purple accent match the history empty state.",
+          "emptySpaceBalance": "Centered empty content occupies the card without appearing crowded or lost.",
+          "lensVerdicts": [
+            {
+              "lens": "page-inset",
+              "verdict": "passed",
+              "observation": "The statistics view uses consistent compact side gutters from tabs through the card."
+            },
+            {
+              "lens": "surface-opacity",
+              "verdict": "passed",
+              "observation": "The white statistics card is clearly separated from the pale gray page."
+            },
+            {
+              "lens": "content-padding",
+              "verdict": "passed",
+              "observation": "The chart icon, explanatory text, and preparation action have generous interior padding."
+            },
+            {
+              "lens": "alignment",
+              "verdict": "passed",
+              "observation": "Breadcrumb, title, active tab, statistics heading, and card align to stable page axes."
+            },
+            {
+              "lens": "vertical-rhythm",
+              "verdict": "passed",
+              "observation": "The title block, tabs, section heading, and empty-state content have consistent vertical gaps."
+            },
+            {
+              "lens": "hierarchy",
+              "verdict": "passed",
+              "observation": "The active Statistics tab and section heading frame the empty-state explanation and next action."
+            },
+            {
+              "lens": "visual-ownership",
+              "verdict": "passed",
+              "observation": "The statistics card contains the chart icon, explanation, and related preparation action."
+            },
+            {
+              "lens": "pinned-boundary-clearance",
+              "verdict": "passed",
+              "observation": "Visible content stays clear of viewport edges and no pinned element covers the card."
+            },
+            {
+              "lens": "wrapping",
+              "verdict": "passed",
+              "observation": "The empty-state explanation wraps into two centered lines without awkward breaks."
+            },
+            {
+              "lens": "clipping",
+              "verdict": "passed",
+              "observation": "The bottom action is partly beyond the viewport due normal page continuation, not card-edge clipping."
+            },
+            {
+              "lens": "occlusion",
+              "verdict": "passed",
+              "observation": "No overlay hides the active tab, section heading, or visible empty-state message."
+            },
+            {
+              "lens": "semantic-utility",
+              "verdict": "passed",
+              "observation": "The view explains when statistics appear and offers a related preparation action."
+            },
+            {
+              "lens": "content-coherence",
+              "verdict": "passed",
+              "observation": "Statistics labels, chart icon, explanatory copy, and prepare-interview action align semantically."
+            },
+            {
+              "lens": "affordance",
+              "verdict": "passed",
+              "observation": "The purple-underlined active tab and pale action pill are recognizable controls."
+            },
+            {
+              "lens": "responsive-composition",
+              "verdict": "passed",
+              "observation": "The compact card and centered content fit the viewport with no horizontal overflow."
+            },
+            {
+              "lens": "visual-consistency",
+              "verdict": "passed",
+              "observation": "Card, icon tile, typography, and purple accent match the history empty state."
+            },
+            {
+              "lens": "empty-space-balance",
+              "verdict": "passed",
+              "observation": "Centered empty content occupies the card without appearing crowded or lost."
+            },
+            {
+              "lens": "task-scanability",
+              "verdict": "passed",
+              "observation": "The missing-statistics reason and follow-up action are easy to find."
+            }
+          ],
+          "challengeRecords": [
+            {
+              "challengeRef": "final-r11-stats.png:purpose-content",
+              "family": "purpose-content",
+              "suspectedProblem": "The empty statistics page may provide no recovery action.",
+              "pixelObservation": "A visible “Chuẩn bị phỏng vấn” pill appears beneath the explanation inside the card.",
+              "disposition": "not-observed"
+            },
+            {
+              "challengeRef": "final-r11-stats.png:composition-spacing",
+              "family": "composition-spacing",
+              "suspectedProblem": "Centered statistics content may feel vertically unbalanced.",
+              "pixelObservation": "Icon, two-line message, and action form a compact centered stack with even gaps.",
+              "disposition": "not-observed"
+            },
+            {
+              "challengeRef": "final-r11-stats.png:interaction-responsive",
+              "family": "interaction-responsive",
+              "suspectedProblem": "The active Statistics tab may be ambiguous.",
+              "pixelObservation": "Thống kê is dark with a purple underline while Overview and History are muted.",
+              "disposition": "not-observed"
+            }
+          ],
+          "verdict": "passed"
+        },
+        {
+          "imageRef": "final-r11-keyboard-focus.png",
+          "pageInset": "The left edge of the shell is visibly displaced: only a sliver of the logo remains and breadcrumb content begins off-canvas.",
+          "surfaceOpacity": "The history empty-state card remains opaque and distinct from the page.",
+          "contentPadding": "Visible tab and history card content retain normal internal padding despite the shifted shell.",
+          "alignment": "The tab row and history section align locally, but top shell context is not aligned within the viewport.",
+          "verticalRhythm": "Vertical spacing around tabs, heading, count, and card is consistent.",
+          "hierarchy": "History remains selected while a purple rectangular focus outline appears around Overview.",
+          "visualOwnership": "The focus outline belongs to the Overview tab and the history content remains in its own card.",
+          "pinnedBoundaryClearance": "The focus state does not overlap the selected underline, but the shell crosses the left viewport boundary.",
+          "wrapping": "Visible history copy wraps normally, while the breadcrumb cannot be read from its beginning.",
+          "clipping": "Logo and leading breadcrumb content are visibly clipped at the left edge in this focus capture.",
+          "occlusion": "No overlay covers the tabs, but the viewport boundary itself hides left-side shell context.",
+          "semanticUtility": "Keyboard focus is visible, yet the shifted/clipped shell weakens context and safe keyboard navigation evidence.",
+          "contentCoherence": "Overview has focus while History remains selected, a valid distinction, but the clipped shell is incoherent.",
+          "affordance": "The rectangular purple focus ring is clearly visible around the Overview tab.",
+          "responsiveComposition": "Keyboard focus coincides with a laterally displaced compact shell, exposing a responsive overflow failure.",
+          "visualConsistency": "Focus color matches the purple system, while its rectangular outline differs intentionally from selection.",
+          "emptySpaceBalance": "The clipped logo and breadcrumb make the upper composition visibly unbalanced to the left.",
+          "lensVerdicts": [
+            {
+              "lens": "page-inset",
+              "verdict": "problem",
+              "observation": "The left edge of the shell is visibly displaced: only a sliver of the logo remains and breadcrumb content begins off-canvas."
+            },
+            {
+              "lens": "surface-opacity",
+              "verdict": "passed",
+              "observation": "The history empty-state card remains opaque and distinct from the page."
+            },
+            {
+              "lens": "content-padding",
+              "verdict": "passed",
+              "observation": "Visible tab and history card content retain normal internal padding despite the shifted shell."
+            },
+            {
+              "lens": "alignment",
+              "verdict": "problem",
+              "observation": "The tab row and history section align locally, but top shell context is not aligned within the viewport."
+            },
+            {
+              "lens": "vertical-rhythm",
+              "verdict": "passed",
+              "observation": "Vertical spacing around tabs, heading, count, and card is consistent."
+            },
+            {
+              "lens": "hierarchy",
+              "verdict": "passed",
+              "observation": "History remains selected while a purple rectangular focus outline appears around Overview."
+            },
+            {
+              "lens": "visual-ownership",
+              "verdict": "passed",
+              "observation": "The focus outline belongs to the Overview tab and the history content remains in its own card."
+            },
+            {
+              "lens": "pinned-boundary-clearance",
+              "verdict": "passed",
+              "observation": "The focus state does not overlap the selected underline, but the shell crosses the left viewport boundary."
+            },
+            {
+              "lens": "wrapping",
+              "verdict": "passed",
+              "observation": "Visible history copy wraps normally, while the breadcrumb cannot be read from its beginning."
+            },
+            {
+              "lens": "clipping",
+              "verdict": "problem",
+              "observation": "Logo and leading breadcrumb content are visibly clipped at the left edge in this focus capture."
+            },
+            {
+              "lens": "occlusion",
+              "verdict": "passed",
+              "observation": "No overlay covers the tabs, but the viewport boundary itself hides left-side shell context."
+            },
+            {
+              "lens": "semantic-utility",
+              "verdict": "passed",
+              "observation": "Keyboard focus is visible, yet the shifted/clipped shell weakens context and safe keyboard navigation evidence."
+            },
+            {
+              "lens": "content-coherence",
+              "verdict": "passed",
+              "observation": "Overview has focus while History remains selected, a valid distinction, but the clipped shell is incoherent."
+            },
+            {
+              "lens": "affordance",
+              "verdict": "passed",
+              "observation": "The rectangular purple focus ring is clearly visible around the Overview tab."
+            },
+            {
+              "lens": "responsive-composition",
+              "verdict": "problem",
+              "observation": "Keyboard focus coincides with a laterally displaced compact shell, exposing a responsive overflow failure."
+            },
+            {
+              "lens": "visual-consistency",
+              "verdict": "passed",
+              "observation": "Focus color matches the purple system, while its rectangular outline differs intentionally from selection."
+            },
+            {
+              "lens": "empty-space-balance",
+              "verdict": "problem",
+              "observation": "The clipped logo and breadcrumb make the upper composition visibly unbalanced to the left."
+            },
+            {
+              "lens": "task-scanability",
+              "verdict": "problem",
+              "observation": "The active History content is scannable, but clipped context makes the overall task harder to orient."
+            }
+          ],
+          "challengeRecords": [
+            {
+              "challengeRef": "final-r11-keyboard-focus.png:purpose-content",
+              "family": "purpose-content",
+              "suspectedProblem": "Keyboard focus may leave the current tab state unclear.",
+              "pixelObservation": "History retains its underline while Overview has a separate purple focus rectangle, so focus and selection are distinguishable.",
+              "disposition": "not-observed"
+            },
+            {
+              "challengeRef": "final-r11-keyboard-focus.png:composition-spacing",
+              "family": "composition-spacing",
+              "suspectedProblem": "Focusing a tab may shift the compact page out of frame.",
+              "pixelObservation": "Only a sliver of the logo is visible and the breadcrumb starts mid-phrase at the left image edge.",
+              "disposition": "confirmed"
+            },
+            {
+              "challengeRef": "final-r11-keyboard-focus.png:interaction-responsive",
+              "family": "interaction-responsive",
+              "suspectedProblem": "The keyboard focus capture may expose viewport overflow.",
+              "pixelObservation": "The focus ring is visible, but top shell and breadcrumb pixels are clipped on the left in the same capture.",
+              "disposition": "not-observed"
+            }
+          ],
+          "verdict": "repair"
+        },
+        {
+          "imageRef": "final-r11-recovery-compact.png",
+          "pageInset": "The recovery card keeps healthy side gutters, but the breadcrumb runs into and is cut by the right viewport edge.",
+          "surfaceOpacity": "The white recovery card is opaque and clearly separated from the light gray page.",
+          "contentPadding": "Retry icon, message, and action have ample centered spacing inside the recovery card.",
+          "alignment": "Header, title block, and recovery card align well; the overlong breadcrumb does not fit its row.",
+          "verticalRhythm": "Navigation, breadcrumb, title, and recovery card are vertically separated with consistent gaps.",
+          "hierarchy": "The interview title precedes a prominent centered error state and retry action.",
+          "visualOwnership": "The error icon, failure message, and retry pill are clearly owned by one recovery card.",
+          "pinnedBoundaryClearance": "The right viewport boundary cuts the final breadcrumb label instead of containing or wrapping it.",
+          "wrapping": "The long “Fullstack Mastery Missing” breadcrumb stays on one line and truncates the current item.",
+          "clipping": "The breadcrumb ends at “Chuẩ” against the right edge, visibly clipping the current context.",
+          "occlusion": "No overlay covers the recovery card or retry control.",
+          "semanticUtility": "The recovery surface explains the failure and exposes a clear retry action.",
+          "contentCoherence": "The missing-course label explains the failure, but clipped current breadcrumb context reduces coherence.",
+          "affordance": "The refresh icon and “Thử lại” pill clearly communicate retry behavior.",
+          "responsiveComposition": "The compact recovery card adapts, but the breadcrumb fails to adapt to the longer course name.",
+          "visualConsistency": "Error card styling, icon tile, rounded action, and typography match the rest of the interface.",
+          "emptySpaceBalance": "The centered recovery card is balanced, though the clipped breadcrumb pulls attention to the right edge.",
+          "lensVerdicts": [
+            {
+              "lens": "page-inset",
+              "verdict": "passed",
+              "observation": "The recovery card keeps healthy side gutters, but the breadcrumb runs into and is cut by the right viewport edge."
+            },
+            {
+              "lens": "surface-opacity",
+              "verdict": "passed",
+              "observation": "The white recovery card is opaque and clearly separated from the light gray page."
+            },
+            {
+              "lens": "content-padding",
+              "verdict": "passed",
+              "observation": "Retry icon, message, and action have ample centered spacing inside the recovery card."
+            },
+            {
+              "lens": "alignment",
+              "verdict": "passed",
+              "observation": "Header, title block, and recovery card align well; the overlong breadcrumb does not fit its row."
+            },
+            {
+              "lens": "vertical-rhythm",
+              "verdict": "passed",
+              "observation": "Navigation, breadcrumb, title, and recovery card are vertically separated with consistent gaps."
+            },
+            {
+              "lens": "hierarchy",
+              "verdict": "passed",
+              "observation": "The interview title precedes a prominent centered error state and retry action."
+            },
+            {
+              "lens": "visual-ownership",
+              "verdict": "passed",
+              "observation": "The error icon, failure message, and retry pill are clearly owned by one recovery card."
+            },
+            {
+              "lens": "pinned-boundary-clearance",
+              "verdict": "problem",
+              "observation": "The right viewport boundary cuts the final breadcrumb label instead of containing or wrapping it."
+            },
+            {
+              "lens": "wrapping",
+              "verdict": "problem",
+              "observation": "The long “Fullstack Mastery Missing” breadcrumb stays on one line and truncates the current item."
+            },
+            {
+              "lens": "clipping",
+              "verdict": "problem",
+              "observation": "The breadcrumb ends at “Chuẩ” against the right edge, visibly clipping the current context."
+            },
+            {
+              "lens": "occlusion",
+              "verdict": "passed",
+              "observation": "No overlay covers the recovery card or retry control."
+            },
+            {
+              "lens": "semantic-utility",
+              "verdict": "passed",
+              "observation": "The recovery surface explains the failure and exposes a clear retry action."
+            },
+            {
+              "lens": "content-coherence",
+              "verdict": "problem",
+              "observation": "The missing-course label explains the failure, but clipped current breadcrumb context reduces coherence."
+            },
+            {
+              "lens": "affordance",
+              "verdict": "passed",
+              "observation": "The refresh icon and “Thử lại” pill clearly communicate retry behavior."
+            },
+            {
+              "lens": "responsive-composition",
+              "verdict": "problem",
+              "observation": "The compact recovery card adapts, but the breadcrumb fails to adapt to the longer course name."
+            },
+            {
+              "lens": "visual-consistency",
+              "verdict": "passed",
+              "observation": "Error card styling, icon tile, rounded action, and typography match the rest of the interface."
+            },
+            {
+              "lens": "empty-space-balance",
+              "verdict": "passed",
+              "observation": "The centered recovery card is balanced, though the clipped breadcrumb pulls attention to the right edge."
+            },
+            {
+              "lens": "task-scanability",
+              "verdict": "problem",
+              "observation": "The recovery action is easy to scan, but the malformed breadcrumb impairs orientation."
+            }
+          ],
+          "challengeRecords": [
+            {
+              "challengeRef": "final-r11-recovery-compact.png:purpose-content",
+              "family": "purpose-content",
+              "suspectedProblem": "The recovery state may omit a way to continue.",
+              "pixelObservation": "The card states that interview preparation failed to load and provides a visible “Thử lại” control.",
+              "disposition": "not-observed"
+            },
+            {
+              "challengeRef": "final-r11-recovery-compact.png:composition-spacing",
+              "family": "composition-spacing",
+              "suspectedProblem": "Long recovery context may overflow compact navigation.",
+              "pixelObservation": "The breadcrumb reaches the right edge and visibly stops mid-word at “Chuẩ”.",
+              "disposition": "confirmed"
+            },
+            {
+              "challengeRef": "final-r11-recovery-compact.png:interaction-responsive",
+              "family": "interaction-responsive",
+              "suspectedProblem": "Recovery UI may hide or clip the retry affordance.",
+              "pixelObservation": "The retry icon and pill are fully visible, but the breadcrumb context above is clipped.",
+              "disposition": "not-observed"
+            }
+          ],
+          "verdict": "repair"
+        },
+        {
+          "imageRef": "final-r11-resume-compact.png",
+          "pageInset": "The page is visibly shifted at the left edge: the logo is reduced to a fragment and breadcrumb text begins mid-label.",
+          "surfaceOpacity": "The pale purple resume panel is clearly distinguishable from the gray page and white lower surfaces.",
+          "contentPadding": "Resume heading, explanatory copy, and purple action have comfortable padding within the panel.",
+          "alignment": "The tabs and resume content align locally, but shell content is displaced outside the left viewport.",
+          "verticalRhythm": "Title, tabs, resume panel copy, and CTA have clear vertical spacing.",
+          "hierarchy": "The lavender resume panel and saturated continue button clearly dominate the return flow.",
+          "visualOwnership": "The resume message and continue action are grouped in a single tinted panel.",
+          "pinnedBoundaryClearance": "The left viewport boundary clips shell and breadcrumb content during the resume state.",
+          "wrapping": "Resume copy wraps cleanly, while the leading breadcrumb segment is unavailable off-canvas.",
+          "clipping": "Logo and breadcrumb are visibly clipped on the left even though the resume action itself fits.",
+          "occlusion": "No overlay covers the resume panel, but off-canvas shell content is lost at the viewport edge.",
+          "semanticUtility": "The panel clearly explains an unfinished session and offers continuation.",
+          "contentCoherence": "The resume message and continue action agree, while displaced surrounding context appears unstable.",
+          "affordance": "The purple “Tiếp tục phỏng vấn” button is prominent and includes a directional arrow.",
+          "responsiveComposition": "The compact resume state introduces visible horizontal displacement or overflow in the shell.",
+          "visualConsistency": "Resume colors and button treatment match the established purple visual language.",
+          "emptySpaceBalance": "The left-clipped shell makes the top composition unbalanced despite a well-centered resume panel.",
+          "lensVerdicts": [
+            {
+              "lens": "page-inset",
+              "verdict": "problem",
+              "observation": "The page is visibly shifted at the left edge: the logo is reduced to a fragment and breadcrumb text begins mid-label."
+            },
+            {
+              "lens": "surface-opacity",
+              "verdict": "passed",
+              "observation": "The pale purple resume panel is clearly distinguishable from the gray page and white lower surfaces."
+            },
+            {
+              "lens": "content-padding",
+              "verdict": "passed",
+              "observation": "Resume heading, explanatory copy, and purple action have comfortable padding within the panel."
+            },
+            {
+              "lens": "alignment",
+              "verdict": "problem",
+              "observation": "The tabs and resume content align locally, but shell content is displaced outside the left viewport."
+            },
+            {
+              "lens": "vertical-rhythm",
+              "verdict": "passed",
+              "observation": "Title, tabs, resume panel copy, and CTA have clear vertical spacing."
+            },
+            {
+              "lens": "hierarchy",
+              "verdict": "passed",
+              "observation": "The lavender resume panel and saturated continue button clearly dominate the return flow."
+            },
+            {
+              "lens": "visual-ownership",
+              "verdict": "passed",
+              "observation": "The resume message and continue action are grouped in a single tinted panel."
+            },
+            {
+              "lens": "pinned-boundary-clearance",
+              "verdict": "problem",
+              "observation": "The left viewport boundary clips shell and breadcrumb content during the resume state."
+            },
+            {
+              "lens": "wrapping",
+              "verdict": "passed",
+              "observation": "Resume copy wraps cleanly, while the leading breadcrumb segment is unavailable off-canvas."
+            },
+            {
+              "lens": "clipping",
+              "verdict": "problem",
+              "observation": "Logo and breadcrumb are visibly clipped on the left even though the resume action itself fits."
+            },
+            {
+              "lens": "occlusion",
+              "verdict": "passed",
+              "observation": "No overlay covers the resume panel, but off-canvas shell content is lost at the viewport edge."
+            },
+            {
+              "lens": "semantic-utility",
+              "verdict": "passed",
+              "observation": "The panel clearly explains an unfinished session and offers continuation."
+            },
+            {
+              "lens": "content-coherence",
+              "verdict": "passed",
+              "observation": "The resume message and continue action agree, while displaced surrounding context appears unstable."
+            },
+            {
+              "lens": "affordance",
+              "verdict": "passed",
+              "observation": "The purple “Tiếp tục phỏng vấn” button is prominent and includes a directional arrow."
+            },
+            {
+              "lens": "responsive-composition",
+              "verdict": "problem",
+              "observation": "The compact resume state introduces visible horizontal displacement or overflow in the shell."
+            },
+            {
+              "lens": "visual-consistency",
+              "verdict": "passed",
+              "observation": "Resume colors and button treatment match the established purple visual language."
+            },
+            {
+              "lens": "empty-space-balance",
+              "verdict": "problem",
+              "observation": "The left-clipped shell makes the top composition unbalanced despite a well-centered resume panel."
+            },
+            {
+              "lens": "task-scanability",
+              "verdict": "problem",
+              "observation": "The continue action scans well, but the clipped course context harms orientation."
+            }
+          ],
+          "challengeRecords": [
+            {
+              "challengeRef": "final-r11-resume-compact.png:purpose-content",
+              "family": "purpose-content",
+              "suspectedProblem": "The resume state may not clearly explain why continuation is offered.",
+              "pixelObservation": "The panel states the latest session is still valid and describes continuing before starting another.",
+              "disposition": "not-observed"
+            },
+            {
+              "challengeRef": "final-r11-resume-compact.png:composition-spacing",
+              "family": "composition-spacing",
+              "suspectedProblem": "Resume content may force the compact shell sideways.",
+              "pixelObservation": "The logo is only partly visible and the breadcrumb starts with the tail of a word at the left edge.",
+              "disposition": "confirmed"
+            },
+            {
+              "challengeRef": "final-r11-resume-compact.png:interaction-responsive",
+              "family": "interaction-responsive",
+              "suspectedProblem": "The continue action may be clipped or covered.",
+              "pixelObservation": "The purple continue button is fully visible, but the surrounding shell has shifted outside the viewport.",
+              "disposition": "not-observed"
+            }
+          ],
+          "verdict": "repair"
+        },
+        {
+          "imageRef": "final-r11-content-stress-en-start.png",
+          "pageInset": "The English compact page keeps consistent side gutters around navigation, tabs, and setup card.",
+          "surfaceOpacity": "The setup card remains opaque white, but several gray skeleton bars occupy the page identity area.",
+          "contentPadding": "Visible card controls retain healthy padding and the skeleton bars sit within the content column.",
+          "alignment": "Navigation, breadcrumb, skeleton bars, tabs, and card align to the compact grid.",
+          "verticalRhythm": "Skeleton rows consume the title block with orderly gaps, followed by tabs and the setup section.",
+          "hierarchy": "Overview and the setup section remain visible, but the missing title and introduction weaken hierarchy.",
+          "visualOwnership": "Skeleton placeholders visually occupy the page identity region instead of showing the long English content.",
+          "pinnedBoundaryClearance": "Scrollbar, cards, and controls remain clear of viewport boundaries.",
+          "wrapping": "Visible English tab and control labels fit, but the intended long title/body text is not rendered to test wrapping.",
+          "clipping": "No rendered label is cut; the evidence gap is substitution by skeletons rather than edge clipping.",
+          "occlusion": "No overlay covers the page, though loading placeholders replace the key content under test.",
+          "semanticUtility": "The screenshot does not demonstrate a steady long-content start because title and description remain loading placeholders.",
+          "contentCoherence": "A loaded breadcrumb, tabs, and controls coexist with skeleton page identity content, producing a mixed state.",
+          "affordance": "Visible tabs and technical/system-design control remain recognizable despite incomplete content.",
+          "responsiveComposition": "The compact structure itself fits, but long-copy responsiveness cannot be verified from placeholder bars.",
+          "visualConsistency": "Skeleton shapes use the neutral loading style, yet their presence conflicts with the otherwise loaded page.",
+          "emptySpaceBalance": "The placeholder block is spatially balanced but leaves the page purpose visually under-specified.",
+          "lensVerdicts": [
+            {
+              "lens": "page-inset",
+              "verdict": "passed",
+              "observation": "The English compact page keeps consistent side gutters around navigation, tabs, and setup card."
+            },
+            {
+              "lens": "surface-opacity",
+              "verdict": "passed",
+              "observation": "The setup card remains opaque white, but several gray skeleton bars occupy the page identity area."
+            },
+            {
+              "lens": "content-padding",
+              "verdict": "passed",
+              "observation": "Visible card controls retain healthy padding and the skeleton bars sit within the content column."
+            },
+            {
+              "lens": "alignment",
+              "verdict": "passed",
+              "observation": "Navigation, breadcrumb, skeleton bars, tabs, and card align to the compact grid."
+            },
+            {
+              "lens": "vertical-rhythm",
+              "verdict": "passed",
+              "observation": "Skeleton rows consume the title block with orderly gaps, followed by tabs and the setup section."
+            },
+            {
+              "lens": "hierarchy",
+              "verdict": "problem",
+              "observation": "Overview and the setup section remain visible, but the missing title and introduction weaken hierarchy."
+            },
+            {
+              "lens": "visual-ownership",
+              "verdict": "problem",
+              "observation": "Skeleton placeholders visually occupy the page identity region instead of showing the long English content."
+            },
+            {
+              "lens": "pinned-boundary-clearance",
+              "verdict": "passed",
+              "observation": "Scrollbar, cards, and controls remain clear of viewport boundaries."
+            },
+            {
+              "lens": "wrapping",
+              "verdict": "problem",
+              "observation": "Visible English tab and control labels fit, but the intended long title/body text is not rendered to test wrapping."
+            },
+            {
+              "lens": "clipping",
+              "verdict": "passed",
+              "observation": "No rendered label is cut; the evidence gap is substitution by skeletons rather than edge clipping."
+            },
+            {
+              "lens": "occlusion",
+              "verdict": "passed",
+              "observation": "No overlay covers the page, though loading placeholders replace the key content under test."
+            },
+            {
+              "lens": "semantic-utility",
+              "verdict": "problem",
+              "observation": "The screenshot does not demonstrate a steady long-content start because title and description remain loading placeholders."
+            },
+            {
+              "lens": "content-coherence",
+              "verdict": "problem",
+              "observation": "A loaded breadcrumb, tabs, and controls coexist with skeleton page identity content, producing a mixed state."
+            },
+            {
+              "lens": "affordance",
+              "verdict": "passed",
+              "observation": "Visible tabs and technical/system-design control remain recognizable despite incomplete content."
+            },
+            {
+              "lens": "responsive-composition",
+              "verdict": "problem",
+              "observation": "The compact structure itself fits, but long-copy responsiveness cannot be verified from placeholder bars."
+            },
+            {
+              "lens": "visual-consistency",
+              "verdict": "passed",
+              "observation": "Skeleton shapes use the neutral loading style, yet their presence conflicts with the otherwise loaded page."
+            },
+            {
+              "lens": "empty-space-balance",
+              "verdict": "passed",
+              "observation": "The placeholder block is spatially balanced but leaves the page purpose visually under-specified."
+            },
+            {
+              "lens": "task-scanability",
+              "verdict": "problem",
+              "observation": "Users can find Overview and setup, but cannot scan the missing page title or long introduction."
+            }
+          ],
+          "challengeRecords": [
+            {
+              "challengeRef": "final-r11-content-stress-en-start.png:purpose-content",
+              "family": "purpose-content",
+              "suspectedProblem": "The long-content start may not actually show the content under test.",
+              "pixelObservation": "Three gray skeleton rows replace the title and introductory copy while surrounding controls are already rendered.",
+              "disposition": "confirmed"
+            },
+            {
+              "challengeRef": "final-r11-content-stress-en-start.png:composition-spacing",
+              "family": "composition-spacing",
+              "suspectedProblem": "Long English text may overflow the compact title region.",
+              "pixelObservation": "The required long title and description are absent, so their compact wrapping and spacing cannot be observed.",
+              "disposition": "not-observed"
+            },
+            {
+              "challengeRef": "final-r11-content-stress-en-start.png:interaction-responsive",
+              "family": "interaction-responsive",
+              "suspectedProblem": "Loading placeholders may leave controls active in a mixed state.",
+              "pixelObservation": "Tabs and segmented choices look interactive while key page identity content still appears as skeleton bars.",
+              "disposition": "not-observed"
+            }
+          ],
+          "verdict": "repair"
+        },
+        {
+          "imageRef": "final-r11-content-stress-en-terminal.png",
+          "pageInset": "The English terminal sections retain consistent compact side gutters.",
+          "surfaceOpacity": "History and progress cards are opaque white against the pale gray page.",
+          "contentPadding": "Icons and centered English empty-state copy have comfortable card padding.",
+          "alignment": "Section headings, history link, and stacked card edges align consistently.",
+          "verticalRhythm": "Start-button tail, recent-history heading, link, card, practice heading, and card have regular gaps.",
+          "hierarchy": "Section headings and the history link frame secondary empty-state messages clearly.",
+          "visualOwnership": "Bookmark and chart messages sit within their corresponding named surfaces.",
+          "pinnedBoundaryClearance": "Scrollbar remains outside the cards and the terminal arrow confirms the page end.",
+          "wrapping": "Long English empty-state sentences wrap into centered lines without overflow.",
+          "clipping": "All English messages and cards are fully contained at the terminal position.",
+          "occlusion": "No overlay or fixed footer covers the stressed English content.",
+          "semanticUtility": "Both terminal empty states explain when their data will become available.",
+          "contentCoherence": "Recent interviews and practice progress pair with the expected bookmark and chart messages.",
+          "affordance": "View all history remains an obvious pill-like link and the preceding start action is still visible.",
+          "responsiveComposition": "Long English terminal copy fits the compact width without horizontal scrolling.",
+          "visualConsistency": "Card radii, icon tiles, centered copy, and purple links match the compact system.",
+          "emptySpaceBalance": "The two stacked cards and remaining bottom whitespace form a balanced terminal view.",
+          "lensVerdicts": [
+            {
+              "lens": "page-inset",
+              "verdict": "passed",
+              "observation": "The English terminal sections retain consistent compact side gutters."
+            },
+            {
+              "lens": "surface-opacity",
+              "verdict": "passed",
+              "observation": "History and progress cards are opaque white against the pale gray page."
+            },
+            {
+              "lens": "content-padding",
+              "verdict": "passed",
+              "observation": "Icons and centered English empty-state copy have comfortable card padding."
+            },
+            {
+              "lens": "alignment",
+              "verdict": "passed",
+              "observation": "Section headings, history link, and stacked card edges align consistently."
+            },
+            {
+              "lens": "vertical-rhythm",
+              "verdict": "passed",
+              "observation": "Start-button tail, recent-history heading, link, card, practice heading, and card have regular gaps."
+            },
+            {
+              "lens": "hierarchy",
+              "verdict": "passed",
+              "observation": "Section headings and the history link frame secondary empty-state messages clearly."
+            },
+            {
+              "lens": "visual-ownership",
+              "verdict": "passed",
+              "observation": "Bookmark and chart messages sit within their corresponding named surfaces."
+            },
+            {
+              "lens": "pinned-boundary-clearance",
+              "verdict": "passed",
+              "observation": "Scrollbar remains outside the cards and the terminal arrow confirms the page end."
+            },
+            {
+              "lens": "wrapping",
+              "verdict": "passed",
+              "observation": "Long English empty-state sentences wrap into centered lines without overflow."
+            },
+            {
+              "lens": "clipping",
+              "verdict": "passed",
+              "observation": "All English messages and cards are fully contained at the terminal position."
+            },
+            {
+              "lens": "occlusion",
+              "verdict": "passed",
+              "observation": "No overlay or fixed footer covers the stressed English content."
+            },
+            {
+              "lens": "semantic-utility",
+              "verdict": "passed",
+              "observation": "Both terminal empty states explain when their data will become available."
+            },
+            {
+              "lens": "content-coherence",
+              "verdict": "passed",
+              "observation": "Recent interviews and practice progress pair with the expected bookmark and chart messages."
+            },
+            {
+              "lens": "affordance",
+              "verdict": "passed",
+              "observation": "View all history remains an obvious pill-like link and the preceding start action is still visible."
+            },
+            {
+              "lens": "responsive-composition",
+              "verdict": "passed",
+              "observation": "Long English terminal copy fits the compact width without horizontal scrolling."
+            },
+            {
+              "lens": "visual-consistency",
+              "verdict": "passed",
+              "observation": "Card radii, icon tiles, centered copy, and purple links match the compact system."
+            },
+            {
+              "lens": "empty-space-balance",
+              "verdict": "passed",
+              "observation": "The two stacked cards and remaining bottom whitespace form a balanced terminal view."
+            },
+            {
+              "lens": "task-scanability",
+              "verdict": "passed",
+              "observation": "English headings and messages are short, distinct, and immediately scannable."
+            }
+          ],
+          "challengeRecords": [
+            {
+              "challengeRef": "final-r11-content-stress-en-terminal.png:purpose-content",
+              "family": "purpose-content",
+              "suspectedProblem": "Long English terminal copy may become ambiguous or truncated.",
+              "pixelObservation": "Both cards show complete explanatory sentences identifying when history and statistics will appear.",
+              "disposition": "not-observed"
+            },
+            {
+              "challengeRef": "final-r11-content-stress-en-terminal.png:composition-spacing",
+              "family": "composition-spacing",
+              "suspectedProblem": "Long English messages may overflow narrow cards.",
+              "pixelObservation": "Each message wraps into two or three centered lines with visible side padding.",
+              "disposition": "not-observed"
+            },
+            {
+              "challengeRef": "final-r11-content-stress-en-terminal.png:interaction-responsive",
+              "family": "interaction-responsive",
+              "suspectedProblem": "The terminal history link may be clipped at compact width.",
+              "pixelObservation": "“View all history” and its arrow are fully visible in a rounded pale action surface.",
+              "disposition": "not-observed"
+            }
+          ],
+          "verdict": "passed"
+        },
+        {
+          "imageRef": "final-r11-course-drawer-open.png",
+          "pageInset": "The drawer occupies most of the compact width with a narrow dimmed background strip on the right.",
+          "surfaceOpacity": "The drawer is opaque white and the underlying page is visibly darkened by a translucent scrim.",
+          "contentPadding": "Drawer title, close button, group labels, and navigation rows have consistent padding.",
+          "alignment": "Icons and labels align in a clean vertical list while the close button aligns with the title.",
+          "verticalRhythm": "Group labels and navigation rows have regular spacing that separates the menu sections.",
+          "hierarchy": "Drawer title and close control lead, with muted group labels and a purple selected row.",
+          "visualOwnership": "All course-navigation choices are contained within the drawer; background content is clearly inactive.",
+          "pinnedBoundaryClearance": "Drawer edge and circular close control remain fully inside the viewport with no collision.",
+          "wrapping": "Vietnamese menu labels fit on one line and the ranking badge stays beside its label.",
+          "clipping": "No drawer label or icon is clipped; background fragments are expected beneath the overlay.",
+          "occlusion": "The drawer intentionally occludes most page content while leaving a consistent scrim strip.",
+          "semanticUtility": "The menu exposes course destinations and clearly marks the current mock-interview section.",
+          "contentCoherence": "Selected Phỏng vấn thử row matches the interview page visible beneath the scrim.",
+          "affordance": "The close icon and full-width highlighted navigation row are obvious interactive targets.",
+          "responsiveComposition": "The drawer width preserves readable labels while retaining enough scrim to communicate modality.",
+          "visualConsistency": "Icons, group labels, selected lavender row, and typography follow a consistent navigation system.",
+          "emptySpaceBalance": "The dense drawer list is balanced by generous horizontal padding and grouped spacing.",
+          "lensVerdicts": [
+            {
+              "lens": "page-inset",
+              "verdict": "passed",
+              "observation": "The drawer occupies most of the compact width with a narrow dimmed background strip on the right."
+            },
+            {
+              "lens": "surface-opacity",
+              "verdict": "passed",
+              "observation": "The drawer is opaque white and the underlying page is visibly darkened by a translucent scrim."
+            },
+            {
+              "lens": "content-padding",
+              "verdict": "passed",
+              "observation": "Drawer title, close button, group labels, and navigation rows have consistent padding."
+            },
+            {
+              "lens": "alignment",
+              "verdict": "passed",
+              "observation": "Icons and labels align in a clean vertical list while the close button aligns with the title."
+            },
+            {
+              "lens": "vertical-rhythm",
+              "verdict": "passed",
+              "observation": "Group labels and navigation rows have regular spacing that separates the menu sections."
+            },
+            {
+              "lens": "hierarchy",
+              "verdict": "passed",
+              "observation": "Drawer title and close control lead, with muted group labels and a purple selected row."
+            },
+            {
+              "lens": "visual-ownership",
+              "verdict": "passed",
+              "observation": "All course-navigation choices are contained within the drawer; background content is clearly inactive."
+            },
+            {
+              "lens": "pinned-boundary-clearance",
+              "verdict": "passed",
+              "observation": "Drawer edge and circular close control remain fully inside the viewport with no collision."
+            },
+            {
+              "lens": "wrapping",
+              "verdict": "passed",
+              "observation": "Vietnamese menu labels fit on one line and the ranking badge stays beside its label."
+            },
+            {
+              "lens": "clipping",
+              "verdict": "passed",
+              "observation": "No drawer label or icon is clipped; background fragments are expected beneath the overlay."
+            },
+            {
+              "lens": "occlusion",
+              "verdict": "passed",
+              "observation": "The drawer intentionally occludes most page content while leaving a consistent scrim strip."
+            },
+            {
+              "lens": "semantic-utility",
+              "verdict": "passed",
+              "observation": "The menu exposes course destinations and clearly marks the current mock-interview section."
+            },
+            {
+              "lens": "content-coherence",
+              "verdict": "passed",
+              "observation": "Selected Phỏng vấn thử row matches the interview page visible beneath the scrim."
+            },
+            {
+              "lens": "affordance",
+              "verdict": "passed",
+              "observation": "The close icon and full-width highlighted navigation row are obvious interactive targets."
+            },
+            {
+              "lens": "responsive-composition",
+              "verdict": "passed",
+              "observation": "The drawer width preserves readable labels while retaining enough scrim to communicate modality."
+            },
+            {
+              "lens": "visual-consistency",
+              "verdict": "passed",
+              "observation": "Icons, group labels, selected lavender row, and typography follow a consistent navigation system."
+            },
+            {
+              "lens": "empty-space-balance",
+              "verdict": "passed",
+              "observation": "The dense drawer list is balanced by generous horizontal padding and grouped spacing."
+            },
+            {
+              "lens": "task-scanability",
+              "verdict": "passed",
+              "observation": "Section labels, icons, and the single highlighted row make navigation easy to scan."
+            }
+          ],
+          "challengeRecords": [
+            {
+              "challengeRef": "final-r11-course-drawer-open.png:purpose-content",
+              "family": "purpose-content",
+              "suspectedProblem": "The drawer may not identify the current destination.",
+              "pixelObservation": "Phỏng vấn thử is the only row with a lavender fill and purple icon/text treatment.",
+              "disposition": "not-observed"
+            },
+            {
+              "challengeRef": "final-r11-course-drawer-open.png:composition-spacing",
+              "family": "composition-spacing",
+              "suspectedProblem": "The drawer may be too narrow for its navigation labels.",
+              "pixelObservation": "All visible labels, including Bảng xếp hạng and its badge, fit without truncation.",
+              "disposition": "not-observed"
+            },
+            {
+              "challengeRef": "final-r11-course-drawer-open.png:interaction-responsive",
+              "family": "interaction-responsive",
+              "suspectedProblem": "The open overlay may lack a visible dismissal control.",
+              "pixelObservation": "A large circular X button appears at the drawer’s upper-right corner.",
+              "disposition": "not-observed"
+            }
+          ],
+          "verdict": "passed"
+        },
+        {
+          "imageRef": "final-r11-course-drawer-restored.png",
+          "pageInset": "The restored page returns to consistent compact gutters around breadcrumb, title, tabs, and card.",
+          "surfaceOpacity": "The white setup card is opaque and the gray background is no longer dimmed by a scrim.",
+          "contentPadding": "Page identity, tab labels, section heading, and setup card content retain comfortable spacing.",
+          "alignment": "Header, breadcrumb, title, tabs, and card realign to the normal compact page grid.",
+          "verticalRhythm": "Navigation, breadcrumb, title, tabs, section heading, and card are evenly separated.",
+          "hierarchy": "Title, active Overview tab, and preparation card restore the expected primary reading order.",
+          "visualOwnership": "Interview setup content again owns the viewport with no drawer surface competing for attention.",
+          "pinnedBoundaryClearance": "No overlay edge remains and the page content stays within both viewport boundaries.",
+          "wrapping": "Vietnamese title description and setup copy wrap naturally within the compact column.",
+          "clipping": "No shell, breadcrumb, tab, or card text is clipped after restoration.",
+          "occlusion": "The scrim and drawer are gone, leaving all visible page content unobscured.",
+          "semanticUtility": "The user is returned to the interview preparation workflow after closing navigation.",
+          "contentCoherence": "Course context, interview title, active overview tab, and setup card agree.",
+          "affordance": "Course navigation, tabs, and segmented control are again available and visually clear.",
+          "responsiveComposition": "The compact layout returns without residual width changes or overlay displacement.",
+          "visualConsistency": "Colors, spacing, and card treatment match the earlier compact overview state.",
+          "emptySpaceBalance": "The restored header context and setup card form a balanced vertical composition.",
+          "lensVerdicts": [
+            {
+              "lens": "page-inset",
+              "verdict": "passed",
+              "observation": "The restored page returns to consistent compact gutters around breadcrumb, title, tabs, and card."
+            },
+            {
+              "lens": "surface-opacity",
+              "verdict": "passed",
+              "observation": "The white setup card is opaque and the gray background is no longer dimmed by a scrim."
+            },
+            {
+              "lens": "content-padding",
+              "verdict": "passed",
+              "observation": "Page identity, tab labels, section heading, and setup card content retain comfortable spacing."
+            },
+            {
+              "lens": "alignment",
+              "verdict": "passed",
+              "observation": "Header, breadcrumb, title, tabs, and card realign to the normal compact page grid."
+            },
+            {
+              "lens": "vertical-rhythm",
+              "verdict": "passed",
+              "observation": "Navigation, breadcrumb, title, tabs, section heading, and card are evenly separated."
+            },
+            {
+              "lens": "hierarchy",
+              "verdict": "passed",
+              "observation": "Title, active Overview tab, and preparation card restore the expected primary reading order."
+            },
+            {
+              "lens": "visual-ownership",
+              "verdict": "passed",
+              "observation": "Interview setup content again owns the viewport with no drawer surface competing for attention."
+            },
+            {
+              "lens": "pinned-boundary-clearance",
+              "verdict": "passed",
+              "observation": "No overlay edge remains and the page content stays within both viewport boundaries."
+            },
+            {
+              "lens": "wrapping",
+              "verdict": "passed",
+              "observation": "Vietnamese title description and setup copy wrap naturally within the compact column."
+            },
+            {
+              "lens": "clipping",
+              "verdict": "passed",
+              "observation": "No shell, breadcrumb, tab, or card text is clipped after restoration."
+            },
+            {
+              "lens": "occlusion",
+              "verdict": "passed",
+              "observation": "The scrim and drawer are gone, leaving all visible page content unobscured."
+            },
+            {
+              "lens": "semantic-utility",
+              "verdict": "passed",
+              "observation": "The user is returned to the interview preparation workflow after closing navigation."
+            },
+            {
+              "lens": "content-coherence",
+              "verdict": "passed",
+              "observation": "Course context, interview title, active overview tab, and setup card agree."
+            },
+            {
+              "lens": "affordance",
+              "verdict": "passed",
+              "observation": "Course navigation, tabs, and segmented control are again available and visually clear."
+            },
+            {
+              "lens": "responsive-composition",
+              "verdict": "passed",
+              "observation": "The compact layout returns without residual width changes or overlay displacement."
+            },
+            {
+              "lens": "visual-consistency",
+              "verdict": "passed",
+              "observation": "Colors, spacing, and card treatment match the earlier compact overview state."
+            },
+            {
+              "lens": "empty-space-balance",
+              "verdict": "passed",
+              "observation": "The restored header context and setup card form a balanced vertical composition."
+            },
+            {
+              "lens": "task-scanability",
+              "verdict": "passed",
+              "observation": "Course context and the next preparation task are immediately easy to locate."
+            }
+          ],
+          "challengeRecords": [
+            {
+              "challengeRef": "final-r11-course-drawer-restored.png:purpose-content",
+              "family": "purpose-content",
+              "suspectedProblem": "Closing the drawer may leave the page in a visually stale state.",
+              "pixelObservation": "The normal interview title, Overview tab, preparation heading, and setup card are visible again.",
+              "disposition": "not-observed"
+            },
+            {
+              "challengeRef": "final-r11-course-drawer-restored.png:composition-spacing",
+              "family": "composition-spacing",
+              "suspectedProblem": "Overlay restoration may preserve a shifted or dimmed layout.",
+              "pixelObservation": "The content is centered in its normal gutters and no dim scrim remains.",
+              "disposition": "not-observed"
+            },
+            {
+              "challengeRef": "final-r11-course-drawer-restored.png:interaction-responsive",
+              "family": "interaction-responsive",
+              "suspectedProblem": "The restored page may retain an invisible modal obstruction.",
+              "pixelObservation": "Visible controls are unobscured and no overlay edge or blocking layer appears in the pixels.",
+              "disposition": "not-observed"
+            }
+          ],
+          "verdict": "passed"
+        },
+        {
+          "imageRef": "final-r11-zoom-in-effective-125.png",
+          "pageInset": "Most content keeps compact gutters, but the breadcrumb current segment disappears beyond the available width.",
+          "surfaceOpacity": "White setup card and header surfaces remain opaque and distinct at increased zoom.",
+          "contentPadding": "Title, tabs, and setup card preserve usable internal spacing despite magnification.",
+          "alignment": "Visible content aligns cleanly, but the breadcrumb no longer communicates its complete path.",
+          "verticalRhythm": "Header, course navigation, breadcrumb, title, tabs, and card remain vertically ordered.",
+          "hierarchy": "The enlarged Mock interview title, Overview tab, and setup heading remain clear.",
+          "visualOwnership": "The setup card owns the primary task and its purple session label remains distinct.",
+          "pinnedBoundaryClearance": "The right edge cuts the breadcrumb after “Mock interview”, omitting the current Setup item.",
+          "wrapping": "Breadcrumb content stays on one line at 125 percent and fails to wrap or visibly elide the missing current item.",
+          "clipping": "The expected terminal Setup breadcrumb segment is not visible at increased zoom.",
+          "occlusion": "No overlay covers the page; loss occurs at the responsive width boundary.",
+          "semanticUtility": "The main setup remains usable, but the zoomed breadcrumb loses current-location context.",
+          "contentCoherence": "Page title and task are coherent while the incomplete breadcrumb path weakens navigation context.",
+          "affordance": "Header actions, tabs, and the visible setup card retain recognizable interactive styling.",
+          "responsiveComposition": "At effective 125 percent, the compact layout fails to preserve or adapt the full breadcrumb.",
+          "visualConsistency": "Typography and purple accents scale consistently, aside from the breadcrumb adaptation failure.",
+          "emptySpaceBalance": "The enlarged content remains balanced, though the abruptly ended breadcrumb looks unfinished.",
+          "lensVerdicts": [
+            {
+              "lens": "page-inset",
+              "verdict": "passed",
+              "observation": "Most content keeps compact gutters, but the breadcrumb current segment disappears beyond the available width."
+            },
+            {
+              "lens": "surface-opacity",
+              "verdict": "passed",
+              "observation": "White setup card and header surfaces remain opaque and distinct at increased zoom."
+            },
+            {
+              "lens": "content-padding",
+              "verdict": "passed",
+              "observation": "Title, tabs, and setup card preserve usable internal spacing despite magnification."
+            },
+            {
+              "lens": "alignment",
+              "verdict": "passed",
+              "observation": "Visible content aligns cleanly, but the breadcrumb no longer communicates its complete path."
+            },
+            {
+              "lens": "vertical-rhythm",
+              "verdict": "passed",
+              "observation": "Header, course navigation, breadcrumb, title, tabs, and card remain vertically ordered."
+            },
+            {
+              "lens": "hierarchy",
+              "verdict": "passed",
+              "observation": "The enlarged Mock interview title, Overview tab, and setup heading remain clear."
+            },
+            {
+              "lens": "visual-ownership",
+              "verdict": "passed",
+              "observation": "The setup card owns the primary task and its purple session label remains distinct."
+            },
+            {
+              "lens": "pinned-boundary-clearance",
+              "verdict": "problem",
+              "observation": "The right edge cuts the breadcrumb after “Mock interview”, omitting the current Setup item."
+            },
+            {
+              "lens": "wrapping",
+              "verdict": "problem",
+              "observation": "Breadcrumb content stays on one line at 125 percent and fails to wrap or visibly elide the missing current item."
+            },
+            {
+              "lens": "clipping",
+              "verdict": "problem",
+              "observation": "The expected terminal Setup breadcrumb segment is not visible at increased zoom."
+            },
+            {
+              "lens": "occlusion",
+              "verdict": "passed",
+              "observation": "No overlay covers the page; loss occurs at the responsive width boundary."
+            },
+            {
+              "lens": "semantic-utility",
+              "verdict": "passed",
+              "observation": "The main setup remains usable, but the zoomed breadcrumb loses current-location context."
+            },
+            {
+              "lens": "content-coherence",
+              "verdict": "problem",
+              "observation": "Page title and task are coherent while the incomplete breadcrumb path weakens navigation context."
+            },
+            {
+              "lens": "affordance",
+              "verdict": "passed",
+              "observation": "Header actions, tabs, and the visible setup card retain recognizable interactive styling."
+            },
+            {
+              "lens": "responsive-composition",
+              "verdict": "problem",
+              "observation": "At effective 125 percent, the compact layout fails to preserve or adapt the full breadcrumb."
+            },
+            {
+              "lens": "visual-consistency",
+              "verdict": "passed",
+              "observation": "Typography and purple accents scale consistently, aside from the breadcrumb adaptation failure."
+            },
+            {
+              "lens": "empty-space-balance",
+              "verdict": "passed",
+              "observation": "The enlarged content remains balanced, though the abruptly ended breadcrumb looks unfinished."
+            },
+            {
+              "lens": "task-scanability",
+              "verdict": "problem",
+              "observation": "The main task scans well, but users cannot scan the complete navigation path."
+            }
+          ],
+          "challengeRecords": [
+            {
+              "challengeRef": "final-r11-zoom-in-effective-125.png:purpose-content",
+              "family": "purpose-content",
+              "suspectedProblem": "Zoomed navigation may omit the user’s current location.",
+              "pixelObservation": "The breadcrumb visibly ends at “Mock interview”; the current Setup segment shown at other zoom levels is absent.",
+              "disposition": "not-observed"
+            },
+            {
+              "challengeRef": "final-r11-zoom-in-effective-125.png:composition-spacing",
+              "family": "composition-spacing",
+              "suspectedProblem": "Magnified breadcrumb may fail to fit the compact row.",
+              "pixelObservation": "The breadcrumb occupies one line and terminates at the right boundary without wrapping or an ellipsis.",
+              "disposition": "confirmed"
+            },
+            {
+              "challengeRef": "final-r11-zoom-in-effective-125.png:interaction-responsive",
+              "family": "interaction-responsive",
+              "suspectedProblem": "Zoom-in may clip core controls or actions.",
+              "pixelObservation": "Header icons, tabs, and setup card remain visible, but the breadcrumb current item is lost.",
+              "disposition": "not-observed"
+            }
+          ],
+          "verdict": "repair"
+        },
+        {
+          "imageRef": "final-r11-zoom-out-effective-80.png",
+          "pageInset": "The zoomed-out page maintains even gutters and uses the extra effective width well.",
+          "surfaceOpacity": "Header and setup card remain opaque and distinct from the gray page.",
+          "contentPadding": "Title block, tabs, and setup card retain comfortable padding at reduced scale.",
+          "alignment": "Breadcrumb, title, tabs, section heading, and card share consistent left edges.",
+          "verticalRhythm": "Navigation and content bands remain orderly with no compressed vertical collisions.",
+          "hierarchy": "Mock interview, Overview, and the setup heading remain clearly prioritized.",
+          "visualOwnership": "The preparation card remains the dominant work surface and does not blend into the page.",
+          "pinnedBoundaryClearance": "Scrollbar and page edges remain clear of navigation text and card content.",
+          "wrapping": "English description and setup helper text wrap cleanly with the additional effective width.",
+          "clipping": "Full breadcrumb including Setup is visible and no label is clipped.",
+          "occlusion": "No control or page text is covered at the zoomed-out scale.",
+          "semanticUtility": "Course context, setup task, format choices, and navigation remain useful and visible.",
+          "contentCoherence": "Breadcrumb, page title, Overview tab, and setup card consistently describe the same flow.",
+          "affordance": "Selected tab and technical-Q&A pill remain visually identifiable.",
+          "responsiveComposition": "The layout expands gracefully at 80 percent without reverting to an inappropriate desktop shell.",
+          "visualConsistency": "Scale changes preserve the same typography hierarchy, purple accents, and rounded surfaces.",
+          "emptySpaceBalance": "Wider effective lines and card width remain balanced inside compact device gutters.",
+          "lensVerdicts": [
+            {
+              "lens": "page-inset",
+              "verdict": "passed",
+              "observation": "The zoomed-out page maintains even gutters and uses the extra effective width well."
+            },
+            {
+              "lens": "surface-opacity",
+              "verdict": "passed",
+              "observation": "Header and setup card remain opaque and distinct from the gray page."
+            },
+            {
+              "lens": "content-padding",
+              "verdict": "passed",
+              "observation": "Title block, tabs, and setup card retain comfortable padding at reduced scale."
+            },
+            {
+              "lens": "alignment",
+              "verdict": "passed",
+              "observation": "Breadcrumb, title, tabs, section heading, and card share consistent left edges."
+            },
+            {
+              "lens": "vertical-rhythm",
+              "verdict": "passed",
+              "observation": "Navigation and content bands remain orderly with no compressed vertical collisions."
+            },
+            {
+              "lens": "hierarchy",
+              "verdict": "passed",
+              "observation": "Mock interview, Overview, and the setup heading remain clearly prioritized."
+            },
+            {
+              "lens": "visual-ownership",
+              "verdict": "passed",
+              "observation": "The preparation card remains the dominant work surface and does not blend into the page."
+            },
+            {
+              "lens": "pinned-boundary-clearance",
+              "verdict": "passed",
+              "observation": "Scrollbar and page edges remain clear of navigation text and card content."
+            },
+            {
+              "lens": "wrapping",
+              "verdict": "passed",
+              "observation": "English description and setup helper text wrap cleanly with the additional effective width."
+            },
+            {
+              "lens": "clipping",
+              "verdict": "passed",
+              "observation": "Full breadcrumb including Setup is visible and no label is clipped."
+            },
+            {
+              "lens": "occlusion",
+              "verdict": "passed",
+              "observation": "No control or page text is covered at the zoomed-out scale."
+            },
+            {
+              "lens": "semantic-utility",
+              "verdict": "passed",
+              "observation": "Course context, setup task, format choices, and navigation remain useful and visible."
+            },
+            {
+              "lens": "content-coherence",
+              "verdict": "passed",
+              "observation": "Breadcrumb, page title, Overview tab, and setup card consistently describe the same flow."
+            },
+            {
+              "lens": "affordance",
+              "verdict": "passed",
+              "observation": "Selected tab and technical-Q&A pill remain visually identifiable."
+            },
+            {
+              "lens": "responsive-composition",
+              "verdict": "passed",
+              "observation": "The layout expands gracefully at 80 percent without reverting to an inappropriate desktop shell."
+            },
+            {
+              "lens": "visual-consistency",
+              "verdict": "passed",
+              "observation": "Scale changes preserve the same typography hierarchy, purple accents, and rounded surfaces."
+            },
+            {
+              "lens": "empty-space-balance",
+              "verdict": "passed",
+              "observation": "Wider effective lines and card width remain balanced inside compact device gutters."
+            },
+            {
+              "lens": "task-scanability",
+              "verdict": "passed",
+              "observation": "The full page context and first configuration choice are easy to scan."
+            }
+          ],
+          "challengeRecords": [
+            {
+              "challengeRef": "final-r11-zoom-out-effective-80.png:purpose-content",
+              "family": "purpose-content",
+              "suspectedProblem": "Zoom-out may make essential text illegibly small or omit context.",
+              "pixelObservation": "Breadcrumb, title, description, tabs, setup heading, and first choices remain legible and complete.",
+              "disposition": "not-observed"
+            },
+            {
+              "challengeRef": "final-r11-zoom-out-effective-80.png:composition-spacing",
+              "family": "composition-spacing",
+              "suspectedProblem": "Reduced zoom may create awkwardly wide or sparse compact layout.",
+              "pixelObservation": "The card width grows proportionately while gutters and text line lengths remain controlled.",
+              "disposition": "not-observed"
+            },
+            {
+              "challengeRef": "final-r11-zoom-out-effective-80.png:interaction-responsive",
+              "family": "interaction-responsive",
+              "suspectedProblem": "Zoom-out may shrink selected controls beyond recognition.",
+              "pixelObservation": "Overview underline and the white Technical Q&A selected pill remain visually strong.",
+              "disposition": "not-observed"
+            }
+          ],
+          "verdict": "passed"
+        },
+        {
+          "imageRef": "final-r11-zoom-restored.png",
+          "pageInset": "Normal compact gutters return around navigation, breadcrumb, title, tabs, and setup card.",
+          "surfaceOpacity": "Header and setup card remain opaque with clear separation from the page background.",
+          "contentPadding": "All visible content returns to comfortable normal-scale padding.",
+          "alignment": "Breadcrumb, title, tabs, section heading, and card align consistently after zoom restoration.",
+          "verticalRhythm": "Vertical spacing returns to the same orderly compact cadence as the steady English view.",
+          "hierarchy": "Mock interview, active Overview, and preparation heading are clearly differentiated.",
+          "visualOwnership": "The setup card remains the primary owned surface for the preparation task.",
+          "pinnedBoundaryClearance": "Right scrollbar stays outside content and the full breadcrumb fits within the viewport.",
+          "wrapping": "English title description and setup helper copy wrap into sensible lines at restored zoom.",
+          "clipping": "No breadcrumb item, tab label, heading, or visible control is clipped.",
+          "occlusion": "No residual zoom artifact or overlay obscures any visible content.",
+          "semanticUtility": "The normal compact view restores complete context and preparation controls.",
+          "contentCoherence": "Course breadcrumb, title, active tab, and setup task all agree.",
+          "affordance": "Course navigation, tabs, and selected segmented control remain obvious.",
+          "responsiveComposition": "The restored view returns to the expected compact composition without residual displacement.",
+          "visualConsistency": "Typography, spacing, colors, and radii match the other steady compact captures.",
+          "emptySpaceBalance": "Title block, tabs, and card distribute visual weight evenly down the viewport.",
+          "lensVerdicts": [
+            {
+              "lens": "page-inset",
+              "verdict": "passed",
+              "observation": "Normal compact gutters return around navigation, breadcrumb, title, tabs, and setup card."
+            },
+            {
+              "lens": "surface-opacity",
+              "verdict": "passed",
+              "observation": "Header and setup card remain opaque with clear separation from the page background."
+            },
+            {
+              "lens": "content-padding",
+              "verdict": "passed",
+              "observation": "All visible content returns to comfortable normal-scale padding."
+            },
+            {
+              "lens": "alignment",
+              "verdict": "passed",
+              "observation": "Breadcrumb, title, tabs, section heading, and card align consistently after zoom restoration."
+            },
+            {
+              "lens": "vertical-rhythm",
+              "verdict": "passed",
+              "observation": "Vertical spacing returns to the same orderly compact cadence as the steady English view."
+            },
+            {
+              "lens": "hierarchy",
+              "verdict": "passed",
+              "observation": "Mock interview, active Overview, and preparation heading are clearly differentiated."
+            },
+            {
+              "lens": "visual-ownership",
+              "verdict": "passed",
+              "observation": "The setup card remains the primary owned surface for the preparation task."
+            },
+            {
+              "lens": "pinned-boundary-clearance",
+              "verdict": "passed",
+              "observation": "Right scrollbar stays outside content and the full breadcrumb fits within the viewport."
+            },
+            {
+              "lens": "wrapping",
+              "verdict": "passed",
+              "observation": "English title description and setup helper copy wrap into sensible lines at restored zoom."
+            },
+            {
+              "lens": "clipping",
+              "verdict": "passed",
+              "observation": "No breadcrumb item, tab label, heading, or visible control is clipped."
+            },
+            {
+              "lens": "occlusion",
+              "verdict": "passed",
+              "observation": "No residual zoom artifact or overlay obscures any visible content."
+            },
+            {
+              "lens": "semantic-utility",
+              "verdict": "passed",
+              "observation": "The normal compact view restores complete context and preparation controls."
+            },
+            {
+              "lens": "content-coherence",
+              "verdict": "passed",
+              "observation": "Course breadcrumb, title, active tab, and setup task all agree."
+            },
+            {
+              "lens": "affordance",
+              "verdict": "passed",
+              "observation": "Course navigation, tabs, and selected segmented control remain obvious."
+            },
+            {
+              "lens": "responsive-composition",
+              "verdict": "passed",
+              "observation": "The restored view returns to the expected compact composition without residual displacement."
+            },
+            {
+              "lens": "visual-consistency",
+              "verdict": "passed",
+              "observation": "Typography, spacing, colors, and radii match the other steady compact captures."
+            },
+            {
+              "lens": "empty-space-balance",
+              "verdict": "passed",
+              "observation": "Title block, tabs, and card distribute visual weight evenly down the viewport."
+            },
+            {
+              "lens": "task-scanability",
+              "verdict": "passed",
+              "observation": "The complete context and first setup choice can be scanned immediately."
+            }
+          ],
+          "challengeRecords": [
+            {
+              "challengeRef": "final-r11-zoom-restored.png:purpose-content",
+              "family": "purpose-content",
+              "suspectedProblem": "Restoring zoom may fail to restore complete navigation context.",
+              "pixelObservation": "The breadcrumb again shows Fullstack Mastery, Mock interview, and Setup completely.",
+              "disposition": "not-observed"
+            },
+            {
+              "challengeRef": "final-r11-zoom-restored.png:composition-spacing",
+              "family": "composition-spacing",
+              "suspectedProblem": "Restored zoom may retain magnified spacing or displacement.",
+              "pixelObservation": "Gutters, line lengths, card width, and navigation bands appear proportionate and centered.",
+              "disposition": "not-observed"
+            },
+            {
+              "challengeRef": "final-r11-zoom-restored.png:interaction-responsive",
+              "family": "interaction-responsive",
+              "suspectedProblem": "Restored controls may remain clipped after zoom changes.",
+              "pixelObservation": "Tabs and the visible Technical Q&A control are fully contained and unobscured.",
+              "disposition": "not-observed"
+            }
+          ],
+          "verdict": "passed"
+        },
+        {
+          "imageRef": "final-r11-host-context-last.png",
+          "pageInset": "The final host-context page uses broad desktop gutters and a centered content column beside the rail.",
+          "surfaceOpacity": "Opaque white setup and lower cards remain distinct from the pale gray canvas.",
+          "contentPadding": "Setup controls, readiness summary, CTA, and lower cards have consistent internal padding.",
+          "alignment": "Breadcrumb, title, tabs, setup card, lower headings, and cards align on a stable grid.",
+          "verticalRhythm": "Page identity, tabs, setup, history, and progress follow a regular vertical cadence.",
+          "hierarchy": "Title, setup heading, selected controls, and purple start button create a clear task hierarchy.",
+          "visualOwnership": "Configuration and readiness occupy clearly separated regions of the main card.",
+          "pinnedBoundaryClearance": "Left rail and right scrollbar remain outside content surfaces with clear separation.",
+          "wrapping": "Vietnamese helper and summary copy wrap cleanly within their desktop columns.",
+          "clipping": "No visible label, control, or action is internally clipped; lower content continues below the viewport.",
+          "occlusion": "No overlay, sticky element, or shell control obscures the page task.",
+          "semanticUtility": "The final capture presents complete preparation controls, readiness details, history, and progress context.",
+          "contentCoherence": "Selected technical and intermediate values match the readiness summary.",
+          "affordance": "Tabs, segmented controls, history link, and purple start button are clearly interactive.",
+          "responsiveComposition": "The final desktop composition uses the available width without crowding or excessive stretch.",
+          "visualConsistency": "Typography, purple accents, rounded cards, dividers, and muted copy are visually consistent.",
+          "emptySpaceBalance": "Central setup density, lower panels, rail, and surrounding whitespace are well balanced.",
+          "lensVerdicts": [
+            {
+              "lens": "page-inset",
+              "verdict": "passed",
+              "observation": "The final host-context page uses broad desktop gutters and a centered content column beside the rail."
+            },
+            {
+              "lens": "surface-opacity",
+              "verdict": "passed",
+              "observation": "Opaque white setup and lower cards remain distinct from the pale gray canvas."
+            },
+            {
+              "lens": "content-padding",
+              "verdict": "passed",
+              "observation": "Setup controls, readiness summary, CTA, and lower cards have consistent internal padding."
+            },
+            {
+              "lens": "alignment",
+              "verdict": "passed",
+              "observation": "Breadcrumb, title, tabs, setup card, lower headings, and cards align on a stable grid."
+            },
+            {
+              "lens": "vertical-rhythm",
+              "verdict": "passed",
+              "observation": "Page identity, tabs, setup, history, and progress follow a regular vertical cadence."
+            },
+            {
+              "lens": "hierarchy",
+              "verdict": "passed",
+              "observation": "Title, setup heading, selected controls, and purple start button create a clear task hierarchy."
+            },
+            {
+              "lens": "visual-ownership",
+              "verdict": "passed",
+              "observation": "Configuration and readiness occupy clearly separated regions of the main card."
+            },
+            {
+              "lens": "pinned-boundary-clearance",
+              "verdict": "passed",
+              "observation": "Left rail and right scrollbar remain outside content surfaces with clear separation."
+            },
+            {
+              "lens": "wrapping",
+              "verdict": "passed",
+              "observation": "Vietnamese helper and summary copy wrap cleanly within their desktop columns."
+            },
+            {
+              "lens": "clipping",
+              "verdict": "passed",
+              "observation": "No visible label, control, or action is internally clipped; lower content continues below the viewport."
+            },
+            {
+              "lens": "occlusion",
+              "verdict": "passed",
+              "observation": "No overlay, sticky element, or shell control obscures the page task."
+            },
+            {
+              "lens": "semantic-utility",
+              "verdict": "passed",
+              "observation": "The final capture presents complete preparation controls, readiness details, history, and progress context."
+            },
+            {
+              "lens": "content-coherence",
+              "verdict": "passed",
+              "observation": "Selected technical and intermediate values match the readiness summary."
+            },
+            {
+              "lens": "affordance",
+              "verdict": "passed",
+              "observation": "Tabs, segmented controls, history link, and purple start button are clearly interactive."
+            },
+            {
+              "lens": "responsive-composition",
+              "verdict": "passed",
+              "observation": "The final desktop composition uses the available width without crowding or excessive stretch."
+            },
+            {
+              "lens": "visual-consistency",
+              "verdict": "passed",
+              "observation": "Typography, purple accents, rounded cards, dividers, and muted copy are visually consistent."
+            },
+            {
+              "lens": "empty-space-balance",
+              "verdict": "passed",
+              "observation": "Central setup density, lower panels, rail, and surrounding whitespace are well balanced."
+            },
+            {
+              "lens": "task-scanability",
+              "verdict": "passed",
+              "observation": "A user can scan choices, readiness, and the primary action efficiently."
+            }
+          ],
+          "challengeRecords": [
+            {
+              "challengeRef": "final-r11-host-context-last.png:purpose-content",
+              "family": "purpose-content",
+              "suspectedProblem": "The final host context may omit a critical preparation step.",
+              "pixelObservation": "Format, level, readiness summary, explanatory copy, and start action are all visible.",
+              "disposition": "not-observed"
+            },
+            {
+              "challengeRef": "final-r11-host-context-last.png:composition-spacing",
+              "family": "composition-spacing",
+              "suspectedProblem": "The final desktop composition may misalign neighboring surfaces.",
+              "pixelObservation": "Setup split, history card, progress card, tabs, and section headings follow consistent grid lines.",
+              "disposition": "not-observed"
+            },
+            {
+              "challengeRef": "final-r11-host-context-last.png:interaction-responsive",
+              "family": "interaction-responsive",
+              "suspectedProblem": "The host shell may occlude the final page action.",
+              "pixelObservation": "The purple start action and supporting controls are fully visible and unobscured.",
+              "disposition": "not-observed"
+            }
+          ],
+          "verdict": "passed"
+        }
+      ],
+      "probeRecords": [
+        {
+          "probeId": "probe-viewport-wide",
+          "category": "viewport",
+          "phase": "baseline",
+          "imageRef": "final-r11-wide.png",
+          "verdict": "survived",
+          "observation": "The wide steady viewport preserves aligned gutters, a balanced two-column setup card, readable controls, and an unobscured primary action."
+        },
+        {
+          "probeId": "probe-breakpoint-1024",
+          "category": "viewport",
+          "phase": "breakpoint-edge",
+          "imageRef": "final-r11-1024.png",
+          "verdict": "survived",
+          "observation": "At 1024 pixels the shell collapses into a course-navigation row while the setup and lower two-column grids remain readable and collision-free."
+        },
+        {
+          "probeId": "probe-breakpoint-1023",
+          "category": "viewport",
+          "phase": "breakpoint-edge",
+          "imageRef": "final-r11-1023.png",
+          "verdict": "survived",
+          "observation": "At 1023 pixels the header reorganizes into two rows without clipping navigation, breadcrumb, setup controls, summary, or the start action."
+        },
+        {
+          "probeId": "probe-zoom-in",
+          "category": "zoom",
+          "phase": "zoom-in",
+          "imageRef": "final-r11-zoom-in-effective-125.png",
+          "verdict": "contradiction",
+          "observation": "At effective 125 percent the breadcrumb ends after “Mock interview”; the current Setup segment is absent with no wrap or ellipsis."
+        },
+        {
+          "probeId": "probe-zoom-out",
+          "category": "zoom",
+          "phase": "zoom-out",
+          "imageRef": "final-r11-zoom-out-effective-80.png",
+          "verdict": "survived",
+          "observation": "At effective 80 percent the full breadcrumb, title, tabs, setup heading, and selected control remain legible and contained."
+        },
+        {
+          "probeId": "probe-zoom-restored",
+          "category": "zoom",
+          "phase": "restored",
+          "imageRef": "final-r11-zoom-restored.png",
+          "verdict": "survived",
+          "observation": "After zoom restoration the complete breadcrumb and normal compact gutters return with no residual displacement or clipping."
+        },
+        {
+          "probeId": "probe-page-scroll-start",
+          "category": "page-scroll",
+          "phase": "start",
+          "imageRef": "final-r11-compact-top.png",
+          "verdict": "survived",
+          "observation": "At scroll start the compact shell, breadcrumb, title, tabs, preparation heading, and top of the setup card are visible and unobscured."
+        },
+        {
+          "probeId": "probe-page-scroll-middle",
+          "category": "page-scroll",
+          "phase": "middle",
+          "imageRef": "final-r11-compact-middle-selected.png",
+          "verdict": "survived",
+          "observation": "At middle scroll the changed selection, matching readiness summary, purple launch action, and following history section remain readable."
+        },
+        {
+          "probeId": "probe-page-scroll-terminal",
+          "category": "page-scroll",
+          "phase": "terminal",
+          "imageRef": "final-r11-compact-terminal.png",
+          "verdict": "survived",
+          "observation": "At terminal scroll both empty-state cards are fully readable, the scrollbar shows the page end, and no fixed surface covers content."
+        },
+        {
+          "probeId": "probe-bounded-scroll",
+          "category": "bounded-scroll",
+          "phase": "steady",
+          "imageRef": null,
+          "verdict": "not-applicable",
+          "observation": "Container-not-present: the pixels show one page scrollbar and no independently bounded scrolling surface."
+        },
+        {
+          "probeId": "probe-content-long-start",
+          "category": "content-stress",
+          "phase": "content-long",
+          "imageRef": "final-r11-content-stress-en-start.png",
+          "verdict": "contradiction",
+          "observation": "The designated long-English start capture shows gray skeleton bars in place of the page title and introduction, so steady long-copy wrapping is not evidenced."
+        },
+        {
+          "probeId": "probe-content-long-terminal",
+          "category": "content-stress",
+          "phase": "terminal",
+          "imageRef": "final-r11-content-stress-en-terminal.png",
+          "verdict": "survived",
+          "observation": "Long English terminal messages wrap within both compact cards with visible side padding and no clipping."
+        },
+        {
+          "probeId": "probe-selection-transition",
+          "category": "state-transition",
+          "phase": "steady",
+          "imageRef": "final-r11-compact-middle-selected.png",
+          "verdict": "survived",
+          "observation": "The selected Cao cấp and Thiết kế hệ thống states visibly match the readiness summary below, with a clear launch action."
+        },
+        {
+          "probeId": "probe-resume-transition",
+          "category": "state-transition",
+          "phase": "steady",
+          "imageRef": "final-r11-resume-compact.png",
+          "verdict": "contradiction",
+          "observation": "The resume panel and continue action render, but the logo and leading breadcrumb are visibly clipped off the left viewport edge."
+        },
+        {
+          "probeId": "probe-recovery-transition",
+          "category": "state-transition",
+          "phase": "steady",
+          "imageRef": "final-r11-recovery-compact.png",
+          "verdict": "contradiction",
+          "observation": "The retry card is clear, but the long recovery breadcrumb is cut mid-word at the right edge instead of wrapping or eliding safely."
+        },
+        {
+          "probeId": "probe-overlay-open",
+          "category": "sticky-fixed-overlay",
+          "phase": "overlay-open",
+          "imageRef": "final-r11-course-drawer-open.png",
+          "verdict": "survived",
+          "observation": "The opaque course drawer, dim scrim, selected interview row, and circular close control are distinct and free of label clipping."
+        },
+        {
+          "probeId": "probe-overlay-restored",
+          "category": "sticky-fixed-overlay",
+          "phase": "restored",
+          "imageRef": "final-r11-course-drawer-restored.png",
+          "verdict": "survived",
+          "observation": "After closing the drawer the scrim disappears and the compact page returns to normal gutters with visible controls and no residual occlusion."
+        },
+        {
+          "probeId": "probe-drag",
+          "category": "drag",
+          "phase": "steady",
+          "imageRef": null,
+          "verdict": "not-applicable",
+          "observation": "Interaction-not-present: no draggable handle, reorder surface, slider thumb, or drag affordance appears in the supplied rasters."
+        },
+        {
+          "probeId": "probe-keyboard-focus",
+          "category": "keyboard-focus",
+          "phase": "focus",
+          "imageRef": "final-r11-keyboard-focus.png",
+          "verdict": "contradiction",
+          "observation": "The Overview tab has a visible focus ring, but the compact shell and breadcrumb are displaced and clipped at the left viewport edge."
+        },
+        {
+          "probeId": "probe-composition-neighbors",
+          "category": "composition-neighbors",
+          "phase": "baseline",
+          "imageRef": "final-r11-host-context-last.png",
+          "verdict": "survived",
+          "observation": "The final host-context raster preserves rail clearance, centered desktop gutters, aligned neighboring cards, and an unobscured start action."
+        }
+      ]
+    },
+    "gaps": [],
+    "evidenceRefs": [
+      "final-r11-host-context.png",
+      "final-r11-wide.png",
+      "final-r11-1024.png",
+      "final-r11-1023.png",
+      "final-r11-compact-top.png",
+      "final-r11-compact-middle-selected.png",
+      "final-r11-compact-terminal.png",
+      "final-r11-history.png",
+      "final-r11-stats.png",
+      "final-r11-keyboard-focus.png",
+      "final-r11-recovery-compact.png",
+      "final-r11-resume-compact.png",
+      "final-r11-content-stress-en-start.png",
+      "final-r11-content-stress-en-terminal.png",
+      "final-r11-course-drawer-open.png",
+      "final-r11-course-drawer-restored.png",
+      "final-r11-zoom-in-effective-125.png",
+      "final-r11-zoom-out-effective-80.png",
+      "final-r11-zoom-restored.png",
+      "final-r11-host-context-last.png"
+    ]
+  }
+}

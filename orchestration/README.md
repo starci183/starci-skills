@@ -4,6 +4,8 @@ Orchestration controls how an operator executes; it never chooses the next Skill
 
 The operator input binds one mode from `modes/` and one provider mapping from `providers/`. Modes describe provider-neutral concurrency. Provider files map those limits to runtime model aliases. A runtime must reject an unavailable alias rather than silently substitute a stronger, more expensive, or differently capable model.
 
+For Codex material AI brainstorm/review work, every non-economical mapping resolves to exactly one fresh `gpt-5.6-sol` execution that completes the activity end to end.
+
 Workers are read-only unless an operator contract explicitly grants a disjoint write target. `be/implementation` grants no worker source writes: only its coordinator may apply product-source changes.
 
 `maxWorkers` is a ceiling, never a target. Before spawning, the coordinator hashes the exact assignment refs and counts truly independent items. It reuses a matching task-session observation instead of spawning again. It downgrades to a cheaper mode when the selected mode's `activation.minIndependentItems` is not met, assignments overlap, or the join would cost at least as much context as sequential execution. Empty workers and context-padding are forbidden.

@@ -41,7 +41,17 @@
               "additionalProperties": false,
               "required": [
                 "summary",
-                "artifactRefs"
+                "artifactRefs",
+                "sourceFingerprint",
+                "latestMutationFingerprint",
+                "latestMutationAt",
+                "capturedAt",
+                "blindReviewPacketRef",
+                "blindReviewPacketFingerprint",
+                "blindReviewPacket",
+                "renderMatrix",
+                "adversarialProbeMatrix",
+                "handoffHostArtifact"
               ],
               "properties": {
                 "summary": {
@@ -55,6 +65,166 @@
                   "items": {
                     "type": "string",
                     "minLength": 1
+                  }
+                },
+                "sourceFingerprint": {
+                  "description": "Fingerprint of the source revision rendered by every matrix cell.",
+                  "type": "string",
+                  "pattern": "^sha256:[0-9a-f]{64}$"
+                },
+                "latestMutationFingerprint": {
+                  "description": "Fingerprint of the most recent source mutation that this capture must follow.",
+                  "type": "string",
+                  "pattern": "^sha256:[0-9a-f]{64}$"
+                },
+                "latestMutationAt": { "type": "string", "format": "date-time" },
+                "capturedAt": { "type": "string", "format": "date-time" },
+                "blindReviewPacketRef": {
+                  "description": "Frozen raster-only packet. It excludes source, DOM, tests, authority, producer rationale, prior verdicts, suspected defects, and intended answers.",
+                  "type": "string",
+                  "minLength": 1
+                },
+                "blindReviewPacketFingerprint": {
+                  "type": "string",
+                  "pattern": "^sha256:[0-9a-f]{64}$"
+                },
+                "blindReviewPacket": {
+                  "description": "Exact immutable raster-only manifest issued by capture. Visual review may add only its receipt binding and this manifest fingerprint.",
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["packetRef", "latestMutationFingerprint", "capturedSourceFingerprint", "latestMutationAt", "capturedAt", "rasterCells", "probeCells", "lastScreenshotRef"],
+                  "properties": {
+                    "packetRef": { "type": "string", "pattern": "^packet://[0-9a-f]{64}$" },
+                    "latestMutationFingerprint": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
+                    "capturedSourceFingerprint": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
+                    "latestMutationAt": { "type": "string", "format": "date-time" },
+                    "capturedAt": { "type": "string", "format": "date-time" },
+                    "rasterCells": {
+                      "type": "array", "minItems": 3, "maxItems": 96,
+                      "items": {
+                        "type": "object", "additionalProperties": false,
+                        "required": ["cellRef", "imageRef", "viewKind", "viewport", "lastScreenshot"],
+                        "properties": {
+                          "cellRef": { "type": "string", "pattern": "^cell-[0-9]{3}$" },
+                          "imageRef": { "type": "string", "pattern": "\\.(png|jpg|jpeg|webp)$" },
+                          "viewKind": { "enum": ["host-context", "viewport", "surface-focus", "scroll-start", "scroll-middle", "scroll-terminal", "lifecycle", "overlay"] },
+                          "viewport": { "enum": ["host", "wide", "intermediate", "compact"] },
+                          "lastScreenshot": { "type": "boolean" }
+                        }
+                      }
+                    },
+                    "probeCells": {
+                      "type": "array", "minItems": 10, "maxItems": 96,
+                      "items": {
+                        "type": "object", "additionalProperties": false,
+                        "required": ["probeId", "category", "phase", "applicable", "imageRef", "reason"],
+                        "properties": {
+                          "probeId": { "type": "string", "pattern": "^probe-[a-z0-9-]+$" },
+                          "category": { "enum": ["viewport", "zoom", "page-scroll", "bounded-scroll", "content-stress", "state-transition", "sticky-fixed-overlay", "drag", "keyboard-focus", "composition-neighbors"] },
+                          "phase": { "enum": ["baseline", "start", "middle", "end", "terminal", "zoom-in", "zoom-out", "restored", "skeleton", "loading", "steady", "expanded", "collapsed", "focus", "drag-limit", "overlay-open", "content-long", "content-short", "breakpoint-edge"] },
+                          "applicable": { "type": "boolean" },
+                          "imageRef": { "type": ["string", "null"], "pattern": "\\.(png|jpg|jpeg|webp)$" },
+                          "reason": { "enum": [null, "not-owned-by-target", "interaction-not-present", "container-not-present", "overlay-not-present", "lifecycle-not-present"] }
+                        }
+                      }
+                    },
+                    "lastScreenshotRef": { "type": "string", "pattern": "\\.(png|jpg|jpeg|webp)$" }
+                  }
+                },
+                "renderMatrix": {
+                  "description": "Actual full-viewport image artifact for every frozen state and viewport cell.",
+                  "type": "array",
+                  "minItems": 3,
+                  "maxItems": 64,
+                  "items": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": [
+                      "stateRef",
+                      "viewport",
+                      "imageRef",
+                      "handoffState"
+                    ],
+                    "properties": {
+                      "stateRef": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "viewport": {
+                        "enum": [
+                          "wide",
+                          "intermediate",
+                          "compact"
+                        ]
+                      },
+                      "imageRef": {
+                        "description": "A real raster screenshot reference; CSS, DOM, geometry, lint, or source reports are invalid here.",
+                        "type": "string",
+                        "pattern": "\\.(png|jpg|jpeg|webp)$"
+                      },
+                      "handoffState": {
+                        "type": "boolean"
+                      }
+                    }
+                  },
+                  "contains": {
+                    "type": "object",
+                    "required": [
+                      "handoffState"
+                    ],
+                    "properties": {
+                      "handoffState": {
+                        "const": true
+                      }
+                    }
+                  },
+                  "minContains": 1
+                },
+                "adversarialProbeMatrix": {
+                  "description": "Observed result of every frozen adversarial probe on latest-source pixels.",
+                  "type": "array",
+                  "minItems": 10,
+                  "maxItems": 64,
+                  "items": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": ["probeId", "category", "phase", "stateRef", "attempt", "expectedFailure", "outcome", "imageRef", "reason"],
+                    "properties": {
+                      "probeId": { "type": "string", "minLength": 1 },
+                      "category": {
+                        "enum": ["viewport", "zoom", "page-scroll", "bounded-scroll", "content-stress", "state-transition", "sticky-fixed-overlay", "drag", "keyboard-focus", "composition-neighbors"]
+                      },
+                      "phase": { "enum": ["baseline", "start", "middle", "end", "terminal", "zoom-in", "zoom-out", "restored", "skeleton", "loading", "steady", "expanded", "collapsed", "focus", "drag-limit", "overlay-open", "content-long", "content-short", "breakpoint-edge"] },
+                      "stateRef": { "type": "string", "minLength": 1 },
+                      "attempt": { "type": "string", "minLength": 1 },
+                      "expectedFailure": { "type": "string", "minLength": 1 },
+                      "outcome": { "enum": ["survived", "contradiction", "not-applicable"] },
+                      "imageRef": { "type": ["string", "null"], "pattern": "\\.(png|jpg|jpeg|webp)$" },
+                      "reason": { "type": ["string", "null"] }
+                    },
+                    "allOf": [
+                      {
+                        "if": { "properties": { "outcome": { "enum": ["survived", "contradiction"] } } },
+                        "then": { "properties": { "imageRef": { "type": "string" }, "reason": { "type": "null" } } }
+                      },
+                      {
+                        "if": { "properties": { "outcome": { "const": "not-applicable" } } },
+                        "then": { "properties": { "imageRef": { "type": "null" }, "reason": { "type": "string", "minLength": 1 } } }
+                      }
+                    ]
+                  }
+                },
+                "handoffHostArtifact": {
+                  "description": "Uncropped raster of the delivered host browser surface at its actual content viewport without emulation.",
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["surfaceRef", "widthPx", "heightPx", "viewportOverride", "imageRef"],
+                  "properties": {
+                    "surfaceRef": { "type": "string", "minLength": 1 },
+                    "widthPx": { "type": "integer", "minimum": 1 },
+                    "heightPx": { "type": "integer", "minimum": 1 },
+                    "viewportOverride": { "const": false },
+                    "imageRef": { "type": "string", "pattern": "\\.(png|jpg|jpeg|webp)$" }
                   }
                 }
               }

@@ -10,13 +10,13 @@
     },
     "balanced": {
       "coordinatorModel": "inherit",
-      "workerModel": "sonnet",
-      "maxWorkers": 3
+      "workerModel": "gpt-5.6-sol",
+      "maxWorkers": 1
     },
     "parallel": {
       "coordinatorModel": "inherit",
-      "workerModel": "sonnet",
-      "maxWorkers": 5
+      "workerModel": "gpt-5.6-sol",
+      "maxWorkers": 1
     }
   }
 }

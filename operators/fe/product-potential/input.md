@@ -9,3 +9,6 @@
 
 - `input.targetRef`: The one target owned by this atomic invocation.
 - `input.constraints`: Closed constraints that bound this job without routing it.
+- `input.requiredOutcomeRefs`: Authority-backed user outcomes that the target must complete.
+- `input.observedCapabilityRefs`: Complete runtime-observed capability and interaction inventory for
+  the target; current presence does not imply `KEEP`.

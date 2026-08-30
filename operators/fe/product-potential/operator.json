@@ -2,7 +2,7 @@
   "schemaVersion": 7,
   "id": "fe/product-potential",
   "domain": "fe",
-  "job": "product potential one closed frontend target.",
+  "job": "Classify the complete capability delta for one closed frontend target against its required user-outcome flow.",
   "inputSchema": "input.schema.json",
   "outputSchema": "output.schema.json",
   "contextRefs": [],
@@ -11,6 +11,6 @@
   "stopConditions": [
     "required authority or evidence is missing or stale",
     "the closed target boundary is ambiguous",
-    "completion would require another operator job"
+    "a capability or flow relation cannot be classified from the closed evidence"
   ]
 }

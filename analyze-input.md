@@ -6,7 +6,7 @@ are called later by that mission owner through typed runtime receipts; do not pr
 
 ## Allowed selection context
 
-Use only the current request and attachments, `request-vocabulary.md`, catalog names/descriptions,
+Use only the current request and attachments, `scope.yaml`, `request-vocabulary.md`, catalog names/descriptions,
 host Source identity, and the exact portable/hydrated route needed by the named project and role. Do
 not inspect unrelated routes, Skill bodies, operators, product source, prior task sessions, or hidden
 conversation history merely to select a Skill.
@@ -24,6 +24,27 @@ For Git, source, browser-to-source, business, UAT, session, or debt work:
 4. Resolve the project's backend route for `.worktrees` authority.
 5. Never substitute the Source root, current directory, nearby clone, or browser hostname.
 6. Ask one focused route question only when two unresolved identities would change the mutation target.
+
+## Scope-clarity guard
+
+Before Skill selection, compile the multidimensional mission `scope` required by `scope.yaml`. Freeze
+its unit, targets, inclusions, exclusions, write roots, external effects, completion proof, and every
+material request-specific dimension. `ambiguityRefs` must be empty and `status` must be `frozen`
+before a Skill input can exist. If multiple interpretations would materially change any field or
+dimension, stop before reading target source and ask one focused question that names the competing
+boundaries and what authority is needed to choose between them. Do not inspect current implementation
+to guess user intent.
+
+For every frontend UX/UI request, add exactly one `frontend.ux-ui.change-level` dimension from
+`knowledge/ux-ui-change-levels.md`:
+
+- `refine`: the approved layout is locked; only element-level audit or repair is authorized;
+- `reconstruct`: an existing experience may be structurally built again; or
+- `new`: an approved experience that does not exist may be created.
+
+This dimension is only one conditional part of scope. Generic verbs such as `audit`, `redesign`,
+`improve`, `fix UI`, or `làm lại` do not resolve it by themselves. If active wording and durable
+authority do not prove exactly one value, ask before selecting `starci-fe-process`.
 
 ## Mission-owner selection
 
@@ -69,6 +90,6 @@ materially different directions, and recommends one.
 }
 ```
 
-Validate the envelope with `analyze-input.schema.json`, keep route resolution and selection as session
+Validate the envelope with `analyze-input.schema.json`, keep the frozen scope, route resolution, and selection as session
 state, then load only the selected Skill. A typed child `RETURN` resumes the existing mission; it never
 causes a new global selection or restarts the parent.

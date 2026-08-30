@@ -6,13 +6,14 @@
   "inputSchema": "input.schema.json",
   "outputSchema": "output.schema.json",
   "contextRefs": [
-    "fe.ui"
+    "fe.ui",
+    "fe.ux-ui-change-levels"
   ],
   "sourceReferenceRefs": [],
   "sideEffects": [],
   "stopConditions": [
     "required authority is missing or stale",
-    "the target boundary is ambiguous",
+    "the target boundary or UX/UI change level is ambiguous",
     "the job would require internal routing"
   ]
 }

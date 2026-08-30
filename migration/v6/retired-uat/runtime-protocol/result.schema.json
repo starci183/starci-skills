@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://starci.dev/v7.0/uat/result.schema.json",
+  "$id": "https://starci.dev/v7.1/uat/result.schema.json",
   "type": "object",
   "additionalProperties": false,
   "required": ["schemaVersion", "runId", "caseId", "sourceRevision", "authorityRevision", "verdicts", "uiAuthority", "recoveryComplete", "terminalProved", "checkpoints", "resultVerification", "fixture", "resources", "findings", "feedbackRefs", "suspenseQuestions", "userActions", "overall"],

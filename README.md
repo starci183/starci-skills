@@ -1,8 +1,12 @@
-# StarCi Skills 7.0
+# StarCi Skills 7.2.0
 
 StarCi v7 turns one product mission into a composable execution graph. One public Skill owns the
 outcome, calls peer Skills across durable boundaries, and resumes from typed `RETURN` receipts. Atomic
 operators do exactly one job: `(context + input) -> typed output`.
+
+Every mission carries a complete frozen `scope` conforming to `scope.yaml`. Scope is
+multidimensional and extensible; unresolved material dimensions are clarified before Skill selection
+or target-source inspection.
 
 ## Public Skills
 
@@ -55,6 +59,7 @@ off. Secrets and hidden reasoning are always redacted.
 
 ```text
 INDEX.md                       binding bootstrap and runtime law
+scope.yaml                     multidimensional mission-scope protocol
 analyze-input.md               global mission-owner selection
 skills/catalog.json            public twelve-Skill catalog
 skills/starci-*/               Skill contracts and state machines

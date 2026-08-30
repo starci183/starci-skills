@@ -1,1 +1,29 @@
-{"$schema":"https://json-schema.org/draft/2020-12/schema","type":"object","additionalProperties":false,"required":["version","debug"],"properties":{"version":{"const":"7.0.0"},"debug":{"type":"boolean"}}}
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "version",
+    "debug",
+    "aiBrainstormModel",
+    "aiBrainstormCount",
+    "aiBrainstormIsolation",
+    "aiBrainstormForkTurns",
+    "visualReviewModel",
+    "visualReviewCount",
+    "visualReviewIsolation",
+    "visualReviewForkTurns"
+  ],
+  "properties": {
+    "version": { "const": "7.2.0" },
+    "debug": { "type": "boolean" },
+    "aiBrainstormModel": { "const": "gpt-5.6-sol" },
+    "aiBrainstormCount": { "const": 1 },
+    "aiBrainstormIsolation": { "const": "fresh" },
+    "aiBrainstormForkTurns": { "const": "none" },
+    "visualReviewModel": { "const": "gpt-5.6-sol" },
+    "visualReviewCount": { "const": 1 },
+    "visualReviewIsolation": { "const": "fresh" },
+    "visualReviewForkTurns": { "const": "none" }
+  }
+}

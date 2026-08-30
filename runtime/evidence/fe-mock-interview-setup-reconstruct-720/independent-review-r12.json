@@ -1,0 +1,359 @@
+{
+  "schemaVersion": 7,
+  "operatorId": "fe/independent-review",
+  "output": {
+    "outcome": "findings",
+    "aiExecution": {
+      "model": "gpt-5.6-sol",
+      "count": 1,
+      "isolation": "fresh",
+      "forkTurns": "none",
+      "executionRef": "execution://6ce6aba5d9731d04458872b9b7d3117b86fcb241e60bbda341509df042330531"
+    },
+    "result": {
+      "summary": "Blind-pixel R12 review returns findings. The 1023-pixel and compact host compositions remove visible search, language, and theme utilities without a replacement disclosure; the recovery raster exposes placeholder-like mixed-language course context; the supplied probe lifecycle omits applicable restoration and content-stress attacks; and the final host artifact has no explicit no-viewport-override attestation. The parent starci-fe-process flow must return through finding-classify to the frontend repair/capture loop; quality handoff is forbidden.",
+      "artifactRefs": [
+        "independent-review-input-r12.json",
+        "visual-fidelity-r12.json",
+        "final-r12-host-context-loading.png",
+        "final-r12-host-context-steady.png",
+        "final-r12-wide.png",
+        "final-r12-1024.png",
+        "final-r12-1023.png",
+        "final-r12-compact-top.png",
+        "final-r12-compact-middle-selected.png",
+        "final-r12-compact-terminal.png",
+        "final-r12-history.png",
+        "final-r12-stats.png",
+        "final-r12-keyboard-focus.png",
+        "final-r12-recovery-compact.png",
+        "final-r12-resume-compact.png",
+        "final-r12-content-stress-en-start.png",
+        "final-r12-content-stress-en-terminal.png",
+        "final-r12-course-drawer-open.png",
+        "final-r12-course-drawer-restored.png",
+        "final-r12-zoom-in-effective-125.png",
+        "final-r12-zoom-out-effective-80.png",
+        "final-r12-zoom-restored.png",
+        "final-r12-host-context-last.png"
+      ],
+      "reviewerExecutionRef": "execution://6ce6aba5d9731d04458872b9b7d3117b86fcb241e60bbda341509df042330531",
+      "inspectionRefs": [
+        "visual-fidelity-r12.json#/output/result/inspectionRecords/0",
+        "visual-fidelity-r12.json#/output/result/inspectionRecords/1",
+        "visual-fidelity-r12.json#/output/result/inspectionRecords/2",
+        "visual-fidelity-r12.json#/output/result/inspectionRecords/3",
+        "visual-fidelity-r12.json#/output/result/inspectionRecords/4",
+        "visual-fidelity-r12.json#/output/result/inspectionRecords/5",
+        "visual-fidelity-r12.json#/output/result/inspectionRecords/6",
+        "visual-fidelity-r12.json#/output/result/inspectionRecords/7",
+        "visual-fidelity-r12.json#/output/result/inspectionRecords/8",
+        "visual-fidelity-r12.json#/output/result/inspectionRecords/9",
+        "visual-fidelity-r12.json#/output/result/inspectionRecords/10",
+        "visual-fidelity-r12.json#/output/result/inspectionRecords/11",
+        "visual-fidelity-r12.json#/output/result/inspectionRecords/12",
+        "visual-fidelity-r12.json#/output/result/inspectionRecords/13",
+        "visual-fidelity-r12.json#/output/result/inspectionRecords/14",
+        "visual-fidelity-r12.json#/output/result/inspectionRecords/15",
+        "visual-fidelity-r12.json#/output/result/inspectionRecords/16",
+        "visual-fidelity-r12.json#/output/result/inspectionRecords/17",
+        "visual-fidelity-r12.json#/output/result/inspectionRecords/18",
+        "visual-fidelity-r12.json#/output/result/inspectionRecords/19",
+        "visual-fidelity-r12.json#/output/result/inspectionRecords/20"
+      ],
+      "inspectionVerdicts": [
+        {
+          "inspectionRef": "visual-fidelity-r12.json#/output/result/inspectionRecords/0",
+          "verdict": "passed",
+          "observation": "final-r12-host-context-loading.png preserves the full wide host shell, opaque skeleton surfaces, stable tabs, coherent grouping, and clear viewport-edge clearance; no visible contradiction was found in this raster."
+        },
+        {
+          "inspectionRef": "visual-fidelity-r12.json#/output/result/inspectionRecords/1",
+          "verdict": "passed",
+          "observation": "final-r12-host-context-steady.png has a clear setup-first hierarchy, internally padded two-column surface, readable summary, reachable primary action, and coherent neighboring history/progress regions."
+        },
+        {
+          "inspectionRef": "visual-fidelity-r12.json#/output/result/inspectionRecords/2",
+          "verdict": "passed",
+          "observation": "final-r12-wide.png uses the wide canvas coherently: the collapsed rail, setup surface, summary, history, and progress regions retain distinct ownership without clipping or an unexplained empty zone."
+        },
+        {
+          "inspectionRef": "visual-fidelity-r12.json#/output/result/inspectionRecords/3",
+          "verdict": "passed",
+          "observation": "final-r12-1024.png remains contained with the complete top utility set, readable two-column task composition, consistent padding, and no visible overlap at the boundary."
+        },
+        {
+          "inspectionRef": "visual-fidelity-r12.json#/output/result/inspectionRecords/4",
+          "verdict": "finding",
+          "observation": "final-r12-1023.png drops the visible search, language, and theme utilities present one pixel wider, while exposing no replacement menu or disclosure. The abrupt ownership loss contradicts responsive persistence even though the remaining setup card fits."
+        },
+        {
+          "inspectionRef": "visual-fidelity-r12.json#/output/result/inspectionRecords/5",
+          "verdict": "finding",
+          "observation": "final-r12-compact-top.png recomposes the task surface cleanly, but the host header again exposes only cart, notifications, and profile: search, language, and theme ownership disappears without an alternative access point."
+        },
+        {
+          "inspectionRef": "visual-fidelity-r12.json#/output/result/inspectionRecords/6",
+          "verdict": "passed",
+          "observation": "final-r12-compact-middle-selected.png shows the selected values, matching readiness summary, primary action, and following history owner without overlap, border contact, or ambiguous attachment at the captured middle position."
+        },
+        {
+          "inspectionRef": "visual-fidelity-r12.json#/output/result/inspectionRecords/7",
+          "verdict": "passed",
+          "observation": "final-r12-compact-terminal.png reaches both terminal empty-state owners with intact copy, consistent insets, no pinned-boundary collision, and only ordinary end-of-page breathing room."
+        },
+        {
+          "inspectionRef": "visual-fidelity-r12.json#/output/result/inspectionRecords/8",
+          "verdict": "finding",
+          "observation": "final-r12-history.png gives the tab and empty state clear ownership, but the visible compact host header has removed search, language, and theme controls with no replacement disclosure."
+        },
+        {
+          "inspectionRef": "visual-fidelity-r12.json#/output/result/inspectionRecords/9",
+          "verdict": "finding",
+          "observation": "final-r12-stats.png keeps the statistics empty state coherent and padded, but repeats the compact-header loss of search, language, and theme reachability."
+        },
+        {
+          "inspectionRef": "visual-fidelity-r12.json#/output/result/inspectionRecords/10",
+          "verdict": "finding",
+          "observation": "final-r12-keyboard-focus.png has a complete, high-contrast focus rectangle and readable active-tab indicator, yet its visible compact host header still removes search, language, and theme without an alternative."
+        },
+        {
+          "inspectionRef": "visual-fidelity-r12.json#/output/result/inspectionRecords/11",
+          "verdict": "finding",
+          "observation": "final-r12-recovery-compact.png presents a visible retry path, but the repeated mixed-language label 'Fullstack Mastery Missing' reads like test or placeholder residue rather than understandable customer context; the compact header also lacks the wide host utilities."
+        },
+        {
+          "inspectionRef": "visual-fidelity-r12.json#/output/result/inspectionRecords/12",
+          "verdict": "finding",
+          "observation": "final-r12-resume-compact.png correctly prioritizes the active-session continuation, but the host header again removes search, language, and theme utilities without a compact replacement."
+        },
+        {
+          "inspectionRef": "visual-fidelity-r12.json#/output/result/inspectionRecords/13",
+          "verdict": "finding",
+          "observation": "final-r12-content-stress-en-start.png wraps the long English copy and setup surface cleanly, but the visible compact host header still loses search, language, and theme reachability."
+        },
+        {
+          "inspectionRef": "visual-fidelity-r12.json#/output/result/inspectionRecords/14",
+          "verdict": "passed",
+          "observation": "final-r12-content-stress-en-terminal.png reaches the long-content terminal state with intact empty-state messages, balanced peer cards, and no clipping or terminal collision."
+        },
+        {
+          "inspectionRef": "visual-fidelity-r12.json#/output/result/inspectionRecords/15",
+          "verdict": "passed",
+          "observation": "final-r12-course-drawer-open.png shows an opaque foreground drawer, uniform scrim, readable grouped destinations, visible close action, and no foreground clipping or accidental occlusion."
+        },
+        {
+          "inspectionRef": "visual-fidelity-r12.json#/output/result/inspectionRecords/16",
+          "verdict": "finding",
+          "observation": "final-r12-course-drawer-restored.png clears the scrim and restores the task layout, but restoration returns to the same compact header that has no search, language, or theme access."
+        },
+        {
+          "inspectionRef": "visual-fidelity-r12.json#/output/result/inspectionRecords/17",
+          "verdict": "finding",
+          "observation": "final-r12-zoom-in-effective-125.png remains horizontally contained and readable at increased scale, but its visible host chrome still omits search, language, and theme with no replacement route."
+        },
+        {
+          "inspectionRef": "visual-fidelity-r12.json#/output/result/inspectionRecords/18",
+          "verdict": "finding",
+          "observation": "final-r12-zoom-out-effective-80.png retains stable task grouping and legible controls, but the compact header continues to remove the three wide-host utilities rather than recomposing them."
+        },
+        {
+          "inspectionRef": "visual-fidelity-r12.json#/output/result/inspectionRecords/19",
+          "verdict": "finding",
+          "observation": "final-r12-zoom-restored.png returns to the expected task geometry, but the restored host state still lacks search, language, and theme access."
+        },
+        {
+          "inspectionRef": "visual-fidelity-r12.json#/output/result/inspectionRecords/20",
+          "verdict": "finding",
+          "observation": "final-r12-host-context-last.png is visually coherent and includes the full wide host shell, setup surface, neighbors, and viewport edge; however, the frozen packet supplies no explicit guarantee that this exact handoff capture used the delivery browser/content viewport with no viewport override, so the host-context inspection cannot close."
+        }
+      ],
+      "probeVerdicts": [
+        {
+          "probeId": "viewport-wide",
+          "category": "viewport",
+          "phase": "steady",
+          "verdict": "survived",
+          "observation": "The wide raster preserves the complete host utilities, coherent setup hierarchy, neighboring sections, and clear page boundaries."
+        },
+        {
+          "probeId": "breakpoint-1024",
+          "category": "viewport",
+          "phase": "breakpoint-edge",
+          "verdict": "survived",
+          "observation": "At 1024 the header utilities and course-navigation access remain visible while the two-column setup stays contained."
+        },
+        {
+          "probeId": "breakpoint-1023",
+          "category": "viewport",
+          "phase": "breakpoint-edge",
+          "verdict": "contradiction",
+          "observation": "At 1023, search, language, and theme controls visible at 1024 disappear without a replacement disclosure, contradicting responsive persistence."
+        },
+        {
+          "probeId": "zoom-in",
+          "category": "zoom",
+          "phase": "zoom-in",
+          "verdict": "contradiction",
+          "observation": "The task content survives increased scale, but the pictured compact host state has no reachable replacement for the omitted search, language, and theme utilities."
+        },
+        {
+          "probeId": "zoom-out",
+          "category": "zoom",
+          "phase": "zoom-out",
+          "verdict": "contradiction",
+          "observation": "The task surface remains readable at reduced scale, while the visible compact header still loses search, language, and theme ownership."
+        },
+        {
+          "probeId": "zoom-restored",
+          "category": "zoom",
+          "phase": "restored",
+          "verdict": "contradiction",
+          "observation": "Task geometry restores without displacement, but restoration returns to the same incomplete compact host-utility composition."
+        },
+        {
+          "probeId": "page-scroll-start",
+          "category": "page-scroll",
+          "phase": "start",
+          "verdict": "contradiction",
+          "observation": "The scroll start exposes context and the primary task, but its visible compact header removes search, language, and theme reachability."
+        },
+        {
+          "probeId": "page-scroll-middle",
+          "category": "page-scroll",
+          "phase": "middle",
+          "verdict": "survived",
+          "observation": "The selected state, summary, primary action, and following history owner remain distinct and unobstructed at the middle position."
+        },
+        {
+          "probeId": "page-scroll-terminal",
+          "category": "page-scroll",
+          "phase": "terminal",
+          "verdict": "survived",
+          "observation": "The terminal position reaches both final cards and a clear page ending without a fixed-boundary collision."
+        },
+        {
+          "probeId": "bounded-scroll",
+          "category": "bounded-scroll",
+          "phase": "baseline",
+          "verdict": "not-applicable",
+          "observation": "No independently bounded scrolling owner is visible in the setup, tab, empty-state, or fully fitting drawer surfaces supplied for R12."
+        },
+        {
+          "probeId": "loading-host",
+          "category": "state-transition",
+          "phase": "loading",
+          "verdict": "survived",
+          "observation": "The supplied host pending raster preserves orientation and stable skeleton grouping without collapse; it does not by itself supply the separately required skeleton/loading identities recorded in gaps."
+        },
+        {
+          "probeId": "content-long-start",
+          "category": "content-stress",
+          "phase": "content-long",
+          "verdict": "contradiction",
+          "observation": "Long copy wraps successfully, but the same raster shows the compact header's unreplaced utility loss."
+        },
+        {
+          "probeId": "content-long-terminal",
+          "category": "content-stress",
+          "phase": "terminal",
+          "verdict": "survived",
+          "observation": "Long-content flow reaches both terminal empty-state cards with complete messages and no clipping."
+        },
+        {
+          "probeId": "selection-transition",
+          "category": "state-transition",
+          "phase": "expanded",
+          "verdict": "survived",
+          "observation": "The visible readiness summary agrees with the selected system-design and advanced values and keeps a clear primary action."
+        },
+        {
+          "probeId": "resume-transition",
+          "category": "state-transition",
+          "phase": "steady",
+          "verdict": "contradiction",
+          "observation": "The resume card correctly dominates new-session setup, but the visible compact host state still omits search, language, and theme access."
+        },
+        {
+          "probeId": "recovery-transition",
+          "category": "state-transition",
+          "phase": "steady",
+          "verdict": "contradiction",
+          "observation": "Retry is visible, but 'Fullstack Mastery Missing' is repeated as mixed-language placeholder-like context and the compact host utilities remain incomplete."
+        },
+        {
+          "probeId": "overlay-open",
+          "category": "sticky-fixed-overlay",
+          "phase": "overlay-open",
+          "verdict": "survived",
+          "observation": "The drawer is opaque, bounded, clearly foregrounded, and leaves its close action and all visible destinations unobstructed."
+        },
+        {
+          "probeId": "overlay-restored",
+          "category": "sticky-fixed-overlay",
+          "phase": "restored",
+          "verdict": "contradiction",
+          "observation": "The overlay itself restores cleanly, but the returned compact host state again lacks search, language, and theme access."
+        },
+        {
+          "probeId": "drag",
+          "category": "drag",
+          "phase": "drag-limit",
+          "verdict": "not-applicable",
+          "observation": "No draggable object or drag affordance is visible anywhere in the supplied R12 interface states."
+        },
+        {
+          "probeId": "keyboard-focus",
+          "category": "keyboard-focus",
+          "phase": "focus",
+          "verdict": "contradiction",
+          "observation": "The focused History tab itself has a complete visible ring, but its captured compact host composition still removes search, language, and theme controls without replacement."
+        },
+        {
+          "probeId": "composition-neighbors-host-last",
+          "category": "composition-neighbors",
+          "phase": "steady",
+          "verdict": "contradiction",
+          "observation": "The final wide pixels compose the setup, history, progress, header, and rail coherently, but the frozen evidence lacks the explicit exact-browser/content-viewport and no-viewport-override guarantee required to accept this handoff artifact."
+        }
+      ]
+    },
+    "gaps": [
+      "The applicable page-scroll lifecycle supplies start, middle, and terminal images but no restored-after-scroll probe or raster.",
+      "The applicable content-stress evidence supplies long-content start/terminal only; no content-short, missing, dense, sparse, or independent wrapping attack is recorded.",
+      "The pending-state evidence labels one skeleton-placeholder raster as loading and does not provide separately identified skeleton and loading visual products where the host owns both presentation phases.",
+      "The frozen handoff evidence names final-r12-host-context-last.png but provides no explicit guarantee that it is the exact delivery browser/content viewport captured with no viewport override.",
+      "The validated input's exact 21 probe identities do not match the canonical probe phase sequence enforced by the operator semantic validator; preserving the required one-to-one input identities and passing that stricter semantic check cannot both be achieved without regenerating the frozen packet."
+    ],
+    "evidenceRefs": [
+      "D:/Repositories/starci-academy-backend/.claude/knowledge/ui.md",
+      "D:/Repositories/starci-academy-fe/packages/grammar/README.md",
+      "D:/Repositories/starci-academy-fe/packages/grammar/src/core/styles.css",
+      "independent-review-input-r12.json",
+      "visual-fidelity-r12.json#/output/result/inspectionRecords",
+      "visual-fidelity-r12.json#/output/result/probeRecords",
+      "final-r12-host-context-loading.png",
+      "final-r12-host-context-steady.png",
+      "final-r12-wide.png",
+      "final-r12-1024.png",
+      "final-r12-1023.png",
+      "final-r12-compact-top.png",
+      "final-r12-compact-middle-selected.png",
+      "final-r12-compact-terminal.png",
+      "final-r12-history.png",
+      "final-r12-stats.png",
+      "final-r12-keyboard-focus.png",
+      "final-r12-recovery-compact.png",
+      "final-r12-resume-compact.png",
+      "final-r12-content-stress-en-start.png",
+      "final-r12-content-stress-en-terminal.png",
+      "final-r12-course-drawer-open.png",
+      "final-r12-course-drawer-restored.png",
+      "final-r12-zoom-in-effective-125.png",
+      "final-r12-zoom-out-effective-80.png",
+      "final-r12-zoom-restored.png",
+      "final-r12-host-context-last.png"
+    ],
+    "handoff": null
+  }
+}

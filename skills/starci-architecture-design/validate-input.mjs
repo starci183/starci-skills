@@ -1,7 +1,13 @@
-import { validatorFor, runValidatorCli } from '../../operators/validation.mjs';
-const requiredByMode={"discover":["verified-source-route"],"design":["observed-source-inventory","approved-tech-stack","data-ownership-model"],"challenge":["architecture-candidate"],"realize":["approved-architecture"]};
-const mutationModes=new Set([]);
-const same=(a,b)=>JSON.stringify(a??null)===JSON.stringify(b??null);
-export const validateInput=validatorFor(new URL('./input.schema.json',import.meta.url),(v)=>{const e=[];const o=v.options;const required=requiredByMode[o.intentMode==='resume'?o.resumeTarget:o.intentMode]??[];for(const name of required)if(!o.prerequisiteRefs.some((ref)=>ref.includes(name)))e.push('missing prerequisite '+name);const mut=mutationModes.has(o.intentMode==='resume'?o.resumeTarget:o.intentMode);if(mut){if(!v.scope.externalMutation||v.scope.writeRoots.length===0||!v.scope.approvalRef)e.push('mutation intent requires writeRoots, externalMutation, and approval');}else if(v.scope.externalMutation||v.scope.writeRoots.length||v.scope.approvalRef!==null)e.push('read-only intent cannot declare mutation authority');if(o.intentMode==='resume'){const r=o.receipt;const h=o.receiptHistory;if(r?.type!=='RESUME'||r.skillId!=='starci-architecture-design')e.push('resume requires canonical RESUME receipt addressed to this skill');const ret=h.at(-1);const call=h.at(-2);if(ret?.type!=='RETURN'||call?.type!=='CALL')e.push('resume history must end CALL then RETURN');else{if(ret.parentId!==call.receiptId||r.parentId!==ret.receiptId)e.push('receipt parent chain mismatch');if(call.childId!==ret.childId||r.childId!==ret.childId)e.push('receipt child mismatch');for(const key of ['payloadRef','sourceHeads'])if(!same(call.trace?.[key],ret.trace?.[key])||!same(ret.trace?.[key],r.trace?.[key]))e.push(key+' binding mismatch');if(r.trace?.resumeState!==o.resumeTarget)e.push('resume target mismatch');}}else if(o.receipt!==null)e.push('new intent cannot consume a resume receipt');const fps=[...o.receiptHistory.map((x)=>x.progressFingerprint),...(o.receipt?[o.receipt.progressFingerprint]:[])];if(fps.length>=3&&new Set(fps.slice(-3)).size===1)e.push('no-progress across three runtime receipts');return e});
-if(process.argv[1]?.endsWith('validate-input.mjs'))await runValidatorCli(validateInput,'node validate-input.mjs <artifact.json>');
+import { runValidatorCli } from '../../operators/validation.mjs';
+import { processInputValidator } from '../validate-process-input.mjs';
 
+export const validateInput = processInputValidator(new URL('./input.schema.json', import.meta.url), {
+  skillId: 'starci-architecture-design',
+  requiredByMode: {
+    discover: ['verified-source-route'],
+    design: ['observed-source-inventory', 'approved-tech-stack', 'data-ownership-model'],
+    challenge: ['architecture-candidate'],
+    realize: ['approved-architecture'],
+  },
+});
+if (process.argv[1]?.endsWith('validate-input.mjs')) await runValidatorCli(validateInput, 'node validate-input.mjs <artifact.json>');

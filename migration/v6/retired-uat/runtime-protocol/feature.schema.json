@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://starci.dev/v7.0/uat/feature.schema.json",
+  "$id": "https://starci.dev/v7.1/uat/feature.schema.json",
   "type": "object",
   "additionalProperties": false,
   "required": ["schemaVersion", "feature", "objective", "owner", "sourceRevision", "authorityRevision", "flows", "sharedFixtureRefs", "sharedResourceRefs", "rootCauseRefs", "feedbackRefs", "suspenseQuestionRefs", "userActionRefs", "userFeedbackStatus"],

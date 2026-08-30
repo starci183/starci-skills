@@ -1,0 +1,25 @@
+{
+  "schemaVersion": 7,
+  "operatorId": "fe/source-repair",
+  "output": {
+    "outcome": "repaired",
+    "result": {
+      "summary": "Restored compact reachability through one utility disclosure, replaced placeholder-like recovery identity with localized customer copy, and regenerated the capture plan with canonical lifecycle phases plus an exact no-override host attestation.",
+      "artifactRefs": [
+        "D:/Repositories/starci-academy-fe/src/components/layouts/ShellNav/component.tsx",
+        "D:/Repositories/starci-academy-fe/src/components/layouts/ShellNav/classNames.ts",
+        "D:/Repositories/starci-academy-fe/src/components/pages/CourseMockInterviewSetupPage/index.tsx",
+        "host-attestation-r13.json"
+      ]
+    },
+    "gaps": [],
+    "evidenceRefs": [
+      "finding-classify-r12.json",
+      "independent-review-r12.json",
+      "final-r13-compact-utility-open.png",
+      "final-r13-recovery-compact.png",
+      "final-r13-host-context-last.png"
+    ],
+    "handoff": null
+  }
+}

@@ -57,6 +57,7 @@
       "additionalProperties": false,
       "required": [
         "targetRef",
+        "uxUiChangeLevel",
         "constraints"
       ],
       "properties": {
@@ -64,6 +65,14 @@
           "description": "The one target owned by this invocation.",
           "type": "string",
           "minLength": 1
+        },
+        "uxUiChangeLevel": {
+          "description": "Projection of the frozen frontend.ux-ui.change-level scope dimension; target resolution must not widen it.",
+          "enum": [
+            "refine",
+            "reconstruct",
+            "new"
+          ]
         },
         "constraints": {
           "description": "Closed constraints for this atomic job.",

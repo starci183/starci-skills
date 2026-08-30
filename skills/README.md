@@ -8,6 +8,10 @@ Every Skill owns one durable boundary, while several related verbs may be input 
 `starci-fe-process` handles create, audit, repair, redesign, debug, and reconcile instead of exposing a
 Skill for every phase. Operators remain atomic and never call or branch.
 
+Every Skill input requires a complete frozen mission `scope` conforming to `../scope.yaml`. A Skill's
+owned capability boundary is static discovery metadata; mission scope is dynamic input compiled from
+the active request and authority. Unresolved material dimensions must be clarified before execution.
+
 Run:
 
 ```bash

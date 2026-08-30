@@ -20,14 +20,17 @@ The collection owner controls repeated-row anatomy, separators, local state plac
 - Keep a compact state legend as a legend, not a data list. Every state needs a visible semantic mark attached to its text label; labels alone name states but do not demonstrate how to recognize them in the controlled object.
 - Make legend marks correspond to the actual controlled states. If answered, current, and future controls do not remain distinguishable without reading the legend text, the state mapping is incomplete.
 - Use dividers or spacing from the package interface; remove orphan first/last separators.
-- Render `affirmative`, `negative`, `pending`, and selected treatments only after application mapping.
+- A disclosure collection uses the package accordion primitive so open/close motion, keyboard state, and panel lifecycle remain coherent. One separator belongs between sibling items; never draw an extra divider between an item's trigger and its own expanded panel.
+- When ordered progression and current position are the comparison meaning, use progression anatomy rather than compressing a generic label-value table into a narrow disclosure. Keep identity readable, attach emphasis to the current status/value, and let the progression marker carry order without divider noise.
+- Render `affirmative`, `negative`, `pending`, and selected treatments only after application mapping. The glyph, tone, and text must make the same evidenced claim; never map promises, benefits, capabilities, or future outcomes to affirmative or negative state rows for decoration. An offering may mark included benefits with a purpose-named foreground `included` glyph, but that marker is not completion or success state.
+- Difficulty, tier, phase name, and other categorical metadata remain neutral unless upstream evidence declares an actual state or consequence. Current emphasis belongs on the active status/value, not on the category identity beside it.
 - Separate static and interactive rows unless a mixed-row variant exists.
 - Use a stable empty treatment owned by the collection.
 - Keep row action emphasis below the collection's primary task.
 
 ## Scale
 
-Use declared pagination, virtualization, clipping, or scrolling for unbounded data. Preserve visible selection scope and keyboard continuity through updates.
+Use declared pagination, virtualization, clipping, or scrolling for unbounded data. When an existing primitive owns the same bounded vertical-scroll job, reuse it instead of recreating raw overflow locally; reject reuse when owner or interaction semantics differ. Preserve visible selection scope and keyboard continuity through updates.
 
 ## Responsive
 

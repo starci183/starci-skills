@@ -1,0 +1,7 @@
+version: 7.2.0
+schemaVersion: 1
+requiredCoreFields: ["status","unit","targetRefs","inclusionRefs","exclusionRefs","writeRoots","externalMutation","approvalRef","completionProofRefs","dimensions","ambiguityRefs"]
+frozenStatus: frozen
+unclearAction: ask-before-skill-selection
+sourceInspectionWhileAmbiguous: forbidden
+registeredDimensions: {"frontend.ux-ui.change-level":["refine","reconstruct","new"]}

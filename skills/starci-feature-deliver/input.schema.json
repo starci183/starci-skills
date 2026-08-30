@@ -13,7 +13,8 @@
     "resume",
     "returnReceipt",
     "progressHistory",
-    "receiptType"
+    "receiptType",
+    "scope"
   ],
   "properties": {
     "schemaVersion": {
@@ -146,7 +147,7 @@
           ],
           "properties": {
             "version": {
-              "const": "7.0.0"
+              "const": "7.2.0"
             },
             "receiptId": {
               "type": "string",
@@ -225,6 +226,142 @@
         "RETURN",
         "RESUME"
       ]
+    },
+    "scope": {
+      "$ref": "#/$defs/missionScope"
+    }
+  },
+  "$defs": {
+    "missionScope": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "status",
+        "unit",
+        "targetRefs",
+        "inclusionRefs",
+        "exclusionRefs",
+        "writeRoots",
+        "externalMutation",
+        "approvalRef",
+        "completionProofRefs",
+        "dimensions",
+        "ambiguityRefs"
+      ],
+      "properties": {
+        "status": {
+          "const": "frozen"
+        },
+        "unit": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9.-]*$"
+        },
+        "targetRefs": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "maxItems": 128,
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 1024
+          }
+        },
+        "inclusionRefs": {
+          "type": "array",
+          "minItems": 0,
+          "uniqueItems": true,
+          "maxItems": 128,
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 1024
+          }
+        },
+        "exclusionRefs": {
+          "type": "array",
+          "minItems": 0,
+          "uniqueItems": true,
+          "maxItems": 128,
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 1024
+          }
+        },
+        "writeRoots": {
+          "type": "array",
+          "minItems": 0,
+          "uniqueItems": true,
+          "maxItems": 128,
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 1024
+          }
+        },
+        "externalMutation": {
+          "type": "boolean"
+        },
+        "approvalRef": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "minLength": 1
+        },
+        "completionProofRefs": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "maxItems": 128,
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 1024
+          }
+        },
+        "dimensions": {
+          "type": "array",
+          "uniqueItems": true,
+          "maxItems": 128,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "key",
+              "value",
+              "authorityRef"
+            ],
+            "properties": {
+              "key": {
+                "type": "string",
+                "pattern": "^[a-z][a-z0-9-]*(?:\\.[a-z][a-z0-9-]*)+$"
+              },
+              "value": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 1024
+              },
+              "authorityRef": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 1024
+              }
+            }
+          }
+        },
+        "ambiguityRefs": {
+          "type": "array",
+          "maxItems": 0,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 1024
+          }
+        }
+      }
     }
   }
 }

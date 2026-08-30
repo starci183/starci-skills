@@ -2,6 +2,10 @@
 
 Synthesize three or four materially different UI directions from one approved UX flow and interaction-container plan.
 
+Apply `knowledge/direction-visualization.md`. Render one inspectable `visualize` HTML comparison with
+realistic page or substantial-surface mockups for every direction, including wide, constrained, and
+material interaction/recovery states. Prose-only alternatives are blocked.
+
 Use only the closed `context` and `input`. Return one typed `output.outcome` plus this job's result, gaps, and evidence. Do not route, persist a session, or choose another operator.
 
 Frontend creation follows `AI-first -> Rules-first -> Grammar-last`. UX synthesis, UI-direction synthesis, principle/law compilation, layout compilation, Grammar application, implementation, and audit are separate jobs. Audit jobs observe and report; they never repair source.

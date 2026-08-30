@@ -42,7 +42,10 @@
               "additionalProperties": false,
               "required": [
                 "summary",
-                "artifactRefs"
+                "artifactRefs",
+                "surfaceInventory",
+                "interactionInventory",
+                "responsiveStateInventory"
               ],
               "properties": {
                 "summary": {
@@ -56,6 +59,56 @@
                   "items": {
                     "type": "string",
                     "minLength": 1
+                  }
+                },
+                "surfaceInventory": {
+                  "type": "array",
+                  "minItems": 1,
+                  "maxItems": 64,
+                  "items": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": ["surfaceRef", "ownerRef", "purpose", "evidenceRef"],
+                    "properties": {
+                      "surfaceRef": { "type": "string", "minLength": 1 },
+                      "ownerRef": { "type": "string", "minLength": 1 },
+                      "purpose": { "type": "string", "minLength": 1 },
+                      "evidenceRef": { "type": "string", "minLength": 1 }
+                    }
+                  }
+                },
+                "interactionInventory": {
+                  "type": "array",
+                  "maxItems": 128,
+                  "items": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": ["interactionRef", "kind", "ownerRef", "entryStateRef", "outcomeRef", "evidenceRef"],
+                    "properties": {
+                      "interactionRef": { "type": "string", "minLength": 1 },
+                      "kind": {
+                        "enum": ["search", "filter", "navigation", "disclosure", "selection", "mutation", "progress", "recovery", "scroll", "drag", "overlay", "keyboard", "other"]
+                      },
+                      "ownerRef": { "type": "string", "minLength": 1 },
+                      "entryStateRef": { "type": "string", "minLength": 1 },
+                      "outcomeRef": { "type": "string", "minLength": 1 },
+                      "evidenceRef": { "type": "string", "minLength": 1 }
+                    }
+                  }
+                },
+                "responsiveStateInventory": {
+                  "type": "array",
+                  "minItems": 3,
+                  "maxItems": 3,
+                  "items": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": ["viewport", "stateRef", "evidenceRef"],
+                    "properties": {
+                      "viewport": { "enum": ["wide", "intermediate", "compact"] },
+                      "stateRef": { "type": "string", "minLength": 1 },
+                      "evidenceRef": { "type": "string", "minLength": 1 }
+                    }
                   }
                 }
               }

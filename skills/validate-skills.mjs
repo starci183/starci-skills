@@ -2,10 +2,12 @@ import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { validatorFor } from '../operators/validation.mjs';
+import { loadScopePolicy } from '../runtime/scope-policy.mjs';
 
 const root = path.dirname(fileURLToPath(import.meta.url));
 const runtimeRoot = path.resolve(root, '..');
 const operatorsRoot = path.join(runtimeRoot, 'operators');
+const scopePolicy = loadScopePolicy();
 const fail = (message) => { throw new Error(message); };
 const readJson = (file) => JSON.parse(readFileSync(file, 'utf8'));
 const requiredFiles = [
@@ -90,6 +92,21 @@ function assertSelection(skillId, inputSchema) {
   if ('mode' in selection.properties) fail(`${skillId}: legacy approval mode is forbidden`);
 }
 
+function assertScope(skillId, inputSchema) {
+  if (!inputSchema.required?.includes('scope')) fail(`${skillId}: input must require mission scope`);
+  const scope = resolveLocal(inputSchema, inputSchema.properties?.scope);
+  if (!scope || scope.additionalProperties !== false) fail(`${skillId}: scope must be a closed object`);
+  const actual = [...(scope.required ?? [])].sort();
+  const expected = [...scopePolicy.requiredCoreFields].sort();
+  if (JSON.stringify(actual) !== JSON.stringify(expected)) fail(`${skillId}: scope fields differ from scope.yaml`);
+  if (scope.properties?.status?.const !== scopePolicy.frozenStatus) fail(`${skillId}: scope must be frozen`);
+  if (scope.properties?.targetRefs?.minItems !== 1) fail(`${skillId}: scope needs at least one target`);
+  if (scope.properties?.completionProofRefs?.minItems !== 1) fail(`${skillId}: scope needs completion proof`);
+  if (scope.properties?.ambiguityRefs?.maxItems !== 0) fail(`${skillId}: ambiguous scope must be rejected`);
+  const dimension = scope.properties?.dimensions?.items;
+  if (!dimension || dimension.additionalProperties !== false) fail(`${skillId}: scope dimensions must be closed entries`);
+}
+
 function assertMachine(skillId, machine, inputSchema, outputSchema) {
   if (machine.schemaVersion !== 7 || inputSchema.properties?.schemaVersion?.const !== 7 || outputSchema.properties?.schemaVersion?.const !== 7) {
     fail(`${skillId}: machine/input/output must all be schemaVersion 7`);
@@ -132,6 +149,7 @@ function assertMachine(skillId, machine, inputSchema, outputSchema) {
     fail(`${skillId}: input and output schemas must be closed`);
   }
   assertSelection(skillId, inputSchema);
+  assertScope(skillId, inputSchema);
   for (const edge of analysis.on) {
     if (!stateIds.has(edge.target)) fail(`${skillId}: analyze-input selected an unknown state`);
   }
@@ -162,7 +180,7 @@ function assertOpenAiInterface(skillId, skillDir) {
 }
 
 const catalog = readJson(path.join(root, 'catalog.json'));
-if (catalog.schemaVersion !== 7 || catalog.systemVersion !== '7.0.0') fail('catalog must be v7.0.0');
+if (catalog.schemaVersion !== 7 || catalog.systemVersion !== '7.2.0') fail('catalog must be v7.2.0');
 if (catalog.skills.length !== 12) fail(`v7 catalog must expose 12 skills, found ${catalog.skills.length}`);
 const catalogIds = catalog.skills.map((entry) => entry.id);
 if (new Set(catalogIds).size !== catalogIds.length) fail('catalog skill IDs must be unique');

@@ -2,6 +2,82 @@
 
 All notable changes are documented here. This project follows Semantic Versioning.
 
+## 7.2.0 - 2026-08-30
+
+### Changed
+
+- Standardized material AI orchestration on one fresh Sol execution: every activity is completed by one
+  fresh `gpt-5.6-sol` across every provider mapping, including legacy balanced/parallel modes.
+- Made router acceptance depend on canonical input and output validators, a non-null expected-output
+  contract, the exact owning Skill, and runtime-issued peer receipts.
+- Content-addressed every visual raster and bound the blind packet to the exact ordered host + render
+  matrix + lifecycle-probe capture. Substitution, reordering, mutable filenames, and unproduced images fail.
+- Expanded exact phase coverage to breakpoint edges, long/short content, overlay-open, drag-limit,
+  keyboard focus, skeleton/loading/steady, zoom restoration, and scroll terminals.
+- Integrated post-completion counterevidence into terminal routing: closure requires a causal failure
+  record, canonical same-mission/same-Skill ERROR→RESUME chain, and a fresh ordered
+  CALL→RETURN→TRANSITION proof lifecycle descended from that RESUME and covering every affected
+  evidence reference. A backend proof cannot close a reopened frontend verdict.
+- Bound every routed operator result to its canonical output validator, canonical `RETURN` receipt,
+  exact current input/output fingerprints, invocation identity, and single-use consumption; stale or
+  narrated results cannot advance a machine.
+- Bound frontend visual output to the exact input packet fingerprint, complete supplied raster set,
+  final screenshot, reviewer execution, and review policy. Opaque raster/probe identifiers and
+  runtime-attested distinct principals close rationale and alias channels.
+- Material AI `CALL`, `RETURN`, and `TRANSITION` receipts require one fresh `gpt-5.6-sol` execution
+  and always emit debug activity. A visual repair can no longer be reclassified as `clean` to bypass
+  fresh capture and review.
+- Replaced narrated operator transitions with validator-issued, invocation-bound RETURN envelopes;
+  a raw `{ outcome: "passed" }` can no longer advance any operator state.
+- Standardized every material AI brainstorm and review on one fresh-context `gpt-5.6-sol` execution;
+  same-context self-review is not a fallback path.
+- Made frontend visual proof raster-only for the reviewer, with uncropped host context, focused surface
+  captures, lifecycle/probe rasters, and exactly one final post-mutation screenshot controlling PASS.
+- Added mandatory terminal debug output for AI CALL/RETURN/TRANSITION contracts and human-readable
+  inspection records per raster; missing records, uncertainty, stale capture, or any finding blocks PASS.
+- Made public Skill inputs reject schema-valid cloned/fabricated receipts, and made render-state and
+  adversarial-probe binding order-sensitive so a reordered capture cannot impersonate the request.
+- Replaced raw WAIT resumption with a canonical, state/mission/Skill/input-bound RESUME envelope that
+  is consumed once. Forged, cloned, retargeted, and replayed RESUME objects fail closed.
+- Made post-completion proof accept only route-issued transitions from declared owning-Skill review
+  operators, with single-use lifecycle closure; relabeling a backend operator as frontend is rejected.
+- Made neutral add/change/remove consideration executable at every Skill analysis boundary and in
+  terminal quality proof, with a required evidence-backed disposition for all three directions.
+- Consolidated frontend visual closure into one fresh-Sol pass bound one-to-one to the complete ordered
+  raster/probe packet. That Sol performs the whole adversarial visual verdict before quality handoff.
+- Made public FE/Feature/UAT return receipts runtime-issued and single-use, made each active WAIT
+  identity issue at most one RESUME resolution, and made quality PASS reject prose-only, empty,
+  invented, or unbound evidence.
+
+## 7.1.0 - 2026-08-30
+
+### Changed
+
+- Made the frontend audit chain fail-closed: runtime observation now returns structured surface,
+  interaction, and responsive-state inventories; semantic, UX, and UI aggregate `passed` requires
+  every evidence-bound check to pass.
+- Added an executable behavior-preservation contract. Every observed interaction must be preserved or
+  explicitly removed/replaced with authority and rationale before source mutation can begin.
+- Bound source apply and repair to the frozen behavior-contract fingerprint so a visual direction
+  cannot silently delete product behavior.
+- Added semantic validators for complete viewport matrices and all ten adversarial probe categories;
+  duplicated probes no longer satisfy coverage.
+- Made visual-fidelity and independent-review aggregates reject any underlying repair, finding, or
+  contradiction, and added regression tests for the false-PASS failures demonstrated by live UI work.
+
+## 7.0.1 - 2026-08-29
+
+### Changed
+
+- Added `.claude/scope.yaml` as the mission-scope protocol and made every public Skill input require
+  a complete, frozen, multidimensional scope with explicit targets, inclusions, exclusions, mutation
+  boundaries, completion proof, extensible dimensions, and no unresolved ambiguity.
+- Required global analysis to ask one focused boundary question before Skill selection or target-source
+  inspection whenever a material scope dimension is unresolved.
+- Added the conditional `frontend.ux-ui.change-level` scope dimension with `refine`, `reconstruct`,
+  and `new`; this dimension remains one small part of the complete frontend mission scope.
+- Added release validation that all 12 public Skill schemas conform to the same scope protocol.
+
 ## 7.0.0 - 2026-08-29
 
 ### Changed

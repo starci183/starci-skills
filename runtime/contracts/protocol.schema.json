@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://starci.dev/v7.0/runtime/protocol.schema.json",
+  "$id": "https://starci.dev/v7.2/runtime/protocol.schema.json",
   "title": "StarCi v7.0 session protocol",
   "$defs": {
     "sha256": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },

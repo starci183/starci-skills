@@ -21,7 +21,7 @@ const expected = [
 
 test('public catalog is exactly the twelve v7 mission skills', () => {
   assert.equal(catalog.schemaVersion, 7);
-  assert.equal(catalog.systemVersion, '7.0.0');
+  assert.equal(catalog.systemVersion, '7.2.0');
   assert.deepEqual(catalog.skills.map(({ id }) => id).sort(), expected);
   const directories = readdirSync(new URL('skills/', root), { withFileTypes: true })
     .filter((entry) => entry.isDirectory() && entry.name.startsWith('starci-'))
@@ -41,7 +41,7 @@ test('selection law routes frontend work to one general FE process skill', () =>
 test('debug configuration is explicit and behavior-neutral', () => {
   const config = readFileSync(new URL('config.yaml', root), 'utf8');
   const index = readFileSync(new URL('INDEX.md', root), 'utf8');
-  assert.match(config, /^version:\s*7\.0\.0$/m);
+  assert.match(config, /^version:\s*7\.2\.0$/m);
   assert.match(config, /^debug:\s*true$/m);
   assert.match(index, /Debug changes visibility only/i);
   assert.match(index, /Never persist or[\s\S]*display chain-of-thought/i);
@@ -52,4 +52,13 @@ test('v7 topology owns typed UAT and session evidence without an index layer', (
   assert.match(index, /uat\/[\s\S]*<feature>\/[\s\S]*<flow>\/[\s\S]*snapshot\.json[\s\S]*result\.json/);
   assert.match(index, /sessions\/[\s\S]*<session-id>\/[\s\S]*calls\.ndjson/);
   assert.match(index, /Qdrant.*not part/is);
+});
+
+test('scope is frozen before selection and remains multidimensional',()=>{
+  const scope=readFileSync(new URL('scope.yaml',root),'utf8');
+  const analysis=readFileSync(new URL('analyze-input.md',root),'utf8');
+  assert.match(scope,/unclearAction:\s*ask-before-skill-selection/);
+  assert.match(scope,/frontend\.ux-ui\.change-level/);
+  assert.match(analysis,/ambiguityRefs[\s\S]*Skill input/i);
+  assert.match(analysis,/one conditional part of scope/i);
 });

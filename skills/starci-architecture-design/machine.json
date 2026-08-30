@@ -162,8 +162,30 @@
               "outcome": "ready"
             }
           },
-          "target": "complete",
-          "label": "ready"
+          "target": "architecture-choice",
+          "label": "rendered alternatives ready for authority choice"
+        }
+      ]
+    },
+    "architecture-choice": {
+      "kind": "wait",
+      "approval": {
+        "prompt": "Choose one of the three or four architecture directions after reviewing the rendered visualize comparison.",
+        "approve": "OK ARCHITECTURE <decision>",
+        "reject": "REJECT ARCHITECTURE <reason>",
+        "resumeTarget": "analyze-input"
+      },
+      "on": [
+        {
+          "when": {
+            "stage": "architecture.decision.handoff",
+            "status": "ready",
+            "allFacts": [
+              "architecture-visual-preview-ready"
+            ]
+          },
+          "target": "analyze-input",
+          "label": "consume the approved visual direction through typed RESUME"
         }
       ]
     },
@@ -255,4 +277,3 @@
     }
   }
 }
-

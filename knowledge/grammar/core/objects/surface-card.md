@@ -17,6 +17,7 @@ SurfaceCard owns one coherent block-level boundary. It may coordinate its declar
 - Use Core's exact radius, border, elevation, background, and spacing interface.
 - External section labels stay outside unless the card interface explicitly owns them.
 - Keep header, content, facts, and actions in stable regions.
+- Group a title with its explanatory sentence before separating the next action; in Core's compact card rhythm the copy group uses `gap-2`, while the action boundary remains visibly stronger.
 - Use whitespace before adding an internal boundary.
 - Equal card height is required only when comparison or action alignment materially benefits.
 - Loading, empty, error, and partial replace only the region they own.
