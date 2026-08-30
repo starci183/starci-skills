@@ -262,7 +262,7 @@
               "outcome": "no-change"
             }
           },
-          "target": "capture-preflight"
+          "target": "direction-quality-screen"
         },
         {
           "when": {
@@ -425,7 +425,7 @@
               "outcome": "applied"
             }
           },
-          "target": "capture-preflight"
+          "target": "direction-quality-screen"
         },
         {
           "when": {
@@ -441,6 +441,32 @@
               "outcome": "blocked"
             }
           },
+          "target": "blocked"
+        }
+      ]
+    },
+    "direction-quality-screen": {
+      "kind": "operator",
+      "ref": "fe/direction-quality-screen",
+      "on": [
+        {
+          "when": { "outputEquals": { "outcome": "continue" } },
+          "target": "capture-preflight"
+        },
+        {
+          "when": { "outputEquals": { "outcome": "rebrainstorm" } },
+          "target": "generate"
+        },
+        {
+          "when": { "outputEquals": { "outcome": "business-required" } },
+          "target": "business-handoff"
+        },
+        {
+          "when": { "outputEquals": { "outcome": "backend-required" } },
+          "target": "backend-handoff"
+        },
+        {
+          "when": { "outputEquals": { "outcome": "blocked" } },
           "target": "blocked"
         }
       ]
@@ -605,7 +631,7 @@
               "outcome": "repaired"
             }
           },
-          "target": "capture-preflight"
+          "target": "direction-quality-screen"
         },
         {
           "when": {

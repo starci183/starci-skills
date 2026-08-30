@@ -1,0 +1,78 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://starci.dev/v7.2.1/operators/fe/direction-quality-screen/output.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "operatorId", "output"],
+  "properties": {
+    "schemaVersion": { "const": 7 },
+    "operatorId": { "const": "fe/direction-quality-screen" },
+    "output": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["outcome", "result", "gaps", "evidenceRefs", "handoff"],
+      "properties": {
+        "outcome": { "description": "Typed continuation, rebrainstorm, owner handoff, or blocked result.", "enum": ["continue", "rebrainstorm", "business-required", "backend-required", "blocked"] },
+        "result": {
+          "description": "Six dimension scores, floored overall score, attempt, owner, and raster identity.",
+          "anyOf": [
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["summary", "artifactRefs", "directionRef", "representativeRasterRef", "attempt", "minimumScore", "overallScore", "scaleBand", "ownerClass", "scoreDimensions"],
+              "properties": {
+                "summary": { "type": "string", "minLength": 1 },
+                "artifactRefs": { "$ref": "#/$defs/refs" },
+                "directionRef": { "type": "string", "minLength": 1 },
+                "representativeRasterRef": { "type": "string", "pattern": "^raster://sha256:[0-9a-f]{64}$" },
+                "attempt": { "type": "integer", "minimum": 1, "maximum": 3 },
+                "minimumScore": { "const": 9 },
+                "overallScore": { "type": "integer", "minimum": 0, "maximum": 10 },
+                "scaleBand": { "enum": ["rejected", "promising", "production", "exceptional"] },
+                "ownerClass": { "enum": ["none", "direction", "implementation", "business", "backend"] },
+                "scoreDimensions": {
+                  "type": "array",
+                  "minItems": 6,
+                  "maxItems": 6,
+                  "items": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": ["dimension", "score", "observation"],
+                    "properties": {
+                      "dimension": { "enum": ["composition", "hierarchy", "density-empty-space", "product-family-dna", "content-media-purpose", "action-clarity"] },
+                      "score": { "type": "integer", "minimum": 0, "maximum": 10 },
+                      "observation": { "type": "string", "minLength": 12 }
+                    }
+                  }
+                }
+              }
+            },
+            { "type": "null" }
+          ]
+        },
+        "gaps": { "description": "Exact visible or authority gaps preventing a nine-point direction.", "$ref": "#/$defs/refs" },
+        "evidenceRefs": { "description": "Exact content-addressed evidence inspected by the reviewer.", "$ref": "#/$defs/refs" },
+        "handoff": {
+          "description": "Correlated Business or Backend supplement mission, otherwise null.",
+          "anyOf": [
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["skillId", "missionRef", "resumeState", "inputRef"],
+              "properties": {
+                "skillId": { "enum": ["starci-business-process", "starci-backend-process"] },
+                "missionRef": { "type": "string", "minLength": 1 },
+                "resumeState": { "enum": ["business-bind", "observe"] },
+                "inputRef": { "type": "string", "minLength": 1 }
+              }
+            },
+            { "type": "null" }
+          ]
+        }
+      }
+    }
+  },
+  "$defs": {
+    "refs": { "type": "array", "maxItems": 64, "uniqueItems": true, "items": { "type": "string", "minLength": 1 } }
+  }
+}

@@ -39,6 +39,7 @@ Do not concatenate the whole directory by habit; route from the observed decisio
 | wide/intermediate/compact transformation or sticky/drag constraints | [`responsive.md`](responsive.md) |
 | loading/empty/error/recovery, labels, focus, links, control feedback | [`states-affordance.md`](states-affordance.md) |
 | no/reuse/generate media decision, crop, alt, fallback, AI image | [`media.md`](media.md) |
+| first-glance direction quality, sub-9 brainstorm, smallest Business/Backend supplement | [`direction-quality.md`](direction-quality.md) |
 | raster/probe sufficiency, invalidation, falsification, visual PASS | [`evidence.md`](evidence.md) |
 
 ## Smallest-owner classification

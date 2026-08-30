@@ -172,7 +172,8 @@ test('FE to backend handoff resumes the exact same FE mission', () => {
   assert.equal(routed('consumed','consume-return'),'peer-guard');
   assert.equal(routed('progress','peer-guard'),'resume-route');
   assert.equal(nextState(machine,'resume-route',null,original),'apply');
-  assert.equal(routed('applied','apply'),'capture-preflight');
+  assert.equal(routed('applied','apply'),'direction-quality-screen');
+  assert.equal(routed('continue','direction-quality-screen'),'capture-preflight');
   assert.equal(routed('ready','capture-preflight'),'capture');
   assert.equal(routed('passed','visual-fidelity'),'quality-handoff');
   assert.equal(routed('fixture-passed','visual-fidelity'),'backend-handoff');

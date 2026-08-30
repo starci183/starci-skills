@@ -1,0 +1,16 @@
+{
+  "schemaVersion": 7,
+  "id": "fe/direction-quality-screen",
+  "domain": "fe",
+  "job": "Score one representative rendered direction before expensive visual proof and reject every result below the StarCi quality bar.",
+  "inputSchema": "input.schema.json",
+  "outputSchema": "output.schema.json",
+  "contextRefs": ["fe.ui"],
+  "sourceReferenceRefs": [],
+  "sideEffects": [],
+  "stopConditions": [
+    "the representative raster is stale or not content-addressed",
+    "the score omits a required dimension",
+    "the job would require internal routing"
+  ]
+}

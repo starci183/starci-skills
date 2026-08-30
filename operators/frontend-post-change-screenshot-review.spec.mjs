@@ -191,8 +191,13 @@ test('frontend design is an enforced repair capture inspect loop', () => {
     (edge) => edge.when?.outputEquals?.outcome === outcome,
   )?.target;
 
-  assert.equal(targetFor('apply', 'applied'), 'capture-preflight');
-  assert.equal(targetFor('repair', 'repaired'), 'capture-preflight');
+  assert.equal(targetFor('apply', 'applied'), 'direction-quality-screen');
+  assert.equal(targetFor('repair', 'repaired'), 'direction-quality-screen');
+  assert.equal(machine.states['direction-quality-screen'].ref, 'fe/direction-quality-screen');
+  assert.equal(targetFor('direction-quality-screen', 'continue'), 'capture-preflight');
+  assert.equal(targetFor('direction-quality-screen', 'rebrainstorm'), 'generate');
+  assert.equal(targetFor('direction-quality-screen', 'business-required'), 'business-handoff');
+  assert.equal(targetFor('direction-quality-screen', 'backend-required'), 'backend-handoff');
   assert.equal(machine.states['capture-preflight'].ref, 'fe/capture-preflight');
   assert.equal(targetFor('capture-preflight', 'ready'), 'capture');
   assert.equal(targetFor('capture', 'captured'), 'visual-fidelity');
@@ -204,8 +209,8 @@ test('frontend design is an enforced repair capture inspect loop', () => {
   assert.equal(targetFor('authority-reconcile', 'reconciled'), 'repair');
   assert.equal(targetFor('visual-fidelity', 'passed'), 'quality-handoff');
   assert.equal(targetFor('visual-fidelity', 'fixture-passed'), 'backend-handoff');
-  assert.equal(targetFor('classify', 'no-change'), 'capture-preflight');
-  assert.match(skill, /apply\/repair -> capture-preflight -> render-capture -> one fresh Sol visual-fidelity -> quality-handoff/i);
+  assert.equal(targetFor('classify', 'no-change'), 'direction-quality-screen');
+  assert.match(skill, /apply\/repair -> direction-quality-screen -> capture-preflight -> render-capture -> one fresh Sol visual-fidelity -> quality-handoff/i);
   assert.match(capture, /render-state matrix/i);
   assert.match(fidelity, /every cell in the frozen render-state matrix/i);
   assert.match(fidelity, /CSS tests.*can never.*visual `passed`/is);
