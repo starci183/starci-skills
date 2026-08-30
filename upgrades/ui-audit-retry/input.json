@@ -1,0 +1,119 @@
+{
+  "schemaVersion": 7,
+  "runId": "ui-audit-retry-20260830",
+  "project": "starci-academy",
+  "selection": {
+    "analyzerVersion": 2,
+    "skillId": "starci-self-upgrade",
+    "confidence": "exact",
+    "interactionPolicy": "ask-only-when-stuck",
+    "activeInputRefs": [
+      "request:current-ui-audit-retry"
+    ],
+    "passiveContextRefs": [
+      "skills:catalog.json",
+      "reference:output-correctness-loop.md"
+    ]
+  },
+  "requestRef": "request:current-ui-audit-retry",
+  "artifactRefs": [
+    ".claude/upgrades/ui-audit-retry/personal-project/result.json",
+    ".claude/upgrades/ui-audit-retry/cv/result.json",
+    ".claude/upgrades/ui-audit-retry/comparison.md"
+  ],
+  "evidenceRefs": [
+    "image:C:/Users/Cuong/AppData/Local/Temp/codex-clipboard-2aab4a15-687d-4147-8391-30e27992560d.png",
+    "image:C:/Users/Cuong/AppData/Local/Temp/codex-clipboard-ad489817-db73-4202-bb05-dc420df2b176.png",
+    "image:C:/Users/Cuong/AppData/Local/Temp/codex-clipboard-c8bf4b95-18ba-4629-9473-deaf124bf1bd.png",
+    "worktree:C:/Repositories/ac/starci-academy-fe-worktrees/personal-project-reconstruct",
+    "worktree:C:/Repositories/ac/starci-academy-fe-worktrees/cv-new"
+  ],
+  "scope": {
+    "status": "frozen",
+    "unit": "runtime.calibration",
+    "targetRefs": [
+      "runtime:starci-v7.2.1",
+      "fixture:personal-project-reconstruct",
+      "fixture:cv-new"
+    ],
+    "inclusionRefs": [
+      "benchmark:course-page-craft",
+      "contract:output-correctness-loop",
+      "layers:all-eleven",
+      "evidence:pixels-first"
+    ],
+    "exclusionRefs": [
+      "mutation:product-source",
+      "mutation:existing-runtime-skill",
+      "mutation:shared-global-runtime",
+      "effect:commit-push-deploy"
+    ],
+    "writeRoots": [
+      ".claude/upgrades/ui-audit-retry/"
+    ],
+    "externalMutation": false,
+    "approvalRef": null,
+    "completionProofRefs": [
+      "artifact:personal-project/result.json",
+      "artifact:cv/result.json",
+      "artifact:comparison.md",
+      "validation:starci-self-upgrade-output-schema"
+    ],
+    "dimensions": [
+      {
+        "key": "runtime.self-upgrade.mode",
+        "value": "calibrate",
+        "authorityRef": "request:current-ui-audit-retry"
+      },
+      {
+        "key": "frontend.ux-ui.personal-project-change-level",
+        "value": "reconstruct",
+        "authorityRef": "request:personal-project-reconstruct"
+      },
+      {
+        "key": "frontend.ux-ui.cv-change-level",
+        "value": "new",
+        "authorityRef": "request:cv-new"
+      }
+    ],
+    "ambiguityRefs": []
+  },
+  "options": {
+    "intentMode": "calibrate",
+    "benchmarkRefs": [
+      "image:course-page-craft:sha256:315ba206eed954b8e559be7a0e743328e976a8d5ffd571efbf5053776f0cd749"
+    ],
+    "fixtureRefs": [
+      "fixture:personal-project-reconstruct@4e571affa5880440df256dd7894273a06e692493+working-tree",
+      "fixture:cv-new@4e571affa5880440df256dd7894273a06e692493+working-tree"
+    ],
+    "metricNames": [
+      "elapsed-ms",
+      "time-to-first-action-ms",
+      "step-count",
+      "context-bytes",
+      "redundant-step-count",
+      "visual-verdict",
+      "product-write-count"
+    ],
+    "requiredLayerNames": [
+      "objective-scope",
+      "input",
+      "prompt",
+      "state-machine",
+      "execute-logic",
+      "knowledge",
+      "grammar-ui",
+      "validation",
+      "output-contract",
+      "tool-model",
+      "proof"
+    ],
+    "stabilityPolicy": {
+      "requiredConsecutivePasses": 2,
+      "maxRepairAttempts": 3,
+      "freshEvidenceEachAttempt": true,
+      "stopOnRepeatedFingerprint": true
+    }
+  }
+}

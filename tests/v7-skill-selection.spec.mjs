@@ -17,9 +17,10 @@ const expected = [
   'starci-workspace-manage',
   'starci-git-publish',
   'starci-workflow-diagnose',
+  'starci-self-upgrade',
 ].sort();
 
-test('public catalog is exactly the twelve v7 mission skills', () => {
+test('public catalog is exactly the thirteen v7 mission skills', () => {
   assert.equal(catalog.schemaVersion, 7);
   assert.equal(catalog.systemVersion, '7.2.1');
   assert.deepEqual(catalog.skills.map(({ id }) => id).sort(), expected);
@@ -36,6 +37,13 @@ test('selection law routes frontend work to one general FE process skill', () =>
   assert.match(selection, /create page X[\s\S]*`starci-fe-process`/i);
   assert.match(selection, /Ask one focused question only when/i);
   assert.doesNotMatch(selection, /ui-ux-pro-max/i);
+});
+
+test('selection law separates runtime calibration from product delivery', () => {
+  const selection = readFileSync(new URL('analyze-input.md', root), 'utf8');
+  assert.match(selection, /`starci-self-upgrade`[\s\S]*StarCi runtime itself/i);
+  assert.match(selection, /Product pages[\s\S]*calibration\s+fixtures[\s\S]*not product mutation authority/i);
+  assert.match(selection, /Ordinary product work[\s\S]*does not become self-upgrade/i);
 });
 
 test('debug configuration is explicit and behavior-neutral', () => {

@@ -1,0 +1,178 @@
+{
+  "schemaVersion": 7,
+  "runId": "ui-audit-retry-20260830-cv",
+  "skillId": "starci-self-upgrade",
+  "mode": "calibrate",
+  "result": "blocked",
+  "finalState": "blocked",
+  "sourceHeads": [
+    {
+      "ref": "source:starci-academy-backend",
+      "head": "2c84dd1e7a64b1665ff8534fecf51dda0977839c"
+    },
+    {
+      "ref": "fixture:cv-new",
+      "head": "4e571affa5880440df256dd7894273a06e692493"
+    }
+  ],
+  "evidenceRefs": [
+    "image:course-page:sha256:315ba206eed954b8e559be7a0e743328e976a8d5ffd571efbf5053776f0cd749",
+    "image:cv:sha256:4d7baaeb710379e1a88def23c68805c0500d333f63c05b6d28cd66c85dd093a2",
+    ".claude/upgrades/ui-audit-retry/cv/evidence.md"
+  ],
+  "artifactRefs": [
+    ".claude/upgrades/ui-audit-retry/input.json",
+    ".claude/upgrades/ui-audit-retry/cv/evidence.md",
+    ".claude/upgrades/ui-audit-retry/cv/result.json",
+    ".claude/upgrades/ui-audit-retry/comparison.md"
+  ],
+  "benchmark": {
+    "qualityTargetRef": "image:course-page-craft:sha256:315ba206eed954b8e559be7a0e743328e976a8d5ffd571efbf5053776f0cd749",
+    "fixtureRefs": [
+      "fixture:cv-new@4e571affa5880440df256dd7894273a06e692493+working-tree"
+    ],
+    "productWritePolicy": "forbidden",
+    "visibleVisualReceipt": "present"
+  },
+  "metrics": {
+    "stepCount": null,
+    "redundantStepCount": null,
+    "productWriteCount": 0,
+    "elapsedMs": null,
+    "timeToFirstActionMs": null,
+    "contextBytes": null,
+    "visualVerdict": "fail"
+  },
+  "correctness": {
+    "initialVerdict": "fail",
+    "finalVerdict": "fail",
+    "requiredConsecutivePasses": 2,
+    "achievedConsecutivePasses": 0,
+    "repairAttempts": 0,
+    "repeatedFingerprint": false
+  },
+  "attempts": [
+    {
+      "attempt": 1,
+      "phase": "baseline",
+      "outputRef": "image:cv-output",
+      "fingerprint": "sha256:4d7baaeb710379e1a88def23c68805c0500d333f63c05b6d28cd66c85dd093a2",
+      "verdict": "fail",
+      "evidenceRefs": [
+        ".claude/upgrades/ui-audit-retry/cv/evidence.md"
+      ]
+    }
+  ],
+  "layerChecks": [
+    {
+      "layer": "objective-scope",
+      "status": "finding",
+      "evidenceRefs": ["request:cv-new", "image:cv-output"],
+      "finding": "The requested new CV outcome is not present; the supplied raster proves only the error/recovery state.",
+      "ownerRef": "runtime:mission-scope-and-terminal-acceptance"
+    },
+    {
+      "layer": "input",
+      "status": "finding",
+      "evidenceRefs": ["evidence-gap:producer-input-unavailable", "evidence-gap:loaded-cv-fixture-unavailable"],
+      "finding": "The producer input and a deterministic loaded-CV fixture are unavailable, so success, error, localization, and responsive cases cannot be proven complete.",
+      "ownerRef": "runtime:frontend-input-contract"
+    },
+    {
+      "layer": "prompt",
+      "status": "finding",
+      "evidenceRefs": ["evidence-gap:producer-prompt-unavailable"],
+      "finding": "The exact prompt is unavailable; no receipt proves that visible CV payload presence, loaded/error separation, locale consistency, and benchmark craft were mandatory.",
+      "ownerRef": "runtime:frontend-review-prompt"
+    },
+    {
+      "layer": "state-machine",
+      "status": "finding",
+      "evidenceRefs": ["image:cv-output", "evidence-gap:producer-transition-trace-unavailable"],
+      "finding": "The available lifecycle evidence does not show an unconditional transition from a core-content error to diagnosis/repair; no valid terminal route is proven.",
+      "ownerRef": "runtime:frontend-proof-state-machine"
+    },
+    {
+      "layer": "execute-logic",
+      "status": "finding",
+      "evidenceRefs": ["image:cv-output", "evidence-gap:operator-receipts-unavailable"],
+      "finding": "Execution produced or accepted an error-state raster without proving a loaded CV first, then did not provide a fresh retry or stability result.",
+      "ownerRef": "runtime:pixels-first-execute-order"
+    },
+    {
+      "layer": "knowledge",
+      "status": "finding",
+      "evidenceRefs": ["image:course-page-craft", "image:cv-output", "evidence-gap:knowledge-binding-unavailable"],
+      "finding": "No executable knowledge receipt binds primary-outcome visibility, locale consistency, document information hierarchy, or benchmark-level craft to acceptance.",
+      "ownerRef": "runtime:ui-quality-knowledge-binding"
+    },
+    {
+      "layer": "grammar-ui",
+      "status": "finding",
+      "evidenceRefs": ["image:cv-output", ".claude/upgrades/ui-audit-retry/cv/evidence.md"],
+      "finding": "The CV is absent; the Vietnamese surface contains an English core error, the primary region collapses into retry UI, and the viewport is mostly empty.",
+      "ownerRef": "fixture:cv-ui-output"
+    },
+    {
+      "layer": "validation",
+      "status": "finding",
+      "evidenceRefs": ["image:cv-output", "contract:output-correctness-loop"],
+      "finding": "Validation did not reject absence of the CV payload, language mismatch, missing loaded-state raster, missing interaction proof, and zero correct passes.",
+      "ownerRef": "runtime:visual-output-validator"
+    },
+    {
+      "layer": "output-contract",
+      "status": "finding",
+      "evidenceRefs": ["request:cv-new", "image:cv-output", ".claude/skills/starci-self-upgrade/output.md"],
+      "finding": "A recovery state is a required supporting case, not the new CV outcome. Success must mean visible correct CV output, not route/component completion.",
+      "ownerRef": "runtime:frontend-terminal-output-contract"
+    },
+    {
+      "layer": "tool-model",
+      "status": "finding",
+      "evidenceRefs": ["evidence-gap:model-call-and-media-receipt-unavailable"],
+      "finding": "The exact model, isolation, raster inputs, browser state, and visible per-raster review receipt are unavailable.",
+      "ownerRef": "runtime:ai-call-receipt"
+    },
+    {
+      "layer": "proof",
+      "status": "finding",
+      "evidenceRefs": ["image:cv:sha256:4d7baaeb710379e1a88def23c68805c0500d333f63c05b6d28cd66c85dd093a2", "evidence-gap:loaded-and-stability-output-unavailable"],
+      "finding": "The baseline is incorrect, no loaded output is supplied, independent review and measurements are missing, and zero of two required consecutive passes are proven.",
+      "ownerRef": "runtime:frontend-delivery-proof"
+    }
+  ],
+  "causalRecord": {
+    "priorDecision": "The new CV work could be treated as delivered because the route, profile shell, CV components, locale changes, page test, and a retry state existed.",
+    "apparentEvidence": "The route renders a composed profile header and a bounded recovery interaction, and the fixture contains focused component, styling, test, and message changes.",
+    "contradiction": "The supplied output contains no CV at all; its primary content is an English error on a Vietnamese page, followed by a large empty outcome area.",
+    "missingCheck": "The lifecycle did not require visible primary-payload presence and a successful loaded-state raster before success, nor two fresh correct outputs."
+  },
+  "ownerRefs": [
+    "runtime:visual-output-validator",
+    "runtime:frontend-terminal-output-contract",
+    "runtime:frontend-delivery-proof"
+  ],
+  "dispositions": [
+    {
+      "direction": "add",
+      "decision": "adopt",
+      "ownerRef": "runtime:visual-output-validator",
+      "rationale": "Add a primary-outcome assertion for UI tasks: a supporting error state cannot pass when the named payload is absent; also require locale and state evidence. Calibration records only."
+    },
+    {
+      "direction": "change",
+      "decision": "adopt",
+      "ownerRef": "runtime:frontend-proof-state-machine",
+      "rationale": "Change routing so failed core content enters diagnosis, loaded-state proof precedes supporting-state proof, and two fresh correct outputs are mandatory. Calibration does not authorize the edit."
+    },
+    {
+      "direction": "remove",
+      "decision": "adopt",
+      "ownerRef": "runtime:frontend-terminal-output-contract",
+      "rationale": "Remove any path that equates route/component/error-state completion with delivery of the named user-visible CV outcome."
+    }
+  ],
+  "changeSetApplied": false,
+  "reason": "BLOCKED: the supplied CV raster is an error state with no CV payload, there are zero correct passes, and loaded, interaction, responsive, reviewer, and producer-trace evidence are unavailable."
+}

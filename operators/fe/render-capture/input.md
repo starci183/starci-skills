@@ -22,3 +22,6 @@
 - `input.handoffStateRef`: Exact visible state that will be handed to the user after completion.
 - `input.handoffViewport`: Exact user-visible browser surface and content viewport, without emulation, required for handoff proof.
 - `input.preflight`: Exact validated preflight freezing matrix, partition map, visual round, and capture/reuse dispositions.
+- `input.productFamilyEvidence`: Exact opaque Grammar Core/package/DNA identity plus content-addressed
+  benchmark rasters copied into the blind review packet without source rationale.
+- `input.preflight.dataEvidence`: Live data or content-addressed visual-evidence-only contract-fixture routing metadata, including the consumed backend `prove` RETURN for fixture mode.

@@ -5,11 +5,12 @@
   "job": "Freeze and deterministically validate one owner-partitioned visual capture packet before AI review.",
   "inputSchema": "input.schema.json",
   "outputSchema": "output.schema.json",
-  "contextRefs": ["fe.ui"],
+  "contextRefs": ["fe.ui", "fe.runtime-capture-readiness"],
   "sourceReferenceRefs": [],
   "sideEffects": [],
   "stopConditions": [
     "the capture matrix or owner partition is ambiguous",
+    "runtime origin, dependency containment, package reproducibility, target loading, or viewport controls are not proven",
     "a deterministic readiness check fails",
     "the visual round exceeds the configured circuit breaker"
   ]

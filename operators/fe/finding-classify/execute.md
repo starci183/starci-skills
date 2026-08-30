@@ -3,7 +3,7 @@
 Classify the complete visual-fidelity or independent-review finding batch by each finding's smallest demonstrated owner. Fingerprint every finding, preserve one ordered ledger, and route one batched repair; never stop after the first visible defect. Round 3 findings return `blocked` for workflow diagnosis.
 
 Start from the already-recorded pixel observation. Only now compare it with StarCi-native frontend
-authority from `knowledge/ui.md`, the routed project Grammar, frozen product/business authority, and
+authority from `knowledge/ui/INDEX.md` plus applicable law records, the routed project Grammar, frozen product/business authority, and
 the implementation evidence needed to locate cause. Do not reverse the visible finding merely because
 the current implementation, Grammar, or knowledge says the render was intended.
 

@@ -26,7 +26,8 @@
         "starci-platform-operate",
         "starci-workspace-manage",
         "starci-git-publish",
-        "starci-workflow-diagnose"
+        "starci-workflow-diagnose",
+        "starci-self-upgrade"
       ]
     },
     "confidence": { "enum": ["exact", "clarified"] },

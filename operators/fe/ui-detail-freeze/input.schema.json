@@ -47,6 +47,8 @@
       "additionalProperties": false,
       "required": [
         "targetRef",
+        "directionRef",
+        "uiLawBindingRef",
         "constraints"
       ],
       "properties": {
@@ -54,6 +56,16 @@
           "description": "The one target owned by this atomic invocation.",
           "type": "string",
           "minLength": 1
+        },
+        "directionRef": {
+          "description": "The selected direction whose native destination, progress, and fact hierarchy semantics are frozen.",
+          "type": "string",
+          "minLength": 1
+        },
+        "uiLawBindingRef": {
+          "description": "Exact mandatory UI-law compilation that governs every frozen semantic detail.",
+          "type": "string",
+          "pattern": "^ui-law-binding://"
         },
         "constraints": {
           "description": "Closed constraints that bound this job without routing it.",

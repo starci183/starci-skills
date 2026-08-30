@@ -6,7 +6,12 @@ Bind the preflight reference, immutable matrix fingerprint, owner-partition fing
 captured partition references, and dependency-proven reused partition references unchanged. Never
 expand or reorder the matrix after preflight. Shared sentinels are always fresh captures.
 
-Record the latest mutation fingerprint/time and the capture fingerprint/time. They must bind the same rendered source and capture must occur after the mutation. Freeze a raster-only blind-review packet as a retained artifact. The packet contains opaque image/probe cells only and excludes source, DOM, tests, measurements, authority text, producer rationale, earlier feedback, suspected defects, prior verdicts, and intended answers.
+Record the latest mutation fingerprint/time and the capture fingerprint/time. They must bind the same
+rendered source and capture must occur after the mutation. Freeze a pixel-evidence blind-review packet
+as a retained artifact. Besides opaque target image/probe cells, it carries only the exact Grammar
+Core/package/DNA identity and content-addressed benchmark rasters needed to judge product-family
+quality. It excludes source, DOM, tests, measurements, authority prose, producer rationale, earlier
+feedback, suspected defects, prior verdicts, and intended answers.
 
 Freeze the exact source fingerprint and render-state matrix first. Capture actual full-viewport image
 artifacts for every matrix cell: each in-scope entry, task, skeleton, loading, pending, empty,
@@ -26,9 +31,14 @@ category must remain present. An unsupported interaction is `not-applicable` onl
 ownership reason; silently skipping it is incomplete capture. Continue through the bounded matrix
 after finding a defect so the reviewer receives the full causal cluster.
 
+Zoom is the sole tool-capability exception: when validated preflight binds a repeated unsupported-zoom
+receipt, retain zoom-in, zoom-out, and restored cells in canonical order as `not-applicable` with
+`tool-capability-unavailable` and null raster refs. Do not synthesize, duplicate, or rename baseline
+rasters as zoom evidence. No other category may use this reason.
+
 The lifecycle probe set is plural, not one screenshot per category: state-transition probes cover
 skeleton, loading, and steady; page-scroll covers start, middle, end, and restoration; bounded scroll
 covers both limits and restoration; zoom covers zoom-in, zoom-out, and restoration. Preserve a fresh
 raster after each applicable phase for AI visual-fidelity.
 
-Use StarCi-native frontend authority from `knowledge/ui.md` and the routed project Grammar. Return only this atomic result; never inspect or route internally. Any source or render-state drift makes the capture stale and requires a new invocation.
+Use StarCi-native frontend authority from `knowledge/ui/INDEX.md`, its applicable law records, and the routed project Grammar. Return only this atomic result; never inspect or route internally. Any source or render-state drift makes the capture stale and requires a new invocation.

@@ -59,7 +59,14 @@
         "targetRef",
         "constraints",
         "behaviorContractRef",
-        "behaviorContractFingerprint"
+        "behaviorContractFingerprint",
+        "uiLawBindingRef",
+        "uiDetailBindingRef",
+        "grammarBindingRef",
+        "grammarCoreRef",
+        "packagedContractRefs",
+        "visualDnaRef",
+        "mediaDecisionRef"
       ],
       "properties": {
         "targetRef": {
@@ -86,6 +93,41 @@
           "description": "Immutable fingerprint of the frozen behavior-preservation contract.",
           "type": "string",
           "pattern": "^sha256:[0-9a-f]{64}$"
+        },
+        "uiLawBindingRef": {
+          "description": "Exact mandatory knowledge/ui law binding compiled before this mutation.",
+          "type": "string",
+          "pattern": "^ui-law-binding://"
+        },
+        "uiDetailBindingRef": {
+          "description": "Exact law-governed destination, progress, and fact-hierarchy detail binding compiled before layout and Grammar.",
+          "type": "string",
+          "pattern": "^ui-detail-binding://"
+        },
+        "grammarBindingRef": {
+          "description": "Exact pre-source Grammar Core compilation binding.",
+          "type": "string",
+          "pattern": "^grammar-binding://"
+        },
+        "grammarCoreRef": {
+          "description": "Exact pre-source Grammar Core authority consumed by this mutation.",
+          "type": "string",
+          "pattern": "^grammar-core://"
+        },
+        "packagedContractRefs": {
+          "description": "Nonempty packaged Grammar object and component contracts consumed by this mutation.",
+          "type": "array", "minItems": 1, "maxItems": 128, "uniqueItems": true,
+          "items": { "type": "string", "pattern": "^grammar-package://" }
+        },
+        "visualDnaRef": {
+          "description": "Exact visual DNA binding consumed by this mutation.",
+          "type": "string",
+          "pattern": "^visual-dna://"
+        },
+        "mediaDecisionRef": {
+          "description": "Exact frozen no-media/reuse/generate decision carried by the executable contract.",
+          "type": "string",
+          "pattern": "^media-decision://"
         }
       }
     }

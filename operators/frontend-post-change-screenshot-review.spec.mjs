@@ -98,37 +98,43 @@ test('visual review rejects flush contact at pinned edges even without overlap',
 
 test('frontend authority critiques proposed remedies and preserves semantic UI claims', () => {
   const skill = readFileSync(new URL('../skills/starci-fe-process/SKILL.md', import.meta.url), 'utf8');
-  const ui = readFileSync(new URL('../knowledge/ui.md', import.meta.url), 'utf8');
+  const ui = [
+    '../knowledge/ui/INDEX.md',
+    '../knowledge/ui/render-truth.md',
+    '../knowledge/ui/hierarchy.md',
+    '../knowledge/ui/ownership-composition.md',
+    '../knowledge/ui/boundaries-spacing.md',
+  ].map((ref) => readFileSync(new URL(ref, import.meta.url), 'utf8')).join('\n').replace(/\s+/g, ' ');
   const collections = readFileSync(new URL('../knowledge/grammar/core/objects/collections.md', import.meta.url), 'utf8');
+  const surfaceCard = readFileSync(new URL('../knowledge/grammar/core/objects/surface-card.md', import.meta.url), 'utf8');
+  const tables = readFileSync(new URL('../knowledge/grammar/core/objects/tables.md', import.meta.url), 'utf8');
 
   assert.match(skill, /user analysis.*evidence.*not automatic implementation authority/is);
   assert.match(skill, /challenge.*glyph.*tone.*business meaning.*reuse contract/is);
   assert.match(ui, /Glyph, shape, tone, and text form one semantic claim/i);
   assert.match(ui, /benefit, capability, promise, or future outcome is neutral content/i);
   assert.match(ui, /Glyph geometry alone does not declare a state/i);
-  assert.match(ui, /20px outline `included` circle-check in inherited foreground/i);
-  assert.match(ui, /must not reuse `complete`, success, accent tone, or solid weight/i);
-  assert.match(ui, /tightly coupled title and explanatory sentence.*`gap-2`/is);
+  assert.match(collections, /purpose-named foreground `included` glyph.*not completion or success state/i);
+  assert.match(surfaceCard, /copy group uses `gap-2`/i);
   assert.match(ui, /Category and magnitude labels are not outcome states/i);
-  assert.match(ui, /approved Grammar or application authority defines a stable categorical palette/i);
-  assert.match(ui, /reuse named tone tokens as visual identity without asserting pass, warning, or failure semantics/i);
-  assert.match(ui, /mapping is deterministic across every consumer/i);
+  assert.match(ui, /stable categorical palette is legal only when approved Grammar or application\s+authority defines it/is);
+  assert.match(ui, /Grammar Core owns.*tokens, variants, object contracts/is);
+  assert.match(ui, /mapping is deterministic across every\s+consumer/is);
   assert.match(collections, /foreground `included` glyph.*not completion or success state/i);
   assert.match(collections, /package accordion primitive.*open\/close motion.*panel lifecycle/is);
   assert.match(collections, /never draw an extra divider between an item's trigger and its own expanded panel/i);
   assert.match(ui, /existing Grammar or application primitive owns the same scroll semantics/i);
   assert.match(collections, /reuse it instead of recreating raw overflow locally/i);
   assert.match(ui, /adjacent siblings together explain one fact.*explicit semantic group/is);
-  assert.match(ui, /pinned action projection.*Reserve that boundary exactly once/is);
-  assert.match(ui, /page stack gap.*terminal content padding.*blank moat visible at scroll end/is);
-  assert.match(ui, /fixed or draggable overlay.*does not reserve terminal document height/is);
-  assert.match(ui, /empty document spacer.*duplicates ownership.*false scrollable space/is);
+  assert.match(ui, /pinned action projection.*Reserve that\s+boundary exactly once/is);
+  assert.match(ui, /fixed or draggable overlay.*does not\s+reserve terminal document height/is);
+  assert.match(ui, /empty document spacer.*duplicates ownership.*creates\s+false scrollable space/is);
   assert.match(ui, /Disclosure does not erase information load.*only defers it/is);
-  assert.match(ui, /split the comparison into a peer surface or a dedicated sheet/is);
+  assert.match(tables, /Tables own comparison across aligned fields/i);
   assert.match(ui, /one dominant decision per primary surface/is);
-  assert.match(ui, /After splitting an overloaded owner, reselect the interaction container/is);
-  assert.match(ui, /short comparison that must be seen together belongs in a static `SurfaceCard`/is);
-  assert.match(ui, /accordion is justified only when hiding its content materially reduces task complexity/is);
+  assert.match(ui, /After splitting an overloaded owner, reselect the interaction\s+container/is);
+  assert.match(surfaceCard, /one coherent block-level boundary/i);
+  assert.match(collections, /disclosure collection uses the package accordion primitive/i);
   assert.match(collections, /ordered progression and current position.*progression anatomy/is);
 });
 
@@ -197,6 +203,7 @@ test('frontend design is an enforced repair capture inspect loop', () => {
   assert.equal(targetFor('finding-classify', 'clean'), undefined);
   assert.equal(targetFor('authority-reconcile', 'reconciled'), 'repair');
   assert.equal(targetFor('visual-fidelity', 'passed'), 'quality-handoff');
+  assert.equal(targetFor('visual-fidelity', 'fixture-passed'), 'backend-handoff');
   assert.equal(targetFor('classify', 'no-change'), 'capture-preflight');
   assert.match(skill, /apply\/repair -> capture-preflight -> render-capture -> one fresh Sol visual-fidelity -> quality-handoff/i);
   assert.match(capture, /render-state matrix/i);

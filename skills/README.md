@@ -1,6 +1,6 @@
 # Public Skills
 
-The v7 public surface is exactly the twelve mission Skills declared in `catalog.json`. Global analysis
+The v7 public surface is exactly the thirteen mission Skills declared in `catalog.json`. Global analysis
 selects one outcome owner from metadata. That owner may issue typed peer `CALL`s and must consume the
 matching `RETURN` and `RESUME` the recorded parent state; it does not restart global selection.
 
@@ -38,6 +38,7 @@ states, operator outcome routes, typed waits, executable resume targets, and fai
 | `starci-workspace-manage` | Workspace routing and continuation |
 | `starci-git-publish` | Exact Git publication |
 | `starci-workflow-diagnose` | Read-only workflow diagnosis |
+| `starci-self-upgrade` | Evidence-backed StarCi runtime calibration and improvement |
 
 Retired v6 public Skills remain recoverable under `migration/v6/retired-skills/`; they are not part of
 discovery or runtime routing.

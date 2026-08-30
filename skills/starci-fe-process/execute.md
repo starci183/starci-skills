@@ -4,3 +4,10 @@ Follow `machine.json`; operators own work and the Skill machine alone routes out
 `direction-choice`, apply `knowledge/direction-visualization.md`, render the validated three-or-four
 direction comparison through `visualize`, and carry the `frontend-direction-visual-preview-ready`
 fact. Never ask the user to imagine a frontend direction from prose.
+
+Whether the direction is dominant or selected after a wait, route it through the mandatory chain
+`fe/principle-compile -> fe/ui-detail-freeze -> fe/layout -> fe/grammar-convergence -> fe/contract-freeze`.
+`fe/source-apply` is unreachable until the contract binds both the complete `knowledge/ui` law result
+and the routed Grammar Core packages + visual DNA. A purposeful empty media slot additionally requires
+a frozen AI-image brief, placement, responsive treatment, alt intent, and fallback; filler for layout
+or content defects is blocked.

@@ -1,0 +1,106 @@
+{
+  "schemaVersion": 7,
+  "runId": "self-upgrade-20260830-personal-project-cv",
+  "skillId": "starci-self-upgrade",
+  "mode": "calibrate",
+  "result": "blocked",
+  "finalState": "blocked",
+  "sourceHeads": [
+    { "ref": "source:starci-academy-backend", "head": "2c84dd1e7a64b1665ff8534fecf51dda0977839c" },
+    { "ref": "source:starci-academy-fe-main", "head": "4e571affa5880440df256dd7894273a06e692493" },
+    { "ref": "fixture:personal-project-reconstruct", "head": "4e571affa5880440df256dd7894273a06e692493" },
+    { "ref": "fixture:cv-new", "head": "4e571affa5880440df256dd7894273a06e692493" }
+  ],
+  "evidenceRefs": [
+    "artifact:.claude/upgrades/fix.md#direct-evidence",
+    "artifact:.claude/upgrades/fix.md#causal-record",
+    "script:.claude/scripts/visualize-directive.mjs",
+    "visual:C:/Users/Cuong/.codex/visualizations/2026/08/30/01a0515f-7294-70d2-a4aa-7f9984841335/personal-project-directions.html"
+  ],
+  "artifactRefs": [
+    "artifact:.claude/upgrades/fix.md",
+    "artifact:.claude/upgrades/self-upgrade-20260830-personal-project-cv.input.json",
+    "artifact:.claude/upgrades/self-upgrade-20260830-personal-project-cv.result.json"
+  ],
+  "benchmark": {
+    "qualityTargetRef": "image:course-page-manual-layout",
+    "fixtureRefs": ["fixture:personal-project-reconstruct", "fixture:cv-new"],
+    "productWritePolicy": "forbidden",
+    "visibleVisualReceipt": "missing"
+  },
+  "metrics": {
+    "stepCount": 2,
+    "redundantStepCount": 0,
+    "productWriteCount": 0,
+    "elapsedMs": null,
+    "timeToFirstActionMs": null,
+    "contextBytes": null,
+    "visualVerdict": "fail"
+  },
+  "correctness": {
+    "initialVerdict": "fail",
+    "finalVerdict": "fail",
+    "requiredConsecutivePasses": 2,
+    "achievedConsecutivePasses": 0,
+    "repairAttempts": 0,
+    "repeatedFingerprint": false
+  },
+  "attempts": [
+    {
+      "attempt": 1,
+      "phase": "baseline",
+      "outputRef": "fixture:personal-project-and-cv-baseline",
+      "fingerprint": "sha256:cbe094e51f3898d200964f0391c69409060c239c61062958a1d7793c5ba70cb0",
+      "verdict": "fail",
+      "evidenceRefs": ["image:personal-project-generated", "image:cv-generated", "image:course-page-benchmark"]
+    }
+  ],
+  "layerChecks": [
+    { "layer": "objective-scope", "status": "finding", "evidenceRefs": ["request:self-upgrade-20260830"], "finding": "The prior analyzer treated calibration fixtures as product delivery authority.", "ownerRef": ".claude/analyze-input.md" },
+    { "layer": "input", "status": "finding", "evidenceRefs": ["artifact:self-upgrade-input-v1"], "finding": "The prior input did not require diagnostic-layer bindings or an output stability policy.", "ownerRef": ".claude/skills/starci-self-upgrade/input.schema.json" },
+    { "layer": "prompt", "status": "finding", "evidenceRefs": ["artifact:prior-run-missing-prompt-receipt"], "finding": "The exact generation and review prompts were not preserved, so prompt adequacy could not be falsified.", "ownerRef": ".claude/skills/starci-self-upgrade/input.schema.json" },
+    { "layer": "state-machine", "status": "finding", "evidenceRefs": ["file:.claude/skills/starci-self-upgrade/machine.json@v1"], "finding": "Calibration routed diagnosed directly to complete without checking the produced output.", "ownerRef": ".claude/skills/starci-self-upgrade/machine.json" },
+    { "layer": "execute-logic", "status": "finding", "evidenceRefs": ["file:.claude/skills/starci-self-upgrade/execute.md@v1"], "finding": "Execution diagnosed process form but did not enforce output check, repair, retry, or stability proof.", "ownerRef": ".claude/skills/starci-self-upgrade/execute.md" },
+    { "layer": "knowledge", "status": "passed", "evidenceRefs": ["file:.claude/knowledge/ui-render-review.md"], "finding": null, "ownerRef": null },
+    { "layer": "grammar-ui", "status": "passed", "evidenceRefs": ["file:.claude/knowledge/ui.md", "file:.claude/knowledge/grammar/core/overview.md"], "finding": null, "ownerRef": null },
+    { "layer": "validation", "status": "finding", "evidenceRefs": ["file:.claude/skills/starci-self-upgrade/validate-output.mjs@v1"], "finding": "The validator accepted complete together with visualVerdict=fail and only one unchecked attempt.", "ownerRef": ".claude/skills/starci-self-upgrade/validate-output.mjs" },
+    { "layer": "output-contract", "status": "finding", "evidenceRefs": ["file:.claude/skills/starci-self-upgrade/output.schema.json@v1"], "finding": "The output omitted ordered attempts, repeated correctness, and per-layer evidence.", "ownerRef": ".claude/skills/starci-self-upgrade/output.schema.json" },
+    { "layer": "tool-model", "status": "finding", "evidenceRefs": ["artifact:prior-run-no-independent-review-receipt"], "finding": "No invocation-bound fresh reviewer receipt proved the prior output verdict.", "ownerRef": ".claude/skills/starci-self-upgrade/output.schema.json" },
+    { "layer": "proof", "status": "finding", "evidenceRefs": ["artifact:prior-run-contract-validation-only"], "finding": "Input/result schema validation was reported as execution without a canonical CALL to RETURN to TRANSITION lifecycle.", "ownerRef": ".claude/upgrades/self-upgrade-20260830-personal-project-cv.result.json" }
+  ],
+  "causalRecord": {
+    "priorDecision": "Route runtime calibration language into two frontend delivery missions and request a UI direction choice.",
+    "apparentEvidence": "The active wording included reconstruct, new, and build two pages, all naming frontend surfaces.",
+    "contradiction": "The user explicitly defined the outcome as improving Skill execution speed, correctness, token use, step count, and output quality without repairing product source.",
+    "missingCheck": "Mission analysis lacked a runtime-calibration owner check, and the direction wait lacked proof that its HTML comparison rendered visibly in the conversation."
+  },
+  "ownerRefs": [
+    ".claude/skills/starci-self-upgrade/",
+    ".claude/analyze-input.md#mission-owner-selection",
+    ".claude/request-vocabulary.md#common-cross-domain-ambiguities",
+    ".claude/knowledge/direction-visualization.md#decision-law",
+    ".claude/scripts/visualize-directive.mjs"
+  ],
+  "dispositions": [
+    {
+      "direction": "add",
+      "decision": "adopt",
+      "ownerRef": ".claude/skills/starci-self-upgrade/",
+      "rationale": "A separate durable runtime-improvement boundary prevents calibration fixtures from inheriting product mutation authority."
+    },
+    {
+      "direction": "change",
+      "decision": "adopt",
+      "ownerRef": ".claude/analyze-input.md",
+      "rationale": "Global selection must distinguish the object being improved from the product artifact used as evidence."
+    },
+    {
+      "direction": "remove",
+      "decision": "adopt",
+      "ownerRef": ".claude/request-vocabulary.md",
+      "rationale": "Remove the implicit calibration-to-product-delivery interpretation while preserving explicit frontend delivery requests."
+    }
+  ],
+  "changeSetApplied": false,
+  "reason": "Baseline output is wrong and the calibration scope cannot repair runtime owners; the prior COMPLETE verdict is invalid."
+}

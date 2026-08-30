@@ -230,7 +230,7 @@
               "outcome": "dominant"
             }
           },
-          "target": "freeze"
+          "target": "principle-compile"
         },
         {
           "when": {
@@ -334,6 +334,62 @@
             ]
           },
           "target": "analyze-input"
+        }
+      ]
+    },
+    "principle-compile": {
+      "kind": "operator",
+      "ref": "fe/principle-compile",
+      "on": [
+        {
+          "when": { "outputEquals": { "outcome": "compiled" } },
+          "target": "ui-detail-freeze"
+        },
+        {
+          "when": { "outputEquals": { "outcome": "blocked" } },
+          "target": "blocked"
+        }
+      ]
+    },
+    "layout-compile": {
+      "kind": "operator",
+      "ref": "fe/layout",
+      "on": [
+        {
+          "when": { "outputEquals": { "outcome": "compiled" } },
+          "target": "grammar-core-compile"
+        },
+        {
+          "when": { "outputEquals": { "outcome": "blocked" } },
+          "target": "blocked"
+        }
+      ]
+    },
+    "grammar-core-compile": {
+      "kind": "operator",
+      "ref": "fe/grammar-convergence",
+      "on": [
+        {
+          "when": { "outputEquals": { "outcome": "converged" } },
+          "target": "freeze"
+        },
+        {
+          "when": { "outputEquals": { "outcome": "refused" } },
+          "target": "blocked"
+        }
+      ]
+    },
+    "ui-detail-freeze": {
+      "kind": "operator",
+      "ref": "fe/ui-detail-freeze",
+      "on": [
+        {
+          "when": { "outputEquals": { "outcome": "detail-frozen" } },
+          "target": "layout-compile"
+        },
+        {
+          "when": { "outputEquals": { "outcome": "blocked" } },
+          "target": "blocked"
         }
       ]
     },
@@ -444,6 +500,14 @@
             }
           },
           "target": "quality-handoff"
+        },
+        {
+          "when": {
+            "outputEquals": {
+              "outcome": "fixture-passed"
+            }
+          },
+          "target": "backend-handoff"
         },
         {
           "when": {
@@ -779,7 +843,7 @@
               "resume.resumeState": "direction-choice"
             }
           },
-          "target": "freeze"
+          "target": "principle-compile"
         },
         {
           "when": {

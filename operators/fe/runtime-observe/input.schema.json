@@ -22,7 +22,8 @@
       "required": [
         "authorityRefs",
         "evidenceRefs",
-        "uiKnowledgeId"
+        "uiKnowledgeId",
+        "runtimeReadinessKnowledgeId"
       ],
       "properties": {
         "authorityRefs": {
@@ -49,6 +50,10 @@
         "uiKnowledgeId": {
           "description": "Exact StarCi-native frontend UI knowledge binding.",
           "const": "fe.ui"
+        },
+        "runtimeReadinessKnowledgeId": {
+          "description": "Exact frontend runtime and capture readiness knowledge binding.",
+          "const": "fe.runtime-capture-readiness"
         }
       }
     },

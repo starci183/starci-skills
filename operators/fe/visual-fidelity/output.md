@@ -5,6 +5,8 @@
 - `output.result.matrixFingerprint`, `partitionFingerprint`, and `visualRound`: Exact preflight/capture identity reviewed by Sol.
 - `output.result.inspectionRecords`: One blind pixel observation record per screenshot, covering purpose/semantic utility, content coherence, inset, surfaces, padding on every edge, alignment, rhythm, hierarchy, visual ownership, pinned-boundary clearance, affordance, wrapping, responsive composition, visual consistency, empty-space balance, clipping, and occlusion.
 - `output.result.reviewMode`: Always `ai-adversarial-pixel`; confirmation-oriented or measurement-led review is invalid.
+- `output.result.productFamilyEvidence`: Exact opaque Grammar identity and benchmark raster set used
+  for the `product-family-quality` lens, copied unchanged from the blind packet.
 - `output.result.packetFingerprint`: Exact raster-only packet reviewed.
 - `output.result.reviewerExecutionRef`, `reviewerModel`, `reviewerCount`, `contextIsolation`, and `forkTurns`: Provenance for the single fresh Sol reviewer.
 - `output.result.lastScreenshotRef` and `lastScreenshotVerdict`: The final post-mutation raster and its controlling verdict.

@@ -49,6 +49,8 @@
                 "visualRound",
                 "capturePartitionRefs",
                 "reusedPartitionRefs",
+                "dataEvidence",
+                "productFamilyEvidence",
                 "sourceFingerprint",
                 "latestMutationFingerprint",
                 "latestMutationAt",
@@ -84,6 +86,33 @@
                 },
                 "capturePartitionRefs": { "type": "array", "minItems": 1, "maxItems": 32, "uniqueItems": true, "items": { "type": "string", "pattern": "^partition://" } },
                 "reusedPartitionRefs": { "type": "array", "maxItems": 32, "uniqueItems": true, "items": { "type": "string", "pattern": "^partition://" } },
+                "dataEvidence": {
+                  "description": "Exact data-evidence mode copied from preflight and into the blind packet.",
+                  "type": "object", "additionalProperties": false,
+                  "required": ["mode", "contractRef", "fixtureFingerprint", "backendGapRef", "backendProofReceiptRef", "fixtureScope", "productMutation"],
+                  "properties": {
+                    "mode": { "enum": ["live", "contract-fixture"] },
+                    "contractRef": { "type": ["string", "null"], "minLength": 1 },
+                    "fixtureFingerprint": { "type": ["string", "null"], "pattern": "^sha256:[0-9a-f]{64}$" },
+                    "backendGapRef": { "type": ["string", "null"], "minLength": 1 },
+                    "backendProofReceiptRef": { "type": ["string", "null"], "pattern": "^receipt:[A-Za-z0-9._-]+$" },
+                    "fixtureScope": { "enum": ["not-applicable", "visual-evidence-only"] },
+                    "productMutation": { "const": false }
+                  }
+                },
+                "productFamilyEvidence": {
+                  "description": "Exact opaque Grammar identity and benchmark raster evidence copied into the blind packet.",
+                  "type": "object", "additionalProperties": false,
+                  "required": ["grammarBindingRef", "grammarCoreRef", "packagedContractRefs", "visualDnaRef", "productFamilyRef", "benchmarkRasterRefs"],
+                  "properties": {
+                    "grammarBindingRef": { "type": "string", "pattern": "^grammar-binding://" },
+                    "grammarCoreRef": { "type": "string", "pattern": "^grammar-core://" },
+                    "packagedContractRefs": { "type": "array", "minItems": 1, "maxItems": 64, "uniqueItems": true, "items": { "type": "string", "pattern": "^grammar-package://" } },
+                    "visualDnaRef": { "type": "string", "pattern": "^visual-dna://" },
+                    "productFamilyRef": { "type": "string", "pattern": "^product-family://" },
+                    "benchmarkRasterRefs": { "type": "array", "minItems": 1, "maxItems": 16, "uniqueItems": true, "items": { "type": "string", "pattern": "sha256[-/][0-9a-f]{64}\\.(png|jpg|jpeg|webp)$" } }
+                  }
+                },
                 "sourceFingerprint": {
                   "description": "Fingerprint of the source revision rendered by every matrix cell.",
                   "type": "string",
@@ -109,7 +138,7 @@
                   "description": "Exact immutable raster-only manifest issued by capture. Visual review may add only its receipt binding and this manifest fingerprint.",
                   "type": "object",
                   "additionalProperties": false,
-                  "required": ["packetRef", "preflightRef", "matrixRef", "matrixFingerprint", "partitionFingerprint", "visualRound", "capturePartitionRefs", "reusedPartitionRefs", "latestMutationFingerprint", "capturedSourceFingerprint", "latestMutationAt", "capturedAt", "rasterCells", "probeCells", "lastScreenshotRef"],
+                  "required": ["packetRef", "preflightRef", "matrixRef", "matrixFingerprint", "partitionFingerprint", "visualRound", "capturePartitionRefs", "reusedPartitionRefs", "dataEvidence", "productFamilyEvidence", "latestMutationFingerprint", "capturedSourceFingerprint", "latestMutationAt", "capturedAt", "rasterCells", "probeCells", "lastScreenshotRef"],
                   "properties": {
                     "packetRef": { "type": "string", "pattern": "^packet://[0-9a-f]{64}$" },
                     "preflightRef": { "type": "string", "pattern": "^preflight://[0-9a-f]{64}$" },
@@ -119,6 +148,33 @@
                     "visualRound": { "type": "object", "additionalProperties": false, "required": ["number", "purpose"], "properties": { "number": { "type": "integer", "minimum": 1, "maximum": 3 }, "purpose": { "enum": ["discovery", "verification", "regression"] } } },
                     "capturePartitionRefs": { "type": "array", "minItems": 1, "maxItems": 32, "uniqueItems": true, "items": { "type": "string", "pattern": "^partition://" } },
                     "reusedPartitionRefs": { "type": "array", "maxItems": 32, "uniqueItems": true, "items": { "type": "string", "pattern": "^partition://" } },
+                    "dataEvidence": {
+                      "description": "Opaque data-evidence routing metadata copied without altering raster content.",
+                      "type": "object", "additionalProperties": false,
+                      "required": ["mode", "contractRef", "fixtureFingerprint", "backendGapRef", "backendProofReceiptRef", "fixtureScope", "productMutation"],
+                      "properties": {
+                        "mode": { "enum": ["live", "contract-fixture"] },
+                        "contractRef": { "type": ["string", "null"], "minLength": 1 },
+                        "fixtureFingerprint": { "type": ["string", "null"], "pattern": "^sha256:[0-9a-f]{64}$" },
+                        "backendGapRef": { "type": ["string", "null"], "minLength": 1 },
+                        "backendProofReceiptRef": { "type": ["string", "null"], "pattern": "^receipt:[A-Za-z0-9._-]+$" },
+                        "fixtureScope": { "enum": ["not-applicable", "visual-evidence-only"] },
+                        "productMutation": { "const": false }
+                      }
+                    },
+                    "productFamilyEvidence": {
+                      "description": "Reviewer-visible benchmark rasters and opaque Grammar identity; no producer rationale or source details.",
+                      "type": "object", "additionalProperties": false,
+                      "required": ["grammarBindingRef", "grammarCoreRef", "packagedContractRefs", "visualDnaRef", "productFamilyRef", "benchmarkRasterRefs"],
+                      "properties": {
+                        "grammarBindingRef": { "type": "string", "pattern": "^grammar-binding://" },
+                        "grammarCoreRef": { "type": "string", "pattern": "^grammar-core://" },
+                        "packagedContractRefs": { "type": "array", "minItems": 1, "maxItems": 64, "uniqueItems": true, "items": { "type": "string", "pattern": "^grammar-package://" } },
+                        "visualDnaRef": { "type": "string", "pattern": "^visual-dna://" },
+                        "productFamilyRef": { "type": "string", "pattern": "^product-family://" },
+                        "benchmarkRasterRefs": { "type": "array", "minItems": 1, "maxItems": 16, "uniqueItems": true, "items": { "type": "string", "pattern": "sha256[-/][0-9a-f]{64}\\.(png|jpg|jpeg|webp)$" } }
+                      }
+                    },
                     "latestMutationFingerprint": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
                     "capturedSourceFingerprint": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
                     "latestMutationAt": { "type": "string", "format": "date-time" },
@@ -148,7 +204,7 @@
                           "phase": { "enum": ["baseline", "start", "middle", "end", "terminal", "zoom-in", "zoom-out", "restored", "skeleton", "loading", "steady", "expanded", "collapsed", "focus", "drag-limit", "overlay-open", "content-long", "content-short", "breakpoint-edge"] },
                           "applicable": { "type": "boolean" },
                           "imageRef": { "type": ["string", "null"], "pattern": "\\.(png|jpg|jpeg|webp)$" },
-                          "reason": { "enum": [null, "not-owned-by-target", "interaction-not-present", "container-not-present", "overlay-not-present", "lifecycle-not-present"] }
+                          "reason": { "enum": [null, "not-owned-by-target", "interaction-not-present", "container-not-present", "overlay-not-present", "lifecycle-not-present", "tool-capability-unavailable"] }
                         }
                       }
                     },

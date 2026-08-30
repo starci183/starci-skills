@@ -1,0 +1,50 @@
+{
+  "schemaVersion": 7,
+  "runId": "self-upgrade-20260830-personal-project-cv",
+  "project": "starci-academy",
+  "selection": {
+    "analyzerVersion": 2,
+    "skillId": "starci-self-upgrade",
+    "confidence": "exact",
+    "interactionPolicy": "ask-only-when-stuck",
+    "activeInputRefs": ["request:self-upgrade-20260830"],
+    "passiveContextRefs": ["skills:catalog.json", "image:course-page", "fixture:personal-project", "fixture:cv"]
+  },
+  "requestRef": "request:self-upgrade-20260830",
+  "artifactRefs": [".claude/upgrades/fix.md"],
+  "evidenceRefs": [
+    "image:C:/Users/Cuong/AppData/Local/Temp/codex-clipboard-2aab4a15-687d-4147-8391-30e27992560d.png",
+    "image:C:/Users/Cuong/AppData/Local/Temp/codex-clipboard-ad489817-db73-4202-bb05-dc420df2b176.png",
+    "image:C:/Users/Cuong/AppData/Local/Temp/codex-clipboard-c8bf4b95-18ba-4629-9473-deaf124bf1bd.png",
+    "worktree:C:/Repositories/ac/starci-academy-fe-worktrees/personal-project-reconstruct",
+    "worktree:C:/Repositories/ac/starci-academy-fe-worktrees/cv-new"
+  ],
+  "scope": {
+    "status": "frozen",
+    "unit": "runtime.mission",
+    "targetRefs": ["runtime:starci-v7.2.1", "case:personal-project-cv-calibration"],
+    "inclusionRefs": ["capability:runtime.self-upgrade", "artifact:.claude/upgrades/fix.md"],
+    "exclusionRefs": ["source:starci-academy-fe", "skill:existing-skill-bodies", "effect:merge-push-deploy-cleanup"],
+    "writeRoots": [".claude/upgrades/"],
+    "externalMutation": false,
+    "approvalRef": null,
+    "completionProofRefs": ["test:validate-skills", "test:v7-skill-selection", "test:validate-release", "artifact:.claude/upgrades/fix.md"],
+    "dimensions": [
+      { "key": "runtime.self-upgrade.mode", "value": "calibrate", "authorityRef": "request:self-upgrade-20260830" }
+    ],
+    "ambiguityRefs": []
+  },
+  "options": {
+    "intentMode": "calibrate",
+    "benchmarkRefs": ["image:course-page-manual-layout"],
+    "fixtureRefs": ["fixture:personal-project-reconstruct", "fixture:cv-new"],
+    "metricNames": ["elapsed-ms", "time-to-first-action-ms", "step-count", "context-bytes", "redundant-step-count", "visual-verdict", "product-write-count"],
+    "requiredLayerNames": ["objective-scope", "input", "prompt", "state-machine", "execute-logic", "knowledge", "grammar-ui", "validation", "output-contract", "tool-model", "proof"],
+    "stabilityPolicy": {
+      "requiredConsecutivePasses": 2,
+      "maxRepairAttempts": 3,
+      "freshEvidenceEachAttempt": true,
+      "stopOnRepeatedFingerprint": true
+    }
+  }
+}

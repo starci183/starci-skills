@@ -61,7 +61,7 @@ off. Secrets and hidden reasoning are always redacted.
 INDEX.md                       binding bootstrap and runtime law
 scope.yaml                     multidimensional mission-scope protocol
 analyze-input.md               global mission-owner selection
-skills/catalog.json            public twelve-Skill catalog
+skills/catalog.json            public thirteen-Skill catalog
 skills/starci-*/               Skill contracts and state machines
 operators/<domain>/<name>/     atomic contracts with two-color icon.svg assets
 runtime/                       config, trace, receipt, and topology contracts

@@ -1,0 +1,26 @@
+{
+  "documentType": "ui-audit-summary",
+  "runId": "ui-audit-retry-20260830",
+  "mode": "calibrate",
+  "result": "blocked",
+  "changeSetApplied": false,
+  "productWriteCount": 0,
+  "cases": [
+    {
+      "case": "personal-project-reconstruct",
+      "verdict": "blocked",
+      "achievedConsecutivePasses": 0,
+      "requiredConsecutivePasses": 2,
+      "resultRef": ".claude/upgrades/ui-audit-retry/personal-project/result.json"
+    },
+    {
+      "case": "cv-new",
+      "verdict": "blocked",
+      "achievedConsecutivePasses": 0,
+      "requiredConsecutivePasses": 2,
+      "resultRef": ".claude/upgrades/ui-audit-retry/cv/result.json"
+    }
+  ],
+  "summaryRef": ".claude/upgrades/ui-audit-retry/comparison.md",
+  "reason": "Both actual outputs fail the frozen correctness contract, and missing producer/stability evidence is preserved as unavailable rather than invented."
+}

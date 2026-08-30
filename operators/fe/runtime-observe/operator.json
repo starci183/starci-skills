@@ -6,12 +6,14 @@
   "inputSchema": "input.schema.json",
   "outputSchema": "output.schema.json",
   "contextRefs": [
-    "fe.ui"
+    "fe.ui",
+    "fe.runtime-capture-readiness"
   ],
   "sourceReferenceRefs": [],
   "sideEffects": [],
   "stopConditions": [
-    "required authority is missing or stale",
+    "required authority or runtime-readiness knowledge is missing or stale",
+    "the routed runtime, dependency containment, package state, target load, or viewport controls are not proven",
     "the target boundary is ambiguous",
     "the job would require internal routing"
   ]

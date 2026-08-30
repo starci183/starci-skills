@@ -16,13 +16,23 @@ import { createOperatorInvocationBindingRegistry } from './invocation-binding.mj
 import { fingerprint } from '../runtime/trace.mjs';
 
 const responsiveStateInventory = [
-  { viewport: 'wide', stateRef: 'state://wide', evidenceRef: 'render://wide.png' },
-  { viewport: 'intermediate', stateRef: 'state://intermediate', evidenceRef: 'render://intermediate.png' },
-  { viewport: 'compact', stateRef: 'state://compact', evidenceRef: 'render://compact.png' },
+  { viewport: 'wide', stateRef: 'state://wide', requestedWidthPx: 1440, requestedHeightPx: 900, observedWidthPx: 1440, observedHeightPx: 900, rasterFingerprint: `sha256:${'a'.repeat(64)}`, evidenceRef: 'render://wide.png' },
+  { viewport: 'intermediate', stateRef: 'state://intermediate', requestedWidthPx: 1024, requestedHeightPx: 800, observedWidthPx: 1024, observedHeightPx: 800, rasterFingerprint: `sha256:${'b'.repeat(64)}`, evidenceRef: 'render://intermediate.png' },
+  { viewport: 'compact', stateRef: 'state://compact', requestedWidthPx: 390, requestedHeightPx: 844, observedWidthPx: 390, observedHeightPx: 844, rasterFingerprint: `sha256:${'c'.repeat(64)}`, evidenceRef: 'render://compact.png' },
 ];
 const invocationBindings = createOperatorInvocationBindingRegistry();
 const raster = (label) => `render://${label}/sha256-${fingerprint(label).slice(7)}.png`;
 const visualRound = { number: 1, purpose: 'discovery' };
+const liveDataEvidence = () => ({ mode: 'live', contractRef: null, fixtureFingerprint: null, backendGapRef: null, backendProofReceiptRef: null, fixtureScope: 'not-applicable', productMutation: false });
+const fixtureDataEvidence = () => ({ mode: 'contract-fixture', contractRef: 'contract://profile-v1', fixtureFingerprint: `sha256:${'f'.repeat(64)}`, backendGapRef: 'backend-gap://missing-profile', backendProofReceiptRef: 'receipt:backend-profile-prove', fixtureScope: 'visual-evidence-only', productMutation: false });
+const productFamilyEvidence = () => ({
+  grammarBindingRef: 'grammar-binding://profile-v1',
+  grammarCoreRef: 'grammar-core://starci-v1',
+  packagedContractRefs: ['grammar-package://surface-list-card'],
+  visualDnaRef: 'visual-dna://starci-v1',
+  productFamilyRef: 'product-family://starci-academy',
+  benchmarkRasterRefs: [raster('benchmark-course')],
+});
 const capturePreflight = () => ({
   preflightRef: `preflight://${'3'.repeat(64)}`,
   matrixRef: 'matrix://profile-v1',
@@ -31,8 +41,10 @@ const capturePreflight = () => ({
   round: { ...visualRound },
   capturePartitionRefs: ['partition://profile-main'],
   reusedPartitionRefs: [],
+  dataEvidence: liveDataEvidence(),
 });
 const readinessChecks = () => [
+  'runtime-origin-valid', 'dependency-graph-ready', 'repository-reproducibility-recorded', 'viewport-controls-effective',
   'data-ready', 'steady-not-skeleton', 'state-content-valid', 'controls-effective',
   'page-scroll-restored', 'bounded-scroll-restored', 'zoom-restored', 'probe-complete',
   'raster-unique', 'handoff-host-valid',
@@ -45,7 +57,16 @@ const behaviorContract = () => ({
     { interactionRef: 'interaction://task-navigation', decision: 'preserve', authorityRef: null, rationale: null, replacementRef: null },
   ],
   surfaceOwnerRefs: ['surface://roadmap'],
-  grammarBindingRefs: ['grammar://surface-list-card'],
+  uiLawBindingRef: 'ui-law-binding://profile-v1',
+  uiDetailBindingRef: 'ui-detail-binding://profile-v1',
+  grammarBindingRef: 'grammar-binding://profile-v1',
+  grammarCoreRef: 'grammar-core://starci-v1',
+  packagedContractRefs: ['grammar-package://surface-list-card'],
+  visualDnaRef: 'visual-dna://starci-v1',
+  productFamilyEvidence: {
+    productFamilyRef: 'product-family://starci-academy',
+    benchmarkRasterRefs: [raster('benchmark-course')],
+  },
   responsiveStates: responsiveStateInventory.map(({ viewport, stateRef }) => ({ viewport, stateRef })),
 });
 
@@ -92,6 +113,8 @@ const blindPacket = () => {
   visualRound:{...visualRound},
   capturePartitionRefs:[...capturePreflight().capturePartitionRefs],
   reusedPartitionRefs:[],
+  dataEvidence:liveDataEvidence(),
+  productFamilyEvidence:productFamilyEvidence(),
   latestMutationFingerprint:`sha256:${'2'.repeat(64)}`,
   capturedSourceFingerprint:`sha256:${'2'.repeat(64)}`,
   latestMutationAt:'2026-08-30T01:00:00.000Z',
@@ -107,8 +130,17 @@ const blindPacket = () => {
   lastScreenshotRef:raster('host'),
  });
 };
-const packetManifest=({packetRef,preflightRef,matrixRef,matrixFingerprint,partitionFingerprint,visualRound,capturePartitionRefs,reusedPartitionRefs,latestMutationFingerprint,capturedSourceFingerprint,latestMutationAt,capturedAt,rasterCells,probeCells,lastScreenshotRef})=>({packetRef,preflightRef,matrixRef,matrixFingerprint,partitionFingerprint,visualRound,capturePartitionRefs,reusedPartitionRefs,latestMutationFingerprint,capturedSourceFingerprint,latestMutationAt,capturedAt,rasterCells,probeCells,lastScreenshotRef});
-const captureOutputDocument=(packet)=>({schemaVersion:7,operatorId:'fe/render-capture',output:{outcome:'captured',result:{summary:'Captured exact visual matrix and lifecycle packet.',artifactRefs:[packet.packetRef],preflightRef:packet.preflightRef,matrixRef:packet.matrixRef,matrixFingerprint:packet.matrixFingerprint,partitionFingerprint:packet.partitionFingerprint,visualRound:packet.visualRound,capturePartitionRefs:packet.capturePartitionRefs,reusedPartitionRefs:packet.reusedPartitionRefs,sourceFingerprint:packet.capturedSourceFingerprint,latestMutationFingerprint:packet.latestMutationFingerprint,latestMutationAt:packet.latestMutationAt,capturedAt:packet.capturedAt,blindReviewPacketRef:packet.packetRef,blindReviewPacketFingerprint:fingerprint(packetManifest(packet)),blindReviewPacket:packetManifest(packet),renderMatrix:[
+const unsupportedZoomPacket = () => {
+  const packet = blindPacket();
+  const zoomRasterRefs = new Set(packet.probeCells.filter(({ category }) => category === 'zoom').map(({ imageRef }) => imageRef));
+  packet.probeCells = packet.probeCells.map((probe) => probe.category === 'zoom'
+    ? { ...probe, applicable: false, imageRef: null, reason: 'tool-capability-unavailable' }
+    : probe);
+  packet.rasterCells = packet.rasterCells.filter(({ imageRef }) => !zoomRasterRefs.has(imageRef));
+  return packet;
+};
+const packetManifest=({packetRef,preflightRef,matrixRef,matrixFingerprint,partitionFingerprint,visualRound,capturePartitionRefs,reusedPartitionRefs,dataEvidence,productFamilyEvidence,latestMutationFingerprint,capturedSourceFingerprint,latestMutationAt,capturedAt,rasterCells,probeCells,lastScreenshotRef})=>({packetRef,preflightRef,matrixRef,matrixFingerprint,partitionFingerprint,visualRound,capturePartitionRefs,reusedPartitionRefs,dataEvidence,productFamilyEvidence,latestMutationFingerprint,capturedSourceFingerprint,latestMutationAt,capturedAt,rasterCells,probeCells,lastScreenshotRef});
+const captureOutputDocument=(packet)=>({schemaVersion:7,operatorId:'fe/render-capture',output:{outcome:'captured',result:{summary:'Captured exact visual matrix and lifecycle packet.',artifactRefs:[packet.packetRef],preflightRef:packet.preflightRef,matrixRef:packet.matrixRef,matrixFingerprint:packet.matrixFingerprint,partitionFingerprint:packet.partitionFingerprint,visualRound:packet.visualRound,capturePartitionRefs:packet.capturePartitionRefs,reusedPartitionRefs:packet.reusedPartitionRefs,dataEvidence:packet.dataEvidence,productFamilyEvidence:packet.productFamilyEvidence,sourceFingerprint:packet.capturedSourceFingerprint,latestMutationFingerprint:packet.latestMutationFingerprint,latestMutationAt:packet.latestMutationAt,capturedAt:packet.capturedAt,blindReviewPacketRef:packet.packetRef,blindReviewPacketFingerprint:fingerprint(packetManifest(packet)),blindReviewPacket:packetManifest(packet),renderMatrix:[
   {stateRef:'state://steady',viewport:'wide',imageRef:raster('wide'),handoffState:true},
   {stateRef:'state://steady',viewport:'intermediate',imageRef:raster('intermediate'),handoffState:true},
   {stateRef:'state://steady',viewport:'compact',imageRef:raster('final'),handoffState:true},
@@ -120,9 +152,9 @@ test('capture preflight freezes a deterministic owner-partitioned matrix before 
     {partitionRef:'partition://profile-main',ownerRef:'surface://profile',stateRefs:['state://steady'],probeRefs:matrixBody.probeRefs,disposition:'capture',dependencyProofRefs:[]},
     {partitionRef:'partition://shared-header',ownerRef:'surface://header',stateRefs:['state://steady'],probeRefs:[],disposition:'reuse',dependencyProofRefs:['dependency://header-unchanged']},
   ];
-  const input={schemaVersion:7,operatorId:'fe/capture-preflight',context:{authorityRefs:['contract://profile'],evidenceRefs:['runtime://profile'],uiKnowledgeId:'fe.ui',sourceFingerprint:`sha256:${'2'.repeat(64)}`,debug:true},input:{targetRef:'surface://profile',round:{...visualRound},matrix:{matrixRef:'matrix://profile-v1',matrixFingerprint:fingerprint(matrixBody),...matrixBody},partitions,readinessChecks:readinessChecks()}};
+  const input={schemaVersion:7,operatorId:'fe/capture-preflight',context:{authorityRefs:['contract://profile'],evidenceRefs:['runtime://profile'],uiKnowledgeId:'fe.ui',runtimeReadinessKnowledgeId:'fe.runtime-capture-readiness',sourceFingerprint:`sha256:${'2'.repeat(64)}`,debug:true},input:{targetRef:'surface://profile',round:{...visualRound},matrix:{matrixRef:'matrix://profile-v1',matrixFingerprint:fingerprint(matrixBody),...matrixBody},partitions,dataEvidence:liveDataEvidence(),readinessChecks:readinessChecks()}};
   assert.deepEqual(validatePreflightInput(input),{valid:true,errors:[]});
-  const result={summary:'Capture mechanics are ready.',artifactRefs:['preflight://artifact'],preflightRef:`preflight://${'3'.repeat(64)}`,sourceFingerprint:input.context.sourceFingerprint,round:{...visualRound},matrixRef:input.input.matrix.matrixRef,matrixFingerprint:input.input.matrix.matrixFingerprint,partitionFingerprint:fingerprint(partitions),capturePartitionRefs:['partition://profile-main'],reusedPartitionRefs:['partition://shared-header'],readinessChecks:readinessChecks()};
+  const result={summary:'Capture mechanics are ready.',artifactRefs:['preflight://artifact'],preflightRef:`preflight://${'3'.repeat(64)}`,sourceFingerprint:input.context.sourceFingerprint,round:{...visualRound},matrixRef:input.input.matrix.matrixRef,matrixFingerprint:input.input.matrix.matrixFingerprint,partitionFingerprint:fingerprint(partitions),capturePartitionRefs:['partition://profile-main'],reusedPartitionRefs:['partition://shared-header'],dataEvidence:liveDataEvidence(),readinessChecks:readinessChecks()};
   const output={schemaVersion:7,operatorId:'fe/capture-preflight',output:{outcome:'ready',result,gaps:[],evidenceRefs:['runtime://profile'],handoff:null}};
   assert.deepEqual(validatePreflightOutput(output),{valid:true,errors:[]});
   assert.deepEqual(invocationBindings.validate('fe/capture-preflight',input,output),[]);
@@ -130,6 +162,30 @@ test('capture preflight freezes a deterministic owner-partitioned matrix before 
   assert.match(validatePreflightInput(unproved).errors.join('\n'),/reuse requires exact dependency proof/);
   const changedMatrix=structuredClone(input); changedMatrix.input.matrix.renderStates.push('state://loading');
   assert.match(validatePreflightInput(changedMatrix).errors.join('\n'),/must hash the exact immutable matrix body/);
+  const legacyChecks=structuredClone(input); legacyChecks.input.readinessChecks=legacyChecks.input.readinessChecks.slice(3);
+  assert.equal(validatePreflightInput(legacyChecks).valid,false);
+  const fixture=structuredClone(input); fixture.input.dataEvidence=fixtureDataEvidence();
+  assert.equal(validatePreflightInput(fixture).valid,true);
+  const invalidFixture=structuredClone(fixture); invalidFixture.input.dataEvidence.backendGapRef=null;
+  assert.match(validatePreflightInput(invalidFixture).errors.join('\n'),/contract-fixture mode requires/);
+  const unroutedFixture=structuredClone(fixture); unroutedFixture.input.dataEvidence.backendProofReceiptRef=null;
+  assert.match(validatePreflightInput(unroutedFixture).errors.join('\n'),/consumed backend prove RETURN/);
+  const backendRequired={schemaVersion:7,operatorId:'fe/capture-preflight',output:{outcome:'backend-required',result:null,gaps:['Routed live playground data is unavailable.'],evidenceRefs:['runtime://playground-empty'],handoff:{skillId:'starci-backend-process',intentMode:'prove',missionRef:'mission-playground-data',resumeState:'apply',inputRef:'backend-input://playground-data-proof'}}};
+  assert.deepEqual(validatePreflightOutput(backendRequired),{valid:true,errors:[]});
+  const missingBackendCall=structuredClone(backendRequired); missingBackendCall.output.handoff=null;
+  assert.match(validatePreflightOutput(missingBackendCall).errors.join('\n'),/must emit a starci-backend-process prove handoff/);
+  const capabilityInput=structuredClone(input);
+  const zoomCheck=capabilityInput.input.readinessChecks.find(({check})=>check==='zoom-restored');
+  Object.assign(zoomCheck,{verdict:'not-applicable',evidenceRef:'capability://zoom/native-and-fresh-context-inert',observation:'Native zoom and one fresh-context confirmation were both unavailable to the capture tool.'});
+  assert.deepEqual(validatePreflightInput(capabilityInput),{valid:true,errors:[]});
+  const capabilityResult={...structuredClone(result),readinessChecks:structuredClone(capabilityInput.input.readinessChecks)};
+  const capabilityOutput={schemaVersion:7,operatorId:'fe/capture-preflight',output:{outcome:'ready',result:capabilityResult,gaps:[],evidenceRefs:['runtime://profile','capability://zoom/native-and-fresh-context-inert'],handoff:null}};
+  assert.deepEqual(validatePreflightOutput(capabilityOutput),{valid:true,errors:[]});
+  assert.deepEqual(invocationBindings.validate('fe/capture-preflight',capabilityInput,capabilityOutput),[]);
+  const wrongCheck=structuredClone(capabilityInput); Object.assign(wrongCheck.input.readinessChecks.find(({check})=>check==='controls-effective'),{verdict:'not-applicable',evidenceRef:'capability://zoom/forged'});
+  assert.match(validatePreflightInput(wrongCheck).errors.join('\n'),/only for zoom-restored/);
+  const missingReceipt=structuredClone(capabilityInput); missingReceipt.input.readinessChecks.find(({check})=>check==='zoom-restored').evidenceRef='evidence://zoom-missing';
+  assert.match(validatePreflightInput(missingReceipt).errors.join('\n'),/capability:\/\/zoom/);
 });
 
 test('finding classification batches every finding and round three cannot reopen repair',()=>{
@@ -165,13 +221,20 @@ test('blind visual input is one fresh Sol raster packet and rejects stale or sel
   noLifecycle.input.blindReviewPacket.rasterCells=noLifecycle.input.blindReviewPacket.rasterCells.filter(({imageRef})=>imageRef && !noLifecycle.input.blindReviewPacket.probeCells.some((probe)=>probe.imageRef===imageRef));
   noLifecycle.context={...value.context,reviewerContextFingerprint:fingerprint(noLifecycle.input.blindReviewPacket)};
   assert.match(validateVisualInput(noLifecycle).errors.join('\n'),/requires .* applicable raster phases/);
+  const unsupportedZoom={...value,input:{blindReviewPacket:unsupportedZoomPacket()}};
+  unsupportedZoom.context={...value.context,reviewerExecutionRef:`execution://${'b'.repeat(64)}`,reviewerPrincipalFingerprint:`sha256:${'d'.repeat(64)}`,reviewerContextFingerprint:fingerprint(unsupportedZoom.input.blindReviewPacket)};
+  assert.deepEqual(validateVisualInput(unsupportedZoom),{valid:true,errors:[]});
+  const partialUnsupported=structuredClone(unsupportedZoom);
+  partialUnsupported.input.blindReviewPacket.probeCells.find(({category})=>category==='zoom').reason='lifecycle-not-present';
+  partialUnsupported.context.reviewerContextFingerprint=fingerprint(partialUnsupported.input.blindReviewPacket);
+  assert.match(validateVisualInput(partialUnsupported).errors.join('\n'),/unsupported zoom must cover all three canonical phases|requires 3 applicable raster phases/);
 });
 
 test('visual verdict is bound to the exact supplied packet, rasters, final screenshot, and reviewer execution',()=>{
   const input={schemaVersion:7,operatorId:'fe/visual-fidelity',context:{implementerExecutionRef:`execution://${'a'.repeat(64)}`,reviewerExecutionRef:`execution://${'b'.repeat(64)}`,implementerPrincipalFingerprint:`sha256:${'c'.repeat(64)}`,reviewerPrincipalFingerprint:`sha256:${'d'.repeat(64)}`,reviewerContextFingerprint:null,reviewerModel:'gpt-5.6-sol',reviewerCount:1,contextIsolation:'fresh',forkTurns:'none',debug:true},input:{blindReviewPacket:blindPacket()}};
   input.context.reviewerContextFingerprint=fingerprint(input.input.blindReviewPacket);
   const packet=input.input.blindReviewPacket;
-  const output={schemaVersion:7,operatorId:'fe/visual-fidelity',output:{result:{packetFingerprint:packet.packetFingerprint,matrixFingerprint:packet.matrixFingerprint,partitionFingerprint:packet.partitionFingerprint,visualRound:packet.visualRound,packetRasterRefs:packet.rasterCells.map(({imageRef})=>imageRef),lastScreenshotRef:packet.lastScreenshotRef,reviewerExecutionRef:input.context.reviewerExecutionRef,reviewerModel:'gpt-5.6-sol',reviewerCount:1,contextIsolation:'fresh',forkTurns:'none',probeRecords:probeRecords()}}};
+  const output={schemaVersion:7,operatorId:'fe/visual-fidelity',output:{result:{dataEvidence:packet.dataEvidence,productFamilyEvidence:packet.productFamilyEvidence,packetFingerprint:packet.packetFingerprint,matrixFingerprint:packet.matrixFingerprint,partitionFingerprint:packet.partitionFingerprint,visualRound:packet.visualRound,packetRasterRefs:packet.rasterCells.map(({imageRef})=>imageRef),lastScreenshotRef:packet.lastScreenshotRef,reviewerExecutionRef:input.context.reviewerExecutionRef,reviewerModel:'gpt-5.6-sol',reviewerCount:1,contextIsolation:'fresh',forkTurns:'none',probeRecords:probeRecords()}}};
   assert.match(invocationBindings.validate('fe/visual-fidelity',input,output).join('\n'),/not bound to a validated render-capture RETURN/);
   invocationBindings.record('fe/render-capture',{output:{outcome:'captured',result:{blindReviewPacketRef:packet.packetRef,blindReviewPacketFingerprint:packet.packetFingerprint,blindReviewPacket:packetManifest(packet),sourceFingerprint:packet.capturedSourceFingerprint,renderMatrix:[
     {stateRef:'state://steady',viewport:'wide',imageRef:raster('wide'),handoffState:false},
@@ -208,7 +271,11 @@ test('visual verdict is bound to the exact supplied packet, rasters, final scree
 
 test('render capture output is cross-bound to requested source, state matrix, handoff, and probes',()=>{
   assert.deepEqual(validateCaptureOutput(captureOutputDocument(blindPacket())),{valid:true,errors:[]});
-  const input={context:{sourceFingerprint:`sha256:${'a'.repeat(64)}`},input:{renderStates:['state://required'],viewports:['wide','intermediate','compact'],handoffStateRef:'state://required',handoffViewport:{surfaceRef:'browser://host',widthPx:1200,heightPx:800,viewportOverride:false},adversarialProbes:probes(),preflight:capturePreflight()}};
+  const unsupportedPacket=unsupportedZoomPacket();
+  const unsupportedCapture=captureOutputDocument(unsupportedPacket);
+  unsupportedCapture.output.result.adversarialProbeMatrix=unsupportedCapture.output.result.adversarialProbeMatrix.map((probe)=>probe.category==='zoom'?{...probe,outcome:'not-applicable',imageRef:null,reason:'tool-capability-unavailable'}:probe);
+  assert.deepEqual(validateCaptureOutput(unsupportedCapture),{valid:true,errors:[]});
+  const input={context:{sourceFingerprint:`sha256:${'a'.repeat(64)}`},input:{renderStates:['state://required'],viewports:['wide','intermediate','compact'],handoffStateRef:'state://required',handoffViewport:{surfaceRef:'browser://host',widthPx:1200,heightPx:800,viewportOverride:false},adversarialProbes:probes(),productFamilyEvidence:productFamilyEvidence(),preflight:capturePreflight()}};
   const output={output:{result:{sourceFingerprint:`sha256:${'b'.repeat(64)}`,renderMatrix:['wide','intermediate','compact'].map((viewport)=>({stateRef:'state://wrong',viewport,handoffState:false})),handoffHostArtifact:{surfaceRef:'browser://other',widthPx:900,heightPx:700,viewportOverride:false},adversarialProbeMatrix:probes().map((probe)=>({...probe,outcome:'survived',imageRef:`render://${probe.probeId}.png`,reason:null}))}}};
   const errors=invocationBindings.validate('fe/render-capture',input,output).join('\n');
   assert.match(errors,/source differs/);
@@ -218,7 +285,7 @@ test('render capture output is cross-bound to requested source, state matrix, ha
 
 test('render capture cannot reorder requested state cells or adversarial probes',()=>{
   const requestedProbes=probes().slice(0,2);
-  const input={context:{sourceFingerprint:`sha256:${'a'.repeat(64)}`},input:{renderStates:['state://one','state://two'],viewports:['wide','compact'],handoffStateRef:'state://two',handoffViewport:{surfaceRef:'browser://host',widthPx:1200,heightPx:800,viewportOverride:false},adversarialProbes:requestedProbes,preflight:capturePreflight()}};
+  const input={context:{sourceFingerprint:`sha256:${'a'.repeat(64)}`},input:{renderStates:['state://one','state://two'],viewports:['wide','compact'],handoffStateRef:'state://two',handoffViewport:{surfaceRef:'browser://host',widthPx:1200,heightPx:800,viewportOverride:false},adversarialProbes:requestedProbes,productFamilyEvidence:productFamilyEvidence(),preflight:capturePreflight()}};
   const renderMatrix=[
     {stateRef:'state://two',viewport:'wide',imageRef:raster('two-wide'),handoffState:true},
     {stateRef:'state://two',viewport:'compact',imageRef:raster('two-compact'),handoffState:true},
@@ -256,18 +323,47 @@ test('runtime observation cannot pass with prose while interaction and responsiv
       result: {
         summary: 'Looks correct.',
         artifactRefs: ['render://overview.png'],
+        runtimeReadiness: { worktreeRef: 'worktree://profile', workingDirectoryRef: 'path://profile', dependencyMode: 'worktree-local-install', dependencyRootRef: 'path://profile/node_modules', dependencyContained: true, manifestLockStatus: 'reproducible', manifestLockEvidenceRef: 'evidence://lock-reproducible', runtimeBuildStatus: 'passed', runtimeLoadStatus: 'passed', runtimeOriginRef: 'runtime://localhost-3000', targetLoadEvidenceRef: 'render://overview.png' },
         surfaceInventory: [{ surfaceRef: 'surface://overview', ownerRef: 'owner://page', purpose: 'Manage the project roadmap.', evidenceRef: 'render://overview.png' }],
         interactionInventory: [{ interactionRef: 'interaction://roadmap-search', kind: 'search', ownerRef: 'owner://roadmap', entryStateRef: 'state://overview', outcomeRef: 'state://filtered', evidenceRef: 'render://search.png' }],
         responsiveStateInventory,
       },
       gaps: [],
-      evidenceRefs: ['render://overview.png'],
+      evidenceRefs: ['render://overview.png', 'evidence://lock-reproducible'],
       handoff: null,
     },
   };
   assert.equal(validateObservation(value).valid, true);
   delete value.output.result.interactionInventory;
   assert.equal(validateObservation(value).valid, false);
+});
+
+test('runtime observation rejects escaped dependencies, ineffective viewport controls, and duplicate rasters', () => {
+  const value = {
+    schemaVersion: 7,
+    operatorId: 'fe/runtime-observe',
+    output: {
+      outcome: 'observed',
+      result: {
+        summary: 'Runtime observation.',
+        artifactRefs: ['render://overview.png'],
+        runtimeReadiness: { worktreeRef: 'worktree://profile', workingDirectoryRef: 'path://profile', dependencyMode: 'worktree-local-install', dependencyRootRef: 'path://profile/node_modules', dependencyContained: true, manifestLockStatus: 'reproducible', manifestLockEvidenceRef: 'evidence://lock-reproducible', runtimeBuildStatus: 'passed', runtimeLoadStatus: 'passed', runtimeOriginRef: 'runtime://localhost-3000', targetLoadEvidenceRef: 'render://overview.png' },
+        surfaceInventory: [{ surfaceRef: 'surface://overview', ownerRef: 'owner://page', purpose: 'Manage the project roadmap.', evidenceRef: 'render://overview.png' }],
+        interactionInventory: [],
+        responsiveStateInventory: structuredClone(responsiveStateInventory),
+      },
+      gaps: [], evidenceRefs: ['render://overview.png', 'evidence://lock-reproducible'], handoff: null,
+    },
+  };
+  assert.equal(validateObservation(value).valid, true);
+  const escaped = structuredClone(value); escaped.output.result.runtimeReadiness.dependencyContained = false;
+  assert.equal(validateObservation(escaped).valid, false);
+  const ineffective = structuredClone(value); ineffective.output.result.responsiveStateInventory[2].observedWidthPx = 1024;
+  assert.match(validateObservation(ineffective).errors.join('\n'), /requested and observed viewport dimensions must match/);
+  const duplicate = structuredClone(value); duplicate.output.result.responsiveStateInventory[2].rasterFingerprint = duplicate.output.result.responsiveStateInventory[1].rasterFingerprint;
+  assert.match(validateObservation(duplicate).errors.join('\n'), /duplicate responsive rasters are forbidden/);
+  const driftRecorded = structuredClone(value); driftRecorded.output.result.runtimeReadiness.manifestLockStatus = 'drift-recorded'; driftRecorded.output.result.runtimeReadiness.manifestLockEvidenceRef = 'evidence://lock-drift'; driftRecorded.output.evidenceRefs = ['render://overview.png', 'evidence://lock-drift'];
+  assert.equal(validateObservation(driftRecorded).valid, true);
 });
 
 test('aggregate audit passed is rejected when any structured check is a finding', () => {
@@ -316,6 +412,7 @@ test('capture rejects ten repeated viewport probes and requires all adversarial 
       viewports: ['wide', 'intermediate', 'compact'],
       handoffStateRef: 'state://overview',
       handoffViewport: { surfaceRef: 'browser://in-app', widthPx: 1200, heightPx: 800, viewportOverride: false },
+      productFamilyEvidence: productFamilyEvidence(),
       preflight: capturePreflight(),
     },
   };
@@ -384,6 +481,8 @@ test('visual fidelity cannot aggregate passed over a repair verdict or probe con
         summary: 'Reviewed all cells.',
         artifactRefs: [raster('wide'), raster('intermediate'), raster('compact')],
         reviewMode: 'ai-adversarial-pixel',
+        dataEvidence: liveDataEvidence(),
+        productFamilyEvidence: productFamilyEvidence(),
         packetFingerprint: `sha256:${'a'.repeat(64)}`,
         matrixFingerprint: capturePreflight().matrixFingerprint,
         partitionFingerprint: capturePreflight().partitionFingerprint,
@@ -421,6 +520,8 @@ test('visual fidelity rejects a shallow AI pass that did not challenge every ima
         summary: 'Looks good.',
         artifactRefs: [raster('wide')],
         reviewMode: 'ai-adversarial-pixel',
+        dataEvidence: liveDataEvidence(),
+        productFamilyEvidence: productFamilyEvidence(),
         packetFingerprint: `sha256:${'a'.repeat(64)}`,
         matrixFingerprint: capturePreflight().matrixFingerprint,
         partitionFingerprint: capturePreflight().partitionFingerprint,

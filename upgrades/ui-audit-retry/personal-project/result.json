@@ -1,0 +1,178 @@
+{
+  "schemaVersion": 7,
+  "runId": "ui-audit-retry-20260830-personal-project",
+  "skillId": "starci-self-upgrade",
+  "mode": "calibrate",
+  "result": "blocked",
+  "finalState": "blocked",
+  "sourceHeads": [
+    {
+      "ref": "source:starci-academy-backend",
+      "head": "2c84dd1e7a64b1665ff8534fecf51dda0977839c"
+    },
+    {
+      "ref": "fixture:personal-project-reconstruct",
+      "head": "4e571affa5880440df256dd7894273a06e692493"
+    }
+  ],
+  "evidenceRefs": [
+    "image:course-page:sha256:315ba206eed954b8e559be7a0e743328e976a8d5ffd571efbf5053776f0cd749",
+    "image:personal-project:sha256:cbe094e51f3898d200964f0391c69409060c239c61062958a1d7793c5ba70cb0",
+    ".claude/upgrades/ui-audit-retry/personal-project/evidence.md"
+  ],
+  "artifactRefs": [
+    ".claude/upgrades/ui-audit-retry/input.json",
+    ".claude/upgrades/ui-audit-retry/personal-project/evidence.md",
+    ".claude/upgrades/ui-audit-retry/personal-project/result.json",
+    ".claude/upgrades/ui-audit-retry/comparison.md"
+  ],
+  "benchmark": {
+    "qualityTargetRef": "image:course-page-craft:sha256:315ba206eed954b8e559be7a0e743328e976a8d5ffd571efbf5053776f0cd749",
+    "fixtureRefs": [
+      "fixture:personal-project-reconstruct@4e571affa5880440df256dd7894273a06e692493+working-tree"
+    ],
+    "productWritePolicy": "forbidden",
+    "visibleVisualReceipt": "present"
+  },
+  "metrics": {
+    "stepCount": null,
+    "redundantStepCount": null,
+    "productWriteCount": 0,
+    "elapsedMs": null,
+    "timeToFirstActionMs": null,
+    "contextBytes": null,
+    "visualVerdict": "fail"
+  },
+  "correctness": {
+    "initialVerdict": "fail",
+    "finalVerdict": "fail",
+    "requiredConsecutivePasses": 2,
+    "achievedConsecutivePasses": 0,
+    "repairAttempts": 0,
+    "repeatedFingerprint": false
+  },
+  "attempts": [
+    {
+      "attempt": 1,
+      "phase": "baseline",
+      "outputRef": "image:personal-project-output",
+      "fingerprint": "sha256:cbe094e51f3898d200964f0391c69409060c239c61062958a1d7793c5ba70cb0",
+      "verdict": "fail",
+      "evidenceRefs": [
+        ".claude/upgrades/ui-audit-retry/personal-project/evidence.md"
+      ]
+    }
+  ],
+  "layerChecks": [
+    {
+      "layer": "objective-scope",
+      "status": "finding",
+      "evidenceRefs": ["request:personal-project-reconstruct", ".claude/upgrades/ui-audit-retry/personal-project/evidence.md"],
+      "finding": "Reconstruct was named, but the producer-run acceptance scope and benchmark-quality terminal criteria are unavailable; rendered existence was insufficient.",
+      "ownerRef": "runtime:mission-scope-and-terminal-acceptance"
+    },
+    {
+      "layer": "input",
+      "status": "finding",
+      "evidenceRefs": ["evidence-gap:producer-input-unavailable"],
+      "finding": "The producer input receipt is unavailable, so benchmark, responsive states, interaction states, and recovery constraints cannot be proven complete.",
+      "ownerRef": "runtime:frontend-input-contract"
+    },
+    {
+      "layer": "prompt",
+      "status": "finding",
+      "evidenceRefs": ["evidence-gap:producer-prompt-unavailable"],
+      "finding": "The exact isolated execution prompt is unavailable; pixels show functional framing without proof that craft comparison and negative boundaries were enforced.",
+      "ownerRef": "runtime:frontend-review-prompt"
+    },
+    {
+      "layer": "state-machine",
+      "status": "finding",
+      "evidenceRefs": ["evidence-gap:producer-transition-trace-unavailable", ".claude/skills/starci-self-upgrade/machine.json"],
+      "finding": "No producer transition receipt proves that a failed visual comparison routes away from completion. A terminal lifecycle cannot be reconstructed from the available evidence.",
+      "ownerRef": "runtime:frontend-proof-state-machine"
+    },
+    {
+      "layer": "execute-logic",
+      "status": "finding",
+      "evidenceRefs": ["image:personal-project-output", "evidence-gap:operator-receipts-unavailable"],
+      "finding": "The actual output was not shown to have been inspected against the benchmark before code/test rationale, and no retry/stability execution exists.",
+      "ownerRef": "runtime:pixels-first-execute-order"
+    },
+    {
+      "layer": "knowledge",
+      "status": "finding",
+      "evidenceRefs": ["image:course-page-craft", "evidence-gap:knowledge-binding-unavailable"],
+      "finding": "No receipt binds the benchmark's composition, hierarchy, density, state richness, or responsive expectations into executable review criteria.",
+      "ownerRef": "runtime:ui-quality-knowledge-binding"
+    },
+    {
+      "layer": "grammar-ui",
+      "status": "finding",
+      "evidenceRefs": ["image:course-page-craft", "image:personal-project-output", ".claude/upgrades/ui-audit-retry/personal-project/evidence.md"],
+      "finding": "The surface is functional but its long list, sparse secondary rail, weak decision hierarchy, and limited demonstrated craft do not satisfy the supplied benchmark.",
+      "ownerRef": "fixture:personal-project-ui-output"
+    },
+    {
+      "layer": "validation",
+      "status": "finding",
+      "evidenceRefs": ["image:personal-project-output", "contract:output-correctness-loop"],
+      "finding": "Available validation evidence does not reject benchmark-quality failure, missing visual measurements, missing reviewer receipt, or missing second pass.",
+      "ownerRef": "runtime:visual-output-validator"
+    },
+    {
+      "layer": "output-contract",
+      "status": "finding",
+      "evidenceRefs": ["contract:output-correctness-loop", ".claude/skills/starci-self-upgrade/output.md"],
+      "finding": "The user outcome is correct, repeatable UI output; a rendered page and passing procedural checks cannot represent success while visual quality remains wrong or unproved.",
+      "ownerRef": "runtime:frontend-terminal-output-contract"
+    },
+    {
+      "layer": "tool-model",
+      "status": "finding",
+      "evidenceRefs": ["evidence-gap:model-call-and-media-receipt-unavailable"],
+      "finding": "The exact model, isolation, supplied raster set, and visible per-raster review receipt from the producer run are unavailable.",
+      "ownerRef": "runtime:ai-call-receipt"
+    },
+    {
+      "layer": "proof",
+      "status": "finding",
+      "evidenceRefs": ["image:personal-project:sha256:cbe094e51f3898d200964f0391c69409060c239c61062958a1d7793c5ba70cb0", "evidence-gap:fresh-stability-output-unavailable"],
+      "finding": "Only one immutable output exists, independent reviewer evidence and metrics are missing, and zero of two required consecutive passes are proven.",
+      "ownerRef": "runtime:frontend-delivery-proof"
+    }
+  ],
+  "causalRecord": {
+    "priorDecision": "The reconstruct output could be treated as ready because the surface rendered and implementation plus page-test changes existed.",
+    "apparentEvidence": "The screenshot contains the named page, navigation, next-task CTA, roadmap list, progress metrics, and repository region; the fixture has focused source and test modifications.",
+    "contradiction": "Direct comparison with the Course-page benchmark shows materially weaker composition, hierarchy, craft evidence, state proof, and visual balance, with no second fresh output.",
+    "missingCheck": "The lifecycle lacked a fail-closed pixels-first benchmark gate and a mandatory second consecutive visual pass tied to the user outcome."
+  },
+  "ownerRefs": [
+    "runtime:visual-output-validator",
+    "runtime:frontend-terminal-output-contract",
+    "runtime:frontend-delivery-proof"
+  ],
+  "dispositions": [
+    {
+      "direction": "add",
+      "decision": "adopt",
+      "ownerRef": "runtime:visual-output-validator",
+      "rationale": "Add a cross-field gate that rejects terminal success when any required raster review, benchmark comparison, measurement, or consecutive pass is missing. Calibration records this recommendation only."
+    },
+    {
+      "direction": "change",
+      "decision": "adopt",
+      "ownerRef": "runtime:frontend-proof-state-machine",
+      "rationale": "Change routing so a wrong visual output enters diagnosis/retry and completion requires two fresh passes under one frozen acceptance contract. Calibration does not authorize the edit."
+    },
+    {
+      "direction": "remove",
+      "decision": "adopt",
+      "ownerRef": "runtime:frontend-terminal-output-contract",
+      "rationale": "Remove any path by which rendered existence, code completion, or tests alone can stand in for correct user-visible output."
+    }
+  ],
+  "changeSetApplied": false,
+  "reason": "BLOCKED: the supplied Personal Project raster fails the Course-page craft comparison and the run has no producer trace, measured responsive proof, independent visual receipt, or two consecutive correct outputs."
+}

@@ -168,9 +168,9 @@ test('ambiguous or absent routes fail closed', () => {
   assert.throws(() => nextState(machine('starci-fe-process'), 'analyze-input', {}, neutralInput({ receiptType: 'UNKNOWN' })), /matched 0/);
 });
 
-test('all twelve public machines are v7 mission machines', () => {
+test('all thirteen public machines are v7 mission machines', () => {
   const catalog = JSON.parse(readFileSync(path.join(root, 'catalog.json'), 'utf8'));
-  assert.equal(catalog.skills.length, 12);
+  assert.equal(catalog.skills.length, 13);
   for (const { id } of catalog.skills) {
     const candidate = machine(id);
     assert.equal(candidate.schemaVersion, 7, id);

@@ -1,0 +1,206 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://starci.dev/v7/skills/starci-self-upgrade/output.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "runId", "skillId", "mode", "result", "finalState", "sourceHeads", "evidenceRefs", "artifactRefs", "benchmark", "metrics", "correctness", "attempts", "layerChecks", "causalRecord", "ownerRefs", "dispositions", "changeSetApplied", "reason"],
+  "properties": {
+    "schemaVersion": { "const": 7 },
+    "runId": { "type": "string", "minLength": 1, "maxLength": 128 },
+    "skillId": { "const": "starci-self-upgrade" },
+    "mode": { "enum": ["calibrate", "upgrade"] },
+    "observationMode": { "enum": ["single", "multi-task"] },
+    "result": { "enum": ["complete", "blocked", "not-needed"] },
+    "finalState": { "enum": ["complete", "blocked", "not-needed"] },
+    "sourceHeads": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["ref", "head"],
+        "properties": {
+          "ref": { "type": "string", "minLength": 1, "maxLength": 1024 },
+          "head": { "type": "string", "pattern": "^[0-9a-f]{40}$" }
+        }
+      }
+    },
+    "evidenceRefs": { "$ref": "#/$defs/nonEmptyRefs" },
+    "artifactRefs": { "$ref": "#/$defs/nonEmptyRefs" },
+    "benchmark": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["qualityTargetRef", "fixtureRefs", "productWritePolicy", "visibleVisualReceipt"],
+      "properties": {
+        "qualityTargetRef": { "type": "string", "minLength": 1, "maxLength": 1024 },
+        "fixtureRefs": { "$ref": "#/$defs/nonEmptyRefs" },
+        "productWritePolicy": { "const": "forbidden" },
+        "visibleVisualReceipt": { "enum": ["present", "missing", "not-applicable"] }
+      }
+    },
+    "metrics": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["stepCount", "redundantStepCount", "productWriteCount", "elapsedMs", "timeToFirstActionMs", "contextBytes", "visualVerdict"],
+      "properties": {
+        "stepCount": { "type": ["integer", "null"], "minimum": 0 },
+        "redundantStepCount": { "type": ["integer", "null"], "minimum": 0 },
+        "productWriteCount": { "type": ["integer", "null"], "minimum": 0 },
+        "elapsedMs": { "type": ["integer", "null"], "minimum": 0 },
+        "timeToFirstActionMs": { "type": ["integer", "null"], "minimum": 0 },
+        "contextBytes": { "type": ["integer", "null"], "minimum": 0 },
+        "visualVerdict": { "enum": ["pass", "fail", "not-run"] }
+      }
+    },
+    "correctness": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["initialVerdict", "finalVerdict", "requiredConsecutivePasses", "achievedConsecutivePasses", "repairAttempts", "repeatedFingerprint"],
+      "properties": {
+        "initialVerdict": { "enum": ["pass", "fail", "blocked"] },
+        "finalVerdict": { "enum": ["pass", "fail", "blocked"] },
+        "requiredConsecutivePasses": { "const": 2 },
+        "achievedConsecutivePasses": { "type": "integer", "minimum": 0 },
+        "repairAttempts": { "type": "integer", "minimum": 0, "maximum": 3 },
+        "repeatedFingerprint": { "type": "boolean" }
+      }
+    },
+    "attempts": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 8,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["attempt", "phase", "outputRef", "fingerprint", "verdict", "evidenceRefs"],
+        "properties": {
+          "attempt": { "type": "integer", "minimum": 1 },
+          "phase": { "enum": ["baseline", "retry", "stability"] },
+          "outputRef": { "type": "string", "minLength": 1, "maxLength": 1024 },
+          "fingerprint": { "$ref": "#/$defs/sha256" },
+          "verdict": { "enum": ["pass", "fail", "blocked"] },
+          "evidenceRefs": { "$ref": "#/$defs/nonEmptyRefs" }
+        }
+      }
+    },
+    "actorResults": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 3,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["actorId", "role", "taskRef", "actionRef", "runtimeFingerprint", "sourceFingerprint", "status", "resultRef", "verdict", "requiredConsecutivePasses", "achievedConsecutivePasses", "attemptFingerprints", "evidenceRefs"],
+        "properties": {
+          "actorId": { "type": "string", "pattern": "^[a-z0-9][a-z0-9-]*$" },
+          "role": { "enum": ["primary", "discriminator"] },
+          "taskRef": { "type": "string", "minLength": 1, "maxLength": 1024 },
+          "actionRef": { "type": "string", "minLength": 1, "maxLength": 1024 },
+          "runtimeFingerprint": { "$ref": "#/$defs/fingerprint" },
+          "sourceFingerprint": { "$ref": "#/$defs/fingerprint" },
+          "status": { "enum": ["complete", "blocked"] },
+          "resultRef": { "type": ["string", "null"], "minLength": 1, "maxLength": 1024 },
+          "verdict": { "enum": ["pass", "fail", "blocked"] },
+          "requiredConsecutivePasses": { "const": 2 },
+          "achievedConsecutivePasses": { "type": "integer", "minimum": 0 },
+          "attemptFingerprints": { "type": "array", "minItems": 1, "maxItems": 8, "items": { "$ref": "#/$defs/sha256" } },
+          "evidenceRefs": { "$ref": "#/$defs/nonEmptyRefs" }
+        }
+      }
+    },
+    "crossCaseDecision": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["classification", "discriminatorRequired", "sharedOwnerRef", "knowledgeStatus", "evidenceRefs", "reason"],
+      "properties": {
+        "classification": { "enum": ["systemic", "product-specific", "mixed", "inconclusive", "not-applicable"] },
+        "discriminatorRequired": { "type": "boolean" },
+        "sharedOwnerRef": { "type": ["string", "null"], "minLength": 1, "maxLength": 1024 },
+        "knowledgeStatus": { "enum": ["missing", "not-loaded", "misapplied", "contradictory", "stale", "sufficient", "not-applicable"] },
+        "evidenceRefs": { "$ref": "#/$defs/nonEmptyRefs" },
+        "reason": { "type": "string", "minLength": 1, "maxLength": 4096 }
+      }
+    },
+    "runtimeTransition": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["beforeFingerprint", "afterFingerprint", "proofsInvalidated", "reloadRequired", "actorNotificationRefs", "resumeRefs"],
+      "properties": {
+        "beforeFingerprint": { "$ref": "#/$defs/fingerprint" },
+        "afterFingerprint": { "anyOf": [{ "$ref": "#/$defs/fingerprint" }, { "type": "null" }] },
+        "proofsInvalidated": { "type": "boolean" },
+        "reloadRequired": { "type": "boolean" },
+        "actorNotificationRefs": { "$ref": "#/$defs/refs" },
+        "resumeRefs": { "$ref": "#/$defs/refs" }
+      }
+    },
+    "layerChecks": {
+      "type": "array",
+      "minItems": 11,
+      "maxItems": 11,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["layer", "status", "evidenceRefs", "finding", "ownerRef"],
+        "properties": {
+          "layer": { "$ref": "#/$defs/layerName" },
+          "status": { "enum": ["passed", "finding", "not-applicable"] },
+          "evidenceRefs": { "$ref": "#/$defs/nonEmptyRefs" },
+          "finding": { "type": ["string", "null"], "minLength": 1, "maxLength": 4096 },
+          "ownerRef": { "type": ["string", "null"], "minLength": 1, "maxLength": 1024 }
+        }
+      }
+    },
+    "causalRecord": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["priorDecision", "apparentEvidence", "contradiction", "missingCheck"],
+      "properties": {
+        "priorDecision": { "type": "string", "minLength": 1, "maxLength": 4096 },
+        "apparentEvidence": { "type": "string", "minLength": 1, "maxLength": 4096 },
+        "contradiction": { "type": "string", "minLength": 1, "maxLength": 4096 },
+        "missingCheck": { "type": "string", "minLength": 1, "maxLength": 4096 }
+      }
+    },
+    "ownerRefs": { "$ref": "#/$defs/nonEmptyRefs" },
+    "dispositions": {
+      "type": "array",
+      "minItems": 3,
+      "maxItems": 3,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["direction", "decision", "ownerRef", "rationale"],
+        "properties": {
+          "direction": { "enum": ["add", "change", "remove"] },
+          "decision": { "enum": ["adopt", "reject", "not-applicable"] },
+          "ownerRef": { "type": ["string", "null"], "minLength": 1, "maxLength": 1024 },
+          "rationale": { "type": "string", "minLength": 1, "maxLength": 4096 }
+        }
+      }
+    },
+    "changeSetApplied": { "type": "boolean" },
+    "reason": { "type": ["string", "null"], "minLength": 1, "maxLength": 4096 }
+  },
+  "$defs": {
+    "sha256": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
+    "fingerprint": { "type": "string", "pattern": "^(?:sha256:[0-9a-f]{64}|[0-9a-f]{40})$" },
+    "layerName": {
+      "enum": ["objective-scope", "input", "prompt", "state-machine", "execute-logic", "knowledge", "grammar-ui", "validation", "output-contract", "tool-model", "proof"]
+    },
+    "nonEmptyRefs": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "maxItems": 128,
+      "items": { "type": "string", "minLength": 1, "maxLength": 1024 }
+    },
+    "refs": {
+      "type": "array",
+      "uniqueItems": true,
+      "maxItems": 128,
+      "items": { "type": "string", "minLength": 1, "maxLength": 1024 }
+    }
+  }
+}

@@ -43,6 +43,7 @@
               "required": [
                 "summary",
                 "artifactRefs",
+                "runtimeReadiness",
                 "surfaceInventory",
                 "interactionInventory",
                 "responsiveStateInventory"
@@ -59,6 +60,36 @@
                   "items": {
                     "type": "string",
                     "minLength": 1
+                  }
+                },
+                "runtimeReadiness": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "worktreeRef",
+                    "workingDirectoryRef",
+                    "dependencyMode",
+                    "dependencyRootRef",
+                    "dependencyContained",
+                    "manifestLockStatus",
+                    "manifestLockEvidenceRef",
+                    "runtimeBuildStatus",
+                    "runtimeLoadStatus",
+                    "runtimeOriginRef",
+                    "targetLoadEvidenceRef"
+                  ],
+                  "properties": {
+                    "worktreeRef": { "type": "string", "minLength": 1 },
+                    "workingDirectoryRef": { "type": "string", "minLength": 1 },
+                    "dependencyMode": { "enum": ["worktree-local-install", "toolchain-supported-local"] },
+                    "dependencyRootRef": { "type": "string", "minLength": 1 },
+                    "dependencyContained": { "const": true },
+                    "manifestLockStatus": { "enum": ["reproducible", "drift-recorded", "not-applicable"] },
+                    "manifestLockEvidenceRef": { "type": "string", "minLength": 1 },
+                    "runtimeBuildStatus": { "enum": ["passed", "not-required"] },
+                    "runtimeLoadStatus": { "const": "passed" },
+                    "runtimeOriginRef": { "type": "string", "minLength": 1 },
+                    "targetLoadEvidenceRef": { "type": "string", "minLength": 1 }
                   }
                 },
                 "surfaceInventory": {
@@ -103,10 +134,15 @@
                   "items": {
                     "type": "object",
                     "additionalProperties": false,
-                    "required": ["viewport", "stateRef", "evidenceRef"],
+                    "required": ["viewport", "stateRef", "requestedWidthPx", "requestedHeightPx", "observedWidthPx", "observedHeightPx", "rasterFingerprint", "evidenceRef"],
                     "properties": {
                       "viewport": { "enum": ["wide", "intermediate", "compact"] },
                       "stateRef": { "type": "string", "minLength": 1 },
+                      "requestedWidthPx": { "type": "integer", "minimum": 240, "maximum": 10000 },
+                      "requestedHeightPx": { "type": "integer", "minimum": 240, "maximum": 10000 },
+                      "observedWidthPx": { "type": "integer", "minimum": 240, "maximum": 10000 },
+                      "observedHeightPx": { "type": "integer", "minimum": 240, "maximum": 10000 },
+                      "rasterFingerprint": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
                       "evidenceRef": { "type": "string", "minLength": 1 }
                     }
                   }

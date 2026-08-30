@@ -56,7 +56,11 @@ test('neutral product potential requires an exhaustive typed capability delta be
 
 test('create page X auto-selects a dominant action without generating choices', () => {
   assert.deepEqual(validateFeInput(feInput('create','Create page X','new')), {valid:true,errors:[]});
-  assert.equal(routed('dominant','classify'),'freeze');
+  assert.equal(routed('dominant','classify'),'principle-compile');
+  assert.equal(routed('compiled','principle-compile'),'ui-detail-freeze');
+  assert.equal(routed('detail-frozen','ui-detail-freeze'),'layout-compile');
+  assert.equal(routed('compiled','layout-compile'),'grammar-core-compile');
+  assert.equal(routed('converged','grammar-core-compile'),'freeze');
 });
 
 test('a true authority choice generates and ranks 3-4 directions before WAIT', async () => {
@@ -91,7 +95,7 @@ test('selected user direction resumes only through a typed RESUME receipt', () =
   assert.deepEqual(validateFeInput(value),{valid:true,errors:[]});
   assert.equal(nextState(machine,'analyze-input',null,{...value,neutralAdversarialDecision}),'consume-choice-resume');
   assert.equal(routed('consumed','consume-choice-resume'),'choice-resume-route');
-  assert.equal(nextState(machine,'choice-resume-route',null,value),'freeze');
+  assert.equal(nextState(machine,'choice-resume-route',null,value),'principle-compile');
 });
 
 test('independent review cannot receive implementer rationale', () => {
@@ -171,6 +175,7 @@ test('FE to backend handoff resumes the exact same FE mission', () => {
   assert.equal(routed('applied','apply'),'capture-preflight');
   assert.equal(routed('ready','capture-preflight'),'capture');
   assert.equal(routed('passed','visual-fidelity'),'quality-handoff');
+  assert.equal(routed('fixture-passed','visual-fidelity'),'backend-handoff');
 });
 
 test('UAT verification binds canonical backend-owned feature/flow authority', () => {

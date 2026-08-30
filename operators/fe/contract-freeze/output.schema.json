@@ -69,7 +69,13 @@
                     "placementRef",
                     "responsiveTreatment",
                     "assetBriefRef",
-                    "altIntent"
+                    "altIntent",
+                    "fallbackTreatment",
+                    "spaceIntent",
+                    "purposeRole",
+                    "layoutIntegrity",
+                    "contentCompleteness"
+                    ,"approvedReusableAssetRef"
                   ],
                   "properties": {
                     "mode": {
@@ -107,6 +113,26 @@
                         "null"
                       ],
                       "minLength": 1
+                    },
+                    "fallbackTreatment": {
+                      "type": ["string", "null"],
+                      "minLength": 1
+                    },
+                    "spaceIntent": {
+                      "enum": ["no-media-space", "purposeful-media-space", "layout-defect"]
+                    },
+                    "purposeRole": {
+                      "enum": ["none", "orientation", "recognition", "explanation", "comparison", "instruction", "emotional-framing"]
+                    },
+                    "layoutIntegrity": {
+                      "enum": ["sound", "defective"]
+                    },
+                    "contentCompleteness": {
+                      "enum": ["complete", "missing"]
+                    },
+                    "approvedReusableAssetRef": {
+                      "type": ["string", "null"],
+                      "minLength": 1
                     }
                   },
                   "allOf": [
@@ -131,6 +157,24 @@
                           },
                           "altIntent": {
                             "type": "null"
+                          },
+                          "fallbackTreatment": {
+                            "type": "null"
+                          },
+                          "spaceIntent": {
+                            "const": "no-media-space"
+                          },
+                          "purposeRole": {
+                            "const": "none"
+                          },
+                          "layoutIntegrity": {
+                            "const": "sound"
+                          },
+                          "contentCompleteness": {
+                            "const": "complete"
+                          },
+                          "approvedReusableAssetRef": {
+                            "type": "null"
                           }
                         }
                       }
@@ -139,10 +183,7 @@
                       "if": {
                         "properties": {
                           "mode": {
-                            "enum": [
-                              "reuse",
-                              "generate"
-                            ]
+                            "const": "reuse"
                           }
                         },
                         "required": [
@@ -162,7 +203,43 @@
                           "altIntent": {
                             "type": "string",
                             "minLength": 1
+                          },
+                          "fallbackTreatment": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "spaceIntent": {
+                            "const": "purposeful-media-space"
+                          },
+                          "purposeRole": {
+                            "enum": ["orientation", "recognition", "explanation", "comparison", "instruction", "emotional-framing"]
+                          },
+                          "layoutIntegrity": {
+                            "const": "sound"
+                          },
+                          "contentCompleteness": {
+                            "const": "complete"
+                          },
+                          "approvedReusableAssetRef": {
+                            "type": "string",
+                            "minLength": 1
                           }
+                        }
+                      }
+                    },
+                    {
+                      "if": { "properties": { "mode": { "const": "generate" } }, "required": ["mode"] },
+                      "then": {
+                        "properties": {
+                          "placementRef": { "type": "string", "minLength": 1 },
+                          "assetBriefRef": { "type": "string", "minLength": 1 },
+                          "altIntent": { "type": "string", "minLength": 1 },
+                          "fallbackTreatment": { "type": "string", "minLength": 1 },
+                          "spaceIntent": { "const": "purposeful-media-space" },
+                          "purposeRole": { "enum": ["orientation", "recognition", "explanation", "comparison", "instruction", "emotional-framing"] },
+                          "layoutIntegrity": { "const": "sound" },
+                          "contentCompleteness": { "const": "complete" },
+                          "approvedReusableAssetRef": { "type": "null" }
                         }
                       }
                     }
@@ -172,7 +249,7 @@
                   "description": "Executable preservation contract carried into mutation and proof.",
                   "type": "object",
                   "additionalProperties": false,
-                  "required": ["observedInteractionRefs", "interactionDecisions", "surfaceOwnerRefs", "grammarBindingRefs", "responsiveStates"],
+                  "required": ["observedInteractionRefs", "interactionDecisions", "surfaceOwnerRefs", "uiLawBindingRef", "uiDetailBindingRef", "grammarBindingRef", "grammarCoreRef", "packagedContractRefs", "visualDnaRef", "productFamilyEvidence", "responsiveStates"],
                   "properties": {
                     "observedInteractionRefs": {
                       "type": "array",
@@ -203,12 +280,22 @@
                       "uniqueItems": true,
                       "items": { "type": "string", "minLength": 1 }
                     },
-                    "grammarBindingRefs": {
-                      "type": "array",
-                      "minItems": 1,
-                      "maxItems": 128,
-                      "uniqueItems": true,
-                      "items": { "type": "string", "minLength": 1 }
+                    "uiLawBindingRef": { "type": "string", "pattern": "^ui-law-binding://" },
+                    "uiDetailBindingRef": { "type": "string", "pattern": "^ui-detail-binding://" },
+                    "grammarBindingRef": { "type": "string", "pattern": "^grammar-binding://" },
+                    "grammarCoreRef": { "type": "string", "pattern": "^grammar-core://" },
+                    "packagedContractRefs": {
+                      "type": "array", "minItems": 1, "maxItems": 128, "uniqueItems": true,
+                      "items": { "type": "string", "pattern": "^grammar-package://" }
+                    },
+                    "visualDnaRef": { "type": "string", "pattern": "^visual-dna://" },
+                    "productFamilyEvidence": {
+                      "type": "object", "additionalProperties": false,
+                      "required": ["productFamilyRef", "benchmarkRasterRefs"],
+                      "properties": {
+                        "productFamilyRef": { "type": "string", "pattern": "^product-family://" },
+                        "benchmarkRasterRefs": { "type": "array", "minItems": 1, "maxItems": 16, "uniqueItems": true, "items": { "type": "string", "pattern": "sha256[-/][0-9a-f]{64}\\.(png|jpg|jpeg|webp)$" } }
+                      }
                     },
                     "responsiveStates": {
                       "type": "array",

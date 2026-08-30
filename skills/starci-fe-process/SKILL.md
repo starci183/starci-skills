@@ -5,9 +5,16 @@ description: Deliver, audit, repair, redesign, debug, or reconcile one frontend 
 
 # StarCi frontend process
 
-Own one frontend mission across request compilation, exact target resolution, business binding, observation, semantic/UX/UI audit, design, implementation, blind visual review, and closure. Intents are input data, never separate skills. Use only StarCi-native operators, `knowledge/ui.md`, and routed Grammar; never invoke or depend on `ui-ux-pro-max`.
+Own one frontend mission across request compilation, exact target resolution, business binding, observation, semantic/UX/UI audit, design, implementation, blind visual review, and closure. Intents are input data, never separate skills. Use only StarCi-native operators, `knowledge/ui/INDEX.md` plus its routed law records, and routed Grammar; never invoke or depend on `ui-ux-pro-max`.
 
-The 7.2 frontend chain is fail-closed. Natural-language confidence, green static checks, component names,
+The 7.2 frontend chain is fail-closed. A selected UI direction must first receive a complete mandatory
+law binding from `knowledge/ui/INDEX.md` and applicable law records, then freeze law-governed destination/progress/fact-hierarchy
+semantics, then responsive layout compilation, then a routed Grammar Core binding before any
+product-source mutation. The semantic-detail binding is immutable input to both layout and Grammar;
+it is never decided after either compilation. Grammar Core is packaged reusable object/component
+contracts plus visual DNA and product-family identity; it is not a token-only styling pass. UI laws
+remain compulsory constraints and never own packages, tokens, recipes, variants, or DNA.
+Natural-language confidence, green static checks, component names,
 DOM measurements, or a direction mock can never substitute for a validated operator product. Runtime
 observation must inventory surfaces, interactions, and responsive states; contract freeze must account
 for every observed interaction as preserve/remove/replace; mutation must bind that exact contract;
@@ -48,13 +55,29 @@ that names the competing boundaries, then wait. Never infer scope from current s
 For every browser-visible change, apply `knowledge/ui-render-review.md` as an enforced adversarial
 loop after the latest source mutation: `apply/repair -> capture-preflight -> render-capture -> AI visual-fidelity`. Capture preflight deterministically rejects bad data, false steady/skeleton identity, ineffective controls, incomplete probes, failed scroll/zoom restoration, duplicate rasters, or the wrong handoff host before any Sol review is called. The AI
 first tries to falsify the pixels without source, DOM, measurements, rules, Grammar, or implementer
-rationale. When it finds a potential problem, only then compare the observation with `knowledge/ui.md`
+rationale. When it finds a potential problem, only then compare the observation with `knowledge/ui/INDEX.md` and its routed law record
 and routed Grammar, classify whether the smallest demonstrated owner is implementation, Grammar, UI
 knowledge, product authority, or another domain, repair that owner, recapture, and restart AI pixel
 review from a blank verdict. Knowledge and Grammar diagnose or govern the correction; they can never
 explain away a bad raster. Only a fresh adversarial `visual-fidelity=passed` from the distinct blind Sol reviewer may advance to quality handoff. Never close from source inspection, DOM/geometry measurements, lint, tests,
 accessibility output, numeric thresholds, or a previous screenshot. Without this complete loop, the
 frontend mission is not complete.
+
+When live backend records are absent, call `starci-backend-process` in read-only `prove` mode first;
+freezing backend/API mutation does not authorize skipping that peer proof. Consume its canonical
+RETURN and resume the same FE mission. Only when that RETURN proves the capability exists while routed
+live data remains unavailable may a frontend-only `new` or `reconstruct` calibration use one
+content-addressed, contract-derived `visual-evidence-only` fixture outside product source. Bind the
+fixture to the exact backend prove receipt and retain the backend gap through every later visual or
+circuit-breaker outcome. A fixture proves frontend visual states only. A fixture-backed visual PASS
+routes to backend handoff rather than quality/UAT and can never claim live integration or frontend
+mission completion.
+
+Capture capability and product behavior are separate. If zoom is unsupported after one native attempt
+and one fresh-context confirmation, retain both tool-model receipts and keep the three canonical zoom
+cells as `tool-capability-unavailable` without rasters. The reviewer may inspect the remaining complete
+packet, but neither the process nor reviewer may claim zoom was tested. This exception is zoom-only;
+other missing applicable probes remain fail-closed.
 
 The enforced outer chain is `apply/repair -> capture-preflight -> render-capture -> one fresh Sol visual-fidelity -> quality-handoff`. That single Sol receives one complete owner-partitioned blind raster and probe packet, performs the full adversarial visual review, and owns the typed visual verdict; no second AI review stage follows it. Round 1 discovers the complete finding batch, round 2 verifies the batched repair, and round 3 is regression-only. Remaining findings at round 3 return `blocked` with diagnosis instead of opening an unbounded fourth review.
 Capture full-viewport screenshots after the latest source mutation and inspect the images themselves. A visual repair takes
@@ -102,7 +125,14 @@ siblings, and page terminal. Attempt every applicable probe and preserve a fresh
 outcome. `not-applicable` requires an exact ownership reason. Do not stop at the first defect. Missing
 an applicable probe or presenting only a pretty baseline screenshot can never produce `PASS`.
 
-The implementer cannot issue the visual verdict. `visual-fidelity` runs under one distinct fresh Sol execution that receives only the raster packet, without authority text, source, DOM, measurements, tests, previous feedback, suspected defects, intended answer, or implementer rationale. If that execution is unavailable, uncertain, or missing any raster inspection record, the mission remains incomplete; self-review never degrades into `PASS`.
+The implementer cannot issue the visual verdict. `visual-fidelity` runs under one distinct fresh Sol
+execution that receives only the target rasters, opaque Grammar Core/package/DNA identity, and
+content-addressed benchmark rasters needed to judge product-family quality. It receives no source,
+DOM, measurements, tests, producer rationale, previous feedback, suspected defects, prior verdict, or
+intended patch. The reviewer first falsifies target pixels, then compares product-family quality to the
+frozen benchmark evidence; neither Grammar identity nor benchmark precedent may explain away a bad
+raster. If that execution is unavailable, uncertain, or missing any raster inspection record, the
+mission remains incomplete; self-review never degrades into `PASS`.
 
 Auto-apply a dominant next action inside the frozen change level. Ask the user only when scope is not
 yet frozen or authority classification proves no dominant action. Scope clarification names the
@@ -113,10 +143,13 @@ and constrained responsive composition plus material interaction/recovery states
 then wait and resume the same mission. Prose, Mermaid, ASCII wireframes, tables, or a written layout
 plan are not visible direction proof and cannot enter `direction-choice`.
 Every frozen frontend contract also records one media decision: no media, reuse an approved asset, or
-generate a purpose-built bitmap. Image generation is an asset-production method, not design authority:
-use it only from an approved media brief whose user purpose, placement, responsive treatment, and
-alternative intent are frozen. A generated asset returns to the ordinary source-apply and complete
-render-review loop; never use it to mask unedited copy or replace business, UX, UI, or Grammar decisions.
+generate a purpose-built bitmap. When a sound, content-complete composition intentionally reserves
+otherwise empty media space for an approved user purpose, reuse a suitable approved asset when one
+exists; otherwise `generate` is mandatory. Freeze the purpose, owner/placement, asset authority or
+generation brief, responsive crop/contain treatment, alt intent, and no-image
+fallback before asset production. A generated asset returns to the ordinary source-apply and complete
+render-review loop. Decorative filler, a weak layout, missing content, weak hierarchy, or an unexplained
+dead zone must be repaired at its owner and can never be concealed by image generation.
 Cross-domain gaps hand off to `starci-business-process` or `starci-backend-process` with an exact
 mission and resume state. Closure hands off to quality and `starci-uat-verify`; consume their receipt
 before completing. A local test suite, screenshot count, or independent visual verdict cannot replace

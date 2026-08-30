@@ -61,6 +61,11 @@
       "id": "starci-workflow-diagnose",
       "capability": "workflow.diagnose",
       "description": "Diagnose one failed workflow from immutable evidence and return a report without repairing source or mutating external state."
+    },
+    {
+      "id": "starci-self-upgrade",
+      "capability": "runtime.self-upgrade",
+      "description": "Calibrate and improve one StarCi runtime behavior from reproducible evidence while keeping product source outside the mutation boundary."
     }
   ]
 }

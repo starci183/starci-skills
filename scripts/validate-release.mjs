@@ -32,6 +32,7 @@ const expectedSkills = [
   'starci-backend-process', 'starci-fe-process', 'starci-quality-assure',
   'starci-uat-verify', 'starci-release-manage', 'starci-platform-operate',
   'starci-workspace-manage', 'starci-git-publish', 'starci-workflow-diagnose',
+  'starci-self-upgrade',
 ].sort();
 const publicSkills = fs.readdirSync(resolve('skills'), { withFileTypes: true })
   .filter((entry) => entry.isDirectory() && entry.name.startsWith('starci-'))
@@ -43,10 +44,10 @@ if (packageJson.version !== '7.2.1' || catalog.systemVersion !== packageJson.ver
 }
 if (catalog.schemaVersion !== 7) fail('catalog must use schemaVersion 7');
 if (JSON.stringify(publicSkills) !== JSON.stringify(expectedSkills)) {
-  fail(`public skill directories differ from the twelve v7 mission skills: ${publicSkills.join(', ')}`);
+  fail(`public skill directories differ from the thirteen v7 mission skills: ${publicSkills.join(', ')}`);
 }
 if (JSON.stringify(catalog.skills.map(({ id }) => id).sort()) !== JSON.stringify(expectedSkills)) {
-  fail('catalog is not exactly the twelve public v7 mission skills');
+  fail('catalog is not exactly the thirteen public v7 mission skills');
 }
 for (const skill of publicSkills) {
   for (const required of ['SKILL.md', 'agents/openai.yaml', 'machine.json', 'input.schema.json', 'output.schema.json']) {
@@ -118,6 +119,6 @@ const siteCatalog = json('sites/skills/src/catalog.generated.json');
 if (sitePackage.version !== packageJson.version || siteCatalog.version !== packageJson.version) {
   fail('site and runtime versions differ');
 }
-if (siteCatalog.skills?.length !== 12) fail('generated site must expose exactly twelve Skills');
+if (siteCatalog.skills?.length !== 13) fail('generated site must expose exactly thirteen Skills');
 
-console.log(`release valid: 12 mission skills, ${operatorAudit.total} atomic operators, ${knowledgeIds.size} knowledge records`);
+console.log(`release valid: 13 mission skills, ${operatorAudit.total} atomic operators, ${knowledgeIds.size} knowledge records`);

@@ -89,7 +89,7 @@
           "description": "Closed reconciliation of observed interactions, visible owners, Grammar bindings, and responsive states.",
           "type": "object",
           "additionalProperties": false,
-          "required": ["observedInteractionRefs", "interactionDecisions", "surfaceOwnerRefs", "grammarBindingRefs", "responsiveStates"],
+          "required": ["observedInteractionRefs", "interactionDecisions", "surfaceOwnerRefs", "uiLawBindingRef", "uiDetailBindingRef", "grammarBindingRef", "grammarCoreRef", "packagedContractRefs", "visualDnaRef", "productFamilyEvidence", "responsiveStates"],
           "properties": {
             "observedInteractionRefs": {
               "type": "array",
@@ -120,12 +120,22 @@
               "uniqueItems": true,
               "items": { "type": "string", "minLength": 1 }
             },
-            "grammarBindingRefs": {
-              "type": "array",
-              "minItems": 1,
-              "maxItems": 128,
-              "uniqueItems": true,
-              "items": { "type": "string", "minLength": 1 }
+            "uiLawBindingRef": { "type": "string", "pattern": "^ui-law-binding://" },
+            "uiDetailBindingRef": { "type": "string", "pattern": "^ui-detail-binding://" },
+            "grammarBindingRef": { "type": "string", "pattern": "^grammar-binding://" },
+            "grammarCoreRef": { "type": "string", "pattern": "^grammar-core://" },
+            "packagedContractRefs": {
+              "type": "array", "minItems": 1, "maxItems": 128, "uniqueItems": true,
+              "items": { "type": "string", "pattern": "^grammar-package://" }
+            },
+            "visualDnaRef": { "type": "string", "pattern": "^visual-dna://" },
+            "productFamilyEvidence": {
+              "type": "object", "additionalProperties": false,
+              "required": ["productFamilyRef", "benchmarkRasterRefs"],
+              "properties": {
+                "productFamilyRef": { "type": "string", "pattern": "^product-family://" },
+                "benchmarkRasterRefs": { "type": "array", "minItems": 1, "maxItems": 16, "uniqueItems": true, "items": { "type": "string", "pattern": "sha256[-/][0-9a-f]{64}\\.(png|jpg|jpeg|webp)$" } }
+              }
             },
             "responsiveStates": {
               "type": "array",

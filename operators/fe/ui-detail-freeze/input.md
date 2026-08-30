@@ -8,4 +8,7 @@
 ## Input
 
 - `input.targetRef`: The one target owned by this atomic invocation.
+- `input.directionRef`: Exact selected direction whose destination semantics, progress presentation,
+  and fact hierarchy are being frozen.
+- `input.uiLawBindingRef`: Exact mandatory UI-law compilation governing those semantic details.
 - `input.constraints`: Closed constraints that bound this job without routing it.

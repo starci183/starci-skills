@@ -5,6 +5,10 @@ fingerprint, and visual round in the result. Round 1 is discovery, round 2 is ve
 is regression-only. If any repair remains in round 3, return `blocked`; never request or imply a fourth
 visual round.
 
+Copy the packet's opaque `dataEvidence` routing metadata without using it to influence pixel judgment.
+A visually passing live packet routes toward quality; a visually passing contract-fixture packet routes
+to the retained backend gap and can never certify live integration or completion.
+
 Falsify one frontend render packet with one fresh-context `gpt-5.6-sol` reviewer without repairing source.
 
 Use only the closed `context` and `input`. Return one typed `output.outcome` plus this job's result, gaps, and evidence. Do not route, persist a session, or choose another operator.
@@ -13,20 +17,27 @@ Frontend creation follows `AI-first -> Rules-first -> Grammar-last`. UX synthesi
 
 Browser proof must show native link semantics with the same real non-null href across hover, focus, keyboard, and click; a visible progress presentation for every contract-declared progress datum; and computed typography that keeps each compact numeric fact below its section title. Any contradiction is `FAIL`; this audit never repairs it.
 
-The parent Skill invokes exactly one reviewer with model `gpt-5.6-sol`, `contextIsolation=fresh`, and `forkTurns=none`. Its execution identity differs from the implementer. The reviewer receives only `input.blindReviewPacket`: opaque raster cells, probe phases, and capture fingerprints. Source code, DOM, measurements, tests, authority text, producer rationale, previous feedback, suspected defects, prior verdicts, and intended answers are absent from the reviewer context. A violation is `blocked`, never a degraded self-review.
+The parent Skill invokes exactly one reviewer with model `gpt-5.6-sol`, `contextIsolation=fresh`, and
+`forkTurns=none`. Its execution identity differs from the implementer. The reviewer receives only
+`input.blindReviewPacket`: opaque target raster cells, probe phases, capture fingerprints, opaque
+Grammar Core/package/DNA identity, and content-addressed benchmark rasters. Source code, DOM,
+measurements, tests, authority prose, producer rationale, previous feedback, suspected defects, prior
+verdicts, and intended answers are absent. A violation is `blocked`, never a degraded self-review.
 
 Inspect the rendered images themselves from the latest source mutation: the full-viewport screenshots and every cell in the frozen render-state matrix, including the uncropped host-context image captured with no viewport override, focused surface images, responsive views, lifecycle states, and applicable scroll/zoom/sticky/overlay evidence. A detached or differently sized viewport cannot certify the delivered host. A distant whole-page screenshot alone is incomplete because it can hide padding, ownership, clipping, and density defects. `lastScreenshotRef` identifies exactly one raster captured after the latest mutation; that raster needs its own inspection record and is the only visual artifact allowed to close `passed`.
 
 Use `ai-adversarial-pixel` review for the verdict. The AI is a hostile reviewer whose job is to find
 potential UX/UI defects, not to confirm the implementer's result. Once the raster is open, do not
 consult source code, DOM/computed styles, geometry, overflow measurements, CSS tests, lint,
-accessibility output, implementation rationale, current Grammar, or claimed intent. They are not
-consulted by this blind operator. The parent may consult them only after this operator records a visible potential defect and routes it to classification; they can never
+accessibility output, implementation rationale, Grammar source, or claimed intent. First falsify the
+target pixels without the benchmark; then compare product-family quality against only the frozen
+benchmark rasters and opaque Grammar identity. Excluded implementation artifacts are not consulted by
+this blind operator. The parent may consult them only after this operator records a visible potential defect and routes it to classification; they can never
 reinterpret the image or establish visual `passed`. A render that is visibly cramped, clipped,
 obscured, unbalanced, incoherent, hard to scan, or poor in its full-viewport context returns `repair`
 even when every measurement passes.
 
-This is a blind-pixel verdict. Every record must explicitly inspect vertical rhythm and every other
+This is a blind-pixel verdict. Every record must explicitly inspect product-family quality, vertical rhythm, and every other
 required visual lens before aggregation.
 
 Produce one typed inspection record per screenshot before choosing the aggregate outcome. Give every
@@ -57,6 +68,11 @@ rasters and invoke this operator again from a blank verdict. Never reuse screens
 defense across a mutation.
 
 For each applicable drag, page/internal scroll, sticky/fixed, zoom, and overlay behavior, exercise its limits and restoration after the latest mutation, then inspect fresh screenshots. Resting-state fidelity does not certify interaction stability.
+
+When the frozen packet records all three zoom phases as `tool-capability-unavailable`, do not infer a
+zoom PASS or FAIL from missing pixels. Review every remaining applicable raster normally and preserve
+the unsupported capability as an explicit limitation in the receipt. A mixed, partial, or raster-backed
+unsupported-zoom declaration is invalid.
 
 Judge skeleton and loading rasters independently from steady content. Also judge fresh rasters after
 scroll start/middle/end/restoration, every bounded-scroll limit/restoration, and zoom-in/zoom-out/

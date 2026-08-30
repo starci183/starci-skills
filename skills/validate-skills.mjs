@@ -181,7 +181,7 @@ function assertOpenAiInterface(skillId, skillDir) {
 
 const catalog = readJson(path.join(root, 'catalog.json'));
 if (catalog.schemaVersion !== 7 || catalog.systemVersion !== '7.2.1') fail('catalog must be v7.2.1');
-if (catalog.skills.length !== 12) fail(`v7 catalog must expose 12 skills, found ${catalog.skills.length}`);
+if (catalog.skills.length !== 13) fail(`v7 catalog must expose 13 skills, found ${catalog.skills.length}`);
 const catalogIds = catalog.skills.map((entry) => entry.id);
 if (new Set(catalogIds).size !== catalogIds.length) fail('catalog skill IDs must be unique');
 
@@ -226,4 +226,4 @@ if (globalAnalyzer.validateAnalyzeInput({ analyzerVersion: 2, skillId: 'starci-m
   fail('global analyzer accepts an unknown skill');
 }
 
-console.log('validated 12 public v7 mission skills');
+console.log('validated 13 public v7 mission skills');

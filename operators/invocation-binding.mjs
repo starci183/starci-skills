@@ -18,6 +18,8 @@ function manifestFromVisualPacket(packet) {
     visualRound: packet.visualRound,
     capturePartitionRefs: packet.capturePartitionRefs,
     reusedPartitionRefs: packet.reusedPartitionRefs,
+    dataEvidence: packet.dataEvidence,
+    productFamilyEvidence: packet.productFamilyEvidence,
     latestMutationFingerprint: packet.latestMutationFingerprint,
     capturedSourceFingerprint: packet.capturedSourceFingerprint,
     latestMutationAt: packet.latestMutationAt,
@@ -44,6 +46,7 @@ export function createOperatorInvocationBindingRegistry() {
         round: result.round,
         capturePartitionRefs: result.capturePartitionRefs,
         reusedPartitionRefs: result.reusedPartitionRefs,
+        dataEvidence: result.dataEvidence,
       };
       const prior = validatedPreflights.get(result.preflightRef);
       if (prior && JSON.stringify(prior) !== JSON.stringify(frozen)) throw new Error('validated capture preflight identity was already bound to a different freeze');
@@ -79,6 +82,7 @@ export function createOperatorInvocationBindingRegistry() {
       const reusedRefs = input.partitions.filter(({ disposition }) => disposition === 'reuse').map(({ partitionRef }) => partitionRef);
       if (!sameSequence(result.capturePartitionRefs, captureRefs) || !sameSequence(result.reusedPartitionRefs, reusedRefs)) errors.push('capture preflight partition disposition differs from invocation input');
       if (JSON.stringify(result.readinessChecks) !== JSON.stringify(input.readinessChecks)) errors.push('capture preflight readiness evidence differs from invocation input');
+      if (JSON.stringify(result.dataEvidence) !== JSON.stringify(input.dataEvidence)) errors.push('capture preflight data evidence differs from invocation input');
       return errors;
     }
     if (operatorId === 'quality/delivery-proof' && outputDocument?.output?.outcome === 'pass') {
@@ -125,6 +129,8 @@ export function createOperatorInvocationBindingRegistry() {
       if (result.partitionFingerprint !== preflight.partitionFingerprint) errors.push('render capture partition fingerprint differs from frozen preflight');
       if (JSON.stringify(result.visualRound) !== JSON.stringify(preflight.round)) errors.push('render capture visual round differs from frozen preflight');
       if (!sameSequence(result.capturePartitionRefs, preflight.capturePartitionRefs) || !sameSequence(result.reusedPartitionRefs, preflight.reusedPartitionRefs)) errors.push('render capture owner partitions differ from frozen preflight');
+      if (JSON.stringify(result.dataEvidence) !== JSON.stringify(preflight.dataEvidence) || JSON.stringify(result.blindReviewPacket?.dataEvidence) !== JSON.stringify(preflight.dataEvidence)) errors.push('render capture data evidence differs from frozen preflight');
+      if (JSON.stringify(result.productFamilyEvidence) !== JSON.stringify(input.productFamilyEvidence) || JSON.stringify(result.blindReviewPacket?.productFamilyEvidence) !== JSON.stringify(input.productFamilyEvidence)) errors.push('render capture product-family evidence differs from invocation input');
       const expectedCells = input.renderStates.flatMap((stateRef) => input.viewports.map((viewport) => `${stateRef}::${viewport}`));
       const actualCells = result.renderMatrix.map(({ stateRef, viewport }) => `${stateRef}::${viewport}`);
       if (!sameSequence(actualCells, expectedCells)) errors.push('render capture matrix differs from requested state and viewport order');
@@ -175,6 +181,8 @@ export function createOperatorInvocationBindingRegistry() {
     if (JSON.stringify(result.visualRound) !== JSON.stringify(packet.visualRound)) errors.push('visual round differs from supplied input');
     if (!sameSequence(result.packetRasterRefs ?? [], suppliedRasters)) errors.push('packet raster refs differ from supplied input order');
     if (result.lastScreenshotRef !== packet.lastScreenshotRef) errors.push('last screenshot differs from supplied input');
+    if (JSON.stringify(result.dataEvidence) !== JSON.stringify(packet.dataEvidence)) errors.push('visual fidelity data evidence differs from supplied packet');
+    if (JSON.stringify(result.productFamilyEvidence) !== JSON.stringify(packet.productFamilyEvidence)) errors.push('visual fidelity product-family evidence differs from supplied packet');
     if (result.reviewerExecutionRef !== context.reviewerExecutionRef) errors.push('reviewer execution differs from supplied context');
     if (result.reviewerModel !== context.reviewerModel || result.reviewerCount !== context.reviewerCount || result.contextIsolation !== context.contextIsolation || result.forkTurns !== context.forkTurns) errors.push('review execution policy differs from supplied context');
     if (returnReceipt && (returnReceipt.trace?.aiActivity?.principalFingerprint !== context.reviewerPrincipalFingerprint || returnReceipt.trace?.aiActivity?.contextFingerprint !== context.reviewerContextFingerprint)) errors.push('reviewer principal or fresh context differs from the runtime receipt');
@@ -185,12 +193,14 @@ export function createOperatorInvocationBindingRegistry() {
       if (!probeRecord || probeRecord.probeId !== probe.probeId || probeRecord.category !== probe.category || probeRecord.phase !== probe.phase || probeRecord.imageRef !== probe.imageRef || (probe.applicable ? probeRecord.verdict === 'not-applicable' : probeRecord.verdict !== 'not-applicable')) errors.push(`output probe at index ${index} differs from the supplied blind packet order`);
     });
     if (outputProbes.length !== packetProbes.length) errors.push('output probe records must bind one-to-one to the supplied blind packet');
-    if (outputDocument?.output?.outcome === 'passed') {
+    if (outputDocument?.output?.outcome === 'passed' || outputDocument?.output?.outcome === 'fixture-passed') {
       if (result.inspectionRecords?.some(({ verdict, lensVerdicts = [], challengeRecords = [] }) => verdict !== 'passed' || lensVerdicts.some(({ verdict: lensVerdict }) => lensVerdict === 'problem') || challengeRecords.some(({ disposition }) => disposition === 'confirmed'))) errors.push('visual problem or confirmed challenge forbids aggregate passed');
       if (result.probeRecords?.some(({ verdict }) => verdict === 'contradiction')) errors.push('probe contradiction forbids aggregate passed');
       if (result.lastScreenshotVerdict !== 'passed') errors.push('non-passing final screenshot forbids aggregate passed');
       if (result.uncertainty !== false) errors.push('reviewer uncertainty forbids aggregate passed');
     }
+    if (outputDocument?.output?.outcome === 'passed' && packet.dataEvidence?.mode !== 'live') errors.push('live visual pass requires live data evidence');
+    if (outputDocument?.output?.outcome === 'fixture-passed' && (packet.dataEvidence?.mode !== 'contract-fixture' || !packet.dataEvidence?.backendGapRef || !packet.dataEvidence?.backendProofReceiptRef)) errors.push('fixture visual pass requires a retained contract-fixture backend gap and consumed backend prove RETURN');
     return errors;
   }
 

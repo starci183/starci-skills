@@ -91,6 +91,7 @@ silently choosing.
 | `workspace` | StarCi logical workspace; repository checkout; Git worktree; product workbench | Use the canonical workspace vocabulary in `INDEX.md`; never select by nearby directory name. |
 | `test` | Unit/integration test; E2E; product UAT; AI evaluation; workflow harness | Bind from the object being proven. Ask when the proof type materially changes cost or definition of done. |
 | `AI work`, `AI chạy được` | Provider connectivity; model quality; product journey correctness; safe authority behavior | Name the proof dimensions rather than treating one successful response as completion. |
+| `self upgrade`, `nâng skill`, `test/kiểm chứng luồng skill` | Improvement of StarCi routing, Skill/operator behavior, efficiency, or result quality | Route to `starci-self-upgrade` when the runtime is the requested object. Treat product surfaces as read-only fixtures unless product mutation is separately explicit. |
 
 ## Normalized scope record
 

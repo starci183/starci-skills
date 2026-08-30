@@ -40,7 +40,10 @@
               "additionalProperties": false,
               "required": [
                 "summary",
-                "artifactRefs"
+                "artifactRefs",
+                "directionRef",
+                "uiLawBindingRef",
+                "uiDetailBindingRef"
               ],
               "properties": {
                 "summary": {
@@ -55,6 +58,18 @@
                     "type": "string",
                     "minLength": 1
                   }
+                },
+                "directionRef": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "uiLawBindingRef": {
+                  "type": "string",
+                  "pattern": "^ui-law-binding://"
+                },
+                "uiDetailBindingRef": {
+                  "type": "string",
+                  "pattern": "^ui-detail-binding://"
                 }
               }
             },

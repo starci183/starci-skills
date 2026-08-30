@@ -10,11 +10,12 @@
     "context": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["authorityRefs", "evidenceRefs", "uiKnowledgeId", "sourceFingerprint", "debug"],
+      "required": ["authorityRefs", "evidenceRefs", "uiKnowledgeId", "runtimeReadinessKnowledgeId", "sourceFingerprint", "debug"],
       "properties": {
         "authorityRefs": { "description": "Exact frozen frontend authority references.", "type": "array", "minItems": 1, "maxItems": 64, "uniqueItems": true, "items": { "type": "string", "minLength": 1 } },
         "evidenceRefs": { "description": "Exact deterministic runtime evidence references.", "type": "array", "maxItems": 64, "uniqueItems": true, "items": { "type": "string", "minLength": 1 } },
         "uiKnowledgeId": { "description": "Exact StarCi UI knowledge binding.", "const": "fe.ui" },
+        "runtimeReadinessKnowledgeId": { "description": "Exact frontend runtime and capture readiness knowledge binding.", "const": "fe.runtime-capture-readiness" },
         "sourceFingerprint": { "description": "Latest source fingerprint to freeze before capture.", "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
         "debug": { "description": "Preflight state and decisions must be visible in terminal debug.", "const": true }
       }
@@ -22,7 +23,7 @@
     "input": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["targetRef", "round", "matrix", "partitions", "readinessChecks"],
+      "required": ["targetRef", "round", "matrix", "partitions", "dataEvidence", "readinessChecks"],
       "properties": {
         "targetRef": { "description": "One closed frontend target.", "type": "string", "minLength": 1 },
         "round": {
@@ -67,18 +68,33 @@
             }
           }
         },
+        "dataEvidence": {
+          "description": "Live data proof or a content-addressed visual-evidence-only contract fixture with a retained backend gap.",
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["mode", "contractRef", "fixtureFingerprint", "backendGapRef", "backendProofReceiptRef", "fixtureScope", "productMutation"],
+          "properties": {
+            "mode": { "enum": ["live", "contract-fixture"] },
+            "contractRef": { "type": ["string", "null"], "minLength": 1 },
+            "fixtureFingerprint": { "type": ["string", "null"], "pattern": "^sha256:[0-9a-f]{64}$" },
+            "backendGapRef": { "type": ["string", "null"], "minLength": 1 },
+            "backendProofReceiptRef": { "description": "Exact starci-backend-process prove RETURN consumed before a fixture may substitute for unavailable live data.", "type": ["string", "null"], "pattern": "^receipt:[A-Za-z0-9._-]+$" },
+            "fixtureScope": { "enum": ["not-applicable", "visual-evidence-only"] },
+            "productMutation": { "const": false }
+          }
+        },
         "readinessChecks": {
           "description": "Exact ordered deterministic checks that must pass before Sol review.",
           "type": "array",
-          "minItems": 10,
-          "maxItems": 10,
+          "minItems": 14,
+          "maxItems": 14,
           "items": {
             "type": "object",
             "additionalProperties": false,
             "required": ["check", "verdict", "evidenceRef", "observation"],
             "properties": {
-              "check": { "enum": ["data-ready", "steady-not-skeleton", "state-content-valid", "controls-effective", "page-scroll-restored", "bounded-scroll-restored", "zoom-restored", "probe-complete", "raster-unique", "handoff-host-valid"] },
-              "verdict": { "enum": ["passed", "failed"] },
+              "check": { "enum": ["runtime-origin-valid", "dependency-graph-ready", "repository-reproducibility-recorded", "viewport-controls-effective", "data-ready", "steady-not-skeleton", "state-content-valid", "controls-effective", "page-scroll-restored", "bounded-scroll-restored", "zoom-restored", "probe-complete", "raster-unique", "handoff-host-valid"] },
+              "verdict": { "enum": ["passed", "failed", "not-applicable"] },
               "evidenceRef": { "type": "string", "minLength": 1 },
               "observation": { "type": "string", "minLength": 12 }
             }

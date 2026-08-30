@@ -54,7 +54,7 @@ purpose/content hypothesis, one composition/spacing hypothesis, and one interact
 hypothesis, then give each required visual lens its own verdict. A top-level PASS cannot override a
 confirmed challenge or a problem lens.
 
-Only after a potential defect is recorded may the workflow inspect `knowledge/ui.md`, routed Grammar,
+Only after a potential defect is recorded may the workflow inspect `knowledge/ui/INDEX.md`, its applicable law records, routed Grammar,
 source, DOM, or measurements to classify the smallest owner: implementation, reusable UI knowledge,
 Grammar, product authority, or another domain. Those authorities guide the repair; they cannot erase
 the pixel finding. Every repair invalidates the raster and restarts AI review without the previous

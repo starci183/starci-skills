@@ -6,6 +6,7 @@
 - `context.evidenceRefs`: Exact evidence references for this job.
 
 - `context.uiKnowledgeId`: Exact StarCi-native frontend UI knowledge binding.
+- `context.runtimeReadinessKnowledgeId`: Exact runtime/capture readiness knowledge binding.
 
 ## Input
 

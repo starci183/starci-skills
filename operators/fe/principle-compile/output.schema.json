@@ -3,87 +3,48 @@
   "$id": "https://starci.dev/v7.2/operators/fe/principle-compile/output.schema.json",
   "type": "object",
   "additionalProperties": false,
-  "required": [
-    "schemaVersion",
-    "operatorId",
-    "output"
-  ],
+  "required": ["schemaVersion", "operatorId", "output"],
   "properties": {
-    "schemaVersion": {
-      "const": 7
-    },
-    "operatorId": {
-      "const": "fe/principle-compile"
-    },
+    "schemaVersion": { "const": 7 },
+    "operatorId": { "const": "fe/principle-compile" },
     "output": {
       "type": "object",
       "additionalProperties": false,
-      "required": [
-        "outcome",
-        "result",
-        "gaps",
-        "evidenceRefs"
-      ],
+      "required": ["outcome", "result", "gaps", "evidenceRefs"],
       "properties": {
-        "outcome": {
-          "description": "Legacy semantic result consumed only by the Skill machine.",
-          "enum": [
-            "compiled",
-            "blocked"
-          ]
-        },
+        "outcome": { "description": "Whether every required UI law compiled successfully or a named gap blocked the target.", "enum": ["compiled", "blocked"] },
         "result": {
-          "description": "The atomic job result, or null when blocked.",
+          "description": "The evidence-bound UI-law compilation, or null when blocked.",
           "anyOf": [
             {
               "type": "object",
               "additionalProperties": false,
-              "required": [
-                "summary",
-                "artifactRefs"
-              ],
+              "required": ["summary", "artifactRefs", "directionRef", "uiLawAuthorityRef", "uiLawBindingRef", "lawChecks"],
               "properties": {
-                "summary": {
-                  "type": "string",
-                  "minLength": 1
-                },
-                "artifactRefs": {
-                  "type": "array",
-                  "maxItems": 64,
-                  "uniqueItems": true,
+                "summary": { "type": "string", "minLength": 1 },
+                "artifactRefs": { "type": "array", "minItems": 1, "maxItems": 64, "uniqueItems": true, "items": { "type": "string", "minLength": 1 } },
+                "directionRef": { "type": "string", "minLength": 1 },
+                "uiLawAuthorityRef": { "type": "string", "pattern": "^knowledge://ui-laws/" },
+                "uiLawBindingRef": { "type": "string", "pattern": "^ui-law-binding://" },
+                "lawChecks": {
+                  "type": "array", "minItems": 1, "maxItems": 64,
                   "items": {
-                    "type": "string",
-                    "minLength": 1
+                    "type": "object", "additionalProperties": false,
+                    "required": ["lawRef", "verdict", "evidenceRefs"],
+                    "properties": {
+                      "lawRef": { "type": "string", "pattern": "^ui-law://" },
+                      "verdict": { "const": "satisfied" },
+                      "evidenceRefs": { "type": "array", "minItems": 1, "maxItems": 16, "uniqueItems": true, "items": { "type": "string", "minLength": 1 } }
+                    }
                   }
                 }
               }
             },
-            {
-              "type": "null"
-            }
+            { "type": "null" }
           ]
         },
-        "gaps": {
-          "description": "Exact missing authority or evidence; empty when complete.",
-          "type": "array",
-          "maxItems": 32,
-          "uniqueItems": true,
-          "items": {
-            "type": "string",
-            "minLength": 1
-          }
-        },
-        "evidenceRefs": {
-          "description": "Exact evidence used to produce the result.",
-          "type": "array",
-          "maxItems": 64,
-          "uniqueItems": true,
-          "items": {
-            "type": "string",
-            "minLength": 1
-          },
-          "minItems": 1
-        }
+        "gaps": { "description": "Finite mandatory-law gaps that prevent compilation.", "type": "array", "maxItems": 32, "uniqueItems": true, "items": { "type": "string", "minLength": 1 } },
+        "evidenceRefs": { "description": "Exact evidence supporting the law-compilation outcome.", "type": "array", "minItems": 1, "maxItems": 64, "uniqueItems": true, "items": { "type": "string", "minLength": 1 } }
       }
     }
   }

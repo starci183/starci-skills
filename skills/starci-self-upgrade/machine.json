@@ -1,0 +1,371 @@
+{
+  "$schema": "../machine.schema.json",
+  "schemaVersion": 7,
+  "id": "starci-self-upgrade",
+  "start": "analyze-input",
+  "states": {
+    "analyze-input": {
+      "kind": "analysis",
+      "on": [
+        { "when": { "inputEquals": { "options.intentMode": "calibrate", "options.observationMode": "multi-task" } }, "target": "calibrate-actors-wait", "label": "wait for independent calibration actors" },
+        { "when": { "inputEquals": { "options.intentMode": "upgrade", "options.observationMode": "multi-task" } }, "target": "upgrade-actors-wait", "label": "wait for independent upgrade actors" },
+        { "when": { "inputEquals": { "options.intentMode": "calibrate", "options.observationMode": "single" } }, "target": "calibrate-baseline", "label": "check actual output before diagnosis" },
+        { "when": { "inputEquals": { "options.intentMode": "upgrade", "options.observationMode": "single" } }, "target": "upgrade-baseline", "label": "check actual output before approved repair" }
+      ]
+    },
+    "calibrate-actors-wait": {
+      "kind": "wait",
+      "approval": {
+        "prompt": "Wait for every registered independent actor to return its bounded evidence packet.",
+        "approve": "Resume with the complete actor result set.",
+        "reject": "Block because the required actor evidence is unavailable.",
+        "resumeTarget": "calibrate-baseline"
+      },
+      "on": [
+        { "when": { "allFacts": ["actor-results-ready"] }, "target": "calibrate-baseline" }
+      ]
+    },
+    "upgrade-actors-wait": {
+      "kind": "wait",
+      "approval": {
+        "prompt": "Wait for every registered independent actor to return its bounded evidence packet.",
+        "approve": "Resume with the complete actor result set.",
+        "reject": "Block because the required actor evidence is unavailable.",
+        "resumeTarget": "upgrade-baseline"
+      },
+      "on": [
+        { "when": { "allFacts": ["actor-results-ready"] }, "target": "upgrade-baseline" }
+      ]
+    },
+    "calibrate-baseline": {
+      "kind": "operator",
+      "ref": "quality/integration",
+      "on": [
+        { "when": { "outputEquals": { "outcome": "pass" } }, "target": "calibrate-pass-route", "label": "first correct output" },
+        { "when": { "outputEquals": { "outcome": "in-boundary" } }, "target": "calibrate-diagnose", "label": "wrong output requires layer diagnosis" },
+        { "when": { "outputEquals": { "outcome": "boundary-drift" } }, "target": "blocked", "label": "acceptance boundary changed" },
+        { "when": { "outputEquals": { "outcome": "external-blocker" } }, "target": "blocked", "label": "output could not be checked" }
+      ]
+    },
+    "calibrate-pass-route": {
+      "kind": "analysis",
+      "on": [
+        { "when": { "inputEquals": { "options.observationMode": "multi-task" } }, "target": "calibrate-stability-wait", "label": "require fresh per-actor stability results" },
+        { "when": { "inputEquals": { "options.observationMode": "single" } }, "target": "calibrate-stability", "label": "require one fresh stability result" }
+      ]
+    },
+    "calibrate-stability-wait": {
+      "kind": "wait",
+      "approval": {
+        "prompt": "Wait for every actor to rerun the unchanged acceptance with fresh fingerprints.",
+        "approve": "Resume with fresh per-actor stability evidence.",
+        "reject": "Block because stability evidence is unavailable.",
+        "resumeTarget": "calibrate-stability"
+      },
+      "on": [
+        { "when": { "allFacts": ["actor-results-ready"] }, "target": "calibrate-stability" }
+      ]
+    },
+    "calibrate-stability": {
+      "kind": "operator",
+      "ref": "quality/integration",
+      "on": [
+        { "when": { "outputEquals": { "outcome": "pass" } }, "target": "calibration-complete", "label": "second consecutive correct output" },
+        { "when": { "outputEquals": { "outcome": "in-boundary" } }, "target": "calibrate-diagnose", "label": "output is not stable" },
+        { "when": { "outputEquals": { "outcome": "boundary-drift" } }, "target": "blocked", "label": "acceptance boundary changed" },
+        { "when": { "outputEquals": { "outcome": "external-blocker" } }, "target": "blocked", "label": "stability output unavailable" }
+      ]
+    },
+    "calibrate-diagnose": {
+      "kind": "operator",
+      "ref": "quality/workflow-diagnose",
+      "on": [
+        { "when": { "outputEquals": { "outcome": "diagnosed" } }, "target": "blocked", "label": "diagnosis recorded; calibration cannot repair" },
+        { "when": { "outputEquals": { "outcome": "inconclusive" } }, "target": "blocked", "label": "smallest owner not proven" },
+        { "when": { "outputEquals": { "outcome": "external-blocker" } }, "target": "blocked", "label": "diagnostic evidence unavailable" }
+      ]
+    },
+    "upgrade-baseline": {
+      "kind": "operator",
+      "ref": "quality/integration",
+      "on": [
+        { "when": { "outputEquals": { "outcome": "pass" } }, "target": "upgrade-pass-route", "label": "first correct output" },
+        { "when": { "outputEquals": { "outcome": "in-boundary" } }, "target": "diagnose-1", "label": "wrong output requires layer diagnosis" },
+        { "when": { "outputEquals": { "outcome": "boundary-drift" } }, "target": "blocked", "label": "acceptance boundary changed" },
+        { "when": { "outputEquals": { "outcome": "external-blocker" } }, "target": "blocked", "label": "output could not be checked" }
+      ]
+    },
+    "upgrade-pass-route": {
+      "kind": "analysis",
+      "on": [
+        { "when": { "inputEquals": { "options.observationMode": "multi-task" } }, "target": "upgrade-stability-wait", "label": "require fresh per-actor stability results" },
+        { "when": { "inputEquals": { "options.observationMode": "single" } }, "target": "upgrade-stability", "label": "require one fresh stability result" }
+      ]
+    },
+    "upgrade-stability-wait": {
+      "kind": "wait",
+      "approval": {
+        "prompt": "Wait for every actor to rerun the unchanged acceptance with fresh fingerprints.",
+        "approve": "Resume with fresh per-actor stability evidence.",
+        "reject": "Block because stability evidence is unavailable.",
+        "resumeTarget": "upgrade-stability"
+      },
+      "on": [
+        { "when": { "allFacts": ["actor-results-ready"] }, "target": "upgrade-stability" }
+      ]
+    },
+    "upgrade-stability": {
+      "kind": "operator",
+      "ref": "quality/integration",
+      "on": [
+        { "when": { "outputEquals": { "outcome": "pass" } }, "target": "not-needed", "label": "output is already repeatedly correct" },
+        { "when": { "outputEquals": { "outcome": "in-boundary" } }, "target": "diagnose-1", "label": "single pass is unstable" },
+        { "when": { "outputEquals": { "outcome": "boundary-drift" } }, "target": "blocked", "label": "acceptance boundary changed" },
+        { "when": { "outputEquals": { "outcome": "external-blocker" } }, "target": "blocked", "label": "stability output unavailable" }
+      ]
+    },
+    "diagnose-1": {
+      "kind": "operator",
+      "ref": "quality/workflow-diagnose",
+      "on": [
+        { "when": { "outputEquals": { "outcome": "diagnosed" } }, "target": "repair-1", "label": "smallest owner proven" },
+        { "when": { "outputEquals": { "outcome": "inconclusive" } }, "target": "blocked", "label": "smallest owner not proven" },
+        { "when": { "outputEquals": { "outcome": "external-blocker" } }, "target": "blocked", "label": "diagnostic evidence unavailable" }
+      ]
+    },
+    "repair-1": {
+      "kind": "operator",
+      "ref": "quality/finding-repair",
+      "on": [
+        { "when": { "outputEquals": { "outcome": "repaired" } }, "target": "repair-1-route", "label": "reload repaired runtime before rerun" },
+        { "when": { "outputEquals": { "outcome": "stale-finding" } }, "target": "blocked", "label": "diagnosis became stale" },
+        { "when": { "outputEquals": { "outcome": "boundary-drift" } }, "target": "blocked", "label": "repair exceeded owner" },
+        { "when": { "outputEquals": { "outcome": "external-blocker" } }, "target": "blocked", "label": "repair unavailable" }
+      ]
+    },
+    "repair-1-route": {
+      "kind": "analysis",
+      "on": [
+        { "when": { "inputEquals": { "options.observationMode": "multi-task" } }, "target": "rerun-1-wait", "label": "notify reload and resume every actor" },
+        { "when": { "inputEquals": { "options.observationMode": "single" } }, "target": "retry-1", "label": "rerun unchanged acceptance" }
+      ]
+    },
+    "rerun-1-wait": {
+      "kind": "wait",
+      "approval": {
+        "prompt": "Wait for every actor to reload the new runtime fingerprint and rerun from its recorded state.",
+        "approve": "Resume with correlated reload and rerun receipts.",
+        "reject": "Block because actor reload or rerun evidence is unavailable.",
+        "resumeTarget": "retry-1"
+      },
+      "on": [
+        { "when": { "allFacts": ["actor-results-ready", "actor-runtime-reloaded"] }, "target": "retry-1" }
+      ]
+    },
+    "retry-1": {
+      "kind": "operator",
+      "ref": "quality/integration",
+      "on": [
+        { "when": { "outputEquals": { "outcome": "pass" } }, "target": "retry-1-pass-route", "label": "first fresh correct retry" },
+        { "when": { "outputEquals": { "outcome": "in-boundary" } }, "target": "diagnose-2", "label": "retry output still wrong" },
+        { "when": { "outputEquals": { "outcome": "boundary-drift" } }, "target": "blocked", "label": "acceptance boundary changed" },
+        { "when": { "outputEquals": { "outcome": "external-blocker" } }, "target": "blocked", "label": "retry output unavailable" }
+      ]
+    },
+    "retry-1-pass-route": {
+      "kind": "analysis",
+      "on": [
+        { "when": { "inputEquals": { "options.observationMode": "multi-task" } }, "target": "stability-1-wait", "label": "require fresh per-actor stability results" },
+        { "when": { "inputEquals": { "options.observationMode": "single" } }, "target": "stability-1", "label": "require one fresh stability result" }
+      ]
+    },
+    "stability-1-wait": {
+      "kind": "wait",
+      "approval": {
+        "prompt": "Wait for every actor's second consecutive result under the same runtime fingerprint.",
+        "approve": "Resume with fresh stability receipts.",
+        "reject": "Block because per-actor stability proof is unavailable.",
+        "resumeTarget": "stability-1"
+      },
+      "on": [
+        { "when": { "allFacts": ["actor-results-ready", "actor-runtime-reloaded"] }, "target": "stability-1" }
+      ]
+    },
+    "stability-1": {
+      "kind": "operator",
+      "ref": "quality/integration",
+      "on": [
+        { "when": { "outputEquals": { "outcome": "pass" } }, "target": "prove", "label": "second consecutive correct retry" },
+        { "when": { "outputEquals": { "outcome": "in-boundary" } }, "target": "diagnose-2", "label": "retry is unstable" },
+        { "when": { "outputEquals": { "outcome": "boundary-drift" } }, "target": "blocked", "label": "acceptance boundary changed" },
+        { "when": { "outputEquals": { "outcome": "external-blocker" } }, "target": "blocked", "label": "stability output unavailable" }
+      ]
+    },
+    "diagnose-2": {
+      "kind": "operator",
+      "ref": "quality/workflow-diagnose",
+      "on": [
+        { "when": { "outputEquals": { "outcome": "diagnosed" } }, "target": "repair-2", "label": "reclassify smallest owner" },
+        { "when": { "outputEquals": { "outcome": "inconclusive" } }, "target": "blocked", "label": "smallest owner not proven" },
+        { "when": { "outputEquals": { "outcome": "external-blocker" } }, "target": "blocked", "label": "diagnostic evidence unavailable" }
+      ]
+    },
+    "repair-2": {
+      "kind": "operator",
+      "ref": "quality/finding-repair",
+      "on": [
+        { "when": { "outputEquals": { "outcome": "repaired" } }, "target": "repair-2-route", "label": "reload repaired runtime before rerun" },
+        { "when": { "outputEquals": { "outcome": "stale-finding" } }, "target": "blocked", "label": "diagnosis became stale" },
+        { "when": { "outputEquals": { "outcome": "boundary-drift" } }, "target": "blocked", "label": "repair exceeded owner" },
+        { "when": { "outputEquals": { "outcome": "external-blocker" } }, "target": "blocked", "label": "repair unavailable" }
+      ]
+    },
+    "repair-2-route": {
+      "kind": "analysis",
+      "on": [
+        { "when": { "inputEquals": { "options.observationMode": "multi-task" } }, "target": "rerun-2-wait", "label": "notify reload and resume every actor" },
+        { "when": { "inputEquals": { "options.observationMode": "single" } }, "target": "retry-2", "label": "rerun unchanged acceptance" }
+      ]
+    },
+    "rerun-2-wait": {
+      "kind": "wait",
+      "approval": {
+        "prompt": "Wait for every actor to reload the second repaired runtime fingerprint and rerun.",
+        "approve": "Resume with correlated reload and rerun receipts.",
+        "reject": "Block because actor reload or rerun evidence is unavailable.",
+        "resumeTarget": "retry-2"
+      },
+      "on": [
+        { "when": { "allFacts": ["actor-results-ready", "actor-runtime-reloaded"] }, "target": "retry-2" }
+      ]
+    },
+    "retry-2": {
+      "kind": "operator",
+      "ref": "quality/integration",
+      "on": [
+        { "when": { "outputEquals": { "outcome": "pass" } }, "target": "retry-2-pass-route", "label": "first fresh correct retry" },
+        { "when": { "outputEquals": { "outcome": "in-boundary" } }, "target": "diagnose-3", "label": "retry output still wrong" },
+        { "when": { "outputEquals": { "outcome": "boundary-drift" } }, "target": "blocked", "label": "acceptance boundary changed" },
+        { "when": { "outputEquals": { "outcome": "external-blocker" } }, "target": "blocked", "label": "retry output unavailable" }
+      ]
+    },
+    "retry-2-pass-route": {
+      "kind": "analysis",
+      "on": [
+        { "when": { "inputEquals": { "options.observationMode": "multi-task" } }, "target": "stability-2-wait", "label": "require fresh per-actor stability results" },
+        { "when": { "inputEquals": { "options.observationMode": "single" } }, "target": "stability-2", "label": "require one fresh stability result" }
+      ]
+    },
+    "stability-2-wait": {
+      "kind": "wait",
+      "approval": {
+        "prompt": "Wait for every actor's second consecutive result under the same runtime fingerprint.",
+        "approve": "Resume with fresh stability receipts.",
+        "reject": "Block because per-actor stability proof is unavailable.",
+        "resumeTarget": "stability-2"
+      },
+      "on": [
+        { "when": { "allFacts": ["actor-results-ready", "actor-runtime-reloaded"] }, "target": "stability-2" }
+      ]
+    },
+    "stability-2": {
+      "kind": "operator",
+      "ref": "quality/integration",
+      "on": [
+        { "when": { "outputEquals": { "outcome": "pass" } }, "target": "prove", "label": "second consecutive correct retry" },
+        { "when": { "outputEquals": { "outcome": "in-boundary" } }, "target": "diagnose-3", "label": "retry is unstable" },
+        { "when": { "outputEquals": { "outcome": "boundary-drift" } }, "target": "blocked", "label": "acceptance boundary changed" },
+        { "when": { "outputEquals": { "outcome": "external-blocker" } }, "target": "blocked", "label": "stability output unavailable" }
+      ]
+    },
+    "diagnose-3": {
+      "kind": "operator",
+      "ref": "quality/workflow-diagnose",
+      "on": [
+        { "when": { "outputEquals": { "outcome": "diagnosed" } }, "target": "repair-3", "label": "final owner reclassification" },
+        { "when": { "outputEquals": { "outcome": "inconclusive" } }, "target": "blocked", "label": "smallest owner not proven" },
+        { "when": { "outputEquals": { "outcome": "external-blocker" } }, "target": "blocked", "label": "diagnostic evidence unavailable" }
+      ]
+    },
+    "repair-3": {
+      "kind": "operator",
+      "ref": "quality/finding-repair",
+      "on": [
+        { "when": { "outputEquals": { "outcome": "repaired" } }, "target": "repair-3-route", "label": "reload final repaired runtime before rerun" },
+        { "when": { "outputEquals": { "outcome": "stale-finding" } }, "target": "blocked", "label": "diagnosis became stale" },
+        { "when": { "outputEquals": { "outcome": "boundary-drift" } }, "target": "blocked", "label": "repair exceeded owner" },
+        { "when": { "outputEquals": { "outcome": "external-blocker" } }, "target": "blocked", "label": "repair unavailable" }
+      ]
+    },
+    "repair-3-route": {
+      "kind": "analysis",
+      "on": [
+        { "when": { "inputEquals": { "options.observationMode": "multi-task" } }, "target": "rerun-3-wait", "label": "notify reload and resume every actor" },
+        { "when": { "inputEquals": { "options.observationMode": "single" } }, "target": "retry-3", "label": "final unchanged-acceptance retry" }
+      ]
+    },
+    "rerun-3-wait": {
+      "kind": "wait",
+      "approval": {
+        "prompt": "Wait for every actor to reload the final repaired runtime fingerprint and rerun.",
+        "approve": "Resume with correlated reload and rerun receipts.",
+        "reject": "Block because actor reload or rerun evidence is unavailable.",
+        "resumeTarget": "retry-3"
+      },
+      "on": [
+        { "when": { "allFacts": ["actor-results-ready", "actor-runtime-reloaded"] }, "target": "retry-3" }
+      ]
+    },
+    "retry-3": {
+      "kind": "operator",
+      "ref": "quality/integration",
+      "on": [
+        { "when": { "outputEquals": { "outcome": "pass" } }, "target": "retry-3-pass-route", "label": "first fresh correct retry" },
+        { "when": { "outputEquals": { "outcome": "in-boundary" } }, "target": "blocked", "label": "third repair still produces wrong output" },
+        { "when": { "outputEquals": { "outcome": "boundary-drift" } }, "target": "blocked", "label": "acceptance boundary changed" },
+        { "when": { "outputEquals": { "outcome": "external-blocker" } }, "target": "blocked", "label": "retry output unavailable" }
+      ]
+    },
+    "retry-3-pass-route": {
+      "kind": "analysis",
+      "on": [
+        { "when": { "inputEquals": { "options.observationMode": "multi-task" } }, "target": "stability-3-wait", "label": "require fresh per-actor stability results" },
+        { "when": { "inputEquals": { "options.observationMode": "single" } }, "target": "stability-3", "label": "require one fresh stability result" }
+      ]
+    },
+    "stability-3-wait": {
+      "kind": "wait",
+      "approval": {
+        "prompt": "Wait for every actor's second consecutive result under the final runtime fingerprint.",
+        "approve": "Resume with fresh stability receipts.",
+        "reject": "Block because per-actor stability proof is unavailable.",
+        "resumeTarget": "stability-3"
+      },
+      "on": [
+        { "when": { "allFacts": ["actor-results-ready", "actor-runtime-reloaded"] }, "target": "stability-3" }
+      ]
+    },
+    "stability-3": {
+      "kind": "operator",
+      "ref": "quality/integration",
+      "on": [
+        { "when": { "outputEquals": { "outcome": "pass" } }, "target": "prove", "label": "second consecutive correct retry" },
+        { "when": { "outputEquals": { "outcome": "in-boundary" } }, "target": "blocked", "label": "third repair is unstable" },
+        { "when": { "outputEquals": { "outcome": "boundary-drift" } }, "target": "blocked", "label": "acceptance boundary changed" },
+        { "when": { "outputEquals": { "outcome": "external-blocker" } }, "target": "blocked", "label": "stability output unavailable" }
+      ]
+    },
+    "prove": {
+      "kind": "operator",
+      "ref": "quality/delivery-proof",
+      "on": [
+        { "when": { "outputEquals": { "outcome": "pass" } }, "target": "upgrade-complete", "label": "repeated output and runtime proof pass" },
+        { "when": { "outputEquals": { "outcome": "blocked" } }, "target": "blocked", "label": "terminal proof incomplete" }
+      ]
+    },
+    "calibration-complete": { "kind": "terminal", "result": "complete" },
+    "upgrade-complete": { "kind": "terminal", "result": "complete" },
+    "not-needed": { "kind": "terminal", "result": "not-needed" },
+    "blocked": { "kind": "terminal", "result": "blocked" }
+  }
+}

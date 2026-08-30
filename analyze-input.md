@@ -58,6 +58,11 @@ completion proof, and genuine ambiguities. Then compare only catalog metadata.
   `starci-fe-process`; frontend may call backend and then resume.
 - Select `starci-workflow-diagnose` only for an explicitly report-only failure diagnosis. A request to
   fix, finish, audit-to-green, or deliver belongs to the owning mutation Skill.
+- Select `starci-self-upgrade` when the requested object is the StarCi runtime itself: its routing,
+  Skill/operator behavior, execution speed, token or step efficiency, or reproducible output quality.
+  Product pages, screenshots, repositories, and worktrees supplied for such a request are calibration
+  fixtures, not product mutation authority. Ordinary product work does not become self-upgrade merely
+  because an AI or Skill participates.
 - Select `starci-git-publish` or `starci-release-manage` only when publication or release lifecycle is
   part of the active outcome; completion of code alone does not imply either action.
 - If no StarCi catalog capability owns the outcome, continue without a Skill while preserving verified

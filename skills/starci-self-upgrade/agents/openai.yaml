@@ -1,0 +1,6 @@
+interface:
+  display_name: "Self Upgrade"
+  short_description: "Calibrate and improve StarCi runtime behavior without touching product source."
+  default_prompt: "Use $starci-self-upgrade for one evidence-backed runtime improvement mission."
+policy:
+  allow_implicit_invocation: true
