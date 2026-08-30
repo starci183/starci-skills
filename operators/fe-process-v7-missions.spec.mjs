@@ -58,7 +58,8 @@ test('create page X auto-selects a dominant action without generating choices', 
   assert.deepEqual(validateFeInput(feInput('create','Create page X','new')), {valid:true,errors:[]});
   assert.equal(routed('dominant','classify'),'principle-compile');
   assert.equal(routed('compiled','principle-compile'),'ui-detail-freeze');
-  assert.equal(routed('detail-frozen','ui-detail-freeze'),'layout-compile');
+  assert.equal(routed('detail-frozen','ui-detail-freeze'),'iconography-resolve');
+  assert.equal(routed('resolved','iconography-resolve'),'layout-compile');
   assert.equal(routed('compiled','layout-compile'),'grammar-core-compile');
   assert.equal(routed('converged','grammar-core-compile'),'freeze');
 });

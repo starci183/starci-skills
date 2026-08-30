@@ -17,6 +17,7 @@ const grammarOutput = () => ({
       layoutCompilationRef: 'layout-compile://profile-v1',
       uiLawBindingRef: 'ui-law-binding://profile-v1',
       uiDetailBindingRef: 'ui-detail-binding://profile-v1',
+      iconographyManifestRef: 'iconography://profile-v1',
       grammarBindingRef: 'grammar-binding://profile-v1',
       grammarCoreRef: 'grammar-core://starci-v1',
       packagedContractRefs: ['grammar-package://surface-card'],
@@ -70,11 +71,13 @@ test('Grammar Core requires packaged contracts plus visual DNA and rejects token
 test('frontend machine freezes law-governed semantic detail before layout and Grammar Core, all before source apply', () => {
   assert.equal(machine.states.classify.on.find((edge) => edge.when?.outputEquals?.outcome === 'dominant').target, 'principle-compile');
   assert.equal(machine.states['principle-compile'].on.find((edge) => edge.when.outputEquals.outcome === 'compiled').target, 'ui-detail-freeze');
-  assert.equal(machine.states['ui-detail-freeze'].on.find((edge) => edge.when.outputEquals.outcome === 'detail-frozen').target, 'layout-compile');
+  assert.equal(machine.states['ui-detail-freeze'].on.find((edge) => edge.when.outputEquals.outcome === 'detail-frozen').target, 'iconography-resolve');
+  assert.equal(machine.states['iconography-resolve'].on.find((edge) => edge.when.outputEquals.outcome === 'resolved').target, 'layout-compile');
   assert.equal(machine.states['layout-compile'].on.find((edge) => edge.when.outputEquals.outcome === 'compiled').target, 'grammar-core-compile');
   assert.equal(machine.states['grammar-core-compile'].on.find((edge) => edge.when.outputEquals.outcome === 'converged').target, 'freeze');
   assert.equal(machine.states.freeze.on.find((edge) => edge.when.outputEquals.outcome === 'frozen').target, 'mutation-freeze');
-  assert.equal(machine.states['mutation-freeze'].on.find((edge) => edge.when.outputEquals.outcome === 'frozen').target, 'apply');
+  assert.equal(machine.states['mutation-freeze'].on.find((edge) => edge.when.outputEquals.outcome === 'frozen').target, 'media-produce');
+  assert.equal(machine.states['media-produce'].on.find((edge) => edge.when.outputEquals.outcome === 'ready').target, 'apply');
   assert.equal(machine.states['choice-resume-route'].on.find((edge) => edge.when.inputEquals['resume.resumeState'] === 'direction-choice').target, 'principle-compile');
 });
 
@@ -106,6 +109,7 @@ test('source apply fails closed without law and packaged Grammar/DNA bindings', 
       packagedContractRefs: ['grammar-package://surface-card'],
       visualDnaRef: 'visual-dna://starci-v1',
       mediaDecisionRef: 'media-decision://profile-v1',
+      mediaManifestRef: 'media-manifest://profile-v1',
     },
   };
   assert.deepEqual(validateSourceApplyInput(value), { valid: true, errors: [] });

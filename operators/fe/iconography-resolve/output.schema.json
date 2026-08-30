@@ -1,0 +1,50 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://starci.dev/v7.4/operators/fe/iconography-resolve/output.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "operatorId", "output"],
+  "properties": {
+    "schemaVersion": { "const": 7 },
+    "operatorId": { "const": "fe/iconography-resolve" },
+    "output": {
+      "type": "object", "additionalProperties": false,
+      "required": ["outcome", "result", "gaps", "evidenceRefs"],
+      "properties": {
+        "outcome": { "description": "Typed result routed only by the parent Skill.", "enum": ["resolved", "blocked"] },
+        "result": {
+          "description": "Resolved iconography manifest, or null when blocked.",
+          "anyOf": [
+            {
+              "type": "object", "additionalProperties": false,
+              "required": ["summary", "iconographyManifestRef", "visualFamilyRef", "decisions"],
+              "properties": {
+                "summary": { "type": "string", "minLength": 1 },
+                "iconographyManifestRef": { "type": "string", "pattern": "^iconography://" },
+                "visualFamilyRef": { "type": "string", "pattern": "^icon-family://" },
+                "decisions": {
+                  "type": "array", "minItems": 1, "maxItems": 64,
+                  "items": {
+                    "type": "object", "additionalProperties": false,
+                    "required": ["roleRef", "meaningAuthorityRef", "source", "glyphRef", "catalogSearchRefs", "customReason"],
+                    "properties": {
+                      "roleRef": { "type": "string", "pattern": "^semantic-icon://" },
+                      "meaningAuthorityRef": { "type": "string", "pattern": "^(business|ui-law|grammar)://" },
+                      "source": { "enum": ["heroicons", "custom-svg"] },
+                      "glyphRef": { "type": "string", "minLength": 1 },
+                      "catalogSearchRefs": { "type": "array", "minItems": 1, "maxItems": 16, "uniqueItems": true, "items": { "type": "string", "pattern": "^icon-catalog://" } },
+                      "customReason": { "type": ["string", "null"], "minLength": 1 }
+                    }
+                  }
+                }
+              }
+            },
+            { "type": "null" }
+          ]
+        },
+        "gaps": { "description": "Exact missing authority or catalog evidence.", "type": "array", "maxItems": 64, "uniqueItems": true, "items": { "type": "string", "minLength": 1 } },
+        "evidenceRefs": { "description": "Exact evidence used by this decision.", "type": "array", "minItems": 1, "maxItems": 64, "uniqueItems": true, "items": { "type": "string", "minLength": 1 } }
+      }
+    }
+  }
+}

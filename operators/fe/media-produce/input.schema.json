@@ -1,0 +1,37 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://starci.dev/v7.4/operators/fe/media-produce/input.schema.json",
+  "type": "object", "additionalProperties": false,
+  "required": ["schemaVersion", "operatorId", "context", "input"],
+  "properties": {
+    "schemaVersion": { "const": 7 },
+    "operatorId": { "const": "fe/media-produce" },
+    "context": {
+      "type": "object", "additionalProperties": false,
+      "required": ["evidenceRefs", "authorityRevision"],
+      "properties": {
+        "evidenceRefs": { "description": "Exact media decision and brief evidence.", "type": "array", "minItems": 1, "maxItems": 64, "uniqueItems": true, "items": { "type": "string", "minLength": 1 } },
+        "authorityRevision": { "description": "Exact approved authority revision binding this invocation.", "type": "string", "minLength": 1 }
+      }
+    },
+    "input": {
+      "type": "object", "additionalProperties": false,
+      "required": ["targetRef", "mediaDecisionRef", "mutationBoundaryRef", "mode", "assetBriefRef", "approvedReusableAssetRef", "outputPath", "constraints"],
+      "properties": {
+        "targetRef": { "description": "One closed frontend target.", "type": "string", "minLength": 1 },
+        "mediaDecisionRef": { "description": "Exact frozen media decision.", "type": "string", "pattern": "^media-decision://" },
+        "mutationBoundaryRef": { "description": "Authorized output boundary for generated files.", "type": "string", "pattern": "^mutation-boundary://" },
+        "mode": { "description": "Already-frozen no-media, reuse, or generate mode.", "enum": ["none", "reuse", "generate"] },
+        "assetBriefRef": { "description": "Frozen reusable-asset or generation brief.", "type": ["string", "null"], "minLength": 1 },
+        "approvedReusableAssetRef": { "description": "Exact approved asset authority for reuse mode.", "type": ["string", "null"], "minLength": 1 },
+        "outputPath": { "description": "Authorized raster path only for generated media.", "type": ["string", "null"], "minLength": 1 },
+        "constraints": { "description": "Closed production constraints.", "type": "array", "maxItems": 64, "uniqueItems": true, "items": { "type": "string", "minLength": 1 } }
+      },
+      "allOf": [
+        { "if": { "properties": { "mode": { "const": "none" } }, "required": ["mode"] }, "then": { "properties": { "assetBriefRef": { "type": "null" }, "approvedReusableAssetRef": { "type": "null" }, "outputPath": { "type": "null" } } } },
+        { "if": { "properties": { "mode": { "const": "reuse" } }, "required": ["mode"] }, "then": { "properties": { "assetBriefRef": { "type": "string" }, "approvedReusableAssetRef": { "type": "string" }, "outputPath": { "type": "null" } } } },
+        { "if": { "properties": { "mode": { "const": "generate" } }, "required": ["mode"] }, "then": { "properties": { "assetBriefRef": { "type": "string", "pattern": "^media-brief://" }, "approvedReusableAssetRef": { "type": "null" }, "outputPath": { "type": "string", "pattern": "\\.(png|jpg|jpeg|webp)$" } } } }
+      ]
+    }
+  }
+}

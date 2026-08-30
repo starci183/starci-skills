@@ -1,0 +1,16 @@
+{
+  "schemaVersion": 7,
+  "id": "fe/iconography-resolve",
+  "domain": "fe",
+  "job": "Resolve one closed semantic iconography set from authority and an approved catalog.",
+  "inputSchema": "input.schema.json",
+  "outputSchema": "output.schema.json",
+  "contextRefs": [],
+  "sourceReferenceRefs": [],
+  "sideEffects": [],
+  "stopConditions": [
+    "a visible icon meaning lacks business, UI-law, or Grammar authority",
+    "the approved icon catalog was not searched before proposing a custom glyph",
+    "one visual layer would mix icon families or optical weights"
+  ]
+}

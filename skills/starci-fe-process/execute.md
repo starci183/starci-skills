@@ -6,7 +6,7 @@ direction comparison through `visualize`, and carry the `frontend-direction-visu
 fact. Never ask the user to imagine a frontend direction from prose.
 
 Whether the direction is dominant or selected after a wait, route it through the mandatory chain
-`fe/principle-compile -> fe/ui-detail-freeze -> fe/layout -> fe/grammar-convergence -> fe/contract-freeze`.
+`fe/principle-compile -> fe/ui-detail-freeze -> fe/iconography-resolve -> fe/layout -> fe/grammar-convergence -> fe/contract-freeze -> fe/mutation-boundary-freeze -> fe/media-produce -> fe/source-apply`.
 `fe/source-apply` is unreachable until the contract binds both the complete `knowledge/ui` law result
 and the routed Grammar Core packages + visual DNA. A purposeful empty media slot additionally requires
 a frozen AI-image brief, placement, responsive treatment, alt intent, and fallback; filler for layout

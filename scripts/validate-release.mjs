@@ -20,6 +20,8 @@ for (const required of [
   'runtime/config.schema.json', 'runtime/receipt.schema.json', 'runtime/topology.schema.json',
   'runtime/contracts/grammar-decision.schema.json', 'runtime/contracts/grammar-decision.mjs',
   'runtime/contracts/grammar-proposal.schema.json', 'runtime/contracts/grammar-proposal.mjs',
+  'runtime/contracts/grammar-audit.schema.json', 'runtime/contracts/grammar-audit.mjs',
+  'knowledge/grammar/common/audit.md',
   'knowledge/grammar/common/semantic-composition.md',
   'knowledge/grammar/common/semantic-color.md',
   'knowledge/grammar/common/application-composition-boundary.md',

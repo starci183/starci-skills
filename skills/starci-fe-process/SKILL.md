@@ -40,6 +40,13 @@ must produce a proposal and wait for explicit teacher approval before adding or 
 Proposal eligibility, visual similarity, repeated code, or implementation convenience never count as
 publication authority.
 
+Iconography is resolved as its own atomic authority boundary before layout compilation. Every glyph
+starts from a frozen business, UI-law, or Grammar semantic role and searches the approved icon catalog
+first. Prefer the exact upstream Heroicon; custom SVG is allowed only when the catalog has no faithful
+meaning and must ship from a frozen brief with the same viewBox, outline/compact cuts, stroke, corners,
+optical weight, accessibility role, and fixtures as the selected icon family. Page code never picks a
+glyph directly or mixes families within one navigation layer.
+
 Every open-ended AI brainstorm or review is completed end to end by exactly one fresh `gpt-5.6-sol` execution with `forkTurns=none`; same-context self-review is not a fallback path. The parent Skill performs the call and routing while every operator remains atomic. With runtime `debug=true`, every AI `CALL`, `RETURN`, and `TRANSITION` is emitted to the terminal with normalized input, expected output, actual output, evidence fingerprints, per-raster inspection records, confirmed findings, and verdict. Never emit secrets or hidden reasoning. Missing a required debug inspection record blocks visual `PASS`.
 
 After runtime observation and before semantic/UX/UI audit, run `fe/product-potential` as mandatory
@@ -106,6 +113,8 @@ The capture count is not the review. Once a screenshot is captured, enter blind 
 
 Before any visual verdict, emit one inspection record for every screenshot cell covering page inset, surface opacity, content-to-border padding, alignment, vertical rhythm, hierarchy, visual ownership, pinned-boundary clearance, wrapping, clipping, occlusion, semantic utility, content coherence, affordance, responsive composition, visual consistency, and empty-space balance. Assign every visible heading, label, status, value, action, and control to the rendered section owner a user without source knowledge would perceive; an external label row plus its framed surface may be one legitimate owner, so DOM ancestry and frame containment are not proof. Inspect the owner with the preceding and following peers and inspect every sticky/fixed edge against its nearest content at scroll start, middle, and terminal. “No overlap” cannot pass a surface that visibly touches or is cut off by a pinned boundary. Challenge every visible object: what user purpose does it serve here, is it understandable without implementation context, is it redundant or stale, and does its prominence match its value? A meaningless object includes debug residue, placeholder copy, duplicated actions, decorative noise, orphan labels, empty shells, misleading controls, or large dead zones without a user purpose; any of these is `repair`. An object visually bound to the wrong sibling or floating between owners, text touching a rounded border, content visible through a sticky/fixed surface, an action cut by an edge, inconsistent peer insets, weak or conflicting hierarchy, or desktop merely squeezed into compact are also `repair` even when controls remain technically reachable.
 
+Before capture or visual `PASS`, produce a validated `grammar-audit` record for every changed visual owner. Audit wide, intermediate, compact, and every affected breakpoint, collapse, expansion, or drawer state. Fail the record when a boundary or inset has more than one visual owner, a control violates its required inline clearance, more than one divider expresses the same separation, or icons are unbound or mix visual families. Source ownership, measurements, and manifests may diagnose these failures, but they cannot waive them.
+
 Freeze a render-state matrix and owner partition map before capture. It includes every in-scope entry, task, skeleton,
 loading, pending, empty, recovery, result, and exit state at every required viewport, plus the exact
 state that will be left visible at handoff. Skeleton and loading are independent visual products, not
@@ -165,7 +174,8 @@ generate a purpose-built bitmap. When a sound, content-complete composition inte
 otherwise empty media space for an approved user purpose, reuse a suitable approved asset when one
 exists; otherwise `generate` is mandatory. Freeze the purpose, owner/placement, asset authority or
 generation brief, responsive crop/contain treatment, alt intent, and no-image
-fallback before asset production. A generated asset returns to the ordinary source-apply and complete
+fallback before asset production. `fe/media-produce` owns reuse/generation after the exact mutation
+boundary is frozen; `source-apply` may only consume its immutable media manifest. A generated asset returns to the ordinary source-apply and complete
 render-review loop. Decorative filler, a weak layout, missing content, weak hierarchy, or an unexplained
 dead zone must be repaired at its owner and can never be concealed by image generation.
 Cross-domain gaps hand off to `starci-business-process` or `starci-backend-process` with an exact

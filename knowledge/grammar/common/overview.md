@@ -24,6 +24,7 @@ Route additional Common knowledge by need:
 - Semantic composition inventory and brainstorm filtering: `fe.grammar-common-semantic-composition`.
 - Grammar versus application block ownership and proposal approval: `fe.grammar-common-application-composition-boundary`.
 - Semantic color roles and accent ownership: `fe.grammar-common-semantic-color`.
+- Rendered owner, inset, divider, responsive and iconography audit: `fe.grammar-common-audit`.
 - Interface or object identity: `fe.grammar-common-capabilities`.
 - Neutral states or interaction semantics: `fe.grammar-common-states-accessibility`.
 - Nested surfaces: `fe.grammar-common-case-surface-inside-surface`.

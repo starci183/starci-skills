@@ -4,7 +4,7 @@ Freeze one selected frontend direction into one executable contract.
 
 Reconcile every interaction found by runtime observation. Each one must be preserved, or explicitly
 removed/replaced with authority and rationale. Freeze visible surface owners, the mandatory UI-law
-binding, the law-governed semantic-detail binding, the pre-source Grammar Core binding, its packaged component/object contracts, visual DNA,
+binding, the law-governed semantic-detail binding, the semantic iconography manifest, the pre-source Grammar Core binding, its packaged component/object contracts, visual DNA,
 product-family evidence, and one state for wide, intermediate, and compact. A visual direction never authorizes silent behavior
 deletion. Missing reconciliation is `blocked`, not an implicit design choice.
 

@@ -408,6 +408,20 @@
       "on": [
         {
           "when": { "outputEquals": { "outcome": "detail-frozen" } },
+          "target": "iconography-resolve"
+        },
+        {
+          "when": { "outputEquals": { "outcome": "blocked" } },
+          "target": "blocked"
+        }
+      ]
+    },
+    "iconography-resolve": {
+      "kind": "operator",
+      "ref": "fe/iconography-resolve",
+      "on": [
+        {
+          "when": { "outputEquals": { "outcome": "resolved" } },
           "target": "layout-compile"
         },
         {
@@ -808,6 +822,20 @@
         }
       ]
     },
+    "media-produce": {
+      "kind": "operator",
+      "ref": "fe/media-produce",
+      "on": [
+        {
+          "when": { "outputEquals": { "outcome": "ready" } },
+          "target": "apply"
+        },
+        {
+          "when": { "outputEquals": { "outcome": "blocked" } },
+          "target": "blocked"
+        }
+      ]
+    },
     "mutation-freeze": {
       "kind": "operator",
       "ref": "fe/mutation-boundary-freeze",
@@ -818,7 +846,7 @@
               "outcome": "frozen"
             }
           },
-          "target": "apply"
+          "target": "media-produce"
         },
         {
           "when": {

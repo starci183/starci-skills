@@ -249,7 +249,7 @@
                   "description": "Executable preservation contract carried into mutation and proof.",
                   "type": "object",
                   "additionalProperties": false,
-                  "required": ["observedInteractionRefs", "interactionDecisions", "surfaceOwnerRefs", "uiLawBindingRef", "uiDetailBindingRef", "grammarBindingRef", "grammarCoreRef", "packagedContractRefs", "visualDnaRef", "productFamilyEvidence", "responsiveStates"],
+                  "required": ["observedInteractionRefs", "interactionDecisions", "surfaceOwnerRefs", "uiLawBindingRef", "uiDetailBindingRef", "iconographyManifestRef", "grammarBindingRef", "grammarCoreRef", "packagedContractRefs", "visualDnaRef", "productFamilyEvidence", "responsiveStates"],
                   "properties": {
                     "observedInteractionRefs": {
                       "type": "array",
@@ -282,6 +282,7 @@
                     },
                     "uiLawBindingRef": { "type": "string", "pattern": "^ui-law-binding://" },
                     "uiDetailBindingRef": { "type": "string", "pattern": "^ui-detail-binding://" },
+                    "iconographyManifestRef": { "type": "string", "pattern": "^iconography://" },
                     "grammarBindingRef": { "type": "string", "pattern": "^grammar-binding://" },
                     "grammarCoreRef": { "type": "string", "pattern": "^grammar-core://" },
                     "packagedContractRefs": {

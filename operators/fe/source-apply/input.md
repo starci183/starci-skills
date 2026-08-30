@@ -19,4 +19,7 @@
 - `input.grammarBindingRef`, `input.grammarCoreRef`, `input.packagedContractRefs`, and
   `input.visualDnaRef`: Exact
   pre-source Grammar Core compilation. Token-only or post-mutation styling is not a valid substitute.
+- `input.iconographyManifestRef`: Exact semantic iconography manifest; application code never chooses
+  a nearby glyph or custom drawing outside this binding.
 - `input.mediaDecisionRef`: Exact frozen media decision; generated assets must already have a frozen brief.
+- `input.mediaManifestRef`: Exact fulfilled no-media/reuse/generate manifest from `fe/media-produce`.

@@ -23,6 +23,7 @@ const output = (mediaDecision) => ({
         surfaceOwnerRefs: ['surface://profile'],
         uiLawBindingRef: 'ui-law-binding://profile-v1',
         uiDetailBindingRef: 'ui-detail-binding://profile-v1',
+        iconographyManifestRef: 'iconography://profile-v1',
         grammarBindingRef: 'grammar-binding://profile-v1',
         grammarCoreRef: 'grammar-core://starci-v1',
         packagedContractRefs: ['grammar-package://surface-list-card'],

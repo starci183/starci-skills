@@ -1,0 +1,16 @@
+{
+  "schemaVersion": 7,
+  "id": "fe/media-produce",
+  "domain": "fe",
+  "job": "Materialize one frozen frontend media decision before source composition.",
+  "inputSchema": "input.schema.json",
+  "outputSchema": "output.schema.json",
+  "contextRefs": [],
+  "sourceReferenceRefs": [],
+  "sideEffects": ["write one authorized media artifact when mode is generate"],
+  "stopConditions": [
+    "the media decision or mutation boundary is missing or stale",
+    "generation would conceal a layout or content defect",
+    "the produced artifact lacks provenance, responsive treatment, alt intent, or fallback"
+  ]
+}
