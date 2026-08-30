@@ -28,4 +28,9 @@ Load named cases only when their trigger matches:
 - Multi-step form with global progress: `fe.grammar-core-case-multi-step-form`.
 - Sticky summary beside long content: `fe.grammar-core-case-sticky-summary`.
 
+Load semantic patterns when their trigger matches:
+
+- Eyebrow, contextual heading, and muted supporting copy: `fe.grammar-core-pattern-context-intro`.
+- Complementary right rail with owned inset and optional sticky lifecycle: `fe.grammar-core-pattern-right-rail`.
+
 Global laws: one calm page field, few meaningful surface levels, consistent radius/border/elevation, one dominant action per decision region, state reinforced by more than color, and responsive order derived from the task.

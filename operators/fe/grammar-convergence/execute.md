@@ -10,6 +10,12 @@ the exact visual-DNA identity, the product-family identity, and content-addresse
 Issue a `grammarBindingRef` only at `before-source-mutation`; never treat Grammar as cosmetic cleanup
 after layout or after source apply.
 
+Validate a Grammar 7.4 decision manifest for every visible semantic owner. Generic visual and
+interaction anatomy must bind published Grammar; business-derived anatomy must be classified as an
+application block/composite whose constituents still bind Grammar. When the needed generic pattern
+is absent, return `grammar-gap` with proposal references. Do not add or export the pattern until an
+explicit teacher approval is bound to its exact pattern fingerprint.
+
 Use only the closed `context` and `input`. Return one typed `output.outcome` plus this job's result, gaps, and evidence. Do not route, persist a session, or choose another operator.
 
 Frontend creation follows `AI-first -> Rules-first -> Grammar-last`. Direction synthesis, mandatory

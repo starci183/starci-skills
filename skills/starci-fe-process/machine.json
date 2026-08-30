@@ -374,8 +374,31 @@
           "target": "freeze"
         },
         {
+          "when": { "outputEquals": { "outcome": "grammar-gap" } },
+          "target": "grammar-proposal-choice"
+        },
+        {
           "when": { "outputEquals": { "outcome": "refused" } },
           "target": "blocked"
+        }
+      ]
+    },
+    "grammar-proposal-choice": {
+      "kind": "wait",
+      "approval": {
+        "prompt": "Review and approve or reject the exact proposed public Grammar pattern before any package export is added.",
+        "approve": "Authorize only the proposed anatomy bound by its pattern fingerprint.",
+        "reject": "Keep the pattern application-owned and do not publish it.",
+        "resumeTarget": "analyze-input"
+      },
+      "on": [
+        {
+          "when": {
+            "allFacts": [
+              "grammar-proposal-decision-recorded"
+            ]
+          },
+          "target": "analyze-input"
         }
       ]
     },
@@ -870,6 +893,14 @@
             }
           },
           "target": "principle-compile"
+        },
+        {
+          "when": {
+            "inputEquals": {
+              "resume.resumeState": "grammar-proposal-choice"
+            }
+          },
+          "target": "grammar-core-compile"
         },
         {
           "when": {

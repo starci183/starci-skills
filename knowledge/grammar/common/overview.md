@@ -21,6 +21,9 @@ Never mix Core and Offset Pop in one application Grammar decision. The installed
 
 Route additional Common knowledge by need:
 
+- Semantic composition inventory and brainstorm filtering: `fe.grammar-common-semantic-composition`.
+- Grammar versus application block ownership and proposal approval: `fe.grammar-common-application-composition-boundary`.
+- Semantic color roles and accent ownership: `fe.grammar-common-semantic-color`.
 - Interface or object identity: `fe.grammar-common-capabilities`.
 - Neutral states or interaction semantics: `fe.grammar-common-states-accessibility`.
 - Nested surfaces: `fe.grammar-common-case-surface-inside-surface`.
@@ -29,4 +32,8 @@ Route additional Common knowledge by need:
 - Small-screen boundary changes: `fe.grammar-common-case-responsive-flattening`.
 - Reuse, extension, or missing capability: `fe.grammar-common-extension`.
 
-Grammar must never own an actor, product entity, price, entitlement, policy, workflow outcome, or business-named state. Application Product Blocks map domain meaning to neutral Grammar state.
+Grammar must never own an actor, product entity, price, entitlement, policy, workflow outcome, or
+business-named state. Application blocks and composites map domain meaning to published Grammar
+authority. They may own business-specific anatomy and ordering, but may not reconstruct generic
+buttons, copy hierarchies, fields, surfaces, navigation, rails, workspaces, or responsive behavior.
+Any proposed new public Grammar interface requires explicit teacher approval before source mutation.

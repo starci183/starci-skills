@@ -4,6 +4,7 @@
   "additionalProperties": false,
   "required": [
     "version",
+    "grammarContractVersion",
     "debug",
     "aiBrainstormModel",
     "aiBrainstormCount",
@@ -17,6 +18,7 @@
   ],
   "properties": {
     "version": { "const": "7.2.1" },
+    "grammarContractVersion": { "const": "7.4.0" },
     "debug": { "type": "boolean" },
     "aiBrainstormModel": { "const": "gpt-5.6-sol" },
     "aiBrainstormCount": { "const": 1 },

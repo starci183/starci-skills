@@ -59,6 +59,7 @@
                 "comparisonArtifactRef",
                 "directionCount",
                 "directions",
+                "grammarFilterRecords",
                 "materialDifferences"
               ],
               "properties": {
@@ -102,6 +103,7 @@
                       "wideStateRef",
                       "compactStateRef",
                       "materialStateRef",
+                      "grammarDecisionManifestRef",
                       "tradeoff"
                     ],
                     "properties": {
@@ -111,7 +113,26 @@
                       "wideStateRef": { "type": "string", "minLength": 1 },
                       "compactStateRef": { "type": "string", "minLength": 1 },
                       "materialStateRef": { "type": "string", "minLength": 1 },
+                      "grammarDecisionManifestRef": { "type": "string", "pattern": "^grammar://" },
                       "tradeoff": { "type": "string", "minLength": 1 }
+                    }
+                  }
+                },
+                "grammarFilterRecords": {
+                  "description": "Every brainstorm candidate is accepted or rejected before rendering and ranking.",
+                  "type": "array",
+                  "minItems": 3,
+                  "maxItems": 16,
+                  "uniqueItems": true,
+                  "items": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": ["candidateRef", "decision", "manifestRef", "reasonRefs"],
+                    "properties": {
+                      "candidateRef": { "type": "string", "minLength": 1 },
+                      "decision": { "enum": ["accepted", "rejected"] },
+                      "manifestRef": { "anyOf": [{ "type": "string", "pattern": "^grammar://" }, { "type": "null" }] },
+                      "reasonRefs": { "type": "array", "minItems": 1, "uniqueItems": true, "items": { "type": "string", "minLength": 1 } }
                     }
                   }
                 },

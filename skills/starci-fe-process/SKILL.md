@@ -22,6 +22,24 @@ visual aggregate `passed` is invalid when any structured finding or contradictio
 remains. If an operator product is absent or invalid, stop at `blocked` rather than narrating progress
 as completion.
 
+Grammar contract 7.4 is independently fail-closed inside this runtime protocol. Before UI audit and
+before contract freeze, `fe/grammar-convergence` must produce a validated decision manifest that
+binds every visible semantic role, composition slot, responsive state, scroll/sticky lifecycle, and
+selected-package export. Every brainstorm candidate passes the semantic-composition filter before
+it may be rendered or ranked; rejected candidates stay out of visual comparison. Application code
+must consume published Grammar compositions instead of reconstructing their anatomy with local
+classes. A missing reusable interface is `grammar-gap`, never permission to imitate it in product CSS.
+
+The Grammar/application boundary is mandatory for every visible element. Product-neutral visual and
+interaction anatomy—including buttons, copy hierarchy, fields, surfaces, collections, navigation,
+rails, workspaces, spacing, responsive transformation, focus, scroll, sticky, resize and overlay
+lifecycle—belongs to Grammar. Business-derived creativity belongs in an application `block` or
+`composite`, which owns domain data, business ordering, permissions, copy, analytics and routes while
+binding every rendered role to published Grammar. When an agent discovers a reusable Grammar gap, it
+must produce a proposal and wait for explicit teacher approval before adding or exporting the pattern.
+Proposal eligibility, visual similarity, repeated code, or implementation convenience never count as
+publication authority.
+
 Every open-ended AI brainstorm or review is completed end to end by exactly one fresh `gpt-5.6-sol` execution with `forkTurns=none`; same-context self-review is not a fallback path. The parent Skill performs the call and routing while every operator remains atomic. With runtime `debug=true`, every AI `CALL`, `RETURN`, and `TRANSITION` is emitted to the terminal with normalized input, expected output, actual output, evidence fingerprints, per-raster inspection records, confirmed findings, and verdict. Never emit secrets or hidden reasoning. Missing a required debug inspection record blocks visual `PASS`.
 
 After runtime observation and before semantic/UX/UI audit, run `fe/product-potential` as mandatory

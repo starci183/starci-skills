@@ -18,6 +18,11 @@ for (const required of [
   'INDEX.md', 'config.yaml', 'scope.yaml', 'analyze-input.md', 'analyze-input.schema.json',
   'request-vocabulary.md', 'skills/catalog.json', 'skills/machine.schema.json',
   'runtime/config.schema.json', 'runtime/receipt.schema.json', 'runtime/topology.schema.json',
+  'runtime/contracts/grammar-decision.schema.json', 'runtime/contracts/grammar-decision.mjs',
+  'runtime/contracts/grammar-proposal.schema.json', 'runtime/contracts/grammar-proposal.mjs',
+  'knowledge/grammar/common/semantic-composition.md',
+  'knowledge/grammar/common/semantic-color.md',
+  'knowledge/grammar/common/application-composition-boundary.md',
   'templates/businesses/business.schema.json', 'templates/uat/snapshot.schema.json',
   'templates/uat/result.schema.json', 'templates/sessions/call-receipt.schema.json',
   'templates/debts/debt.schema.json', 'tests/v7-skill-selection.spec.mjs',
@@ -61,7 +66,7 @@ for (const skill of publicSkills) {
 }
 
 const config = read('config.yaml');
-if (!/^version:\s*7\.2\.1$/m.test(config) || !/^debug:\s*true$/m.test(config)) {
+if (!/^version:\s*7\.2\.1$/m.test(config) || !/^grammarContractVersion:\s*7\.4\.0$/m.test(config) || !/^debug:\s*true$/m.test(config)) {
   fail('config.yaml must enable the v7.2.1 debug trace');
 }
 for (const required of [
