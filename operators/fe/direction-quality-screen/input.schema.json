@@ -27,11 +27,14 @@
     "input": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["targetRef", "directionRef", "representativeRasterRef", "benchmarkRasterRefs", "attempt", "minimumScore"],
+      "required": ["targetRef", "directionRef", "representativeRasterRef", "representativeRasterArtifactRef", "requiredStateKind", "acceptanceRef", "benchmarkRasterRefs", "attempt", "minimumScore"],
       "properties": {
         "targetRef": { "description": "Exact browser-visible surface being screened.", "type": "string", "minLength": 1 },
         "directionRef": { "description": "Current direction invalidated when its score is below nine.", "type": "string", "minLength": 1 },
         "representativeRasterRef": { "description": "One fresh latest-source raster representing the direction.", "type": "string", "pattern": "^raster://sha256:[0-9a-f]{64}$" },
+        "representativeRasterArtifactRef": { "description": "Durable artifact receipt for the exact representative raster.", "type": "string", "pattern": "^artifact://raster/sha256:[0-9a-f]{64}$" },
+        "requiredStateKind": { "description": "Approved primary state that the representative raster must show.", "enum": ["live-ready", "fixture-ready"] },
+        "acceptanceRef": { "description": "Frozen user-outcome acceptance judged by the fresh reviewer.", "type": "string", "minLength": 1 },
         "benchmarkRasterRefs": { "description": "Approved product-family rasters used to judge native quality.", "type": "array", "minItems": 1, "maxItems": 4, "uniqueItems": true, "items": { "type": "string", "pattern": "^raster://sha256:[0-9a-f]{64}$" } },
         "attempt": { "description": "Fresh direction attempt number from one through three.", "type": "integer", "minimum": 1, "maximum": 3 },
         "minimumScore": { "description": "Fixed production continuation threshold.", "const": 9 }

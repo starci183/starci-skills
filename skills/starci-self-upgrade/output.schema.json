@@ -91,7 +91,7 @@
       "items": {
         "type": "object",
         "additionalProperties": false,
-        "required": ["actorId", "role", "taskRef", "actionRef", "runtimeFingerprint", "sourceFingerprint", "status", "resultRef", "verdict", "requiredConsecutivePasses", "achievedConsecutivePasses", "attemptFingerprints", "evidenceRefs"],
+        "required": ["actorId", "role", "taskRef", "actionRef", "runtimeFingerprint", "sourceFingerprint", "status", "resultRef", "verdict", "requiredConsecutivePasses", "achievedConsecutivePasses", "attemptFingerprints", "evidenceRefs", "proofPacket"],
         "properties": {
           "actorId": { "type": "string", "pattern": "^[a-z0-9][a-z0-9-]*$" },
           "role": { "enum": ["primary", "discriminator"] },
@@ -106,6 +106,20 @@
           "achievedConsecutivePasses": { "type": "integer", "minimum": 0 },
           "attemptFingerprints": { "type": "array", "minItems": 1, "maxItems": 8, "items": { "$ref": "#/$defs/sha256" } },
           "evidenceRefs": { "$ref": "#/$defs/nonEmptyRefs" }
+          ,"proofPacket": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["preMutationRuntimeObserveReceiptRef", "terminalVisible", "skillResultRef", "typedOutcome", "directionQualityReceiptRef", "durableRasterRefs", "independentReviewRef"],
+            "properties": {
+              "preMutationRuntimeObserveReceiptRef": { "type": ["string", "null"], "minLength": 1, "maxLength": 1024 },
+              "terminalVisible": { "type": "boolean" },
+              "skillResultRef": { "type": ["string", "null"], "minLength": 1, "maxLength": 1024 },
+              "typedOutcome": { "enum": ["complete", "handoff", "waiting-choice", "blocked", "missing"] },
+              "directionQualityReceiptRef": { "type": ["string", "null"], "minLength": 1, "maxLength": 1024 },
+              "durableRasterRefs": { "$ref": "#/$defs/refs" },
+              "independentReviewRef": { "type": ["string", "null"], "minLength": 1, "maxLength": 1024 }
+            }
+          }
         }
       }
     },

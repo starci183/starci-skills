@@ -1,9 +1,16 @@
 # Execute `fe/direction-quality-screen`
 
 Capture or consume exactly one latest-source, uncropped representative raster at the primary target
-viewport. Give a fresh `gpt-5.6-sol` execution only that raster, the approved user outcome, opaque
+viewport and persist it before review. Bind its content digest to a durable artifact receipt. Give a
+fresh `gpt-5.6-sol` execution only that raster, the approved user outcome, opaque
 product-family/Grammar identity, and content-addressed benchmark rasters. Do not load source, DOM,
 tests, implementation rationale, prior verdicts, or suggested fixes.
+
+First classify the visible state. A ready-state acceptance may continue only when the raster actually
+shows the requested live-ready or contract-fixture-ready business state. Loading, empty, recovery, or
+error pixels may be scored as counterevidence and routed to the smallest owner, but they cannot stand
+in for the requested ready-state direction. Never reconstruct scores later from inline screenshots or
+producer narration; absence of the durable raster or fresh execution receipt is `blocked`.
 
 Score the visible result from 0 to 10 for composition, hierarchy, density/empty-space balance,
 product-family DNA, content/media purpose, and action clarity. Set `overallScore` to the arithmetic

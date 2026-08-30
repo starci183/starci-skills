@@ -9,7 +9,10 @@
     "outcome",
     "missionRef",
     "artifactRefs",
-    "handoff"
+    "handoff",
+    "runtimeFingerprint",
+    "sourceFingerprint",
+    "terminalEvidence"
   ],
   "properties": {
     "schemaVersion": {
@@ -78,6 +81,45 @@
           "type": "null"
         }
       ]
+    },
+    "runtimeFingerprint": {
+      "$ref": "#/$defs/fingerprint"
+    },
+    "sourceFingerprint": {
+      "$ref": "#/$defs/fingerprint"
+    },
+    "terminalEvidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "stage",
+        "operatorReceiptRefs",
+        "directionQualityReceiptRef",
+        "representativeRasterRef",
+        "representativeRasterArtifactRef",
+        "visualFidelityReceiptRef",
+        "qualityReceiptRef",
+        "uatReceiptRef",
+        "testEvidenceRefs",
+        "buildEvidenceRef"
+      ],
+      "properties": {
+        "stage": { "enum": ["live-complete", "fixture-passed", "pre-proof-handoff", "waiting-choice", "blocked"] },
+        "operatorReceiptRefs": { "$ref": "#/$defs/refs" },
+        "directionQualityReceiptRef": { "$ref": "#/$defs/nullableRef" },
+        "representativeRasterRef": { "anyOf": [{ "type": "string", "pattern": "^raster://sha256:[0-9a-f]{64}$" }, { "type": "null" }] },
+        "representativeRasterArtifactRef": { "anyOf": [{ "type": "string", "pattern": "^artifact://raster/sha256:[0-9a-f]{64}$" }, { "type": "null" }] },
+        "visualFidelityReceiptRef": { "$ref": "#/$defs/nullableRef" },
+        "qualityReceiptRef": { "$ref": "#/$defs/nullableRef" },
+        "uatReceiptRef": { "$ref": "#/$defs/nullableRef" },
+        "testEvidenceRefs": { "$ref": "#/$defs/refs" },
+        "buildEvidenceRef": { "$ref": "#/$defs/nullableRef" }
+      }
     }
+  },
+  "$defs": {
+    "fingerprint": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
+    "refs": { "type": "array", "maxItems": 64, "uniqueItems": true, "items": { "type": "string", "minLength": 1 } },
+    "nullableRef": { "type": ["string", "null"], "minLength": 1, "maxLength": 1024 }
   }
 }

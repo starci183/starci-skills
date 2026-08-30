@@ -20,6 +20,11 @@ export const validateInput = validatorFor(new URL('./input.schema.json', import.
     if (new Set(actorIds).size !== actorIds.length) errors.push('multi-task actor ids must be unique');
     const actorRoots = actors.flatMap(({ writeRootRefs }) => writeRootRefs);
     if (new Set(actorRoots).size !== actorRoots.length) errors.push('multi-task actor product write roots must not overlap');
+    if (!policy?.preMutationCaptureGate) errors.push('multi-task actors require a pre-mutation capture gate');
+    for (const actor of actors) {
+      if (actor.expectedSkillId === 'starci-fe-process' && actor.preMutationGateRef !== 'operator://fe/runtime-observe') errors.push(`${actor.actorId}: frontend actor must gate mutation on fe/runtime-observe`);
+      if (actor.expectedSkillId === 'starci-fe-process' && actor.terminalContractRef !== 'skill-output://starci-fe-process/v7') errors.push(`${actor.actorId}: frontend actor must bind the v7 terminal evidence contract`);
+    }
   }
   if (value.options.observationMode === 'single' && (value.options.actorSpecs?.length ?? 0) > 1) errors.push('single observation cannot bind multiple actors');
   if (value.scope.externalMutation) errors.push('self-upgrade never authorizes external mutation');

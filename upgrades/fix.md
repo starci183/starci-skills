@@ -248,3 +248,70 @@ Playground reloads the current runtime, calls Backend `prove`, consumes RETURN, 
 same visual matrix must have no primary-action clipping; the same two behavioral actors must both
 confirm state truth. Unsupported zoom remains explicitly untested unless a real zoom-capable capture
 path produces its lifecycle. Only then may the actor advance beyond the current block.
+
+## Repair 007 — reject self-scored, wrong-state, and invisible UI success
+
+Round 4 proved that bypassing redundant approval was necessary but insufficient. Personal Project's
+direct output scored 8.6/8.5, Playground's only raster was an 8.0 recovery state, and CV persisted no
+raster. Actor-reported 9+ scores therefore failed the unchanged user acceptance.
+
+### ADD
+
+- Add a typed FE terminal evidence packet and a regression that rejects narration-only complete and
+  fixture-passed claims.
+- Add a self-upgrade actor proof packet: terminal visibility, typed Skill result, validated direction
+  receipt, durable raster refs, and independent review receipt.
+
+### CHANGE
+
+- Direction quality now screens a durable latest-source raster against a frozen acceptance and an
+  explicit requested ready-state kind. It carries the fresh `gpt-5.6-sol` execution receipt and exact
+  source/benchmark bindings through validation.
+- A recovery/error raster may diagnose a gap but cannot score itself into ready-state continuation.
+- `starci-fe-process` complete/fixture terminals now fail closed unless their exact proof chain is
+  present; `starci-self-upgrade` cannot aggregate invisible or inline-only actor results into PASS.
+
+### REMOVE
+
+- Remove post-hoc score reconstruction from inline screenshots.
+- Remove producer self-ratings as acceptance evidence.
+- Remove terminal success with zero visible output or no durable raster.
+
+### Proof and remaining work
+
+- Repair fingerprint: `sha256:0ab4e288eae3493e10bfa16628f3ed985294a623a1bdf99bcc3fb996b9131a28`.
+- Focused 15/15, full operators 132/132, 13 Skill validation, and release validation all pass.
+- Behavioral streak remains 0/2. Personal Project, CV, and Playground must reload repair 007 and
+  rerun unchanged 9+ acceptance twice each. Product code is not changed by this repair.
+
+## Repair 008 — preflight visual proof before actor mutation
+
+Round 5 correctly refused false visual success, but all three actors still spent product work before
+discovering that the in-app Browser could not access localhost. Root reproduced the same hard security
+denial using the documented Browser surface; policy forbids alternate Playwright/CDP/browser
+workarounds. This is not an approval gate that StarCi may bypass.
+
+### ADD
+
+- Add a multi-task actor preflight wait before the existing actor execution wait.
+- Add `preMutationRuntimeObserveReceiptRef` to every passing actor proof packet.
+
+### CHANGE
+
+- Every actor spec binds runtime fingerprint, frozen acceptance, `fe/runtime-observe`, and the v7 FE
+  terminal contract.
+- Release product mutation only after the required capture surface is actually accessible and its
+  observation receipt validates.
+
+### REMOVE
+
+- Remove mutation-first actor launch when output cannot be rendered or reviewed.
+- Remove wasted implementation/build/review steps caused by discovering capture denial after source work.
+
+### Proof and blocker
+
+- Final runtime fingerprint: `sha256:eb2aab1ba0201c2d1c8587800ac529674e379e9d3b1158b3340831944c6826d0`.
+- Focused 15/15, full operators 132/132, 13 Skill validation, and release validation pass.
+- Round 5 produced zero fresh rasters, therefore zero visual scores and 0/2 stability for every actor.
+- Next retry must stop at preflight until localhost Browser access is allowed. No runtime or product
+  rule may convert this external denial into PASS.

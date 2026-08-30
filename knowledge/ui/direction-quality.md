@@ -7,8 +7,12 @@
 | Search tags | `first glance, direction score, brainstorm, business supplement, backend facts, quality threshold` |
 | Dependencies | approved user outcome; `fe.ui.hierarchy`; `fe.ui.ownership-composition`; routed Grammar Core and product DNA |
 
-Before the expensive capture matrix, judge one fresh representative raster as a user would encounter
-the product. Score exactly six dimensions from zero to ten: composition, hierarchy,
+Before the expensive capture matrix, judge one fresh, durably persisted representative raster as a
+user would encounter the product. The raster must name the frozen acceptance, latest source
+fingerprint, requested business state, local artifact identity, and fresh isolated reviewer execution.
+An inline screenshot, producer narration, reconstructed score, recovery/error state standing in for a
+ready-state outcome, or a raster without a durable artifact receipt cannot pass this screen. Score
+exactly six dimensions from zero to ten: composition, hierarchy,
 density/empty-space, product-family DNA, content/media purpose, and action clarity. The overall score
 is the floored arithmetic mean. Only `9` or `10` may advance.
 

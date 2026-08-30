@@ -19,12 +19,21 @@
             {
               "type": "object",
               "additionalProperties": false,
-              "required": ["summary", "artifactRefs", "directionRef", "representativeRasterRef", "attempt", "minimumScore", "overallScore", "scaleBand", "ownerClass", "scoreDimensions"],
+              "required": ["summary", "artifactRefs", "directionRef", "sourceFingerprint", "reviewerExecutionRef", "reviewMode", "acceptanceRef", "requiredStateKind", "observedStateKind", "businessOutcomeMatch", "representativeRasterRef", "representativeRasterArtifactRef", "benchmarkRasterRefs", "attempt", "minimumScore", "overallScore", "scaleBand", "ownerClass", "scoreDimensions"],
               "properties": {
                 "summary": { "type": "string", "minLength": 1 },
                 "artifactRefs": { "$ref": "#/$defs/refs" },
                 "directionRef": { "type": "string", "minLength": 1 },
+                "sourceFingerprint": { "$ref": "#/$defs/sha256" },
+                "reviewerExecutionRef": { "type": "string", "pattern": "^execution://[0-9a-f]{64}$" },
+                "reviewMode": { "const": "fresh-blind" },
+                "acceptanceRef": { "type": "string", "minLength": 1 },
+                "requiredStateKind": { "enum": ["live-ready", "fixture-ready"] },
+                "observedStateKind": { "enum": ["live-ready", "fixture-ready", "loading", "empty", "recovery", "error"] },
+                "businessOutcomeMatch": { "type": "boolean" },
                 "representativeRasterRef": { "type": "string", "pattern": "^raster://sha256:[0-9a-f]{64}$" },
+                "representativeRasterArtifactRef": { "type": "string", "pattern": "^artifact://raster/sha256:[0-9a-f]{64}$" },
+                "benchmarkRasterRefs": { "type": "array", "minItems": 1, "maxItems": 4, "uniqueItems": true, "items": { "type": "string", "pattern": "^raster://sha256:[0-9a-f]{64}$" } },
                 "attempt": { "type": "integer", "minimum": 1, "maximum": 3 },
                 "minimumScore": { "const": 9 },
                 "overallScore": { "type": "integer", "minimum": 0, "maximum": 10 },
@@ -73,6 +82,7 @@
     }
   },
   "$defs": {
-    "refs": { "type": "array", "maxItems": 64, "uniqueItems": true, "items": { "type": "string", "minLength": 1 } }
+    "refs": { "type": "array", "maxItems": 64, "uniqueItems": true, "items": { "type": "string", "minLength": 1 } },
+    "sha256": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" }
   }
 }

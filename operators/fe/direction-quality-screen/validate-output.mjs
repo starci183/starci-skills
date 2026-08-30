@@ -1,6 +1,7 @@
 import { validatorFor, runValidatorCli } from '../../validation.mjs';
 
 const expectedBand = (score) => score <= 6 ? 'rejected' : score <= 8 ? 'promising' : score === 9 ? 'production' : 'exceptional';
+const digest = (ref) => ref?.match(/[0-9a-f]{64}$/)?.[0];
 
 export const validateOutput = validatorFor(new URL('./output.schema.json', import.meta.url), (value) => {
   const issues = [];
@@ -12,6 +13,10 @@ export const validateOutput = validatorFor(new URL('./output.schema.json', impor
     return issues;
   }
   if (result === null) return ['non-blocked direction screen requires a result'];
+  if (digest(result.representativeRasterRef) !== digest(result.representativeRasterArtifactRef)) issues.push('representative raster content and durable artifact receipts must bind the same digest');
+  for (const ref of [result.representativeRasterRef, result.representativeRasterArtifactRef, result.reviewerExecutionRef, ...result.benchmarkRasterRefs]) {
+    if (!result.artifactRefs.includes(ref) && !value.output.evidenceRefs.includes(ref)) issues.push(`result evidence must bind ${ref}`);
+  }
   const dimensions = result.scoreDimensions.map(({ dimension }) => dimension);
   if (new Set(dimensions).size !== 6) issues.push('every score dimension must appear exactly once');
   const calculated = Math.floor(result.scoreDimensions.reduce((sum, item) => sum + item.score, 0) / 6);
@@ -20,6 +25,7 @@ export const validateOutput = validatorFor(new URL('./output.schema.json', impor
 
   if (result.overallScore >= result.minimumScore) {
     if (outcome !== 'continue') issues.push('a 9+ score must continue');
+    if (result.observedStateKind !== result.requiredStateKind || !result.businessOutcomeMatch) issues.push('a continuing score must prove the requested ready-state business outcome');
     if (result.ownerClass !== 'none') issues.push('a continuing score cannot claim a defect owner');
     if (handoff !== null) issues.push('a continuing score cannot hand off');
   } else {
@@ -36,6 +42,7 @@ export const validateOutput = validatorFor(new URL('./output.schema.json', impor
     }
     if (outcome === 'rebrainstorm' && handoff !== null) issues.push('rebrainstorm cannot claim a peer handoff');
   }
+  if (outcome === 'continue' && !result.artifactRefs.includes(result.representativeRasterArtifactRef)) issues.push('continue requires the durable representative raster in artifactRefs');
   return issues;
 });
 

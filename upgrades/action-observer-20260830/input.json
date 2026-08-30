@@ -12,12 +12,12 @@
   },
   "requestRef": "thread:coordinator-self-upgrade",
   "artifactRefs": [
-    "thread:01a051ba-39ec-7371-8942-03092987a124",
-    "thread:01a051ba-4020-7f40-9f88-f882a5e7fd13",
-    "thread:01a051c9-d1b2-7522-b881-8100ce33aafd",
-    "worktree:C:/Repositories/ac/starci-academy-fe-worktrees/personal-project-reconstruct",
-    "worktree:C:/Repositories/ac/starci-academy-fe-worktrees/cv-new",
-    "worktree:C:/Repositories/ac/starci-academy-fe-worktrees/playground-k8s-docker-rag"
+    "thread:01a05332-b75f-7653-9ad5-6ce1291dfc85",
+    "thread:01a05332-ba2a-7d41-879d-f36bc5d0129f",
+    "thread:01a05332-bce2-7321-a9ef-66990375eda5",
+    "worktree:C:/Repositories/ac/starci-academy-backend/.frontend-worktrees/personal-project-round4",
+    "worktree:C:/Repositories/ac/starci-academy-backend/.frontend-worktrees/cv-round4-01a05332",
+    "worktree:C:/Repositories/ac/starci-academy-fe-worktrees/playground-round4"
   ],
   "evidenceRefs": ["file:.claude/upgrades/action-observer-20260830/observation-log.md"],
   "scope": {
@@ -43,32 +43,44 @@
       {
         "actorId": "personal-project",
         "role": "primary",
-        "taskRef": "thread:01a051ba-39ec-7371-8942-03092987a124",
+        "taskRef": "thread:01a05332-b75f-7653-9ad5-6ce1291dfc85",
         "actionRef": "action:personal-project-reconstruct",
         "expectedSkillId": "starci-fe-process",
         "scopeRef": "scope:personal-project-reconstruct",
-        "writeRootRefs": ["worktree:C:/Repositories/ac/starci-academy-fe-worktrees/personal-project-reconstruct"],
-        "productMutationAuthorityRef": "request:reconstruct-personal-project"
+        "writeRootRefs": ["worktree:C:/Repositories/ac/starci-academy-backend/.frontend-worktrees/personal-project-round4"],
+        "productMutationAuthorityRef": "request:reconstruct-personal-project",
+        "runtimeFingerprint": "sha256:eb2aab1ba0201c2d1c8587800ac529674e379e9d3b1158b3340831944c6826d0",
+        "acceptanceRef": "acceptance:personal-project-9-plus",
+        "preMutationGateRef": "operator://fe/runtime-observe",
+        "terminalContractRef": "skill-output://starci-fe-process/v7"
       },
       {
         "actorId": "cv",
         "role": "primary",
-        "taskRef": "thread:01a051ba-4020-7f40-9f88-f882a5e7fd13",
+        "taskRef": "thread:01a05332-ba2a-7d41-879d-f36bc5d0129f",
         "actionRef": "action:cv-new",
         "expectedSkillId": "starci-fe-process",
         "scopeRef": "scope:cv-new",
-        "writeRootRefs": ["worktree:C:/Repositories/ac/starci-academy-fe-worktrees/cv-new"],
-        "productMutationAuthorityRef": "request:new-cv"
+        "writeRootRefs": ["worktree:C:/Repositories/ac/starci-academy-backend/.frontend-worktrees/cv-round4-01a05332"],
+        "productMutationAuthorityRef": "request:new-cv",
+        "runtimeFingerprint": "sha256:eb2aab1ba0201c2d1c8587800ac529674e379e9d3b1158b3340831944c6826d0",
+        "acceptanceRef": "acceptance:cv-9-plus",
+        "preMutationGateRef": "operator://fe/runtime-observe",
+        "terminalContractRef": "skill-output://starci-fe-process/v7"
       },
       {
         "actorId": "playground",
         "role": "primary",
-        "taskRef": "thread:01a051c9-d1b2-7522-b881-8100ce33aafd",
+        "taskRef": "thread:01a05332-bce2-7321-a9ef-66990375eda5",
         "actionRef": "action:playground-k8s-docker-rag-reconstruct",
         "expectedSkillId": "starci-fe-process",
         "scopeRef": "scope:playground-k8s-docker-rag-reconstruct",
-        "writeRootRefs": ["worktree:C:/Repositories/ac/starci-academy-fe-worktrees/playground-k8s-docker-rag"],
-        "productMutationAuthorityRef": "request:reconstruct-playground-k8s-docker-rag"
+        "writeRootRefs": ["worktree:C:/Repositories/ac/starci-academy-fe-worktrees/playground-round4"],
+        "productMutationAuthorityRef": "request:reconstruct-playground-k8s-docker-rag",
+        "runtimeFingerprint": "sha256:eb2aab1ba0201c2d1c8587800ac529674e379e9d3b1158b3340831944c6826d0",
+        "acceptanceRef": "acceptance:playground-9-plus",
+        "preMutationGateRef": "operator://fe/runtime-observe",
+        "terminalContractRef": "skill-output://starci-fe-process/v7"
       }
     ],
     "supervisionPolicy": {
@@ -77,16 +89,17 @@
       "independentContexts": true,
       "requirePerActorPasses": true,
       "runtimeReloadOnChange": true,
+      "preMutationCaptureGate": true,
       "discriminatorPolicy": "user-requested-or-asymmetric-inconclusive",
       "communicationMode": "codex-task"
     },
     "benchmarkRefs": ["benchmark:two-concurrent-starci-fe-process-actions-correct-and-efficient"],
     "fixtureRefs": [
-      "worktree:C:/Repositories/ac/starci-academy-fe-worktrees/personal-project-reconstruct@4e571affa5880440df256dd7894273a06e692493",
-      "worktree:C:/Repositories/ac/starci-academy-fe-worktrees/cv-new@4e571affa5880440df256dd7894273a06e692493"
-      ,"worktree:C:/Repositories/ac/starci-academy-fe-worktrees/playground-k8s-docker-rag@4e571affa5880440df256dd7894273a06e692493"
+      "worktree:C:/Repositories/ac/starci-academy-backend/.frontend-worktrees/personal-project-round4@4e571affa5880440df256dd7894273a06e692493",
+      "worktree:C:/Repositories/ac/starci-academy-backend/.frontend-worktrees/cv-round4-01a05332@4e571affa5880440df256dd7894273a06e692493",
+      "worktree:C:/Repositories/ac/starci-academy-fe-worktrees/playground-round4@9405496"
     ],
-    "metricNames": ["elapsed-ms", "time-to-first-action-ms", "step-count", "context-bytes", "redundant-step-count", "visual-verdict", "product-write-count"],
+    "metricNames": ["elapsed-ms", "time-to-first-action-ms", "step-count", "context-bytes", "redundant-step-count", "visual-verdict", "product-write-count", "terminal-visible", "durable-raster-count"],
     "requiredLayerNames": ["objective-scope", "input", "prompt", "state-machine", "execute-logic", "knowledge", "grammar-ui", "validation", "output-contract", "tool-model", "proof"],
     "stabilityPolicy": {
       "requiredConsecutivePasses": 2,

@@ -1,0 +1,13 @@
+{
+  "analyzerVersion": 2,
+  "skillId": "starci-self-upgrade",
+  "confidence": "exact",
+  "interactionPolicy": "ask-only-when-stuck",
+  "activeInputRefs": [
+    "request:round-4-retry-three-ui-fixtures"
+  ],
+  "passiveContextRefs": [
+    "file:.claude/request-vocabulary.md",
+    "file:.claude/skills/catalog.json"
+  ]
+}

@@ -46,10 +46,20 @@ export const validateOutput = validatorFor(new URL('./output.schema.json', impor
     if (new Set(taskRefs).size !== taskRefs.length) errors.push('multi-task actor result task refs must be unique');
     for (const actor of actors) {
       const repeated = new Set(actor.attemptFingerprints).size !== actor.attemptFingerprints.length;
+      const packet = actor.proofPacket;
       if (actor.verdict === 'pass' && actor.status !== 'complete') errors.push(`${actor.actorId}: passing actor must be complete`);
       if (actor.verdict === 'pass' && !actor.resultRef) errors.push(`${actor.actorId}: passing actor requires a resultRef`);
       if (actor.verdict === 'pass' && actor.achievedConsecutivePasses < actor.requiredConsecutivePasses) errors.push(`${actor.actorId}: passing actor requires its own consecutive passes`);
       if (actor.verdict === 'pass' && repeated) errors.push(`${actor.actorId}: passing actor cannot reuse a fingerprint`);
+      if (actor.verdict === 'pass' && !packet?.preMutationRuntimeObserveReceiptRef) errors.push(`${actor.actorId}: passing actor requires a pre-mutation runtime-observe receipt`);
+      if (actor.verdict === 'pass' && (!packet?.terminalVisible || !packet.skillResultRef)) errors.push(`${actor.actorId}: passing actor requires one visible typed Skill result`);
+      if (actor.verdict === 'pass' && !['complete', 'handoff'].includes(packet?.typedOutcome)) errors.push(`${actor.actorId}: passing actor requires a successful typed outcome`);
+      if (actor.verdict === 'pass' && (!packet?.directionQualityReceiptRef || !packet.independentReviewRef || !packet.durableRasterRefs.length)) errors.push(`${actor.actorId}: passing visual actor requires direction, durable raster, and independent review receipts`);
+      if (actor.verdict === 'pass') {
+        for (const ref of [packet.preMutationRuntimeObserveReceiptRef, packet.skillResultRef, packet.directionQualityReceiptRef, packet.independentReviewRef, ...packet.durableRasterRefs]) {
+          if (!actor.evidenceRefs.includes(ref)) errors.push(`${actor.actorId}: proof packet ref is not bound in actor evidenceRefs: ${ref}`);
+        }
+      }
     }
     if (['complete', 'not-needed'].includes(value.result) && actors.some(({ verdict }) => verdict !== 'pass')) errors.push('multi-task success requires every actor to pass independently');
     if (['complete', 'not-needed'].includes(value.result) && actors.some(({ runtimeFingerprint }) => runtimeFingerprint !== actors[0]?.runtimeFingerprint)) errors.push('multi-task success requires one final runtime fingerprint');

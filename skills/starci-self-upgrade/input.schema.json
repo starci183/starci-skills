@@ -39,7 +39,7 @@
           "items": {
             "type": "object",
             "additionalProperties": false,
-            "required": ["actorId", "role", "taskRef", "actionRef", "expectedSkillId", "scopeRef", "writeRootRefs", "productMutationAuthorityRef"],
+            "required": ["actorId", "role", "taskRef", "actionRef", "expectedSkillId", "scopeRef", "writeRootRefs", "productMutationAuthorityRef", "runtimeFingerprint", "acceptanceRef", "preMutationGateRef", "terminalContractRef"],
             "properties": {
               "actorId": { "type": "string", "pattern": "^[a-z0-9][a-z0-9-]*$" },
               "role": { "enum": ["primary", "discriminator"] },
@@ -48,20 +48,25 @@
               "expectedSkillId": { "type": "string", "pattern": "^starci-[a-z0-9-]+$" },
               "scopeRef": { "type": "string", "minLength": 1, "maxLength": 1024 },
               "writeRootRefs": { "$ref": "#/$defs/nonEmptyRefs" },
-              "productMutationAuthorityRef": { "type": "string", "minLength": 1, "maxLength": 1024 }
+              "productMutationAuthorityRef": { "type": "string", "minLength": 1, "maxLength": 1024 },
+              "runtimeFingerprint": { "$ref": "#/$defs/sha256" },
+              "acceptanceRef": { "type": "string", "minLength": 1, "maxLength": 1024 },
+              "preMutationGateRef": { "type": "string", "minLength": 1, "maxLength": 1024 },
+              "terminalContractRef": { "type": "string", "minLength": 1, "maxLength": 1024 }
             }
           }
         },
         "supervisionPolicy": {
           "type": "object",
           "additionalProperties": false,
-          "required": ["minPrimaryActors", "maxActors", "independentContexts", "requirePerActorPasses", "runtimeReloadOnChange", "discriminatorPolicy", "communicationMode"],
+          "required": ["minPrimaryActors", "maxActors", "independentContexts", "requirePerActorPasses", "runtimeReloadOnChange", "preMutationCaptureGate", "discriminatorPolicy", "communicationMode"],
           "properties": {
             "minPrimaryActors": { "const": 2 },
             "maxActors": { "const": 3 },
             "independentContexts": { "const": true },
             "requirePerActorPasses": { "const": true },
             "runtimeReloadOnChange": { "const": true },
+            "preMutationCaptureGate": { "const": true },
             "discriminatorPolicy": { "const": "user-requested-or-asymmetric-inconclusive" },
             "communicationMode": { "const": "codex-task" }
           }
@@ -73,7 +78,7 @@
           "minItems": 1,
           "uniqueItems": true,
           "items": {
-            "enum": ["elapsed-ms", "time-to-first-action-ms", "step-count", "context-bytes", "redundant-step-count", "visual-verdict", "product-write-count"]
+            "enum": ["elapsed-ms", "time-to-first-action-ms", "step-count", "context-bytes", "redundant-step-count", "visual-verdict", "product-write-count", "terminal-visible", "durable-raster-count"]
           }
         },
         "requiredLayerNames": {
@@ -98,6 +103,7 @@
     }
   },
   "$defs": {
+    "sha256": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
     "layerName": {
       "enum": ["objective-scope", "input", "prompt", "state-machine", "execute-logic", "knowledge", "grammar-ui", "validation", "output-contract", "tool-model", "proof"]
     },

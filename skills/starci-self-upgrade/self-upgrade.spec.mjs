@@ -167,7 +167,8 @@ test('multi-task mode waits for independent Codex actor results before integrati
   const multi = structuredClone(machineInput);
   multi.options.intentMode = 'upgrade';
   multi.options.observationMode = 'multi-task';
-  assert.equal(nextState(machine, 'analyze-input', {}, multi), 'upgrade-actors-wait');
+  assert.equal(nextState(machine, 'analyze-input', {}, multi), 'upgrade-actor-preflight-wait');
+  assert.equal(machine.states['upgrade-actor-preflight-wait'].on[0].target, 'upgrade-actors-wait');
 });
 
 test('multi-task output cannot assemble success from different actor streaks', () => {
@@ -178,13 +179,15 @@ test('multi-task output cannot assemble success from different actor streaks', (
       actorId: 'personal-project', role: 'primary', taskRef: 'thread://personal', actionRef: 'action://reconstruct',
       runtimeFingerprint: hash('d'), sourceFingerprint: hash('e'), status: 'complete', resultRef: 'result://personal',
       verdict: 'pass', requiredConsecutivePasses: 2, achievedConsecutivePasses: 2,
-      attemptFingerprints: [hash('f'), hash('1')], evidenceRefs: ['evidence://personal'],
+      attemptFingerprints: [hash('f'), hash('1')], evidenceRefs: ['evidence://personal', 'result://personal', 'receipt://personal/runtime-observe', 'receipt://personal/direction', 'raster://personal', 'review://personal'],
+      proofPacket: { preMutationRuntimeObserveReceiptRef: 'receipt://personal/runtime-observe', terminalVisible: true, skillResultRef: 'result://personal', typedOutcome: 'complete', directionQualityReceiptRef: 'receipt://personal/direction', durableRasterRefs: ['raster://personal'], independentReviewRef: 'review://personal' },
     },
     {
       actorId: 'cv', role: 'primary', taskRef: 'thread://cv', actionRef: 'action://new',
       runtimeFingerprint: hash('d'), sourceFingerprint: hash('2'), status: 'complete', resultRef: 'result://cv',
       verdict: 'pass', requiredConsecutivePasses: 2, achievedConsecutivePasses: 1,
-      attemptFingerprints: [hash('3')], evidenceRefs: ['evidence://cv'],
+      attemptFingerprints: [hash('3')], evidenceRefs: ['evidence://cv', 'result://cv', 'receipt://cv/runtime-observe', 'receipt://cv/direction', 'raster://cv', 'review://cv'],
+      proofPacket: { preMutationRuntimeObserveReceiptRef: 'receipt://cv/runtime-observe', terminalVisible: true, skillResultRef: 'result://cv', typedOutcome: 'handoff', directionQualityReceiptRef: 'receipt://cv/direction', durableRasterRefs: ['raster://cv'], independentReviewRef: 'review://cv' },
     },
   ];
   value.crossCaseDecision = {
@@ -198,4 +201,30 @@ test('multi-task output cannot assemble success from different actor streaks', (
   const validation = validateSkillOutput(value);
   assert.equal(validation.valid, false);
   assert.match(validation.errors.join('\n'), /cv: passing actor requires its own consecutive passes/i);
+});
+
+test('multi-task output rejects narration-only, inline-only, and invisible actor passes', () => {
+  const value = stableResult();
+  value.observationMode = 'multi-task';
+  value.actorResults = [
+    {
+      actorId: 'personal-project', role: 'primary', taskRef: 'thread://personal', actionRef: 'action://reconstruct',
+      runtimeFingerprint: hash('d'), sourceFingerprint: hash('e'), status: 'complete', resultRef: 'result://personal',
+      verdict: 'pass', requiredConsecutivePasses: 2, achievedConsecutivePasses: 2,
+      attemptFingerprints: [hash('f'), hash('1')], evidenceRefs: ['evidence://narration'],
+      proofPacket: { preMutationRuntimeObserveReceiptRef: null, terminalVisible: false, skillResultRef: null, typedOutcome: 'missing', directionQualityReceiptRef: null, durableRasterRefs: [], independentReviewRef: null },
+    },
+    {
+      actorId: 'cv', role: 'primary', taskRef: 'thread://cv', actionRef: 'action://new',
+      runtimeFingerprint: hash('d'), sourceFingerprint: hash('2'), status: 'complete', resultRef: 'result://cv',
+      verdict: 'pass', requiredConsecutivePasses: 2, achievedConsecutivePasses: 2,
+      attemptFingerprints: [hash('3'), hash('4')], evidenceRefs: ['evidence://inline-screenshot'],
+      proofPacket: { preMutationRuntimeObserveReceiptRef: null, terminalVisible: true, skillResultRef: 'result://cv', typedOutcome: 'handoff', directionQualityReceiptRef: null, durableRasterRefs: [], independentReviewRef: null },
+    },
+  ];
+  value.crossCaseDecision = { classification: 'systemic', discriminatorRequired: false, sharedOwnerRef: 'runtime://actor-proof', knowledgeStatus: 'missing', evidenceRefs: ['evidence://narration'], reason: 'Direct proof is absent.' };
+  value.runtimeTransition = { beforeFingerprint: hash('d'), afterFingerprint: null, proofsInvalidated: false, reloadRequired: false, actorNotificationRefs: [], resumeRefs: [] };
+  const validation = validateSkillOutput(value);
+  assert.equal(validation.valid, false);
+  assert.match(validation.errors.join('\n'), /visible typed Skill result|direction, durable raster, and independent review receipts/i);
 });

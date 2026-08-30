@@ -7,10 +7,34 @@
     "analyze-input": {
       "kind": "analysis",
       "on": [
-        { "when": { "inputEquals": { "options.intentMode": "calibrate", "options.observationMode": "multi-task" } }, "target": "calibrate-actors-wait", "label": "wait for independent calibration actors" },
-        { "when": { "inputEquals": { "options.intentMode": "upgrade", "options.observationMode": "multi-task" } }, "target": "upgrade-actors-wait", "label": "wait for independent upgrade actors" },
+        { "when": { "inputEquals": { "options.intentMode": "calibrate", "options.observationMode": "multi-task" } }, "target": "calibrate-actor-preflight-wait", "label": "prove actor capture capability before product work" },
+        { "when": { "inputEquals": { "options.intentMode": "upgrade", "options.observationMode": "multi-task" } }, "target": "upgrade-actor-preflight-wait", "label": "prove actor capture capability before product work" },
         { "when": { "inputEquals": { "options.intentMode": "calibrate", "options.observationMode": "single" } }, "target": "calibrate-baseline", "label": "check actual output before diagnosis" },
         { "when": { "inputEquals": { "options.intentMode": "upgrade", "options.observationMode": "single" } }, "target": "upgrade-baseline", "label": "check actual output before approved repair" }
+      ]
+    },
+    "calibrate-actor-preflight-wait": {
+      "kind": "wait",
+      "approval": {
+        "prompt": "Wait for every registered actor to return a validated pre-mutation runtime-observe receipt proving the required capture surface is accessible.",
+        "approve": "Release only actors with valid capture receipts to product work.",
+        "reject": "Block before product mutation because output proof cannot be captured.",
+        "resumeTarget": "calibrate-actors-wait"
+      },
+      "on": [
+        { "when": { "allFacts": ["actor-preflight-ready"] }, "target": "calibrate-actors-wait" }
+      ]
+    },
+    "upgrade-actor-preflight-wait": {
+      "kind": "wait",
+      "approval": {
+        "prompt": "Wait for every registered actor to return a validated pre-mutation runtime-observe receipt proving the required capture surface is accessible.",
+        "approve": "Release only actors with valid capture receipts to product work.",
+        "reject": "Block before product mutation because output proof cannot be captured.",
+        "resumeTarget": "upgrade-actors-wait"
+      },
+      "on": [
+        { "when": { "allFacts": ["actor-preflight-ready"] }, "target": "upgrade-actors-wait" }
       ]
     },
     "calibrate-actors-wait": {

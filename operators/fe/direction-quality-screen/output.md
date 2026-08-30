@@ -1,6 +1,9 @@
 # `fe/direction-quality-screen` output
 
-Return one score from the arithmetic mean, rounded down, of exactly six visible dimensions:
+Return one score from the arithmetic mean, rounded down, of exactly six visible dimensions. Copy the
+latest source fingerprint, acceptance, requested/observed state, durable raster artifact, benchmark
+rasters, and fresh reviewer execution receipt into the result so invocation validation can reject
+inline-only, stale, self-scored, or wrong-state evidence:
 composition, hierarchy, density/empty-space balance, product-family DNA, content/media purpose, and
 action clarity.
 

@@ -23,7 +23,12 @@ user outcome instead of rendering the same premise again.
 - `context.debug`: Required observable CALL, RETURN, dimension scores, and transition trace.
 - `input.targetRef`: Exact browser-visible surface being screened.
 - `input.directionRef`: Current direction invalidated when its score is below nine.
-- `input.representativeRasterRef`: One fresh latest-source raster that represents the direction.
+- `input.representativeRasterRef`: Content identity of one fresh latest-source raster.
+- `input.representativeRasterArtifactRef`: Durable artifact identity for that exact raster; inline-only
+  screenshots are invalid.
+- `input.requiredStateKind`: The approved primary state this screen must represent: live ready or
+  contract-fixture ready.
+- `input.acceptanceRef`: Frozen user-outcome acceptance judged by the reviewer.
 - `input.benchmarkRasterRefs`: Approved product-family rasters used to judge native quality.
 - `input.attempt`: Fresh direction-attempt number, from one through three.
 - `input.minimumScore`: Fixed production continuation threshold of nine.

@@ -392,3 +392,103 @@ remain open until fresh actor results under their current fingerprints satisfy p
 - All prior preflight/capture/visual evidence is stale for these owners. The next Playground run must
   reload this runtime, issue Backend `prove`, consume RETURN, then resume FE from `apply` or
   capture-preflight. No product source, backend source, commit, push, or deployment is claimed here.
+
+## Round 4 counterevidence — procedural success still accepted wrong or invisible output
+
+The user pre-approved direction selection, isolated worktrees, browser/image operations, reversible FE
+mutation, and in-scope verification. None of the three actors requested user approval, so the earlier
+authority-loop defect did not recur. The outputs still failed the unchanged 9+ acceptance:
+
+| Actor | Direct evidence | Fresh blind score | Typed disposition |
+| --- | --- | ---: | --- |
+| Personal Project | durable wide and compact rasters from the Round 4 worktree | 8.6 wide; 8.5 compact | fail; rebrainstorm |
+| CV | no durable raster; only actor-reported inline screenshots | unavailable | blocked evidence; no visual claim |
+| Playground | durable raster shows recovery/error with retry, not the requested loaded lab catalog | 8.0 | fail; backend/runtime handoff cannot claim direction pass |
+
+Actor narration contradicted the direct evidence. CV reconstructed a 9.08 score after the run even
+though no raster was persisted. Playground reported 9.22 while its only fresh raster was an error
+state. All three Codex task turns also became terminal with zero visible assistant items; later recovery
+ledgers are diagnostic evidence, not substitutes for visible typed FE outputs. One fresh isolated Sol
+review inspected the durable rasters without producer rationale and rejected every 9+ claim.
+
+### Eleven-layer diagnosis
+
+- `objective-scope`: passed; three fixed surfaces, preserved Business outcomes, and 9+ acceptance were explicit.
+- `input`: finding; direction-screen input did not bind durable artifact identity and requested ready-state kind.
+- `prompt`: passed; Round 4 prompts explicitly required fresh 9+ screening and prohibited narrated substitution.
+- `state-machine`: finding; the public FE terminal contract could end with a minimal outcome and arbitrary artifacts.
+- `execute-logic`: finding; inline screenshots and recovery pixels could be scored after the fact rather than through the declared fresh reviewer execution.
+- `knowledge`: `missing`; direction-quality law did not explicitly reject inline-only, wrong-state, or reconstructed score evidence.
+- `grammar-ui`: sufficient but not exculpatory; Personal retained StarCi DNA yet remained below production density/composition, while Playground never showed its requested ready state.
+- `validation`: finding; direction output did not cross-bind reviewer execution, source, acceptance, requested/observed state, and durable raster.
+- `output-contract`: finding; FE and self-upgrade actor results could accept invisible or narration-only terminals.
+- `tool-model`: external visibility limitation observed; the runtime must fail closed on invisible terminals instead of treating them as success.
+- `proof`: failed; CV had no durable raster, Playground proved only recovery, and no actor supplied two consecutive 9+ outputs.
+
+## Runtime repair 007 — durable state-correct direction evidence and evidence-bearing FE terminals
+
+- `ADD`: FE terminal regression covering live complete and fixture-passed handoff evidence packets.
+- `CHANGE`: `fe.ui.direction-quality` now requires one durably persisted representative raster,
+  frozen acceptance, latest source fingerprint, requested/observed state, and fresh isolated reviewer
+  receipt. Error/recovery pixels may classify a gap but cannot continue as ready-state proof.
+- `CHANGE`: direction-screen input/output schemas and validators cross-bind raster content/artifact
+  digests, benchmark rasters, reviewer execution, acceptance, source, state, and evidence refs.
+- `CHANGE`: `starci-fe-process` terminal output now binds runtime/source fingerprints and typed
+  terminal evidence. `complete` requires live direction, durable raster, blind review, quality, UAT,
+  tests, and build; `fixture-passed` remains a handoff and requires durable visual/test/build proof.
+- `CHANGE`: `starci-self-upgrade` actor results now require a visible typed Skill result, durable
+  rasters, validated direction receipt, and independent review receipt before an actor may pass.
+- `REMOVE`: reconstructed scores from inline screenshots, producer self-ratings, invisible terminals,
+  and recovery/error raster substitution as success evidence.
+- Runtime fingerprint:
+  `sha256:0ab4e288eae3493e10bfa16628f3ed985294a623a1bdf99bcc3fb996b9131a28`.
+- Focused repair suite: 15/15 passed. Full active operator suite: 132/132 passed. Skill validation:
+  13 public v7 skills. Release: 13 mission skills, 150 atomic operators, 87 knowledge records.
+- Product boundary: observer changed no actor product source. Existing Round 4 worktrees remain actor
+  fixtures. Repair 007 invalidates their quality/terminal claims; it does not retroactively improve pixels.
+- Stability status: 0/2 after repair. All three actors must reload fingerprint 007 and rerun the same
+  acceptance from fresh evidence. Completion remains unavailable until every actor independently
+  produces two consecutive visible, durable, state-correct 9+ results.
+
+## Round 5 result — false 9+ claims eliminated; capture permission blocks all visual acceptance
+
+Repair 007 changed the behavior materially: no actor self-scored, reused Round 4 pixels, reconstructed
+inline screenshots, or claimed visual PASS. All three returned explicit no-raster blockers.
+
+| Actor | Source/test evidence | Visual evidence | Outcome |
+| --- | --- | --- | --- |
+| Personal Project | source `sha256:8c7f51...a2a797`; focused 9/9, lint, typecheck, build pass | none; localhost:3115 denied | `BLOCKED_TOOL_MODEL_NO_FRESH_RASTER` |
+| CV | source `sha256:87315f...fe8b62`; focused 5/5, lint, typecheck, Next and fixture builds pass | none; localhost:4173 denied | `BLOCKED_TOOL_MODEL_NO_FRESH_RASTER` + backend handoff retained |
+| Playground | source `sha256:819258...4f98ca`; lint and focused 2/2 pass; typecheck has four pre-existing generated-global errors; build blocked by Turbopack dependency junction | none; localhost capture denied | `BLOCKED_TOOL_MODEL_NO_FRESH_RASTER` + runtime/backend truth retained |
+
+The supervisor independently selected the documented in-app Browser, loaded its local-development and
+screenshot policy, and reproduced the denial. The Browser security result states that the user declined
+localhost access and explicitly forbids alternate browser, Playwright, CDP, or indirect automation.
+This is a genuine external tool-model boundary, not a StarCi approval gate and not authority that the
+runtime may bypass.
+
+Repair 007 therefore passes its negative behavioral test: wrong/invisible output no longer becomes
+success. It cannot yet pass positive output stability because zero fresh rasters exist.
+
+## Runtime repair 008 — actor capture capability must pass before product mutation
+
+Round 5 also proved an efficiency defect. `starci-fe-process` already places `fe/runtime-observe`
+before product mutation, but multi-task self-upgrade launched actors directly into full product work.
+All three spent source, test, build, and fixture steps before discovering the same capture denial.
+
+- `ADD`: multi-task `calibrate-actor-preflight-wait` and `upgrade-actor-preflight-wait` states.
+- `CHANGE`: every actor specification now binds the final runtime fingerprint, unchanged acceptance,
+  `operator://fe/runtime-observe` pre-mutation gate, and v7 FE terminal contract.
+- `CHANGE`: supervision policy requires `preMutationCaptureGate=true`; actors begin in preflight-only
+  mode and receive product-mutation release only after validated capture-surface receipts.
+- `CHANGE`: passing actor proof packets must retain their exact pre-mutation runtime-observe receipt.
+- `REMOVE`: mutation-first multi-task launch and implementation/build work when the required visual
+  proof channel is already inaccessible.
+- Final runtime fingerprint:
+  `sha256:eb2aab1ba0201c2d1c8587800ac529674e379e9d3b1158b3340831944c6826d0`.
+- Validation: focused 15/15, active operators 132/132, 13 public Skills, release valid with 150
+  atomic operators and 87 knowledge records.
+- Product boundary: repair 008 changes no product source. Round 5 actor changes remain isolated,
+  uncommitted, unpushed, and visually unaccepted.
+- Final status: `blocked`, stability 0/2. A new run may start only after the in-app Browser can access
+  localhost; the new preflight will detect that before any additional product mutation.

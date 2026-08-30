@@ -1,0 +1,184 @@
+{
+  "schemaVersion": 7,
+  "runId": "round-4-ui-calibration-20260831",
+  "project": "starci-academy",
+  "selection": {
+    "analyzerVersion": 2,
+    "skillId": "starci-self-upgrade",
+    "confidence": "exact",
+    "interactionPolicy": "ask-only-when-stuck",
+    "activeInputRefs": [
+      "request:round-4-retry-three-ui-fixtures"
+    ],
+    "passiveContextRefs": [
+      "file:.claude/request-vocabulary.md",
+      "file:.claude/skills/catalog.json"
+    ]
+  },
+  "requestRef": "request:run-three-independent-ui-actions-under-self-upgrade-with-no-product-source-mutation",
+  "artifactRefs": [
+    "file:C:/Users/Cuong/AppData/Local/Temp/codex-clipboard-ad489817-db73-4202-bb05-dc420df2b176.png",
+    "file:C:/Users/Cuong/AppData/Local/Temp/codex-clipboard-c8bf4b95-18ba-4629-9473-deaf124bf1bd.png",
+    "file:C:/Users/Cuong/AppData/Local/Temp/codex-clipboard-14180493-8d18-4202-886d-4077334ec966.png",
+    "file:C:/Users/Cuong/AppData/Local/Temp/codex-clipboard-2aab4a15-687d-4147-8391-30e27992560d.png",
+    "file:C:/Users/Cuong/.codex/visualizations/2026/08/30/01a0515f-7294-70d2-a4aa-7f9984841335/starci-playground-redesign.html"
+  ],
+  "evidenceRefs": [
+    "browser-preflight:http://localhost:3115/:allowed-but-connection-refused",
+    "source-head:starci-academy-fe@4e571affa5880440df256dd7894273a06e692493",
+    "source-head:starci-academy-backend@dafab6f67329245766969e1d830a8648236e43de"
+  ],
+  "scope": {
+    "status": "frozen",
+    "unit": "runtime.calibration",
+    "targetRefs": [
+      "runtime:starci-v7.2.1",
+      "fixture:personal-project-reconstruct",
+      "fixture:cv-new",
+      "fixture:playground-reconstruct"
+    ],
+    "inclusionRefs": [
+      "behavior:pre-mutation-browser-capture-gate",
+      "behavior:three-independent-codex-actor-tasks",
+      "behavior:visual-output-correctness-and-stability",
+      "behavior:eleven-layer-diagnosis-on-failure",
+      "artifact:.claude/upgrades/round-4-ui-calibration-20260831"
+    ],
+    "exclusionRefs": [
+      "mutation:product-source",
+      "external:commit",
+      "external:push",
+      "external:deploy",
+      "runtime-owner-mutation:existing-.claude-files"
+    ],
+    "writeRoots": [
+      ".claude/upgrades/round-4-ui-calibration-20260831/"
+    ],
+    "externalMutation": false,
+    "approvalRef": null,
+    "completionProofRefs": [
+      "proof:each-actor-has-validated-runtime-observe-receipt",
+      "proof:each-actor-has-visible-typed-skill-result-durable-raster-and-independent-review",
+      "proof:each-actor-achieves-two-consecutive-passes-at-visual-quality-9-plus",
+      "proof:product-write-count-zero"
+    ],
+    "dimensions": [
+      {
+        "key": "runtime.observation-mode",
+        "value": "multi-task",
+        "authorityRef": "request:three-independent-ui-fixtures"
+      },
+      {
+        "key": "runtime.product-write-policy",
+        "value": "forbidden",
+        "authorityRef": "request:not-for-source-repair"
+      }
+    ],
+    "ambiguityRefs": []
+  },
+  "options": {
+    "intentMode": "calibrate",
+    "observationMode": "multi-task",
+    "actorSpecs": [
+      {
+        "actorId": "personal-project",
+        "role": "primary",
+        "taskRef": "codex-task:01a0540e-6728-7c31-a620-d095c1989ec6",
+        "actionRef": "fe-action:audit-personal-project-reconstruct",
+        "expectedSkillId": "starci-fe-process",
+        "scopeRef": "scope:surface-personal-project:frontend.ux-ui.change-level=reconstruct",
+        "writeRootRefs": [
+          "artifact-root:codex-task/personal-project"
+        ],
+        "productMutationAuthorityRef": "authority:product-source-forbidden",
+        "runtimeFingerprint": "sha256:9b0865a0729d6f080f3586c98458dc46ac19d60de2df3aa58159f95341e7d69d",
+        "acceptanceRef": "acceptance:visual-9-plus-business-fit-two-consecutive-passes",
+        "preMutationGateRef": "operator://fe/runtime-observe",
+        "terminalContractRef": "skill-output://starci-fe-process/v7"
+      },
+      {
+        "actorId": "cv-new",
+        "role": "primary",
+        "taskRef": "codex-task:01a0540e-69d8-71b3-aa39-605a6ca183d7",
+        "actionRef": "fe-action:audit-cv-new",
+        "expectedSkillId": "starci-fe-process",
+        "scopeRef": "scope:surface-cv:frontend.ux-ui.change-level=new",
+        "writeRootRefs": [
+          "artifact-root:codex-task/cv-new"
+        ],
+        "productMutationAuthorityRef": "authority:product-source-forbidden",
+        "runtimeFingerprint": "sha256:9b0865a0729d6f080f3586c98458dc46ac19d60de2df3aa58159f95341e7d69d",
+        "acceptanceRef": "acceptance:visual-9-plus-business-fit-two-consecutive-passes",
+        "preMutationGateRef": "operator://fe/runtime-observe",
+        "terminalContractRef": "skill-output://starci-fe-process/v7"
+      },
+      {
+        "actorId": "playground",
+        "role": "discriminator",
+        "taskRef": "codex-task:01a0540e-6c96-7a82-9f7c-78401e551391",
+        "actionRef": "fe-action:audit-playground-reconstruct",
+        "expectedSkillId": "starci-fe-process",
+        "scopeRef": "scope:surface-devops-playground:frontend.ux-ui.change-level=reconstruct",
+        "writeRootRefs": [
+          "artifact-root:codex-task/playground"
+        ],
+        "productMutationAuthorityRef": "authority:product-source-forbidden",
+        "runtimeFingerprint": "sha256:9b0865a0729d6f080f3586c98458dc46ac19d60de2df3aa58159f95341e7d69d",
+        "acceptanceRef": "acceptance:visual-9-plus-business-fit-two-consecutive-passes",
+        "preMutationGateRef": "operator://fe/runtime-observe",
+        "terminalContractRef": "skill-output://starci-fe-process/v7"
+      }
+    ],
+    "supervisionPolicy": {
+      "minPrimaryActors": 2,
+      "maxActors": 3,
+      "independentContexts": true,
+      "requirePerActorPasses": true,
+      "runtimeReloadOnChange": true,
+      "preMutationCaptureGate": true,
+      "discriminatorPolicy": "user-requested-or-asymmetric-inconclusive",
+      "communicationMode": "codex-task"
+    },
+    "benchmarkRefs": [
+      "benchmark:user-approved-course-page-quality",
+      "benchmark:visual-score-at-least-9-of-10",
+      "benchmark:business-purpose-remains-correct"
+    ],
+    "fixtureRefs": [
+      "fixture:personal-project-current-page",
+      "fixture:cv-current-page",
+      "fixture:playground-current-page",
+      "fixture:course-page-quality-reference"
+    ],
+    "metricNames": [
+      "elapsed-ms",
+      "time-to-first-action-ms",
+      "step-count",
+      "context-bytes",
+      "redundant-step-count",
+      "visual-verdict",
+      "product-write-count",
+      "terminal-visible",
+      "durable-raster-count"
+    ],
+    "requiredLayerNames": [
+      "objective-scope",
+      "input",
+      "prompt",
+      "state-machine",
+      "execute-logic",
+      "knowledge",
+      "grammar-ui",
+      "validation",
+      "output-contract",
+      "tool-model",
+      "proof"
+    ],
+    "stabilityPolicy": {
+      "requiredConsecutivePasses": 2,
+      "maxRepairAttempts": 3,
+      "freshEvidenceEachAttempt": true,
+      "stopOnRepeatedFingerprint": true
+    }
+  }
+}
