@@ -1,6 +1,10 @@
 # Execute `fe/render-capture`
 
-Capture one deterministic rendered evidence set for one frozen contract after the latest source mutation.
+Capture one deterministic rendered evidence set for one frozen contract after the latest source mutation and a validated `fe/capture-preflight=ready` result.
+
+Bind the preflight reference, immutable matrix fingerprint, owner-partition fingerprint, visual round,
+captured partition references, and dependency-proven reused partition references unchanged. Never
+expand or reorder the matrix after preflight. Shared sentinels are always fresh captures.
 
 Record the latest mutation fingerprint/time and the capture fingerprint/time. They must bind the same rendered source and capture must occur after the mutation. Freeze a raster-only blind-review packet as a retained artifact. The packet contains opaque image/probe cells only and excludes source, DOM, tests, measurements, authority text, producer rationale, earlier feedback, suspected defects, prior verdicts, and intended answers.
 

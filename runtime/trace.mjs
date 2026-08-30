@@ -119,6 +119,22 @@ export function renderAiDebug(receipt) {
   return [header, `[CONTRACT] ${contract}`, ...inspectionLines(receipt.trace.actualOutput, receipt.operatorId)];
 }
 
+export function renderVisualLoopDebug(receipt) {
+  if (!['fe/capture-preflight', 'fe/render-capture', 'fe/visual-fidelity', 'fe/finding-classify', 'fe/source-repair'].includes(receipt.operatorId)) return [];
+  const document = receipt.trace?.actualOutput ?? receipt.trace?.input;
+  const result = document?.output?.result ?? document?.input ?? {};
+  const round = result.visualRound ?? result.round ?? result.preflight?.round ?? document?.input?.blindReviewPacket?.visualRound ?? null;
+  const packet = result.packetFingerprint ?? result.blindReviewPacketFingerprint ?? document?.input?.blindReviewPacket?.packetFingerprint ?? 'pending';
+  const matrix = result.matrixFingerprint ?? result.preflight?.matrixFingerprint ?? document?.input?.blindReviewPacket?.matrixFingerprint ?? 'pending';
+  const capturePartitions = result.capturePartitionRefs ?? result.preflight?.capturePartitionRefs ?? document?.input?.blindReviewPacket?.capturePartitionRefs ?? [];
+  const reusedPartitions = result.reusedPartitionRefs ?? result.preflight?.reusedPartitionRefs ?? document?.input?.blindReviewPacket?.reusedPartitionRefs ?? [];
+  const findings = result.findingLedger?.length ?? result.inspectionRecords?.filter(({ verdict }) => verdict === 'repair').length ?? 0;
+  return [
+    `[VISUAL LOOP][${receipt.type}] operator=${receipt.operatorId} round=${round?.number ?? 'pending'} purpose=${round?.purpose ?? 'pending'}`,
+    `[VISUAL PACKET] packet=${packet} matrix=${matrix} capturePartitions=${capturePartitions.length} reusedPartitions=${reusedPartitions.length} findings=${findings}`,
+  ];
+}
+
 export function createReceipt(type, fields, { debug = true, now = () => new Date().toISOString(), writeDebug = console.log } = {}) {
   if (!RECEIPT_TYPES.includes(type)) throw new Error(`unsupported receipt type: ${type}`);
   const normalized = redact(fields);
@@ -138,7 +154,7 @@ export function createReceipt(type, fields, { debug = true, now = () => new Date
   const operatorLifecycle = lifecycleRequired ? planOperatorLifecycle(type, normalized) : null;
   const fullTrace = { missionContext: normalized.missionContext ?? null, context: normalized.context ?? null, input: normalized.input ?? null, expectedOutput: normalized.expectedOutput ?? null, actualOutput: normalized.actualOutput ?? null, payloadRef: normalized.payloadRef ?? null, authorityRefs: normalized.authorityRefs ?? [], evidenceRefs: normalized.evidenceRefs ?? [], sourceHeads: normalized.sourceHeads ?? [], transitionRule: normalized.transitionRule ?? null, resumeState: normalized.resumeState ?? null, skip: normalized.skip ?? null, error: normalized.error ?? null, aiActivity: normalized.aiActivity ?? null };
   const progressFingerprint = fingerprint({ type, skillId: normalized.skillId, operatorId: normalized.operatorId, actualOutput: fullTrace.actualOutput, transitionRule: fullTrace.transitionRule, resumeState: fullTrace.resumeState });
-  const receipt = { version:'7.2.0', receiptId: normalized.receiptId, type, missionId: normalized.missionId, skillId: normalized.skillId ?? null, operatorId: normalized.operatorId ?? null, parentId: normalized.parentId ?? null, childId: normalized.childId ?? null, timestamp: now(), progressFingerprint, trace: debug ? fullTrace : { authorityRefs: fullTrace.authorityRefs, evidenceRefs: fullTrace.evidenceRefs, sourceHeads: fullTrace.sourceHeads } };
+  const receipt = { version:'7.2.1', receiptId: normalized.receiptId, type, missionId: normalized.missionId, skillId: normalized.skillId ?? null, operatorId: normalized.operatorId ?? null, parentId: normalized.parentId ?? null, childId: normalized.childId ?? null, timestamp: now(), progressFingerprint, trace: debug ? fullTrace : { authorityRefs: fullTrace.authorityRefs, evidenceRefs: fullTrace.evidenceRefs, sourceHeads: fullTrace.sourceHeads } };
   const result = validate(receipt); if (!result.valid) throw new Error(result.errors.join('; '));
   deepFreeze(receipt);
   if (operatorLifecycle) {
@@ -149,6 +165,7 @@ export function createReceipt(type, fields, { debug = true, now = () => new Date
   }
   issuedReceipts.add(receipt);
   issuedReceiptDigests.set(receipt, fingerprint(receipt));
+  if (debug) for (const line of renderVisualLoopDebug(receipt)) writeDebug(line);
   if (debug && fullTrace.aiActivity) for (const line of renderAiDebug(receipt)) writeDebug(line);
   return receipt;
 }

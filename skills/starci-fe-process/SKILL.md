@@ -46,7 +46,7 @@ that names the competing boundaries, then wait. Never infer scope from current s
 `audit`/`redesign` alone.
 
 For every browser-visible change, apply `knowledge/ui-render-review.md` as an enforced adversarial
-loop after the latest source mutation: `apply/repair -> render-capture -> AI visual-fidelity`. The AI
+loop after the latest source mutation: `apply/repair -> capture-preflight -> render-capture -> AI visual-fidelity`. Capture preflight deterministically rejects bad data, false steady/skeleton identity, ineffective controls, incomplete probes, failed scroll/zoom restoration, duplicate rasters, or the wrong handoff host before any Sol review is called. The AI
 first tries to falsify the pixels without source, DOM, measurements, rules, Grammar, or implementer
 rationale. When it finds a potential problem, only then compare the observation with `knowledge/ui.md`
 and routed Grammar, classify whether the smallest demonstrated owner is implementation, Grammar, UI
@@ -56,16 +56,16 @@ explain away a bad raster. Only a fresh adversarial `visual-fidelity=passed` fro
 accessibility output, numeric thresholds, or a previous screenshot. Without this complete loop, the
 frontend mission is not complete.
 
-The enforced outer chain is `apply/repair -> render-capture -> one fresh Sol visual-fidelity -> quality-handoff`. That single Sol receives the complete blind raster and probe packet, performs the full adversarial visual review, and owns the typed visual verdict; no second AI review stage follows it.
+The enforced outer chain is `apply/repair -> capture-preflight -> render-capture -> one fresh Sol visual-fidelity -> quality-handoff`. That single Sol receives one complete owner-partitioned blind raster and probe packet, performs the full adversarial visual review, and owns the typed visual verdict; no second AI review stage follows it. Round 1 discovers the complete finding batch, round 2 verifies the batched repair, and round 3 is regression-only. Remaining findings at round 3 return `blocked` with diagnosis instead of opening an unbounded fourth review.
 Capture full-viewport screenshots after the latest source mutation and inspect the images themselves. A visual repair takes
-the inner path `visual-fidelity -> finding-classify -> authority-reconcile or source-repair ->
-render-capture`; it rejoins the outer chain only with fresh evidence.
+the inner path `visual-fidelity -> finding-classify -> authority-reconcile or one batched source-repair ->
+capture-preflight -> render-capture`; it rejoins the outer chain only with fresh evidence.
 
 The capture count is not the review. Once a screenshot is captured, enter blind pixel review: temporarily exclude source code, DOM/computed-style facts, tests, measurements, implementation rationale, and the implementer's intended design from the visual verdict. Judge what a user can actually see. Those excluded artifacts may diagnose a confirmed defect later, but they cannot explain away pixels or raise the verdict.
 
 Before any visual verdict, emit one inspection record for every screenshot cell covering page inset, surface opacity, content-to-border padding, alignment, vertical rhythm, hierarchy, visual ownership, pinned-boundary clearance, wrapping, clipping, occlusion, semantic utility, content coherence, affordance, responsive composition, visual consistency, and empty-space balance. Assign every visible heading, label, status, value, action, and control to the rendered section owner a user without source knowledge would perceive; an external label row plus its framed surface may be one legitimate owner, so DOM ancestry and frame containment are not proof. Inspect the owner with the preceding and following peers and inspect every sticky/fixed edge against its nearest content at scroll start, middle, and terminal. “No overlap” cannot pass a surface that visibly touches or is cut off by a pinned boundary. Challenge every visible object: what user purpose does it serve here, is it understandable without implementation context, is it redundant or stale, and does its prominence match its value? A meaningless object includes debug residue, placeholder copy, duplicated actions, decorative noise, orphan labels, empty shells, misleading controls, or large dead zones without a user purpose; any of these is `repair`. An object visually bound to the wrong sibling or floating between owners, text touching a rounded border, content visible through a sticky/fixed surface, an action cut by an edge, inconsistent peer insets, weak or conflicting hierarchy, or desktop merely squeezed into compact are also `repair` even when controls remain technically reachable.
 
-Freeze a render-state matrix before capture. It includes every in-scope entry, task, skeleton,
+Freeze a render-state matrix and owner partition map before capture. It includes every in-scope entry, task, skeleton,
 loading, pending, empty, recovery, result, and exit state at every required viewport, plus the exact
 state that will be left visible at handoff. Skeleton and loading are independent visual products, not
 temporary exceptions: when owned by the surface, each requires fresh raster capture and AI
@@ -75,8 +75,11 @@ an uncropped host-context screenshot from the
 exact browser surface and content viewport the user will see, without a viewport override; a detached
 or emulated browser raster does not certify a narrower in-app panel. An overlay image does not certify
 the obscured entry surface, and an audited task state does not certify a different state left visible
-at handoff. Any source mutation, handoff-state change, host-surface change, or handoff viewport change
-after capture stales the visual evidence and returns the mission to capture.
+at handoff. A source mutation invalidates every affected owner partition plus all shared sentinels. An
+unaffected partition may reuse its prior raster only when deterministic dependency proof binds it to
+the unchanged source boundary; absence of that proof invalidates it. Any handoff-state change,
+host-surface change, or handoff viewport change invalidates the host and dependent partitions and
+returns the mission to capture preflight.
 The exact handoff state must therefore have fresh visual evidence.
 
 For draggable, scrollable, sticky, fixed, zoom-sensitive, or overlay-bearing surfaces, a reload

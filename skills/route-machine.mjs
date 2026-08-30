@@ -62,7 +62,7 @@ export async function validatedOperatorReturn({ machineId, stateId, operatorId, 
   const canonicalInput = await canonicalInputValidator(operatorId);
   const canonicalValidator = await canonicalOutputValidator(operatorId);
   if (validateOutput !== canonicalValidator) throw new Error('validated operator return requires the exact canonical operator output validator export');
-  if (!isRoutableOperatorReturnReceipt(returnReceipt) || returnReceipt?.type !== 'RETURN' || returnReceipt.operatorId !== operatorId || returnReceipt.version !== '7.2.0') {
+  if (!isRoutableOperatorReturnReceipt(returnReceipt) || returnReceipt?.type !== 'RETURN' || returnReceipt.operatorId !== operatorId || returnReceipt.version !== '7.2.1') {
     throw new Error('validated operator return requires the canonical operator RETURN receipt');
   }
   if (returnReceipt.skillId !== machineId) throw new Error('canonical operator RETURN belongs to another Skill machine');

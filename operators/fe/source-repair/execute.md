@@ -1,5 +1,9 @@
 # Execute `fe/source-repair`
 
+Repair the complete classified `repairBatchRef` in one bounded mutation. Preserve the affected owner
+partition references so capture preflight can recapture them and every shared sentinel while reusing
+only dependency-proven unaffected partitions.
+
 Repair one classified frontend finding inside one frozen source boundary.
 
 Keep the frozen behavior-contract fingerprint unchanged and repair the exact failed evidence refs.

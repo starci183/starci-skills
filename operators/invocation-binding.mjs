@@ -1,10 +1,23 @@
+import crypto from 'node:crypto';
+
+const contentFingerprint = (value) => `sha256:${crypto.createHash('sha256').update(JSON.stringify(value)).digest('hex')}`;
+
 function sameSequence(left, right) {
+  left ??= [];
+  right ??= [];
   return left.length === right.length && left.every((item, index) => item === right[index]);
 }
 
 function manifestFromVisualPacket(packet) {
   return {
     packetRef: packet.packetRef,
+    preflightRef: packet.preflightRef,
+    matrixRef: packet.matrixRef,
+    matrixFingerprint: packet.matrixFingerprint,
+    partitionFingerprint: packet.partitionFingerprint,
+    visualRound: packet.visualRound,
+    capturePartitionRefs: packet.capturePartitionRefs,
+    reusedPartitionRefs: packet.reusedPartitionRefs,
     latestMutationFingerprint: packet.latestMutationFingerprint,
     capturedSourceFingerprint: packet.capturedSourceFingerprint,
     latestMutationAt: packet.latestMutationAt,
@@ -17,8 +30,26 @@ function manifestFromVisualPacket(packet) {
 
 export function createOperatorInvocationBindingRegistry() {
   const validatedCapturePackets = new Map();
+  const validatedPreflights = new Map();
 
   function record(operatorId, outputDocument, returnReceipt) {
+    if (operatorId === 'fe/capture-preflight' && outputDocument?.output?.outcome === 'ready') {
+      const result = outputDocument.output.result;
+      const frozen = {
+        receiptId: returnReceipt.receiptId,
+        preflightRef: result.preflightRef,
+        matrixRef: result.matrixRef,
+        matrixFingerprint: result.matrixFingerprint,
+        partitionFingerprint: result.partitionFingerprint,
+        round: result.round,
+        capturePartitionRefs: result.capturePartitionRefs,
+        reusedPartitionRefs: result.reusedPartitionRefs,
+      };
+      const prior = validatedPreflights.get(result.preflightRef);
+      if (prior && JSON.stringify(prior) !== JSON.stringify(frozen)) throw new Error('validated capture preflight identity was already bound to a different freeze');
+      validatedPreflights.set(result.preflightRef, frozen);
+      return;
+    }
     if (operatorId !== 'fe/render-capture' || outputDocument?.output?.outcome !== 'captured') return;
     const result = outputDocument.output.result;
     const packetRef = result.blindReviewPacketRef;
@@ -34,6 +65,22 @@ export function createOperatorInvocationBindingRegistry() {
   }
 
   function validate(operatorId, inputDocument, outputDocument, returnReceipt = null) {
+    if (operatorId === 'fe/capture-preflight') {
+      const errors = [];
+      const input = inputDocument?.input;
+      const context = inputDocument?.context;
+      const result = outputDocument?.output?.result;
+      if (!input || !context || !result) return ['capture preflight requires complete input and output documents'];
+      if (result.sourceFingerprint !== context.sourceFingerprint) errors.push('capture preflight source differs from invocation input');
+      if (result.matrixRef !== input.matrix.matrixRef || result.matrixFingerprint !== input.matrix.matrixFingerprint) errors.push('capture preflight matrix differs from invocation input');
+      if (result.partitionFingerprint !== contentFingerprint(input.partitions)) errors.push('capture preflight partition fingerprint must hash the exact owner partition map');
+      if (JSON.stringify(result.round) !== JSON.stringify(input.round)) errors.push('capture preflight round differs from invocation input');
+      const captureRefs = input.partitions.filter(({ disposition }) => disposition !== 'reuse').map(({ partitionRef }) => partitionRef);
+      const reusedRefs = input.partitions.filter(({ disposition }) => disposition === 'reuse').map(({ partitionRef }) => partitionRef);
+      if (!sameSequence(result.capturePartitionRefs, captureRefs) || !sameSequence(result.reusedPartitionRefs, reusedRefs)) errors.push('capture preflight partition disposition differs from invocation input');
+      if (JSON.stringify(result.readinessChecks) !== JSON.stringify(input.readinessChecks)) errors.push('capture preflight readiness evidence differs from invocation input');
+      return errors;
+    }
     if (operatorId === 'quality/delivery-proof' && outputDocument?.output?.outcome === 'pass') {
       const supplied = new Set([...(inputDocument?.context?.contextRefs ?? []), ...(inputDocument?.context?.sourceRefs ?? [])]);
       const resultRef = outputDocument.output.resultRef;
@@ -66,6 +113,18 @@ export function createOperatorInvocationBindingRegistry() {
       const result = outputDocument?.output?.result;
       if (!input || !context || !result) return ['render capture requires complete input and output documents'];
       if (result.sourceFingerprint !== context.sourceFingerprint) errors.push('render capture source differs from invocation input');
+      const preflight = input.preflight;
+      const frozenPreflight = validatedPreflights.get(preflight.preflightRef);
+      if (!frozenPreflight) errors.push('render capture preflight is not bound to a validated capture-preflight RETURN');
+      if (frozenPreflight) {
+        const supplied = { receiptId: frozenPreflight.receiptId, ...preflight };
+        if (JSON.stringify(supplied) !== JSON.stringify(frozenPreflight)) errors.push('render capture preflight differs from the exact validated freeze');
+      }
+      if (result.preflightRef !== preflight.preflightRef) errors.push('render capture preflight differs from invocation input');
+      if (result.matrixRef !== preflight.matrixRef || result.matrixFingerprint !== preflight.matrixFingerprint) errors.push('render capture matrix fingerprint differs from frozen preflight');
+      if (result.partitionFingerprint !== preflight.partitionFingerprint) errors.push('render capture partition fingerprint differs from frozen preflight');
+      if (JSON.stringify(result.visualRound) !== JSON.stringify(preflight.round)) errors.push('render capture visual round differs from frozen preflight');
+      if (!sameSequence(result.capturePartitionRefs, preflight.capturePartitionRefs) || !sameSequence(result.reusedPartitionRefs, preflight.reusedPartitionRefs)) errors.push('render capture owner partitions differ from frozen preflight');
       const expectedCells = input.renderStates.flatMap((stateRef) => input.viewports.map((viewport) => `${stateRef}::${viewport}`));
       const actualCells = result.renderMatrix.map(({ stateRef, viewport }) => `${stateRef}::${viewport}`);
       if (!sameSequence(actualCells, expectedCells)) errors.push('render capture matrix differs from requested state and viewport order');
@@ -111,6 +170,9 @@ export function createOperatorInvocationBindingRegistry() {
       ...(packet.probeCells ?? []).filter(({ applicable }) => applicable).map(({ imageRef }) => imageRef),
     ])];
     if (result.packetFingerprint !== packet.packetFingerprint) errors.push('packet fingerprint differs from supplied input');
+    if (result.matrixFingerprint !== packet.matrixFingerprint) errors.push('matrix fingerprint differs from supplied input');
+    if (result.partitionFingerprint !== packet.partitionFingerprint) errors.push('partition fingerprint differs from supplied input');
+    if (JSON.stringify(result.visualRound) !== JSON.stringify(packet.visualRound)) errors.push('visual round differs from supplied input');
     if (!sameSequence(result.packetRasterRefs ?? [], suppliedRasters)) errors.push('packet raster refs differ from supplied input order');
     if (result.lastScreenshotRef !== packet.lastScreenshotRef) errors.push('last screenshot differs from supplied input');
     if (result.reviewerExecutionRef !== context.reviewerExecutionRef) errors.push('reviewer execution differs from supplied context');

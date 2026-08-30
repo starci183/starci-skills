@@ -11,7 +11,7 @@ const base = { receiptId:'receipt:r1', missionId:'m1', skillId:'starci-quality-a
 const lifecycleFields=(id,hex)=>({missionId:`mission:${id}`,context:{source:'be',invocationRef:`invocation://${id}`,executionRef:`execution://${hex.repeat(64)}`}});
 
 test('sole YAML config is strict v7.2 with one fresh Sol for brainstorm and visual review', () => assert.deepEqual(loadRuntimeConfig(), {
-  version:'7.2.0',
+  version:'7.2.1',
   debug:true,
   aiBrainstormModel:'gpt-5.6-sol',
   aiBrainstormCount:1,
@@ -21,11 +21,12 @@ test('sole YAML config is strict v7.2 with one fresh Sol for brainstorm and visu
   visualReviewCount:1,
   visualReviewIsolation:'fresh',
   visualReviewForkTurns:'none',
+  visualReviewMaxRounds:3,
 }));
 
 test('scope policy rejects unresolved mission scope before skill selection', () => {
   const policy=loadScopePolicy();
-  assert.equal(policy.version,'7.2.0');
+  assert.equal(policy.version,'7.2.1');
   assert.equal(policy.unclearAction,'ask-before-skill-selection');
   assert.equal(policy.sourceInspectionWhileAmbiguous,'forbidden');
   assert.deepEqual(policy.registeredDimensions['frontend.ux-ui.change-level'],['refine','reconstruct','new']);
@@ -34,6 +35,14 @@ test('scope policy rejects unresolved mission scope before skill selection', () 
 test('debug true renders the normalized execution contract', () => {
   const receipt = createReceipt('CALL', {...base,...lifecycleFields('debug-contract','1')}, { debug:true, now:()=> '2026-01-01T00:00:00.000Z' });
   for (const key of ['missionContext','context','input','expectedOutput','actualOutput','evidenceRefs','sourceHeads','transitionRule','resumeState','skip','error']) assert.ok(Object.hasOwn(receipt.trace,key), key);
+});
+
+test('debug true prints the visual phase, packet, round, partitions, and finding count', () => {
+  const lines=[];
+  const fields={...base,...lifecycleFields('visual-loop-debug','d'),operatorId:'fe/capture-preflight',actualOutput:{output:{outcome:'ready',result:{round:{number:2,purpose:'verification'},matrixFingerprint:`sha256:${'a'.repeat(64)}`,capturePartitionRefs:['partition://main','partition://shared'],reusedPartitionRefs:['partition://header'],findingLedger:[{findingRef:'finding://spacing'}]}}}};
+  createReceipt('CALL',{...fields,receiptId:'receipt:visual-loop-debug-call'},{debug:true,writeDebug:(line)=>lines.push(line)});
+  assert.ok(lines.some((line)=>line.includes('[VISUAL LOOP][CALL] operator=fe/capture-preflight round=2 purpose=verification')));
+  assert.ok(lines.some((line)=>line.includes('capturePartitions=2 reusedPartitions=1 findings=1')));
 });
 
 test('debug false retains a typed receipt while reducing visibility', () => {

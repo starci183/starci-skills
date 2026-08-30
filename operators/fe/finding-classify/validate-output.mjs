@@ -19,6 +19,12 @@ const semantic = (value) => {
   if (new Set(refs).size !== refs.length) {
     errors.push('$.output.result.ownerAssessments: duplicate finding ownership is forbidden');
   }
+  const ledgerRefs = result?.findingLedger?.map(({ findingRef }) => findingRef) ?? [];
+  const ledgerFingerprints = result?.findingLedger?.map(({ findingFingerprint }) => findingFingerprint) ?? [];
+  if (new Set(ledgerRefs).size !== ledgerRefs.length) errors.push('$.output.result.findingLedger: duplicate findingRef values are forbidden');
+  if (new Set(ledgerFingerprints).size !== ledgerFingerprints.length) errors.push('$.output.result.findingLedger: duplicate finding fingerprints are forbidden');
+  if (JSON.stringify(refs) !== JSON.stringify(ledgerRefs)) errors.push('$.output.result.ownerAssessments: must cover the complete finding ledger in exact order');
+  if (result?.visualRound?.number === 3 && outcome !== 'blocked') errors.push('$.output.outcome: round 3 findings must trip the circuit breaker and block');
   return errors;
 };
 export const validateOutput=validatorFor(new URL('./output.schema.json',import.meta.url), semantic);

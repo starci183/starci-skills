@@ -1,4 +1,4 @@
-version: 7.2.0
+version: 7.2.1
 debug: true
 aiBrainstormModel: gpt-5.6-sol
 aiBrainstormCount: 1
@@ -8,3 +8,4 @@ visualReviewModel: gpt-5.6-sol
 visualReviewCount: 1
 visualReviewIsolation: fresh
 visualReviewForkTurns: none
+visualReviewMaxRounds: 3

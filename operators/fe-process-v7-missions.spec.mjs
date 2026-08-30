@@ -120,7 +120,7 @@ test('frontend public input rejects fabricated and replayed return receipts',()=
   const value=feInput('repair','Repair Profile');
   value.receiptType='RETURN';
   value.resume={missionRef:'mission-1',fromSkillId:'starci-backend-process',receiptRef:'receipt:fe-public',resumeState:'apply'};
-  value.returnReceipt={version:'7.2.0',receiptId:'receipt:fe-public',type:'RETURN',missionId:'mission-1',skillId:'starci-backend-process',operatorId:null,parentId:'receipt:call',childId:null,timestamp:'2026-08-30T00:00:00.000Z',progressFingerprint:`sha256:${'a'.repeat(64)}`,trace:{resumeState:'apply'}};
+  value.returnReceipt={version:'7.2.1',receiptId:'receipt:fe-public',type:'RETURN',missionId:'mission-1',skillId:'starci-backend-process',operatorId:null,parentId:'receipt:call',childId:null,timestamp:'2026-08-30T00:00:00.000Z',progressFingerprint:`sha256:${'a'.repeat(64)}`,trace:{resumeState:'apply'}};
   assert.match(validateFeInput(value).errors.join('\n'),/not a runtime-issued immutable receipt/);
   value.returnReceipt=createReceipt('RETURN',{receiptId:'receipt:fe-public-canonical',missionId:'mission-1',skillId:'starci-backend-process',parentId:'receipt:call',resumeState:'apply'},{debug:true});
   value.resume.receiptRef=value.returnReceipt.receiptId;
@@ -168,7 +168,8 @@ test('FE to backend handoff resumes the exact same FE mission', () => {
   assert.equal(routed('consumed','consume-return'),'peer-guard');
   assert.equal(routed('progress','peer-guard'),'resume-route');
   assert.equal(nextState(machine,'resume-route',null,original),'apply');
-  assert.equal(routed('applied','apply'),'capture');
+  assert.equal(routed('applied','apply'),'capture-preflight');
+  assert.equal(routed('ready','capture-preflight'),'capture');
   assert.equal(routed('passed','visual-fidelity'),'quality-handoff');
 });
 

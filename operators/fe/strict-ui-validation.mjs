@@ -58,6 +58,19 @@ export const REQUIRED_PROBE_PHASES = {
   'keyboard-focus': ['focus'],
   'composition-neighbors': ['baseline'],
 };
+export const REQUIRED_PREFLIGHT_CHECKS = [
+  'data-ready',
+  'steady-not-skeleton',
+  'state-content-valid',
+  'controls-effective',
+  'page-scroll-restored',
+  'bounded-scroll-restored',
+  'zoom-restored',
+  'probe-complete',
+  'raster-unique',
+  'handoff-host-valid',
+];
+export const VISUAL_ROUND_PURPOSES = Object.freeze({ 1: 'discovery', 2: 'verification', 3: 'regression' });
 
 const duplicates = (values) => values.filter((value, index) => values.indexOf(value) !== index);
 const missing = (required, actual) => required.filter((value) => !actual.includes(value));
@@ -172,9 +185,72 @@ export function renderMatrixSemantic(matrix, at) {
   return errors;
 }
 
+export function capturePreflightInputSemantic(value) {
+  const errors = [];
+  const { round, matrix, partitions, readinessChecks } = value.input;
+  if (VISUAL_ROUND_PURPOSES[round.number] !== round.purpose) {
+    errors.push(`$.input.round.purpose: round ${round.number} must be ${VISUAL_ROUND_PURPOSES[round.number]}`);
+  }
+  if (!exactSequence(matrix.viewports, REQUIRED_VIEWPORTS)) {
+    errors.push(`$.input.matrix.viewports: must be ordered ${REQUIRED_VIEWPORTS.join(', ')}`);
+  }
+  const expectedMatrixFingerprint = fingerprint({ renderStates: matrix.renderStates, viewports: matrix.viewports, probeRefs: matrix.probeRefs });
+  if (matrix.matrixFingerprint !== expectedMatrixFingerprint) errors.push('$.input.matrix.matrixFingerprint: must hash the exact immutable matrix body');
+  const checks = readinessChecks.map(({ check }) => check);
+  if (!exactSequence(checks, REQUIRED_PREFLIGHT_CHECKS)) {
+    errors.push(`$.input.readinessChecks: must be ordered ${REQUIRED_PREFLIGHT_CHECKS.join(', ')}`);
+  }
+  if (duplicates(checks).length > 0) errors.push('$.input.readinessChecks: duplicate checks are forbidden');
+  const partitionRefs = partitions.map(({ partitionRef }) => partitionRef);
+  if (duplicates(partitionRefs).length > 0) errors.push('$.input.partitions: duplicate partitionRef values are forbidden');
+  for (const [index, partition] of partitions.entries()) {
+    if (partition.disposition === 'reuse' && partition.dependencyProofRefs.length === 0) {
+      errors.push(`$.input.partitions[${index}].dependencyProofRefs: reuse requires exact dependency proof`);
+    }
+    if (partition.disposition === 'shared-sentinel' && partition.dependencyProofRefs.length > 0) {
+      errors.push(`$.input.partitions[${index}]: shared sentinels are recaptured, never justified as reusable`);
+    }
+    for (const stateRef of partition.stateRefs) {
+      if (!matrix.renderStates.includes(stateRef)) errors.push(`$.input.partitions[${index}].stateRefs: ${stateRef} is absent from the frozen matrix`);
+    }
+    for (const probeRef of partition.probeRefs) {
+      if (!matrix.probeRefs.includes(probeRef)) errors.push(`$.input.partitions[${index}].probeRefs: ${probeRef} is absent from the frozen matrix`);
+    }
+  }
+  for (const stateRef of matrix.renderStates) {
+    if (!partitions.some((partition) => partition.stateRefs.includes(stateRef))) errors.push(`$.input.partitions: frozen state ${stateRef} has no owner partition`);
+  }
+  for (const probeRef of matrix.probeRefs) {
+    if (!partitions.some((partition) => partition.probeRefs.includes(probeRef))) errors.push(`$.input.partitions: frozen probe ${probeRef} has no owner partition`);
+  }
+  return errors;
+}
+
+export function capturePreflightOutputSemantic(value) {
+  const errors = [];
+  const { outcome, result, gaps, evidenceRefs } = value.output;
+  if (outcome === 'ready') {
+    if (!result) return ['$.output.result: ready requires a frozen preflight result'];
+    if (gaps.length > 0) errors.push('$.output.gaps: ready cannot retain gaps');
+    if (evidenceRefs.length === 0) errors.push('$.output.evidenceRefs: ready requires deterministic evidence');
+    if (VISUAL_ROUND_PURPOSES[result.round?.number] !== result.round?.purpose) errors.push('$.output.result.round: number and purpose do not match the visual-round policy');
+    const checks = result.readinessChecks ?? [];
+    if (!exactSequence(checks.map(({ check }) => check), REQUIRED_PREFLIGHT_CHECKS)) errors.push('$.output.result.readinessChecks: exact ordered readiness matrix is required');
+    if (checks.some(({ verdict }) => verdict !== 'passed')) errors.push('$.output.result.readinessChecks: every deterministic check must pass before capture');
+    if ((result.capturePartitionRefs?.length ?? 0) === 0) errors.push('$.output.result.capturePartitionRefs: at least one owner partition must be captured');
+  } else if (result !== null) {
+    errors.push('$.output.result: incomplete preflight outcomes must return null');
+  }
+  if (outcome !== 'ready' && gaps.length === 0) errors.push('$.output.gaps: non-ready preflight requires exact gaps');
+  return errors;
+}
+
 export function renderCaptureInputSemantic(value) {
   const errors = probeCoverageSemantic(value.input.adversarialProbes, '$.input.adversarialProbes');
   if (!exactSequence(value.input.viewports, REQUIRED_VIEWPORTS)) errors.push(`$.input.viewports: must be ordered ${REQUIRED_VIEWPORTS.join(', ')}`);
+  const { preflight } = value.input;
+  if (!preflight) errors.push('$.input.preflight: validated capture preflight is required');
+  if (preflight && VISUAL_ROUND_PURPOSES[preflight.round.number] !== preflight.round.purpose) errors.push('$.input.preflight.round: number and purpose do not match');
   return errors;
 }
 
@@ -183,6 +259,8 @@ export function renderCaptureOutputSemantic(value) {
   if (value.output.outcome === 'captured') {
     const result = value.output.result;
     if (!result) return ['$.output.result: captured requires structured evidence'];
+    if (result.preflightRef == null) errors.push('$.output.result.preflightRef: capture must bind a validated preflight');
+    if (VISUAL_ROUND_PURPOSES[result.visualRound?.number] !== result.visualRound?.purpose) errors.push('$.output.result.visualRound: number and purpose do not match');
     errors.push(...renderMatrixSemantic(result.renderMatrix, '$.output.result.renderMatrix'));
     errors.push(...probeCoverageSemantic(result.adversarialProbeMatrix, '$.output.result.adversarialProbeMatrix'));
     if (!result.renderMatrix.some(({ handoffState }) => handoffState)) {
@@ -198,6 +276,12 @@ export function renderCaptureOutputSemantic(value) {
       errors.push('$.output.result.blindReviewPacketRef: frozen packet must be retained as an artifact');
     }
     if (result.blindReviewPacket?.packetRef !== result.blindReviewPacketRef) errors.push('$.output.result.blindReviewPacket: packetRef differs from retained packet');
+    for (const field of ['preflightRef', 'matrixRef', 'matrixFingerprint', 'partitionFingerprint']) {
+      if (result.blindReviewPacket?.[field] !== result[field]) errors.push(`$.output.result.blindReviewPacket.${field}: differs from capture result`);
+    }
+    if (JSON.stringify(result.blindReviewPacket?.visualRound) !== JSON.stringify(result.visualRound)) errors.push('$.output.result.blindReviewPacket.visualRound: differs from capture result');
+    if (!exactSequence(result.blindReviewPacket?.capturePartitionRefs ?? [], result.capturePartitionRefs ?? [])) errors.push('$.output.result.blindReviewPacket.capturePartitionRefs: differs from capture result');
+    if (!exactSequence(result.blindReviewPacket?.reusedPartitionRefs ?? [], result.reusedPartitionRefs ?? [])) errors.push('$.output.result.blindReviewPacket.reusedPartitionRefs: differs from capture result');
     if (fingerprint(result.blindReviewPacket) !== result.blindReviewPacketFingerprint) errors.push('$.output.result.blindReviewPacketFingerprint: must hash the exact complete packet manifest');
     if (result.blindReviewPacket?.capturedSourceFingerprint !== result.sourceFingerprint || result.blindReviewPacket?.latestMutationFingerprint !== result.latestMutationFingerprint) errors.push('$.output.result.blindReviewPacket: source fingerprints differ from capture result');
     if (result.blindReviewPacket?.capturedAt !== result.capturedAt || result.blindReviewPacket?.latestMutationAt !== result.latestMutationAt) errors.push('$.output.result.blindReviewPacket: capture timestamps differ from capture result');
@@ -219,6 +303,9 @@ export function visualFidelityInputSemantic(value) {
   const errors = [];
   const { context, input } = value;
   const packet = input.blindReviewPacket;
+  if (VISUAL_ROUND_PURPOSES[packet.visualRound?.number] !== packet.visualRound?.purpose) {
+    errors.push('$.input.blindReviewPacket.visualRound: number and purpose do not match');
+  }
   if (context.implementerExecutionRef === context.reviewerExecutionRef) {
     errors.push('$.context.reviewerExecutionRef: blind reviewer must differ from the implementer');
   }
@@ -271,6 +358,7 @@ export function visualFidelityOutputSemantic(value) {
     errors.push('$.output.result.reviewMode: visual fidelity requires AI adversarial pixel review');
   }
   if (result) {
+    if (VISUAL_ROUND_PURPOSES[result.visualRound?.number] !== result.visualRound?.purpose) errors.push('$.output.result.visualRound: number and purpose do not match');
     if (result.reviewerModel !== 'gpt-5.6-sol' || result.reviewerCount !== 1 || result.contextIsolation !== 'fresh' || result.forkTurns !== 'none') {
       errors.push('$.output.result: v7.2 visual review requires one fresh-context gpt-5.6-sol reviewer');
     }
@@ -327,6 +415,9 @@ export function visualFidelityOutputSemantic(value) {
       !result.inspectionRecords.some(({ verdict }) => verdict === 'repair') &&
       !result.probeRecords.some(({ verdict }) => verdict === 'contradiction')) {
     errors.push('$.output.result: repair requires a visible repair verdict or probe contradiction');
+  }
+  if (outcome === 'repair' && result?.visualRound?.number === 3) {
+    errors.push('$.output.outcome: round 3 is the regression circuit breaker; remaining findings must return blocked');
   }
   errors.push(...probeCoverageSemantic(result?.probeRecords, '$.output.result.probeRecords'));
   const imageRefs = result?.inspectionRecords?.map(({ imageRef }) => imageRef) ?? [];

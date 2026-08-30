@@ -1,5 +1,10 @@
 # Execute `fe/visual-fidelity`
 
+Consume only a preflight-bound raster packet. Preserve its matrix fingerprint, owner-partition
+fingerprint, and visual round in the result. Round 1 is discovery, round 2 is verification, and round 3
+is regression-only. If any repair remains in round 3, return `blocked`; never request or imply a fourth
+visual round.
+
 Falsify one frontend render packet with one fresh-context `gpt-5.6-sol` reviewer without repairing source.
 
 Use only the closed `context` and `input`. Return one typed `output.outcome` plus this job's result, gaps, and evidence. Do not route, persist a session, or choose another operator.

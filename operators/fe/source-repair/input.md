@@ -14,3 +14,5 @@
 - `input.behaviorContractRef`: Exact frozen behavior-preservation contract that remains binding.
 - `input.behaviorContractFingerprint`: Immutable fingerprint binding repair to that contract.
 - `input.failedEvidenceRefs`: Exact latest-source inspection or probe contradictions repaired now.
+- `input.repairBatchRef`: One complete classified finding batch repaired atomically.
+- `input.affectedPartitionRefs`: Owner partitions invalidated by the batched repair.

@@ -164,7 +164,7 @@
               ],
               "properties": {
                 "version": {
-                  "const": "7.2.0"
+                  "const": "7.2.1"
                 },
                 "receiptId": {
                   "type": "string",
@@ -248,7 +248,7 @@
             ],
             "properties": {
               "version": {
-                "const": "7.2.0"
+                "const": "7.2.1"
               },
               "receiptId": {
                 "type": "string",

@@ -1,4 +1,4 @@
-# StarCi Skills 7.2.0
+# StarCi Skills 7.2.1
 
 StarCi v7 turns one product mission into a composable execution graph. One public Skill owns the
 outcome, calls peer Skills across durable boundaries, and resumes from typed `RETURN` receipts. Atomic
@@ -81,7 +81,7 @@ npm run materialize
 npm test
 ```
 
-The release gate validates the exact 12-Skill catalog, 148 strict atomic operators, typed nested
+The release gate validates the exact 12-Skill catalog, 149 strict atomic operators, typed nested
 `CALL -> RETURN -> RESUME`, selection behavior, flat worktree topology, UAT templates, direct-search
 boundary, and the generated Skills site.
 

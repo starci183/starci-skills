@@ -59,7 +59,9 @@
         "targetRef",
         "constraints",
         "reviewStage",
-        "findingSetRef"
+        "findingSetRef",
+        "visualRound",
+        "findingRefs"
       ],
       "properties": {
         "targetRef": {
@@ -85,6 +87,16 @@
           "description": "Exact validated visual or independent finding product to classify.",
           "type": "string",
           "minLength": 1
+        },
+        "visualRound": {
+          "description": "Visual round that produced this complete finding set.",
+          "type": "object", "additionalProperties": false, "required": ["number", "purpose"],
+          "properties": { "number": { "type": "integer", "minimum": 1, "maximum": 3 }, "purpose": { "enum": ["discovery", "verification", "regression"] } }
+        },
+        "findingRefs": {
+          "description": "The complete visual finding batch; classification may not stop after the first finding.",
+          "type": "array", "minItems": 1, "maxItems": 128, "uniqueItems": true,
+          "items": { "type": "string", "minLength": 1 }
         }
       }
     }

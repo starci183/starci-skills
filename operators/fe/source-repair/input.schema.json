@@ -60,7 +60,9 @@
         "constraints",
         "behaviorContractRef",
         "behaviorContractFingerprint",
-        "failedEvidenceRefs"
+        "failedEvidenceRefs",
+        "repairBatchRef",
+        "affectedPartitionRefs"
       ],
       "properties": {
         "targetRef": {
@@ -95,6 +97,16 @@
           "maxItems": 128,
           "uniqueItems": true,
           "items": { "type": "string", "minLength": 1 }
+        },
+        "repairBatchRef": {
+          "description": "One complete classified finding batch repaired atomically before recapture.",
+          "type": "string",
+          "pattern": "^batch://[0-9a-f]{64}$"
+        },
+        "affectedPartitionRefs": {
+          "description": "Owner partitions invalidated by this repair; shared sentinels are added again by preflight.",
+          "type": "array", "minItems": 1, "maxItems": 32, "uniqueItems": true,
+          "items": { "type": "string", "pattern": "^partition://" }
         }
       }
     }

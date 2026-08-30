@@ -9,6 +9,9 @@ import { validateOutput as validateCaptureOutput } from './fe/render-capture/val
 import { validateInput as validateVisualInput } from './fe/visual-fidelity/validate-input.mjs';
 import { validateOutput as validateVisualOutput } from './fe/visual-fidelity/validate-output.mjs';
 import { validateOutput as validateIndependentOutput } from './fe/independent-review/validate-output.mjs';
+import { validateInput as validatePreflightInput } from './fe/capture-preflight/validate-input.mjs';
+import { validateOutput as validatePreflightOutput } from './fe/capture-preflight/validate-output.mjs';
+import { validateOutput as validateFindingOutput } from './fe/finding-classify/validate-output.mjs';
 import { createOperatorInvocationBindingRegistry } from './invocation-binding.mjs';
 import { fingerprint } from '../runtime/trace.mjs';
 
@@ -19,6 +22,21 @@ const responsiveStateInventory = [
 ];
 const invocationBindings = createOperatorInvocationBindingRegistry();
 const raster = (label) => `render://${label}/sha256-${fingerprint(label).slice(7)}.png`;
+const visualRound = { number: 1, purpose: 'discovery' };
+const capturePreflight = () => ({
+  preflightRef: `preflight://${'3'.repeat(64)}`,
+  matrixRef: 'matrix://profile-v1',
+  matrixFingerprint: `sha256:${'4'.repeat(64)}`,
+  partitionFingerprint: `sha256:${'5'.repeat(64)}`,
+  round: { ...visualRound },
+  capturePartitionRefs: ['partition://profile-main'],
+  reusedPartitionRefs: [],
+});
+const readinessChecks = () => [
+  'data-ready', 'steady-not-skeleton', 'state-content-valid', 'controls-effective',
+  'page-scroll-restored', 'bounded-scroll-restored', 'zoom-restored', 'probe-complete',
+  'raster-unique', 'handoff-host-valid',
+].map((check) => ({ check, verdict: 'passed', evidenceRef: `evidence://${check}`, observation: `Deterministic ${check} check passed on the frozen target.` }));
 
 const behaviorContract = () => ({
   observedInteractionRefs: ['interaction://roadmap-search', 'interaction://task-navigation'],
@@ -67,6 +85,13 @@ const blindPacket = () => {
   packetRef:`packet://${'9'.repeat(64)}`,
   packetFingerprint:`sha256:${'1'.repeat(64)}`,
   captureReceiptId:'receipt:capture-001',
+  preflightRef:capturePreflight().preflightRef,
+  matrixRef:capturePreflight().matrixRef,
+  matrixFingerprint:capturePreflight().matrixFingerprint,
+  partitionFingerprint:capturePreflight().partitionFingerprint,
+  visualRound:{...visualRound},
+  capturePartitionRefs:[...capturePreflight().capturePartitionRefs],
+  reusedPartitionRefs:[],
   latestMutationFingerprint:`sha256:${'2'.repeat(64)}`,
   capturedSourceFingerprint:`sha256:${'2'.repeat(64)}`,
   latestMutationAt:'2026-08-30T01:00:00.000Z',
@@ -82,12 +107,41 @@ const blindPacket = () => {
   lastScreenshotRef:raster('host'),
  });
 };
-const packetManifest=({packetRef,latestMutationFingerprint,capturedSourceFingerprint,latestMutationAt,capturedAt,rasterCells,probeCells,lastScreenshotRef})=>({packetRef,latestMutationFingerprint,capturedSourceFingerprint,latestMutationAt,capturedAt,rasterCells,probeCells,lastScreenshotRef});
-const captureOutputDocument=(packet)=>({schemaVersion:7,operatorId:'fe/render-capture',output:{outcome:'captured',result:{summary:'Captured exact visual matrix and lifecycle packet.',artifactRefs:[packet.packetRef],sourceFingerprint:packet.capturedSourceFingerprint,latestMutationFingerprint:packet.latestMutationFingerprint,latestMutationAt:packet.latestMutationAt,capturedAt:packet.capturedAt,blindReviewPacketRef:packet.packetRef,blindReviewPacketFingerprint:fingerprint(packetManifest(packet)),blindReviewPacket:packetManifest(packet),renderMatrix:[
+const packetManifest=({packetRef,preflightRef,matrixRef,matrixFingerprint,partitionFingerprint,visualRound,capturePartitionRefs,reusedPartitionRefs,latestMutationFingerprint,capturedSourceFingerprint,latestMutationAt,capturedAt,rasterCells,probeCells,lastScreenshotRef})=>({packetRef,preflightRef,matrixRef,matrixFingerprint,partitionFingerprint,visualRound,capturePartitionRefs,reusedPartitionRefs,latestMutationFingerprint,capturedSourceFingerprint,latestMutationAt,capturedAt,rasterCells,probeCells,lastScreenshotRef});
+const captureOutputDocument=(packet)=>({schemaVersion:7,operatorId:'fe/render-capture',output:{outcome:'captured',result:{summary:'Captured exact visual matrix and lifecycle packet.',artifactRefs:[packet.packetRef],preflightRef:packet.preflightRef,matrixRef:packet.matrixRef,matrixFingerprint:packet.matrixFingerprint,partitionFingerprint:packet.partitionFingerprint,visualRound:packet.visualRound,capturePartitionRefs:packet.capturePartitionRefs,reusedPartitionRefs:packet.reusedPartitionRefs,sourceFingerprint:packet.capturedSourceFingerprint,latestMutationFingerprint:packet.latestMutationFingerprint,latestMutationAt:packet.latestMutationAt,capturedAt:packet.capturedAt,blindReviewPacketRef:packet.packetRef,blindReviewPacketFingerprint:fingerprint(packetManifest(packet)),blindReviewPacket:packetManifest(packet),renderMatrix:[
   {stateRef:'state://steady',viewport:'wide',imageRef:raster('wide'),handoffState:true},
   {stateRef:'state://steady',viewport:'intermediate',imageRef:raster('intermediate'),handoffState:true},
   {stateRef:'state://steady',viewport:'compact',imageRef:raster('final'),handoffState:true},
 ],adversarialProbeMatrix:probes().map((probe)=>({...probe,outcome:'survived',imageRef:raster(probe.probeId),reason:null})),handoffHostArtifact:{surfaceRef:'browser://host',widthPx:1200,heightPx:800,viewportOverride:false,imageRef:raster('host')}},gaps:[],evidenceRefs:[raster('host')],handoff:null}});
+
+test('capture preflight freezes a deterministic owner-partitioned matrix before Sol review',()=>{
+  const matrixBody={renderStates:['state://steady'],viewports:['wide','intermediate','compact'],probeRefs:probes().map(({probeId})=>probeId)};
+  const partitions=[
+    {partitionRef:'partition://profile-main',ownerRef:'surface://profile',stateRefs:['state://steady'],probeRefs:matrixBody.probeRefs,disposition:'capture',dependencyProofRefs:[]},
+    {partitionRef:'partition://shared-header',ownerRef:'surface://header',stateRefs:['state://steady'],probeRefs:[],disposition:'reuse',dependencyProofRefs:['dependency://header-unchanged']},
+  ];
+  const input={schemaVersion:7,operatorId:'fe/capture-preflight',context:{authorityRefs:['contract://profile'],evidenceRefs:['runtime://profile'],uiKnowledgeId:'fe.ui',sourceFingerprint:`sha256:${'2'.repeat(64)}`,debug:true},input:{targetRef:'surface://profile',round:{...visualRound},matrix:{matrixRef:'matrix://profile-v1',matrixFingerprint:fingerprint(matrixBody),...matrixBody},partitions,readinessChecks:readinessChecks()}};
+  assert.deepEqual(validatePreflightInput(input),{valid:true,errors:[]});
+  const result={summary:'Capture mechanics are ready.',artifactRefs:['preflight://artifact'],preflightRef:`preflight://${'3'.repeat(64)}`,sourceFingerprint:input.context.sourceFingerprint,round:{...visualRound},matrixRef:input.input.matrix.matrixRef,matrixFingerprint:input.input.matrix.matrixFingerprint,partitionFingerprint:fingerprint(partitions),capturePartitionRefs:['partition://profile-main'],reusedPartitionRefs:['partition://shared-header'],readinessChecks:readinessChecks()};
+  const output={schemaVersion:7,operatorId:'fe/capture-preflight',output:{outcome:'ready',result,gaps:[],evidenceRefs:['runtime://profile'],handoff:null}};
+  assert.deepEqual(validatePreflightOutput(output),{valid:true,errors:[]});
+  assert.deepEqual(invocationBindings.validate('fe/capture-preflight',input,output),[]);
+  const unproved=structuredClone(input); unproved.input.partitions[1].dependencyProofRefs=[];
+  assert.match(validatePreflightInput(unproved).errors.join('\n'),/reuse requires exact dependency proof/);
+  const changedMatrix=structuredClone(input); changedMatrix.input.matrix.renderStates.push('state://loading');
+  assert.match(validatePreflightInput(changedMatrix).errors.join('\n'),/must hash the exact immutable matrix body/);
+});
+
+test('finding classification batches every finding and round three cannot reopen repair',()=>{
+  const ledger=['finding://spacing','finding://scroll'].map((findingRef,index)=>({findingRef,findingFingerprint:`sha256:${String(index+7).repeat(64)}`,disposition:'new',affectedPartitionRefs:['partition://profile-main']}));
+  const value={schemaVersion:7,operatorId:'fe/finding-classify',output:{outcome:'repair',result:{summary:'Two implementation findings form one repair batch.',artifactRefs:['artifact://batch'],reviewStage:'visual-fidelity',batchRef:`batch://${'8'.repeat(64)}`,visualRound:{number:2,purpose:'verification'},findingLedger:ledger,ownerAssessments:ledger.map(({findingRef})=>({findingRef,owner:'implementation',counterevidenceRef:'raster://counterevidence',authorityRef:null,rationale:'The pixels demonstrate an implementation-owned regression.'}))},gaps:[],evidenceRefs:['visual://round-2'],handoff:null}};
+  assert.deepEqual(validateFindingOutput(value),{valid:true,errors:[]});
+  value.output.result.ownerAssessments.pop();
+  assert.match(validateFindingOutput(value).errors.join('\n'),/complete finding ledger/);
+  value.output.result.ownerAssessments=ledger.map(({findingRef})=>({findingRef,owner:'implementation',counterevidenceRef:'raster://counterevidence',authorityRef:null,rationale:'The pixels demonstrate an implementation-owned regression.'}));
+  value.output.result.visualRound={number:3,purpose:'regression'};
+  assert.match(validateFindingOutput(value).errors.join('\n'),/round 3 findings must trip the circuit breaker/);
+});
 
 test('blind visual input is one fresh Sol raster packet and rejects stale or self review',()=>{
   const value={schemaVersion:7,operatorId:'fe/visual-fidelity',context:{implementerExecutionRef:`execution://${'a'.repeat(64)}`,reviewerExecutionRef:`execution://${'b'.repeat(64)}`,implementerPrincipalFingerprint:`sha256:${'c'.repeat(64)}`,reviewerPrincipalFingerprint:`sha256:${'d'.repeat(64)}`,reviewerContextFingerprint:null,reviewerModel:'gpt-5.6-sol',reviewerCount:1,contextIsolation:'fresh',forkTurns:'none',debug:true},input:{blindReviewPacket:blindPacket()}};
@@ -117,7 +171,7 @@ test('visual verdict is bound to the exact supplied packet, rasters, final scree
   const input={schemaVersion:7,operatorId:'fe/visual-fidelity',context:{implementerExecutionRef:`execution://${'a'.repeat(64)}`,reviewerExecutionRef:`execution://${'b'.repeat(64)}`,implementerPrincipalFingerprint:`sha256:${'c'.repeat(64)}`,reviewerPrincipalFingerprint:`sha256:${'d'.repeat(64)}`,reviewerContextFingerprint:null,reviewerModel:'gpt-5.6-sol',reviewerCount:1,contextIsolation:'fresh',forkTurns:'none',debug:true},input:{blindReviewPacket:blindPacket()}};
   input.context.reviewerContextFingerprint=fingerprint(input.input.blindReviewPacket);
   const packet=input.input.blindReviewPacket;
-  const output={schemaVersion:7,operatorId:'fe/visual-fidelity',output:{result:{packetFingerprint:packet.packetFingerprint,packetRasterRefs:packet.rasterCells.map(({imageRef})=>imageRef),lastScreenshotRef:packet.lastScreenshotRef,reviewerExecutionRef:input.context.reviewerExecutionRef,reviewerModel:'gpt-5.6-sol',reviewerCount:1,contextIsolation:'fresh',forkTurns:'none',probeRecords:probeRecords()}}};
+  const output={schemaVersion:7,operatorId:'fe/visual-fidelity',output:{result:{packetFingerprint:packet.packetFingerprint,matrixFingerprint:packet.matrixFingerprint,partitionFingerprint:packet.partitionFingerprint,visualRound:packet.visualRound,packetRasterRefs:packet.rasterCells.map(({imageRef})=>imageRef),lastScreenshotRef:packet.lastScreenshotRef,reviewerExecutionRef:input.context.reviewerExecutionRef,reviewerModel:'gpt-5.6-sol',reviewerCount:1,contextIsolation:'fresh',forkTurns:'none',probeRecords:probeRecords()}}};
   assert.match(invocationBindings.validate('fe/visual-fidelity',input,output).join('\n'),/not bound to a validated render-capture RETURN/);
   invocationBindings.record('fe/render-capture',{output:{outcome:'captured',result:{blindReviewPacketRef:packet.packetRef,blindReviewPacketFingerprint:packet.packetFingerprint,blindReviewPacket:packetManifest(packet),sourceFingerprint:packet.capturedSourceFingerprint,renderMatrix:[
     {stateRef:'state://steady',viewport:'wide',imageRef:raster('wide'),handoffState:false},
@@ -154,7 +208,7 @@ test('visual verdict is bound to the exact supplied packet, rasters, final scree
 
 test('render capture output is cross-bound to requested source, state matrix, handoff, and probes',()=>{
   assert.deepEqual(validateCaptureOutput(captureOutputDocument(blindPacket())),{valid:true,errors:[]});
-  const input={context:{sourceFingerprint:`sha256:${'a'.repeat(64)}`},input:{renderStates:['state://required'],viewports:['wide','intermediate','compact'],handoffStateRef:'state://required',handoffViewport:{surfaceRef:'browser://host',widthPx:1200,heightPx:800,viewportOverride:false},adversarialProbes:probes()}};
+  const input={context:{sourceFingerprint:`sha256:${'a'.repeat(64)}`},input:{renderStates:['state://required'],viewports:['wide','intermediate','compact'],handoffStateRef:'state://required',handoffViewport:{surfaceRef:'browser://host',widthPx:1200,heightPx:800,viewportOverride:false},adversarialProbes:probes(),preflight:capturePreflight()}};
   const output={output:{result:{sourceFingerprint:`sha256:${'b'.repeat(64)}`,renderMatrix:['wide','intermediate','compact'].map((viewport)=>({stateRef:'state://wrong',viewport,handoffState:false})),handoffHostArtifact:{surfaceRef:'browser://other',widthPx:900,heightPx:700,viewportOverride:false},adversarialProbeMatrix:probes().map((probe)=>({...probe,outcome:'survived',imageRef:`render://${probe.probeId}.png`,reason:null}))}}};
   const errors=invocationBindings.validate('fe/render-capture',input,output).join('\n');
   assert.match(errors,/source differs/);
@@ -164,7 +218,7 @@ test('render capture output is cross-bound to requested source, state matrix, ha
 
 test('render capture cannot reorder requested state cells or adversarial probes',()=>{
   const requestedProbes=probes().slice(0,2);
-  const input={context:{sourceFingerprint:`sha256:${'a'.repeat(64)}`},input:{renderStates:['state://one','state://two'],viewports:['wide','compact'],handoffStateRef:'state://two',handoffViewport:{surfaceRef:'browser://host',widthPx:1200,heightPx:800,viewportOverride:false},adversarialProbes:requestedProbes}};
+  const input={context:{sourceFingerprint:`sha256:${'a'.repeat(64)}`},input:{renderStates:['state://one','state://two'],viewports:['wide','compact'],handoffStateRef:'state://two',handoffViewport:{surfaceRef:'browser://host',widthPx:1200,heightPx:800,viewportOverride:false},adversarialProbes:requestedProbes,preflight:capturePreflight()}};
   const renderMatrix=[
     {stateRef:'state://two',viewport:'wide',imageRef:raster('two-wide'),handoffState:true},
     {stateRef:'state://two',viewport:'compact',imageRef:raster('two-compact'),handoffState:true},
@@ -262,6 +316,7 @@ test('capture rejects ten repeated viewport probes and requires all adversarial 
       viewports: ['wide', 'intermediate', 'compact'],
       handoffStateRef: 'state://overview',
       handoffViewport: { surfaceRef: 'browser://in-app', widthPx: 1200, heightPx: 800, viewportOverride: false },
+      preflight: capturePreflight(),
     },
   };
   assert.equal(validateCaptureInput(value).valid, true);
@@ -330,6 +385,9 @@ test('visual fidelity cannot aggregate passed over a repair verdict or probe con
         artifactRefs: [raster('wide'), raster('intermediate'), raster('compact')],
         reviewMode: 'ai-adversarial-pixel',
         packetFingerprint: `sha256:${'a'.repeat(64)}`,
+        matrixFingerprint: capturePreflight().matrixFingerprint,
+        partitionFingerprint: capturePreflight().partitionFingerprint,
+        visualRound: { ...visualRound },
         packetRasterRefs: [raster('wide'), raster('intermediate'), raster('compact')],
         reviewerExecutionRef: 'agent://blind-sol',
         reviewerModel: 'gpt-5.6-sol',
@@ -364,6 +422,9 @@ test('visual fidelity rejects a shallow AI pass that did not challenge every ima
         artifactRefs: [raster('wide')],
         reviewMode: 'ai-adversarial-pixel',
         packetFingerprint: `sha256:${'a'.repeat(64)}`,
+        matrixFingerprint: capturePreflight().matrixFingerprint,
+        partitionFingerprint: capturePreflight().partitionFingerprint,
+        visualRound: { ...visualRound },
         packetRasterRefs: [raster('wide'), raster('intermediate'), raster('compact')],
         reviewerExecutionRef: 'agent://blind-sol',
         reviewerModel: 'gpt-5.6-sol',

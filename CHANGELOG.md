@@ -2,6 +2,20 @@
 
 All notable changes are documented here. This project follows Semantic Versioning.
 
+## 7.2.1 - 2026-08-30
+
+### Changed
+
+- Added deterministic `fe/capture-preflight` before capture and Sol review, including ten readiness
+  checks for data/state identity, controls, scroll/zoom restoration, probe completeness, raster
+  uniqueness, and the handoff host.
+- Froze owner-partitioned visual packets so repairs recapture affected owners and shared sentinels while
+  reusing only partitions with explicit dependency proof.
+- Bound visual review to discovery, verification, and regression rounds; remaining round-three findings
+  block for diagnosis instead of opening an unbounded loop.
+- Classified complete fingerprinted finding batches and repaired each batch once before recapture.
+- Added terminal debug records for visual phase, packet, matrix, round, partition counts, and findings.
+
 ## 7.2.0 - 2026-08-30
 
 ### Changed

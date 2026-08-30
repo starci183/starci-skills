@@ -44,6 +44,9 @@
                 "artifactRefs",
                 "reviewMode",
                 "packetFingerprint",
+                "matrixFingerprint",
+                "partitionFingerprint",
+                "visualRound",
                 "packetRasterRefs",
                 "reviewerExecutionRef",
                 "reviewerModel",
@@ -78,6 +81,13 @@
                   "description": "Exact raster-only packet reviewed by the fresh Sol execution.",
                   "type": "string",
                   "pattern": "^sha256:[0-9a-f]{64}$"
+                },
+                "matrixFingerprint": { "description": "Immutable matrix fingerprint inherited from preflight and capture.", "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
+                "partitionFingerprint": { "description": "Immutable owner-partition fingerprint inherited from preflight and capture.", "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
+                "visualRound": {
+                  "description": "Bounded discovery, verification, or regression round.",
+                  "type": "object", "additionalProperties": false, "required": ["number", "purpose"],
+                  "properties": { "number": { "type": "integer", "minimum": 1, "maximum": 3 }, "purpose": { "enum": ["discovery", "verification", "regression"] } }
                 },
                 "packetRasterRefs": {
                   "description": "Exact raster set supplied by the blind packet; every item requires one inspection record.",

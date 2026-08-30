@@ -2,6 +2,7 @@
 
 - `output.outcome`: Legacy semantic result consumed only by the Skill machine.
 - `output.result`: The atomic job result, or null when blocked.
+- `output.result.matrixFingerprint`, `partitionFingerprint`, and `visualRound`: Exact preflight/capture identity reviewed by Sol.
 - `output.result.inspectionRecords`: One blind pixel observation record per screenshot, covering purpose/semantic utility, content coherence, inset, surfaces, padding on every edge, alignment, rhythm, hierarchy, visual ownership, pinned-boundary clearance, affordance, wrapping, responsive composition, visual consistency, empty-space balance, clipping, and occlusion.
 - `output.result.reviewMode`: Always `ai-adversarial-pixel`; confirmation-oriented or measurement-led review is invalid.
 - `output.result.packetFingerprint`: Exact raster-only packet reviewed.

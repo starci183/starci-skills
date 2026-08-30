@@ -2,6 +2,8 @@
 
 - `output.outcome`: Typed result routed only by the parent Skill machine.
 - `output.result`: This operator atomic product, or null when incomplete.
+- `output.result.preflightRef`, `matrixRef`, `matrixFingerprint`, `partitionFingerprint`, and `visualRound`: Exact immutable capture contract inherited from preflight.
+- `output.result.capturePartitionRefs` and `reusedPartitionRefs`: Fresh owner partitions and dependency-proven reused partitions.
 - `output.result.latestMutationFingerprint`, `latestMutationAt`, and `capturedAt`: Prove the raster packet was created after the latest source mutation.
 - `output.result.blindReviewPacketRef`, `blindReviewPacketFingerprint`, and `blindReviewPacket`: The exact immutable raster-only manifest issued by this validated capture RETURN. A later review may bind its receipt and packet fingerprint but may not add, remove, reorder, or relabel rasters.
 - `output.result.renderMatrix`: Exactly one latest-source raster for every requested state × viewport cell; the requested source fingerprint, matrix, probe phases, and handoff cell must match the input one-to-one.

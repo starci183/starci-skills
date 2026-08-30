@@ -185,8 +185,10 @@ test('frontend design is an enforced repair capture inspect loop', () => {
     (edge) => edge.when?.outputEquals?.outcome === outcome,
   )?.target;
 
-  assert.equal(targetFor('apply', 'applied'), 'capture');
-  assert.equal(targetFor('repair', 'repaired'), 'capture');
+  assert.equal(targetFor('apply', 'applied'), 'capture-preflight');
+  assert.equal(targetFor('repair', 'repaired'), 'capture-preflight');
+  assert.equal(machine.states['capture-preflight'].ref, 'fe/capture-preflight');
+  assert.equal(targetFor('capture-preflight', 'ready'), 'capture');
   assert.equal(targetFor('capture', 'captured'), 'visual-fidelity');
   assert.equal(machine.states['visual-fidelity'].ref, 'fe/visual-fidelity');
   assert.equal(targetFor('visual-fidelity', 'repair'), 'finding-classify');
@@ -195,8 +197,8 @@ test('frontend design is an enforced repair capture inspect loop', () => {
   assert.equal(targetFor('finding-classify', 'clean'), undefined);
   assert.equal(targetFor('authority-reconcile', 'reconciled'), 'repair');
   assert.equal(targetFor('visual-fidelity', 'passed'), 'quality-handoff');
-  assert.equal(targetFor('classify', 'no-change'), 'capture');
-  assert.match(skill, /apply\/repair -> render-capture -> one fresh Sol visual-fidelity -> quality-handoff/i);
+  assert.equal(targetFor('classify', 'no-change'), 'capture-preflight');
+  assert.match(skill, /apply\/repair -> capture-preflight -> render-capture -> one fresh Sol visual-fidelity -> quality-handoff/i);
   assert.match(capture, /render-state matrix/i);
   assert.match(fidelity, /every cell in the frozen render-state matrix/i);
   assert.match(fidelity, /CSS tests.*can never.*visual `passed`/is);

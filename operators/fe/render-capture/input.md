@@ -21,3 +21,4 @@
 - `input.viewports`: The mandatory responsive viewport set.
 - `input.handoffStateRef`: Exact visible state that will be handed to the user after completion.
 - `input.handoffViewport`: Exact user-visible browser surface and content viewport, without emulation, required for handoff proof.
+- `input.preflight`: Exact validated preflight freezing matrix, partition map, visual round, and capture/reuse dispositions.

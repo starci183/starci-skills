@@ -262,7 +262,7 @@
               "outcome": "no-change"
             }
           },
-          "target": "capture"
+          "target": "capture-preflight"
         },
         {
           "when": {
@@ -369,7 +369,7 @@
               "outcome": "applied"
             }
           },
-          "target": "capture"
+          "target": "capture-preflight"
         },
         {
           "when": {
@@ -385,6 +385,28 @@
               "outcome": "blocked"
             }
           },
+          "target": "blocked"
+        }
+      ]
+    },
+    "capture-preflight": {
+      "kind": "operator",
+      "ref": "fe/capture-preflight",
+      "on": [
+        {
+          "when": { "outputEquals": { "outcome": "ready" } },
+          "target": "capture"
+        },
+        {
+          "when": { "outputEquals": { "outcome": "source-repair" } },
+          "target": "repair"
+        },
+        {
+          "when": { "outputEquals": { "outcome": "backend-required" } },
+          "target": "backend-handoff"
+        },
+        {
+          "when": { "outputEquals": { "outcome": "blocked" } },
           "target": "blocked"
         }
       ]
@@ -519,7 +541,7 @@
               "outcome": "repaired"
             }
           },
-          "target": "capture"
+          "target": "capture-preflight"
         },
         {
           "when": {

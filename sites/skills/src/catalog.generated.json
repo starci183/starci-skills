@@ -1,5 +1,5 @@
 {
-  "version": "7.2.0",
+  "version": "7.2.1",
   "skills": [
     {
       "id": "starci-feature-deliver",
@@ -635,7 +635,10 @@
       "knowledgeCount": 0,
       "accepts": [],
       "emits": [],
-      "sideEffects": []
+      "sideEffects": [
+        "may update the exact classified routed Grammar or shared UI-knowledge authority",
+        "must preserve unrelated authority consumers"
+      ]
     },
     {
       "id": "fe/block-reconcile",
@@ -648,6 +651,15 @@
     },
     {
       "id": "fe/business-bind",
+      "domain": "fe",
+      "iconUrl": null,
+      "knowledgeCount": 1,
+      "accepts": [],
+      "emits": [],
+      "sideEffects": []
+    },
+    {
+      "id": "fe/capture-preflight",
       "domain": "fe",
       "iconUrl": null,
       "knowledgeCount": 1,
@@ -911,7 +923,7 @@
       "id": "fe/request-compile",
       "domain": "fe",
       "iconUrl": null,
-      "knowledgeCount": 1,
+      "knowledgeCount": 2,
       "accepts": [],
       "emits": [],
       "sideEffects": []
@@ -1589,7 +1601,7 @@
   "domains": [
     {
       "id": "fe",
-      "operatorCount": 51,
+      "operatorCount": 52,
       "skillCount": 1
     },
     {
