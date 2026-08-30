@@ -1,0 +1,18 @@
+{
+  "$schema":"https://json-schema.org/draft/2020-12/schema","$id":"https://starci.dev/v7/operators/content/review/input.schema.json","type":"object","additionalProperties":false,"required":["schemaVersion","operatorId","context","input"],
+  "properties":{"schemaVersion":{"const":7},"operatorId":{"const":"content/review"},
+    "context":{"type":"object","additionalProperties":false,"required":["briefRefs","articleRefs","imageRefs","codeRefs","e2eEvidenceRefs"],"properties":{
+      "briefRefs":{"description":"Exact frozen teacher brief used as review authority.","$ref":"#/$defs/nonEmptyRefs"},
+      "articleRefs":{"description":"Exact written article editions under review.","$ref":"#/$defs/nonEmptyRefs"},
+      "imageRefs":{"description":"Exact visual artifacts and prompt evidence, empty only when disabled.","$ref":"#/$defs/refs"},
+      "codeRefs":{"description":"Exact implementation artifacts, empty only when disabled.","$ref":"#/$defs/refs"},
+      "e2eEvidenceRefs":{"description":"Exact executable proof, empty only when disabled.","$ref":"#/$defs/refs"}
+    }},
+    "input":{"type":"object","additionalProperties":false,"required":["reviewRound","maxReviewRounds","requiredArtifactKinds","reviewTargetRef"],"properties":{
+      "reviewRound":{"description":"Current independent review round.","type":"integer","minimum":1,"maximum":3},
+      "maxReviewRounds":{"description":"Maximum authority-approved review rounds.","type":"integer","minimum":1,"maximum":3},
+      "requiredArtifactKinds":{"description":"Artifact kinds that must exist before review can approve.","type":"array","minItems":1,"maxItems":5,"uniqueItems":true,"items":{"enum":["brief","article","image","code","e2e"]}},
+      "reviewTargetRef":{"description":"Bounded destination for the independent critique artifact.","$ref":"#/$defs/ref"}
+    }}
+  },"$defs":{"ref":{"type":"string","minLength":1,"maxLength":1024},"refs":{"type":"array","maxItems":128,"uniqueItems":true,"items":{"$ref":"#/$defs/ref"}},"nonEmptyRefs":{"type":"array","minItems":1,"maxItems":128,"uniqueItems":true,"items":{"$ref":"#/$defs/ref"}}}
+}

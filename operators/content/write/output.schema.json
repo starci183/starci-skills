@@ -1,0 +1,12 @@
+{
+  "$schema":"https://json-schema.org/draft/2020-12/schema","$id":"https://starci.dev/v7/operators/content/write/output.schema.json","type":"object","additionalProperties":false,"required":["schemaVersion","operatorId","output"],
+  "properties":{"schemaVersion":{"const":7},"operatorId":{"const":"content/write"},"output":{"type":"object","additionalProperties":false,"required":["outcome","aiExecution","articleRefs","coveredOutcomeRefs","interviewQuestionCount","evidenceRefs","reason"],"properties":{
+    "outcome":{"description":"Typed writing result consumed by the content Skill.","enum":["ready","blocked"]},
+    "aiExecution":{"description":"Runtime-attested Luna writing execution.","$ref":"#/$defs/lunaExecution"},
+    "articleRefs":{"description":"Inspectible article edition references, or empty when blocked.","$ref":"#/$defs/refs"},
+    "coveredOutcomeRefs":{"description":"Teacher-brief learning outcomes explicitly covered by the article.","$ref":"#/$defs/refs"},
+    "interviewQuestionCount":{"description":"Number of substantive interview questions included across beginner and follow-up depth.","type":"integer","minimum":0,"maximum":256},
+    "evidenceRefs":{"description":"Exact writing artifacts and trace evidence.","$ref":"#/$defs/refs"},
+    "reason":{"description":"Bounded blocker reason, otherwise null.","type":["string","null"],"minLength":1,"maxLength":2048}
+  }}},"$defs":{"ref":{"type":"string","minLength":1,"maxLength":1024},"refs":{"type":"array","maxItems":128,"uniqueItems":true,"items":{"$ref":"#/$defs/ref"}},"lunaExecution":{"type":"object","additionalProperties":false,"required":["model","count","isolation","forkTurns","executionRef"],"properties":{"model":{"const":"gpt-5.6-luna"},"count":{"type":"integer","minimum":1,"maximum":64},"isolation":{"const":"fresh"},"forkTurns":{"const":"none"},"executionRef":{"type":"string","pattern":"^execution://[0-9a-f]{64}$"}}}}
+}

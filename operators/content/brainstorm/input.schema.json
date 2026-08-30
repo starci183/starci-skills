@@ -1,0 +1,19 @@
+{
+  "$schema":"https://json-schema.org/draft/2020-12/schema","$id":"https://starci.dev/v7/operators/content/brainstorm/input.schema.json",
+  "type":"object","additionalProperties":false,"required":["schemaVersion","operatorId","context","input"],
+  "properties":{
+    "schemaVersion":{"const":7},"operatorId":{"const":"content/brainstorm"},
+    "context":{"type":"object","additionalProperties":false,"required":["contextRefs","sourceRefs"],"properties":{
+      "contextRefs":{"description":"Exact curriculum, style, and migration authority references.","$ref":"#/$defs/refs"},
+      "sourceRefs":{"description":"Exact current lesson or source evidence references.","$ref":"#/$defs/refs"}
+    }},
+    "input":{"type":"object","additionalProperties":false,"required":["objectiveRef","audience","naturalLanguages","implementationLanguages","briefTargetRef"],"properties":{
+      "objectiveRef":{"description":"Exact bounded educational objective reference.","$ref":"#/$defs/ref"},
+      "audience":{"description":"Learner profile whose prerequisites and outputs must be designed.","type":"string","minLength":1,"maxLength":512},
+      "naturalLanguages":{"description":"Natural-language editions required from the later writer.","type":"array","minItems":1,"maxItems":8,"uniqueItems":true,"items":{"type":"string","minLength":2,"maxLength":16}},
+      "implementationLanguages":{"description":"Zero to four programming-language tracks to design as one behavioral contract.","type":"array","maxItems":4,"uniqueItems":true,"items":{"enum":["typescript","java","csharp","go"]}},
+      "briefTargetRef":{"description":"Bounded destination reference for the frozen teacher brief.","$ref":"#/$defs/ref"}
+    }}
+  },
+  "$defs":{"ref":{"type":"string","minLength":1,"maxLength":1024},"refs":{"type":"array","maxItems":128,"uniqueItems":true,"items":{"$ref":"#/$defs/ref"}}}
+}

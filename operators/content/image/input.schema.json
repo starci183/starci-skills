@@ -1,0 +1,16 @@
+{
+  "$schema":"https://json-schema.org/draft/2020-12/schema","$id":"https://starci.dev/v7/operators/content/image/input.schema.json","type":"object","additionalProperties":false,"required":["schemaVersion","operatorId","context","input"],
+  "properties":{"schemaVersion":{"const":7},"operatorId":{"const":"content/image"},
+    "context":{"type":"object","additionalProperties":false,"required":["briefRefs","articleRefs","styleRefs"],"properties":{
+      "briefRefs":{"description":"Exact frozen teacher and visual-claim references.","$ref":"#/$defs/nonEmptyRefs"},
+      "articleRefs":{"description":"Exact written article references from which labels may be derived.","$ref":"#/$defs/nonEmptyRefs"},
+      "styleRefs":{"description":"Exact visual style or supplied reference-image evidence.","$ref":"#/$defs/refs"}
+    }},
+    "input":{"type":"object","additionalProperties":false,"required":["mode","imageTargetRef","promptTargetRef","revisionFindingRefs"],"properties":{
+      "mode":{"description":"Whether an image is required, optional, or disabled.","enum":["required","optional","none"]},
+      "imageTargetRef":{"description":"Bounded output image reference, or null when disabled.","oneOf":[{"$ref":"#/$defs/ref"},{"type":"null"}]},
+      "promptTargetRef":{"description":"Bounded generation-prompt evidence reference, or null when disabled.","oneOf":[{"$ref":"#/$defs/ref"},{"type":"null"}]},
+      "revisionFindingRefs":{"description":"Exact final-review visual findings to fix.","$ref":"#/$defs/refs"}
+    }}
+  },"$defs":{"ref":{"type":"string","minLength":1,"maxLength":1024},"refs":{"type":"array","maxItems":128,"uniqueItems":true,"items":{"$ref":"#/$defs/ref"}},"nonEmptyRefs":{"type":"array","minItems":1,"maxItems":128,"uniqueItems":true,"items":{"$ref":"#/$defs/ref"}}}
+}

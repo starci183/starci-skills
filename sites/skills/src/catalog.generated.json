@@ -38,6 +38,12 @@
       "domain": "quality"
     },
     {
+      "id": "starci-content-generate",
+      "capability": "content.generate",
+      "description": "Generate or refactor one educational content unit through a Sol teacher brief, Luna writing and implementation, visual generation, executable E2E, and independent final critique.",
+      "domain": "content"
+    },
+    {
       "id": "starci-uat-verify",
       "capability": "uat.verify",
       "description": "Verify one product-decision flow from frozen inputs and independent Behavior, UX, and UI evidence, then publish its canonical UAT snapshot and result pair.",
@@ -392,6 +398,74 @@
       "emits": [],
       "sideEffects": [
         "read only the supplied exact references"
+      ]
+    },
+    {
+      "id": "content/brainstorm",
+      "domain": "content",
+      "iconUrl": null,
+      "knowledgeCount": 0,
+      "accepts": [],
+      "emits": [],
+      "sideEffects": [
+        "write only the bounded lesson brief artifact"
+      ]
+    },
+    {
+      "id": "content/code",
+      "domain": "content",
+      "iconUrl": null,
+      "knowledgeCount": 0,
+      "accepts": [],
+      "emits": [],
+      "sideEffects": [
+        "write only declared implementation-track artifacts",
+        "run bounded build or format commands"
+      ]
+    },
+    {
+      "id": "content/e2e",
+      "domain": "content",
+      "iconUrl": null,
+      "knowledgeCount": 0,
+      "accepts": [],
+      "emits": [],
+      "sideEffects": [
+        "run bounded local build, server, and test commands",
+        "repair only declared implementation or E2E artifacts"
+      ]
+    },
+    {
+      "id": "content/image",
+      "domain": "content",
+      "iconUrl": null,
+      "knowledgeCount": 0,
+      "accepts": [],
+      "emits": [],
+      "sideEffects": [
+        "write only declared image and prompt artifacts"
+      ]
+    },
+    {
+      "id": "content/review",
+      "domain": "content",
+      "iconUrl": null,
+      "knowledgeCount": 0,
+      "accepts": [],
+      "emits": [],
+      "sideEffects": [
+        "write only the bounded review artifact"
+      ]
+    },
+    {
+      "id": "content/write",
+      "domain": "content",
+      "iconUrl": null,
+      "knowledgeCount": 0,
+      "accepts": [],
+      "emits": [],
+      "sideEffects": [
+        "write only bounded article artifacts"
       ]
     },
     {
@@ -1632,6 +1706,11 @@
     {
       "id": "workspace",
       "operatorCount": 8,
+      "skillCount": 1
+    },
+    {
+      "id": "content",
+      "operatorCount": 6,
       "skillCount": 1
     },
     {

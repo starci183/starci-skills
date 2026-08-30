@@ -1,0 +1,7 @@
+{
+  "schemaVersion":7,"id":"content/e2e","domain":"content",
+  "job":"Execute and repair one shared behavioral E2E contract across the declared implementation tracks.",
+  "inputSchema":"input.schema.json","outputSchema":"output.schema.json","sourceReferenceRefs":[],
+  "sideEffects":["run bounded local build, server, and test commands","repair only declared implementation or E2E artifacts"],
+  "stopConditions":["E2E mode is none","required runtime is unavailable","repair would weaken the frozen behavioral contract","the bounded iteration limit is exhausted"]
+}

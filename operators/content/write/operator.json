@@ -1,0 +1,7 @@
+{
+  "schemaVersion":7,"id":"content/write","domain":"content",
+  "job":"Write one educational article bundle from a frozen teacher brief.",
+  "inputSchema":"input.schema.json","outputSchema":"output.schema.json","sourceReferenceRefs":[],
+  "sideEffects":["write only bounded article artifacts"],
+  "stopConditions":["the brief is missing or unfrozen","writing would change the learning contract"]
+}

@@ -58,6 +58,9 @@ completion proof, and genuine ambiguities. Then compare only catalog metadata.
   `starci-fe-process`; frontend may call backend and then resume.
 - Select `starci-workflow-diagnose` only for an explicitly report-only failure diagnosis. A request to
   fix, finish, audit-to-green, or deliver belongs to the owning mutation Skill.
+- Select `starci-content-generate` for creating, refactoring, or migrating one educational content
+  unit whose durable output includes a teacher brief, article, applicable image and code tracks,
+  executable E2E proof, and independent final critique.
 - Select `starci-git-publish` or `starci-release-manage` only when publication or release lifecycle is
   part of the active outcome; completion of code alone does not imply either action.
 - If no StarCi catalog capability owns the outcome, continue without a Skill while preserving verified

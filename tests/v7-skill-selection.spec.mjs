@@ -11,6 +11,7 @@ const expected = [
   'starci-backend-process',
   'starci-fe-process',
   'starci-quality-assure',
+  'starci-content-generate',
   'starci-uat-verify',
   'starci-release-manage',
   'starci-platform-operate',
@@ -19,7 +20,7 @@ const expected = [
   'starci-workflow-diagnose',
 ].sort();
 
-test('public catalog is exactly the twelve v7 mission skills', () => {
+test('public catalog is exactly the thirteen v7 mission skills', () => {
   assert.equal(catalog.schemaVersion, 7);
   assert.equal(catalog.systemVersion, '7.2.1');
   assert.deepEqual(catalog.skills.map(({ id }) => id).sort(), expected);

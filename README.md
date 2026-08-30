@@ -18,6 +18,7 @@ or target-source inspection.
 | `starci-backend-process` | Design, implement, repair, and prove backend behavior |
 | `starci-fe-process` | Create, audit, repair, redesign, debug, and reconcile frontend work |
 | `starci-quality-assure` | Measure and close quality, rule, or declared-debt findings |
+| `starci-content-generate` | Generate reviewed educational content with visuals, code, and E2E proof |
 | `starci-uat-verify` | Freeze and independently prove Behavior, UX, and UI outcomes |
 | `starci-release-manage` | Deploy, monitor, recover, or roll back a release |
 | `starci-platform-operate` | Operate bounded platform services and routes |
@@ -61,7 +62,7 @@ off. Secrets and hidden reasoning are always redacted.
 INDEX.md                       binding bootstrap and runtime law
 scope.yaml                     multidimensional mission-scope protocol
 analyze-input.md               global mission-owner selection
-skills/catalog.json            public twelve-Skill catalog
+skills/catalog.json            public thirteen-Skill catalog
 skills/starci-*/               Skill contracts and state machines
 operators/<domain>/<name>/     atomic contracts with two-color icon.svg assets
 runtime/                       config, trace, receipt, and topology contracts
@@ -81,7 +82,7 @@ npm run materialize
 npm test
 ```
 
-The release gate validates the exact 12-Skill catalog, 149 strict atomic operators, typed nested
+The release gate validates the exact 13-Skill catalog, strict atomic operators, typed nested
 `CALL -> RETURN -> RESUME`, selection behavior, flat worktree topology, UAT templates, direct-search
 boundary, and the generated Skills site.
 

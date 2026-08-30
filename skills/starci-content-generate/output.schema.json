@@ -1,0 +1,20 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://starci.dev/v7/skills/starci-content-generate/output.schema.json",
+  "type": "object", "additionalProperties": false,
+  "required": ["schemaVersion","runId","skillId","result","finalState","state","artifactRefs","evidenceRefs","reviewRound","findings","cleanup"],
+  "properties": {
+    "schemaVersion": { "const": 7 },
+    "runId": { "type": "string", "minLength": 1, "maxLength": 128 },
+    "skillId": { "const": "starci-content-generate" },
+    "result": { "enum": ["complete","blocked"] },
+    "finalState": { "enum": ["complete","blocked"] },
+    "state": { "type": "object", "additionalProperties": false, "required": ["status","code","retryable","terminalState"], "properties": { "status": { "enum": ["completed","blocked"] }, "code": { "type": "string", "minLength": 1, "maxLength": 256 }, "retryable": { "type": "boolean" }, "terminalState": { "enum": ["complete","blocked"] } } },
+    "artifactRefs": { "$ref": "#/$defs/refs" },
+    "evidenceRefs": { "$ref": "#/$defs/refs" },
+    "reviewRound": { "type": "integer", "minimum": 1, "maximum": 3 },
+    "findings": { "type": "array", "maxItems": 128, "items": { "type": "object", "additionalProperties": false, "required": ["code","severity","message","evidenceRefs"], "properties": { "code": { "type": "string", "minLength": 1 }, "severity": { "enum": ["info","warning","error"] }, "message": { "type": "string", "minLength": 1, "maxLength": 2048 }, "evidenceRefs": { "$ref": "#/$defs/refs" } } } },
+    "cleanup": { "type": "object", "additionalProperties": false, "required": ["scratchRefs","retention","purgeAt"], "properties": { "scratchRefs": { "$ref": "#/$defs/refs" }, "retention": { "const": "until-skill-terminal" }, "purgeAt": { "const": "skill-terminal" } } }
+  },
+  "$defs": { "refs": { "type": "array", "maxItems": 128, "uniqueItems": true, "items": { "type": "string", "minLength": 1, "maxLength": 1024 } } }
+}

@@ -33,6 +33,11 @@
       "description": "Assure one bounded delivery through measured readiness, executable rule binding, approved repairs or debt, and exact static quality proof."
     },
     {
+      "id": "starci-content-generate",
+      "capability": "content.generate",
+      "description": "Generate or refactor one educational content unit through a Sol teacher brief, Luna writing and implementation, visual generation, executable E2E, and independent final critique."
+    },
+    {
       "id": "starci-uat-verify",
       "capability": "uat.verify",
       "description": "Verify one product-decision flow from frozen inputs and independent Behavior, UX, and UI evidence, then publish its canonical UAT snapshot and result pair."

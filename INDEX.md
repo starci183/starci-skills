@@ -235,7 +235,7 @@ to kill another process.
 ## Validation
 
 Focused Skill/operator tests must pass before integration. The Source-wide release then validates the
-12-skill catalog, v7 machines, operator contracts, nested call/resume traces, flat worktree topology,
+13-skill catalog, v7 machines, operator contracts, nested call/resume traces, flat worktree topology,
 UAT templates, default-search boundary, site materialization, and realistic forward tests including:
 
 ```text

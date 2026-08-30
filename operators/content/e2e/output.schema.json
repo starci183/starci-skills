@@ -1,0 +1,12 @@
+{
+  "$schema":"https://json-schema.org/draft/2020-12/schema","$id":"https://starci.dev/v7/operators/content/e2e/output.schema.json","type":"object","additionalProperties":false,"required":["schemaVersion","operatorId","output"],
+  "properties":{"schemaVersion":{"const":7},"operatorId":{"const":"content/e2e"},"output":{"type":"object","additionalProperties":false,"required":["outcome","aiExecution","iterations","trackResults","contractFingerprint","evidenceRefs","reason"],"properties":{
+    "outcome":{"description":"Typed executable-proof result consumed by the content Skill.","enum":["passed","failed","not-needed","blocked"]},
+    "aiExecution":{"description":"Runtime-attested Luna E2E repair-loop execution, or null when disabled.","oneOf":[{"$ref":"#/$defs/lunaExecution"},{"type":"null"}]},
+    "iterations":{"description":"Number of run-read-repair iterations actually performed.","type":"integer","minimum":0,"maximum":5},
+    "trackResults":{"description":"Deterministic result for every requested implementation track.","type":"array","maxItems":4,"items":{"type":"object","additionalProperties":false,"required":["language","command","exitCode","assertionCount","passed","evidenceRef"],"properties":{"language":{"enum":["typescript","java","csharp","go"]},"command":{"type":"string","minLength":1,"maxLength":2048},"exitCode":{"type":"integer"},"assertionCount":{"type":"integer","minimum":0,"maximum":10000},"passed":{"type":"boolean"},"evidenceRef":{"$ref":"#/$defs/ref"}}}},
+    "contractFingerprint":{"description":"Fingerprint proving the test authority stayed unchanged during repair, or null when disabled.","type":["string","null"],"pattern":"^sha256:[0-9a-f]{64}$"},
+    "evidenceRefs":{"description":"Exact command outputs and test evidence references.","$ref":"#/$defs/refs"},
+    "reason":{"description":"Bounded failure, blocker, or not-needed reason, otherwise null.","type":["string","null"],"minLength":1,"maxLength":2048}
+  }}},"$defs":{"ref":{"type":"string","minLength":1,"maxLength":1024},"refs":{"type":"array","maxItems":128,"uniqueItems":true,"items":{"$ref":"#/$defs/ref"}},"lunaExecution":{"type":"object","additionalProperties":false,"required":["model","count","isolation","forkTurns","executionRef"],"properties":{"model":{"const":"gpt-5.6-luna"},"count":{"type":"integer","minimum":1,"maximum":5},"isolation":{"const":"fresh"},"forkTurns":{"const":"none"},"executionRef":{"type":"string","pattern":"^execution://[0-9a-f]{64}$"}}}}
+}

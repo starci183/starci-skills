@@ -1,0 +1,3 @@
+import { validatorFor, runValidatorCli } from '../../validation.mjs';
+export const validateInput=validatorFor(new URL('./input.schema.json',import.meta.url),(v)=>{const e=[];if(v.input.mode==='none'&&(v.input.implementationLanguages.length||v.input.trackTargetRefs.length))e.push('disabled code must not declare tracks');if(v.input.mode==='required'&&!v.input.implementationLanguages.length)e.push('required code needs at least one language');if(v.input.implementationLanguages.length!==v.input.trackTargetRefs.length)e.push('track targets must match implementation languages');return e;});
+if(process.argv[1]?.endsWith('validate-input.mjs'))await runValidatorCli(validateInput,'node validate-input.mjs <artifact.json>');

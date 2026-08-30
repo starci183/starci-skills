@@ -1,0 +1,13 @@
+{
+  "$schema":"https://json-schema.org/draft/2020-12/schema","$id":"https://starci.dev/v7/operators/content/image/output.schema.json","type":"object","additionalProperties":false,"required":["schemaVersion","operatorId","output"],
+  "properties":{"schemaVersion":{"const":7},"operatorId":{"const":"content/image"},"output":{"type":"object","additionalProperties":false,"required":["outcome","generator","imageRef","promptRef","claimRefs","inspection","evidenceRefs","reason"],"properties":{
+    "outcome":{"description":"Typed visual result consumed by the content Skill.","enum":["ready","not-needed","blocked"]},
+    "generator":{"description":"Image-generation mechanism used for the artifact, or null when no image is needed.","type":["string","null"],"minLength":1,"maxLength":128},
+    "imageRef":{"description":"Generated image reference, or null when unavailable or disabled.","oneOf":[{"$ref":"#/$defs/ref"},{"type":"null"}]},
+    "promptRef":{"description":"Exact saved generation prompt reference, or null when disabled.","oneOf":[{"$ref":"#/$defs/ref"},{"type":"null"}]},
+    "claimRefs":{"description":"Frozen brief claims encoded in the visual.","$ref":"#/$defs/refs"},
+    "inspection":{"description":"Deterministic visual inspection result before final independent review.","type":"object","additionalProperties":false,"required":["dimensions","readable","observation","evidenceRef"],"properties":{"dimensions":{"type":["string","null"],"maxLength":64},"readable":{"type":["boolean","null"]},"observation":{"type":["string","null"],"minLength":1,"maxLength":2048},"evidenceRef":{"oneOf":[{"$ref":"#/$defs/ref"},{"type":"null"}]}}},
+    "evidenceRefs":{"description":"Exact image, prompt, and inspection evidence references.","$ref":"#/$defs/refs"},
+    "reason":{"description":"Bounded blocker or not-needed reason, otherwise null.","type":["string","null"],"minLength":1,"maxLength":2048}
+  }}},"$defs":{"ref":{"type":"string","minLength":1,"maxLength":1024},"refs":{"type":"array","maxItems":128,"uniqueItems":true,"items":{"$ref":"#/$defs/ref"}}}
+}

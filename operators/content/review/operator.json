@@ -1,0 +1,7 @@
+{
+  "schemaVersion":7,"id":"content/review","domain":"content",
+  "job":"Independently review and adversarially challenge one complete educational bundle, then route precise revisions to the owning stage.",
+  "inputSchema":"input.schema.json","outputSchema":"output.schema.json","sourceReferenceRefs":[],
+  "sideEffects":["write only the bounded review artifact"],
+  "stopConditions":["the teacher brief or required bundle evidence is incomplete","the maximum review round is exceeded","a finding cannot be assigned to one owning stage"]
+}
