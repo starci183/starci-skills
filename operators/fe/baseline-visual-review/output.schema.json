@@ -1,0 +1,70 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://starci.dev/v7.5-alpha/operators/fe/baseline-visual-review/output.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "operatorId", "output"],
+  "properties": {
+    "schemaVersion": { "const": 7 },
+    "operatorId": { "const": "fe/baseline-visual-review" },
+    "output": {
+      "type": "object", "additionalProperties": false,
+      "required": ["outcome", "aiExecution", "result", "gaps", "evidenceRefs"],
+      "properties": {
+        "outcome": { "description": "Routing verdict; this discovery operator never certifies PASS.", "enum": ["failed", "ready-for-closure", "insufficient-evidence"] },
+        "aiExecution": {
+          "description": "Exact fresh Sol execution that inspected the packet.",
+          "type": "object", "additionalProperties": false,
+          "required": ["model", "count", "isolation", "forkTurns", "executionRef"],
+          "properties": {
+            "model": { "const": "gpt-5.6-sol" }, "count": { "const": 1 }, "isolation": { "const": "fresh" }, "forkTurns": { "const": "none" },
+            "executionRef": { "type": "string", "pattern": "^execution://[0-9a-f]{64}$" }
+          }
+        },
+        "result": {
+          "description": "Blind score and complete initial finding batch, or null when evidence is insufficient.",
+          "anyOf": [
+            {
+              "type": "object", "additionalProperties": false,
+              "required": ["typedVerdict", "auditScore", "axes", "inspectionRecords", "findingRefs", "structuralFindingRefs", "findingBatchFingerprint"],
+              "properties": {
+                "typedVerdict": { "enum": ["FAIL", "SUSPENSE"] },
+                "auditScore": { "type": "integer", "minimum": 0, "maximum": 9 },
+                "axes": {
+                  "type": "array", "minItems": 5, "maxItems": 5,
+                  "items": {
+                    "type": "object", "additionalProperties": false,
+                    "required": ["axis", "score", "observation"],
+                    "properties": {
+                      "axis": { "type": "string", "minLength": 1 },
+                      "score": { "type": "number", "minimum": 0, "maximum": 2 },
+                      "observation": { "type": "string", "minLength": 1 }
+                    }
+                  }
+                },
+                "inspectionRecords": {
+                  "type": "array", "minItems": 3, "maxItems": 8, "uniqueItems": true,
+                  "items": {
+                    "type": "object", "additionalProperties": false,
+                    "required": ["cellRef", "verdict", "observation"],
+                    "properties": {
+                      "cellRef": { "type": "string", "pattern": "^cell-[0-9]{3}$" },
+                      "verdict": { "enum": ["passed", "problem"] },
+                      "observation": { "type": "string", "minLength": 1 }
+                    }
+                  }
+                },
+                "findingRefs": { "type": "array", "maxItems": 64, "uniqueItems": true, "items": { "type": "string", "minLength": 1 } },
+                "structuralFindingRefs": { "type": "array", "maxItems": 64, "uniqueItems": true, "items": { "type": "string", "minLength": 1 } },
+                "findingBatchFingerprint": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" }
+              }
+            },
+            { "type": "null" }
+          ]
+        },
+        "gaps": { "description": "Missing evidence that prevents routing.", "type": "array", "maxItems": 16, "uniqueItems": true, "items": { "type": "string", "minLength": 1 } },
+        "evidenceRefs": { "description": "Immutable packet and review evidence references.", "type": "array", "maxItems": 32, "uniqueItems": true, "items": { "type": "string", "minLength": 1 } }
+      }
+    }
+  }
+}

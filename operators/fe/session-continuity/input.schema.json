@@ -26,7 +26,7 @@
         "accountRef": { "description": "Fresh mission-scoped logical UAT account reference.", "type": "string", "pattern": "^account://fresh" },
         "browserContextRef": { "description": "Isolated Browser context bound to the lease.", "type": "string", "minLength": 1 },
         "principalFingerprint": { "description": "Opaque authenticated principal identity.", "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
-        "continuityFailure": { "description": "Observed reason the existing lease cannot be trusted.", "enum": ["expired", "contaminated", "browser-disconnected", "runtime-generation-changed", "identity-mismatch"] }
+        "continuityFailure": { "description": "Observed reason the existing lease cannot be trusted or cannot execute in the consumer.", "enum": ["expired", "contaminated", "browser-disconnected", "runtime-generation-changed", "identity-mismatch", "handoff-not-materialized"] }
       }
     }
   }

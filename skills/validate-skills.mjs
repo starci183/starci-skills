@@ -56,17 +56,33 @@ function operatorOutcomes(operatorRef) {
   return outcomes;
 }
 
-function assertOperatorRoutes(skillId, stateId, state) {
+function assertOperatorRoutes(skillId, stateId, state, inputSchema) {
   const outcomes = operatorOutcomes(state.ref);
   const routes = state.on ?? [];
-  if (routes.some((edge) => !edge.when?.outputEquals || Object.keys(edge.when.outputEquals).length !== 1 || edge.when.outputEquals.outcome === undefined)) {
-    fail(`${skillId}/${stateId}: operator transitions must route only on output.outcome`);
+  if (routes.some((edge) => !edge.when?.outputEquals || Object.keys(edge.when.outputEquals).length !== 1 || edge.when.outputEquals.outcome === undefined || Object.keys(edge.when).some((key) => !['outputEquals','inputEquals'].includes(key)))) {
+    fail(`${skillId}/${stateId}: operator transitions must route on output.outcome with at most one exact input partition`);
   }
   const routed = routes.map((edge) => edge.when.outputEquals.outcome);
   const missing = outcomes.filter((outcome) => !routed.includes(outcome));
   const unknown = routed.filter((outcome) => !outcomes.includes(outcome));
-  if (missing.length || unknown.length || new Set(routed).size !== routed.length) {
+  if (missing.length || unknown.length) {
     fail(`${skillId}/${stateId}: routes differ from ${state.ref}; missing [${missing}], unknown [${unknown}]`);
+  }
+  for (const outcome of outcomes) {
+    const group = routes.filter((edge) => edge.when.outputEquals.outcome === outcome);
+    if (group.length === 1 && !group[0].when.inputEquals) continue;
+    if (group.some((edge) => !edge.when.inputEquals || Object.keys(edge.when.inputEquals).length !== 1)) {
+      fail(`${skillId}/${stateId}/${outcome}: conditional routes must use one exact input field on every edge`);
+    }
+    const keys = new Set(group.map((edge) => Object.keys(edge.when.inputEquals)[0]));
+    if (keys.size !== 1) fail(`${skillId}/${stateId}/${outcome}: conditional routes must partition the same input field`);
+    const key = [...keys][0];
+    const allowed = inputSchema.properties?.[key]?.enum;
+    if (!Array.isArray(allowed) || allowed.length === 0) fail(`${skillId}/${stateId}/${outcome}: conditional field ${key} needs a closed top-level enum`);
+    const actual = group.map((edge) => edge.when.inputEquals[key]);
+    if (new Set(actual).size !== actual.length || JSON.stringify([...actual].sort()) !== JSON.stringify([...allowed].sort())) {
+      fail(`${skillId}/${stateId}/${outcome}: conditional routes must cover ${key} exactly once`);
+    }
   }
 }
 
@@ -124,7 +140,7 @@ function assertMachine(skillId, machine, inputSchema, outputSchema) {
   }
   const stateIds = new Set(Object.keys(machine.states));
   for (const [stateId, state] of Object.entries(machine.states)) {
-    if (state.kind === 'operator') assertOperatorRoutes(skillId, stateId, state);
+    if (state.kind === 'operator') assertOperatorRoutes(skillId, stateId, state, inputSchema);
     if (state.kind === 'terminal' && state.on !== undefined) fail(`${skillId}/${stateId}: terminal cannot route`);
     if (state.kind !== 'terminal' && !Array.isArray(state.on)) fail(`${skillId}/${stateId}: missing routes`);
     if (state.kind === 'wait') {

@@ -9,6 +9,8 @@ All notable changes are documented here. This project follows Semantic Versionin
 - Added executable `fe/audit-route`: direct structural failures below 7 route to one dominant
   reconstruction, scores 7-8 and low nonstructural findings route to one batched repair, and
   shared/business/backend/runtime-auth defects stay with their smallest owner.
+- Added executable `fe/baseline-visual-review` before audit repair routing, so initial scoring is a
+  fresh blind raster contract rather than manual prose; a clean baseline still cannot self-PASS.
 - Added `fe/dominant-direction-generate`, which renders exactly one wide/compact/material-state
   direction and proceeds directly to Grammar bind/freeze/apply. The 3-4 direction WAIT remains only
   for explicit comparison requests.
@@ -17,6 +19,9 @@ All notable changes are documented here. This project follows Semantic Versionin
 - Added centralized mission-scoped Browser/UAT leases. Feature tasks cannot handle credentials or
   restart shared services; the same isolated account/context is reused across audit, repair,
   recapture, quality, and UAT rounds until continuity is proven lost.
+- Made Browser delivery executable: a consumer handoff requires current-turn tab discovery proof;
+  unavailable cross-task transfer switches the same authenticated lease to broker-executed typed
+  action/capture evidence instead of retrying symbolic refs or provisioning another account.
 - Added deterministic `fe/capture-preflight` before capture and Sol review, including ten readiness
   checks for data/state identity, controls, scroll/zoom restoration, probe completeness, raster
   uniqueness, and the handoff host.

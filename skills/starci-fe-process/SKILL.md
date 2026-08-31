@@ -89,6 +89,11 @@ explain away a bad raster. Only a fresh adversarial `visual-fidelity=passed` fro
 accessibility output, numeric thresholds, or a previous screenshot. Without this complete loop, the
 frontend mission is not complete.
 
+For audit intent, the executable initial route is `ui-audit -> baseline-review
+(fe/baseline-visual-review) -> authority-gap-classify -> audit-route`. The baseline operator uses one
+fresh Sol and 3-8 representative rasters; it may emit FAIL or SUSPENSE but never PASS. A direct
+dominant change renders exactly one direction before Grammar binding for audit and non-audit work.
+
 The enforced outer chain is `score latest evidence -> audit-route -> repair or dominant reconstruct -> recapture -> rescore -> quality-handoff`. Its compatibility receipt chain remains `apply/repair -> capture-preflight -> render-capture -> one fresh Sol visual-fidelity -> audit-route -> quality-handoff`. That single Sol receives one complete owner-partitioned blind raster and probe packet, performs the full adversarial visual review, and owns the typed visual verdict; no second AI review stage follows it. `fe/audit-route` is executable authority, not prose: scores 7-8 permit one batched smallest-owner repair. A score below 7 reconstructs only when direct-owner structural findings prove composition failure; a low score caused by a shared overlay, auth/session, business, or backend defect routes to that owner instead of redrawing an unrelated page. Structural scores below 7 freeze the batch, generate exactly one dominant replacement layout, visualize it, and construct it immediately inside the approved boundary. Generate three or four alternatives and wait for direction choice only when the user explicitly asks for options. Round 1 discovers the complete finding batch, round 2 verifies the chosen route, and round 3 onward attacks regressions while the mission is still making measurable progress. A round number is never a blocker. Stop only for canonical PASS, a genuine missing authority/runtime/permission after its typed route has been attempted, or three consecutive identical progress fingerprints proving no progress. A frontend finding routes to the score-selected repair or reconstruct path; a Grammar/UI-knowledge finding routes to authority repair; a product/business or backend finding emits the corresponding typed CALL and resumes this exact mission after RETURN. A mutation above the frozen layout-owner ceiling requests exact authorization and resumes after the choice; it is not reported as terminal `BLOCKED` merely because the current ceiling is narrower.
 Capture full-viewport screenshots after the latest source mutation and inspect the images themselves. A visual repair takes
 the inner path `visual-fidelity -> finding-classify -> authority-reconcile or one batched source-repair ->
@@ -221,6 +226,13 @@ automation. Group the imminent login sequence into one uninterrupted secure tran
 Browser supports it. Do not end a turn while holding a temporary tab, OTP challenge, or model-memory
 credential. A repeated confirmation is valid only when the secure Browser mechanism explicitly
 requires it after destination, scope, or lease continuity changed.
+
+An opaque Browser handoff ref never proves that this task can execute against the tab. Before direct
+Browser action, require a current-turn consumer inventory observation bound to the lease. If the tab
+does not materialize, do not retry handoff refs or provision another identity. Preserve the same
+authenticated lease, switch to broker-executed mode, send typed action/capture plans to the Control
+Panel Browser owner, and consume only returned evidence bound to the exact mission, source, runtime,
+principal, state and viewport. The frontend task retains audit and repair authority.
 
 ## Runtime continuation
 

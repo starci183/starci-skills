@@ -10,6 +10,9 @@ import { validateOutput as validateDirectionOutput } from './fe/direction-genera
 import { validateInput as validateAuditRouteInput } from './fe/audit-route/validate-input.mjs';
 import { validateOutput as validateAuditRouteOutput } from './fe/audit-route/validate-output.mjs';
 import { validateOutput as validateDominantDirectionOutput } from './fe/dominant-direction-generate/validate-output.mjs';
+import { validateOutput as validateSessionContinuityOutput } from './fe/session-continuity/validate-output.mjs';
+import { validateInput as validateBaselineInput } from './fe/baseline-visual-review/validate-input.mjs';
+import { validateOutput as validateBaselineOutput } from './fe/baseline-visual-review/validate-output.mjs';
 import { validateInput as validatePotentialInput } from './fe/product-potential/validate-input.mjs';
 import { validateOutput as validatePotentialOutput } from './fe/product-potential/validate-output.mjs';
 import { validateOutput as validateUatPublishOutput } from './test/uat-result-publish/validate-output.mjs';
@@ -19,6 +22,8 @@ import { REQUIRED_PROBE_CATEGORIES, REQUIRED_PROBE_PHASES } from './fe/strict-ui
 import { createOperatorInvocationBindingRegistry } from './invocation-binding.mjs';
 
 const machine = JSON.parse(readFileSync(new URL('../skills/starci-fe-process/machine.json', import.meta.url)));
+const feInputSchema = JSON.parse(readFileSync(new URL('../skills/starci-fe-process/input.schema.json', import.meta.url)));
+const machineInputIntents = () => feInputSchema.properties.intent.enum;
 const uatMachine = JSON.parse(readFileSync(new URL('../skills/starci-uat-verify/machine.json', import.meta.url)));
 const selection=(skillId)=>({analyzerVersion:2,skillId,confidence:'exact',interactionPolicy:'ask-only-when-stuck',activeInputRefs:['request://current'],passiveContextRefs:[]});
 const scope=(unit='surface',dimensions=[])=>({status:'frozen',unit,targetRefs:['surface://Profile'],inclusionRefs:['state://default'],exclusionRefs:['layout://AppShell'],writeRoots:['src/Profile.tsx'],externalMutation:false,approvalRef:null,completionProofRefs:['proof://render-review'],dimensions,ambiguityRefs:[]});
@@ -28,9 +33,9 @@ const layoutOwnerCeiling=()=>({targetOwnerRef:'surface://Profile',directInteract
 const neutralAdversarialDecision={add:{disposition:'reject',rationale:'No missing capability is evidenced.',evidenceRefs:['evidence://mission']},change:{disposition:'adopt',rationale:'The requested outcome requires bounded change.',evidenceRefs:['evidence://mission']},remove:{disposition:'reject',rationale:'No removal is supported by evidence.',evidenceRefs:['evidence://mission']}};
 const independentProbeSequence=()=>REQUIRED_PROBE_CATEGORIES.flatMap((category)=>REQUIRED_PROBE_PHASES[category].map((phase,index)=>({probeId:`${category}-${index}`,category,phase})));
 const feInput = (intent, objective, level='refine') => ({ schemaVersion:7, runId:'mission-1', project:'academy', selection:selection('starci-fe-process'), intent, objective, auditTargetScore:null, auditScoreHistory:[], targetHints:['route://academy/fe','surface://Profile'], authorityRefs:['business://profile'], scope:scope('surface',[changeLevel(level),ownerCeilingLevel('surface-only')]), resume:null, receiptType:'NONE', returnReceipt:null, progressHistory:[], mutationAuthorizationRef:null, verifiedFrontendRoute:'.workspaces/projects/academy/fe.json', exactFiles:[{path:'src/Profile.tsx',beforeSha256:`sha256:${'a'.repeat(64)}`,ownerRef:'surface://Profile'}], layoutOwnerCeiling:layoutOwnerCeiling(), approvedContractFingerprint:null });
-const routed = (outcome, stateId = null) => {
+const routed = (outcome, stateId = null, intent = 'audit') => {
   const state = stateId ?? Object.entries(machine.states).find(([, value]) => value.ref && value.on?.some((edge) => edge.when?.outputEquals?.outcome === outcome))?.[0];
-  const matches = machine.states[state].on.filter((edge) => edge.when?.outputEquals?.outcome === outcome);
+  const matches = machine.states[state].on.filter((edge) => edge.when?.outputEquals?.outcome === outcome && (edge.when?.inputEquals?.intent === undefined || edge.when.inputEquals.intent === intent));
   assert.equal(matches.length, 1);
   return matches[0].target;
 };
@@ -43,7 +48,30 @@ test('audit Profile compiles as one frontend mission and traverses all three ind
   assert.equal(routed('passed','semantic-audit'),'ux-audit');
   assert.equal(routed('passed','ux-audit'),'grammar-audit');
   assert.equal(routed('converged','grammar-audit'),'ui-audit');
-  assert.equal(routed('findings','ui-audit'),'classify');
+  assert.equal(routed('findings','ui-audit','audit'),'baseline-review');
+});
+
+test('intent-conditioned UI and dominant routes cover every frontend intent exactly once',()=>{
+  const intents=machine.states['ui-audit'].on.filter((edge)=>edge.when.outputEquals.outcome==='findings').map((edge)=>edge.when.inputEquals?.intent).sort();
+  assert.deepEqual(intents,[...machineInputIntents()].sort());
+  const dominantIntents=machine.states.classify.on.filter((edge)=>edge.when.outputEquals.outcome==='dominant').map((edge)=>edge.when.inputEquals?.intent).sort();
+  assert.deepEqual(dominantIntents,[...machineInputIntents()].sort());
+});
+
+test('rapid audit baseline is blind, representative, and routes structural failure without claiming PASS',()=>{
+  const cells=[
+    {cellRef:'cell-001',imageRef:'raster://wide',artifactSha256:'1'.repeat(64),viewport:'wide',stateRole:'core-task'},
+    {cellRef:'cell-002',imageRef:'raster://compact',artifactSha256:'2'.repeat(64),viewport:'compact',stateRole:'core-task'},
+    {cellRef:'cell-003',imageRef:'raster://constrained',artifactSha256:'3'.repeat(64),viewport:'wide',stateRole:'constrained'},
+  ];
+  const input={schemaVersion:7,operatorId:'fe/baseline-visual-review',context:{reviewerExecutionRef:`execution://${'4'.repeat(64)}`,reviewerPrincipalFingerprint:`sha256:${'5'.repeat(64)}`,reviewerContextFingerprint:`sha256:${'6'.repeat(64)}`,reviewerModel:'gpt-5.6-sol',reviewerCount:1,contextIsolation:'fresh',forkTurns:'none',debug:true,knowledgeRefs:['fe.audit-loop-v75-alpha','fe.ui-render-review']},input:{targetRef:'surface://dashboard',auditTargetScore:9,packet:{profile:'rapid-baseline',packetRef:'packet://dashboard',packetFingerprint:`sha256:${'7'.repeat(64)}`,sourceFingerprint:`sha256:${'8'.repeat(64)}`,runtimeGeneration:1,leaseRef:'browser-lease://dashboard',executionMode:'broker-executed',cells}}};
+  assert.deepEqual(validateBaselineInput(input),{valid:true,errors:[]});
+  const output={schemaVersion:7,operatorId:'fe/baseline-visual-review',output:{outcome:'failed',aiExecution:{model:'gpt-5.6-sol',count:1,isolation:'fresh',forkTurns:'none',executionRef:`execution://${'4'.repeat(64)}`},result:{typedVerdict:'FAIL',auditScore:4,axes:['hierarchy','flow','responsive','semantics','polish'].map((axis)=>({axis,score:0.8,observation:`${axis} has visible counterevidence.`})),inspectionRecords:cells.map(({cellRef},index)=>({cellRef,verdict:index===0?'problem':'passed',observation:`Inspected ${cellRef} from pixels.`})),findingRefs:['finding://wasted-wide-space'],structuralFindingRefs:['finding://wasted-wide-space'],findingBatchFingerprint:`sha256:${'9'.repeat(64)}`},gaps:[],evidenceRefs:['packet://dashboard']}};
+  assert.deepEqual(validateBaselineOutput(output),{valid:true,errors:[]});
+  assert.equal(routed('failed','baseline-review'),'classify');
+  assert.equal(routed('dominant','classify','audit'),'score-route');
+  output.output.outcome='ready-for-closure';
+  assert.equal(validateBaselineOutput(output).valid,false);
 });
 
 test('numeric audit target preserves an ordered evidence-bound progress history',()=>{
@@ -97,7 +125,8 @@ test('neutral product potential requires an exhaustive typed capability delta be
 
 test('create page X auto-selects a dominant action without generating choices', () => {
   assert.deepEqual(validateFeInput(feInput('create','Create page X','new')), {valid:true,errors:[]});
-  assert.equal(routed('dominant','classify'),'grammar-bind');
+  assert.equal(routed('dominant','classify','create'),'dominant-generate');
+  assert.equal(routed('generated','dominant-generate','create'),'grammar-bind');
   assert.equal(routed('converged','grammar-bind'),'freeze');
 });
 
@@ -222,7 +251,7 @@ test('UAT verification binds canonical backend-owned feature/flow authority', ()
 });
 
 test('authenticated UAT accepts only a fresh run-scoped account with a mission Browser lease', () => {
-  const sessionLease={leaseRef:'browser-lease://mission-1',missionRef:'mission-1',browserContextRef:'browser://in-app/run-1',principalFingerprint:`sha256:${'a'.repeat(64)}`,runtimeGeneration:1,origin:'http://localhost:3000',fixtureNamespace:'uat-personal-project-run-1',state:'authenticated'};
+  const sessionLease={leaseRef:'browser-lease://mission-1',missionRef:'mission-1',browserContextRef:'browser://in-app/run-1',principalFingerprint:`sha256:${'a'.repeat(64)}`,runtimeGeneration:1,origin:'http://localhost:3000',fixtureNamespace:'uat-personal-project-run-1',state:'authenticated',executionMode:'broker-executed',executionOwnerRef:'thread://control-panel',consumerTabRef:null,evidenceBrokerRef:'browser-broker://control-panel/personal-project',materializationStatus:'not-applicable',materializationEvidenceRefs:['browser-observation://consumer/no-tabs']};
   const value={schemaVersion:7,operatorId:'test/uat-case-freeze',context:{snapshotRef:'uat://personal-project/core/snapshot'},input:{evidenceRefs:['runtime://personal-project'],browserSessionRef:'browser://in-app/run-1',accountRef:'account://fresh/personal-project/run-1',sessionLease}};
   assert.deepEqual(validateUatCaseInput(value),{valid:true,errors:[]});
   value.input.accountRef='account://personal/teacher';
@@ -231,6 +260,17 @@ test('authenticated UAT accepts only a fresh run-scoped account with a mission B
   assert.equal(validateUatCaseInput(value).valid,false);
   value.input.accountRef='anonymous://explicit/personal-project-entry';
   assert.deepEqual(validateUatCaseInput(value),{valid:true,errors:[]});
+});
+
+test('session continuity never treats a symbolic cross-task handoff as materialized', () => {
+  const value={schemaVersion:7,operatorId:'fe/session-continuity',output:{outcome:'recovered',result:{leaseRef:'browser-lease://dashboard',browserContextRef:'browser-context://broker/dashboard',principalFingerprint:`sha256:${'b'.repeat(64)}`,runtimeGeneration:1,origin:'http://localhost:3000',state:'authenticated',executionMode:'broker-executed',executionOwnerRef:'thread://control-panel',consumerTabRef:null,evidenceBrokerRef:'browser-broker://control-panel/dashboard',materializationStatus:'failed',materializationEvidenceRefs:['browser-observation://dashboard/no-tabs']},gaps:[],evidenceRefs:['lease://dashboard']}};
+  assert.equal(validateSessionContinuityOutput(value).valid,true);
+  const falseHandoff=structuredClone(value);
+  falseHandoff.output.result.executionMode='consumer-materialized';
+  falseHandoff.output.result.materializationStatus='materialized';
+  falseHandoff.output.result.consumerTabRef=null;
+  falseHandoff.output.result.evidenceBrokerRef=null;
+  assert.equal(validateSessionContinuityOutput(falseHandoff).valid,false);
 });
 
 test('frontend completion is reachable only after quality and UAT returns', () => {

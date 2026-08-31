@@ -14,7 +14,8 @@ One audit mission optimizes for visible progress while preserving typed proof:
    mission-scoped Browser/UAT lease;
 2. capture a rapid representative baseline: wide, compact, core task, and worst recovery/constrained
    state; intermediate is required only when the breakpoint materially changes composition;
-3. obtain one fresh Sol visual score and owner-classified finding batch;
+3. invoke executable `fe/baseline-visual-review` with one fresh Sol to obtain the routing score and
+   complete initial finding batch; prose or implementer self-scoring cannot substitute for it;
 4. route mechanically: `7-8 -> one batched repair`; `<7 + direct structural findings -> one dominant
    reconstruct`; shared/business/backend/runtime-auth findings route to their owner;
 5. fix UX task flow and recovery before UI polish, construct the selected composition, then recapture
@@ -24,6 +25,11 @@ One audit mission optimizes for visible progress while preserving typed proof:
 
 Baseline evidence never certifies PASS. Closure still requires fresh typed PASS plus score at least 9.
 Inapplicable probes require an exact owner/capability reason rather than synthetic exercise.
+
+The machine route for an audit is `ui-audit -> baseline-review`. A failed baseline continues through
+owner classification and `audit-route`; a clean score-9 baseline remains SUSPENSE and expands through
+capture preflight to the complete closure matrix. Non-audit create/repair/redesign/debug/reconcile
+missions also render one dominant direction before Grammar binding when a dominant change exists.
 
 ## No-wait law
 
@@ -44,3 +50,7 @@ binds mission, account, isolated context, principal fingerprint, localhost origi
 fixture namespace, and expiry. Reuse it across audit/repair/recapture rounds. On contamination or
 continuity loss, invalidate affected evidence and reacquire the lease; do not restart FE/API and do
 not keep a temporary challenge across turns.
+
+Treat a cross-task tab interruption as a delivery failure, not identity loss. A symbolic handoff is
+usable only after consumer-side discovery. Otherwise retain the authenticated lease, switch to
+broker-executed capture, and continue from the same audit receipt instead of provisioning again.

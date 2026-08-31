@@ -25,6 +25,8 @@
     "localUatBrowserOwnership",
     "localUatBrowserControlPlane",
     "localUatBrowserLeaseRegistry",
+    "localUatBrowserDelivery",
+    "crossTaskBrowserHandleAssumption",
     "featureTaskCredentialHandling"
   ],
   "properties": {
@@ -53,6 +55,8 @@
     "localUatBrowserOwnership": { "const": "centralized-lease" },
     "localUatBrowserControlPlane": { "const": "control-panel" },
     "localUatBrowserLeaseRegistry": { "const": ".worktrees/sessions/central-uat-browser/leases" },
+    "localUatBrowserDelivery": { "const": "materialize-or-broker-execute" },
+    "crossTaskBrowserHandleAssumption": { "const": "forbidden" },
     "featureTaskCredentialHandling": { "const": "forbidden" }
   }
 }

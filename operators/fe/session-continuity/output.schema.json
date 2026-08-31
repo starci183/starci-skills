@@ -19,14 +19,20 @@
             {
               "type": "object",
               "additionalProperties": false,
-              "required": ["leaseRef", "browserContextRef", "principalFingerprint", "runtimeGeneration", "origin", "state"],
+              "required": ["leaseRef", "browserContextRef", "principalFingerprint", "runtimeGeneration", "origin", "state", "executionMode", "executionOwnerRef", "consumerTabRef", "evidenceBrokerRef", "materializationStatus", "materializationEvidenceRefs"],
               "properties": {
                 "leaseRef": { "description": "Opaque recovered lease identity.", "type": "string", "pattern": "^browser-lease://" },
                 "browserContextRef": { "description": "Recovered isolated Browser context.", "type": "string", "minLength": 1 },
                 "principalFingerprint": { "description": "Verified authenticated principal identity.", "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
                 "runtimeGeneration": { "description": "Verified central runtime generation.", "type": "integer", "minimum": 1 },
                 "origin": { "description": "Verified canonical local origin.", "const": "http://localhost:3000" },
-                "state": { "description": "Recovered authenticated lease state.", "const": "authenticated" }
+                "state": { "description": "Recovered authenticated lease state.", "const": "authenticated" },
+                "executionMode": { "description": "Where Browser actions execute after recovery.", "enum": ["consumer-materialized", "broker-executed"] },
+                "executionOwnerRef": { "description": "Task that owns the executable Browser handle.", "type": "string", "minLength": 1 },
+                "consumerTabRef": { "description": "Consumer-local tab only after direct discovery proof.", "type": ["string", "null"], "minLength": 1 },
+                "evidenceBrokerRef": { "description": "Broker endpoint for typed action/capture requests when the consumer has no tab.", "type": ["string", "null"], "minLength": 1 },
+                "materializationStatus": { "description": "Observed consumer materialization result.", "enum": ["materialized", "failed", "not-applicable"] },
+                "materializationEvidenceRefs": { "description": "Direct consumer discovery or failure observations.", "type": "array", "minItems": 1, "maxItems": 16, "uniqueItems": true, "items": { "type": "string", "minLength": 1 } }
               }
             },
             { "type": "null" }

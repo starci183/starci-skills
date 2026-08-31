@@ -23,6 +23,13 @@ One feature/flow owns exactly `.worktrees/uat/<feature>/<flow>/snapshot.json` an
 
 Before any product action, publish the case ID, run ID, account or anonymous identity, fixture namespace, precondition, expected outcome, Browser session lease, and execution order. One canonical mission provisions one fresh logical account when applicable and owns an exclusive authenticated Browser context, origin, principal fingerprint, runtime generation, mailbox/query namespace, mutable fixture namespace, artifact directory, and resource locks. Audit, repair, recapture, quality, and UAT rounds reuse this leased account/context. A new account is required only for a new product case whose precondition requires reset or after proven continuity loss; a visual recapture is not a new case-run. Anonymous entry explicitly records no account; a registration journey creates its own outcome account. Execute one authenticated Browser lease at a time on the user-visible Browser in the declared order. A browser tab is not authenticated isolation unless the lease proves clean storage, cookies and autofill. Resource classes remain coordination metadata; they never authorize simultaneous visible-browser cases.
 
+The lease also declares `executionMode`. `consumer-materialized` requires a fresh consumer-side tab
+discovery proof in the active turn. Cross-task handoff refs and remembered tab IDs never satisfy this
+proof. If the task cannot discover the tab, use the same lease in `broker-executed` mode: the central
+Browser owner performs typed actions/captures and publishes opaque evidence with exact mission,
+source, runtime, principal, state and viewport bindings. Broker execution must not leak credentials
+or transfer implementation/review authority to the broker.
+
 For an authenticated feature, obtain the mission-scoped Browser lease and provision the fresh
 run-scoped account before any Browser authentication action. The feature task consumes the opaque
 lease and never owns raw credentials, cookies, OTPs, tabs, or authentication storage. Use the declared

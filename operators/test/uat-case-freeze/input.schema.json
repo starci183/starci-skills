@@ -63,7 +63,7 @@
           "description": "Opaque mission-scoped browser/auth continuity contract; contains no secret.",
           "type": "object",
           "additionalProperties": false,
-          "required": ["leaseRef", "missionRef", "browserContextRef", "principalFingerprint", "runtimeGeneration", "origin", "fixtureNamespace", "state"],
+          "required": ["leaseRef", "missionRef", "browserContextRef", "principalFingerprint", "runtimeGeneration", "origin", "fixtureNamespace", "state", "executionMode", "executionOwnerRef", "consumerTabRef", "evidenceBrokerRef", "materializationStatus", "materializationEvidenceRefs"],
           "properties": {
             "leaseRef": { "type": "string", "pattern": "^browser-lease://" },
             "missionRef": { "type": "string", "minLength": 1 },
@@ -72,8 +72,24 @@
             "runtimeGeneration": { "type": "integer", "minimum": 1 },
             "origin": { "const": "http://localhost:3000" },
             "fixtureNamespace": { "type": "string", "minLength": 1 },
-            "state": { "enum": ["leased", "authenticated", "released", "invalidated"] }
-          }
+            "state": { "enum": ["leased", "authenticated", "released", "invalidated"] },
+            "executionMode": { "enum": ["consumer-materialized", "broker-executed"] },
+            "executionOwnerRef": { "type": "string", "minLength": 1 },
+            "consumerTabRef": { "type": ["string", "null"], "minLength": 1 },
+            "evidenceBrokerRef": { "type": ["string", "null"], "minLength": 1 },
+            "materializationStatus": { "enum": ["materialized", "failed", "not-applicable"] },
+            "materializationEvidenceRefs": { "type": "array", "minItems": 1, "maxItems": 16, "uniqueItems": true, "items": { "type": "string", "minLength": 1 } }
+          },
+          "allOf": [
+            {
+              "if": { "properties": { "executionMode": { "const": "consumer-materialized" } } },
+              "then": { "properties": { "materializationStatus": { "const": "materialized" }, "consumerTabRef": { "type": "string", "minLength": 1 }, "evidenceBrokerRef": { "type": "null" } } }
+            },
+            {
+              "if": { "properties": { "executionMode": { "const": "broker-executed" } } },
+              "then": { "properties": { "materializationStatus": { "enum": ["failed", "not-applicable"] }, "consumerTabRef": { "type": "null" }, "evidenceBrokerRef": { "type": "string", "minLength": 1 } } }
+            }
+          ]
         }
       }
     }

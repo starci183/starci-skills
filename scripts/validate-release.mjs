@@ -19,6 +19,7 @@ for (const required of [
   'request-vocabulary.md', 'skills/catalog.json', 'skills/machine.schema.json',
   'runtime/config.schema.json', 'runtime/receipt.schema.json', 'runtime/topology.schema.json',
   'runtime/contracts/grammar-decision.schema.json', 'runtime/contracts/grammar-decision.mjs',
+  'runtime/contracts/browser-execution-lease.schema.json',
   'knowledge/grammar/common/semantic-composition.md', 'operators/fe-grammar-v74.spec.mjs',
   'templates/businesses/business.schema.json', 'templates/uat/snapshot.schema.json',
   'templates/uat/result.schema.json', 'templates/sessions/call-receipt.schema.json',

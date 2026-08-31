@@ -6,6 +6,7 @@ export const MATERIAL_AI_OPERATORS = Object.freeze(new Set([
   'architecture/alternatives',
   'business/model-challenge',
   'fe/design-critique',
+  'fe/baseline-visual-review',
   'fe/dominant-direction-generate',
   'fe/direction-generate',
   'fe/direction-rank',

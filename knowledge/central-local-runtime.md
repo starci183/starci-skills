@@ -30,6 +30,22 @@ runtime receipt, logs, source, or evidence.
 
 ## Discovery and communication
 
+## Browser lease execution
+
+An opaque lease proves account/context ownership; it does not transfer an executable tab between
+Codex tasks. A consumer may use `consumer-materialized` mode only after that consumer directly sees
+the tab in its current Browser inventory and records an origin/principal-bound discovery proof. A
+handoff URI, broker-held tab, queued `open_in_codex` call, or prior-turn tab ID is insufficient.
+
+When materialization is unavailable or lost after an interruption, preserve the same authenticated
+lease and switch once to `broker-executed`. The Control Panel Browser owner executes the consumer's
+typed action/capture plan and returns opaque artifacts bound to mission, source fingerprint, runtime
+generation, principal fingerprint, state, viewport, and capture time. The consumer owns UI decisions
+and review; the broker owns only Browser execution. Do not retry symbolic handoffs, create another
+account, or call the broker-held tab a consumer-visible handoff.
+
+## Discovery and communication
+
 The Control Panel registers the delegated task in the local-only runtime registry. The registry
 contains its task ID, generation, current status, canonical endpoints, health evidence, and update
 time; it contains no secret. Feature tasks resolve and validate this registry before local browser

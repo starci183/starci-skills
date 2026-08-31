@@ -33,6 +33,8 @@ test('sole YAML config is strict v7.5-alpha with fresh Sol review and centralize
   localUatBrowserOwnership:'centralized-lease',
   localUatBrowserControlPlane:'control-panel',
   localUatBrowserLeaseRegistry:'.worktrees/sessions/central-uat-browser/leases',
+  localUatBrowserDelivery:'materialize-or-broker-execute',
+  crossTaskBrowserHandleAssumption:'forbidden',
   featureTaskCredentialHandling:'forbidden',
 }));
 
@@ -54,6 +56,17 @@ test('central runtime registry binds one owner generation and canonical localhos
   assert.equal(validateOwner(owner).valid,true);
   assert.equal(validateOwner({...owner,endpoints:{...owner.endpoints,api:'http://127.0.0.1:3001'}}).valid,false);
   assert.equal(validateOwner({...owner,status:'ready',ownerThreadId:''}).valid,false);
+});
+
+test('authenticated Browser work requires materialization proof or broker execution',()=>{
+  const validateLease=validatorFor(new URL('./contracts/browser-execution-lease.schema.json',import.meta.url));
+  const base={schemaVersion:1,leaseRef:'browser-lease://mission-1',missionRef:'mission://dashboard',accountRef:'account://fresh/dashboard/run-1',principalFingerprint:`sha256:${'a'.repeat(64)}`,runtimeGeneration:1,origin:'http://localhost:3000',fixtureNamespace:'uat-dashboard-run-1',expiresAt:'2026-08-31T09:29:40.167Z',state:'authenticated'};
+  const materialized={...base,executionMode:'consumer-materialized',executionOwnerRef:'thread://dashboard',browserContextRef:'browser-context://dashboard/1',consumerTabRef:'browser-tab://dashboard/4',evidenceBrokerRef:null,materializationStatus:'materialized',materializationEvidenceRefs:['browser-observation://dashboard/tab-4']};
+  assert.equal(validateLease(materialized).valid,true);
+  assert.equal(validateLease({...materialized,consumerTabRef:null,materializationEvidenceRefs:[]}).valid,false);
+  const brokered={...base,executionMode:'broker-executed',executionOwnerRef:'thread://control-panel',browserContextRef:'browser-context://broker/1',consumerTabRef:null,evidenceBrokerRef:'browser-broker://control-panel/dashboard',materializationStatus:'not-applicable',materializationEvidenceRefs:['browser-observation://consumer/no-tabs']};
+  assert.equal(validateLease(brokered).valid,true);
+  assert.equal(validateLease({...brokered,evidenceBrokerRef:null}).valid,false);
 });
 
 test('scope policy rejects unresolved mission scope before skill selection', () => {
