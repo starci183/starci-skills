@@ -30,8 +30,9 @@ runtime receipt, logs, source, or evidence.
 
 Sequential read-only visual audits with the same required role may reuse one authenticated UAT-pool
 context through a newly issued mission lease after the previous lease is released. The broker must
-prove compatible role, locale, fixture visibility, origin, runtime generation, expiry, and clean
-storage before re-leasing it. Product UAT and any state-mutating or reset-sensitive flow still require
+prove compatible role, locale, fixture visibility, origin, runtime generation, and expiry, then reset
+browser-observable route/scroll/overlay state before re-leasing it. It must not inspect cookies,
+tokens, passwords, storage, or autofill. Product UAT and any state-mutating or reset-sensitive flow still require
 a fresh account/context. Reuse never transfers credentials or a tab to the feature task.
 
 ## Discovery and communication

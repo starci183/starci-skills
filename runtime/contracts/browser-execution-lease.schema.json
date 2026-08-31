@@ -3,13 +3,23 @@
   "$id": "https://starci.dev/v7.5-alpha/runtime/contracts/browser-execution-lease.schema.json",
   "type": "object",
   "additionalProperties": false,
-  "required": ["schemaVersion", "leaseRef", "missionRef", "purpose", "accountRef", "principalFingerprint", "runtimeGeneration", "origin", "fixtureNamespace", "expiresAt", "state", "executionMode", "executionOwnerRef", "browserContextRef", "consumerTabRef", "evidenceBrokerRef", "materializationStatus", "materializationEvidenceRefs"],
+  "required": ["schemaVersion", "leaseRef", "missionRef", "purpose", "accountRef", "reuseAttestations", "principalFingerprint", "runtimeGeneration", "origin", "fixtureNamespace", "expiresAt", "state", "executionMode", "executionOwnerRef", "browserContextRef", "consumerTabRef", "evidenceBrokerRef", "materializationStatus", "materializationEvidenceRefs"],
   "properties": {
     "schemaVersion": { "const": 1 },
     "leaseRef": { "type": "string", "pattern": "^browser-lease://" },
     "missionRef": { "type": "string", "minLength": 1 },
     "purpose": { "enum": ["read-only-visual-audit", "product-uat"] },
     "accountRef": { "type": "string", "pattern": "^account://(?:fresh|uat-pool)" },
+    "reuseAttestations": {
+      "anyOf": [
+        { "type": "null" },
+        {
+          "type": "array",
+          "uniqueItems": true,
+          "items": { "enum": ["previous-lease-released", "role-compatible", "locale-resettable", "fixture-readable", "origin-matches", "runtime-generation-matches"] }
+        }
+      ]
+    },
     "principalFingerprint": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
     "runtimeGeneration": { "type": "integer", "minimum": 1 },
     "origin": { "const": "http://localhost:3000" },
@@ -27,7 +37,28 @@
   "allOf": [
     {
       "if": { "properties": { "purpose": { "const": "product-uat" } } },
-      "then": { "properties": { "accountRef": { "pattern": "^account://fresh" } } }
+      "then": { "properties": { "accountRef": { "pattern": "^account://fresh" }, "reuseAttestations": { "type": "null" } } }
+    },
+    {
+      "if": { "properties": { "accountRef": { "pattern": "^account://uat-pool" } } },
+      "then": {
+        "properties": {
+          "purpose": { "const": "read-only-visual-audit" },
+          "reuseAttestations": {
+            "type": "array",
+            "minItems": 6,
+            "maxItems": 6,
+            "allOf": [
+              { "contains": { "const": "previous-lease-released" } },
+              { "contains": { "const": "role-compatible" } },
+              { "contains": { "const": "locale-resettable" } },
+              { "contains": { "const": "fixture-readable" } },
+              { "contains": { "const": "origin-matches" } },
+              { "contains": { "const": "runtime-generation-matches" } }
+            ]
+          }
+        }
+      }
     },
     {
       "if": { "properties": { "executionMode": { "const": "consumer-materialized" } } },
