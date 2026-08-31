@@ -10,7 +10,10 @@ After the complete blind inspection, emit `auditScore` as five separately eviden
 sum is the 0-10 value. The target is parent-owned and does not enter the blind reviewer context. Any
 visible finding caps the score at 8; only aggregate `passed` may score 9 or 10. Preserve the previous
 score and exact delta when this is a rescore. The score is diagnostic progress only and cannot soften
-or replace the typed outcome. A below-target repair must proceed to finding classification.
+or replace the typed outcome. A below-target repair must proceed to finding classification. If the
+packet cannot distinguish a visible defect from a capture boundary, return `insufficient-evidence`
+with `result=null`, exact recapture gaps, and no numeric score; the Skill routes back to capture
+preflight without mutating source.
 
 Use only the closed `context` and `input`. Return one typed `output.outcome` plus this job's result, gaps, and evidence. Do not route, persist a session, or choose another operator.
 
@@ -54,6 +57,12 @@ the task. A measurement-only record or generic reassurance is invalid. Any such 
 object visually bound to the wrong surface, weak/conflicting hierarchy, dead zone, desktop layout
 merely squeezed into compact, text touching a framed edge, readable content showing through a
 sticky/fixed surface, clipped action, or inconsistent peer padding returns `repair`.
+
+A surface ending at the screenshot edge is not by itself proof that the product collapsed, clipped,
+or omitted it. Before confirming such a finding, require an adjacent scroll-middle, scroll-terminal,
+restored, or focused raster that shows the same defect inside the viewport. If that corroborating
+raster is absent, return `insufficient-evidence`; do not infer a score, route to reconstruction, or
+use DOM/geometry evidence inside this blind operator to settle the visual claim.
 
 This operator is the only AI visual decision inside the design loop. `passed` advances to quality handoff.
 `repair` first exposes the pixel findings to classification against UI knowledge, routed Grammar,

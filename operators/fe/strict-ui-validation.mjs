@@ -361,6 +361,11 @@ export function visualFidelityInputSemantic(value) {
 export function visualFidelityOutputSemantic(value) {
   const errors = [];
   const { outcome, result, gaps } = value.output;
+  if (outcome === 'insufficient-evidence') {
+    if (result !== null) errors.push('$.output.result: insufficient evidence cannot emit a visual result or audit score');
+    if (gaps.length === 0) errors.push('$.output.gaps: insufficient evidence requires exact recapture gaps');
+    return errors;
+  }
   if (result && result.reviewMode !== 'ai-adversarial-pixel') {
     errors.push('$.output.result.reviewMode: visual fidelity requires AI adversarial pixel review');
   }

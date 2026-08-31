@@ -10,6 +10,7 @@ import { validateOutput as validateDirectionOutput } from './fe/direction-genera
 import { validateInput as validateAuditRouteInput } from './fe/audit-route/validate-input.mjs';
 import { validateOutput as validateAuditRouteOutput } from './fe/audit-route/validate-output.mjs';
 import { validateOutput as validateDominantDirectionOutput } from './fe/dominant-direction-generate/validate-output.mjs';
+import { validateOutput as validateVisualFidelityOutput } from './fe/visual-fidelity/validate-output.mjs';
 import { validateOutput as validateSessionContinuityOutput } from './fe/session-continuity/validate-output.mjs';
 import { validateInput as validateBaselineInput } from './fe/baseline-visual-review/validate-input.mjs';
 import { validateOutput as validateBaselineOutput } from './fe/baseline-visual-review/validate-output.mjs';
@@ -98,6 +99,16 @@ test('v7.5-alpha routes only direct structural scores below 7 to one dominant re
   assert.deepEqual(validateDominantDirectionOutput(dominant),{valid:true,errors:[]});
   assert.equal(routed('generated','dominant-generate'),'grammar-bind');
   assert.notEqual(routed('generated','dominant-generate'),'direction-choice');
+});
+
+test('v7.5-alpha recaptures an edge-cut visual claim without scoring or reconstructing',()=>{
+  const output={schemaVersion:7,operatorId:'fe/visual-fidelity',output:{outcome:'insufficient-evidence',result:null,gaps:['Compact raster ends at the Streak card edge; capture scroll-middle and restored rasters with the card fully inside the viewport.'],evidenceRefs:['packet://round-5-focused']}};
+  assert.deepEqual(validateVisualFidelityOutput(output),{valid:true,errors:[]});
+  assert.equal(routed('insufficient-evidence','visual-fidelity'),'capture-preflight');
+  assert.notEqual(routed('insufficient-evidence','visual-fidelity'),'score-route');
+  const invalid=structuredClone(output);
+  invalid.output.result={auditScore:{value:6}};
+  assert.equal(validateVisualFidelityOutput(invalid).valid,false);
 });
 
 test('v7.5-alpha keeps a low nonstructural score on the current owner repair route',()=>{

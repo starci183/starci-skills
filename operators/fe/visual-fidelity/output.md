@@ -1,7 +1,7 @@
 # `fe/visual-fidelity` output
 
 - `output.outcome`: Legacy semantic result consumed only by the Skill machine.
-- `output.result`: The atomic job result, or null when blocked.
+- `output.result`: The atomic job result, or null when blocked or when evidence is insufficient.
 - `output.result.matrixFingerprint`, `partitionFingerprint`, and `visualRound`: Exact preflight/capture identity reviewed by Sol.
 - `output.result.inspectionRecords`: One blind pixel observation record per screenshot, covering purpose/semantic utility, content coherence, inset, surfaces, padding on every edge, alignment, rhythm, hierarchy, visual ownership, pinned-boundary clearance, affordance, wrapping, responsive composition, visual consistency, empty-space balance, clipping, and occlusion.
 - `output.result.reviewMode`: Always `ai-adversarial-pixel`; confirmation-oriented or measurement-led review is invalid.
@@ -12,6 +12,9 @@
 - `output.result.auditScore`: Noncanonical 0-10 progress score with five 0-2 evidence axes, requested
   target, previous-round delta, and target status. A visible finding caps the score at 8; 9 or higher
   requires typed `passed` over the complete latest-source packet.
+- `output.outcome=insufficient-evidence`: A capture boundary or missing adjacent lifecycle raster
+  prevents a visual conclusion. It requires `result=null`, at least one exact recapture gap, and no
+  numeric score; the parent returns to capture preflight without source mutation.
 - `output.result.inspectionRecords[].lensVerdicts`: One concrete AI pixel verdict for every required lens; any `problem` forces repair.
 - `output.result.inspectionRecords[].challengeRecords`: Potential defects deliberately attacked in all purpose/content, composition/spacing, and interaction/responsive families; any confirmed candidate forces repair.
 - `output.result.probeRecords`: Exactly one falsification verdict per requested adversarial probe and lifecycle phase, preserving the attempted attack, raster reference or exact inapplicability reason, and observed contradiction. Counts alone never satisfy this contract.

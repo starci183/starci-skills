@@ -30,11 +30,12 @@
           "enum": [
             "passed",
             "repair",
+            "insufficient-evidence",
             "blocked"
           ]
         },
         "result": {
-          "description": "The atomic job result, or null when blocked.",
+          "description": "The atomic job result, or null when blocked or when the raster packet cannot support a verdict.",
           "anyOf": [
             {
               "type": "object",
@@ -300,7 +301,21 @@
           },
           "minItems": 1
         }
-      }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": { "outcome": { "const": "insufficient-evidence" } },
+            "required": ["outcome"]
+          },
+          "then": {
+            "properties": {
+              "result": { "type": "null" },
+              "gaps": { "minItems": 1 }
+            }
+          }
+        }
+      ]
     }
   }
 }

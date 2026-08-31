@@ -614,6 +614,14 @@
         {
           "when": {
             "outputEquals": {
+              "outcome": "insufficient-evidence"
+            }
+          },
+          "target": "capture-preflight"
+        },
+        {
+          "when": {
+            "outputEquals": {
               "outcome": "blocked"
             }
           },
