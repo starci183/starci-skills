@@ -16,4 +16,8 @@
 - `input.partitions`: Owner partitions defining fresh capture, dependency-proven reuse, and shared sentinels.
 - `input.readinessChecks`: Exact ordered deterministic checks that must pass before Sol review.
 
+For a capability absent from the direct owner, the corresponding check records passed readiness via
+exact non-applicability evidence and keeps every canonical probe phase with the same typed reason.
+Tooling inability is not non-applicability for a capability the feature actually exposes.
+
 A reused partition requires dependency proof; shared sentinels are always recaptured.

@@ -180,11 +180,18 @@ test('blind visual input is one fresh Sol raster packet and rejects stale or sel
   missingIntermediate.input.blindReviewPacket.rasterCells=missingIntermediate.input.blindReviewPacket.rasterCells.filter(({viewport})=>viewport!=='intermediate');
   missingIntermediate.context.reviewerContextFingerprint=fingerprint(missingIntermediate.input.blindReviewPacket);
   assert.match(validateVisualInput(missingIntermediate).errors.join('\n'),/contains|schema branch|intermediate/i);
-  const noLifecycle={...value,input:{auditTargetScore:9,blindReviewPacket:blindPacket()}};
-  for(const probe of noLifecycle.input.blindReviewPacket.probeCells){ if(['zoom','page-scroll','bounded-scroll','state-transition'].includes(probe.category)){ probe.applicable=false; probe.imageRef=null; probe.reason='lifecycle-not-present'; } }
-  noLifecycle.input.blindReviewPacket.rasterCells=noLifecycle.input.blindReviewPacket.rasterCells.filter(({imageRef})=>imageRef && !noLifecycle.input.blindReviewPacket.probeCells.some((probe)=>probe.imageRef===imageRef));
-  noLifecycle.context={...value.context,reviewerContextFingerprint:fingerprint(noLifecycle.input.blindReviewPacket)};
-  assert.match(validateVisualInput(noLifecycle).errors.join('\n'),/requires .* applicable raster phases/);
+  const noBoundedContainer={...value,input:{auditTargetScore:9,blindReviewPacket:blindPacket()}};
+  const removedBoundedRefs=new Set();
+  for(const probe of noBoundedContainer.input.blindReviewPacket.probeCells){ if(probe.category==='bounded-scroll'){ removedBoundedRefs.add(probe.imageRef); probe.applicable=false; probe.imageRef=null; probe.reason='container-not-present'; } }
+  noBoundedContainer.input.blindReviewPacket.rasterCells=noBoundedContainer.input.blindReviewPacket.rasterCells.filter(({imageRef})=>!removedBoundedRefs.has(imageRef));
+  noBoundedContainer.context={...value.context,reviewerContextFingerprint:fingerprint(noBoundedContainer.input.blindReviewPacket)};
+  assert.deepEqual(validateVisualInput(noBoundedContainer),{valid:true,errors:[]});
+  const partialBounded=structuredClone(noBoundedContainer);
+  const firstBounded=partialBounded.input.blindReviewPacket.probeCells.find((probe)=>probe.category==='bounded-scroll');
+  firstBounded.applicable=true; firstBounded.imageRef=raster(firstBounded.probeId); firstBounded.reason=null;
+  partialBounded.input.blindReviewPacket.rasterCells.splice(-1,0,{cellRef:'cell-098',imageRef:firstBounded.imageRef,viewKind:'scroll-start',viewport:'wide',lastScreenshot:false});
+  partialBounded.context.reviewerContextFingerprint=fingerprint(partialBounded.input.blindReviewPacket);
+  assert.match(validateVisualInput(partialBounded).errors.join('\n'),/cannot mix partial applicable and inapplicable/);
 });
 
 test('visual verdict is bound to the exact supplied packet, rasters, final screenshot, and reviewer execution',()=>{

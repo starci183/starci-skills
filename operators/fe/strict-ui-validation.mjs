@@ -348,8 +348,11 @@ export function visualFidelityInputSemantic(value) {
     }
   }
   for (const [category, minimum] of Object.entries(REQUIRED_PROBE_COUNTS)) {
-    const applicableCount = packet.probeCells.filter((probe) => probe.category === category && probe.applicable).length;
-    if (applicableCount < minimum) errors.push(`$.input.blindReviewPacket.probeCells: ${category} requires ${minimum} applicable raster phases`);
+    const categoryCells = packet.probeCells.filter((probe) => probe.category === category);
+    const applicableCount = categoryCells.filter((probe) => probe.applicable).length;
+    const fullyInapplicable = categoryCells.length >= minimum && categoryCells.every((probe) => !probe.applicable && probe.imageRef === null && probe.reason !== null);
+    if (applicableCount > 0 && applicableCount < minimum) errors.push(`$.input.blindReviewPacket.probeCells: ${category} cannot mix partial applicable and inapplicable lifecycle phases`);
+    if (applicableCount === 0 && !fullyInapplicable) errors.push(`$.input.blindReviewPacket.probeCells: ${category} requires ${minimum} applicable raster phases or complete evidenced non-applicability`);
   }
   errors.push(...probeCoverageSemantic(packet.probeCells, '$.input.blindReviewPacket.probeCells'));
   return errors;

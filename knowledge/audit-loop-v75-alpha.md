@@ -25,6 +25,10 @@ One audit mission optimizes for visible progress while preserving typed proof:
 
 Baseline evidence never certifies PASS. Closure still requires fresh typed PASS plus score at least 9.
 Inapplicable probes require an exact owner/capability reason rather than synthetic exercise.
+An absent bounded container therefore records all bounded-scroll phases as
+`container-not-present`; it does not block capture and is not replaced by fake scrolling. Conversely,
+an applicable recovery state remains required even when the Browser lacks request interception; the
+central runtime owner must produce it safely or retain a typed closure gap.
 
 The machine route for an audit is `ui-audit -> baseline-review`. A failed baseline continues through
 owner classification and `audit-route`; a clean score-9 baseline remains SUSPENSE and expands through
