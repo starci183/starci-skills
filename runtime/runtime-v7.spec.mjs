@@ -50,6 +50,21 @@ test('local feature tasks consume one control-panel-owned runtime instead of own
   );
 });
 
+test('UI-only fast lane preserves business authority and exact-file mutation boundaries',()=>{
+  const auditLoop=fs.readFileSync(new URL('../knowledge/audit-loop-v75-alpha.md',import.meta.url),'utf8');
+  const skill=fs.readFileSync(new URL('../skills/starci-fe-process/SKILL.md',import.meta.url),'utf8');
+  const apply=fs.readFileSync(new URL('../operators/fe/source-apply/execute.md',import.meta.url),'utf8');
+  const repair=fs.readFileSync(new URL('../operators/fe/source-repair/execute.md',import.meta.url),'utf8');
+  for(const text of [auditLoop,skill,apply,repair]){
+    assert.match(text,/ui-only-preserve-business/);
+    assert.match(text,/GraphQL/);
+    assert.match(text,/tracked and untracked/is);
+    assert.match(text,/exact-file|exact allowed files|exact listed/is);
+  }
+  assert.match(auditLoop,/A task badge or `active` status is not evidence/);
+  assert.match(skill,/Never let two tasks repair the same page group concurrently/);
+});
+
 test('central runtime registry binds one owner generation and canonical localhost endpoints',()=>{
   const validateOwner=validatorFor(new URL('../templates/runtime/owner.schema.json',import.meta.url));
   const owner=JSON.parse(fs.readFileSync(new URL('../templates/runtime/owner.template.json',import.meta.url)));

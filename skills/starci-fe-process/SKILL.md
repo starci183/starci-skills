@@ -54,6 +54,14 @@ the mission, so visual polish cannot certify an incomplete product.
 
 Treat user analysis as high-value evidence, not automatic implementation authority. Say which observed problem is valid, challenge a proposed remedy when its glyph, tone, business meaning, ownership, or reuse contract is contradictory, then take the strongest reversible correction inside the frozen scope. Preserve the requested outcome without literalizing a weaker method.
 
+When the owner says the business behavior is already correct and requests UI/UX-only or render-only
+work, bind the `ui-only-preserve-business` fast lane from
+`knowledge/audit-loop-v75-alpha.md`. Do not run product-potential as license to add behavior and do not
+create routes, API/GraphQL operations, remote-mutation hooks, fixtures, auth behavior, or persistence.
+Repair misleading controls only through an already-authorized route/outcome or emit the exact
+business gap. Validate the complete tracked and untracked diff against the frozen exact-file set
+after every mutation; green tests never excuse an authority escape.
+
 When user feedback contradicts a frontend `DONE` or `PASS`, first invalidate that verdict and explain
 why the previous implementation/review accepted the bad result: name the prior claim, its supporting
 assumption or incomplete evidence, the visible counterexample, and the omitted review or authority
@@ -139,6 +147,12 @@ visibly distinct from AI findings. Never manufacture `PASS` from a requested lab
 same fresh typed `PASS` that controls the mission, and incomplete page/modal/layout/drawer evidence is
 `INSUFFICIENT_EVIDENCE`, not a score. A mutation affecting an owner marks its prior snapshot `STALE`
 without rewriting history. Missing or invalid required owner `audit.md` files block quality/UAT handoff.
+
+Maintain one observable writer per owner group. `active` without a recent tool event, validated
+receipt, or owned source delta is not progress. Send STOP/checkpoint to a silent writer and transfer
+ownership only after terminal status, or an explicit handoff plus two stable read-only diff checks.
+A late write after STOP is an overlap finding: stop mutation, reconcile the exact task-owned delta,
+then resume with one named writer. Never let two tasks repair the same page group concurrently.
 
 Use evidence profiles proportional to the phase. Baseline routing uses the smallest representative packet that includes wide, compact, the core task, and the worst recovery or constrained state; it cannot certify PASS. Repair rounds recapture changed owner partitions, adjacent sentinels, and affected interactions only, with dependency proof for reused evidence. Closure alone expands to the complete applicable render-state and lifecycle matrix. A probe is required only when the owner actually exposes that capability; an exact owner reason marks it not applicable.
 
