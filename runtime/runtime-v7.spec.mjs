@@ -60,13 +60,16 @@ test('central runtime registry binds one owner generation and canonical localhos
 
 test('authenticated Browser work requires materialization proof or broker execution',()=>{
   const validateLease=validatorFor(new URL('./contracts/browser-execution-lease.schema.json',import.meta.url));
-  const base={schemaVersion:1,leaseRef:'browser-lease://mission-1',missionRef:'mission://dashboard',accountRef:'account://fresh/dashboard/run-1',principalFingerprint:`sha256:${'a'.repeat(64)}`,runtimeGeneration:1,origin:'http://localhost:3000',fixtureNamespace:'uat-dashboard-run-1',expiresAt:'2026-08-31T09:29:40.167Z',state:'authenticated'};
+  const base={schemaVersion:1,leaseRef:'browser-lease://mission-1',missionRef:'mission://dashboard',purpose:'product-uat',accountRef:'account://fresh/dashboard/run-1',principalFingerprint:`sha256:${'a'.repeat(64)}`,runtimeGeneration:1,origin:'http://localhost:3000',fixtureNamespace:'uat-dashboard-run-1',expiresAt:'2026-08-31T09:29:40.167Z',state:'authenticated'};
   const materialized={...base,executionMode:'consumer-materialized',executionOwnerRef:'thread://dashboard',browserContextRef:'browser-context://dashboard/1',consumerTabRef:'browser-tab://dashboard/4',evidenceBrokerRef:null,materializationStatus:'materialized',materializationEvidenceRefs:['browser-observation://dashboard/tab-4']};
   assert.equal(validateLease(materialized).valid,true);
   assert.equal(validateLease({...materialized,consumerTabRef:null,materializationEvidenceRefs:[]}).valid,false);
   const brokered={...base,executionMode:'broker-executed',executionOwnerRef:'thread://control-panel',browserContextRef:'browser-context://broker/1',consumerTabRef:null,evidenceBrokerRef:'browser-broker://control-panel/dashboard',materializationStatus:'not-applicable',materializationEvidenceRefs:['browser-observation://consumer/no-tabs']};
   assert.equal(validateLease(brokered).valid,true);
   assert.equal(validateLease({...brokered,evidenceBrokerRef:null}).valid,false);
+  const readOnlyReuse={...brokered,leaseRef:'browser-lease://profile-audit',missionRef:'mission://profile-audit',purpose:'read-only-visual-audit',accountRef:'account://uat-pool/learner/default',fixtureNamespace:'read-only-profile'};
+  assert.equal(validateLease(readOnlyReuse).valid,true);
+  assert.equal(validateLease({...readOnlyReuse,purpose:'product-uat'}).valid,false);
 });
 
 test('scope policy rejects unresolved mission scope before skill selection', () => {

@@ -11,8 +11,9 @@ For audit-to-target work, read and apply [`knowledge/audit-loop-v75-alpha.md`](.
 
 Local FE missions consume the centralized runtime declared by `.claude/config.yaml`. They never own
 ports or processes and must not start, stop, restart, replace, or kill FE, API, or identity services.
-Send runtime health and recovery requests to the single Control-Panel-delegated runtime task. Keep
-fresh UAT identity isolated in its account and Browser session; never restart a server, rebind its
+Send runtime health and recovery requests to the single Control-Panel-delegated runtime task. A
+read-only visual audit may use a newly leased compatible UAT-pool context after the previous mission
+releases it; product UAT and state-mutating flows keep fresh identity isolated in their account and Browser session. Never restart a server, rebind its
 environment, or launch a feature-specific API to switch accounts. `EADDRINUSE` and an unexpected
 session are coordination findings, not process-mutation authority.
 
@@ -210,6 +211,10 @@ the typed quality RETURN followed by the typed UAT RETURN. UAT must independentl
 UX, and UI for the frozen product-decision cases before frontend `complete` is reachable. Before an
 authenticated UAT browser action, acquire one mission-scoped UAT session lease and provision one
 fresh run-scoped logical account plus its smallest required fixture inside the declared environment.
+This fresh-account requirement begins at product UAT or any state-mutating/reset-sensitive case. A
+preceding read-only visual audit may instead acquire a new mission lease over a compatible broker-held
+UAT-pool context after the prior lease is released and compatibility is proved; it must not prompt for
+credentials or misrepresent that pool identity as a fresh product-UAT account.
 Reuse that account and isolated Browser context across audit, repair, recapture, quality, and UAT
 rounds in the same canonical mission. Rotate only for a new product case that requires reset or proven
 continuity loss. Bind the lease to the mission, account ref, Browser context ref, principal

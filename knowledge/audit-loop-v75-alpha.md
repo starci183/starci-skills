@@ -55,6 +55,13 @@ fixture namespace, and expiry. Reuse it across audit/repair/recapture rounds. On
 continuity loss, invalidate affected evidence and reacquire the lease; do not restart FE/API and do
 not keep a temporary challenge across turns.
 
+A read-only visual audit may acquire a new mission lease over an already authenticated UAT-pool
+account/context when execution is sequential and the required role, locale, fixture visibility,
+origin, runtime generation, and contamination checks all match. The prior mission lease must be
+released first. This reuse is forbidden for product UAT, flows that mutate user state, reset-sensitive
+preconditions, role changes, or incompatible fixtures; those still require a fresh run-scoped account.
+Session compatibility is proved once by the broker and never by asking the user to sign in again.
+
 Treat a cross-task tab interruption as a delivery failure, not identity loss. A symbolic handoff is
 usable only after consumer-side discovery. Otherwise retain the authenticated lease, switch to
 broker-executed capture, and continue from the same audit receipt instead of provisioning again.

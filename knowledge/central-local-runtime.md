@@ -28,6 +28,12 @@ different run-scoped accounts against the same FE/API/identity services. Never b
 password, cookie, or token into shared server environment. Never publish credentials in the registry,
 runtime receipt, logs, source, or evidence.
 
+Sequential read-only visual audits with the same required role may reuse one authenticated UAT-pool
+context through a newly issued mission lease after the previous lease is released. The broker must
+prove compatible role, locale, fixture visibility, origin, runtime generation, expiry, and clean
+storage before re-leasing it. Product UAT and any state-mutating or reset-sensitive flow still require
+a fresh account/context. Reuse never transfers credentials or a tab to the feature task.
+
 ## Discovery and communication
 
 ## Browser lease execution
