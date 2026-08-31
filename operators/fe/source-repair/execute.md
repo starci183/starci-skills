@@ -6,6 +6,11 @@ only dependency-proven unaffected partitions.
 
 Repair one classified frontend finding inside one frozen source boundary.
 
+If the smallest demonstrated source owner sits above the frozen layout-owner ceiling, return
+`authorization-required` with the exact owner/files and mutation gap. Do not mutate that owner and do
+not call the mission blocked; the parent routes the existing mutation choice and resumes after an
+explicit authorization receipt.
+
 Keep the frozen behavior-contract fingerprint unchanged and repair the exact failed evidence refs.
 Every source repair invalidates prior rasters and must return to capture.
 

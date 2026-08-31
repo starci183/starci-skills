@@ -7,12 +7,14 @@
   "outputSchema": "output.schema.json",
   "sourceReferenceRefs": [],
   "sideEffects": [
-    "create mission-only checkpoint commits on dedicated branches when publish mode receives exclusively mission-owned changes",
-    "push checkpoint branches and one annotated continuation tag without force",
-    "fetch and adopt exact checkpoint heads in resume mode only after identity and cleanliness proof"
+    "create mission-only checkpoint commits on dedicated branches only when the routed Git policy permits them",
+    "under direct-main policy fetch incoming branch refs and merge them non-force into the declared mutation branch without creating or switching branches",
+    "push approved heads and one annotated continuation tag without force",
+    "fetch and adopt exact checkpoint heads in resume mode only after identity, policy, and cleanliness proof"
   ],
   "stopConditions": [
     "an exact reference is missing or its fingerprint differs",
+    "the requested branch action violates the routed Git mutation policy",
     "the requested work exceeds this operator job"
   ]
 }

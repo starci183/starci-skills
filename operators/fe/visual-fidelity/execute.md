@@ -2,10 +2,15 @@
 
 Consume only a preflight-bound raster packet. Preserve its matrix fingerprint, owner-partition
 fingerprint, and visual round in the result. Round 1 is discovery, round 2 is verification, and round 3
-is regression-only. If any repair remains in round 3, return `blocked`; never request or imply a fourth
-visual round.
+onward attacks regressions while progress continues. Never block because of the round number.
 
 Falsify one frontend render packet with one fresh-context `gpt-5.6-sol` reviewer without repairing source.
+
+After the complete blind inspection, emit `auditScore` as five separately evidenced 0-2 axes whose
+sum is the 0-10 value. The target is parent-owned and does not enter the blind reviewer context. Any
+visible finding caps the score at 8; only aggregate `passed` may score 9 or 10. Preserve the previous
+score and exact delta when this is a rescore. The score is diagnostic progress only and cannot soften
+or replace the typed outcome. A below-target repair must proceed to finding classification.
 
 Use only the closed `context` and `input`. Return one typed `output.outcome` plus this job's result, gaps, and evidence. Do not route, persist a session, or choose another operator.
 

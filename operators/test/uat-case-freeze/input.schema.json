@@ -35,7 +35,8 @@
       "required": [
         "evidenceRefs",
         "browserSessionRef",
-        "accountRef"
+        "accountRef",
+        "sessionLease"
       ],
       "properties": {
         "evidenceRefs": {
@@ -54,9 +55,25 @@
           "minLength": 1
         },
         "accountRef": {
-          "description": "Fresh isolated account or explicit anonymous identity.",
+          "description": "Fresh run-scoped isolated account or explicitly declared anonymous identity.",
           "type": "string",
-          "minLength": 1
+          "pattern": "^(?:account://fresh(?:[/?#].*)?|anonymous://explicit(?:[/?#].*)?)$"
+        },
+        "sessionLease": {
+          "description": "Opaque mission-scoped browser/auth continuity contract; contains no secret.",
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["leaseRef", "missionRef", "browserContextRef", "principalFingerprint", "runtimeGeneration", "origin", "fixtureNamespace", "state"],
+          "properties": {
+            "leaseRef": { "type": "string", "pattern": "^browser-lease://" },
+            "missionRef": { "type": "string", "minLength": 1 },
+            "browserContextRef": { "type": "string", "minLength": 1 },
+            "principalFingerprint": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
+            "runtimeGeneration": { "type": "integer", "minimum": 1 },
+            "origin": { "const": "http://localhost:3000" },
+            "fixtureNamespace": { "type": "string", "minLength": 1 },
+            "state": { "enum": ["leased", "authenticated", "released", "invalidated"] }
+          }
         }
       }
     }

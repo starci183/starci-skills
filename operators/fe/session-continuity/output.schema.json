@@ -1,0 +1,40 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://starci.dev/v7.5-alpha/operators/fe/session-continuity/output.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "operatorId", "output"],
+  "properties": {
+    "schemaVersion": { "const": 7 },
+    "operatorId": { "const": "fe/session-continuity" },
+    "output": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["outcome", "result", "gaps", "evidenceRefs"],
+      "properties": {
+        "outcome": { "description": "Typed result consumed only by the parent Skill machine.", "enum": ["recovered", "blocked"] },
+        "result": {
+          "description": "Verified authenticated replacement lease, or null when blocked.",
+          "anyOf": [
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["leaseRef", "browserContextRef", "principalFingerprint", "runtimeGeneration", "origin", "state"],
+              "properties": {
+                "leaseRef": { "description": "Opaque recovered lease identity.", "type": "string", "pattern": "^browser-lease://" },
+                "browserContextRef": { "description": "Recovered isolated Browser context.", "type": "string", "minLength": 1 },
+                "principalFingerprint": { "description": "Verified authenticated principal identity.", "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
+                "runtimeGeneration": { "description": "Verified central runtime generation.", "type": "integer", "minimum": 1 },
+                "origin": { "description": "Verified canonical local origin.", "const": "http://localhost:3000" },
+                "state": { "description": "Recovered authenticated lease state.", "const": "authenticated" }
+              }
+            },
+            { "type": "null" }
+          ]
+        },
+        "gaps": { "description": "Exact recovery blockers.", "type": "array", "uniqueItems": true, "maxItems": 16, "items": { "type": "string", "minLength": 1 } },
+        "evidenceRefs": { "description": "Exact lease and identity evidence consumed.", "type": "array", "uniqueItems": true, "maxItems": 32, "items": { "type": "string", "minLength": 1 } }
+      }
+    }
+  }
+}

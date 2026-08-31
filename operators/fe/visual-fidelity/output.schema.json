@@ -56,6 +56,7 @@
                 "lastScreenshotRef",
                 "lastScreenshotVerdict",
                 "uncertainty",
+                "auditScore",
                 "inspectionRecords",
                 "probeRecords"
               ],
@@ -85,9 +86,9 @@
                 "matrixFingerprint": { "description": "Immutable matrix fingerprint inherited from preflight and capture.", "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
                 "partitionFingerprint": { "description": "Immutable owner-partition fingerprint inherited from preflight and capture.", "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
                 "visualRound": {
-                  "description": "Bounded discovery, verification, or regression round.",
+                  "description": "Discovery, verification, or later regression-attack round.",
                   "type": "object", "additionalProperties": false, "required": ["number", "purpose"],
-                  "properties": { "number": { "type": "integer", "minimum": 1, "maximum": 3 }, "purpose": { "enum": ["discovery", "verification", "regression"] } }
+                  "properties": { "number": { "type": "integer", "minimum": 1 }, "purpose": { "enum": ["discovery", "verification", "regression"] } }
                 },
                 "packetRasterRefs": {
                   "description": "Exact raster set supplied by the blind packet; every item requires one inspection record.",
@@ -111,6 +112,35 @@
                 "uncertainty": {
                   "description": "True means the reviewer could not safely close and aggregate PASS is forbidden.",
                   "type": "boolean"
+                },
+                "auditScore": {
+                  "description": "Evidence-backed noncanonical progress score. It reports movement between rounds but never replaces the typed verdict.",
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["value", "target", "status", "canonical", "previousValue", "delta", "axes"],
+                  "properties": {
+                    "value": { "type": "integer", "minimum": 0, "maximum": 10 },
+                    "target": { "type": ["integer", "null"], "minimum": 1, "maximum": 9 },
+                    "status": { "enum": ["below-target", "met-target", "not-requested"] },
+                    "canonical": { "const": false },
+                    "previousValue": { "type": ["integer", "null"], "minimum": 0, "maximum": 10 },
+                    "delta": { "type": ["integer", "null"], "minimum": -10, "maximum": 10 },
+                    "axes": {
+                      "type": "array",
+                      "minItems": 5,
+                      "maxItems": 5,
+                      "items": {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "required": ["axis", "value", "observation"],
+                        "properties": {
+                          "axis": { "enum": ["business-task-closure", "ux-flow-state-clarity", "visual-hierarchy-composition", "responsive-interaction-resilience", "consistency-accessibility-cues"] },
+                          "value": { "type": "integer", "minimum": 0, "maximum": 2 },
+                          "observation": { "type": "string", "minLength": 20 }
+                        }
+                      }
+                    }
+                  }
                 },
                 "inspectionRecords": {
                   "description": "One pixel-observation record for every inspected screenshot cell.",

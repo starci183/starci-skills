@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { readdirSync, readFileSync } from 'node:fs';
 import test from 'node:test';
+import { resolveBrowserSurface } from '../runtime/browser-surface.mjs';
 
 const root = new URL('../', import.meta.url);
 const catalog = JSON.parse(readFileSync(new URL('skills/catalog.json', root), 'utf8'));
@@ -22,7 +23,7 @@ const expected = [
 
 test('public catalog is exactly the thirteen v7 mission skills', () => {
   assert.equal(catalog.schemaVersion, 7);
-  assert.equal(catalog.systemVersion, '7.2.1');
+  assert.equal(catalog.systemVersion, '7.5.0-alpha.1');
   assert.deepEqual(catalog.skills.map(({ id }) => id).sort(), expected);
   const directories = readdirSync(new URL('skills/', root), { withFileTypes: true })
     .filter((entry) => entry.isDirectory() && entry.name.startsWith('starci-'))
@@ -42,9 +43,10 @@ test('selection law routes frontend work to one general FE process skill', () =>
 test('debug configuration is explicit and behavior-neutral', () => {
   const config = readFileSync(new URL('config.yaml', root), 'utf8');
   const index = readFileSync(new URL('INDEX.md', root), 'utf8');
-  assert.match(config, /^version:\s*7\.2\.1$/m);
+  assert.match(config, /^version:\s*7\.5\.0-alpha\.1$/m);
   assert.match(config, /^debug:\s*true$/m);
-  assert.match(config, /^visualReviewMaxRounds:\s*3$/m);
+  assert.match(config, /^visualReviewNoProgressLimit:\s*3$/m);
+  assert.doesNotMatch(config, /^visualReviewMaxRounds:/m);
   assert.match(index, /Debug changes visibility only/i);
   assert.match(index, /Never persist or[\s\S]*display chain-of-thought/i);
 });
@@ -63,4 +65,18 @@ test('scope is frozen before selection and remains multidimensional',()=>{
   assert.match(scope,/frontend\.ux-ui\.change-level/);
   assert.match(analysis,/ambiguityRefs[\s\S]*Skill input/i);
   assert.match(analysis,/one conditional part of scope/i);
+});
+
+test('browser host qualifiers route in-session UI before browser-family wording',()=>{
+  const vocabulary=readFileSync(new URL('request-vocabulary.md',root),'utf8');
+  const analysis=readFileSync(new URL('analyze-input.md',root),'utf8');
+  assert.equal(resolveBrowserSurface('trò mở Chrome ở trong này được không?'),'in-app');
+  assert.equal(resolveBrowserSurface('mở trình duyệt trong side panel của phiên này'),'in-app');
+  assert.equal(resolveBrowserSurface('dùng tab Chrome đang mở'),'external-chrome');
+  assert.equal(resolveBrowserSurface('mở Chrome'),'external-chrome');
+  assert.equal(resolveBrowserSurface('audit lại UI trang Personal Project',{uiWork:true}),'in-app');
+  assert.equal(resolveBrowserSurface('xem trang này'),'unspecified');
+  assert.match(vocabulary,/host qualifier[\s\S]*wins/i);
+  assert.match(analysis,/runtime\/browser-surface\.mjs/i);
+  assert.match(analysis,/Never replace a requested in-session panel with extension diagnostics/i);
 });

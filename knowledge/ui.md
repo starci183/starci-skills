@@ -92,6 +92,14 @@ When adjacent siblings together explain one fact, create an explicit semantic gr
 
 When an existing Grammar or application primitive owns the same scroll semantics, boundary, and constraints, reuse that primitive so edge cues, overscroll, focus, and scrollbar behavior remain coherent. Raw `overflow-*` is not an equivalent local replacement. Reuse is not blind copying: reject a precedent whose owner or interaction contract differs.
 
+Cross-page consistency is an explicit product contract. Before composing a new or reconstructed
+surface, inventory the nearest sibling pages for their reusable visual signatures and semantic roles.
+Carry forward relevant hero treatment, color roles, typography hierarchy, shell rhythm, navigation
+model, and published Grammar compositions so one application does not render as unrelated websites.
+Blind creativity may reject the incumbent target layout, but it cannot ignore the product family.
+Omit or adapt a sibling signature only when the target's user outcome, owner contract, responsive
+lifecycle, or interaction model proves it inapplicable; record that reason instead of silently diverging.
+
 Disclosure labels and their indicators share one trigger-row owner, alignment axis, and inset. Comparison rows likewise keep their names and values on one predictable axis; a visually detached indicator or drifting value column is a composition failure.
 
 ## Hierarchy

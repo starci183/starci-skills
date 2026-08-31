@@ -23,6 +23,15 @@ const responsiveStateInventory = [
 const invocationBindings = createOperatorInvocationBindingRegistry();
 const raster = (label) => `render://${label}/sha256-${fingerprint(label).slice(7)}.png`;
 const visualRound = { number: 1, purpose: 'discovery' };
+const auditScore = (value=9, target=9, previousValue=null) => ({
+  value,
+  target,
+  status: target===null?'not-requested':value>=target?'met-target':'below-target',
+  canonical:false,
+  previousValue,
+  delta:previousValue===null?null:value-previousValue,
+  axes:['business-task-closure','ux-flow-state-clarity','visual-hierarchy-composition','responsive-interaction-resilience','consistency-accessibility-cues'].map((axis,index)=>({axis,value:index<value%5?Math.ceil(value/5):Math.floor(value/5),observation:`Evidence for ${axis} is recorded from the complete raster matrix.`})),
+});
 const capturePreflight = () => ({
   preflightRef: `preflight://${'3'.repeat(64)}`,
   matrixRef: 'matrix://profile-v1',
@@ -125,6 +134,8 @@ test('capture preflight freezes a deterministic owner-partitioned matrix before 
   const result={summary:'Capture mechanics are ready.',artifactRefs:['preflight://artifact'],preflightRef:`preflight://${'3'.repeat(64)}`,sourceFingerprint:input.context.sourceFingerprint,round:{...visualRound},matrixRef:input.input.matrix.matrixRef,matrixFingerprint:input.input.matrix.matrixFingerprint,partitionFingerprint:fingerprint(partitions),capturePartitionRefs:['partition://profile-main'],reusedPartitionRefs:['partition://shared-header'],readinessChecks:readinessChecks()};
   const output={schemaVersion:7,operatorId:'fe/capture-preflight',output:{outcome:'ready',result,gaps:[],evidenceRefs:['runtime://profile'],handoff:null}};
   assert.deepEqual(validatePreflightOutput(output),{valid:true,errors:[]});
+  const scored=structuredClone(output); scored.output.result.summary='Capture readiness is 9/10.';
+  assert.match(validatePreflightOutput(scored).errors.join('\n'),/must not be expressed as a ten-point score/);
   assert.deepEqual(invocationBindings.validate('fe/capture-preflight',input,output),[]);
   const unproved=structuredClone(input); unproved.input.partitions[1].dependencyProofRefs=[];
   assert.match(validatePreflightInput(unproved).errors.join('\n'),/reuse requires exact dependency proof/);
@@ -132,19 +143,28 @@ test('capture preflight freezes a deterministic owner-partitioned matrix before 
   assert.match(validatePreflightInput(changedMatrix).errors.join('\n'),/must hash the exact immutable matrix body/);
 });
 
-test('finding classification batches every finding and round three cannot reopen repair',()=>{
+test('finding classification batches every finding and later regression rounds remain routable',()=>{
   const ledger=['finding://spacing','finding://scroll'].map((findingRef,index)=>({findingRef,findingFingerprint:`sha256:${String(index+7).repeat(64)}`,disposition:'new',affectedPartitionRefs:['partition://profile-main']}));
   const value={schemaVersion:7,operatorId:'fe/finding-classify',output:{outcome:'repair',result:{summary:'Two implementation findings form one repair batch.',artifactRefs:['artifact://batch'],reviewStage:'visual-fidelity',batchRef:`batch://${'8'.repeat(64)}`,visualRound:{number:2,purpose:'verification'},findingLedger:ledger,ownerAssessments:ledger.map(({findingRef})=>({findingRef,owner:'implementation',counterevidenceRef:'raster://counterevidence',authorityRef:null,rationale:'The pixels demonstrate an implementation-owned regression.'}))},gaps:[],evidenceRefs:['visual://round-2'],handoff:null}};
   assert.deepEqual(validateFindingOutput(value),{valid:true,errors:[]});
   value.output.result.ownerAssessments.pop();
   assert.match(validateFindingOutput(value).errors.join('\n'),/complete finding ledger/);
   value.output.result.ownerAssessments=ledger.map(({findingRef})=>({findingRef,owner:'implementation',counterevidenceRef:'raster://counterevidence',authorityRef:null,rationale:'The pixels demonstrate an implementation-owned regression.'}));
-  value.output.result.visualRound={number:3,purpose:'regression'};
-  assert.match(validateFindingOutput(value).errors.join('\n'),/round 3 findings must trip the circuit breaker/);
+  value.output.result.visualRound={number:4,purpose:'regression'};
+  assert.deepEqual(validateFindingOutput(value),{valid:true,errors:[]});
+});
+
+test('business visual findings require a typed business CALL and cannot be mislabeled blocked',()=>{
+  const findingRef='finding://missing-project-decision';
+  const result={summary:'Visible project closure needs business authority.',artifactRefs:['artifact://business-gap'],reviewStage:'visual-fidelity',batchRef:`batch://${'9'.repeat(64)}`,visualRound:{number:3,purpose:'regression'},findingLedger:[{findingRef,findingFingerprint:`sha256:${'1'.repeat(64)}`,disposition:'still-present',affectedPartitionRefs:['partition://personal-project']}],ownerAssessments:[{findingRef,owner:'business',counterevidenceRef:'raster://project',authorityRef:null,rationale:'The visible next decision has no authorized business meaning.'}]};
+  const value={schemaVersion:7,operatorId:'fe/finding-classify',output:{outcome:'business-required',result,gaps:[],evidenceRefs:['visual://round-3'],handoff:{skillId:'starci-business-process',missionRef:'mission://personal-project',resumeState:'finding-classify-return',inputRef:'input://business-gap'}}};
+  assert.deepEqual(validateFindingOutput(value),{valid:true,errors:[]});
+  value.output.outcome='blocked'; value.output.handoff=null; value.output.gaps=['business authority missing'];
+  assert.match(validateFindingOutput(value).errors.join('\n'),/classified owner is routable/);
 });
 
 test('blind visual input is one fresh Sol raster packet and rejects stale or self review',()=>{
-  const value={schemaVersion:7,operatorId:'fe/visual-fidelity',context:{implementerExecutionRef:`execution://${'a'.repeat(64)}`,reviewerExecutionRef:`execution://${'b'.repeat(64)}`,implementerPrincipalFingerprint:`sha256:${'c'.repeat(64)}`,reviewerPrincipalFingerprint:`sha256:${'d'.repeat(64)}`,reviewerContextFingerprint:null,reviewerModel:'gpt-5.6-sol',reviewerCount:1,contextIsolation:'fresh',forkTurns:'none',debug:true},input:{blindReviewPacket:blindPacket()}};
+  const value={schemaVersion:7,operatorId:'fe/visual-fidelity',context:{implementerExecutionRef:`execution://${'a'.repeat(64)}`,reviewerExecutionRef:`execution://${'b'.repeat(64)}`,implementerPrincipalFingerprint:`sha256:${'c'.repeat(64)}`,reviewerPrincipalFingerprint:`sha256:${'d'.repeat(64)}`,reviewerContextFingerprint:null,reviewerModel:'gpt-5.6-sol',reviewerCount:1,contextIsolation:'fresh',forkTurns:'none',debug:true},input:{auditTargetScore:9,blindReviewPacket:blindPacket()}};
   value.context.reviewerContextFingerprint=fingerprint(value.input.blindReviewPacket);
   assert.deepEqual(validateVisualInput(value),{valid:true,errors:[]});
   value.context.reviewerExecutionRef=value.context.implementerExecutionRef;
@@ -155,12 +175,12 @@ test('blind visual input is one fresh Sol raster packet and rejects stale or sel
   value.context.reviewerPrincipalFingerprint=`sha256:${'d'.repeat(64)}`;
   value.input.blindReviewPacket.capturedSourceFingerprint=`sha256:${'3'.repeat(64)}`;
   assert.match(validateVisualInput(value).errors.join('\n'),/stale/);
-  const missingIntermediate={...value,input:{blindReviewPacket:blindPacket()}};
+  const missingIntermediate={...value,input:{auditTargetScore:9,blindReviewPacket:blindPacket()}};
   missingIntermediate.context={...value.context,reviewerContextFingerprint:fingerprint(missingIntermediate.input.blindReviewPacket)};
   missingIntermediate.input.blindReviewPacket.rasterCells=missingIntermediate.input.blindReviewPacket.rasterCells.filter(({viewport})=>viewport!=='intermediate');
   missingIntermediate.context.reviewerContextFingerprint=fingerprint(missingIntermediate.input.blindReviewPacket);
   assert.match(validateVisualInput(missingIntermediate).errors.join('\n'),/contains|schema branch|intermediate/i);
-  const noLifecycle={...value,input:{blindReviewPacket:blindPacket()}};
+  const noLifecycle={...value,input:{auditTargetScore:9,blindReviewPacket:blindPacket()}};
   for(const probe of noLifecycle.input.blindReviewPacket.probeCells){ if(['zoom','page-scroll','bounded-scroll','state-transition'].includes(probe.category)){ probe.applicable=false; probe.imageRef=null; probe.reason='lifecycle-not-present'; } }
   noLifecycle.input.blindReviewPacket.rasterCells=noLifecycle.input.blindReviewPacket.rasterCells.filter(({imageRef})=>imageRef && !noLifecycle.input.blindReviewPacket.probeCells.some((probe)=>probe.imageRef===imageRef));
   noLifecycle.context={...value.context,reviewerContextFingerprint:fingerprint(noLifecycle.input.blindReviewPacket)};
@@ -168,10 +188,10 @@ test('blind visual input is one fresh Sol raster packet and rejects stale or sel
 });
 
 test('visual verdict is bound to the exact supplied packet, rasters, final screenshot, and reviewer execution',()=>{
-  const input={schemaVersion:7,operatorId:'fe/visual-fidelity',context:{implementerExecutionRef:`execution://${'a'.repeat(64)}`,reviewerExecutionRef:`execution://${'b'.repeat(64)}`,implementerPrincipalFingerprint:`sha256:${'c'.repeat(64)}`,reviewerPrincipalFingerprint:`sha256:${'d'.repeat(64)}`,reviewerContextFingerprint:null,reviewerModel:'gpt-5.6-sol',reviewerCount:1,contextIsolation:'fresh',forkTurns:'none',debug:true},input:{blindReviewPacket:blindPacket()}};
+  const input={schemaVersion:7,operatorId:'fe/visual-fidelity',context:{implementerExecutionRef:`execution://${'a'.repeat(64)}`,reviewerExecutionRef:`execution://${'b'.repeat(64)}`,implementerPrincipalFingerprint:`sha256:${'c'.repeat(64)}`,reviewerPrincipalFingerprint:`sha256:${'d'.repeat(64)}`,reviewerContextFingerprint:null,reviewerModel:'gpt-5.6-sol',reviewerCount:1,contextIsolation:'fresh',forkTurns:'none',debug:true},input:{auditTargetScore:9,blindReviewPacket:blindPacket()}};
   input.context.reviewerContextFingerprint=fingerprint(input.input.blindReviewPacket);
   const packet=input.input.blindReviewPacket;
-  const output={schemaVersion:7,operatorId:'fe/visual-fidelity',output:{result:{packetFingerprint:packet.packetFingerprint,matrixFingerprint:packet.matrixFingerprint,partitionFingerprint:packet.partitionFingerprint,visualRound:packet.visualRound,packetRasterRefs:packet.rasterCells.map(({imageRef})=>imageRef),lastScreenshotRef:packet.lastScreenshotRef,reviewerExecutionRef:input.context.reviewerExecutionRef,reviewerModel:'gpt-5.6-sol',reviewerCount:1,contextIsolation:'fresh',forkTurns:'none',probeRecords:probeRecords()}}};
+  const output={schemaVersion:7,operatorId:'fe/visual-fidelity',output:{result:{packetFingerprint:packet.packetFingerprint,matrixFingerprint:packet.matrixFingerprint,partitionFingerprint:packet.partitionFingerprint,visualRound:packet.visualRound,packetRasterRefs:packet.rasterCells.map(({imageRef})=>imageRef),lastScreenshotRef:packet.lastScreenshotRef,reviewerExecutionRef:input.context.reviewerExecutionRef,reviewerModel:'gpt-5.6-sol',reviewerCount:1,contextIsolation:'fresh',forkTurns:'none',auditScore:auditScore(9),probeRecords:probeRecords()}}};
   assert.match(invocationBindings.validate('fe/visual-fidelity',input,output).join('\n'),/not bound to a validated render-capture RETURN/);
   invocationBindings.record('fe/render-capture',{output:{outcome:'captured',result:{blindReviewPacketRef:packet.packetRef,blindReviewPacketFingerprint:packet.packetFingerprint,blindReviewPacket:packetManifest(packet),sourceFingerprint:packet.capturedSourceFingerprint,renderMatrix:[
     {stateRef:'state://steady',viewport:'wide',imageRef:raster('wide'),handoffState:false},
@@ -179,6 +199,9 @@ test('visual verdict is bound to the exact supplied packet, rasters, final scree
     {stateRef:'state://steady',viewport:'compact',imageRef:raster('final'),handoffState:true},
   ],adversarialProbeMatrix:packet.probeCells.map(({probeId,category,phase,imageRef})=>({probeId,category,phase,outcome:'survived',imageRef})),handoffHostArtifact:{imageRef:raster('host')}}}},{receiptId:packet.captureReceiptId});
   assert.deepEqual(invocationBindings.validate('fe/visual-fidelity',input,output),[]);
+  output.output.result.auditScore.target=8;
+  assert.match(invocationBindings.validate('fe/visual-fidelity',input,output).join('\n'),/audit score target differs/);
+  output.output.result.auditScore.target=9;
   output.output.result.probeRecords=[...output.output.result.probeRecords].reverse();
   assert.match(invocationBindings.validate('fe/visual-fidelity',input,output).join('\n'),/supplied blind packet order/);
   output.output.result.probeRecords.reverse();
@@ -397,6 +420,7 @@ test('visual fidelity cannot aggregate passed over a repair verdict or probe con
         lastScreenshotRef: raster('compact'),
         lastScreenshotVerdict: 'passed',
         uncertainty: false,
+        auditScore: auditScore(9),
         inspectionRecords: [inspection(raster('wide')), inspection(raster('intermediate'), 'repair'), inspection(raster('compact'))],
         probeRecords: probeRecords(1),
       },
@@ -434,6 +458,7 @@ test('visual fidelity rejects a shallow AI pass that did not challenge every ima
         lastScreenshotRef: raster('compact'),
         lastScreenshotVerdict: 'passed',
         uncertainty: false,
+        auditScore: auditScore(9),
         inspectionRecords: [shallow, inspection(raster('intermediate')), inspection(raster('compact'))],
         probeRecords: probeRecords(),
       },

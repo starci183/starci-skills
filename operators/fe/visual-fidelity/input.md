@@ -1,5 +1,8 @@
 # `fe/visual-fidelity` input
 
+- `input.auditTargetScore`: Explicit noncanonical target from 1 through 9, or null. The parent
+  preserves it across rounds; it is not included in the raster-only reviewer context.
+
 ## Context
 
 - `implementerExecutionRef` and `reviewerExecutionRef` must differ.

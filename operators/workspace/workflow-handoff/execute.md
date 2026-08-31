@@ -10,7 +10,12 @@ Bind one publish or resume operation to the exact route, approval, touched check
 
 ## Action
 
-Publish the smallest mission-only checkpoint or adopt one exact checkpoint. Preserve only Git heads, the annotated continuation tag, resume capability, resume point, and durable authority references. Do not route later work, own workflow state, broaden source scope, or perform another operator's job.
+Publish the smallest mission-only checkpoint or adopt one exact checkpoint. When the route declares
+`worktreeBranches=forbidden`, remain on `mutationBranch`: never create or switch to a task, feature, or
+worktree branch. An incoming branch ref may be fetched and merged non-force into `mutationBranch`; it
+must never become the mutation branch. Preserve only Git heads, the annotated continuation tag,
+resume capability, resume point, and durable authority references. Do not route later work, own
+workflow state, broaden source scope, or perform another operator's job.
 
 ## Output
 
@@ -18,4 +23,5 @@ Return one atomic checkpoint result whose `resultKind` agrees with `outcome`, pl
 
 ## Stop
 
-Return the applicable non-success outcome when evidence is missing, fingerprints drift, or the requested work exceeds this single job.
+Return the applicable non-success outcome when evidence is missing, fingerprints drift, a force
+operation or policy-forbidden branch action is requested, or the requested work exceeds this single job.

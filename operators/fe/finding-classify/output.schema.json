@@ -72,7 +72,7 @@
                 "visualRound": {
                   "description": "Visual round in which the finding batch was observed.",
                   "type": "object", "additionalProperties": false, "required": ["number", "purpose"],
-                  "properties": { "number": { "type": "integer", "minimum": 1, "maximum": 3 }, "purpose": { "enum": ["discovery", "verification", "regression"] } }
+                  "properties": { "number": { "type": "integer", "minimum": 1 }, "purpose": { "enum": ["discovery", "verification", "regression"] } }
                 },
                 "findingLedger": {
                   "description": "Complete ordered and fingerprinted finding ledger for one batched repair.",

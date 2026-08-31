@@ -102,6 +102,10 @@ export function validatePortableRoute(route, label = 'portable route') {
   if (route.schemaVersion === 6 && route.role !== 'fe' && route.context.grammarId !== null) {
     fail(`${label} non-FE grammarId must be null`);
   }
+  if (route.repository.gitPolicy?.mutationBranch !== undefined
+    && route.repository.gitPolicy.mutationBranch !== route.repository.branch) {
+    fail(`${label} gitPolicy.mutationBranch must equal repository.branch`);
+  }
   assertPublicationSafe(route, label);
   return route;
 }
@@ -114,6 +118,10 @@ export function validateLocalRoute(route, label = 'local route') {
   }
   if (route.schemaVersion === 6 && route.role !== 'fe' && route.context.grammarId !== null) {
     fail(`${label} non-FE grammarId must be null`);
+  }
+  if (route.repository.gitPolicy?.mutationBranch !== undefined
+    && route.repository.gitPolicy.mutationBranch !== route.repository.branch) {
+    fail(`${label} gitPolicy.mutationBranch must equal repository.branch`);
   }
   return route;
 }
@@ -212,7 +220,8 @@ function buildLocalRoute({ source, repositoriesRoot, workspaceRoot, declaration 
       gitRoot: repository,
       gitRepository: route.repository.gitRepository,
       branch,
-      head: git(repository, 'rev-parse', 'HEAD')
+      head: git(repository, 'rev-parse', 'HEAD'),
+      ...(route.repository.gitPolicy ? { gitPolicy: route.repository.gitPolicy } : {})
     },
     context: v6
       ? { ...commonContext, grammarId: context.grammarId }

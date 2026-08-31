@@ -30,6 +30,7 @@
           "description": "Typed result routed only by the parent Skill machine.",
           "enum": [
             "repaired",
+            "authorization-required",
             "backend-required",
             "blocked"
           ]

@@ -6,6 +6,7 @@ export const MATERIAL_AI_OPERATORS = Object.freeze(new Set([
   'architecture/alternatives',
   'business/model-challenge',
   'fe/design-critique',
+  'fe/dominant-direction-generate',
   'fe/direction-generate',
   'fe/direction-rank',
   'fe/independent-review',
@@ -154,7 +155,7 @@ export function createReceipt(type, fields, { debug = true, now = () => new Date
   const operatorLifecycle = lifecycleRequired ? planOperatorLifecycle(type, normalized) : null;
   const fullTrace = { missionContext: normalized.missionContext ?? null, context: normalized.context ?? null, input: normalized.input ?? null, expectedOutput: normalized.expectedOutput ?? null, actualOutput: normalized.actualOutput ?? null, payloadRef: normalized.payloadRef ?? null, authorityRefs: normalized.authorityRefs ?? [], evidenceRefs: normalized.evidenceRefs ?? [], sourceHeads: normalized.sourceHeads ?? [], transitionRule: normalized.transitionRule ?? null, resumeState: normalized.resumeState ?? null, skip: normalized.skip ?? null, error: normalized.error ?? null, aiActivity: normalized.aiActivity ?? null };
   const progressFingerprint = fingerprint({ type, skillId: normalized.skillId, operatorId: normalized.operatorId, actualOutput: fullTrace.actualOutput, transitionRule: fullTrace.transitionRule, resumeState: fullTrace.resumeState });
-  const receipt = { version:'7.2.1', receiptId: normalized.receiptId, type, missionId: normalized.missionId, skillId: normalized.skillId ?? null, operatorId: normalized.operatorId ?? null, parentId: normalized.parentId ?? null, childId: normalized.childId ?? null, timestamp: now(), progressFingerprint, trace: debug ? fullTrace : { authorityRefs: fullTrace.authorityRefs, evidenceRefs: fullTrace.evidenceRefs, sourceHeads: fullTrace.sourceHeads } };
+  const receipt = { version:'7.5.0-alpha.1', receiptId: normalized.receiptId, type, missionId: normalized.missionId, skillId: normalized.skillId ?? null, operatorId: normalized.operatorId ?? null, parentId: normalized.parentId ?? null, childId: normalized.childId ?? null, timestamp: now(), progressFingerprint, trace: debug ? fullTrace : { authorityRefs: fullTrace.authorityRefs, evidenceRefs: fullTrace.evidenceRefs, sourceHeads: fullTrace.sourceHeads } };
   const result = validate(receipt); if (!result.valid) throw new Error(result.errors.join('; '));
   deepFreeze(receipt);
   if (operatorLifecycle) {

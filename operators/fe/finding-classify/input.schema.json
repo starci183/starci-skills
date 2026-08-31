@@ -91,7 +91,7 @@
         "visualRound": {
           "description": "Visual round that produced this complete finding set.",
           "type": "object", "additionalProperties": false, "required": ["number", "purpose"],
-          "properties": { "number": { "type": "integer", "minimum": 1, "maximum": 3 }, "purpose": { "enum": ["discovery", "verification", "regression"] } }
+          "properties": { "number": { "type": "integer", "minimum": 1 }, "purpose": { "enum": ["discovery", "verification", "regression"] } }
         },
         "findingRefs": {
           "description": "The complete visual finding batch; classification may not stop after the first finding.",

@@ -173,6 +173,7 @@ export function createOperatorInvocationBindingRegistry() {
     if (result.matrixFingerprint !== packet.matrixFingerprint) errors.push('matrix fingerprint differs from supplied input');
     if (result.partitionFingerprint !== packet.partitionFingerprint) errors.push('partition fingerprint differs from supplied input');
     if (JSON.stringify(result.visualRound) !== JSON.stringify(packet.visualRound)) errors.push('visual round differs from supplied input');
+    if (result.auditScore?.target !== inputDocument.input.auditTargetScore) errors.push('audit score target differs from supplied mission target');
     if (!sameSequence(result.packetRasterRefs ?? [], suppliedRasters)) errors.push('packet raster refs differ from supplied input order');
     if (result.lastScreenshotRef !== packet.lastScreenshotRef) errors.push('last screenshot differs from supplied input');
     if (result.reviewerExecutionRef !== context.reviewerExecutionRef) errors.push('reviewer execution differs from supplied context');

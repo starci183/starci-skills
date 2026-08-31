@@ -1,6 +1,6 @@
 # Execute `fe/finding-classify`
 
-Classify the complete visual-fidelity or independent-review finding batch by each finding's smallest demonstrated owner. Fingerprint every finding, preserve one ordered ledger, and route one batched repair; never stop after the first visible defect. Round 3 findings return `blocked` for workflow diagnosis.
+Classify the complete visual-fidelity or independent-review finding batch by each finding's smallest demonstrated owner. Fingerprint every finding, preserve one ordered ledger, and route one batched repair; never stop after the first visible defect. Round 3 and later findings remain routable while their progress fingerprint changes.
 
 Start from the already-recorded pixel observation. Only now compare it with StarCi-native frontend
 authority from `knowledge/ui.md`, the routed project Grammar, frozen product/business authority, and
@@ -19,4 +19,8 @@ Assign each finding to exactly one owner:
 Return `repair` only for implementation-owned findings, `authority-repair` only for Grammar or UI
 knowledge ownership, and the existing typed handoff outcome for business/backend ownership. There is
 no `clean` outcome: this operator is reachable only from a validated visual repair verdict. Return only
-this atomic classification; never repair or route internally.
+this atomic classification; never repair or route internally. `blocked` is legal only when
+classification itself lacks finite evidence or a required route is unavailable. A known implementation,
+Grammar, UI-knowledge, business, product-authority, or backend owner is routable and therefore cannot
+be converted to `blocked` here. Cross-domain outcomes must carry the matching typed handoff so the
+parent can CALL that skill and resume the exact FE mission.

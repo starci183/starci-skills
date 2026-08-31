@@ -9,6 +9,9 @@
 - `output.result.reviewerExecutionRef`, `reviewerModel`, `reviewerCount`, `contextIsolation`, and `forkTurns`: Provenance for the single fresh Sol reviewer.
 - `output.result.lastScreenshotRef` and `lastScreenshotVerdict`: The final post-mutation raster and its controlling verdict.
 - `output.result.uncertainty`: Any uncertainty forbids `passed` and returns repair or blocked.
+- `output.result.auditScore`: Noncanonical 0-10 progress score with five 0-2 evidence axes, requested
+  target, previous-round delta, and target status. A visible finding caps the score at 8; 9 or higher
+  requires typed `passed` over the complete latest-source packet.
 - `output.result.inspectionRecords[].lensVerdicts`: One concrete AI pixel verdict for every required lens; any `problem` forces repair.
 - `output.result.inspectionRecords[].challengeRecords`: Potential defects deliberately attacked in all purpose/content, composition/spacing, and interaction/responsive families; any confirmed candidate forces repair.
 - `output.result.probeRecords`: Exactly one falsification verdict per requested adversarial probe and lifecycle phase, preserving the attempted attack, raster reference or exact inapplicability reason, and observed contradiction. Counts alone never satisfy this contract.

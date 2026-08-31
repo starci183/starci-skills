@@ -1,0 +1,28 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://starci.dev/grammar/7.4/decision.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "contractVersion", "manifestId", "targetRef", "grammar", "semanticComposition", "requiredDecisionRefs", "decisions", "responsiveBindings", "gapRefs", "manifestFingerprint"],
+  "properties": {
+    "schemaVersion": { "const": 1 },
+    "contractVersion": { "const": "7.4.0" },
+    "manifestId": { "type": "string", "minLength": 1 },
+    "targetRef": { "type": "string", "minLength": 1 },
+    "grammar": { "type": "object", "additionalProperties": false, "required": ["common", "selected"], "properties": { "common": { "$ref": "#/$defs/packageBinding" }, "selected": { "$ref": "#/$defs/packageBinding" } } },
+    "semanticComposition": { "type": "array", "minItems": 1, "uniqueItems": true, "items": { "$ref": "#/$defs/composition" } },
+    "requiredDecisionRefs": { "type": "array", "minItems": 1, "uniqueItems": true, "items": { "type": "string", "minLength": 1 } },
+    "decisions": { "type": "array", "minItems": 1, "uniqueItems": true, "items": { "$ref": "#/$defs/decision" } },
+    "responsiveBindings": { "type": "array", "minItems": 3, "uniqueItems": true, "items": { "$ref": "#/$defs/responsive" } },
+    "gapRefs": { "type": "array", "maxItems": 0 },
+    "manifestFingerprint": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" }
+  },
+  "$defs": {
+    "packageBinding": { "type": "object", "additionalProperties": false, "required": ["package", "version", "integrity", "exportMapFingerprint"], "properties": { "package": { "type": "string", "minLength": 1 }, "version": { "type": "string", "minLength": 1 }, "integrity": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" }, "exportMapFingerprint": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" } } },
+    "slot": { "type": "object", "additionalProperties": false, "required": ["slotRef", "semanticRole", "cardinality", "order"], "properties": { "slotRef": { "type": "string", "minLength": 1 }, "semanticRole": { "type": "string", "minLength": 1 }, "cardinality": { "enum": ["one", "optional", "many"] }, "order": { "type": "integer", "minimum": 0 } } },
+    "composition": { "type": "object", "additionalProperties": false, "required": ["instanceRef", "patternRef", "ownerRef", "slots"], "properties": { "instanceRef": { "type": "string", "minLength": 1 }, "patternRef": { "type": "string", "minLength": 1 }, "ownerRef": { "type": "string", "minLength": 1 }, "slots": { "type": "array", "minItems": 1, "uniqueItems": true, "items": { "$ref": "#/$defs/slot" } } } },
+    "sticky": { "type": "object", "additionalProperties": false, "required": ["scrollOwnerRef", "edge", "offsetTokenRef", "collisionBoundaryRef", "stopRef", "fallbackPatternRef"], "properties": { "scrollOwnerRef": { "type": "string", "minLength": 1 }, "edge": { "enum": ["block-start", "block-end"] }, "offsetTokenRef": { "type": "string", "pattern": "^token://" }, "collisionBoundaryRef": { "type": "string", "minLength": 1 }, "stopRef": { "type": "string", "minLength": 1 }, "fallbackPatternRef": { "type": "string", "minLength": 1 } } },
+    "decision": { "type": "object", "additionalProperties": false, "required": ["decisionRef", "ownerRef", "kind", "semanticRole", "tokenRefs", "evidenceRefs"], "properties": { "decisionRef": { "type": "string", "minLength": 1 }, "ownerRef": { "type": "string", "minLength": 1 }, "kind": { "enum": ["typography", "color", "spacing", "surface", "collection", "layout", "sticky", "interaction"] }, "semanticRole": { "type": "string", "minLength": 1 }, "tokenRefs": { "type": "array", "minItems": 1, "uniqueItems": true, "items": { "type": "string", "pattern": "^token://" } }, "evidenceRefs": { "type": "array", "minItems": 1, "uniqueItems": true, "items": { "type": "string", "minLength": 1 } }, "sticky": { "$ref": "#/$defs/sticky" } } },
+    "responsive": { "type": "object", "additionalProperties": false, "required": ["ownerRef", "range", "patternRef"], "properties": { "ownerRef": { "type": "string", "minLength": 1 }, "range": { "enum": ["wide", "intermediate", "compact"] }, "patternRef": { "type": "string", "minLength": 1 } } }
+  }
+}

@@ -70,7 +70,8 @@ export const REQUIRED_PREFLIGHT_CHECKS = [
   'raster-unique',
   'handoff-host-valid',
 ];
-export const VISUAL_ROUND_PURPOSES = Object.freeze({ 1: 'discovery', 2: 'verification', 3: 'regression' });
+export const VISUAL_ROUND_PURPOSES = Object.freeze({ 1: 'discovery', 2: 'verification' });
+const visualRoundPurpose = (number) => number === 1 ? 'discovery' : number === 2 ? 'verification' : 'regression';
 
 const duplicates = (values) => values.filter((value, index) => values.indexOf(value) !== index);
 const missing = (required, actual) => required.filter((value) => !actual.includes(value));
@@ -188,8 +189,8 @@ export function renderMatrixSemantic(matrix, at) {
 export function capturePreflightInputSemantic(value) {
   const errors = [];
   const { round, matrix, partitions, readinessChecks } = value.input;
-  if (VISUAL_ROUND_PURPOSES[round.number] !== round.purpose) {
-    errors.push(`$.input.round.purpose: round ${round.number} must be ${VISUAL_ROUND_PURPOSES[round.number]}`);
+  if (visualRoundPurpose(round.number) !== round.purpose) {
+    errors.push(`$.input.round.purpose: round ${round.number} must be ${visualRoundPurpose(round.number)}`);
   }
   if (!exactSequence(matrix.viewports, REQUIRED_VIEWPORTS)) {
     errors.push(`$.input.matrix.viewports: must be ordered ${REQUIRED_VIEWPORTS.join(', ')}`);
@@ -231,9 +232,12 @@ export function capturePreflightOutputSemantic(value) {
   const { outcome, result, gaps, evidenceRefs } = value.output;
   if (outcome === 'ready') {
     if (!result) return ['$.output.result: ready requires a frozen preflight result'];
+    if (/\b\d+(?:\.\d+)?\s*(?:\/|out\s+of\s+)\s*10\b/i.test(result.summary)) {
+      errors.push('$.output.result.summary: capture readiness must not be expressed as a ten-point score');
+    }
     if (gaps.length > 0) errors.push('$.output.gaps: ready cannot retain gaps');
     if (evidenceRefs.length === 0) errors.push('$.output.evidenceRefs: ready requires deterministic evidence');
-    if (VISUAL_ROUND_PURPOSES[result.round?.number] !== result.round?.purpose) errors.push('$.output.result.round: number and purpose do not match the visual-round policy');
+    if (visualRoundPurpose(result.round?.number) !== result.round?.purpose) errors.push('$.output.result.round: number and purpose do not match the visual-round policy');
     const checks = result.readinessChecks ?? [];
     if (!exactSequence(checks.map(({ check }) => check), REQUIRED_PREFLIGHT_CHECKS)) errors.push('$.output.result.readinessChecks: exact ordered readiness matrix is required');
     if (checks.some(({ verdict }) => verdict !== 'passed')) errors.push('$.output.result.readinessChecks: every deterministic check must pass before capture');
@@ -250,7 +254,7 @@ export function renderCaptureInputSemantic(value) {
   if (!exactSequence(value.input.viewports, REQUIRED_VIEWPORTS)) errors.push(`$.input.viewports: must be ordered ${REQUIRED_VIEWPORTS.join(', ')}`);
   const { preflight } = value.input;
   if (!preflight) errors.push('$.input.preflight: validated capture preflight is required');
-  if (preflight && VISUAL_ROUND_PURPOSES[preflight.round.number] !== preflight.round.purpose) errors.push('$.input.preflight.round: number and purpose do not match');
+  if (preflight && visualRoundPurpose(preflight.round.number) !== preflight.round.purpose) errors.push('$.input.preflight.round: number and purpose do not match');
   return errors;
 }
 
@@ -260,7 +264,7 @@ export function renderCaptureOutputSemantic(value) {
     const result = value.output.result;
     if (!result) return ['$.output.result: captured requires structured evidence'];
     if (result.preflightRef == null) errors.push('$.output.result.preflightRef: capture must bind a validated preflight');
-    if (VISUAL_ROUND_PURPOSES[result.visualRound?.number] !== result.visualRound?.purpose) errors.push('$.output.result.visualRound: number and purpose do not match');
+    if (visualRoundPurpose(result.visualRound?.number) !== result.visualRound?.purpose) errors.push('$.output.result.visualRound: number and purpose do not match');
     errors.push(...renderMatrixSemantic(result.renderMatrix, '$.output.result.renderMatrix'));
     errors.push(...probeCoverageSemantic(result.adversarialProbeMatrix, '$.output.result.adversarialProbeMatrix'));
     if (!result.renderMatrix.some(({ handoffState }) => handoffState)) {
@@ -303,7 +307,7 @@ export function visualFidelityInputSemantic(value) {
   const errors = [];
   const { context, input } = value;
   const packet = input.blindReviewPacket;
-  if (VISUAL_ROUND_PURPOSES[packet.visualRound?.number] !== packet.visualRound?.purpose) {
+  if (visualRoundPurpose(packet.visualRound?.number) !== packet.visualRound?.purpose) {
     errors.push('$.input.blindReviewPacket.visualRound: number and purpose do not match');
   }
   if (context.implementerExecutionRef === context.reviewerExecutionRef) {
@@ -358,7 +362,21 @@ export function visualFidelityOutputSemantic(value) {
     errors.push('$.output.result.reviewMode: visual fidelity requires AI adversarial pixel review');
   }
   if (result) {
-    if (VISUAL_ROUND_PURPOSES[result.visualRound?.number] !== result.visualRound?.purpose) errors.push('$.output.result.visualRound: number and purpose do not match');
+    if (visualRoundPurpose(result.visualRound?.number) !== result.visualRound?.purpose) errors.push('$.output.result.visualRound: number and purpose do not match');
+    const score = result.auditScore;
+    const axes = score?.axes ?? [];
+    const expectedAxes = ['business-task-closure', 'ux-flow-state-clarity', 'visual-hierarchy-composition', 'responsive-interaction-resilience', 'consistency-accessibility-cues'];
+    if (JSON.stringify(axes.map(({ axis }) => axis)) !== JSON.stringify(expectedAxes)) {
+      errors.push('$.output.result.auditScore.axes: five score axes must appear once in canonical order');
+    }
+    const axisTotal = axes.reduce((total, axis) => total + axis.value, 0);
+    if (score && axisTotal !== score.value) errors.push('$.output.result.auditScore.value: must equal the sum of the five axis values');
+    if (score?.previousValue === null && score?.delta !== null) errors.push('$.output.result.auditScore.delta: first score must use null delta');
+    if (score?.previousValue !== null && score?.delta !== score.value - score.previousValue) errors.push('$.output.result.auditScore.delta: must equal value minus previousValue');
+    const expectedScoreStatus = score?.target === null ? 'not-requested' : score.value >= score.target ? 'met-target' : 'below-target';
+    if (score?.status !== expectedScoreStatus) errors.push('$.output.result.auditScore.status: does not match value and target');
+    if (outcome === 'passed' && score?.value < 9) errors.push('$.output.result.auditScore.value: aggregate passed requires a score of at least 9');
+    if (outcome !== 'passed' && score?.value > 8) errors.push('$.output.result.auditScore.value: any non-passing visual verdict caps the score at 8');
     if (result.reviewerModel !== 'gpt-5.6-sol' || result.reviewerCount !== 1 || result.contextIsolation !== 'fresh' || result.forkTurns !== 'none') {
       errors.push('$.output.result: v7.2 visual review requires one fresh-context gpt-5.6-sol reviewer');
     }
@@ -415,9 +433,6 @@ export function visualFidelityOutputSemantic(value) {
       !result.inspectionRecords.some(({ verdict }) => verdict === 'repair') &&
       !result.probeRecords.some(({ verdict }) => verdict === 'contradiction')) {
     errors.push('$.output.result: repair requires a visible repair verdict or probe contradiction');
-  }
-  if (outcome === 'repair' && result?.visualRound?.number === 3) {
-    errors.push('$.output.outcome: round 3 is the regression circuit breaker; remaining findings must return blocked');
   }
   errors.push(...probeCoverageSemantic(result?.probeRecords, '$.output.result.probeRecords'));
   const imageRefs = result?.inspectionRecords?.map(({ imageRef }) => imageRef) ?? [];

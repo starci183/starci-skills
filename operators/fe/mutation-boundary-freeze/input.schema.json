@@ -41,6 +41,8 @@
       "required": [
         "intent",
         "uxUiChangeLevel",
+        "layoutOwnerCeilingMode",
+        "layoutOwnerCeiling",
         "mutationAuthorizationRef",
         "files",
         "dominance"
@@ -65,6 +67,39 @@
             "new"
           ]
         },
+        "layoutOwnerCeiling": {
+          "description": "Exact mutable owner set and immutable ancestor ceiling projected from frozen frontend scope.",
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "targetOwnerRef",
+            "directInteractionOwnerRefs",
+            "mutableNestedLayoutRefs",
+            "mutableAncestorLayoutRefs",
+            "immutableAncestorLayoutRefs"
+          ],
+          "properties": {
+            "targetOwnerRef": { "type": "string", "minLength": 1 },
+            "directInteractionOwnerRefs": {
+              "description": "Feature-owned or directly nested page/modal/drawer owners; shared branches and ancestors remain outside this set.",
+              "type": "array",
+              "uniqueItems": true,
+              "maxItems": 64,
+              "items": { "type": "string", "minLength": 1 }
+            },
+            "mutableNestedLayoutRefs": { "type": "array", "uniqueItems": true, "maxItems": 32, "items": { "type": "string", "minLength": 1 } },
+            "mutableAncestorLayoutRefs": { "type": "array", "uniqueItems": true, "maxItems": 32, "items": { "type": "string", "minLength": 1 } },
+            "immutableAncestorLayoutRefs": { "type": "array", "uniqueItems": true, "maxItems": 32, "items": { "type": "string", "minLength": 1 } }
+          }
+        },
+        "layoutOwnerCeilingMode": {
+          "description": "Projection of the frozen frontend.layout.owner-ceiling scope dimension.",
+          "enum": [
+            "surface-only",
+            "surface-and-nested-layouts",
+            "ancestor-layouts-authorized"
+          ]
+        },
         "mutationAuthorizationRef": {
           "description": "Explicit mutation authorization, nullable only for non-mutating outcomes.",
           "type": [
@@ -82,7 +117,8 @@
             "additionalProperties": false,
             "required": [
               "path",
-              "beforeSha256"
+              "beforeSha256",
+              "ownerRef"
             ],
             "properties": {
               "path": {
@@ -92,6 +128,10 @@
               "beforeSha256": {
                 "type": "string",
                 "pattern": "^sha256:[0-9a-f]{64}$"
+              },
+              "ownerRef": {
+                "type": "string",
+                "minLength": 1
               }
             }
           }

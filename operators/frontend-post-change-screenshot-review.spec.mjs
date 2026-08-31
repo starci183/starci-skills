@@ -191,14 +191,16 @@ test('frontend design is an enforced repair capture inspect loop', () => {
   assert.equal(targetFor('capture-preflight', 'ready'), 'capture');
   assert.equal(targetFor('capture', 'captured'), 'visual-fidelity');
   assert.equal(machine.states['visual-fidelity'].ref, 'fe/visual-fidelity');
-  assert.equal(targetFor('visual-fidelity', 'repair'), 'finding-classify');
+  assert.equal(targetFor('visual-fidelity', 'repair'), 'score-route');
+  assert.equal(targetFor('score-route', 'repair'), 'finding-classify');
+  assert.equal(targetFor('score-route', 'reconstruct'), 'dominant-generate');
   assert.equal(targetFor('finding-classify', 'repair'), 'repair');
   assert.equal(targetFor('finding-classify', 'authority-repair'), 'authority-reconcile');
   assert.equal(targetFor('finding-classify', 'clean'), undefined);
   assert.equal(targetFor('authority-reconcile', 'reconciled'), 'repair');
   assert.equal(targetFor('visual-fidelity', 'passed'), 'quality-handoff');
   assert.equal(targetFor('classify', 'no-change'), 'capture-preflight');
-  assert.match(skill, /apply\/repair -> capture-preflight -> render-capture -> one fresh Sol visual-fidelity -> quality-handoff/i);
+  assert.match(skill, /apply\/repair -> capture-preflight -> render-capture -> one fresh Sol visual-fidelity -> audit-route -> quality-handoff/i);
   assert.match(capture, /render-state matrix/i);
   assert.match(fidelity, /every cell in the frozen render-state matrix/i);
   assert.match(fidelity, /CSS tests.*can never.*visual `passed`/is);
@@ -252,7 +254,7 @@ test('capture and visual review schemas require latest-source raster evidence', 
   assert.equal(fidelityInput.properties.context.properties.reviewerCount.const, 1);
   assert.equal(fidelityInput.properties.context.properties.contextIsolation.const, 'fresh');
   assert.equal(fidelityInput.properties.context.properties.forkTurns.const, 'none');
-  assert.deepEqual(fidelityInput.properties.input.required, ['blindReviewPacket']);
+  assert.deepEqual(fidelityInput.properties.input.required, ['auditTargetScore','blindReviewPacket']);
   const packet=fidelityInput.properties.input.properties.blindReviewPacket;
   assert.ok(packet.required.includes('lastScreenshotRef'));
   assert.ok(packet.required.includes('captureReceiptId'));
@@ -261,7 +263,7 @@ test('capture and visual review schemas require latest-source raster evidence', 
 
   const fidelityResult = fidelityOutput.properties.output.properties.result.anyOf[0];
   assert.ok(fidelityResult.required.includes('probeRecords'));
-  for (const field of ['packetFingerprint','packetRasterRefs','reviewerExecutionRef','reviewerModel','reviewerCount','contextIsolation','forkTurns','lastScreenshotRef','lastScreenshotVerdict','uncertainty']) assert.ok(fidelityResult.required.includes(field));
+  for (const field of ['packetFingerprint','packetRasterRefs','reviewerExecutionRef','reviewerModel','reviewerCount','contextIsolation','forkTurns','lastScreenshotRef','lastScreenshotVerdict','uncertainty','auditScore']) assert.ok(fidelityResult.required.includes(field));
   assert.equal(fidelityResult.properties.probeRecords.minItems, 10);
   assert.ok(independentInput.properties.input.required.includes('adversarialProbeRecordsRef'));
   assert.ok(independentInput.properties.input.required.includes('handoffHostArtifactRef'));

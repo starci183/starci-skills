@@ -1,6 +1,6 @@
 {
   "name": "@starci/skills-site",
-  "version": "7.2.1",
+  "version": "7.5.0-alpha.1",
   "private": true,
   "type": "module",
   "scripts": {

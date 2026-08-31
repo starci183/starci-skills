@@ -18,6 +18,8 @@ for (const required of [
   'INDEX.md', 'config.yaml', 'scope.yaml', 'analyze-input.md', 'analyze-input.schema.json',
   'request-vocabulary.md', 'skills/catalog.json', 'skills/machine.schema.json',
   'runtime/config.schema.json', 'runtime/receipt.schema.json', 'runtime/topology.schema.json',
+  'runtime/contracts/grammar-decision.schema.json', 'runtime/contracts/grammar-decision.mjs',
+  'knowledge/grammar/common/semantic-composition.md', 'operators/fe-grammar-v74.spec.mjs',
   'templates/businesses/business.schema.json', 'templates/uat/snapshot.schema.json',
   'templates/uat/result.schema.json', 'templates/sessions/call-receipt.schema.json',
   'templates/debts/debt.schema.json', 'tests/v7-skill-selection.spec.mjs',
@@ -39,8 +41,8 @@ const publicSkills = fs.readdirSync(resolve('skills'), { withFileTypes: true })
   .map((entry) => entry.name)
   .sort();
 
-if (packageJson.version !== '7.2.1' || catalog.systemVersion !== packageJson.version) {
-  fail('package and catalog must agree on version 7.2.1');
+if (packageJson.version !== '7.5.0-alpha.1' || catalog.systemVersion !== packageJson.version) {
+  fail('package and catalog must agree on version 7.5.0-alpha.1');
 }
 if (catalog.schemaVersion !== 7) fail('catalog must use schemaVersion 7');
 if (JSON.stringify(publicSkills) !== JSON.stringify(expectedSkills)) {
@@ -61,8 +63,8 @@ for (const skill of publicSkills) {
 }
 
 const config = read('config.yaml');
-if (!/^version:\s*7\.2\.1$/m.test(config) || !/^debug:\s*true$/m.test(config)) {
-  fail('config.yaml must enable the v7.2.1 debug trace');
+if (!/^version:\s*7\.5\.0-alpha\.1$/m.test(config) || !/^grammarContractVersion:\s*7\.4\.0$/m.test(config) || !/^debug:\s*true$/m.test(config)) {
+  fail('config.yaml must enable the v7.5.0-alpha.1 debug trace');
 }
 for (const required of [
   'aiBrainstormModel: gpt-5.6-sol',
@@ -73,12 +75,12 @@ for (const required of [
   'visualReviewCount: 1',
   'visualReviewIsolation: fresh',
   'visualReviewForkTurns: none',
-  'visualReviewMaxRounds: 3',
-]) if (!config.includes(required)) fail(`config.yaml is missing v7.2 AI boundary: ${required}`);
+  'visualReviewNoProgressLimit: 3',
+]) if (!config.includes(required)) fail(`config.yaml is missing v7.5-alpha AI boundary: ${required}`);
 const index = read('INDEX.md');
 for (const required of [
   '(context + input) -> typed output', 'CALL child', 'RETURN', 'RESUME exact parent state',
-  'Debug changes visibility only', 'three or four materially different choices',
+  'Debug changes visibility only', 'one dominant direction',
   'scope.yaml',
   '.worktrees/uat/<feature>/<flow>/', '.worktrees/sessions/<session-id>/',
 ]) {

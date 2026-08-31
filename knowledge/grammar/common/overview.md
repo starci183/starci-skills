@@ -21,6 +21,8 @@ Never mix Core and Offset Pop in one application Grammar decision. The installed
 
 Route additional Common knowledge by need:
 
+- Semantic composition inventory and brainstorm filtering: `fe.grammar-common-semantic-composition`.
+- Semantic color roles and accent ownership: `fe.grammar-common-semantic-color`.
 - Interface or object identity: `fe.grammar-common-capabilities`.
 - Neutral states or interaction semantics: `fe.grammar-common-states-accessibility`.
 - Nested surfaces: `fe.grammar-common-case-surface-inside-surface`.

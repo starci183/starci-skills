@@ -36,7 +36,8 @@
           "maxLength": 512,
           "pattern": "^https://github\\.com/[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+(?:\\.git)?$"
         },
-        "branch": { "type": "string", "minLength": 1, "maxLength": 255 }
+        "branch": { "type": "string", "minLength": 1, "maxLength": 255 },
+        "gitPolicy": { "$ref": "#/$defs/gitPolicy" }
       },
       "allOf": [
         {
@@ -45,6 +46,16 @@
           "else": { "properties": { "directory": { "$ref": "#/$defs/relativePath" } } }
         }
       ]
+    },
+    "gitPolicy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["mutationBranch", "worktreeBranches", "incomingBranchRefs"],
+      "properties": {
+        "mutationBranch": { "type": "string", "minLength": 1, "maxLength": 255 },
+        "worktreeBranches": { "const": "forbidden" },
+        "incomingBranchRefs": { "const": "merge-into-mutation-branch" }
+      }
     },
     "commonContext": {
       "properties": {

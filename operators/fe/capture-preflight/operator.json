@@ -11,6 +11,6 @@
   "stopConditions": [
     "the capture matrix or owner partition is ambiguous",
     "a deterministic readiness check fails",
-    "the visual round exceeds the configured circuit breaker"
+    "the same progress fingerprint repeats for the configured no-progress limit without a completed owner repair or routed authority change"
   ]
 }

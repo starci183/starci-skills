@@ -2,10 +2,21 @@
 
 All notable changes are documented here. This project follows Semantic Versioning.
 
-## 7.2.1 - 2026-08-30
+## 7.5.0-alpha.1 - 2026-08-31
 
 ### Changed
 
+- Added executable `fe/audit-route`: direct structural failures below 7 route to one dominant
+  reconstruction, scores 7-8 and low nonstructural findings route to one batched repair, and
+  shared/business/backend/runtime-auth defects stay with their smallest owner.
+- Added `fe/dominant-direction-generate`, which renders exactly one wide/compact/material-state
+  direction and proceeds directly to Grammar bind/freeze/apply. The 3-4 direction WAIT remains only
+  for explicit comparison requests.
+- Added phase-proportional audit evidence: rapid baseline for routing, changed-owner/sentinel packets
+  for repair, and the complete applicable state/lifecycle matrix only for closure.
+- Added centralized mission-scoped Browser/UAT leases. Feature tasks cannot handle credentials or
+  restart shared services; the same isolated account/context is reused across audit, repair,
+  recapture, quality, and UAT rounds until continuity is proven lost.
 - Added deterministic `fe/capture-preflight` before capture and Sol review, including ten readiness
   checks for data/state identity, controls, scroll/zoom restoration, probe completeness, raster
   uniqueness, and the handoff host.

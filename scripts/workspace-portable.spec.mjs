@@ -70,7 +70,10 @@ function fixture(t) {
     schemaVersion: 6,
     project: 'nivo',
     role: 'fe',
-    repository: { kind: 'sibling', directory: 'nivo-fe', gitRepository: 'https://github.com/starci-lab/nivo-fe.git', branch: 'main' },
+    repository: {
+      kind: 'sibling', directory: 'nivo-fe', gitRepository: 'https://github.com/starci-lab/nivo-fe.git', branch: 'main',
+      gitPolicy: { mutationBranch: 'main', worktreeBranches: 'forbidden', incomingBranchRefs: 'merge-into-mutation-branch' }
+    },
     context: {
       instructions: [],
       manifests: ['package.json'],
@@ -107,6 +110,11 @@ test('hydrates V1 and V6 routes, refreshes stale heads, and preserves credential
   const v6 = JSON.parse(readFileSync(v6Path, 'utf8'));
   assert.equal(v6.schemaVersion, 6);
   assert.equal(v6.context.grammarId, 'core');
+  assert.deepEqual(v6.repository.gitPolicy, {
+    mutationBranch: 'main',
+    worktreeBranches: 'forbidden',
+    incomingBranchRefs: 'merge-into-mutation-branch'
+  });
   assert.equal(v6.repository.head, git(f.frontend, 'rev-parse', 'HEAD'));
   assert.equal(readFileSync(join(f.source, '.workspaces', 'local', 'credentials', 'provider.key.enc'), 'utf8'), 'ciphertext');
 
@@ -155,7 +163,10 @@ test('V6 rejects legacy grammar fields, mixed versions, and non-FE grammar', () 
     schemaVersion: 6,
     project: 'nivo',
     role: 'fe',
-    repository: { kind: 'sibling', directory: 'nivo-fe', gitRepository: 'https://github.com/starci-lab/nivo-fe.git', branch: 'main' },
+    repository: {
+      kind: 'sibling', directory: 'nivo-fe', gitRepository: 'https://github.com/starci-lab/nivo-fe.git', branch: 'main',
+      gitPolicy: { mutationBranch: 'main', worktreeBranches: 'forbidden', incomingBranchRefs: 'merge-into-mutation-branch' }
+    },
     context: { instructions: [], manifests: ['package.json'], grammarId: 'core' }
   };
   assert.throws(() => validatePortableRoute({ ...base, version: 1 }), /invalid/);
@@ -163,6 +174,18 @@ test('V6 rejects legacy grammar fields, mixed versions, and non-FE grammar', () 
   assert.throws(() => validatePortableRoute({ ...base, role: 'be' }), /non-FE grammarId must be null|invalid/);
   assert.throws(() => validatePortableRoute({ ...base, repository: { ...base.repository, directory: '../nivo-fe' } }), /invalid/);
   assert.throws(() => validatePortableRoute({ ...base, repository: { ...base.repository, gitRepository: 'https://token@github.com/starci-lab/nivo-fe.git' } }), /invalid/);
+  assert.throws(() => validatePortableRoute({
+    ...base,
+    repository: { ...base.repository, gitPolicy: { ...base.repository.gitPolicy, mutationBranch: 'feature/task' } }
+  }), /mutationBranch must equal repository\.branch/);
+});
+
+test('direct-main policy blocks hydration from a feature branch', (t) => {
+  const f = fixture(t);
+  git(f.frontend, 'switch', '-c', 'feature/task');
+  const result = runScript(f, 'hydrate', '--apply');
+  assert.equal(result.status, 1);
+  assert.match(result.stderr, /branch mismatch: expected main, observed feature\/task/);
 });
 
 test('a failing declaration produces no partial local route writes', (t) => {

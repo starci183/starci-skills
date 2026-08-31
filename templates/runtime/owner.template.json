@@ -1,0 +1,14 @@
+{
+  "$schema": "./owner.schema.json",
+  "schemaVersion": 1,
+  "ownerThreadId": "thread://central-runtime/unbound",
+  "generation": 1,
+  "status": "starting",
+  "endpoints": {
+    "frontend": "http://localhost:3000",
+    "api": "http://localhost:3001",
+    "identity": "http://localhost:8080"
+  },
+  "healthEvidenceRefs": [],
+  "updatedAt": "2026-01-01T00:00:00.000Z"
+}

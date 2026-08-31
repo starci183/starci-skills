@@ -1,4 +1,4 @@
-# StarCi v7.2 runtime
+# StarCi v7.5-alpha runtime
 
 This Source owns one composable StarCi runtime. Resolve the requested project routes, select one
 mission-owning Skill, and let that Skill call peer Skills and atomic operators until the requested
@@ -150,9 +150,10 @@ guess the user's intended scope. For frontend UX/UI work, one conditional dimens
 
 Wait for the user only when no valid next action dominates, scope or product authority is genuinely missing,
 or a destructive/external mutation needs new authorization. For every redesign without an already
-approved direction, follow `knowledge/direction-visualization.md`: render three or four materially different choices
-through `visualize`, explain their tradeoffs, recommend one, and only then wait for
-selection. Architecture choices render architecture boundaries and flows; UX/UI choices render
+approved direction, follow `knowledge/direction-visualization.md`: render one dominant direction
+through `visualize` and continue inside the frozen boundary. Render three or four materially different
+choices and wait for selection only when the user explicitly asks to compare alternatives.
+Architecture choices render architecture boundaries and flows; UX/UI choices render
 realistic representative pages or substantial surfaces and responsive/material states. Prose,
 Mermaid, ASCII, tables, or implementation plans alone never satisfy this choice proof. Resume the
 same mission after selection. Do not ask for approval between routine analysis, implementation,
@@ -207,6 +208,7 @@ display chain-of-thought.
 | Authority | Canonical owner |
 | --- | --- |
 | Runtime configuration | `<Source>/.claude/config.yaml` |
+| Central local runtime registry | `<project-backend>/.worktrees/sessions/central-runtime/owner.json` |
 | Mission scope protocol | `<Source>/.claude/scope.yaml` |
 | Public Skill discovery | `<Source>/.claude/skills/catalog.json` |
 | Workspace routing | `<Source>/.workspaces/` |
@@ -231,6 +233,14 @@ Read-only diagnosis never receives write roots or external mutation authority.
 Before changing a shared product runtime, inventory its listener, command, working directory, and
 session owner. Reuse a healthy verified runtime. `EADDRINUSE` is a coordination finding, not permission
 to kill another process.
+
+For local StarCi product work, the Control Panel delegates exactly one centralized runtime task to own
+FE `localhost:3000`, API `localhost:3001`, and identity `localhost:8080`. Feature, audit, quality, and
+UAT tasks are consumers: they communicate runtime needs to that owner and must not start, stop,
+restart, replace, or claim any shared listener. UAT identity is isolated by account and Browser
+session, never by rebinding server environment or launching a per-feature API. Only the Control Panel
+may create or replace the runtime-owner task. A verified service failure is reported to that task;
+feature work pauses without mutating shared processes.
 
 ## Validation
 

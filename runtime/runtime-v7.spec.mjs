@@ -10,8 +10,9 @@ import { loadScopePolicy } from './scope-policy.mjs';
 const base = { receiptId:'receipt:r1', missionId:'m1', skillId:'starci-quality-assure', operatorId:'quality/lint', parentId:'call-parent', childId:'call-child', missionContext:{ project:'starci', objective:'assure' }, context:{ source:'be', invocationRef:'invocation://runtime-v7' }, input:{ exact:true }, expectedOutput:{ outcome:'pass' }, actualOutput:{ outcome:'pass' }, evidenceRefs:['git:abc'], sourceHeads:['git:abc'], transitionRule:{ outcome:'pass', target:'complete' }, resumeState:null, skip:null, error:null };
 const lifecycleFields=(id,hex)=>({missionId:`mission:${id}`,context:{source:'be',invocationRef:`invocation://${id}`,executionRef:`execution://${hex.repeat(64)}`}});
 
-test('sole YAML config is strict v7.2 with one fresh Sol for brainstorm and visual review', () => assert.deepEqual(loadRuntimeConfig(), {
-  version:'7.2.1',
+test('sole YAML config is strict v7.5-alpha with fresh Sol review and centralized runtime/session ownership', () => assert.deepEqual(loadRuntimeConfig(), {
+  version:'7.5.0-alpha.1',
+  grammarContractVersion:'7.4.0',
   debug:true,
   aiBrainstormModel:'gpt-5.6-sol',
   aiBrainstormCount:1,
@@ -21,15 +22,47 @@ test('sole YAML config is strict v7.2 with one fresh Sol for brainstorm and visu
   visualReviewCount:1,
   visualReviewIsolation:'fresh',
   visualReviewForkTurns:'none',
-  visualReviewMaxRounds:3,
+  visualReviewNoProgressLimit:3,
+  localRuntimeOwnership:'centralized-task',
+  localRuntimeControlPlane:'control-panel',
+  localFrontendUrl:'http://localhost:3000',
+  localApiUrl:'http://localhost:3001',
+  localIdentityUrl:'http://localhost:8080',
+  featureTaskRuntimeMutation:'forbidden',
+  localRuntimeRegistry:'.worktrees/sessions/central-runtime/owner.json',
+  localUatBrowserOwnership:'centralized-lease',
+  localUatBrowserControlPlane:'control-panel',
+  localUatBrowserLeaseRegistry:'.worktrees/sessions/central-uat-browser/leases',
+  featureTaskCredentialHandling:'forbidden',
 }));
+
+test('local feature tasks consume one control-panel-owned runtime instead of owning ports',()=>{
+  const runtime=loadRuntimeConfig();
+  assert.equal(runtime.localRuntimeOwnership,'centralized-task');
+  assert.equal(runtime.localRuntimeControlPlane,'control-panel');
+  assert.equal(runtime.featureTaskRuntimeMutation,'forbidden');
+  assert.equal(runtime.localRuntimeRegistry,'.worktrees/sessions/central-runtime/owner.json');
+  assert.deepEqual(
+    [runtime.localFrontendUrl,runtime.localApiUrl,runtime.localIdentityUrl],
+    ['http://localhost:3000','http://localhost:3001','http://localhost:8080']
+  );
+});
+
+test('central runtime registry binds one owner generation and canonical localhost endpoints',()=>{
+  const validateOwner=validatorFor(new URL('../templates/runtime/owner.schema.json',import.meta.url));
+  const owner=JSON.parse(fs.readFileSync(new URL('../templates/runtime/owner.template.json',import.meta.url)));
+  assert.equal(validateOwner(owner).valid,true);
+  assert.equal(validateOwner({...owner,endpoints:{...owner.endpoints,api:'http://127.0.0.1:3001'}}).valid,false);
+  assert.equal(validateOwner({...owner,status:'ready',ownerThreadId:''}).valid,false);
+});
 
 test('scope policy rejects unresolved mission scope before skill selection', () => {
   const policy=loadScopePolicy();
-  assert.equal(policy.version,'7.2.1');
+  assert.equal(policy.version,'7.5.0-alpha.1');
   assert.equal(policy.unclearAction,'ask-before-skill-selection');
   assert.equal(policy.sourceInspectionWhileAmbiguous,'forbidden');
   assert.deepEqual(policy.registeredDimensions['frontend.ux-ui.change-level'],['refine','reconstruct','new']);
+  assert.deepEqual(policy.registeredDimensions['frontend.layout.owner-ceiling'],['surface-only','surface-and-nested-layouts','ancestor-layouts-authorized']);
 });
 
 test('debug true renders the normalized execution contract', () => {

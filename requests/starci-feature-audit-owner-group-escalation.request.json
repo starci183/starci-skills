@@ -1,0 +1,50 @@
+{
+  "$schema": "./request.schema.json",
+  "schemaVersion": 1,
+  "id": "starci-feature-audit-owner-group-escalation",
+  "kind": "frontend-feedback-upgrade",
+  "status": "resolved",
+  "project": "starci-academy",
+  "targetOwners": [
+    "starci-runtime"
+  ],
+  "need": "A feature audit must automatically manage its complete direct page, route-local or nested layout, feature-owned modal, and feature-owned drawer group through repair and fresh PASS 9+ evidence. A required shared-owner defect must be escalated to the Control Panel for explicit owner permission after remaining direct work continues; the feature task must neither stop silently nor duplicate shared behavior locally to evade scope.",
+  "negativeBoundary": "Do not automatically mutate shared branches, global overlays, application shells, headers, navigation, or ancestor layouts. Do not let a scoped direct-owner PASS imply that an unresolved required shared owner passed, and do not force unrelated shared consumers into the feature mutation boundary without owner authorization.",
+  "acceptanceCriteria": [
+    "Frontend audit guidance compiles every direct feature page, page-local or route-nested layout, modal, and drawer before capture and continues the whole group rather than stopping after one owner.",
+    "The mutation boundary accepts exact files owned by directly included modal and drawer owners while continuing to reject excluded shared branches and immutable ancestors.",
+    "A required shared-owner finding produces one Control Panel authority request naming exact files, visible defect, smallest proposed change, affected consumer regression matrix, and failed in-scope alternatives.",
+    "The runtime forbids recreating shared behavior inside a page-local component merely to bypass owner authority.",
+    "Feature PASS or 9+ remains forbidden while a required shared finding is unresolved unless the owner explicitly authorizes the shared mutation or accepts an evidence-backed debt or exclusion."
+  ],
+  "feedbackSessions": [
+    {
+      "fingerprint": "sha256:773b1c2ca923a98cda6828cb7c9be1522cf5f0d229f8811bb704ee1b9a58b5c5",
+      "sourceSkillId": "starci-frontend-maintenance-apply",
+      "evidenceSha256": "sha256:8e743d1fd4b5f7ac33020b9d16f27657d698b5715427d1d99dc154e350ea1499",
+      "accepts": [
+        "Keep every direct feature owner moving toward fresh PASS 9+ under Control Panel supervision.",
+        "Report a required shared-owner mutation to Control Panel and wait for explicit owner permission on that boundary.",
+        "Continue independent in-scope repairs before waiting on the shared authority decision."
+      ],
+      "rejects": [
+        "Stop the entire feature without reporting the shared authority request to Control Panel.",
+        "Replace a shared modal with a page-local clone solely to avoid requesting shared-owner authority.",
+        "Claim feature 9+ while a required shared interaction still has fresh failing evidence."
+      ],
+      "targetOwners": [
+        "starci-runtime"
+      ],
+      "proofStatus": "proven"
+    }
+  ],
+  "review": {
+    "decision": "approved",
+    "priority": "urgent",
+    "evidenceSha256": "sha256:8e743d1fd4b5f7ac33020b9d16f27657d698b5715427d1d99dc154e350ea1499",
+    "targetOwners": [
+      "starci-runtime"
+    ],
+    "rationale": "Mock Interview exposed both failure modes: premature stop at a shared owner and an attempted local workaround that would duplicate shared behavior. The runtime needs direct-group persistence plus explicit Control Panel escalation."
+  }
+}

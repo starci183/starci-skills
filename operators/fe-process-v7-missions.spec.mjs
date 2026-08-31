@@ -7,9 +7,13 @@ import { validateInput as validateUatInput } from '../skills/starci-uat-verify/v
 import { validateInput as validateFeatureInput } from '../skills/starci-feature-deliver/validate-input.mjs';
 import { validateInput as validateReviewInput } from './fe/independent-review/validate-input.mjs';
 import { validateOutput as validateDirectionOutput } from './fe/direction-generate/validate-output.mjs';
+import { validateInput as validateAuditRouteInput } from './fe/audit-route/validate-input.mjs';
+import { validateOutput as validateAuditRouteOutput } from './fe/audit-route/validate-output.mjs';
+import { validateOutput as validateDominantDirectionOutput } from './fe/dominant-direction-generate/validate-output.mjs';
 import { validateInput as validatePotentialInput } from './fe/product-potential/validate-input.mjs';
 import { validateOutput as validatePotentialOutput } from './fe/product-potential/validate-output.mjs';
 import { validateOutput as validateUatPublishOutput } from './test/uat-result-publish/validate-output.mjs';
+import { validateInput as validateUatCaseInput } from './test/uat-case-freeze/validate-input.mjs';
 import { createReceipt, fingerprint } from '../runtime/trace.mjs';
 import { REQUIRED_PROBE_CATEGORIES, REQUIRED_PROBE_PHASES } from './fe/strict-ui-validation.mjs';
 import { createOperatorInvocationBindingRegistry } from './invocation-binding.mjs';
@@ -17,11 +21,13 @@ import { createOperatorInvocationBindingRegistry } from './invocation-binding.mj
 const machine = JSON.parse(readFileSync(new URL('../skills/starci-fe-process/machine.json', import.meta.url)));
 const uatMachine = JSON.parse(readFileSync(new URL('../skills/starci-uat-verify/machine.json', import.meta.url)));
 const selection=(skillId)=>({analyzerVersion:2,skillId,confidence:'exact',interactionPolicy:'ask-only-when-stuck',activeInputRefs:['request://current'],passiveContextRefs:[]});
-const scope=(unit='surface',dimensions=[])=>({status:'frozen',unit,targetRefs:['surface://Profile'],inclusionRefs:['state://default'],exclusionRefs:[],writeRoots:['src/Profile.tsx'],externalMutation:false,approvalRef:null,completionProofRefs:['proof://render-review'],dimensions,ambiguityRefs:[]});
+const scope=(unit='surface',dimensions=[])=>({status:'frozen',unit,targetRefs:['surface://Profile'],inclusionRefs:['state://default'],exclusionRefs:['layout://AppShell'],writeRoots:['src/Profile.tsx'],externalMutation:false,approvalRef:null,completionProofRefs:['proof://render-review'],dimensions,ambiguityRefs:[]});
 const changeLevel=(value)=>({key:'frontend.ux-ui.change-level',value,authorityRef:'request://current'});
+const ownerCeilingLevel=(value)=>({key:'frontend.layout.owner-ceiling',value,authorityRef:'request://current'});
+const layoutOwnerCeiling=()=>({targetOwnerRef:'surface://Profile',directInteractionOwnerRefs:[],mutableNestedLayoutRefs:[],mutableAncestorLayoutRefs:[],immutableAncestorLayoutRefs:['layout://AppShell']});
 const neutralAdversarialDecision={add:{disposition:'reject',rationale:'No missing capability is evidenced.',evidenceRefs:['evidence://mission']},change:{disposition:'adopt',rationale:'The requested outcome requires bounded change.',evidenceRefs:['evidence://mission']},remove:{disposition:'reject',rationale:'No removal is supported by evidence.',evidenceRefs:['evidence://mission']}};
 const independentProbeSequence=()=>REQUIRED_PROBE_CATEGORIES.flatMap((category)=>REQUIRED_PROBE_PHASES[category].map((phase,index)=>({probeId:`${category}-${index}`,category,phase})));
-const feInput = (intent, objective, level='refine') => ({ schemaVersion:7, runId:'mission-1', project:'academy', selection:selection('starci-fe-process'), intent, objective, targetHints:['route://academy/fe','surface://Profile'], authorityRefs:['business://profile'], scope:scope('surface',[changeLevel(level)]), resume:null, receiptType:'NONE', returnReceipt:null, progressHistory:[], mutationAuthorizationRef:null, verifiedFrontendRoute:'.workspaces/projects/academy/fe.json', exactFiles:[{path:'src/Profile.tsx',beforeSha256:`sha256:${'a'.repeat(64)}`}], approvedContractFingerprint:null });
+const feInput = (intent, objective, level='refine') => ({ schemaVersion:7, runId:'mission-1', project:'academy', selection:selection('starci-fe-process'), intent, objective, auditTargetScore:null, auditScoreHistory:[], targetHints:['route://academy/fe','surface://Profile'], authorityRefs:['business://profile'], scope:scope('surface',[changeLevel(level),ownerCeilingLevel('surface-only')]), resume:null, receiptType:'NONE', returnReceipt:null, progressHistory:[], mutationAuthorizationRef:null, verifiedFrontendRoute:'.workspaces/projects/academy/fe.json', exactFiles:[{path:'src/Profile.tsx',beforeSha256:`sha256:${'a'.repeat(64)}`,ownerRef:'surface://Profile'}], layoutOwnerCeiling:layoutOwnerCeiling(), approvedContractFingerprint:null });
 const routed = (outcome, stateId = null) => {
   const state = stateId ?? Object.entries(machine.states).find(([, value]) => value.ref && value.on?.some((edge) => edge.when?.outputEquals?.outcome === outcome))?.[0];
   const matches = machine.states[state].on.filter((edge) => edge.when?.outputEquals?.outcome === outcome);
@@ -35,8 +41,43 @@ test('audit Profile compiles as one frontend mission and traverses all three ind
   assert.equal(routed('observed','observe'),'product-potential');
   assert.equal(routed('assessed','product-potential'),'semantic-audit');
   assert.equal(routed('passed','semantic-audit'),'ux-audit');
-  assert.equal(routed('passed','ux-audit'),'ui-audit');
+  assert.equal(routed('passed','ux-audit'),'grammar-audit');
+  assert.equal(routed('converged','grammar-audit'),'ui-audit');
   assert.equal(routed('findings','ui-audit'),'classify');
+});
+
+test('numeric audit target preserves an ordered evidence-bound progress history',()=>{
+  const value=feInput('audit','Audit Personal Project to 9/10');
+  value.auditTargetScore=9;
+  value.auditScoreHistory=[
+    {round:1,score:6,delta:null,typedVerdict:'FAIL',sourceFingerprint:`sha256:${'1'.repeat(64)}`,evidenceFingerprint:`sha256:${'2'.repeat(64)}`,findingBatchFingerprint:`sha256:${'3'.repeat(64)}`},
+    {round:2,score:8,delta:2,typedVerdict:'FAIL',sourceFingerprint:`sha256:${'4'.repeat(64)}`,evidenceFingerprint:`sha256:${'5'.repeat(64)}`,findingBatchFingerprint:`sha256:${'6'.repeat(64)}`},
+    {round:3,score:9,delta:1,typedVerdict:'PASS',sourceFingerprint:`sha256:${'7'.repeat(64)}`,evidenceFingerprint:`sha256:${'8'.repeat(64)}`,findingBatchFingerprint:null},
+  ];
+  assert.deepEqual(validateFeInput(value),{valid:true,errors:[]});
+  value.auditScoreHistory[1].delta=3;
+  assert.match(validateFeInput(value).errors.join('\n'),/delta must equal score movement/);
+});
+
+test('v7.5-alpha routes only direct structural scores below 7 to one dominant reconstruction without WAIT',()=>{
+  assert.equal(routed('repair','visual-fidelity'),'score-route');
+  const input={schemaVersion:7,operatorId:'fe/audit-route',context:{sourceFingerprint:`sha256:${'1'.repeat(64)}`,evidenceFingerprint:`sha256:${'2'.repeat(64)}`,findingBatchFingerprint:`sha256:${'3'.repeat(64)}`},input:{typedVerdict:'FAIL',score:3,changeLevel:'reconstruct',comparisonRequested:false,structuralFindingRefs:['finding://compact-composition'],findingOwnerClasses:['direct-implementation']}};
+  assert.deepEqual(validateAuditRouteInput(input),{valid:true,errors:[]});
+  const output={schemaVersion:7,operatorId:'fe/audit-route',output:{outcome:'reconstruct',result:{score:3,route:'reconstruct',directionMode:'dominant',reason:'Direct-owner structural composition failed on current evidence.'},gaps:[],evidenceRefs:['visual://round-1']}};
+  assert.deepEqual(validateAuditRouteOutput(output),{valid:true,errors:[]});
+  assert.equal(routed('reconstruct','score-route'),'dominant-generate');
+  const dominant={schemaVersion:7,operatorId:'fe/dominant-direction-generate',output:{outcome:'generated',aiExecution:{model:'gpt-5.6-sol',count:1,isolation:'fresh',forkTurns:'none',executionRef:`execution://${'4'.repeat(64)}`},result:{summary:'One coherent direct-owner replacement composition is ready.',artifactRefs:['artifact://dominant.html'],directionCount:1,directionRef:'direction://dominant',visualizeArtifactRef:'artifact://dominant.html',wideStateRef:'panel://wide',compactStateRef:'panel://compact',materialStateRef:'panel://recovery',familySignatureManifestRef:'family://academy',grammarDecisionManifestRef:'grammar://dominant',constructionContractRef:'contract://dominant'},gaps:[],evidenceRefs:['visual://round-1']}};
+  assert.deepEqual(validateDominantDirectionOutput(dominant),{valid:true,errors:[]});
+  assert.equal(routed('generated','dominant-generate'),'grammar-bind');
+  assert.notEqual(routed('generated','dominant-generate'),'direction-choice');
+});
+
+test('v7.5-alpha keeps a low nonstructural score on the current owner repair route',()=>{
+  const input={schemaVersion:7,operatorId:'fe/audit-route',context:{sourceFingerprint:`sha256:${'1'.repeat(64)}`,evidenceFingerprint:`sha256:${'2'.repeat(64)}`,findingBatchFingerprint:`sha256:${'3'.repeat(64)}`},input:{typedVerdict:'FAIL',score:6,changeLevel:'reconstruct',comparisonRequested:false,structuralFindingRefs:[],findingOwnerClasses:['direct-implementation']}};
+  assert.deepEqual(validateAuditRouteInput(input),{valid:true,errors:[]});
+  const output={schemaVersion:7,operatorId:'fe/audit-route',output:{outcome:'repair',result:{score:6,route:'repair',directionMode:'none',reason:'The failure is semantic and local; composition itself remains coherent.'},gaps:[],evidenceRefs:['visual://round-1']}};
+  assert.deepEqual(validateAuditRouteOutput(output),{valid:true,errors:[]});
+  assert.equal(routed('repair','score-route'),'finding-classify');
 });
 
 test('neutral product potential requires an exhaustive typed capability delta before visual audit', () => {
@@ -56,13 +97,15 @@ test('neutral product potential requires an exhaustive typed capability delta be
 
 test('create page X auto-selects a dominant action without generating choices', () => {
   assert.deepEqual(validateFeInput(feInput('create','Create page X','new')), {valid:true,errors:[]});
-  assert.equal(routed('dominant','classify'),'freeze');
+  assert.equal(routed('dominant','classify'),'grammar-bind');
+  assert.equal(routed('converged','grammar-bind'),'freeze');
 });
 
 test('a true authority choice generates and ranks 3-4 directions before WAIT', async () => {
   assert.equal(routed('choice-required','classify'),'generate');
-  const directions=['split-workbench','guided-pipeline','submission-drawer','review-canvas'].map((id)=>({id,title:id,visualPanelRef:`#${id}`,wideStateRef:`#${id}-wide`,compactStateRef:`#${id}-compact`,materialStateRef:`#${id}-recovery`,tradeoff:`${id} trade-off`}));
-  const value={schemaVersion:7,operatorId:'fe/direction-generate',output:{outcome:'generated',aiExecution:{model:'gpt-5.6-sol',count:1,isolation:'fresh',forkTurns:'none',executionRef:`execution://${'e'.repeat(64)}`},result:{summary:'Four distinct directions.',artifactRefs:['artifact://directions.html'],comparisonArtifactRef:'artifact://directions.html',directionCount:4,directions,materialDifferences:['navigation model','information hierarchy','interaction character','responsive composition']},gaps:[],evidenceRefs:['authority://frozen'],handoff:null}};
+  const directions=['split-workbench','guided-pipeline','submission-drawer','review-canvas'].map((id)=>({id,title:id,visualPanelRef:`#${id}`,wideStateRef:`#${id}-wide`,compactStateRef:`#${id}-compact`,materialStateRef:`#${id}-recovery`,grammarDecisionManifestRef:`grammar://${id}`,tradeoff:`${id} trade-off`}));
+  const grammarFilterRecords=directions.map((direction)=>({candidateRef:direction.id,decision:'accepted',manifestRef:direction.grammarDecisionManifestRef,reasonRefs:['grammar://validated']}));
+  const value={schemaVersion:7,operatorId:'fe/direction-generate',output:{outcome:'generated',aiExecution:{model:'gpt-5.6-sol',count:1,isolation:'fresh',forkTurns:'none',executionRef:`execution://${'e'.repeat(64)}`},result:{summary:'Four distinct directions.',artifactRefs:['artifact://directions.html'],comparisonArtifactRef:'artifact://directions.html',directionCount:4,directions,grammarFilterRecords,materialDifferences:['navigation model','information hierarchy','interaction character','responsive composition']},gaps:[],evidenceRefs:['authority://frozen'],handoff:null}};
   assert.deepEqual(validateDirectionOutput(value),{valid:true,errors:[]});
   const directionInput={schemaVersion:7,operatorId:'fe/direction-generate',context:{authorityRefs:['authority://frozen'],evidenceRefs:[],uiKnowledgeId:'fe.ui'},input:{targetRef:'surface://profile',constraints:[]}};
   const receiptFields={missionId:'mission-1',skillId:'starci-fe-process',operatorId:'fe/direction-generate',parentId:'invocation://generate',childId:null,context:{executionRef:`execution://${'e'.repeat(64)}`,invocationRef:'invocation://generate'},input:directionInput,expectedOutput:{outcome:'generated'},actualOutput:value,aiActivity:{kind:'brainstorm',model:'gpt-5.6-sol',count:1,executionRef:`execution://${'e'.repeat(64)}`,principalFingerprint:`sha256:${'a'.repeat(64)}`,contextFingerprint:`sha256:${'b'.repeat(64)}`,isolation:'fresh',forkTurns:'none'}};
@@ -91,7 +134,7 @@ test('selected user direction resumes only through a typed RESUME receipt', () =
   assert.deepEqual(validateFeInput(value),{valid:true,errors:[]});
   assert.equal(nextState(machine,'analyze-input',null,{...value,neutralAdversarialDecision}),'consume-choice-resume');
   assert.equal(routed('consumed','consume-choice-resume'),'choice-resume-route');
-  assert.equal(nextState(machine,'choice-resume-route',null,value),'freeze');
+  assert.equal(nextState(machine,'choice-resume-route',null,value),'grammar-bind');
 });
 
 test('independent review cannot receive implementer rationale', () => {
@@ -120,7 +163,7 @@ test('frontend public input rejects fabricated and replayed return receipts',()=
   const value=feInput('repair','Repair Profile');
   value.receiptType='RETURN';
   value.resume={missionRef:'mission-1',fromSkillId:'starci-backend-process',receiptRef:'receipt:fe-public',resumeState:'apply'};
-  value.returnReceipt={version:'7.2.1',receiptId:'receipt:fe-public',type:'RETURN',missionId:'mission-1',skillId:'starci-backend-process',operatorId:null,parentId:'receipt:call',childId:null,timestamp:'2026-08-30T00:00:00.000Z',progressFingerprint:`sha256:${'a'.repeat(64)}`,trace:{resumeState:'apply'}};
+  value.returnReceipt={version:'7.5.0-alpha.1',receiptId:'receipt:fe-public',type:'RETURN',missionId:'mission-1',skillId:'starci-backend-process',operatorId:null,parentId:'receipt:call',childId:null,timestamp:'2026-08-30T00:00:00.000Z',progressFingerprint:`sha256:${'a'.repeat(64)}`,trace:{resumeState:'apply'}};
   assert.match(validateFeInput(value).errors.join('\n'),/not a runtime-issued immutable receipt/);
   value.returnReceipt=createReceipt('RETURN',{receiptId:'receipt:fe-public-canonical',missionId:'mission-1',skillId:'starci-backend-process',parentId:'receipt:call',resumeState:'apply'},{debug:true});
   value.resume.receiptRef=value.returnReceipt.receiptId;
@@ -178,6 +221,18 @@ test('UAT verification binds canonical backend-owned feature/flow authority', ()
   assert.deepEqual(validateUatInput(value),{valid:true,errors:[]});
 });
 
+test('authenticated UAT accepts only a fresh run-scoped account with a mission Browser lease', () => {
+  const sessionLease={leaseRef:'browser-lease://mission-1',missionRef:'mission-1',browserContextRef:'browser://in-app/run-1',principalFingerprint:`sha256:${'a'.repeat(64)}`,runtimeGeneration:1,origin:'http://localhost:3000',fixtureNamespace:'uat-personal-project-run-1',state:'authenticated'};
+  const value={schemaVersion:7,operatorId:'test/uat-case-freeze',context:{snapshotRef:'uat://personal-project/core/snapshot'},input:{evidenceRefs:['runtime://personal-project'],browserSessionRef:'browser://in-app/run-1',accountRef:'account://fresh/personal-project/run-1',sessionLease}};
+  assert.deepEqual(validateUatCaseInput(value),{valid:true,errors:[]});
+  value.input.accountRef='account://personal/teacher';
+  assert.equal(validateUatCaseInput(value).valid,false);
+  value.input.accountRef='account://reused/test-at-starci';
+  assert.equal(validateUatCaseInput(value).valid,false);
+  value.input.accountRef='anonymous://explicit/personal-project-entry';
+  assert.deepEqual(validateUatCaseInput(value),{valid:true,errors:[]});
+});
+
 test('frontend completion is reachable only after quality and UAT returns', () => {
   assert.equal(nextState(machine,'resume-route',null,{resume:{resumeState:'quality-return'}}),'uat-handoff');
   assert.equal(nextState(machine,'resume-route',null,{resume:{resumeState:'uat-return'}}),'complete');
@@ -195,4 +250,31 @@ test('frontend scope rejects missing, duplicate, or unknown UX/UI change levels'
   assert.match(validateFeInput(duplicate).errors.join('\n'),/exactly one frontend\.ux-ui\.change-level/);
   const unknown=feInput('audit','Audit Profile'); unknown.scope.dimensions[0].value='layout';
   assert.match(validateFeInput(unknown).errors.join('\n'),/refine, reconstruct, or new/);
+});
+
+test('frontend layout owner ceiling permits nested page layouts and rejects higher ancestors',()=>{
+  const nested=feInput('audit','Audit Profile page and its nested layout');
+  nested.scope.dimensions=nested.scope.dimensions.map((dimension)=>dimension.key==='frontend.layout.owner-ceiling'?ownerCeilingLevel('surface-and-nested-layouts'):dimension);
+  nested.scope.inclusionRefs.push('layout://ProfileNested');
+  nested.layoutOwnerCeiling.mutableNestedLayoutRefs.push('layout://ProfileNested');
+  nested.exactFiles.push({path:'src/layouts/ProfileNested.tsx',beforeSha256:`sha256:${'b'.repeat(64)}`,ownerRef:'layout://ProfileNested'});
+  assert.deepEqual(validateFeInput(nested),{valid:true,errors:[]});
+  const escaped=structuredClone(nested);
+  escaped.exactFiles.push({path:'src/layouts/AppShell.tsx',beforeSha256:`sha256:${'c'.repeat(64)}`,ownerRef:'layout://AppShell'});
+  assert.match(validateFeInput(escaped).errors.join('\n'),/owned above the mutable layout ceiling/);
+});
+
+test('feature audit mutates directly owned modal and drawer owners without widening to a shared branch',()=>{
+  const grouped=feInput('audit','Audit the complete Profile feature owner group');
+  grouped.scope.inclusionRefs.push('modal://ProfileEdit','drawer://ProfileHistory');
+  grouped.scope.exclusionRefs.push('modal://SharedModalBranch');
+  grouped.layoutOwnerCeiling.directInteractionOwnerRefs.push('modal://ProfileEdit','drawer://ProfileHistory');
+  grouped.exactFiles.push(
+    {path:'src/ProfileEditModal.tsx',beforeSha256:`sha256:${'b'.repeat(64)}`,ownerRef:'modal://ProfileEdit'},
+    {path:'src/ProfileHistoryDrawer.tsx',beforeSha256:`sha256:${'c'.repeat(64)}`,ownerRef:'drawer://ProfileHistory'}
+  );
+  assert.deepEqual(validateFeInput(grouped),{valid:true,errors:[]});
+  const escaped=structuredClone(grouped);
+  escaped.exactFiles.push({path:'src/SharedModalBranch.tsx',beforeSha256:`sha256:${'d'.repeat(64)}`,ownerRef:'modal://SharedModalBranch'});
+  assert.match(validateFeInput(escaped).errors.join('\n'),/owned above the mutable layout ceiling/);
 });

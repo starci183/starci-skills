@@ -1,4 +1,5 @@
-version: 7.2.1
+version: 7.5.0-alpha.1
+grammarContractVersion: 7.4.0
 debug: true
 aiBrainstormModel: gpt-5.6-sol
 aiBrainstormCount: 1
@@ -8,4 +9,15 @@ visualReviewModel: gpt-5.6-sol
 visualReviewCount: 1
 visualReviewIsolation: fresh
 visualReviewForkTurns: none
-visualReviewMaxRounds: 3
+visualReviewNoProgressLimit: 3
+localRuntimeOwnership: centralized-task
+localRuntimeControlPlane: control-panel
+localFrontendUrl: http://localhost:3000
+localApiUrl: http://localhost:3001
+localIdentityUrl: http://localhost:8080
+featureTaskRuntimeMutation: forbidden
+localRuntimeRegistry: .worktrees/sessions/central-runtime/owner.json
+localUatBrowserOwnership: centralized-lease
+localUatBrowserControlPlane: control-panel
+localUatBrowserLeaseRegistry: .worktrees/sessions/central-uat-browser/leases
+featureTaskCredentialHandling: forbidden

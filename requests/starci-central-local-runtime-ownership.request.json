@@ -1,0 +1,50 @@
+{
+  "$schema": "./request.schema.json",
+  "schemaVersion": 1,
+  "id": "starci-central-local-runtime-ownership",
+  "kind": "frontend-feedback-upgrade",
+  "status": "resolved",
+  "project": "starci-academy",
+  "targetOwners": [
+    "starci-runtime"
+  ],
+  "need": "Local StarCi FE, API, and identity services must have one Control-Panel-delegated runtime-owner task. Every feature, audit, quality, and UAT task consumes the same localhost:3000, localhost:3001, and localhost:8080 runtime and communicates health or recovery needs to that owner instead of claiming ports, replacing processes, or rebinding server environment for its UAT account.",
+  "negativeBoundary": "Do not serialize all feature work merely because the runtime is shared, centralize feature source ownership, store credentials in the runtime registry, let the runtime task mutate product source, or treat a listening port alone as a ready receipt. Account and fixture isolation remain per UAT run and Browser session.",
+  "acceptanceCriteria": [
+    "Runtime configuration declares centralized-task ownership, Control Panel authority, canonical localhost endpoints, a local-only owner registry, and forbidden feature-task process mutation.",
+    "A schema-validated local registry identifies exactly one owner thread generation, state, canonical endpoints, health evidence, and update time without credentials.",
+    "Frontend and UAT guidance forbid feature tasks from starting, stopping, restarting, replacing, killing, or claiming shared listeners and route recovery requests to the registered runtime owner.",
+    "UAT account isolation uses account and Browser-session boundaries against the shared runtime rather than per-feature API processes or server-environment rebinding.",
+    "Executable regression coverage rejects non-localhost registry endpoints and incomplete owner identity while accepting the canonical centralized runtime contract."
+  ],
+  "feedbackSessions": [
+    {
+      "fingerprint": "sha256:a9a82ea78397b8b3d1574f8cd5e30f250002b4e54e37e2060c5c61049db72337",
+      "sourceSkillId": "starci-frontend-maintenance-apply",
+      "evidenceSha256": "sha256:c39b30c4eed0cd1b5d0cbaf4ce3287a46c22ca2343752748da2f752680d683d2",
+      "accepts": [
+        "Use one dedicated runtime task created by the Control Panel for FE 3000, API 3001, and identity 8080.",
+        "Make every feature task communicate runtime needs to that task while continuing to isolate its own UAT account and Browser session.",
+        "Keep shared runtime lifecycle separate from feature source, audit, and business ownership."
+      ],
+      "rejects": [
+        "Treat Community, Playground, Dashboard, or another feature task as owner of localhost:3001.",
+        "Pause or replace another feature because each task assumes it needs a private API process.",
+        "Restart shared servers or rewrite server environment merely to switch the active UAT account."
+      ],
+      "targetOwners": [
+        "starci-runtime"
+      ],
+      "proofStatus": "proven"
+    }
+  ],
+  "review": {
+    "decision": "approved",
+    "priority": "urgent",
+    "evidenceSha256": "sha256:c39b30c4eed0cd1b5d0cbaf4ce3287a46c22ca2343752748da2f752680d683d2",
+    "targetOwners": [
+      "starci-runtime"
+    ],
+    "rationale": "Owner correction and the observed Playground/Community port-conflict pause prove a systemic runtime-ownership gap. Central ownership preserves shared service continuity while allowing isolated feature UAT sessions."
+  }
+}

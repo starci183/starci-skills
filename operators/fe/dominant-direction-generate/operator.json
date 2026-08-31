@@ -1,0 +1,16 @@
+{
+  "schemaVersion": 7,
+  "id": "fe/dominant-direction-generate",
+  "domain": "fe",
+  "job": "generate one dominant reconstruction direction and visible construction contract",
+  "inputSchema": "input.schema.json",
+  "outputSchema": "output.schema.json",
+  "contextRefs": ["fe.ui"],
+  "sourceReferenceRefs": [],
+  "sideEffects": ["creates one inspectable presentation-only visualize artifact"],
+  "stopConditions": [
+    "the frozen owner boundary cannot contain the reconstruction",
+    "business authority or product-family signatures are missing",
+    "the direction lacks wide, compact, or material-state proof"
+  ]
+}

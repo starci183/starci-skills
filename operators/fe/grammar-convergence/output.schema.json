@@ -29,7 +29,8 @@
           "description": "Legacy semantic result consumed only by the Skill machine.",
           "enum": [
             "converged",
-            "refused"
+            "grammar-gap",
+            "blocked"
           ]
         },
         "result": {
@@ -40,7 +41,8 @@
               "additionalProperties": false,
               "required": [
                 "summary",
-                "artifactRefs"
+                "artifactRefs",
+                "grammarDecisionManifest"
               ],
               "properties": {
                 "summary": {
@@ -55,7 +57,8 @@
                     "type": "string",
                     "minLength": 1
                   }
-                }
+                },
+                "grammarDecisionManifest": { "type": "object" }
               }
             },
             {

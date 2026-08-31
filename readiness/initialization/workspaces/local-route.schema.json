@@ -42,7 +42,18 @@
           "pattern": "^https://github\\.com/[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+(?:\\.git)?$"
         },
         "branch": { "type": "string", "minLength": 1, "maxLength": 255 },
-        "head": { "type": "string", "pattern": "^[0-9a-f]{40}$" }
+        "head": { "type": "string", "pattern": "^[0-9a-f]{40}$" },
+        "gitPolicy": { "$ref": "#/$defs/gitPolicy" }
+      }
+    },
+    "gitPolicy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["mutationBranch", "worktreeBranches", "incomingBranchRefs"],
+      "properties": {
+        "mutationBranch": { "type": "string", "minLength": 1, "maxLength": 255 },
+        "worktreeBranches": { "const": "forbidden" },
+        "incomingBranchRefs": { "const": "merge-into-mutation-branch" }
       }
     },
     "commonContext": {

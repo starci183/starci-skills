@@ -24,7 +24,11 @@ const semantic = (value) => {
   if (new Set(ledgerRefs).size !== ledgerRefs.length) errors.push('$.output.result.findingLedger: duplicate findingRef values are forbidden');
   if (new Set(ledgerFingerprints).size !== ledgerFingerprints.length) errors.push('$.output.result.findingLedger: duplicate finding fingerprints are forbidden');
   if (JSON.stringify(refs) !== JSON.stringify(ledgerRefs)) errors.push('$.output.result.ownerAssessments: must cover the complete finding ledger in exact order');
-  if (result?.visualRound?.number === 3 && outcome !== 'blocked') errors.push('$.output.outcome: round 3 findings must trip the circuit breaker and block');
+  if (outcome === 'blocked' && owners.length > 0) errors.push('$.output.outcome: a classified owner is routable and cannot be converted to blocked');
+  if (outcome === 'blocked' && value.output.gaps.length === 0) errors.push('$.output.gaps: blocked requires an exact non-routable gap');
+  if (outcome === 'business-required' && value.output.handoff?.skillId !== 'starci-business-process') errors.push('$.output.handoff.skillId: business-required must CALL starci-business-process');
+  if (outcome === 'backend-required' && value.output.handoff?.skillId !== 'starci-backend-process') errors.push('$.output.handoff.skillId: backend-required must CALL starci-backend-process');
+  if (!['business-required','backend-required'].includes(outcome) && value.output.handoff !== null) errors.push('$.output.handoff: only cross-domain outcomes may carry a handoff');
   return errors;
 };
 export const validateOutput=validatorFor(new URL('./output.schema.json',import.meta.url), semantic);

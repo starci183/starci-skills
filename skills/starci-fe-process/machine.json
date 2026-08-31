@@ -170,7 +170,7 @@
               "outcome": "passed"
             }
           },
-          "target": "ui-audit"
+          "target": "grammar-audit"
         },
         {
           "when": {
@@ -178,7 +178,7 @@
               "outcome": "findings"
             }
           },
-          "target": "ui-audit"
+          "target": "grammar-audit"
         },
         {
           "when": {
@@ -220,6 +220,15 @@
         }
       ]
     },
+    "grammar-audit": {
+      "kind": "operator",
+      "ref": "fe/grammar-convergence",
+      "on": [
+        { "when": { "outputEquals": { "outcome": "converged" } }, "target": "ui-audit" },
+        { "when": { "outputEquals": { "outcome": "grammar-gap" } }, "target": "blocked" },
+        { "when": { "outputEquals": { "outcome": "blocked" } }, "target": "blocked" }
+      ]
+    },
     "classify": {
       "kind": "operator",
       "ref": "fe/authority-gap-classify",
@@ -230,7 +239,7 @@
               "outcome": "dominant"
             }
           },
-          "target": "freeze"
+          "target": "grammar-bind"
         },
         {
           "when": {
@@ -359,6 +368,15 @@
         }
       ]
     },
+    "grammar-bind": {
+      "kind": "operator",
+      "ref": "fe/grammar-convergence",
+      "on": [
+        { "when": { "outputEquals": { "outcome": "converged" } }, "target": "freeze" },
+        { "when": { "outputEquals": { "outcome": "grammar-gap" } }, "target": "blocked" },
+        { "when": { "outputEquals": { "outcome": "blocked" } }, "target": "blocked" }
+      ]
+    },
     "apply": {
       "kind": "operator",
       "ref": "fe/source-apply",
@@ -451,7 +469,7 @@
               "outcome": "repair"
             }
           },
-          "target": "finding-classify"
+          "target": "score-route"
         },
         {
           "when": {
@@ -459,6 +477,72 @@
               "outcome": "blocked"
             }
           },
+          "target": "blocked"
+        }
+      ]
+    },
+    "score-route": {
+      "kind": "operator",
+      "ref": "fe/audit-route",
+      "on": [
+        {
+          "when": { "outputEquals": { "outcome": "repair" } },
+          "target": "finding-classify"
+        },
+        {
+          "when": { "outputEquals": { "outcome": "reconstruct" } },
+          "target": "dominant-generate"
+        },
+        {
+          "when": { "outputEquals": { "outcome": "shared-authority-required" } },
+          "target": "finding-classify"
+        },
+        {
+          "when": { "outputEquals": { "outcome": "business-required" } },
+          "target": "business-handoff"
+        },
+        {
+          "when": { "outputEquals": { "outcome": "backend-required" } },
+          "target": "backend-handoff"
+        },
+        {
+          "when": { "outputEquals": { "outcome": "session-recovery" } },
+          "target": "session-continuity"
+        },
+        {
+          "when": { "outputEquals": { "outcome": "authorization-required" } },
+          "target": "mutation-choice"
+        },
+        {
+          "when": { "outputEquals": { "outcome": "blocked" } },
+          "target": "blocked"
+        }
+      ]
+    },
+    "session-continuity": {
+      "kind": "operator",
+      "ref": "fe/session-continuity",
+      "on": [
+        {
+          "when": { "outputEquals": { "outcome": "recovered" } },
+          "target": "capture-preflight"
+        },
+        {
+          "when": { "outputEquals": { "outcome": "blocked" } },
+          "target": "blocked"
+        }
+      ]
+    },
+    "dominant-generate": {
+      "kind": "operator",
+      "ref": "fe/dominant-direction-generate",
+      "on": [
+        {
+          "when": { "outputEquals": { "outcome": "generated" } },
+          "target": "grammar-bind"
+        },
+        {
+          "when": { "outputEquals": { "outcome": "blocked" } },
           "target": "blocked"
         }
       ]
@@ -550,6 +634,14 @@
             }
           },
           "target": "backend-handoff"
+        },
+        {
+          "when": {
+            "outputEquals": {
+              "outcome": "authorization-required"
+            }
+          },
+          "target": "mutation-choice"
         },
         {
           "when": {
@@ -779,7 +871,7 @@
               "resume.resumeState": "direction-choice"
             }
           },
-          "target": "freeze"
+          "target": "grammar-bind"
         },
         {
           "when": {

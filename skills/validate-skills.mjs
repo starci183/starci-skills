@@ -180,7 +180,7 @@ function assertOpenAiInterface(skillId, skillDir) {
 }
 
 const catalog = readJson(path.join(root, 'catalog.json'));
-if (catalog.schemaVersion !== 7 || catalog.systemVersion !== '7.2.1') fail('catalog must be v7.2.1');
+if (catalog.schemaVersion !== 7 || catalog.systemVersion !== '7.5.0-alpha.1') fail('catalog must be v7.5.0-alpha.1');
 if (catalog.skills.length !== 13) fail(`v7 catalog must expose 13 skills, found ${catalog.skills.length}`);
 const catalogIds = catalog.skills.map((entry) => entry.id);
 if (new Set(catalogIds).size !== catalogIds.length) fail('catalog skill IDs must be unique');

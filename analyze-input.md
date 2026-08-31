@@ -25,6 +25,15 @@ For Git, source, browser-to-source, business, UAT, session, or debt work:
 5. Never substitute the Source root, current directory, nearby clone, or browser hostname.
 6. Ask one focused route question only when two unresolved identities would change the mutation target.
 
+For browser-visible work, resolve the host surface from `request-vocabulary.md` before selecting a
+browser capability. `Trong phiên này`, `ở trong này`, and `side panel` explicitly select the current
+task's in-app browser panel, even when `Chrome` is used colloquially in the same request. External
+Chrome requires an external-host qualifier such as `Chrome ngoài`, an already-open Chrome tab, or the
+Chrome extension. Never replace a requested in-session panel with extension diagnostics. Deterministic
+normalization and precedence are bound by `runtime/browser-surface.mjs`. Frontend UI audit, render,
+interaction test, and visual proof default to the current task's in-app browser panel when no external
+host is explicitly requested.
+
 ## Scope-clarity guard
 
 Before Skill selection, compile the multidimensional mission `scope` required by `scope.yaml`. Freeze
@@ -42,9 +51,18 @@ For every frontend UX/UI request, add exactly one `frontend.ux-ui.change-level` 
 - `reconstruct`: an existing experience may be structurally built again; or
 - `new`: an approved experience that does not exist may be created.
 
-This dimension is only one conditional part of scope. Generic verbs such as `audit`, `redesign`,
-`improve`, `fix UI`, or `làm lại` do not resolve it by themselves. If active wording and durable
-authority do not prove exactly one value, ask before selecting `starci-fe-process`.
+This dimension is only one conditional part of scope. An audit-to-target request such as audit to
+PASS or 9+ freezes `reconstruct` within the separately frozen direct owner group unless the user
+explicitly says refine/read-only inspection. Generic verbs such as `redesign`, `improve`, `fix UI`, or
+`làm lại` do not otherwise resolve it by themselves. If active wording and durable authority do not
+prove exactly one value, ask before selecting `starci-fe-process`.
+
+Also freeze exactly one `frontend.layout.owner-ceiling` dimension. `surface-only` permits only the
+named surface owner; `surface-and-nested-layouts` additionally permits only the explicitly included
+page-local or route-nested layout owners; `ancestor-layouts-authorized` permits named higher layout
+owners only when the active request explicitly grants that authority. Parent shells, global headers,
+navigation, and other ancestors may be observed as render context without becoming mutable. Record
+every non-mutable ancestor in `exclusionRefs`; never inspect source to silently widen this ceiling.
 
 ## Mission-owner selection
 
@@ -76,9 +94,9 @@ outcome, challenge weaker methods with evidence, and take a stronger reversible 
 dominates within scope. Do not ask for confirmation between routine states.
 
 Ask one focused question only when unresolved alternatives would materially change product authority,
-the exact project/source, destructive or external effects, or the outcome itself. A frontend visual
-choice is asked only after the Skill proves that no direction dominates, visibly renders three or four
-materially different directions, and recommends one.
+the exact project/source, destructive or external effects, or the outcome itself. For a frontend visual
+direction, render and apply one dominant direction by default. Ask for a visual choice only when the
+user explicitly requests alternatives; then render three or four material directions and recommend one.
 
 ## Selection envelope
 

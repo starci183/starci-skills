@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://starci.dev/v7.2.1/operators/fe/capture-preflight/output.schema.json",
+  "$id": "https://starci.dev/v7.5.0-alpha.1/operators/fe/capture-preflight/output.schema.json",
   "type": "object",
   "additionalProperties": false,
   "required": ["schemaVersion", "operatorId", "output"],
@@ -29,7 +29,7 @@
                   "type": "object",
                   "additionalProperties": false,
                   "required": ["number", "purpose"],
-                  "properties": { "number": { "type": "integer", "minimum": 1, "maximum": 3 }, "purpose": { "enum": ["discovery", "verification", "regression"] } }
+                  "properties": { "number": { "type": "integer", "minimum": 1 }, "purpose": { "enum": ["discovery", "verification", "regression"] } }
                 },
                 "matrixRef": { "type": "string", "pattern": "^matrix://[a-z0-9][a-z0-9._/-]*$" },
                 "matrixFingerprint": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },

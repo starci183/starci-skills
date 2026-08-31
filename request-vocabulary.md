@@ -46,6 +46,27 @@ user wording or authorize a broader task.
 | `riêng`, `chỉ`, `tập trung`, `kệ phần trước` | Narrow or replace the active scope with the named target. |
 | `cái khác`, `ở phần khác` | A separate target whose identity must come from explicit nearby context; clarify if more than one candidate remains. |
 
+## Browser surface qualifiers
+
+The requested host surface is distinct from a browser-family noun. A qualifier that names where the
+browser must appear controls the tool surface; do not discard it because the same sentence casually
+uses `Chrome` to mean a browser.
+
+| Wording | Normalized surface | Boundary rule |
+| --- | --- | --- |
+| `trong phiên này`, `ở trong này`, `trong side panel`, `ở panel bên`, `browser trong phiên` | Codex in-app browser in the current task panel | Open or reveal the URL in the current task's in-app browser panel. Do not diagnose, install, or switch to the external Chrome extension. |
+| `Chrome ngoài`, `tab Chrome đang mở`, `Chrome extension`, `browser ngoài` | External Chrome browser | Use the connected Chrome surface; if unavailable, report its connection requirement without substituting the in-app browser. |
+
+When a request contains both a browser-family word and an explicit host qualifier, the host qualifier
+wins: `mở Chrome ở side panel này` means the in-app browser because `side panel này` identifies the
+delivery surface. Ambient browser context alone never selects a surface. If neither an in-session nor
+an external-host qualifier is present and the family noun is genuinely material, follow the explicit
+browser-family request or ask one focused question when the wording conflicts.
+
+For StarCi UI audit, render, interaction test, and visual proof, the default delivery surface is the
+current task's in-app browser panel. External Chrome is never inferred from an authenticated-looking
+screenshot or an earlier Chrome mention; it requires a current explicit external-host request.
+
 ## Action and completion words
 
 | Wording | Normalized meaning |
@@ -53,8 +74,8 @@ user wording or authorize a broader task.
 | `phân tích`, `xem thử`, `diagnose`, `report only` | Read-only diagnosis or comparison unless mutation is separately requested. |
 | `audit <frontend target>` | Route to `starci-fe-process` with `intent=audit` only after exactly one UX/UI change level is frozen; observe critically, repair inside that level, independently review, and close quality/UAT unless the request explicitly says report-only. |
 | `sửa`, `làm`, `implement`, `code` | Mutate the authorized source boundary and verify proportionally. |
-| `redesign` for a page | Does not determine the UX/UI change level alone. If the request authorizes structural rebuilding of an existing page, bind `reconstruct`; if layout may be locked, ask. When the direction is not already approved, render three or four materially different realistic UI directions through `visualize` before asking for selection. |
-| `redesign` for a feature or `nhánh` | Does not determine the UX/UI change level alone. After `reconstruct` is authorized, rework the closed journey and applicable surface family; otherwise ask before widening beyond element-level work. An unresolved direction choice requires three or four rendered journey/surface directions, not prose-only options. |
+| `redesign` for a page | Does not determine the UX/UI change level alone. If the request authorizes structural rebuilding of an existing page, bind `reconstruct`; if layout may be locked, ask. When the direction is not already approved, render and apply one dominant realistic UI direction through `visualize`; render three or four choices only when the user explicitly requests alternatives. |
+| `redesign` for a feature or `nhánh` | Does not determine the UX/UI change level alone. After `reconstruct` is authorized, rework the closed journey and applicable surface family; otherwise ask before widening beyond element-level work. Use one rendered journey/surface direction by default; alternatives require an explicit comparison request. |
 | `redesign` for architecture, workflow or another technical boundary | Preserve approved outcomes and authority, generate three or four material alternatives, and render the decision-relevant boundaries, flows, failure/recovery and trade-offs through `visualize` before selection. |
 | `render`, `vẽ`, `cho xem UI`, `in ra UX UI` | Produce an inspectable visual; prose or a contract alone is insufficient. |
 | `hoàn thiện`, `đóng`, `đóng luôn`, `finish` | Carry the declared scope through its required workflow and proof gates; it does not waive gates or widen authority. |
@@ -80,6 +101,17 @@ inspection. The complete authority is `knowledge/ux-ui-change-levels.md`.
 that excludes the other levels. Ask one focused question naming the plausible boundaries rather than
 silently choosing.
 
+Every frontend UX/UI request also resolves one independent `frontend.layout.owner-ceiling`:
+
+| Wording | Normalized ceiling | Mutation boundary |
+| --- | --- | --- |
+| `chỉ page`, `surface only` | `surface-only` | Mutate only the named page/surface owner. |
+| `page và layout nested`, `không layout cao hơn` | `surface-and-nested-layouts` | Mutate the page plus explicitly named page-local or route-nested layouts; higher shells remain observation-only exclusions. |
+| `sửa cả parent shell/layout`, `ancestor layouts included` | `ancestor-layouts-authorized` | Mutate only the explicitly named ancestor layouts in addition to the target; proximity or visual influence is not authorization. |
+
+Rendered context never widens ownership. A defect that appears to originate above the frozen owner
+ceiling is an authority gap or blocker for this mission, not permission to edit the parent shell.
+
 ## Common cross-domain ambiguities
 
 | Term | Plausible meanings | Resolution |
@@ -97,7 +129,7 @@ silently choosing.
 Keep the following task-session-only facts before selecting a skill or doing unskilled work:
 
 - `scopeUnit`: umbrella, domain, feature, branch, journey, flow, surface, block, component, state or case;
-- `dimensions`: every material conditional scope dimension; for frontend UX/UI this includes `frontend.ux-ui.change-level=refine|reconstruct|new`;
+- `dimensions`: every material conditional scope dimension; for frontend UX/UI this includes both `frontend.ux-ui.change-level=refine|reconstruct|new` and `frontend.layout.owner-ceiling=surface-only|surface-and-nested-layouts|ancestor-layouts-authorized`;
 - `targetSet`: exact named targets and the minimal closed related set;
 - `surfaceRoles`: applicable entry, task, pending/recovery, result, history/retry/resume and exit roles;
 - `exclusions`: explicit replacements, deferrals and out-of-scope areas;

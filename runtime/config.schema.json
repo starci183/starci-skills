@@ -4,6 +4,7 @@
   "additionalProperties": false,
   "required": [
     "version",
+    "grammarContractVersion",
     "debug",
     "aiBrainstormModel",
     "aiBrainstormCount",
@@ -13,10 +14,22 @@
     "visualReviewCount",
     "visualReviewIsolation",
     "visualReviewForkTurns",
-    "visualReviewMaxRounds"
+    "visualReviewNoProgressLimit",
+    "localRuntimeOwnership",
+    "localRuntimeControlPlane",
+    "localFrontendUrl",
+    "localApiUrl",
+    "localIdentityUrl",
+    "featureTaskRuntimeMutation",
+    "localRuntimeRegistry",
+    "localUatBrowserOwnership",
+    "localUatBrowserControlPlane",
+    "localUatBrowserLeaseRegistry",
+    "featureTaskCredentialHandling"
   ],
   "properties": {
-    "version": { "const": "7.2.1" },
+    "version": { "const": "7.5.0-alpha.1" },
+    "grammarContractVersion": { "const": "7.4.0" },
     "debug": { "type": "boolean" },
     "aiBrainstormModel": { "const": "gpt-5.6-sol" },
     "aiBrainstormCount": { "const": 1 },
@@ -26,6 +39,20 @@
     "visualReviewCount": { "const": 1 },
     "visualReviewIsolation": { "const": "fresh" },
     "visualReviewForkTurns": { "const": "none" },
-    "visualReviewMaxRounds": { "const": 3 }
+    "visualReviewNoProgressLimit": {
+      "description": "Block only after this many consecutive identical progress fingerprints, never after an absolute round count.",
+      "const": 3
+    },
+    "localRuntimeOwnership": { "const": "centralized-task" },
+    "localRuntimeControlPlane": { "const": "control-panel" },
+    "localFrontendUrl": { "const": "http://localhost:3000" },
+    "localApiUrl": { "const": "http://localhost:3001" },
+    "localIdentityUrl": { "const": "http://localhost:8080" },
+    "featureTaskRuntimeMutation": { "const": "forbidden" },
+    "localRuntimeRegistry": { "const": ".worktrees/sessions/central-runtime/owner.json" },
+    "localUatBrowserOwnership": { "const": "centralized-lease" },
+    "localUatBrowserControlPlane": { "const": "control-panel" },
+    "localUatBrowserLeaseRegistry": { "const": ".worktrees/sessions/central-uat-browser/leases" },
+    "featureTaskCredentialHandling": { "const": "forbidden" }
   }
 }

@@ -21,7 +21,28 @@ One feature/flow owns exactly `.worktrees/uat/<feature>/<flow>/snapshot.json` an
 
 ## Declared sequential execution
 
-Before any product action, publish the case ID, run ID, account or anonymous identity, fixture namespace, precondition, expected outcome, Browser session, and execution order. Each case-run provisions a new logical account when applicable and owns a unique agent, authenticated browser context, origin, mailbox/query namespace, mutable fixture namespace, artifact directory, and resource locks. Reruns never reuse accounts. Anonymous entry explicitly records no account; a registration journey creates its own outcome account. Execute one case at a time on the user-visible Browser in the declared order. A browser tab is not authenticated isolation unless the run proves clean storage, cookies and autofill. Resource classes remain coordination metadata; they never authorize simultaneous visible-browser cases.
+Before any product action, publish the case ID, run ID, account or anonymous identity, fixture namespace, precondition, expected outcome, Browser session lease, and execution order. One canonical mission provisions one fresh logical account when applicable and owns an exclusive authenticated Browser context, origin, principal fingerprint, runtime generation, mailbox/query namespace, mutable fixture namespace, artifact directory, and resource locks. Audit, repair, recapture, quality, and UAT rounds reuse this leased account/context. A new account is required only for a new product case whose precondition requires reset or after proven continuity loss; a visual recapture is not a new case-run. Anonymous entry explicitly records no account; a registration journey creates its own outcome account. Execute one authenticated Browser lease at a time on the user-visible Browser in the declared order. A browser tab is not authenticated isolation unless the lease proves clean storage, cookies and autofill. Resource classes remain coordination metadata; they never authorize simultaneous visible-browser cases.
+
+For an authenticated feature, obtain the mission-scoped Browser lease and provision the fresh
+run-scoped account before any Browser authentication action. The feature task consumes the opaque
+lease and never owns raw credentials, cookies, OTPs, tabs, or authentication storage. Use the declared
+environment's local or provider-native provisioner only when its mutation is authorized, keep
+credentials in secure configuration, and expose only opaque `account://fresh/...` and
+`browser-lease://...` evidence references. A personal/owner account, a deterministic account reused
+from an earlier run, an inherited signed-in browser, or a signed-out skeleton is not UAT identity
+evidence. If provisioning authority or secrets are unavailable, return the exact blocker; do not ask
+the user to lend personal credentials as a substitute. Anonymous proof is valid only when the frozen
+case explicitly declares `anonymous://explicit/...`.
+
+Local UAT consumes the one Control-Panel-delegated runtime at FE `localhost:3000`, API
+`localhost:3001`, and identity `localhost:8080`. A case owns its account, Browser context, fixtures,
+and artifacts; it never owns a listener or server process. Do not restart API/FE, replace server
+environment, or request a per-feature port merely to change authenticated identity. Concurrent UAT
+identities use isolated Browser sessions against the same runtime. Before each authenticated capture,
+verify the lease origin, principal fingerprint, runtime generation, and expiry. On mismatch,
+invalidate only affected evidence and reacquire the lease; never restart FE or API to repair identity.
+When runtime health fails, report the probe and request recovery from the centralized runtime task;
+do not kill another task's PID.
 
 ## Fixture law
 
@@ -29,6 +50,6 @@ Lifecycle is `constraint preflight → prepare → product execute → verify �
 
 ## Feedback and finality
 
-User feedback is append-only and bound to source plus authority revision. Behavior and UX may be proved even when UI detail is incomplete. UI evaluates `fe.ui` and Grammar Common plus the selected Grammar independently. A contradiction to either authority is `FAIL` even when the other authority is incomplete. `SUSPENSE` belongs only to UI and only when neither authority is violated but a finite render choice remains missing or conflicting. It closes only after user decision, smallest authority promotion, source repair when needed, and a fresh run. `REQUIRE_USER_ACTION` is a non-pass pause for one exact manual action with completion evidence and a resume command; it is neither a defect nor authority uncertainty. Resumption appends to the same resumable leased run, or starts a fresh immutable run when continuity is lost.
+User feedback is append-only and bound to source plus authority revision. Behavior and UX may be proved even when UI detail is incomplete. UI evaluates `fe.ui` and Grammar Common plus the selected Grammar independently. A contradiction to either authority is `FAIL` even when the other authority is incomplete. `SUSPENSE` belongs only to UI and only when neither authority is violated but a finite render choice remains missing or conflicting. It closes only after user decision, smallest authority promotion, source repair when needed, and a fresh run. `REQUIRE_USER_ACTION` is a non-pass pause for one exact manual action with completion evidence and a resume command; it is neither a defect nor authority uncertainty. Sensitive authentication uses the Browser's secure auth mechanism instead of a chat confirmation loop. Never end a turn while holding a temporary credential or OTP challenge. Resumption appends to the same resumable leased run, or starts a fresh immutable run only when continuity is proven lost.
 
 Root causes deduplicate only when authority, semantic owner, causal mechanism, corrective action, and source boundary match. One writer repairs a root cause. Retest the discovering checkpoint, complete recovery path, all known occurrences, and canonical happy smoke. Final pass requires read-only result verification, scoped cleanup, no open hard findings, no open feedback correction, and no SUSPENSE.

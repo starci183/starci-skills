@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://starci.dev/v7.2.1/operators/fe/capture-preflight/input.schema.json",
+  "$id": "https://starci.dev/v7.5.0-alpha.1/operators/fe/capture-preflight/input.schema.json",
   "type": "object",
   "additionalProperties": false,
   "required": ["schemaVersion", "operatorId", "context", "input"],
@@ -26,12 +26,12 @@
       "properties": {
         "targetRef": { "description": "One closed frontend target.", "type": "string", "minLength": 1 },
         "round": {
-          "description": "Bounded visual round and its fixed purpose.",
+          "description": "Visual round and its fixed purpose; later regression-attack rounds remain legal while progress continues.",
           "type": "object",
           "additionalProperties": false,
           "required": ["number", "purpose"],
           "properties": {
-            "number": { "type": "integer", "minimum": 1, "maximum": 3 },
+            "number": { "type": "integer", "minimum": 1 },
             "purpose": { "enum": ["discovery", "verification", "regression"] }
           }
         },

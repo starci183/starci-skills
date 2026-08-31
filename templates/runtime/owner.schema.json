@@ -1,0 +1,39 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://starci.dev/v7/runtime/central-local-owner.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "$schema",
+    "schemaVersion",
+    "ownerThreadId",
+    "generation",
+    "status",
+    "endpoints",
+    "healthEvidenceRefs",
+    "updatedAt"
+  ],
+  "properties": {
+    "$schema": { "const": "./owner.schema.json" },
+    "schemaVersion": { "const": 1 },
+    "ownerThreadId": { "type": "string", "minLength": 1 },
+    "generation": { "type": "integer", "minimum": 1 },
+    "status": { "enum": ["starting", "ready", "degraded", "stopped"] },
+    "endpoints": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["frontend", "api", "identity"],
+      "properties": {
+        "frontend": { "const": "http://localhost:3000" },
+        "api": { "const": "http://localhost:3001" },
+        "identity": { "const": "http://localhost:8080" }
+      }
+    },
+    "healthEvidenceRefs": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": { "type": "string", "minLength": 1 }
+    },
+    "updatedAt": { "type": "string", "format": "date-time" }
+  }
+}
