@@ -3,8 +3,9 @@
 | Field | Value |
 | --- | --- |
 | Knowledge ID | `fe.grammar-core-overview` |
+| Contract revision | `7.6.0` |
 | Package | `@starci/grammar/core` |
-| Operators | `grammar-convergence` |
+| Operators | `fe/authority-reconcile` |
 | Search tags | `core, calm, trustworthy, operational, information dense, routing` |
 | Dependencies | `fe.grammar-common-overview` |
 
@@ -30,6 +31,8 @@ Load named cases only when their trigger matches:
 
 Load semantic patterns when their trigger matches:
 
+- Core body typography and semantic priority: `fe.grammar-core-typography`.
+- Page/content inset and peer-card rhythm: `fe.grammar-core-pattern-page-container`.
 - Eyebrow, contextual heading, and muted supporting copy: `fe.grammar-core-pattern-context-intro`.
 - Complementary right rail with owned inset and optional sticky lifecycle: `fe.grammar-core-pattern-right-rail`.
 

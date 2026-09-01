@@ -1,20 +1,31 @@
-# UI testing as a real user
+# Frontend product UAT guidance
 
 | Field | Value |
 | --- | --- |
 | Knowledge ID | `fe.ui-testing` |
-| Operators | `test/ui` |
-| Search tags | `browser test, test account, real user, customer journey, accessibility, responsive, screenshot, trace` |
-| Dependencies | `fe.customer-journey, fe.layout-composition, fe.state-modeling, fe.product-seeding, fe.ui-quality-review` |
+| Contract revision | `7.6.0` |
+| Operators | `fe/capture-preflight, fe/render-capture` |
+| Search tags | `browser, UAT, final journey, authentication, responsive, persisted outcome` |
+| Dependencies | `fe.customer-journey, fe.state-modeling, fe.product-seeding, fe.product-proof` |
 
-## Record
+Product UAT is the final gate after latest-source blind UI PASS and final quality PASS. This record is
+journey-execution guidance; it does not create a test stage before review, mutate product source, or
+route a repair.
 
-UI proof opens the running application in a real browser and follows the selected customer journey with a declared test account as an ordinary user. Direct database mutation, internal route shortcuts, DOM scripting that bypasses controls, and authenticated storage injection are not user interaction and cannot prove the journey.
+Open the connected application in a real browser and follow the compiled journey as an ordinary user
+with the declared run-scoped account. Direct database mutation, internal route shortcuts, DOM
+scripting that bypasses controls, and authenticated storage injection are not user interaction and
+cannot prove the journey. Never expose secrets in logs, screenshots, traces, or artifacts.
 
-Start from the public entry route. Sign in through the visible authentication surface unless a declared reusable authenticated setup is itself part of the product test contract. Navigate, type, select, submit, recover, sign out, and revisit through user-visible controls. Never expose secret values in logs, screenshots, traces, or output artifacts.
+Start from the approved public entry. Navigate, type, select, submit, recover, sign out/re-enter when
+applicable, refresh/resume, and reach the meaningful persisted terminal only through user-visible
+controls. Validate every required populated, pending, validation, denied, error, recovery, and result
+state across the declared responsive owners; do not rerun the blind aesthetic review inside UAT.
 
-Before journey proof, require a fresh `test/ui-quality-audit` pass receipt for the same route, target set, viewports, browser build, source revision, and knowledge generation. This record owns journey behavior only; `fe.ui-quality-review` is the single authority for product-neutral accessibility, interaction, responsive, motion, form, visual-stability, and data-presentation rules. Never re-evaluate or restate those rules here.
-
-For each page and required state, capture journey-specific user-visible assertions plus wide, intermediate, and compact evidence. Verify the approved route sequence, business-state transitions, recovery path, progress, and final persisted outcome. Evidence includes the consumed UI-quality receipt, scenario result, sanitized trace, screenshots, console/network failures, and the exact source and seed hashes.
-
-If the app cannot start, the account is absent or unsafe, authentication fails before the scenario, or a required state cannot be reached normally, return blocked. If code violates the approved direction inside its boundary, return an in-boundary repair. If correction changes layout, ownership, responsive transformation, or source boundary, return to the existing layout approval checkpoint.
+Evidence includes the final quality receipt, scenario/fixture identity, sanitized interaction trace,
+screenshots, console/network failures, persisted outcome, and exact FE/BE/runtime/source fingerprints.
+The result is typed `PASS`, `FAIL`, or `BLOCKED`. UAT never writes product source. Canonical PASS
+returns to frontend completion. Fresh frontend-owned counterevidence may return one single-use typed
+handoff to the exact `reapply` resume state; the frontend caller—not UAT—reruns
+capture/preflight, blind review, Quality, and UAT. Replayed/unchanged findings, boundary drift, or a
+non-frontend owner return their exact typed exit.

@@ -56,7 +56,7 @@
           ],
           "properties": {
             "version": {
-              "const": "7.5.0-alpha.1"
+              "const": "7.6.0-beta.1"
             },
             "receiptId": {
               "type": "string",
@@ -133,7 +133,7 @@
           ],
           "properties": {
             "version": {
-              "const": "7.5.0-alpha.1"
+              "const": "7.6.0-beta.1"
             },
             "receiptId": {
               "type": "string",

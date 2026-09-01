@@ -1,6 +1,6 @@
 {
   "name": "starci-skills",
-  "version": "7.5.0-alpha.1",
+  "version": "7.6.0-beta.1",
   "private": true,
   "description": "Composable StarCi agent skills built from validated state machines, atomic operators, and exact default-search context.",
   "license": "MIT",
@@ -24,7 +24,7 @@
     "check:operator-v7-docs": "node migration/v7/document-operator-fields.mjs",
     "check:operator-v7-routes": "node migration/v7/route-machines-on-output.mjs --check",
     "check:requests": "node requests/validate-requests.mjs",
-    "check:operators": "npm run check:no-load-tables && npm run check:requests && node operators/validate-operators.mjs && node --test operators/fe-grammar-v74.spec.mjs operators/contract-v7.spec.mjs operators/conversation-contracts.spec.mjs operators/platform-contracts.spec.mjs operators/frontend-generation-v7.spec.mjs operators/frontend-post-change-screenshot-review.spec.mjs operators/architecture-visual-preview.spec.mjs operators/be-implementation.spec.mjs operators/business-model-challenge.spec.mjs operators/fe-interaction-container-decision.spec.mjs operators/fe-layout-visual-preview.spec.mjs operators/fe-mutation-acceptance.spec.mjs operators/fe-ui-direction-output-schema.spec.mjs operators/fe-ux-ui-resolve.spec.mjs operators/fe-strict-audit-v71.spec.mjs operators/tech-stack-contracts.spec.mjs operators/workflow-handoff.spec.mjs operators/mission-process-contracts.spec.mjs operators/fe-process-v7-missions.spec.mjs",
+    "check:operators": "npm run check:no-load-tables && npm run check:requests && node operators/validate-operators.mjs && node --test operators/fe-grammar-v74.spec.mjs operators/contract-v7.spec.mjs operators/conversation-contracts.spec.mjs operators/platform-contracts.spec.mjs operators/frontend-post-change-screenshot-review.spec.mjs operators/architecture-visual-preview.spec.mjs operators/be-implementation.spec.mjs operators/business-model-challenge.spec.mjs operators/fe-mutation-acceptance.spec.mjs operators/fe-ui-direction-output-schema.spec.mjs operators/fe-strict-audit-v71.spec.mjs operators/redesign-direction-visualization.spec.mjs operators/tech-stack-contracts.spec.mjs operators/workflow-handoff.spec.mjs operators/mission-process-contracts.spec.mjs operators/fe-process-v7-missions.spec.mjs",
     "audit:operators-v7": "node operators/contract-v7.mjs operators",
     "test:content": "node --test operators/content-generation.spec.mjs",
     "check:skills": "node skills/validate-skills.mjs",

@@ -43,6 +43,10 @@
                 "summary",
                 "artifactRefs",
                 "preflightRef",
+                "compiledRequestRef",
+                "compiledRequestFingerprint",
+                "sourceApplyReturnReceiptRef",
+                "aggregateAfterFingerprint",
                 "matrixRef",
                 "matrixFingerprint",
                 "partitionFingerprint",
@@ -68,13 +72,18 @@
                 "artifactRefs": {
                   "type": "array",
                   "uniqueItems": true,
-                  "maxItems": 64,
+                  "minItems": 1,
+                  "maxItems": 192,
                   "items": {
                     "type": "string",
                     "minLength": 1
                   }
                 },
                 "preflightRef": { "type": "string", "pattern": "^preflight://[0-9a-f]{64}$" },
+                "compiledRequestRef": { "type": "string", "pattern": "^compiled-request://" },
+                "compiledRequestFingerprint": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
+                "sourceApplyReturnReceiptRef": { "type": "string", "pattern": "^receipt:[A-Za-z0-9._-]+$" },
+                "aggregateAfterFingerprint": { "description": "Registered source-apply aggregate after-state inherited through preflight.", "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
                 "matrixRef": { "type": "string", "pattern": "^matrix://[a-z0-9][a-z0-9._/-]*$" },
                 "matrixFingerprint": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
                 "partitionFingerprint": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
@@ -85,12 +94,12 @@
                 "capturePartitionRefs": { "type": "array", "minItems": 1, "maxItems": 32, "uniqueItems": true, "items": { "type": "string", "pattern": "^partition://" } },
                 "reusedPartitionRefs": { "type": "array", "maxItems": 32, "uniqueItems": true, "items": { "type": "string", "pattern": "^partition://" } },
                 "sourceFingerprint": {
-                  "description": "Fingerprint of the source revision rendered by every matrix cell.",
+                  "description": "Derived alias of aggregateAfterFingerprint for the source revision rendered by every matrix cell.",
                   "type": "string",
                   "pattern": "^sha256:[0-9a-f]{64}$"
                 },
                 "latestMutationFingerprint": {
-                  "description": "Fingerprint of the most recent source mutation that this capture must follow.",
+                  "description": "Derived alias of aggregateAfterFingerprint for the registered source mutation this capture follows.",
                   "type": "string",
                   "pattern": "^sha256:[0-9a-f]{64}$"
                 },
@@ -279,44 +288,8 @@
           }
         },
         "handoff": {
-          "description": "Typed cross-domain continuation, only when the outcome requires it.",
-          "anyOf": [
-            {
-              "type": "object",
-              "additionalProperties": false,
-              "required": [
-                "skillId",
-                "missionRef",
-                "resumeState",
-                "inputRef"
-              ],
-              "properties": {
-                "skillId": {
-                  "enum": [
-                    "starci-business-process",
-                    "starci-backend-process",
-                    "starci-quality-assure",
-                    "starci-uat-verify"
-                  ]
-                },
-                "missionRef": {
-                  "type": "string",
-                  "minLength": 1
-                },
-                "resumeState": {
-                  "type": "string",
-                  "minLength": 1
-                },
-                "inputRef": {
-                  "type": "string",
-                  "minLength": 1
-                }
-              }
-            },
-            {
-              "type": "null"
-            }
-          ]
+          "description": "Always null; raster capture never owns routing or cross-domain continuation.",
+          "type": "null"
         }
       }
     }

@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import test from 'node:test';
 import { validateOutput as validateArchitectureAlternatives } from './architecture/alternatives/validate-output.mjs';
-import { validateInput as validateDirectionRankInput } from './fe/direction-rank/validate-input.mjs';
+import { validateInput as validateDirectionGenerateInput } from './fe/direction-generate/validate-input.mjs';
 
 const architectureOutput = () => ({
   schemaVersion: 7,
@@ -28,17 +28,28 @@ test('architecture redesign accepts only a three-or-four direction visualize com
   assert.equal(validateArchitectureAlternatives(proseOnly).valid, false);
 });
 
-test('frontend ranking cannot begin without the rendered HTML comparison', () => {
+test('frontend alternatives cannot begin without an author-once request and exact Grammar identity', () => {
   const valid = {
     schemaVersion: 7,
-    operatorId: 'fe/direction-rank',
-    context: { authorityRefs: ['authority://frozen'], evidenceRefs: ['artifact://workspace.html'], uiKnowledgeId: 'fe.ui' },
-    input: { targetRef: 'surface://workspace', directionSetRef: 'direction-set://workspace', visualArtifactRefs: ['artifact://workspace.html'], constraints: ['recommend exactly one'] },
+    operatorId: 'fe/direction-generate',
+    context: {
+      authorityRefs: ['authority://frozen'],
+      evidenceRefs: ['compiled-request://workspace', 'grammar-package://starci', 'grammar://workspace'],
+      uiKnowledgeId: 'fe.ui',
+    },
+    input: {
+      compiledRequestRef: 'compiled-request://workspace',
+      compiledRequestFingerprint: `sha256:${'b'.repeat(64)}`,
+      grammarBinding: { packageRef: 'grammar-package://starci', manifestRef: 'grammar://workspace', exportRefs: ['grammar://surface-card'], contentSha256: `sha256:${'c'.repeat(64)}`, authorityRevision: 'grammar-revision-1' },
+      targetRef: 'surface://workspace',
+      mode: 'alternatives',
+      constraints: ['material ambiguity remains after Grammar validation'],
+    },
   };
-  assert.deepEqual(validateDirectionRankInput(valid), { valid: true, errors: [] });
-  const proseOnly = structuredClone(valid);
-  proseOnly.input.visualArtifactRefs = [];
-  assert.equal(validateDirectionRankInput(proseOnly).valid, false);
+  assert.deepEqual(validateDirectionGenerateInput(valid), { valid: true, errors: [] });
+  const substituted = structuredClone(valid);
+  substituted.input.compiledRequestRef = 'compiled-request://other';
+  assert.equal(validateDirectionGenerateInput(substituted).valid, false);
 });
 
 test('global redesign law assigns domain-specific visual effort before choice', () => {
@@ -47,9 +58,9 @@ test('global redesign law assigns domain-specific visual effort before choice', 
   const frontend = readFileSync(new URL('../skills/starci-fe-process/SKILL.md', import.meta.url), 'utf8');
   const architecture = readFileSync(new URL('../skills/starci-architecture-design/SKILL.md', import.meta.url), 'utf8');
   assert.match(law, /three or four materially different/);
-  assert.match(law, /realistic page or substantial-surface mockups/);
-  assert.match(law, /system and ownership boundaries/);
-  assert.match(index, /render three or four materially\s+different choices\s+through `visualize`/);
-  assert.match(frontend, /realistic representative page or substantial-surface mockups/);
+  assert.match(law, /realistic pages? or substantial surfaces?/);
+  assert.match(law, /ownership boundaries, data\/control flow/);
+  assert.match(index, /through `visualize`[\s\S]*Render three or four materially different[\s\S]*choices and wait for selection/);
+  assert.match(frontend, /valid-Grammar visual ambiguity presents three or four rendered alternatives/);
   assert.match(architecture, /system\/ownership boundaries/);
 });

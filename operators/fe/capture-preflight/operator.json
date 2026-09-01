@@ -2,7 +2,7 @@
   "schemaVersion": 7,
   "id": "fe/capture-preflight",
   "domain": "fe",
-  "job": "Freeze and deterministically validate one owner-partitioned visual capture packet before AI review.",
+  "job": "Freeze and deterministically classify one owner-partitioned capture contract before raster capture and AI review.",
   "inputSchema": "input.schema.json",
   "outputSchema": "output.schema.json",
   "contextRefs": ["fe.ui"],
@@ -10,7 +10,7 @@
   "sideEffects": [],
   "stopConditions": [
     "the capture matrix or owner partition is ambiguous",
-    "a deterministic readiness check fails",
+    "a deterministic source-owned or backend-owned readiness check fails",
     "the same progress fingerprint repeats for the configured no-progress limit without a completed owner repair or routed authority change"
   ]
 }

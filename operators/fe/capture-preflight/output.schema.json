@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://starci.dev/v7.5.0-alpha.1/operators/fe/capture-preflight/output.schema.json",
+  "$id": "https://starci.dev/v7.6.0-beta.1/operators/fe/capture-preflight/output.schema.json",
   "type": "object",
   "additionalProperties": false,
   "required": ["schemaVersion", "operatorId", "output"],
@@ -19,12 +19,15 @@
             {
               "type": "object",
               "additionalProperties": false,
-              "required": ["summary", "artifactRefs", "preflightRef", "sourceFingerprint", "round", "matrixRef", "matrixFingerprint", "partitionFingerprint", "capturePartitionRefs", "reusedPartitionRefs", "readinessChecks"],
+              "required": ["summary", "artifactRefs", "preflightRef", "compiledRequestRef", "compiledRequestFingerprint", "sourceApplyReturnReceiptRef", "aggregateAfterFingerprint", "round", "matrixRef", "matrixFingerprint", "partitionFingerprint", "capturePartitionRefs", "reusedPartitionRefs", "readinessChecks"],
               "properties": {
                 "summary": { "type": "string", "minLength": 1 },
-                "artifactRefs": { "type": "array", "maxItems": 64, "uniqueItems": true, "items": { "type": "string", "minLength": 1 } },
+                "artifactRefs": { "type": "array", "minItems": 1, "maxItems": 64, "uniqueItems": true, "items": { "type": "string", "minLength": 1 } },
                 "preflightRef": { "type": "string", "pattern": "^preflight://[0-9a-f]{64}$" },
-                "sourceFingerprint": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
+                "compiledRequestRef": { "type": "string", "pattern": "^compiled-request://" },
+                "compiledRequestFingerprint": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
+                "sourceApplyReturnReceiptRef": { "type": "string", "pattern": "^receipt:[A-Za-z0-9._-]+$" },
+                "aggregateAfterFingerprint": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
                 "round": {
                   "type": "object",
                   "additionalProperties": false,
@@ -59,7 +62,7 @@
         "handoff": {
           "description": "Typed backend handoff only when backend-owned readiness is missing.",
           "anyOf": [
-            { "type": "object", "additionalProperties": false, "required": ["skillId", "missionRef", "resumeState", "inputRef"], "properties": { "skillId": { "const": "starci-backend-process" }, "missionRef": { "type": "string", "minLength": 1 }, "resumeState": { "const": "apply" }, "inputRef": { "type": "string", "minLength": 1 } } },
+            { "type": "object", "additionalProperties": false, "required": ["skillId", "missionRef", "resumeState", "inputRef"], "properties": { "skillId": { "const": "starci-backend-process" }, "missionRef": { "type": "string", "minLength": 1 }, "resumeState": { "enum": ["capture-preflight", "recapture-preflight"] }, "inputRef": { "type": "string", "minLength": 1 } } },
             { "type": "null" }
           ]
         }

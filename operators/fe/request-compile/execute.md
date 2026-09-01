@@ -1,9 +1,18 @@
 # Execute `fe/request-compile`
 
-Compile one frontend request into one intent and closed objective.
+Compile one frontend request into one closed, implementation-ready contract. Do not design, mutate,
+capture, review, or choose the next operator.
 
-Require the already-frozen `uxUiChangeLevel` from `knowledge/ux-ui-change-levels.md`. Reject an
-unresolved level before target-source inspection. Encode its negative mutation boundary in the
-compiled constraints.
+Require the frozen `uxUiChangeLevel` before inspecting target source. Resolve one objective, exact
+target, acceptance criteria, negative mutation boundary, and exact direct-owner source files with
+owner refs and before hashes (null only for approved new files). Fingerprint that ordered boundary and
+preserve every closed constraint. Ambiguous authority,
+scope or target ambiguity returns `blocked`. A missing Grammar owner capability returns
+`grammar-required` with exact local repair metadata and compile-resume state; never improvise local CSS
+or duplicate Grammar authority. Missing business or backend authority returns the matching typed
+cross-domain outcome with no compiled result. Prose cannot substitute for the compiled artifact.
 
-Use StarCi-native frontend authority from `knowledge/ui.md` and the routed project Grammar. Follow `AI-first -> Rules-first -> Grammar-last`. Return only this atomic result; never route internally.
+Use `knowledge/ui.md`, `knowledge/ux-ui-change-levels.md`, and the routed project Grammar in
+`AI-first -> Rules-first -> Grammar-last` order. Return only the typed compilation receipt; the
+parent Skill owns whether the next frontend job is direction generation or source application and
+owns every cross-domain continuation.

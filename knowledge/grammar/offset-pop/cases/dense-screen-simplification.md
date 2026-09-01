@@ -4,7 +4,7 @@
 | --- | --- |
 | Knowledge ID | `fe.grammar-offset-pop-case-dense-screen-simplification` |
 | Package | `@starci/grammar/offset-pop` |
-| Operators | `grammar-convergence` |
+| Operators | `fe/authority-reconcile` |
 | Search tags | `dense screen, dashboard, forms, tables, reduce decoration, hierarchy` |
 | Dependencies | `fe.grammar-offset-pop-object-tables, fe.grammar-offset-pop-object-fields` |
 

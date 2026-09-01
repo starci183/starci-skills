@@ -4,7 +4,7 @@
 | --- | --- |
 | Knowledge ID | `fe.grammar-core-case-sticky-summary` |
 | Package | `@starci/grammar/core` |
-| Operators | `grammar-convergence` |
+| Operators | `fe/authority-reconcile` |
 | Search tags | `sticky summary, long form, side column, action, validation, scroll` |
 | Dependencies | `fe.grammar-core-case-primary-secondary-grid, fe.grammar-common-case-sticky-scroll-owner` |
 

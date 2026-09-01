@@ -20,6 +20,7 @@
       "additionalProperties": false,
       "required": [
         "outcome",
+        "debtPolicy",
         "resultRef",
         "evidenceRefs",
         "findings",
@@ -33,6 +34,10 @@
             "findings",
             "green"
           ]
+        },
+        "debtPolicy": {
+          "description": "Exact invocation policy echoed for deterministic verification-only routing.",
+          "enum": ["allowed", "forbidden"]
         },
         "resultRef": {
           "description": "Exact produced artifact or receipt reference, or null.",

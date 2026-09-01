@@ -4,7 +4,7 @@
 | --- | --- |
 | Knowledge ID | `fe.grammar-offset-pop-object-collections` |
 | Package | `@starci/grammar/offset-pop` |
-| Operators | `grammar-convergence` |
+| Operators | `fe/authority-reconcile` |
 | Search tags | `collection, rows, subordinate contour, divider, state, list inside card` |
 | Dependencies | `fe.grammar-common-case-collection-cardinality, fe.grammar-offset-pop-overview` |
 

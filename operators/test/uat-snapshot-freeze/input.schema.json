@@ -20,7 +20,8 @@
       "additionalProperties": false,
       "required": [
         "backendSourceRef",
-        "authorityRefs"
+        "authorityRefs",
+        "sourceFingerprint"
       ],
       "properties": {
         "backendSourceRef": {
@@ -38,6 +39,11 @@
             "minLength": 1
           },
           "minItems": 1
+        },
+        "sourceFingerprint": {
+          "description": "Exact immutable source fingerprint inherited from Quality PASS.",
+          "type": "string",
+          "pattern": "^sha256:[0-9a-f]{64}$"
         }
       }
     },

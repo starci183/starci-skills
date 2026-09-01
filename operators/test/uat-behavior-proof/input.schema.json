@@ -19,13 +19,25 @@
       "type": "object",
       "additionalProperties": false,
       "required": [
-        "snapshotRef"
+        "snapshotRef",
+        "caseFreezeReturnReceiptRef",
+        "sourceFingerprint"
       ],
       "properties": {
         "snapshotRef": {
           "description": "Frozen canonical snapshot.",
           "type": "string",
           "minLength": 1
+        },
+        "caseFreezeReturnReceiptRef": {
+          "description": "Exact validated case-freeze RETURN receipt.",
+          "type": "string",
+          "pattern": "^receipt:[A-Za-z0-9._-]+$"
+        },
+        "sourceFingerprint": {
+          "description": "Exact source fingerprint inherited from frozen cases.",
+          "type": "string",
+          "pattern": "^sha256:[0-9a-f]{64}$"
         }
       }
     },

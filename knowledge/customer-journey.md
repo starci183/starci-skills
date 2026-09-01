@@ -3,37 +3,46 @@
 | Field | Value |
 | --- | --- |
 | Knowledge ID | `fe.customer-journey` |
-| Operators | `customer-journey` |
-| Search tags | `journey, user flow, multi-page, direction, approval` |
-| Dependencies | `none` |
+| Contract revision | `7.6.0` |
+| Operators | `fe/request-compile` |
+| Search tags | `journey, user flow, multi-page, recovery, compile` |
+| Dependencies | `fe.audit-loop-v75b` |
 
-## Record
+## Internal compile guidance
 
-Derive the complete user journey before deciding page layouts. A page is a checkpoint in a task, not the unit of product reasoning.
+Derive the complete user journey before page layout. A page is one checkpoint in a task, not the unit
+of product reasoning. This record contributes a compiled contract; it does not create a journey
+stage, flow-approval checkpoint, or loop.
 
-UX is proactive, not merely a reaction to defects. Treat user feedback as evidence of a reusable pain pattern, then search the proposed journey for every state where that pattern could recur before implementation. Do not wait for production failure to discover missing validation, recovery, refresh, resume, async, realtime, or backend-state adaptation.
+Start from the actor's trigger, desired outcome, verified business operations, consequential
+decisions, and terminal states. Preserve uncertainty as an open fact. Challenge plausible sequencing,
+decision timing, recovery, and page-boundary alternatives internally, then emit one strongest closed
+journey using evidenced fit, risk, reversibility, and implementation cost. Three or four rendered
+alternatives exist only when no material direction dominates or the user explicitly requests
+comparison, and remain inside the optional `generate` guidance in `direction.visualization`.
 
-## Method
+The compiled journey names:
 
-Start from the actor's trigger, desired outcome, verified business operations, consequential decisions, and terminal states. Preserve uncertainty as an open fact. Then propose three or four materially different paths; a direction is different only when it changes sequencing, decision timing, recovery, or page boundaries.
-
-Each direction states:
-
-- entry and exit conditions;
+- entry evidence and safe exit/terminal conditions;
 - ordered user goals and system commitments;
-- page boundaries and why each boundary exists;
+- page/container boundaries and why each exists;
 - reversible and irreversible actions;
-- failure, empty, pending, denied, and recovery paths supported by evidence;
-- client validation, business refusal, auth/security, stale or expired, concurrency/idempotency, rate-limit, transport/infrastructure, realtime, refresh and resume edges when applicable;
-- journey-wide elements versus page-local elements;
-- the main trade-off against the other directions.
+- populated, initial loading, mutation pending, settled empty, validation, denied, error, recovery,
+  refresh/resume, and long-content states when reachable;
+- client validation, business refusal, auth/security, stale/expired, concurrency/idempotency,
+  rate-limit, transport/infrastructure, realtime, and recovery edges when applicable;
+- journey-global owners versus page-local owners;
+- strongest rejected alternative and why it loses.
 
-Do not produce cosmetic variants of one flow. Do not invent prices, permissions, policies, outcomes, or hidden automation.
+Do not invent prices, permissions, policies, outcomes, hidden automation, or unreachable decorative
+states. User feedback is evidence of a possible reusable pain relationship; probe every journey state
+where that relationship may recur rather than patching the originating screenshot.
 
-Freeze a behavior envelope and failure topology before UI direction. Interaction-container choice belongs to UX. UI may later vary composition, hierarchy, density, and state presentation, but it cannot reorder the journey, move an interaction into another container, change API semantics, or alter business policy without returning to UX/Behavior authority.
+Freeze the behavior envelope and failure topology before UI composition. Interaction-container
+selection is UX authority. UI may later vary hierarchy, density, surface treatment, and responsive
+composition, but it cannot reorder the journey, change API semantics/business policy, or move work to
+another container outside the compiled contract.
 
-## Shared journey ownership
-
-A linear multi-page process gets one journey-progress owner and one reference from each participating page. It is not copied into four page owners. Tabs are reserved for same-page peer panels where only one panel is visible; tabs do not represent progress across routes.
-
-Recommend exactly one direction using evidenced fit, risk, recoverability, and implementation cost. Under `manual`, stop after emitting three or four directions and wait for an exact selected-flow approval receipt. Under `auto-recommended`, bind the recommendation to a selected-flow session receipt and continue without pretending that the other directions were approved. Never persist the batch outside the task session.
+A linear multi-page process has one journey-progress owner referenced by participating pages. Tabs
+are same-page peer panels; they never represent progress across routes. Existing flows and product
+examples are evidence, not journey templates.

@@ -42,7 +42,10 @@ Invalid input stops before the action or effects. Invalid output never reaches t
 
 Broad repository source context is forbidden. Default search resolves exact files rather than preloading a repository or querying an index. Business authority comes from an exact `.worktrees/businesses/...` revision; source work opens only hash-pinned contract JSON or exact approved files. Workers are read/analyze-only unless an operator explicitly proves disjoint safe writes, and the coordinator owns joins and mutations.
 
-Input and output schemas are independent files. `operator.json` binds their exact filenames; validation refuses missing, extra, or cross-direction contract files. During the 7.0 migration, `node contract-v7.mjs` reports remaining v6 contracts. Release completion requires every operator to pass the v7 contract.
+Input and output schemas are independent files. `operator.json` binds their exact filenames;
+validation refuses missing, extra, or cross-direction contract files, while allowing only the
+optional `icon.svg` addition. During the 7.0 migration, `node contract-v7.mjs`
+reports remaining v6 contracts. Release completion requires every operator to pass the v7 contract.
 
 ## Domains
 
@@ -59,4 +62,8 @@ Input and output schemas are independent files. `operator.json` binds their exac
 | `source` | provider-neutral provenance record/query |
 | `test` | focused test operators retained for FE product proof |
 
-Operator prose and semantic schemas are hand-authored; `materialize.mjs` deliberately preserves them instead of regenerating generic instructions. Run `node materialize.mjs`, then `node validate-operators.mjs`. The validator proves path/manifest identity, exact eight-file shape, closed schemas, default-search context boundaries, absence of routing leakage, source-reference identity, and fail-closed validators.
+Operator prose and semantic schemas are hand-authored; `materialize.mjs`
+deliberately preserves them instead of regenerating generic instructions. Run `node materialize.mjs`,
+then `node validate-operators.mjs`. The validator proves path/manifest identity, exact bundle shape,
+closed schemas, default-search context boundaries, absence of routing leakage, source-reference
+identity, and fail-closed validators.

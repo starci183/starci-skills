@@ -4,7 +4,7 @@
 | --- | --- |
 | Knowledge ID | `fe.grammar-offset-pop-case-mobile-accent-reduction` |
 | Package | `@starci/grammar/offset-pop` |
-| Operators | `grammar-convergence` |
+| Operators | `fe/authority-reconcile` |
 | Search tags | `mobile, remove rotation, reduce overlap, safe area, touch target, clipping` |
 | Dependencies | `fe.grammar-common-case-responsive-flattening, fe.grammar-offset-pop-overview` |
 

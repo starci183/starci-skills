@@ -19,13 +19,25 @@
       "type": "object",
       "additionalProperties": false,
       "required": [
-        "snapshotRef"
+        "snapshotRef",
+        "snapshotReturnReceiptRef",
+        "sourceFingerprint"
       ],
       "properties": {
         "snapshotRef": {
           "description": "Frozen canonical snapshot.",
           "type": "string",
           "minLength": 1
+        },
+        "snapshotReturnReceiptRef": {
+          "description": "Exact validated snapshot-freeze RETURN receipt.",
+          "type": "string",
+          "pattern": "^receipt:[A-Za-z0-9._-]+$"
+        },
+        "sourceFingerprint": {
+          "description": "Exact source fingerprint inherited from the frozen snapshot.",
+          "type": "string",
+          "pattern": "^sha256:[0-9a-f]{64}$"
         }
       }
     },

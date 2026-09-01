@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import { loadRuntimeConfig } from './config.mjs';
-import { createReceipt, assertProgress } from './trace.mjs';
+import { createReceipt, assertProgress, MATERIAL_AI_OPERATORS } from './trace.mjs';
 import { canonicalRoots, uatPair } from './topology.mjs';
 import { validatorFor } from '../operators/validation.mjs';
 import { loadScopePolicy } from './scope-policy.mjs';
@@ -10,8 +10,8 @@ import { loadScopePolicy } from './scope-policy.mjs';
 const base = { receiptId:'receipt:r1', missionId:'m1', skillId:'starci-quality-assure', operatorId:'quality/lint', parentId:'call-parent', childId:'call-child', missionContext:{ project:'starci', objective:'assure' }, context:{ source:'be', invocationRef:'invocation://runtime-v7' }, input:{ exact:true }, expectedOutput:{ outcome:'pass' }, actualOutput:{ outcome:'pass' }, evidenceRefs:['git:abc'], sourceHeads:['git:abc'], transitionRule:{ outcome:'pass', target:'complete' }, resumeState:null, skip:null, error:null };
 const lifecycleFields=(id,hex)=>({missionId:`mission:${id}`,context:{source:'be',invocationRef:`invocation://${id}`,executionRef:`execution://${hex.repeat(64)}`}});
 
-test('sole YAML config is strict v7.5-alpha with fresh Sol review and centralized runtime/session ownership', () => assert.deepEqual(loadRuntimeConfig(), {
-  version:'7.5.0-alpha.1',
+test('sole YAML config is strict v7.6 with fresh Sol review and centralized runtime/session ownership', () => assert.deepEqual(loadRuntimeConfig(), {
+  version:'7.6.0-beta.1',
   grammarContractVersion:'7.4.0',
   debug:true,
   aiBrainstormModel:'gpt-5.6-sol',
@@ -51,18 +51,21 @@ test('local feature tasks consume one control-panel-owned runtime instead of own
 });
 
 test('UI-only fast lane preserves business authority and exact-file mutation boundaries',()=>{
-  const auditLoop=fs.readFileSync(new URL('../knowledge/audit-loop-v75-alpha.md',import.meta.url),'utf8');
+  const auditLoop=fs.readFileSync(new URL('../knowledge/audit-loop-v75b.md',import.meta.url),'utf8');
   const skill=fs.readFileSync(new URL('../skills/starci-fe-process/SKILL.md',import.meta.url),'utf8');
   const apply=fs.readFileSync(new URL('../operators/fe/source-apply/execute.md',import.meta.url),'utf8');
-  const repair=fs.readFileSync(new URL('../operators/fe/source-repair/execute.md',import.meta.url),'utf8');
-  for(const text of [auditLoop,skill,apply,repair]){
+  for(const text of [skill,apply]){
     assert.match(text,/ui-only-preserve-business/);
     assert.match(text,/GraphQL/);
     assert.match(text,/tracked and untracked/is);
     assert.match(text,/exact-file|exact allowed files|exact listed/is);
   }
-  assert.match(auditLoop,/A task badge or `active` status is not evidence/);
-  assert.match(skill,/Never let two tasks repair the same page group concurrently/);
+  assert.match(auditLoop,/render-only contract preserves business behavior/);
+  assert.match(auditLoop,/forbids new API operations/);
+  assert.match(auditLoop,/tracked and untracked/);
+  assert.match(auditLoop,/exact frozen write set/);
+  assert.match(auditLoop,/badge or narrated\s+progress is insufficient/);
+  assert.match(skill,/never let two tasks repair the same page group concurrently/);
 });
 
 test('central runtime registry binds one owner generation and canonical localhost endpoints',()=>{
@@ -91,7 +94,7 @@ test('authenticated Browser work requires materialization proof or broker execut
 
 test('scope policy rejects unresolved mission scope before skill selection', () => {
   const policy=loadScopePolicy();
-  assert.equal(policy.version,'7.5.0-alpha.1');
+  assert.equal(policy.version,'7.6.0-beta.1');
   assert.equal(policy.unclearAction,'ask-before-skill-selection');
   assert.equal(policy.sourceInspectionWhileAmbiguous,'forbidden');
   assert.deepEqual(policy.registeredDimensions['frontend.ux-ui.change-level'],['refine','reconstruct','new']);
@@ -151,16 +154,18 @@ test('debug true visibly blocks a visual review that omitted inspection records'
   assert.ok(lines.some((line)=>line==='[VERDICT] BLOCKED'));
 });
 
-test('debug true prints independent-review inspection verdicts as per-raster findings',()=>{
+test('debug true prints the core direction-generation contract without a fake pixel verdict',()=>{
   const lines=[];
-  const fields={...base,...lifecycleFields('independent-debug','c'),operatorId:'fe/independent-review',aiActivity:{kind:'review',model:'gpt-5.6-sol',count:1,executionRef:`execution://${'c'.repeat(64)}`,principalFingerprint:`sha256:${'d'.repeat(64)}`,contextFingerprint:`sha256:${'e'.repeat(64)}`,isolation:'fresh',forkTurns:'none'},actualOutput:{outcome:'findings',result:{inspectionVerdicts:[{inspectionRef:'render://independent.png',verdict:'finding',observation:'The roadmap is visibly clipped inside nested scrolling.'}]}}};
-  createReceipt('CALL',{...fields,receiptId:'receipt:independent-debug-call'},{debug:true,writeDebug:(line)=>lines.push(line)});
-  createReceipt('RETURN',{...fields,receiptId:'receipt:independent-debug-return'},{debug:true,writeDebug:(line)=>lines.push(line)});
-  assert.ok(lines.some((line)=>line==='[AI REVIEW][image: render://independent.png]'));
-  assert.ok(lines.some((line)=>line.includes('[FINDING][independent-review][PROBLEM] The roadmap is visibly clipped')));
+  const fields={...base,...lifecycleFields('direction-debug','c'),operatorId:'fe/direction-generate',aiActivity:{kind:'brainstorm',model:'gpt-5.6-sol',count:1,executionRef:`execution://${'c'.repeat(64)}`,principalFingerprint:`sha256:${'d'.repeat(64)}`,contextFingerprint:`sha256:${'e'.repeat(64)}`,isolation:'fresh',forkTurns:'none'},actualOutput:{outcome:'generated',result:{mode:'dominant',requiresChoice:false,comparisonArtifactRef:'artifact://direction.html'}}};
+  createReceipt('CALL',{...fields,receiptId:'receipt:direction-debug-call'},{debug:true,writeDebug:(line)=>lines.push(line)});
+  createReceipt('RETURN',{...fields,receiptId:'receipt:direction-debug-return'},{debug:true,writeDebug:(line)=>lines.push(line)});
+  assert.ok(lines.some((line)=>line.startsWith('[AI BRAINSTORM][RETURN]')));
+  assert.ok(lines.some((line)=>line.includes('"requiresChoice":false')));
+  assert.equal(lines.some((line)=>line.startsWith('[AI REVIEW][image:')),false);
 });
 
 test('material AI CALL RETURN and TRANSITION cannot execute silently or with a different model policy', () => {
+  assert.deepEqual([...MATERIAL_AI_OPERATORS].filter((operatorId)=>operatorId.startsWith('fe/')).sort(),['fe/direction-generate','fe/visual-fidelity']);
   for (const type of ['CALL','RETURN','TRANSITION']) {
     assert.throws(() => createReceipt(type,{...base,receiptId:`receipt:missing-${type}`,operatorId:'fe/visual-fidelity'},{debug:true,writeDebug:()=>{}}),/AI activity is required/);
     const lines=[];
@@ -212,7 +217,18 @@ test('nested calls return and resume with parent-child identity', () => {
   assert.equal(ret.parentId,call.childId); assert.deepEqual(resume.trace.resumeState,{from:'wait-1'});
 });
 
-test('identical progress cycles are rejected', () => { const a=createReceipt('ERROR',{...base,receiptId:'receipt:r7'},{debug:false}); const b={...a,receiptId:'receipt:r8'}; assert.throws(()=>assertProgress([a,b]),/no-progress cycle/); });
+test('progress allows legitimate repeated CALLs but rejects wording-only RETURN replay', () => {
+  const common={...base,missionId:'mission:progress-guard',operatorId:'quality/readiness-inventory',input:{sourceFingerprint:`sha256:${'7'.repeat(64)}`},expectedOutput:{outcome:'green'}};
+  const first={...common,context:{invocationRef:'invocation://progress-round-1',executionRef:`execution://${'7'.repeat(64)}`},actualOutput:{output:{outcome:'green',result:{findingRefs:[],summary:'First wording.'}}}};
+  const second={...common,context:{invocationRef:'invocation://progress-round-2',executionRef:`execution://${'8'.repeat(64)}`},actualOutput:{output:{outcome:'green',result:{findingRefs:[],summary:'Different wording only.'}}}};
+  const firstCall=createReceipt('CALL',{...first,receiptId:'receipt:progress-call-1'},{debug:true,writeDebug:()=>{}});
+  const secondCall=createReceipt('CALL',{...second,receiptId:'receipt:progress-call-2'},{debug:true,writeDebug:()=>{}});
+  assert.equal(assertProgress([firstCall,secondCall]),true);
+  const firstReturn=createReceipt('RETURN',{...first,receiptId:'receipt:progress-return-1',parentId:firstCall.receiptId},{debug:true,writeDebug:()=>{}});
+  const secondReturn=createReceipt('RETURN',{...second,receiptId:'receipt:progress-return-2',parentId:secondCall.receiptId},{debug:true,writeDebug:()=>{}});
+  assert.equal(firstReturn.progressFingerprint,secondReturn.progressFingerprint);
+  assert.throws(()=>assertProgress([firstReturn,secondReturn]),/no-progress cycle/);
+});
 
 test('topology is flat and excludes projects, coding-context, and Qdrant', () => {
   const roots=canonicalRoots(); assert.deepEqual(roots,['.worktrees/_templates','.worktrees/businesses','.worktrees/uat','.worktrees/sessions','.worktrees/debts']); assert.doesNotMatch(JSON.stringify(roots),/projects|coding-context|qdrant/i);

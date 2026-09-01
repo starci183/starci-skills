@@ -4,7 +4,7 @@
 | --- | --- |
 | Knowledge ID | `fe.grammar-offset-pop-overview` |
 | Package | `@starci/grammar/offset-pop` |
-| Operators | `grammar-convergence` |
+| Operators | `fe/authority-reconcile` |
 | Search tags | `offset pop, bold contour, offset shadow, playful, editorial, routing` |
 | Dependencies | `fe.grammar-common-overview` |
 

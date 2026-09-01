@@ -4,7 +4,7 @@
 | --- | --- |
 | Knowledge ID | `fe.grammar-offset-pop-case-list-in-offset-card` |
 | Package | `@starci/grammar/offset-pop` |
-| Operators | `grammar-convergence` |
+| Operators | `fe/authority-reconcile` |
 | Search tags | `nested list, offset card, one shadow owner, affirmative rows, contour` |
 | Dependencies | `fe.grammar-common-case-surface-inside-surface, fe.grammar-offset-pop-object-collections` |
 

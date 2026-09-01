@@ -3,131 +3,170 @@
 | Field | Value |
 | --- | --- |
 | Knowledge ID | `fe.ui` |
-| Operators | `principle-compile` |
-| Search tags | `ui, principles, grammar, composition, spacing, hierarchy, responsive, render decision, suspense, destination, link, href, progress, fact rank` |
+| Contract revision | `7.6.0` |
+| Operators | `fe/request-compile` |
+| Search tags | `ui, semantic card, composition, spacing, typography, TextLink, Button, IconTile, state, responsive, rank` |
 | Dependencies | `fe.layout-composition, fe.grammar-common-overview`, plus exactly one selected Grammar and only its triggered object/case guides |
 
 ## Authority
 
-UI decision authority binds every render decision, including whether `SUSPENSE` is legal, to two authorities together: `fe.ui` plus Grammar Common and exactly one selected Grammar.
+Every render decision binds two authorities together:
 
-1. this `fe.ui` record owns cross-object composition and decisive presentation rules;
-2. Grammar Common plus exactly one selected Grammar owns object rendering, visual language, supported states, tokens, variants and triggered complex cases.
+1. `fe.ui` owns cross-object composition, hierarchy, responsive persistence, and decisive
+   presentation laws;
+2. Grammar Common plus exactly one selected Grammar owns object anatomy, visual language, supported
+   states, variants, tokens, padding, gaps, typography, and responsive treatment.
 
-Neither authority is optional. Never mix selected Grammars in one application decision, and never invent a local visual convention when the selected Grammar already owns that axis.
+Neither is optional. Never mix selected Grammars or invent a local convention for an axis already
+owned by the selected package.
 
-## Decision boundary
+UI decides presentation, not customer journey order, business policy, API semantics, persistence,
+authorization, or which product facts exist. It renders approved neutral facts and reachable states;
+it never manufactures truth to improve a composition.
 
-This knowledge decides only the UI layer: region composition, hierarchy, density, span, grouping, nesting, alignment, spacing, responsive transformation, visual state treatment and the presentation of interaction affordances.
+## Decision order
 
-It does not decide:
+Each material decision records one verdict per layer:
 
-- the customer journey, task order, recovery strategy or whether a step belongs in a page, modal or realtime flow; those are UX decisions;
-- business rules, authorization, API semantics, persistence, events or data correctness; those are Behavior decisions;
-- which product facts or states exist; UI renders the approved neutral facts and reachable states supplied upstream.
+1. `AI-first`: bind the approved meaning and decide what the user must notice first. Synthesis is
+   justified only by real density or decision complexity; simple label/content stays direct.
+2. `Rules-first`: prove semantic reading/action order, information rank, surface and collection
+   ownership, nesting, responsive persistence, and complete state/recovery presentation.
+3. `Grammar-last`: bind every accepted role to Grammar Common and one selected package's exact
+   object, interface, state, token, and complex case.
 
-Do not use UI preference to overrule UX or Behavior evidence.
+Failure in any layer fails the decision. Grammar conformance cannot rescue incoherent meaning, and an
+attractive layout cannot excuse an exact Grammar contradiction.
 
-UI direction begins only after the UX flow and interaction-container plan are frozen. Proactively enumerate every reachable presentation state exposed by UX—populated, empty, pending, validation, denied, error, recovery, long content, refresh/resume, and material responsive branches—before implementation. User feedback should be promoted into the smallest reusable UI or Grammar rule and applied to every matching state/consumer, not patched only where the symptom was first seen.
+For every situation record the exact surface/region/state/viewport, presentation decision, Grammar
+binding, observable implementation intent, negative boundary, and proof. Current source, a sibling
+page, a Dashboard example, and a prior PASS are evidence—not authority by incumbency.
 
-## Three-layer decision order
+## Semantic card-first composition
 
-Every UI decision runs in this order and records one independent verdict per layer:
+Normalize content into semantic Blocks before choosing a frame. A coherent block-level responsibility
+uses the selected Grammar's `SurfaceCard` by default when a visible boundary improves ownership and
+scanning. A page field, article, joined collection, navigation owner, or intentionally frameless
+region keeps its own declared object; “card-first” never means card-per-row or wrapping every element.
 
-1. `AI-first`: bind the approved business-visible meaning, decide what the user must notice first, distinguish evidence from supporting metadata, and decide whether density or decision complexity benefits from synthesis. This is a reasoning gate, not a requirement to generate AI content; simple label-content and short-list data stay direct.
-2. `Rules-first`: validate reading and action order, hierarchy, semantic data presentation, surface ownership, collection ownership, nesting, responsive persistence, and reachable state treatment. Reject contradictory metrics, misleading progress encodings, redundant emphasis, uniform spacing that erases relationships, and a supporting block that visually dominates stronger evidence.
-3. `Grammar-last`: only after the first two layers pass, bind the composition to Grammar Common plus one selected Grammar's exact object, variant, token, padding, gap, typography, and responsive treatment.
+A single-function card and a compound multi-function card are different contracts. The single owner
+uses one card body. A compound surface is valid only when its child blocks have distinct semantic
+jobs but need one shared outer relationship; the outer surface owns frame/elevation, child blocks meet
+through one divider owner, and no child competes with another card frame. Exact Core padding modes
+belong only to `fe.grammar-core-object-surface-card`.
 
-A failure in any layer makes the UI decision fail. Grammar conformance cannot rescue an incoherent meaning or composition, and an attractive composition cannot bypass an exact Grammar violation. Preserve approved upstream facts and journey behavior; these layers decide presentation, not new product truth.
+Every boundary has one padding owner. Page/content inset and peer-card rhythm belong to the selected
+Grammar's page container; internal block rhythm belongs to the block. Never stack parent/child padding
+into a moat or use one uniform gap across copy, facts, controls, disclosure, and peer cards. Core's
+exact page inset and peer rhythm are authored once in `fe.grammar-core-pattern-page-container`.
 
-## Required decision
+A nested surface is justified only by a distinct repeated schema, focus, selection, scrolling, state,
+or interaction owner. Removing the nested boundary must make responsibility ambiguous; otherwise it
+is decoration. Repeated rows share one collection, rhythm, state position, and divider owner.
 
-For every UI situation, emit one explicit decision containing:
+## Hierarchy and typography
 
-- `Situation`: exact surface, region, state and viewport;
-- `Decision`: what must render and how it is composed;
-- `Grammar binding`: Common plus the selected Grammar object/case rule that owns the treatment;
-- `Implementation intent`: the observable structure, alignment, density or responsive behavior;
-- `Negative boundary`: what must not be rendered or inferred;
-- `Proof`: runtime evidence at the required states and viewports.
+Emphasis follows task consequence and information weight. Primary content receives the strongest
+position and sufficient width; supporting facts remain legible and subordinate. A datum, status, or
+delta cannot equal or exceed the visible rank of its owning section title. Reading and action order
+remain intelligible without color.
 
-Current source is evidence, not authority. A component that already renders does not pass merely because it exists.
+Typography is role-bound, not a local size/weight choice. The selected package maps metadata,
+supporting text, primary content, controls, and headings to its closed role matrix. Core's 12/14/base
+scale and normal/medium/bold priority mapping live only in `fe.grammar-core-typography`. Do not use
+weight or size to compensate for weak ownership, and do not promote every label to heading rank.
 
-## UI verdict
+Ranked data binds numeric position, placement mark, score, and movement delta through
+`fe.grammar-common-case-ranked-collection-semantics`. A medal, cup, arrow, sign, or tone supplements
+explicit rank text; it never invents a placement or movement claim.
 
-- `PASS`: `AI-first`, `Rules-first`, and `Grammar-last` each pass at every required state and viewport.
-- `FAIL`: runtime evidence contradicts any applicable meaning-priority, UI composition, or Grammar rule. One layer's success cannot hide another layer's failure. Fix the owning FE/BE source, then retest the same case.
-- `SUSPENSE`: neither authority fails, but no applicable rule exists, required authorities conflict, or the authority does not specify enough to decide how the state should render.
+## Affordance and accent
 
-`SUSPENSE` is not a stylistic guess, not runtime `BLOCKED`, and never counts as PASS. Record the exact unresolved render question, request owner feedback, update the smallest UI/Grammar authority, then rerun the case. The calibration goal is `NO SUSPENSE`.
+Choose the semantic element from the effect. A destination uses native link semantics and a real
+non-null href; a same-context command or mutation uses a button. A visually elevated destination may
+use a package link-action treatment while remaining an anchor. Core's `TextLink`/`Button` boundary,
+pending API, and restricted universal action-icon vocabulary live in
+`fe.grammar-core-object-actions`.
 
-## Composition
+An `IconTile` is a compact identity/accent owner, not a button decoration, state badge, or substitute
+for a heading. Its accent-subtle surface and accent-text glyph identify one subject without claiming
+selection, success, progress, or rank. The canonical color law lives in
+`fe.grammar-common-semantic-color`.
 
-Give every meaningful region one clear owner. A child collection receives a distinct nested surface only when it owns a repeated schema, row boundaries, state or interaction boundary; decoration alone never justifies nesting. Removing the child surface must make grouping or ownership ambiguous, otherwise the nested surface is unnecessary.
+Glyph, shape, tone, and adjacent text form one claim. Success/complete treatment requires affirmative
+outcome evidence; negative treatment requires evidenced failure/destruction. A benefit, capability,
+promise, category, difficulty, tier, or future outcome remains neutral unless approved authority
+defines a stable non-outcome categorical mapping.
 
-Separate dense subjects when they have different decisions, states or scan patterns. Preserve one obvious reading order and one obvious primary-action order. Supporting information stays visible without competing with the primary task.
+## State presentation
 
-Treat media as information architecture, not decoration. After editing copy into the shortest useful
-headings, summaries, steps, examples, or checklists, decide whether a visual would still materially
-improve orientation, recognition, explanation, comparison, instruction, or emotional framing. A
-useful visual may be an existing product preview, diagram, annotated example, or a purpose-built
-AI-generated illustration. Do not add stock-like or generated imagery merely to fill whitespace, hide
-unedited prose, make a generic page appear designed, or compete with the primary task.
+Render every reachable populated, initial-loading, pending mutation, settled empty, validation,
+denied, error, recovery, refresh/resume, long-content, and responsive state required by compile.
+Grammar state semantics are authored once in `fe.grammar-common-states-accessibility`:
 
-Every accepted media role declares its user purpose, owner and placement, source or generation brief,
-responsive crop/contain behavior, and accessible alternative intent before implementation. Generate
-a new bitmap only when no approved reusable asset serves the role and the generated result can be
-reviewed as part of the same wide/intermediate/compact render matrix. Generated text, fake product UI,
-brand drift, implausible detail, awkward cropping, or an image that consumes more attention than the
-content it clarifies is a UI contradiction. Image generation produces an asset; it never creates
-business authority or excuses weak content structure.
+- skeleton represents only unresolved initial content geometry;
+- settled zero-data renders the owning `EmptyState`, never a lingering skeleton or blank shell;
+- a mutation's pending state stays on its triggering button, prevents duplicate activation, and does
+  not replace unrelated content with skeletons.
 
-## Spacing and boundary
+Controls expose label, pending/disabled meaning, validation, recovery, focus, and keyboard path.
+Positive treatment is allowed only for evidenced affirmative state and remains understandable in text.
 
-Every boundary has one padding owner. Parent-to-child spacing expresses relationship; internal spacing expresses one owner's rhythm. Do not stack parent and child padding into an accidental moat. Repeated rows share one rhythm and one divider owner. Prove edge alignment, first/last-child treatment and long-content wrapping.
+## Responsive persistence and interaction
 
-Select spacing only after semantic grouping. A tightly coupled title and explanatory sentence form one copy group and may bind Core's compact `gap-2`; the following action belongs to a separate action boundary with stronger separation. Never apply one uniform stack gap across facts, explanation, controls, and disclosure merely because the numeric token is valid.
+Responsive rendering may change tracks, order, disclosure, and persistence, but not owner, meaning,
+reachability, or necessary comparison. Wide, intermediate when materially distinct, and compact states
+must pass sparse and long content.
 
-When adjacent siblings together explain one fact, create an explicit semantic group and bind its internal rhythm; do not leave them as peers in a looser outer stack. Current price plus its savings explanation is one evidence group, while purchase intent and action remain separate owners.
+Navigation and complementary rails transform rather than disappear. When compact composition removes
+desktop orientation, provide the declared native mobile back link. Secondary rail/context work moves
+behind an accessible three-dot trigger into the declared Drawer/Sheet with complete open, close,
+focus-return, scroll, and restoration lifecycle. Exact Core navigation treatment lives in
+`fe.grammar-core-object-navigation`.
 
-When an existing Grammar or application primitive owns the same scroll semantics, boundary, and constraints, reuse that primitive so edge cues, overscroll, focus, and scrollbar behavior remain coherent. Raw `overflow-*` is not an equivalent local replacement. Reuse is not blind copying: reject a precedent whose owner or interaction contract differs.
+Sticky or pinned UI names one scroll owner, height/offset/collision boundary, safe focus/overflow, and
+compact static fallback. Reserve terminal clearance once; page gap, content padding, and pinned bar may
+not accumulate into a blank moat.
 
-Cross-page consistency is an explicit product contract. Before composing a new or reconstructed
-surface, inventory the nearest sibling pages for their reusable visual signatures and semantic roles.
-Carry forward relevant hero treatment, color roles, typography hierarchy, shell rhythm, navigation
-model, and published Grammar compositions so one application does not render as unrelated websites.
-Blind creativity may reject the incumbent target layout, but it cannot ignore the product family.
-Omit or adapt a sibling signature only when the target's user outcome, owner contract, responsive
-lifecycle, or interaction model proves it inapplicable; record that reason instead of silently diverging.
+A draggable fixed overlay owns no document spacer. It may cross underlying content while actively
+dragged, but release, edge constraints, keyboard/focus access, resize/zoom, and restored position must
+keep essential work recoverable. One captured overlap is evidence to exercise the lifecycle, not an
+automatic exemption or automatic failure. Use
+`fe.grammar-common-case-draggable-overlay-lifecycle`; no named launcher or Dashboard position is a
+global law.
 
-Disclosure labels and their indicators share one trigger-row owner, alignment axis, and inset. Comparison rows likewise keep their names and values on one predictable axis; a visually detached indicator or drifting value column is a composition failure.
+## Media
 
-## Hierarchy
+Treat media as information architecture, not decoration. After copy is reduced to its shortest useful
+form, add media only when it materially improves orientation, recognition, explanation, comparison,
+instruction, identity, evidence, or emotional framing. Every accepted media role declares purpose,
+owner, placement, source/brief, responsive crop/contain behavior, and accessible alternative intent.
 
-Visual emphasis follows task consequence and information weight. Primary content receives the strongest position and enough width; supporting facts remain legible and subordinate. State markers supplement text and structure rather than replace them. Reading order and action order must remain intelligible without color.
+Do not add stock-like or generated imagery to fill whitespace, hide unedited prose, mimic a sibling,
+or make a generic page appear designed. Generated text, fake product UI, brand drift, implausible
+detail, awkward crop, or media that dominates the task is a contradiction.
 
-Every datum declares its presentation rank. A compact numeric fact or status remains subordinate to its owning section and content title; concatenating it into a larger or equal-rank headline is a hierarchy failure.
+## Evidence and promotion boundary
 
-Contract-declared progress remains an observable progress presentation; a badge-only substitute is not equivalent unless upstream authority changes the datum.
+Owner feedback and Dashboard surfaces may reveal reusable relationships such as compound-card
+padding, ranking semantics, mobile rail access, or drag restoration. Promote only the smallest law
+proved across its semantic owner and preserve a negative boundary. Never encode a page name, fixture,
+copy string, route, or screenshot arrangement as the global rule.
 
-## Responsive persistence
+## Grammar gap versus visual ambiguity
 
-Responsive rendering preserves meaning, reachability and necessary comparison. Tracks, order, disclosure and persistence may change, but ownership may not disappear. Sticky UI requires a declared scroll owner, bounded height, known offset, safe focus/overflow and a compact static fallback. Prove wide, intermediate and compact widths with both sparse and long content.
+Use `fe.grammar-common-extension` as the single authority. Missing semantic rule, token,
+component/export, state, or extension axis is `grammar-gap`: the exact Grammar owner repairs and
+publishes it, then frontend recompiles against the new package identity. It is never UI `SUSPENSE`,
+or permission for local CSS/anatomy improvisation. When Grammar is complete, render one preview
+for a materially dominant direction; if several real directions remain and none dominates, render
+three or four for selection inside `generate`.
 
-A pinned action projection and the content ending above it own one bottom boundary. Reserve that boundary exactly once: page stack gap, terminal content padding, and the pinned bar must not accumulate into a blank moat visible at scroll end.
+## Verdict
 
-A fixed or draggable overlay constrained to a safe viewport boundary does not reserve terminal document height. Do not add an empty document spacer for the same collision already prevented by the overlay constraint; that duplicates ownership and creates false scrollable space.
+- `PASS`: all three decision layers pass at every required state and viewport.
+- `FAIL`: visible/runtime evidence contradicts meaning priority, UI composition, or Grammar.
+- `SUSPENSE`: Grammar is complete and no rule fails, but one finite visual choice remains unresolved.
 
-Disclosure does not erase information load; it only defers it. If opening secondary comparison data turns a primary decision card into a nested, internally scrolling information container, split the comparison into a peer surface or a dedicated sheet. Preserve one dominant decision per primary surface and do not repair overload by repeatedly reducing padding or typography.
-
-After splitting an overloaded owner, reselect the interaction container from the remaining task instead of carrying the old container forward. A short comparison that must be seen together belongs in a static `SurfaceCard`; an accordion is justified only when hiding its content materially reduces task complexity. Separation alone is not proof that the inherited interaction still has value.
-
-## State presentation and affordance
-
-Render every reachable neutral presentation state required by the case. Controls expose a label, disabled reason, pending treatment, validation, recovery affordance, focus and keyboard path. Positive visual treatment is permitted only for an evidenced affirmative state and remains accompanied by understandable text; UI must never manufacture trust.
-
-Category and magnitude labels are not outcome states, but neutrality is not the only valid category identity. Difficulty, tier, phase, and similar classifications use neutral treatment unless approved Grammar or application authority defines a stable categorical palette. That palette may reuse named tone tokens as visual identity without asserting pass, warning, or failure semantics when the text label remains explicit, the mapping is deterministic across every consumer, and it does not change with transient outcome state. Without that approved mapping, `success`, `warning`, and `danger` still require evidenced state or consequence semantics rather than an ordinal position or a desire for visual variety. Attach active emphasis to the value or status that is active, not to an adjacent identity label.
-
-Glyph, shape, tone, and text form one semantic claim and must agree with the evidenced business state. Glyph geometry alone does not declare a state. The `complete` role and success-soft treatment require affirmative outcome evidence; X/incomplete and danger treatments require negative or incomplete evidence. A benefit, capability, promise, or future outcome is neutral content, not a completed or failed state. It may use a purpose-named 20px outline `included` circle-check in inherited foreground when adjacent text names what the offering contains; it must not reuse `complete`, success, accent tone, or solid weight. A negative glyph wearing a success tone is contradictory and fails UI review.
-
-A destination-bearing row preserves native link semantics and a real non-null href so hover, focus, keyboard activation, and click expose the same route.
+`SUSPENSE` is not a Grammar gap, runtime `BLOCKED`, stylistic guess, or PASS. The frontend machine owns
+the typed continuation; this record emits no route or repair stage.

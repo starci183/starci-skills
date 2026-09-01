@@ -5,254 +5,134 @@ description: Deliver, audit, repair, redesign, debug, or reconcile one frontend 
 
 # StarCi frontend process
 
-Own one frontend mission across request compilation, exact target resolution, business binding, observation, semantic/UX/UI audit, design, implementation, blind visual review, and closure. Intents are input data, never separate skills. Use only StarCi-native operators, `knowledge/ui.md`, and routed Grammar; never invoke or depend on `ui-ux-pro-max`.
+Own one UI-only frontend mission. Preserve approved business and backend behavior; never create routes,
+API operations, persistence, authentication behavior, fixtures, or remote mutations to make pixels
+look complete. A typed gap exits to its exact domain owner. The same mission resumes at the exact
+owned state carried by the correlated receipt.
 
-For audit-to-target work, read and apply [`knowledge/audit-loop-v75-alpha.md`](../../knowledge/audit-loop-v75-alpha.md). It is the execution profile that keeps baseline routing, UX repair, UI construction, session continuity, and closure proof proportional.
+The v7.6 path is deliberately linear:
 
-Local FE missions consume the centralized runtime declared by `.claude/config.yaml`. They never own
-ports or processes and must not start, stop, restart, replace, or kill FE, API, or identity services.
-Send runtime health and recovery requests to the single Control-Panel-delegated runtime task. A
-read-only visual audit may use a newly leased compatible UAT-pool context after the previous mission
-releases it; product UAT and state-mutating flows keep fresh identity isolated in their account and Browser session. Never restart a server, rebind its
-environment, or launch a feature-specific API to switch accounts. `EADDRINUSE` and an unexpected
-session are coordination findings, not process-mutation authority.
+`compile -> [direction-generate for reconstruct/new] -> source-apply -> capture-preflight -> render-capture -> blind visual-fidelity -> quality -> UAT`
 
-The 7.5-alpha frontend chain is fail-closed. Natural-language confidence, green static checks, component names,
-DOM measurements, or a direction mock can never substitute for a validated operator product. Runtime
-observation must inventory surfaces, interactions, and responsive states; contract freeze must account
-for every observed interaction as preserve/remove/replace; mutation must bind that exact contract;
-visual aggregate `passed` is invalid when any structured finding or contradiction
-remains. If an operator product is absent or invalid, stop at `blocked` rather than narrating progress
-as completion.
+`refine` skips direction generation. One confirmed frontend visual finding may return exactly once
+from visual fidelity to source apply, then repeats preflight, capture, and blind review. A second
+finding closes as `blocked`; it never reopens analysis or grows another public stage. Product
+potential, audit routing, authority classification, and finding classification are internal helpers
+inside this path, not sequential public gates. Two fail-closed
+exceptions are explicit: a compile-time Grammar gap repairs and publishes the exact Grammar authority
+before recompiling, and valid-Grammar visual ambiguity presents three or four rendered alternatives
+and waits for one user choice.
 
-Grammar contract 7.4 is independently fail-closed inside this runtime protocol. Before UI audit and
-before contract freeze, `fe/grammar-convergence` must produce a validated decision manifest that
-binds every visible semantic role, composition slot, responsive state, scroll/sticky lifecycle, and
-selected-package export. Every brainstorm candidate passes the semantic-composition filter before
-it may be rendered or ranked; rejected candidates stay out of visual comparison. Application code
-must consume published Grammar compositions instead of reconstructing their anatomy with local
-classes. A missing reusable interface is `grammar-gap`, never permission to imitate it in product CSS.
+## Author once, compile outward
 
-Every open-ended AI brainstorm or review is completed end to end by exactly one fresh `gpt-5.6-sol` execution with `forkTurns=none`; same-context self-review is not a fallback path. The parent Skill performs the call and routing while every operator remains atomic. With runtime `debug=true`, every AI `CALL`, `RETURN`, and `TRANSITION` is emitted to the terminal with normalized input, expected output, actual output, evidence fingerprints, per-raster inspection records, confirmed findings, and verdict. Never emit secrets or hidden reasoning. Missing a required debug inspection record blocks visual `PASS`.
+Freeze the complete mission scope before entering the machine. Scope owns the one
+`frontend.ux-ui.change-level` value (`refine`, `reconstruct`, or `new`), and
+`uxUiChangeLevel` is its validated executable projection. Scope also owns the exact target and file
+set, exclusions, write roots, completion proof, and one `frontend.layout.owner-ceiling`. Every exact
+file names an owner inside the authorized mutable ceiling. Shared branches, global shells, and
+unauthorized ancestors remain observation-only.
 
-Blind creativity means the incumbent target does not define the answer; it never means product-family
-amnesia. Before brainstorm or direction visualization, bind the nearest sibling-page signature
-inventory required by `knowledge/ui.md` and `knowledge/direction-visualization.md`. Every candidate
-must reconcile those signatures through reuse or an exact semantic/owner/lifecycle reason for
-divergence. A candidate that creates an unrelated local visual language is invalid before ranking.
+`fe/request-compile` authors the single canonical UI contract from approved authority. Direction,
+source, capture, and review artifacts compile outward from that contract; they do not silently
+re-author intent, behavior, ownership, or scope. User feedback is evidence. If it contradicts a prior
+PASS, invalidate the claim, bind the visible counterexample, and continue only through the one owned
+repair route or a typed domain exit.
 
-After runtime observation and before semantic/UX/UI audit, run `fe/product-potential` as mandatory
-neutral capability synthesis. Reconstruct the authority-backed user-outcome graph as though the
-incumbent UI did not define the answer, then classify the complete target with `ADD`, `CHANGE`,
-`REMOVE`, or `KEEP`. Test required nodes, transitions, feedback, recovery, and terminal outcomes: a
-visible `A` and `C` do not make `A -> B -> C` complete when `B` or either relation is absent. Existing
-features are evidence, not a scope ceiling; new ideas are hypotheses, not automatically valuable.
-Every decision binds a user outcome, rationale, evidence, and smallest likely owner. The parent Skill
-uses those typed deltas to select later frontend operators or to emit a correlated CALL to business or
-backend; the atomic operator never routes itself. A missing or invalid capability-delta product blocks
-the mission, so visual polish cannot certify an incomplete product.
+The machine routes `compiled` directly from `result.directionMode`; it does not re-read raw mission
+intent in a second policy stage. Invocation binding proves that the compiled projection still equals
+the validated mission input.
 
-Treat user analysis as high-value evidence, not automatic implementation authority. Say which observed problem is valid, challenge a proposed remedy when its glyph, tone, business meaning, ownership, or reuse contract is contradictory, then take the strongest reversible correction inside the frozen scope. Preserve the requested outcome without literalizing a weaker method.
+For reconstruct/new, `fe/direction-generate` must return its real inspectable visualization artifact.
+`directionMode=dominant` produces one evidence-selected direction with `requiresChoice=false` and
+continues directly to apply. Only `directionMode=alternatives`, justified by material visual ambiguity
+after Grammar is valid or an explicit user request to compare, produces three or four alternatives
+with `requiresChoice=true` and enters the user-choice wait. Refine applies the compiled correction directly. A direction mock is never delivery
+proof.
 
-When the owner says the business behavior is already correct and requests UI/UX-only or render-only
-work, bind the `ui-only-preserve-business` fast lane from
-`knowledge/audit-loop-v75-alpha.md`. Do not run product-potential as license to add behavior and do not
-create routes, API/GraphQL operations, remote-mutation hooks, fixtures, auth behavior, or persistence.
-Repair misleading controls only through an already-authorized route/outcome or emit the exact
-business gap. Validate the complete tracked and untracked diff against the frozen exact-file set
-after every mutation; green tests never excuse an authority escape.
+## UI-only execution boundary
 
-When user feedback contradicts a frontend `DONE` or `PASS`, first invalidate that verdict and explain
-why the previous implementation/review accepted the bad result: name the prior claim, its supporting
-assumption or incomplete evidence, the visible counterexample, and the omitted review or authority
-check. Then repair; only when the failure exposes a systematic review or authority gap, improve the
-smallest owning `.claude` review mechanism and its regression proof. Never compile one page's spacing,
-composition, or suggested patch into a general UI law. Never answer confirmed counterevidence with
-only an apology or "đã sửa" summary.
+Local FE missions consume the centralized runtime from `.claude/config.yaml`. They do not start,
+stop, restart, replace, or kill FE, API, identity, tunnel, or Browser processes and do not rebind
+ports or environment. Runtime or account readiness gaps go to their existing delegated owner.
 
-Before selection or target-source inspection, compile the complete mission `scope` required by
-`scope.yaml`. Frontend UX/UI missions add exactly one `frontend.ux-ui.change-level` dimension from
-`knowledge/ux-ui-change-levels.md`: `refine`, `reconstruct`, or `new`. This is one conditional scope
-dimension, not the whole scope. If any material dimension is unresolved, ask one focused question
-that names the competing boundaries, then wait. Never infer scope from current source or from
-`audit`/`redesign` alone.
+Grammar and shared composition contracts remain fail-closed. Consume published compositions rather
+than imitating their anatomy in local CSS. A missing reusable interface is `grammar-required`:
+reconcile and publish the smallest exact Grammar authority, then resume `request-compile`. Never use a
+product-local CSS workaround. Do not
+compile one page's spacing, padding, dividers, cards, or leaderboard treatment into a global law.
 
-Frontend UX/UI missions also add exactly one `frontend.layout.owner-ceiling`. Bind the executable
-`layoutOwnerCeiling` to the target owner, mutable nested-layout owners, explicitly authorized mutable
-ancestor owners, and immutable ancestor owners. Every exact file names one of those owners. Source
-mutation is valid only when the file owner is inside the mutable set allowed by the frozen ceiling.
-Ancestors outside it—including parent shells, global headers, and navigation—remain observation-only
-context. If a confirmed defect belongs above the ceiling, return `authorization-required` with the
-exact owner and files, then WAIT for the existing mutation choice; never widen the boundary because
-an ancestor could repair the pixels more conveniently, and never relabel that finite route as a
-terminal blocker.
+The source writer stays inside the frozen exact-file and owner boundary. After every mutation, compare
+the complete tracked and untracked delta with that boundary. Static checks, component names, DOM
+measurements, and implementation rationale cannot certify the pixels.
 
-For every browser-visible change, apply `knowledge/ui-render-review.md` as an enforced adversarial
-loop after the latest source mutation: `apply/repair -> capture-preflight -> render-capture -> AI visual-fidelity`. Capture preflight deterministically rejects bad data, false steady/skeleton identity, ineffective controls, incomplete probes, failed scroll/zoom restoration, duplicate rasters, or the wrong handoff host before any Sol review is called. The AI
-first tries to falsify the pixels without source, DOM, measurements, rules, Grammar, or implementer
-rationale. When it finds a potential problem, only then compare the observation with `knowledge/ui.md`
-and routed Grammar, classify whether the smallest demonstrated owner is implementation, Grammar, UI
-knowledge, product authority, or another domain, repair that owner, recapture, and restart AI pixel
-review from a blank verdict. Knowledge and Grammar diagnose or govern the correction; they can never
-explain away a bad raster. Only a fresh adversarial `visual-fidelity=passed` from the distinct blind Sol reviewer may advance to quality handoff. Never close from source inspection, DOM/geometry measurements, lint, tests,
-accessibility output, numeric thresholds, or a previous screenshot. Without this complete loop, the
-frontend mission is not complete.
+When the compiled constraint includes `delivery-mode=ui-only-preserve-business`, preserve business
+behavior and allow presentation-only changes in the exact listed files. Do not add API/GraphQL
+operations, remote mutations, persistence, auth/session behavior, fixtures, or business actions. Keep
+one observable writer for the owner group; never let two tasks repair the same page group concurrently.
 
-For audit intent, the executable initial route is `ui-audit -> baseline-review
-(fe/baseline-visual-review) -> authority-gap-classify -> audit-route`. The baseline operator uses one
-fresh Sol and 3-8 representative rasters; it may emit FAIL or SUSPENSE but never PASS. A direct
-dominant change renders exactly one direction before Grammar binding for audit and non-audit work.
+## Capture and blind visual proof
 
-The enforced outer chain is `score latest evidence -> audit-route -> repair or dominant reconstruct -> recapture -> rescore -> quality-handoff`. Its compatibility receipt chain remains `apply/repair -> capture-preflight -> render-capture -> one fresh Sol visual-fidelity -> audit-route -> quality-handoff`. That single Sol receives one complete owner-partitioned blind raster and probe packet, performs the full adversarial visual review, and owns the typed visual verdict; no second AI review stage follows it. If a screenshot edge makes a surface look collapsed, clipped, or absent without an adjacent lifecycle raster proving it inside the viewport, visual fidelity returns `insufficient-evidence` with score `N/A` and routes directly to capture preflight; do not mutate or reconstruct from that ambiguity. `fe/audit-route` is executable authority, not prose: scores 7-8 permit one batched smallest-owner repair. A score below 7 reconstructs only when direct-owner structural findings prove composition failure; a low score caused by a shared overlay, auth/session, business, or backend defect routes to that owner instead of redrawing an unrelated page. Structural scores below 7 freeze the batch, generate exactly one dominant replacement layout, visualize it, and construct it immediately inside the approved boundary. Generate three or four alternatives and wait for direction choice only when the user explicitly asks for options. Round 1 discovers the complete finding batch, round 2 verifies the chosen route, and round 3 onward attacks regressions while the mission is still making measurable progress. A round number is never a blocker. Stop only for canonical PASS, a genuine missing authority/runtime/permission after its typed route has been attempted, or three consecutive identical progress fingerprints proving no progress. A frontend finding routes to the score-selected repair or reconstruct path; a Grammar/UI-knowledge finding routes to authority repair; a product/business or backend finding emits the corresponding typed CALL and resumes this exact mission after RETURN. A mutation above the frozen layout-owner ceiling requests exact authorization and resumes after the choice; it is not reported as terminal `BLOCKED` merely because the current ceiling is narrower.
-Capture full-viewport screenshots after the latest source mutation and inspect the images themselves. A visual repair takes
-the inner path `visual-fidelity -> finding-classify -> authority-reconcile or one batched source-repair ->
-capture-preflight -> render-capture`; it rejoins the outer chain only with fresh evidence.
+After the latest mutation, freeze the render-state matrix and owner partitions, then execute
+`capture-preflight -> render-capture -> visual-fidelity`. Preflight must reject bad or missing data,
+false steady/skeleton identity, ineffective controls, incomplete probes, failed scroll or zoom
+restoration, duplicate rasters, stale source binding, or the wrong handoff host before review.
 
-The capture count is not the review. The ten capture-preflight readiness checks are binary capture
-mechanics, never a ten-point UI scale. Never serialize or narrate their count as `x/10`, a percentage,
-a star rating, or a visual-quality claim. One failed or missing readiness check makes preflight
-non-ready and forbids any visual-quality conclusion. Canonical visual quality is only the typed
-`PASS`, `FAIL`, `SUSPENSE`, or `BLOCKED` verdict produced from the complete latest-source raster
-review; checks cannot compensate for one another. Every complete review emits the structured
-noncanonical audit score internally and appends one immutable `auditScoreHistory` record. If the user
-explicitly asks for a numeric score, preserve `auditTargetScore` and show its five evidence-backed axis values
-plus the previous-round delta. Each history record binds round, typed verdict, source fingerprint,
-evidence fingerprint, and finding-batch fingerprint; every CALL/RETURN resume carries the complete
-ledger without rewriting earlier records. A score at or
-above 9 is invalid unless the typed verdict is `PASS`; any visible repair finding caps the score at 8.
-Below-target findings must continue through the score-selected reconstruct/repair route or typed cross-domain CALL,
-fresh capture, and rescore. When the required raster or lifecycle matrix is incomplete, report
-insufficient evidence instead of a number. A numeric estimate can never override or soften the typed
-verdict, and the score target can never authorize mutation outside the frozen boundary.
+The primary whole-page proof is a real populated happy-case steady state that renders every major
+region and the core task. Empty, loading, skeleton, error, and recovery states are secondary evidence
+only. If a populated hero cannot be observed, the result is `insufficient-evidence / N/A`, never PASS
+or 9/10.
 
-For `audit` intent, compile the complete direct feature owner group before capture: the target page,
-all feature-owned pages, page-local/route-nested layouts, and feature-owned or directly nested modals
-and drawers exercised by the flow. Put their owner refs in the frozen target/inclusion boundary and
-do not stop after auditing one member. Shared branches, global overlays, application shells, and
-ancestors outside the approved ceiling remain immutable. Record their findings and continue every
-remaining direct-group repair. If a shared finding is still required for feature closure, send one
-authority request to the Control Panel with the exact owner/files, visible defect, smallest change,
-consumer regression matrix, and in-scope alternatives considered. Do not stop without reporting, do
-not clone shared behavior into a local owner, and do not claim feature PASS/9+ until the owner grants
-the shared scope or explicitly accepts an evidence-backed debt/exclusion.
+Capture the full applicable viewport and lifecycle matrix after the latest mutation. Bind every
+raster and probe to the same source, matrix, partition, and packet fingerprints. Applicable viewport,
+zoom, page-scroll, bounded-scroll, content-stress, transition, sticky/fixed/overlay, drag,
+keyboard-focus, and neighboring-composition probes need their own observed image. An unsupported
+probe is `not-applicable` only with an exact ownership reason. Probe/capture mismatch or stale binding
+is terminal counterevidence.
 
-Every audited application owner of kind `page`, `layout`, `modal`, or `drawer` also owns a durable
-lowercase `audit.md` beside its source. Read and apply
-[`knowledge/frontend-owner-audit.md`](../../knowledge/frontend-owner-audit.md) whenever any of these
-owners enters the render-state matrix. After each complete visual review, append the owner-specific
-round to that file and refresh only its current snapshot. Record the typed verdict, noncanonical score,
-five evidenced axes, concise `reason why`, covered states/viewports/interactions, source/evidence/finding
-fingerprints, and remaining gaps. Manual owner feedback is append-only counterevidence and must stay
-visibly distinct from AI findings. Never manufacture `PASS` from a requested label: `9/10` requires the
-same fresh typed `PASS` that controls the mission, and incomplete page/modal/layout/drawer evidence is
-`INSUFFICIENT_EVIDENCE`, not a score. A mutation affecting an owner marks its prior snapshot `STALE`
-without rewriting history. Missing or invalid required owner `audit.md` files block quality/UAT handoff.
+`fe/visual-fidelity` runs once per round under one distinct fresh `gpt-5.6-sol` execution with
+`forkTurns=none`. It receives only the immutable raster packet: no source, DOM, measurements, tests,
+authority text, producer rationale, suspected defect, intended answer, prior verdict, or score. It
+attacks purpose/content, composition/spacing, and interaction/responsive behavior from the pixels.
+Every raster and applicable probe receives its required inspection record.
 
-Maintain one observable writer per owner group. `active` without a recent tool event, validated
-receipt, or owned source delta is not progress. Send STOP/checkpoint to a silent writer and transfer
-ownership only after terminal status, or an explicit handoff plus two stable read-only diff checks.
-A late write after STOP is an overlap finding: stop mutation, reconcile the exact task-owned delta,
-then resume with one named writer. Never let two tasks repair the same page group concurrently.
+The reviewer judges whole-page hierarchy, information density, card/surface composition, internal
+padding, section rhythm, divider ownership, alignment, typography, color/material finish, content
+coherence, responsive reflow, wrapping, clipping, occlusion, affordance, fixed-edge clearance, and
+empty-space balance. A cropped component, clean skeleton, accessibility report, screenshot count,
+readiness-check count, or green test cannot raise the visual verdict.
 
-Use evidence profiles proportional to the phase. Baseline routing uses the smallest representative packet that includes wide, compact, the core task, and the worst recovery or constrained state; it cannot certify PASS. Repair rounds recapture changed owner partitions, adjacent sentinels, and affected interactions only, with dependency proof for reused evidence. Closure alone expands to the complete applicable render-state and lifecycle matrix. A probe is required only when the owner actually exposes that capability; an exact owner reason marks it not applicable.
+## Terminal predicates and closure
 
-Once a screenshot is captured, enter blind pixel review: temporarily exclude source code, DOM/computed-style facts, tests, measurements, implementation rationale, and the implementer's intended design from the visual verdict. Judge what a user can actually see. Those excluded artifacts may diagnose a confirmed defect later, but they cannot explain away pixels or raise the verdict.
+Visual PASS is forbidden when any of these is true:
 
-Before any visual verdict, emit one inspection record for every screenshot cell covering page inset, surface opacity, content-to-border padding, alignment, vertical rhythm, hierarchy, visual ownership, pinned-boundary clearance, wrapping, clipping, occlusion, semantic utility, content coherence, affordance, responsive composition, visual consistency, and empty-space balance. Assign every visible heading, label, status, value, action, and control to the rendered section owner a user without source knowledge would perceive; an external label row plus its framed surface may be one legitimate owner, so DOM ancestry and frame containment are not proof. Inspect the owner with the preceding and following peers and inspect every sticky/fixed edge against its nearest content at scroll start, middle, and terminal. “No overlap” cannot pass a surface that visibly touches or is cut off by a pinned boundary. Challenge every visible object: what user purpose does it serve here, is it understandable without implementation context, is it redundant or stale, and does its prominence match its value? A meaningless object includes debug residue, placeholder copy, duplicated actions, decorative noise, orphan labels, empty shells, misleading controls, or large dead zones without a user purpose; any of these is `repair`. An object visually bound to the wrong sibling or floating between owners, text touching a rounded border, content visible through a sticky/fixed surface, an action cut by an edge, inconsistent peer insets, weak or conflicting hierarchy, or desktop merely squeezed into compact are also `repair` even when controls remain technically reachable.
+- the compiled contract, exact mutation boundary, or latest-source binding is missing or stale;
+- the populated happy-case hero or an applicable state, viewport, lifecycle, or probe is absent;
+- preflight is not ready, raster/probe partitions disagree, or any review record is missing;
+- any structured visual finding, uncertainty, contradiction, clipping, overlap, misleading control,
+  unfinished composition, weak hierarchy, bad padding/divider ownership, or responsive defect remains;
+- the implementer reviewed its own work, the Sol execution is not fresh and isolated, or non-pixel
+  evidence influenced the blind verdict;
+- the same finding survives the single permitted source-apply repair loop or progress repeats.
 
-Freeze a render-state matrix and owner partition map before capture. It includes every in-scope entry, task, skeleton,
-loading, pending, empty, recovery, result, and exit state at every required viewport, plus the exact
-state that will be left visible at handoff. Skeleton and loading are independent visual products, not
-temporary exceptions: when owned by the surface, each requires fresh raster capture and AI
-visual-fidelity PASS. The core surface roles remain entry, task, pending, recovery, result, and exit;
-skeleton, loading, and empty are additional independent visual states. The handoff proof must include
-an uncropped host-context screenshot from the
-exact browser surface and content viewport the user will see, without a viewport override; a detached
-or emulated browser raster does not certify a narrower in-app panel. An overlay image does not certify
-the obscured entry surface, and an audited task state does not certify a different state left visible
-at handoff. A source mutation invalidates every affected owner partition plus all shared sentinels. An
-unaffected partition may reuse its prior raster only when deterministic dependency proof binds it to
-the unchanged source boundary; absence of that proof invalidates it. Any handoff-state change,
-host-surface change, or handoff viewport change invalidates the host and dependent partitions and
-returns the mission to capture preflight.
-The exact handoff state must therefore have fresh visual evidence.
+A complete review may append the noncanonical audit score ledger. Numeric score never replaces the
+typed verdict; PASS requires at least 9, any finding caps the score at 8, and missing evidence is N/A.
+The ten preflight checks are mechanics, not a ten-point scale.
 
-For draggable, scrollable, sticky, fixed, zoom-sensitive, or overlay-bearing surfaces, a reload
-screenshot is insufficient. Run the applicable interaction lifecycle from
-`knowledge/ui-render-review.md`: capture page scroll at start, middle, end, and restored; every bounded
-scroll at both limits and restored; zoom-in, zoom-out, and restored baseline; plus edge drags and
-overlay transitions. This lifecycle still includes edge drags, scroll limits, zoom changes,
-restoration, and fresh AI-reviewed rasters. Every post-interaction raster must independently pass AI
-visual-fidelity. A
-control that can leave its usable safe area, become unrecoverable, jump, clip, or change ownership is
-a visual/interaction `FAIL` even when its resting render passes.
-This proof exercises edge drags, scroll limits, zoom changes, restoration, and state transitions.
+After blind visual PASS, emit a one-way handoff to `starci-quality-assure`. Consume its exact RETURN
+only at `quality-return`, then hand off one way to `starci-uat-verify`. Consume its canonical final
+RETURN at `uat-return` to complete, or its explicit counterevidence RETURN at `reapply` for one new
+source/capture/review cycle. Quality or UAT cannot route back to analysis or direction generation. A new contradiction after terminal closure uses
+the runtime's canonical counterevidence mechanism rather than pretending the old verdict still holds.
 
-Before capture, freeze an adversarial probe matrix whose purpose is to falsify the implementation,
-not confirm it. It must cover viewport extremes and breakpoint-adjacent widths; zoom/text scaling;
-page and every bounded scroll owner at both limits; longest, shortest, missing, dense, sparse, and
-wrapping content; material state transitions; sticky/fixed/overlay collisions; drag constraints;
-keyboard/focus traversal; and the changed surface together with its parent, preceding and following
-siblings, and page terminal. Attempt every applicable probe and preserve a fresh image plus observed
-outcome. `not-applicable` requires an exact ownership reason. Do not stop at the first defect. Missing
-an applicable probe or presenting only a pretty baseline screenshot can never produce `PASS`.
-
-The implementer cannot issue the visual verdict. `visual-fidelity` runs under one distinct fresh Sol execution that receives only the raster packet, without authority text, source, DOM, measurements, tests, previous feedback, suspected defects, intended answer, or implementer rationale. If that execution is unavailable, uncertain, or missing any raster inspection record, the mission remains incomplete; self-review never degrades into `PASS`.
-
-Auto-apply a dominant next action inside the frozen change level. Ask the user only when scope is not
-yet frozen or authority classification proves no dominant action. Scope clarification names the
-competing boundaries. Every `redesign`/`reconstruct` without an already approved direction applies
-`knowledge/direction-visualization.md`: brainstorm one dominant direction, render a realistic
-representative page or substantial-surface mockup through `visualize`, show wide and constrained
-responsive composition plus material interaction/recovery states, then construct immediately. Only
-an explicit user request for alternatives generates three or four materially different directions and
-enters `direction-choice`. Prose, Mermaid, ASCII wireframes, tables, or a written layout plan are not
-visible direction proof.
-Every frozen frontend contract also records one media decision: no media, reuse an approved asset, or
-generate a purpose-built bitmap. Image generation is an asset-production method, not design authority:
-use it only from an approved media brief whose user purpose, placement, responsive treatment, and
-alternative intent are frozen. A generated asset returns to the ordinary source-apply and complete
-render-review loop; never use it to mask unedited copy or replace business, UX, UI, or Grammar decisions.
-Product-family coherence does not require imagery on every page. For a below-7 reconstruct with a
-dead-space, orientation, explanation, identity, evidence, or empty-state finding, actively test whether
-structure alone resolves the problem. Select `no media` when imagery would distract or merely fill area;
-reuse or generate media only when the evidence-backed brief gives it a recognizable user purpose and
-the final raster proves that purpose across responsive states.
-Cross-domain gaps hand off to `starci-business-process` or `starci-backend-process` with an exact
-mission and resume state. Closure hands off to quality and `starci-uat-verify`; consume their receipt
-before completing. A local test suite, screenshot count, or independent visual verdict cannot replace
-the typed quality RETURN followed by the typed UAT RETURN. UAT must independently prove Behavior,
-UX, and UI for the frozen product-decision cases before frontend `complete` is reachable. Before an
-authenticated UAT browser action, acquire one mission-scoped UAT session lease and provision one
-fresh run-scoped logical account plus its smallest required fixture inside the declared environment.
-This fresh-account requirement begins at product UAT or any state-mutating/reset-sensitive case. A
-preceding read-only visual audit may instead acquire a new mission lease over a compatible broker-held
-UAT-pool context after the prior lease is released and compatibility is proved; it must not prompt for
-credentials or misrepresent that pool identity as a fresh product-UAT account.
-Reuse that account and isolated Browser context across audit, repair, recapture, quality, and UAT
-rounds in the same canonical mission. Rotate only for a new product case that requires reset or proven
-continuity loss. Bind the lease to the mission, account ref, Browser context ref, principal
-fingerprint, runtime generation, origin, fixture namespace, and expiry; never persist a secret in the
-lease. Never ask the user to lend a personal account,
-reuse a prior test account, or treat a signed-out/skeleton render as authenticated proof. Missing
-provisioning authority or secure configuration is an exact UAT blocker, not permission to borrow an
-identity. A localhost product-UAT round verifies the frozen behavior, UX, and UI contract; it does not
-silently expand into a security assessment. Defer security findings and hardening to an explicitly
-scoped security mission unless they directly prevent the current UAT flow. This separation never
-waives host/browser sensitive-input requirements. Use the Browser's supported secure authentication
-mechanism; never read, reconstruct, log, persist, or type passwords or OTPs through ordinary page
-automation. Group the imminent login sequence into one uninterrupted secure transaction when the
-Browser supports it. Do not end a turn while holding a temporary tab, OTP challenge, or model-memory
-credential. A repeated confirmation is valid only when the secure Browser mechanism explicitly
-requires it after destination, scope, or lease continuity changed.
-
-An opaque Browser handoff ref never proves that this task can execute against the tab. Before direct
-Browser action, require a current-turn consumer inventory observation bound to the lease. If the tab
-does not materialize, do not retry handoff refs or provision another identity. Preserve the same
-authenticated lease, switch to broker-executed mode, send typed action/capture plans to the Control
-Panel Browser owner, and consume only returned evidence bound to the exact mission, source, runtime,
-principal, state and viewport. The frontend task retains audit and repair authority.
+For every audited application owner of kind page, layout, modal, or drawer, preserve its adjacent
+lowercase `audit.md` as latest evidence and append-only history. Missing or stale owner audit evidence
+blocks quality/UAT handoff. Never manufacture PASS from a requested label.
 
 ## Runtime continuation
 
-Every peer call emits a typed CALL and is resumed only by consuming a correlated runtime `RETURN` receipt. Mission id, parent-child id, authority/source heads, resume state, and progress fingerprint must match. Repeated repair or peer-call fingerprints block as no-progress cycles.
+Every peer call emits a typed CALL and resumes only from a correlated runtime RETURN. Mission,
+parent-child identity, authority/source heads, resume state, and progress fingerprint must match.
+Accept only current v7.6 typed receipts. An exact portable checkpoint may continue only through its
+canonical workspace route and current receipt; legacy versions, aliases, and stale migration
+artifacts are rejected instead of becoming an FE resume path. Repeated progress fingerprints, missing authority, or an invalid
+receipt close fail-safe as `blocked`.

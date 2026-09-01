@@ -21,7 +21,8 @@
       "additionalProperties": false,
       "required": [
         "contextRefs",
-        "sourceRefs"
+        "sourceRefs",
+        "readinessReturnReceiptRef"
       ],
       "properties": {
         "contextRefs": {
@@ -31,6 +32,11 @@
         "sourceRefs": {
           "description": "Exact routed source references allowed for this job.",
           "$ref": "#/$defs/refs"
+        },
+        "readinessReturnReceiptRef": {
+          "description": "Exact validated readiness-inventory RETURN for this Quality run.",
+          "type": "string",
+          "pattern": "^receipt:[A-Za-z0-9._-]+$"
         }
       }
     },
@@ -40,7 +46,9 @@
       "required": [
         "project",
         "objectiveRef",
-        "sourceFingerprint"
+        "sourceFingerprint",
+        "debtPolicy",
+        "origin"
       ],
       "properties": {
         "project": {
@@ -57,11 +65,36 @@
         "sourceFingerprint": {
           "description": "Frozen fingerprint for the supplied source evidence.",
           "$ref": "#/$defs/sha256"
+        },
+        "debtPolicy": {
+          "description": "Exact mutation/debt policy projected from the Quality mission.",
+          "enum": ["allowed", "forbidden"]
+        },
+        "origin": {
+          "description": "Exact final frontend visual PASS projection for verification-only Quality, otherwise null.",
+          "$ref": "#/$defs/feOrigin"
         }
       }
     }
   },
   "$defs": {
+    "feOrigin": {
+      "anyOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["fromSkillId", "visualPassReturnReceiptRef", "sourceFingerprint", "evidenceFingerprint", "auditRefs"],
+          "properties": {
+            "fromSkillId": { "const": "starci-fe-process" },
+            "visualPassReturnReceiptRef": { "type": "string", "pattern": "^receipt:[A-Za-z0-9._-]+$" },
+            "sourceFingerprint": { "$ref": "#/$defs/sha256" },
+            "evidenceFingerprint": { "$ref": "#/$defs/sha256" },
+            "auditRefs": { "type": "array", "minItems": 1, "maxItems": 16, "uniqueItems": true, "items": { "type": "string", "pattern": "(^|[\\\\/])audit\\.md$" } }
+          }
+        },
+        { "type": "null" }
+      ]
+    },
     "sha256": {
       "type": "string",
       "pattern": "^sha256:[0-9a-f]{64}$"

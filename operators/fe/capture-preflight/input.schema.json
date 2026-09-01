@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://starci.dev/v7.5.0-alpha.1/operators/fe/capture-preflight/input.schema.json",
+  "$id": "https://starci.dev/v7.6.0-beta.1/operators/fe/capture-preflight/input.schema.json",
   "type": "object",
   "additionalProperties": false,
   "required": ["schemaVersion", "operatorId", "context", "input"],
@@ -10,21 +10,25 @@
     "context": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["authorityRefs", "evidenceRefs", "uiKnowledgeId", "sourceFingerprint", "debug"],
+      "required": ["authorityRefs", "evidenceRefs", "uiKnowledgeId", "resumeState", "debug"],
       "properties": {
         "authorityRefs": { "description": "Exact frozen frontend authority references.", "type": "array", "minItems": 1, "maxItems": 64, "uniqueItems": true, "items": { "type": "string", "minLength": 1 } },
         "evidenceRefs": { "description": "Exact deterministic runtime evidence references.", "type": "array", "maxItems": 64, "uniqueItems": true, "items": { "type": "string", "minLength": 1 } },
         "uiKnowledgeId": { "description": "Exact StarCi UI knowledge binding.", "const": "fe.ui" },
-        "sourceFingerprint": { "description": "Latest source fingerprint to freeze before capture.", "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
+        "resumeState": { "description": "Exact FE preflight state restored after a backend handoff.", "enum": ["capture-preflight", "recapture-preflight"] },
         "debug": { "description": "Preflight state and decisions must be visible in terminal debug.", "const": true }
       }
     },
     "input": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["targetRef", "round", "matrix", "partitions", "readinessChecks"],
+      "required": ["targetRef", "compiledRequestRef", "compiledRequestFingerprint", "sourceApplyReturnReceiptRef", "aggregateAfterFingerprint", "round", "matrix", "partitions", "readinessChecks"],
       "properties": {
         "targetRef": { "description": "One closed frontend target.", "type": "string", "minLength": 1 },
+        "compiledRequestRef": { "description": "Exact author-once compiled request that froze the proof matrix.", "type": "string", "pattern": "^compiled-request://" },
+        "compiledRequestFingerprint": { "description": "Exact fingerprint of the author-once compiled request; it is inherited, never recomputed from capture inputs.", "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
+        "sourceApplyReturnReceiptRef": { "description": "Exact runtime-issued source-apply RETURN bound to the latest mutation.", "type": "string", "pattern": "^receipt:[A-Za-z0-9._-]+$" },
+        "aggregateAfterFingerprint": { "description": "Aggregate fingerprint of exact mutation effect paths and after hashes.", "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
         "round": {
           "description": "Visual round and its fixed purpose; later regression-attack rounds remain legal while progress continues.",
           "type": "object",
@@ -39,13 +43,39 @@
           "description": "Immutable render-state, viewport, and adversarial-probe matrix.",
           "type": "object",
           "additionalProperties": false,
-          "required": ["matrixRef", "matrixFingerprint", "renderStates", "viewports", "probeRefs"],
+          "required": ["matrixRef", "matrixFingerprint", "states", "viewports", "probeRefs", "populatedHeroStateRef", "coreTaskRef", "cells"],
           "properties": {
             "matrixRef": { "type": "string", "pattern": "^matrix://[a-z0-9][a-z0-9._/-]*$" },
             "matrixFingerprint": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
-            "renderStates": { "type": "array", "minItems": 1, "maxItems": 32, "uniqueItems": true, "items": { "type": "string", "minLength": 1 } },
+            "states": {
+              "type": "array", "minItems": 1, "maxItems": 32,
+              "items": {
+                "type": "object", "additionalProperties": false,
+                "required": ["stateRef", "lifecycle", "populated", "coreTaskVisible"],
+                "properties": {
+                  "stateRef": { "type": "string", "minLength": 1 },
+                  "lifecycle": { "enum": ["happy-case", "loading", "empty", "error", "recovery", "result"] },
+                  "populated": { "type": "boolean" },
+                  "coreTaskVisible": { "type": "boolean" }
+                }
+              }
+            },
             "viewports": { "type": "array", "minItems": 3, "maxItems": 3, "uniqueItems": true, "items": { "enum": ["wide", "intermediate", "compact"] } },
-            "probeRefs": { "type": "array", "minItems": 10, "maxItems": 96, "uniqueItems": true, "items": { "type": "string", "pattern": "^probe-[a-z0-9-]+$" } }
+            "probeRefs": { "type": "array", "minItems": 22, "maxItems": 22, "uniqueItems": true, "items": { "type": "string", "pattern": "^probe-[a-z0-9-]+$" } },
+            "populatedHeroStateRef": { "type": "string", "minLength": 1 },
+            "coreTaskRef": { "type": "string", "minLength": 1 },
+            "cells": {
+              "type": "array", "minItems": 3, "maxItems": 96,
+              "items": {
+                "type": "object", "additionalProperties": false,
+                "required": ["cellRef", "stateRef", "viewport"],
+                "properties": {
+                  "cellRef": { "type": "string", "pattern": "^proof-cell-[0-9]{3}$" },
+                  "stateRef": { "type": "string", "minLength": 1 },
+                  "viewport": { "enum": ["wide", "intermediate", "compact"] }
+                }
+              }
+            }
           }
         },
         "partitions": {

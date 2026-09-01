@@ -3,13 +3,17 @@
 | Field | Value |
 | --- | --- |
 | Knowledge ID | `fe.product-seeding` |
-| Operators | `product-seed` |
+| Contract revision | `7.6.0` |
+| Operators | `fe/request-compile, fe/capture-preflight` |
 | Search tags | `seed, fixture, state, reproducible, business evidence` |
 | Dependencies | `fe.state-modeling` |
 
-## Record
+## Internal fixture guidance
 
-Browser proof is meaningful only when required product states can be reproduced from evidence-backed fixtures or safe setup operations.
+Browser proof is meaningful only when required product states can be reproduced from evidence-backed
+fixtures or safe setup operations. Fixture planning belongs to compile and safe setup belongs to the
+owning capture/UAT boundary; seeding is not a visible frontend stage or permission to manufacture an
+outcome.
 
 Create the smallest deterministic seed for each consequential product state selected by the flow compiler. A meaningful populated render may require run-namespaced records across several related tables or services; that is valid fixture preparation only when it completes before Browser execution, stays inside the declared case namespace, and does not create the business outcome under test. A seed records business evidence, setup action, stable locator, expected state, cleanup or isolation, and a receipt.
 

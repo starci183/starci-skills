@@ -4,7 +4,7 @@
 | --- | --- |
 | Knowledge ID | `fe.grammar-core-object-overlays-feedback` |
 | Package | `@starci/grammar/core` |
-| Operators | `grammar-convergence` |
+| Operators | `fe/authority-reconcile` |
 | Search tags | `dialog, sheet, popover, tooltip, toast, inline feedback, focus return` |
 | Dependencies | `fe.grammar-core-overview, fe.grammar-common-states-accessibility` |
 

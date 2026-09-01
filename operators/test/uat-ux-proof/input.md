@@ -3,6 +3,8 @@
 ## Context
 
 - `context.snapshotRef`: Frozen canonical snapshot.
+- `context.behaviorProofReturnReceiptRef`: Exact validated behavior-proof RETURN.
+- `context.sourceFingerprint`: Exact source inherited from behavior proof.
 
 ## Input
 

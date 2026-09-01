@@ -23,13 +23,17 @@
         "result",
         "gaps",
         "evidenceRefs",
-        "handoff"
+        "handoff",
+        "repair"
       ],
       "properties": {
         "outcome": {
           "description": "Typed result routed only by the parent Skill machine.",
           "enum": [
             "compiled",
+            "grammar-required",
+            "business-required",
+            "backend-required",
             "blocked"
           ]
         },
@@ -41,6 +45,23 @@
               "additionalProperties": false,
               "required": [
                 "summary",
+                "compiledRequestRef",
+                "compiledRequestFingerprint",
+                "objective",
+                "targetRef",
+                "uxUiChangeLevel",
+                "directionMode",
+                "directionEvidence",
+                "behaviorContractRef",
+                "behaviorContractFingerprint",
+                "grammarBinding",
+                "proofMatrix",
+                "proofMatrixFingerprint",
+                "constraints",
+                "negativeBoundary",
+                "acceptanceCriteria",
+                "sourceBoundary",
+                "sourceBoundaryFingerprint",
                 "artifactRefs"
               ],
               "properties": {
@@ -48,9 +69,139 @@
                   "type": "string",
                   "minLength": 1
                 },
+                "compiledRequestRef": { "type": "string", "pattern": "^compiled-request://" },
+                "compiledRequestFingerprint": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
+                "objective": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "targetRef": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "uxUiChangeLevel": {
+                  "enum": ["refine", "reconstruct", "new"]
+                },
+                "directionMode": {
+                  "enum": ["none", "dominant", "alternatives"]
+                },
+                "directionEvidence": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["classification", "evidenceRefs"],
+                  "properties": {
+                    "classification": { "enum": ["not-applicable", "dominant", "ambiguous", "comparison-requested"] },
+                    "evidenceRefs": {
+                      "type": "array",
+                      "uniqueItems": true,
+                      "minItems": 1,
+                      "maxItems": 32,
+                      "items": { "type": "string", "minLength": 1 }
+                    }
+                  }
+                },
+                "behaviorContractRef": { "type": "string", "minLength": 1 },
+                "behaviorContractFingerprint": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
+                "grammarBinding": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["packageRef", "manifestRef", "exportRefs", "contentSha256", "authorityRevision"],
+                  "properties": {
+                    "packageRef": { "type": "string", "pattern": "^grammar-package://" },
+                    "manifestRef": { "type": "string", "pattern": "^grammar://" },
+                    "exportRefs": { "type": "array", "minItems": 1, "maxItems": 32, "uniqueItems": true, "items": { "type": "string", "pattern": "^grammar://" } },
+                    "contentSha256": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
+                    "authorityRevision": { "type": "string", "minLength": 1 }
+                  }
+                },
+                "proofMatrix": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["matrixRef", "states", "viewports", "probeRefs", "populatedHeroStateRef", "coreTaskRef", "cells"],
+                  "properties": {
+                    "matrixRef": { "type": "string", "pattern": "^matrix://[a-z0-9][a-z0-9._/-]*$" },
+                    "states": {
+                      "type": "array", "minItems": 1, "maxItems": 32,
+                      "items": {
+                        "type": "object", "additionalProperties": false,
+                        "required": ["stateRef", "lifecycle", "populated", "coreTaskVisible"],
+                        "properties": {
+                          "stateRef": { "type": "string", "minLength": 1 },
+                          "lifecycle": { "enum": ["happy-case", "loading", "empty", "error", "recovery", "result"] },
+                          "populated": { "type": "boolean" },
+                          "coreTaskVisible": { "type": "boolean" }
+                        }
+                      }
+                    },
+                    "viewports": { "type": "array", "minItems": 3, "maxItems": 3, "uniqueItems": true, "items": { "enum": ["wide", "intermediate", "compact"] } },
+                    "probeRefs": { "type": "array", "minItems": 22, "maxItems": 22, "uniqueItems": true, "items": { "type": "string", "pattern": "^probe-[a-z0-9-]+$" } },
+                    "populatedHeroStateRef": { "type": "string", "minLength": 1 },
+                    "coreTaskRef": { "type": "string", "minLength": 1 },
+                    "cells": {
+                      "type": "array", "minItems": 3, "maxItems": 96,
+                      "items": {
+                        "type": "object", "additionalProperties": false,
+                        "required": ["cellRef", "stateRef", "viewport"],
+                        "properties": {
+                          "cellRef": { "type": "string", "pattern": "^proof-cell-[0-9]{3}$" },
+                          "stateRef": { "type": "string", "minLength": 1 },
+                          "viewport": { "enum": ["wide", "intermediate", "compact"] }
+                        }
+                      }
+                    }
+                  }
+                },
+                "proofMatrixFingerprint": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
+                "constraints": {
+                  "type": "array",
+                  "uniqueItems": true,
+                  "minItems": 1,
+                  "maxItems": 64,
+                  "items": { "type": "string", "minLength": 1 }
+                },
+                "negativeBoundary": {
+                  "type": "array",
+                  "uniqueItems": true,
+                  "minItems": 1,
+                  "maxItems": 64,
+                  "items": { "type": "string", "minLength": 1 }
+                },
+                "acceptanceCriteria": {
+                  "type": "array",
+                  "uniqueItems": true,
+                  "minItems": 1,
+                  "maxItems": 64,
+                  "items": { "type": "string", "minLength": 1 }
+                },
+                "sourceBoundary": {
+                  "type": "array",
+                  "uniqueItems": true,
+                  "minItems": 1,
+                  "maxItems": 64,
+                  "items": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": ["path", "beforeSha256", "ownerRef"],
+                    "properties": {
+                      "path": { "type": "string", "minLength": 1 },
+                      "beforeSha256": {
+                        "anyOf": [
+                          { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
+                          { "type": "null" }
+                        ]
+                      },
+                      "ownerRef": { "type": "string", "minLength": 1 }
+                    }
+                  }
+                },
+                "sourceBoundaryFingerprint": {
+                  "type": "string",
+                  "pattern": "^sha256:[0-9a-f]{64}$"
+                },
                 "artifactRefs": {
                   "type": "array",
                   "uniqueItems": true,
+                  "minItems": 1,
                   "maxItems": 64,
                   "items": {
                     "type": "string",
@@ -122,6 +273,23 @@
             {
               "type": "null"
             }
+          ]
+        },
+        "repair": {
+          "description": "Exact local Grammar-owner repair metadata, only for grammar-required.",
+          "anyOf": [
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["ownerRef", "gapRef", "resumeState", "inputRef"],
+              "properties": {
+                "ownerRef": { "type": "string", "pattern": "^grammar://" },
+                "gapRef": { "type": "string", "minLength": 1 },
+                "resumeState": { "const": "request-compile" },
+                "inputRef": { "type": "string", "minLength": 1 }
+              }
+            },
+            { "type": "null" }
           ]
         }
       }

@@ -3,6 +3,7 @@
 | Field | Value |
 | --- | --- |
 | Knowledge ID | `fe.ux-ui-change-levels` |
+| Contract revision | `7.6.0` |
 | Owners | `starci-fe-process`, global input analysis |
 | Search tags | `ux ui, audit, scope, layout, reconstruct, new, clarification` |
 
@@ -20,14 +21,14 @@ route-nested layouts. `ancestor-layouts-authorized` allows only the higher layou
 named by the user or durable authority. A parent shell, global navigation, or header remains
 observation context when excluded, even if changing it would make the target easier to repair.
 
-The executable boundary records one target owner, mutable nested layouts, any explicitly mutable
+The compiled boundary records one target owner, mutable nested layouts, any explicitly mutable
 ancestors, immutable ancestors, and the feature-owned/directly nested page-modal-drawer group. These
 sets are disjoint. Every exact file names its owner, and a file is rejected unless that owner is inside
 the mutable set permitted by the frozen ceiling. A shared branch outside the ceiling does not stop
 repair of the remaining direct feature group, but a required shared finding blocks feature PASS/9+
-until the task reports it to the Control Panel and the owner explicitly authorizes mutation or accepts
-an evidence-backed debt/exclusion. Cloning shared behavior into a local owner to bypass the ceiling is
-forbidden.
+until the canonical frontend machine returns a typed shared-owner exit and the caller supplies new
+authority and the owning repair is published/proved. No waiver converts the unresolved shared
+requirement into PASS. Cloning shared behavior into a local owner to bypass the ceiling is forbidden.
 
 ## `refine`
 
@@ -55,6 +56,19 @@ typed peer Skill changes them.
 The approved target surface, flow, or journey does not yet exist and may be created. The mission must
 bind the new target to approved business authority and define its closed states and exits before UI
 implementation. Existing adjacent experiences are evidence, not a layout contract to copy.
+
+## Effect on the frontend machine
+
+- `refine`: compile binds the approved structure, skips `generate`, and applies only element-level
+  changes inside that structure.
+- `reconstruct`: compile may replace the existing UX/UI structure; `generate` runs only when no exact
+  approved direction is already bound.
+- `new`: compile closes the new experience's authority and states; `generate` runs only when no exact
+  approved direction is already bound.
+
+The level changes authorization, not routing. All three continue through the one machine in
+`fe.audit-loop-v75b`; none creates a layout checkpoint, a second design loop, or a private approval
+stage.
 
 ## Clarity gate
 

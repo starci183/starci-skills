@@ -4,7 +4,7 @@
 | --- | --- |
 | Knowledge ID | `fe.grammar-offset-pop-object-surface-card` |
 | Package | `@starci/grammar/offset-pop` |
-| Operators | `grammar-convergence` |
+| Operators | `fe/authority-reconcile` |
 | Search tags | `SurfaceCard, contour, offset shadow, rotation, accent, peer cards` |
 | Dependencies | `fe.grammar-offset-pop-overview, fe.grammar-common-capabilities` |
 

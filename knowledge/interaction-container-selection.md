@@ -3,11 +3,15 @@
 | Field | Value |
 | --- | --- |
 | Knowledge ID | `fe.interaction-container-selection` |
-| Operators | `interaction-container-decision` |
+| Contract revision | `7.6.0` |
+| Operators | `fe/request-compile` |
 | Search tags | `page, modal, dialog, drawer, sheet, popover, inline, responsive transformation, focus return` |
 | Dependencies | `fe.customer-journey, fe.state-modeling` |
 
-Choose the container from the job the interaction performs, not from visual novelty or implementation convenience. Every meaningful interaction must consider `page`, `modal`, `drawer`, `popover`, and `inline`; the artifact records why four were rejected.
+This is internal compile guidance, not a visible decision stage. Choose the container from the job the
+interaction performs, not from visual novelty or implementation convenience. Every meaningful
+interaction considers `page`, `modal`, `drawer`, `popover`, and `inline`; the compiled contract records
+why four were rejected.
 
 ## Page
 

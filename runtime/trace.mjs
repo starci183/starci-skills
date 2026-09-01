@@ -5,23 +5,13 @@ export const RECEIPT_TYPES = Object.freeze(['CALL','RETURN','TRANSITION','WAIT',
 export const MATERIAL_AI_OPERATORS = Object.freeze(new Set([
   'architecture/alternatives',
   'business/model-challenge',
-  'fe/design-critique',
-  'fe/baseline-visual-review',
-  'fe/dominant-direction-generate',
   'fe/direction-generate',
-  'fe/direction-rank',
-  'fe/independent-review',
-  'fe/product-potential',
-  'fe/semantic-audit',
-  'fe/ui-audit',
-  'fe/ui-direction',
-  'fe/ux-audit',
-  'fe/ux-flow',
   'fe/visual-fidelity',
 ]));
 const validate = validatorFor(new URL('./receipt.schema.json', import.meta.url));
 const issuedReceipts = new WeakSet();
 const issuedReceiptDigests = new WeakMap();
+const issuedReceiptsById = new Map();
 const routableReturnReceipts = new WeakSet();
 const operatorLifecycles = new Map();
 const executionOwners = new Map();
@@ -47,6 +37,15 @@ function deepFreeze(value) {
   if (!value || typeof value !== 'object' || Object.isFrozen(value)) return value;
   for (const child of Object.values(value)) deepFreeze(child);
   return Object.freeze(value);
+}
+
+const narrativeProgressKeys = new Set(['summary', 'reason', 'rationale', 'observation', 'description', 'message', 'title', 'tradeoff']);
+function materialProgressValue(value) {
+  if (Array.isArray(value)) return value.map(materialProgressValue);
+  if (!value || typeof value !== 'object') return value;
+  return Object.fromEntries(Object.entries(value)
+    .filter(([key]) => !narrativeProgressKeys.has(key))
+    .map(([key, item]) => [key, materialProgressValue(item)]));
 }
 
 function planOperatorLifecycle(type, normalized) {
@@ -83,14 +82,7 @@ function planOperatorLifecycle(type, normalized) {
 function inspectionLines(actualOutput, operatorId) {
   const result = (actualOutput?.output ?? actualOutput)?.result;
   const records = result?.inspectionRecords ?? [];
-  if (operatorId === 'fe/independent-review' && (result?.inspectionVerdicts?.length ?? 0) > 0) {
-    return result.inspectionVerdicts.flatMap((record) => [
-      `[AI REVIEW][image: ${record.inspectionRef}]`,
-      `[FINDING][independent-review][${record.verdict === 'finding' ? 'PROBLEM' : 'PASSED'}] ${record.observation}`,
-      `[VERDICT] ${record.verdict === 'finding' ? 'FINDING' : 'PASSED'}`,
-    ]);
-  }
-  if (records.length === 0 && ['fe/visual-fidelity', 'fe/independent-review'].includes(operatorId)) return [
+  if (records.length === 0 && operatorId === 'fe/visual-fidelity') return [
     '[AI REVIEW][image: missing]',
     '[FINDING][inspection][MISSING] No concrete raster inspection record was supplied.',
     '[VERDICT] BLOCKED',
@@ -122,7 +114,7 @@ export function renderAiDebug(receipt) {
 }
 
 export function renderVisualLoopDebug(receipt) {
-  if (!['fe/capture-preflight', 'fe/render-capture', 'fe/visual-fidelity', 'fe/finding-classify', 'fe/source-repair'].includes(receipt.operatorId)) return [];
+  if (!['fe/capture-preflight', 'fe/render-capture', 'fe/source-apply', 'fe/visual-fidelity'].includes(receipt.operatorId)) return [];
   const document = receipt.trace?.actualOutput ?? receipt.trace?.input;
   const result = document?.output?.result ?? document?.input ?? {};
   const round = result.visualRound ?? result.round ?? result.preflight?.round ?? document?.input?.blindReviewPacket?.visualRound ?? null;
@@ -155,9 +147,13 @@ export function createReceipt(type, fields, { debug = true, now = () => new Date
   )) throw new Error('AI activity must bind one fresh gpt-5.6-sol execution with no forked turns');
   const operatorLifecycle = lifecycleRequired ? planOperatorLifecycle(type, normalized) : null;
   const fullTrace = { missionContext: normalized.missionContext ?? null, context: normalized.context ?? null, input: normalized.input ?? null, expectedOutput: normalized.expectedOutput ?? null, actualOutput: normalized.actualOutput ?? null, payloadRef: normalized.payloadRef ?? null, authorityRefs: normalized.authorityRefs ?? [], evidenceRefs: normalized.evidenceRefs ?? [], sourceHeads: normalized.sourceHeads ?? [], transitionRule: normalized.transitionRule ?? null, resumeState: normalized.resumeState ?? null, skip: normalized.skip ?? null, error: normalized.error ?? null, aiActivity: normalized.aiActivity ?? null };
-  const progressFingerprint = fingerprint({ type, skillId: normalized.skillId, operatorId: normalized.operatorId, actualOutput: fullTrace.actualOutput, transitionRule: fullTrace.transitionRule, resumeState: fullTrace.resumeState });
-  const receipt = { version:'7.5.0-alpha.1', receiptId: normalized.receiptId, type, missionId: normalized.missionId, skillId: normalized.skillId ?? null, operatorId: normalized.operatorId ?? null, parentId: normalized.parentId ?? null, childId: normalized.childId ?? null, timestamp: now(), progressFingerprint, trace: debug ? fullTrace : { authorityRefs: fullTrace.authorityRefs, evidenceRefs: fullTrace.evidenceRefs, sourceHeads: fullTrace.sourceHeads } };
+  const semanticProgress = ['RETURN', 'RESUME'].includes(type)
+    ? { type, skillId: normalized.skillId, operatorId: normalized.operatorId, input: materialProgressValue(fullTrace.input), actualOutput: materialProgressValue(fullTrace.actualOutput), resumeState: fullTrace.resumeState }
+    : { type, skillId: normalized.skillId, operatorId: normalized.operatorId, invocationRef: fullTrace.context?.invocationRef ?? null, executionRef: normalized.aiActivity?.executionRef ?? fullTrace.context?.executionRef ?? null, input: fullTrace.input, transitionRule: fullTrace.transitionRule };
+  const progressFingerprint = fingerprint(semanticProgress);
+  const receipt = { version:'7.6.0-beta.1', receiptId: normalized.receiptId, type, missionId: normalized.missionId, skillId: normalized.skillId ?? null, operatorId: normalized.operatorId ?? null, parentId: normalized.parentId ?? null, childId: normalized.childId ?? null, timestamp: now(), progressFingerprint, trace: debug ? fullTrace : { authorityRefs: fullTrace.authorityRefs, evidenceRefs: fullTrace.evidenceRefs, sourceHeads: fullTrace.sourceHeads } };
   const result = validate(receipt); if (!result.valid) throw new Error(result.errors.join('; '));
+  if (issuedReceiptsById.has(receipt.receiptId)) throw new Error(`duplicate runtime receipt id: ${receipt.receiptId}`);
   deepFreeze(receipt);
   if (operatorLifecycle) {
     operatorLifecycles.set(operatorLifecycle.lifecycleKey, operatorLifecycle);
@@ -167,12 +163,17 @@ export function createReceipt(type, fields, { debug = true, now = () => new Date
   }
   issuedReceipts.add(receipt);
   issuedReceiptDigests.set(receipt, fingerprint(receipt));
+  issuedReceiptsById.set(receipt.receiptId, receipt);
   if (debug) for (const line of renderVisualLoopDebug(receipt)) writeDebug(line);
   if (debug && fullTrace.aiActivity) for (const line of renderAiDebug(receipt)) writeDebug(line);
   return receipt;
 }
 export function isCanonicalReceipt(receipt) {
   return issuedReceipts.has(receipt) && issuedReceiptDigests.get(receipt) === fingerprint(receipt) && validate(receipt).valid;
+}
+export function canonicalReceiptById(receiptId) {
+  const receipt = issuedReceiptsById.get(receiptId) ?? null;
+  return receipt && isCanonicalReceipt(receipt) ? receipt : null;
 }
 export function assertCanonicalReceipts(receipts, label = 'receipts') {
   const invalidIndex = receipts.findIndex((receipt) => !isCanonicalReceipt(receipt));
@@ -182,4 +183,14 @@ export function assertCanonicalReceipts(receipts, label = 'receipts') {
 export function isRoutableOperatorReturnReceipt(receipt) {
   return isCanonicalReceipt(receipt) && routableReturnReceipts.has(receipt);
 }
-export function assertProgress(receipts) { const seen = new Set(); for (const item of receipts) { const key = `${item.type}:${item.progressFingerprint}`; if (seen.has(key)) throw new Error('no-progress cycle'); seen.add(key); } return true; }
+export function assertProgress(receiptsOrFingerprints) {
+  const seen = new Set();
+  for (const item of receiptsOrFingerprints) {
+    if (typeof item !== 'string' && !['RETURN', 'RESUME'].includes(item?.type)) continue;
+    const progressFingerprint = typeof item === 'string' ? item : item?.progressFingerprint;
+    if (!/^sha256:[0-9a-f]{64}$/.test(progressFingerprint ?? '')) throw new Error('progress history contains an invalid fingerprint');
+    if (seen.has(progressFingerprint)) throw new Error('no-progress cycle');
+    seen.add(progressFingerprint);
+  }
+  return true;
+}

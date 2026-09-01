@@ -1,0 +1,20 @@
+{
+  "schemaVersion": 7,
+  "operatorId": "fe/source-repair",
+  "output": {
+    "outcome": "repaired",
+    "result": {
+      "summary": "Corrected the review capture implementation contract: browser-emulated viewport rasters are extracted at exact pixel bounds from fresh host screenshots, never resized from the surrounding host frame. R13 rasters and verdict are invalidated; local UI findings remain open until the fresh R14 review.",
+      "artifactRefs": [
+        "make-r14-captures.mjs",
+        "finding-classify-r13.json"
+      ]
+    },
+    "gaps": [],
+    "evidenceRefs": [
+      "visual-fidelity-r13.json",
+      "finding-classify-r13.json"
+    ],
+    "handoff": null
+  }
+}

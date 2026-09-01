@@ -2,10 +2,20 @@ import { validatorFor, runValidatorCli } from '../../operators/validation.mjs';
 import { loadScopePolicy } from '../../runtime/scope-policy.mjs';
 import { validatePublicSkillReceipt } from '../receipt-consumption.mjs';
 import { isRouteIssuedTransitionReceipt, routeIssuedTransitionFor } from '../../runtime/route-transition.mjs';
+import { assertProgress } from '../../runtime/trace.mjs';
+import { isValidatedDirectionChoiceResume } from '../route-machine.mjs';
 
 const scopePolicy=loadScopePolicy();
 const changeLevelKey='frontend.ux-ui.change-level';
 const ownerCeilingKey='frontend.layout.owner-ceiling';
+const hasFinalRoute=(receipt,{skillId,operatorId,outcome,target})=>{
+  const transition=routeIssuedTransitionFor(receipt);
+  return receipt?.skillId===skillId&&receipt?.operatorId===operatorId&&
+    receipt?.trace?.actualOutput?.output?.outcome===outcome&&
+    isRouteIssuedTransitionReceipt(transition)&&transition.skillId===skillId&&
+    transition.operatorId===operatorId&&transition.missionId===receipt.missionId&&
+    transition.trace?.transitionRule?.outcome===outcome&&transition.trace?.transitionRule?.target===target;
+};
 export const validateInput=validatorFor(new URL('./input.schema.json',import.meta.url),(value)=>{
   const errors=[];
   for (const [index, record] of value.auditScoreHistory.entries()) {
@@ -21,7 +31,9 @@ export const validateInput=validatorFor(new URL('./input.schema.json',import.met
   if(matches.length!==1) errors.push(`scope requires exactly one ${changeLevelKey} dimension`);
   else if(!scopePolicy.registeredDimensions[changeLevelKey].includes(matches[0].value)) {
     errors.push(`${changeLevelKey} must be refine, reconstruct, or new`);
-  }
+  } else if(value.uxUiChangeLevel!==matches[0].value) errors.push(`uxUiChangeLevel must equal the frozen ${changeLevelKey} dimension`);
+  if(value.uxUiChangeLevel==='refine'&&value.directionMode!=='none') errors.push('refine requires directionMode none');
+  if(['reconstruct','new'].includes(value.uxUiChangeLevel)&&!['dominant','alternatives'].includes(value.directionMode)) errors.push('reconstruct/new requires dominant or alternatives directionMode');
   const ceilingMatches=value.scope.dimensions.filter((dimension)=>dimension.key===ownerCeilingKey);
   if(ceilingMatches.length!==1) errors.push(`scope requires exactly one ${ownerCeilingKey} dimension`);
   else if(!scopePolicy.registeredDimensions[ownerCeilingKey].includes(ceilingMatches[0].value)) {
@@ -52,18 +64,53 @@ export const validateInput=validatorFor(new URL('./input.schema.json',import.met
   }else{
     if(value.receiptType!==value.returnReceipt.type) errors.push('receiptType must match the canonical returnReceipt type');
     const expectedSkillId=value.resume?.fromSkillId==='user-choice'?'starci-fe-process':value.resume?.fromSkillId??null;
-    errors.push(...validatePublicSkillReceipt(value.returnReceipt,{allowedTypes:['RETURN','RESUME'],expectedMissionId:value.runId,expectedSkillId,consume:false}));
+    const expectedParentType=value.resume?.fromSkillId==='user-choice'?'WAIT':'CALL';
+    errors.push(...validatePublicSkillReceipt(value.returnReceipt,{allowedTypes:['RETURN','RESUME'],expectedMissionId:value.runId,expectedSkillId,expectedParentId:value.resume?.expectedCallReceiptRef??null,expectedParentType,consume:false}));
+    try{assertProgress([...value.progressHistory,value.returnReceipt.progressFingerprint])}catch(error){errors.push(error.message)}
     if(value.resume===null) errors.push('returnReceipt requires matching resume metadata');
     else {
       if(value.resume.receiptRef!==value.returnReceipt.receiptId) errors.push('resume receiptRef does not identify returnReceipt');
+      if(value.resume.expectedCallReceiptRef!==value.returnReceipt.parentId) errors.push('resume expectedCallReceiptRef does not identify the exact peer CALL parent');
       if(value.resume.missionRef!==value.runId) errors.push('resume missionRef must equal the active runId');
       if(value.resume.resumeState!==value.returnReceipt.trace?.resumeState) errors.push('resume state does not match returnReceipt trace');
-      if(value.resume.resumeState==='uat-return') {
-        const transition=routeIssuedTransitionFor(value.returnReceipt);
-        if(!isRouteIssuedTransitionReceipt(transition)||transition.skillId!=='starci-uat-verify'||transition.missionId!==value.runId||transition.trace?.transitionRule?.target!=='complete') errors.push('uat-return requires UAT canonical route-issued final transition evidence');
+      const allowedResumeStates=new Set(['request-compile','apply','reapply','capture-preflight','recapture-preflight','direction-choice','quality-return','uat-return']);
+      if(!allowedResumeStates.has(value.resume.resumeState)) errors.push('resume state must identify an exact state in the v7.6 frontend machine');
+      if(value.resume.fromSkillId==='starci-quality-assure'&&value.resume.resumeState!=='quality-return') errors.push('quality RETURN must resume at quality-return');
+      if(value.resume.fromSkillId==='starci-uat-verify'&&!['uat-return','reapply'].includes(value.resume.resumeState)) errors.push('UAT RETURN must resume at uat-return or reapply with counterevidence');
+      if(value.resume.fromSkillId==='starci-business-process'&&value.resume.resumeState!=='request-compile') errors.push('business RETURN must resume at request-compile');
+      if(value.resume.fromSkillId==='starci-backend-process'&&!['request-compile','apply','reapply','capture-preflight','recapture-preflight'].includes(value.resume.resumeState)) errors.push('backend RETURN must resume at its exact compile, apply, or preflight state');
+      if(value.resume.fromSkillId==='user-choice') {
+        const choice=value.resume.directionChoice;
+        const resolution=value.returnReceipt.trace?.actualOutput;
+        if(value.resume.resumeState!=='direction-choice'||value.returnReceipt.type!=='RESUME'||!isValidatedDirectionChoiceResume(value.returnReceipt)) errors.push('user choice requires a registry-validated direction-choice RESUME');
+        if(!choice) errors.push('direction-choice resume requires the selected or rejected direction product');
+        if(choice?.decision==='approve'&&(choice.selectedDirectionId===null||choice.reason!==null)) errors.push('approved direction choice requires selectedDirectionId and no rejection reason');
+        if(choice?.decision==='reject'&&(choice.selectedDirectionId!==null||choice.reason===null)) errors.push('rejected direction choice requires one reason and no selected direction');
+        if(choice&&(resolution?.decision!==choice.decision||resolution?.selectedDirectionId!==(choice.selectedDirectionId??undefined)||resolution?.reason!==(choice.reason??undefined)||resolution?.generatedDirectionReceiptRef!==choice.generatedDirectionReceiptRef||resolution?.comparisonArtifactRef!==choice.comparisonArtifactRef)) errors.push('public direction choice differs from the registry-validated RESUME resolution');
+      } else if(value.resume.directionChoice!==null) errors.push('directionChoice is only valid for the user-choice resume');
+      if(value.resume.fromSkillId==='starci-quality-assure') {
+        if(!hasFinalRoute(value.returnReceipt,{skillId:'starci-quality-assure',operatorId:'quality/delivery-proof',outcome:'pass',target:'complete'})) errors.push('quality-return requires the exact route-issued quality/delivery-proof PASS transition');
+        const latestPass=[...value.auditScoreHistory].reverse().find(({typedVerdict})=>typedVerdict==='PASS');
+        const proofInput=value.returnReceipt.trace?.input?.input;
+        const proofOutput=value.returnReceipt.trace?.actualOutput?.output;
+        if(proofInput?.debtPolicy!=='forbidden') errors.push('frontend quality-return requires verification-only debtPolicy forbidden');
+        if(!latestPass||proofInput?.sourceFingerprint!==latestPass.sourceFingerprint) errors.push('Quality PASS source must equal the latest blind visual PASS source');
+        if(!latestPass||!proofOutput?.evidenceRefs?.includes(latestPass.evidenceFingerprint)) errors.push('Quality PASS evidence must include the latest blind visual packet fingerprint');
+        if(!proofOutput?.evidenceRefs?.some((ref)=>(/(^|[\\/])audit\.md$/).test(ref))) errors.push('Quality PASS evidence must include the latest owner audit artifact');
+      }
+      if(value.resume.fromSkillId==='starci-uat-verify'&&value.resume.resumeState==='uat-return') {
+        if(!hasFinalRoute(value.returnReceipt,{skillId:'starci-uat-verify',operatorId:'test/uat-result-publish',outcome:'passed',target:'complete'})) errors.push('uat-return requires the exact route-issued test/uat-result-publish PASS transition');
+      }
+      if(value.resume.fromSkillId==='starci-uat-verify'&&value.resume.resumeState==='reapply') {
+        const validRoute=hasFinalRoute(value.returnReceipt,{skillId:'starci-uat-verify',operatorId:'test/uat-result-publish',outcome:'frontend-counterevidence',target:'counterevidence-handoff'});
+        const counterevidence=value.returnReceipt.trace?.actualOutput?.output?.result?.counterevidence;
+        const latestPass=[...value.auditScoreHistory].reverse().find(({typedVerdict})=>typedVerdict==='PASS');
+        if(!validRoute) errors.push('UAT reapply requires the exact route-issued frontend-counterevidence transition');
+        if(!counterevidence||counterevidence.ownerSkillId!=='starci-fe-process'||counterevidence.resumeState!=='reapply') errors.push('UAT reapply requires typed FE-owned counterevidence');
+        if(!latestPass||counterevidence?.sourceFingerprint!==latestPass.sourceFingerprint) errors.push('UAT counterevidence source must equal the latest blind visual PASS source');
       }
     }
-    if(errors.length===0) errors.push(...validatePublicSkillReceipt(value.returnReceipt,{allowedTypes:['RETURN','RESUME'],expectedMissionId:value.runId,expectedSkillId}));
+    if(errors.length===0) errors.push(...validatePublicSkillReceipt(value.returnReceipt,{allowedTypes:['RETURN','RESUME'],expectedMissionId:value.runId,expectedSkillId,expectedParentId:value.resume?.expectedCallReceiptRef??null,expectedParentType}));
   }
   return errors;
 });

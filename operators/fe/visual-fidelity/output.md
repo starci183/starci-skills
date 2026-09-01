@@ -1,24 +1,23 @@
 # `fe/visual-fidelity` output
 
-- `output.outcome`: Legacy semantic result consumed only by the Skill machine.
-- `output.result`: The atomic job result, or null when blocked or when evidence is insufficient.
-- `output.result.matrixFingerprint`, `partitionFingerprint`, and `visualRound`: Exact preflight/capture identity reviewed by Sol.
-- `output.result.inspectionRecords`: One blind pixel observation record per screenshot, covering purpose/semantic utility, content coherence, inset, surfaces, padding on every edge, alignment, rhythm, hierarchy, visual ownership, pinned-boundary clearance, affordance, wrapping, responsive composition, visual consistency, empty-space balance, clipping, and occlusion.
-- `output.result.reviewMode`: Always `ai-adversarial-pixel`; confirmation-oriented or measurement-led review is invalid.
-- `output.result.packetFingerprint`: Exact raster-only packet reviewed.
-- `output.result.reviewerExecutionRef`, `reviewerModel`, `reviewerCount`, `contextIsolation`, and `forkTurns`: Provenance for the single fresh Sol reviewer.
-- `output.result.lastScreenshotRef` and `lastScreenshotVerdict`: The final post-mutation raster and its controlling verdict.
-- `output.result.uncertainty`: Any uncertainty forbids `passed` and returns repair or blocked.
-- `output.result.auditScore`: Noncanonical 0-10 progress score with five 0-2 evidence axes, requested
-  target, previous-round delta, and target status. A visible finding caps the score at 8; 9 or higher
-  requires typed `passed` over the complete latest-source packet.
-- `output.outcome=insufficient-evidence`: A capture boundary or missing adjacent lifecycle raster
-  prevents a visual conclusion. It requires `result=null`, at least one exact recapture gap, and no
-  numeric score; the parent returns to capture preflight without source mutation.
-- `output.result.inspectionRecords[].lensVerdicts`: One concrete AI pixel verdict for every required lens; any `problem` forces repair.
-- `output.result.inspectionRecords[].challengeRecords`: Potential defects deliberately attacked in all purpose/content, composition/spacing, and interaction/responsive families; any confirmed candidate forces repair.
-- `output.result.probeRecords`: Exactly one falsification verdict per requested adversarial probe and lifecycle phase, preserving the attempted attack, raster reference or exact inapplicability reason, and observed contradiction. Counts alone never satisfy this contract.
-- `output.gaps`: Exact missing authority or evidence; empty when complete.
-- `output.evidenceRefs`: Exact evidence used to produce the result.
+- `output.outcome`: `passed`, `repair`, `insufficient-evidence`, or `blocked`, consumed only by the
+  parent Skill.
+- `output.result`: Structured pixel-review receipt for `passed` or `repair`; null otherwise.
+- `output.gaps`: Exact unresolved evidence or authority gaps.
+- `output.evidenceRefs`: Non-empty exact evidence behind every outcome.
 
-With `debug=true`, serialize every inspection record to the terminal as `[AI REVIEW][image: <ref>]`, concrete `[FINDING][<lens>][<status>] <visible observation>` lines for passed and failed lenses/challenges, and one `[VERDICT]` line. Findings such as touching edges, oversized empty cards, wasteful rails, clipping, or nested scroll must be inspection records rather than omitted commentary. Structured debug output never contains hidden reasoning or secrets.
+The structured result repeats packet, matrix, partition, round, reviewer, final-screenshot, and audit
+identity. `packetRasterRefs` must preserve packet order and match `inspectionRecords` one-for-one in
+that order. Every inspection contains all 19 visual lenses and all three challenge families.
+`probeRecords` contains the exact 22 canonical probes in order: applicable `survived`/`contradiction`
+records keep an exact packet raster ref, while `not-applicable` keeps `imageRef: null`.
+
+`passed` requires a complete populated happy-case packet, score at least 9, a passing final screenshot,
+no retained gaps, no problem/confirmed challenge/probe contradiction, and `uncertainty=false`.
+`repair` requires at least one concrete visible problem or contradiction. `insufficient-evidence`
+means the reviewer ran but the packet cannot support a conclusion; it returns `result: null`, exact
+recapture gaps, and no score. `blocked` is reserved for missing authority/runtime/isolation before
+pixel inspection and also returns `result: null`.
+
+The parent compares every repeated packet and reviewer binding with the invocation. A score, summary,
+or prose assertion cannot override missing bindings, parity, or inspection evidence.

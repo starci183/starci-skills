@@ -4,6 +4,7 @@
 
 - `context.backendSourceRef`: Verified backend Source owning canonical UAT authority.
 - `context.authorityRefs`: Frozen business, source, runtime, and lens authority.
+- `context.sourceFingerprint`: Exact immutable source inherited from Quality PASS.
 
 ## Input
 

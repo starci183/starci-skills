@@ -95,8 +95,9 @@ dominates within scope. Do not ask for confirmation between routine states.
 
 Ask one focused question only when unresolved alternatives would materially change product authority,
 the exact project/source, destructive or external effects, or the outcome itself. For a frontend visual
-direction, render and apply one dominant direction by default. Ask for a visual choice only when the
-user explicitly requests alternatives; then render three or four material directions and recommend one.
+direction, render and apply one dominant direction by default. Render three or four material directions
+and ask for a visual choice only when valid Grammar evidence leaves material ambiguity or the user
+explicitly requests comparison.
 
 ## Selection envelope
 

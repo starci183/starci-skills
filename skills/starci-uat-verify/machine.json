@@ -75,7 +75,7 @@
               "outcome": "failed"
             }
           },
-          "target": "publish"
+          "target": "ux"
         },
         {
           "when": {
@@ -105,7 +105,7 @@
               "outcome": "failed"
             }
           },
-          "target": "publish"
+          "target": "ui"
         },
         {
           "when": {
@@ -162,10 +162,18 @@
         {
           "when": {
             "outputEquals": {
+              "outcome": "frontend-counterevidence"
+            }
+          },
+          "target": "counterevidence-handoff"
+        },
+        {
+          "when": {
+            "outputEquals": {
               "outcome": "failed"
             }
           },
-          "target": "complete"
+          "target": "blocked"
         },
         {
           "when": {
@@ -180,6 +188,10 @@
     "complete": {
       "kind": "terminal",
       "result": "complete"
+    },
+    "counterevidence-handoff": {
+      "kind": "terminal",
+      "result": "handoff"
     },
     "blocked": {
       "kind": "terminal",

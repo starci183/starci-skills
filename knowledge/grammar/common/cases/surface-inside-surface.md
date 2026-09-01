@@ -4,7 +4,7 @@
 | --- | --- |
 | Knowledge ID | `fe.grammar-common-case-surface-inside-surface` |
 | Package | `@starci/grammar/common` |
-| Operators | `grammar-convergence` |
+| Operators | `fe/authority-reconcile` |
 | Search tags | `nested surface, surface card, list inside card, padding owner, boundary` |
 | Dependencies | `fe.grammar-common-capabilities` |
 

@@ -4,7 +4,7 @@
 | --- | --- |
 | Knowledge ID | `fe.grammar-core-object-fields` |
 | Package | `@starci/grammar/core` |
-| Operators | `grammar-convergence` |
+| Operators | `fe/authority-reconcile` |
 | Search tags | `field, input, label, help, validation, form group, read only` |
 | Dependencies | `fe.grammar-core-overview, fe.grammar-common-states-accessibility` |
 

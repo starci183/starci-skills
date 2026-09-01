@@ -4,7 +4,7 @@
 | --- | --- |
 | Knowledge ID | `fe.grammar-core-object-tabs` |
 | Package | `@starci/grammar/core` |
-| Operators | `grammar-convergence` |
+| Operators | `fe/authority-reconcile` |
 | Search tags | `tabs, peer content, selected tab, overflow, keyboard, unsaved panel` |
 | Dependencies | `fe.grammar-core-overview, fe.grammar-common-states-accessibility` |
 

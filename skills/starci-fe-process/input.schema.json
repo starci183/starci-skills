@@ -9,6 +9,8 @@
     "project",
     "selection",
     "intent",
+    "uxUiChangeLevel",
+    "directionMode",
     "objective",
     "auditTargetScore",
     "auditScoreHistory",
@@ -96,6 +98,22 @@
         "reconcile"
       ]
     },
+    "uxUiChangeLevel": {
+      "description": "Top-level projection of the frozen frontend.ux-ui.change-level dimension used by the executable machine.",
+      "enum": [
+        "refine",
+        "reconstruct",
+        "new"
+      ]
+    },
+    "directionMode": {
+      "description": "Validated direction projection supplied to request-compile: none for refine, dominant when evidence selects one action, or alternatives when valid Grammar leaves material visual ambiguity or the user explicitly requests comparison. The machine routes the invocation-bound compiled result, not this raw field.",
+      "enum": [
+        "none",
+        "dominant",
+        "alternatives"
+      ]
+    },
     "objective": {
       "type": "string",
       "minLength": 1
@@ -121,7 +139,7 @@
           "round": { "type": "integer", "minimum": 1 },
           "score": { "type": "integer", "minimum": 0, "maximum": 10 },
           "delta": { "type": ["integer", "null"], "minimum": -10, "maximum": 10 },
-          "typedVerdict": { "enum": ["PASS", "FAIL", "SUSPENSE", "BLOCKED"] },
+          "typedVerdict": { "enum": ["PASS", "FAIL", "BLOCKED"] },
           "sourceFingerprint": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
           "evidenceFingerprint": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
           "findingBatchFingerprint": { "type": ["string", "null"], "pattern": "^sha256:[0-9a-f]{64}$" }
@@ -155,7 +173,9 @@
             "missionRef",
             "fromSkillId",
             "receiptRef",
-            "resumeState"
+            "expectedCallReceiptRef",
+            "resumeState",
+            "directionChoice"
           ],
           "properties": {
             "missionRef": {
@@ -175,9 +195,31 @@
               "type": "string",
               "minLength": 1
             },
+            "expectedCallReceiptRef": {
+              "description": "Exact runtime CALL receipt that owns this RETURN or RESUME continuation.",
+              "type": "string",
+              "pattern": "^receipt:[A-Za-z0-9._-]+$"
+            },
             "resumeState": {
               "type": "string",
               "minLength": 1
+            },
+            "directionChoice": {
+              "anyOf": [
+                {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["decision", "selectedDirectionId", "reason", "generatedDirectionReceiptRef", "comparisonArtifactRef"],
+                  "properties": {
+                    "decision": { "enum": ["approve", "reject"] },
+                    "selectedDirectionId": { "type": ["string", "null"], "pattern": "^[a-z0-9][a-z0-9-]*$" },
+                    "reason": { "type": ["string", "null"], "minLength": 1 },
+                    "generatedDirectionReceiptRef": { "type": "string", "pattern": "^receipt:[A-Za-z0-9._-]+$" },
+                    "comparisonArtifactRef": { "type": "string", "pattern": "\\.html$" }
+                  }
+                },
+                { "type": "null" }
+              ]
             }
           }
         },
@@ -207,7 +249,7 @@
           ],
           "properties": {
             "version": {
-              "const": "7.5.0-alpha.1"
+              "const": "7.6.0-beta.1"
             },
             "receiptId": {
               "type": "string",

@@ -22,6 +22,7 @@ export const REQUIRED_VISUAL_LENSES = [
   'alignment',
   'vertical-rhythm',
   'hierarchy',
+  'aesthetic-finish',
   'visual-ownership',
   'pinned-boundary-clearance',
   'wrapping',
@@ -189,14 +190,35 @@ export function renderMatrixSemantic(matrix, at) {
 export function capturePreflightInputSemantic(value) {
   const errors = [];
   const { round, matrix, partitions, readinessChecks } = value.input;
+  const matrixBody = {
+    matrixRef: matrix.matrixRef,
+    states: matrix.states,
+    viewports: matrix.viewports,
+    probeRefs: matrix.probeRefs,
+    populatedHeroStateRef: matrix.populatedHeroStateRef,
+    coreTaskRef: matrix.coreTaskRef,
+    cells: matrix.cells,
+  };
+  const stateRefs = matrix.states.map(({ stateRef }) => stateRef);
   if (visualRoundPurpose(round.number) !== round.purpose) {
     errors.push(`$.input.round.purpose: round ${round.number} must be ${visualRoundPurpose(round.number)}`);
   }
   if (!exactSequence(matrix.viewports, REQUIRED_VIEWPORTS)) {
     errors.push(`$.input.matrix.viewports: must be ordered ${REQUIRED_VIEWPORTS.join(', ')}`);
   }
-  const expectedMatrixFingerprint = fingerprint({ renderStates: matrix.renderStates, viewports: matrix.viewports, probeRefs: matrix.probeRefs });
+  const expectedMatrixFingerprint = fingerprint(matrixBody);
   if (matrix.matrixFingerprint !== expectedMatrixFingerprint) errors.push('$.input.matrix.matrixFingerprint: must hash the exact immutable matrix body');
+  if (duplicates(stateRefs).length > 0) errors.push('$.input.matrix.states: duplicate stateRef values are forbidden');
+  const hero = matrix.states.find(({ stateRef }) => stateRef === matrix.populatedHeroStateRef);
+  if (!hero || hero.lifecycle !== 'happy-case' || hero.populated !== true || hero.coreTaskVisible !== true) {
+    errors.push('$.input.matrix.populatedHeroStateRef: must identify a populated happy-case state with the core task visible');
+  }
+  const expectedCells = matrix.states.flatMap(({ stateRef }) => REQUIRED_VIEWPORTS.map((viewport) => `${stateRef}::${viewport}`));
+  const actualCells = matrix.cells.map(({ stateRef, viewport }) => `${stateRef}::${viewport}`);
+  if (!exactSequence(actualCells, expectedCells)) errors.push('$.input.matrix.cells: must cover every state and viewport exactly once in canonical order');
+  if (duplicates(matrix.cells.map(({ cellRef }) => cellRef)).length > 0) errors.push('$.input.matrix.cells: duplicate cellRef values are forbidden');
+  if (!value.context.evidenceRefs.includes(value.input.compiledRequestRef)) errors.push('$.context.evidenceRefs: must include compiledRequestRef');
+  if (!value.context.evidenceRefs.includes(value.input.sourceApplyReturnReceiptRef)) errors.push('$.context.evidenceRefs: must include sourceApplyReturnReceiptRef');
   const checks = readinessChecks.map(({ check }) => check);
   if (!exactSequence(checks, REQUIRED_PREFLIGHT_CHECKS)) {
     errors.push(`$.input.readinessChecks: must be ordered ${REQUIRED_PREFLIGHT_CHECKS.join(', ')}`);
@@ -212,13 +234,13 @@ export function capturePreflightInputSemantic(value) {
       errors.push(`$.input.partitions[${index}]: shared sentinels are recaptured, never justified as reusable`);
     }
     for (const stateRef of partition.stateRefs) {
-      if (!matrix.renderStates.includes(stateRef)) errors.push(`$.input.partitions[${index}].stateRefs: ${stateRef} is absent from the frozen matrix`);
+      if (!stateRefs.includes(stateRef)) errors.push(`$.input.partitions[${index}].stateRefs: ${stateRef} is absent from the frozen matrix`);
     }
     for (const probeRef of partition.probeRefs) {
       if (!matrix.probeRefs.includes(probeRef)) errors.push(`$.input.partitions[${index}].probeRefs: ${probeRef} is absent from the frozen matrix`);
     }
   }
-  for (const stateRef of matrix.renderStates) {
+  for (const stateRef of stateRefs) {
     if (!partitions.some((partition) => partition.stateRefs.includes(stateRef))) errors.push(`$.input.partitions: frozen state ${stateRef} has no owner partition`);
   }
   for (const probeRef of matrix.probeRefs) {
@@ -255,6 +277,12 @@ export function renderCaptureInputSemantic(value) {
   const { preflight } = value.input;
   if (!preflight) errors.push('$.input.preflight: validated capture preflight is required');
   if (preflight && visualRoundPurpose(preflight.round.number) !== preflight.round.purpose) errors.push('$.input.preflight.round: number and purpose do not match');
+  if (preflight && !value.context.evidenceRefs.includes(preflight.preflightRef)) errors.push('$.context.evidenceRefs: must include the exact preflightRef');
+  if (preflight && !value.context.evidenceRefs.includes(preflight.compiledRequestRef)) errors.push('$.context.evidenceRefs: must include the exact compiledRequestRef');
+  if (preflight && !value.context.evidenceRefs.includes(preflight.sourceApplyReturnReceiptRef)) errors.push('$.context.evidenceRefs: must include the exact sourceApplyReturnReceiptRef');
+  if (duplicates(value.input.renderStates).length > 0) errors.push('$.input.renderStates: duplicate state refs are forbidden');
+  const probeStateRefs = value.input.adversarialProbes.map(({ stateRef }) => stateRef);
+  for (const stateRef of probeStateRefs) if (!value.input.renderStates.includes(stateRef)) errors.push(`$.input.adversarialProbes: state ${stateRef} is absent from renderStates`);
   return errors;
 }
 
@@ -270,8 +298,8 @@ export function renderCaptureOutputSemantic(value) {
     if (!result.renderMatrix.some(({ handoffState }) => handoffState)) {
       errors.push('$.output.result.renderMatrix: handoff state cell is required');
     }
-    if (result.sourceFingerprint !== result.latestMutationFingerprint) {
-      errors.push('$.output.result: render source must equal the latest mutation fingerprint');
+    if (result.sourceFingerprint !== result.aggregateAfterFingerprint || result.latestMutationFingerprint !== result.aggregateAfterFingerprint) {
+      errors.push('$.output.result: render source and latest mutation aliases must equal aggregateAfterFingerprint');
     }
     if (Date.parse(result.capturedAt) < Date.parse(result.latestMutationAt)) {
       errors.push('$.output.result.capturedAt: capture must occur after the latest mutation');
@@ -366,6 +394,12 @@ export function visualFidelityOutputSemantic(value) {
     if (gaps.length === 0) errors.push('$.output.gaps: insufficient evidence requires exact recapture gaps');
     return errors;
   }
+  if (outcome === 'blocked') {
+    if (result !== null) errors.push('$.output.result: blocked visual review requires a null result');
+    if (gaps.length === 0) errors.push('$.output.gaps: blocked visual review requires exact authority or runtime gaps');
+    return errors;
+  }
+  if (result === null) errors.push(`$.output.result: ${outcome} visual review requires structured inspection evidence`);
   if (result && result.reviewMode !== 'ai-adversarial-pixel') {
     errors.push('$.output.result.reviewMode: visual fidelity requires AI adversarial pixel review');
   }
@@ -385,6 +419,12 @@ export function visualFidelityOutputSemantic(value) {
     if (score?.status !== expectedScoreStatus) errors.push('$.output.result.auditScore.status: does not match value and target');
     if (outcome === 'passed' && score?.value < 9) errors.push('$.output.result.auditScore.value: aggregate passed requires a score of at least 9');
     if (outcome !== 'passed' && score?.value > 8) errors.push('$.output.result.auditScore.value: any non-passing visual verdict caps the score at 8');
+    if (score?.value >= 9) {
+      const axisValues = Object.fromEntries(axes.map(({ axis, value }) => [axis, value]));
+      if (axisValues['visual-hierarchy-composition'] !== 2 || axisValues['consistency-accessibility-cues'] !== 2) {
+        errors.push('$.output.result.auditScore.axes: score 9 or 10 requires full marks for whole-interface visual hierarchy/composition and consistency/accessibility cues');
+      }
+    }
     if (result.reviewerModel !== 'gpt-5.6-sol' || result.reviewerCount !== 1 || result.contextIsolation !== 'fresh' || result.forkTurns !== 'none') {
       errors.push('$.output.result: v7.2 visual review requires one fresh-context gpt-5.6-sol reviewer');
     }

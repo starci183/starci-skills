@@ -13,7 +13,10 @@ const contractFiles = [
   'validate-input.mjs',
   'validate-output.mjs'
 ].sort();
-const allowedContracts = [contractFiles, [...contractFiles, 'icon.svg'].sort()];
+const allowedContracts = [
+  contractFiles,
+  [...contractFiles, 'icon.svg'].sort(),
+];
 
 const domains = fs.readdirSync(root, { withFileTypes: true })
   .filter((entry) => entry.isDirectory())

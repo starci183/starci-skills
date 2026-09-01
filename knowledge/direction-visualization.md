@@ -1,93 +1,90 @@
-# Direction visualization
+# Direction visualization guidance
 
 | Field | Value |
 | --- | --- |
 | Knowledge ID | `direction.visualization` |
-| Scope | Any redesign or unresolved product/technical direction choice |
-| Search tags | `redesign, alternatives, direction, visualize, mockup, architecture` |
+| Contract revision | `7.6.0` |
+| Scope | Internal `generate` guidance for a new or reconstructed product/technical direction |
+| Search tags | `generate, redesign, alternatives, direction, visualize, mockup, architecture` |
+| Dependencies | `fe.ui` for frontend routing and visual contract authority |
 
-## Decision law
+## Boundary
 
-When a redesign has no already approved direction, brainstorm one dominant direction, render its
-representative layout through `visualize`, and construct it immediately inside the frozen boundary.
-Do not stop for a direction-choice round and do not generate alternatives by default. The agent owns
-the judgment required to make the single direction coherent; the user should not have to choose among
-options merely because the current layout failed.
+This record guides the optional `generate` stage; it does not own implementation or repair. Frontend
+`refine` skips generation. A `new` or `reconstruct` mission also skips it when compile already binds
+an approved direction. Only the parent frontend machine may open the alternatives-only user-choice
+wait and resume the exact chosen direction at apply.
 
-Generate three or four materially different directions only when the user explicitly asks to compare
-options, alternatives, or directions before implementation. In that explicit comparison mode, prose,
-Mermaid, ASCII boxes, a Markdown table, implementation notes, or a list of trade-offs cannot
-substitute for the rendered comparison.
+## Default decision
+
+Produce one dominant, reversible direction, render enough realistic material to falsify it, and pass
+the coherent artifact to apply. The agent owns this judgment; a user does not choose among variants
+merely because the incumbent design failed.
+
+Generate three or four materially different directions when the complete Grammar admits several real
+compositions and none materially dominates, or when the user explicitly requests comparison.
+Render all of them in one real inspectable comparison artifact and expose the material trade-offs.
+Return `requiresChoice=true`; the parent machine then waits for one correlated user choice and resumes
+that exact direction at apply without another ideation pass. Prose, Mermaid, ASCII, implementation
+notes, or a trade-off table alone cannot satisfy a visual comparison.
+
+Missing semantic rule, token, component/export, state, or responsive interface is `grammar-gap`, not
+visual ambiguity. Stop generation, return the exact Grammar-owner repair/publish request, and
+recompile after the new package identity exists. Never pad a comparison with local CSS improvisation
+or directions that assume an unpublished Grammar contract.
+
+A direction is material only when it changes a boundary, responsibility, sequence, interaction
+model, information hierarchy, responsive composition, recovery strategy, or operational trade-off.
+Color, decoration, token, spacing, or naming variants are one direction.
+
+## Product-family evidence
 
 Blind direction work is blind to the incumbent target as an answer, not blind to the product family.
-Before generating candidates, inventory the nearest sibling surfaces and name the reusable visual
-signatures that make them one product: hero treatment, semantic color roles, typography hierarchy,
-shell rhythm, navigation model, and shared Grammar compositions. Every rendered direction must reuse
-each relevant signature or visibly state why its user outcome or owner contract makes that signature
-inapplicable. Reuse the product language, not a screenshot: never copy a sibling whose semantic owner,
-interaction, responsive lifecycle, or business purpose differs. A direction that invents a new local
-website language without this reconciliation is invalid and cannot enter `direction-choice`.
+Inventory nearby sibling surfaces and record relevant shared signatures: hero treatment, semantic
+color roles, typography hierarchy, shell rhythm, navigation model, and published Grammar
+compositions. Reuse each applicable signature or state why the target's outcome, owner, responsive
+lifecycle, or interaction model makes it inapplicable.
 
-A direction is material only when it changes an important boundary, responsibility, sequence,
-interaction model, information hierarchy, responsive composition, recovery strategy, or operational
-trade-off. Color, decoration, spacing, or naming variants do not count as separate directions.
+Sibling pages and product examples are evidence of those signatures, never templates or
+page-specific authority. Reuse the relationship, not the screenshot. A direction that invents a new
+local website language without an evidenced exception is invalid.
 
-Every explicit comparison:
+Media is independent from family resemblance. Add media only for an explicit purpose such as
+orientation, explanation, identity, evidence, or a meaningful empty state. Resolve task focus and
+dead space through information structure first. `No media` is correct when an image would distract or
+only fill area. Any reusable or generated asset declares purpose, owner, placement, responsive
+behavior, and alternative-text intent.
 
-- renders all three or four directions in one inspectable HTML comparison or in separately inspectable
-  HTML artifacts, with an exact visual panel reference for every direction;
-- uses realistic domain content and labels, not generic placeholder boxes;
-- exposes the states and scale needed to understand the decision, including at least one normal path
-  and the most consequential failure, recovery, constrained, or boundary condition;
-- states one recommendation and the strongest trade-off against it without visually hiding the other
-  directions;
-- remains presentation-only: visual controls may compare states but never approve, publish, mutate,
-  submit, or silently select a direction;
-- enters a user-choice wait only after the comparison is visibly rendered in the conversation.
-
-A single-direction construct still renders enough of the normal path, consequential state, and
-responsive composition to guide implementation, but it is an internal design artifact rather than a
-user-choice gate. `fe/dominant-direction-generate` returns exactly one direction and routes directly
-to Grammar bind/freeze/apply; it must never pass through ranking or `direction-choice`. Construct
-resumes as soon as that artifact is coherent.
-
-For frontend work, family coherence and media uniformity are separate decisions. Every direction must
-reuse the relevant product-family signatures, but it must not add an illustration merely because a
-sibling page has one. Evaluate media only against an explicit user purpose such as orientation,
-explanation, identity, evidence, or a meaningful empty state. Resolve task-focus and dead-space
-problems through information structure and responsive composition first. Choose `no media` when an
-image would distract or only fill area; reuse or generate an asset only when the frozen media brief
-names its purpose, owner, placement, responsive behavior, and alternative-text intent.
-
-## Domain render contract
-
-### Architecture
-
-Render system and ownership boundaries, data/control flow, normal operation, retry or idempotency,
-concurrency or stale state where applicable, dependency outage and recovery, migration/rollback, and
-the cost or coupling that differentiates the alternatives. The diagram must let the reviewer trace a
-real request or event; decorative topology alone is insufficient.
+## Render contract
 
 ### UX/UI
 
-Render realistic page or substantial-surface mockups, not abstract layout rectangles. Include enough
-representative surfaces to expose the changed journey, plus wide and constrained responsive
-composition and at least one material interaction or recovery state. A reconstruct proposal must
-make region ownership, reading order, actions, reusable Grammar objects, and multi-item behavior
-visible before source mutation begins.
+Render realistic pages or substantial surfaces with representative content, not abstract boxes.
+Expose the changed journey, semantic block owners, reading and action order, selected Grammar
+objects, multi-item behavior, wide and constrained composition, and at least one consequential
+pending, failure, recovery, or boundary state.
+
+### Architecture
+
+Render ownership boundaries, data/control flow, normal operation, retry/idempotency, relevant
+concurrency or stale state, dependency outage and recovery, migration/rollback, and differentiating
+cost or coupling. A reviewer must be able to trace one real request or event.
 
 ### Journey, workflow, or business model
 
-Render actors, decisions, state transitions, ownership, failure/recovery paths, and the meaningful
-outcome. Use a diagram, timeline, or interactive comparison appropriate to the choice; prose-only
-process descriptions are incomplete.
+Render actors, decisions, state transitions, ownership, failure/recovery paths, and meaningful
+outcomes using the visual form that best exposes the choice.
 
-## Stop conditions
+## Rejection conditions
 
-- Fewer than three or more than four directions when the user explicitly requested a comparison.
-- Multiple directions or a direction-choice wait when the user did not request alternatives.
-- A claimed direction lacks a visual panel or inspectable HTML artifact.
-- The visual omits the exact distinction used to recommend or reject that direction.
-- A UX/UI proposal shows only one viewport or only a pretty baseline state.
-- An architecture proposal cannot trace boundaries and flows under both normal and adverse operation.
-- The approval request appears before the rendered comparison.
+Reject a generated product when:
+
+- comparison mode contains fewer than three or more than four material directions;
+- alternatives are manufactured even though one direction materially dominates, or a separate choice
+  stage is introduced;
+- any claimed direction lacks an inspectable visual reference;
+- the visual omits the distinction used to recommend it;
+- a UX/UI proposal lacks a constrained viewport or consequential state;
+- a generated direction conflicts with frozen business facts, owner ceiling, or Grammar;
+- a Grammar gap is disguised as a visual option or local implementation workaround;
+- an architecture proposal cannot trace normal and adverse flows.

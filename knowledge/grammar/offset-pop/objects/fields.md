@@ -4,7 +4,7 @@
 | --- | --- |
 | Knowledge ID | `fe.grammar-offset-pop-object-fields` |
 | Package | `@starci/grammar/offset-pop` |
-| Operators | `grammar-convergence` |
+| Operators | `fe/authority-reconcile` |
 | Search tags | `field, input, contour, label, validation, focus, dense form` |
 | Dependencies | `fe.grammar-offset-pop-overview, fe.grammar-common-states-accessibility` |
 

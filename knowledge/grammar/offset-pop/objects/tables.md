@@ -4,7 +4,7 @@
 | --- | --- |
 | Knowledge ID | `fe.grammar-offset-pop-object-tables` |
 | Package | `@starci/grammar/offset-pop` |
-| Operators | `grammar-convergence` |
+| Operators | `fe/authority-reconcile` |
 | Search tags | `table, dense data, comparison, simplify accents, bulk selection` |
 | Dependencies | `fe.grammar-offset-pop-overview, fe.grammar-common-case-collection-cardinality` |
 

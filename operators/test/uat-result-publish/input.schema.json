@@ -19,14 +19,42 @@
       "type": "object",
       "additionalProperties": false,
       "required": [
-        "snapshotRef"
+        "snapshotRef",
+        "sourceFingerprint",
+        "priorVisualPassRef",
+        "priorVisualPassedAt",
+        "snapshotReturnReceiptRef",
+        "caseFreezeReturnReceiptRef",
+        "behaviorProofReturnReceiptRef",
+        "uxProofReturnReceiptRef",
+        "uiProofReturnReceiptRef"
       ],
       "properties": {
         "snapshotRef": {
           "description": "Frozen canonical snapshot.",
           "type": "string",
           "minLength": 1
-        }
+        },
+        "sourceFingerprint": {
+          "description": "Exact source frozen by the UAT snapshot.",
+          "type": "string",
+          "pattern": "^sha256:[0-9a-f]{64}$"
+        },
+        "priorVisualPassRef": {
+          "description": "Exact final blind visual PASS that preceded UAT.",
+          "type": "string",
+          "minLength": 1
+        },
+        "priorVisualPassedAt": {
+          "description": "Timestamp of the final blind visual PASS.",
+          "type": "string",
+          "format": "date-time"
+        },
+        "snapshotReturnReceiptRef": { "description": "Exact validated snapshot-freeze RETURN.", "type": "string", "pattern": "^receipt:[A-Za-z0-9._-]+$" },
+        "caseFreezeReturnReceiptRef": { "description": "Exact validated case-freeze RETURN.", "type": "string", "pattern": "^receipt:[A-Za-z0-9._-]+$" },
+        "behaviorProofReturnReceiptRef": { "description": "Exact validated behavior-proof RETURN.", "type": "string", "pattern": "^receipt:[A-Za-z0-9._-]+$" },
+        "uxProofReturnReceiptRef": { "description": "Exact validated UX-proof RETURN.", "type": "string", "pattern": "^receipt:[A-Za-z0-9._-]+$" },
+        "uiProofReturnReceiptRef": { "description": "Exact validated UI-proof RETURN.", "type": "string", "pattern": "^receipt:[A-Za-z0-9._-]+$" }
       }
     },
     "input": {
@@ -41,6 +69,7 @@
         "evidenceRefs": {
           "description": "Exact browser, account, behavior, UX, or UI evidence.",
           "type": "array",
+          "minItems": 1,
           "uniqueItems": true,
           "maxItems": 128,
           "items": {

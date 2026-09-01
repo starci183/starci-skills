@@ -27,10 +27,20 @@
         {
           "when": {
             "outputEquals": {
+              "debtPolicy": "allowed",
               "outcome": "findings"
             }
           },
           "target": "repair"
+        },
+        {
+          "when": {
+            "outputEquals": {
+              "debtPolicy": "forbidden",
+              "outcome": "findings"
+            }
+          },
+          "target": "blocked"
         },
         {
           "when": {
@@ -87,6 +97,7 @@
         {
           "when": {
             "outputEquals": {
+              "debtPolicy": "allowed",
               "outcome": "pass"
             }
           },
@@ -95,10 +106,29 @@
         {
           "when": {
             "outputEquals": {
+              "debtPolicy": "forbidden",
+              "outcome": "pass"
+            }
+          },
+          "target": "proof"
+        },
+        {
+          "when": {
+            "outputEquals": {
+              "debtPolicy": "allowed",
               "outcome": "fail"
             }
           },
           "target": "repair"
+        },
+        {
+          "when": {
+            "outputEquals": {
+              "debtPolicy": "forbidden",
+              "outcome": "fail"
+            }
+          },
+          "target": "blocked"
         },
         {
           "when": {

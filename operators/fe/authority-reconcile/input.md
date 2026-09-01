@@ -9,6 +9,8 @@
 
 - `input.targetRef`: The one target owned by this atomic invocation.
 - `input.constraints`: Closed constraints that bound this job without routing it.
-- `input.findingRef`: Exact classified visual finding whose reusable authority owner is being reconciled.
-- `input.owner`: The proven authority owner: `grammar` or `ui-knowledge`.
-- `input.authorityRef`: Exact routed Grammar or shared UI-knowledge record allowed to change.
+- `input.gapRef`: Exact compile-time Grammar gap being repaired.
+- `input.owner`: Always `grammar`.
+- `input.authorityRef`: Exact routed `grammar://` owner allowed to change.
+- `input.authorityBoundary`: Exact Grammar file paths, owners, and before hashes authorized for repair.
+- `input.authorityBoundaryFingerprint`: Immutable fingerprint of that ordered Grammar boundary.

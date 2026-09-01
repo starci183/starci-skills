@@ -2,10 +2,45 @@
 
 All notable changes are documented here. This project follows Semantic Versioning.
 
-## 7.5.0-alpha.1 - 2026-08-31
+## 7.6.0-beta.1 - 2026-09-01
 
 ### Changed
 
+- Reduced the public frontend runtime to nine canonical operators and removed 47 obsolete FE operator
+  directories after migrating their active consumers; the generated catalog now exposes 112 operators.
+- Replaced the circular v7.5 frontend chain with one compiled route: refine applies directly, while
+  reconstruct/new invokes the single direction generator for one dominant preview or three-to-four
+  rendered alternatives followed by an exact, single-use user choice.
+- Made Grammar repair author-once and executable: a typed Grammar gap publishes through the exact
+  authority owner, recompiles from that publication once, and rejects page-local CSS workarounds.
+- Bound compile, direction, source mutation, preflight, capture, and blind visual review through
+  runtime-owned receipts, source fingerprints, the populated happy-case proof matrix, and the complete
+  viewport/lifecycle probe set.
+- Made frontend Quality verification-only after visual PASS. UI missions cannot enter repair, debt, or
+  legacy compatibility routes; Quality and UAT preserve unchanged source heads and exact predecessor
+  evidence through their one-way PASS gates.
+- Required UAT snapshot, case, behavior, UX, UI, and final publication to form one exact same-run chain.
+  Empty success evidence, mixed predecessors, stale frontend counterevidence, and failed-lens PASS are
+  rejected.
+- Required post-completion frontend reproof to traverse a fresh visual PASS, Quality delivery PASS, and
+  UAT PASS chain. Visual proof alone can reopen but cannot re-close a contradicted terminal result.
+- Added runtime-owned machine identity, exact RETURN/RESUME parent correlation, bounded progress based on
+  material changes rather than prose, and single-use direction WAIT resolution.
+
+## 7.5.0-beta.1 - 2026-08-31
+
+### Changed
+
+- Made beauty and visual pleasantness a non-compensatory whole-interface veto: a crude, generic,
+  wireframe-like, mechanically assembled, or merely functional page cannot score 9 regardless of
+  technical, UX, responsive, accessibility, or test success.
+- Added the required `aesthetic-finish` pixel-review lens and executable validation that 9+ receives
+  full marks for both visual hierarchy/composition and consistency/accessibility cues.
+- Required the primary wide and compact scoring rasters to use settled populated happy-case data with
+  every major region visible. Empty/loading/error states remain separate evidence and cannot certify
+  the finished page; duplicate route/state images are not independent coverage.
+- Routed structurally ugly pages below 7 directly to one dominant reconstruction without waiting for
+  design alternatives unless the owner explicitly requests options.
 - Added executable `fe/audit-route`: direct structural failures below 7 route to one dominant
   reconstruction, scores 7-8 and low nonstructural findings route to one batched repair, and
   shared/business/backend/runtime-auth defects stay with their smallest owner.

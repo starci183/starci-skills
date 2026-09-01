@@ -3,13 +3,16 @@
 | Field | Value |
 | --- | --- |
 | Knowledge ID | `fe.state-modeling` |
-| Operators | `state` |
+| Contract revision | `7.6.0` |
+| Operators | `fe/request-compile, fe/capture-preflight` |
 | Search tags | `business state, block state, unknown, presentation state, safety` |
 | Dependencies | `fe.page-model` |
 
-## Record
+## Internal compile guidance
 
-State comes from business evidence or from a mechanically necessary Block operation. Visual treatment never creates business truth.
+State comes from business evidence or from a mechanically necessary Block operation. This record
+contributes the closed state model to compile; it creates no visible state stage or route. Visual
+treatment never creates business truth.
 
 ## Provenance
 
@@ -23,6 +26,9 @@ Unknown state is not a renderable fallback when it affects money, access, entitl
 
 ## Mapping boundary
 
-The Product Block maps a domain or operation state to a closed neutral presentation state such as `neutral`, `affirmative`, `negative`, `pending`, `selected`, or `disabled`. Grammar sees only that neutral state and applies generic treatment. It must never infer that a check mark means paid, verified, completed, entitled, or successful.
+The Product Block maps a domain or operation state to a closed neutral presentation state such as
+`neutral`, `affirmative`, `negative`, `pending`, `selected`, or `disabled`. Grammar sees only that
+neutral state and applies `fe.grammar-common-states-accessibility`; it must never infer that a check
+mark means paid, verified, completed, entitled, or successful.
 
 Model default, loading, empty, partial, success, failure, validation, disabled, and recovery only when the owning operation can actually produce them. Record reachability and transition triggers. Reject impossible or decorative states, contradictory simultaneous states, and success treatments without a verified successful outcome.

@@ -3,6 +3,8 @@
 ## Context
 
 - `context.snapshotRef`: Frozen canonical snapshot.
+- `context.snapshotReturnReceiptRef`: Exact validated snapshot-freeze RETURN.
+- `context.sourceFingerprint`: Exact source inherited from the frozen snapshot.
 
 ## Input
 

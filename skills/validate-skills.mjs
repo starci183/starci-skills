@@ -42,7 +42,7 @@ function resolveLocal(schema, value) {
   );
 }
 
-function operatorOutcomes(operatorRef) {
+function operatorContract(operatorRef) {
   const directory = path.join(operatorsRoot, ...operatorRef.split('/'));
   const manifestFile = path.join(directory, 'operator.json');
   const outputFile = path.join(directory, 'output.schema.json');
@@ -53,14 +53,38 @@ function operatorOutcomes(operatorRef) {
   const outcomes = exactValues(resolveLocal(output, outputRoot?.properties?.outcome));
   if (manifest.schemaVersion !== 7) fail(`${operatorRef}: public v7 skills may call only v7 operators`);
   if (!outcomes.length) fail(`${operatorRef}: output contract needs a closed output.outcome`);
-  return outcomes;
+  return { outcomes, outputSchema: output, outputRoot };
+}
+
+function schemaProperty(schema, node, property) {
+  const resolved = resolveLocal(schema, node);
+  if (resolved?.properties?.[property]) return resolveLocal(schema, resolved.properties[property]);
+  for (const branch of [...(resolved?.anyOf ?? []), ...(resolved?.oneOf ?? [])]) {
+    const found = schemaProperty(schema, branch, property);
+    if (found) return found;
+  }
+  return null;
+}
+
+function outputPathValues(schema, outputRoot, dottedPath) {
+  let node = outputRoot;
+  for (const part of dottedPath.split('.')) {
+    node = schemaProperty(schema, node, part);
+    if (!node) return [];
+  }
+  return exactValues(node);
 }
 
 function assertOperatorRoutes(skillId, stateId, state, inputSchema) {
-  const outcomes = operatorOutcomes(state.ref);
+  const { outcomes, outputSchema, outputRoot } = operatorContract(state.ref);
   const routes = state.on ?? [];
-  if (routes.some((edge) => !edge.when?.outputEquals || Object.keys(edge.when.outputEquals).length !== 1 || edge.when.outputEquals.outcome === undefined || Object.keys(edge.when).some((key) => !['outputEquals','inputEquals'].includes(key)))) {
-    fail(`${skillId}/${stateId}: operator transitions must route on output.outcome with at most one exact input partition`);
+  if (routes.some((edge) => {
+    const outputKeys = Object.keys(edge.when?.outputEquals ?? {});
+    return !edge.when?.outputEquals || !outputKeys.includes('outcome') || outputKeys.length > 2 ||
+      Object.keys(edge.when).some((key) => !['outputEquals','inputEquals'].includes(key)) ||
+      (outputKeys.length === 2 && edge.when.inputEquals !== undefined);
+  })) {
+    fail(`${skillId}/${stateId}: operator transitions must route on output.outcome with at most one exact input or output partition`);
   }
   const routed = routes.map((edge) => edge.when.outputEquals.outcome);
   const missing = outcomes.filter((outcome) => !routed.includes(outcome));
@@ -70,9 +94,22 @@ function assertOperatorRoutes(skillId, stateId, state, inputSchema) {
   }
   for (const outcome of outcomes) {
     const group = routes.filter((edge) => edge.when.outputEquals.outcome === outcome);
-    if (group.length === 1 && !group[0].when.inputEquals) continue;
+    if (group.length === 1 && !group[0].when.inputEquals && Object.keys(group[0].when.outputEquals).length === 1) continue;
+    const outputPartitions = group.map((edge) => Object.keys(edge.when.outputEquals).filter((key) => key !== 'outcome'));
+    if (outputPartitions.every((keys) => keys.length === 1) && group.every((edge) => edge.when.inputEquals === undefined)) {
+      const keys = new Set(outputPartitions.map(([key]) => key));
+      if (keys.size !== 1) fail(`${skillId}/${stateId}/${outcome}: conditional routes must partition the same output field`);
+      const key = [...keys][0];
+      const allowed = outputPathValues(outputSchema, outputRoot, key);
+      if (allowed.length === 0) fail(`${skillId}/${stateId}/${outcome}: conditional output field ${key} needs a closed enum`);
+      const actual = group.map((edge) => edge.when.outputEquals[key]);
+      if (new Set(actual).size !== actual.length || JSON.stringify([...actual].sort()) !== JSON.stringify([...allowed].sort())) {
+        fail(`${skillId}/${stateId}/${outcome}: conditional routes must cover output.${key} exactly once`);
+      }
+      continue;
+    }
     if (group.some((edge) => !edge.when.inputEquals || Object.keys(edge.when.inputEquals).length !== 1)) {
-      fail(`${skillId}/${stateId}/${outcome}: conditional routes must use one exact input field on every edge`);
+      fail(`${skillId}/${stateId}/${outcome}: conditional routes must use one exact input or output field on every edge`);
     }
     const keys = new Set(group.map((edge) => Object.keys(edge.when.inputEquals)[0]));
     if (keys.size !== 1) fail(`${skillId}/${stateId}/${outcome}: conditional routes must partition the same input field`);
@@ -196,7 +233,7 @@ function assertOpenAiInterface(skillId, skillDir) {
 }
 
 const catalog = readJson(path.join(root, 'catalog.json'));
-if (catalog.schemaVersion !== 7 || catalog.systemVersion !== '7.5.0-alpha.1') fail('catalog must be v7.5.0-alpha.1');
+if (catalog.schemaVersion !== 7 || catalog.systemVersion !== '7.6.0-beta.1') fail('catalog must be v7.6.0-beta.1');
 if (catalog.skills.length !== 13) fail(`v7 catalog must expose 13 skills, found ${catalog.skills.length}`);
 const catalogIds = catalog.skills.map((entry) => entry.id);
 if (new Set(catalogIds).size !== catalogIds.length) fail('catalog skill IDs must be unique');

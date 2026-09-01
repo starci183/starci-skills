@@ -4,7 +4,7 @@
 | --- | --- |
 | Knowledge ID | `fe.grammar-core-case-multi-step-form` |
 | Package | `@starci/grammar/core` |
-| Operators | `grammar-convergence` |
+| Operators | `fe/authority-reconcile` |
 | Search tags | `multi step, journey progress, form, validation, draft, back navigation` |
 | Dependencies | `fe.grammar-core-object-fields, fe.grammar-core-object-actions` |
 

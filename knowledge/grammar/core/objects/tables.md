@@ -4,7 +4,7 @@
 | --- | --- |
 | Knowledge ID | `fe.grammar-core-object-tables` |
 | Package | `@starci/grammar/core` |
-| Operators | `grammar-convergence` |
+| Operators | `fe/authority-reconcile` |
 | Search tags | `table, dense data, comparison, columns, bulk selection, sticky header` |
 | Dependencies | `fe.grammar-core-overview, fe.grammar-common-case-collection-cardinality` |
 

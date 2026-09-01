@@ -1,5 +1,5 @@
 {
-  "version": "7.5.0-alpha.1",
+  "version": "7.6.0-beta.1",
   "skills": [
     {
       "id": "starci-feature-deliver",
@@ -28,7 +28,7 @@
     {
       "id": "starci-fe-process",
       "capability": "fe.process",
-      "description": "Process one frontend outcome for create, audit, repair, redesign, debug, or reconciliation through native UX/UI operators, code, one blind Sol visual review, quality, and UAT.",
+      "description": "Compile one UI-only frontend outcome, repair exact Grammar gaps, optionally render a reconstruct/new direction, apply it, prove each round by blind Sol review, then close through quality and UAT.",
       "domain": "fe"
     },
     {
@@ -694,15 +694,6 @@
       ]
     },
     {
-      "id": "fe/authority-gap-classify",
-      "domain": "fe",
-      "iconUrl": null,
-      "knowledgeCount": 1,
-      "accepts": [],
-      "emits": [],
-      "sideEffects": []
-    },
-    {
       "id": "fe/authority-reconcile",
       "domain": "fe",
       "iconUrl": null,
@@ -710,27 +701,9 @@
       "accepts": [],
       "emits": [],
       "sideEffects": [
-        "may update the exact classified routed Grammar or shared UI-knowledge authority",
+        "may update the exact classified routed Grammar authority",
         "must preserve unrelated authority consumers"
       ]
-    },
-    {
-      "id": "fe/block-reconcile",
-      "domain": "fe",
-      "iconUrl": null,
-      "knowledgeCount": 0,
-      "accepts": [],
-      "emits": [],
-      "sideEffects": []
-    },
-    {
-      "id": "fe/business-bind",
-      "domain": "fe",
-      "iconUrl": null,
-      "knowledgeCount": 1,
-      "accepts": [],
-      "emits": [],
-      "sideEffects": []
     },
     {
       "id": "fe/capture-preflight",
@@ -742,238 +715,15 @@
       "sideEffects": []
     },
     {
-      "id": "fe/coding-scope-freeze",
-      "domain": "fe",
-      "iconUrl": null,
-      "knowledgeCount": 0,
-      "accepts": [],
-      "emits": [],
-      "sideEffects": []
-    },
-    {
-      "id": "fe/consumer-align",
-      "domain": "fe",
-      "iconUrl": null,
-      "knowledgeCount": 0,
-      "accepts": [],
-      "emits": [],
-      "sideEffects": []
-    },
-    {
-      "id": "fe/context-sync",
-      "domain": "fe",
-      "iconUrl": null,
-      "knowledgeCount": 0,
-      "accepts": [],
-      "emits": [],
-      "sideEffects": []
-    },
-    {
-      "id": "fe/contract-freeze",
-      "domain": "fe",
-      "iconUrl": null,
-      "knowledgeCount": 1,
-      "accepts": [],
-      "emits": [],
-      "sideEffects": []
-    },
-    {
-      "id": "fe/customer-journey",
-      "domain": "fe",
-      "iconUrl": null,
-      "knowledgeCount": 0,
-      "accepts": [],
-      "emits": [],
-      "sideEffects": []
-    },
-    {
-      "id": "fe/design-critique",
-      "domain": "fe",
-      "iconUrl": null,
-      "knowledgeCount": 0,
-      "accepts": [],
-      "emits": [],
-      "sideEffects": []
-    },
-    {
-      "id": "fe/design-implementation",
-      "domain": "fe",
-      "iconUrl": null,
-      "knowledgeCount": 0,
-      "accepts": [],
-      "emits": [],
-      "sideEffects": []
-    },
-    {
       "id": "fe/direction-generate",
       "domain": "fe",
       "iconUrl": null,
       "knowledgeCount": 1,
       "accepts": [],
       "emits": [],
-      "sideEffects": []
-    },
-    {
-      "id": "fe/direction-rank",
-      "domain": "fe",
-      "iconUrl": null,
-      "knowledgeCount": 1,
-      "accepts": [],
-      "emits": [],
-      "sideEffects": []
-    },
-    {
-      "id": "fe/feedback-request",
-      "domain": "fe",
-      "iconUrl": null,
-      "knowledgeCount": 0,
-      "accepts": [],
-      "emits": [],
-      "sideEffects": []
-    },
-    {
-      "id": "fe/finding-classify",
-      "domain": "fe",
-      "iconUrl": null,
-      "knowledgeCount": 1,
-      "accepts": [],
-      "emits": [],
-      "sideEffects": []
-    },
-    {
-      "id": "fe/grammar-convergence",
-      "domain": "fe",
-      "iconUrl": null,
-      "knowledgeCount": 0,
-      "accepts": [],
-      "emits": [],
-      "sideEffects": []
-    },
-    {
-      "id": "fe/implementation",
-      "domain": "fe",
-      "iconUrl": null,
-      "knowledgeCount": 0,
-      "accepts": [],
-      "emits": [],
-      "sideEffects": []
-    },
-    {
-      "id": "fe/independent-review",
-      "domain": "fe",
-      "iconUrl": null,
-      "knowledgeCount": 1,
-      "accepts": [],
-      "emits": [],
-      "sideEffects": []
-    },
-    {
-      "id": "fe/interaction-container-decision",
-      "domain": "fe",
-      "iconUrl": null,
-      "knowledgeCount": 0,
-      "accepts": [],
-      "emits": [],
-      "sideEffects": []
-    },
-    {
-      "id": "fe/layout",
-      "domain": "fe",
-      "iconUrl": null,
-      "knowledgeCount": 0,
-      "accepts": [],
-      "emits": [],
-      "sideEffects": []
-    },
-    {
-      "id": "fe/learning-request",
-      "domain": "fe",
-      "iconUrl": null,
-      "knowledgeCount": 0,
-      "accepts": [],
-      "emits": [],
-      "sideEffects": []
-    },
-    {
-      "id": "fe/learning-resolve",
-      "domain": "fe",
-      "iconUrl": null,
-      "knowledgeCount": 0,
-      "accepts": [],
-      "emits": [],
-      "sideEffects": []
-    },
-    {
-      "id": "fe/maintenance-apply",
-      "domain": "fe",
-      "iconUrl": null,
-      "knowledgeCount": 0,
-      "accepts": [],
-      "emits": [],
-      "sideEffects": []
-    },
-    {
-      "id": "fe/mutation-boundary-freeze",
-      "domain": "fe",
-      "iconUrl": null,
-      "knowledgeCount": 0,
-      "accepts": [],
-      "emits": [],
-      "sideEffects": []
-    },
-    {
-      "id": "fe/page-model",
-      "domain": "fe",
-      "iconUrl": null,
-      "knowledgeCount": 0,
-      "accepts": [],
-      "emits": [],
-      "sideEffects": []
-    },
-    {
-      "id": "fe/preflight",
-      "domain": "fe",
-      "iconUrl": null,
-      "knowledgeCount": 0,
-      "accepts": [],
-      "emits": [],
-      "sideEffects": []
-    },
-    {
-      "id": "fe/principle-compile",
-      "domain": "fe",
-      "iconUrl": null,
-      "knowledgeCount": 0,
-      "accepts": [],
-      "emits": [],
-      "sideEffects": []
-    },
-    {
-      "id": "fe/product-potential",
-      "domain": "fe",
-      "iconUrl": null,
-      "knowledgeCount": 0,
-      "accepts": [],
-      "emits": [],
-      "sideEffects": []
-    },
-    {
-      "id": "fe/product-proof",
-      "domain": "fe",
-      "iconUrl": null,
-      "knowledgeCount": 0,
-      "accepts": [],
-      "emits": [],
-      "sideEffects": []
-    },
-    {
-      "id": "fe/product-seed",
-      "domain": "fe",
-      "iconUrl": null,
-      "knowledgeCount": 0,
-      "accepts": [],
-      "emits": [],
-      "sideEffects": []
+      "sideEffects": [
+        "write one local inspectable visualize HTML comparison artifact"
+      ]
     },
     {
       "id": "fe/progress-guard",
@@ -991,31 +741,15 @@
       "knowledgeCount": 1,
       "accepts": [],
       "emits": [],
-      "sideEffects": []
+      "sideEffects": [
+        "write content-addressed raster artifacts and one retained raster-only blind-review packet"
+      ]
     },
     {
       "id": "fe/request-compile",
       "domain": "fe",
       "iconUrl": null,
       "knowledgeCount": 2,
-      "accepts": [],
-      "emits": [],
-      "sideEffects": []
-    },
-    {
-      "id": "fe/request-emission",
-      "domain": "fe",
-      "iconUrl": null,
-      "knowledgeCount": 0,
-      "accepts": [],
-      "emits": [],
-      "sideEffects": []
-    },
-    {
-      "id": "fe/request-review",
-      "domain": "fe",
-      "iconUrl": null,
-      "knowledgeCount": 0,
       "accepts": [],
       "emits": [],
       "sideEffects": []
@@ -1030,24 +764,6 @@
       "sideEffects": []
     },
     {
-      "id": "fe/runtime-observe",
-      "domain": "fe",
-      "iconUrl": null,
-      "knowledgeCount": 1,
-      "accepts": [],
-      "emits": [],
-      "sideEffects": []
-    },
-    {
-      "id": "fe/semantic-audit",
-      "domain": "fe",
-      "iconUrl": null,
-      "knowledgeCount": 1,
-      "accepts": [],
-      "emits": [],
-      "sideEffects": []
-    },
-    {
       "id": "fe/source-apply",
       "domain": "fe",
       "iconUrl": null,
@@ -1057,107 +773,6 @@
       "sideEffects": [
         "mutate only the exact frozen frontend source boundary"
       ]
-    },
-    {
-      "id": "fe/source-fit",
-      "domain": "fe",
-      "iconUrl": null,
-      "knowledgeCount": 0,
-      "accepts": [],
-      "emits": [],
-      "sideEffects": []
-    },
-    {
-      "id": "fe/source-repair",
-      "domain": "fe",
-      "iconUrl": null,
-      "knowledgeCount": 1,
-      "accepts": [],
-      "emits": [],
-      "sideEffects": [
-        "mutate only the exact frozen frontend source boundary"
-      ]
-    },
-    {
-      "id": "fe/state",
-      "domain": "fe",
-      "iconUrl": null,
-      "knowledgeCount": 0,
-      "accepts": [],
-      "emits": [],
-      "sideEffects": []
-    },
-    {
-      "id": "fe/surface-audit",
-      "domain": "fe",
-      "iconUrl": null,
-      "knowledgeCount": 0,
-      "accepts": [],
-      "emits": [],
-      "sideEffects": []
-    },
-    {
-      "id": "fe/target-resolve",
-      "domain": "fe",
-      "iconUrl": null,
-      "knowledgeCount": 1,
-      "accepts": [],
-      "emits": [],
-      "sideEffects": []
-    },
-    {
-      "id": "fe/ui-audit",
-      "domain": "fe",
-      "iconUrl": null,
-      "knowledgeCount": 1,
-      "accepts": [],
-      "emits": [],
-      "sideEffects": []
-    },
-    {
-      "id": "fe/ui-detail-freeze",
-      "domain": "fe",
-      "iconUrl": null,
-      "knowledgeCount": 0,
-      "accepts": [],
-      "emits": [],
-      "sideEffects": []
-    },
-    {
-      "id": "fe/ui-direction",
-      "domain": "fe",
-      "iconUrl": null,
-      "knowledgeCount": 0,
-      "accepts": [],
-      "emits": [],
-      "sideEffects": []
-    },
-    {
-      "id": "fe/ux-audit",
-      "domain": "fe",
-      "iconUrl": null,
-      "knowledgeCount": 1,
-      "accepts": [],
-      "emits": [],
-      "sideEffects": []
-    },
-    {
-      "id": "fe/ux-flow",
-      "domain": "fe",
-      "iconUrl": null,
-      "knowledgeCount": 2,
-      "accepts": [],
-      "emits": [],
-      "sideEffects": []
-    },
-    {
-      "id": "fe/ux-ui-resolve",
-      "domain": "fe",
-      "iconUrl": null,
-      "knowledgeCount": 0,
-      "accepts": [],
-      "emits": [],
-      "sideEffects": []
     },
     {
       "id": "fe/visual-fidelity",
@@ -1655,9 +1270,10 @@
       "accepts": [],
       "emits": [],
       "sideEffects": [
-        "create mission-only checkpoint commits on dedicated branches when publish mode receives exclusively mission-owned changes",
-        "push checkpoint branches and one annotated continuation tag without force",
-        "fetch and adopt exact checkpoint heads in resume mode only after identity and cleanliness proof"
+        "create mission-only checkpoint commits on dedicated branches only when the routed Git policy permits them",
+        "under direct-main policy fetch incoming branch refs and merge them non-force into the declared mutation branch without creating or switching branches",
+        "push approved heads and one annotated continuation tag without force",
+        "fetch and adopt exact checkpoint heads in resume mode only after identity, policy, and cleanliness proof"
       ]
     },
     {
@@ -1673,11 +1289,6 @@
     }
   ],
   "domains": [
-    {
-      "id": "fe",
-      "operatorCount": 52,
-      "skillCount": 1
-    },
     {
       "id": "architecture",
       "operatorCount": 16,
@@ -1697,6 +1308,11 @@
       "id": "test",
       "operatorCount": 14,
       "skillCount": 0
+    },
+    {
+      "id": "fe",
+      "operatorCount": 9,
+      "skillCount": 1
     },
     {
       "id": "be",

@@ -3,15 +3,28 @@
 | Field | Value |
 | --- | --- |
 | Knowledge ID | `fe.uat-flow-coverage` |
-| Operators | `test/flow-coverage-audit` |
+| Contract revision | `7.6.0` |
+| Operators | `test/uat-case-freeze, test/uat-behavior-proof, test/uat-ux-proof, test/uat-ui-proof` |
 | Search tags | `uat, flow graph, happy, unhappy, recovery, coverage, merge signature` |
 | Dependencies | `fe.customer-journey, fe.uat-protocol` |
 
 ## Authority
 
-Flow Audit compiles test coverage; it does not issue a fourth product-quality verdict. Build a reachable state graph from entry through success and every evidenced safe terminal. Include user actions, system commitments, side effects, async/realtime edges, refresh/resume, denials, failures, recovery, and cancellation.
+Flow coverage is internal compile guidance; it does not create a flow-audit stage or issue another
+product-quality verdict. It compiles the intended UAT cases before source mutation; the durable
+snapshot binds the final source/runtime only after blind UI and Quality PASS, immediately before
+final-only UAT execution. Build a reachable state graph from entry through
+success and every evidenced safe terminal. Include user actions, system commitments, side effects,
+async/realtime edges, refresh/resume, denials, failures, recovery, and cancellation.
 
-Compile the smallest complete flow set. A flow identity changes only when actor/recognizable entry, business outcome/terminal, semantic owner/side-effect boundary, or recovery topology materially changes. A route, page, viewport, copy, field, validation message, or data permutation alone is not a new flow. Each selected flow is one canonical pair under the verified project backend: `.worktrees/uat/<feature>/<flow>/snapshot.json` freezes intent, identities, source heads, cases, fixtures and proof requirements; `result.json` records immutable verdicts and evidence. Feature coverage is derived from these pairs by default search, never copied into a second index or routed checkout-local `.uat`.
+Compile the smallest complete flow set. A flow identity changes only when actor/recognizable entry,
+business outcome/terminal, semantic owner/side-effect boundary, or recovery topology materially
+changes. A route, page, viewport, copy, field, validation message, or data permutation alone is not a
+new flow. Each selected flow is one canonical pair under the verified project backend:
+`.worktrees/uat/<feature>/<flow>/snapshot.json` freezes intent, identities, final source heads, cases,
+fixtures and proof requirements immediately before execution; `result.json` records immutable
+verdicts and evidence. Feature coverage is derived from these pairs by default search, never copied
+into a second index or routed checkout-local `.uat`.
 
 The canonical happy case is always separate. Select a separate unhappy UAT case only when the branch changes a business outcome or next action, crosses auth or permission, reads or writes durable state, creates FE–BE integration risk, requires user recovery, or threatens refresh/resume continuity. An unhappy case may cover multiple examples only when start/pre-failure state, semantic owner, side effect, recovery action, terminal state, and fault scope are identical. Record the six-field signature and lower-level evidence for any omitted permutation.
 

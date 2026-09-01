@@ -4,7 +4,7 @@
 | --- | --- |
 | Knowledge ID | `fe.grammar-offset-pop-object-tabs` |
 | Package | `@starci/grammar/offset-pop` |
-| Operators | `grammar-convergence` |
+| Operators | `fe/authority-reconcile` |
 | Search tags | `tabs, selected, underline gesture, contour, peer content, overflow` |
 | Dependencies | `fe.grammar-offset-pop-overview, fe.grammar-common-states-accessibility` |
 

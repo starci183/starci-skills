@@ -6,7 +6,10 @@ import { operatorV7Issues } from './contract-v7.mjs';
 const root = path.dirname(fileURLToPath(import.meta.url));
 const releaseRoot = path.dirname(root);
 const required = ['execute.md','input.md','input.schema.json','operator.json','output.md','output.schema.json','validate-input.mjs','validate-output.mjs'].sort();
-const allowedContracts = [required, [...required, 'icon.svg'].sort()];
+const allowedContracts = [
+  required,
+  [...required, 'icon.svg'].sort(),
+];
 const fail = (message) => { throw new Error(message); };
 const readJson = (file) => JSON.parse(fs.readFileSync(file, 'utf8'));
 function closedRoot(rule, schema, seen = new Set()) {
@@ -39,7 +42,6 @@ function walkFiles(directory) {
 }
 const contextIds = new Set(walkFiles(path.join(releaseRoot, 'knowledge')).filter((file) => file.endsWith('.md')).map((file) => fs.readFileSync(file, 'utf8').match(/^\|\s*Knowledge ID\s*\|\s*`([^`]+)`\s*\|/mi)?.[1]).filter(Boolean));
 const sourceRefs = new Set(readJson(path.join(releaseRoot, 'knowledge', 'references', 'catalog.json')).references.map((item) => item.id));
-
 function collectStrings(value, found = new Set()) {
   if (typeof value === 'string') found.add(value);
   else if (Array.isArray(value)) for (const item of value) collectStrings(item, found);

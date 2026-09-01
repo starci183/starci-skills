@@ -30,6 +30,9 @@ for (const required of [
 
 const packageJson = json('package.json');
 const catalog = json('skills/catalog.json');
+const expectedRuntimeVersion = '7.6.0-beta.1';
+const debtSchema = json('templates/debts/debt.schema.json');
+const debtTemplate = json('templates/debts/debt.template.json');
 const expectedSkills = [
   'starci-feature-deliver', 'starci-business-process', 'starci-architecture-design',
   'starci-backend-process', 'starci-fe-process', 'starci-quality-assure',
@@ -42,10 +45,13 @@ const publicSkills = fs.readdirSync(resolve('skills'), { withFileTypes: true })
   .map((entry) => entry.name)
   .sort();
 
-if (packageJson.version !== '7.5.0-alpha.1' || catalog.systemVersion !== packageJson.version) {
-  fail('package and catalog must agree on version 7.5.0-alpha.1');
+if (packageJson.version !== expectedRuntimeVersion || catalog.systemVersion !== packageJson.version) {
+  fail(`package and catalog must agree on the current prerelease ${expectedRuntimeVersion}`);
 }
 if (catalog.schemaVersion !== 7) fail('catalog must use schemaVersion 7');
+if (debtSchema.properties?.version?.const !== '7.0.0' || debtTemplate.version !== '7.0.0') {
+  fail('debt records must preserve the canonical 7.0.0 contract version');
+}
 if (JSON.stringify(publicSkills) !== JSON.stringify(expectedSkills)) {
   fail(`public skill directories differ from the thirteen v7 mission skills: ${publicSkills.join(', ')}`);
 }
@@ -64,9 +70,28 @@ for (const skill of publicSkills) {
 }
 
 const config = read('config.yaml');
-if (!/^version:\s*7\.5\.0-alpha\.1$/m.test(config) || !/^grammarContractVersion:\s*7\.4\.0$/m.test(config) || !/^debug:\s*true$/m.test(config)) {
-  fail('config.yaml must enable the v7.5.0-alpha.1 debug trace');
+const scopeConfig = read('scope.yaml');
+if (!new RegExp(`^version:\\s*${expectedRuntimeVersion.replaceAll('.', '\\.')}\\s*$`, 'm').test(config) || !/^grammarContractVersion:\s*7\.4\.0$/m.test(config) || !/^debug:\s*true$/m.test(config)) {
+  fail(`config.yaml must enable the ${expectedRuntimeVersion} debug trace`);
 }
+if (!new RegExp(`^version:\\s*${expectedRuntimeVersion.replaceAll('.', '\\.')}\\s*$`, 'm').test(scopeConfig)) fail('scope.yaml version differs from the runtime release');
+for (const [relative, actual] of [
+  ['package-lock.json', json('package-lock.json').version],
+  ['runtime/config.schema.json', json('runtime/config.schema.json').properties?.version?.const],
+  ['runtime/receipt.schema.json', json('runtime/receipt.schema.json').properties?.version?.const],
+  ['runtime/scope-policy.schema.json', json('runtime/scope-policy.schema.json').properties?.version?.const],
+  ['templates/businesses/business.schema.json', json('templates/businesses/business.schema.json').properties?.version?.const],
+  ['templates/businesses/business.template.json', json('templates/businesses/business.template.json').version],
+  ['templates/uat/snapshot.schema.json', json('templates/uat/snapshot.schema.json').properties?.version?.const],
+  ['templates/uat/snapshot.template.json', json('templates/uat/snapshot.template.json').version],
+  ['templates/uat/result.schema.json', json('templates/uat/result.schema.json').properties?.version?.const],
+  ['templates/uat/result.template.json', json('templates/uat/result.template.json').version],
+  ['templates/sessions/call-receipt.template.json', json('templates/sessions/call-receipt.template.json').version],
+]) if (actual !== expectedRuntimeVersion) fail(`${relative} version differs from ${expectedRuntimeVersion}`);
+const changelog = read('CHANGELOG.md');
+const currentChangelogVersion = changelog.match(/^##\s+([^\s]+)\s+-\s+\d{4}-\d{2}-\d{2}\s*$/m)?.[1];
+if (currentChangelogVersion !== expectedRuntimeVersion) fail('CHANGELOG.md must begin with the exact current prerelease');
+if (!read('README.md').startsWith(`# StarCi Skills ${expectedRuntimeVersion}`)) fail('README title differs from the runtime release');
 for (const required of [
   'aiBrainstormModel: gpt-5.6-sol',
   'aiBrainstormCount: 1',
@@ -77,7 +102,7 @@ for (const required of [
   'visualReviewIsolation: fresh',
   'visualReviewForkTurns: none',
   'visualReviewNoProgressLimit: 3',
-]) if (!config.includes(required)) fail(`config.yaml is missing v7.5-alpha AI boundary: ${required}`);
+]) if (!config.includes(required)) fail(`config.yaml is missing v7.6 AI boundary: ${required}`);
 const index = read('INDEX.md');
 for (const required of [
   '(context + input) -> typed output', 'CALL child', 'RETURN', 'RESUME exact parent state',
@@ -101,7 +126,7 @@ const operatorAudit = auditOperatorRoot(resolve('operators'));
 if (operatorAudit.remaining > 0) {
   fail(`${operatorAudit.remaining} of ${operatorAudit.total} operators violate the strict v7 contract`);
 }
-if (operatorAudit.total < 140) fail(`operator coverage unexpectedly fell to ${operatorAudit.total}`);
+if (operatorAudit.total !== 112) fail(`operator catalog must contain exactly 112 active v7.6 operators, found ${operatorAudit.total}`);
 
 const operatorManifests = walk(resolve('operators')).filter((file) => path.basename(file) === 'operator.json');
 const knowledgeFiles = walk(resolve('knowledge')).filter((file) => file.endsWith('.md'));
@@ -118,10 +143,16 @@ for (const manifestFile of operatorManifests) {
 }
 
 const sitePackage = json('sites/skills/package.json');
+const sitePackageLock = json('sites/skills/package-lock.json');
 const siteCatalog = json('sites/skills/src/catalog.generated.json');
-if (sitePackage.version !== packageJson.version || siteCatalog.version !== packageJson.version) {
+if (sitePackage.version !== packageJson.version || sitePackageLock.version !== packageJson.version || siteCatalog.version !== packageJson.version) {
   fail('site and runtime versions differ');
 }
 if (siteCatalog.skills?.length !== 13) fail('generated site must expose exactly thirteen Skills');
+if (siteCatalog.operators?.length !== operatorAudit.total) fail('generated site operator count differs from the active operator catalog');
+const manifestIds = operatorManifests.map((file) => JSON.parse(fs.readFileSync(file, 'utf8')).id).sort();
+if (JSON.stringify(siteCatalog.operators.map(({ id }) => id).sort()) !== JSON.stringify(manifestIds)) fail('generated site operator identities differ from the active manifests');
+const expectedFeOperators = ['fe/authority-reconcile','fe/capture-preflight','fe/direction-generate','fe/progress-guard','fe/render-capture','fe/request-compile','fe/return-consume','fe/source-apply','fe/visual-fidelity'];
+if (JSON.stringify(siteCatalog.operators.filter(({ id }) => id.startsWith('fe/')).map(({ id }) => id).sort()) !== JSON.stringify(expectedFeOperators)) fail('generated site must expose exactly the nine retained v7.6 FE operators');
 
 console.log(`release valid: 13 mission skills, ${operatorAudit.total} atomic operators, ${knowledgeIds.size} knowledge records`);

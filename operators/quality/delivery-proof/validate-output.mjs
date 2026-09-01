@@ -13,6 +13,9 @@ export const validateOutput = validatorFor(new URL('./output.schema.json', impor
       if (refs.length===0) issues.push(`quality PASS requires evidenced ${direction} consideration`);
       if (refs.some((ref)=>!value.output.evidenceRefs.includes(ref))) issues.push(`quality PASS ${direction} evidence must be bound in top-level evidenceRefs`);
     }
+  } else {
+    if (value.output.resultRef !== null) issues.push('blocked quality proof cannot publish a resultRef');
+    if (typeof value.output.reason !== 'string') issues.push('blocked quality proof requires an exact reason');
   }
   return issues;
 });

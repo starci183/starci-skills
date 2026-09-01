@@ -23,7 +23,7 @@ const expected = [
 
 test('public catalog is exactly the thirteen v7 mission skills', () => {
   assert.equal(catalog.schemaVersion, 7);
-  assert.equal(catalog.systemVersion, '7.5.0-alpha.1');
+  assert.equal(catalog.systemVersion, '7.6.0-beta.1');
   assert.deepEqual(catalog.skills.map(({ id }) => id).sort(), expected);
   const directories = readdirSync(new URL('skills/', root), { withFileTypes: true })
     .filter((entry) => entry.isDirectory() && entry.name.startsWith('starci-'))
@@ -43,7 +43,7 @@ test('selection law routes frontend work to one general FE process skill', () =>
 test('debug configuration is explicit and behavior-neutral', () => {
   const config = readFileSync(new URL('config.yaml', root), 'utf8');
   const index = readFileSync(new URL('INDEX.md', root), 'utf8');
-  assert.match(config, /^version:\s*7\.5\.0-alpha\.1$/m);
+  assert.match(config, /^version:\s*7\.6\.0-beta\.1$/m);
   assert.match(config, /^debug:\s*true$/m);
   assert.match(config, /^visualReviewNoProgressLimit:\s*3$/m);
   assert.doesNotMatch(config, /^visualReviewMaxRounds:/m);

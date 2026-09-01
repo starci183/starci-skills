@@ -5,5 +5,7 @@
 - `input.project`: verified project identity.
 - `input.objectiveRef`: exact bounded objective reference.
 - `input.sourceFingerprint`: frozen fingerprint for supplied evidence.
+- `input.debtPolicy`: exact `allowed` or verification-only `forbidden` policy.
+- `input.origin`: exact registered final frontend visual PASS receipt, source, packet fingerprint, and audit references for `forbidden`; otherwise `null`.
 
 The runtime Source resolves routes through `.claude/.workspaces`; project authority lives only in the verified backend Source under flat `.worktrees/<kind>`.

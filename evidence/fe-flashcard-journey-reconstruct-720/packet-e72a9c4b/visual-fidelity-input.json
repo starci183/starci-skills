@@ -1,0 +1,493 @@
+{
+  "schemaVersion": 7,
+  "operatorId": "fe/visual-fidelity",
+  "context": {
+    "implementerExecutionRef": "execution://cbf78ef5bbf7ac2470e56b75e83ced950b585f37b49f2459a84e86da36f8a268",
+    "reviewerExecutionRef": "execution://f9a82805c107d5fd6744401e4268c7290685815b99783a3817c0fe4c139b259e",
+    "implementerPrincipalFingerprint": "sha256:cbf78ef5bbf7ac2470e56b75e83ced950b585f37b49f2459a84e86da36f8a268",
+    "reviewerPrincipalFingerprint": "sha256:f9a82805c107d5fd6744401e4268c7290685815b99783a3817c0fe4c139b259e",
+    "reviewerContextFingerprint": "sha256:4dec5744f68a979d6f58b3c025fcea5b25ee497a3c5d6e3012f8ded12df51100",
+    "reviewerModel": "gpt-5.6-sol",
+    "reviewerCount": 1,
+    "contextIsolation": "fresh",
+    "forkTurns": "none",
+    "debug": true
+  },
+  "input": {
+    "blindReviewPacket": {
+      "packetRef": "packet://856fb84f0e7b16a74ec6f697c6504c55cbf346370eb2b374b0dbdcaf46e8eae1",
+      "packetFingerprint": "sha256:856fb84f0e7b16a74ec6f697c6504c55cbf346370eb2b374b0dbdcaf46e8eae1",
+      "captureReceiptId": "receipt:fe:render-capture:flashcard-720-v7:20260830t043640z",
+      "preflightRef": "preflight://29513172bfe828d2e2fe706cfd3c4ac5ec064cf441463ef16c916af38b07c076",
+      "matrixRef": "matrix://flashcard-journey-v7-final",
+      "matrixFingerprint": "sha256:3acbee06ad03e81725bf5629512aa99358ee47cb0eb5c206b5dafe64297236ef",
+      "partitionFingerprint": "sha256:13ce8db64d73997c2c9e5bd15bf1f414c87fec233e382c64be8da0625d5eac64",
+      "visualRound": {
+        "number": 3,
+        "purpose": "regression"
+      },
+      "capturePartitionRefs": [
+        "partition://flashcard-v7-full-matrix"
+      ],
+      "reusedPartitionRefs": [],
+      "latestMutationFingerprint": "sha256:3dc6d1c218a0e818149156ecc7c75dfa82321567842eee32fba90c6f8f32787d",
+      "capturedSourceFingerprint": "sha256:3dc6d1c218a0e818149156ecc7c75dfa82321567842eee32fba90c6f8f32787d",
+      "latestMutationAt": "2026-08-30T04:21:03.885Z",
+      "capturedAt": "2026-08-30T04:36:40.783Z",
+      "rasterCells": [
+        {
+          "imageRef": "sha256-e30109292c3f870cec7d12fbc123a980590964a2f85570264470b0b4e32c840e.png",
+          "cellRef": "cell-000",
+          "viewKind": "host-context",
+          "viewport": "host",
+          "lastScreenshot": true
+        },
+        {
+          "imageRef": "sha256-76091fd46bb2e04d1031ea9f99c3327436db7556487de18ff71195688abc8090.png",
+          "cellRef": "cell-001",
+          "viewKind": "viewport",
+          "viewport": "wide",
+          "lastScreenshot": false
+        },
+        {
+          "imageRef": "sha256-a4b330a9b40464aeaa7cf585b87988ebd0944fb5b8af82b35bccb8247c604586.png",
+          "cellRef": "cell-002",
+          "viewKind": "viewport",
+          "viewport": "wide",
+          "lastScreenshot": false
+        },
+        {
+          "imageRef": "sha256-e6a59ea67b0b673297b52b667b9655fd665d9eb5cc0923ffc465b95468b862d4.png",
+          "cellRef": "cell-003",
+          "viewKind": "viewport",
+          "viewport": "compact",
+          "lastScreenshot": false
+        },
+        {
+          "imageRef": "sha256-b6bf1ef992adc209627c84e423923d999944ed0a9e37dd45f434de5283deba97.png",
+          "cellRef": "cell-004",
+          "viewKind": "viewport",
+          "viewport": "intermediate",
+          "lastScreenshot": false
+        },
+        {
+          "imageRef": "sha256-5a2733078c5329359b127fec67a5285f4e887ff78596b5fd91b5b4643b5dad65.png",
+          "cellRef": "cell-005",
+          "viewKind": "viewport",
+          "viewport": "wide",
+          "lastScreenshot": false
+        },
+        {
+          "imageRef": "sha256-54e481b78909dc15317040bbbaf563e91903868df7f3306a518fccfc84e3336e.png",
+          "cellRef": "cell-006",
+          "viewKind": "viewport",
+          "viewport": "intermediate",
+          "lastScreenshot": false
+        },
+        {
+          "imageRef": "sha256-f261dab257c3ac4ebaf1fac17addc127641d81ebd74c0bd732cac92bfbe055d8.png",
+          "cellRef": "cell-007",
+          "viewKind": "viewport",
+          "viewport": "wide",
+          "lastScreenshot": false
+        },
+        {
+          "imageRef": "sha256-0c96b14624d377cc5a5eae9406cc86ab287f9c88e5cdef860b4dbd450bfbeb85.png",
+          "cellRef": "cell-008",
+          "viewKind": "viewport",
+          "viewport": "intermediate",
+          "lastScreenshot": false
+        },
+        {
+          "imageRef": "sha256-a6429b1084052fc4a5d0ad837b5e9d2faad75373c55f3643059809b77d32febc.png",
+          "cellRef": "cell-009",
+          "viewKind": "viewport",
+          "viewport": "intermediate",
+          "lastScreenshot": false
+        },
+        {
+          "imageRef": "sha256-43b555c660c64c2f81f56dd140bf0d9935edaece14e11b5e9c740ac62088e66c.png",
+          "cellRef": "cell-010",
+          "viewKind": "viewport",
+          "viewport": "intermediate",
+          "lastScreenshot": false
+        },
+        {
+          "imageRef": "sha256-aa092952d25d7e07dd415ee34eac5ba5e4741c15011be7132bfdc6dd8e6f5c8d.png",
+          "cellRef": "cell-011",
+          "viewKind": "viewport",
+          "viewport": "intermediate",
+          "lastScreenshot": false
+        },
+        {
+          "imageRef": "sha256-bbc073e09830ba0dc47fac8c1690271ad57d0b1de8286d9cc45f56596d8120fa.png",
+          "cellRef": "cell-012",
+          "viewKind": "surface-focus",
+          "viewport": "wide",
+          "lastScreenshot": false
+        },
+        {
+          "imageRef": "sha256-ada52a21a4ab51f9d4842bf74b96af658c1691c135b4ac6c7c84b4342c905508.png",
+          "cellRef": "cell-013",
+          "viewKind": "surface-focus",
+          "viewport": "wide",
+          "lastScreenshot": false
+        },
+        {
+          "imageRef": "sha256-c168f3c71d454c12dc26101f4d4abe5338e3c24e752c2014eb881747382baf6c.png",
+          "cellRef": "cell-014",
+          "viewKind": "surface-focus",
+          "viewport": "wide",
+          "lastScreenshot": false
+        },
+        {
+          "imageRef": "sha256-de017d0354da5b9f5574593af77b36af0867cca14e4e028d12dde9d04644245e.png",
+          "cellRef": "cell-015",
+          "viewKind": "viewport",
+          "viewport": "compact",
+          "lastScreenshot": false
+        },
+        {
+          "imageRef": "sha256-9f47891f43943e5c1f4645b87a22f047eb8ca4f247e9629deb1a2ef47d71fe4a.png",
+          "cellRef": "cell-016",
+          "viewKind": "lifecycle",
+          "viewport": "compact",
+          "lastScreenshot": false
+        },
+        {
+          "imageRef": "sha256-79b91525247a2def9ebae611709527545e0fc64e6e9225515e321919cdf83736.png",
+          "cellRef": "cell-017",
+          "viewKind": "scroll-start",
+          "viewport": "compact",
+          "lastScreenshot": false
+        },
+        {
+          "imageRef": "sha256-6cd145458caef90c44feec2aa7bbffd8f620a8b6f7884876c2872c065f0c6b30.png",
+          "cellRef": "cell-018",
+          "viewKind": "scroll-start",
+          "viewport": "compact",
+          "lastScreenshot": false
+        },
+        {
+          "imageRef": "sha256-efd5f3d14f8d2e06fa4a763fabc737ad65b969a219bc3975fcddeea4fff8a41a.png",
+          "cellRef": "cell-019",
+          "viewKind": "scroll-middle",
+          "viewport": "compact",
+          "lastScreenshot": false
+        },
+        {
+          "imageRef": "sha256-309504ce9f53db5f0c75975c20c873c392f63531064070d14f0c80c37aa4c1e2.png",
+          "cellRef": "cell-020",
+          "viewKind": "scroll-terminal",
+          "viewport": "compact",
+          "lastScreenshot": false
+        },
+        {
+          "imageRef": "sha256-b137830eb4d2a88ce18d102cdffda12a5a30140357850d323a409480c1843582.png",
+          "cellRef": "cell-021",
+          "viewKind": "lifecycle",
+          "viewport": "compact",
+          "lastScreenshot": false
+        },
+        {
+          "imageRef": "sha256-9154b40565be1eb7bdb59debde31ed7643401dd2be089ad3a0bf383e0e233257.png",
+          "cellRef": "cell-022",
+          "viewKind": "surface-focus",
+          "viewport": "intermediate",
+          "lastScreenshot": false
+        },
+        {
+          "imageRef": "sha256-8710bce73f41372e6ddef3d1b4a625ac4cf3322b5192d5d0e427456b1dc05ec9.png",
+          "cellRef": "cell-023",
+          "viewKind": "viewport",
+          "viewport": "compact",
+          "lastScreenshot": false
+        },
+        {
+          "imageRef": "sha256-f91e888ae69d9183fc44ca1b37f3685ca3e6b17b793d9394145f2fb7db62b8d9.png",
+          "cellRef": "cell-024",
+          "viewKind": "surface-focus",
+          "viewport": "wide",
+          "lastScreenshot": false
+        },
+        {
+          "imageRef": "sha256-eb8339b595d88e514f90ed691d37f61bff1073aba005afd4fec3749b74479133.png",
+          "cellRef": "cell-025",
+          "viewKind": "surface-focus",
+          "viewport": "wide",
+          "lastScreenshot": false
+        },
+        {
+          "imageRef": "sha256-ec2100590365aabb0a21103ae93743704ab77c8bdb96ad5d442aa33203fe609a.png",
+          "cellRef": "cell-026",
+          "viewKind": "viewport",
+          "viewport": "compact",
+          "lastScreenshot": false
+        },
+        {
+          "imageRef": "sha256-da743f866df730ee2ffdcd99eb0b8b65db26875a05454e320a0f27cb7c508e70.png",
+          "cellRef": "cell-027",
+          "viewKind": "lifecycle",
+          "viewport": "compact",
+          "lastScreenshot": false
+        },
+        {
+          "imageRef": "sha256-1758018c436bc21ca82efbeb78d4923de85d815248dce99ecb33589ffe6449fa.png",
+          "cellRef": "cell-028",
+          "viewKind": "lifecycle",
+          "viewport": "compact",
+          "lastScreenshot": false
+        },
+        {
+          "imageRef": "sha256-8c8b4f6e1d4491d7b5d4a717ab1aa58b1c7c6955c39f7ff2cdfda946a6418528.png",
+          "cellRef": "cell-029",
+          "viewKind": "surface-focus",
+          "viewport": "wide",
+          "lastScreenshot": false
+        },
+        {
+          "imageRef": "sha256-a08a5c759499ce4bafd9f32df5c8137c2f98f05848570bb879f7072bc80d3ec5.png",
+          "cellRef": "cell-030",
+          "viewKind": "scroll-terminal",
+          "viewport": "compact",
+          "lastScreenshot": false
+        },
+        {
+          "imageRef": "sha256-58fb6d39e2e4916df274738a92fb84809f33b03363a82eeb3ea63b0a38cebb77.png",
+          "cellRef": "cell-031",
+          "viewKind": "lifecycle",
+          "viewport": "compact",
+          "lastScreenshot": false
+        },
+        {
+          "imageRef": "sha256-bfe7d66088ce921a94e2c669fca0a38d0cd3bb897dd24aff6efb1bc71a8c5e9e.png",
+          "cellRef": "cell-032",
+          "viewKind": "viewport",
+          "viewport": "compact",
+          "lastScreenshot": false
+        },
+        {
+          "imageRef": "sha256-1e87706ea399bb8e30090aa939ef6bee199275c6d66e61954f4cd54628ad19cc.png",
+          "cellRef": "cell-033",
+          "viewKind": "lifecycle",
+          "viewport": "compact",
+          "lastScreenshot": false
+        },
+        {
+          "imageRef": "sha256-25bafb41afc717c16bd62033ceb1185a0d17c6a50a8826c4b3ade9a59c6b4a83.png",
+          "cellRef": "cell-034",
+          "viewKind": "overlay",
+          "viewport": "wide",
+          "lastScreenshot": false
+        },
+        {
+          "imageRef": "sha256-7506bce593405566bd3ec908d31db1f9e9dd185d3163efd98b348679c10ed281.png",
+          "cellRef": "cell-035",
+          "viewKind": "scroll-start",
+          "viewport": "wide",
+          "lastScreenshot": false
+        },
+        {
+          "imageRef": "sha256-aa9c36897971ceef2ef626bfb1f7e0af465de20a5b68b93f6131657ea6a4a563.png",
+          "cellRef": "cell-036",
+          "viewKind": "scroll-terminal",
+          "viewport": "wide",
+          "lastScreenshot": false
+        },
+        {
+          "imageRef": "sha256-6dbf495b2e65d9a78ffe26b63cb74ee772964dc359b59ff3d1c1378f3937e173.png",
+          "cellRef": "cell-037",
+          "viewKind": "lifecycle",
+          "viewport": "wide",
+          "lastScreenshot": false
+        },
+        {
+          "imageRef": "sha256-e090dd95dc9e9dd6b8803e3953b47cbea092bc801ddfa3305561534eb3938eac.png",
+          "cellRef": "cell-038",
+          "viewKind": "lifecycle",
+          "viewport": "compact",
+          "lastScreenshot": false
+        }
+      ],
+      "probeCells": [
+        {
+          "probeId": "probe-viewport-baseline",
+          "category": "viewport",
+          "phase": "baseline",
+          "applicable": true,
+          "imageRef": "sha256-76091fd46bb2e04d1031ea9f99c3327436db7556487de18ff71195688abc8090.png",
+          "reason": null
+        },
+        {
+          "probeId": "probe-viewport-breakpoint-edge",
+          "category": "viewport",
+          "phase": "breakpoint-edge",
+          "applicable": true,
+          "imageRef": "sha256-0c96b14624d377cc5a5eae9406cc86ab287f9c88e5cdef860b4dbd450bfbeb85.png",
+          "reason": null
+        },
+        {
+          "probeId": "probe-zoom-zoom-in",
+          "category": "zoom",
+          "phase": "zoom-in",
+          "applicable": true,
+          "imageRef": "sha256-54e481b78909dc15317040bbbaf563e91903868df7f3306a518fccfc84e3336e.png",
+          "reason": null
+        },
+        {
+          "probeId": "probe-zoom-zoom-out",
+          "category": "zoom",
+          "phase": "zoom-out",
+          "applicable": true,
+          "imageRef": "sha256-f261dab257c3ac4ebaf1fac17addc127641d81ebd74c0bd732cac92bfbe055d8.png",
+          "reason": null
+        },
+        {
+          "probeId": "probe-zoom-restored",
+          "category": "zoom",
+          "phase": "restored",
+          "applicable": true,
+          "imageRef": "sha256-5a2733078c5329359b127fec67a5285f4e887ff78596b5fd91b5b4643b5dad65.png",
+          "reason": null
+        },
+        {
+          "probeId": "probe-page-scroll-start",
+          "category": "page-scroll",
+          "phase": "start",
+          "applicable": true,
+          "imageRef": "sha256-6cd145458caef90c44feec2aa7bbffd8f620a8b6f7884876c2872c065f0c6b30.png",
+          "reason": null
+        },
+        {
+          "probeId": "probe-page-scroll-middle",
+          "category": "page-scroll",
+          "phase": "middle",
+          "applicable": true,
+          "imageRef": "sha256-efd5f3d14f8d2e06fa4a763fabc737ad65b969a219bc3975fcddeea4fff8a41a.png",
+          "reason": null
+        },
+        {
+          "probeId": "probe-page-scroll-end",
+          "category": "page-scroll",
+          "phase": "end",
+          "applicable": true,
+          "imageRef": "sha256-309504ce9f53db5f0c75975c20c873c392f63531064070d14f0c80c37aa4c1e2.png",
+          "reason": null
+        },
+        {
+          "probeId": "probe-page-scroll-restored",
+          "category": "page-scroll",
+          "phase": "restored",
+          "applicable": true,
+          "imageRef": "sha256-b137830eb4d2a88ce18d102cdffda12a5a30140357850d323a409480c1843582.png",
+          "reason": null
+        },
+        {
+          "probeId": "probe-bounded-scroll-start",
+          "category": "bounded-scroll",
+          "phase": "start",
+          "applicable": true,
+          "imageRef": "sha256-7506bce593405566bd3ec908d31db1f9e9dd185d3163efd98b348679c10ed281.png",
+          "reason": null
+        },
+        {
+          "probeId": "probe-bounded-scroll-end",
+          "category": "bounded-scroll",
+          "phase": "end",
+          "applicable": true,
+          "imageRef": "sha256-aa9c36897971ceef2ef626bfb1f7e0af465de20a5b68b93f6131657ea6a4a563.png",
+          "reason": null
+        },
+        {
+          "probeId": "probe-bounded-scroll-restored",
+          "category": "bounded-scroll",
+          "phase": "restored",
+          "applicable": true,
+          "imageRef": "sha256-6dbf495b2e65d9a78ffe26b63cb74ee772964dc359b59ff3d1c1378f3937e173.png",
+          "reason": null
+        },
+        {
+          "probeId": "probe-content-stress-content-long",
+          "category": "content-stress",
+          "phase": "content-long",
+          "applicable": true,
+          "imageRef": "sha256-9154b40565be1eb7bdb59debde31ed7643401dd2be089ad3a0bf383e0e233257.png",
+          "reason": null
+        },
+        {
+          "probeId": "probe-content-stress-content-short",
+          "category": "content-stress",
+          "phase": "content-short",
+          "applicable": true,
+          "imageRef": "sha256-1e87706ea399bb8e30090aa939ef6bee199275c6d66e61954f4cd54628ad19cc.png",
+          "reason": null
+        },
+        {
+          "probeId": "probe-state-transition-skeleton",
+          "category": "state-transition",
+          "phase": "skeleton",
+          "applicable": true,
+          "imageRef": "sha256-58fb6d39e2e4916df274738a92fb84809f33b03363a82eeb3ea63b0a38cebb77.png",
+          "reason": null
+        },
+        {
+          "probeId": "probe-state-transition-loading",
+          "category": "state-transition",
+          "phase": "loading",
+          "applicable": true,
+          "imageRef": "sha256-e090dd95dc9e9dd6b8803e3953b47cbea092bc801ddfa3305561534eb3938eac.png",
+          "reason": null
+        },
+        {
+          "probeId": "probe-state-transition-steady",
+          "category": "state-transition",
+          "phase": "steady",
+          "applicable": true,
+          "imageRef": "sha256-76091fd46bb2e04d1031ea9f99c3327436db7556487de18ff71195688abc8090.png",
+          "reason": null
+        },
+        {
+          "probeId": "probe-sticky-fixed-overlay-baseline",
+          "category": "sticky-fixed-overlay",
+          "phase": "baseline",
+          "applicable": true,
+          "imageRef": "sha256-76091fd46bb2e04d1031ea9f99c3327436db7556487de18ff71195688abc8090.png",
+          "reason": null
+        },
+        {
+          "probeId": "probe-sticky-fixed-overlay-overlay-open",
+          "category": "sticky-fixed-overlay",
+          "phase": "overlay-open",
+          "applicable": true,
+          "imageRef": "sha256-25bafb41afc717c16bd62033ceb1185a0d17c6a50a8826c4b3ade9a59c6b4a83.png",
+          "reason": null
+        },
+        {
+          "probeId": "probe-drag-drag-limit",
+          "category": "drag",
+          "phase": "drag-limit",
+          "applicable": false,
+          "imageRef": null,
+          "reason": "interaction-not-present"
+        },
+        {
+          "probeId": "probe-keyboard-focus-focus",
+          "category": "keyboard-focus",
+          "phase": "focus",
+          "applicable": true,
+          "imageRef": "sha256-bbc073e09830ba0dc47fac8c1690271ad57d0b1de8286d9cc45f56596d8120fa.png",
+          "reason": null
+        },
+        {
+          "probeId": "probe-composition-neighbors-baseline",
+          "category": "composition-neighbors",
+          "phase": "baseline",
+          "applicable": true,
+          "imageRef": "sha256-e30109292c3f870cec7d12fbc123a980590964a2f85570264470b0b4e32c840e.png",
+          "reason": null
+        }
+      ],
+      "lastScreenshotRef": "sha256-e30109292c3f870cec7d12fbc123a980590964a2f85570264470b0b4e32c840e.png"
+    }
+  }
+}

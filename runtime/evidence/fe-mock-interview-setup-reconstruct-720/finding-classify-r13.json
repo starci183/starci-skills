@@ -1,0 +1,309 @@
+{
+  "schemaVersion": 7,
+  "operatorId": "fe/finding-classify",
+  "output": {
+    "outcome": "repair",
+    "result": {
+      "summary": "23 repair rasters and 18 contradiction probes are implementation-owned. The dominant owner is the frontend capture adapter; local clipping remains implementation-owned and will be re-evaluated from fresh bounded rasters.",
+      "artifactRefs": [
+        "finding-classify-input-r13.json",
+        "visual-fidelity-r13.json"
+      ],
+      "reviewStage": "visual-fidelity",
+      "ownerAssessments": [
+        {
+          "findingRef": "inspection:sha256-b8aea14ce0a6ff03f614b043034f8df486a7e5659cba32a036777daee6089c14.png",
+          "owner": "implementation",
+          "counterevidenceRef": "capture-source:sha256-b8aea14ce0a6ff03f614b043034f8df486a7e5659cba32a036777daee6089c14.png",
+          "authorityRef": "D:/Repositories/starci-academy-backend/.claude/knowledge/ui.md",
+          "rationale": "The visible contradiction is owned by the frontend evidence implementation: the host screenshot was resampled to the requested viewport instead of extracting the emulated browser viewport, so outer host pixels were pulled into the review raster. Any remaining local clipping in the same raster remains implementation-owned and must be challenged again after a fresh correctly bounded capture."
+        },
+        {
+          "findingRef": "inspection:sha256-d3bfbbc36019d2990fd3e22a9bae5b67f87e56f23aae0603b50e6634c2c7280c.png",
+          "owner": "implementation",
+          "counterevidenceRef": "capture-source:sha256-d3bfbbc36019d2990fd3e22a9bae5b67f87e56f23aae0603b50e6634c2c7280c.png",
+          "authorityRef": "D:/Repositories/starci-academy-backend/.claude/knowledge/ui.md",
+          "rationale": "The visible contradiction is owned by the frontend evidence implementation: the host screenshot was resampled to the requested viewport instead of extracting the emulated browser viewport, so outer host pixels were pulled into the review raster. Any remaining local clipping in the same raster remains implementation-owned and must be challenged again after a fresh correctly bounded capture."
+        },
+        {
+          "findingRef": "inspection:sha256-b76aca82ddc681a35fa40f60df26d549a69c4ef3d1b7714454633603aff4bd9e.png",
+          "owner": "implementation",
+          "counterevidenceRef": "capture-source:sha256-b76aca82ddc681a35fa40f60df26d549a69c4ef3d1b7714454633603aff4bd9e.png",
+          "authorityRef": "D:/Repositories/starci-academy-backend/.claude/knowledge/ui.md",
+          "rationale": "The visible contradiction is owned by the frontend evidence implementation: the host screenshot was resampled to the requested viewport instead of extracting the emulated browser viewport, so outer host pixels were pulled into the review raster. Any remaining local clipping in the same raster remains implementation-owned and must be challenged again after a fresh correctly bounded capture."
+        },
+        {
+          "findingRef": "inspection:sha256-32b00c72338c6772f2f10d3d97448262399b8ecc378bd7e93bb6cc35de174c1c.png",
+          "owner": "implementation",
+          "counterevidenceRef": "capture-source:sha256-32b00c72338c6772f2f10d3d97448262399b8ecc378bd7e93bb6cc35de174c1c.png",
+          "authorityRef": "D:/Repositories/starci-academy-backend/.claude/knowledge/ui.md",
+          "rationale": "The visible contradiction is owned by the frontend evidence implementation: the host screenshot was resampled to the requested viewport instead of extracting the emulated browser viewport, so outer host pixels were pulled into the review raster. Any remaining local clipping in the same raster remains implementation-owned and must be challenged again after a fresh correctly bounded capture."
+        },
+        {
+          "findingRef": "inspection:sha256-775f0dea4a32ae012298340574e48ab681ad34624ef9041efbbf7dc3e52f4552.png",
+          "owner": "implementation",
+          "counterevidenceRef": "capture-source:sha256-775f0dea4a32ae012298340574e48ab681ad34624ef9041efbbf7dc3e52f4552.png",
+          "authorityRef": "D:/Repositories/starci-academy-backend/.claude/knowledge/ui.md",
+          "rationale": "The visible contradiction is owned by the frontend evidence implementation: the host screenshot was resampled to the requested viewport instead of extracting the emulated browser viewport, so outer host pixels were pulled into the review raster. Any remaining local clipping in the same raster remains implementation-owned and must be challenged again after a fresh correctly bounded capture."
+        },
+        {
+          "findingRef": "inspection:sha256-b0ff1b42ed03422be4e55f862206f5f34f0a25e9671e571f7b6a6c3e8bd3ece1.png",
+          "owner": "implementation",
+          "counterevidenceRef": "capture-source:sha256-b0ff1b42ed03422be4e55f862206f5f34f0a25e9671e571f7b6a6c3e8bd3ece1.png",
+          "authorityRef": "D:/Repositories/starci-academy-backend/.claude/knowledge/ui.md",
+          "rationale": "The visible contradiction is owned by the frontend evidence implementation: the host screenshot was resampled to the requested viewport instead of extracting the emulated browser viewport, so outer host pixels were pulled into the review raster. Any remaining local clipping in the same raster remains implementation-owned and must be challenged again after a fresh correctly bounded capture."
+        },
+        {
+          "findingRef": "inspection:sha256-7bfc14491bc7996c8d5f70aafd020ab70b6edddbd8b0c806ec1b8fea284cf558.png",
+          "owner": "implementation",
+          "counterevidenceRef": "capture-source:sha256-7bfc14491bc7996c8d5f70aafd020ab70b6edddbd8b0c806ec1b8fea284cf558.png",
+          "authorityRef": "D:/Repositories/starci-academy-backend/.claude/knowledge/ui.md",
+          "rationale": "The visible contradiction is owned by the frontend evidence implementation: the host screenshot was resampled to the requested viewport instead of extracting the emulated browser viewport, so outer host pixels were pulled into the review raster. Any remaining local clipping in the same raster remains implementation-owned and must be challenged again after a fresh correctly bounded capture."
+        },
+        {
+          "findingRef": "inspection:sha256-8488d05bee6210922ac60ade736042b717bff9893872b1f7061c27ed2f209959.png",
+          "owner": "implementation",
+          "counterevidenceRef": "capture-source:sha256-8488d05bee6210922ac60ade736042b717bff9893872b1f7061c27ed2f209959.png",
+          "authorityRef": "D:/Repositories/starci-academy-backend/.claude/knowledge/ui.md",
+          "rationale": "The visible contradiction is owned by the frontend evidence implementation: the host screenshot was resampled to the requested viewport instead of extracting the emulated browser viewport, so outer host pixels were pulled into the review raster. Any remaining local clipping in the same raster remains implementation-owned and must be challenged again after a fresh correctly bounded capture."
+        },
+        {
+          "findingRef": "inspection:sha256-6cf79f92805a72fbe9c7cef2e1f275a9afc9ce44a7f2f832f062d158bf4ca2ca.png",
+          "owner": "implementation",
+          "counterevidenceRef": "capture-source:sha256-6cf79f92805a72fbe9c7cef2e1f275a9afc9ce44a7f2f832f062d158bf4ca2ca.png",
+          "authorityRef": "D:/Repositories/starci-academy-backend/.claude/knowledge/ui.md",
+          "rationale": "The visible contradiction is owned by the frontend evidence implementation: the host screenshot was resampled to the requested viewport instead of extracting the emulated browser viewport, so outer host pixels were pulled into the review raster. Any remaining local clipping in the same raster remains implementation-owned and must be challenged again after a fresh correctly bounded capture."
+        },
+        {
+          "findingRef": "inspection:sha256-727417414b9d5729d634b231fb8741839f13e733d6db2a54b63944f862d6f311.png",
+          "owner": "implementation",
+          "counterevidenceRef": "capture-source:sha256-727417414b9d5729d634b231fb8741839f13e733d6db2a54b63944f862d6f311.png",
+          "authorityRef": "D:/Repositories/starci-academy-backend/.claude/knowledge/ui.md",
+          "rationale": "The visible contradiction is owned by the frontend evidence implementation: the host screenshot was resampled to the requested viewport instead of extracting the emulated browser viewport, so outer host pixels were pulled into the review raster. Any remaining local clipping in the same raster remains implementation-owned and must be challenged again after a fresh correctly bounded capture."
+        },
+        {
+          "findingRef": "inspection:sha256-f771a9f1b13f4d0730e8859178aa1a5ba4d3c60e5a1ab3a5151f98e60f0ab94b.png",
+          "owner": "implementation",
+          "counterevidenceRef": "capture-source:sha256-f771a9f1b13f4d0730e8859178aa1a5ba4d3c60e5a1ab3a5151f98e60f0ab94b.png",
+          "authorityRef": "D:/Repositories/starci-academy-backend/.claude/knowledge/ui.md",
+          "rationale": "The visible contradiction is owned by the frontend evidence implementation: the host screenshot was resampled to the requested viewport instead of extracting the emulated browser viewport, so outer host pixels were pulled into the review raster. Any remaining local clipping in the same raster remains implementation-owned and must be challenged again after a fresh correctly bounded capture."
+        },
+        {
+          "findingRef": "inspection:sha256-61f49e6ae8e46edc1adf11000b1542c89deb3d8c2e8a80ad05c7f532a1bd8292.png",
+          "owner": "implementation",
+          "counterevidenceRef": "capture-source:sha256-61f49e6ae8e46edc1adf11000b1542c89deb3d8c2e8a80ad05c7f532a1bd8292.png",
+          "authorityRef": "D:/Repositories/starci-academy-backend/.claude/knowledge/ui.md",
+          "rationale": "The visible contradiction is owned by the frontend evidence implementation: the host screenshot was resampled to the requested viewport instead of extracting the emulated browser viewport, so outer host pixels were pulled into the review raster. Any remaining local clipping in the same raster remains implementation-owned and must be challenged again after a fresh correctly bounded capture."
+        },
+        {
+          "findingRef": "inspection:sha256-933aa9e574c1c6669eb9ef31a0af26364e2cad61b88cb9c8a0285d8fe9a55ed3.png",
+          "owner": "implementation",
+          "counterevidenceRef": "capture-source:sha256-933aa9e574c1c6669eb9ef31a0af26364e2cad61b88cb9c8a0285d8fe9a55ed3.png",
+          "authorityRef": "D:/Repositories/starci-academy-backend/.claude/knowledge/ui.md",
+          "rationale": "The visible contradiction is owned by the frontend evidence implementation: the host screenshot was resampled to the requested viewport instead of extracting the emulated browser viewport, so outer host pixels were pulled into the review raster. Any remaining local clipping in the same raster remains implementation-owned and must be challenged again after a fresh correctly bounded capture."
+        },
+        {
+          "findingRef": "inspection:sha256-3f05c2f8e71187e5179c37ee9755d5444740e34e106e910a63eff17596f61c42.png",
+          "owner": "implementation",
+          "counterevidenceRef": "capture-source:sha256-3f05c2f8e71187e5179c37ee9755d5444740e34e106e910a63eff17596f61c42.png",
+          "authorityRef": "D:/Repositories/starci-academy-backend/.claude/knowledge/ui.md",
+          "rationale": "The visible contradiction is owned by the frontend evidence implementation: the host screenshot was resampled to the requested viewport instead of extracting the emulated browser viewport, so outer host pixels were pulled into the review raster. Any remaining local clipping in the same raster remains implementation-owned and must be challenged again after a fresh correctly bounded capture."
+        },
+        {
+          "findingRef": "inspection:sha256-63e485d11111741c968781113e36cfd550a87987f01224a82859c9eef50ff8ce.png",
+          "owner": "implementation",
+          "counterevidenceRef": "capture-source:sha256-63e485d11111741c968781113e36cfd550a87987f01224a82859c9eef50ff8ce.png",
+          "authorityRef": "D:/Repositories/starci-academy-backend/.claude/knowledge/ui.md",
+          "rationale": "The visible contradiction is owned by the frontend evidence implementation: the host screenshot was resampled to the requested viewport instead of extracting the emulated browser viewport, so outer host pixels were pulled into the review raster. Any remaining local clipping in the same raster remains implementation-owned and must be challenged again after a fresh correctly bounded capture."
+        },
+        {
+          "findingRef": "inspection:sha256-2543e272dd6d73600fb4a8a89f1a174476cdb73ae6ed99494cb8ac4285a60056.png",
+          "owner": "implementation",
+          "counterevidenceRef": "capture-source:sha256-2543e272dd6d73600fb4a8a89f1a174476cdb73ae6ed99494cb8ac4285a60056.png",
+          "authorityRef": "D:/Repositories/starci-academy-backend/.claude/knowledge/ui.md",
+          "rationale": "The visible contradiction is owned by the frontend evidence implementation: the host screenshot was resampled to the requested viewport instead of extracting the emulated browser viewport, so outer host pixels were pulled into the review raster. Any remaining local clipping in the same raster remains implementation-owned and must be challenged again after a fresh correctly bounded capture."
+        },
+        {
+          "findingRef": "inspection:sha256-7c116119756e999f57715027813dc155eb5e37fd1838c74c78ee9e0879d48eb4.png",
+          "owner": "implementation",
+          "counterevidenceRef": "capture-source:sha256-7c116119756e999f57715027813dc155eb5e37fd1838c74c78ee9e0879d48eb4.png",
+          "authorityRef": "D:/Repositories/starci-academy-backend/.claude/knowledge/ui.md",
+          "rationale": "The visible contradiction is owned by the frontend evidence implementation: the host screenshot was resampled to the requested viewport instead of extracting the emulated browser viewport, so outer host pixels were pulled into the review raster. Any remaining local clipping in the same raster remains implementation-owned and must be challenged again after a fresh correctly bounded capture."
+        },
+        {
+          "findingRef": "inspection:sha256-d502fab1346190018826f5a5883cefb348f398c5f2a90ed8e5e0979f179830c1.png",
+          "owner": "implementation",
+          "counterevidenceRef": "capture-source:sha256-d502fab1346190018826f5a5883cefb348f398c5f2a90ed8e5e0979f179830c1.png",
+          "authorityRef": "D:/Repositories/starci-academy-backend/.claude/knowledge/ui.md",
+          "rationale": "The visible contradiction is owned by the frontend evidence implementation: the host screenshot was resampled to the requested viewport instead of extracting the emulated browser viewport, so outer host pixels were pulled into the review raster. Any remaining local clipping in the same raster remains implementation-owned and must be challenged again after a fresh correctly bounded capture."
+        },
+        {
+          "findingRef": "inspection:sha256-94f59ac93b13da3c9a8c8d64005a0f1fef296620cb9f7caca7a66edb9cd55113.png",
+          "owner": "implementation",
+          "counterevidenceRef": "capture-source:sha256-94f59ac93b13da3c9a8c8d64005a0f1fef296620cb9f7caca7a66edb9cd55113.png",
+          "authorityRef": "D:/Repositories/starci-academy-backend/.claude/knowledge/ui.md",
+          "rationale": "The visible contradiction is owned by the frontend evidence implementation: the host screenshot was resampled to the requested viewport instead of extracting the emulated browser viewport, so outer host pixels were pulled into the review raster. Any remaining local clipping in the same raster remains implementation-owned and must be challenged again after a fresh correctly bounded capture."
+        },
+        {
+          "findingRef": "inspection:sha256-e13cec5f54edcdaad19d93ea779ba5b96089e01c6486acb075be9f88bad6f713.png",
+          "owner": "implementation",
+          "counterevidenceRef": "capture-source:sha256-e13cec5f54edcdaad19d93ea779ba5b96089e01c6486acb075be9f88bad6f713.png",
+          "authorityRef": "D:/Repositories/starci-academy-backend/.claude/knowledge/ui.md",
+          "rationale": "The visible contradiction is owned by the frontend evidence implementation: the host screenshot was resampled to the requested viewport instead of extracting the emulated browser viewport, so outer host pixels were pulled into the review raster. Any remaining local clipping in the same raster remains implementation-owned and must be challenged again after a fresh correctly bounded capture."
+        },
+        {
+          "findingRef": "inspection:sha256-b5baee1694610fdd98c2579d998e7803fd488d8351634ae8a1a7c99012eaf006.png",
+          "owner": "implementation",
+          "counterevidenceRef": "capture-source:sha256-b5baee1694610fdd98c2579d998e7803fd488d8351634ae8a1a7c99012eaf006.png",
+          "authorityRef": "D:/Repositories/starci-academy-backend/.claude/knowledge/ui.md",
+          "rationale": "The visible contradiction is owned by the frontend evidence implementation: the host screenshot was resampled to the requested viewport instead of extracting the emulated browser viewport, so outer host pixels were pulled into the review raster. Any remaining local clipping in the same raster remains implementation-owned and must be challenged again after a fresh correctly bounded capture."
+        },
+        {
+          "findingRef": "inspection:sha256-490094d417c2388f78cd1020761aae74209a7eb9640918865d641ef4d9a38591.png",
+          "owner": "implementation",
+          "counterevidenceRef": "capture-source:sha256-490094d417c2388f78cd1020761aae74209a7eb9640918865d641ef4d9a38591.png",
+          "authorityRef": "D:/Repositories/starci-academy-backend/.claude/knowledge/ui.md",
+          "rationale": "The visible contradiction is owned by the frontend evidence implementation: the host screenshot was resampled to the requested viewport instead of extracting the emulated browser viewport, so outer host pixels were pulled into the review raster. Any remaining local clipping in the same raster remains implementation-owned and must be challenged again after a fresh correctly bounded capture."
+        },
+        {
+          "findingRef": "inspection:sha256-0a1e7eb888a8a9567309747b09eafb7923df43c01d8843f343da56fb19c04e8c.png",
+          "owner": "implementation",
+          "counterevidenceRef": "capture-source:sha256-0a1e7eb888a8a9567309747b09eafb7923df43c01d8843f343da56fb19c04e8c.png",
+          "authorityRef": "D:/Repositories/starci-academy-backend/.claude/knowledge/ui.md",
+          "rationale": "The visible contradiction is owned by the frontend evidence implementation: the host screenshot was resampled to the requested viewport instead of extracting the emulated browser viewport, so outer host pixels were pulled into the review raster. Any remaining local clipping in the same raster remains implementation-owned and must be challenged again after a fresh correctly bounded capture."
+        },
+        {
+          "findingRef": "probe:probe-viewport-baseline",
+          "owner": "implementation",
+          "counterevidenceRef": "capture-source:sha256-32b00c72338c6772f2f10d3d97448262399b8ecc378bd7e93bb6cc35de174c1c.png",
+          "authorityRef": "D:/Repositories/starci-academy-backend/.claude/knowledge/ui.md",
+          "rationale": "The probe contradiction is demonstrated in pixels and is implementation-owned. The capture adapter scaled the full host screenshot rather than extracting the active emulated viewport, invalidating responsive, scroll, overlay, focus, or lifecycle evidence; the probe must be freshly captured and reviewed after correcting that adapter."
+        },
+        {
+          "findingRef": "probe:probe-viewport-breakpoint",
+          "owner": "implementation",
+          "counterevidenceRef": "capture-source:sha256-775f0dea4a32ae012298340574e48ab681ad34624ef9041efbbf7dc3e52f4552.png",
+          "authorityRef": "D:/Repositories/starci-academy-backend/.claude/knowledge/ui.md",
+          "rationale": "The probe contradiction is demonstrated in pixels and is implementation-owned. The capture adapter scaled the full host screenshot rather than extracting the active emulated viewport, invalidating responsive, scroll, overlay, focus, or lifecycle evidence; the probe must be freshly captured and reviewed after correcting that adapter."
+        },
+        {
+          "findingRef": "probe:probe-zoom-in",
+          "owner": "implementation",
+          "counterevidenceRef": "capture-source:sha256-b0ff1b42ed03422be4e55f862206f5f34f0a25e9671e571f7b6a6c3e8bd3ece1.png",
+          "authorityRef": "D:/Repositories/starci-academy-backend/.claude/knowledge/ui.md",
+          "rationale": "The probe contradiction is demonstrated in pixels and is implementation-owned. The capture adapter scaled the full host screenshot rather than extracting the active emulated viewport, invalidating responsive, scroll, overlay, focus, or lifecycle evidence; the probe must be freshly captured and reviewed after correcting that adapter."
+        },
+        {
+          "findingRef": "probe:probe-zoom-out",
+          "owner": "implementation",
+          "counterevidenceRef": "capture-source:sha256-7bfc14491bc7996c8d5f70aafd020ab70b6edddbd8b0c806ec1b8fea284cf558.png",
+          "authorityRef": "D:/Repositories/starci-academy-backend/.claude/knowledge/ui.md",
+          "rationale": "The probe contradiction is demonstrated in pixels and is implementation-owned. The capture adapter scaled the full host screenshot rather than extracting the active emulated viewport, invalidating responsive, scroll, overlay, focus, or lifecycle evidence; the probe must be freshly captured and reviewed after correcting that adapter."
+        },
+        {
+          "findingRef": "probe:probe-zoom-restored",
+          "owner": "implementation",
+          "counterevidenceRef": "capture-source:sha256-8488d05bee6210922ac60ade736042b717bff9893872b1f7061c27ed2f209959.png",
+          "authorityRef": "D:/Repositories/starci-academy-backend/.claude/knowledge/ui.md",
+          "rationale": "The probe contradiction is demonstrated in pixels and is implementation-owned. The capture adapter scaled the full host screenshot rather than extracting the active emulated viewport, invalidating responsive, scroll, overlay, focus, or lifecycle evidence; the probe must be freshly captured and reviewed after correcting that adapter."
+        },
+        {
+          "findingRef": "probe:probe-page-scroll-start",
+          "owner": "implementation",
+          "counterevidenceRef": "capture-source:sha256-6cf79f92805a72fbe9c7cef2e1f275a9afc9ce44a7f2f832f062d158bf4ca2ca.png",
+          "authorityRef": "D:/Repositories/starci-academy-backend/.claude/knowledge/ui.md",
+          "rationale": "The probe contradiction is demonstrated in pixels and is implementation-owned. The capture adapter scaled the full host screenshot rather than extracting the active emulated viewport, invalidating responsive, scroll, overlay, focus, or lifecycle evidence; the probe must be freshly captured and reviewed after correcting that adapter."
+        },
+        {
+          "findingRef": "probe:probe-page-scroll-middle",
+          "owner": "implementation",
+          "counterevidenceRef": "capture-source:sha256-727417414b9d5729d634b231fb8741839f13e733d6db2a54b63944f862d6f311.png",
+          "authorityRef": "D:/Repositories/starci-academy-backend/.claude/knowledge/ui.md",
+          "rationale": "The probe contradiction is demonstrated in pixels and is implementation-owned. The capture adapter scaled the full host screenshot rather than extracting the active emulated viewport, invalidating responsive, scroll, overlay, focus, or lifecycle evidence; the probe must be freshly captured and reviewed after correcting that adapter."
+        },
+        {
+          "findingRef": "probe:probe-page-scroll-end",
+          "owner": "implementation",
+          "counterevidenceRef": "capture-source:sha256-f771a9f1b13f4d0730e8859178aa1a5ba4d3c60e5a1ab3a5151f98e60f0ab94b.png",
+          "authorityRef": "D:/Repositories/starci-academy-backend/.claude/knowledge/ui.md",
+          "rationale": "The probe contradiction is demonstrated in pixels and is implementation-owned. The capture adapter scaled the full host screenshot rather than extracting the active emulated viewport, invalidating responsive, scroll, overlay, focus, or lifecycle evidence; the probe must be freshly captured and reviewed after correcting that adapter."
+        },
+        {
+          "findingRef": "probe:probe-page-scroll-restored",
+          "owner": "implementation",
+          "counterevidenceRef": "capture-source:sha256-61f49e6ae8e46edc1adf11000b1542c89deb3d8c2e8a80ad05c7f532a1bd8292.png",
+          "authorityRef": "D:/Repositories/starci-academy-backend/.claude/knowledge/ui.md",
+          "rationale": "The probe contradiction is demonstrated in pixels and is implementation-owned. The capture adapter scaled the full host screenshot rather than extracting the active emulated viewport, invalidating responsive, scroll, overlay, focus, or lifecycle evidence; the probe must be freshly captured and reviewed after correcting that adapter."
+        },
+        {
+          "findingRef": "probe:probe-bounded-scroll-start",
+          "owner": "implementation",
+          "counterevidenceRef": "capture-source:sha256-933aa9e574c1c6669eb9ef31a0af26364e2cad61b88cb9c8a0285d8fe9a55ed3.png",
+          "authorityRef": "D:/Repositories/starci-academy-backend/.claude/knowledge/ui.md",
+          "rationale": "The probe contradiction is demonstrated in pixels and is implementation-owned. The capture adapter scaled the full host screenshot rather than extracting the active emulated viewport, invalidating responsive, scroll, overlay, focus, or lifecycle evidence; the probe must be freshly captured and reviewed after correcting that adapter."
+        },
+        {
+          "findingRef": "probe:probe-bounded-scroll-end",
+          "owner": "implementation",
+          "counterevidenceRef": "capture-source:sha256-3f05c2f8e71187e5179c37ee9755d5444740e34e106e910a63eff17596f61c42.png",
+          "authorityRef": "D:/Repositories/starci-academy-backend/.claude/knowledge/ui.md",
+          "rationale": "The probe contradiction is demonstrated in pixels and is implementation-owned. The capture adapter scaled the full host screenshot rather than extracting the active emulated viewport, invalidating responsive, scroll, overlay, focus, or lifecycle evidence; the probe must be freshly captured and reviewed after correcting that adapter."
+        },
+        {
+          "findingRef": "probe:probe-bounded-scroll-restored",
+          "owner": "implementation",
+          "counterevidenceRef": "capture-source:sha256-63e485d11111741c968781113e36cfd550a87987f01224a82859c9eef50ff8ce.png",
+          "authorityRef": "D:/Repositories/starci-academy-backend/.claude/knowledge/ui.md",
+          "rationale": "The probe contradiction is demonstrated in pixels and is implementation-owned. The capture adapter scaled the full host screenshot rather than extracting the active emulated viewport, invalidating responsive, scroll, overlay, focus, or lifecycle evidence; the probe must be freshly captured and reviewed after correcting that adapter."
+        },
+        {
+          "findingRef": "probe:probe-content-long",
+          "owner": "implementation",
+          "counterevidenceRef": "capture-source:sha256-2543e272dd6d73600fb4a8a89f1a174476cdb73ae6ed99494cb8ac4285a60056.png",
+          "authorityRef": "D:/Repositories/starci-academy-backend/.claude/knowledge/ui.md",
+          "rationale": "The probe contradiction is demonstrated in pixels and is implementation-owned. The capture adapter scaled the full host screenshot rather than extracting the active emulated viewport, invalidating responsive, scroll, overlay, focus, or lifecycle evidence; the probe must be freshly captured and reviewed after correcting that adapter."
+        },
+        {
+          "findingRef": "probe:probe-content-short",
+          "owner": "implementation",
+          "counterevidenceRef": "capture-source:sha256-7c116119756e999f57715027813dc155eb5e37fd1838c74c78ee9e0879d48eb4.png",
+          "authorityRef": "D:/Repositories/starci-academy-backend/.claude/knowledge/ui.md",
+          "rationale": "The probe contradiction is demonstrated in pixels and is implementation-owned. The capture adapter scaled the full host screenshot rather than extracting the active emulated viewport, invalidating responsive, scroll, overlay, focus, or lifecycle evidence; the probe must be freshly captured and reviewed after correcting that adapter."
+        },
+        {
+          "findingRef": "probe:probe-state-skeleton",
+          "owner": "implementation",
+          "counterevidenceRef": "capture-source:sha256-d502fab1346190018826f5a5883cefb348f398c5f2a90ed8e5e0979f179830c1.png",
+          "authorityRef": "D:/Repositories/starci-academy-backend/.claude/knowledge/ui.md",
+          "rationale": "The probe contradiction is demonstrated in pixels and is implementation-owned. The capture adapter scaled the full host screenshot rather than extracting the active emulated viewport, invalidating responsive, scroll, overlay, focus, or lifecycle evidence; the probe must be freshly captured and reviewed after correcting that adapter."
+        },
+        {
+          "findingRef": "probe:probe-state-loading",
+          "owner": "implementation",
+          "counterevidenceRef": "capture-source:sha256-94f59ac93b13da3c9a8c8d64005a0f1fef296620cb9f7caca7a66edb9cd55113.png",
+          "authorityRef": "D:/Repositories/starci-academy-backend/.claude/knowledge/ui.md",
+          "rationale": "The probe contradiction is demonstrated in pixels and is implementation-owned. The capture adapter scaled the full host screenshot rather than extracting the active emulated viewport, invalidating responsive, scroll, overlay, focus, or lifecycle evidence; the probe must be freshly captured and reviewed after correcting that adapter."
+        },
+        {
+          "findingRef": "probe:probe-state-steady",
+          "owner": "implementation",
+          "counterevidenceRef": "capture-source:sha256-e13cec5f54edcdaad19d93ea779ba5b96089e01c6486acb075be9f88bad6f713.png",
+          "authorityRef": "D:/Repositories/starci-academy-backend/.claude/knowledge/ui.md",
+          "rationale": "The probe contradiction is demonstrated in pixels and is implementation-owned. The capture adapter scaled the full host screenshot rather than extracting the active emulated viewport, invalidating responsive, scroll, overlay, focus, or lifecycle evidence; the probe must be freshly captured and reviewed after correcting that adapter."
+        },
+        {
+          "findingRef": "probe:probe-sticky-overlay-open",
+          "owner": "implementation",
+          "counterevidenceRef": "capture-source:sha256-490094d417c2388f78cd1020761aae74209a7eb9640918865d641ef4d9a38591.png",
+          "authorityRef": "D:/Repositories/starci-academy-backend/.claude/knowledge/ui.md",
+          "rationale": "The probe contradiction is demonstrated in pixels and is implementation-owned. The capture adapter scaled the full host screenshot rather than extracting the active emulated viewport, invalidating responsive, scroll, overlay, focus, or lifecycle evidence; the probe must be freshly captured and reviewed after correcting that adapter."
+        }
+      ]
+    },
+    "gaps": [],
+    "evidenceRefs": [
+      "visual-fidelity-r13.json"
+    ],
+    "handoff": null
+  }
+}

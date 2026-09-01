@@ -53,8 +53,12 @@
           ],
           "properties": {
             "skillId": {
-              "type": "string",
-              "minLength": 1
+              "enum": [
+                "starci-business-process",
+                "starci-backend-process",
+                "starci-quality-assure",
+                "starci-uat-verify"
+              ]
             },
             "inputRef": {
               "type": "string",
@@ -67,6 +71,9 @@
             "resumeState": {
               "type": "string",
               "minLength": 1
+            },
+            "debtPolicy": {
+              "const": "forbidden"
             },
             "missionRef": {
               "type": "string",

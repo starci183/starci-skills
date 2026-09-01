@@ -1,3 +1,19 @@
 import { validatorFor, runValidatorCli } from '../../validation.mjs';
-export const validateInput=validatorFor(new URL('./input.schema.json',import.meta.url));
+import crypto from 'node:crypto';
+const fingerprint=(value)=>`sha256:${crypto.createHash('sha256').update(JSON.stringify(value)).digest('hex')}`;
+export const validateInput=validatorFor(new URL('./input.schema.json',import.meta.url),(value)=>{
+  const errors=[];
+  const paths=value.input.sourceBoundary.map(({path})=>path);
+  if(new Set(paths).size!==paths.length) errors.push('sourceBoundary paths must be unique');
+  if(value.input.sourceBoundaryFingerprint!==fingerprint(value.input.sourceBoundary)) errors.push('sourceBoundaryFingerprint must hash the exact ordered sourceBoundary');
+  if(value.input.directionMode==='none'&&value.input.directionBinding!==null) errors.push('refine mutation with directionMode none requires null directionBinding');
+  if(value.input.directionMode!=='none'&&value.input.directionBinding===null) errors.push('generated direction mutation requires an exact directionBinding');
+  if(value.input.directionBinding&&value.input.directionBinding.mode!==value.input.directionMode) errors.push('directionBinding mode must equal directionMode');
+  if(!value.context.evidenceRefs.includes(value.input.compiledRequestRef)) errors.push('context evidenceRefs must include compiledRequestRef');
+  if(value.input.directionBinding&&!value.context.evidenceRefs.includes(value.input.directionBinding.directionGenerateReturnReceiptRef)) errors.push('context evidenceRefs must include direction-generate RETURN receipt');
+  if(value.input.directionBinding&&!value.context.evidenceRefs.includes(value.input.directionBinding.selectedDirectionRef)) errors.push('context evidenceRefs must include selectedDirectionRef');
+  if(!value.context.evidenceRefs.includes(value.input.grammarBinding.packageRef)||!value.context.evidenceRefs.includes(value.input.grammarBinding.manifestRef)) errors.push('context evidenceRefs must include compiled Grammar package and manifest identities');
+  if(value.input.proofMatrixFingerprint!==fingerprint(value.input.proofMatrix)) errors.push('proofMatrixFingerprint must hash the exact compiled proofMatrix');
+  return errors;
+});
 if(process.argv[1]?.endsWith('validate-input.mjs')) await runValidatorCli(validateInput,'node validate-input.mjs <input.json>');

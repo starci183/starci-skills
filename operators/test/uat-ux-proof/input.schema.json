@@ -19,13 +19,25 @@
       "type": "object",
       "additionalProperties": false,
       "required": [
-        "snapshotRef"
+        "snapshotRef",
+        "behaviorProofReturnReceiptRef",
+        "sourceFingerprint"
       ],
       "properties": {
         "snapshotRef": {
           "description": "Frozen canonical snapshot.",
           "type": "string",
           "minLength": 1
+        },
+        "behaviorProofReturnReceiptRef": {
+          "description": "Exact validated behavior-proof RETURN receipt.",
+          "type": "string",
+          "pattern": "^receipt:[A-Za-z0-9._-]+$"
+        },
+        "sourceFingerprint": {
+          "description": "Exact source fingerprint inherited from behavior proof.",
+          "type": "string",
+          "pattern": "^sha256:[0-9a-f]{64}$"
         }
       }
     },

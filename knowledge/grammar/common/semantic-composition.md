@@ -3,9 +3,9 @@
 | Field | Value |
 | --- | --- |
 | Knowledge ID | `fe.grammar-common-semantic-composition` |
-| Contract revision | `7.4.0` |
+| Contract revision | `7.6.0` |
 | Package | `@starci/grammar/common` |
-| Operators | `grammar-convergence, direction-generate, contract-freeze` |
+| Operators | `fe/authority-reconcile, fe/direction-generate, fe/request-compile` |
 | Search tags | `semantic composition, anatomy, pattern catalog, grammar filter, ownership` |
 | Dependencies | `fe.grammar-common-capabilities, fe.grammar-common-extension` |
 
@@ -23,7 +23,8 @@ semantic tokens -> primitives -> semantic composition patterns -> layout pattern
 
 Do not skip a layer by reconstructing it in application CSS. `available` means an exact public package
 interface exists. `adapter` means application code may bind product data without changing the closed
-anatomy. `grammar-gap` blocks implementation until the package publishes the missing interface.
+anatomy. `grammar-gap` follows `fe.grammar-common-extension`: exact owner repair/publish, then frontend
+recompile; it is never visual ambiguity or a local workaround.
 
 ## Copy, identity, and action patterns
 
@@ -32,6 +33,8 @@ anatomy. `grammar-gap` blocks implementation until the package publishes the mis
 | `ContextIntro` | required eyebrow -> required contextual heading -> required supporting description | available as the `SectionHeader` context-intro composition |
 | `SectionHeader` | optional eyebrow -> required heading -> optional description -> optional peer action | available |
 | `SurfaceCopyGroup` | required title -> optional explanation; a stronger boundary precedes any external action | available |
+| `IconTile` | one purpose-bound glyph in one accent-subtle identity tile -> adjacent accessible identity | adapter; semantic color contract required |
+| `TextLink` | native destination text -> optional universal directional cue, with a real href | available |
 | `ActionGroup` | one dominant action -> optional secondary/tertiary actions owned by the same decision | grammar-gap |
 | `BreadcrumbTrail` | ancestor destinations -> current location, with declared compact fallback | adapter |
 
@@ -49,7 +52,7 @@ anatomy. `grammar-gap` blocks implementation until the package publishes the mis
 
 | Pattern | Ordered anatomy | Status |
 | --- | --- | --- |
-| `SurfaceCard` | optional external/owned label -> coherent body -> optional facts/status -> optional action | available |
+| `SurfaceCard` | one coherent block, or one compound relationship whose functional children share one frame/divider owner | available |
 | `SurfaceListCard` | label/fact/action -> one joined collection -> empty/loading/error owner -> optional footer | available |
 | `DisclosureList` | labelled owner -> repeated trigger/panel rows -> one separator owner | available |
 | `StateRow` | state mark -> identity -> optional description/fact/action | available |
@@ -65,6 +68,7 @@ anatomy. `grammar-gap` blocks implementation until the package publishes the mis
 | Pattern | Ordered anatomy | Status |
 | --- | --- | --- |
 | `RegionState` | state identity -> explanation -> optional recovery action | adapter |
+| `EmptyState` | settled-empty identity -> explanation -> optional authority-backed next action | available |
 | `InlineFeedback` | consequence/status -> explanation -> optional recovery owned by the affected region | grammar-gap |
 | `DialogSurface` | title -> description -> body -> action region, with focus lifecycle | adapter |
 | `DrawerSurface` | title -> description -> bounded body -> terminal action region, with focus lifecycle | adapter |
@@ -74,9 +78,9 @@ anatomy. `grammar-gap` blocks implementation until the package publishes the mis
 
 | Pattern | Regions and behavior | Status |
 | --- | --- | --- |
-| `PageContainer` | one page measure and inset owner | available |
+| `PageContainer` | one page measure, content inset, and peer-block rhythm owner | available |
 | `PrimaryRailLayout` | dominant primary region + subordinate rail; stacks by declared container rule | available |
-| `RightRail` | complementary right rail whose content owns `space.inline.3` and `space.block.6`; flow/sticky is explicit | available through `PrimaryRailLayout + Rail[inset=content]` |
+| `RightRail` | complementary right rail consuming the selected package's canonical content inset; flow/sticky is explicit | available through `PrimaryRailLayout + Rail[inset=content]` |
 | `StickySummaryLayout` | primary task + derived summary with one scroll owner, collision stop, and compact fallback | available as a named case |
 | `ResizableRailLayout` | persistent rail + separator + min/default/max width + keyboard/pointer lifecycle + compact fallback | grammar-gap |
 | `ThreePaneWorkspace` | navigation/outline + primary editor/task + preview/support with explicit scroll owners | grammar-gap |
@@ -96,27 +100,27 @@ anatomy. `grammar-gap` blocks implementation until the package publishes the mis
 | `CollapsibleNavigationRail` | expanded/collapsed navigation with one width, padding, focus, tooltip, and motion owner | grammar-gap |
 | `ResizableNavigationRail` | navigation rail + separator + min/default/max size + keyboard/pointer resize + compact fallback | grammar-gap |
 | `BreadcrumbHeader` | breadcrumb trail + context identity + optional peer actions | adapter |
-| `MobileNavigationFallback` | compact trigger + modal/drawer destination tree + focus restoration | adapter |
+| `MobileNavigationFallback` | explicit return link when hierarchy is removed + compact destination trigger/tree + focus restoration | adapter |
 
-## Dashboard and activity patterns
+## Overview, activity, and ranking patterns
 
 | Pattern | Ordered anatomy | Status |
 | --- | --- | --- |
-| `DashboardShell` | ExtendedNavbar -> optional NavigationSidebar -> primary dashboard regions -> global assistants | adapter |
+| `OverviewShell` | primary navigation -> optional complementary navigation -> overview regions -> declared global utilities | adapter |
 | `MetricStrip` | repeated value-label pairs under one comparison owner | grammar-gap |
 | `TaskChecklist` | section identity -> actionable rows -> completion hint/reward | adapter |
-| `ContinueLearningRail` | section identity -> resumable learning cards -> overflow owner | adapter |
+| `ResumableItemRail` | section identity -> resumable destination cards -> overflow owner | adapter |
 | `ActivityStreak` | period markers -> current marker -> streak fact/badge | adapter |
 | `GoalProgressGroup` | summary -> repeated goal metrics/progress -> edit/recovery action | adapter |
 | `ActivityFeed` | feed identity -> typed activity rows -> pagination/empty/loading owner | adapter |
 | `RecommendationRail` | labelled recommendations -> repeated destination cards -> overflow owner | adapter |
-| `LeaderboardSummary` | standing identity -> ranked rows -> destination to full ranking | adapter |
+| `RankedSummary` | standing identity -> comparable ranked rows -> destination to full ranking; ranked-collection case required | adapter |
 
 ## Conversation and assistant patterns
 
 | Pattern | Ordered anatomy | Status |
 | --- | --- | --- |
-| `FloatingLauncher` | leading visual + accessible label + optional status + controlled open action | grammar-gap; keep product adapter until drag/focus/collision proof closes |
+| `FloatingLauncher` | leading identity + accessible label/state + controlled open action + draggable lifecycle when enabled | grammar-gap; product adapter must bind draggable-overlay case |
 | `ChatWidget` | launcher -> anchored conversation surface -> compact/expanded state -> close/focus return | grammar-gap |
 | `ConversationWorkspace` | conversation header -> context? -> one transcript scroll owner -> status? -> composer dock | grammar-gap; keep product adapter until focus/stream/IME/scroll proof closes |
 | `MessageTranscript` | labelled chronological messages -> streaming/pending marker -> load-history boundary | adapter |

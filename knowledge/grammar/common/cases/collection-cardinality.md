@@ -4,7 +4,7 @@
 | --- | --- |
 | Knowledge ID | `fe.grammar-common-case-collection-cardinality` |
 | Package | `@starci/grammar/common` |
-| Operators | `grammar-convergence` |
+| Operators | `fe/authority-reconcile` |
 | Search tags | `collection, zero one many, repeated rows, long content, mixed rows` |
 | Dependencies | `fe.grammar-common-capabilities, fe.grammar-common-states-accessibility` |
 

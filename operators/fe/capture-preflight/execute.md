@@ -1,16 +1,22 @@
 # Execute `fe/capture-preflight`
 
-Validate capture mechanics before AI review. Freeze the exact matrix fingerprint and owner-partition fingerprint. Check real data, skeleton/loading/steady identity, state content, control effects, page and bounded scroll restoration, zoom restoration, probe completeness, raster uniqueness, and the unmodified host handoff surface.
+Freeze and validate one deterministic capture contract before any AI review. Do not capture rasters,
+judge visual quality, call a reviewer, repair source, or choose the next operator.
 
-The ten readiness checks are binary mechanics, not a ten-point visual-quality rubric. Never summarize
-them as `x/10`, a percentage, a star rating, or a UI-quality claim. `ready` requires all ten exact
-checks to pass; one failed or missing check returns a non-ready outcome with `result: null`. This
-operator never emits or implies a visual-quality score or verdict.
+Bind the exact compiled-request fingerprint, registered source-apply RETURN and aggregate after-state,
+fixed round purpose, proof-matrix fingerprint, owner-partition
+fingerprint, three viewports, and all 22 canonical probes. Evaluate the ten ordered readiness checks:
+representative data, steady-vs-skeleton identity, state content, control effects, page and bounded
+scroll restoration, zoom restoration, probe completeness, raster uniqueness, and unmodified host
+handoff. They are binary mechanics, never a score or visual verdict.
 
-A readiness check may pass through exact non-applicability only when the target exposes no such
-capability. For example, `bounded-scroll-restored` passes with evidence that no bounded scroll owner
-exists, and every bounded-scroll phase is retained as `not-applicable` with
-`container-not-present`. Never waive an applicable recovery or interaction merely because the
-Browser lacks a convenient injection API; route that limitation to the runtime owner or retain a gap.
+`ready` requires all ten checks, registered preflight evidence, a fresh capture partition, and primary
+wide and compact settled populated happy cases with the core task and major regions visible. Empty,
+loading, skeleton, error, or recovery states only supplement their exact identities. A true absent
+capability may use typed non-applicability across every related probe phase; tooling inability may not.
+Reuse needs dependency proof and shared sentinels always recapture.
 
-Every `reuse` partition must carry dependency proof that the latest mutation cannot affect it. Every shared sentinel is recaptured. Do not infer visual quality and do not call a reviewer. A failed deterministic check routes to source repair or backend authority; an invalid capture contract blocks. Round purposes are fixed: 1 discovery, 2 verification, 3 regression.
+Classify deterministic frontend failure as `source-repair`, missing backend-owned representative data
+as `backend-required`, and invalid authority/runtime/matrix/partition identity as `blocked`. Every
+non-ready result is null with exact evidence and gaps. Return only the typed preflight receipt; the
+parent Skill owns the next state.

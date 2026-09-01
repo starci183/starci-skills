@@ -3,13 +3,15 @@
 | Field | Value |
 | --- | --- |
 | Knowledge ID | `fe.page-model` |
-| Operators | `page-model` |
+| Contract revision | `7.6.0` |
+| Operators | `fe/request-compile` |
 | Search tags | `page model, block, global ref, reading order, normalized content` |
 | Dependencies | `fe.customer-journey` |
 
-## Record
+## Internal compile guidance
 
 Turn an approved journey into normalized pages and purposeful Blocks before composing visual layout.
+This is a compile helper, not a page-model stage, approval checkpoint, or route.
 
 ## Page contract
 

@@ -4,7 +4,7 @@
 | --- | --- |
 | Knowledge ID | `fe.grammar-offset-pop-object-overlays-feedback` |
 | Package | `@starci/grammar/offset-pop` |
-| Operators | `grammar-convergence` |
+| Operators | `fe/authority-reconcile` |
 | Search tags | `dialog, sheet, popover, tooltip, toast, bold frame, focus return` |
 | Dependencies | `fe.grammar-offset-pop-overview, fe.grammar-common-states-accessibility` |
 

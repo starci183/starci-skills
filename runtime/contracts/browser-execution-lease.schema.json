@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://starci.dev/v7.5-alpha/runtime/contracts/browser-execution-lease.schema.json",
+  "$id": "https://starci.dev/v7.6/runtime/contracts/browser-execution-lease.schema.json",
   "type": "object",
   "additionalProperties": false,
   "required": ["schemaVersion", "leaseRef", "missionRef", "purpose", "accountRef", "reuseAttestations", "principalFingerprint", "runtimeGeneration", "origin", "fixtureNamespace", "expiresAt", "state", "executionMode", "executionOwnerRef", "browserContextRef", "consumerTabRef", "evidenceBrokerRef", "materializationStatus", "materializationEvidenceRefs"],

@@ -4,7 +4,7 @@
 | --- | --- |
 | Knowledge ID | `fe.grammar-common-case-responsive-flattening` |
 | Package | `@starci/grammar/common` |
-| Operators | `grammar-convergence` |
+| Operators | `fe/authority-reconcile` |
 | Search tags | `responsive, flatten surface, mobile, reading order, focus order, reflow` |
 | Dependencies | `fe.grammar-common-capabilities, fe.grammar-common-states-accessibility` |
 

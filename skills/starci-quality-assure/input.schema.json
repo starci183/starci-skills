@@ -7,6 +7,8 @@
     "skillId",
     "selection",
     "mission",
+    "debtPolicy",
+    "origin",
     "receipts",
     "scope"
   ],
@@ -16,6 +18,28 @@
     },
     "skillId": {
       "const": "starci-quality-assure"
+    },
+    "debtPolicy": {
+      "description": "FE-origin assurance forbids all debt and mutation after blind visual PASS.",
+      "enum": ["allowed", "forbidden"]
+    },
+    "origin": {
+      "anyOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["fromSkillId", "returnReceiptRef", "expectedCallReceiptRef", "sourceFingerprint", "evidenceFingerprint", "auditRef"],
+          "properties": {
+            "fromSkillId": { "const": "starci-fe-process" },
+            "returnReceiptRef": { "type": "string", "pattern": "^receipt:[A-Za-z0-9._-]+$" },
+            "expectedCallReceiptRef": { "type": "string", "pattern": "^receipt:[A-Za-z0-9._-]+$" },
+            "sourceFingerprint": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
+            "evidenceFingerprint": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
+            "auditRef": { "type": "string", "pattern": "(^|[\\\\/])audit\\.md$" }
+          }
+        },
+        { "type": "null" }
+      ]
     },
     "mission": {
       "type": "object",
@@ -84,7 +108,7 @@
         ],
         "properties": {
           "version": {
-            "const": "7.5.0-alpha.1"
+            "const": "7.6.0-beta.1"
           },
           "receiptId": {
             "type": "string",

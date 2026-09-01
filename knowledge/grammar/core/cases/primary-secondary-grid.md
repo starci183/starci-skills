@@ -4,7 +4,7 @@
 | --- | --- |
 | Knowledge ID | `fe.grammar-core-case-primary-secondary-grid` |
 | Package | `@starci/grammar/core` |
-| Operators | `grammar-convergence` |
+| Operators | `fe/authority-reconcile` |
 | Search tags | `grid, col span 2, col span 1, dense primary, small secondary` |
 | Dependencies | `fe.grammar-core-object-surface-card` |
 

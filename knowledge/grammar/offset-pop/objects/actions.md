@@ -4,7 +4,7 @@
 | --- | --- |
 | Knowledge ID | `fe.grammar-offset-pop-object-actions` |
 | Package | `@starci/grammar/offset-pop` |
-| Operators | `grammar-convergence` |
+| Operators | `fe/authority-reconcile` |
 | Search tags | `button, primary, offset shadow, pressed, bright color, action group` |
 | Dependencies | `fe.grammar-offset-pop-overview, fe.grammar-common-states-accessibility` |
 

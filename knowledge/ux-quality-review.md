@@ -3,13 +3,17 @@
 | Field | Value |
 | --- | --- |
 | Knowledge ID | `fe.ux-quality-review` |
-| Operators | `test/ux-audit, fe/customer-journey` |
+| Contract revision | `7.6.0` |
+| Operators | `fe/request-compile, fe/visual-fidelity` |
 | Search tags | `ux, journey, recovery, navigation, refresh, resume, async, realtime, validation` |
-| Dependencies | `fe.customer-journey, fe.uat-flow-coverage` |
+| Dependencies | `fe.customer-journey, fe.uat-flow-coverage, fe.audit-loop-v75b` |
 
 ## Boundary
 
 UX owns task order, interaction containers, navigation, orientation, prevention, feedback timing, recovery, refresh/resume, async/realtime continuity, and the adaptation of backend states into an understandable user path. UX does not choose visual styling, spacing, component tokens, API semantics, or business policy.
+
+This record supplies compile and blind-review observations; it does not expose a UX-audit stage,
+perform source repair, or route around the canonical frontend machine.
 
 Audit every selected case from recognizable entry to terminal. A user must understand current state, consequence, available next action, and how to recover. Invalid input must identify the correction without erasing valid work. Pending work must prevent harmful duplication and explain whether the user may leave, retry, or resume. Refresh/back/close must produce the approved destination and preserve or deliberately discard state.
 

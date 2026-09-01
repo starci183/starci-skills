@@ -3,6 +3,8 @@
 ## Context
 
 - `context.snapshotRef`: Frozen canonical snapshot.
+- `context.uxProofReturnReceiptRef`: Exact validated UX-proof RETURN.
+- `context.sourceFingerprint`: Exact source inherited from UX proof.
 
 ## Input
 

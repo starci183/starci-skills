@@ -2,7 +2,7 @@
   "schemaVersion": 7,
   "id": "fe/request-compile",
   "domain": "fe",
-  "job": "Compile one frontend request into one intent and closed objective.",
+  "job": "Compile one frontend request into one closed implementation contract and exact source boundary.",
   "inputSchema": "input.schema.json",
   "outputSchema": "output.schema.json",
   "contextRefs": [
@@ -14,6 +14,7 @@
   "stopConditions": [
     "required authority is missing or stale",
     "the target boundary or UX/UI change level is ambiguous",
-    "the job would require internal routing"
+    "business or backend authority is required",
+    "completion would require design, mutation, capture, review, or another operator job"
   ]
 }

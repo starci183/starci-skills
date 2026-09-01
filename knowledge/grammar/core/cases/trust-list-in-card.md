@@ -4,7 +4,7 @@
 | --- | --- |
 | Knowledge ID | `fe.grammar-core-case-trust-list-in-card` |
 | Package | `@starci/grammar/core` |
-| Operators | `grammar-convergence` |
+| Operators | `fe/authority-reconcile` |
 | Search tags | `SurfaceCard, list inside card, affirmative check, trustworthy, nested surface` |
 | Dependencies | `fe.grammar-common-case-surface-inside-surface, fe.grammar-core-object-collections` |
 

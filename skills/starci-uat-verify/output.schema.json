@@ -7,7 +7,10 @@
     "schemaVersion",
     "skillId",
     "outcome",
+    "verdict",
     "missionRef",
+    "sourceFingerprint",
+    "evidenceFingerprint",
     "artifactRefs",
     "handoff"
   ],
@@ -22,13 +25,23 @@
       "enum": [
         "complete",
         "handoff",
-        "waiting-choice",
         "blocked"
       ]
+    },
+    "verdict": {
+      "enum": ["PASS", "FAIL", "BLOCKED"]
     },
     "missionRef": {
       "type": "string",
       "minLength": 1
+    },
+    "sourceFingerprint": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "evidenceFingerprint": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
     },
     "artifactRefs": {
       "type": "array",

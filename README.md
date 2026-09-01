@@ -1,4 +1,4 @@
-# StarCi Skills 7.5.0-alpha.1
+# StarCi Skills 7.6.0-beta.1
 
 StarCi v7 turns one product mission into a composable execution graph. One public Skill owns the
 outcome, calls peer Skills across durable boundaries, and resumes from typed `RETURN` receipts. Atomic

@@ -1,117 +1,116 @@
-# Frontend UI render review
+# Frontend blind render review
 
 | Field | Value |
 | --- | --- |
 | Knowledge ID | `fe.ui-render-review` |
-| Operators | `test/ui-audit` |
-| Search tags | `ui, render, composition, hierarchy, responsive, overflow, accessibility, suspense` |
-| Dependencies | `fe.ui, fe.ui-quality-review` |
+| Contract revision | `7.6.0` |
+| Operators | `fe/visual-fidelity` |
+| Search tags | `ui, blind review, raster, composition, hierarchy, responsive, lifecycle, aesthetic veto` |
+| Dependencies | `fe.ui, fe.ui-quality-review, fe.audit-loop-v75b` |
 
-## Boundary
+## Authority boundary
 
-UI Audit evaluates browser-observable composition, hierarchy, data presentation, state rendering, responsive transformation, overflow, focus visibility, accessible name/role/state, contrast, and fidelity to `fe.ui` plus Grammar Common and exactly one selected Grammar. It cannot redesign task order, interaction container choice, API behavior, or business outcome.
+Blind review judges browser-visible UI pixels against `fe.ui`, Grammar Common, and exactly one
+selected Grammar. It evaluates purpose, content coherence, composition, hierarchy, state rendering,
+responsive transformation, interaction visibility, accessibility cues, and perceived finish. It does
+not redesign the journey, change business truth, inspect source, or route the mission. The canonical
+frontend machine owns the one permitted repair cycle and every terminal exit.
 
-Each case freezes a render-state matrix and proves every cell using full-viewport screenshots plus direct DOM, computed-style, accessibility, geometry, or trace evidence. The matrix crosses all in-scope entry, task, pending, recovery, result, exit, and exact handoff states with every required viewport. The exact handoff cell also owns one uncropped host-context screenshot captured from the browser surface the user will actually see, at its current content viewport, with no viewport override. A detached automation viewport, a resized emulation, or a browser-only raster cannot certify an in-app panel whose visible host geometry differs. Record the host surface identity and exact content width/height beside that artifact; if either changes before handoff, recapture and rereview. An overlay image does not prove the obscured surface beneath it; a task-state image does not prove a different state left visible at handoff. Existence of a node or a pretty screenshot is not proof of visibility, meaning, hierarchy, reachability, or correct Grammar identity.
+## Validated packet
 
-Full-viewport screenshots are the primary evidence for visual composition. The enforced loop is `apply/repair -> capture the complete matrix -> inspect the images -> repair on any contradiction -> recapture`. After every implementation or repair, the reviewer must capture the exact wide, intermediate, and compact renders and inspect the images themselves for hierarchy, density, wrapping, spacing, clipping, occlusion, balance, and overall coherence before issuing a verdict. DOM existence, computed styles, element rectangles, overflow measurements, CSS tests, accessibility output, lint, tests, and numeric thresholds are corroborating evidence only; none can substitute for image-based visual judgment or independently produce a visual `PASS`. A numerically valid render that looks cramped, unbalanced, obscured, or plainly poor is `FAIL`. Any source or handoff-state change stales prior screenshots. If the screenshots were not captured and actually reviewed after the latest source change, the visual review is incomplete and cannot close.
+Review begins only after capture/preflight validates a latest-source packet. The packet includes:
 
-Do not mistake the screenshot boundary for a product boundary. When a card, collection, or section is
-only partially visible at the top or bottom edge, a claim that it is collapsed, clipped, or missing
-requires an adjacent scroll-middle, scroll-terminal, restored, or focused raster showing the defect
-inside the viewport. Without that corroboration, the verdict is `INSUFFICIENT_EVIDENCE`, score `N/A`,
-and the next action is recapture—not repair or reconstruction.
+- one uncropped host-context image at the actual delivery surface and content viewport;
+- a settled, populated happy-case full-page image with every major region and primary task visible;
+- wide, intermediate when composition changes, and compact states;
+- focused material-surface crops with adjacent context where whole-page scale hides edge detail;
+- every applicable loading, pending, empty, error, denied, recovery, refresh/resume, overlay, sticky,
+  bounded-scroll, zoom, focus, and drag lifecycle cell;
+- opaque cell IDs and source, runtime, state, viewport, and capture fingerprints.
 
-Every screenshot cell owns a written inspection record before aggregation. The visual verdict is a blind pixel review: while judging the image, ignore source code, DOM/computed styles, test output, measurements, implementation rationale, and claimed intent. They may be used only after a visible finding to locate its cause. They cannot excuse, reinterpret, or upgrade the rendered result.
+An empty, loading, skeleton, error, duplicate, or cropped image cannot replace the populated hero or
+carry a whole-page aesthetic verdict. A screenshot clipped at a viewport edge does not prove the
+partially visible owner is broken; require the adjacent scroll/focus cell. Missing applicable cells
+make the packet incomplete and the verdict `BLOCKED` or `INSUFFICIENT_EVIDENCE`, never PASS.
 
-The blind verdict is executed by exactly one fresh-context `gpt-5.6-sol` reviewer with `forkTurns=none`; the reviewer identity must differ from the implementation identity. Its only visible input is the raster packet: an uncropped host image, focused material-surface images with adjacent context, responsive/lifecycle/probe rasters, opaque cell labels, and capture fingerprints. Do not provide source, DOM, measurements, rules, Grammar, feedback history, suspected defects, prior verdicts, producer rationale, or intended answers. A single distant whole-screen image is insufficient because local padding, ownership, density, and clipping can disappear at that scale.
+Any source mutation, runtime generation change, handoff-state change, host geometry change, or stale
+fingerprint invalidates the packet.
 
-Record visible observations for all of these lenses:
+## Blind execution boundary
 
-- **Purpose and semantic utility:** every visible object has a user-recognizable job in this state. A meaningless object has no understandable user purpose in the rendered state. Flag debug residue, placeholders, duplicated controls or copy, decorative noise, orphan labels, empty shells, irrelevant metadata, controls without an available action, and anything whose prominence exceeds its usefulness.
-- **Content coherence:** labels, values, status, guidance, and actions agree with one another and with the visible task. The user should not need source knowledge to understand what happened or what to do next.
-- **Composition and hierarchy:** focal point, reading order, grouping, density, typography, action priority, balance, and whitespace make the task scannable. Blank space must separate or focus content; a large dead zone, accidental moat, stranded control, or visually competing primary action is a contradiction.
-- **Media fitness:** judge an image by the job it performs in the current state, not by whether sibling pages contain imagery. Missing media is a finding only when orientation, explanation, identity, evidence, or an empty-state outcome remains visibly unresolved after structural composition is considered. Present media is a contradiction when it is decorative filler, competes with the task, repeats copy, or survives responsive layout without a meaningful owner. Product-family coherence does not require identical media treatment on every page.
-- **Visual ownership:** assign every visible heading, label, value, status, action, and control to the rendered section owner it appears to name, describe, or control. Inspect that object together with its intended owner and the preceding and following peer sections. A section owner may legitimately comprise an external label row plus its framed surface; frame containment is not ownership. A user without source knowledge must still bind the label and frame together through alignment, proximity, and separation from adjacent owners. DOM ancestry, component intent, or mere existence inside a layout cannot prove or disprove this relationship; an object visually attached to the wrong sibling or floating between owners is a contradiction.
-- **Surfaces and spacing:** outer page inset, surface opacity or intentionally frameless treatment, content-to-border padding on every edge, peer-edge alignment, vertical rhythm, border/radius/shadow ownership, and nested-surface consistency are visibly complete. Audit each edge, not just the easiest one.
-- **Pinned-boundary clearance:** for every sticky, fixed, or otherwise pinned edge, inspect the nearest visible content and surface at scroll start, middle, and terminal. “No text overlap” is insufficient: the pinned owner and adjacent content must retain an intentional breathing boundary from the applicable composition authority. A surface touching a pinned edge, appearing cut off beneath it, or ending flush against it is a contradiction even when all content remains technically readable. Do not assume one numeric token globally; resolve the spacing from the owning page/Grammar composition.
-- **Affordance and legibility:** interactive objects look interactive; disabled, pending, selected, destructive, and primary states are distinguishable; text contrast, line length, wrapping, truncation, icons, and touch/click targets are visually credible.
-- **Responsive composition:** each viewport has an intentional composition, not a wider layout squeezed or clipped. Priority, grouping, action placement, navigation, readable width, and terminal whitespace remain coherent when compact or expanded.
-- **Integrity:** reject clipping, overlap, bleed-through, accidental transparency, broken z-order, sticky/fixed occlusion, missing edges, cropped text, and controls that appear detached from their owner.
+Exactly one fresh-context `gpt-5.6-sol` reviewer with `forkTurns=none`, distinct from the implementer,
+receives only raster artifacts and opaque cell metadata. Withhold source, DOM, computed styles,
+measurements, tests, rules, Grammar prose, feedback history, suspected defects, intended answers,
+producer rationale, and prior verdicts until the pixel verdict and written observations are frozen.
 
-`Not applicable` must name why. A record containing only dimensions, DOM facts, accessibility facts, `no overflow`, `looks good`, or a checklist without concrete pixel observations is invalid. Text touching a border or edge, content showing through a sticky/fixed surface, and every other contradiction in any lens force `FAIL`/`repair`; technical reachability and passing code evidence cannot cancel them.
+DOM, accessibility trees, geometry, traces, static gates, and tests may classify a visible finding
+afterward; they cannot reinterpret pixels, excuse a contradiction, or manufacture visual PASS.
 
-Static screenshots at scroll origin do not prove an interactive surface. Skeleton, loading, pending,
-empty, recovery, and steady content are separate visual states and cannot share a verdict. Exercise
-every applicable lifecycle after the latest source mutation: page scroll at start/middle/end and
-back; each bounded scroll owner at both limits and restored; draggable controls released against every
-constraint edge; browser zoom-in, zoom-out, and restored baseline; sticky, fixed, overlay, and focus
-behavior before and after those changes. Capture and run AI visual-fidelity on every resulting state.
-Reject off-screen or unrecoverable controls, scroll bleed, stale drag transforms, sticky occlusion,
-clipped content, accidental overlap, and any state that changes owner when the viewport or zoom
-changes. Skip only states or interactions the resolved surface does not own, and record the exact
-inapplicability reason.
+## Required visual lenses
 
-The lifecycle explicitly covers page scroll at start/middle/end and back before its verdict may pass.
-It also covers draggable controls released against every constraint edge.
-Browser zoom/text scaling must pass zoom-in and zoom-out before the baseline is restored.
+Every raster has a concrete observation and `PASSED`, `PROBLEM`, or exact `not-applicable` disposition
+for each applicable lens:
 
-Review is AI-led adversarial falsification, not confirmation. The AI begins with pixels and actively
-tries to discover potential UX/UI defects. For every screenshot it must challenge at least one
-purpose/content hypothesis, one composition/spacing hypothesis, and one interaction/responsive
-hypothesis, then give each required visual lens its own verdict. A top-level PASS cannot override a
-confirmed challenge or a problem lens.
+- **Purpose and semantic utility:** every visible object has a recognizable job; reject placeholders,
+  debug residue, duplicated controls/copy, decorative noise, orphan labels, empty shells, irrelevant
+  metadata, and unavailable actions.
+- **Content coherence:** identity, values, status, guidance, and actions agree and make the next step
+  understandable without source knowledge.
+- **Composition and hierarchy:** focal point, reading order, semantic card ownership, density,
+  typography roles, action priority, whitespace, and balance are deliberate rather than a generic
+  data dump or mechanically assembled grid.
+- **Visual ownership:** labels, frames, rows, actions, and controls visually bind to the owner they
+  name or affect through alignment, proximity, and separation from peers.
+- **Surfaces and rhythm:** page inset, peer/card rhythm, card mode, edge padding, divider ownership,
+  radius/border/elevation, header surface parity, and nested boundaries match the routed Grammar.
+- **State and affordance:** populated/loading/pending/empty/error treatment, native destination/action
+  semantics, IconTile accent, button pending treatment, state text, icons, and focus cues make one
+  coherent claim.
+- **Responsive and interaction resilience:** navigation, rails, mobile return/overflow access,
+  sticky/fixed boundaries, scroll, zoom, overlays, and draggable controls retain reachability and
+  restoration without desktop geometry leaking into compact composition.
+- **Integrity and accessibility cues:** reject clipping, occlusion, bleed-through, broken z-order,
+  missing edges, cropped text, unreadable wrapping, low-credibility targets, and color-only meaning.
+- **Media fitness:** imagery performs an explicit orientation, explanation, identity, evidence, or
+  empty-state job and remains subordinate to the task; sibling imagery alone is not a requirement.
 
-Only after a potential defect is recorded may the workflow inspect `knowledge/ui.md`, routed Grammar,
-source, DOM, or measurements to classify the smallest owner: implementation, reusable UI knowledge,
-Grammar, product authority, or another domain. Those authorities guide the repair; they cannot erase
-the pixel finding. Every repair invalidates the raster and restarts AI review without the previous
-rationale. If the same potential problem persists, reclassify the owner rather than repeatedly tuning
-the implementation around a possibly wrong Grammar or rule.
+The complete interface is judged first, then individual owners. Technically valid parts do not rescue
+an incoherent whole.
 
-Before capture, freeze an adversarial probe
-matrix and try to break the UI across every category: viewport extremes and breakpoint-adjacent
-widths; zoom/text scale below, at, and above baseline with restoration; page scroll at start, middle,
-end, and back; every bounded or nested scroll owner at both limits plus scroll-bleed attempts;
-longest, shortest, missing, dense, sparse, and wrapping content; closed/open, loading, pending, error,
-empty, disabled, selected, recovery, and other material transitions; sticky, fixed, and overlay
-collisions at viewport edges and terminal boundaries; drag release at every constraint edge and
-restoration; keyboard/focus traversal; and composition around the change, including its parent,
-preceding and following siblings, and page terminal. Each category is either attempted with latest-
-source raster evidence or marked `not-applicable` with an exact ownership reason.
+## Adversarial lifecycle
 
-For every probe, record its category, target state, attack attempted, expected failure mode, image
-reference, observed outcome, and concrete finding. Do not stop at the first defect: finish the bounded
-probe matrix so repair can address a causal cluster, unless continuing is unsafe or impossible. A
-pretty baseline screenshot, passing checklist, test suite, or collection of measurements cannot
-produce `PASS`. Missing any applicable probe is incomplete proof and therefore never `PASS`.
+The packet attempts to falsify the UI across viewport extremes and breakpoint-adjacent widths;
+zoom/text scale below, at, and above baseline with restoration; page and bounded scroll at both limits
+and restored; longest, shortest, missing, dense, sparse, and wrapping content; state transitions;
+keyboard/focus traversal; sticky/fixed/overlay collisions; mobile navigation and drawer return; and
+drag release/restoration defined by `fe.grammar-common-case-draggable-overlay-lifecycle`.
 
-Blind review is an execution boundary, not a second paragraph written by the implementer. Without the distinct fresh Sol identity, raster-only packet, one inspection record per raster, and an explicit verdict for the final post-mutation screenshot, the result is incomplete and never `PASS`.
+Each probe records category, owner, target state, attack, expected failure mode, raster, observed
+outcome, and finding. A pretty baseline, passing checklist, measurements, or `no overflow` is never a
+substitute. Complete the bounded probe matrix even after a defect so one repair batch can address the
+causal cluster, unless continuing is unsafe or impossible.
 
-With `debug=true`, terminal output includes `[AI REVIEW][image: ...]`, all `[FINDING][lens] ...` observations, and `[VERDICT] ...` for every raster, plus the normalized AI CALL/RETURN/TRANSITION contracts. Missing a raster block is missing proof, not a logging inconvenience.
+## Verdict
 
-Audit in the fixed order `AI-first -> Rules-first -> Grammar-last`:
+- `PASS`: every required raster and lens passes, the populated full interface clears the aesthetic
+  veto, and no contradictory finding remains.
+- `FAIL`: any observable contradiction exists, including a crude, generic, wireframe-like,
+  mechanically assembled, merely functional, or unpleasant complete interface.
+- `SUSPENSE`: Grammar is complete, no contradiction exists, and one finite visual choice remains
+  unresolved. Missing semantic rule/token/component is `grammar-gap`, not a visual verdict.
+- `BLOCKED`: runtime, identity, capture, or evidence prevents a valid visual verdict.
 
-- `AI-first` observes whether approved identity, evidence, status and next action have a coherent priority, and whether any synthesis is justified by density or decision complexity. Do not require AI copy for simple content and do not invent product meaning.
-- `Rules-first` observes reading order, semantic hierarchy, data representation, surface and collection ownership, nesting, responsive persistence and state/recovery presentation. Prove a destination with native link semantics and a real non-null href, preserve contract-declared progress as a progress presentation, and reject any compact numeric fact whose visible rank equals or exceeds its owning section title.
-- `Grammar-last` proves exact Grammar object/interface identity, variants, padding, gap, typography, separators, state marks and responsive treatment only after the earlier observations are recorded.
+The first visual decision is the aesthetic veto on the settled populated whole. A result that is not
+immediately harmonious, polished, and pleasant is `FAIL`; correct rendering, working behavior,
+responsive fit, accessibility output, or green tests cannot upgrade it.
 
-Verdicts are `PASS`, `FAIL`, `SUSPENSE`, and `BLOCKED`. These typed verdicts are the canonical UI
-result. Capture-preflight's ten binary readiness checks are not a visual-quality rubric: never convert
-their passed count into `x/10`, a percentage, a star rating, or a quality claim. Any failed or missing
-readiness check means preflight is non-ready, not that the UI earned a lower score. If a user explicitly
-requests a numeric rating, label it noncanonical and evidence-limited, place it after the typed verdict,
-and provide it only after the complete latest-source raster and lifecycle matrix has been reviewed.
-Use five separately evidenced 0-2 axes: visible business/task closure, UX flow/state clarity, visual
-hierarchy/composition, responsive/interaction resilience, and consistency/accessibility cues. Any
-visible contradiction caps the score at 8; 9 or higher requires typed `PASS`. Append each complete
-round to the immutable audit history with its delta, verdict, source fingerprint, evidence fingerprint,
-and finding-batch fingerprint. Scores 7-8 route every finding to its smallest owner and allow one
-batched repair of the current composition. A score below 7 rejects patch continuation: freeze the
-finding batch, brainstorm one dominant replacement layout, visualize it, and construct it immediately
-inside the approved boundary. Generate three or four alternatives and wait for a choice only when the
-user explicitly requests options. Recapture and rescore after either route. Round count alone never blocks this loop; only a
-repeated no-progress fingerprint or a genuine unavailable authority/runtime route may block it.
-Otherwise report insufficient evidence. No numeric rating may compensate for, soften, or replace a
-typed contradiction.
+Capture-preflight readiness is binary and never a score. A numeric rating is noncanonical and emitted
+only when the user explicitly requests it, after the typed verdict. If requested, use five separately
+evidenced 0-2 axes: task closure, UX state clarity, visual hierarchy/composition,
+responsive/interaction resilience, and consistency/accessibility cues. Any visible contradiction
+caps the rating at 8; 9+ requires typed PASS and full marks for hierarchy/composition and
+consistency/accessibility. The rating never routes or softens the typed verdict.
 
-Record separate verdicts and evidence for all three layers before aggregating. A contradiction in any layer makes the UI verdict `FAIL`, even when another layer passes or is missing. `SUSPENSE` is legal only when no layer fails and one finite render choice remains unspecified or conflicts. Record exact surface/state/viewport, authorities checked, finite question, and owner. Runtime unavailability is `BLOCKED`; observable contradiction is `FAIL`; uncertainty outside UI is routed to its owner.
+After the verdict, classify each finding to its smallest owner with corroborating evidence. Do not
+repair or recapture inside this record; return the typed review product to the canonical frontend
+machine.

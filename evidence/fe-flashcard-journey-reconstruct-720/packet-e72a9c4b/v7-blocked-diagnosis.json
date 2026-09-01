@@ -1,0 +1,71 @@
+{
+  "schemaVersion": 1,
+  "missionRef": "fe-flashcard-journey-reconstruct-720",
+  "visualRound": {
+    "number": 3,
+    "purpose": "regression"
+  },
+  "outcome": "blocked",
+  "reason": "The final authorized blind visual round returned unresolved repair findings; no fourth visual round is authorized.",
+  "visualFidelityOutputRef": "visual-fidelity-output.json",
+  "lastScreenshot": {
+    "imageRef": "sha256-e30109292c3f870cec7d12fbc123a980590964a2f85570264470b0b4e32c840e.png",
+    "verdict": "passed"
+  },
+  "findings": [
+    {
+      "findingRef": "history-empty-density",
+      "owner": "implementation:CourseFlashcardsReviewBlock",
+      "evidenceRefs": [
+        "cell-012:sha256-bbc073e09830ba0dc47fac8c1690271ad57d0b1de8286d9cc45f56596d8120fa.png",
+        "cell-013:sha256-ada52a21a4ab51f9d4842bf74b96af658c1691c135b4ac6c7c84b4342c905508.png"
+      ],
+      "problem": "The wide History empty surface is a shallow top strip followed by a dominant blank field, weakening scanability and empty-space balance."
+    },
+    {
+      "findingRef": "history-focus-indicator",
+      "owner": "grammar:ChoiceTabs",
+      "evidenceRefs": [
+        "cell-012:sha256-bbc073e09830ba0dc47fac8c1690271ad57d0b1de8286d9cc45f56596d8120fa.png",
+        "probe-keyboard-focus-focus"
+      ],
+      "problem": "The long rectangular focus ring competes with the selected tab underline."
+    },
+    {
+      "findingRef": "quiz-setup-wide-density",
+      "owner": "implementation:CourseFlashcardsQuizBlock",
+      "evidenceRefs": [
+        "cell-024:sha256-f91e888ae69d9183fc44ca1b37f3685ca3e6b17b793d9394145f2fb7db62b8d9.png"
+      ],
+      "problem": "The wide setup workbench compresses useful controls into the upper third and leaves most of the viewport unused."
+    },
+    {
+      "findingRef": "session-recovery-compact-density",
+      "owner": "implementation:CourseFlashcardSessionBlock",
+      "evidenceRefs": [
+        "cell-032:sha256-bfe7d66088ce921a94e2c669fca0a38d0cd3bb897dd24aff6efb1bc71a8c5e9e.png"
+      ],
+      "problem": "The compact invalid-session recovery is one small card followed by nearly a full blank viewport, so the state looks unfinished."
+    },
+    {
+      "findingRef": "overlay-restored-focus-clipping",
+      "owner": "grammar:ModalBranch",
+      "evidenceRefs": [
+        "cell-037:sha256-6dbf495b2e65d9a78ffe26b63cb74ee772964dc359b59ff3d1c1378f3937e173.png",
+        "probe-bounded-scroll-restored"
+      ],
+      "problem": "The restored overlay clips a purple focus-ring arc at the upper-right boundary beside the close control."
+    }
+  ],
+  "gateDiagnosis": {
+    "preflight": "Preflight validated source freshness, packet structure, raster coverage and probe binding; it is not a pixel-quality verdict and therefore cannot reject visual imbalance or focus-ring clipping.",
+    "matrix": "The current matrix did not miss these states: cells 012, 013, 024, 032 and 037 were present and the blind reviewer rejected them. Earlier packets were stale after the latest source mutation and did not contain this exact host-restored overlay raster.",
+    "previousReviewGap": "For state roles that existed earlier, the prior review failed to falsify empty-space balance, task scanability and competing focus shapes. The evidence coverage was present, but the adversarial lens challenge was insufficient; tests, lint and DOM checks could not compensate."
+  },
+  "closure": {
+    "independentReviewCalled": false,
+    "qualityCalled": false,
+    "uatCalled": false,
+    "nextVisualRoundOpened": false
+  }
+}

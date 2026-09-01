@@ -56,19 +56,46 @@
       "type": "object",
       "additionalProperties": false,
       "required": [
+        "compiledRequestRef",
+        "compiledRequestFingerprint",
+        "grammarBinding",
         "targetRef",
+        "mode",
         "constraints"
       ],
       "properties": {
+        "compiledRequestRef": {
+          "description": "Exact compiled request artifact authorizing this generation.",
+          "type": "string",
+          "minLength": 1
+        },
+        "compiledRequestFingerprint": { "description": "Fingerprint of the exact author-once compiled request.", "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
+        "grammarBinding": {
+          "description": "Exact Grammar identity published into the compiled request.",
+          "type": "object", "additionalProperties": false,
+          "required": ["packageRef", "manifestRef", "exportRefs", "contentSha256", "authorityRevision"],
+          "properties": {
+            "packageRef": { "type": "string", "pattern": "^grammar-package://" },
+            "manifestRef": { "type": "string", "pattern": "^grammar://" },
+            "exportRefs": { "type": "array", "minItems": 1, "maxItems": 32, "uniqueItems": true, "items": { "type": "string", "pattern": "^grammar://" } },
+            "contentSha256": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
+            "authorityRevision": { "type": "string", "minLength": 1 }
+          }
+        },
         "targetRef": {
           "description": "The one target owned by this invocation.",
           "type": "string",
           "minLength": 1
         },
+        "mode": {
+          "description": "One dominant direction, or three to four alternatives when valid Grammar evidence leaves material ambiguity or the user explicitly requests comparison.",
+          "enum": ["dominant", "alternatives"]
+        },
         "constraints": {
           "description": "Closed constraints for this atomic job.",
           "type": "array",
           "uniqueItems": true,
+          "minItems": 1,
           "maxItems": 64,
           "items": {
             "type": "string",

@@ -48,9 +48,11 @@
       "required": [
         "targetRef",
         "constraints",
-        "findingRef",
+        "gapRef",
         "owner",
-        "authorityRef"
+        "authorityRef",
+        "authorityBoundary",
+        "authorityBoundaryFingerprint"
       ],
       "properties": {
         "targetRef": {
@@ -61,6 +63,7 @@
         "constraints": {
           "description": "Closed constraints that bound this job without routing it.",
           "type": "array",
+          "minItems": 1,
           "maxItems": 64,
           "uniqueItems": true,
           "items": {
@@ -68,19 +71,45 @@
             "minLength": 1
           }
         },
-        "findingRef": {
-          "description": "Exact classified visual finding whose reusable authority owner is being reconciled.",
+        "gapRef": {
+          "description": "Exact compile-time Grammar gap being repaired.",
           "type": "string",
           "minLength": 1
         },
         "owner": {
           "description": "The proven reusable frontend authority owner.",
-          "enum": ["grammar", "ui-knowledge"]
+          "const": "grammar"
         },
         "authorityRef": {
-          "description": "Exact routed Grammar or shared UI-knowledge record allowed to change.",
+          "description": "Exact routed Grammar owner allowed to change.",
           "type": "string",
-          "minLength": 1
+          "pattern": "^grammar://"
+        },
+        "authorityBoundary": {
+          "description": "Exact Grammar files, owner refs, and before hashes authorized for this repair.",
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 32,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["path", "beforeSha256", "ownerRef"],
+            "properties": {
+              "path": { "type": "string", "minLength": 1 },
+              "beforeSha256": {
+                "anyOf": [
+                  { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
+                  { "type": "null" }
+                ]
+              },
+              "ownerRef": { "type": "string", "pattern": "^grammar://" }
+            }
+          }
+        },
+        "authorityBoundaryFingerprint": {
+          "description": "Immutable fingerprint of the ordered Grammar authority boundary.",
+          "type": "string",
+          "pattern": "^sha256:[0-9a-f]{64}$"
         }
       }
     }

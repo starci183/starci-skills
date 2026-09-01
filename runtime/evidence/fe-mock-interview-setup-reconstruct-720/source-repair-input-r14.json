@@ -1,0 +1,69 @@
+{
+  "schemaVersion": 7,
+  "operatorId": "fe/source-repair",
+  "context": {
+    "authorityRefs": [
+      "D:/Repositories/starci-academy-backend/.claude/knowledge/ui.md",
+      "D:/Repositories/starci-academy-fe/packages/grammar/src/core"
+    ],
+    "evidenceRefs": [
+      "finding-classify-r13.json",
+      "visual-fidelity-r13.json"
+    ],
+    "uiKnowledgeId": "fe.ui"
+  },
+  "input": {
+    "targetRef": "implementation://fe-render-capture/viewport-extraction",
+    "constraints": [
+      "do not alter approved product behavior",
+      "discard all R13 review rasters",
+      "freshly capture every applicable probe",
+      "crop the active emulated viewport; never resample the host frame"
+    ],
+    "behaviorContractRef": "contract://mock-interview-setup-reconstruct-progress-home/v1",
+    "behaviorContractFingerprint": "sha256:de2006951b91e2e82044dc86fa5dceecbc084d550d50ec581dadf02f166201af",
+    "failedEvidenceRefs": [
+      "inspection:sha256-b8aea14ce0a6ff03f614b043034f8df486a7e5659cba32a036777daee6089c14.png",
+      "inspection:sha256-d3bfbbc36019d2990fd3e22a9bae5b67f87e56f23aae0603b50e6634c2c7280c.png",
+      "inspection:sha256-b76aca82ddc681a35fa40f60df26d549a69c4ef3d1b7714454633603aff4bd9e.png",
+      "inspection:sha256-32b00c72338c6772f2f10d3d97448262399b8ecc378bd7e93bb6cc35de174c1c.png",
+      "inspection:sha256-775f0dea4a32ae012298340574e48ab681ad34624ef9041efbbf7dc3e52f4552.png",
+      "inspection:sha256-b0ff1b42ed03422be4e55f862206f5f34f0a25e9671e571f7b6a6c3e8bd3ece1.png",
+      "inspection:sha256-7bfc14491bc7996c8d5f70aafd020ab70b6edddbd8b0c806ec1b8fea284cf558.png",
+      "inspection:sha256-8488d05bee6210922ac60ade736042b717bff9893872b1f7061c27ed2f209959.png",
+      "inspection:sha256-6cf79f92805a72fbe9c7cef2e1f275a9afc9ce44a7f2f832f062d158bf4ca2ca.png",
+      "inspection:sha256-727417414b9d5729d634b231fb8741839f13e733d6db2a54b63944f862d6f311.png",
+      "inspection:sha256-f771a9f1b13f4d0730e8859178aa1a5ba4d3c60e5a1ab3a5151f98e60f0ab94b.png",
+      "inspection:sha256-61f49e6ae8e46edc1adf11000b1542c89deb3d8c2e8a80ad05c7f532a1bd8292.png",
+      "inspection:sha256-933aa9e574c1c6669eb9ef31a0af26364e2cad61b88cb9c8a0285d8fe9a55ed3.png",
+      "inspection:sha256-3f05c2f8e71187e5179c37ee9755d5444740e34e106e910a63eff17596f61c42.png",
+      "inspection:sha256-63e485d11111741c968781113e36cfd550a87987f01224a82859c9eef50ff8ce.png",
+      "inspection:sha256-2543e272dd6d73600fb4a8a89f1a174476cdb73ae6ed99494cb8ac4285a60056.png",
+      "inspection:sha256-7c116119756e999f57715027813dc155eb5e37fd1838c74c78ee9e0879d48eb4.png",
+      "inspection:sha256-d502fab1346190018826f5a5883cefb348f398c5f2a90ed8e5e0979f179830c1.png",
+      "inspection:sha256-94f59ac93b13da3c9a8c8d64005a0f1fef296620cb9f7caca7a66edb9cd55113.png",
+      "inspection:sha256-e13cec5f54edcdaad19d93ea779ba5b96089e01c6486acb075be9f88bad6f713.png",
+      "inspection:sha256-b5baee1694610fdd98c2579d998e7803fd488d8351634ae8a1a7c99012eaf006.png",
+      "inspection:sha256-490094d417c2388f78cd1020761aae74209a7eb9640918865d641ef4d9a38591.png",
+      "inspection:sha256-0a1e7eb888a8a9567309747b09eafb7923df43c01d8843f343da56fb19c04e8c.png",
+      "probe:probe-viewport-baseline",
+      "probe:probe-viewport-breakpoint",
+      "probe:probe-zoom-in",
+      "probe:probe-zoom-out",
+      "probe:probe-zoom-restored",
+      "probe:probe-page-scroll-start",
+      "probe:probe-page-scroll-middle",
+      "probe:probe-page-scroll-end",
+      "probe:probe-page-scroll-restored",
+      "probe:probe-bounded-scroll-start",
+      "probe:probe-bounded-scroll-end",
+      "probe:probe-bounded-scroll-restored",
+      "probe:probe-content-long",
+      "probe:probe-content-short",
+      "probe:probe-state-skeleton",
+      "probe:probe-state-loading",
+      "probe:probe-state-steady",
+      "probe:probe-sticky-overlay-open"
+    ]
+  }
+}

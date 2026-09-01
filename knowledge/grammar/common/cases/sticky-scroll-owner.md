@@ -4,7 +4,7 @@
 | --- | --- |
 | Knowledge ID | `fe.grammar-common-case-sticky-scroll-owner` |
 | Package | `@starci/grammar/common` |
-| Operators | `grammar-convergence` |
+| Operators | `fe/authority-reconcile` |
 | Search tags | `sticky, scroll container, collision, summary, action bar, focus` |
 | Dependencies | `fe.grammar-common-capabilities, fe.grammar-common-states-accessibility` |
 

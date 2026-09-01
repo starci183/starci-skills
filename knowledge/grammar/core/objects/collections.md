@@ -3,8 +3,9 @@
 | Field | Value |
 | --- | --- |
 | Knowledge ID | `fe.grammar-core-object-collections` |
+| Contract revision | `7.6.0` |
 | Package | `@starci/grammar/core` |
-| Operators | `grammar-convergence` |
+| Operators | `fe/authority-reconcile` |
 | Search tags | `list, rows, SurfaceListCard, collection, divider, row action, status` |
 | Dependencies | `fe.grammar-common-case-collection-cardinality, fe.grammar-core-overview` |
 
@@ -16,7 +17,9 @@ The collection owner controls repeated-row anatomy, separators, local state plac
 
 - Keep primary identity, supporting copy, neutral state, and row action in predictable positions.
 - Render repeated label-value facts that share one reading job through `SurfaceListCard`; the list owns one labelled shell, joined rows, and their separators. A generic `SurfaceCard` with hand-spaced rows is not the same object.
-- When that list lives inside an approved `SurfaceCard`, use `SurfaceListCard`'s `nested` interface. Core's outer card body keeps its `p-4` inset while the nested list must not add a second full card inset or compete for elevation; its row padding and separators remain owned by the collection.
+- When that list lives inside an approved `SurfaceCard`, use `SurfaceListCard`'s `nested` interface.
+  The owning surface mode comes from `fe.grammar-core-object-surface-card`; the nested list adds no
+  second full-card inset or elevation, while its row padding and separators remain collection-owned.
 - Keep a compact state legend as a legend, not a data list. Every state needs a visible semantic mark attached to its text label; labels alone name states but do not demonstrate how to recognize them in the controlled object.
 - Make legend marks correspond to the actual controlled states. If answered, current, and future controls do not remain distinguishable without reading the legend text, the state mapping is incomplete.
 - Use dividers or spacing from the package interface; remove orphan first/last separators.
@@ -25,7 +28,9 @@ The collection owner controls repeated-row anatomy, separators, local state plac
 - Render `affirmative`, `negative`, `pending`, and selected treatments only after application mapping. The glyph, tone, and text must make the same evidenced claim; never map promises, benefits, capabilities, or future outcomes to affirmative or negative state rows for decoration. An offering may mark included benefits with a purpose-named foreground `included` glyph, but that marker is not completion or success state.
 - Difficulty, tier, phase name, and other categorical metadata remain neutral unless upstream evidence declares an actual state or consequence. Current emphasis belongs on the active status/value, not on the category identity beside it.
 - Separate static and interactive rows unless a mixed-row variant exists.
-- Use a stable empty treatment owned by the collection.
+- Settled zero-data uses the package `EmptyState` owned once by the collection; initial unresolved
+  geometry alone may use its skeleton. Never leave an empty Card shell or skeleton after zero-data is
+  known.
 - Keep row action emphasis below the collection's primary task.
 
 ## Scale

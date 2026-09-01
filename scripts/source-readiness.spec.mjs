@@ -28,7 +28,7 @@ function git(repository, ...args) {
 }
 
 function fixture(t, {
-  runtimeVersion = '7.5.0-alpha.1',
+  runtimeVersion = '7.6.0-beta.1',
   configVersion = 6,
   routeVersion = 6,
   role = 'be',

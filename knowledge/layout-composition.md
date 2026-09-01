@@ -3,22 +3,43 @@
 | Field | Value |
 | --- | --- |
 | Knowledge ID | `fe.layout-composition` |
-| Operators | `layout` |
-| Search tags | `layout, block composition, grid span, sticky, responsive, direction` |
-| Dependencies | `fe.page-model, fe.state-modeling` |
+| Contract revision | `7.6.0` |
+| Operators | `fe/request-compile` |
+| Search tags | `layout, semantic block, card-first, grid span, sticky, responsive, direction` |
+| Dependencies | `fe.page-model, fe.state-modeling, fe.ui` |
 
-## Record
+## Internal guidance
 
-Compose normalized Blocks by task priority, information weight, density, comparison need, persistence, and responsive transformation. Do not select an archetype and force content into it.
+This record helps compile a closed layout and, when eligible, helps `generate` one dominant direction.
+It is not a visible layout stage, approval checkpoint, or repair route.
 
-## Composition decisions
+Begin with semantic reading order and one dominant task path. Compose normalized Blocks by task
+priority, information weight, density, comparison need, persistence, and responsive transformation;
+never select an archetype and force content into it.
 
-Begin with semantic reading order and one dominant task path. Give primary dense content more space than short supporting data. A `2 + 1` grid is justified only when the wide Block owns the main task, the narrow Block remains useful beside it, and both satisfy minimum readable widths. Equal peers use equal tracks. Sparse supporting facts must not stretch into a visually dominant empty surface.
+Use semantic card-first composition: a coherent Block receives one selected-Grammar surface when a
+boundary improves ownership, while joined collections, articles, navigation, and intentionally
+frameless regions keep their declared objects. A compound surface contains multiple functional child
+Blocks only when one shared relationship and divider owner are real. Card-per-row and wrapper Cards
+around unrelated content are invalid.
 
-Separate two dense subjects when they have distinct decisions, states, or scan patterns. Use tabs only for same-page peer panels that are mutually exclusive and do not need side-by-side comparison. Use collections when items share one schema and repeated action model. Use nested surfaces only when the child has a distinct collection or interaction boundary; decoration alone is insufficient.
+Give primary dense content more space than short supporting data. A `2 + 1` grid is justified only
+when the wide Block owns the main task, the narrow Block remains useful beside it, and both meet
+minimum readable widths. Equal peers use equal tracks. Sparse supporting facts do not stretch into a
+dominant empty slab.
 
-Sticky is allowed when a long primary task repeatedly needs bounded supporting reference or action. Declare scroll owner, offset, height bound, focus behavior, overflow behavior, and compact fallback. Compact layouts are static unless a smaller persistent pattern is proven safe.
+Separate dense subjects with different decisions, states, or scan patterns. Tabs are only same-page
+peer panels that need not be compared simultaneously. Collections own one repeated schema/action
+model. Nested surfaces require a distinct collection, focus, selection, state, scroll, or interaction
+owner.
 
-## Directions
+Sticky is allowed only when a long primary task repeatedly needs bounded supporting reference or
+action. Declare scroll owner, offset, height/collision bound, focus, overflow, terminal clearance, and
+compact static fallback. Page/content inset and peer rhythm come from the selected Grammar's page
+container, not per-page invention.
 
-Produce two or three materially different layout directions. Each includes page regions, block placement/order/span, global refs, wide/intermediate/compact transformations, state visibility, action reachability, reasons, and trade-offs. A direction differs by composition or interaction strategy, not color or minor spacing. Stop for the layout approval checkpoint.
+One dominant generated layout records page regions, block placement/order/span, wide/intermediate/
+compact transformations, state visibility, action reachability, Grammar bindings, reasons, and
+trade-offs. When complete Grammar leaves several material compositions and none dominates, or the
+owner explicitly asks to compare, use the three-or-four direction mode defined by
+`direction.visualization`; this record never waits or routes.

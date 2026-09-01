@@ -3,9 +3,10 @@
 | Field | Value |
 | --- | --- |
 | Knowledge ID | `fe.ui-quality-review` |
+| Contract revision | `7.6.0` |
 | Operators | `test/ui-quality-audit` |
 | Search tags | `ui quality, accessibility, interaction, responsive, visual stability, forms, motion, browser audit` |
-| Dependencies | `workspace.routing` |
+| Dependencies | `workspace.routing, fe.audit-loop-v75b` |
 
 ## Authority boundary
 
@@ -24,7 +25,7 @@ Each result names one stable rule ID, applicability, severity, observable eviden
 | `uiq.interaction.target-spacing` | Pointer or touch target | Target size or spacing meets the declared platform baseline and adjacent actions can be selected without precision traps. | error | Do not reuse native units as CSS pixels or invent one cross-platform number. |
 | `uiq.interaction.feedback-state` | Action with pending, success, error, disabled, or destructive state | Activation produces prompt feedback; pending prevents accidental duplicate action; errors identify recovery; disabled/read-only/destructive states remain distinct. | error | Do not infer business success or entitlement. |
 | `uiq.motion.preference-stability` | Animated or auto-moving surface | Motion has a functional purpose, respects the platform reduction preference, preserves comprehensible state, and does not shift surrounding layout during control feedback. | warning | Do not prescribe an animation library or a universal duration. |
-| `uiq.layout.viewport-reflow` | Declared compact, intermediate, and wide viewports | Core content and actions remain reachable with no unintended horizontal page overflow; fixed regions reserve space and do not cover content. | error | Do not choose layout direction or ownership. |
+| `uiq.layout.viewport-reflow` | Declared compact, intermediate, and wide viewports | Core content and actions remain reachable with no unintended horizontal page overflow; persistent fixed layout regions reserve their owned boundary, while a declared draggable overlay follows its no-spacer constraint/release lifecycle. | error | Do not choose layout direction or ownership. |
 | `uiq.layout.visual-stability` | Web page with asynchronous media or content | Expected async regions reserve geometry and measured unexpected layout shift stays within the declared project threshold. | warning | Do not treat every intentional user-triggered movement as failure. |
 | `uiq.forms.label-error-recovery` | Form or editable field | Persistent label and instructions are associated; invalid submission exposes field-level recovery and moves or announces focus according to the declared error-summary policy. | error | Do not invent validation or business rules. |
 | `uiq.navigation.orientation-return` | Multi-route, overlay, or multi-step flow | Current location and exit are discoverable; back/close returns predictably; route change and overlay dismissal place focus at the declared destination. | error | Do not add or remove product destinations. |
@@ -34,7 +35,10 @@ Each result names one stable rule ID, applicability, severity, observable eviden
 
 Audit the exact declared state at every declared viewport. Evidence may include accessibility-tree snapshots, keyboard traversal records, computed contrast, element rectangles, overflow measurements, reduced-motion observations, layout-shift entries, screenshots, and sanitized traces. The receipt records the browser build, route, surface/state IDs, viewport, source revision, knowledge generation, command/config fingerprint, and applied rule IDs.
 
-Delivery mode classifies a failure as `delivery-in-boundary` only when correction preserves approved layout, ownership, responsive transformation, business behavior, and source boundary. Otherwise it is `delivery-boundary-drift`. Standalone audit mode reports findings without proposing or applying a repair.
+The registry returns typed observations only. It never creates a quality stage, performs repair, or
+routes the mission. Classification is `frontend-local` only when correction preserves the compiled
+layout, ownership, responsive transformation, business behavior, and source boundary; otherwise
+return exact boundary/cross-domain evidence to the canonical frontend machine.
 
 ## Provenance
 

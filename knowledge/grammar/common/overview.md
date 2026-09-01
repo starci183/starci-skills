@@ -3,8 +3,9 @@
 | Field | Value |
 | --- | --- |
 | Knowledge ID | `fe.grammar-common-overview` |
+| Contract revision | `7.6.0` |
 | Package | `@starci/grammar/common` |
-| Operators | `grammar-convergence` |
+| Operators | `fe/authority-reconcile` |
 | Search tags | `grammar, common, package, routing, business-free, object ownership` |
 | Dependencies | exact installed package version |
 
@@ -29,6 +30,8 @@ Route additional Common knowledge by need:
 - Collection size and repeated rows: `fe.grammar-common-case-collection-cardinality`.
 - Sticky or multiple scroll regions: `fe.grammar-common-case-sticky-scroll-owner`.
 - Small-screen boundary changes: `fe.grammar-common-case-responsive-flattening`.
+- Draggable floating controls: `fe.grammar-common-case-draggable-overlay-lifecycle`.
+- Ranked rows, placement marks, and movement delta: `fe.grammar-common-case-ranked-collection-semantics`.
 - Reuse, extension, or missing capability: `fe.grammar-common-extension`.
 
 Grammar must never own an actor, product entity, price, entitlement, policy, workflow outcome, or business-named state. Application Product Blocks map domain meaning to neutral Grammar state.

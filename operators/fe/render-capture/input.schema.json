@@ -22,8 +22,7 @@
       "required": [
         "authorityRefs",
         "evidenceRefs",
-        "uiKnowledgeId",
-        "sourceFingerprint"
+        "uiKnowledgeId"
       ],
       "properties": {
         "authorityRefs": {
@@ -50,11 +49,6 @@
         "uiKnowledgeId": {
           "description": "Exact StarCi-native frontend UI knowledge binding.",
           "const": "fe.ui"
-        },
-        "sourceFingerprint": {
-          "description": "Fingerprint of the latest source revision that every captured image must render.",
-          "type": "string",
-          "pattern": "^sha256:[0-9a-f]{64}$"
         }
       }
     },
@@ -177,9 +171,13 @@
           "description": "Exact validated preflight that froze the matrix, round, and owner partitions before capture.",
           "type": "object",
           "additionalProperties": false,
-          "required": ["preflightRef", "matrixRef", "matrixFingerprint", "partitionFingerprint", "round", "capturePartitionRefs", "reusedPartitionRefs"],
+          "required": ["preflightRef", "compiledRequestRef", "compiledRequestFingerprint", "sourceApplyReturnReceiptRef", "aggregateAfterFingerprint", "matrixRef", "matrixFingerprint", "partitionFingerprint", "round", "capturePartitionRefs", "reusedPartitionRefs"],
           "properties": {
             "preflightRef": { "type": "string", "pattern": "^preflight://[0-9a-f]{64}$" },
+            "compiledRequestRef": { "description": "Exact author-once compiled request inherited through preflight.", "type": "string", "pattern": "^compiled-request://" },
+            "compiledRequestFingerprint": { "description": "Exact inherited compiled request fingerprint.", "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
+            "sourceApplyReturnReceiptRef": { "description": "Exact registered source-apply RETURN inherited through preflight.", "type": "string", "pattern": "^receipt:[A-Za-z0-9._-]+$" },
+            "aggregateAfterFingerprint": { "description": "Exact aggregate after-state registered for the source-apply RETURN.", "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
             "matrixRef": { "type": "string", "pattern": "^matrix://[a-z0-9][a-z0-9._/-]*$" },
             "matrixFingerprint": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
             "partitionFingerprint": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },

@@ -42,6 +42,21 @@
               "additionalProperties": false,
               "required": [
                 "summary",
+                "mode",
+                "compiledRequestRef",
+                "compiledRequestFingerprint",
+                "directionMode",
+                "directionBinding",
+                "grammarBinding",
+                "proofMatrix",
+                "proofMatrixFingerprint",
+                "targetRef",
+                "behaviorContractRef",
+                "behaviorContractFingerprint",
+                "sourceBoundary",
+                "sourceBoundaryFingerprint",
+                "effectRecords",
+                "aggregateAfterFingerprint",
                 "artifactRefs"
               ],
               "properties": {
@@ -49,9 +64,150 @@
                   "type": "string",
                   "minLength": 1
                 },
+                "mode": {
+                  "enum": ["apply", "repair"]
+                },
+                "compiledRequestRef": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "compiledRequestFingerprint": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
+                "directionMode": {
+                  "enum": ["none", "dominant", "alternatives"]
+                },
+                "directionBinding": {
+                  "anyOf": [
+                    {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "required": ["mode", "directionGenerateReturnReceiptRef", "selectedDirectionId", "selectedDirectionRef", "grammarDecisionManifestRef"],
+                      "properties": {
+                        "mode": { "enum": ["dominant", "alternatives"] },
+                        "directionGenerateReturnReceiptRef": { "type": "string", "pattern": "^receipt:[A-Za-z0-9._-]+$" },
+                        "selectedDirectionId": { "type": "string", "pattern": "^[a-z0-9][a-z0-9-]*$" },
+                        "selectedDirectionRef": { "type": "string", "minLength": 1 },
+                        "grammarDecisionManifestRef": { "type": "string", "pattern": "^grammar://" }
+                      }
+                    },
+                    { "type": "null" }
+                  ]
+                },
+                "grammarBinding": {
+                  "type": "object", "additionalProperties": false,
+                  "required": ["packageRef", "manifestRef", "exportRefs", "contentSha256", "authorityRevision"],
+                  "properties": {
+                    "packageRef": { "type": "string", "pattern": "^grammar-package://" },
+                    "manifestRef": { "type": "string", "pattern": "^grammar://" },
+                    "exportRefs": { "type": "array", "minItems": 1, "maxItems": 32, "uniqueItems": true, "items": { "type": "string", "pattern": "^grammar://" } },
+                    "contentSha256": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
+                    "authorityRevision": { "type": "string", "minLength": 1 }
+                  }
+                },
+                                                        "proofMatrix": {
+                                                          "type": "object", "additionalProperties": false,
+                                                          "required": ["matrixRef", "states", "viewports", "probeRefs", "populatedHeroStateRef", "coreTaskRef", "cells"],
+                                                          "properties": {
+                                                            "matrixRef": { "type": "string", "pattern": "^matrix://[a-z0-9][a-z0-9._/-]*$" },
+                                                            "states": {
+                                                              "type": "array", "minItems": 1, "maxItems": 32,
+                                                              "items": {
+                                                                "type": "object", "additionalProperties": false,
+                                                                "required": ["stateRef", "lifecycle", "populated", "coreTaskVisible"],
+                                                                "properties": {
+                                                                  "stateRef": { "type": "string", "minLength": 1 },
+                                                                  "lifecycle": { "enum": ["happy-case", "loading", "empty", "error", "recovery", "result"] },
+                                                                  "populated": { "type": "boolean" },
+                                                                  "coreTaskVisible": { "type": "boolean" }
+                                                                }
+                                                              }
+                                                            },
+                                                            "viewports": { "type": "array", "minItems": 3, "maxItems": 3, "uniqueItems": true, "items": { "enum": ["wide", "intermediate", "compact"] } },
+                                                            "probeRefs": { "type": "array", "minItems": 22, "maxItems": 22, "uniqueItems": true, "items": { "type": "string", "pattern": "^probe-[a-z0-9-]+$" } },
+                                                            "populatedHeroStateRef": { "type": "string", "minLength": 1 },
+                                                            "coreTaskRef": { "type": "string", "minLength": 1 },
+                                                            "cells": {
+                                                              "type": "array", "minItems": 3, "maxItems": 96,
+                                                              "items": {
+                                                                "type": "object", "additionalProperties": false,
+                                                                "required": ["cellRef", "stateRef", "viewport"],
+                                                                "properties": {
+                                                                  "cellRef": { "type": "string", "pattern": "^proof-cell-[0-9]{3}$" },
+                                                                  "stateRef": { "type": "string", "minLength": 1 },
+                                                                  "viewport": { "enum": ["wide", "intermediate", "compact"] }
+                                                                }
+                                                              }
+                                                            }
+                                                          }
+                                                        },
+                                                        "proofMatrixFingerprint": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
+                "targetRef": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "behaviorContractRef": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "behaviorContractFingerprint": {
+                  "type": "string",
+                  "pattern": "^sha256:[0-9a-f]{64}$"
+                },
+                "sourceBoundary": {
+                  "type": "array",
+                  "uniqueItems": true,
+                  "minItems": 1,
+                  "maxItems": 64,
+                  "items": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": ["path", "beforeSha256", "ownerRef"],
+                    "properties": {
+                      "path": { "type": "string", "minLength": 1 },
+                      "beforeSha256": {
+                        "anyOf": [
+                          { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
+                          { "type": "null" }
+                        ]
+                      },
+                      "ownerRef": { "type": "string", "minLength": 1 }
+                    }
+                  }
+                },
+                "sourceBoundaryFingerprint": {
+                  "type": "string",
+                  "pattern": "^sha256:[0-9a-f]{64}$"
+                },
+                "effectRecords": {
+                  "type": "array",
+                  "minItems": 1,
+                  "maxItems": 64,
+                  "items": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": ["path", "beforeSha256", "afterSha256", "effect"],
+                    "properties": {
+                      "path": { "type": "string", "minLength": 1 },
+                      "beforeSha256": {
+                        "anyOf": [
+                          { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
+                          { "type": "null" }
+                        ]
+                      },
+                      "afterSha256": {
+                        "anyOf": [
+                          { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
+                          { "type": "null" }
+                        ]
+                      },
+                      "effect": { "enum": ["created", "updated", "deleted"] }
+                    }
+                  }
+                },
+                "aggregateAfterFingerprint": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
                 "artifactRefs": {
                   "type": "array",
                   "uniqueItems": true,
+                  "minItems": 1,
                   "maxItems": 64,
                   "items": {
                     "type": "string",
@@ -99,20 +255,14 @@
               ],
               "properties": {
                 "skillId": {
-                  "enum": [
-                    "starci-business-process",
-                    "starci-backend-process",
-                    "starci-quality-assure",
-                    "starci-uat-verify"
-                  ]
+                  "const": "starci-backend-process"
                 },
                 "missionRef": {
                   "type": "string",
                   "minLength": 1
                 },
                 "resumeState": {
-                  "type": "string",
-                  "minLength": 1
+                  "enum": ["apply", "reapply"]
                 },
                 "inputRef": {
                   "type": "string",

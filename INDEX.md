@@ -1,4 +1,4 @@
-# StarCi v7.5-alpha runtime
+# StarCi v7.6 runtime
 
 This Source owns one composable StarCi runtime. Resolve the requested project routes, select one
 mission-owning Skill, and let that Skill call peer Skills and atomic operators until the requested
@@ -149,10 +149,13 @@ guess the user's intended scope. For frontend UX/UI work, one conditional dimens
 `frontend.ux-ui.change-level` from `knowledge/ux-ui-change-levels.md`.
 
 Wait for the user only when no valid next action dominates, scope or product authority is genuinely missing,
-or a destructive/external mutation needs new authorization. For every redesign without an already
+or a destructive/external mutation needs new authorization. For reconstruct/new without an already
 approved direction, follow `knowledge/direction-visualization.md`: render one dominant direction
 through `visualize` and continue inside the frozen boundary. Render three or four materially different
-choices and wait for selection only when the user explicitly asks to compare alternatives.
+choices and wait for selection only when the user explicitly asks to compare alternatives or the
+compiled valid-Grammar evidence proves material visual ambiguity with no dominant direction. A
+compile-time Grammar gap repairs and publishes the exact Grammar authority before recompiling; it is
+never worked around with product-local CSS or copied component anatomy.
 Architecture choices render architecture boundaries and flows; UX/UI choices render
 realistic representative pages or substantial surfaces and responsive/material states. Prose,
 Mermaid, ASCII, tables, or implementation plans alone never satisfy this choice proof. Resume the
@@ -172,10 +175,11 @@ result, update the smallest owning `.claude` review mechanism and its meaningful
 before closing again. Do not turn a page-specific arrangement, one screenshot preference, or the
 user's proposed patch into a general law. Product defects are repaired in product source; `.claude`
 changes only when the failure demonstrates a reusable process or authority gap. A reopened mission
-returns to complete only after a causal failure record, canonical same-mission and same-Skill
-`ERROR -> RESUME`, and one fresh ordered `CALL -> RETURN -> TRANSITION` lifecycle descended from that
-`RESUME`. The proof lifecycle belongs to the same owning Skill and must name every affected evidence
-reference on the latest source; proof from a peer Skill cannot close the reopened verdict.
+returns to complete only after a causal failure record and canonical same-mission, same-owner
+`ERROR -> RESUME`. Frontend reclosure then requires the correlated fresh chain declared by the FE
+owner: blind visual `PASS -> quality-handoff`, Quality delivery `PASS`, and UAT `PASS`, with unchanged
+source identity and every affected evidence reference carried through the final gate. Neither visual
+proof nor a peer proof can close alone; the complete owner-declared chain is consumed once.
 
 Before reporting a repair for confirmed counterevidence, explain the failed prior decision in a
 compact causal record: the exact earlier claim, the evidence or assumption that made it appear valid,

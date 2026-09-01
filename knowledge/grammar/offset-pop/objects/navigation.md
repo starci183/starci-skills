@@ -4,7 +4,7 @@
 | --- | --- |
 | Knowledge ID | `fe.grammar-offset-pop-object-navigation` |
 | Package | `@starci/grammar/offset-pop` |
-| Operators | `grammar-convergence` |
+| Operators | `fe/authority-reconcile` |
 | Search tags | `navigation, Sidebar, selected field, offset marker, disclosure, drawer` |
 | Dependencies | `fe.grammar-offset-pop-overview, fe.grammar-common-states-accessibility` |
 

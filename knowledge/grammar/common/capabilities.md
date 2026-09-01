@@ -3,8 +3,9 @@
 | Field | Value |
 | --- | --- |
 | Knowledge ID | `fe.grammar-common-capabilities` |
+| Contract revision | `7.6.0` |
 | Package | `@starci/grammar/common` |
-| Operators | `grammar-convergence` |
+| Operators | `fe/authority-reconcile` |
 | Search tags | `object, interface, export, anatomy, variants, extension axes, invariants` |
 | Dependencies | `fe.grammar-common-overview` |
 
@@ -28,4 +29,6 @@ For each object, resolve:
 
 Leaves own one atomic responsibility. Branches own a small stable anatomy. Composites coordinate branches around a generic interaction model. Product Blocks and above belong to the application and may bind business data without altering package-owned anatomy.
 
-If a required interface part cannot be proven, classify the requirement as `grammar-gap` rather than completing it from intuition.
+If a required interface part cannot be proven, classify it through
+`fe.grammar-common-extension` as `grammar-gap`: exact Grammar-owner repair/publish and frontend
+recompile, never intuition or local CSS.

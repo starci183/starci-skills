@@ -1,36 +1,31 @@
 # `fe/visual-fidelity` input
 
-- `input.auditTargetScore`: Explicit noncanonical target from 1 through 9, or null. The parent
-  preserves it across rounds; it is not included in the raster-only reviewer context.
-
 ## Context
 
-- `implementerExecutionRef` and `reviewerExecutionRef` must differ.
-- `reviewerModel=gpt-5.6-sol`, `reviewerCount=1`, `contextIsolation=fresh`, and `forkTurns=none` are fixed by `config.yaml`.
-- `debug=true` requires terminal emission of the normalized AI contract and every per-raster inspection record.
+- `context.implementerExecutionRef` and `context.reviewerExecutionRef` identify different executions.
+- `context.implementerPrincipalFingerprint` and `context.reviewerPrincipalFingerprint` identify
+  different principals.
+- `context.reviewerContextFingerprint` is the exact SHA-256 fingerprint of `input.blindReviewPacket`.
+- `context.reviewerModel=gpt-5.6-sol`, `context.reviewerCount=1`,
+  `context.contextIsolation=fresh`, and `context.forkTurns=none` are fixed.
+- `context.debug=true` exposes the normalized reviewer call/return and per-raster records in the
+  terminal.
 
 ## Input
 
-- `blindReviewPacket` is the only reviewer-visible payload.
-- It contains the validated capture `captureReceiptId`, opaque raster cells, exact probe phases, latest-mutation/capture fingerprints, timestamps, and exactly one `lastScreenshotRef`.
-- It includes an uncropped host-context raster and focused surface raster so a distant whole-screen image cannot hide local defects.
-- It excludes source, DOM, tests, measurements, authority prose, producer rationale, previous feedback, suspected defects, prior verdicts, and intended answers.
+- `input.auditTargetScore`: Optional noncanonical progress target from 1 through 9. It is parent-held
+  context and is not reviewer-visible.
+- `input.blindReviewPacket`: The only reviewer-visible payload. It binds the capture receipt,
+  preflight, source freshness, matrix/partition/round identity, exact ordered content-addressed raster
+  cells, exact ordered canonical probe cells, and one `lastScreenshotRef`.
 
-The manifest must be byte-for-byte equivalent to the packet frozen by that capture receipt. Any stale fingerprint, pre-mutation capture, forged/extra/reordered raster, reused execution identity, missing raster, missing inspection record, or extra reviewer-visible context blocks the invocation.
+The packet requires uncropped host context, focused surface views, wide/intermediate/compact coverage,
+and lifecycle evidence. Its primary evidence must include a settled populated happy-case hero with
+representative data, the core task, and every major region visible. Empty/loading/skeleton/error and
+recovery evidence only supplement that hero. Source, DOM, tests, measurements, authority prose,
+producer rationale, previous feedback, suspected defects, and intended answers are forbidden from
+the blind reviewer context.
 
-## Contract fields
-
-- `context.implementerExecutionRef`: Typed field bound to this single operator job.
-- `context.reviewerExecutionRef`: Typed field bound to this single operator job.
-- `context.reviewerModel`: Typed field bound to this single operator job.
-- `context.reviewerCount`: Typed field bound to this single operator job.
-- `context.contextIsolation`: Typed field bound to this single operator job.
-- `context.forkTurns`: Typed field bound to this single operator job.
-- `context.debug`: Typed field bound to this single operator job.
-- `input.blindReviewPacket`: Raster-only packet. Cell labels are opaque execution labels, never producer intent or a suspected answer.
-
-## Contract fields
-
-- `context.implementerPrincipalFingerprint`: Runtime-attested principal fingerprint for the implementer.
-- `context.reviewerPrincipalFingerprint`: Runtime-attested principal fingerprint for the blind reviewer; it must differ from the implementer principal.
-- `context.reviewerContextFingerprint`: Fingerprint of the fresh raster-only context delivered to the reviewer.
+Stale source, reused reviewer identity, fingerprint mismatch, forged/extra/reordered raster evidence,
+or invalid probe parity prevents a passing review. A packet that reaches the reviewer but lacks enough
+visual evidence produces `insufficient-evidence`, not a guessed verdict.

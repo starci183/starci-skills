@@ -9,10 +9,13 @@
     "fe.ui"
   ],
   "sourceReferenceRefs": [],
-  "sideEffects": [],
+  "sideEffects": [
+    "write content-addressed raster artifacts and one retained raster-only blind-review packet"
+  ],
   "stopConditions": [
     "required authority is missing or stale",
     "the target boundary is ambiguous",
-    "the job would require internal routing"
+    "source or render-state identity drifts after preflight",
+    "completion would require source mutation, visual judgment, review, or another operator job"
   ]
 }

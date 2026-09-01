@@ -3,6 +3,8 @@
 ## Context
 
 - `context.snapshotRef`: Frozen canonical snapshot.
+- `context.caseFreezeReturnReceiptRef`: Exact validated case-freeze RETURN.
+- `context.sourceFingerprint`: Exact source inherited from frozen cases.
 
 ## Input
 

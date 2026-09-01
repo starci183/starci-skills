@@ -63,6 +63,8 @@
       "required": [
         "targetRef",
         "uxUiChangeLevel",
+        "directionMode",
+        "directionEvidence",
         "constraints"
       ],
       "properties": {
@@ -79,10 +81,31 @@
             "new"
           ]
         },
+        "directionMode": {
+          "description": "Executable projection of observed direction need.",
+          "enum": ["none", "dominant", "alternatives"]
+        },
+        "directionEvidence": {
+          "description": "Observed dominance, material ambiguity, or explicit comparison authority that justifies directionMode.",
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["classification", "evidenceRefs"],
+          "properties": {
+            "classification": { "enum": ["not-applicable", "dominant", "ambiguous", "comparison-requested"] },
+            "evidenceRefs": {
+              "type": "array",
+              "uniqueItems": true,
+              "minItems": 1,
+              "maxItems": 32,
+              "items": { "type": "string", "minLength": 1 }
+            }
+          }
+        },
         "constraints": {
           "description": "Closed constraints for this atomic job.",
           "type": "array",
           "uniqueItems": true,
+          "minItems": 1,
           "maxItems": 64,
           "items": {
             "type": "string",

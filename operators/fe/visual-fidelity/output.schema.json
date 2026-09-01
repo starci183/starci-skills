@@ -26,7 +26,7 @@
       ],
       "properties": {
         "outcome": {
-          "description": "Legacy semantic result consumed only by the Skill machine.",
+          "description": "Typed blind visual-review result consumed only by the parent Skill machine.",
           "enum": [
             "passed",
             "repair",
@@ -68,7 +68,7 @@
                 },
                 "artifactRefs": {
                   "type": "array",
-                  "maxItems": 64,
+                  "maxItems": 96,
                   "uniqueItems": true,
                   "items": {
                     "type": "string",
@@ -99,7 +99,7 @@
                   "uniqueItems": true,
                   "items": { "type": "string", "pattern": "\\.(png|jpg|jpeg|webp)$" }
                 },
-                "reviewerExecutionRef": { "type": "string", "minLength": 1 },
+                "reviewerExecutionRef": { "type": "string", "pattern": "^execution://[0-9a-f]{64}$" },
                 "reviewerModel": { "const": "gpt-5.6-sol" },
                 "reviewerCount": { "const": 1 },
                 "contextIsolation": { "const": "fresh" },
@@ -147,7 +147,7 @@
                   "description": "One pixel-observation record for every inspected screenshot cell.",
                   "type": "array",
                   "minItems": 3,
-                  "maxItems": 64,
+                  "maxItems": 96,
                   "items": {
                     "type": "object",
                     "additionalProperties": false,
@@ -196,8 +196,8 @@
                       "lensVerdicts": {
                         "description": "A separate falsification verdict for every required visual lens; one problem forces this image to repair.",
                         "type": "array",
-                        "minItems": 18,
-                        "maxItems": 18,
+                        "minItems": 19,
+                        "maxItems": 19,
                         "items": {
                           "type": "object",
                           "additionalProperties": false,
@@ -211,6 +211,7 @@
                                 "alignment",
                                 "vertical-rhythm",
                                 "hierarchy",
+                                "aesthetic-finish",
                                 "visual-ownership",
                                 "pinned-boundary-clearance",
                                 "wrapping",
@@ -256,7 +257,7 @@
                   "description": "One adversarial verdict for every supplied probe; no applicable attack may disappear during aggregation.",
                   "type": "array",
                   "minItems": 10,
-                  "maxItems": 64,
+                  "maxItems": 96,
                   "items": {
                     "type": "object",
                     "additionalProperties": false,
@@ -270,7 +271,17 @@
                       "imageRef": { "type": ["string", "null"], "pattern": "\\.(png|jpg|jpeg|webp)$" },
                       "verdict": { "enum": ["survived", "contradiction", "not-applicable"] },
                       "observation": { "type": "string", "minLength": 1 }
-                    }
+                    },
+                    "allOf": [
+                      {
+                        "if": { "properties": { "verdict": { "const": "not-applicable" } }, "required": ["verdict"] },
+                        "then": { "properties": { "imageRef": { "type": "null" } } }
+                      },
+                      {
+                        "if": { "properties": { "verdict": { "enum": ["survived", "contradiction"] } }, "required": ["verdict"] },
+                        "then": { "properties": { "imageRef": { "type": "string" } } }
+                      }
+                    ]
                   }
                 }
               }

@@ -9,5 +9,10 @@
 
 ## Input
 
+- `input.compiledRequestRef`: Exact compiled request artifact authorizing this generation.
+- `input.compiledRequestFingerprint`: Fingerprint of that exact author-once compiled request.
+- `input.grammarBinding`: Exact Grammar package, manifest, exports, hash, and revision from compilation.
 - `input.targetRef`: The one target owned by this invocation.
-- `input.constraints`: Closed constraints for this atomic job.
+- `input.mode`: `dominant` for exactly one evidenced direction. Use `alternatives` when valid Grammar
+  evidence leaves no materially dominant direction or the user explicitly requests comparison.
+- `input.constraints`: Non-empty closed constraints for this atomic job.

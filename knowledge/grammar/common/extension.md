@@ -3,8 +3,9 @@
 | Field | Value |
 | --- | --- |
 | Knowledge ID | `fe.grammar-common-extension` |
+| Contract revision | `7.6.0` |
 | Package | `@starci/grammar/common` |
-| Operators | `grammar-convergence` |
+| Operators | `fe/authority-reconcile` |
 | Search tags | `reuse, extend, grammar gap, package request, global css, forbidden` |
 | Dependencies | `fe.grammar-common-capabilities` |
 
@@ -12,9 +13,27 @@ Classify every required capability:
 
 - `reuse`: an exact public export and effective interface already satisfy it.
 - `extend`: the interface explicitly opens the required axis.
-- `grammar-gap`: the capability, anatomy, state, or extension axis is absent.
+- `grammar-gap`: a required semantic rule, token, component/export, anatomy, state, or extension axis
+  is absent.
 
-An extension names its base package/export, base interface hash, allowed axis, consumer set, and proof that all closed invariants remain unchanged. A Grammar gap blocks local reconstruction and creates a package request.
+An extension names its base package/export, base interface hash, allowed axis, consumer set, and proof
+that all closed invariants remain unchanged.
+
+## Gap versus visual ambiguity
+
+A `grammar-gap` is missing reusable authority, not visual ambiguity and not UI `SUSPENSE`. Return an
+exact Grammar-owner repair request naming the absent semantic contract, affected consumers, selected
+package/version/hash, and required proof. The Grammar owner repairs and publishes the package; the
+frontend mission then recompiles against the new exact export/token/interface hash before apply.
+
+Application code must not improvise the missing contract with local CSS, raw utilities, a copied
+component, an anatomy-changing wrapper, a guessed prop/variant, or a page-specific token. No
+exception converts a missing Grammar contract into valid UI.
+
+Visual ambiguity exists only after every required semantic rule, token, component, state, and
+responsive contract is available and several materially valid compositions still remain. Then
+`generate` renders three or four realistic Grammar-valid directions for selection. When one direction
+materially dominates, render one realistic preview and continue without manufacturing alternatives.
 
 Forbidden:
 

@@ -22,7 +22,8 @@
       "required": [
         "authorityRefs",
         "evidenceRefs",
-        "uiKnowledgeId"
+        "uiKnowledgeId",
+        "resumeState"
       ],
       "properties": {
         "authorityRefs": {
@@ -49,6 +50,10 @@
         "uiKnowledgeId": {
           "description": "Exact StarCi-native frontend UI knowledge binding.",
           "const": "fe.ui"
+        },
+        "resumeState": {
+          "description": "Exact FE machine state that must resume after a typed backend return.",
+          "enum": ["apply", "reapply"]
         }
       }
     },
@@ -57,9 +62,19 @@
       "additionalProperties": false,
       "required": [
         "targetRef",
+        "mode",
+        "compiledRequestRef",
+        "compiledRequestFingerprint",
+        "directionMode",
+        "directionBinding",
+        "grammarBinding",
+        "proofMatrix",
+        "proofMatrixFingerprint",
         "constraints",
         "behaviorContractRef",
-        "behaviorContractFingerprint"
+        "behaviorContractFingerprint",
+        "sourceBoundary",
+        "sourceBoundaryFingerprint"
       ],
       "properties": {
         "targetRef": {
@@ -67,10 +82,93 @@
           "type": "string",
           "minLength": 1
         },
+        "mode": {
+          "description": "Approved implementation or one bounded frontend repair.",
+          "enum": ["apply", "repair"]
+        },
+        "compiledRequestRef": {
+          "description": "Exact compiled request authorizing this mutation.",
+          "type": "string",
+          "minLength": 1
+        },
+        "compiledRequestFingerprint": { "description": "Fingerprint of the exact author-once compiled request.", "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
+        "directionMode": {
+          "description": "Compiled direction projection consumed by this mutation.",
+          "enum": ["none", "dominant", "alternatives"]
+        },
+        "directionBinding": {
+          "description": "Exact generated or selected direction and Grammar manifest, or null for refine.",
+          "anyOf": [
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["mode", "directionGenerateReturnReceiptRef", "selectedDirectionId", "selectedDirectionRef", "grammarDecisionManifestRef"],
+              "properties": {
+                "mode": { "enum": ["dominant", "alternatives"] },
+                "directionGenerateReturnReceiptRef": { "type": "string", "pattern": "^receipt:[A-Za-z0-9._-]+$" },
+                "selectedDirectionId": { "type": "string", "pattern": "^[a-z0-9][a-z0-9-]*$" },
+                "selectedDirectionRef": { "type": "string", "minLength": 1 },
+                "grammarDecisionManifestRef": { "type": "string", "pattern": "^grammar://" }
+              }
+            },
+            { "type": "null" }
+          ]
+        },
+        "grammarBinding": {
+          "description": "Exact Grammar identity from the compiled request.",
+          "type": "object", "additionalProperties": false,
+          "required": ["packageRef", "manifestRef", "exportRefs", "contentSha256", "authorityRevision"],
+          "properties": {
+            "packageRef": { "type": "string", "pattern": "^grammar-package://" },
+            "manifestRef": { "type": "string", "pattern": "^grammar://" },
+            "exportRefs": { "type": "array", "minItems": 1, "maxItems": 32, "uniqueItems": true, "items": { "type": "string", "pattern": "^grammar://" } },
+            "contentSha256": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
+            "authorityRevision": { "type": "string", "minLength": 1 }
+          }
+        },
+        "proofMatrix": {
+          "description": "Exact frozen proof matrix compiled once for every lifecycle state, viewport, and canonical probe.",
+          "type": "object", "additionalProperties": false,
+          "required": ["matrixRef", "states", "viewports", "probeRefs", "populatedHeroStateRef", "coreTaskRef", "cells"],
+          "properties": {
+            "matrixRef": { "type": "string", "pattern": "^matrix://[a-z0-9][a-z0-9._/-]*$" },
+            "states": {
+              "type": "array", "minItems": 1, "maxItems": 32,
+              "items": {
+                "type": "object", "additionalProperties": false,
+                "required": ["stateRef", "lifecycle", "populated", "coreTaskVisible"],
+                "properties": {
+                  "stateRef": { "type": "string", "minLength": 1 },
+                  "lifecycle": { "enum": ["happy-case", "loading", "empty", "error", "recovery", "result"] },
+                  "populated": { "type": "boolean" },
+                  "coreTaskVisible": { "type": "boolean" }
+                }
+              }
+            },
+            "viewports": { "type": "array", "minItems": 3, "maxItems": 3, "uniqueItems": true, "items": { "enum": ["wide", "intermediate", "compact"] } },
+            "probeRefs": { "type": "array", "minItems": 22, "maxItems": 22, "uniqueItems": true, "items": { "type": "string", "pattern": "^probe-[a-z0-9-]+$" } },
+            "populatedHeroStateRef": { "type": "string", "minLength": 1 },
+            "coreTaskRef": { "type": "string", "minLength": 1 },
+            "cells": {
+              "type": "array", "minItems": 3, "maxItems": 96,
+              "items": {
+                "type": "object", "additionalProperties": false,
+                "required": ["cellRef", "stateRef", "viewport"],
+                "properties": {
+                  "cellRef": { "type": "string", "pattern": "^proof-cell-[0-9]{3}$" },
+                  "stateRef": { "type": "string", "minLength": 1 },
+                  "viewport": { "enum": ["wide", "intermediate", "compact"] }
+                }
+              }
+            }
+          }
+        },
+        "proofMatrixFingerprint": { "description": "Exact hash of proofMatrix inherited from request compilation.", "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
         "constraints": {
           "description": "Closed constraints for this atomic job.",
           "type": "array",
           "uniqueItems": true,
+          "minItems": 1,
           "maxItems": 64,
           "items": {
             "type": "string",
@@ -84,6 +182,33 @@
         },
         "behaviorContractFingerprint": {
           "description": "Immutable fingerprint of the frozen behavior-preservation contract.",
+          "type": "string",
+          "pattern": "^sha256:[0-9a-f]{64}$"
+        },
+        "sourceBoundary": {
+          "description": "Exact direct-owner files, owners, and before hashes authorized for mutation.",
+          "type": "array",
+          "uniqueItems": true,
+          "minItems": 1,
+          "maxItems": 64,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["path", "beforeSha256", "ownerRef"],
+            "properties": {
+              "path": { "type": "string", "minLength": 1 },
+              "beforeSha256": {
+                "anyOf": [
+                  { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
+                  { "type": "null" }
+                ]
+              },
+              "ownerRef": { "type": "string", "minLength": 1 }
+            }
+          }
+        },
+        "sourceBoundaryFingerprint": {
+          "description": "Immutable fingerprint of the ordered source boundary.",
           "type": "string",
           "pattern": "^sha256:[0-9a-f]{64}$"
         }

@@ -12,6 +12,8 @@
     "flow",
     "authorityRefs",
     "runtimeEvidenceRefs",
+    "origin",
+    "sourceHeads",
     "returnReceipt",
     "progressHistory",
     "scope"
@@ -104,6 +106,27 @@
         "minLength": 1
       }
     },
+    "origin": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["fromSkillId", "returnReceiptRef", "expectedCallReceiptRef", "sourceFingerprint", "evidenceFingerprint", "auditRef"],
+      "properties": {
+        "fromSkillId": { "const": "starci-quality-assure" },
+        "returnReceiptRef": { "type": "string", "pattern": "^receipt:[A-Za-z0-9._-]+$" },
+        "expectedCallReceiptRef": { "type": "string", "pattern": "^receipt:[A-Za-z0-9._-]+$" },
+        "sourceFingerprint": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
+        "evidenceFingerprint": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
+        "auditRef": { "type": "string", "pattern": "(^|[\\\\/])audit\\.md$" }
+      }
+    },
+    "sourceHeads": {
+      "description": "Immutable source heads inherited from Quality and frontend visual PASS.",
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 32,
+      "uniqueItems": true,
+      "items": { "type": "string", "pattern": "^(?:git:|refs/).+" }
+    },
     "returnReceipt": {
       "description": "Typed runtime RETURN receipt for executable resume.",
       "anyOf": [
@@ -125,7 +148,7 @@
           ],
           "properties": {
             "version": {
-              "const": "7.5.0-alpha.1"
+              "const": "7.6.0-beta.1"
             },
             "receiptId": {
               "type": "string",

@@ -4,11 +4,6 @@ import { isRouteIssuedTransitionReceipt } from '../skills/route-machine.mjs';
 
 const FINDINGS = new Set(['unverified', 'confirmed', 'disproved']);
 const requiredCausalFields = ['priorVerdict','failedAssumption','missingProof','cause','counterevidenceRef'];
-const closureProofOperators = Object.freeze({
-  'starci-fe-process': new Set([
-    'fe/semantic-audit','fe/ux-audit','fe/ui-audit','fe/visual-fidelity','fe/independent-review',
-  ]),
-});
 const consumedProofTransitions = new WeakSet();
 
 function assertReopenEvidence(input) {
@@ -19,24 +14,45 @@ function assertReopenEvidence(input) {
 }
 
 function assertReproof(input) {
-  const call = input.proofLifecycle?.callReceipt;
-  const returned = input.proofLifecycle?.returnReceipt;
-  const transition = input.proofLifecycle?.transitionReceipt;
-  const receipts = [call, returned, transition];
-  if (!receipts.every(isCanonicalReceipt) || call.type !== 'CALL' || returned.type !== 'RETURN' || transition.type !== 'TRANSITION') throw new Error('closure requires one canonical CALL→RETURN→TRANSITION proof lifecycle');
-  if (!isRoutableOperatorReturnReceipt(returned) || !isRouteIssuedTransitionReceipt(transition)) throw new Error('closure proof must be validator-routed by the owning Skill machine');
-  if (receipts.some((receipt) => receipt.missionId !== input.missionId || receipt.skillId !== input.skillId)) throw new Error('closure proof lifecycle must belong to the reopened mission and owning skill');
-  if (!call.operatorId || receipts.some((receipt) => receipt.operatorId !== call.operatorId)) throw new Error('closure proof lifecycle must belong to one operator');
-  if (!closureProofOperators[input.skillId]?.has(call.operatorId)) throw new Error('closure proof operator is not declared by the owning Skill review boundary');
-  const invocationRef = call.trace?.context?.invocationRef;
-  const executionRef = call.trace?.context?.executionRef;
-  if (!invocationRef || !executionRef || receipts.some((receipt) => receipt.trace?.context?.invocationRef !== invocationRef || receipt.trace?.context?.executionRef !== executionRef)) throw new Error('closure proof lifecycle invocation or execution identity changed');
-  if (call.parentId !== input.resumeReceipt.receiptId || returned.parentId !== call.receiptId || transition.parentId !== returned.receiptId) throw new Error('closure proof lifecycle is not descended from the counterevidence RESUME');
-  if (transition.trace?.transitionRule?.target !== 'complete') throw new Error('closure proof lifecycle does not transition the owning skill to complete');
-  if (!Array.isArray(input.affectedEvidenceRefs) || input.affectedEvidenceRefs.length === 0 || receipts.some((receipt) => input.affectedEvidenceRefs.some((ref) => !receipt.trace?.evidenceRefs?.includes(ref)))) throw new Error('closure proof does not cover every affected lifecycle evidence reference across CALL RETURN and TRANSITION');
-  if (Date.parse(call.timestamp) < Date.parse(input.resumeReceipt.timestamp)) throw new Error('closure proof predates counterevidence RESUME');
-  if (consumedProofTransitions.has(transition)) throw new Error('closure proof lifecycle was already consumed');
-  consumedProofTransitions.add(transition);
+  if (input.skillId !== 'starci-fe-process') throw new Error('chained completion reproof is currently defined only for the frontend owner');
+  const specs = [
+    ['visual','starci-fe-process','fe/visual-fidelity','passed','quality-handoff'],
+    ['quality','starci-quality-assure','quality/delivery-proof','pass','complete'],
+    ['uat','starci-uat-verify','test/uat-result-publish','passed','complete'],
+  ];
+  let expectedParent = input.resumeReceipt.receiptId;
+  const lifecycles = [];
+  for (const [name, skillId, operatorId, outcome, target] of specs) {
+    const lifecycle = input.proofChain?.[name];
+    const call = lifecycle?.callReceipt;
+    const returned = lifecycle?.returnReceipt;
+    const transition = lifecycle?.transitionReceipt;
+    const receipts = [call, returned, transition];
+    if (!receipts.every(isCanonicalReceipt) || call.type !== 'CALL' || returned.type !== 'RETURN' || transition.type !== 'TRANSITION') throw new Error(`closure requires a canonical ${name} CALL→RETURN→TRANSITION lifecycle`);
+    if (!isRoutableOperatorReturnReceipt(returned) || !isRouteIssuedTransitionReceipt(transition)) throw new Error(`${name} closure proof must be validator-routed by its canonical Skill machine`);
+    if (receipts.some((receipt) => receipt.missionId !== input.missionId || receipt.skillId !== skillId || receipt.operatorId !== operatorId)) throw new Error(`${name} closure lifecycle identity mismatch`);
+    const invocationRef = call.trace?.context?.invocationRef;
+    const executionRef = call.trace?.context?.executionRef;
+    if (!invocationRef || !executionRef || receipts.some((receipt) => receipt.trace?.context?.invocationRef !== invocationRef || receipt.trace?.context?.executionRef !== executionRef)) throw new Error(`${name} closure lifecycle invocation or execution identity changed`);
+    if (call.parentId !== expectedParent || returned.parentId !== call.receiptId || transition.parentId !== returned.receiptId) throw new Error(`${name} closure lifecycle does not descend from the prior canonical gate`);
+    if (returned.trace?.actualOutput?.output?.outcome !== outcome || transition.trace?.transitionRule?.outcome !== outcome || transition.trace?.transitionRule?.target !== target) throw new Error(`${name} closure lifecycle is not the required PASS transition`);
+    if (Date.parse(call.timestamp) < Date.parse(input.resumeReceipt.timestamp)) throw new Error(`${name} closure proof predates counterevidence RESUME`);
+    if (consumedProofTransitions.has(transition)) throw new Error(`${name} closure transition was already consumed`);
+    expectedParent = transition.receiptId;
+    lifecycles.push({ name, call, returned, transition });
+  }
+  const visual = lifecycles[0].returned;
+  const quality = lifecycles[1].returned;
+  const uat = lifecycles[2].returned;
+  const visualResult = visual.trace.actualOutput.output.result;
+  const sourceFingerprint = visual.trace.input.input.blindReviewPacket.capturedSourceFingerprint;
+  const packetFingerprint = visualResult.packetFingerprint;
+  const auditRefs = visualResult.artifactRefs.filter((ref) => /(^|[\\/])audit\.md$/.test(ref));
+  if (quality.trace.input.input.sourceFingerprint !== sourceFingerprint || uat.trace.input.context.sourceFingerprint !== sourceFingerprint) throw new Error('closure gate chain changed source fingerprint');
+  if (!quality.trace.actualOutput.output.evidenceRefs.includes(packetFingerprint) || !uat.trace.actualOutput.output.evidenceRefs.includes(packetFingerprint)) throw new Error('closure gate chain lost the exact visual packet evidence');
+  if (auditRefs.length === 0 || auditRefs.some((ref) => !quality.trace.actualOutput.output.evidenceRefs.includes(ref) || !uat.trace.actualOutput.output.evidenceRefs.includes(ref))) throw new Error('closure gate chain lost the final owner audit evidence');
+  if (!Array.isArray(input.affectedEvidenceRefs) || input.affectedEvidenceRefs.length === 0 || input.affectedEvidenceRefs.some((ref) => !uat.trace.actualOutput.output.evidenceRefs.includes(ref))) throw new Error('closure proof does not cover every affected evidence reference at final UAT PASS');
+  for (const { transition } of lifecycles) consumedProofTransitions.add(transition);
 }
 
 function result(input, value) {
@@ -51,9 +67,9 @@ export function evaluateCompletionCounterevidence(input) {
   if (input.priorTerminal !== true) return result(input,{ verdict: 'normal', nextState: null, canClose: false, authorityUpdateRequired: false });
   assertReopenEvidence(input);
   if (!FINDINGS.has(input.finding)) throw new Error('invalid counterevidence finding');
-  if (input.finding === 'unverified') return result(input,{ verdict: 'reopened', nextState: 'capture', canClose: false, authorityUpdateRequired: false });
-  if (input.finding === 'confirmed' && input.reusableGap === true && input.authorityUpdated !== true) return result(input,{ verdict: 'reopened', nextState: 'finding-classify', canClose: false, authorityUpdateRequired: true });
-  if (input.proofRerun !== true) return result(input,{ verdict: 'reopened', nextState: input.finding === 'confirmed' ? 'repair' : 'capture', canClose: false, authorityUpdateRequired: false });
+  if (input.finding === 'unverified') return result(input,{ verdict: 'reopened', nextState: 'capture-preflight', canClose: false, authorityUpdateRequired: false });
+  if (input.finding === 'confirmed' && input.reusableGap === true && input.authorityUpdated !== true) return result(input,{ verdict: 'reopened', nextState: 'request-compile', canClose: false, authorityUpdateRequired: true });
+  if (input.proofRerun !== true) return result(input,{ verdict: 'reopened', nextState: input.finding === 'confirmed' ? 'reapply' : 'capture-preflight', canClose: false, authorityUpdateRequired: false });
   assertReproof(input);
   return result(input,{ verdict: 'reproved', nextState: 'complete', canClose: true, authorityUpdateRequired: false });
 }
