@@ -12,9 +12,13 @@ owned state carried by the correlated receipt.
 
 The v7.6 path is deliberately linear:
 
-`compile -> [direction-generate for reconstruct/new] -> source-apply -> capture-preflight -> render-capture -> blind visual-fidelity -> quality -> UAT`
+`compile -> [direction-generate for reconstruct/new without an approved direction] -> source-apply -> capture-preflight -> render-capture -> blind visual-fidelity -> quality -> UAT`
 
-`refine` skips direction generation. One confirmed frontend visual finding may return exactly once
+`refine` skips direction generation with `directionEvidence.classification=not-applicable`. A
+`reconstruct` or `new` mission also skips generation when compilation binds an exact approved
+direction with `directionEvidence.classification=approved` plus its `direction://` identity,
+content fingerprint, and exact `direction-approval://` authority; both cases route with
+`directionMode=none`. One confirmed frontend visual finding may return exactly once
 from visual fidelity to source apply, then repeats preflight, capture, and blind review. A second
 finding closes as `blocked`; it never reopens analysis or grows another public stage. Product
 potential, audit routing, authority classification, and finding classification are internal helpers
@@ -42,12 +46,25 @@ The machine routes `compiled` directly from `result.directionMode`; it does not 
 intent in a second policy stage. Invocation binding proves that the compiled projection still equals
 the validated mission input.
 
-For reconstruct/new, `fe/direction-generate` must return its real inspectable visualization artifact.
-`directionMode=dominant` produces one evidence-selected direction with `requiresChoice=false` and
+For reconstruct/new, an already approved direction compiles as `directionMode=none` and applies
+directly only when the typed direction identity, fingerprint, and approval ref occur unchanged in
+the compiled evidence and exact authority context. A generic authority ref cannot authorize reuse.
+Otherwise `fe/direction-generate` must
+return its real inspectable visualization artifact. `directionMode=dominant` produces one
+evidence-selected direction with `requiresChoice=false` and
 continues directly to apply. Only `directionMode=alternatives`, justified by material visual ambiguity
 after Grammar is valid or an explicit user request to compare, produces three or four alternatives
-with `requiresChoice=true` and enters the user-choice wait. Refine applies the compiled correction directly. A direction mock is never delivery
-proof.
+with `requiresChoice=true` and enters the user-choice wait. Refine and approved reconstruct/new apply
+the compiled contract directly. A direction mock is never delivery proof.
+
+When the business domain or interaction model is unfamiliar, compilation performs the bounded
+external reference research required by `knowledge/direction-visualization.md` and freezes its
+provenance and limitations in `directionEvidence`. External pages and optional design-agent datasets
+remain evidence, not authority or templates. If relevant references cannot be found, generation may
+render only an explicitly evidenced, reversible hypothesis whose material decisions are already
+supported by approved business facts, product-family signatures, Grammar, and product-neutral UX
+principles. Unresolved business or recovery semantics exit through `business-required` or `blocked`;
+the frontend process never fills them in by taste.
 
 ## UI-only execution boundary
 

@@ -1,1 +1,1 @@
-{"version":"7.6.0-beta.1","feature":"feature-id","flow":"flow-id","snapshotFingerprint":"sha256:0000000000000000000000000000000000000000000000000000000000000000","outcome":"blocked","evidenceRefs":[]}
+{"version":"7.6.0-beta.1","feature":"feature-id","flow":"flow-id","snapshotFingerprint":"sha256:0000000000000000000000000000000000000000000000000000000000000000","outcome":"blocked","evidenceRefs":["evidence://pending"]}

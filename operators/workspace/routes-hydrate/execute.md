@@ -12,6 +12,10 @@ Bind all work to the verified project and one bounded objective.
 
 Hydrates machine-local routes from portable declarations. Do not route later work, own workflow state, broaden source scope, or perform another operator's job.
 
+Canonical V6 hydration emits `schemaRevision: 2` and a paired `contract` / `contractSource`. The
+immediately preceding unrevisioned V6 declaration remains readable only for Source-readiness
+migration; when it predates contract discovery, both fields default to `null` together.
+
 ## Output
 
 Return only one atomic result: `outcome`, `resultRef`, `evidenceRefs`, `findings`, and `reason`.

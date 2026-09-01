@@ -5,8 +5,13 @@ implementation; `mode=repair` performs one bounded frontend repair from an accep
 compile intent, generate direction, capture, review, or choose another operator.
 
 Bind the mutation to the exact compiled request, selected direction/Grammar manifest when present,
-target, behavior-contract fingerprint, source-boundary files with before hashes/owners, and
-source-boundary fingerprint. Preserve every interaction marked `preserve`; implement every
+UX/UI change level, exact direction evidence, target, behavior-contract fingerprint,
+source-boundary files with before hashes/owners, and
+source-boundary fingerprint. `directionMode=none` carries no generated-direction binding and may
+represent refine or an already approved reconstruct/new contract; do not infer the change level from
+that mode. Approved reuse must carry the unchanged typed direction identity, content fingerprint,
+and direction-specific approval authority from compilation; reject generic authority labels.
+Preserve every interaction marked `preserve`; implement every
 authorized replacement; never infer removal from a visual direction.
 
 If the frozen constraints contain `delivery-mode=ui-only-preserve-business`, mutate only the exact

@@ -1,6 +1,7 @@
 import { validatorFor, runValidatorCli } from '../../validation.mjs';
 import crypto from 'node:crypto';
 import { REQUIRED_PROBE_CATEGORIES, REQUIRED_PROBE_PHASES, REQUIRED_VIEWPORTS } from '../strict-ui-validation.mjs';
+import { directionContractErrors } from '../direction-authority.mjs';
 const fingerprint=(value)=>`sha256:${crypto.createHash('sha256').update(JSON.stringify(value)).digest('hex')}`;
 const compiledProjection=(result)=>({objective:result.objective,targetRef:result.targetRef,uxUiChangeLevel:result.uxUiChangeLevel,directionMode:result.directionMode,directionEvidence:result.directionEvidence,behaviorContractRef:result.behaviorContractRef,behaviorContractFingerprint:result.behaviorContractFingerprint,grammarBinding:result.grammarBinding,iconographyManifest:result.iconographyManifest,mediaManifest:result.mediaManifest,productFamilyEvidence:result.productFamilyEvidence,proofMatrix:result.proofMatrix,proofMatrixFingerprint:result.proofMatrixFingerprint,constraints:result.constraints,negativeBoundary:result.negativeBoundary,acceptanceCriteria:result.acceptanceCriteria,sourceBoundary:result.sourceBoundary,sourceBoundaryFingerprint:result.sourceBoundaryFingerprint});
 const iconographyProjection=(manifest)=>({manifestRef:manifest.manifestRef,mode:manifest.mode,visualFamilyRef:manifest.visualFamilyRef,decisions:manifest.decisions});
@@ -60,10 +61,8 @@ export const validateOutput=validatorFor(new URL('./output.schema.json',import.m
       if(!exact(actualCells,expectedCells)) errors.push('proofMatrix cells must cover every state and viewport exactly once in canonical order');
       if(new Set(result.proofMatrix.cells.map(({cellRef})=>cellRef)).size!==result.proofMatrix.cells.length) errors.push('proofMatrix cell refs must be unique');
     }
-    const validClassifications={none:['not-applicable'],dominant:['dominant'],alternatives:['ambiguous','comparison-requested']}[result?.directionMode];
-    if(result&&!validClassifications.includes(result.directionEvidence.classification)) errors.push('compiled request directionEvidence must justify directionMode');
-    if(result?.uxUiChangeLevel==='refine'&&result.directionMode!=='none') errors.push('compiled refine requires directionMode none');
-    if(result&&result.uxUiChangeLevel!=='refine'&&result.directionMode==='none') errors.push('compiled reconstruct/new requires dominant or alternatives directionMode');
+    if(result) errors.push(...directionContractErrors(result));
+    if(result) for(const ref of result.directionEvidence.evidenceRefs) if(!evidenceRefs.includes(ref)) errors.push(`compiled request evidenceRefs must include direction evidence ${ref}`);
     if(result&&new Set(result.sourceBoundary.map(({path})=>path)).size!==result.sourceBoundary.length) errors.push('compiled request sourceBoundary paths must be unique');
     if(result&&result.sourceBoundaryFingerprint!==fingerprint(result.sourceBoundary)) errors.push('compiled request sourceBoundaryFingerprint must hash the exact ordered sourceBoundary');
     if(gaps.length!==0) errors.push('compiled request cannot retain gaps');

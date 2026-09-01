@@ -22,10 +22,17 @@ verdict, but it must be preserved across repair, cross-domain CALL/RETURN, recap
 binds its round score and delta to the typed verdict, latest source, reviewed evidence, and optional
 finding batch; resumes must carry the entire ledger without rewriting prior entries.
 
-`directionMode` is the validated evidence projection supplied to request compilation: refine requires `none`; reconstruct/new uses
-`dominant` when evidence selects one direction and `alternatives` when valid Grammar still leaves
-material visual ambiguity or the user explicitly requests comparison. Both modes use `fe/direction-generate`; alternatives require a visible
-three-or-four-direction comparison and user-choice receipt, while dominant continues without a wait.
+`directionMode` is the validated evidence projection supplied to request compilation. Refine uses
+`none` with `directionEvidence.classification=not-applicable`. Reconstruct/new also uses `none` when
+the compiled evidence binds an exact already approved direction with `classification=approved`;
+that evidence must name one typed `direction://` identity, its exact `sha256:` content fingerprint,
+and one `direction-approval://` authority. Both direction and approval refs must occur in
+`authorityRefs`; a generic or empty authority list cannot authorize reuse. The three values remain
+in `directionEvidence.evidenceRefs` through compilation and source apply. Otherwise it uses
+`dominant` when evidence selects one direction and `alternatives` when valid Grammar
+still leaves material visual ambiguity or the user explicitly requests comparison. The two generated
+modes use `fe/direction-generate`; alternatives require a visible three-or-four-direction comparison
+and user-choice receipt, while dominant continues without a wait.
 The machine routes the invocation-bound compiled result rather than treating this raw projection as a
 second authority.
 A resume names the exact request-compile, apply, preflight, quality-return, uat-return, or UAT

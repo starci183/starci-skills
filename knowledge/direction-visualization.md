@@ -55,6 +55,32 @@ dead space through information structure first. `No media` is correct when an im
 only fill area. Any reusable or generated asset declares purpose, owner, placement, responsive
 behavior, and alternative-text intent.
 
+## Unfamiliar-domain reference research
+
+Treat a business domain or interaction model as unfamiliar when approved business authority and
+product-family evidence do not already explain how real users recognize the offer, compare or commit,
+understand risk, recover from failure, and confirm the outcome. Before selecting a direction for such
+a target, perform bounded external reference research with the available web-search/browser
+capability. Prefer primary product surfaces and official help or policy documentation; use independent
+standards or research for product-neutral behavior. Record the queries, source URLs, access date,
+observed interaction relationships, relevance, and limitations in the compiled direction evidence.
+Stop when the material patterns converge enough to choose or falsify a direction, or when one
+broadened retry yields only irrelevant, inaccessible, duplicate, or non-material results.
+
+External examples, design-intelligence datasets, and agent skills are evidence, never StarCi business
+or visual authority. Extract relationships such as information order, decision support, trust signal,
+commitment disclosure, pending feedback, and recovery; never copy a page, brand language, palette,
+component anatomy, or screenshot composition.
+
+An exhausted search does not authorize subjective invention. A dominant reversible direction may
+still be rendered only when approved business facts, product-family signatures, Grammar, and
+product-neutral UX principles jointly support every material decision; mark the external-reference
+gap and each consequential assumption in the artifact. If a missing reference leaves business
+behavior, promise, risk, actor decision, or recovery semantics unresolved, return the owning
+`business-required` or `blocked` gap instead of rendering by taste. Aesthetic freedom is allowed only
+inside those evidenced boundaries and remains falsifiable in the rendered wide, constrained, and
+material states.
+
 ## Render contract
 
 ### UX/UI
@@ -86,5 +112,7 @@ Reject a generated product when:
 - the visual omits the distinction used to recommend it;
 - a UX/UI proposal lacks a constrained viewport or consequential state;
 - a generated direction conflicts with frozen business facts, owner ceiling, or Grammar;
+- an unfamiliar-domain direction omits bounded external research, hides an exhausted-search gap, or
+  substitutes taste for unresolved business or interaction authority;
 - a Grammar gap is disguised as a visual option or local implementation workaround;
 - an architecture proposal cannot trace normal and adverse flows.

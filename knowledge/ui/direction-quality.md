@@ -8,8 +8,10 @@
 | Dependencies | approved user outcome; `fe.ui.hierarchy`; `fe.ui.ownership-composition`; routed Grammar Core and product DNA |
 
 Direction quality is compiled into the ordinary v7.6 path, not exposed as another public stage. A
-`refine` change skips generation. A `new` or `reconstruct` change uses one
-`fe/direction-generate`: `dominant` emits one inspectable direction and continues without waiting;
+`refine` change skips generation, as does a `new` or `reconstruct` change whose compile evidence binds
+an exact approved direction by its typed identity, content fingerprint, and direction-specific
+approval authority. Generic approval labels do not establish that binding. Otherwise `new` or `reconstruct` uses one `fe/direction-generate`:
+`dominant` emits one inspectable direction and continues without waiting;
 `alternatives` emits exactly three or four materially different directions plus one real local HTML
 comparison and waits for the exact selected id.
 

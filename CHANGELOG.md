@@ -6,6 +6,11 @@ All notable changes are documented here. This project follows Semantic Versionin
 
 ### Changed
 
+- Replaced universal local endpoint constants in runtime-owner and Browser/UAT lease contracts with a
+  closed project binding resolved from canonical workspace routes, port allocation, and routed backend
+  metadata. StarCi Academy keeps `3000/3001/8080`; Nivo core resolves to `3067/3068/8147`, and UAT now
+  rejects stale fingerprints, mismatched owner generations/origins, unready owners, and
+  unauthenticated, expired, foreign-mission or foreign-account leases.
 - Reduced the public frontend runtime to nine canonical operators and removed 47 obsolete FE operator
   directories after migrating their active consumers; the generated catalog now exposes 112 operators.
 - Replaced the circular v7.5 frontend chain with one compiled route: refine applies directly, while

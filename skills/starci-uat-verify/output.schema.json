@@ -11,6 +11,8 @@
     "missionRef",
     "sourceFingerprint",
     "evidenceFingerprint",
+    "canonicalResultRef",
+    "canonicalResultFingerprint",
     "artifactRefs",
     "handoff"
   ],
@@ -41,6 +43,16 @@
     },
     "evidenceFingerprint": {
       "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "canonicalResultRef": {
+      "description": "Exact backend-owned canonical UAT result.json, or null when publication never succeeded.",
+      "type": ["string", "null"],
+      "pattern": "^\\.worktrees/uat/[a-z0-9][a-z0-9-]*/[a-z0-9][a-z0-9-]*/result\\.json$"
+    },
+    "canonicalResultFingerprint": {
+      "description": "Fingerprint of the parsed canonical result content, or null when publication never succeeded.",
+      "type": ["string", "null"],
       "pattern": "^sha256:[0-9a-f]{64}$"
     },
     "artifactRefs": {

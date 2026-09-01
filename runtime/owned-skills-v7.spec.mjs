@@ -12,6 +12,7 @@ import { validateOutput as validateUatSnapshot } from '../operators/test/uat-sna
 import { validateOutput as validateUatBehavior } from '../operators/test/uat-behavior-proof/validate-output.mjs';
 import { createOperatorInvocationBindingRegistry } from '../operators/invocation-binding.mjs';
 import { validateInput as validateUatSkill } from '../skills/starci-uat-verify/validate-input.mjs';
+import { uatContentFingerprint } from '../operators/test/uat-artifact.mjs';
 
 const ids=['starci-quality-assure','starci-release-manage','starci-platform-operate','starci-workspace-manage','starci-git-publish'];
 const load=canonicalMachine;
@@ -45,12 +46,12 @@ test('nominal Quality and UAT success cannot pass with empty concrete proof',()=
   assert.match(validateReadiness(readiness).errors.join('\n'),/nonempty evidenceRefs/);
   const rules={schemaVersion:7,operatorId:'quality/rule-binding-check',output:{outcome:'pass',debtPolicy:'forbidden',resultRef:'proof://rules',evidenceRefs:[],findings:[],reason:null}};
   assert.match(validateRuleBinding(rules).errors.join('\n'),/nonempty evidenceRefs/);
-  const snapshot={schemaVersion:7,operatorId:'test/uat-snapshot-freeze',output:{outcome:'frozen',canonicalRef:'.worktrees/uat/dashboard/happy/snapshot.json',evidenceRefs:[],gaps:[]}};
+  const snapshot={schemaVersion:7,operatorId:'test/uat-snapshot-freeze',output:{outcome:'frozen',canonicalRef:'.worktrees/uat/dashboard/happy/snapshot.json',contentFingerprint:null,evidenceRefs:[],gaps:[]}};
   assert.match(validateUatSnapshot(snapshot).errors.join('\n'),/nonempty evidence/);
   const behavior={schemaVersion:7,operatorId:'test/uat-behavior-proof',output:{outcome:'passed',result:null,gaps:[],evidenceRefs:[]}};
   assert.match(validateUatBehavior(behavior).errors.join('\n'),/concrete nonempty artifact result|nonempty evidence/);
 });
-test('verification-only Quality rejects debt and source drift, and UAT cannot publish PASS after a failed lens',()=>{
+test('verification-only Quality rejects debt and source drift, and UAT cannot publish PASS after a failed lens',(t)=>{
   const registry=createOperatorInvocationBindingRegistry();
   const source=`sha256:${'1'.repeat(64)}`;
   const packet=`sha256:${'2'.repeat(64)}`;
@@ -64,15 +65,28 @@ test('verification-only Quality rejects debt and source drift, and UAT cannot pu
   const driftErrors=registry.validate('quality/readiness-inventory',{context:qualityContext,input:{sourceFingerprint:`sha256:${'3'.repeat(64)}`,debtPolicy:'forbidden',origin:visualOrigin}},{output:{outcome:'green',debtPolicy:'forbidden'}},{missionId:'mission:chain'});
   assert.match(driftErrors.join('\n'),/source differs from registered visual PASS/);
 
+  const feature=`contract-chain-${process.pid}`;
+  const snapshotRef=`.worktrees/uat/${feature}/happy/snapshot.json`;
+  const resultRef=`.worktrees/uat/${feature}/happy/result.json`;
+  const artifactRoot=new URL(`../../.worktrees/uat/${feature}/happy/`,import.meta.url);
+  const featureRoot=new URL(`../../.worktrees/uat/${feature}/`,import.meta.url);
+  t.after(()=>fs.rmSync(featureRoot,{recursive:true,force:true}));
+  fs.mkdirSync(artifactRoot,{recursive:true});
+  const snapshotDocument={version:'7.6.0-beta.1',feature,flow:'happy',sourceHeads:['git:one'],cases:['happy']};
+  const snapshotFingerprint=uatContentFingerprint(snapshotDocument);
+  fs.writeFileSync(new URL('snapshot.json',artifactRoot),`${JSON.stringify(snapshotDocument)}\n`);
   const stage=(receiptId,operatorId,input,output,timestamp)=>registry.record(operatorId,{output},{receiptId,missionId:'mission:chain',timestamp,trace:{input,sourceHeads:['git:one']}});
-  stage('receipt:snapshot','test/uat-snapshot-freeze',{context:{sourceFingerprint:source},input:{}},{outcome:'frozen',canonicalRef:'.worktrees/uat/dashboard/happy/snapshot.json',evidenceRefs:['evidence://snapshot']},'2026-09-01T00:00:02.000Z');
-  stage('receipt:cases','test/uat-case-freeze',{context:{snapshotRef:'.worktrees/uat/dashboard/happy/snapshot.json',snapshotReturnReceiptRef:'receipt:snapshot',sourceFingerprint:source},input:{browserSessionRef:'browser://one',accountRef:'account://fresh/one'}},{outcome:'frozen',result:{artifactRefs:['evidence://cases']},evidenceRefs:['evidence://cases']},'2026-09-01T00:00:03.000Z');
-  stage('receipt:behavior','test/uat-behavior-proof',{context:{snapshotRef:'.worktrees/uat/dashboard/happy/snapshot.json',caseFreezeReturnReceiptRef:'receipt:cases',sourceFingerprint:source},input:{browserSessionRef:'browser://one',accountRef:'account://fresh/one'}},{outcome:'failed',result:null,evidenceRefs:['evidence://behavior']},'2026-09-01T00:00:04.000Z');
-  stage('receipt:ux','test/uat-ux-proof',{context:{snapshotRef:'.worktrees/uat/dashboard/happy/snapshot.json',behaviorProofReturnReceiptRef:'receipt:behavior',sourceFingerprint:source},input:{browserSessionRef:'browser://one',accountRef:'account://fresh/one'}},{outcome:'passed',result:{artifactRefs:['evidence://ux']},evidenceRefs:['evidence://ux']},'2026-09-01T00:00:05.000Z');
-  stage('receipt:ui','test/uat-ui-proof',{context:{snapshotRef:'.worktrees/uat/dashboard/happy/snapshot.json',uxProofReturnReceiptRef:'receipt:ux',sourceFingerprint:source},input:{browserSessionRef:'browser://one',accountRef:'account://fresh/one'}},{outcome:'passed',result:{artifactRefs:['evidence://ui']},evidenceRefs:['evidence://ui']},'2026-09-01T00:00:06.000Z');
-  const refs=['receipt:snapshot','receipt:cases','receipt:behavior','receipt:ux','receipt:ui','.worktrees/uat/dashboard/happy/snapshot.json','evidence://snapshot','evidence://cases','evidence://behavior','evidence://ux','evidence://ui'];
-  const publishInput={context:{snapshotRef:'.worktrees/uat/dashboard/happy/snapshot.json',sourceFingerprint:source,priorVisualPassRef:'receipt:visual-pass',priorVisualPassedAt:'2026-09-01T00:00:01.000Z',snapshotReturnReceiptRef:'receipt:snapshot',caseFreezeReturnReceiptRef:'receipt:cases',behaviorProofReturnReceiptRef:'receipt:behavior',uxProofReturnReceiptRef:'receipt:ux',uiProofReturnReceiptRef:'receipt:ui'},input:{browserSessionRef:'browser://one',accountRef:'account://fresh/one',evidenceRefs:refs}};
-  const publishOutput={output:{outcome:'passed',result:{artifactRefs:['result://uat']},evidenceRefs:refs}};
+  stage('receipt:snapshot','test/uat-snapshot-freeze',{context:{sourceFingerprint:source},input:{feature,flow:'happy'}},{outcome:'frozen',canonicalRef:snapshotRef,contentFingerprint:snapshotFingerprint,evidenceRefs:['evidence://snapshot']},'2026-09-01T00:00:02.000Z');
+  stage('receipt:cases','test/uat-case-freeze',{context:{snapshotRef,snapshotReturnReceiptRef:'receipt:snapshot',sourceFingerprint:source,missionRef:'mission:chain'},input:{browserSessionRef:'browser://one',accountRef:'account://fresh/one'}},{outcome:'frozen',result:{artifactRefs:['evidence://cases']},evidenceRefs:['evidence://cases']},'2026-09-01T00:00:03.000Z');
+  stage('receipt:behavior','test/uat-behavior-proof',{context:{snapshotRef,caseFreezeReturnReceiptRef:'receipt:cases',sourceFingerprint:source},input:{browserSessionRef:'browser://one',accountRef:'account://fresh/one'}},{outcome:'failed',result:null,evidenceRefs:['evidence://behavior']},'2026-09-01T00:00:04.000Z');
+  stage('receipt:ux','test/uat-ux-proof',{context:{snapshotRef,behaviorProofReturnReceiptRef:'receipt:behavior',sourceFingerprint:source},input:{browserSessionRef:'browser://one',accountRef:'account://fresh/one'}},{outcome:'passed',result:{artifactRefs:['evidence://ux']},evidenceRefs:['evidence://ux']},'2026-09-01T00:00:05.000Z');
+  stage('receipt:ui','test/uat-ui-proof',{context:{snapshotRef,uxProofReturnReceiptRef:'receipt:ux',sourceFingerprint:source},input:{browserSessionRef:'browser://one',accountRef:'account://fresh/one'}},{outcome:'passed',result:{artifactRefs:['evidence://ui']},evidenceRefs:['evidence://ui']},'2026-09-01T00:00:06.000Z');
+  const refs=['receipt:snapshot','receipt:cases','receipt:behavior','receipt:ux','receipt:ui',snapshotRef,snapshotFingerprint,'evidence://snapshot','evidence://cases','evidence://behavior','evidence://ux','evidence://ui'];
+  const resultDocument={version:'7.6.0-beta.1',feature,flow:'happy',snapshotFingerprint,outcome:'passed',evidenceRefs:refs};
+  const resultFingerprint=uatContentFingerprint(resultDocument);
+  fs.writeFileSync(new URL('result.json',artifactRoot),`${JSON.stringify(resultDocument)}\n`);
+  const publishInput={context:{snapshotRef,sourceFingerprint:source,priorVisualPassRef:'receipt:visual-pass',priorVisualPassedAt:'2026-09-01T00:00:01.000Z',snapshotReturnReceiptRef:'receipt:snapshot',caseFreezeReturnReceiptRef:'receipt:cases',behaviorProofReturnReceiptRef:'receipt:behavior',uxProofReturnReceiptRef:'receipt:ux',uiProofReturnReceiptRef:'receipt:ui'},input:{browserSessionRef:'browser://one',accountRef:'account://fresh/one',evidenceRefs:refs}};
+  const publishOutput={output:{outcome:'passed',canonicalRef:resultRef,contentFingerprint:resultFingerprint,result:{artifactRefs:[resultRef]},evidenceRefs:refs}};
   const publishErrors=registry.validate('test/uat-result-publish',publishInput,publishOutput,{missionId:'mission:chain',timestamp:'2026-09-01T00:00:07.000Z'});
   assert.match(publishErrors.join('\n'),/PASS requires behavior, UX, and UI all passed/);
 });

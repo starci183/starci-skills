@@ -4,6 +4,7 @@ import { validatePublicSkillReceipt } from '../receipt-consumption.mjs';
 import { isRouteIssuedTransitionReceipt, routeIssuedTransitionFor } from '../../runtime/route-transition.mjs';
 import { assertProgress } from '../../runtime/trace.mjs';
 import { isValidatedDirectionChoiceResume } from '../route-machine.mjs';
+import { directionAuthorityContextErrors, directionContractErrors } from '../../operators/fe/direction-authority.mjs';
 
 const scopePolicy=loadScopePolicy();
 const changeLevelKey='frontend.ux-ui.change-level';
@@ -32,8 +33,8 @@ export const validateInput=validatorFor(new URL('./input.schema.json',import.met
   else if(!scopePolicy.registeredDimensions[changeLevelKey].includes(matches[0].value)) {
     errors.push(`${changeLevelKey} must be refine, reconstruct, or new`);
   } else if(value.uxUiChangeLevel!==matches[0].value) errors.push(`uxUiChangeLevel must equal the frozen ${changeLevelKey} dimension`);
-  if(value.uxUiChangeLevel==='refine'&&value.directionMode!=='none') errors.push('refine requires directionMode none');
-  if(['reconstruct','new'].includes(value.uxUiChangeLevel)&&!['dominant','alternatives'].includes(value.directionMode)) errors.push('reconstruct/new requires dominant or alternatives directionMode');
+  errors.push(...directionContractErrors(value));
+  errors.push(...directionAuthorityContextErrors(value.directionEvidence,{authorityRefs:value.authorityRefs,label:'skill input'}));
   const ceilingMatches=value.scope.dimensions.filter((dimension)=>dimension.key===ownerCeilingKey);
   if(ceilingMatches.length!==1) errors.push(`scope requires exactly one ${ownerCeilingKey} dimension`);
   else if(!scopePolicy.registeredDimensions[ownerCeilingKey].includes(ceilingMatches[0].value)) {

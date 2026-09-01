@@ -14,7 +14,12 @@
 - `input.mode`: `apply` for the approved implementation or `repair` for one accepted frontend finding.
 - `input.compiledRequestRef`: Exact compiled request authorizing the mutation.
 - `input.compiledRequestFingerprint`: Fingerprint of that exact author-once compiled request.
-- `input.directionMode`: Exact compiled `none`, `dominant`, or `alternatives` projection.
+- `input.uxUiChangeLevel`: Exact compiled `refine`, `reconstruct`, or `new` level.
+- `input.directionMode`: Exact compiled `none`, `dominant`, or `alternatives` projection. `none`
+  covers refine and reconstruct/new whose exact approved direction was already bound at compilation.
+- `input.directionEvidence`: Exact compiled classification and evidence. Approved reuse repeats the
+  typed `direction://` identity, content fingerprint, and `direction-approval://` ref, with both
+  authority refs present exactly in context; generic or empty authority refs are invalid.
 - `input.directionBinding`: Exact direction-generate RETURN, selected direction id/ref, and Grammar
   manifest; null only when `directionMode=none`.
 - `input.grammarBinding`: Exact Grammar package/decision identity, composition owner layers and

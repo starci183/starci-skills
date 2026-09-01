@@ -207,7 +207,9 @@ test('the central registry rejects governance drift at compile, direction, and s
     compiledRequestRef,
     compiledRequestFingerprint: hash('1'),
     targetRef: 'surface://dashboard',
+    uxUiChangeLevel: 'refine',
     directionMode: 'none',
+    directionEvidence: { classification: 'not-applicable', approvedDirectionAuthority: null, evidenceRefs: ['request://dashboard'] },
     behaviorContractRef: 'behavior://dashboard',
     behaviorContractFingerprint: hash('2'),
     proofMatrix: { matrixRef: 'proof://dashboard' },
@@ -245,7 +247,9 @@ test('the central registry rejects governance drift at compile, direction, and s
     compiledRequestRef,
     compiledRequestFingerprint: compiled.compiledRequestFingerprint,
     targetRef: compiled.targetRef,
+    uxUiChangeLevel: compiled.uxUiChangeLevel,
     directionMode: 'none',
+    directionEvidence: structuredClone(compiled.directionEvidence),
     directionBinding: null,
     behaviorContractRef: compiled.behaviorContractRef,
     behaviorContractFingerprint: compiled.behaviorContractFingerprint,
@@ -264,6 +268,12 @@ test('the central registry rejects governance drift at compile, direction, and s
     drifted.output.result[field].drift = field;
     assert.match(registry.validate('fe/source-apply', sourceDocument, drifted, { missionId }).join('\n'), new RegExp(field));
   }
+  const directionInputDrift=structuredClone(sourceDocument);
+  directionInputDrift.input.directionEvidence.evidenceRefs=['request://different'];
+  assert.match(registry.validate('fe/source-apply', directionInputDrift, sourceOutput, { missionId }).join('\n'), /directionEvidence differs from the registered compiled request/);
+  const directionResultDrift=structuredClone(sourceOutput);
+  directionResultDrift.output.result.directionEvidence.evidenceRefs=['request://different'];
+  assert.match(registry.validate('fe/source-apply', sourceDocument, directionResultDrift, { missionId }).join('\n'), /directionEvidence differs from invocation input/);
 });
 
 test('preflight consumes exact compile and registered mutation lineage', () => {

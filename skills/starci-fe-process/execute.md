@@ -1,11 +1,15 @@
 # Execute frontend mission
 
 Follow `machine.json`; operators own work and the Skill machine alone routes outcomes. The visible
-path is compile, optional direction generation for reconstruct/new, source apply, deterministic
-capture preflight and rendering, then one fresh blind Sol visual-fidelity review. Refine skips
-generation. Both direction modes use `fe/direction-generate`: dominant returns one rendered direction
-and proceeds without waiting; alternatives returns three or four rendered directions and enters the
-typed user-choice wait. The transition is selected directly from the invocation-bound compiled
+path is compile, optional direction generation for reconstruct/new without an approved direction,
+source apply, deterministic capture preflight and rendering, then one fresh blind Sol visual-fidelity
+review. Refine and an already approved reconstruct/new direction skip generation with
+`directionMode=none`; request compilation distinguishes them with `not-applicable` versus `approved`
+direction evidence. Approved evidence is valid only with the exact typed direction identity,
+fingerprint, and direction-specific approval ref bound in authority; a generic approval reference is
+not sufficient. Both generated direction modes use `fe/direction-generate`: dominant returns one
+rendered direction and proceeds without waiting; alternatives returns three or four rendered
+directions and enters the typed user-choice wait. The transition is selected directly from the invocation-bound compiled
 `result.directionMode`, with no second policy stage. A compile-time `grammar-required` result runs exact Grammar authority
 reconcile/publish and resumes request compilation; product-local CSS is forbidden.
 

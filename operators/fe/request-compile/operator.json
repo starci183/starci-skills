@@ -7,7 +7,8 @@
   "outputSchema": "output.schema.json",
   "contextRefs": [
     "fe.ui",
-    "fe.ux-ui-change-levels"
+    "fe.ux-ui-change-levels",
+    "direction.visualization"
   ],
   "sourceReferenceRefs": [],
   "sideEffects": [],

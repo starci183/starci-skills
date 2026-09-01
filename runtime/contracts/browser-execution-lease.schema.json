@@ -6,10 +6,10 @@
   "required": ["schemaVersion", "leaseRef", "missionRef", "purpose", "accountRef", "reuseAttestations", "principalFingerprint", "runtimeGeneration", "origin", "fixtureNamespace", "expiresAt", "state", "executionMode", "executionOwnerRef", "browserContextRef", "consumerTabRef", "evidenceBrokerRef", "materializationStatus", "materializationEvidenceRefs"],
   "properties": {
     "schemaVersion": { "const": 1 },
-    "leaseRef": { "type": "string", "pattern": "^browser-lease://" },
+    "leaseRef": { "type": "string", "pattern": "^browser-lease://.+$" },
     "missionRef": { "type": "string", "minLength": 1 },
     "purpose": { "enum": ["read-only-visual-audit", "product-uat"] },
-    "accountRef": { "type": "string", "pattern": "^account://(?:fresh|uat-pool)" },
+    "accountRef": { "type": "string", "pattern": "^account://(?:fresh|uat-pool)(?:[/?#].*)?$" },
     "reuseAttestations": {
       "anyOf": [
         { "type": "null" },
@@ -22,7 +22,19 @@
     },
     "principalFingerprint": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
     "runtimeGeneration": { "type": "integer", "minimum": 1 },
-    "origin": { "const": "http://localhost:3000" },
+    "runtimeBinding": {
+      "description": "Exact canonical runtime owner identity required outside the legacy StarCi Academy endpoint set.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["project", "application", "ownerThreadId", "endpointAuthorityFingerprint"],
+      "properties": {
+        "project": { "type": "string", "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$" },
+        "application": { "type": "string", "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$" },
+        "ownerThreadId": { "type": "string", "minLength": 1 },
+        "endpointAuthorityFingerprint": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" }
+      }
+    },
+    "origin": { "type": "string", "pattern": "^http://localhost:[1-9][0-9]{0,4}$" },
     "fixtureNamespace": { "type": "string", "minLength": 1 },
     "expiresAt": { "type": "string", "format": "date-time" },
     "state": { "const": "authenticated" },
@@ -35,6 +47,10 @@
     "materializationEvidenceRefs": { "type": "array", "minItems": 1, "maxItems": 16, "uniqueItems": true, "items": { "type": "string", "minLength": 1 } }
   },
   "allOf": [
+    {
+      "if": { "required": ["runtimeBinding"] },
+      "else": { "properties": { "origin": { "const": "http://localhost:3000" } } }
+    },
     {
       "if": { "properties": { "purpose": { "const": "product-uat" } } },
       "then": { "properties": { "accountRef": { "pattern": "^account://fresh" }, "reuseAttestations": { "type": "null" } } }

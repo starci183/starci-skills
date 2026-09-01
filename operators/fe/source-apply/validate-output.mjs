@@ -1,5 +1,6 @@
 import { validatorFor, runValidatorCli } from '../../validation.mjs';
 import crypto from 'node:crypto';
+import { directionContractErrors } from '../direction-authority.mjs';
 const fingerprint=(value)=>`sha256:${crypto.createHash('sha256').update(JSON.stringify(value)).digest('hex')}`;
 export const validateOutput=validatorFor(new URL('./output.schema.json',import.meta.url),(value)=>{
   const errors=[];
@@ -10,9 +11,11 @@ export const validateOutput=validatorFor(new URL('./output.schema.json',import.m
     const boundaryByPath=new Map((result?.sourceBoundary??[]).map((entry)=>[entry.path,entry]));
     if(result&&boundaryByPath.size!==result.sourceBoundary.length) errors.push('applied source change sourceBoundary paths must be unique');
     if(result&&result.sourceBoundaryFingerprint!==fingerprint(result.sourceBoundary)) errors.push('applied source change sourceBoundaryFingerprint must hash the exact ordered sourceBoundary');
-    if(result?.directionMode==='none'&&result.directionBinding!==null) errors.push('applied refine mutation requires null directionBinding');
+    if(result?.directionMode==='none'&&result.directionBinding!==null) errors.push('applied directionMode none requires null directionBinding');
     if(result?.directionMode!=='none'&&result?.directionBinding===null) errors.push('applied generated direction requires an exact directionBinding');
     if(result?.directionBinding&&result.directionBinding.mode!==result.directionMode) errors.push('applied directionBinding mode must equal directionMode');
+    if(result) errors.push(...directionContractErrors(result));
+    if(result) for(const ref of result.directionEvidence.evidenceRefs) if(!evidenceRefs.includes(ref)) errors.push(`applied evidenceRefs must include direction evidence ${ref}`);
     if(result&&!evidenceRefs.includes(result.compiledRequestRef)) errors.push('applied evidenceRefs must include compiledRequestRef');
     if(result?.directionBinding&&!evidenceRefs.includes(result.directionBinding.directionGenerateReturnReceiptRef)) errors.push('applied evidenceRefs must include direction-generate RETURN receipt');
     if(result?.directionBinding&&!evidenceRefs.includes(result.directionBinding.selectedDirectionRef)) errors.push('applied evidenceRefs must include selectedDirectionRef');

@@ -1,11 +1,11 @@
 import { validatorFor, runValidatorCli } from '../../validation.mjs';
-const directionSemantic=(input)=>{
+import { directionAuthorityContextErrors, directionContractErrors } from '../direction-authority.mjs';
+const directionSemantic=({context,input})=>{
   const errors=[];
-  const validClassifications={none:['not-applicable'],dominant:['dominant'],alternatives:['ambiguous','comparison-requested']}[input.directionMode];
-  if(!validClassifications.includes(input.directionEvidence.classification)) errors.push('directionEvidence.classification must justify directionMode');
-  if(input.uxUiChangeLevel==='refine'&&input.directionMode!=='none') errors.push('refine requires directionMode none');
-  if(input.uxUiChangeLevel!=='refine'&&input.directionMode==='none') errors.push('reconstruct/new requires dominant or alternatives directionMode');
+  for(const ref of input.directionEvidence.evidenceRefs) if(!context.evidenceRefs.includes(ref)) errors.push(`direction evidence ${ref} must be present in context.evidenceRefs`);
+  errors.push(...directionContractErrors(input));
+  errors.push(...directionAuthorityContextErrors(input.directionEvidence,{authorityRefs:context.authorityRefs,evidenceRefs:context.evidenceRefs}));
   return errors;
 };
-export const validateInput=validatorFor(new URL('./input.schema.json',import.meta.url),(value)=>directionSemantic(value.input));
+export const validateInput=validatorFor(new URL('./input.schema.json',import.meta.url),(value)=>directionSemantic(value));
 if(process.argv[1]?.endsWith('validate-input.mjs')) await runValidatorCli(validateInput,'node validate-input.mjs <input.json>');

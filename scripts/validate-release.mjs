@@ -2,6 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { auditOperatorRoot } from '../operators/contract-v7.mjs';
+import { createRuntimeOwnerValidator } from '../runtime/contracts/runtime-owner.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const resolve = (relative) => path.join(root, relative);
@@ -20,6 +21,9 @@ for (const required of [
   'runtime/config.schema.json', 'runtime/receipt.schema.json', 'runtime/topology.schema.json',
   'runtime/contracts/grammar-decision.schema.json', 'runtime/contracts/grammar-decision.mjs',
   'runtime/contracts/browser-execution-lease.schema.json',
+  'runtime/contracts/browser-execution-lease.mjs', 'runtime/contracts/endpoint-authority.mjs',
+  'runtime/contracts/runtime-owner.mjs', 'templates/runtime/owner.schema.json',
+  'templates/runtime/owner.template.json',
   'knowledge/grammar/common/semantic-composition.md', 'operators/fe-grammar-v74.spec.mjs',
   'templates/businesses/business.schema.json', 'templates/uat/snapshot.schema.json',
   'templates/uat/result.schema.json', 'templates/sessions/call-receipt.schema.json',
@@ -92,6 +96,8 @@ const changelog = read('CHANGELOG.md');
 const currentChangelogVersion = changelog.match(/^##\s+([^\s]+)\s+-\s+\d{4}-\d{2}-\d{2}\s*$/m)?.[1];
 if (currentChangelogVersion !== expectedRuntimeVersion) fail('CHANGELOG.md must begin with the exact current prerelease');
 if (!read('README.md').startsWith(`# StarCi Skills ${expectedRuntimeVersion}`)) fail('README title differs from the runtime release');
+const runtimeOwnerValidation = createRuntimeOwnerValidator({ sourceRoot:path.resolve(root, '..') })(json('templates/runtime/owner.template.json'));
+if (!runtimeOwnerValidation.valid) fail(`runtime owner template violates endpoint authority: ${runtimeOwnerValidation.errors.join('; ')}`);
 for (const required of [
   'aiBrainstormModel: gpt-5.6-sol',
   'aiBrainstormCount: 1',

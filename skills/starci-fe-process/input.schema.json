@@ -11,6 +11,7 @@
     "intent",
     "uxUiChangeLevel",
     "directionMode",
+    "directionEvidence",
     "objective",
     "auditTargetScore",
     "auditScoreHistory",
@@ -107,12 +108,16 @@
       ]
     },
     "directionMode": {
-      "description": "Validated direction projection supplied to request-compile: none for refine, dominant when evidence selects one action, or alternatives when valid Grammar leaves material visual ambiguity or the user explicitly requests comparison. The machine routes the invocation-bound compiled result, not this raw field.",
+      "description": "Validated direction projection supplied to request-compile: none for refine or an already approved reconstruct/new direction, dominant when evidence selects one direction to generate, or alternatives when valid Grammar leaves material visual ambiguity or the user explicitly requests comparison. Request compilation validates the matching directionEvidence classification before routing.",
       "enum": [
         "none",
         "dominant",
         "alternatives"
       ]
+    },
+    "directionEvidence": {
+      "description": "Typed evidence projection supplied unchanged to request compilation. Approved reconstruct/new directions carry exact direction identity, content fingerprint, and direction-specific approval authority.",
+      "$ref": "#/$defs/directionEvidence"
     },
     "objective": {
       "type": "string",
@@ -417,6 +422,37 @@
     }
   },
   "$defs": {
+    "approvedDirectionAuthority": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["directionRef", "directionFingerprint", "approvalRef"],
+      "properties": {
+        "directionRef": { "type": "string", "pattern": "^direction://[A-Za-z0-9][A-Za-z0-9._/-]*$" },
+        "directionFingerprint": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
+        "approvalRef": { "type": "string", "pattern": "^direction-approval://[A-Za-z0-9][A-Za-z0-9._/-]*$" }
+      }
+    },
+    "directionEvidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["classification", "approvedDirectionAuthority", "evidenceRefs"],
+      "properties": {
+        "classification": { "enum": ["not-applicable", "approved", "dominant", "ambiguous", "comparison-requested"] },
+        "approvedDirectionAuthority": {
+          "anyOf": [
+            { "$ref": "#/$defs/approvedDirectionAuthority" },
+            { "type": "null" }
+          ]
+        },
+        "evidenceRefs": {
+          "type": "array",
+          "uniqueItems": true,
+          "minItems": 1,
+          "maxItems": 32,
+          "items": { "type": "string", "minLength": 1 }
+        }
+      }
+    },
     "missionScope": {
       "type": "object",
       "additionalProperties": false,

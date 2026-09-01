@@ -21,7 +21,8 @@
       "required": [
         "snapshotRef",
         "snapshotReturnReceiptRef",
-        "sourceFingerprint"
+        "sourceFingerprint",
+        "missionRef"
       ],
       "properties": {
         "snapshotRef": {
@@ -38,6 +39,73 @@
           "description": "Exact source fingerprint inherited from the frozen snapshot.",
           "type": "string",
           "pattern": "^sha256:[0-9a-f]{64}$"
+        },
+        "missionRef": {
+          "description": "Trusted canonical mission identity that the Browser lease must match exactly.",
+          "type": "string",
+          "minLength": 1
+        },
+        "runtimeOwner": {
+          "description": "Exact current canonical owner artifact. Required for every non-default project endpoint binding; omitted only by legacy StarCi Academy inputs.",
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["$schema", "schemaVersion", "ownerThreadId", "generation", "status", "endpoints", "healthEvidenceRefs", "updatedAt"],
+          "properties": {
+            "$schema": { "const": "./owner.schema.json" },
+            "schemaVersion": { "const": 1 },
+            "ownerThreadId": { "type": "string", "minLength": 1 },
+            "generation": { "type": "integer", "minimum": 1 },
+            "status": { "enum": ["starting", "ready", "degraded", "stopped"] },
+            "endpointBinding": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["authority", "project", "application", "services", "authorityFingerprint"],
+              "properties": {
+                "authority": { "const": "workspace-route-port-projection" },
+                "project": { "type": "string", "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$" },
+                "application": { "type": "string", "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$" },
+                "services": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["frontend", "api", "identity"],
+                  "properties": {
+                    "frontend": { "type": "string", "pattern": "^[A-Za-z][A-Za-z0-9]*$" },
+                    "api": { "type": "string", "pattern": "^[A-Za-z][A-Za-z0-9]*$" },
+                    "identity": { "type": "string", "pattern": "^[A-Za-z][A-Za-z0-9]*$" }
+                  }
+                },
+                "authorityFingerprint": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" }
+              }
+            },
+            "endpoints": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["frontend", "api", "identity"],
+              "properties": {
+                "frontend": { "type": "string", "pattern": "^http://localhost:[1-9][0-9]{0,4}$" },
+                "api": { "type": "string", "pattern": "^http://localhost:[1-9][0-9]{0,4}$" },
+                "identity": { "type": "string", "pattern": "^http://localhost:[1-9][0-9]{0,4}$" }
+              }
+            },
+            "healthEvidenceRefs": { "type": "array", "uniqueItems": true, "items": { "type": "string", "minLength": 1 } },
+            "updatedAt": { "type": "string", "format": "date-time" }
+          },
+          "allOf": [
+            {
+              "if": { "required": ["endpointBinding"] },
+              "else": {
+                "properties": {
+                  "endpoints": {
+                    "properties": {
+                      "frontend": { "const": "http://localhost:3000" },
+                      "api": { "const": "http://localhost:3001" },
+                      "identity": { "const": "http://localhost:8080" }
+                    }
+                  }
+                }
+              }
+            }
+          ]
         }
       }
     },
@@ -75,16 +143,29 @@
           "description": "Opaque mission-scoped browser/auth continuity contract; contains no secret.",
           "type": "object",
           "additionalProperties": false,
-          "required": ["leaseRef", "missionRef", "browserContextRef", "principalFingerprint", "runtimeGeneration", "origin", "fixtureNamespace", "state", "executionMode", "executionOwnerRef", "consumerTabRef", "evidenceBrokerRef", "materializationStatus", "materializationEvidenceRefs"],
+          "required": ["leaseRef", "missionRef", "accountRef", "browserContextRef", "principalFingerprint", "runtimeGeneration", "origin", "fixtureNamespace", "expiresAt", "state", "executionMode", "executionOwnerRef", "consumerTabRef", "evidenceBrokerRef", "materializationStatus", "materializationEvidenceRefs"],
           "properties": {
-            "leaseRef": { "type": "string", "pattern": "^browser-lease://" },
+            "leaseRef": { "type": "string", "pattern": "^browser-lease://.+$" },
             "missionRef": { "type": "string", "minLength": 1 },
+            "accountRef": { "type": "string", "pattern": "^(?:account://fresh(?:[/?#].*)?|anonymous://explicit(?:[/?#].*)?)$" },
             "browserContextRef": { "type": "string", "minLength": 1 },
             "principalFingerprint": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
             "runtimeGeneration": { "type": "integer", "minimum": 1 },
-            "origin": { "const": "http://localhost:3000" },
+            "runtimeBinding": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["project", "application", "ownerThreadId", "endpointAuthorityFingerprint"],
+              "properties": {
+                "project": { "type": "string", "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$" },
+                "application": { "type": "string", "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$" },
+                "ownerThreadId": { "type": "string", "minLength": 1 },
+                "endpointAuthorityFingerprint": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" }
+              }
+            },
+            "origin": { "type": "string", "pattern": "^http://localhost:[1-9][0-9]{0,4}$" },
             "fixtureNamespace": { "type": "string", "minLength": 1 },
-            "state": { "enum": ["leased", "authenticated", "released", "invalidated"] },
+            "expiresAt": { "type": "string", "format": "date-time" },
+            "state": { "const": "authenticated" },
             "executionMode": { "enum": ["consumer-materialized", "broker-executed"] },
             "executionOwnerRef": { "type": "string", "minLength": 1 },
             "consumerTabRef": { "type": ["string", "null"], "minLength": 1 },
@@ -93,6 +174,10 @@
             "materializationEvidenceRefs": { "type": "array", "minItems": 1, "maxItems": 16, "uniqueItems": true, "items": { "type": "string", "minLength": 1 } }
           },
           "allOf": [
+            {
+              "if": { "required": ["runtimeBinding"] },
+              "else": { "properties": { "origin": { "const": "http://localhost:3000" } } }
+            },
             {
               "if": { "properties": { "executionMode": { "const": "consumer-materialized" } } },
               "then": { "properties": { "materializationStatus": { "const": "materialized" }, "consumerTabRef": { "type": "string", "minLength": 1 }, "evidenceBrokerRef": { "type": "null" } } }

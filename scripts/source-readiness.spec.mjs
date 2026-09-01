@@ -31,6 +31,8 @@ function fixture(t, {
   runtimeVersion = '7.6.0-beta.1',
   configVersion = 6,
   routeVersion = 6,
+  routeRevision = 2,
+  contractAware = true,
   role = 'be',
   grammar = null
 } = {}) {
@@ -72,7 +74,13 @@ function fixture(t, {
     ? {
         ...common,
         schemaVersion: 6,
-        context: { instructions: [], manifests: ['package.json'], grammarId: grammar }
+        ...(routeRevision === null ? {} : { schemaRevision: routeRevision }),
+        context: {
+          instructions: [],
+          ...(contractAware ? { contract: null, contractSource: null } : {}),
+          manifests: ['package.json'],
+          grammarId: grammar
+        }
       }
     : {
         ...common,
@@ -136,8 +144,34 @@ test('upgrades safe legacy workspace declarations and rehydrates local routes', 
   const after = upgradeSource({ sourceRoot: f.source, repositoriesRoot: f.repositories, apply: true });
   assert.equal(after.status, 'ready');
   assert.equal(JSON.parse(readFileSync(join(f.source, '.workspaces', 'config.json'), 'utf8')).schemaVersion, 6);
-  assert.equal(JSON.parse(readFileSync(join(f.source, '.workspaces', 'projects', 'source', 'be.json'), 'utf8')).schemaVersion, 6);
-  assert.equal(JSON.parse(readFileSync(join(f.source, '.workspaces', 'local', 'routes', 'source', 'be', 'config.json'), 'utf8')).schemaVersion, 6);
+  const upgradedRoute = JSON.parse(readFileSync(join(f.source, '.workspaces', 'projects', 'source', 'be.json'), 'utf8'));
+  assert.equal(upgradedRoute.schemaVersion, 6);
+  assert.equal(upgradedRoute.schemaRevision, 2);
+  assert.equal(upgradedRoute.context.contract, null);
+  assert.equal(upgradedRoute.context.contractSource, null);
+  const localRoute = JSON.parse(readFileSync(join(f.source, '.workspaces', 'local', 'routes', 'source', 'be', 'config.json'), 'utf8'));
+  assert.equal(localRoute.schemaVersion, 6);
+  assert.equal(localRoute.schemaRevision, 2);
+});
+
+test('migrates the immediately preceding unrevisioned V6 route without a blocked-upgrade deadlock', (t) => {
+  const f = fixture(t, { routeRevision: null, contractAware: false });
+  const before = inspectSource({ sourceRoot: f.source, repositoriesRoot: f.repositories });
+  assert.equal(before.status, 'stale');
+  assert.equal(before.modules.workspaces.status, 'initialize-required');
+  assert.deepEqual(before.modules.workspaces.legacyV6Routes, ['.workspaces/projects/source/be.json']);
+
+  const after = upgradeSource({ sourceRoot: f.source, repositoriesRoot: f.repositories, apply: true });
+  assert.equal(after.status, 'ready');
+  const upgradedRoute = JSON.parse(readFileSync(join(f.source, '.workspaces', 'projects', 'source', 'be.json'), 'utf8'));
+  assert.equal(upgradedRoute.schemaVersion, 6);
+  assert.equal(upgradedRoute.schemaRevision, 2);
+  assert.equal(upgradedRoute.context.contract, null);
+  assert.equal(upgradedRoute.context.contractSource, null);
+  const localRoute = JSON.parse(readFileSync(join(f.source, '.workspaces', 'local', 'routes', 'source', 'be', 'config.json'), 'utf8'));
+  assert.equal(localRoute.schemaRevision, 2);
+  assert.equal(localRoute.context.contract, null);
+  assert.equal(localRoute.context.contractSource, null);
 });
 
 test('blocks ambiguous legacy Grammar and unregistered worktrees without mutating them', (t) => {

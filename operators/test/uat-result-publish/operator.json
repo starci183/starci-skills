@@ -7,7 +7,9 @@
   "outputSchema": "output.schema.json",
   "contextRefs": [],
   "sourceReferenceRefs": [],
-  "sideEffects": [],
+  "sideEffects": [
+    "write only .worktrees/uat/<feature>/<flow>/result.json beside the validated frozen snapshot in the verified backend Source"
+  ],
   "stopConditions": [
     "identity or authority correlation fails",
     "progress fingerprint repeats without changed evidence"

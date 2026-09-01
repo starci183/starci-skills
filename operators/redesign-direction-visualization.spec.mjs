@@ -112,6 +112,8 @@ test('global redesign law assigns domain-specific visual effort before choice', 
   const law = readFileSync(new URL('../knowledge/direction-visualization.md', import.meta.url), 'utf8');
   const index = readFileSync(new URL('../INDEX.md', import.meta.url), 'utf8');
   const frontend = readFileSync(new URL('../skills/starci-fe-process/SKILL.md', import.meta.url), 'utf8');
+  const compile = readFileSync(new URL('./fe/request-compile/execute.md', import.meta.url), 'utf8');
+  const generate = readFileSync(new URL('./fe/direction-generate/execute.md', import.meta.url), 'utf8');
   const architecture = readFileSync(new URL('../skills/starci-architecture-design/SKILL.md', import.meta.url), 'utf8');
   assert.match(law, /three or four materially different/);
   assert.match(law, /realistic pages? or substantial surfaces?/);
@@ -119,4 +121,11 @@ test('global redesign law assigns domain-specific visual effort before choice', 
   assert.match(index, /through `visualize`[\s\S]*Render three or four materially different[\s\S]*choices and wait for selection/);
   assert.match(frontend, /valid-Grammar visual ambiguity presents three or four rendered alternatives/);
   assert.match(architecture, /system\/ownership boundaries/);
+  assert.match(law, /unfamiliar[\s\S]*bounded external reference research/i);
+  assert.match(law, /exhausted search does not authorize subjective invention/i);
+  assert.match(law, /evidence, never StarCi business[\s\S]*authority/i);
+  assert.match(frontend, /never fills them in by taste/i);
+  assert.match(compile, /research queries, source URLs, access date/i);
+  assert.match(compile, /return `business-required` or `blocked`/i);
+  assert.match(generate, /explicit reversible hypothesis/i);
 });

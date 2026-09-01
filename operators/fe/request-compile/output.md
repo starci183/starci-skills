@@ -18,6 +18,18 @@ one populated happy-case hero with its visible core task. Artifact refs include 
 and behavior contract; evidence includes the Grammar package and manifest identities. It also requires exact evidence, no gaps,
 and no handoff. The parent must compare these repeated bindings with the invocation before use.
 
+Direction classification is closed: `refine + not-applicable` and an already approved
+`reconstruct|new + approved` both compile with `directionMode=none` and apply directly. A
+reconstruct/new target without an approved direction compiles `dominant` or `alternatives` with its
+matching generated-direction evidence; no other level/mode/classification combination is valid.
+Approved evidence remains bound to its exact `direction://` identity, content fingerprint, and
+`direction-approval://` authority; a generic approval label cannot substitute for any of them.
+
+For an unfamiliar domain, `directionEvidence` is incomplete unless it records bounded external
+research and provenance, or an explicit exhausted-search gap plus the approved business,
+product-family, Grammar, and product-neutral UX evidence that supports every remaining material
+decision. An exhausted search cannot convert unresolved behavior into a compiled visual choice.
+
 `grammar-required` requires a null result, exact evidence/gaps, no cross-domain handoff, and one local
 Grammar-owner repair receipt with `resumeState=request-compile`. `business-required` and
 `backend-required` require a null result, exact evidence/gaps, and one typed handoff to the matching

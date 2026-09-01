@@ -20,6 +20,7 @@
       "required": [
         "outcome",
         "canonicalRef",
+        "contentFingerprint",
         "evidenceRefs",
         "gaps"
       ],
@@ -32,12 +33,20 @@
           ]
         },
         "canonicalRef": {
-          "description": "Backend-owned canonical UAT snapshot or result reference.",
+          "description": "Exact backend-owned canonical UAT snapshot.json reference.",
           "type": [
             "string",
             "null"
           ],
-          "pattern": "^\\.worktrees/uat/[a-z0-9-]+/[a-z0-9-]+/"
+          "pattern": "^\\.worktrees/uat/[a-z0-9][a-z0-9-]*/[a-z0-9][a-z0-9-]*/snapshot\\.json$"
+        },
+        "contentFingerprint": {
+          "description": "Fingerprint of the parsed canonical snapshot content.",
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^sha256:[0-9a-f]{64}$"
         },
         "evidenceRefs": {
           "description": "Independent evidence used.",

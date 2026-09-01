@@ -45,7 +45,9 @@
                 "mode",
                 "compiledRequestRef",
                 "compiledRequestFingerprint",
+                "uxUiChangeLevel",
                 "directionMode",
+                "directionEvidence",
                 "directionBinding",
                 "grammarBinding",
                 "iconographyManifest",
@@ -75,10 +77,20 @@
                   "minLength": 1
                 },
                 "compiledRequestFingerprint": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
+                "uxUiChangeLevel": {
+                  "description": "Repeated compiled frontend change level.",
+                  "enum": ["refine", "reconstruct", "new"]
+                },
                 "directionMode": {
+                  "description": "Repeated compiled projection; none covers refine and already approved reconstruct/new directions.",
                   "enum": ["none", "dominant", "alternatives"]
                 },
+                "directionEvidence": {
+                  "description": "Repeated compiled direction evidence, including typed approved-direction authority when applicable.",
+                  "$ref": "#/$defs/directionEvidence"
+                },
                 "directionBinding": {
+                  "description": "Repeated generated-direction binding, or null when directionMode is none.",
                   "anyOf": [
                     {
                       "type": "object",
@@ -290,6 +302,37 @@
     }
   },
   "$defs": {
+    "approvedDirectionAuthority": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["directionRef", "directionFingerprint", "approvalRef"],
+      "properties": {
+        "directionRef": { "type": "string", "pattern": "^direction://[A-Za-z0-9][A-Za-z0-9._/-]*$" },
+        "directionFingerprint": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
+        "approvalRef": { "type": "string", "pattern": "^direction-approval://[A-Za-z0-9][A-Za-z0-9._/-]*$" }
+      }
+    },
+    "directionEvidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["classification", "approvedDirectionAuthority", "evidenceRefs"],
+      "properties": {
+        "classification": { "enum": ["not-applicable", "approved", "dominant", "ambiguous", "comparison-requested"] },
+        "approvedDirectionAuthority": {
+          "anyOf": [
+            { "$ref": "#/$defs/approvedDirectionAuthority" },
+            { "type": "null" }
+          ]
+        },
+        "evidenceRefs": {
+          "type": "array",
+          "uniqueItems": true,
+          "minItems": 1,
+          "maxItems": 32,
+          "items": { "type": "string", "minLength": 1 }
+        }
+      }
+    },
     "compositionOwners": { "type": "array", "minItems": 1, "maxItems": 64, "items": { "type": "object", "additionalProperties": false, "required": ["ownerRef", "ownerLayer", "authorityRef", "patternRef"], "properties": { "ownerRef": { "type": "string", "pattern": "^owner://" }, "ownerLayer": { "enum": ["grammar", "application-block", "application-composite"] }, "authorityRef": { "type": "string", "pattern": "^(grammar|application)://" }, "patternRef": { "type": "string", "pattern": "^(pattern|block|composite)://" } } } },
     "iconographyManifest": { "type": "object", "additionalProperties": false, "required": ["manifestRef", "manifestFingerprint", "mode", "visualFamilyRef", "decisions"], "properties": { "manifestRef": { "type": "string", "pattern": "^iconography://" }, "manifestFingerprint": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" }, "mode": { "enum": ["none", "resolved"] }, "visualFamilyRef": { "anyOf": [{ "type": "string", "pattern": "^icon-family://" }, { "type": "null" }] }, "decisions": { "type": "array", "maxItems": 64, "items": { "type": "object", "additionalProperties": false, "required": ["roleRef", "meaningAuthorityRef", "source", "glyphRef", "catalogSearchRefs", "customReason"], "properties": { "roleRef": { "type": "string", "pattern": "^semantic-icon://" }, "meaningAuthorityRef": { "type": "string", "pattern": "^(business|ui-law|grammar)://" }, "source": { "enum": ["heroicons", "custom-svg"] }, "glyphRef": { "type": "string", "minLength": 1 }, "catalogSearchRefs": { "type": "array", "minItems": 1, "maxItems": 16, "uniqueItems": true, "items": { "type": "string", "pattern": "^icon-catalog://" } }, "customReason": { "type": ["string", "null"], "minLength": 1 } } } } } },
     "mediaManifest": { "type": "object", "additionalProperties": false, "required": ["manifestRef", "manifestFingerprint", "mode", "assetRef", "artifactRefs", "provenanceRefs", "responsiveTreatmentRef", "altIntentRef", "fallbackRef"], "properties": { "manifestRef": { "type": "string", "pattern": "^media-manifest://" }, "manifestFingerprint": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" }, "mode": { "enum": ["none", "reuse", "generate"] }, "assetRef": { "type": ["string", "null"], "minLength": 1 }, "artifactRefs": { "type": "array", "maxItems": 16, "uniqueItems": true, "items": { "type": "string", "minLength": 1 } }, "provenanceRefs": { "type": "array", "maxItems": 16, "uniqueItems": true, "items": { "type": "string", "minLength": 1 } }, "responsiveTreatmentRef": { "type": ["string", "null"], "minLength": 1 }, "altIntentRef": { "type": ["string", "null"], "minLength": 1 }, "fallbackRef": { "type": ["string", "null"], "minLength": 1 } } },

@@ -128,6 +128,7 @@
             },
             "routeCount": { "type": "integer", "minimum": 0 },
             "legacyRoutes": { "$ref": "#/$defs/pathList" },
+            "legacyV6Routes": { "$ref": "#/$defs/pathList" },
             "grammarMappingRequired": { "$ref": "#/$defs/pathList" },
             "changedRoutes": { "$ref": "#/$defs/pathList" },
             "commitPolicyId": { "type": "string", "minLength": 1 },
@@ -135,7 +136,7 @@
             "localStateTracked": { "$ref": "#/$defs/pathList" },
             "missingIgnoreRules": { "$ref": "#/$defs/pathList" }
           },
-          "required": ["configVersion", "routeCount", "legacyRoutes", "grammarMappingRequired", "changedRoutes", "commitPolicyId", "portableUntracked", "localStateTracked", "missingIgnoreRules"]
+          "required": ["configVersion", "routeCount", "legacyRoutes", "legacyV6Routes", "grammarMappingRequired", "changedRoutes", "commitPolicyId", "portableUntracked", "localStateTracked", "missingIgnoreRules"]
         }
       ]
     },

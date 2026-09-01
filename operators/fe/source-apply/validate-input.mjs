@@ -1,14 +1,18 @@
 import { validatorFor, runValidatorCli } from '../../validation.mjs';
 import crypto from 'node:crypto';
+import { directionAuthorityContextErrors, directionContractErrors } from '../direction-authority.mjs';
 const fingerprint=(value)=>`sha256:${crypto.createHash('sha256').update(JSON.stringify(value)).digest('hex')}`;
 export const validateInput=validatorFor(new URL('./input.schema.json',import.meta.url),(value)=>{
   const errors=[];
   const paths=value.input.sourceBoundary.map(({path})=>path);
   if(new Set(paths).size!==paths.length) errors.push('sourceBoundary paths must be unique');
   if(value.input.sourceBoundaryFingerprint!==fingerprint(value.input.sourceBoundary)) errors.push('sourceBoundaryFingerprint must hash the exact ordered sourceBoundary');
-  if(value.input.directionMode==='none'&&value.input.directionBinding!==null) errors.push('refine mutation with directionMode none requires null directionBinding');
+  if(value.input.directionMode==='none'&&value.input.directionBinding!==null) errors.push('directionMode none requires null directionBinding');
   if(value.input.directionMode!=='none'&&value.input.directionBinding===null) errors.push('generated direction mutation requires an exact directionBinding');
   if(value.input.directionBinding&&value.input.directionBinding.mode!==value.input.directionMode) errors.push('directionBinding mode must equal directionMode');
+  errors.push(...directionContractErrors(value.input));
+  errors.push(...directionAuthorityContextErrors(value.input.directionEvidence,{authorityRefs:value.context.authorityRefs,evidenceRefs:value.context.evidenceRefs}));
+  for(const ref of value.input.directionEvidence.evidenceRefs) if(!value.context.evidenceRefs.includes(ref)) errors.push(`context evidenceRefs must include direction evidence ${ref}`);
   if(!value.context.evidenceRefs.includes(value.input.compiledRequestRef)) errors.push('context evidenceRefs must include compiledRequestRef');
   if(value.input.directionBinding&&!value.context.evidenceRefs.includes(value.input.directionBinding.directionGenerateReturnReceiptRef)) errors.push('context evidenceRefs must include direction-generate RETURN receipt');
   if(value.input.directionBinding&&!value.context.evidenceRefs.includes(value.input.directionBinding.selectedDirectionRef)) errors.push('context evidenceRefs must include selectedDirectionRef');

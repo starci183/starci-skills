@@ -19,14 +19,36 @@
     "ownerThreadId": { "type": "string", "minLength": 1 },
     "generation": { "type": "integer", "minimum": 1 },
     "status": { "enum": ["starting", "ready", "degraded", "stopped"] },
+    "endpointBinding": {
+      "description": "Closed projection from canonical workspace routes, the project port registry, and backend metadata. Absence is the legacy StarCi Academy binding.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["authority", "project", "application", "services", "authorityFingerprint"],
+      "properties": {
+        "authority": { "const": "workspace-route-port-projection" },
+        "project": { "type": "string", "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$" },
+        "application": { "type": "string", "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$" },
+        "services": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["frontend", "api", "identity"],
+          "properties": {
+            "frontend": { "type": "string", "pattern": "^[A-Za-z][A-Za-z0-9]*$" },
+            "api": { "type": "string", "pattern": "^[A-Za-z][A-Za-z0-9]*$" },
+            "identity": { "type": "string", "pattern": "^[A-Za-z][A-Za-z0-9]*$" }
+          }
+        },
+        "authorityFingerprint": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" }
+      }
+    },
     "endpoints": {
       "type": "object",
       "additionalProperties": false,
       "required": ["frontend", "api", "identity"],
       "properties": {
-        "frontend": { "const": "http://localhost:3000" },
-        "api": { "const": "http://localhost:3001" },
-        "identity": { "const": "http://localhost:8080" }
+        "frontend": { "type": "string", "pattern": "^http://localhost:[1-9][0-9]{0,4}$" },
+        "api": { "type": "string", "pattern": "^http://localhost:[1-9][0-9]{0,4}$" },
+        "identity": { "type": "string", "pattern": "^http://localhost:[1-9][0-9]{0,4}$" }
       }
     },
     "healthEvidenceRefs": {
@@ -35,5 +57,25 @@
       "items": { "type": "string", "minLength": 1 }
     },
     "updatedAt": { "type": "string", "format": "date-time" }
-  }
+  },
+  "allOf": [
+    {
+      "if": { "properties": { "status": { "const": "ready" } }, "required": ["status"] },
+      "then": { "properties": { "healthEvidenceRefs": { "minItems": 1 } } }
+    },
+    {
+      "if": { "required": ["endpointBinding"] },
+      "else": {
+        "properties": {
+          "endpoints": {
+            "properties": {
+              "frontend": { "const": "http://localhost:3000" },
+              "api": { "const": "http://localhost:3001" },
+              "identity": { "const": "http://localhost:8080" }
+            }
+          }
+        }
+      }
+    }
+  ]
 }

@@ -1,4 +1,5 @@
 import crypto from 'node:crypto';
+import { expectedUatResultRef, expectedUatSnapshotRef, inspectUatArtifact } from './test/uat-artifact.mjs';
 
 const contentFingerprint = (value) => `sha256:${crypto.createHash('sha256').update(JSON.stringify(value)).digest('hex')}`;
 const canonicalValue = (value) => Array.isArray(value)
@@ -282,6 +283,15 @@ export function createOperatorInvocationBindingRegistry() {
       const errors = [];
       if (inputDocument.context.sourceFingerprint !== quality.sourceFingerprint) errors.push('UAT snapshot source differs from Quality PASS');
       if (!inputDocument.context.authorityRefs.includes(quality.receiptId)) errors.push('UAT snapshot authority must include the exact Quality PASS receipt');
+      if (!sameSequence(returnReceipt?.trace?.sourceHeads, quality.sourceHeads)) errors.push('UAT snapshot source heads differ from Quality PASS');
+      if (outputDocument?.output?.outcome === 'frozen') {
+        const expectedRef = expectedUatSnapshotRef(inputDocument.input.feature, inputDocument.input.flow);
+        if (outputDocument.output.canonicalRef !== expectedRef) errors.push('UAT snapshot canonicalRef differs from the exact feature/flow snapshot.json path');
+        const artifact = inspectUatArtifact(outputDocument.output.canonicalRef, 'snapshot');
+        errors.push(...artifact.errors);
+        if (outputDocument.output.contentFingerprint !== artifact.contentFingerprint) errors.push('UAT snapshot fingerprint differs from the canonical artifact content');
+        if (!sameSequence(artifact.document?.sourceHeads, quality.sourceHeads)) errors.push('UAT snapshot artifact source heads differ from Quality PASS');
+      }
       return errors;
     }
     if (operatorId === 'fe/authority-reconcile' && outputDocument?.output?.outcome === 'reconciled') {
@@ -346,6 +356,7 @@ export function createOperatorInvocationBindingRegistry() {
       const errors = [];
       if (snapshot.output.outcome !== 'frozen' || inputDocument.context.snapshotRef !== snapshot.output.canonicalRef) errors.push('UAT case freeze snapshot differs from the validated frozen snapshot');
       if (inputDocument.context.sourceFingerprint !== snapshot.input.context.sourceFingerprint) errors.push('UAT case freeze source differs from the frozen snapshot source');
+      if (inputDocument.context.missionRef !== returnReceipt?.missionId) errors.push('UAT case freeze Browser lease mission differs from the owning runtime mission');
       return errors;
     }
     if (operatorId === 'test/uat-behavior-proof') {
@@ -402,6 +413,18 @@ export function createOperatorInvocationBindingRegistry() {
       if (ux && ux.input.context.behaviorProofReturnReceiptRef !== behavior?.receiptId) errors.push('UAT result UX proof does not descend from the selected behavior RETURN');
       if (ui && ui.input.context.uxProofReturnReceiptRef !== ux?.receiptId) errors.push('UAT result UI proof does not descend from the selected UX RETURN');
       if (snapshot && context.snapshotRef !== snapshot.output.canonicalRef) errors.push('UAT result snapshot differs from the validated frozen snapshot');
+      if (output.outcome !== 'blocked') {
+        const expectedRef = expectedUatResultRef(context.snapshotRef);
+        if (output.canonicalRef !== expectedRef) errors.push('UAT result canonicalRef differs from the exact frozen feature/flow result.json path');
+        const artifact = inspectUatArtifact(output.canonicalRef, 'result');
+        errors.push(...artifact.errors);
+        if (output.contentFingerprint !== artifact.contentFingerprint) errors.push('UAT result fingerprint differs from the canonical artifact content');
+        if (artifact.document?.snapshotFingerprint !== snapshot?.output?.contentFingerprint) errors.push('UAT result does not bind the exact frozen snapshot fingerprint');
+        const expectedArtifactOutcome = output.outcome === 'passed' ? 'passed' : 'failed';
+        if (artifact.document?.outcome !== expectedArtifactOutcome) errors.push('UAT result artifact outcome differs from the typed publication outcome');
+        if (!sameSequence(artifact.document?.evidenceRefs, input.evidenceRefs)) errors.push('UAT result artifact evidence differs from the exact invocation evidence');
+        if (output.result && !output.result.artifactRefs.includes(output.canonicalRef)) errors.push('UAT result product does not include canonicalRef');
+      } else if (output.canonicalRef !== null || output.contentFingerprint !== null) errors.push('blocked UAT result publication cannot claim a canonical artifact');
       for (const stage of [cases,behavior,ux,ui].filter(Boolean)) {
         if (stage.input.context.snapshotRef !== context.snapshotRef) errors.push(`UAT result snapshot differs at ${stage.operatorId}`);
       }
@@ -415,6 +438,7 @@ export function createOperatorInvocationBindingRegistry() {
       const exactStageEvidence=[
         ...[snapshot,cases,behavior,ux,ui].filter(Boolean).map(({receiptId})=>receiptId),
         snapshot?.output?.canonicalRef,
+        snapshot?.output?.contentFingerprint,
         ...[snapshot,cases,behavior,ux,ui].filter(Boolean).flatMap(({output:stageOutput})=>[
           ...(stageOutput.evidenceRefs??[]),
           ...(stageOutput.result?.artifactRefs??[]),
@@ -467,14 +491,14 @@ export function createOperatorInvocationBindingRegistry() {
       const compiled = validatedCompiles.get(input.compiledRequestRef);
       if (!compiled || compiled.missionId !== returnReceipt?.missionId) return ['source apply is not bound to a validated same-mission compiled request'];
       const compiledResult = compiled.result;
-      for (const field of ['compiledRequestFingerprint','targetRef','directionMode','behaviorContractRef','behaviorContractFingerprint','proofMatrixFingerprint','sourceBoundaryFingerprint']) {
+      for (const field of ['compiledRequestFingerprint','targetRef','uxUiChangeLevel','directionMode','behaviorContractRef','behaviorContractFingerprint','proofMatrixFingerprint','sourceBoundaryFingerprint']) {
         if (input[field] !== compiledResult[field]) errors.push(`source apply ${field} differs from the registered compiled request`);
       }
-      for (const field of [...GOVERNANCE_FIELDS,'proofMatrix','constraints','sourceBoundary']) {
+      for (const field of ['directionEvidence',...GOVERNANCE_FIELDS,'proofMatrix','constraints','sourceBoundary']) {
         if (!sameValue(input[field], compiledResult[field])) errors.push(`source apply ${field} differs from the registered compiled request`);
       }
       if (input.directionMode === 'none') {
-        if (input.directionBinding !== null) errors.push('refine source apply cannot carry a generated direction binding');
+        if (input.directionBinding !== null) errors.push('source apply directionMode none cannot carry a generated direction binding');
       } else {
         const directionRef = input.directionBinding?.directionGenerateReturnReceiptRef;
         const direction = validatedDirections.get(directionRef);
@@ -487,7 +511,7 @@ export function createOperatorInvocationBindingRegistry() {
           if (!selection || selection.selectedDirectionId !== input.directionBinding?.selectedDirectionId) errors.push('alternatives source apply requires the exact registry-validated user selection');
         }
       }
-      for (const field of ['mode','compiledRequestRef','compiledRequestFingerprint','directionMode','directionBinding',...GOVERNANCE_FIELDS,'proofMatrix','proofMatrixFingerprint','targetRef','behaviorContractRef','behaviorContractFingerprint','sourceBoundary','sourceBoundaryFingerprint']) {
+      for (const field of ['mode','compiledRequestRef','compiledRequestFingerprint','uxUiChangeLevel','directionMode','directionEvidence','directionBinding',...GOVERNANCE_FIELDS,'proofMatrix','proofMatrixFingerprint','targetRef','behaviorContractRef','behaviorContractFingerprint','sourceBoundary','sourceBoundaryFingerprint']) {
         if (!sameValue(result?.[field], input[field])) errors.push(`source apply result ${field} differs from invocation input`);
       }
       return errors;

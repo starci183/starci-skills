@@ -206,7 +206,7 @@ function buildLocalRoute({ source, repositoriesRoot, workspaceRoot, declaration 
   const v6 = route.schemaVersion === 6;
   const local = {
     $schema: '../../../../../.claude/readiness/initialization/workspaces/local-route.schema.json',
-    ...(v6 ? { schemaVersion: 6 } : { version: 1 }),
+    ...(v6 ? { schemaVersion: 6, schemaRevision: 2 } : { version: 1 }),
     project: route.project,
     role: route.role,
     source: {
@@ -224,7 +224,14 @@ function buildLocalRoute({ source, repositoriesRoot, workspaceRoot, declaration 
       ...(route.repository.gitPolicy ? { gitPolicy: route.repository.gitPolicy } : {})
     },
     context: v6
-      ? { ...commonContext, grammarId: context.grammarId }
+      ? {
+          ...commonContext,
+          contract: (context.contract ?? null) === null
+            ? null
+            : resolveContextFile(repository, context.contract, `${route.project}/${route.role} contract`),
+          contractSource: context.contractSource ?? null,
+          grammarId: context.grammarId
+        }
       : { ...commonContext, grammar: context.grammar, grammarProfile: context.grammarProfile },
     updatedAt: new Date().toISOString()
   };

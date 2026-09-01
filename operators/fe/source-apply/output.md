@@ -8,7 +8,7 @@
 
 `applied` repeats the mode, compiled request ref/fingerprint, Grammar decision/audit identity,
 iconography and media provenance manifests, product-family evidence, proof matrix,
-direction mode/binding, target, behavior-contract
+UX/UI change level, exact direction evidence, direction mode/binding, target, behavior-contract
 binding, source-boundary files/before hashes,
 and exact mutation effect records. Artifact refs must equal changed paths, remain inside the repeated
 boundary, and prove a real created/updated/deleted before-to-after transition. Its
@@ -17,8 +17,11 @@ binding. It also requires exact
 mutation evidence, no gaps, and no handoff. The parent must compare every repeated binding with the
 invocation before accepting the receipt.
 
-The compiled request and selected direction refs must appear in evidence. `backend-required`
-requires a null result, exact evidence/gaps, and one backend handoff whose
+The compiled request and, when generation ran, selected direction refs must appear in evidence.
+For approved reconstruct/new reuse, the direction identity, fingerprint, and direction-specific
+approval ref also remain in evidence unchanged; runtime binding rejects compile-to-apply drift.
+
+`backend-required` requires a null result, exact evidence/gaps, and one backend handoff whose
 `resumeState` exactly repeats the invocation's `context.resumeState`. `blocked`
 requires a null result, exact evidence/gaps, and no handoff. Green tests, prose, or an artifact outside
 the frozen boundary cannot substitute for effect evidence.

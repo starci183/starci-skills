@@ -4,7 +4,10 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import test from 'node:test';
 import { assertNeutralAdversarialDecision, canonicalMachine, conditionMatches, nextState, validatedOperatorReturn, validatedWaitResume } from './route-machine.mjs';
+import { validateInput as validateRequestCompileInput } from '../operators/fe/request-compile/validate-input.mjs';
 import { validateOutput as validateRequestCompileOutput } from '../operators/fe/request-compile/validate-output.mjs';
+import { validateInput as validateSourceApplyInput } from '../operators/fe/source-apply/validate-input.mjs';
+import { validateInput as validateFeInput } from './starci-fe-process/validate-input.mjs';
 import { REQUIRED_PROBE_CATEGORIES, REQUIRED_PROBE_PHASES, REQUIRED_VIEWPORTS } from '../operators/fe/strict-ui-validation.mjs';
 import { validatorFor } from '../operators/validation.mjs';
 import { createReceipt, fingerprint } from '../runtime/trace.mjs';
@@ -31,7 +34,7 @@ const requestCompiled = () => {
     targetRef:'surface://one',
     uxUiChangeLevel:'refine',
     directionMode:'none',
-    directionEvidence:{classification:'not-applicable',evidenceRefs:['request://one']},
+    directionEvidence:{classification:'not-applicable',approvedDirectionAuthority:null,evidenceRefs:['request://one']},
     behaviorContractRef:'behavior://profile-one',
     behaviorContractFingerprint:`sha256:${'b'.repeat(64)}`,
     grammarBinding:{bindingRef:'grammar-binding://profile',packageRef:'grammar-package://profile',manifestRef:'grammar://profile/manifest',exportRefs:['grammar://profile/card'],contentSha256:`sha256:${'c'.repeat(64)}`,authorityRevision:'grammar-revision-1',decisionManifestFingerprint:`sha256:${'d'.repeat(64)}`,auditPlanRef:'grammar-audit://profile',auditPlanFingerprint:`sha256:${'0'.repeat(64)}`,compositionOwners:[{ownerRef:'owner://profile-card',ownerLayer:'grammar',authorityRef:'grammar://profile/card',patternRef:'pattern://profile-card'}]},
@@ -51,10 +54,75 @@ const requestCompiled = () => {
   result.mediaManifest.manifestFingerprint=fingerprint({manifestRef:result.mediaManifest.manifestRef,mode:result.mediaManifest.mode,assetRef:result.mediaManifest.assetRef,artifactRefs:result.mediaManifest.artifactRefs,provenanceRefs:result.mediaManifest.provenanceRefs,responsiveTreatmentRef:result.mediaManifest.responsiveTreatmentRef,altIntentRef:result.mediaManifest.altIntentRef,fallbackRef:result.mediaManifest.fallbackRef});
   result.grammarBinding.auditPlanFingerprint=fingerprint({auditPlanRef:result.grammarBinding.auditPlanRef,manifestRef:result.grammarBinding.manifestRef,decisionManifestFingerprint:result.grammarBinding.decisionManifestFingerprint,compositionOwners:result.grammarBinding.compositionOwners,proofMatrixFingerprint:result.proofMatrixFingerprint,iconographyManifestFingerprint:result.iconographyManifest.manifestFingerprint,mediaManifestFingerprint:result.mediaManifest.manifestFingerprint});
   result.compiledRequestFingerprint=compiledFingerprint(result);
-  return {schemaVersion:7,operatorId:'fe/request-compile',output:{outcome:'compiled',result,gaps:[],evidenceRefs:['authority://one','grammar-package://profile','grammar://profile/manifest','grammar-audit://profile','iconography://profile','media-manifest://profile',...result.productFamilyEvidence.benchmarkRasterRefs],handoff:null,repair:null}};
+  return {schemaVersion:7,operatorId:'fe/request-compile',output:{outcome:'compiled',result,gaps:[],evidenceRefs:['authority://one','request://one','grammar-package://profile','grammar://profile/manifest','grammar-audit://profile','iconography://profile','media-manifest://profile',...result.productFamilyEvidence.benchmarkRasterRefs],handoff:null,repair:null}};
 };
-const requestInput = () => ({ schemaVersion:7, operatorId:'fe/request-compile', context:{ authorityRefs:['authority://one'], evidenceRefs:['request://one'], uiKnowledgeId:'fe.ui', scopeKnowledgeId:'fe.ux-ui-change-levels' }, input:{ targetRef:'surface://one', uxUiChangeLevel:'refine', directionMode:'none', directionEvidence:{classification:'not-applicable',evidenceRefs:['request://one']}, constraints:['delivery-mode=ui-only-preserve-business'] } });
+const requestInput = () => ({ schemaVersion:7, operatorId:'fe/request-compile', context:{ authorityRefs:['authority://one'], evidenceRefs:['request://one'], uiKnowledgeId:'fe.ui', scopeKnowledgeId:'fe.ux-ui-change-levels', directionKnowledgeId:'direction.visualization' }, input:{ targetRef:'surface://one', uxUiChangeLevel:'refine', directionMode:'none', directionEvidence:{classification:'not-applicable',approvedDirectionAuthority:null,evidenceRefs:['request://one']}, constraints:['delivery-mode=ui-only-preserve-business'] } });
+const approvedDirectionAuthority = (suffix) => ({
+  directionRef:`direction://${suffix}/approved`,
+  directionFingerprint:`sha256:${(suffix === 'new' ? '6' : '5').repeat(64)}`,
+  approvalRef:`direction-approval://${suffix}/approved`,
+});
+const approvedEvidence = (suffix) => {
+  const authority=approvedDirectionAuthority(suffix);
+  return {classification:'approved',approvedDirectionAuthority:authority,evidenceRefs:[authority.directionRef,authority.directionFingerprint,authority.approvalRef]};
+};
+const feSkillInput = () => ({
+  schemaVersion:7,
+  runId:'direction-authority-test',
+  project:'starci-academy',
+  selection:{analyzerVersion:2,skillId:'starci-fe-process',confidence:'exact',interactionPolicy:'ask-only-when-stuck',activeInputRefs:[],passiveContextRefs:[]},
+  intent:'redesign',
+  uxUiChangeLevel:'refine',
+  directionMode:'none',
+  directionEvidence:{classification:'not-applicable',approvedDirectionAuthority:null,evidenceRefs:['request://direction-authority-test']},
+  objective:'Refine one surface.',
+  auditTargetScore:null,
+  auditScoreHistory:[],
+  targetHints:[],
+  authorityRefs:[],
+  resume:null,
+  returnReceipt:null,
+  progressHistory:[],
+  mutationAuthorizationRef:null,
+  verifiedFrontendRoute:'route://starci-academy/fe',
+  exactFiles:[],
+  layoutOwnerCeiling:{targetOwnerRef:'surface://one',directInteractionOwnerRefs:[],mutableNestedLayoutRefs:[],mutableAncestorLayoutRefs:[],immutableAncestorLayoutRefs:[]},
+  approvedContractFingerprint:null,
+  receiptType:'NONE',
+  scope:{status:'frozen',unit:'frontend-surface',targetRefs:['surface://one'],inclusionRefs:[],exclusionRefs:[],writeRoots:[],externalMutation:false,approvalRef:null,completionProofRefs:['proof://direction-authority-test'],dimensions:[{key:'frontend.ux-ui.change-level',value:'refine',authorityRef:'scope://direction-authority-test'},{key:'frontend.layout.owner-ceiling',value:'surface-only',authorityRef:'scope://direction-authority-test'}],ambiguityRefs:[]},
+});
+const sourceApplyInput = (compiledDocument, authorityRefs) => {
+  const result=compiledDocument.output.result;
+  const evidenceRefs=[...new Set([...compiledDocument.output.evidenceRefs,result.compiledRequestRef,...result.directionEvidence.evidenceRefs])];
+  return {
+    schemaVersion:7,
+    operatorId:'fe/source-apply',
+    context:{authorityRefs,evidenceRefs,uiKnowledgeId:'fe.ui',resumeState:'apply'},
+    input:{
+      targetRef:result.targetRef,
+      mode:'apply',
+      compiledRequestRef:result.compiledRequestRef,
+      compiledRequestFingerprint:result.compiledRequestFingerprint,
+      uxUiChangeLevel:result.uxUiChangeLevel,
+      directionMode:result.directionMode,
+      directionEvidence:structuredClone(result.directionEvidence),
+      directionBinding:null,
+      grammarBinding:structuredClone(result.grammarBinding),
+      iconographyManifest:structuredClone(result.iconographyManifest),
+      mediaManifest:structuredClone(result.mediaManifest),
+      productFamilyEvidence:structuredClone(result.productFamilyEvidence),
+      proofMatrix:structuredClone(result.proofMatrix),
+      proofMatrixFingerprint:result.proofMatrixFingerprint,
+      constraints:[...result.constraints],
+      behaviorContractRef:result.behaviorContractRef,
+      behaviorContractFingerprint:result.behaviorContractFingerprint,
+      sourceBoundary:structuredClone(result.sourceBoundary),
+      sourceBoundaryFingerprint:result.sourceBoundaryFingerprint,
+    },
+  };
+};
 let receiptSequence = 0;
+let compiledSequence = 0;
 const neutralInput=(value)=>({...value,neutralAdversarialDecision:{
   add:{disposition:'reject',rationale:'No evidenced missing capability serves this bounded mission.',evidenceRefs:['evidence://analysis']},
   change:{disposition:'adopt',rationale:'The requested outcome requires the bounded change.',evidenceRefs:['evidence://analysis']},
@@ -87,10 +155,14 @@ const returnReceipt = (stateId, input, outputDocument, overrides={}) => {
 };
 const route = async (candidate, stateId, input = requestInput()) => {
  const outputDocument=requestCompiled();
+ const compiledRequestRef=`compiled-request://route-${++compiledSequence}`;
+ outputDocument.output.result.compiledRequestRef=compiledRequestRef;
+ outputDocument.output.result.artifactRefs[0]=compiledRequestRef;
  outputDocument.output.result.targetRef=input.input.targetRef;
  outputDocument.output.result.uxUiChangeLevel=input.input.uxUiChangeLevel;
  outputDocument.output.result.directionMode=input.input.directionMode;
  outputDocument.output.result.directionEvidence=structuredClone(input.input.directionEvidence);
+ outputDocument.output.evidenceRefs=[...new Set([...outputDocument.output.evidenceRefs,...input.input.directionEvidence.evidenceRefs])];
  outputDocument.output.result.constraints=[...input.input.constraints];
  outputDocument.output.result.compiledRequestFingerprint=compiledFingerprint(outputDocument.output.result);
  return await validatedOperatorReturn({
@@ -137,6 +209,65 @@ test('operator states reject narrated PASS and accept only validator-issued invo
   const currentInput=requestInput(); currentInput.input.targetRef='surface://current';
   const stale = await route(fe,'request-compile',staleInput);
   assert.throws(() => nextState(fe, 'request-compile', stale, currentInput, stale.invocationRef, stale.missionId), /input fingerprint differs/);
+});
+
+test('approved reconstruct and new directions skip generation while refine stays not-applicable', async () => {
+  const fe = machine('starci-fe-process');
+  for (const uxUiChangeLevel of ['reconstruct', 'new']) {
+    const approved = requestInput();
+    approved.input.uxUiChangeLevel = uxUiChangeLevel;
+    approved.input.directionEvidence = approvedEvidence(uxUiChangeLevel);
+    const authority=approved.input.directionEvidence.approvedDirectionAuthority;
+    approved.context.authorityRefs.push(authority.directionRef,authority.approvalRef);
+    approved.context.evidenceRefs.push(...approved.input.directionEvidence.evidenceRefs);
+    assert.equal(validateRequestCompileInput(approved).valid, true, uxUiChangeLevel);
+    const compiled = await route(fe, 'request-compile', approved);
+    assert.equal(nextState(fe, 'request-compile', compiled, approved, compiled.invocationRef, compiled.missionId), 'apply');
+  }
+
+  const invalidRefine = requestInput();
+  invalidRefine.input.directionEvidence = approvedEvidence('refine');
+  assert.match(validateRequestCompileInput(invalidRefine).errors.join('\n'), /refine requires not-applicable/i);
+
+  const invalidReconstruct = requestInput();
+  invalidReconstruct.input.uxUiChangeLevel = 'reconstruct';
+  assert.match(validateRequestCompileInput(invalidReconstruct).errors.join('\n'), /requires approved direction evidence/i);
+
+  const unboundApproval = requestInput();
+  unboundApproval.input.uxUiChangeLevel = 'reconstruct';
+  unboundApproval.input.directionEvidence = approvedEvidence('reconstruct');
+  unboundApproval.context.evidenceRefs.push(...unboundApproval.input.directionEvidence.evidenceRefs);
+  assert.match(validateRequestCompileInput(unboundApproval).errors.join('\n'), /exact approved direction authority/i);
+  unboundApproval.context.authorityRefs.push('authority://generic-direction-approval');
+  assert.match(validateRequestCompileInput(unboundApproval).errors.join('\n'), /exact approved direction authority/i);
+  unboundApproval.context.authorityRefs=[];
+  assert.match(validateRequestCompileInput(unboundApproval).errors.join('\n'), /array is too short|exact approved direction authority/i);
+});
+
+test('public skill and source apply reject generic or empty approved-direction authority refs', () => {
+  const skillInput=feSkillInput();
+  skillInput.uxUiChangeLevel='reconstruct';
+  skillInput.scope.dimensions.find(({key})=>key==='frontend.ux-ui.change-level').value='reconstruct';
+  skillInput.directionEvidence=approvedEvidence('reconstruct');
+  const authority=skillInput.directionEvidence.approvedDirectionAuthority;
+  skillInput.authorityRefs=[authority.directionRef,authority.approvalRef];
+  assert.equal(validateFeInput(skillInput).valid,true);
+  skillInput.authorityRefs=['authority://generic-direction-approval'];
+  assert.match(validateFeInput(skillInput).errors.join('\n'),/exact approved direction authority/i);
+  skillInput.authorityRefs=[];
+  assert.match(validateFeInput(skillInput).errors.join('\n'),/exact approved direction authority/i);
+
+  const compiled=requestCompiled();
+  compiled.output.result.uxUiChangeLevel='reconstruct';
+  compiled.output.result.directionEvidence=approvedEvidence('reconstruct');
+  compiled.output.result.compiledRequestFingerprint=compiledFingerprint(compiled.output.result);
+  compiled.output.evidenceRefs.push(...compiled.output.result.directionEvidence.evidenceRefs);
+  const sourceInput=sourceApplyInput(compiled,[authority.directionRef,authority.approvalRef]);
+  assert.equal(validateSourceApplyInput(sourceInput).valid,true);
+  sourceInput.context.authorityRefs=['authority://generic-direction-approval'];
+  assert.match(validateSourceApplyInput(sourceInput).errors.join('\n'),/exact approved direction authority/i);
+  sourceInput.context.authorityRefs=[];
+  assert.match(validateSourceApplyInput(sourceInput).errors.join('\n'),/array is too short|exact approved direction authority/i);
 });
 
 test('operator RETURN receipts are runtime-issued and may be wrapped only once', async () => {

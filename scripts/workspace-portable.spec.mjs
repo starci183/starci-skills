@@ -6,6 +6,7 @@ import {
   mkdirSync,
   mkdtempSync,
   readFileSync,
+  realpathSync,
   rmSync,
   writeFileSync
 } from 'node:fs';
@@ -47,6 +48,11 @@ function fixture(t) {
   t.after(() => rmSync(repositories, { recursive: true, force: true }));
   repository(source, 'https://github.com/starci-lab/source.git');
   repository(frontend, 'https://github.com/starci-lab/nivo-fe.git');
+  const frontendContract = join(frontend, 'packages', 'ui', 'src', 'contracts', 'index.ts');
+  mkdirSync(dirname(frontendContract), { recursive: true });
+  writeFileSync(frontendContract, 'export const CONTRACTS = {};\n');
+  git(frontend, 'add', 'packages/ui/src/contracts/index.ts');
+  git(frontend, 'commit', '-m', 'contract fixture');
   mkdirSync(join(source, '.claude', 'readiness', 'initialization', 'workspaces'), { recursive: true });
   for (const name of ['config.schema.json', 'portable-route.schema.json', 'local-route.schema.json']) {
     copyFileSync(join(schemaRoot, name), join(source, '.claude', 'readiness', 'initialization', 'workspaces', name));
@@ -68,6 +74,7 @@ function fixture(t) {
   writeJson(join(source, '.workspaces', 'projects', 'nivo', 'fe.json'), {
     $schema: '../../../.claude/readiness/initialization/workspaces/portable-route.schema.json',
     schemaVersion: 6,
+    schemaRevision: 2,
     project: 'nivo',
     role: 'fe',
     repository: {
@@ -76,6 +83,8 @@ function fixture(t) {
     },
     context: {
       instructions: [],
+      contract: 'packages/ui/src/contracts/index.ts',
+      contractSource: 'discovered:packages/ui/src/contracts/index.ts',
       manifests: ['package.json'],
       grammarId: 'core'
     }
@@ -109,6 +118,9 @@ test('hydrates V1 and V6 routes, refreshes stale heads, and preserves credential
   assert.equal(JSON.parse(readFileSync(v1Path, 'utf8')).version, 1);
   const v6 = JSON.parse(readFileSync(v6Path, 'utf8'));
   assert.equal(v6.schemaVersion, 6);
+  assert.equal(v6.schemaRevision, 2);
+  assert.equal(v6.context.contract, realpathSync(join(f.frontend, 'packages', 'ui', 'src', 'contracts', 'index.ts')));
+  assert.equal(v6.context.contractSource, 'discovered:packages/ui/src/contracts/index.ts');
   assert.equal(v6.context.grammarId, 'core');
   assert.deepEqual(v6.repository.gitPolicy, {
     mutationBranch: 'main',
@@ -157,21 +169,44 @@ test('bootstrap clones a missing declared sibling and hydrates it without user-s
   assert.equal(runScript(f, 'check', '--project', 'nivo').status, 0);
 });
 
-test('V6 rejects legacy grammar fields, mixed versions, and non-FE grammar', () => {
+test('current V6 rejects legacy grammar fields, mixed versions, and non-FE grammar while accepting the immediate predecessor', () => {
   const base = {
     $schema: '../../../.claude/readiness/initialization/workspaces/portable-route.schema.json',
     schemaVersion: 6,
+    schemaRevision: 2,
     project: 'nivo',
     role: 'fe',
     repository: {
       kind: 'sibling', directory: 'nivo-fe', gitRepository: 'https://github.com/starci-lab/nivo-fe.git', branch: 'main',
       gitPolicy: { mutationBranch: 'main', worktreeBranches: 'forbidden', incomingBranchRefs: 'merge-into-mutation-branch' }
     },
-    context: { instructions: [], manifests: ['package.json'], grammarId: 'core' }
+    context: {
+      instructions: [],
+      contract: null,
+      contractSource: null,
+      manifests: ['package.json'],
+      grammarId: 'core'
+    }
   };
+  const preContractV6 = structuredClone(base);
+  delete preContractV6.schemaRevision;
+  delete preContractV6.context.contract;
+  delete preContractV6.context.contractSource;
+  assert.doesNotThrow(() => validatePortableRoute(preContractV6));
+  const pairedUnrevisionedV6 = structuredClone(base);
+  delete pairedUnrevisionedV6.schemaRevision;
+  assert.doesNotThrow(() => validatePortableRoute(pairedUnrevisionedV6));
   assert.throws(() => validatePortableRoute({ ...base, version: 1 }), /invalid/);
   assert.throws(() => validatePortableRoute({ ...base, context: { ...base.context, grammar: 'starci' } }), /invalid/);
   assert.throws(() => validatePortableRoute({ ...base, role: 'be' }), /non-FE grammarId must be null|invalid/);
+  assert.throws(() => validatePortableRoute({
+    ...base,
+    context: { ...base.context, contract: 'packages/ui/src/contracts/index.ts', contractSource: null }
+  }), /invalid/);
+  assert.throws(() => validatePortableRoute({
+    ...base,
+    context: { ...base.context, contract: null, contractSource: 'discovered:packages/ui/src/contracts/index.ts' }
+  }), /invalid/);
   assert.throws(() => validatePortableRoute({ ...base, repository: { ...base.repository, directory: '../nivo-fe' } }), /invalid/);
   assert.throws(() => validatePortableRoute({ ...base, repository: { ...base.repository, gitRepository: 'https://token@github.com/starci-lab/nivo-fe.git' } }), /invalid/);
   assert.throws(() => validatePortableRoute({

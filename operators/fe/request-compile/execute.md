@@ -16,7 +16,26 @@ scope or target ambiguity returns `blocked`. A missing Grammar owner capability 
 or duplicate Grammar authority. Missing business or backend authority returns the matching typed
 cross-domain outcome with no compiled result. Prose cannot substitute for the compiled artifact.
 
-Use `knowledge/ui.md`, `knowledge/ux-ui-change-levels.md`, and the routed project Grammar in
+Classify the direction contract before routing. Refine is exactly
+`directionEvidence.classification=not-applicable` with `directionMode=none`. Reconstruct/new with an
+exact approved direction is exactly `classification=approved` with `directionMode=none` and applies
+without generation only when the typed direction identity, exact content fingerprint, and
+direction-specific approval ref are present in evidence and the two authority refs match context
+exactly. Reject generic or empty authority references. Reconstruct/new without that approval uses the matching `dominant` or
+`ambiguous|comparison-requested` evidence for `directionMode=dominant|alternatives`.
+
+For reconstruct/new without an exact approved direction, classify whether the business domain and interaction model are familiar from
+approved authority plus product-family evidence. When unfamiliar, perform the bounded external
+reference research in `knowledge/direction-visualization.md` before compiling `directionEvidence`.
+Evidence refs must preserve the research queries, source URLs, access date, observed relationships,
+limitations, and either convergence or the explicit exhausted-search gap. Do not promote external
+examples, `ui-ux-pro-max`, Impeccable, or another design dataset/skill into business, Grammar, or visual
+authority. If an exhausted search still leaves a material business promise, actor decision, risk, or
+recovery behavior unresolved, return `business-required` or `blocked`; do not compile taste as a
+dominant direction.
+
+Use `knowledge/ui.md`, `knowledge/ux-ui-change-levels.md`,
+`knowledge/direction-visualization.md`, and the routed project Grammar in
 `AI-first -> Rules-first -> Grammar-last` order. Return only the typed compilation receipt; the
 parent Skill owns whether the next frontend job is direction generation or source application and
 owns every cross-domain continuation.

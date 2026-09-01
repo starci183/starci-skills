@@ -4,6 +4,17 @@
   "ownerThreadId": "thread://central-runtime/unbound",
   "generation": 1,
   "status": "starting",
+  "endpointBinding": {
+    "authority": "workspace-route-port-projection",
+    "project": "starci-academy",
+    "application": "main",
+    "services": {
+      "frontend": "web",
+      "api": "core",
+      "identity": "keycloak"
+    },
+    "authorityFingerprint": "sha256:12a7b1617a72fd3e603816e5fa3f05f786984df05502fda40280131db9654781"
+  },
   "endpoints": {
     "frontend": "http://localhost:3000",
     "api": "http://localhost:3001",

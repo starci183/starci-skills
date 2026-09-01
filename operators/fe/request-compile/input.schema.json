@@ -23,7 +23,8 @@
         "authorityRefs",
         "evidenceRefs",
         "uiKnowledgeId",
-        "scopeKnowledgeId"
+        "scopeKnowledgeId",
+        "directionKnowledgeId"
       ],
       "properties": {
         "authorityRefs": {
@@ -54,6 +55,10 @@
         "scopeKnowledgeId": {
           "description": "Exact UX/UI change-level scope knowledge binding.",
           "const": "fe.ux-ui-change-levels"
+        },
+        "directionKnowledgeId": {
+          "description": "Exact direction visualization and unfamiliar-domain research knowledge binding.",
+          "const": "direction.visualization"
         }
       }
     },
@@ -82,16 +87,31 @@
           ]
         },
         "directionMode": {
-          "description": "Executable projection of observed direction need.",
+          "description": "Executable projection of direction work: none for refine or an already approved reconstruct/new direction, otherwise dominant or alternatives for generation.",
           "enum": ["none", "dominant", "alternatives"]
         },
         "directionEvidence": {
-          "description": "Observed dominance, material ambiguity, or explicit comparison authority that justifies directionMode.",
+          "description": "Exact classification that justifies directionMode and change level. Approved reconstruct/new evidence carries a typed direction identity, content fingerprint, and direction-specific approval authority.",
           "type": "object",
           "additionalProperties": false,
-          "required": ["classification", "evidenceRefs"],
+          "required": ["classification", "approvedDirectionAuthority", "evidenceRefs"],
           "properties": {
-            "classification": { "enum": ["not-applicable", "dominant", "ambiguous", "comparison-requested"] },
+            "classification": { "enum": ["not-applicable", "approved", "dominant", "ambiguous", "comparison-requested"] },
+            "approvedDirectionAuthority": {
+              "anyOf": [
+                {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["directionRef", "directionFingerprint", "approvalRef"],
+                  "properties": {
+                    "directionRef": { "type": "string", "pattern": "^direction://[A-Za-z0-9][A-Za-z0-9._/-]*$" },
+                    "directionFingerprint": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
+                    "approvalRef": { "type": "string", "pattern": "^direction-approval://[A-Za-z0-9][A-Za-z0-9._/-]*$" }
+                  }
+                },
+                { "type": "null" }
+              ]
+            },
             "evidenceRefs": {
               "type": "array",
               "uniqueItems": true,

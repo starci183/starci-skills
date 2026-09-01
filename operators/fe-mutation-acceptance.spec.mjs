@@ -18,10 +18,21 @@ test('source-apply owns one atomic apply-or-repair mutation', () => {
 test('source-apply consumes the complete author-once contract', () => {
   const required = input.properties.input.required;
   for (const field of [
-    'compiledRequestRef', 'compiledRequestFingerprint', 'directionMode', 'directionBinding',
+    'compiledRequestRef', 'compiledRequestFingerprint', 'uxUiChangeLevel', 'directionMode',
+    'directionEvidence', 'directionBinding',
     'grammarBinding', 'proofMatrix', 'proofMatrixFingerprint', 'behaviorContractRef',
     'behaviorContractFingerprint', 'sourceBoundary', 'sourceBoundaryFingerprint',
   ]) assert.ok(required.includes(field), field);
+});
+
+test('approved direction reuse requires typed identity, fingerprint, and approval authority', () => {
+  const evidence = input.$defs.directionEvidence;
+  assert.deepEqual(evidence.required, ['classification', 'approvedDirectionAuthority', 'evidenceRefs']);
+  const authority = input.$defs.approvedDirectionAuthority;
+  assert.deepEqual(authority.required, ['directionRef', 'directionFingerprint', 'approvalRef']);
+  assert.equal(authority.properties.directionRef.pattern, '^direction://[A-Za-z0-9][A-Za-z0-9._/-]*$');
+  assert.equal(authority.properties.directionFingerprint.pattern, '^sha256:[0-9a-f]{64}$');
+  assert.equal(authority.properties.approvalRef.pattern, '^direction-approval://[A-Za-z0-9][A-Za-z0-9._/-]*$');
 });
 
 test('a generated direction is bound by receipt, member id, artifact ref, and Grammar manifest', () => {

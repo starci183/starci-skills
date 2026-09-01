@@ -7,12 +7,18 @@ description: Verify one product-decision flow and publish its canonical backend-
 
 Verify one product-decision flow and publish its canonical backend-owned UAT snapshot and result contract.
 
-Predeclare product-decision cases and consume runtime/template authority without editing it. Store canonical snapshots and results only under the routed backend Source at `.worktrees/uat/<feature>/<flow>/`; never write checkout-local UAT authority or add an extra project directory. Independent Behavior, UX, and UI evidence determines the result.
+Predeclare product-decision cases and consume runtime/template authority without editing it. Store canonical snapshots and results only under the routed backend Source at `.worktrees/uat/<feature>/<flow>/`; never write checkout-local UAT authority or add an extra project directory. A canonical ref is valid only when the exact `snapshot.json` or `result.json` exists, passes its template schema, and matches its returned content fingerprint. Independent Behavior, UX, and UI evidence determines the result.
 
 Publish `complete` only from the final `test/uat-result-publish=passed` route. A fresh finding may
 return to frontend only as typed FE-owned counterevidence bound to the current snapshot, unchanged
 source, prior blind visual PASS, exact evidence fingerprint, and `reapply`. All ordinary failures
 block; they never become completion or an untyped frontend retry.
+
+The public output boundary reopens the exact canonical `result.json`, validates its schema and
+feature/flow path, recomputes its semantic content fingerprint, and requires its stored outcome to
+match the public verdict. A syntactically valid reference or fingerprint supplied only by the
+caller cannot certify UAT; invocation and Quality ancestry remain owned by the validated
+`test/uat-result-publish` RETURN route.
 
 ## Runtime continuation
 

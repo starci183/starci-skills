@@ -9,9 +9,19 @@
     "output": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["outcome", "result", "gaps", "evidenceRefs"],
+      "required": ["outcome", "canonicalRef", "contentFingerprint", "result", "gaps", "evidenceRefs"],
       "properties": {
         "outcome": { "description": "Typed final UAT result routed by the Skill machine.", "enum": ["passed", "frontend-counterevidence", "failed", "blocked"] },
+        "canonicalRef": {
+          "description": "Exact backend-owned canonical UAT result.json reference, or null when publication itself is blocked.",
+          "type": ["string", "null"],
+          "pattern": "^\\.worktrees/uat/[a-z0-9][a-z0-9-]*/[a-z0-9][a-z0-9-]*/result\\.json$"
+        },
+        "contentFingerprint": {
+          "description": "Fingerprint of the parsed canonical result content, or null when publication itself is blocked.",
+          "type": ["string", "null"],
+          "pattern": "^sha256:[0-9a-f]{64}$"
+        },
         "result": {
           "description": "Canonical PASS or fresh frontend-owned counterevidence product; null for ordinary failure/blocking.",
           "anyOf": [

@@ -238,11 +238,19 @@ Before changing a shared product runtime, inventory its listener, command, worki
 session owner. Reuse a healthy verified runtime. `EADDRINUSE` is a coordination finding, not permission
 to kill another process.
 
-For local StarCi product work, the Control Panel delegates exactly one centralized runtime task to own
-FE `localhost:3000`, API `localhost:3001`, and identity `localhost:8080`. Feature, audit, quality, and
-UAT tasks are consumers: they communicate runtime needs to that owner and must not start, stop,
-restart, replace, or claim any shared listener. UAT identity is isolated by account and Browser
-session, never by rebinding server environment or launching a per-feature API. Only the Control Panel
+For local StarCi product work, `.claude/config.yaml` preserves the StarCi Academy default binding at
+FE `localhost:3000`, API `localhost:3001`, and identity `localhost:8080`. A routed project's Control
+Panel may instead issue one owner generation with a closed `workspace-route-port-projection` binding.
+That binding is resolved from the verified FE/BE routes, `.workspaces/ports/`, and the routed backend's
+`metadata.json`; caller-supplied origins or arbitrary loopback ports are invalid. For example,
+`nivo/core` binds `webApp/api/keycloak` to `3067/3068/8147`. Every authenticated Browser lease must
+match the ready owner's project, application, generation, owner identity, endpoint-authority
+fingerprint, and exact FE origin.
+
+Feature, audit, quality, and UAT tasks are consumers: they communicate runtime needs to that owner and
+must not start, stop, restart, replace, or claim any shared listener. UAT identity is isolated by
+account and Browser session, never by rebinding server environment or launching a per-feature API.
+Only the Control Panel
 may create or replace the runtime-owner task. A verified service failure is reported to that task;
 feature work pauses without mutating shared processes.
 

@@ -117,25 +117,40 @@ function jsonFiles(root) {
   return files.sort();
 }
 
-function migrateLegacyRoute(route, label) {
-  if (route.version !== 1) return route;
-  let grammarId = null;
-  if (route.context.grammar !== null) {
-    if (route.role === 'fe' && ['core', 'offset-pop'].includes(route.context.grammar)) grammarId = route.context.grammar;
-    else throw new Error(`${label} requires an explicit V6 grammarId mapping`);
-  }
-  const migrated = {
-    $schema: route.$schema,
-    schemaVersion: 6,
-    project: route.project,
-    role: route.role,
-    repository: route.repository,
-    context: {
-      instructions: route.context.instructions,
-      manifests: route.context.manifests,
-      grammarId
+function migrateRouteToCurrent(route, label) {
+  let migrated = route;
+  if (route.version === 1) {
+    let grammarId = null;
+    if (route.context.grammar !== null) {
+      if (route.role === 'fe' && ['core', 'offset-pop'].includes(route.context.grammar)) grammarId = route.context.grammar;
+      else throw new Error(`${label} requires an explicit V6 grammarId mapping`);
     }
-  };
+    migrated = {
+      $schema: route.$schema,
+      schemaVersion: 6,
+      schemaRevision: 2,
+      project: route.project,
+      role: route.role,
+      repository: route.repository,
+      context: {
+        instructions: route.context.instructions,
+        contract: null,
+        contractSource: null,
+        manifests: route.context.manifests,
+        grammarId
+      }
+    };
+  } else if (route.schemaVersion === 6 && route.schemaRevision !== 2) {
+    migrated = {
+      ...route,
+      schemaRevision: 2,
+      context: {
+        ...route.context,
+        contract: route.context.contract ?? null,
+        contractSource: route.context.contractSource ?? null
+      }
+    };
+  }
   validatePortableRoute(migrated, label);
   return migrated;
 }
@@ -161,6 +176,7 @@ function inspectWorkspaces(source, repositoriesRoot) {
   const evidence = [];
   const findings = [];
   const legacyRoutes = [];
+  const legacyV6Routes = [];
   const grammarMappingRequired = [];
   const changedRoutes = [];
   let configVersion = null;
@@ -204,11 +220,14 @@ function inspectWorkspaces(source, repositoriesRoot) {
       if (route.version === 1) {
         legacyRoutes.push(label);
         try {
-          migrateLegacyRoute(route, label);
+          migrateRouteToCurrent(route, label);
         } catch (error) {
           grammarMappingRequired.push(label);
           findings.push(error.message);
         }
+      } else if (route.schemaVersion === 6 && route.schemaRevision !== 2) {
+        legacyV6Routes.push(label);
+        migrateRouteToCurrent(route, label);
       }
     } catch (error) {
       blocked = true;
@@ -238,15 +257,16 @@ function inspectWorkspaces(source, repositoriesRoot) {
     }
   }
 
-  const stale = configLegacy || legacyRoutes.length > 0 || changedRoutes.length > 0;
+  const stale = configLegacy || legacyRoutes.length > 0 || legacyV6Routes.length > 0 || changedRoutes.length > 0;
   const status = blocked ? 'blocked' : stale ? 'initialize-required' : 'ready';
   const code = blocked ? 'workspaces-blocked' : stale ? 'workspaces-upgrade-required' : 'workspaces-ready';
-  evidence.push(`portable-routes:${files.length}`, `legacy-routes:${legacyRoutes.length}`, `stale-local-routes:${changedRoutes.length}`);
+  evidence.push(`portable-routes:${files.length}`, `legacy-routes:${legacyRoutes.length}`, `legacy-v6-routes:${legacyV6Routes.length}`, `stale-local-routes:${changedRoutes.length}`);
   return {
     ...moduleStatus(status, code, evidence, findings),
     configVersion,
     routeCount: files.length,
     legacyRoutes,
+    legacyV6Routes,
     grammarMappingRequired,
     changedRoutes,
     commitPolicyId: commitBoundary.policyId,
@@ -338,8 +358,9 @@ function plannedChanges(modules) {
   for (const file of modules.bootstrap.files.filter((item) => item.status !== 'ready')) changes.push(file.path);
   if (modules.workspaces.configVersion === 1) changes.push('.workspaces/config.json');
   const safeLegacyRoutes = modules.workspaces.legacyRoutes.filter((path) => !modules.workspaces.grammarMappingRequired.includes(path));
-  changes.push(...safeLegacyRoutes);
-  if (modules.workspaces.changedRoutes.length > 0 || safeLegacyRoutes.length > 0) changes.push('hydrate:.workspaces/local/routes');
+  const migratableRoutes = [...safeLegacyRoutes, ...modules.workspaces.legacyV6Routes];
+  changes.push(...migratableRoutes);
+  if (modules.workspaces.changedRoutes.length > 0 || migratableRoutes.length > 0) changes.push('hydrate:.workspaces/local/routes');
   return [...new Set(changes)];
 }
 
@@ -383,16 +404,16 @@ function workspaceWrites(source, module) {
     const config = readJson(configPath);
     writes.push({ path: configPath, content: stableJson({ $schema: config.$schema, schemaVersion: 6, defaultLang: config.defaultLang }) });
   }
-  for (const label of module.legacyRoutes) {
+  for (const label of [...module.legacyRoutes, ...module.legacyV6Routes]) {
     const path = resolve(source, label);
-    writes.push({ path, content: stableJson(migrateLegacyRoute(readJson(path), label)) });
+    writes.push({ path, content: stableJson(migrateRouteToCurrent(readJson(path), label)) });
   }
   return writes;
 }
 
 function localRouteTargets(source, module) {
   const targets = module.changedRoutes.map((path) => resolve(source, path));
-  for (const label of module.legacyRoutes) {
+  for (const label of [...module.legacyRoutes, ...module.legacyV6Routes]) {
     const route = readJson(resolve(source, label));
     targets.push(join(source, '.workspaces', 'local', 'routes', route.project, route.role, 'config.json'));
   }

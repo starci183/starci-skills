@@ -42,9 +42,15 @@ evidence. If provisioning authority or secrets are unavailable, return the exact
 the user to lend personal credentials as a substitute. Anonymous proof is valid only when the frozen
 case explicitly declares `anonymous://explicit/...`.
 
-Local UAT consumes the one Control-Panel-delegated runtime at FE `localhost:3000`, API
-`localhost:3001`, and identity `localhost:8080`. A case owns its account, Browser context, fixtures,
-and artifacts; it never owns a listener or server process. Do not restart API/FE, replace server
+Local UAT consumes the one Control-Panel-delegated owner generation. StarCi Academy retains the
+default FE/API/identity ports `3000/3001/8080`; a routed project consumes only the closed endpoint
+projection recorded by its canonical owner (for example Nivo core `3067/3068/8147`). Case freeze
+rejects arbitrary localhost or remote origins and binds the lease to the ready owner's project,
+application, generation, owner identity, authority fingerprint, and exact FE origin. It also requires
+the lease to be authenticated, unexpired, and equal to the frozen mission and account.
+
+A case owns its account, Browser context, fixtures, and artifacts; it never owns a listener or server
+process. Do not restart API/FE, replace server
 environment, or request a per-feature port merely to change authenticated identity. Concurrent UAT
 identities use isolated Browser sessions against the same runtime. Before each authenticated capture,
 verify the lease origin, principal fingerprint, runtime generation, and expiry. On mismatch,

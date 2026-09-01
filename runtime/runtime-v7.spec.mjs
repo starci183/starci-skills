@@ -1,14 +1,53 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
 import { loadRuntimeConfig } from './config.mjs';
 import { createReceipt, assertProgress, MATERIAL_AI_OPERATORS } from './trace.mjs';
 import { canonicalRoots, uatPair } from './topology.mjs';
 import { validatorFor } from '../operators/validation.mjs';
 import { loadScopePolicy } from './scope-policy.mjs';
+import { createProjectEndpointBinding } from './contracts/endpoint-authority.mjs';
+import { createRuntimeOwnerValidator } from './contracts/runtime-owner.mjs';
+import { createBrowserExecutionLeaseValidator } from './contracts/browser-execution-lease.mjs';
+import { createUatCaseFreezeInputValidator } from '../operators/test/uat-case-freeze/validate-input.mjs';
 
 const base = { receiptId:'receipt:r1', missionId:'m1', skillId:'starci-quality-assure', operatorId:'quality/lint', parentId:'call-parent', childId:'call-child', missionContext:{ project:'starci', objective:'assure' }, context:{ source:'be', invocationRef:'invocation://runtime-v7' }, input:{ exact:true }, expectedOutput:{ outcome:'pass' }, actualOutput:{ outcome:'pass' }, evidenceRefs:['git:abc'], sourceHeads:['git:abc'], transitionRule:{ outcome:'pass', target:'complete' }, resumeState:null, skip:null, error:null };
 const lifecycleFields=(id,hex)=>({missionId:`mission:${id}`,context:{source:'be',invocationRef:`invocation://${id}`,executionRef:`execution://${hex.repeat(64)}`}});
+const writeJson=(file,value)=>{fs.mkdirSync(path.dirname(file),{recursive:true});fs.writeFileSync(file,`${JSON.stringify(value,null,2)}\n`);};
+
+function nivoEndpointWorkspace(t) {
+  const fixtureRoot=fs.mkdtempSync(path.join(os.tmpdir(),'starci-endpoint-authority-'));
+  const sourceRoot=path.join(fixtureRoot,'source');
+  const frontendRoot=path.join(fixtureRoot,'nivo-fe');
+  const backendRoot=path.join(fixtureRoot,'nivo-backend');
+  fs.mkdirSync(sourceRoot,{recursive:true});
+  fs.mkdirSync(frontendRoot,{recursive:true});
+  fs.mkdirSync(backendRoot,{recursive:true});
+  t.after(()=>fs.rmSync(fixtureRoot,{recursive:true,force:true}));
+  const repositories={
+    fe:{kind:'sibling',directory:'nivo-fe',gitRepository:'https://github.com/starci-lab/nivo-fe.git',branch:'main'},
+    be:{kind:'sibling',directory:'nivo-backend',gitRepository:'https://github.com/starci-lab/nivo-backend.git',branch:'main'},
+  };
+  for(const role of ['fe','be']){
+    const diskPath=role==='fe'?frontendRoot:backendRoot;
+    writeJson(path.join(sourceRoot,'.workspaces','projects','nivo',`${role}.json`),{schemaVersion:6,project:'nivo',role,repository:repositories[role],context:{}});
+    writeJson(path.join(sourceRoot,'.workspaces','local','routes','nivo',role,'config.json'),{schemaVersion:6,project:'nivo',role,source:{path:sourceRoot,workspaceRoot:path.join(sourceRoot,'.workspaces')},repository:{diskPath,gitRoot:diskPath,gitRepository:repositories[role].gitRepository,branch:'main'},context:{}});
+  }
+  writeJson(path.join(sourceRoot,'.workspaces','ports','config.json'),{version:1,slotStep:1000});
+  writeJson(path.join(sourceRoot,'.workspaces','ports','nivo.json'),{version:1,project:'nivo',offset:67,applications:{core:0,academy:1}});
+  writeJson(path.join(backendRoot,'metadata.json'),{
+    project:'nivo',
+    ports:{webApp:3067,api:3068,keycloak:8147},
+    portServices:{
+      webApp:{scope:'application',application:'core',basePort:3000},
+      api:{scope:'application',application:'core',basePort:3001},
+      keycloak:{scope:'shared',basePort:8080},
+    },
+  });
+  return {sourceRoot,backendRoot};
+}
 
 test('sole YAML config is strict v7.6 with fresh Sol review and centralized runtime/session ownership', () => assert.deepEqual(loadRuntimeConfig(), {
   version:'7.6.0-beta.1',
@@ -69,15 +108,19 @@ test('UI-only fast lane preserves business authority and exact-file mutation bou
 });
 
 test('central runtime registry binds one owner generation and canonical localhost endpoints',()=>{
-  const validateOwner=validatorFor(new URL('../templates/runtime/owner.schema.json',import.meta.url));
+  const validateOwner=createRuntimeOwnerValidator();
   const owner=JSON.parse(fs.readFileSync(new URL('../templates/runtime/owner.template.json',import.meta.url)));
   assert.equal(validateOwner(owner).valid,true);
   assert.equal(validateOwner({...owner,endpoints:{...owner.endpoints,api:'http://127.0.0.1:3001'}}).valid,false);
   assert.equal(validateOwner({...owner,status:'ready',ownerThreadId:''}).valid,false);
+  const legacyOwner=structuredClone(owner);
+  delete legacyOwner.endpointBinding;
+  assert.equal(validateOwner(legacyOwner).valid,true);
+  assert.equal(validateOwner({...legacyOwner,endpoints:{...legacyOwner.endpoints,frontend:'http://localhost:3999'}}).valid,false);
 });
 
 test('authenticated Browser work requires materialization proof or broker execution',()=>{
-  const validateLease=validatorFor(new URL('./contracts/browser-execution-lease.schema.json',import.meta.url));
+  const validateLease=createBrowserExecutionLeaseValidator({now:()=>Date.parse('2026-08-31T09:00:00.000Z')});
   const base={schemaVersion:1,leaseRef:'browser-lease://mission-1',missionRef:'mission://dashboard',purpose:'product-uat',accountRef:'account://fresh/dashboard/run-1',reuseAttestations:null,principalFingerprint:`sha256:${'a'.repeat(64)}`,runtimeGeneration:1,origin:'http://localhost:3000',fixtureNamespace:'uat-dashboard-run-1',expiresAt:'2026-08-31T09:29:40.167Z',state:'authenticated'};
   const materialized={...base,executionMode:'consumer-materialized',executionOwnerRef:'thread://dashboard',browserContextRef:'browser-context://dashboard/1',consumerTabRef:'browser-tab://dashboard/4',evidenceBrokerRef:null,materializationStatus:'materialized',materializationEvidenceRefs:['browser-observation://dashboard/tab-4']};
   assert.equal(validateLease(materialized).valid,true);
@@ -90,6 +133,53 @@ test('authenticated Browser work requires materialization proof or broker execut
   assert.equal(validateLease(readOnlyReuse).valid,true);
   assert.equal(validateLease({...readOnlyReuse,purpose:'product-uat'}).valid,false);
   assert.equal(validateLease({...readOnlyReuse,reuseAttestations:reuseAttestations.filter((item)=>item!=='fixture-readable')}).valid,false);
+  assert.equal(validateLease({...materialized,expiresAt:'not-a-date'}).valid,false);
+  assert.equal(validateLease({...materialized,expiresAt:'2026-08-31T09:00:00.000Z'}).valid,false);
+  assert.equal(validateLease({...materialized,accountRef:'account://freshness'}).valid,false);
+});
+
+test('Nivo endpoint authority binds owner, authenticated lease, and UAT freeze to 3067/3068/8147',t=>{
+  const {sourceRoot,backendRoot}=nivoEndpointWorkspace(t);
+  const {endpointBinding,endpoints}=createProjectEndpointBinding({project:'nivo',application:'core',services:{frontend:'webApp',api:'api',identity:'keycloak'}},{sourceRoot});
+  assert.deepEqual(endpoints,{frontend:'http://localhost:3067',api:'http://localhost:3068',identity:'http://localhost:8147'});
+  const owner={$schema:'./owner.schema.json',schemaVersion:1,ownerThreadId:'thread://control-panel/nivo',generation:7,status:'ready',endpointBinding,endpoints,healthEvidenceRefs:['probe://nivo/frontend-api-identity'],updatedAt:'2026-09-02T08:00:00.000Z'};
+  const validateOwner=createRuntimeOwnerValidator({sourceRoot});
+  assert.deepEqual(validateOwner(owner),{valid:true,errors:[]});
+  assert.equal(validateOwner({...owner,endpoints:{...endpoints,frontend:'http://localhost:3999'}}).valid,false);
+  assert.equal(validateOwner({...owner,endpoints:{...endpoints,frontend:'http://evil.test:3067'}}).valid,false);
+  assert.equal(validateOwner({...owner,endpointBinding:{...endpointBinding,authorityFingerprint:`sha256:${'0'.repeat(64)}`}}).valid,false);
+  assert.equal(validateOwner({...owner,status:'ready',healthEvidenceRefs:[]}).valid,false);
+  assert.equal(validateOwner({...owner,updatedAt:'not-a-date'}).valid,false);
+
+  const runtimeBinding={project:'nivo',application:'core',ownerThreadId:owner.ownerThreadId,endpointAuthorityFingerprint:endpointBinding.authorityFingerprint};
+  const leaseBase={schemaVersion:1,leaseRef:'browser-lease://nivo-visual-proof',missionRef:'mission://nivo-visual-proof',purpose:'product-uat',accountRef:'account://fresh/nivo/run-1',reuseAttestations:null,principalFingerprint:`sha256:${'a'.repeat(64)}`,runtimeGeneration:7,runtimeBinding,origin:endpoints.frontend,fixtureNamespace:'nivo-visual-run-1',expiresAt:'2026-09-02T09:00:00.000Z',state:'authenticated'};
+  const lease={...leaseBase,executionMode:'broker-executed',executionOwnerRef:'thread://control-panel/browser',browserContextRef:'browser-context://nivo/1',consumerTabRef:null,evidenceBrokerRef:'browser-broker://control-panel/nivo',materializationStatus:'not-applicable',materializationEvidenceRefs:['browser-observation://nivo/broker']};
+  const validateLease=createBrowserExecutionLeaseValidator({runtimeOwner:owner,sourceRoot,now:()=>Date.parse('2026-09-02T08:30:00.000Z')});
+  assert.deepEqual(validateLease(lease),{valid:true,errors:[]});
+  assert.equal(validateLease({...lease,origin:'http://localhost:3068'}).valid,false);
+  assert.equal(validateLease({...lease,origin:'http://localhost:9999'}).valid,false);
+  assert.equal(validateLease({...lease,origin:'http://127.0.0.1:3067'}).valid,false);
+  assert.equal(validateLease({...lease,runtimeGeneration:8}).valid,false);
+  assert.equal(validateLease({...lease,runtimeBinding:{...runtimeBinding,project:'starci-academy'}}).valid,false);
+  assert.equal(validateLease({...lease,runtimeBinding:{...runtimeBinding,application:'academy'}}).valid,false);
+  assert.equal(validateLease({...lease,runtimeBinding:{...runtimeBinding,endpointAuthorityFingerprint:`sha256:${'f'.repeat(64)}`}}).valid,false);
+  assert.equal(createBrowserExecutionLeaseValidator({sourceRoot,now:()=>Date.parse('2026-09-02T08:30:00.000Z')})(lease).valid,false);
+
+  const sessionLease={leaseRef:lease.leaseRef,missionRef:lease.missionRef,accountRef:lease.accountRef,browserContextRef:lease.browserContextRef,principalFingerprint:lease.principalFingerprint,runtimeGeneration:lease.runtimeGeneration,runtimeBinding:lease.runtimeBinding,origin:lease.origin,fixtureNamespace:lease.fixtureNamespace,expiresAt:lease.expiresAt,state:lease.state,executionMode:lease.executionMode,executionOwnerRef:lease.executionOwnerRef,consumerTabRef:lease.consumerTabRef,evidenceBrokerRef:lease.evidenceBrokerRef,materializationStatus:lease.materializationStatus,materializationEvidenceRefs:lease.materializationEvidenceRefs};
+  const uatInput={schemaVersion:7,operatorId:'test/uat-case-freeze',context:{snapshotRef:'.worktrees/uat/nivo/visual/snapshot.json',snapshotReturnReceiptRef:'receipt:nivo-snapshot',sourceFingerprint:`sha256:${'b'.repeat(64)}`,missionRef:lease.missionRef,runtimeOwner:owner},input:{evidenceRefs:['browser-observation://nivo/broker'],browserSessionRef:'browser-context://nivo/1',accountRef:lease.accountRef,sessionLease}};
+  const validateUat=createUatCaseFreezeInputValidator({sourceRoot,now:()=>Date.parse('2026-09-02T08:30:00.000Z')});
+  assert.deepEqual(validateUat(uatInput),{valid:true,errors:[]});
+  assert.equal(validateUat({...uatInput,context:{...uatInput.context,missionRef:'mission://foreign'}}).valid,false);
+  assert.equal(validateUat({...uatInput,input:{...uatInput.input,accountRef:'account://fresh/nivo/other'}}).valid,false);
+  assert.equal(validateUat({...uatInput,input:{...uatInput.input,sessionLease:{...sessionLease,state:'invalidated'}}}).valid,false);
+  assert.equal(validateUat({...uatInput,input:{...uatInput.input,sessionLease:{...sessionLease,expiresAt:'2026-09-02T08:00:00.000Z'}}}).valid,false);
+
+  const metadataFile=path.join(backendRoot,'metadata.json');
+  const metadata=JSON.parse(fs.readFileSync(metadataFile,'utf8'));
+  writeJson(metadataFile,{...metadata,project:'foreign-project'});
+  assert.throws(()=>createProjectEndpointBinding({project:'nivo',application:'core',services:{frontend:'webApp',api:'api',identity:'keycloak'}},{sourceRoot}),/metadata belongs to project foreign-project/);
+  writeJson(metadataFile,{...metadata,ports:{...metadata.ports,webApp:3999}});
+  assert.throws(()=>createProjectEndpointBinding({project:'nivo',application:'core',services:{frontend:'webApp',api:'api',identity:'keycloak'}},{sourceRoot}),/differs from the canonical workspace projection/);
 });
 
 test('scope policy rejects unresolved mission scope before skill selection', () => {
@@ -238,4 +328,6 @@ test('UAT snapshot and result form one canonical feature-flow pair', () => {
   assert.deepEqual(uatPair('.worktrees','authentication','sign-in'),{snapshot:'.worktrees/uat/authentication/sign-in/snapshot.json',result:'.worktrees/uat/authentication/sign-in/result.json'});
   const validateSnapshot=validatorFor(new URL('../templates/uat/snapshot.schema.json',import.meta.url));
   const template=JSON.parse(fs.readFileSync(new URL('../templates/uat/snapshot.template.json',import.meta.url))); assert.equal(validateSnapshot(template).valid,true);
+  const validateResult=validatorFor(new URL('../templates/uat/result.schema.json',import.meta.url));
+  const resultTemplate=JSON.parse(fs.readFileSync(new URL('../templates/uat/result.template.json',import.meta.url))); assert.equal(validateResult(resultTemplate).valid,true);
 });

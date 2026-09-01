@@ -1,6 +1,8 @@
 # `test/uat-result-publish` output
 
 - `output.outcome`: `passed`, fresh `frontend-counterevidence`, ordinary `failed`, or `blocked`.
+- `output.canonicalRef`: Exact `.worktrees/uat/<feature>/<flow>/result.json`, or null only when publication itself is blocked.
+- `output.contentFingerprint`: Fingerprint of the parsed canonical result content, or null only when publication itself is blocked.
 - `output.result`: Canonical PASS artifact or exact FE-owned counterevidence; ordinary failure/blocking is null.
 - `output.gaps`: Exact blockers.
 - `output.evidenceRefs`: Evidence consumed.
