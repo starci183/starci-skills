@@ -2,6 +2,8 @@
 
 - `output.outcome`: Typed preflight classification consumed only by the parent Skill.
 - `output.result`: Frozen preflight product, or null when preflight cannot become ready.
+- `output.result.grammarBinding`, `iconographyManifest`, `mediaManifest`, and
+  `productFamilyEvidence`: Exact compile-owned governance propagated to capture.
 - `output.gaps`: Exact deterministic failures or authority gaps.
 - `output.evidenceRefs`: Exact evidence used by the readiness decision.
 - `output.handoff`: Typed backend handoff only when backend-owned readiness is missing.

@@ -17,7 +17,11 @@
 - `input.directionMode`: Exact compiled `none`, `dominant`, or `alternatives` projection.
 - `input.directionBinding`: Exact direction-generate RETURN, selected direction id/ref, and Grammar
   manifest; null only when `directionMode=none`.
-- `input.grammarBinding`: Exact Grammar package, manifest, exports, hash, and revision from compilation.
+- `input.grammarBinding`: Exact Grammar package/decision identity, composition owner layers and
+  authorities, and audit plan from compilation.
+- `input.iconographyManifest`: Exact semantic icon decisions and catalog/custom provenance from compilation.
+- `input.mediaManifest`: Exact `none|reuse|generate` asset, provenance, responsive, alt, and fallback contract from compilation.
+- `input.productFamilyEvidence`: Exact Grammar/DNA identity and benchmark rasters from compilation.
 - `input.proofMatrix` / `input.proofMatrixFingerprint`: Exact typed states, canonical viewports/probes,
   populated hero/core task, and cells frozen by compilation.
 - `input.constraints`: Closed constraints for this atomic job.

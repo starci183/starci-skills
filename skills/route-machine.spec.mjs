@@ -11,7 +11,7 @@ import { createReceipt, fingerprint } from '../runtime/trace.mjs';
 
 const root = path.dirname(fileURLToPath(import.meta.url));
 const machine = canonicalMachine;
-const compiledFingerprint=(result)=>fingerprint({objective:result.objective,targetRef:result.targetRef,uxUiChangeLevel:result.uxUiChangeLevel,directionMode:result.directionMode,directionEvidence:result.directionEvidence,behaviorContractRef:result.behaviorContractRef,behaviorContractFingerprint:result.behaviorContractFingerprint,grammarBinding:result.grammarBinding,proofMatrix:result.proofMatrix,proofMatrixFingerprint:result.proofMatrixFingerprint,constraints:result.constraints,negativeBoundary:result.negativeBoundary,acceptanceCriteria:result.acceptanceCriteria,sourceBoundary:result.sourceBoundary,sourceBoundaryFingerprint:result.sourceBoundaryFingerprint});
+const compiledFingerprint=(result)=>fingerprint({objective:result.objective,targetRef:result.targetRef,uxUiChangeLevel:result.uxUiChangeLevel,directionMode:result.directionMode,directionEvidence:result.directionEvidence,behaviorContractRef:result.behaviorContractRef,behaviorContractFingerprint:result.behaviorContractFingerprint,grammarBinding:result.grammarBinding,iconographyManifest:result.iconographyManifest,mediaManifest:result.mediaManifest,productFamilyEvidence:result.productFamilyEvidence,proofMatrix:result.proofMatrix,proofMatrixFingerprint:result.proofMatrixFingerprint,constraints:result.constraints,negativeBoundary:result.negativeBoundary,acceptanceCriteria:result.acceptanceCriteria,sourceBoundary:result.sourceBoundary,sourceBoundaryFingerprint:result.sourceBoundaryFingerprint});
 const requestCompiled = () => {
   const sourceBoundary=[{path:'src/Profile.tsx',beforeSha256:`sha256:${'a'.repeat(64)}`,ownerRef:'surface://one'}];
   const states=[{stateRef:'state://happy-populated',lifecycle:'happy-case',populated:true,coreTaskVisible:true}];
@@ -34,7 +34,10 @@ const requestCompiled = () => {
     directionEvidence:{classification:'not-applicable',evidenceRefs:['request://one']},
     behaviorContractRef:'behavior://profile-one',
     behaviorContractFingerprint:`sha256:${'b'.repeat(64)}`,
-    grammarBinding:{packageRef:'grammar-package://profile',manifestRef:'grammar://profile/manifest',exportRefs:['grammar://profile/card'],contentSha256:`sha256:${'c'.repeat(64)}`,authorityRevision:'grammar-revision-1'},
+    grammarBinding:{bindingRef:'grammar-binding://profile',packageRef:'grammar-package://profile',manifestRef:'grammar://profile/manifest',exportRefs:['grammar://profile/card'],contentSha256:`sha256:${'c'.repeat(64)}`,authorityRevision:'grammar-revision-1',decisionManifestFingerprint:`sha256:${'d'.repeat(64)}`,auditPlanRef:'grammar-audit://profile',auditPlanFingerprint:`sha256:${'0'.repeat(64)}`,compositionOwners:[{ownerRef:'owner://profile-card',ownerLayer:'grammar',authorityRef:'grammar://profile/card',patternRef:'pattern://profile-card'}]},
+    iconographyManifest:{manifestRef:'iconography://profile',manifestFingerprint:`sha256:${'0'.repeat(64)}`,mode:'none',visualFamilyRef:null,decisions:[]},
+    mediaManifest:{manifestRef:'media-manifest://profile',manifestFingerprint:`sha256:${'0'.repeat(64)}`,mode:'none',assetRef:null,artifactRefs:[],provenanceRefs:[],responsiveTreatmentRef:null,altIntentRef:null,fallbackRef:null},
+    productFamilyEvidence:{grammarBindingRef:'grammar-binding://profile',grammarCoreRef:'grammar-core://starci',packagedContractRefs:['grammar-package://profile'],visualDnaRef:'visual-dna://starci',productFamilyRef:'product-family://starci-academy',benchmarkRasterRefs:[`benchmark://sha256-${'e'.repeat(64)}.png`]},
     proofMatrix,
     proofMatrixFingerprint:fingerprint(proofMatrix),
     constraints:['delivery-mode=ui-only-preserve-business'],
@@ -44,8 +47,11 @@ const requestCompiled = () => {
     sourceBoundaryFingerprint:fingerprint(sourceBoundary),
     artifactRefs:['compiled-request://profile-one','behavior://profile-one'],
   };
+  result.iconographyManifest.manifestFingerprint=fingerprint({manifestRef:result.iconographyManifest.manifestRef,mode:result.iconographyManifest.mode,visualFamilyRef:result.iconographyManifest.visualFamilyRef,decisions:result.iconographyManifest.decisions});
+  result.mediaManifest.manifestFingerprint=fingerprint({manifestRef:result.mediaManifest.manifestRef,mode:result.mediaManifest.mode,assetRef:result.mediaManifest.assetRef,artifactRefs:result.mediaManifest.artifactRefs,provenanceRefs:result.mediaManifest.provenanceRefs,responsiveTreatmentRef:result.mediaManifest.responsiveTreatmentRef,altIntentRef:result.mediaManifest.altIntentRef,fallbackRef:result.mediaManifest.fallbackRef});
+  result.grammarBinding.auditPlanFingerprint=fingerprint({auditPlanRef:result.grammarBinding.auditPlanRef,manifestRef:result.grammarBinding.manifestRef,decisionManifestFingerprint:result.grammarBinding.decisionManifestFingerprint,compositionOwners:result.grammarBinding.compositionOwners,proofMatrixFingerprint:result.proofMatrixFingerprint,iconographyManifestFingerprint:result.iconographyManifest.manifestFingerprint,mediaManifestFingerprint:result.mediaManifest.manifestFingerprint});
   result.compiledRequestFingerprint=compiledFingerprint(result);
-  return {schemaVersion:7,operatorId:'fe/request-compile',output:{outcome:'compiled',result,gaps:[],evidenceRefs:['authority://one','grammar-package://profile','grammar://profile/manifest'],handoff:null,repair:null}};
+  return {schemaVersion:7,operatorId:'fe/request-compile',output:{outcome:'compiled',result,gaps:[],evidenceRefs:['authority://one','grammar-package://profile','grammar://profile/manifest','grammar-audit://profile','iconography://profile','media-manifest://profile',...result.productFamilyEvidence.benchmarkRasterRefs],handoff:null,repair:null}};
 };
 const requestInput = () => ({ schemaVersion:7, operatorId:'fe/request-compile', context:{ authorityRefs:['authority://one'], evidenceRefs:['request://one'], uiKnowledgeId:'fe.ui', scopeKnowledgeId:'fe.ux-ui-change-levels' }, input:{ targetRef:'surface://one', uxUiChangeLevel:'refine', directionMode:'none', directionEvidence:{classification:'not-applicable',evidenceRefs:['request://one']}, constraints:['delivery-mode=ui-only-preserve-business'] } });
 let receiptSequence = 0;

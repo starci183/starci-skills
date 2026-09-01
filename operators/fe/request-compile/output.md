@@ -9,7 +9,9 @@
 
 `compiled` publishes one `compiledRequestRef` whose fingerprint covers the exact objective, target,
 frozen UX/UI level, direction mode/evidence, behavior-contract ref/fingerprint, Grammar
-package/manifest/exports/hash/revision, constraints, negative boundary, acceptance criteria, source
+package/manifest/exports/hash/revision, decision-manifest fingerprint, composition owner layers and
+authorities, audit-plan fingerprint, iconography/media provenance manifests, product-family benchmark
+evidence, constraints, negative boundary, acceptance criteria, source
 boundary, and frozen proof matrix. The proof matrix covers every typed state across wide,
 intermediate, and compact viewports in canonical order, carries the exact 22 probes, and identifies
 one populated happy-case hero with its visible core task. Artifact refs include the compiled request

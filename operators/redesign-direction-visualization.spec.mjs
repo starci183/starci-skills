@@ -4,6 +4,51 @@ import test from 'node:test';
 import { validateOutput as validateArchitectureAlternatives } from './architecture/alternatives/validate-output.mjs';
 import { validateInput as validateDirectionGenerateInput } from './fe/direction-generate/validate-input.mjs';
 
+const hash = (character) => `sha256:${character.repeat(64)}`;
+const grammarBinding = {
+  bindingRef: 'grammar-binding://starci/dashboard',
+  packageRef: 'grammar-package://starci',
+  manifestRef: 'grammar://workspace',
+  exportRefs: ['grammar://surface-card'],
+  contentSha256: hash('c'),
+  authorityRevision: 'grammar-revision-1',
+  decisionManifestFingerprint: hash('d'),
+  auditPlanRef: 'grammar-audit://dashboard',
+  auditPlanFingerprint: hash('e'),
+  compositionOwners: [{
+    ownerRef: 'owner://dashboard-card',
+    ownerLayer: 'grammar',
+    authorityRef: 'grammar://surface-card',
+    patternRef: 'pattern://surface-card',
+  }],
+};
+const iconographyManifest = {
+  manifestRef: 'iconography://dashboard',
+  manifestFingerprint: hash('f'),
+  mode: 'none',
+  visualFamilyRef: null,
+  decisions: [],
+};
+const mediaManifest = {
+  manifestRef: 'media-manifest://dashboard',
+  manifestFingerprint: hash('1'),
+  mode: 'none',
+  assetRef: null,
+  artifactRefs: [],
+  provenanceRefs: [],
+  responsiveTreatmentRef: null,
+  altIntentRef: null,
+  fallbackRef: null,
+};
+const productFamilyEvidence = {
+  grammarBindingRef: grammarBinding.bindingRef,
+  grammarCoreRef: 'grammar-core://starci',
+  packagedContractRefs: ['grammar-package://starci'],
+  visualDnaRef: 'visual-dna://starci',
+  productFamilyRef: 'product-family://starci-academy',
+  benchmarkRasterRefs: [`benchmark://sha256-${'2'.repeat(64)}.png`],
+};
+
 const architectureOutput = () => ({
   schemaVersion: 7,
   operatorId: 'architecture/alternatives',
@@ -34,13 +79,24 @@ test('frontend alternatives cannot begin without an author-once request and exac
     operatorId: 'fe/direction-generate',
     context: {
       authorityRefs: ['authority://frozen'],
-      evidenceRefs: ['compiled-request://workspace', 'grammar-package://starci', 'grammar://workspace'],
+      evidenceRefs: [
+        'compiled-request://workspace',
+        grammarBinding.packageRef,
+        grammarBinding.manifestRef,
+        grammarBinding.auditPlanRef,
+        iconographyManifest.manifestRef,
+        mediaManifest.manifestRef,
+        ...productFamilyEvidence.benchmarkRasterRefs,
+      ],
       uiKnowledgeId: 'fe.ui',
     },
     input: {
       compiledRequestRef: 'compiled-request://workspace',
       compiledRequestFingerprint: `sha256:${'b'.repeat(64)}`,
-      grammarBinding: { packageRef: 'grammar-package://starci', manifestRef: 'grammar://workspace', exportRefs: ['grammar://surface-card'], contentSha256: `sha256:${'c'.repeat(64)}`, authorityRevision: 'grammar-revision-1' },
+      grammarBinding,
+      iconographyManifest,
+      mediaManifest,
+      productFamilyEvidence,
       targetRef: 'surface://workspace',
       mode: 'alternatives',
       constraints: ['material ambiguity remains after Grammar validation'],

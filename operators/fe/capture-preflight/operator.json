@@ -5,7 +5,7 @@
   "job": "Freeze and deterministically classify one owner-partitioned capture contract before raster capture and AI review.",
   "inputSchema": "input.schema.json",
   "outputSchema": "output.schema.json",
-  "contextRefs": ["fe.ui"],
+  "contextRefs": ["fe.ui", "fe.runtime-capture-readiness"],
   "sourceReferenceRefs": [],
   "sideEffects": [],
   "stopConditions": [

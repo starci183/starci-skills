@@ -3,7 +3,8 @@
 - `output.outcome`: Typed result routed only by the parent Skill machine.
 - `output.result`: This operator atomic product, including the exact repeated compiled request
   ref/fingerprint, one inspectable local visualize HTML artifact, the repeated mode, visually addressable directions, wide/compact/material-state refs,
-  Grammar manifests, trade-offs, and `requiresChoice`; or null when incomplete.
+  Grammar manifests, trade-offs, `requiresChoice`, and the exact compile-owned `grammarBinding`,
+  `iconographyManifest`, `mediaManifest`, and `productFamilyEvidence`; or null when incomplete.
 - `output.gaps`: Exact blockers or authority gaps.
 - `output.evidenceRefs`: Exact evidence used.
 - `output.handoff`: Always null; the generator never owns routing or cross-domain continuation.

@@ -42,8 +42,9 @@ Compile classifies every known gap before continuing:
   new package identity is available; application CSS or copied local anatomy is forbidden;
 - missing business, backend, shared-owner, runtime, identity, or other domain authority produces one
   typed cross-domain exit with exact evidence and required continuation;
-- when Grammar is complete but no reversible visual direction dominates, continue to `generate` for
-  three or four realistic directions and an exact selection;
+- when Grammar is complete but no reversible visual direction dominates, continue to `generate`,
+  render three or four realistic directions, and emit a typed user-choice `WAIT`; resume the exact
+  stage only from the bound selection;
 - unavailable proof produces a typed evidence gap, never an invented fixture or narrated PASS.
 
 An audit-to-target compile may authorize reconstruct inside its frozen direct owner group, but it does
@@ -56,8 +57,9 @@ previously absent product actions.
 Run `generate` only for `new` or `reconstruct` when compile did not bind an already approved direction.
 When one direction materially dominates, render one realistic Grammar-valid preview and continue.
 When the complete Grammar admits several material directions and none dominates—or the owner
-explicitly asks to compare—render three or four realistic directions and bind the exact selection.
-Any selection pause remains internal to this stage. `refine` and `grammar-gap` never enter `generate`.
+explicitly asks to compare—render three or four realistic directions and emit a typed user-choice
+`WAIT`. The immutable `RESUME` binds the exact selected direction and continues this same `generate`
+stage; prose or an unbound choice cannot resume it. `refine` and `grammar-gap` never enter `generate`.
 
 The generated contract fixes journey boundaries, semantic block ownership, responsive transformation,
 state presentation, product-family signatures, and selected-Grammar bindings needed by `apply`.
@@ -99,8 +101,9 @@ broker-executed capture may continue on the same valid lease.
 ## `blind review`
 
 One fresh-context independent reviewer consumes only the validated raster packet and returns the
-typed verdict defined by `fe.ui-render-review`. Source, DOM, tests, measurements, intended answers,
-producer rationale, prior findings, and prior scores are withheld until the pixel verdict is frozen.
+typed verdict defined by `fe.ui-render-review`: `PASS`, `FAIL`, `BLOCKED`,
+`INSUFFICIENT_EVIDENCE`, or `STALE`. Source, DOM, tests, measurements, intended answers, producer
+rationale, prior findings, and prior scores are withheld until the pixel verdict is frozen.
 
 `PASS` proceeds to final quality. A frontend-local `FAIL` permits exactly one repair cycle:
 
@@ -114,9 +117,11 @@ blind review FAIL
 The repair may change only the already compiled owner and contract. It never reopens generation,
 widens scope, changes business behavior, or creates another repair loop. A second `FAIL`, repeated
 finding fingerprint, boundary drift, missing authority, or non-frontend owner returns a typed terminal
-failure or cross-domain exit with exact evidence. `SUSPENSE` is legal only when Grammar is complete,
-no contradiction exists, and a finite visual choice remains unresolved; missing Grammar is an exact
-owner repair/publish exit, while runtime/evidence unavailability is `BLOCKED`.
+failure or cross-domain exit with exact evidence. Visual ambiguity is never a blind-review verdict:
+before apply it resolves through one dominant preview or rendered alternatives plus a typed
+user-choice `WAIT`. Missing Grammar is an exact owner repair/publish exit; runtime or identity
+unavailability is `BLOCKED`, incomplete evidence is `INSUFFICIENT_EVIDENCE`, and invalidated
+fingerprints are `STALE`.
 
 ## Typed exits and final gates
 

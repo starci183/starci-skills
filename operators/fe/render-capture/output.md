@@ -4,6 +4,10 @@
 - `output.result`: This operator atomic product, or null when incomplete.
 - `output.result.preflightRef`, `compiledRequestRef`, `compiledRequestFingerprint`, `sourceApplyReturnReceiptRef`, `aggregateAfterFingerprint`, `matrixRef`, `matrixFingerprint`, `partitionFingerprint`, and `visualRound`: Exact immutable lineage and capture contract inherited from preflight.
 - `output.result.capturePartitionRefs` and `reusedPartitionRefs`: Fresh owner partitions and dependency-proven reused partitions.
+- `output.result.grammarBinding`, `iconographyManifest`, `mediaManifest`, and
+  `productFamilyEvidence`: Exact full governance inherited unchanged. The blind packet contains only
+  Grammar decision/audit fingerprints, icon family identity, media mode/asset identity, and the full
+  benchmark evidence; it excludes owner and producer rationale.
 - `output.result.sourceFingerprint` and `latestMutationFingerprint`: Derived aliases that must both
   equal the registered `aggregateAfterFingerprint`; `latestMutationAt` and `capturedAt` prove the
   raster packet was created after that mutation.

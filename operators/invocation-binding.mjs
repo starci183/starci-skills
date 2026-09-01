@@ -14,6 +14,39 @@ function sameSequence(left, right) {
   return left.length === right.length && left.every((item, index) => item === right[index]);
 }
 
+const GOVERNANCE_FIELDS = ['grammarBinding', 'iconographyManifest', 'mediaManifest', 'productFamilyEvidence'];
+
+function blindGrammarBinding(binding) {
+  if (!binding) return binding;
+  return {
+    bindingRef: binding.bindingRef,
+    manifestRef: binding.manifestRef,
+    decisionManifestFingerprint: binding.decisionManifestFingerprint,
+    auditPlanRef: binding.auditPlanRef,
+    auditPlanFingerprint: binding.auditPlanFingerprint,
+  };
+}
+
+function blindIconographyManifest(manifest) {
+  if (!manifest) return manifest;
+  return {
+    manifestRef: manifest.manifestRef,
+    manifestFingerprint: manifest.manifestFingerprint,
+    mode: manifest.mode,
+    visualFamilyRef: manifest.visualFamilyRef,
+  };
+}
+
+function blindMediaManifest(manifest) {
+  if (!manifest) return manifest;
+  return {
+    manifestRef: manifest.manifestRef,
+    manifestFingerprint: manifest.manifestFingerprint,
+    mode: manifest.mode,
+    assetRef: manifest.assetRef,
+  };
+}
+
 function manifestFromVisualPacket(packet) {
   return {
     packetRef: packet.packetRef,
@@ -24,6 +57,10 @@ function manifestFromVisualPacket(packet) {
     visualRound: packet.visualRound,
     capturePartitionRefs: packet.capturePartitionRefs,
     reusedPartitionRefs: packet.reusedPartitionRefs,
+    grammarBinding: packet.grammarBinding,
+    iconographyManifest: packet.iconographyManifest,
+    mediaManifest: packet.mediaManifest,
+    productFamilyEvidence: packet.productFamilyEvidence,
     latestMutationFingerprint: packet.latestMutationFingerprint,
     capturedSourceFingerprint: packet.capturedSourceFingerprint,
     latestMutationAt: packet.latestMutationAt,
@@ -142,9 +179,13 @@ export function createOperatorInvocationBindingRegistry() {
         round: result.round,
         capturePartitionRefs: result.capturePartitionRefs,
         reusedPartitionRefs: result.reusedPartitionRefs,
+        grammarBinding: result.grammarBinding,
+        iconographyManifest: result.iconographyManifest,
+        mediaManifest: result.mediaManifest,
+        productFamilyEvidence: result.productFamilyEvidence,
       };
       const prior = validatedPreflights.get(result.preflightRef);
-      if (prior && JSON.stringify(prior) !== JSON.stringify(frozen)) throw new Error('validated capture preflight identity was already bound to a different freeze');
+      if (prior && !sameValue(prior, frozen)) throw new Error('validated capture preflight identity was already bound to a different freeze');
       validatedPreflights.set(result.preflightRef, frozen);
       return;
     }
@@ -287,7 +328,13 @@ export function createOperatorInvocationBindingRegistry() {
       if (!compiled || compiled.missionId !== returnReceipt?.missionId) errors.push('generated direction is not bound to a validated same-mission compiled request');
       if (compiled) {
         if (input.compiledRequestFingerprint !== compiled.result.compiledRequestFingerprint || output.result.compiledRequestFingerprint !== compiled.result.compiledRequestFingerprint) errors.push('generated direction compiled fingerprint differs from the registered request');
-        if (input.targetRef !== compiled.result.targetRef || JSON.stringify(input.grammarBinding) !== JSON.stringify(compiled.result.grammarBinding) || !sameSequence(input.constraints, compiled.result.constraints)) errors.push('generated direction invocation differs from the registered compiled target, Grammar, or constraints');
+        if (input.targetRef !== compiled.result.targetRef || !sameSequence(input.constraints, compiled.result.constraints)) errors.push('generated direction invocation differs from the registered compiled target or constraints');
+        for (const field of GOVERNANCE_FIELDS) {
+          if (!sameValue(input[field], compiled.result[field])) errors.push(`generated direction ${field} differs from the registered compiled request`);
+        }
+      }
+      for (const field of GOVERNANCE_FIELDS) {
+        if (!sameValue(output.result[field], input[field])) errors.push(`generated direction result ${field} differs from invocation input`);
       }
       if (!context.evidenceRefs.includes(input.compiledRequestRef)) errors.push('direction invocation context does not include compiledRequestRef');
       if (!output.evidenceRefs.includes(input.compiledRequestRef)) errors.push('generated direction evidence does not include compiledRequestRef');
@@ -423,7 +470,7 @@ export function createOperatorInvocationBindingRegistry() {
       for (const field of ['compiledRequestFingerprint','targetRef','directionMode','behaviorContractRef','behaviorContractFingerprint','proofMatrixFingerprint','sourceBoundaryFingerprint']) {
         if (input[field] !== compiledResult[field]) errors.push(`source apply ${field} differs from the registered compiled request`);
       }
-      for (const field of ['grammarBinding','proofMatrix','constraints','sourceBoundary']) {
+      for (const field of [...GOVERNANCE_FIELDS,'proofMatrix','constraints','sourceBoundary']) {
         if (!sameValue(input[field], compiledResult[field])) errors.push(`source apply ${field} differs from the registered compiled request`);
       }
       if (input.directionMode === 'none') {
@@ -440,7 +487,7 @@ export function createOperatorInvocationBindingRegistry() {
           if (!selection || selection.selectedDirectionId !== input.directionBinding?.selectedDirectionId) errors.push('alternatives source apply requires the exact registry-validated user selection');
         }
       }
-      for (const field of ['mode','compiledRequestRef','compiledRequestFingerprint','directionMode','directionBinding','grammarBinding','proofMatrix','proofMatrixFingerprint','targetRef','behaviorContractRef','behaviorContractFingerprint','sourceBoundary','sourceBoundaryFingerprint']) {
+      for (const field of ['mode','compiledRequestRef','compiledRequestFingerprint','directionMode','directionBinding',...GOVERNANCE_FIELDS,'proofMatrix','proofMatrixFingerprint','targetRef','behaviorContractRef','behaviorContractFingerprint','sourceBoundary','sourceBoundaryFingerprint']) {
         if (!sameValue(result?.[field], input[field])) errors.push(`source apply result ${field} differs from invocation input`);
       }
       return errors;
@@ -480,6 +527,9 @@ export function createOperatorInvocationBindingRegistry() {
       const reusedRefs = input.partitions.filter(({ disposition }) => disposition === 'reuse').map(({ partitionRef }) => partitionRef);
       if (!sameSequence(result.capturePartitionRefs, captureRefs) || !sameSequence(result.reusedPartitionRefs, reusedRefs)) errors.push('capture preflight partition disposition differs from invocation input');
       if (JSON.stringify(result.readinessChecks) !== JSON.stringify(input.readinessChecks)) errors.push('capture preflight readiness evidence differs from invocation input');
+      for (const field of GOVERNANCE_FIELDS) {
+        if (!sameValue(result[field], input[field])) errors.push(`capture preflight ${field} differs from invocation input`);
+      }
       return errors;
     }
     if (operatorId === 'quality/delivery-proof' && outputDocument?.output?.outcome === 'pass') {
@@ -502,7 +552,11 @@ export function createOperatorInvocationBindingRegistry() {
       if (!frozenPreflight) errors.push('render capture preflight is not bound to a validated capture-preflight RETURN');
       if (frozenPreflight) {
         const supplied = { receiptId: frozenPreflight.receiptId, ...preflight };
-        if (JSON.stringify(supplied) !== JSON.stringify(frozenPreflight)) errors.push('render capture preflight differs from the exact validated freeze');
+        const frozenCore = Object.fromEntries(Object.entries(frozenPreflight).filter(([field]) => !GOVERNANCE_FIELDS.includes(field)));
+        if (!sameValue(supplied, frozenCore)) errors.push('render capture preflight differs from the exact validated freeze');
+        for (const field of GOVERNANCE_FIELDS) {
+          if (!sameValue(input[field], frozenPreflight[field])) errors.push(`render capture ${field} differs from the exact validated preflight`);
+        }
       }
       if (result.preflightRef !== preflight.preflightRef) errors.push('render capture preflight differs from invocation input');
       for (const field of ['compiledRequestRef','compiledRequestFingerprint','sourceApplyReturnReceiptRef','aggregateAfterFingerprint']) {
@@ -512,6 +566,13 @@ export function createOperatorInvocationBindingRegistry() {
       if (result.partitionFingerprint !== preflight.partitionFingerprint) errors.push('render capture partition fingerprint differs from frozen preflight');
       if (JSON.stringify(result.visualRound) !== JSON.stringify(preflight.round)) errors.push('render capture visual round differs from frozen preflight');
       if (!sameSequence(result.capturePartitionRefs, preflight.capturePartitionRefs) || !sameSequence(result.reusedPartitionRefs, preflight.reusedPartitionRefs)) errors.push('render capture owner partitions differ from frozen preflight');
+      for (const field of GOVERNANCE_FIELDS) {
+        if (!sameValue(result[field], input[field])) errors.push(`render capture ${field} differs from invocation input`);
+      }
+      if (!sameValue(result.blindReviewPacket?.grammarBinding, blindGrammarBinding(input.grammarBinding))) errors.push('render capture blind Grammar binding differs from the opaque invocation projection');
+      if (!sameValue(result.blindReviewPacket?.iconographyManifest, blindIconographyManifest(input.iconographyManifest))) errors.push('render capture blind iconography manifest differs from the opaque invocation projection');
+      if (!sameValue(result.blindReviewPacket?.mediaManifest, blindMediaManifest(input.mediaManifest))) errors.push('render capture blind media manifest differs from the opaque invocation projection');
+      if (!sameValue(result.blindReviewPacket?.productFamilyEvidence, input.productFamilyEvidence)) errors.push('render capture blind product-family evidence differs from invocation input');
       const expectedCells = input.renderStates.flatMap((stateRef) => input.viewports.map((viewport) => `${stateRef}::${viewport}`));
       const actualCells = result.renderMatrix.map(({ stateRef, viewport }) => `${stateRef}::${viewport}`);
       if (!sameSequence(actualCells, expectedCells)) errors.push('render capture matrix differs from requested state and viewport order');
@@ -549,7 +610,7 @@ export function createOperatorInvocationBindingRegistry() {
       if (packet.captureReceiptId !== capture.receiptId) errors.push('capture receipt differs from the validated render-capture RETURN');
       if (packet.packetFingerprint !== capture.packetFingerprint) errors.push('packet fingerprint differs from validated render-capture evidence');
       if (packet.capturedSourceFingerprint !== capture.sourceFingerprint) errors.push('captured source differs from validated render-capture evidence');
-      if (JSON.stringify(manifestFromVisualPacket(packet)) !== JSON.stringify(capture.manifest)) errors.push('blind packet differs from the exact validated render-capture manifest');
+      if (!sameValue(manifestFromVisualPacket(packet), capture.manifest)) errors.push('blind packet differs from the exact validated render-capture manifest');
     }
 
     const suppliedRasters = [...new Set([
@@ -563,6 +624,9 @@ export function createOperatorInvocationBindingRegistry() {
     if (result.auditScore?.target !== inputDocument.input.auditTargetScore) errors.push('audit score target differs from supplied mission target');
     if (!sameSequence(result.packetRasterRefs ?? [], suppliedRasters)) errors.push('packet raster refs differ from supplied input order');
     if (result.lastScreenshotRef !== packet.lastScreenshotRef) errors.push('last screenshot differs from supplied input');
+    for (const field of GOVERNANCE_FIELDS) {
+      if (!sameValue(result[field], packet[field])) errors.push(`visual fidelity ${field} differs from supplied packet`);
+    }
     if (result.reviewerExecutionRef !== context.reviewerExecutionRef) errors.push('reviewer execution differs from supplied context');
     if (result.reviewerModel !== context.reviewerModel || result.reviewerCount !== context.reviewerCount || result.contextIsolation !== context.contextIsolation || result.forkTurns !== context.forkTurns) errors.push('review execution policy differs from supplied context');
     if (returnReceipt && (returnReceipt.trace?.aiActivity?.executionRef !== context.reviewerExecutionRef || returnReceipt.trace?.aiActivity?.principalFingerprint !== context.reviewerPrincipalFingerprint || returnReceipt.trace?.aiActivity?.contextFingerprint !== context.reviewerContextFingerprint)) errors.push('reviewer execution, principal, or fresh context differs from the runtime receipt');

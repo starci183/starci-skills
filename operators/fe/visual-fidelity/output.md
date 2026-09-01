@@ -6,13 +6,16 @@
 - `output.gaps`: Exact unresolved evidence or authority gaps.
 - `output.evidenceRefs`: Non-empty exact evidence behind every outcome.
 
-The structured result repeats packet, matrix, partition, round, reviewer, final-screenshot, and audit
+The structured result repeats packet, matrix, partition, round, opaque Grammar/icon/media identities,
+product-family benchmarks, reviewer, final-screenshot, and audit
 identity. `packetRasterRefs` must preserve packet order and match `inspectionRecords` one-for-one in
-that order. Every inspection contains all 19 visual lenses and all three challenge families.
+that order. Every inspection contains all 20 visual lenses, including product-family quality, and all
+three challenge families.
 `probeRecords` contains the exact 22 canonical probes in order: applicable `survived`/`contradiction`
 records keep an exact packet raster ref, while `not-applicable` keeps `imageRef: null`.
 
-`passed` requires a complete populated happy-case packet, score at least 9, a passing final screenshot,
+`passed` requires a complete populated happy-case packet, a separately validated Grammar audit bound
+to the exact decision/icon/media/matrix fingerprints, score at least 9, a passing final screenshot,
 no retained gaps, no problem/confirmed challenge/probe contradiction, and `uncertainty=false`.
 `repair` requires at least one concrete visible problem or contradiction. `insufficient-evidence`
 means the reviewer ran but the packet cannot support a conclusion; it returns `result: null`, exact

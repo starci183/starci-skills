@@ -1,7 +1,7 @@
 import { validatorFor, runValidatorCli } from '../../validation.mjs';
 import fs from 'node:fs';
 import path from 'node:path';
-export const validateOutput=validatorFor(new URL('./output.schema.json',import.meta.url),(value)=>{
+const validateDocument=validatorFor(new URL('./output.schema.json',import.meta.url),(value)=>{
   const errors=[];
   const { outcome, aiExecution, result, gaps, evidenceRefs, handoff }=value.output;
   if(outcome==='generated'){
@@ -10,6 +10,8 @@ export const validateOutput=validatorFor(new URL('./output.schema.json',import.m
     else {
       if(result.directions.length!==result.directionCount) errors.push('directionCount must equal rendered directions');
       if(!evidenceRefs.includes(result.compiledRequestRef)) errors.push('generated direction evidence must include compiledRequestRef');
+      if(result.productFamilyEvidence.grammarBindingRef!==result.grammarBinding.bindingRef) errors.push('generated product-family evidence must bind the compiled Grammar binding');
+      for(const ref of [result.grammarBinding.auditPlanRef,result.iconographyManifest.manifestRef,result.mediaManifest.manifestRef,...result.productFamilyEvidence.benchmarkRasterRefs]) if(!evidenceRefs.includes(ref)) errors.push(`generated direction evidence must include ${ref}`);
       if(result.mode==='dominant'&&result.directionCount!==1) errors.push('dominant mode requires exactly one rendered direction');
       if(result.mode==='alternatives'&&(result.directionCount<3||result.directionCount>4)) errors.push('alternatives mode requires three or four rendered directions');
       if(result.requiresChoice!==(result.mode==='alternatives')) errors.push('requiresChoice must be false for dominant mode and true for alternatives mode');
@@ -54,4 +56,13 @@ export const validateOutput=validatorFor(new URL('./output.schema.json',import.m
   }
   return errors;
 });
+export const validateOutput=(value)=>{
+  const artifactRef=value?.output?.outcome==='generated'?value?.output?.result?.comparisonArtifactRef:null;
+  if(typeof artifactRef==='string'&&artifactRef.endsWith('.html')&&!/^[a-z][a-z0-9+.-]*:\/\//i.test(artifactRef)){
+    const artifactPath=path.resolve(process.cwd(),artifactRef);
+    const relativeArtifact=path.relative(process.cwd(),artifactPath);
+    if(!path.isAbsolute(artifactRef)&&!relativeArtifact.startsWith('..')&&!path.isAbsolute(relativeArtifact)&&(!fs.existsSync(artifactPath)||!fs.statSync(artifactPath).isFile())) return {valid:false,errors:['comparisonArtifactRef must point to an existing inspectable HTML file']};
+  }
+  return validateDocument(value);
+};
 if(process.argv[1]?.endsWith('validate-output.mjs')) await runValidatorCli(validateOutput,'node validate-output.mjs <output.json>');

@@ -157,16 +157,17 @@ copy string, route, or screenshot arrangement as the global rule.
 
 Use `fe.grammar-common-extension` as the single authority. Missing semantic rule, token,
 component/export, state, or extension axis is `grammar-gap`: the exact Grammar owner repairs and
-publishes it, then frontend recompiles against the new package identity. It is never UI `SUSPENSE`,
-or permission for local CSS/anatomy improvisation. When Grammar is complete, render one preview
+publishes it, then frontend recompiles against the new package identity. It is never a local
+compatibility path or permission for page-local CSS/anatomy improvisation. When Grammar is complete,
+render one preview
 for a materially dominant direction; if several real directions remain and none dominates, render
-three or four for selection inside `generate`.
+three or four inside the single `fe/direction-generate` product and wait for the exact selected id.
 
 ## Verdict
 
 - `PASS`: all three decision layers pass at every required state and viewport.
 - `FAIL`: visible/runtime evidence contradicts meaning priority, UI composition, or Grammar.
-- `SUSPENSE`: Grammar is complete and no rule fails, but one finite visual choice remains unresolved.
+- `BLOCKED`: required authority, runtime evidence, or a valid choice product is unavailable.
 
-`SUSPENSE` is not a Grammar gap, runtime `BLOCKED`, stylistic guess, or PASS. The frontend machine owns
-the typed continuation; this record emits no route or repair stage.
+A finite visual choice is not a verdict. It yields the typed direction-choice wait owned by the
+frontend machine; approve resumes the exact selected direction and reject terminates without apply.

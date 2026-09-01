@@ -31,7 +31,8 @@ Review begins only after capture/preflight validates a latest-source packet. The
 An empty, loading, skeleton, error, duplicate, or cropped image cannot replace the populated hero or
 carry a whole-page aesthetic verdict. A screenshot clipped at a viewport edge does not prove the
 partially visible owner is broken; require the adjacent scroll/focus cell. Missing applicable cells
-make the packet incomplete and the verdict `BLOCKED` or `INSUFFICIENT_EVIDENCE`, never PASS.
+make the packet incomplete and the verdict `INSUFFICIENT_EVIDENCE`, never PASS. When runtime,
+identity, or capture availability prevents obtaining a valid packet at all, the verdict is `BLOCKED`.
 
 Any source mutation, runtime generation change, handoff-state change, host geometry change, or stale
 fingerprint invalidates the packet.
@@ -96,9 +97,19 @@ causal cluster, unless continuing is unsafe or impossible.
   veto, and no contradictory finding remains.
 - `FAIL`: any observable contradiction exists, including a crude, generic, wireframe-like,
   mechanically assembled, merely functional, or unpleasant complete interface.
-- `SUSPENSE`: Grammar is complete, no contradiction exists, and one finite visual choice remains
-  unresolved. Missing semantic rule/token/component is `grammar-gap`, not a visual verdict.
-- `BLOCKED`: runtime, identity, capture, or evidence prevents a valid visual verdict.
+- `BLOCKED`: runtime, identity, or capture availability prevents obtaining a valid review packet.
+- `INSUFFICIENT_EVIDENCE`: a packet exists but omits an applicable raster, lifecycle cell, viewport,
+  lens observation, or required fingerprint needed to judge the interface.
+- `STALE`: source, runtime generation, handoff state, host geometry, or an evidence fingerprint changed
+  after the packet was frozen.
+
+Visual ambiguity is not a review verdict. Before apply, complete Grammar with one materially dominant
+direction produces one realistic preview and continues. When no direction dominates—or comparison
+was explicitly requested—render three or four material alternatives, emit a typed user-choice
+`WAIT`, and resume only from the bound selection. Once rendered implementation reaches blind review,
+an observable visual contradiction is `FAIL`; lack of proof is `INSUFFICIENT_EVIDENCE`, `BLOCKED`, or
+`STALE` as defined above. Missing semantic rule, token, component, or extension axis is a
+`grammar-gap`, not a visual verdict.
 
 The first visual decision is the aesthetic veto on the settled populated whole. A result that is not
 immediately harmonious, polished, and pleasant is `FAIL`; correct rendering, working behavior,

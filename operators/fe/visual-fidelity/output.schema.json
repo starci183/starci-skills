@@ -44,6 +44,11 @@
                 "summary",
                 "artifactRefs",
                 "reviewMode",
+                "grammarBinding",
+                "iconographyManifest",
+                "mediaManifest",
+                "productFamilyEvidence",
+                "grammarAudit",
                 "packetFingerprint",
                 "matrixFingerprint",
                 "partitionFingerprint",
@@ -78,6 +83,40 @@
                 "reviewMode": {
                   "description": "The AI must attack the raster before consulting implementation or authority.",
                   "const": "ai-adversarial-pixel"
+                },
+                "grammarBinding": { "$ref": "#/$defs/blindGrammarBinding" },
+                "iconographyManifest": { "$ref": "#/$defs/blindIconographyManifest" },
+                "mediaManifest": { "$ref": "#/$defs/blindMediaManifest" },
+                "productFamilyEvidence": {
+                  "description": "Exact product-family comparison identity copied from the blind packet.",
+                  "type": "object", "additionalProperties": false,
+                  "required": ["grammarBindingRef", "grammarCoreRef", "packagedContractRefs", "visualDnaRef", "productFamilyRef", "benchmarkRasterRefs"],
+                  "properties": {
+                    "grammarBindingRef": { "type": "string", "pattern": "^grammar-binding://" },
+                    "grammarCoreRef": { "type": "string", "pattern": "^grammar-core://" },
+                    "packagedContractRefs": { "type": "array", "minItems": 1, "maxItems": 64, "uniqueItems": true, "items": { "type": "string", "pattern": "^grammar-package://" } },
+                    "visualDnaRef": { "type": "string", "pattern": "^visual-dna://" },
+                    "productFamilyRef": { "type": "string", "pattern": "^product-family://" },
+                    "benchmarkRasterRefs": { "type": "array", "minItems": 1, "maxItems": 16, "uniqueItems": true, "items": { "type": "string", "pattern": "sha256[-/][0-9a-f]{64}\\.(png|jpg|jpeg|webp)$" } }
+                  }
+                },
+                "grammarAudit": {
+                  "description": "Exact separately validated Grammar audit record bound to this packet and proof matrix.",
+                  "type": "object", "additionalProperties": false,
+                  "required": ["auditRef", "auditFingerprint", "status", "grammarManifestRef", "grammarManifestFingerprint", "iconographyManifestRef", "iconographyManifestFingerprint", "mediaManifestRef", "mediaManifestFingerprint", "proofMatrixFingerprint", "evidenceRefs"],
+                  "properties": {
+                    "auditRef": { "type": "string", "pattern": "^grammar-audit://" },
+                    "auditFingerprint": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
+                    "status": { "enum": ["passed", "failed"] },
+                    "grammarManifestRef": { "type": "string", "pattern": "^grammar://" },
+                    "grammarManifestFingerprint": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
+                    "iconographyManifestRef": { "type": "string", "pattern": "^iconography://" },
+                    "iconographyManifestFingerprint": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
+                    "mediaManifestRef": { "type": "string", "pattern": "^media-manifest://" },
+                    "mediaManifestFingerprint": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
+                    "proofMatrixFingerprint": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
+                    "evidenceRefs": { "type": "array", "minItems": 1, "maxItems": 64, "uniqueItems": true, "items": { "type": "string", "minLength": 1 } }
+                  }
                 },
                 "packetFingerprint": {
                   "description": "Exact raster-only packet reviewed by the fresh Sol execution.",
@@ -196,8 +235,8 @@
                       "lensVerdicts": {
                         "description": "A separate falsification verdict for every required visual lens; one problem forces this image to repair.",
                         "type": "array",
-                        "minItems": 19,
-                        "maxItems": 19,
+                        "minItems": 20,
+                        "maxItems": 20,
                         "items": {
                           "type": "object",
                           "additionalProperties": false,
@@ -223,7 +262,8 @@
                                 "responsive-composition",
                                 "visual-consistency",
                                 "empty-space-balance",
-                                "task-scanability"
+                                "task-scanability",
+                                "product-family-quality"
                               ]
                             },
                             "verdict": { "enum": ["passed", "problem"] },
@@ -328,5 +368,10 @@
         }
       ]
     }
+  },
+  "$defs": {
+    "blindGrammarBinding": { "type": "object", "additionalProperties": false, "required": ["bindingRef", "manifestRef", "decisionManifestFingerprint", "auditPlanRef", "auditPlanFingerprint"], "properties": { "bindingRef": { "type": "string", "pattern": "^grammar-binding://" }, "manifestRef": { "type": "string", "pattern": "^grammar://" }, "decisionManifestFingerprint": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" }, "auditPlanRef": { "type": "string", "pattern": "^grammar-audit://" }, "auditPlanFingerprint": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" } } },
+    "blindIconographyManifest": { "type": "object", "additionalProperties": false, "required": ["manifestRef", "manifestFingerprint", "mode", "visualFamilyRef"], "properties": { "manifestRef": { "type": "string", "pattern": "^iconography://" }, "manifestFingerprint": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" }, "mode": { "enum": ["none", "resolved"] }, "visualFamilyRef": { "anyOf": [{ "type": "string", "pattern": "^icon-family://" }, { "type": "null" }] } } },
+    "blindMediaManifest": { "type": "object", "additionalProperties": false, "required": ["manifestRef", "manifestFingerprint", "mode", "assetRef"], "properties": { "manifestRef": { "type": "string", "pattern": "^media-manifest://" }, "manifestFingerprint": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" }, "mode": { "enum": ["none", "reuse", "generate"] }, "assetRef": { "type": ["string", "null"], "minLength": 1 } } }
   }
 }

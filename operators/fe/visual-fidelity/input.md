@@ -17,7 +17,8 @@
   context and is not reviewer-visible.
 - `input.blindReviewPacket`: The only reviewer-visible payload. It binds the capture receipt,
   preflight, source freshness, matrix/partition/round identity, exact ordered content-addressed raster
-  cells, exact ordered canonical probe cells, and one `lastScreenshotRef`.
+  cells, exact ordered canonical probe cells, one `lastScreenshotRef`, opaque Grammar/icon/media
+  manifest fingerprints, and product-family benchmark rasters.
 
 The packet requires uncropped host context, focused surface views, wide/intermediate/compact coverage,
 and lifecycle evidence. Its primary evidence must include a settled populated happy-case hero with

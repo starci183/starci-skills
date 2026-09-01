@@ -34,4 +34,8 @@ Route additional Common knowledge by need:
 - Ranked rows, placement marks, and movement delta: `fe.grammar-common-case-ranked-collection-semantics`.
 - Reuse, extension, or missing capability: `fe.grammar-common-extension`.
 
-Grammar must never own an actor, product entity, price, entitlement, policy, workflow outcome, or business-named state. Application Product Blocks map domain meaning to neutral Grammar state.
+Grammar must never own an actor, product entity, price, entitlement, policy, workflow outcome, or
+business-named state. Application blocks and composites map domain meaning to published Grammar
+authority. They may own business-specific anatomy and ordering, but may not reconstruct generic
+buttons, copy hierarchies, fields, surfaces, navigation, rails, workspaces, or responsive behavior.
+Any proposed new public Grammar interface requires explicit teacher approval before source mutation.

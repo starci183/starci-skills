@@ -16,8 +16,10 @@ A subordinate complementary region appears to the right of a dominant primary ta
 ## Closed contract
 
 - `PrimaryRailLayout` owns tracks, rail width, gap, and responsive stacking.
-- `Rail` with `inset=content` owns the complementary landmark and reuses the canonical Core
-  PageContainer content inset; this file publishes no second numeric inset.
+- `Rail` with `inset=content` owns the complementary landmark and consumes the canonical Core
+  `PageContainer` content-inset decision. Its `navigation.right-rail.content-inset` decision must use
+  exactly the same token set as `page-container.content-inset`; this file publishes no second numeric
+  inset.
 - `mode=sticky` additionally names the page scroll owner, top offset, collision/stop boundary, and
   compact fallback. CSS `position: sticky` alone is not the pattern.
 - Children own their own surface boundaries; the rail must not add decorative color or a duplicate

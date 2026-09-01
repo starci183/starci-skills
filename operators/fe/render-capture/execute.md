@@ -4,7 +4,8 @@ Capture one deterministic raster evidence set from one validated `capture-prefli
 Do not mutate source, change the matrix, judge visual quality, call a reviewer, or choose another
 operator.
 
-Bind preflight, compiled request, registered source-apply RETURN, aggregate after-state, matrix,
+Bind preflight, compiled request, registered source-apply RETURN, aggregate after-state, Grammar
+decision/audit identity, icon/media manifests, product-family benchmarks, matrix,
 partition, round, and capture/reuse partition identities unchanged. Reused partitions require their
 frozen dependency proof; shared sentinels recapture. Source
 or render-state drift blocks this invocation and requires a fresh one.
@@ -23,5 +24,7 @@ handoff raster captured after the latest mutation.
 
 Freeze one retained raster-only blind-review packet ordered exactly as host artifact, render matrix,
 then applicable probe rasters. Exclude source, DOM, tests, measurements, authority prose, producer
-rationale, previous feedback, suspected defects, prior verdicts, and intended answers. Return only the
-typed capture receipt; the parent Skill owns review or another capture invocation.
+rationale, full composition ownership, icon-role/custom reasons, media provenance, previous feedback,
+suspected defects, prior verdicts, and intended answers. Preserve only opaque manifest fingerprints,
+family/mode/asset identities, and benchmark rasters. Return only the typed capture receipt; the parent
+Skill owns review or another capture invocation.

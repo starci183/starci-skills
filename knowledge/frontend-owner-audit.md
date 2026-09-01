@@ -38,7 +38,7 @@ typed cross-domain exit. Never clone or reconstruct shared behavior locally to e
 The replaceable snapshot derives only from the latest immutable blind-review entry and names:
 
 - exact owner kind, source references, route/overlay entry, and owner-group fingerprint;
-- `PASS`, `FAIL`, `SUSPENSE`, `BLOCKED`, `INSUFFICIENT_EVIDENCE`, or `STALE`;
+- `PASS`, `FAIL`, `BLOCKED`, `INSUFFICIENT_EVIDENCE`, or `STALE`;
 - one evidence-grounded reason;
 - covered states, viewports, host context, scroll/zoom/drag, and overlay focus-return lifecycle;
 - source, runtime, evidence-packet, and finding-batch fingerprints;
@@ -48,6 +48,11 @@ The replaceable snapshot derives only from the latest immutable blind-review ent
 A source, runtime, host-geometry, or handoff-state change makes the snapshot `STALE` until fresh
 capture/preflight and blind review. Skeleton shown as settled content, missing populated hero,
 untested applicable lifecycle, or missing viewport is `INSUFFICIENT_EVIDENCE`, not PASS.
+
+Visual ambiguity never becomes an owner-audit verdict. Before apply, use one realistic dominant
+preview when a direction materially dominates; otherwise render three or four material alternatives
+and bind the selection through a typed user-choice `WAIT`. The audit snapshot records only the
+resulting implementation verdict from the five-value set above.
 
 Numeric score is optional legacy/user-requested metadata and never routes. When present it must obey
 `fe.ui-render-review`: any visible contradiction caps it at 8, 9+ requires typed PASS, and incomplete

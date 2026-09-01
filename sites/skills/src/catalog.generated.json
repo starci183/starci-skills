@@ -709,7 +709,7 @@
       "id": "fe/capture-preflight",
       "domain": "fe",
       "iconUrl": null,
-      "knowledgeCount": 1,
+      "knowledgeCount": 2,
       "accepts": [],
       "emits": [],
       "sideEffects": []

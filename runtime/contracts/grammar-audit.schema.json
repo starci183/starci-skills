@@ -1,0 +1,59 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://starci.dev/v7.4/runtime/contracts/grammar-audit.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "contractVersion", "auditRef", "targetRef", "grammarManifestRef", "grammarManifestFingerprint", "iconographyManifestRef", "iconographyManifestFingerprint", "mediaManifestRef", "mediaManifestFingerprint", "proofMatrixFingerprint", "status", "checks", "violations", "evidenceRefs", "auditFingerprint"],
+  "properties": {
+    "schemaVersion": { "const": 1 },
+    "contractVersion": { "const": "7.6.0" },
+    "auditRef": { "type": "string", "pattern": "^grammar-audit://" },
+    "targetRef": { "type": "string", "minLength": 1 },
+    "grammarManifestRef": { "type": "string", "pattern": "^grammar://" },
+    "grammarManifestFingerprint": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
+    "iconographyManifestRef": { "type": "string", "pattern": "^iconography://" },
+    "iconographyManifestFingerprint": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
+    "mediaManifestRef": { "type": "string", "pattern": "^media-manifest://" },
+    "mediaManifestFingerprint": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
+    "proofMatrixFingerprint": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
+    "status": { "enum": ["passed", "failed"] },
+    "checks": {
+      "type": "array", "minItems": 3, "maxItems": 256,
+      "items": {
+        "type": "object", "additionalProperties": false,
+        "required": ["cellRef", "ownerRef", "ownerLayer", "authorityRef", "stateRef", "viewport", "boundaryOwnerRefs", "insetOwnerRefs", "minimumInlineClearancePx", "inlineStartPx", "inlineEndPx", "dividerCount", "iconFamilyRefs", "evidenceRefs"],
+        "properties": {
+          "cellRef": { "type": "string", "pattern": "^proof-cell-[0-9]{3}$" },
+          "ownerRef": { "type": "string", "pattern": "^owner://" },
+          "ownerLayer": { "enum": ["grammar", "application-block", "application-composite"] },
+          "authorityRef": { "type": "string", "pattern": "^(grammar|application)://" },
+          "stateRef": { "type": "string", "minLength": 1 },
+          "viewport": { "enum": ["wide", "intermediate", "compact"] },
+          "boundaryOwnerRefs": { "type": "array", "maxItems": 2, "uniqueItems": true, "items": { "type": "string", "pattern": "^owner://" } },
+          "insetOwnerRefs": { "type": "array", "maxItems": 2, "uniqueItems": true, "items": { "type": "string", "pattern": "^owner://" } },
+          "minimumInlineClearancePx": { "type": "number", "minimum": 0 },
+          "inlineStartPx": { "type": "number", "minimum": 0 },
+          "inlineEndPx": { "type": "number", "minimum": 0 },
+          "dividerCount": { "type": "integer", "minimum": 0, "maximum": 2 },
+          "iconFamilyRefs": { "type": "array", "maxItems": 2, "uniqueItems": true, "items": { "type": "string", "pattern": "^icon-family://" } },
+          "evidenceRefs": { "type": "array", "minItems": 1, "maxItems": 16, "uniqueItems": true, "items": { "type": "string", "minLength": 1 } }
+        }
+      }
+    },
+    "violations": {
+      "type": "array", "maxItems": 256,
+      "items": {
+        "type": "object", "additionalProperties": false,
+        "required": ["kind", "ownerRef", "state", "evidenceRefs"],
+        "properties": {
+          "kind": { "enum": ["duplicate-boundary-owner", "duplicate-inset-owner", "unsafe-inline-clearance", "duplicate-divider", "mixed-icon-family", "unbound-icon", "overflow", "other"] },
+          "ownerRef": { "type": "string", "pattern": "^owner://" },
+          "state": { "type": "string", "minLength": 1 },
+          "evidenceRefs": { "type": "array", "minItems": 1, "maxItems": 16, "uniqueItems": true, "items": { "type": "string", "minLength": 1 } }
+        }
+      }
+    },
+    "evidenceRefs": { "type": "array", "minItems": 1, "maxItems": 256, "uniqueItems": true, "items": { "type": "string", "minLength": 1 } },
+    "auditFingerprint": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" }
+  }
+}

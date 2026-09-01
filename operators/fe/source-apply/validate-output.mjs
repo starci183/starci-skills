@@ -17,6 +17,8 @@ export const validateOutput=validatorFor(new URL('./output.schema.json',import.m
     if(result?.directionBinding&&!evidenceRefs.includes(result.directionBinding.directionGenerateReturnReceiptRef)) errors.push('applied evidenceRefs must include direction-generate RETURN receipt');
     if(result?.directionBinding&&!evidenceRefs.includes(result.directionBinding.selectedDirectionRef)) errors.push('applied evidenceRefs must include selectedDirectionRef');
     if(result&&(!evidenceRefs.includes(result.grammarBinding.packageRef)||!evidenceRefs.includes(result.grammarBinding.manifestRef))) errors.push('applied evidenceRefs must include compiled Grammar package and manifest identities');
+    if(result&&result.productFamilyEvidence.grammarBindingRef!==result.grammarBinding.bindingRef) errors.push('applied product-family evidence must bind the exact compiled Grammar binding');
+    if(result) for(const ref of [result.grammarBinding.auditPlanRef,result.iconographyManifest.manifestRef,result.mediaManifest.manifestRef,...result.productFamilyEvidence.benchmarkRasterRefs]) if(!evidenceRefs.includes(ref)) errors.push(`applied evidenceRefs must include ${ref}`);
     if(result&&result.proofMatrixFingerprint!==fingerprint(result.proofMatrix)) errors.push('applied proofMatrixFingerprint must hash the exact proofMatrix');
     if(result&&result.aggregateAfterFingerprint!==fingerprint(result.effectRecords.map(({path,afterSha256})=>({path,afterSha256})))) errors.push('aggregateAfterFingerprint must hash exact ordered effect paths and after hashes');
     const effectPaths=result?.effectRecords.map(({path})=>path)??[];

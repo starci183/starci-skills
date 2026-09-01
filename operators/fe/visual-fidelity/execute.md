@@ -16,13 +16,15 @@ the packet cannot support a conclusion—including a missing populated hero, adj
 or raster/probe parity—return `insufficient-evidence` with `result: null`, non-empty evidence, and exact
 recapture gaps. Never turn incomplete evidence into PASS or a numeric score.
 
-Inspect every packet raster once and in packet order. Emit all 19 lens verdicts and all three challenge
+Inspect every packet raster once and in packet order. Emit all 20 lens verdicts and all three challenge
 families for each raster. Emit one probe verdict for every canonical probe in canonical order: a
 `survived` or `contradiction` record retains its exact packet raster ref; `not-applicable` retains a
 null image ref and the observed non-applicability. Extra, missing, reordered, or substituted raster
 and probe refs invalidate closure.
 
-Return `repair` for any visible problem, confirmed challenge, probe contradiction, uncertainty, or
+Emit the separately validated Grammar audit reference/fingerprint bound to the exact decision,
+iconography, media, and proof-matrix identities. Return `repair` for any visible problem, failed
+Grammar audit, confirmed challenge, probe contradiction, uncertainty, or
 non-passing final screenshot. Return `passed` only over the complete latest-source packet with score
 at least 9, no retained gaps, no problem or contradiction, `uncertainty=false`, and the one final
 post-mutation screenshot passed. The score reports progress; it never overrides the typed verdict.

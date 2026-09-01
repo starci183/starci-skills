@@ -6,7 +6,8 @@
 - `output.evidenceRefs`: Exact evidence used.
 - `output.handoff`: Typed cross-domain continuation, only when the outcome requires it.
 
-`applied` repeats the mode, compiled request ref/fingerprint, Grammar identity, proof matrix,
+`applied` repeats the mode, compiled request ref/fingerprint, Grammar decision/audit identity,
+iconography and media provenance manifests, product-family evidence, proof matrix,
 direction mode/binding, target, behavior-contract
 binding, source-boundary files/before hashes,
 and exact mutation effect records. Artifact refs must equal changed paths, remain inside the repeated

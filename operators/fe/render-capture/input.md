@@ -20,6 +20,9 @@
 - `input.viewports`: The mandatory responsive viewport set.
 - `input.handoffStateRef`: Exact visible state that will be handed to the user after completion.
 - `input.handoffViewport`: Exact user-visible browser surface and content viewport, without emulation, required for handoff proof.
+- `input.grammarBinding`, `input.iconographyManifest`, `input.mediaManifest`, and
+  `input.productFamilyEvidence`: Exact compile-owned governance inherited through preflight; capture
+  may only project opaque identities into the blind packet.
 - `input.preflight`: Exact validated preflight freezing the compiled-request identity, registered
   source-apply RETURN and aggregate after-state, matrix, partition map, visual round, and
   capture/reuse dispositions. No free source fingerprint may replace this lineage.

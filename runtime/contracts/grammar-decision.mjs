@@ -33,6 +33,16 @@ const semanticErrors = (manifest) => {
   }
 
   for (const composition of manifest.semanticComposition) {
+    if (composition.patternRef.startsWith('proposal://')) errors.push(`$.semanticComposition.${composition.instanceRef}: unapproved Grammar proposals are non-renderable`);
+    if (composition.ownerLayer === 'grammar') {
+      if (!composition.patternRef.startsWith('pattern://')) errors.push(`$.semanticComposition.${composition.instanceRef}: Grammar ownership requires pattern:// authority`);
+      if (!composition.authorityRef.startsWith('grammar://')) errors.push(`$.semanticComposition.${composition.instanceRef}: Grammar ownership requires grammar:// authority`);
+    } else {
+      const expectedPrefix = composition.ownerLayer === 'application-block' ? 'block://' : 'composite://';
+      if (!composition.patternRef.startsWith(expectedPrefix)) errors.push(`$.semanticComposition.${composition.instanceRef}: ${composition.ownerLayer} requires ${expectedPrefix} authority`);
+      if (!composition.authorityRef.startsWith('application://')) errors.push(`$.semanticComposition.${composition.instanceRef}: application composition requires application:// authority`);
+      if (!manifest.decisions.some((item) => item.ownerRef === composition.ownerRef)) errors.push(`$.semanticComposition.${composition.instanceRef}: application composition must bind its visible roles to published Grammar decisions`);
+    }
     const slots = composition.slots.slice().sort((a, b) => a.order - b.order).map((slot) => slot.slotRef);
     if (composition.patternRef === 'pattern://ContextIntro') {
       if (slots.join(',') !== 'eyebrow,heading,description') errors.push(`$.semanticComposition.${composition.instanceRef}: ContextIntro slots must be eyebrow, heading, description`);
@@ -42,8 +52,13 @@ const semanticErrors = (manifest) => {
       }
     }
     if (composition.patternRef === 'pattern://RightRail') {
-      const bound = manifest.decisions.filter((item) => item.ownerRef === composition.ownerRef && item.semanticRole === 'navigation.right-rail.content').flatMap((item) => item.tokenRefs);
-      for (const token of ['token://space/inline-3', 'token://space/block-6']) if (!bound.includes(token)) errors.push(`$.semanticComposition.${composition.instanceRef}: RightRail requires ${token}`);
+      const railInset = manifest.decisions.find((item) => item.ownerRef === composition.ownerRef && item.semanticRole === 'navigation.right-rail.content-inset');
+      const pageInset = manifest.decisions.find((item) => item.semanticRole === 'page-container.content-inset');
+      if (!railInset || !pageInset) {
+        errors.push(`$.semanticComposition.${composition.instanceRef}: RightRail must consume one PageContainer content-inset decision`);
+      } else if (JSON.stringify([...railInset.tokenRefs].sort()) !== JSON.stringify([...pageInset.tokenRefs].sort())) {
+        errors.push(`$.semanticComposition.${composition.instanceRef}: RightRail content inset must exactly reuse PageContainer inset tokens`);
+      }
     }
     const ranges = new Set(manifest.responsiveBindings.filter((item) => item.ownerRef === composition.ownerRef).map((item) => item.range));
     for (const range of ['wide', 'intermediate', 'compact']) if (!ranges.has(range)) errors.push(`$.responsiveBindings: ${composition.ownerRef} is missing ${range}`);

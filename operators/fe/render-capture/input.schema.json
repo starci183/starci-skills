@@ -63,7 +63,11 @@
         "viewports",
         "handoffStateRef",
         "handoffViewport",
-        "preflight"
+        "preflight",
+        "grammarBinding",
+        "iconographyManifest",
+        "mediaManifest",
+        "productFamilyEvidence"
       ],
       "properties": {
         "targetRef": {
@@ -167,6 +171,22 @@
             "viewportOverride": { "const": false }
           }
         },
+        "grammarBinding": { "description": "Exact compile-owned Grammar decision and audit binding inherited through preflight.", "$ref": "#/$defs/grammarBinding" },
+        "iconographyManifest": { "description": "Exact compile-owned iconography provenance manifest inherited through preflight.", "$ref": "#/$defs/iconographyManifest" },
+        "mediaManifest": { "description": "Exact compile-owned media provenance manifest inherited through preflight.", "$ref": "#/$defs/mediaManifest" },
+        "productFamilyEvidence": {
+          "description": "Opaque Grammar identity plus content-addressed benchmark rasters allowed in the otherwise blind pixel packet.",
+          "type": "object", "additionalProperties": false,
+          "required": ["grammarBindingRef", "grammarCoreRef", "packagedContractRefs", "visualDnaRef", "productFamilyRef", "benchmarkRasterRefs"],
+          "properties": {
+            "grammarBindingRef": { "type": "string", "pattern": "^grammar-binding://" },
+            "grammarCoreRef": { "type": "string", "pattern": "^grammar-core://" },
+            "packagedContractRefs": { "type": "array", "minItems": 1, "maxItems": 64, "uniqueItems": true, "items": { "type": "string", "pattern": "^grammar-package://" } },
+            "visualDnaRef": { "type": "string", "pattern": "^visual-dna://" },
+            "productFamilyRef": { "type": "string", "pattern": "^product-family://" },
+            "benchmarkRasterRefs": { "type": "array", "minItems": 1, "maxItems": 16, "uniqueItems": true, "items": { "type": "string", "pattern": "sha256[-/][0-9a-f]{64}\\.(png|jpg|jpeg|webp)$" } }
+          }
+        },
         "preflight": {
           "description": "Exact validated preflight that froze the matrix, round, and owner partitions before capture.",
           "type": "object",
@@ -193,5 +213,11 @@
         }
       }
     }
+  },
+  "$defs": {
+    "compositionOwners": { "type": "array", "minItems": 1, "maxItems": 64, "items": { "type": "object", "additionalProperties": false, "required": ["ownerRef", "ownerLayer", "authorityRef", "patternRef"], "properties": { "ownerRef": { "type": "string", "pattern": "^owner://" }, "ownerLayer": { "enum": ["grammar", "application-block", "application-composite"] }, "authorityRef": { "type": "string", "pattern": "^(grammar|application)://" }, "patternRef": { "type": "string", "pattern": "^(pattern|block|composite)://" } } } },
+    "grammarBinding": { "type": "object", "additionalProperties": false, "required": ["bindingRef", "packageRef", "manifestRef", "exportRefs", "contentSha256", "authorityRevision", "decisionManifestFingerprint", "auditPlanRef", "auditPlanFingerprint", "compositionOwners"], "properties": { "bindingRef": { "type": "string", "pattern": "^grammar-binding://" }, "packageRef": { "type": "string", "pattern": "^grammar-package://" }, "manifestRef": { "type": "string", "pattern": "^grammar://" }, "exportRefs": { "type": "array", "minItems": 1, "maxItems": 32, "uniqueItems": true, "items": { "type": "string", "pattern": "^grammar://" } }, "contentSha256": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" }, "authorityRevision": { "type": "string", "minLength": 1 }, "decisionManifestFingerprint": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" }, "auditPlanRef": { "type": "string", "pattern": "^grammar-audit://" }, "auditPlanFingerprint": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" }, "compositionOwners": { "$ref": "#/$defs/compositionOwners" } } },
+    "iconographyManifest": { "type": "object", "additionalProperties": false, "required": ["manifestRef", "manifestFingerprint", "mode", "visualFamilyRef", "decisions"], "properties": { "manifestRef": { "type": "string", "pattern": "^iconography://" }, "manifestFingerprint": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" }, "mode": { "enum": ["none", "resolved"] }, "visualFamilyRef": { "anyOf": [{ "type": "string", "pattern": "^icon-family://" }, { "type": "null" }] }, "decisions": { "type": "array", "maxItems": 64, "items": { "type": "object", "additionalProperties": false, "required": ["roleRef", "meaningAuthorityRef", "source", "glyphRef", "catalogSearchRefs", "customReason"], "properties": { "roleRef": { "type": "string", "pattern": "^semantic-icon://" }, "meaningAuthorityRef": { "type": "string", "pattern": "^(business|ui-law|grammar)://" }, "source": { "enum": ["heroicons", "custom-svg"] }, "glyphRef": { "type": "string", "minLength": 1 }, "catalogSearchRefs": { "type": "array", "minItems": 1, "maxItems": 16, "uniqueItems": true, "items": { "type": "string", "pattern": "^icon-catalog://" } }, "customReason": { "type": ["string", "null"], "minLength": 1 } } } } } },
+    "mediaManifest": { "type": "object", "additionalProperties": false, "required": ["manifestRef", "manifestFingerprint", "mode", "assetRef", "artifactRefs", "provenanceRefs", "responsiveTreatmentRef", "altIntentRef", "fallbackRef"], "properties": { "manifestRef": { "type": "string", "pattern": "^media-manifest://" }, "manifestFingerprint": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" }, "mode": { "enum": ["none", "reuse", "generate"] }, "assetRef": { "type": ["string", "null"], "minLength": 1 }, "artifactRefs": { "type": "array", "maxItems": 16, "uniqueItems": true, "items": { "type": "string", "minLength": 1 } }, "provenanceRefs": { "type": "array", "maxItems": 16, "uniqueItems": true, "items": { "type": "string", "minLength": 1 } }, "responsiveTreatmentRef": { "type": ["string", "null"], "minLength": 1 }, "altIntentRef": { "type": ["string", "null"], "minLength": 1 }, "fallbackRef": { "type": ["string", "null"], "minLength": 1 } } }
   }
 }

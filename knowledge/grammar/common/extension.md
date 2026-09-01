@@ -21,7 +21,7 @@ that all closed invariants remain unchanged.
 
 ## Gap versus visual ambiguity
 
-A `grammar-gap` is missing reusable authority, not visual ambiguity and not UI `SUSPENSE`. Return an
+A `grammar-gap` is missing reusable authority, not visual ambiguity and not a frontend choice wait. Return an
 exact Grammar-owner repair request naming the absent semantic contract, affected consumers, selected
 package/version/hash, and required proof. The Grammar owner repairs and publishes the package; the
 frontend mission then recompiles against the new exact export/token/interface hash before apply.
