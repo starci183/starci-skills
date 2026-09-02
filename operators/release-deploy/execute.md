@@ -36,40 +36,45 @@ enters the plan, the manifest, the receipt, a log line, a command argument, or a
 receipt records which handles were resolved and nothing more, and no field in the contract can hold a
 value even if someone tried.
 
-## Execution sequence
+## Sequence
 
-1. **Validate input and resume.** Apply `input.schema.json` and semantic validation. Reject a foreign
-   or expired authorization, a manifest pinned elsewhere, an observation of another target, a
-   replacement identity that disagrees with the observed active release, a deadline that cannot contain
-   its window, a rollback identity equal to the release, and an unchanged resume.
-2. **Bind the release and the plan.** Compile the declared intent and the observed state into the plan
-   this pass will execute. Every effect is a compare-and-set against the frozen release, the frozen
-   target, and the observed revision.
-3. **Initialize the execution root and resolve credentials.** The execution root is ignored and
-   rebuildable. Credentials resolve by name; nothing is written down.
-4. **Prepare the host, publish the artifact, migrate, and reconcile the domain.** Each of these owns a
-   boundary and records that boundary's observed revision before and after. A desired state that
-   already matches is a proved idempotent no-op and is recorded as one; claiming an application without
-   moving a revision is rejected.
-5. **Roll out.** On this project a push to `main` triggers the GitHub Actions workflow. The rollout step
-   records the target revision before and after.
-6. **Monitor under a bounded deadline and backoff.** Observation distinguishes `progressing` from
-   failing. Boot takes roughly eight to nine minutes here, so `progressing` is the expected condition
-   for most of the window and is never treated as failure. One transient probe never converts into
-   recovery; a failing condition has to persist across observations.
-7. **Detect concurrent drift before acting.** If a release appears that is neither this release nor the
-   one it replaces, the run stops and replans. It is never recovered or rolled back as though it
-   belonged here.
-8. **Take the recovery branch when the failure persists.** Recovery repeats only approved reversible
-   actions and preserves the same release identity. Exhaustion, an unsafe action, a changed boundary, or
-   an unavailable rollback identity leaves recovery for approval, rollback, or blocked.
-9. **Take the rollback branch when recovery cannot hold.** Rollback is valid only when the exact safe
-   release still exists, the current data and schema state remain compatible, and every provider or
-   runtime mutation records a before and after revision.
-10. **Prove the steady state and stop.** Steady means the immutable digest is active, every declared
-    target is available, no superseded target remains active unless the strategy permits it, and every
-    declared probe passed for the whole window. Write the receipt under
-    `input.project.artifactRootRef`, emit one output conforming to `output.schema.json`, and stop.
+| # | Step | Reads | Writes | Stops with |
+| --- | --- | --- | --- | --- |
+| 1 | Validate input and resume | input, prior receipt, declared authorization | — | `INVALID_INPUT`, `AUTHORIZATION_MISSING`, `NO_PROGRESS` |
+| 2 | Bind the release and the plan | declared intent, observed state, frozen release and target | — | `MANIFEST_INVALID`, `APPROVAL_REQUIRED` |
+| 3 | Initialize the execution root and resolve credentials | credential names, the rebuildable execution root | — | `CREDENTIAL_UNAVAILABLE` |
+| 4 | Prepare the host, publish the artifact, migrate, and reconcile the domain | each boundary's observed revision before and after | — | `HOST_UNAVAILABLE`, `ARTIFACT_MISSING`, `MIGRATION_BLOCKED`, `DOMAIN_UNRECONCILED` |
+| 5 | Roll out | the compiled plan, the target revision before and after | — | `ROLLOUT_FAILED` |
+| 6 | Monitor under a bounded deadline and backoff | probe observations across the window | — | — |
+| 7 | Detect concurrent drift before acting | the active release, this release, the one it replaces | — | `CONCURRENT_DRIFT` |
+| 8 | Take the recovery branch when the failure persists | approved reversible actions, the same release identity | — | `RECOVERY_EXHAUSTED` |
+| 9 | Take the rollback branch when recovery cannot hold | the exact safe release, current data and schema state | — | `ROLLBACK_IDENTITY_MISSING` |
+| 10 | Prove the steady state and stop | immutable digest, declared targets, superseded targets, every declared probe | `deployment-receipt.json` | `STEADY_STATE_UNPROVEN` |
+
+Validation rejects a foreign or expired authorization, a manifest pinned elsewhere, an observation of
+another target, a replacement identity that disagrees with the observed active release, a deadline
+that cannot contain its window, a rollback identity equal to the release, and an unchanged resume.
+Every effect in the compiled plan is a compare-and-set against the frozen release, the frozen target,
+and the observed revision. The execution root is ignored and rebuildable, and credentials resolve by
+name with nothing written down.
+
+Each mutating boundary records its observed revision before and after. A desired state that already
+matches is a proved idempotent no-op and is recorded as one; claiming an application without moving a
+revision is rejected. On this project a push to `main` triggers the GitHub Actions workflow.
+
+Monitoring distinguishes `progressing` from failing. Boot takes roughly eight to nine minutes here, so
+`progressing` is the expected condition for most of the window and is never treated as failure, and
+one transient probe never converts into recovery: a failing condition has to persist across
+observations. A release that is neither this release nor the one it replaces stops the run and forces
+a replan; it is never recovered or rolled back as though it belonged here.
+
+Recovery repeats only approved reversible actions and preserves the same release identity; exhaustion,
+an unsafe action, a changed boundary, or an unavailable rollback identity leaves recovery for
+approval, rollback, or blocked. Rollback is valid only when the exact safe release still exists, the
+current data and schema state remain compatible, and every provider or runtime mutation records a
+before and after revision. Steady means the immutable digest is active, every declared target is
+available, no superseded target remains active unless the strategy permits it, and every declared
+probe passed for the whole window.
 
 ## Steady state is proved, not assumed
 

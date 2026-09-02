@@ -35,40 +35,45 @@ hoạch, manifest, receipt, một dòng log, một tham số lệnh, hay một t
 handle nào đã được phân giải, và không trường nào trong hợp đồng chứa nổi một giá trị kể cả khi có
 người cố tình.
 
-## Trình tự thực thi
+## Trình tự
 
-1. **Kiểm tra input và resume.** Áp `input.schema.json` cùng kiểm tra ngữ nghĩa. Từ chối giấy phép lạ
-   hoặc hết hạn, manifest ghim nơi khác, quan sát của target khác, danh tính bị thay thế không khớp
-   release đang chạy, deadline không chứa nổi cửa sổ của nó, danh tính rollback trùng release, và
-   resume không đổi gì.
-2. **Ràng release và kế hoạch.** Biên dịch ý định đã khai cùng trạng thái quan sát thành kế hoạch mà
-   lượt này sẽ chạy. Mọi tác động đều là compare-and-set với release đã đóng băng, target đã đóng băng,
-   và revision đã quan sát.
-3. **Khởi tạo execution root và phân giải credential.** Execution root bị ignore và dựng lại được.
-   Credential phân giải theo tên; không có gì bị ghi xuống.
-4. **Chuẩn bị host, publish artifact, migrate, và hoà hợp domain.** Mỗi bước trong số này sở hữu một
-   ranh giới và ghi revision quan sát được của ranh giới đó trước và sau. Một trạng thái mong muốn vốn
-   đã khớp là một no-op bất biến đã được chứng minh và phải được ghi đúng như vậy; khai là đã áp dụng
-   mà không dịch chuyển revision sẽ bị loại.
-5. **Rollout.** Ở dự án này, đẩy `main` kích hoạt workflow GitHub Actions. Bước rollout ghi revision
-   của target trước và sau.
-6. **Giám sát dưới deadline có chặn và backoff.** Quan sát phân biệt `progressing` với thất bại. Boot ở
-   đây mất khoảng tám tới chín phút, nên `progressing` là điều kiện dự kiến trong phần lớn cửa sổ và
-   không bao giờ bị coi là hỏng. Một probe chập chờn duy nhất không bao giờ biến thành phục hồi; điều
-   kiện thất bại phải kéo dài qua nhiều lần quan sát.
-7. **Phát hiện trôi dạt đồng thời trước khi hành động.** Nếu xuất hiện một release không phải release
-   này cũng không phải release nó thay thế, lần chạy dừng lại và lập kế hoạch lại. Nó không bao giờ
-   được phục hồi hay rollback như thể release đó thuộc về đây.
-8. **Đi vào nhánh phục hồi khi thất bại kéo dài.** Phục hồi chỉ lặp lại những hành động thuận nghịch đã
-   được duyệt và giữ nguyên danh tính release. Cạn kiệt, một hành động không an toàn, một ranh giới đã
-   đổi, hay một danh tính rollback không còn đều đưa việc sang phê duyệt, rollback, hoặc bị chặn.
-9. **Đi vào nhánh rollback khi phục hồi không giữ nổi.** Rollback chỉ hợp lệ khi đúng release an toàn
-   đó còn tồn tại, trạng thái dữ liệu và schema hiện tại còn tương thích, và mọi thay đổi ở provider
-   hay runtime đều ghi revision trước và sau.
-10. **Chứng minh trạng thái ổn định rồi dừng.** Ổn định nghĩa là digest bất biến đang hoạt động, mọi
-    target đã khai đều sẵn sàng, không target bị thay thế nào còn hoạt động trừ khi chiến lược cho
-    phép, và mọi probe đã khai đều pass suốt cả cửa sổ. Ghi receipt dưới
-    `input.project.artifactRootRef`, phát đúng một output theo `output.schema.json`, rồi dừng.
+| # | Bước | Đọc | Ghi | Dừng với |
+| --- | --- | --- | --- | --- |
+| 1 | Kiểm tra input và resume | input, receipt trước đó, giấy phép đã khai | — | `INVALID_INPUT`, `AUTHORIZATION_MISSING`, `NO_PROGRESS` |
+| 2 | Ràng release và kế hoạch | ý định đã khai, trạng thái quan sát được, release và target đã đóng băng | — | `MANIFEST_INVALID`, `APPROVAL_REQUIRED` |
+| 3 | Khởi tạo execution root và phân giải credential | tên các credential, execution root dựng lại được | — | `CREDENTIAL_UNAVAILABLE` |
+| 4 | Chuẩn bị host, publish artifact, migrate, và hoà hợp domain | revision quan sát được của từng ranh giới trước và sau | — | `HOST_UNAVAILABLE`, `ARTIFACT_MISSING`, `MIGRATION_BLOCKED`, `DOMAIN_UNRECONCILED` |
+| 5 | Rollout | kế hoạch đã biên dịch, revision của target trước và sau | — | `ROLLOUT_FAILED` |
+| 6 | Giám sát dưới deadline có chặn và backoff | các lần quan sát probe suốt cửa sổ | — | — |
+| 7 | Phát hiện trôi dạt đồng thời trước khi hành động | release đang hoạt động, release này, release nó thay thế | — | `CONCURRENT_DRIFT` |
+| 8 | Đi vào nhánh phục hồi khi thất bại kéo dài | các hành động thuận nghịch đã duyệt, chính danh tính release đó | — | `RECOVERY_EXHAUSTED` |
+| 9 | Đi vào nhánh rollback khi phục hồi không giữ nổi | đúng release an toàn đó, trạng thái dữ liệu và schema hiện tại | — | `ROLLBACK_IDENTITY_MISSING` |
+| 10 | Chứng minh trạng thái ổn định rồi dừng | digest bất biến, các target đã khai, các target bị thay thế, mọi probe đã khai | `deployment-receipt.json` | `STEADY_STATE_UNPROVEN` |
+
+Khâu kiểm tra từ chối giấy phép lạ hoặc hết hạn, manifest ghim nơi khác, quan sát của target khác,
+danh tính bị thay thế không khớp release đang chạy, deadline không chứa nổi cửa sổ của nó, danh tính
+rollback trùng release, và resume không đổi gì. Mọi tác động trong kế hoạch đã biên dịch đều là
+compare-and-set với release đã đóng băng, target đã đóng băng, và revision đã quan sát. Execution root
+bị ignore và dựng lại được, còn credential phân giải theo tên và không có gì bị ghi xuống.
+
+Mỗi ranh giới có thay đổi đều ghi revision quan sát được của nó trước và sau. Một trạng thái mong muốn
+vốn đã khớp là một no-op bất biến đã được chứng minh và phải được ghi đúng như vậy; khai là đã áp dụng
+mà không dịch chuyển revision thì bị loại. Ở dự án này, đẩy `main` kích hoạt workflow GitHub Actions.
+
+Khâu giám sát phân biệt `progressing` với thất bại. Boot ở đây mất khoảng tám tới chín phút, nên
+`progressing` là điều kiện dự kiến trong phần lớn cửa sổ và không bao giờ bị coi là hỏng, và một probe
+chập chờn duy nhất không bao giờ biến thành phục hồi: điều kiện thất bại phải kéo dài qua nhiều lần
+quan sát. Một release không phải release này cũng không phải release nó thay thế thì làm lần chạy dừng
+lại và buộc lập kế hoạch lại; nó không bao giờ được phục hồi hay rollback như thể release đó thuộc về
+đây.
+
+Phục hồi chỉ lặp lại những hành động thuận nghịch đã được duyệt và giữ nguyên danh tính release; cạn
+kiệt, một hành động không an toàn, một ranh giới đã đổi, hay một danh tính rollback không còn đều đưa
+việc sang phê duyệt, rollback, hoặc bị chặn. Rollback chỉ hợp lệ khi đúng release an toàn đó còn tồn
+tại, trạng thái dữ liệu và schema hiện tại còn tương thích, và mọi thay đổi ở provider hay runtime đều
+ghi revision trước và sau. Ổn định nghĩa là digest bất biến đang hoạt động, mọi target đã khai đều sẵn
+sàng, không target bị thay thế nào còn hoạt động trừ khi chiến lược cho phép, và mọi probe đã khai đều
+pass suốt cả cửa sổ.
 
 ## Trạng thái ổn định được chứng minh, không được giả định
 
