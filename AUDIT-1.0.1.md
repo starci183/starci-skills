@@ -23,7 +23,7 @@ decision has one recorded answer. No finding below stays open without a named ow
 | A5 | `ui/presentation/` | 10 topics | gap, padding, margin only | rule shape, `Owner` column, "Common already owns" table grounded in `packages/grammar` source; no invented API | none |
 | A6 | `ui/composition/` | 8 topics | no | one prefix per file, `Decide` column states what the direction must settle, no verdict tables | none |
 | A7 | `ui/proof/` | 4 topics | no | `Observe` column names runtime evidence that would falsify; contrast rules relocated from `_pending-contrast` | where measured-contrast lands |
-| A8 | `patterns/fe`, `patterns/be` | 18 topics | no | every rule cites two real paths; non-universal counts stated; open questions left open | 7 recorded open questions |
+| A8 | `patterns/fe`, `patterns/be` | 16 topics | no | every rule cites two real paths; non-universal counts stated; open questions left open | 7 recorded open questions |
 | A9 | `grammars/starci/` | 5 topics | partly | matches current `packages/grammar`: no `Link`, `TextAction`/`Button` take `href`; 41 renderers | none |
 | A10 | `_pending-*` | 7 files | no | each has a destination and is moved, not deleted | contrast → proof; surface, boundary, icon, media, control-state, field → grammars |
 

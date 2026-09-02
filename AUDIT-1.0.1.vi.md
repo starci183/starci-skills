@@ -23,7 +23,7 @@ còn treo đều có đúng một câu trả lời được ghi lại. Không fi
 | A5 | `ui/presentation/` | 10 topic | mới gap, padding, margin | khuôn rule, cột `Owner`, bảng "Common đã sở hữu" bám vào source `packages/grammar`; không bịa API | không |
 | A6 | `ui/composition/` | 8 topic | chưa | mỗi file một tiền tố, cột `Decide` nói direction phải chốt gì, không có bảng verdict | không |
 | A7 | `ui/proof/` | 4 topic | chưa | cột `Observe` gọi tên bằng chứng lúc chạy có thể bác bỏ; luật tương phản chuyển từ `_pending-contrast` về | đo tương phản đặt ở đâu |
-| A8 | `patterns/fe`, `patterns/be` | 18 topic | chưa | mỗi rule dẫn hai đường dẫn thật; nêu số đếm khi không phổ quát; câu hỏi mở để mở | 7 câu hỏi mở đã ghi |
+| A8 | `patterns/fe`, `patterns/be` | 16 topic | chưa | mỗi rule dẫn hai đường dẫn thật; nêu số đếm khi không phổ quát; câu hỏi mở để mở | 7 câu hỏi mở đã ghi |
 | A9 | `grammars/starci/` | 5 topic | một phần | khớp `packages/grammar` hiện tại: không còn `Link`, `TextAction`/`Button` nhận `href`; 41 renderer | không |
 | A10 | `_pending-*` | 7 file | chưa | mỗi file có đích và được chuyển, không bị xoá | contrast → proof; surface, boundary, icon, media, control-state, field → grammars |
 
