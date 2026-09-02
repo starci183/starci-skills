@@ -30,13 +30,14 @@ knowledge/
   ui/proof/              what is only true once rendered              -> fe.surface.audit
   patterns/fe, be        code conventions extracted from the two live sources
   grammars/<family>/     one visual family's realization of Common
-scripts/                 validate-routing.mjs, validate-resources.mjs, validate-knowledge-citations.mjs, run-operator-self-tests.mjs;
+templates/               one template per document kind; each carries the json template-contract the tree is checked against
+scripts/                 validate-routing.mjs, validate-resources.mjs, validate-knowledge-citations.mjs, validate-templates.mjs, run-operator-self-tests.mjs;
                          device-state.mjs and workspace-portable.mjs (+ specs), which the backend package.json calls
 readiness/               workspaces/ schemas that the portable and hydrated route declarations name as $schema
 audits/<version>/        dry-run records with their validated input and output artifacts
 ```
 
-`npm test` runs the routing validation, the resources validation, the knowledge citation check, every operator self-test, and the two script specs. It is green at the published
+`npm test` runs the routing validation, the resources validation, the knowledge citation check, the template check, every operator self-test, and the script specs. It is green at the published
 head or the head is not publishable.
 
 ## Rules that hold everywhere
