@@ -21,41 +21,38 @@ Chúng đến qua `context.hints`, mỗi cái mang hằng `authoritative: false`
 `HINT_REJECTED` thay vì được tra cứu. Việc gọi tên chúng chính là điểm mấu chốt. Một gợi ý không bao
 giờ được ghi ra là một gợi ý sẽ được đi theo ngay khi route đã khai trông có vẻ bất tiện.
 
-## Trình tự thực thi
+## Trình tự
 
-1. **Kiểm tra input và resume.** Áp `input.schema.json` cùng kiểm tra ngữ nghĩa. Từ chối một route
-   khai danh tính khác, một source route mang directory, một sibling route đi ngược lên, một route đã
-   hydrate có workspace root ngoại lai, một quan sát của checkout khác, một runtime được ràng mà
-   không có nhu cầu, và một resume không đổi gì.
-2. **Ràng bootstrap và danh tính.** Xác nhận các entry bootstrap và việc phát hiện agent cho Source
-   này, rồi tới danh tính máy cùng roster credential đã mã hoá của nó. Danh tính chưa xác minh là
-   `IDENTITY_UNVERIFIED`. Không credential nào được đọc, sao chép hay ghi lại; chỉ tham chiếu roster
-   đã niêm phong được ràng vào, và `IDENTITY_ROSTER_SEALED` nói ra điều đó.
-3. **Phân giải route.** Đọc khai báo portable cho đúng project và role được yêu cầu. Một khai báo
-   không tồn tại là `ROUTE_UNDECLARED`; việc sửa thuộc về chủ sở hữu workspace, không bao giờ thuộc
-   operator này. Hydrate nó, rồi ghi `ROUTE_HYDRATED_FROM_PORTABLE` gọi tên route cục bộ. Thiếu route
-   đã hydrate là `ROUTE_UNHYDRATED`; một route đã hydrate lệch với route portable đóng ở kho, branch
-   hay đường dẫn đĩa là `ROUTE_MISMATCH`.
-4. **Từ chối mọi gợi ý.** Ghi một finding `HINT_REJECTED` cho từng gợi ý được cấp, nêu nó là gì và vì
-   sao nó không quyết định điều gì.
-5. **Xác minh checkout.** So head quan sát được với `input.frozenSourceHead`; khác nhau là
-   `SOURCE_DRIFT`. Đối chiếu branch với chính sách Git đã route; dưới
-   `worktreeBranches: forbidden`, mọi branch khác `mutationBranch` là `BRANCH_POLICY_VIOLATION`, và
-   route được ràng sẽ ghi `WORKTREE_BRANCH_FORBIDDEN`. Xác nhận không có gì bẩn nằm ngoài write root
-   đã khai, nếu không thì trả `CHECKOUT_DIRTY`. Suy ra `authorityRoots.businesses` là
-   `<gitRoot>/.worktrees/businesses` khi worktree đó tồn tại trên một source checkout, ngược lại là
-   `null`; không bao giờ nhận nó từ input, vì một gốc thẩm quyền gõ tay là cách một cây nghiệp vụ thứ
-   hai ra đời.
-6. **Ràng runtime khi bên gọi tiêu thụ nó.** Phân giải registry của chủ sở hữu, generation và bằng
-   chứng health của nó. Không tính lại gì cả: fingerprint của `endpointBinding` hoặc khớp phép chiếu
-   đóng `workspace-route-port-projection`, hoặc là `ENDPOINT_AUTHORITY_STALE`. Chỉ chấp nhận giá trị
-   chỉ-origin dạng `http://localhost:<cổng-chuẩn>`. Một registry thiếu, cũ, `starting`, `degraded`
-   hay `stopped` là `RUNTIME_NOT_READY`.
-7. **Ràng provenance và độ tươi.** Gắn head hội thoại đã redact khi có, rồi ghi
-   `PROVENANCE_HEAD_BOUND`. Khi một receipt đã cache khớp cùng bộ danh tính và cùng fingerprint, ghi
-   `CACHED_ROUTE_REUSED`; một receipt cache cũ hoặc hỏng là bằng chứng, không bao giờ là thứ để sửa.
-8. **Phát ra và dừng.** Ghi receipt route dưới `input.artifactRootRef`, phát đúng một output hợp với
-   `output.schema.json`, và ràng mọi fingerprint.
+| # | Bước | Đọc | Ghi | Dừng với |
+| --- | --- | --- | --- | --- |
+| 1 | Kiểm tra input và resume | input, receipt trước đó, head quan sát được của Source | — | `INVALID_INPUT`, `SOURCE_DRIFT`, `NO_PROGRESS` |
+| 2 | Ràng bootstrap và danh tính | các entry bootstrap của Source, việc phát hiện agent, danh tính máy, roster credential đã niêm phong | — | `IDENTITY_UNVERIFIED` |
+| 3 | Phân giải route | khai báo portable cho đúng project và role này, route cục bộ đã hydrate | — | `ROUTE_UNDECLARED`, `ROUTE_UNHYDRATED`, `ROUTE_MISMATCH` |
+| 4 | Từ chối mọi gợi ý | `context.hints` | — | — |
+| 5 | Xác minh checkout | route đã phân giải, checkout quan sát được, chính sách Git đã route, cây làm việc | — | `BRANCH_POLICY_VIOLATION`, `CHECKOUT_DIRTY` |
+| 6 | Ràng runtime mà bên gọi tiêu thụ | registry của chủ sở hữu, generation và bằng chứng health của nó, `workspace-route-port-projection` | — | `ENDPOINT_AUTHORITY_STALE`, `RUNTIME_NOT_READY` |
+| 7 | Ràng provenance và độ tươi | head hội thoại đã redact, receipt đã cache | — | — |
+| 8 | Phát ra và dừng | tất cả những gì ở trên | `route-receipt.json` | — |
+
+Khâu kiểm tra từ chối một route khai danh tính khác, một source route mang directory, một sibling
+route đi ngược lên, một route đã hydrate có workspace root ngoại lai, một quan sát của checkout khác,
+một runtime được ràng mà không có nhu cầu, và một resume không đổi gì.
+
+Không credential nào được đọc, sao chép hay ghi lại; chỉ tham chiếu roster đã niêm phong được ràng
+vào, và `IDENTITY_ROSTER_SEALED` nói ra điều đó. Việc hydrate ghi `ROUTE_HYDRATED_FROM_PORTABLE` gọi
+tên route cục bộ, còn một khai báo không tồn tại thì do chủ sở hữu workspace sửa, không bao giờ do
+operator này sửa. Mỗi gợi ý được cấp nhận đúng một finding `HINT_REJECTED` nêu nó là gì và vì sao nó
+không quyết định điều gì.
+
+Dưới `worktreeBranches: forbidden`, mọi branch khác `mutationBranch` đều vi phạm chính sách, và route
+được ràng sẽ ghi `WORKTREE_BRANCH_FORBIDDEN`. `authorityRoots.businesses` được suy ra là
+`<gitRoot>/.worktrees/businesses` khi worktree đó tồn tại trên một source checkout, ngược lại là
+`null`; không bao giờ nhận nó từ input, vì một gốc thẩm quyền gõ tay là cách một cây nghiệp vụ thứ
+hai ra đời. Bước runtime không tính lại gì cả: fingerprint của `endpointBinding` hoặc khớp phép chiếu
+đóng, hoặc lần gọi dừng lại, và chỉ giá trị chỉ-origin dạng `http://localhost:<cổng-chuẩn>` được chấp
+nhận. Một head hội thoại đã redact ghi `PROVENANCE_HEAD_BOUND`, còn một receipt đã cache khớp cùng bộ
+danh tính và cùng fingerprint ghi `CACHED_ROUTE_REUSED`; một receipt cache cũ hoặc hỏng là bằng
+chứng, không bao giờ là thứ để sửa.
 
 ## Bên gọi tiêu thụ runtime, không bao giờ sở hữu nó
 

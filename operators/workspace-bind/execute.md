@@ -21,43 +21,38 @@ Those arrive as `context.hints`, each carrying `authoritative: false` as a const
 recorded as `HINT_REJECTED` rather than consulted. Naming them is the point. A hint that is never
 written down is a hint that gets followed the moment the declared route looks inconvenient.
 
-## Execution sequence
+## Sequence
 
-1. **Validate input and resume.** Apply `input.schema.json` and semantic validation. Reject a route
-   that declares another identity, a source route carrying a directory, a sibling route that
-   traverses, a hydrated route with a foreign workspace root, an observation of a different
-   checkout, a runtime bound without need, and an unchanged resume.
-2. **Bind bootstrap and identity.** Confirm the bootstrap entries and agent discovery for this
-   Source, then the machine identity and its encrypted credential roster. An unverified identity is
-   `IDENTITY_UNVERIFIED`. No credential is read, copied, or recorded; only the sealed roster
-   reference is bound, and `IDENTITY_ROSTER_SEALED` states that.
-3. **Resolve the route.** Read the portable declaration for exactly the requested project and role.
-   A declaration that does not exist is `ROUTE_UNDECLARED`; the repair belongs to the workspace
-   owner, never to this operator. Hydrate it, and record
-   `ROUTE_HYDRATED_FROM_PORTABLE` naming the local route. A missing hydrated route is
-   `ROUTE_UNHYDRATED`; a hydrated route that disagrees with the closed portable route on repository,
-   branch, or disk path is `ROUTE_MISMATCH`.
-4. **Reject every hint.** Record one `HINT_REJECTED` finding per supplied hint, naming what it was
-   and why it decided nothing.
-5. **Verify the checkout.** Compare the observed head with `input.frozenSourceHead`; a difference is
-   `SOURCE_DRIFT`. Confirm the branch against the routed Git policy; under
-   `worktreeBranches: forbidden` any branch other than `mutationBranch` is
-   `BRANCH_POLICY_VIOLATION`, and the bound route records `WORKTREE_BRANCH_FORBIDDEN`. Confirm that
-   nothing dirty lies outside the declared write roots, or return `CHECKOUT_DIRTY`. Derive
-   `authorityRoots.businesses` as `<gitRoot>/.worktrees/businesses` when that worktree exists on a
-   source checkout, otherwise `null`; it is never accepted from input, because a typed authority root
-   is how a second business tree is born.
-6. **Bind the runtime when the caller consumes it.** Resolve the owner registry, its generation, and
-   its health evidence. Recompute nothing: the `endpointBinding` fingerprint either matches the
-   closed `workspace-route-port-projection` or it is `ENDPOINT_AUTHORITY_STALE`. Accept only
-   origin-only `http://localhost:<canonical-port>` values. A registry that is missing, stale,
-   `starting`, `degraded`, or `stopped` is `RUNTIME_NOT_READY`.
-7. **Bind provenance and freshness.** Attach the redacted conversation head when one is supplied and
-   record `PROVENANCE_HEAD_BOUND`. When a cached receipt matches the same identity tuple and
-   fingerprints, record `CACHED_ROUTE_REUSED`; a stale or invalid cached receipt is evidence, never
-   a repair target.
-8. **Emit and stop.** Write the route receipt under `input.artifactRootRef`, emit one output
-   conforming to `output.schema.json`, and bind every fingerprint.
+| # | Step | Reads | Writes | Stops with |
+| --- | --- | --- | --- | --- |
+| 1 | Validate input and resume | input, prior receipt, observed source head | — | `INVALID_INPUT`, `SOURCE_DRIFT`, `NO_PROGRESS` |
+| 2 | Bind bootstrap and identity | Source bootstrap entries, agent discovery, machine identity, sealed credential roster | — | `IDENTITY_UNVERIFIED` |
+| 3 | Resolve the route | portable declaration for exactly this project and role, hydrated local route | — | `ROUTE_UNDECLARED`, `ROUTE_UNHYDRATED`, `ROUTE_MISMATCH` |
+| 4 | Reject every hint | `context.hints` | — | — |
+| 5 | Verify the checkout | resolved route, observed checkout, routed Git policy, working tree | — | `BRANCH_POLICY_VIOLATION`, `CHECKOUT_DIRTY` |
+| 6 | Bind the runtime the caller consumes | owner registry, its generation and health evidence, `workspace-route-port-projection` | — | `ENDPOINT_AUTHORITY_STALE`, `RUNTIME_NOT_READY` |
+| 7 | Bind provenance and freshness | redacted conversation head, cached receipt | — | — |
+| 8 | Emit and stop | everything above | `route-receipt.json` | — |
+
+Validation rejects a route that declares another identity, a source route carrying a directory, a
+sibling route that traverses, a hydrated route with a foreign workspace root, an observation of a
+different checkout, a runtime bound without need, and an unchanged resume.
+
+No credential is read, copied, or recorded; only the sealed roster reference is bound, and
+`IDENTITY_ROSTER_SEALED` states that. Hydration records `ROUTE_HYDRATED_FROM_PORTABLE` naming the
+local route, and a declaration that does not exist is repaired by the workspace owner, never by this
+operator. Each supplied hint gets one `HINT_REJECTED` finding naming what it was and why it decided
+nothing.
+
+Under `worktreeBranches: forbidden` any branch other than `mutationBranch` is a policy violation, and
+the bound route records `WORKTREE_BRANCH_FORBIDDEN`. `authorityRoots.businesses` is derived as
+`<gitRoot>/.worktrees/businesses` when that worktree exists on a source checkout and is `null`
+otherwise; it is never accepted from input, because a typed authority root is how a second business
+tree is born. The runtime step recomputes nothing: the `endpointBinding` fingerprint either matches
+the closed projection or the invocation stops, and only origin-only
+`http://localhost:<canonical-port>` values are accepted. A redacted conversation head records
+`PROVENANCE_HEAD_BOUND`, and a cached receipt matching the same identity tuple and fingerprints
+records `CACHED_ROUTE_REUSED`; a stale or invalid cached receipt is evidence, never a repair target.
 
 ## The caller consumes the runtime; it never owns it
 
