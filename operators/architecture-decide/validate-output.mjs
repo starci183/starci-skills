@@ -60,6 +60,12 @@ export const validateOutput = validatorFor(new URL('./output.schema.json', impor
     errors.push('a retryable failure requires a resume and a non-retryable failure forbids one');
   }
 
+  // CHOICE_REQUIRED is the one code that hands the decision back to the owner. It is useless unless
+  // it says between what, so the surviving candidates travel with it.
+  if (failure?.code === 'CHOICE_REQUIRED' && (resume?.candidateAlternativeIds ?? []).length === 0) {
+    errors.push('CHOICE_REQUIRED must name the surviving candidate alternatives');
+  }
+
   if (decision === null) return errors;
 
   const root = binding.artifactRootRef.replace(/[\\/]+$/, '');
@@ -202,10 +208,10 @@ export const validateOutput = validatorFor(new URL('./output.schema.json', impor
     }
   }
 
-  // Independent critique. It must be written by someone other than the decider, and it must attack
-  // the decision that was actually taken.
+  // Independent critique. It is a fresh execution with no inherited turns, so it carries its own
+  // reference rather than the author's, and it must attack the decision that was actually taken.
   if (decision.critique.reviewerRef === decision.authorRef) {
-    errors.push('the critique is authored by the deciding role, so it is not independent');
+    errors.push('the critique reuses the deciding execution, so it inherited the author rationale');
   }
   const attacksOnSelected = new Set();
   for (const attack of decision.critique.attacks) {

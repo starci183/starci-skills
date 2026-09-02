@@ -70,16 +70,17 @@ delta and any surviving candidate alternatives.
 | `EVIDENCE_MISSING` | A claim about the system has no file behind it. | The observed evidence. |
 | `CONSTRAINT_CONTRADICTION` | Two fixed constraints cannot both hold. | The owner's resolution. |
 | `NO_VIABLE_ALTERNATIVE` | Nothing survives the frozen constraints. | A relaxed constraint, or a new alternative. |
-| `ALTERNATIVE_CHOICE_REQUIRED` | Several alternatives remain material. | The owner's choice of one candidate. |
+| `CHOICE_REQUIRED` | The owner must choose: several alternatives remain material, or an approval-required policy bound none. | The owner's choice of one named candidate. |
 | `COMPATIBILITY_UNVERIFIED` | A retained component has no compatibility evidence. | The compatibility check and its evidence. |
 | `DATA_OWNERSHIP_UNASSIGNED` | A store has no owning boundary. | The ownership decision. |
 | `CRITIQUE_UNRESOLVED` | An attack on the selected architecture has no resolution. | The resolution, or a different selection. |
-| `APPROVAL_REQUIRED` | The selection policy needs an approval that was never bound. | The approval reference. |
 | `NO_PROGRESS` | A resume adds no effective delta. | Materially new evidence, constraint, inventory, or approval. |
 
-`ALTERNATIVE_CHOICE_REQUIRED` is the expected outcome when two designs are genuinely different and
-neither dominates. It is owned by product authority, and deciding again after the choice is bound is
-the correct next step.
+`CHOICE_REQUIRED` is the expected outcome when two designs are genuinely different and neither
+dominates, and equally when an `approval-required` policy has no approval bound. It is one code
+because both are the same missing thing: the owner's choice. Its message names the candidates, the
+resume carries them in `candidateAlternativeIds`, it is owned by product authority, and deciding
+again after the choice is bound is the correct next step.
 
 ## Cross-field invariants
 
@@ -105,6 +106,7 @@ the correct next step.
   verified across all five compatibility axes with evidence; a removed component carries no verdict.
 - The critique reviewer differs from the decision author, every attack names a known alternative, and
   all eight adverse paths attack the selected alternative.
+- A `CHOICE_REQUIRED` failure names at least one surviving candidate in `resume.candidateAlternativeIds`.
 - No affected contract reference names an implementation file.
 - `handoff` is always `null`.
 
@@ -118,5 +120,5 @@ a justified second writer, change capture is added with verified compatibility, 
 carries no verdict, and the critique attacks the selected boundary under all eight adverse paths.
 
 Decide the same objective when two alternatives survive the constraints: the invocation returns
-`ALTERNATIVE_CHOICE_REQUIRED` with both candidates and the rendered comparison, and no boundary, store,
-or component is bound.
+`CHOICE_REQUIRED` with both candidates named in the message and the rendered comparison, and no
+boundary, store, or component is bound.

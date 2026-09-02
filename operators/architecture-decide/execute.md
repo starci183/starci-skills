@@ -9,8 +9,8 @@ another operator, route a workflow, pause internally, or return a free-form cont
 
 The twenty v7 stages — bounding the scope, discovering source and evidence, capturing current state,
 binding patterns, modelling the system, planning and challenging boundaries, modelling data ownership,
-analysing contradictions, framing the decision, generating alternatives, challenging the selection,
-critiquing it independently, realizing the design, checking conformance, packaging the handoff, and
+analysing contradictions, framing the decision, generating alternatives, selecting one, challenging
+and critiquing that selection, realizing the design, checking conformance, packaging the handoff, and
 the four tech-stack stages that discover, model, check, and publish the stack — are steps inside the
 sequence below, not separate operators.
 
@@ -41,43 +41,52 @@ Four prohibitions carry the decision, and each is enforced rather than advised:
    that it owns none. A store names one owning boundary, and that boundary writes it; a second writer
    exists only with an explicit justification.
 
-## Execution sequence
+## Sequence
 
-1. **Validate input and resume.** Apply `input.schema.json` and semantic validation. Reject a stale
-   source binding, an unevidenced inventory component, missing fixed intent or measurable constraints,
-   an automatic policy carrying an approval, and unchanged progress.
-2. **Observe the current state.** Read the routed source at the frozen head and record the boundaries
-   that exist today, each with its responsibility and the evidence behind it. Failure to observe is
-   `CURRENT_STATE_UNOBSERVED`; the invocation does not proceed on memory.
-3. **Bind the observed inventory.** Take the runtimes, frameworks, persistence, communication, build,
-   deployment, and operational ownership as facts about today, and as nothing more.
-4. **Frame the decision.** Restate the objective as a cross-boundary trade-off on the named axes, with
-   the separated constraints attached. A contradiction between two fixed constraints stops the
-   invocation with `CONSTRAINT_CONTRADICTION` rather than being averaged away.
-5. **Generate alternatives.** Produce two to four materially different alternatives — different in
-   ownership or mechanism, not in wording — and assess each on every named axis. Render them as one
-   inspectable HTML comparison exposing boundaries, ownership, data and control flow, normal
-   operation, and the applicable adverse paths.
-6. **Model boundaries and data ownership.** State each boundary's responsibility, owner, interfaces,
-   and whether it owns data. For each store, name the owning boundary, its writers, readers,
-   migrators, transaction scope, backup, and restore. An unowned store is `DATA_OWNERSHIP_UNASSIGNED`.
-7. **Model and check the stack.** Mark each component existing, added, replaced, or removed; state its
-   role and the kind of justification behind it; and verify compatibility across all five axes. An
-   unverified retained component is `COMPATIBILITY_UNVERIFIED`.
-8. **Critique independently.** A reviewer other than the deciding author attacks the *selected*
-   alternative under partial failure, retry and idempotency, concurrency, stale state, deletion,
-   recovery, dependency outage, and rollback. Each attack carries a resolution, or the invocation
-   stops with `CRITIQUE_UNRESOLVED`. Attacking only the rejected options restates the decision.
-9. **Select.** Under `approval-required`, bind exactly the alternative the owner approved; with no
-   approval bound, stop with `APPROVAL_REQUIRED`. Under `automatic`, bind the surviving alternative.
-   When several alternatives remain material, stop with `ALTERNATIVE_CHOICE_REQUIRED` and return the
-   candidates rather than picking one.
-10. **Freeze the handoff.** Record the invariants, risks, affected contracts, migration steps and
-    rollback, proof expectations, and unknowns. The handoff names contracts, never implementation
-    files: choosing the files is the next domain's job, and naming them here quietly takes it.
-11. **Emit and stop.** Write the artifacts under `input.project.artifactRootRef`, return one output
-    conforming to `output.schema.json`, and bind every fingerprint. Do not claim implementation,
-    quality, or UAT proof.
+| # | Step | Reads | Writes | Stops with |
+| --- | --- | --- | --- | --- |
+| 1 | Validate input and resume | input, prior receipt, frozen source binding | — | `INVALID_INPUT`, `SOURCE_DRIFT`, `NO_PROGRESS` |
+| 2 | Observe the current state | routed source at the frozen head | `current-state.json` | `CURRENT_STATE_UNOBSERVED` |
+| 3 | Bind the observed inventory and the business authority | inventory components and their evidence, published business head | — | `BUSINESS_AUTHORITY_REQUIRED`, `EVIDENCE_MISSING` |
+| 4 | Frame the decision | objective, trade-off axes, separated constraints | — | `CONSTRAINT_CONTRADICTION` |
+| 5 | Generate alternatives | framed decision, current state, inventory | `<decisionId>-alternatives.html` | `NO_VIABLE_ALTERNATIVE` |
+| 6 | Select provisionally | alternatives, selection policy, owner approval | — | `CHOICE_REQUIRED` |
+| 7 | Deepen the selected alternative | provisional selection, inventory, constraints | `stack-model.json` | `DATA_OWNERSHIP_UNASSIGNED`, `COMPATIBILITY_UNVERIFIED` |
+| 8 | Critique the selected alternative | deepened design and its claims | `independent-critique.json` | `CRITIQUE_UNRESOLVED` |
+| 9 | Confirm the selection | critique resolutions, deepened design | — | — |
+| 10 | Freeze the handoff | confirmed decision | — | — |
+| 11 | Emit and stop | everything above | — | — |
+
+Validation rejects a stale source binding, an unevidenced inventory component, missing fixed intent or
+measurable constraints, an automatic policy carrying an approval, and unchanged progress. Nothing is
+proposed on memory: the observation is read at the frozen head, and the inventory is taken as facts
+about today and as nothing more. A contradiction between two fixed constraints stops the invocation
+rather than being averaged away.
+
+Alternatives are two to four materially different designs — different in ownership or mechanism, not
+in wording — each carrying its own boundary and store-ownership sketch, each assessed on every named
+axis, and all of them rendered as one inspectable HTML comparison exposing boundaries, ownership,
+data and control flow, normal operation, and the applicable adverse paths. Selection is provisional
+and cheap: under `approval-required` it binds exactly the alternative the owner approved, under
+`automatic` it binds the sole survivor, and when several alternatives remain material it returns the
+candidates rather than picking one. Only the selected alternative is deepened, because deepening all
+of them is how a comparison turns into four designs nobody chose.
+
+Deepening states each boundary's responsibility, owner, interfaces, and whether it owns data; for
+each store it names the owning boundary, its writers, readers, migrators, transaction scope, backup,
+and restore; and it marks each stack component existing, added, replaced, or removed, states the kind
+of justification behind it, and verifies compatibility across all five axes.
+
+The critique attacks the *selected* alternative under partial failure, retry and idempotency,
+concurrency, stale state, deletion, recovery, dependency outage, and rollback; attacking only the
+rejected options restates the decision. It is a fresh execution on this operator's own profile with
+no inherited turns, given only the artifacts and the claims they make, never the author's rationale.
+Each attack carries a resolution, and confirmation either keeps the provisional selection or returns
+the choice to the owner. The handoff records the invariants, risks, affected contracts, migration
+steps and rollback, proof expectations, and unknowns; it names contracts, never implementation files,
+because choosing the files is the next domain's job and naming them here quietly takes it. Emission
+writes the artifacts under `input.project.artifactRootRef`, returns one output conforming to
+`output.schema.json`, binds every fingerprint, and claims no implementation, quality, or UAT proof.
 
 ## Resume execution
 
@@ -96,6 +105,6 @@ The operator cannot decide while any applicable item remains unresolved:
 - a boundary leaves the data question unanswered, or a store has an owner that never writes it;
 - a second writer exists with no justification;
 - the selected architecture was never attacked under one of the eight adverse paths;
-- the critique was authored by the deciding role;
+- the critique received the author's rationale or inherited turns;
 - the handoff names implementation files;
 - an error finding is still open.

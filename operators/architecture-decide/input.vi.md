@@ -47,7 +47,7 @@ nó là một phép đo chính là thất bại mà sự tách bạch này tồn
 
 `approval-required` nghĩa là thẩm quyền sản phẩm chọn. Lựa chọn đến trong `input.approval`, gọi tên
 phương án đã duyệt và fingerprint của nó, và quyết định phải chọn đúng phương án ấy. Khi chưa có phê
-duyệt nào được bind, lần gọi dừng với `APPROVAL_REQUIRED` thay vì tự chọn.
+duyệt nào được bind, lần gọi dừng với `CHOICE_REQUIRED` thay vì tự chọn.
 
 `automatic` nghĩa là chính input đã khai rằng operator được phép bind phương án còn sống sót. Vì vậy
 chính sách automatic không mang phê duyệt; đưa cả hai vào sẽ che mất bên nào thật sự đã quyết.

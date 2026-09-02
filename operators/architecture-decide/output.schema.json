@@ -455,11 +455,10 @@
             "EVIDENCE_MISSING",
             "CONSTRAINT_CONTRADICTION",
             "NO_VIABLE_ALTERNATIVE",
-            "ALTERNATIVE_CHOICE_REQUIRED",
+            "CHOICE_REQUIRED",
             "COMPATIBILITY_UNVERIFIED",
             "DATA_OWNERSHIP_UNASSIGNED",
             "CRITIQUE_UNRESOLVED",
-            "APPROVAL_REQUIRED",
             "NO_PROGRESS"
           ]
         },

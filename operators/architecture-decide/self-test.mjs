@@ -360,7 +360,7 @@ const validBlockedOutput = {
       ],
       evidenceRefs,
       failure: {
-        code: 'ALTERNATIVE_CHOICE_REQUIRED',
+        code: 'CHOICE_REQUIRED',
         message: 'Two alternatives survive the frozen constraints and product authority must choose between them.',
         missingRefs: ['approval://owner/entitlement-read-path'],
         retryable: true,
@@ -522,7 +522,14 @@ const selfCritique = structuredClone(validDecidedOutput);
 selfCritique.output.receipt.decision.critique.reviewerRef = 'role://architecture-decider';
 const selfCritiqueResult = validateOutput(selfCritique);
 assert.equal(selfCritiqueResult.valid, false);
-assert.ok(selfCritiqueResult.errors.some((error) => error.includes('not independent')));
+assert.ok(selfCritiqueResult.errors.some((error) => error.includes('inherited the author rationale')));
+
+// CHOICE_REQUIRED without candidates hands the owner a question with no options in it.
+const choiceWithoutCandidates = structuredClone(validBlockedOutput);
+choiceWithoutCandidates.output.receipt.resume.candidateAlternativeIds = [];
+const choiceResult = validateOutput(choiceWithoutCandidates);
+assert.equal(choiceResult.valid, false);
+assert.ok(choiceResult.errors.some((error) => error.includes('surviving candidate alternatives')));
 
 // Prose alone is not architecture proof; the comparison must be inspectable.
 const proseComparison = structuredClone(validDecidedOutput);

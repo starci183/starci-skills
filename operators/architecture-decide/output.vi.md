@@ -69,15 +69,17 @@ delta vật chất cần bổ sung và những phương án ứng viên còn s�
 | `EVIDENCE_MISSING` | Một khẳng định về hệ thống không có file nào đứng sau. | Bằng chứng quan sát được. |
 | `CONSTRAINT_CONTRADICTION` | Hai ràng buộc cố định không thể cùng đúng. | Phán quyết của chủ sở hữu. |
 | `NO_VIABLE_ALTERNATIVE` | Không gì sống sót qua các ràng buộc đã đóng băng. | Một ràng buộc nới ra, hoặc một phương án mới. |
-| `ALTERNATIVE_CHOICE_REQUIRED` | Nhiều phương án vẫn ngang sức. | Lựa chọn của chủ sở hữu về một ứng viên. |
+| `CHOICE_REQUIRED` | Chủ sở hữu phải chọn: nhiều phương án vẫn ngang sức, hoặc chính sách cần phê duyệt mà chưa bind phê duyệt nào. | Lựa chọn của chủ sở hữu về một ứng viên được gọi tên. |
 | `COMPATIBILITY_UNVERIFIED` | Một thành phần giữ lại không có bằng chứng tương thích. | Lần kiểm tương thích và bằng chứng của nó. |
 | `DATA_OWNERSHIP_UNASSIGNED` | Một kho không có ranh giới sở hữu. | Quyết định về quyền sở hữu. |
 | `CRITIQUE_UNRESOLVED` | Một đòn tấn công vào kiến trúc đã chọn chưa có cách xử lý. | Cách xử lý, hoặc một lựa chọn khác. |
-| `APPROVAL_REQUIRED` | Chính sách chọn cần một phê duyệt chưa được bind. | Tham chiếu phê duyệt. |
 | `NO_PROGRESS` | Một resume không thêm delta hữu hiệu nào. | Bằng chứng, ràng buộc, inventory hay phê duyệt thật sự mới. |
 
-`ALTERNATIVE_CHOICE_REQUIRED` là kết quả đúng khi hai thiết kế thật sự khác nhau và không cái nào áp
-đảo. Nó thuộc thẩm quyền sản phẩm, và quyết lại sau khi lựa chọn được bind là bước tiếp theo đúng đắn.
+`CHOICE_REQUIRED` là kết quả đúng khi hai thiết kế thật sự khác nhau và không cái nào áp đảo, và cũng
+đúng khi một chính sách `approval-required` chưa có phê duyệt nào được bind. Chúng gộp làm một mã vì
+cả hai đều thiếu đúng một thứ: lựa chọn của chủ sở hữu. Thông điệp của nó gọi tên các ứng viên, phần
+resume mang chúng trong `candidateAlternativeIds`, nó thuộc thẩm quyền sản phẩm, và quyết lại sau khi
+lựa chọn được bind là bước tiếp theo đúng đắn.
 
 ## Bất biến liên trường
 
@@ -105,6 +107,7 @@ delta vật chất cần bổ sung và những phương án ứng viên còn s�
   quyết nào.
 - Người rà soát khác tác giả quyết định, mọi đòn tấn công gọi tên một phương án đã biết, và cả tám
   đường bất lợi đều tấn công phương án được chọn.
+- Một thất bại `CHOICE_REQUIRED` gọi tên ít nhất một ứng viên còn sống trong `resume.candidateAlternativeIds`.
 - Không tham chiếu hợp đồng bị ảnh hưởng nào gọi tên một file hiện thực.
 - `handoff` luôn là `null`.
 
@@ -118,5 +121,5 @@ biện minh, phần bắt thay đổi được thêm vào với tương thích �
 quyết nào, và bản phản biện tấn công ranh giới được chọn dưới cả tám đường bất lợi.
 
 Quyết cùng mục tiêu đó khi hai phương án cùng sống sót qua các ràng buộc: lần gọi trả về
-`ALTERNATIVE_CHOICE_REQUIRED` kèm cả hai ứng viên và bản so sánh đã render, và không ranh giới, kho hay
-thành phần nào được bind.
+`CHOICE_REQUIRED` kèm cả hai ứng viên được gọi tên trong thông điệp và bản so sánh đã render, và không
+ranh giới, kho hay thành phần nào được bind.

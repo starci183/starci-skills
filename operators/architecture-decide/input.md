@@ -49,7 +49,7 @@ the comparison as though it were a measurement is the failure this separation ex
 
 `approval-required` means product authority chooses. The choice arrives in `input.approval`, naming
 the approved alternative and its fingerprint, and the decision must select exactly that alternative.
-When no approval is bound, the invocation blocks with `APPROVAL_REQUIRED` rather than choosing.
+When no approval is bound, the invocation blocks with `CHOICE_REQUIRED` rather than choosing.
 
 `automatic` means the input itself declared that the operator may bind the surviving alternative. An
 automatic policy therefore carries no approval; supplying both would hide which one actually decided.

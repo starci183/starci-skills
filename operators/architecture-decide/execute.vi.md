@@ -10,8 +10,9 @@ Nó không gọi operator khác, không điều phối workflow, không tự d�
 
 Hai mươi chặng của v7 — khoanh phạm vi, thu thập source và bằng chứng, chụp hiện trạng, bind pattern,
 mô hình hệ thống, lập và chất vấn ranh giới, mô hình quyền sở hữu dữ liệu, phân tích mâu thuẫn, đóng
-khung quyết định, sinh phương án, chất vấn lựa chọn, phản biện độc lập, hiện thực hoá thiết kế, kiểm
-tuân thủ, đóng gói handoff, cùng bốn chặng tech-stack khám phá, mô hình, kiểm tương thích và publish —
+khung quyết định, sinh phương án, chọn một phương án, chất vấn và phản biện lựa chọn đó, hiện thực hoá
+thiết kế, kiểm tuân thủ, đóng gói handoff, cùng bốn chặng tech-stack khám phá, mô hình, kiểm tương
+thích và publish —
 là các bước bên trong trình tự dưới đây, không phải các operator riêng.
 
 ## Quan sát trước khi đề xuất
@@ -42,45 +43,53 @@ Bốn điều cấm gánh quyết định này, và mỗi điều đều đượ
    biểu rằng nó không sở hữu kho nào. Một kho gọi tên đúng một ranh giới sở hữu, và ranh giới đó phải
    ghi vào kho; người ghi thứ hai chỉ tồn tại kèm một lời biện minh tường minh.
 
-## Trình tự thực thi
+## Trình tự
 
-1. **Kiểm tra input và resume.** Áp `input.schema.json` và kiểm tra ngữ nghĩa. Từ chối binding source
-   đã cũ, thành phần inventory không có bằng chứng, thiếu ý định cố định hay ràng buộc đo được, chính
-   sách automatic mà vẫn mang phê duyệt, và tiến độ không đổi.
-2. **Quan sát hiện trạng.** Đọc source đã route tại head đã đóng băng và ghi lại các ranh giới đang tồn
-   tại hôm nay, mỗi cái kèm trách nhiệm và bằng chứng đứng sau. Không quan sát được là
-   `CURRENT_STATE_UNOBSERVED`; lần gọi không đi tiếp bằng trí nhớ.
-3. **Bind inventory quan sát được.** Nhận runtime, framework, lưu trữ, giao tiếp, build, triển khai và
-   quyền sở hữu vận hành như những sự thật về hôm nay, và không hơn thế.
-4. **Đóng khung quyết định.** Phát biểu lại mục tiêu thành một đánh đổi liên ranh giới trên các trục đã
-   gọi tên, kèm các ràng buộc đã tách. Mâu thuẫn giữa hai ràng buộc cố định làm lần gọi dừng với
-   `CONSTRAINT_CONTRADICTION` thay vì bị lấy trung bình cho qua.
-5. **Sinh phương án.** Tạo hai đến bốn phương án khác nhau về chất — khác về quyền sở hữu hoặc cơ chế,
-   không phải khác câu chữ — và đánh giá từng cái trên mọi trục đã gọi tên. Render chúng thành một bản
-   so sánh HTML kiểm tra được, phơi ra ranh giới, quyền sở hữu, luồng dữ liệu và điều khiển, vận hành
-   bình thường, cùng các đường bất lợi áp dụng được.
-6. **Mô hình ranh giới và quyền sở hữu dữ liệu.** Nêu trách nhiệm, chủ sở hữu, giao diện của từng ranh
-   giới và việc nó có sở hữu dữ liệu hay không. Với mỗi kho, gọi tên ranh giới sở hữu, người ghi, người
-   đọc, người di trú, phạm vi giao dịch, sao lưu và phục hồi. Một kho vô chủ là
-   `DATA_OWNERSHIP_UNASSIGNED`.
-7. **Mô hình và kiểm stack.** Đánh dấu mỗi thành phần là đang có, thêm mới, thay thế hay gỡ bỏ; nêu vai
-   trò và loại lý do biện minh đứng sau; và kiểm tương thích trên cả năm trục. Một thành phần giữ lại
-   mà chưa kiểm chứng là `COMPATIBILITY_UNVERIFIED`.
-8. **Phản biện độc lập.** Một người rà soát khác với tác giả quyết định tấn công *phương án đã chọn*
-   dưới lỗi bộ phận, thử lại và tính bất biến khi lặp, tương tranh, trạng thái cũ, xoá, phục hồi, phụ
-   thuộc ngoài chết, và quay lui. Mỗi đòn tấn công phải kèm cách xử lý, nếu không lần gọi dừng với
-   `CRITIQUE_UNRESOLVED`. Chỉ tấn công các phương án đã bị bác là kể lại quyết định chứ không phải kiểm
-   nó.
-9. **Chọn.** Với `approval-required`, bind đúng phương án chủ sở hữu đã duyệt; nếu chưa có phê duyệt,
-   dừng với `APPROVAL_REQUIRED`. Với `automatic`, bind phương án còn sống sót. Khi vẫn còn nhiều phương
-   án ngang sức, dừng với `ALTERNATIVE_CHOICE_REQUIRED` và trả về các ứng viên thay vì tự chọn một.
-10. **Đóng băng handoff.** Ghi các bất biến, rủi ro, hợp đồng bị ảnh hưởng, các bước di trú và đường
-    quay lui, kỳ vọng chứng minh, và các ẩn số. Handoff gọi tên hợp đồng, không bao giờ gọi tên file
-    hiện thực: chọn file là việc của domain kế tiếp, và gọi tên chúng ở đây là lặng lẽ giành lấy việc
-    ấy.
-11. **Phát ra và dừng.** Ghi artifact dưới `input.project.artifactRootRef`, trả về một output đúng
-    `output.schema.json`, và ràng mọi fingerprint. Không khẳng định bằng chứng hiện thực, chất lượng
-    hay UAT.
+| # | Bước | Đọc | Ghi | Dừng với |
+| --- | --- | --- | --- | --- |
+| 1 | Kiểm tra input và resume | input, receipt trước đó, binding source đã đóng băng | — | `INVALID_INPUT`, `SOURCE_DRIFT`, `NO_PROGRESS` |
+| 2 | Quan sát hiện trạng | source đã route tại head đã đóng băng | `current-state.json` | `CURRENT_STATE_UNOBSERVED` |
+| 3 | Ràng inventory quan sát được và thẩm quyền nghiệp vụ | các thành phần inventory cùng bằng chứng, head nghiệp vụ đã publish | — | `BUSINESS_AUTHORITY_REQUIRED`, `EVIDENCE_MISSING` |
+| 4 | Đóng khung quyết định | mục tiêu, các trục đánh đổi, các ràng buộc đã tách | — | `CONSTRAINT_CONTRADICTION` |
+| 5 | Sinh phương án | quyết định đã đóng khung, hiện trạng, inventory | `<decisionId>-alternatives.html` | `NO_VIABLE_ALTERNATIVE` |
+| 6 | Chọn tạm thời | các phương án, chính sách chọn, phê duyệt của chủ sở hữu | — | `CHOICE_REQUIRED` |
+| 7 | Đào sâu phương án đã chọn | lựa chọn tạm thời, inventory, các ràng buộc | `stack-model.json` | `DATA_OWNERSHIP_UNASSIGNED`, `COMPATIBILITY_UNVERIFIED` |
+| 8 | Phản biện phương án đã chọn | thiết kế đã đào sâu và các khẳng định của nó | `independent-critique.json` | `CRITIQUE_UNRESOLVED` |
+| 9 | Xác nhận lựa chọn | cách xử lý các đòn tấn công, thiết kế đã đào sâu | — | — |
+| 10 | Đóng băng handoff | quyết định đã xác nhận | — | — |
+| 11 | Phát ra và dừng | tất cả những gì ở trên | — | — |
+
+Khâu kiểm tra từ chối binding source đã cũ, thành phần inventory không có bằng chứng, thiếu ý định cố
+định hay ràng buộc đo được, chính sách automatic mà vẫn mang phê duyệt, và tiến độ không đổi. Không gì
+được đề xuất theo trí nhớ: quan sát được đọc tại head đã đóng băng, còn inventory được nhận như sự
+thật về hôm nay và không hơn thế. Mâu thuẫn giữa hai ràng buộc cố định làm lần gọi dừng lại, thay vì
+bị lấy trung bình cho qua.
+
+Các phương án là hai tới bốn thiết kế khác nhau thực chất — khác ở quyền sở hữu hay cơ chế, không phải
+ở cách diễn đạt — mỗi phương án mang phác thảo ranh giới và quyền sở hữu kho của riêng nó, mỗi phương
+án được đánh giá trên mọi trục đã gọi tên, và tất cả được render thành một bản so sánh HTML soi được,
+phơi ra ranh giới, quyền sở hữu, luồng dữ liệu và điều khiển, vận hành bình thường, cùng các đường bất
+lợi áp dụng được. Việc chọn ở đây là tạm thời và rẻ: với `approval-required` nó bind đúng phương án
+chủ sở hữu đã duyệt, với `automatic` nó bind phương án duy nhất còn sống sót, và khi nhiều phương án
+vẫn ngang sức thì nó trả về các ứng viên thay vì tự chọn một. Chỉ phương án đã chọn mới được đào sâu,
+vì đào sâu tất cả là cách một bản so sánh biến thành bốn thiết kế không ai chọn.
+
+Việc đào sâu phát biểu trách nhiệm, chủ sở hữu, giao diện của từng ranh giới và việc nó có sở hữu dữ
+liệu hay không; với mỗi kho, nó gọi tên ranh giới sở hữu, những người ghi, người đọc, người di trú,
+phạm vi giao dịch, sao lưu và phục hồi; và nó đánh dấu từng thành phần stack là đang có, thêm mới,
+thay thế hay bị gỡ, nêu loại biện minh đứng sau, rồi kiểm tương thích trên cả năm trục.
+
+Bản phản biện tấn công *phương án đã chọn* dưới lỗi cục bộ, retry và tính idempotent, đồng thời, trạng
+thái cũ, xoá, phục hồi, phụ thuộc chết và rollback; chỉ tấn công các phương án bị bác là phát biểu lại
+quyết định chứ không phản biện. Nó là một lần thực thi mới trên đúng profile của operator này, không
+thừa hưởng lượt nào, và chỉ được đưa các artifact cùng những khẳng định trong đó, không bao giờ được
+đưa lý lẽ của tác giả. Mỗi đòn tấn công mang một cách xử lý, và khâu xác nhận hoặc giữ nguyên lựa chọn
+tạm thời, hoặc trả lựa chọn về cho chủ sở hữu. Handoff ghi các bất biến, rủi ro, hợp đồng bị ảnh
+hưởng, các bước di trú và rollback, kỳ vọng chứng minh, cùng những ẩn số; nó gọi tên hợp đồng, không
+bao giờ gọi tên file hiện thực, vì chọn file là việc của domain kế tiếp và gọi tên ở đây là lặng lẽ
+giành lấy việc đó. Khâu phát ra ghi các artifact dưới `input.project.artifactRootRef`, trả đúng một
+output hợp với `output.schema.json`, ràng mọi fingerprint, và không khai bất kỳ chứng minh hiện thực,
+chất lượng hay UAT nào.
 
 ## Thực thi khi resume
 
@@ -100,6 +109,6 @@ Operator không được quyết khi còn bất kỳ mục nào áp dụng mà c
 - một ranh giới bỏ ngỏ câu hỏi dữ liệu, hoặc một kho có chủ sở hữu không bao giờ ghi vào nó;
 - có người ghi thứ hai mà không có biện minh;
 - kiến trúc đã chọn chưa từng bị tấn công dưới một trong tám đường bất lợi;
-- bản phản biện do chính vai quyết định viết ra;
+- bản phản biện đã nhận lý lẽ của tác giả hoặc thừa hưởng lượt hội thoại;
 - handoff gọi tên file hiện thực;
 - còn một finding mức lỗi đang mở.
