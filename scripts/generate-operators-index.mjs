@@ -42,7 +42,9 @@ for (const entry of (await readdir(operatorsDir, { withFileTypes: true })).filte
     id: manifest.id, dir: entry.name, job: manifest.job, profile: manifest.resources?.profile ?? '?',
     refs: manifest.refs ?? [], steps: rows.length, codes,
     readsStatic: [...readsAll].filter((a) => !isDyn(a) && !writesAll.has(a)).sort(),
-    readsDynamic: [...readsAll].filter(isDyn).sort(),
+    // Own intermediate artifacts (written by an earlier step of the same operator) are not hand-offs.
+    readsDynamic: [...readsAll].filter((a) => isDyn(a) && !writesAll.has(a)).sort(),
+    readsOwn: [...readsAll].filter((a) => isDyn(a) && writesAll.has(a)).sort(),
     writes: [...writesAll].sort(),
   });
 }
@@ -73,7 +75,8 @@ function render(lang) {
   const dynFiles = new Set([...producers.keys(), ...ops.flatMap((o) => o.readsDynamic)]);
   for (const f of [...dynFiles].sort()) {
     const by = producers.get(f) ?? [];
-    const consumers = ops.filter((o) => o.readsDynamic.some((r) => r === f || (f.includes('<receiptType>') && r.startsWith('@dynamic/') && r.endsWith('.json')))).map((o) => o.id);
+    const consumers = ops.filter((o) => !by.includes(o.id) && o.readsDynamic.some((r) => r === f)).map((o) => o.id);
+    if (by.length && !consumers.length && !f.endsWith('.json')) continue; // an operator's own intermediate artifact, not a hand-off
     out.push(`| ${code(f)} | ${list(by)} | ${list(consumers)} |`);
   }
   out.push('', t.h3, '', t.c3, '| --- | --- |');
