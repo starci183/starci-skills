@@ -54,34 +54,41 @@ cầu trong chính lần gọi này. Ngoài ra, gate được ghi thành `skippe
 `E2E_NOT_REQUESTED`: không lệnh, không mã thoát, không bằng chứng, và không hàm ý nào rằng hành vi đã
 được chứng minh.
 
-## Trình tự thi hành
+## Trình tự
 
-1. **Kiểm tra input và resume.** Áp `input.schema.json` cùng phần kiểm tra ngữ nghĩa. Từ chối các head
-   tiền nhiệm bất đồng, binding source đã cũ, kế hoạch e2e không được yêu cầu, kế hoạch Sonar mâu thuẫn
-   với phạm vi của nó, khoản nợ có phê duyệt đã hết hạn, bản giao frontend mang nợ, và resume không đổi
-   gì.
-2. **Tiêu thụ tiền nhiệm nguyên trạng.** Ràng từng receipt thượng nguồn bằng tham chiếu, loại,
-   fingerprint và head. Không dựng lại, không hoạch định lại, không xét lại điều họ đã quyết. Ghi
-   `PREDECESSOR_CONSUMED`.
-3. **Xác minh head.** Xác minh lại head quan sát được so với head đã đóng băng trước khi gate đầu tiên
-   chạy. Khác biệt là `SOURCE_DRIFT`, vì một gate đo trên head khác là đang đo một bản giao khác.
-4. **Chạy các gate theo thứ tự đã khai.** Format chỉ kiểm, lint không lỗi và không cảnh báo, typecheck
-   và build qua entrypoint của repo, unit là nơi duy nhất sinh độ phủ, integration cho những ranh giới
-   kết nối đã khai, e2e chỉ khi được yêu cầu, Sonar cuối cùng và không thừa hưởng gì. Mỗi lần chạy ghi
-   bằng chứng của nó dưới artifact root.
-5. **Áp chính sách độ phủ.** Câu lệnh, dòng, hàm và nhánh được so với ngưỡng riêng của chúng. Nhánh mang
-   ngưỡng độc lập, vì gộp nó vào con số câu lệnh chính là cách một đường lỗi chưa được test đi lọt. Một
-   chỉ số dưới ngưỡng làm cổng unit thành thất bại và ghi `COVERAGE_BELOW_THRESHOLD`; nó không bao giờ
-   trở thành một ghi chú nhỏ bên cạnh một kết quả xanh.
-6. **Phân loại từng thất bại.** Đọc chẩn đoán có cấu trúc và gán đúng một cách phân loại. Không bao giờ
-   bỏ qua, chặn tiếng, thay thế hay `passWithNoTests` một gate để đẩy nó đi. Một lần chạy không có bài
-   test nào không phải là đạt.
-7. **Áp nợ đã duyệt.** Một gate chỉ được để đỏ dưới một khoản nợ đã được chủ sở hữu duyệt, còn hạn, phủ
-   một thất bại `in-boundary`, ghi thành `DEBT_DECLARED`. Nợ đặt lên một gate đã đạt hoặc lên một thất
-   bại `boundary-drift` thì bị từ chối.
-8. **Phát và dừng.** Tính phán quyết, ghi receipt dưới `input.project.artifactRootRef`, đăng ký mọi
-   tham chiếu bằng chứng vào `artifactRefs`, phát đúng một output tuân theo `output.schema.json`, và
-   ràng mọi fingerprint.
+| # | Bước | Đọc | Ghi | Dừng với |
+| --- | --- | --- | --- | --- |
+| 1 | Kiểm tra input và resume | input, receipt trước đó, binding source đã đóng băng | — | `INVALID_INPUT`, `SOURCE_DRIFT`, `NO_PROGRESS` |
+| 2 | Tiêu thụ tiền nhiệm nguyên trạng | từng receipt thượng nguồn theo tham chiếu, loại, fingerprint và head | — | `PREDECESSOR_MIXED`, `PREDECESSOR_STALE` |
+| 3 | Xác minh head | head quan sát được, head đã đóng băng | — | — |
+| 4 | Chạy các gate theo thứ tự đã khai | kế hoạch gate đã khai và các entrypoint của repo | `gates/<gate>.json` | `GATE_UNAVAILABLE` |
+| 5 | Áp chính sách độ phủ | kết quả độ phủ của cổng unit và bốn ngưỡng | `gates/unit-coverage.coverage.json` | — |
+| 6 | Phân loại từng thất bại | chẩn đoán có cấu trúc của mọi gate đỏ | — | — |
+| 7 | Áp nợ đã duyệt | các khoản nợ đã được chủ sở hữu duyệt cùng hạn của chúng | — | `DEBT_UNAPPROVED` |
+| 8 | Phát và dừng | tất cả những gì ở trên | `quality-receipt.json` | — |
+
+Khâu kiểm tra từ chối các head tiền nhiệm bất đồng, binding source đã cũ, kế hoạch e2e không được yêu
+cầu, kế hoạch Sonar mâu thuẫn với phạm vi của nó, khoản nợ có phê duyệt đã hết hạn, bản giao frontend
+mang nợ, và resume không đổi gì. Các tiền nhiệm được ràng và ghi thành `PREDECESSOR_CONSUMED`: không
+điều nào họ đã quyết bị dựng lại, hoạch định lại hay xét lại. Head quan sát được được xác minh lại
+trước khi gate đầu tiên chạy, và một khác biệt trả về đúng lỗi trôi đó, vì một gate đo trên head khác
+là đang đo một bản giao khác.
+
+Các gate chạy theo thứ tự: format chỉ kiểm, lint không lỗi và không cảnh báo, typecheck và build qua
+entrypoint của repo, unit là nơi duy nhất sinh độ phủ, integration cho những ranh giới kết nối đã
+khai, e2e chỉ khi được yêu cầu, và Sonar cuối cùng và không thừa hưởng gì; mỗi lần chạy ghi bằng
+chứng riêng của nó dưới artifact root. Câu lệnh, dòng, hàm và nhánh được so với ngưỡng riêng của
+chúng, và nhánh mang ngưỡng độc lập vì gộp nó vào con số câu lệnh chính là cách một đường lỗi chưa
+được test đi lọt; một chỉ số dưới ngưỡng làm cổng unit thành thất bại và ghi
+`COVERAGE_BELOW_THRESHOLD` chứ không thành một ghi chú nhỏ bên cạnh một kết quả xanh.
+
+Mỗi thất bại được đọc từ chẩn đoán có cấu trúc và gán đúng một cách phân loại. Không gate nào bị bỏ
+qua, chặn tiếng, thay thế hay đẩy đi bằng `passWithNoTests`, và một lần chạy không có bài test nào
+không phải là đạt. Một gate chỉ được để đỏ dưới một khoản nợ đã được chủ sở hữu duyệt, còn hạn, phủ
+một thất bại `in-boundary`, ghi thành `DEBT_DECLARED`; nợ đặt lên một gate đã đạt hoặc lên một thất
+bại `boundary-drift` thì bị từ chối. Khâu phát ra tính phán quyết, ghi receipt dưới
+`input.project.artifactRootRef`, đăng ký mọi tham chiếu bằng chứng vào `artifactRefs`, phát đúng một
+output tuân theo `output.schema.json`, và ràng mọi fingerprint.
 
 ## Phán quyết
 

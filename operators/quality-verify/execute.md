@@ -55,34 +55,41 @@ it in this invocation. Otherwise the gate is recorded as `skipped-not-requested`
 `E2E_NOT_REQUESTED` finding: no command, no exit code, no evidence, and no implication that behaviour
 was proved.
 
-## Execution sequence
+## Sequence
 
-1. **Validate input and resume.** Apply `input.schema.json` and semantic validation. Reject predecessor
-   heads that disagree, a stale source binding, an unrequested e2e plan, a Sonar plan that contradicts
-   its scope, a debt whose approval has expired, a frontend delivery carrying debt, and an unchanged
-   resume.
-2. **Consume the predecessors unchanged.** Bind each upstream receipt by reference, type, fingerprint,
-   and head. Do not re-derive, re-plan, or second-guess what they decided. Record
-   `PREDECESSOR_CONSUMED`.
-3. **Verify the head.** Reverify the observed source head against the frozen one before the first gate
-   runs. A difference is `SOURCE_DRIFT`, because a gate measuring a different head measures a
-   different delivery.
-4. **Run the gates in declared order.** Format check-only, lint at zero errors and zero warnings,
-   typecheck and build through repository entrypoints, unit as the sole coverage producer, integration
-   for the declared connected boundaries, e2e only when requested, Sonar last and inheriting nothing.
-   Each run writes its evidence under the artifact root.
-5. **Apply the coverage policy.** Statements, lines, functions, and branches are compared against their
-   own thresholds. Branches carry an independent threshold, because folding it into the statement
-   figure is how an untested error path passes. A metric under its threshold makes the unit gate a
-   failure and records `COVERAGE_BELOW_THRESHOLD`; it never becomes a note beside a green result.
-6. **Classify each failure.** Read the structured diagnostics and assign one classification. Never skip,
-   suppress, substitute, or `passWithNoTests` a gate to move it. A zero-test run is not a pass.
-7. **Apply approved debt.** A gate may stay red only under an owner-approved, unexpired debt covering
-   an `in-boundary` failure, recorded as `DEBT_DECLARED`. A debt on a passing gate or on a
-   `boundary-drift` failure is refused.
-8. **Emit and stop.** Compute the verdict, write the receipt under `input.project.artifactRootRef`,
-   register every evidence reference in `artifactRefs`, emit one output conforming to
-   `output.schema.json`, and bind every fingerprint.
+| # | Step | Reads | Writes | Stops with |
+| --- | --- | --- | --- | --- |
+| 1 | Validate input and resume | input, prior receipt, frozen source binding | — | `INVALID_INPUT`, `SOURCE_DRIFT`, `NO_PROGRESS` |
+| 2 | Consume the predecessors unchanged | each upstream receipt by reference, type, fingerprint, and head | — | `PREDECESSOR_MIXED`, `PREDECESSOR_STALE` |
+| 3 | Verify the head | observed source head, frozen head | — | — |
+| 4 | Run the gates in declared order | the declared gate plan and repository entrypoints | `gates/<gate>.json` | `GATE_UNAVAILABLE` |
+| 5 | Apply the coverage policy | the unit gate's coverage output and the four thresholds | `gates/unit-coverage.coverage.json` | — |
+| 6 | Classify each failure | structured diagnostics from every red gate | — | — |
+| 7 | Apply approved debt | owner-approved debt records and their expiry | — | `DEBT_UNAPPROVED` |
+| 8 | Emit and stop | everything above | `quality-receipt.json` | — |
+
+Validation rejects predecessor heads that disagree, a stale source binding, an unrequested e2e plan, a
+Sonar plan that contradicts its scope, a debt whose approval has expired, a frontend delivery carrying
+debt, and an unchanged resume. Predecessors are bound and recorded as `PREDECESSOR_CONSUMED`: nothing
+they decided is re-derived, re-planned, or second-guessed. The observed head is verified again before
+the first gate runs, and a difference returns the same drift failure, because a gate measuring a
+different head measures a different delivery.
+
+The gates run as format check-only, lint at zero errors and zero warnings, typecheck and build through
+repository entrypoints, unit as the sole coverage producer, integration for the declared connected
+boundaries, e2e only when requested, and Sonar last and inheriting nothing; each run writes its own
+evidence under the artifact root. Statements, lines, functions, and branches are compared against
+their own thresholds, and branches carry an independent threshold because folding it into the
+statement figure is how an untested error path passes; a metric under its threshold makes the unit
+gate a failure and records `COVERAGE_BELOW_THRESHOLD` rather than a note beside a green result.
+
+Each failure is read from the structured diagnostics and assigned one classification. No gate is ever
+skipped, suppressed, substituted, or moved with `passWithNoTests`, and a zero-test run is not a pass.
+A gate may stay red only under an owner-approved, unexpired debt covering an `in-boundary` failure,
+recorded as `DEBT_DECLARED`; a debt on a passing gate or on a `boundary-drift` failure is refused.
+Emission computes the verdict, writes the receipt under `input.project.artifactRootRef`, registers
+every evidence reference in `artifactRefs`, returns one output conforming to `output.schema.json`, and
+binds every fingerprint.
 
 ## The verdict
 
