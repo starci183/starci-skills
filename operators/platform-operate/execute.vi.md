@@ -41,28 +41,33 @@ Credential đứng sau một capability handle được resolve để dùng ngay
 log, bị chép vào bằng chứng hay bị lưu lại. Receipt từ chối cả handle lẫn giá trị: receipt là bản ghi
 lâu dài, và một bản ghi lâu dài của capability chính là credential bị lộ có độ trễ.
 
-## Trình tự thực thi
+## Trình tự
 
-1. **Validate input và resume.** Áp `input.schema.json` cùng validate ngữ nghĩa. Từ chối binding
-   source cũ, effect hay check xếp nhầm nhánh, bộ chứng minh bị thu hẹp, resource chưa kiểm kê,
-   capability còn thiếu, vật liệu credential lọt vào contract, và tiến độ không đổi.
-2. **Bind authority.** Bind knowledge record của nhánh, phê duyệt cùng plan hash, từng capability
-   handle kèm bằng chứng custody, fingerprint của inventory, và source head đã route.
-3. **Kiểm lại inventory.** Quan sát lại các resource đã khai đúng một lượt. Revision khác với
-   inventory đã bind là `INVENTORY_DRIFT` và dừng lần gọi trước mọi thay đổi.
-4. **Xử lý các claim cổng.** Đối chiếu từng cổng được claim với những tiến trình đang giữ. Xung đột
-   thành finding phối hợp cùng `PORT_CONFLICT`; cổng rảnh thì được effect cần nó bind bình thường.
-5. **Suy ra delta.** So mong muốn với quan sát và chỉ giữ những effect còn thật sự cần. Một dịch vụ
-   đã hội tụ sẵn là một no-op đã được chứng minh, không mutation nào cả, không phải lỗi và cũng không
-   phải cớ để viết lại.
-6. **Áp delta đã duyệt.** Chỉ áp các effect nằm trong tập đã duyệt, mỗi lần một resource, ghi revision
-   trước và sau của từng cái. Áp dở dang được báo cáo bằng `PARTIAL_MUTATION` kèm revision chính xác;
-   nó không bao giờ bị giấu sau một blocker chung chung.
-7. **Chứng minh mọi check bắt buộc.** Đọc lại dịch vụ và chạy trọn bộ chứng minh của nhánh. Một check
-   thiếu, không đọc được hoặc thất bại thì không thể kết thúc bằng kết quả đã vận hành.
-8. **Phát ra rồi dừng.** Ghi receipt dưới `input.project.artifactRootRef`, phát đúng một output theo
-   `output.schema.json`, và ràng mọi fingerprint. Không claim sự sẵn sàng của product, không claim
-   phê duyệt release hay bằng chứng UAT.
+| # | Bước | Đọc | Ghi | Dừng với |
+| --- | --- | --- | --- | --- |
+| 1 | Validate input và resume | input, receipt trước đó, binding source đã đóng băng | — | `INVALID_INPUT`, `SOURCE_DRIFT`, `NO_PROGRESS` |
+| 2 | Bind authority | knowledge record của nhánh, phê duyệt cùng plan hash, từng capability handle kèm bằng chứng custody, fingerprint của inventory, source head đã route | — | `AUTHORITY_DRIFT`, `CAPABILITY_MISSING` |
+| 3 | Kiểm lại inventory | các resource đã khai, quan sát lại đúng một lượt | — | `INVENTORY_DRIFT` |
+| 4 | Xử lý các claim cổng | các cổng được claim, những tiến trình đang giữ | — | `PORT_CONFLICT` |
+| 5 | Suy ra delta | trạng thái mong muốn, trạng thái quan sát được | — | — |
+| 6 | Áp delta đã duyệt | tập effect đã duyệt, mỗi lần một resource | — | `EFFECT_UNAUTHORIZED`, `SERVICE_UNAVAILABLE` |
+| 7 | Chứng minh mọi check bắt buộc | dịch vụ đã đọc lại, trọn bộ chứng minh của nhánh | — | `PROOF_FAILED` |
+| 8 | Phát ra rồi dừng | tất cả những gì ở trên | `<branch>.receipt.json` | — |
+
+Khâu validate từ chối binding source cũ, effect hay check xếp nhầm nhánh, bộ chứng minh bị thu hẹp,
+resource chưa kiểm kê, capability còn thiếu, vật liệu credential lọt vào contract, và tiến độ không
+đổi. Việc kiểm lại inventory diễn ra trước mọi thay đổi, nên một revision khác với inventory đã bind
+sẽ dừng lần gọi khi chưa có gì bị đổi.
+
+Một cổng được claim mà người giữ là kẻ khác thì thành finding phối hợp chứ không phải một cổng bị
+giành lấy; cổng rảnh thì được effect cần nó bind bình thường. Một dịch vụ đã hội tụ sẵn là một no-op
+đã được chứng minh, không mutation nào cả, không phải lỗi và cũng không phải cớ để viết lại. Khâu áp
+chỉ đụng vào các effect nằm trong tập đã duyệt, mỗi lần một resource, ghi revision trước và sau của
+từng cái; áp dở dang được báo cáo bằng `PARTIAL_MUTATION` kèm revision chính xác và không bao giờ bị
+giấu sau một blocker chung chung. Một check thiếu, không đọc được hoặc thất bại thì không thể kết thúc
+bằng kết quả đã vận hành. Khâu phát ra ghi receipt dưới `input.project.artifactRootRef`, phát đúng một
+output theo `output.schema.json`, ràng mọi fingerprint, và không claim sự sẵn sàng của product, không
+claim phê duyệt release hay bằng chứng UAT.
 
 ## Thực thi khi resume
 

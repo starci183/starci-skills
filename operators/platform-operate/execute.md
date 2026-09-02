@@ -39,28 +39,33 @@ The credential behind a capability handle is resolved for use at the moment of t
 logged, echoed into evidence, or persisted. The receipt refuses the handle as well as the value: a
 receipt is durable, and a durable record of a capability is a leaked credential with a delay.
 
-## Execution sequence
+## Sequence
 
-1. **Validate input and resume.** Apply `input.schema.json` and semantic validation. Reject a stale
-   source binding, a cross-filed effect or check, a narrowed proof set, an uninventoried resource, a
-   missing capability, credential material in the contract, and unchanged progress.
-2. **Bind authority.** Bind the knowledge record for the branch, the approval and its plan hash, each
-   capability handle with its custody evidence, the inventory fingerprint, and the routed source head.
-3. **Recheck the inventory.** Re-observe the declared resources once. A revision that differs from the
-   bound inventory is `INVENTORY_DRIFT` and stops the invocation before any mutation.
-4. **Resolve the port claims.** Compare each claimed port against the observed holders. A conflict
-   becomes a coordination finding and `PORT_CONFLICT`; a free port is simply bound by the effect that
-   needs it.
-5. **Derive the delta.** Compare desired against observed and keep only the effects still required. An
-   already-converged service is a proved no-op with no mutations, not a failure and not a rewrite.
-6. **Apply the approved delta.** Apply only effects inside the approved set, one resource at a time,
-   recording the before and after revision of each. A partial application is reported as
-   `PARTIAL_MUTATION` with exact revisions; it is never hidden behind a generic blocker.
-7. **Prove every required check.** Re-read the service and run the branch's complete proof set. A
-   check that is missing, unreadable, or failed cannot end in an operated outcome.
-8. **Emit and stop.** Write the receipt under `input.project.artifactRootRef`, emit one output
-   conforming to `output.schema.json`, and bind every fingerprint. Do not claim product readiness,
-   release approval, or UAT proof.
+| # | Step | Reads | Writes | Stops with |
+| --- | --- | --- | --- | --- |
+| 1 | Validate input and resume | input, prior receipt, frozen source binding | — | `INVALID_INPUT`, `SOURCE_DRIFT`, `NO_PROGRESS` |
+| 2 | Bind authority | knowledge record for the branch, the approval and its plan hash, each capability handle with its custody evidence, the inventory fingerprint, the routed source head | — | `AUTHORITY_DRIFT`, `CAPABILITY_MISSING` |
+| 3 | Recheck the inventory | the declared resources, re-observed once | — | `INVENTORY_DRIFT` |
+| 4 | Resolve the port claims | claimed ports, observed holders | — | `PORT_CONFLICT` |
+| 5 | Derive the delta | desired state, observed state | — | — |
+| 6 | Apply the approved delta | the approved effect set, one resource at a time | — | `EFFECT_UNAUTHORIZED`, `SERVICE_UNAVAILABLE` |
+| 7 | Prove every required check | the re-read service, the branch's complete proof set | — | `PROOF_FAILED` |
+| 8 | Emit and stop | everything above | `<branch>.receipt.json` | — |
+
+Validation rejects a stale source binding, a cross-filed effect or check, a narrowed proof set, an
+uninventoried resource, a missing capability, credential material in the contract, and unchanged
+progress. The inventory recheck happens before any mutation, so a revision that differs from the
+bound inventory stops the invocation while nothing has changed yet.
+
+A claimed port whose holder is somebody else becomes a coordination finding rather than a seized
+port; a free port is simply bound by the effect that needs it. An already-converged service is a
+proved no-op with no mutations, not a failure and not a rewrite. Application touches only effects
+inside the approved set, one resource at a time, recording the before and after revision of each; a
+partial application is reported as `PARTIAL_MUTATION` with exact revisions and is never hidden behind
+a generic blocker. A check that is missing, unreadable, or failed cannot end in an operated outcome.
+Emission writes the receipt under `input.project.artifactRootRef`, returns one output conforming to
+`output.schema.json`, binds every fingerprint, and claims no product readiness, release approval, or
+UAT proof.
 
 ## Resume execution
 
