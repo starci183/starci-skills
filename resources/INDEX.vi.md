@@ -2,13 +2,14 @@
 
 Ai chạy operator nào, bằng gì, và dưới những chính sách thường trực nào. Hai file đóng mang việc đó:
 
-- `agents.json`: các profile thực thi, gồm provider, model, cách cô lập, model làm được gì ở đây
+- `agents.json`: các profile thực thi, gom theo runtime (`codex`, `claude`); runtime giữ provider,
+  profile mang model, cách cô lập, model làm được gì ở đây
   (`capabilities`), và một vai trò trên profile đó được phép dùng gì (`permits`).
 - `assignments.json`: mỗi operator một mục, ghi profile nào chạy từng vai trò, operator thật sự cần
   những quyền nào, và câu trả lời của nó cho ba câu hỏi thường trực.
 
 `scripts/validate-resources.mjs` chạy bên trong `npm test`. Nó từ chối operator không có assignment,
-vai trò trỏ tới profile không tồn tại, quyền được yêu cầu mà không profile nào được cấp, profile cho phép
+vai trò trỏ tới profile không tồn tại, một id profile khai ở hai runtime, quyền được yêu cầu mà không profile nào được cấp, profile cho phép
 thứ model không làm được, câu trả lời
 chính sách mâu thuẫn với quyền, và model mà schema của operator đã ghim nhưng không profile nào dùng.
 Nhờ vậy sổ đăng ký và hợp đồng operator không thể lặng lẽ lệch nhau.
@@ -64,11 +65,18 @@ tên nó. Mọi nơi khác, `never`.
 
 ## Profile
 
+### Runtime `codex` (provider `openai`)
+
 | Profile | Model | Năng lực | Được cấp | Dùng cho |
 | --- | --- | --- | --- | --- |
 | `sol-fresh` | `gpt-5.6-sol` | mạng, hình, trình duyệt, source | mạng, hình, trình duyệt, source | Một quyết định hay brainstorm mới, từ đầu tới cuối |
 | `sol-reviewer` | `gpt-5.6-sol` | mạng, hình, trình duyệt, source | trình duyệt | Một reviewer mới; chỉ artifact và lời khai |
 | `luna` | `gpt-5.6-luna` | mạng, hình, source | hình, source | Sản xuất nội dung có tác giả |
+
+### Runtime `claude` (provider `anthropic`)
+
+| Profile | Model | Năng lực | Được cấp | Dùng cho |
+| --- | --- | --- | --- | --- |
 | `opus` | `claude-opus-5` | mạng, trình duyệt, source | trình duyệt, source | Tác giả nặng và mutation rủi ro cao |
 | `sonnet` | `claude-sonnet-5` | mạng, trình duyệt, source | source | Việc xác định và cơ học |
 | `fable` | `claude-fable-5-1` | mạng, trình duyệt, source | source | Trích xuất và audit bám source |

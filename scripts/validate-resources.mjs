@@ -12,6 +12,18 @@ const GRANTS = ['webSearch', 'imageGeneration', 'browser', 'sourceWrite'];
 const WEB = new Set(['never', 'bounded']);
 const IMAGE = new Set(['never', 'authority-only', 'required']);
 
+// Profiles are grouped by runtime; a runtime owns the provider, and profile ids must be unique
+// across runtimes because assignments.json binds the bare id.
+const profiles = {};
+for (const [runtime, group] of Object.entries(agents.runtimes ?? {})) {
+  if (typeof group.provider !== 'string') errors.push(`runtime ${runtime}: provider must be a string`);
+  for (const [id, profile] of Object.entries(group.profiles ?? {})) {
+    if (profiles[id]) errors.push(`profile ${id}: declared in more than one runtime`);
+    profiles[id] = { ...profile, runtime, provider: group.provider };
+  }
+}
+agents.profiles = profiles;
+
 // Every profile declares every grant explicitly, so a missing key cannot read as "allowed".
 for (const [id, profile] of Object.entries(agents.profiles)) {
   for (const grant of GRANTS) {
@@ -91,5 +103,5 @@ if (errors.length > 0) {
   process.exitCode = 1;
 } else {
   const roles = Object.values(assignments.operators).reduce((n, e) => n + Object.keys(e.roles).length, 0);
-  process.stdout.write(`resources bound: ${Object.keys(agents.profiles).length} profiles, ${onDisk.size} operators, ${roles} roles\n`);
+  process.stdout.write(`resources bound: ${Object.keys(agents.runtimes).length} runtimes, ${Object.keys(agents.profiles).length} profiles, ${onDisk.size} operators, ${roles} roles\n`);
 }

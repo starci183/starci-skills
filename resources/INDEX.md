@@ -2,7 +2,8 @@
 
 Who runs each operator, with what, and under which standing policies. Two closed files carry it:
 
-- `agents.json` — the execution profiles: provider, model, isolation, what the model can do here
+- `agents.json` — the execution profiles grouped by runtime (`codex`, `claude`); a runtime owns
+  its provider, a profile carries model, isolation, what the model can do here
   (`capabilities`), and what a role on that profile is allowed to use (`permits`).
 - `assignments.json` — one entry per operator: which profile runs each role, which grants the
   operator actually requires, and its answer to the three standing questions.
@@ -62,11 +63,18 @@ names it. Everywhere else, `never`.
 
 ## Profiles
 
+### Runtime `codex` (provider `openai`)
+
 | Profile | Model | Capabilities | Permits | Used for |
 | --- | --- | --- | --- | --- |
 | `sol-fresh` | `gpt-5.6-sol` | web, images, browser, source | web, images, browser, source | One fresh decision or brainstorm, end to end |
 | `sol-reviewer` | `gpt-5.6-sol` | web, images, browser, source | browser | One fresh reviewer; artifacts and claims only |
 | `luna` | `gpt-5.6-luna` | web, images, source | images, source | Production of authored content |
+
+### Runtime `claude` (provider `anthropic`)
+
+| Profile | Model | Capabilities | Permits | Used for |
+| --- | --- | --- | --- | --- |
 | `opus` | `claude-opus-5` | web, browser, source | browser, source | Heavy authoring and high-stakes mutation |
 | `sonnet` | `claude-sonnet-5` | web, browser, source | source | Deterministic and mechanical work |
 | `fable` | `claude-fable-5-1` | web, browser, source | source | Source-grounded extraction and audits |
