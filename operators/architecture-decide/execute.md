@@ -45,17 +45,17 @@ Four prohibitions carry the decision, and each is enforced rather than advised:
 
 | # | Step | Reads | Writes | Stops with |
 | --- | --- | --- | --- | --- |
-| 1 | Validate input and resume | input, prior receipt, frozen source binding | — | `INVALID_INPUT`, `SOURCE_DRIFT`, `NO_PROGRESS` |
-| 2 | Observe the current state | routed source at the frozen head | `current-state.json` | `CURRENT_STATE_UNOBSERVED` |
-| 3 | Bind the observed inventory and the business authority | inventory components and their evidence, published business head | — | `BUSINESS_AUTHORITY_REQUIRED`, `EVIDENCE_MISSING` |
-| 4 | Frame the decision | objective, trade-off axes, separated constraints | — | `CONSTRAINT_CONTRADICTION` |
-| 5 | Generate alternatives | framed decision, current state, inventory | `<decisionId>-alternatives.html` | `NO_VIABLE_ALTERNATIVE` |
-| 6 | Select provisionally | alternatives, selection policy, owner approval | — | `CHOICE_REQUIRED` |
-| 7 | Deepen the selected alternative | provisional selection, inventory, constraints | `stack-model.json` | `DATA_OWNERSHIP_UNASSIGNED`, `COMPATIBILITY_UNVERIFIED` |
-| 8 | Critique the selected alternative | deepened design and its claims | `independent-critique.json` | `CRITIQUE_UNRESOLVED` |
-| 9 | Confirm the selection | critique resolutions, deepened design | — | — |
-| 10 | Freeze the handoff | confirmed decision | — | — |
-| 11 | Emit and stop | everything above | — | — |
+| 1 | Validate input and resume | input, `@receipt/architecture-decision/<invocationId>`, `@be` (the frozen head binding) | — | `INVALID_INPUT`, `SOURCE_DRIFT`, `NO_PROGRESS` |
+| 2 | Observe the current state | `@be` (observed at the frozen head) | `@artifacts/current-state.json` | `CURRENT_STATE_UNOBSERVED` |
+| 3 | Bind the observed inventory and the business authority | `@artifacts/current-state.json` (inventory components and their evidence), `@business/<featureId>` (the published head) | — | `BUSINESS_AUTHORITY_REQUIRED`, `EVIDENCE_MISSING` |
+| 4 | Frame the decision | input (objective, trade-off axes, separated constraints) | — | `CONSTRAINT_CONTRADICTION` |
+| 5 | Generate alternatives | `@artifacts/current-state.json`, `@knowledge/patterns` | `@artifacts/<decisionId>-alternatives.html` | `NO_VIABLE_ALTERNATIVE` |
+| 6 | Select provisionally | `@artifacts/<decisionId>-alternatives.html`, input (selection policy, owner approval) | — | `CHOICE_REQUIRED` |
+| 7 | Deepen the selected alternative | `@artifacts/<decisionId>-alternatives.html`, `@artifacts/current-state.json` (inventory), input (constraints) | `@artifacts/stack-model.json` | `DATA_OWNERSHIP_UNASSIGNED`, `COMPATIBILITY_UNVERIFIED` |
+| 8 | Critique the selected alternative | `@artifacts/stack-model.json` (the deepened design and its claims) | `@artifacts/independent-critique.json` | `CRITIQUE_UNRESOLVED` |
+| 9 | Confirm the selection | `@artifacts/independent-critique.json`, `@artifacts/stack-model.json` | — | — |
+| 10 | Freeze the handoff | `@artifacts/stack-model.json` (the confirmed decision) | — | — |
+| 11 | Emit and stop | everything above | `@artifacts/architecture-decision.json` | — |
 
 Validation rejects a stale source binding, an unevidenced inventory component, missing fixed intent or
 measurable constraints, an automatic policy carrying an approval, and unchanged progress. Nothing is

@@ -21,7 +21,7 @@
       "purpose": "The promise the architecture must keep."
     },
     {
-      "alias": "@source/<project>/<role>",
+      "alias": "@be",
       "required": true,
       "purpose": "The routed checkout observed at the frozen head; the inventory comes from its manifests and deployment files."
     },
