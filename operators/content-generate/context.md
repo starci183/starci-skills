@@ -31,15 +31,12 @@ Style and audit references are evidence and may be empty.
 
 ## Refs
 
-Every location this operator may read, by alias. `refs.json` at the root of `.claude` resolves each alias;
-a location not in this table is unreadable for this operator, and `@artifacts` is the only one it writes.
-
 | Alias | Resolves to | Bind | Required |
 | --- | --- | --- | --- |
-| `@content/<contentId>/<locale>` | MinIO object contents/<contentId>/<locale>.json through the routed runtime | fingerprint of the fetched object | Required: The lesson as served; the unit being authored or revised. |
-| `@runtime` | <Source>/.worktrees/sessions/central-runtime/owner.json | fingerprint + generation | Required: The AI runtime that runs, reads, and repairs generated code. |
-| `@receipt/content-generation-receipt/<invocationId>` | <@artifacts of invocation <invocationId>>/<receiptType>.json (the receipt file that invocation registered in output.artifactRefs) | fingerprint + the sourceHead the receipt binds | Optional: A prior audit of the same unit; regression history. |
-| `@artifacts` | input.project.artifactRootRef; convention <Source>/.worktrees/sessions/<invocationId>/artifacts/ | fingerprint per artifact; every artifact an operator writes is registered in output.artifactRefs | Required: Where the brief, articles, code tracks, images, review, and receipt are written. |
+| `@content/<contentId>/<locale>` | `MinIO object contents/<contentId>/<locale>.json through the routed runtime` | fingerprint of the fetched object | Required: The lesson as served; the unit being authored or revised. |
+| `@runtime` | `<Source>/.worktrees/sessions/central-runtime/owner.json` | fingerprint + generation | Required: The AI runtime that runs, reads, and repairs generated code. |
+| `@receipt/content-generation-receipt/<invocationId>` | `<@artifacts of invocation <invocationId>>/<receiptType>.json (the receipt file that invocation registered in output.artifactRefs)` | fingerprint + the sourceHead the receipt binds | Optional: A prior audit of the same unit; regression history. |
+| `@artifacts` | `input.project.artifactRootRef; convention <Source>/.worktrees/sessions/<invocationId>/artifacts/` | fingerprint per artifact; every artifact an operator writes is registered in output.artifactRefs | Required: Where the brief, articles, code tracks, images, review, and receipt are written. |
 
 ## The runtime binding is a boundary, not a preference
 

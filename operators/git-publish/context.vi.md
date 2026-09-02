@@ -32,16 +32,13 @@ Mỗi lần gọi đều cần:
 
 ## Ref
 
-Mọi nơi operator này được đọc, theo alias. `refs.json` ở gốc `.claude` phân giải từng alias; nơi nào
-không có trong bảng thì operator này không được đọc, và `@artifacts` là nơi duy nhất nó ghi.
-
 | Alias | Trỏ tới | Bind | Bắt buộc |
 | --- | --- | --- | --- |
-| `@receipt/workspace-route-binding/<invocationId>` | <@artifacts of invocation <invocationId>>/<receiptType>.json (the receipt file that invocation registered in output.artifactRefs) | fingerprint + the sourceHead the receipt binds | Bắt buộc: A publish never resolves its own checkout. |
-| `@route/<project>/<role>` | <Source>/.workspaces/local/routes/<project>/<role>/config.json | fingerprint | Bắt buộc: The checkout and mutation branch being published. |
-| `@hooks/<project>/<role>` | <checkout:project/role>/.husky/ | fingerprint per hook file at the checkout head | Bắt buộc: pre-commit and pre-push, which always run. |
-| `@remote/<project>/<role>` | the origin URL recorded in @route/<project>/<role> (repository.gitRepository) | observed remote head (git ls-remote) at invocation time | Bắt buộc: The publication target and its observed head. |
-| `@artifacts` | input.project.artifactRootRef; convention <Source>/.worktrees/sessions/<invocationId>/artifacts/ | fingerprint per artifact; every artifact an operator writes is registered in output.artifactRefs | Bắt buộc: Where the publication receipt is written. |
+| `@receipt/workspace-route-binding/<invocationId>` | `<@artifacts of invocation <invocationId>>/<receiptType>.json (the receipt file that invocation registered in output.artifactRefs)` | fingerprint + the sourceHead the receipt binds | Bắt buộc: A publish never resolves its own checkout. |
+| `@route/<project>/<role>` | `<Source>/.workspaces/local/routes/<project>/<role>/config.json` | fingerprint | Bắt buộc: The checkout and mutation branch being published. |
+| `@hooks/<project>/<role>` | `<checkout:project/role>/.husky/` | fingerprint per hook file at the checkout head | Bắt buộc: pre-commit and pre-push, which always run. |
+| `@remote/<project>/<role>` | `the origin URL recorded in @route/<project>/<role> (repository.gitRepository)` | observed remote head (git ls-remote) at invocation time | Bắt buộc: The publication target and its observed head. |
+| `@artifacts` | `input.project.artifactRootRef; convention <Source>/.worktrees/sessions/<invocationId>/artifacts/` | fingerprint per artifact; every artifact an operator writes is registered in output.artifactRefs | Bắt buộc: Where the publication receipt is written. |
 
 ## Route được đọc, không bao giờ được tìm lại
 

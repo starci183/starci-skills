@@ -29,16 +29,13 @@ Mỗi lần gọi đều cần:
 
 ## Ref
 
-Mọi nơi operator này được đọc, theo alias. `refs.json` ở gốc `.claude` phân giải từng alias; nơi nào
-không có trong bảng thì operator này không được đọc, và `@artifacts` là nơi duy nhất nó ghi.
-
 | Alias | Trỏ tới | Bind | Bắt buộc |
 | --- | --- | --- | --- |
-| `@receipt/<receiptType>/<invocationId>` | <@artifacts of invocation <invocationId>>/<receiptType>.json (the receipt file that invocation registered in output.artifactRefs) | fingerprint + the sourceHead the receipt binds | Bắt buộc: The producer's receipt; fixes the head every gate runs against. |
-| `@gates/<project>/<role>` | <checkout:project/role>/package.json#scripts plus the configs it names (eslint, tsconfig, jest/vitest, sonar-project.properties) | fingerprint of each file at the checkout head | Bắt buộc: The pinned gate commands and configuration. |
-| `@source/<project>/<role>` | <checkout:project/role> | fingerprint + sourceHead (git rev-parse HEAD of the checkout) | Bắt buộc: The subject every gate measures. |
-| `@debts` | <Source>/.worktrees/debts/ | fingerprint per file | Tuỳ chọn: Owner-approved debts a red gate may carry. |
-| `@artifacts` | input.project.artifactRootRef; convention <Source>/.worktrees/sessions/<invocationId>/artifacts/ | fingerprint per artifact; every artifact an operator writes is registered in output.artifactRefs | Bắt buộc: Where gate evidence, coverage, and the receipt are written. |
+| `@receipt/<receiptType>/<invocationId>` | `<@artifacts of invocation <invocationId>>/<receiptType>.json (the receipt file that invocation registered in output.artifactRefs)` | fingerprint + the sourceHead the receipt binds | Bắt buộc: The producer's receipt; fixes the head every gate runs against. |
+| `@gates/<project>/<role>` | `<checkout:project/role>/package.json#scripts plus the configs it names (eslint, tsconfig, jest/vitest, sonar-project.properties)` | fingerprint of each file at the checkout head | Bắt buộc: The pinned gate commands and configuration. |
+| `@source/<project>/<role>` | `<checkout:project/role>` | fingerprint + sourceHead (git rev-parse HEAD of the checkout) | Bắt buộc: The subject every gate measures. |
+| `@debts` | `<Source>/.worktrees/debts/` | fingerprint per file | Tuỳ chọn: Owner-approved debts a red gate may carry. |
+| `@artifacts` | `input.project.artifactRootRef; convention <Source>/.worktrees/sessions/<invocationId>/artifacts/` | fingerprint per artifact; every artifact an operator writes is registered in output.artifactRefs | Bắt buộc: Where gate evidence, coverage, and the receipt are written. |
 
 ## Tiền nhiệm được tiêu thụ, không phải dựng lại
 

@@ -76,13 +76,12 @@
     },
     "@knowledge": {
       "params": [
-        "group",
-        "topic"
+        "group"
       ],
-      "kind": "file",
-      "resolvesTo": "<Source>/.claude/knowledge/<group>/<topic>.md",
+      "kind": "dir",
+      "resolvesTo": "<Source>/.claude/knowledge/<group>/  (every canonical .md inside; a single file may be named as <group>/<topic>.md)",
       "scheme": "knowledge://<group>/<topic>",
-      "bind": "fingerprint; the rule inventory is the set of `## PREFIX-n` headings of the file",
+      "bind": "fingerprint per file; the rule inventory is the set of `## PREFIX-n` headings across the folder's canonical files",
       "writers": [],
       "purpose": "Canonical English knowledge: ui/composition, ui/presentation, ui/proof, grammars/<family>, patterns/fe, patterns/be. The .vi.md mirror is never bound."
     },

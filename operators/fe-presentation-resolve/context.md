@@ -36,17 +36,14 @@ published rule behind it.
 
 ## Refs
 
-Every location this operator may read, by alias. `refs.json` at the root of `.claude` resolves each alias;
-a location not in this table is unreadable for this operator, and `@artifacts` is the only one it writes.
-
 | Alias | Resolves to | Bind | Required |
 | --- | --- | --- | --- |
-| `@knowledge/ui/presentation/<topic>` | <Source>/.claude/knowledge/<group>/<topic>.md | fingerprint; the rule inventory is the set of `## PREFIX-n` headings of the file | Required: The closed rule inventory; the only source of valid identifiers. |
-| `@grammar` | <checkout:starci-academy/fe>/packages/grammar | fingerprint of packages/grammar/package.json (manifestRef) + the checkout head | Required: Which relationships a component already owns. |
-| `@source/starci-academy/fe` | <checkout:project/role> | fingerprint + sourceHead (git rev-parse HEAD of the checkout) | Required: The checkout the composed tree belongs to. |
-| `@receipt/fe-direction-decision/<invocationId>` | <@artifacts of invocation <invocationId>>/<receiptType>.json (the receipt file that invocation registered in output.artifactRefs) | fingerprint + the sourceHead the receipt binds | Optional: Intent; never a source of presentation values. |
-| `@receipt/fe-surface-audit/<invocationId>` | <@artifacts of invocation <invocationId>>/<receiptType>.json (the receipt file that invocation registered in output.artifactRefs) | fingerprint + the sourceHead the receipt binds | Optional: Regression history. |
-| `@artifacts` | input.project.artifactRootRef; convention <Source>/.worktrees/sessions/<invocationId>/artifacts/ | fingerprint per artifact; every artifact an operator writes is registered in output.artifactRefs | Required: Where the resolved tree and the resolution receipt are written. |
+| `@knowledge/ui/presentation` | `<Source>/.claude/knowledge/<group>/  (every canonical .md inside; a single file may be named as <group>/<topic>.md)` | fingerprint per file; the rule inventory is the set of `## PREFIX-n` headings across the folder's canonical files | Required: The closed rule inventory; the only source of valid identifiers. |
+| `@grammar` | `<checkout:starci-academy/fe>/packages/grammar` | fingerprint of packages/grammar/package.json (manifestRef) + the checkout head | Required: Which relationships a component already owns. |
+| `@source/starci-academy/fe` | `<checkout:project/role>` | fingerprint + sourceHead (git rev-parse HEAD of the checkout) | Required: The checkout the composed tree belongs to. |
+| `@receipt/fe-direction-decision/<invocationId>` | `<@artifacts of invocation <invocationId>>/<receiptType>.json (the receipt file that invocation registered in output.artifactRefs)` | fingerprint + the sourceHead the receipt binds | Optional: Intent; never a source of presentation values. |
+| `@receipt/fe-surface-audit/<invocationId>` | `<@artifacts of invocation <invocationId>>/<receiptType>.json (the receipt file that invocation registered in output.artifactRefs)` | fingerprint + the sourceHead the receipt binds | Optional: Regression history. |
+| `@artifacts` | `input.project.artifactRootRef; convention <Source>/.worktrees/sessions/<invocationId>/artifacts/` | fingerprint per artifact; every artifact an operator writes is registered in output.artifactRefs | Required: Where the resolved tree and the resolution receipt are written. |
 
 ## Rule inventory
 

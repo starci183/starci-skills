@@ -26,7 +26,7 @@
       "purpose": "The frozen mutation contract the implementation fills and may not widen."
     },
     {
-      "alias": "@knowledge/patterns/be/<topic>",
+      "alias": "@knowledge/patterns/be",
       "required": true,
       "purpose": "Sibling patterns: the only source of valid conventions."
     },

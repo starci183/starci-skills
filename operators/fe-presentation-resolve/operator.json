@@ -14,7 +14,7 @@
   },
   "refs": [
     {
-      "alias": "@knowledge/ui/presentation/<topic>",
+      "alias": "@knowledge/ui/presentation",
       "required": true,
       "purpose": "The closed rule inventory; the only source of valid identifiers."
     },

@@ -33,16 +33,13 @@ Every invocation requires:
 
 ## Refs
 
-Every location this operator may read, by alias. `refs.json` at the root of `.claude` resolves each alias;
-a location not in this table is unreadable for this operator, and `@artifacts` is the only one it writes.
-
 | Alias | Resolves to | Bind | Required |
 | --- | --- | --- | --- |
-| `@runtime` | <Source>/.worktrees/sessions/central-runtime/owner.json | fingerprint + generation | Required: The shared runtime owner: inventory, generation, health. |
-| `@ports/<project>` | <Source>/.workspaces/ports/<project>.json | fingerprint | Required: Port projection the runtime binds to. |
-| `@identity` | <Source>/.workspaces/device-state.json | fingerprint; the sealed keys under <Source>/.workspaces/local/credentials/*.key.enc are bound by name and never read | Required: Credential handles by name; values never appear. |
-| `@declaration/<project>/<role>` | <Source>/.workspaces/projects/<project>/<role>.json | fingerprint | Optional: Which projects the shared services serve. |
-| `@artifacts` | input.project.artifactRootRef; convention <Source>/.worktrees/sessions/<invocationId>/artifacts/ | fingerprint per artifact; every artifact an operator writes is registered in output.artifactRefs | Required: Where the operation receipt is written. |
+| `@runtime` | `<Source>/.worktrees/sessions/central-runtime/owner.json` | fingerprint + generation | Required: The shared runtime owner: inventory, generation, health. |
+| `@ports/<project>` | `<Source>/.workspaces/ports/<project>.json` | fingerprint | Required: Port projection the runtime binds to. |
+| `@identity` | `<Source>/.workspaces/device-state.json` | fingerprint; the sealed keys under &lt;Source&gt;/.workspaces/local/credentials/*.key.enc are bound by name and never read | Required: Credential handles by name; values never appear. |
+| `@declaration/<project>/<role>` | `<Source>/.workspaces/projects/<project>/<role>.json` | fingerprint | Optional: Which projects the shared services serve. |
+| `@artifacts` | `input.project.artifactRootRef; convention <Source>/.worktrees/sessions/<invocationId>/artifacts/` | fingerprint per artifact; every artifact an operator writes is registered in output.artifactRefs | Required: Where the operation receipt is written. |
 
 ## Shared infrastructure only
 

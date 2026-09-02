@@ -18,10 +18,7 @@ The exact refs, fingerprints, and heads the input must bind before the operator 
 
 | Alias | Resolves to | Bind | Required |
 | --- | --- | --- | --- |
-| `@<alias>/<params>` | from `refs.json` | how it is fingerprinted | Required or Optional: purpose |
-
-Generated from `operator.json` → `refs` through `refs.json`. A location not in this table is unreadable
-for the operator; `@artifacts` is the only one it writes.
+| `@<alias>/<params>` | `<location from refs.json, code-spanned so placeholders render>` | how it is fingerprinted | Required or Optional: purpose |
 
 ## <Law section, optional, repeatable>
 

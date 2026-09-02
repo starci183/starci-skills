@@ -32,15 +32,12 @@ dẫn không được bind thì không phân biệt được với một trích 
 
 ## Ref
 
-Mọi nơi operator này được đọc, theo alias. `refs.json` ở gốc `.claude` phân giải từng alias; nơi nào
-không có trong bảng thì operator này không được đọc, và `@artifacts` là nơi duy nhất nó ghi.
-
 | Alias | Trỏ tới | Bind | Bắt buộc |
 | --- | --- | --- | --- |
-| `@business/<featureId>` | <Source>/.worktrees/businesses/features/<featureId>/model.json | content address from <Source>/.worktrees/businesses/business-registry-v1.json (featureHeads.<featureId>.head) with its authorityStatus | Bắt buộc: The promise head and its lifecycle state, by content address. |
-| `@source/starci-academy/be` | <checkout:project/role> | fingerprint + sourceHead (git rev-parse HEAD of the checkout) | Bắt buộc: The backend checkout every fact claim cites by path, line range, and head. |
-| `@receipt/architecture-decision/<invocationId>` | <@artifacts of invocation <invocationId>>/<receiptType>.json (the receipt file that invocation registered in output.artifactRefs) | fingerprint + the sourceHead the receipt binds | Tuỳ chọn: Architecture evidence; never a source of business behaviour. |
-| `@artifacts` | input.project.artifactRootRef; convention <Source>/.worktrees/sessions/<invocationId>/artifacts/ | fingerprint per artifact; every artifact an operator writes is registered in output.artifactRefs | Bắt buộc: Where the coverage matrix and the published head copy are written. |
+| `@business/<featureId>` | `<Source>/.worktrees/businesses/features/<featureId>/model.json` | content address from &lt;Source&gt;/.worktrees/businesses/business-registry-v1.json (featureHeads.&lt;featureId&gt;.head) with its authorityStatus | Bắt buộc: The promise head and its lifecycle state, by content address. |
+| `@source/starci-academy/be` | `<checkout:project/role>` | fingerprint + sourceHead (git rev-parse HEAD of the checkout) | Bắt buộc: The backend checkout every fact claim cites by path, line range, and head. |
+| `@receipt/architecture-decision/<invocationId>` | `<@artifacts of invocation <invocationId>>/<receiptType>.json (the receipt file that invocation registered in output.artifactRefs)` | fingerprint + the sourceHead the receipt binds | Tuỳ chọn: Architecture evidence; never a source of business behaviour. |
+| `@artifacts` | `input.project.artifactRootRef; convention <Source>/.worktrees/sessions/<invocationId>/artifacts/` | fingerprint per artifact; every artifact an operator writes is registered in output.artifactRefs | Bắt buộc: Where the coverage matrix and the published head copy are written. |
 
 ## Tách bạch claim
 

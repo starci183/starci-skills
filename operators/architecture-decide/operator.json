@@ -26,7 +26,7 @@
       "purpose": "The routed checkout observed at the frozen head; the inventory comes from its manifests and deployment files."
     },
     {
-      "alias": "@knowledge/patterns/<topic>",
+      "alias": "@knowledge/patterns",
       "required": false,
       "purpose": "Reusable patterns the scope may bind; a shape, not a selection."
     },

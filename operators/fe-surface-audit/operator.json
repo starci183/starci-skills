@@ -16,7 +16,7 @@
   },
   "refs": [
     {
-      "alias": "@knowledge/ui/proof/<topic>",
+      "alias": "@knowledge/ui/proof",
       "required": true,
       "purpose": "What only becomes true once rendered; the audit's rule inventory."
     },

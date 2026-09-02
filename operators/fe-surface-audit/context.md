@@ -31,16 +31,13 @@ Every invocation requires:
 
 ## Refs
 
-Every location this operator may read, by alias. `refs.json` at the root of `.claude` resolves each alias;
-a location not in this table is unreadable for this operator, and `@artifacts` is the only one it writes.
-
 | Alias | Resolves to | Bind | Required |
 | --- | --- | --- | --- |
-| `@knowledge/ui/proof/<topic>` | <Source>/.claude/knowledge/<group>/<topic>.md | fingerprint; the rule inventory is the set of `## PREFIX-n` headings of the file | Required: What only becomes true once rendered; the audit's rule inventory. |
-| `@receipt/fe-source-application/<invocationId>` | <@artifacts of invocation <invocationId>>/<receiptType>.json (the receipt file that invocation registered in output.artifactRefs) | fingerprint + the sourceHead the receipt binds | Required: The stated intention this audit exists to contradict. |
-| `@source/starci-academy/fe` | <checkout:project/role> | fingerprint + sourceHead (git rev-parse HEAD of the checkout) | Required: Proves the observed surface is the applied surface. |
-| `@runtime` | <Source>/.worktrees/sessions/central-runtime/owner.json | fingerprint + generation | Required: The endpoint that serves the route under observation. |
-| `@artifacts` | input.project.artifactRootRef; convention <Source>/.worktrees/sessions/<invocationId>/artifacts/ | fingerprint per artifact; every artifact an operator writes is registered in output.artifactRefs | Required: Where captures and the audit receipt are written. |
+| `@knowledge/ui/proof` | `<Source>/.claude/knowledge/<group>/  (every canonical .md inside; a single file may be named as <group>/<topic>.md)` | fingerprint per file; the rule inventory is the set of `## PREFIX-n` headings across the folder's canonical files | Required: What only becomes true once rendered; the audit's rule inventory. |
+| `@receipt/fe-source-application/<invocationId>` | `<@artifacts of invocation <invocationId>>/<receiptType>.json (the receipt file that invocation registered in output.artifactRefs)` | fingerprint + the sourceHead the receipt binds | Required: The stated intention this audit exists to contradict. |
+| `@source/starci-academy/fe` | `<checkout:project/role>` | fingerprint + sourceHead (git rev-parse HEAD of the checkout) | Required: Proves the observed surface is the applied surface. |
+| `@runtime` | `<Source>/.worktrees/sessions/central-runtime/owner.json` | fingerprint + generation | Required: The endpoint that serves the route under observation. |
+| `@artifacts` | `input.project.artifactRootRef; convention <Source>/.worktrees/sessions/<invocationId>/artifacts/` | fingerprint per artifact; every artifact an operator writes is registered in output.artifactRefs | Required: Where captures and the audit receipt are written. |
 
 ## Rule inventory
 

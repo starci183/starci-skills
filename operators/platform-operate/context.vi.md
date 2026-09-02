@@ -33,16 +33,13 @@ Mỗi lần gọi đều cần:
 
 ## Ref
 
-Mọi nơi operator này được đọc, theo alias. `refs.json` ở gốc `.claude` phân giải từng alias; nơi nào
-không có trong bảng thì operator này không được đọc, và `@artifacts` là nơi duy nhất nó ghi.
-
 | Alias | Trỏ tới | Bind | Bắt buộc |
 | --- | --- | --- | --- |
-| `@runtime` | <Source>/.worktrees/sessions/central-runtime/owner.json | fingerprint + generation | Bắt buộc: The shared runtime owner: inventory, generation, health. |
-| `@ports/<project>` | <Source>/.workspaces/ports/<project>.json | fingerprint | Bắt buộc: Port projection the runtime binds to. |
-| `@identity` | <Source>/.workspaces/device-state.json | fingerprint; the sealed keys under <Source>/.workspaces/local/credentials/*.key.enc are bound by name and never read | Bắt buộc: Credential handles by name; values never appear. |
-| `@declaration/<project>/<role>` | <Source>/.workspaces/projects/<project>/<role>.json | fingerprint | Tuỳ chọn: Which projects the shared services serve. |
-| `@artifacts` | input.project.artifactRootRef; convention <Source>/.worktrees/sessions/<invocationId>/artifacts/ | fingerprint per artifact; every artifact an operator writes is registered in output.artifactRefs | Bắt buộc: Where the operation receipt is written. |
+| `@runtime` | `<Source>/.worktrees/sessions/central-runtime/owner.json` | fingerprint + generation | Bắt buộc: The shared runtime owner: inventory, generation, health. |
+| `@ports/<project>` | `<Source>/.workspaces/ports/<project>.json` | fingerprint | Bắt buộc: Port projection the runtime binds to. |
+| `@identity` | `<Source>/.workspaces/device-state.json` | fingerprint; the sealed keys under &lt;Source&gt;/.workspaces/local/credentials/*.key.enc are bound by name and never read | Bắt buộc: Credential handles by name; values never appear. |
+| `@declaration/<project>/<role>` | `<Source>/.workspaces/projects/<project>/<role>.json` | fingerprint | Tuỳ chọn: Which projects the shared services serve. |
+| `@artifacts` | `input.project.artifactRootRef; convention <Source>/.worktrees/sessions/<invocationId>/artifacts/` | fingerprint per artifact; every artifact an operator writes is registered in output.artifactRefs | Bắt buộc: Where the operation receipt is written. |
 
 ## Chỉ hạ tầng dùng chung
 

@@ -37,7 +37,7 @@
       "purpose": "Published Grammar: the compositions a direction may bind."
     },
     {
-      "alias": "@knowledge/ui/composition/<topic>",
+      "alias": "@knowledge/ui/composition",
       "required": true,
       "purpose": "What a tree must contain before it exists."
     },

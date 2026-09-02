@@ -44,21 +44,18 @@ hay behavior chỉ để trình diễn.
 
 ## Ref
 
-Mọi nơi operator này được đọc, theo alias. `refs.json` ở gốc `.claude` phân giải từng alias; nơi nào
-không có trong bảng thì operator này không được đọc, và `@artifacts` là nơi duy nhất nó ghi.
-
 | Alias | Trỏ tới | Bind | Bắt buộc |
 | --- | --- | --- | --- |
-| `@receipt/business-promise-authority/<invocationId>` | <@artifacts of invocation <invocationId>>/<receiptType>.json (the receipt file that invocation registered in output.artifactRefs) | fingerprint + the sourceHead the receipt binds | Bắt buộc: Business authority for the requested outcome. |
-| `@receipt/backend-implementation/<invocationId>` | <@artifacts of invocation <invocationId>>/<receiptType>.json (the receipt file that invocation registered in output.artifactRefs) | fingerprint + the sourceHead the receipt binds | Tuỳ chọn: Technical authority when the direction touches a delivered contract. |
-| `@receipt/architecture-decision/<invocationId>` | <@artifacts of invocation <invocationId>>/<receiptType>.json (the receipt file that invocation registered in output.artifactRefs) | fingerprint + the sourceHead the receipt binds | Tuỳ chọn: Technical authority when boundaries are in question. |
-| `@grammar` | <checkout:starci-academy/fe>/packages/grammar | fingerprint of packages/grammar/package.json (manifestRef) + the checkout head | Bắt buộc: Published Grammar: the compositions a direction may bind. |
-| `@knowledge/ui/composition/<topic>` | <Source>/.claude/knowledge/<group>/<topic>.md | fingerprint; the rule inventory is the set of `## PREFIX-n` headings of the file | Bắt buộc: What a tree must contain before it exists. |
-| `@source/starci-academy/fe` | <checkout:project/role> | fingerprint + sourceHead (git rev-parse HEAD of the checkout) | Bắt buộc: Current implementation as evidence, never as the requested direction. |
-| `@uat/<flow>/<case>` | <Source>/.worktrees/uat/<flow>/<case>/ | fingerprint of snapshot.json and result.json | Tuỳ chọn: Evidence and counterevidence; a prior PASS is not current authority. |
-| `@screenshots` | <Source>/.artifacts/ | fingerprint per image | Tuỳ chọn: Pixel evidence only. |
-| `@receipt/fe-direction-decision/<invocationId>` | <@artifacts of invocation <invocationId>>/<receiptType>.json (the receipt file that invocation registered in output.artifactRefs) | fingerprint + the sourceHead the receipt binds | Tuỳ chọn: A previous direction; evidence unless the exact identity and fingerprint match. |
-| `@artifacts` | input.project.artifactRootRef; convention <Source>/.worktrees/sessions/<invocationId>/artifacts/ | fingerprint per artifact; every artifact an operator writes is registered in output.artifactRefs | Bắt buộc: Where candidate renders and the decision receipt are written. |
+| `@receipt/business-promise-authority/<invocationId>` | `<@artifacts of invocation <invocationId>>/<receiptType>.json (the receipt file that invocation registered in output.artifactRefs)` | fingerprint + the sourceHead the receipt binds | Bắt buộc: Business authority for the requested outcome. |
+| `@receipt/backend-implementation/<invocationId>` | `<@artifacts of invocation <invocationId>>/<receiptType>.json (the receipt file that invocation registered in output.artifactRefs)` | fingerprint + the sourceHead the receipt binds | Tuỳ chọn: Technical authority when the direction touches a delivered contract. |
+| `@receipt/architecture-decision/<invocationId>` | `<@artifacts of invocation <invocationId>>/<receiptType>.json (the receipt file that invocation registered in output.artifactRefs)` | fingerprint + the sourceHead the receipt binds | Tuỳ chọn: Technical authority when boundaries are in question. |
+| `@grammar` | `<checkout:starci-academy/fe>/packages/grammar` | fingerprint of packages/grammar/package.json (manifestRef) + the checkout head | Bắt buộc: Published Grammar: the compositions a direction may bind. |
+| `@knowledge/ui/composition` | `<Source>/.claude/knowledge/<group>/  (every canonical .md inside; a single file may be named as <group>/<topic>.md)` | fingerprint per file; the rule inventory is the set of `## PREFIX-n` headings across the folder's canonical files | Bắt buộc: What a tree must contain before it exists. |
+| `@source/starci-academy/fe` | `<checkout:project/role>` | fingerprint + sourceHead (git rev-parse HEAD of the checkout) | Bắt buộc: Current implementation as evidence, never as the requested direction. |
+| `@uat/<flow>/<case>` | `<Source>/.worktrees/uat/<flow>/<case>/` | fingerprint of snapshot.json and result.json | Tuỳ chọn: Evidence and counterevidence; a prior PASS is not current authority. |
+| `@screenshots` | `<Source>/.artifacts/` | fingerprint per image | Tuỳ chọn: Pixel evidence only. |
+| `@receipt/fe-direction-decision/<invocationId>` | `<@artifacts of invocation <invocationId>>/<receiptType>.json (the receipt file that invocation registered in output.artifactRefs)` | fingerprint + the sourceHead the receipt binds | Tuỳ chọn: A previous direction; evidence unless the exact identity and fingerprint match. |
+| `@artifacts` | `input.project.artifactRootRef; convention <Source>/.worktrees/sessions/<invocationId>/artifacts/` | fingerprint per artifact; every artifact an operator writes is registered in output.artifactRefs | Bắt buộc: Where candidate renders and the decision receipt are written. |
 
 ## Luật chọn context
 
