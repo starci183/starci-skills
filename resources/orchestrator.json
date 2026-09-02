@@ -7,7 +7,7 @@
   "agent": {
     "profile": "operator.json → resources.profile",
     "grants": "operator.json → resources.requires, and nothing the profile would otherwise permit",
-    "refs": "operator.json → refs, resolved through refs.json; an unlisted location is unreadable",
+    "refs": "operator.json → refs, resolved through alias/alias.json; an unlisted location is unreadable",
     "isolation": "fresh, no inherited turns; a critique inside an operator is a step of the same agent",
     "writes": "only @dynamic/<file> in its own step folder, registered in output.artifactRefs"
   },

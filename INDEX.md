@@ -22,7 +22,7 @@ its fingerprint and complete rule inventory, and may emit no identifier outside 
 ```text
 SKILL.md                 one entry, fourteen operators, one routing map
 routing.json             14 operators, 76 routes, four kinds: operator | resume | user | external
-refs.json                alias -> exact location, scheme, binding, writers; every operator reads by alias only
+alias/                   alias.json (machine registry: location, scheme, binding, writers, zone) + INDEX.md (generated map by zone); every operator reads by alias only
 resources/               agents/profiles/{openai,claude}.json (6 profiles) + orchestrator.json (one agent per operator, max 3); validated
 operators/INDEX.md       generated matrix: what each operator reads (static, dynamic), writes, its steps and stop codes
 operators/<id>/          fifteen files each; operator.json carries resources and refs; self-test.mjs must pass

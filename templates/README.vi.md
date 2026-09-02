@@ -10,8 +10,8 @@ vào, cùng bản `.vi.md` của file ấy. Hợp đồng là thẩm quyền; b�
 | `input.template.md` | `operators/*/input.md` | tiêu đề; Vỏ ngoài, Các binding context, mục tự do, Input khi resume |
 | `execute.template.md` | `operators/*/execute.md` | tiêu đề; Một việc duy nhất, các mục luật tự do, Trình tự kèm bảng bước, tự do, Thực thi khi resume, Các đòn tấn công bắt buộc |
 | `output.template.md` | `operators/*/output.md` | tiêu đề; một mục `Receipt khi …`, tự do, Receipt khi blocked, Mã lỗi, Bất biến liên trường, Kết quả thực tế |
-| `ui-composition.template.md` | `knowledge/ui/composition/*.md` | tiêu đề; chỉ các mục rule `PREFIX-n — …`, mỗi mục một bảng `Case \| Dùng khi \| Chốt`; mục đóng |
-| `ui-presentation.template.md` | `knowledge/ui/presentation/*.md` | tiêu đề; Thang giá trị hoặc Danh mục, Owner kèm bảng, mục khung tự do, rule với một bảng `Case \| Dùng khi \| Owner \| Render`; mục đóng |
+| `ui-composition.template.md` | `knowledge/ui/composition/*.md` | tiêu đề; chỉ các mục rule `PREFIX-n — …`, mỗi mục một bảng `Case \| Dùng khi \| Khẳng định`; mục đóng |
+| `ui-presentation.template.md` | `knowledge/ui/presentation/*.md` | tiêu đề; Thang giá trị hoặc Danh mục, Owner kèm bảng, mục khung tự do — trong đó `<Topic> Common already owns` do `scripts/generate-presentation-owned.mjs` sinh ra chứ không viết tay — rule với một bảng `Case \| Dùng khi \| Owner \| Render`; mục đóng |
 | `ui-proof.template.md` | `knowledge/ui/proof/*.md` | tiêu đề; chỉ các mục rule, mỗi mục một bảng `Case \| Dùng khi \| Quan sát`; mục đóng |
 | `grammars.template.md` | `knowledge/grammars/*/*.md` | tiêu đề; mục tuỳ ý; mọi mục rule mang một bảng `Case \| Luật \| Owner của Common \| Core hiện thực` |
 | `patterns.template.md` | `knowledge/patterns/*/*.md` | tiêu đề; mục tuỳ ý; mọi mục rule mang một bảng `Case \| Dùng khi \| Viết` |

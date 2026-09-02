@@ -22,7 +22,7 @@ fingerprint và danh sách rule đầy đủ, và không được phát ra mã n
 ```text
 SKILL.md                 một cửa vào, mười bốn operator, một bảng định tuyến
 routing.json             14 operator, 76 route, bốn loại: operator | resume | user | external
-refs.json                alias -> vị trí chính xác, scheme, cách bind, ai được ghi; operator chỉ đọc qua alias
+alias/                   alias.json (sổ cho máy: vị trí, scheme, bind, ai ghi, vùng) + INDEX.md (bản đồ sinh theo vùng); operator chỉ đọc qua alias
 resources/               agents/profiles/{openai,claude}.json (6 profile) + orchestrator.json (mỗi operator một agent, tối đa 3); có kiểm
 operators/INDEX.md       ma trận sinh tự động: mỗi operator đọc gì (tĩnh, động), ghi gì, các bước và mã dừng
 operators/<id>/          mười lăm file mỗi gói; operator.json mang resources và refs; self-test.mjs phải xanh

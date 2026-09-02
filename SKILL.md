@@ -113,5 +113,6 @@ One invocation of one operator is one agent, created fresh on the profile its `o
 with the grants and the refs it declares and nothing else. `resources/orchestrator.json` fixes the
 rules: at most three agents at once, never two agents sharing a writable location, dispatch by
 `routing.json`, hand-off only through the typed receipt and `changes.md` under `@dynamic`, in a session folder the orchestrator creates first and deletes when the run completes. An agent never starts
-another agent; a critique inside an operator is a step of the same agent. `refs.json` is the one
-place an alias resolves to a location; an operator reads only what its Refs table names.
+another agent; a critique inside an operator is a step of the same agent. `alias/alias.json` is the one
+place an alias resolves to a location, and `alias/INDEX.md` is its readable map by zone (workspaces, grammar,
+knowledge, worktrees, remote, dynamic); an operator reads only what its Refs table names.

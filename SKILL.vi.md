@@ -111,5 +111,6 @@ Một lần gọi một operator là một agent, tạo mới trên profile mà 
 đúng những quyền và ref nó khai, không hơn. `resources/orchestrator.json` chốt luật: tối đa ba agent
 cùng lúc, không bao giờ hai agent chung một nơi ghi, điều phối theo `routing.json`, bàn giao chỉ qua
 receipt có kiểu và `changes.md` dưới `@dynamic`, trong thư mục phiên mà orchestrator tạo trước và xoá khi chạy xong. Agent không bao giờ khởi động agent khác; một bước phản biện bên
-trong operator là một bước của chính agent đó. `refs.json` là nơi duy nhất một alias phân giải ra vị
-trí; operator chỉ đọc những gì bảng Ref của nó gọi tên.
+trong operator là một bước của chính agent đó. `alias/alias.json` là nơi duy nhất một alias phân giải ra vị
+trí, và `alias/INDEX.md` là bản đồ đọc được của nó theo vùng (workspaces, grammar, knowledge, worktrees, remote,
+dynamic); operator chỉ đọc những gì bảng Ref của nó gọi tên.

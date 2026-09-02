@@ -1,4 +1,4 @@
-// Every reference an operator reads is named by an alias that refs.json resolves to an exact
+// Every reference an operator reads is named by an alias that alias/alias.json resolves to an exact
 // location. An operator declares its aliases in operator.json (`refs`), and its context.md states
 // the same table for the reader. This script rejects an alias nobody registered, a required alias
 // the context table omits, a writer that is not an operator, and a context row that names an alias
@@ -8,23 +8,24 @@ import { readdir, readFile } from 'node:fs/promises';
 import path from 'node:path';
 import process from 'node:process';
 import { fileURLToPath } from 'node:url';
+import { loadAliasRegistry, baseOf as baseOfIn } from './alias-registry.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const registry = JSON.parse(await readFile(path.join(root, 'refs.json'), 'utf8'));
+const registry = await loadAliasRegistry(root);
 const errors = [];
 
-if (registry.schemaVersion !== 8) errors.push('refs.json: schemaVersion must be 8');
+if (registry.schemaVersion !== 8) errors.push('alias.json: schemaVersion must be 8');
 const aliases = registry.aliases ?? {};
 const KINDS = new Set(['file', 'dir', 'checkout', 'service', 'caller-supplied']);
 for (const [alias, def] of Object.entries(aliases)) {
-  if (!/^@[a-z][a-z-]*(?:\/[a-z_][a-z0-9_-]*)*$/.test(alias)) errors.push(`refs.json: alias ${alias} must look like @name or @name/sub/path`);
+  if (!/^@[a-z][a-z-]*(?:\/[a-z_][a-z0-9_-]*)*$/.test(alias)) errors.push(`alias.json: alias ${alias} must look like @name or @name/sub/path`);
   for (const key of ['params', 'kind', 'resolvesTo', 'scheme', 'bind', 'writers', 'purpose']) {
-    if (def[key] === undefined) errors.push(`refs.json: ${alias} lacks ${key}`);
+    if (def[key] === undefined) errors.push(`alias.json: ${alias} lacks ${key}`);
   }
-  if (!KINDS.has(def.kind)) errors.push(`refs.json: ${alias} kind ${def.kind} is not one of ${[...KINDS].join(', ')}`);
+  if (!KINDS.has(def.kind)) errors.push(`alias.json: ${alias} kind ${def.kind} is not one of ${[...KINDS].join(', ')}`);
   for (const p of def.params ?? []) {
     if (!def.resolvesTo.includes(`<${p}>`) && !def.resolvesTo.includes(`${p}/`) && !def.resolvesTo.includes(`/${p}`)) {
-      errors.push(`refs.json: ${alias} declares param ${p} that resolvesTo never uses`);
+      errors.push(`alias.json: ${alias} declares param ${p} that resolvesTo never uses`);
     }
   }
 }
@@ -41,14 +42,14 @@ for (const entry of await readdir(operatorsDir, { withFileTypes: true })) {
 }
 for (const [alias, def] of Object.entries(aliases)) {
   for (const w of def.writers ?? []) {
-    if (w !== '*' && !operatorIds.has(w)) errors.push(`refs.json: ${alias} names writer ${w}, which is not an operator`);
+    if (w !== '*' && !operatorIds.has(w)) errors.push(`alias.json: ${alias} names writer ${w}, which is not an operator`);
   }
 }
 
 // A context table row: | `@alias/...` | resolves to | bind | Required/Optional |
 const ROW = /^\|\s*`(@[a-z][a-z-]*(?:\/[A-Za-z0-9_<>.@#:-]+)*)`\s*\|/;
 // The registered alias an alias string belongs to is its longest registered prefix.
-const baseOf = (alias) => Object.keys(aliases).filter((k) => alias === k || alias.startsWith(`${k}/`)).sort((a, b) => b.length - a.length)[0] ?? null;
+const baseOf = (alias) => baseOfIn(aliases, alias);
 function tableAliases(text, heading) {
   const lines = text.split(/\r?\n/);
   const start = lines.findIndex((l) => l.trim() === heading);
@@ -69,7 +70,7 @@ for (const { dir, manifest } of manifests) {
   const seen = new Set();
   for (const ref of refs) {
     const base = baseOf(ref.alias ?? '');
-    if (!base) errors.push(`${id}: ref ${ref.alias} is not registered in refs.json`);
+    if (!base) errors.push(`${id}: ref ${ref.alias} is not registered in alias/alias.json`);
     if (typeof ref.required !== 'boolean') errors.push(`${id}: ref ${ref.alias} must say required true or false`);
     if (typeof ref.purpose !== 'string' || ref.purpose.length === 0) errors.push(`${id}: ref ${ref.alias} needs a purpose`);
     if (seen.has(ref.alias)) errors.push(`${id}: ref ${ref.alias} is declared twice`);
@@ -115,5 +116,5 @@ if (errors.length > 0) {
   process.stderr.write(`${errors.join('\n')}\n`);
   process.exitCode = 1;
 } else {
-  process.stdout.write(`refs closed: ${Object.keys(aliases).length} aliases, ${declared} bindings across ${manifests.length} operators\n`);
+  process.stdout.write(`alias closed: ${Object.keys(aliases).length} aliases, ${declared} bindings across ${manifests.length} operators\n`);
 }
