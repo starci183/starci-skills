@@ -1,15 +1,15 @@
 # StarCi Core — Boundary
 
-File này map các luật giải phẫu `BOUNDARY-n` vào family Core đang chạy: owner Common nào vẽ, đặt tên,
+File này map các luật giải phẫu `CORE-BOUNDARY-n` vào family Core đang chạy: owner Common nào vẽ, đặt tên,
 cắt, tách hay nâng một vùng, và Core sơn gì lên đó. Chữ `gap` ở cột cuối nghĩa là Common không công bố
 owner nào cho case đó.
 
-Lưu ý về tiền tố: `knowledge/ui/presentation/boundary.md` công bố một dãy `BOUNDARY-1` tới `BOUNDARY-6`
-khác, dành cho token separator và border do app sở hữu. Dãy dưới đây là dãy giải phẫu component legacy,
-chuyển từ `ui/boundary.md` đã nghỉ về. Cả hai giữ nguyên số; một lượt chạy operator chỉ bind một trong
-hai, không bao giờ bind cả hai.
+Nguồn gốc: `CORE-BOUNDARY-1` tới `CORE-BOUNDARY-5` từng là `BOUNDARY-1` tới `BOUNDARY-5` trong
+`ui/boundary.md` đã nghỉ. Tiền tố gắn theo họ vì `knowledge/ui/presentation/boundary.md` đang công bố một
+dãy `BOUNDARY-1` tới `BOUNDARY-6` sống cho token separator và border do app sở hữu, và một số đã nghỉ
+không bao giờ được phát lại dưới một tiền tố đang sống. Bản thân các con số không đổi.
 
-## BOUNDARY-1 — Một owner ranh giới dùng lại được
+## CORE-BOUNDARY-1 — Một owner ranh giới dùng lại được
 
 Một hộp vùng nhìn thấy được hay một đường tách giữa các mục ngang hàng có đúng một owner Common phát ra
 trọn vẹn mép đó.
@@ -22,7 +22,7 @@ trọn vẹn mép đó.
 
 Source: packages/grammar/src/core/branch/SurfaceCard/index.tsx; packages/grammar/src/core/branch/SurfaceListCard/index.tsx; packages/grammar/src/core/branch/SurfaceAccordionCard/index.tsx; packages/grammar/src/core/primitive/Divider/index.tsx
 
-## BOUNDARY-2 — Lồng và đường nối
+## CORE-BOUNDARY-2 — Lồng và đường nối
 
 Một việc lồng bên trong hay một cụm dải chạm nhau cho mỗi đường nối đúng một owner.
 
@@ -35,7 +35,7 @@ Một việc lồng bên trong hay một cụm dải chạm nhau cho mỗi đư�
 
 Source: packages/grammar/src/core/branch/SurfaceCard/index.tsx; packages/grammar/src/common/styles.css
 
-## BOUNDARY-3 — Lựa chọn thay thế có nhãn và divider
+## CORE-BOUNDARY-3 — Lựa chọn thay thế có nhãn và divider
 
 Nhãn của surface nằm bên trong component mà nó đặt tên; một divider có nhãn chỉ đứng giữa những lựa
 chọn thay thế thật.
@@ -48,7 +48,7 @@ chọn thay thế thật.
 
 Source: packages/grammar/src/core/primitive/Divider/index.tsx; packages/grammar/src/core/primitive/Label/index.tsx
 
-## BOUNDARY-4 — Độ nâng đi theo sự che phủ
+## CORE-BOUNDARY-4 — Độ nâng đi theo sự che phủ
 
 Xếp lớp, vị trí và cách đóng thuộc về owner thật sự che lên một lớp khác.
 
@@ -60,7 +60,7 @@ Xếp lớp, vị trí và cách đóng thuộc về owner thật sự che lên 
 
 Source: packages/grammar/src/core/branch/Tooltip/index.tsx; packages/grammar/src/common/styles.css; packages/grammar/src/core/styles.css
 
-## BOUNDARY-5 — State, cắt và làm phẳng theo responsive
+## CORE-BOUNDARY-5 — State, cắt và làm phẳng theo responsive
 
 Cùng owner giữ vùng qua thay đổi state, tràn và viewport.
 

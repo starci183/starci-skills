@@ -1,15 +1,14 @@
 # StarCi Core — Surface
 
-This file maps the `SURFACE-n` anatomy rules to the live Core family. The universal meaning of each
+This file maps the `CORE-SURFACE-n` anatomy rules to the live Core family. The universal meaning of each
 rule is one line under its heading; the table says which Common renderer, slot, or prop owns the
 case and what Core does with it. `gap` in the last column means Core inherits the case unchanged and
 Common publishes nothing for it.
 
-Prefix notice: `knowledge/ui/presentation/surface.md` publishes a different `SURFACE-1` to
-`SURFACE-6` series for app-owned surface tokens. The series below is the legacy component-anatomy
-series relocated from the retired `ui/surface.md`. Both keep their numbers because rule IDs are never
-renumbered; an operator invocation binds one of the two, never both, because one prefix belongs to
-one topic.
+Provenance: `CORE-SURFACE-1` to `CORE-SURFACE-5` were `SURFACE-1` to `SURFACE-5` in the retired
+`ui/surface.md`. The prefix is family-scoped because `knowledge/ui/presentation/surface.md` publishes a
+live `SURFACE-1` to `SURFACE-6` for app-owned surface tokens, and a retired number is never re-emitted
+under a live prefix. The numbers themselves are unchanged.
 
 Common's public renderers are exported from `packages/grammar/src/common/renderers.ts`; their
 physical files sit under `packages/grammar/src/core/` as internal storage. Core the family replaces
@@ -17,7 +16,7 @@ only `GrammarRoot` (`packages/grammar/src/core/index.ts`) and contributes
 `packages/grammar/src/core/styles.css`, so "Core realization" below is either a token binding in that
 stylesheet, the one labelled-card rule it adds, or nothing.
 
-## SURFACE-1 — One Common compound-card anatomy
+## CORE-SURFACE-1 — One Common compound-card anatomy
 
 A reusable region is one `SurfaceCard`: one root, at most one label row, exactly one content owner.
 
@@ -30,7 +29,7 @@ A reusable region is one `SurfaceCard`: one root, at most one label row, exactly
 
 Source: packages/grammar/src/common/renderers.ts → packages/grammar/src/core/branch/SurfaceCard/index.tsx; packages/grammar/src/core/index.ts
 
-## SURFACE-2 — Family chooses where the one material is painted
+## CORE-SURFACE-2 — Family chooses where the one material is painted
 
 The same Common DOM adopts a family's material at exactly one boundary.
 
@@ -43,7 +42,7 @@ The same Common DOM adopts a family's material at exactly one boundary.
 
 Source: packages/grammar/src/core/branch/SurfaceCard/index.tsx; packages/grammar/src/core/styles.css; packages/grammar/src/common/styles.css
 
-## SURFACE-3 — Frame, depth, composition, measure, and height remain closed props
+## CORE-SURFACE-3 — Frame, depth, composition, measure, and height remain closed props
 
 Geometry is chosen from the published enums, never from descendant CSS or compensating wrappers.
 
@@ -57,7 +56,7 @@ Geometry is chosen from the published enums, never from descendant CSS or compen
 
 Source: packages/grammar/src/core/branch/SurfaceCard/index.tsx; packages/grammar/src/core/branch/SurfaceCard/classNames.ts; packages/grammar/src/common/styles.css
 
-## SURFACE-4 — State, whole action, scroll, and highlight keep one owner
+## CORE-SURFACE-4 — State, whole action, scroll, and highlight keep one owner
 
 A surface's state, its single whole-surface action, its one scroll owner, and its one highlight are
 all emitted by the same renderer.
@@ -71,7 +70,7 @@ all emitted by the same renderer.
 
 Source: packages/grammar/src/core/branch/SurfaceCard/index.tsx; packages/grammar/src/core/state.ts; packages/grammar/src/common/styles.css
 
-## SURFACE-5 — Heading ownership is a current exact Common gap
+## CORE-SURFACE-5 — Heading ownership is a current exact Common gap
 
 A labelled surface's heading level should follow its outline context; today it cannot.
 

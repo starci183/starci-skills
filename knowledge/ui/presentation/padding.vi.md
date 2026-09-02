@@ -180,7 +180,7 @@ mới. Mọi cạnh của một công thức ghép đều quy về một rule g�
 Thêm số tiếp theo khi xuất hiện một pattern lệch cạnh thật sự mới. Phải nêu lý do vì sao từng cạnh
 khác nhau; một công thức không có lý do thì là quyết định riêng của sản phẩm chứ không phải rule.
 
-### PADDING-7 — Nhích inset lên ở breakpoint rộng
+## PADDING-7 — Nhích inset lên ở breakpoint rộng
 
 Cùng một ranh giới giữ nguyên ý nghĩa qua các khổ màn hình nhưng lấy rộng hơn khi có chỗ. Giá trị ở
 khổ hẹp và khổ rộng là hai rule liền kề, không bao giờ nhảy hai bậc, và trục block chỉ nhích theo ở
@@ -201,7 +201,7 @@ những cạnh mà chính ranh giới đó làm chủ.
 Không phải rule này: cạnh chạm separator thì không nhích, vì separator vẫn vẽ đúng một đường ở mọi
 khổ màn hình.
 
-### PADDING-8 — Nội dung con thụt vào ở đầu trục inline
+## PADDING-8 — Nội dung con thụt vào ở đầu trục inline
 
 Nội dung thuộc về hàng nằm trên nó, chứ không phải đứng ngang với nó, thì thụt vào một bậc ở đầu
 trục inline. Chỉ cạnh đầu mang nghĩa phân cấp. Cạnh cuối không mang nghĩa đó nên giữ thẳng hàng với

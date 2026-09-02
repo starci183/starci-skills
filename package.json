@@ -4,6 +4,6 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "test": "node scripts/validate-routing.mjs && node scripts/validate-resources.mjs && node scripts/run-operator-self-tests.mjs"
+    "test": "node scripts/validate-routing.mjs && node scripts/validate-resources.mjs && node scripts/validate-knowledge-citations.mjs && node scripts/run-operator-self-tests.mjs"
   }
 }

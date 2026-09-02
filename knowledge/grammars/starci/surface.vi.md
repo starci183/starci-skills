@@ -1,14 +1,14 @@
 # StarCi Core — Surface
 
-File này map các luật giải phẫu `SURFACE-n` vào family Core đang chạy. Ý nghĩa universal của mỗi luật
+File này map các luật giải phẫu `CORE-SURFACE-n` vào family Core đang chạy. Ý nghĩa universal của mỗi luật
 là một dòng dưới heading của nó; bảng nói renderer, slot hay prop nào của Common sở hữu case đó và
 Core làm gì với nó. Chữ `gap` ở cột cuối nghĩa là Core thừa kế case nguyên vẹn và Common không công bố
 gì cho nó.
 
-Lưu ý về tiền tố: `knowledge/ui/presentation/surface.md` công bố một dãy `SURFACE-1` tới `SURFACE-6`
-khác, dành cho token surface do app sở hữu. Dãy dưới đây là dãy giải phẫu component legacy, chuyển từ
-`ui/surface.md` đã nghỉ về. Cả hai giữ nguyên số vì rule ID không bao giờ được đánh số lại; một lượt
-chạy operator chỉ bind một trong hai, không bao giờ bind cả hai, vì một tiền tố thuộc về một topic.
+Nguồn gốc: `CORE-SURFACE-1` tới `CORE-SURFACE-5` từng là `SURFACE-1` tới `SURFACE-5` trong
+`ui/surface.md` đã nghỉ. Tiền tố gắn theo họ vì `knowledge/ui/presentation/surface.md` đang công bố một dãy
+`SURFACE-1` tới `SURFACE-6` sống cho token surface do app sở hữu, và một số đã nghỉ không bao giờ được
+phát lại dưới một tiền tố đang sống. Bản thân các con số không đổi.
 
 Các renderer công khai của Common được export từ `packages/grammar/src/common/renderers.ts`; file
 vật lý của chúng nằm dưới `packages/grammar/src/core/` như kho lưu nội bộ. Family Core chỉ thay
@@ -16,7 +16,7 @@ vật lý của chúng nằm dưới `packages/grammar/src/core/` như kho lưu 
 nên "Core hiện thực" bên dưới hoặc là một binding token trong stylesheet đó, hoặc là luật thẻ có nhãn
 duy nhất mà nó thêm vào, hoặc là không có gì.
 
-## SURFACE-1 — Một giải phẫu compound-card duy nhất của Common
+## CORE-SURFACE-1 — Một giải phẫu compound-card duy nhất của Common
 
 Một vùng dùng lại được là một `SurfaceCard`: một root, nhiều nhất một hàng nhãn, đúng một owner nội dung.
 
@@ -29,7 +29,7 @@ Một vùng dùng lại được là một `SurfaceCard`: một root, nhiều nh
 
 Source: packages/grammar/src/common/renderers.ts → packages/grammar/src/core/branch/SurfaceCard/index.tsx; packages/grammar/src/core/index.ts
 
-## SURFACE-2 — Family chọn nơi sơn vật liệu duy nhất
+## CORE-SURFACE-2 — Family chọn nơi sơn vật liệu duy nhất
 
 Cùng một DOM Common nhận vật liệu của family tại đúng một ranh giới.
 
@@ -42,7 +42,7 @@ Cùng một DOM Common nhận vật liệu của family tại đúng một ranh 
 
 Source: packages/grammar/src/core/branch/SurfaceCard/index.tsx; packages/grammar/src/core/styles.css; packages/grammar/src/common/styles.css
 
-## SURFACE-3 — Frame, depth, composition, measure và height vẫn là prop đóng
+## CORE-SURFACE-3 — Frame, depth, composition, measure và height vẫn là prop đóng
 
 Hình học được chọn từ các enum đã công bố, không bao giờ từ CSS con cháu hay lớp bọc bù trừ.
 
@@ -56,7 +56,7 @@ Hình học được chọn từ các enum đã công bố, không bao giờ t�
 
 Source: packages/grammar/src/core/branch/SurfaceCard/index.tsx; packages/grammar/src/core/branch/SurfaceCard/classNames.ts; packages/grammar/src/common/styles.css
 
-## SURFACE-4 — State, action toàn mặt, cuộn và highlight giữ một owner
+## CORE-SURFACE-4 — State, action toàn mặt, cuộn và highlight giữ một owner
 
 State của surface, action toàn mặt duy nhất, owner cuộn duy nhất và highlight duy nhất đều do cùng
 một renderer phát ra.
@@ -70,7 +70,7 @@ một renderer phát ra.
 
 Source: packages/grammar/src/core/branch/SurfaceCard/index.tsx; packages/grammar/src/core/state.ts; packages/grammar/src/common/styles.css
 
-## SURFACE-5 — Quyền sở hữu heading hiện là một gap chính xác của Common
+## CORE-SURFACE-5 — Quyền sở hữu heading hiện là một gap chính xác của Common
 
 Cấp heading của một surface có nhãn đáng lẽ đi theo ngữ cảnh outline; hôm nay nó chưa làm được.
 

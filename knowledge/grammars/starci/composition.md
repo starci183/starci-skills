@@ -2,7 +2,7 @@
 
 ## Surfaces and material
 
-Common owns `SurfaceCard`, `SurfaceListCard`, `SurfaceAccordionCard`, state, scroll, action props, semantic relationships, and stable hooks. Core binds surface colors, radius, borders, shadow, and depth under family scope. Bindings: [SURFACE-1..5](../../ui/presentation/surface.md), [BOUNDARY-1..5](../../ui/presentation/boundary.md), [GAP-1..5](../../ui/presentation/gap.md), and [PADDING-1..5](../../ui/presentation/padding.md).
+Common owns `SurfaceCard`, `SurfaceListCard`, `SurfaceAccordionCard`, state, scroll, action props, semantic relationships, and stable hooks. Core binds surface colors, radius, borders, shadow, and depth under family scope. Bindings: [SURFACE-1..6](../../ui/presentation/surface.md), [BOUNDARY-1..6](../../ui/presentation/boundary.md), [GAP-0..6](../../ui/presentation/gap.md), and [PADDING-0..8](../../ui/presentation/padding.md).
 
 For a labelled bounded `SurfaceCard`, Core uses the Common outer `data-grammar-surface-card` as the single material paint boundary, adds label inset there, and makes the inner bounded frame transparent/no-shadow. The label is therefore visually inside one Core material box while props, heading relationship, content region, state, whole action, and accessibility remain Common. Heritage proves the symmetric family choice by painting only its inner frame, so its label remains outside; this is evidence of family variance, not a second contract.
 
@@ -41,4 +41,4 @@ Core CSS binds Common anatomy to intrinsic tracks, container/media transitions, 
 
 Feature/content workflow owns whether an image should exist, whether it is generated, the generation brief, factual provenance, alt meaning, and asset selection. Grammar never decides to call image generation.
 
-After selection, Common `MediaFrame` owns aspect, fit, treatment, caption, frame semantics, and stable geometry. Core owns only family presentation—crop discipline, border/radius/material, and theme behavior. Use `contain` when cropping could remove meaning. The missing loading/error prop remains a Common gap. Bindings: [MEDIA-1..6](media.md), [ICON-1..6](icon.md), and [RENDER-TRUTH-1..4](../../ui/proof/render-truth.md).
+After selection, Common `MediaFrame` owns aspect, fit, treatment, caption, frame semantics, and stable geometry. Core owns only family presentation—crop discipline, border/radius/material, and theme behavior. Use `contain` when cropping could remove meaning. The missing loading/error prop remains a Common gap. Bindings: [MEDIA-1..6](media.md), [ICON-1..6](icon.md), and [TRUTH-1..4](../../ui/proof/render-truth.md).

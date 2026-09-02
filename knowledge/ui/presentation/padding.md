@@ -181,7 +181,7 @@ introduces a value of its own. Every side of a composite resolves to a base rule
 Append the next number when a genuinely new asymmetric pattern appears. State the reason each side
 differs; a recipe without one is a product decision, not a rule.
 
-### PADDING-7 — Inset step at the wider breakpoint
+## PADDING-7 — Inset step at the wider breakpoint
 
 One boundary keeps its meaning across widths but takes more room once the width allows it. The
 compact value and the wide value are adjacent rules, never a jump of two steps, and the block axis
@@ -202,7 +202,7 @@ follows only where the boundary itself is the owner.
 Not this rule: a separator side does not step, because the separator draws the same line at every
 width.
 
-### PADDING-8 — Subordinate content indented at the inline start
+## PADDING-8 — Subordinate content indented at the inline start
 
 Content that belongs under the row above it, rather than beside it, indents one step at the inline
 start. Only the start edge carries the hierarchy. The end edge has no such meaning, so it stays

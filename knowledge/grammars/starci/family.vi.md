@@ -4,7 +4,7 @@
 
 StarCi Core được định nghĩa bởi `coreGrammar` và được chọn bằng `CoreGrammarRoot`. Nó hiện thực Common contract; nó không phải parent của Common hay family khác. `CORE_GRAMMAR_COMPONENTS` chỉ còn là compatibility alias tới `COMMON_GRAMMAR_COMPONENTS`.
 
-Luật universal áp dụng: [TONE-1..5](../../ui/presentation/tone.vi.md), [ACCENT-1..5](../../ui/composition/accent.vi.md), [BOUNDARY-1..5](../../ui/presentation/boundary.vi.md), [FONT-1..5](../../ui/presentation/font.vi.md), [GAP-1..5](../../ui/presentation/gap.vi.md) và [PADDING-1..5](../../ui/presentation/padding.vi.md).
+Luật universal áp dụng: [TONE-1..3](../../ui/presentation/tone.vi.md), [ACCENT-1..5](../../ui/composition/accent.vi.md), [BOUNDARY-1..6](../../ui/presentation/boundary.vi.md), [FONT-1..6](../../ui/presentation/font.vi.md), [GAP-0..6](../../ui/presentation/gap.vi.md) và [PADDING-0..8](../../ui/presentation/padding.vi.md).
 
 ## Hướng dependency CSS
 
@@ -18,7 +18,7 @@ Nguồn spacing universal là Common: `COMMON_SPACING_SCALE` và `COMMON_SPACING
 
 ## Binding theme và accessibility
 
-Core hỗ trợ light, explicit dark, system dark, forced colors, focus-visible và reduced motion dưới Core root. Nó giữ semantics Common và không được dùng palette hay motion để đổi business truth. Luật áp dụng: [ACCESSIBILITY-1..4](../../ui/proof/accessibility.vi.md), [FOCUS-1..4](../../ui/proof/focus.vi.md), [MOTION-1..4](../../ui/proof/motion.vi.md) và [STATE-1..4](../../ui/composition/state.vi.md).
+Core hỗ trợ light, explicit dark, system dark, forced colors, focus-visible và reduced motion dưới Core root. Nó giữ semantics Common và không được dùng palette hay motion để đổi business truth. Luật áp dụng: [A11Y-1..4](../../ui/proof/accessibility.vi.md), [FOCUS-1..4](../../ui/proof/focus.vi.md), [MOTION-1..4](../../ui/proof/motion.vi.md) và [STATE-1..4](../../ui/composition/state.vi.md).
 
 ## Behavior family và gap có bằng chứng source
 

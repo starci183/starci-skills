@@ -4,7 +4,7 @@
 
 StarCi Core is defined by `coreGrammar` and selected by `CoreGrammarRoot`. It implements the Common contract; it is not the parent of Common or of any other family. `CORE_GRAMMAR_COMPONENTS` remains only a compatibility alias to `COMMON_GRAMMAR_COMPONENTS`.
 
-Applicable universal rules: [TONE-1..5](../../ui/presentation/tone.md), [ACCENT-1..5](../../ui/composition/accent.md), [BOUNDARY-1..5](../../ui/presentation/boundary.md), [FONT-1..5](../../ui/presentation/font.md), [GAP-1..5](../../ui/presentation/gap.md), and [PADDING-1..5](../../ui/presentation/padding.md).
+Applicable universal rules: [TONE-1..3](../../ui/presentation/tone.md), [ACCENT-1..5](../../ui/composition/accent.md), [BOUNDARY-1..6](../../ui/presentation/boundary.md), [FONT-1..6](../../ui/presentation/font.md), [GAP-0..6](../../ui/presentation/gap.md), and [PADDING-0..8](../../ui/presentation/padding.md).
 
 ## CSS dependency direction
 
@@ -18,7 +18,7 @@ The universal spacing source is Common: `COMMON_SPACING_SCALE` and `COMMON_SPACI
 
 ## Theme and accessibility binding
 
-Core supports light, explicit dark, system dark, forced colors, focus-visible, and reduced motion under the Core root. It preserves Common semantics and cannot use palette or motion to change business truth. Applicable rules: [ACCESSIBILITY-1..4](../../ui/proof/accessibility.md), [FOCUS-1..4](../../ui/proof/focus.md), [MOTION-1..4](../../ui/proof/motion.md), and [STATE-1..4](../../ui/composition/state.md).
+Core supports light, explicit dark, system dark, forced colors, focus-visible, and reduced motion under the Core root. It preserves Common semantics and cannot use palette or motion to change business truth. Applicable rules: [A11Y-1..4](../../ui/proof/accessibility.md), [FOCUS-1..4](../../ui/proof/focus.md), [MOTION-1..4](../../ui/proof/motion.md), and [STATE-1..4](../../ui/composition/state.md).
 
 ## Source-backed family behavior and gaps
 

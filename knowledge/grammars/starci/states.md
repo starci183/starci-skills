@@ -2,7 +2,7 @@
 
 ## Fields
 
-Business code supplies label, value, hint/error, validity, disabled state, and change effects to Common `Input` or `OtpInput`. Core supplies scoped field material; it never infers validation. Bindings: [FIELD-1..4](field.md), [FEEDBACK-1](../../ui/composition/feedback.md), and [ACCESSIBILITY-1](../../ui/proof/accessibility.md).
+Business code supplies label, value, hint/error, validity, disabled state, and change effects to Common `Input` or `OtpInput`. Core supplies scoped field material; it never infers validation. Bindings: [FIELD-1..4](field.md), [FEEDBACK-1](../../ui/composition/feedback.md), and [A11Y-1](../../ui/proof/accessibility.md).
 
 ```tsx
 <Input
@@ -32,13 +32,13 @@ Bindings: [ACTION-1..4](../../ui/composition/action.md), [STATE-1](../../ui/comp
 
 ## Presentation states
 
-Common owns `neutral | affirmative | attention | negative | unavailable | pending | skeleton`, its guards, and state-capable props. Core maps visible tone/material without inventing facts. Bindings: [STATE-1..4](../../ui/composition/state.md), [RENDER-TRUTH-1..4](../../ui/proof/render-truth.md), and [TONE-4..5](../../ui/presentation/tone.md).
+Common owns `neutral | informative | affirmative | cautionary | negative | pending | unavailable`, its guards, and state-capable props. Core maps visible tone/material without inventing facts. Bindings: [STATE-1..4](../../ui/composition/state.md), [TRUTH-1..4](../../ui/proof/render-truth.md).
 
 Use `EmptyNotice` only after feature authority resolves empty/failure/unavailable truth. Use `Progress` only for named measurable progress; zero is not failure and skeleton is not progress.
 
 ## Focus and accessibility
 
-Core preserves Common native DOM, labels, controlled selection, and focus-visible treatment. `Tooltip` is supplementary only. General modal focus containment/restoration remains a Common gap. Bindings: [ACCESSIBILITY-1..4](../../ui/proof/accessibility.md), [FOCUS-1..4](../../ui/proof/focus.md), and [ICON-5..6](icon.md).
+Core preserves Common native DOM, labels, controlled selection, and focus-visible treatment. `Tooltip` is supplementary only. General modal focus containment/restoration remains a Common gap. Bindings: [A11Y-1..4](../../ui/proof/accessibility.md), [FOCUS-1..4](../../ui/proof/focus.md), and [ICON-5..6](icon.md).
 
 ## Motion
 

@@ -2,7 +2,7 @@
 
 ## Surface và material
 
-Common sở hữu `SurfaceCard`, `SurfaceListCard`, `SurfaceAccordionCard`, state, scroll, action prop, semantic relationship và hook ổn định. Core bind surface color, radius, border, shadow và depth dưới family scope. Binding: [SURFACE-1..5](../../ui/presentation/surface.vi.md), [BOUNDARY-1..5](../../ui/presentation/boundary.vi.md), [GAP-1..5](../../ui/presentation/gap.vi.md) và [PADDING-1..5](../../ui/presentation/padding.vi.md).
+Common sở hữu `SurfaceCard`, `SurfaceListCard`, `SurfaceAccordionCard`, state, scroll, action prop, semantic relationship và hook ổn định. Core bind surface color, radius, border, shadow và depth dưới family scope. Binding: [SURFACE-1..6](../../ui/presentation/surface.vi.md), [BOUNDARY-1..6](../../ui/presentation/boundary.vi.md), [GAP-0..6](../../ui/presentation/gap.vi.md) và [PADDING-0..8](../../ui/presentation/padding.vi.md).
 
 Với `SurfaceCard` bounded có label, Core dùng outer `data-grammar-surface-card` của Common làm material paint boundary duy nhất, thêm label inset ở đó và làm inner bounded frame transparent/không shadow. Vì vậy label nằm visually inside một Core material box trong khi props, heading relationship, content region, state, whole action và accessibility vẫn thuộc Common. Heritage chứng minh lựa chọn family đối xứng bằng cách chỉ paint inner frame nên label nằm ngoài; đây là family variance, không phải contract thứ hai.
 
@@ -41,4 +41,4 @@ Core CSS bind Common anatomy vào intrinsic track, container/media transition, c
 
 Feature/content workflow sở hữu quyết định có cần image hay không, có generate hay không, generation brief, factual provenance, alt meaning và chọn asset. Grammar không bao giờ quyết định gọi image generation.
 
-Sau khi chọn asset, Common `MediaFrame` sở hữu aspect, fit, treatment, caption, frame semantics và geometry ổn định. Core chỉ sở hữu family presentation—crop discipline, border/radius/material và theme behavior. Dùng `contain` khi crop có thể làm mất meaning. Prop loading/error còn thiếu vẫn là Common gap. Binding: [MEDIA-1..6](media.vi.md), [ICON-1..6](icon.vi.md) và [RENDER-TRUTH-1..4](../../ui/proof/render-truth.vi.md).
+Sau khi chọn asset, Common `MediaFrame` sở hữu aspect, fit, treatment, caption, frame semantics và geometry ổn định. Core chỉ sở hữu family presentation—crop discipline, border/radius/material và theme behavior. Dùng `contain` khi crop có thể làm mất meaning. Prop loading/error còn thiếu vẫn là Common gap. Binding: [MEDIA-1..6](media.vi.md), [ICON-1..6](icon.vi.md) và [TRUTH-1..4](../../ui/proof/render-truth.vi.md).

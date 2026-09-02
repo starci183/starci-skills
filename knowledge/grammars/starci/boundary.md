@@ -1,15 +1,15 @@
 # StarCi Core — Boundary
 
-This file maps the `BOUNDARY-n` anatomy rules to the live Core family: which Common owner draws,
+This file maps the `CORE-BOUNDARY-n` anatomy rules to the live Core family: which Common owner draws,
 names, clips, separates, or elevates a region, and what Core paints on it. `gap` in the last column
 means Common publishes no owner for the case.
 
-Prefix notice: `knowledge/ui/presentation/boundary.md` publishes a different `BOUNDARY-1` to
-`BOUNDARY-6` series for app-owned separator and border tokens. The series below is the legacy
-component-anatomy series relocated from the retired `ui/boundary.md`. Both keep their numbers; an
-operator invocation binds one of the two, never both.
+Provenance: `CORE-BOUNDARY-1` to `CORE-BOUNDARY-5` were `BOUNDARY-1` to `BOUNDARY-5` in the retired
+`ui/boundary.md`. The prefix is family-scoped because `knowledge/ui/presentation/boundary.md` publishes
+a live `BOUNDARY-1` to `BOUNDARY-6` for app-owned separator and border tokens, and a retired number is
+never re-emitted under a live prefix. The numbers themselves are unchanged.
 
-## BOUNDARY-1 — One reusable boundary owner
+## CORE-BOUNDARY-1 — One reusable boundary owner
 
 A visible region box or a peer separator has exactly one Common owner that emits the complete edge.
 
@@ -21,7 +21,7 @@ A visible region box or a peer separator has exactly one Common owner that emits
 
 Source: packages/grammar/src/core/branch/SurfaceCard/index.tsx; packages/grammar/src/core/branch/SurfaceListCard/index.tsx; packages/grammar/src/core/branch/SurfaceAccordionCard/index.tsx; packages/grammar/src/core/primitive/Divider/index.tsx
 
-## BOUNDARY-2 — Nesting and seams
+## CORE-BOUNDARY-2 — Nesting and seams
 
 A nested job or a set of touching bands gives every seam exactly one owner.
 
@@ -34,7 +34,7 @@ A nested job or a set of touching bands gives every seam exactly one owner.
 
 Source: packages/grammar/src/core/branch/SurfaceCard/index.tsx; packages/grammar/src/common/styles.css
 
-## BOUNDARY-3 — Labelled alternatives and dividers
+## CORE-BOUNDARY-3 — Labelled alternatives and dividers
 
 A surface label stays inside the component it names; a labelled divider stands only between real
 alternatives.
@@ -47,7 +47,7 @@ alternatives.
 
 Source: packages/grammar/src/core/primitive/Divider/index.tsx; packages/grammar/src/core/primitive/Label/index.tsx
 
-## BOUNDARY-4 — Elevation follows occlusion
+## CORE-BOUNDARY-4 — Elevation follows occlusion
 
 Stacking, placement, and dismissal belong to the owner that actually covers another layer.
 
@@ -59,7 +59,7 @@ Stacking, placement, and dismissal belong to the owner that actually covers anot
 
 Source: packages/grammar/src/core/branch/Tooltip/index.tsx; packages/grammar/src/common/styles.css; packages/grammar/src/core/styles.css
 
-## BOUNDARY-5 — State, clipping, and responsive flattening
+## CORE-BOUNDARY-5 — State, clipping, and responsive flattening
 
 The same owner keeps the region through state, overflow, and viewport changes.
 

@@ -2,7 +2,7 @@
 
 ## Field
 
-Business code truyền label, value, hint/error, validity, disabled state và change effect vào Common `Input` hay `OtpInput`. Core cung cấp scoped field material; không tự suy validation. Binding: [FIELD-1..4](field.vi.md), [FEEDBACK-1](../../ui/composition/feedback.vi.md) và [ACCESSIBILITY-1](../../ui/proof/accessibility.vi.md).
+Business code truyền label, value, hint/error, validity, disabled state và change effect vào Common `Input` hay `OtpInput`. Core cung cấp scoped field material; không tự suy validation. Binding: [FIELD-1..4](field.vi.md), [FEEDBACK-1](../../ui/composition/feedback.vi.md) và [A11Y-1](../../ui/proof/accessibility.vi.md).
 
 ```tsx
 <Input
@@ -32,13 +32,13 @@ Binding: [ACTION-1..4](../../ui/composition/action.vi.md), [STATE-1](../../ui/co
 
 ## Presentation state
 
-Common sở hữu `neutral | affirmative | attention | negative | unavailable | pending | skeleton`, guard và state-capable prop. Core map tone/material nhìn thấy mà không bịa fact. Binding: [STATE-1..4](../../ui/composition/state.vi.md), [RENDER-TRUTH-1..4](../../ui/proof/render-truth.vi.md) và [TONE-4..5](../../ui/presentation/tone.vi.md).
+Common sở hữu `neutral | informative | affirmative | cautionary | negative | pending | unavailable`, guard và state-capable prop. Core map tone/material nhìn thấy mà không bịa fact. Binding: [STATE-1..4](../../ui/composition/state.vi.md), [TRUTH-1..4](../../ui/proof/render-truth.vi.md).
 
 Chỉ dùng `EmptyNotice` sau khi feature authority resolve truth empty/failure/unavailable. Chỉ dùng `Progress` cho progress đo được có tên; zero không phải failure và skeleton không phải progress.
 
 ## Focus và accessibility
 
-Core giữ native DOM, label, controlled selection và focus-visible treatment của Common. `Tooltip` chỉ bổ sung. Modal focus containment/restoration tổng quát vẫn là Common gap. Binding: [ACCESSIBILITY-1..4](../../ui/proof/accessibility.vi.md), [FOCUS-1..4](../../ui/proof/focus.vi.md) và [ICON-5..6](icon.vi.md).
+Core giữ native DOM, label, controlled selection và focus-visible treatment của Common. `Tooltip` chỉ bổ sung. Modal focus containment/restoration tổng quát vẫn là Common gap. Binding: [A11Y-1..4](../../ui/proof/accessibility.vi.md), [FOCUS-1..4](../../ui/proof/focus.vi.md) và [ICON-5..6](icon.vi.md).
 
 ## Motion
 

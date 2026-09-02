@@ -18,8 +18,8 @@ Nhánh này mô tả một visual family: StarCi Core. Luật UI universal vẫn
 3. [Ma trận component](components.vi.md) — đủ 41 Common public renderer và cách Core hiện thực.
 4. [Field, action và state](states.vi.md) — input, command, destination, pending, feedback, focus và motion.
 5. [Surface và composition](composition.vi.md) — material, vị trí label, layout, navigation, responsive và media/art direction.
-6. [Surface](surface.vi.md) — giải phẫu SURFACE-1..5: một compound card duy nhất, nơi Core sơn vật liệu duy nhất, prop hình học đóng, quyền sở hữu state/action toàn mặt/cuộn/highlight, và gap cấp heading.
-7. [Boundary](boundary.vi.md) — giải phẫu BOUNDARY-1..5: owner nào vẽ, lồng, đặt tên, nâng và cắt một vùng, và cái gì sống sót qua đổi state và viewport.
+6. [Surface](surface.vi.md) — giải phẫu CORE-SURFACE-1..5: một compound card duy nhất, nơi Core sơn vật liệu duy nhất, prop hình học đóng, quyền sở hữu state/action toàn mặt/cuộn/highlight, và gap cấp heading.
+7. [Boundary](boundary.vi.md) — giải phẫu CORE-BOUNDARY-1..5: owner nào vẽ, lồng, đặt tên, nâng và cắt một vùng, và cái gì sống sót qua đổi state và viewport.
 8. [Icon](icon.vi.md) — cơ chế ICON-1..6: hộp `Icon usage`, chip trạng thái, danh tính tab, mũi tên action, tiện ích chỉ có glyph, và đặt tên truy cập được.
 9. [Media](media.vi.md) — cơ chế MEDIA-1..6: tỉ lệ, fit, treatment, caption của `MediaFrame`, và gap loading/error lẫn tiêu điểm.
 10. [Control state](control-state.vi.md) — CONTROL-STATE-1..4: pending, không dùng được, skeleton và lựa chọn bền vững qua các prop đã công bố.
