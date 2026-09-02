@@ -21,12 +21,17 @@
       "purpose": "What only becomes true once rendered; the audit's rule inventory."
     },
     {
+      "alias": "@grammar-law/starci",
+      "required": false,
+      "purpose": "Family realization rules: how the Core family is meant to realize Common. Law about the Grammar, never the Grammar itself."
+    },
+    {
       "alias": "@receipt/fe-source-application/<invocationId>",
       "required": true,
       "purpose": "The stated intention this audit exists to contradict."
     },
     {
-      "alias": "@source/starci-academy/fe",
+      "alias": "@fe",
       "required": true,
       "purpose": "Proves the observed surface is the applied surface."
     },

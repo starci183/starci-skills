@@ -58,14 +58,14 @@ hay bị nuốt bởi logic khớp-đầu-tiên. `PASS` chỉ hợp lệ ở nơ
 
 | # | Bước | Đọc | Ghi | Dừng với |
 | --- | --- | --- | --- | --- |
-| 1 | Validate input và resume | input, receipt trước đó, binding source đã đóng băng, applied head | — | `INVALID_INPUT`, `SOURCE_DRIFT`, `NO_PROGRESS` |
-| 2 | Bind authority | knowledge index và từng topic kèm fingerprint với danh sách mã, application receipt kèm các lời khai, source head đã route, runtime endpoint | — | — |
-| 3 | Xác nhận bề mặt | checkout quan sát được tại route đang dùng | — | — |
-| 4 | Đạt mức sẵn sàng | mục matrix cùng viewport, color scheme, trạng thái và điều kiện sẵn sàng đã khai | — | `RUNTIME_UNAVAILABLE` |
-| 5 | Chụp | bề mặt đã sẵn sàng của một mục matrix | `<matrixId>.capture.json` | `EVIDENCE_MISSING` |
-| 6 | Đo | các ảnh chụp, các node nằm trong owner được quan sát, những mã từng node khai | — | — |
-| 7 | Đối chiếu và phán xét | các phép đo, các lời khai, danh sách mã đã bind | — | `UNKNOWN_RULE` |
-| 8 | Phát ra rồi dừng | tất cả những gì ở trên | — | — |
+| 1 | Validate input và resume | input, `@receipt/fe-source-application/<invocationId>`, `@fe` (binding head đã đóng băng và applied head) | — | `INVALID_INPUT`, `SOURCE_DRIFT`, `NO_PROGRESS` |
+| 2 | Bind authority | `@knowledge/ui/proof` (từng topic kèm fingerprint và danh sách mã), `@receipt/fe-source-application/<invocationId>` (các lời khai của nó), `@fe` (source head đã route), `@runtime` (endpoint đang phục vụ) | — | — |
+| 3 | Xác nhận bề mặt | `@fe` (checkout quan sát được tại route đang dùng) | — | — |
+| 4 | Đạt mức sẵn sàng | input (mục matrix cùng viewport, color scheme, trạng thái và điều kiện sẵn sàng đã khai), `@runtime` | — | `RUNTIME_UNAVAILABLE` |
+| 5 | Chụp | `@runtime` (bề mặt đã sẵn sàng của một mục matrix) | `@artifacts/<matrixId>.capture.json` | `EVIDENCE_MISSING` |
+| 6 | Đo | `@artifacts/<matrixId>.capture.json`, `@fe` (các owner được quan sát và những mã từng node khai) | — | — |
+| 7 | Đối chiếu và phán xét | `@artifacts/<matrixId>.capture.json`, `@receipt/fe-source-application/<invocationId>` (các lời khai), `@knowledge/ui/proof` (danh sách mã đã bind), `@grammar-law/starci` (luật hiện thực hoá của family) | — | `UNKNOWN_RULE` |
+| 8 | Phát ra rồi dừng | tất cả những gì ở trên | `@artifacts/fe-surface-audit.json` | — |
 
 Khâu validate từ chối binding source cũ, applied head khác head quan sát được, topic trùng, mã xếp
 nhầm topic, hai matrix id cho cùng một điều kiện, và tiến độ không đổi. Checkout đã route được quan

@@ -34,8 +34,9 @@ Mỗi lần gọi đều cần:
 | Alias | Trỏ tới | Bind | Bắt buộc |
 | --- | --- | --- | --- |
 | `@knowledge/ui/proof` | `<Source>/.claude/knowledge/<group>/  (every canonical .md inside; a single file may be named as <group>/<topic>.md)` | fingerprint per file; the rule inventory is the set of `## PREFIX-n` headings across the folder's canonical files | Bắt buộc: What only becomes true once rendered; the audit's rule inventory. |
+| `@grammar-law/starci` | `<Source>/.claude/knowledge/grammars/<family>/  (the family's knowledge: family, consumption, components, states, composition, and the CORE-* anatomy topics)` | fingerprint per file; rule inventory = every `## PREFIX-n` heading across the folder | Tuỳ chọn: Family realization rules: how the Core family is meant to realize Common. Law about the Grammar, never the Grammar itself. |
 | `@receipt/fe-source-application/<invocationId>` | `<@artifacts of invocation <invocationId>>/<receiptType>.json (the receipt file that invocation registered in output.artifactRefs)` | fingerprint + the sourceHead the receipt binds | Bắt buộc: The stated intention this audit exists to contradict. |
-| `@source/starci-academy/fe` | `<checkout:project/role>` | fingerprint + sourceHead (git rev-parse HEAD of the checkout) | Bắt buộc: Proves the observed surface is the applied surface. |
+| `@fe` | `<checkout:input.project.id/fe>  (the frontend checkout of the project this invocation binds)` | fingerprint + sourceHead (git rev-parse HEAD of the checkout) | Bắt buộc: Proves the observed surface is the applied surface. |
 | `@runtime` | `<Source>/.worktrees/sessions/central-runtime/owner.json` | fingerprint + generation | Bắt buộc: The endpoint that serves the route under observation. |
 | `@artifacts` | `input.project.artifactRootRef; convention <Source>/.worktrees/sessions/<invocationId>/artifacts/` | fingerprint per artifact; every artifact an operator writes is registered in output.artifactRefs | Bắt buộc: Where captures and the audit receipt are written. |
 
