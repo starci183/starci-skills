@@ -1,0 +1,116 @@
+{
+  "schemaVersion": 8,
+  "operatorId": "workspace.bind",
+  "output": {
+    "outcome": "blocked",
+    "receipt": {
+      "receiptType": "workspace-route-binding",
+      "receiptId": "receipt:a4-starci-academy-be-route-blocked",
+      "invocationId": "invocation-a4-bind-be-1",
+      "missionId": "audit-1.0.1-a4",
+      "status": "blocked",
+      "binding": {
+        "projectId": "starci-academy",
+        "role": "be",
+        "portableRouteRef": ".workspaces/projects/starci-academy/be.json",
+        "hydratedRouteRef": ".workspaces/local/routes/starci-academy/be/config.json",
+        "routeFingerprint": "sha256:a5389fb9e7956d02311fa4dbf6543f82468c05ae1f1cea0a0c741109e52393ee",
+        "identityFingerprint": "sha256:27a787a32b3cf010e7a417a3e2aced5b0cfe2d81fe15229b3f0688ecc8d4da12",
+        "sourceHead": "0b540dd21e250a346e6206c70225849cc31ead8e",
+        "artifactRootRef": "audits/1.0.1/a4-workspace-bind",
+        "inputFingerprint": "sha256:0b682030206c9bc3531831e56706ebb31dc9244e6c607fa067bf48b74c40e652",
+        "progressFingerprint": "sha256:ce78351bad0eb68655935c076b774938c9fea70a49e94fac404d4cbb40e981cf"
+      },
+      "route": null,
+      "findings": [
+        {
+          "code": "IDENTITY_ROSTER_SEALED",
+          "subject": ".workspaces/local/credentials",
+          "statement": "Two age-encrypted key files were bound by reference and never read."
+        }
+      ],
+      "evidenceRefs": [
+        ".workspaces/projects/starci-academy/be.json",
+        ".workspaces/local/routes/starci-academy/be/config.json",
+        ".workspaces/device-state.json"
+      ],
+      "failure": {
+        "code": "CHECKOUT_DIRTY",
+        "message": "54 of 75 dirty paths lie outside the declared write root src/features/api/core: uncommitted Pro subscription, seeder, migration, and socket work plus four workspace project declarations. The route itself resolved: portable and hydrated declarations agree on repository, branch, and disk path, and the observed head equals the frozen head.",
+        "subjects": [
+          ".workspaces/projects/miamia/be.json",
+          ".workspaces/projects/miamia/fe.json",
+          ".workspaces/projects/nivo/be.json",
+          ".workspaces/projects/nivo/chart.json",
+          ".workspaces/projects/nivo/fe.json",
+          ".workspaces/projects/starci-academy/be.json",
+          ".workspaces/projects/starci-academy/fe.json",
+          ".workspaces/projects/tayson/fe.json",
+          ".workspaces/projects/tedo/be.json",
+          ".workspaces/projects/tedo/fe.json",
+          "src/features/api/processors/reconcile-transaction/reconcile-transaction.worker.ts",
+          "src/features/socketio/core/community-feed/community-feed.gateway.spec.ts",
+          "src/features/socketio/core/community-feed/community-feed.gateway.ts",
+          "src/features/socketio/core/content-ai/content-ai.gateway.spec.ts",
+          "src/modules/ai/ai-entitlement.service.ts",
+          "src/modules/bussiness/bussiness.module.ts",
+          "src/modules/bussiness/chat/global-chat-policy.service.ts",
+          "src/modules/bussiness/community/community-post-quota.service.ts",
+          "src/modules/bussiness/content-ai/content-ai.service.spec.ts",
+          "src/modules/bussiness/content-ai/content-ai.service.ts",
+          "src/modules/bussiness/flashcard/flashcard-deck.service.spec.ts",
+          "src/modules/bussiness/flashcard/flashcard-deck.service.ts",
+          "src/modules/bussiness/flashcard/flashcard-due-review-session.service.spec.ts",
+          "src/modules/bussiness/flashcard/flashcard-due-review-session.service.ts",
+          "src/modules/bussiness/flashcard/flashcard-review-session.service.spec.ts",
+          "src/modules/bussiness/flashcard/flashcard-review-session.service.ts",
+          "src/modules/bussiness/flashcard/flashcard-review.service.spec.ts",
+          "src/modules/bussiness/flashcard/flashcard-review.service.ts",
+          "src/modules/bussiness/guards/graphql-must-enrolled.guard.ts",
+          "src/modules/bussiness/transactions/atomic/transaction-grant.service.ts",
+          "src/modules/bussiness/transactions/transactions.module.ts",
+          "src/modules/databases/postgresql/primary/entities/course.entity.ts",
+          "src/modules/databases/postgresql/primary/entities/transaction.entity.ts",
+          "src/modules/databases/postgresql/primary/enums/action-type.ts",
+          "src/modules/databases/postgresql/primary/primary.module.ts",
+          "src/modules/filesystem/types/config.ts",
+          "src/modules/init/diff/specs/parse-changed-paths.spec.ts",
+          "src/modules/init/diff/utils/parse-changed-paths.ts",
+          "src/modules/init/seeders/catalog/catalog-seeder.service.spec.ts",
+          "src/modules/init/seeders/catalog/catalog-seeder.service.ts",
+          "src/modules/init/seeders/catalog/parsers/types.ts",
+          "src/modules/init/seeders/seeders.module.ts",
+          "src/tests/harness/ai-tutor.harness-spec.ts",
+          "src/tests/harness/content-ai.harness-spec.ts",
+          ".pnpm-store/",
+          "src/modules/bussiness/guards/graphql-must-enrolled.guard.spec.ts",
+          "src/modules/bussiness/pro-subscription/",
+          "src/modules/databases/postgresql/primary/entities/pro-entitlement-source.entity.ts",
+          "src/modules/databases/postgresql/primary/entities/pro-subscription.entity.ts",
+          "src/modules/databases/postgresql/primary/enums/pro-subscription-status.ts",
+          "src/modules/databases/postgresql/primary/migrations/1788300000000-CreateProSubscriptions.ts",
+          "src/modules/init/seeders/catalog/parsers/learner-plan-catalog.parser.ts",
+          "src/modules/init/seeders/catalog/path/learner-plan-catalog.path.ts",
+          "src/modules/platform/exceptions/errors/pro-subscription/"
+        ],
+        "missingRefs": [],
+        "retryable": true,
+        "owningDomain": "source"
+      },
+      "resume": {
+        "resumeToken": "resume-a4-bind-be-1",
+        "requiredDelta": [
+          "Commit or relocate the dirty paths outside src/features/api/core, or declare write roots that truthfully cover the mission, then re-observe the checkout."
+        ]
+      },
+      "createdAt": "2026-09-02T12:44:28.000Z"
+    },
+    "evidenceRefs": [
+      ".workspaces/projects/starci-academy/be.json",
+      ".workspaces/local/routes/starci-academy/be/config.json",
+      ".workspaces/device-state.json"
+    ],
+    "artifactRefs": [],
+    "handoff": null
+  }
+}

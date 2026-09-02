@@ -1,0 +1,159 @@
+{
+  "schemaVersion": 8,
+  "operatorId": "workspace.bind",
+  "context": {
+    "bootstrapRefs": [
+      {
+        "ref": "source://starci-academy-backend/CLAUDE.md",
+        "fingerprint": "sha256:62bc7b7fc720782707075c58a4d9bda21423d8a2467ef7ad9f703145260e8a04",
+        "sourceHead": "0b540dd21e250a346e6206c70225849cc31ead8e",
+        "observedAt": "2026-09-02T12:44:28.000Z"
+      }
+    ],
+    "declarationRefs": [
+      {
+        "ref": ".workspaces/projects/starci-academy",
+        "fingerprint": "sha256:1317e2b91d637478a7ee6f6578f136c88a39ff0f138683d403809a39b16fe79b",
+        "sourceHead": null,
+        "observedAt": "2026-09-02T12:44:28.000Z"
+      }
+    ],
+    "portableRoute": {
+      "ref": ".workspaces/projects/starci-academy/be.json",
+      "fingerprint": "sha256:9c750bf94415c185ca22b10cdc861ea606de966fbe2e3c671824cf9a18d1ee99",
+      "project": "starci-academy",
+      "role": "be",
+      "repository": {
+        "kind": "source",
+        "directory": null,
+        "gitRepository": "https://github.com/starci-lab/starci-academy-backend",
+        "branch": "mtp"
+      }
+    },
+    "hydratedRoute": {
+      "ref": ".workspaces/local/routes/starci-academy/be/config.json",
+      "fingerprint": "sha256:7622d009af0a2d1ccb58eebb56dcd51aa5475528f26c3f4f51389eef9d2d6392",
+      "project": "starci-academy",
+      "role": "be",
+      "sourceRootPath": "D:/Repositories/starci-academy-backend",
+      "workspaceRootPath": "D:/Repositories/starci-academy-backend/.workspaces",
+      "repository": {
+        "diskPath": "D:/Repositories/starci-academy-backend",
+        "gitRoot": "D:/Repositories/starci-academy-backend",
+        "gitRepository": "https://github.com/starci-lab/starci-academy-backend",
+        "branch": "mtp"
+      }
+    },
+    "identity": {
+      "ref": ".workspaces/device-state.json",
+      "fingerprint": "sha256:27a787a32b3cf010e7a417a3e2aced5b0cfe2d81fe15229b3f0688ecc8d4da12",
+      "machineId": "starci-academy-local-state-v1",
+      "credentialRosterRef": ".workspaces/local/credentials",
+      "rosterEncrypted": true
+    },
+    "runtime": null,
+    "provenance": null,
+    "cachedRouteReceipt": null,
+    "hints": []
+  },
+  "input": {
+    "invocationId": "invocation-a4-bind-be-1",
+    "missionId": "audit-1.0.1-a4",
+    "project": "starci-academy",
+    "role": "be",
+    "frozenSourceHead": "0b540dd21e250a346e6206c70225849cc31ead8e",
+    "gitPolicy": {
+      "worktreeBranches": "forbidden",
+      "mutationBranch": "mtp"
+    },
+    "observedCheckout": {
+      "diskPath": "D:/Repositories/starci-academy-backend",
+      "branch": "mtp",
+      "head": "0b540dd21e250a346e6206c70225849cc31ead8e",
+      "originUrl": "https://github.com/starci-lab/starci-academy-backend",
+      "dirtyPaths": [
+        ".workspaces/projects/miamia/be.json",
+        ".workspaces/projects/miamia/fe.json",
+        ".workspaces/projects/nivo/be.json",
+        ".workspaces/projects/nivo/chart.json",
+        ".workspaces/projects/nivo/fe.json",
+        ".workspaces/projects/starci-academy/be.json",
+        ".workspaces/projects/starci-academy/fe.json",
+        ".workspaces/projects/tayson/fe.json",
+        ".workspaces/projects/tedo/be.json",
+        ".workspaces/projects/tedo/fe.json",
+        "src/features/api/core/core.composition.spec.ts",
+        "src/features/api/core/graphql/mutations/ai/purchase-ai-subscription/purchase-ai-subscription.handler.ts",
+        "src/features/api/core/graphql/mutations/courses/add-to-cart/add-to-cart.handler.ts",
+        "src/features/api/core/graphql/mutations/courses/course-enroll/course-enroll.handler.ts",
+        "src/features/api/core/graphql/mutations/courses/courses-checkout/courses-checkout.handler.ts",
+        "src/features/api/core/graphql/mutations/membership/purchase-membership/purchase-membership.handler.ts",
+        "src/features/api/core/graphql/mutations/mutations.module.ts",
+        "src/features/api/core/graphql/queries/blog/blog-post/blog-post.resolver.ts",
+        "src/features/api/core/graphql/queries/contents/content/content.handler.spec.ts",
+        "src/features/api/core/graphql/queries/contents/content/content.handler.ts",
+        "src/features/api/core/graphql/queries/contents/contents/contents.handler.ts",
+        "src/features/api/core/graphql/queries/contents/sandbox-repo-url/sandbox-repo-url.service.spec.ts",
+        "src/features/api/core/graphql/queries/contents/sandbox-repo-url/sandbox-repo-url.service.ts",
+        "src/features/api/core/graphql/queries/courses/course/course.resolver.spec.ts",
+        "src/features/api/core/graphql/queries/courses/course/course.resolver.ts",
+        "src/features/api/core/graphql/queries/queries.module.ts",
+        "src/features/api/core/graphql/shared/community/course-community-api.service.spec.ts",
+        "src/features/api/core/graphql/shared/community/course-community-api.service.ts",
+        "src/features/api/processors/reconcile-transaction/reconcile-transaction.worker.ts",
+        "src/features/socketio/core/community-feed/community-feed.gateway.spec.ts",
+        "src/features/socketio/core/community-feed/community-feed.gateway.ts",
+        "src/features/socketio/core/content-ai/content-ai.gateway.spec.ts",
+        "src/modules/ai/ai-entitlement.service.ts",
+        "src/modules/bussiness/bussiness.module.ts",
+        "src/modules/bussiness/chat/global-chat-policy.service.ts",
+        "src/modules/bussiness/community/community-post-quota.service.ts",
+        "src/modules/bussiness/content-ai/content-ai.service.spec.ts",
+        "src/modules/bussiness/content-ai/content-ai.service.ts",
+        "src/modules/bussiness/flashcard/flashcard-deck.service.spec.ts",
+        "src/modules/bussiness/flashcard/flashcard-deck.service.ts",
+        "src/modules/bussiness/flashcard/flashcard-due-review-session.service.spec.ts",
+        "src/modules/bussiness/flashcard/flashcard-due-review-session.service.ts",
+        "src/modules/bussiness/flashcard/flashcard-review-session.service.spec.ts",
+        "src/modules/bussiness/flashcard/flashcard-review-session.service.ts",
+        "src/modules/bussiness/flashcard/flashcard-review.service.spec.ts",
+        "src/modules/bussiness/flashcard/flashcard-review.service.ts",
+        "src/modules/bussiness/guards/graphql-must-enrolled.guard.ts",
+        "src/modules/bussiness/transactions/atomic/transaction-grant.service.ts",
+        "src/modules/bussiness/transactions/transactions.module.ts",
+        "src/modules/databases/postgresql/primary/entities/course.entity.ts",
+        "src/modules/databases/postgresql/primary/entities/transaction.entity.ts",
+        "src/modules/databases/postgresql/primary/enums/action-type.ts",
+        "src/modules/databases/postgresql/primary/primary.module.ts",
+        "src/modules/filesystem/types/config.ts",
+        "src/modules/init/diff/specs/parse-changed-paths.spec.ts",
+        "src/modules/init/diff/utils/parse-changed-paths.ts",
+        "src/modules/init/seeders/catalog/catalog-seeder.service.spec.ts",
+        "src/modules/init/seeders/catalog/catalog-seeder.service.ts",
+        "src/modules/init/seeders/catalog/parsers/types.ts",
+        "src/modules/init/seeders/seeders.module.ts",
+        "src/tests/harness/ai-tutor.harness-spec.ts",
+        "src/tests/harness/content-ai.harness-spec.ts",
+        ".pnpm-store/",
+        "src/features/api/core/graphql/mutations/pro-subscription/",
+        "src/features/api/core/graphql/queries/pro-subscription/",
+        "src/features/api/core/graphql/shared/pro-subscription/",
+        "src/modules/bussiness/guards/graphql-must-enrolled.guard.spec.ts",
+        "src/modules/bussiness/pro-subscription/",
+        "src/modules/databases/postgresql/primary/entities/pro-entitlement-source.entity.ts",
+        "src/modules/databases/postgresql/primary/entities/pro-subscription.entity.ts",
+        "src/modules/databases/postgresql/primary/enums/pro-subscription-status.ts",
+        "src/modules/databases/postgresql/primary/migrations/1788300000000-CreateProSubscriptions.ts",
+        "src/modules/init/seeders/catalog/parsers/learner-plan-catalog.parser.ts",
+        "src/modules/init/seeders/catalog/path/learner-plan-catalog.path.ts",
+        "src/modules/platform/exceptions/errors/pro-subscription/"
+      ]
+    },
+    "declaredWriteRoots": [
+      "src/features/api/core"
+    ],
+    "runtimeNeed": "none",
+    "artifactRootRef": "audits/1.0.1/a4-workspace-bind",
+    "resume": null
+  }
+}
