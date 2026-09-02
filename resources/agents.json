@@ -1,0 +1,60 @@
+{
+  "schemaVersion": 8,
+  "note": "Closed registry of execution profiles. An operator role binds exactly one profile id from here. `permits` lists runtime grants a profile may use in this workspace; it is a policy statement checked against each operator's `requires`, not a claim about what a model can do in the abstract.",
+  "profiles": {
+    "sol-fresh": {
+      "provider": "openai",
+      "model": "gpt-5.6-sol",
+      "isolation": "fresh",
+      "forkTurns": "none",
+      "count": 1,
+      "role": "One fresh execution that completes a material brainstorm or decision end to end with no inherited turns.",
+      "permits": { "webSearch": true, "imageGeneration": false, "browser": false, "sourceWrite": false }
+    },
+    "sol-reviewer": {
+      "provider": "openai",
+      "model": "gpt-5.6-sol",
+      "isolation": "fresh",
+      "forkTurns": "none",
+      "count": 1,
+      "role": "One fresh reviewer that receives artifacts and claims only, never the producer's rationale, and returns findings without repairing anything.",
+      "permits": { "webSearch": false, "imageGeneration": false, "browser": true, "sourceWrite": false }
+    },
+    "luna": {
+      "provider": "openai",
+      "model": "gpt-5.6-luna",
+      "isolation": "fresh",
+      "forkTurns": "none",
+      "count": 1,
+      "role": "Production execution for authored content: writing, per-language code tracks, image prompts, and the bounded run-read-repair loop.",
+      "permits": { "webSearch": false, "imageGeneration": true, "browser": false, "sourceWrite": true }
+    },
+    "opus": {
+      "provider": "anthropic",
+      "model": "claude-opus-5",
+      "isolation": "fresh",
+      "forkTurns": "none",
+      "count": 1,
+      "role": "Heavy authoring and high-stakes mutation inside a frozen boundary: source apply, backend implementation, release and platform operations.",
+      "permits": { "webSearch": false, "imageGeneration": false, "browser": true, "sourceWrite": true }
+    },
+    "sonnet": {
+      "provider": "anthropic",
+      "model": "claude-sonnet-5",
+      "isolation": "fresh",
+      "forkTurns": "none",
+      "count": 1,
+      "role": "Deterministic and mechanical work: lookups against a closed inventory, gate execution, route verification, non-force publication.",
+      "permits": { "webSearch": false, "imageGeneration": false, "browser": false, "sourceWrite": true }
+    },
+    "fable": {
+      "provider": "anthropic",
+      "model": "claude-fable-5-1",
+      "isolation": "fresh",
+      "forkTurns": "none",
+      "count": 1,
+      "role": "Long-form extraction and documentation grounded in source, such as pattern catalogs and audits that must count rather than assert.",
+      "permits": { "webSearch": false, "imageGeneration": false, "browser": false, "sourceWrite": true }
+    }
+  }
+}

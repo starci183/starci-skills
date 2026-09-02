@@ -26,6 +26,7 @@ còn treo đều có đúng một câu trả lời được ghi lại. Không fi
 | A8 | `patterns/fe`, `patterns/be` | 16 topic | chưa | mỗi rule dẫn hai đường dẫn thật; nêu số đếm khi không phổ quát; câu hỏi mở để mở | 7 câu hỏi mở đã ghi |
 | A9 | `grammars/starci/` | 5 topic | một phần | khớp `packages/grammar` hiện tại: không còn `Link`, `TextAction`/`Button` nhận `href`; 41 renderer | không |
 | A10 | `_pending-*` | 7 file | chưa | mỗi file có đích và được chuyển, không bị xoá | contrast → proof; surface, boundary, icon, media, control-state, field → grammars |
+| A11 | `resources/` | 2 sổ đăng ký, 21 vai trò | chưa | mọi ràng buộc vai trò → profile và mọi câu trả lời chính sách (mạng, Grammar, hình) là mặc định đặt ngày 2026-09-02, chưa phải phán quyết của thầy; validator chỉ chứng minh nhất quán nội bộ | profile nào chạy vai trò nào; `sonnet` có đủ cho vai trò cơ học không; `fable` có nên ràng vai trò nào không |
 
 ## Nhánh B — những thứ cây này phụ thuộc bên ngoài
 

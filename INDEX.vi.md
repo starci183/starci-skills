@@ -9,8 +9,10 @@ operator dựa trên kết quả có kiểu.
 1. `SKILL.md`: cửa vào, vòng lặp định tuyến, và tuyên bố về thẩm quyền.
 2. `routing.json`: bảng đóng ánh xạ `failure.owningDomain` của mọi operator sang bước kế tiếp. Bảng
    được kiểm đối chiếu với chính schema của các operator, nên thiếu một route là lỗi build.
-3. Đúng một operator mà nhiệm vụ cần: `operator.json`, `context.md`, `input.md`, `execute.md`.
-4. Chỉ những topic knowledge mà operator đó bind.
+3. `resources/`: profile thực thi nào chạy từng vai trò của operator, nó được dùng quyền nào lúc
+   chạy, và câu trả lời thường trực về tìm mạng, ràng Grammar, sinh hình. Cũng được kiểm.
+4. Đúng một operator mà nhiệm vụ cần: `operator.json`, `context.md`, `input.md`, `execute.md`.
+5. Chỉ những topic knowledge mà operator đó bind.
 
 Không nạp trước cả cây. Một operator bind tập topic nhỏ nhất mà quyết định của nó cần, mỗi topic kèm
 fingerprint và danh sách rule đầy đủ, và không được phát ra mã nào ngoài danh sách ấy.
@@ -20,6 +22,7 @@ fingerprint và danh sách rule đầy đủ, và không được phát ra mã n
 ```text
 SKILL.md                 một cửa vào, mười bốn operator, một bảng định tuyến
 routing.json             14 operator, 76 route, bốn loại: operator | resume | user | external
+resources/               agents.json (6 profile) + assignments.json (14 operator, 21 vai trò); có kiểm
 operators/<id>/          mười lăm file mỗi gói; self-test.mjs phải xanh
 knowledge/
   ui/composition/        cây phải chứa gì, trước khi nó tồn tại      -> fe.direction.decide
@@ -27,10 +30,10 @@ knowledge/
   ui/proof/              thứ chỉ đúng sai sau khi đã render          -> fe.surface.audit
   patterns/fe, be        quy ước code trích từ hai source thật
   grammars/<họ>/         cách một họ hình ảnh hiện thực Common
-scripts/                 validate-routing.mjs, run-operator-self-tests.mjs
+scripts/                 validate-routing.mjs, validate-resources.mjs, run-operator-self-tests.mjs
 ```
 
-`npm test` chạy kiểm định tuyến và mọi self-test của operator. Head đã publish phải xanh, không xanh
+`npm test` chạy kiểm định tuyến, kiểm resources, và mọi self-test của operator. Head đã publish phải xanh, không xanh
 thì không được publish.
 
 ## Luật áp dụng khắp nơi

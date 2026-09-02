@@ -18,6 +18,9 @@ result.
    checkout, and a similar directory name is never route authority.
 3. Select the first operator from the table below. Read only that operator's `operator.json`,
    `context.md`, `input.md`, and `execute.md`.
+4. Run each role of that operator on the profile `resources/assignments.json` binds to it, with only
+   the grants it lists. A role has no other model, no inherited turns, and no grant the assignment
+   omits.
 
 ## Entry
 

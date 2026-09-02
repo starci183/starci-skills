@@ -9,8 +9,10 @@ typed results.
 1. `SKILL.md` — entry, routing loop, and the authority statement.
 2. `routing.json` — the closed map from every operator's `failure.owningDomain` to its next step. It
    is validated against the operators' own schemas, so a missing route is a build failure.
-3. The one operator the mission needs: its `operator.json`, `context.md`, `input.md`, `execute.md`.
-4. Only the knowledge topics that operator binds.
+3. `resources/` — which execution profile runs each operator role, which runtime grants it may use,
+   and its standing answers on web search, Grammar binding, and image generation. Also validated.
+4. The one operator the mission needs: its `operator.json`, `context.md`, `input.md`, `execute.md`.
+5. Only the knowledge topics that operator binds.
 
 Do not preload the tree. An operator binds the smallest set of topics its decision needs, each with
 its fingerprint and complete rule inventory, and may emit no identifier outside that inventory.
@@ -20,6 +22,7 @@ its fingerprint and complete rule inventory, and may emit no identifier outside 
 ```text
 SKILL.md                 one entry, fourteen operators, one routing map
 routing.json             14 operators, 76 routes, four kinds: operator | resume | user | external
+resources/               agents.json (6 profiles) + assignments.json (14 operators, 21 roles); validated
 operators/<id>/          fifteen files each; self-test.mjs must pass
 knowledge/
   ui/composition/        what a tree must contain, before it exists   -> fe.direction.decide
@@ -27,10 +30,10 @@ knowledge/
   ui/proof/              what is only true once rendered              -> fe.surface.audit
   patterns/fe, be        code conventions extracted from the two live sources
   grammars/<family>/     one visual family's realization of Common
-scripts/                 validate-routing.mjs, run-operator-self-tests.mjs
+scripts/                 validate-routing.mjs, validate-resources.mjs, run-operator-self-tests.mjs
 ```
 
-`npm test` runs the routing validation and every operator self-test. It is green at the published
+`npm test` runs the routing validation, the resources validation, and every operator self-test. It is green at the published
 head or the head is not publishable.
 
 ## Rules that hold everywhere

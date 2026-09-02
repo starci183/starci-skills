@@ -26,6 +26,7 @@ decision has one recorded answer. No finding below stays open without a named ow
 | A8 | `patterns/fe`, `patterns/be` | 16 topics | no | every rule cites two real paths; non-universal counts stated; open questions left open | 7 recorded open questions |
 | A9 | `grammars/starci/` | 5 topics | partly | matches current `packages/grammar`: no `Link`, `TextAction`/`Button` take `href`; 41 renderers | none |
 | A10 | `_pending-*` | 7 files | no | each has a destination and is moved, not deleted | contrast → proof; surface, boundary, icon, media, control-state, field → grammars |
+| A11 | `resources/` | 2 registries, 21 roles | no | every role → profile binding and every policy answer (web search, Grammar, images) is a default set on 2026-09-02, not an owner ruling; the validator only proves internal consistency | which profile runs each role; whether `sonnet` is enough for mechanical roles; whether `fable` should bind any role |
 
 ## Track B — what the tree depends on outside itself
 
