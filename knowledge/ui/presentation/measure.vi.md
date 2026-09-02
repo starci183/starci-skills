@@ -8,8 +8,8 @@ và chiều cao trên những vùng ứng dụng sở hữu. Kích thước bên
 
 ## Danh mục
 
-Chiều rộng và chiều cao không có thang giá trị đóng, nên số của rule ở đây là địa chỉ trên tập các
-kiểu ràng buộc chứ không phải vị trí trên một thang. Ưu tiên rule sớm nhất mà vẫn chạy được: co giãn
+Chiều cao không có thang giá trị đóng, còn chiều rộng chỉ có thang cho trần (xem Thang chiều rộng),
+nên số của rule ở đây là địa chỉ trên tập các kiểu ràng buộc chứ không phải vị trí trên một thang. Ưu tiên rule sớm nhất mà vẫn chạy được: co giãn
 trước, vừa nội dung sau, rồi mới tới chặn trần, cuối cùng mới tới cố định.
 
 | Rule | Ràng buộc | Quyết định |
@@ -37,6 +37,27 @@ dung hay viewport là quyết định layout đã chốt trước bước presen
 Mọi vùng có thể nhận nội dung dài đều phải mang thêm `min-w-0`. Thiếu nó, một phần tử con trong flex
 hay grid từ chối co nhỏ hơn nội dung của nó và đẩy các phần tử kề ra khỏi viewport. Common áp nó
 xuyên suốt các renderer của mình; một vùng của ứng dụng có bọc chữ thì phải làm y như vậy.
+
+## Thang chiều rộng
+
+Một chiều rộng bị chặn trần lấy đúng một bậc của thang đóng này, không gì khác; chiều rộng tuỳ ý như
+`max-w-[720px]` nằm ngoài thang và bị `fe.presentation.resolve` gỡ bỏ. Trần cho văn xuôi `max-w-[65ch]`
+là bậc duy nhất tính theo ký tự, vì độ dài dòng đi theo con chữ. Chốt của owner ngày 2026-09-03: thang
+này cố định cho mọi ứng dụng, không suy ra theo từng dự án.
+
+| Bậc | Class | Chiều rộng |
+| --- | --- | --- |
+| W-sm | `max-w-sm` | 24rem |
+| W-md | `max-w-md` | 28rem |
+| W-lg | `max-w-lg` | 32rem |
+| W-xl | `max-w-xl` | 36rem |
+| W-2xl | `max-w-2xl` | 42rem |
+| W-3xl | `max-w-3xl` | 48rem |
+| W-4xl | `max-w-4xl` | 56rem |
+| W-5xl | `max-w-5xl` | 64rem |
+| W-6xl | `max-w-6xl` | 72rem |
+| W-7xl | `max-w-7xl` | 80rem |
+| W-prose | `max-w-[65ch]` | 65 ký tự |
 
 ## Measure mà Common đã sở hữu
 
@@ -98,7 +119,8 @@ Vùng co giãn ngừng nở khi nở thêm không còn giúp người đọc.
 | Case | Dùng khi | Owner | Render |
 | --- | --- | --- | --- |
 | Case 1 | Vùng văn xuôi mà độ dài dòng cần một ngưỡng trên để còn đọc được | `App` | `<article className="max-w-[65ch]">` |
-| Case 2 | Vùng nội dung mất tính gom nhóm khi vượt một chiều rộng đã biết | `App` | `<main className="w-full max-w-6xl">` |
+| Case 2 | Vùng nội dung mất tính gom nhóm khi vượt một chiều rộng đã biết | `App` | `<main className="w-full max-w-6xl">`, trần là một bậc của Thang chiều rộng |
+| Case 3 | Vùng bị chặn trần mà nội dung hẹp hơn cột chứa nó, khoảng trống sẽ dồn về một bên nếu để nguyên (sân bida, một form, một khung media) | `App` | `<section className="w-full max-w-4xl mx-auto">`: trần cộng `mx-auto`, không bao giờ chặn trần mà canh trái |
 
 Chặn theo số ký tự thì đi theo chính con chữ và thuộc về văn xuôi. Chặn theo độ dài thì thuộc về nội
 dung hỗn hợp. Cả hai đều không áp cho bảng, media hay code, vì những thứ đó có chiều rộng nội tại

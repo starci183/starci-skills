@@ -8,8 +8,8 @@ or shell belong to Grammar.
 
 ## Catalog
 
-Width and height have no closed value scale, so the rule ID is an address over constraint kinds
-rather than a position on a ramp. Prefer the earliest rule that works: fluid before fitted, fitted
+Height has no closed value scale, and width has one only for caps (see Width scale), so the rule
+ID is an address over constraint kinds rather than a position on a ramp. Prefer the earliest rule that works: fluid before fitted, fitted
 before capped, capped before fixed.
 
 | Rule | Constraint | Decides |
@@ -37,6 +37,27 @@ than written here.
 Every region that can receive long content also carries `min-w-0`. Without it a flex or grid child
 refuses to shrink below its content and pushes its neighbours out of the viewport. Common applies it
 throughout its own renderers; an application region that wraps text must do the same.
+
+## Width scale
+
+A capped width takes one step of this closed scale and nothing else; an arbitrary width such as
+`max-w-[720px]` is outside the scale and is removed by `fe.presentation.resolve`. The prose cap
+`max-w-[65ch]` is the one character-based step, because line length follows the text. Owner ruling
+2026-09-03: the scale is fixed for every application, not derived per project.
+
+| Step | Class | Width |
+| --- | --- | --- |
+| W-sm | `max-w-sm` | 24rem |
+| W-md | `max-w-md` | 28rem |
+| W-lg | `max-w-lg` | 32rem |
+| W-xl | `max-w-xl` | 36rem |
+| W-2xl | `max-w-2xl` | 42rem |
+| W-3xl | `max-w-3xl` | 48rem |
+| W-4xl | `max-w-4xl` | 56rem |
+| W-5xl | `max-w-5xl` | 64rem |
+| W-6xl | `max-w-6xl` | 72rem |
+| W-7xl | `max-w-7xl` | 80rem |
+| W-prose | `max-w-[65ch]` | 65 characters |
 
 ## Measure Common already owns
 
@@ -98,7 +119,8 @@ A fluid region stops widening once further width stops helping the reader.
 | Case | When | Owner | Render |
 | --- | --- | --- | --- |
 | Case 1 | A prose region whose line length needs a readable upper bound | `App` | `<article className="max-w-[65ch]">` |
-| Case 2 | A content region that loses its grouping past a known width | `App` | `<main className="w-full max-w-6xl">` |
+| Case 2 | A content region that loses its grouping past a known width | `App` | `<main className="w-full max-w-6xl">`, the cap one step of the Width scale |
+| Case 3 | A capped region whose content is narrower than the column it sits in, so the free space would otherwise gather on one side (a game table, a form, a media frame) | `App` | `<section className="w-full max-w-4xl mx-auto">`: the cap plus `mx-auto`, never a left-aligned cap |
 
 Character-based caps follow the text itself and belong to prose. Length-based caps belong to mixed
 content. Neither applies to tables, media, or code, which have their own intrinsic width.
