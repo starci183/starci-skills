@@ -25,14 +25,14 @@ giờ được ghi ra là một gợi ý sẽ được đi theo ngay khi route �
 
 | # | Bước | Đọc | Ghi | Dừng với |
 | --- | --- | --- | --- | --- |
-| 1 | Kiểm tra input và resume | input, receipt trước đó, head quan sát được của Source | — | `INVALID_INPUT`, `SOURCE_DRIFT`, `NO_PROGRESS` |
-| 2 | Ràng bootstrap và danh tính | các entry bootstrap của Source, việc phát hiện agent, danh tính máy, roster credential đã niêm phong | — | `IDENTITY_UNVERIFIED` |
-| 3 | Phân giải route | khai báo portable cho đúng project và role này, route cục bộ đã hydrate | — | `ROUTE_UNDECLARED`, `ROUTE_UNHYDRATED`, `ROUTE_MISMATCH` |
-| 4 | Từ chối mọi gợi ý | `context.hints` | — | — |
-| 5 | Xác minh checkout | route đã phân giải, checkout quan sát được, chính sách Git đã route, cây làm việc | — | `BRANCH_POLICY_VIOLATION`, `CHECKOUT_DIRTY` |
-| 6 | Ràng runtime mà bên gọi tiêu thụ | registry của chủ sở hữu, generation và bằng chứng health của nó, `workspace-route-port-projection` | — | `ENDPOINT_AUTHORITY_STALE`, `RUNTIME_NOT_READY` |
-| 7 | Ràng provenance và độ tươi | head hội thoại đã redact, receipt đã cache | — | — |
-| 8 | Phát ra và dừng | tất cả những gì ở trên | `route-receipt.json` | — |
+| 1 | Kiểm tra input và resume | input, `@route/<project>/<role>` (head quan sát được của Source) | — | `INVALID_INPUT`, `SOURCE_DRIFT`, `NO_PROGRESS` |
+| 2 | Ràng bootstrap và danh tính | `@identity` (danh tính máy và roster credential đã niêm phong), input (các entry bootstrap của Source, việc phát hiện agent) | — | `IDENTITY_UNVERIFIED` |
+| 3 | Phân giải route | `@declaration/<project>/<role>` (khai báo portable cho đúng project và role này), `@route/<project>/<role>` (route cục bộ đã hydrate) | — | `ROUTE_UNDECLARED`, `ROUTE_UNHYDRATED`, `ROUTE_MISMATCH` |
+| 4 | Từ chối mọi gợi ý | input (`context.hints`) | — | — |
+| 5 | Xác minh checkout | `@route/<project>/<role>` (route đã phân giải, checkout quan sát được, chính sách Git đã route, cây làm việc) | — | `BRANCH_POLICY_VIOLATION`, `CHECKOUT_DIRTY` |
+| 6 | Ràng runtime mà bên gọi tiêu thụ | `@runtime` (registry của chủ sở hữu, generation và bằng chứng health của nó), `@ports/<project>` (`workspace-route-port-projection`) | — | `ENDPOINT_AUTHORITY_STALE`, `RUNTIME_NOT_READY` |
+| 7 | Ràng provenance và độ tươi | input (head hội thoại đã redact), `@artifacts` (receipt đã cache) | — | — |
+| 8 | Phát ra và dừng | tất cả những gì ở trên | `@artifacts/route-receipt.json` | — |
 
 Khâu kiểm tra từ chối một route khai danh tính khác, một source route mang directory, một sibling
 route đi ngược lên, một route đã hydrate có workspace root ngoại lai, một quan sát của checkout khác,
