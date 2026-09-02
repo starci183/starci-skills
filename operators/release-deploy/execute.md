@@ -40,16 +40,16 @@ value even if someone tried.
 
 | # | Step | Reads | Writes | Stops with |
 | --- | --- | --- | --- | --- |
-| 1 | Validate input and resume | input, prior receipt, declared authorization | — | `INVALID_INPUT`, `AUTHORIZATION_MISSING`, `NO_PROGRESS` |
-| 2 | Bind the release and the plan | declared intent, observed state, frozen release and target | — | `MANIFEST_INVALID`, `APPROVAL_REQUIRED` |
-| 3 | Initialize the execution root and resolve credentials | credential names, the rebuildable execution root | — | `CREDENTIAL_UNAVAILABLE` |
-| 4 | Prepare the host, publish the artifact, migrate, and reconcile the domain | each boundary's observed revision before and after | — | `HOST_UNAVAILABLE`, `ARTIFACT_MISSING`, `MIGRATION_BLOCKED`, `DOMAIN_UNRECONCILED` |
-| 5 | Roll out | the compiled plan, the target revision before and after | — | `ROLLOUT_FAILED` |
-| 6 | Monitor under a bounded deadline and backoff | probe observations across the window | — | — |
-| 7 | Detect concurrent drift before acting | the active release, this release, the one it replaces | — | `CONCURRENT_DRIFT` |
-| 8 | Take the recovery branch when the failure persists | approved reversible actions, the same release identity | — | `RECOVERY_EXHAUSTED` |
-| 9 | Take the rollback branch when recovery cannot hold | the exact safe release, current data and schema state | — | `ROLLBACK_IDENTITY_MISSING` |
-| 10 | Prove the steady state and stop | immutable digest, declared targets, superseded targets, every declared probe | `deployment-receipt.json` | `STEADY_STATE_UNPROVEN` |
+| 1 | Validate input and resume | input, `@receipt/quality-verification/<invocationId>` (the declared authorization) | — | `INVALID_INPUT`, `AUTHORIZATION_MISSING`, `NO_PROGRESS` |
+| 2 | Bind the release and the plan | input (the declared intent), `@oci/<image>` (the frozen release and target), `@workflow-run/<runId>` (the observed state) | — | `MANIFEST_INVALID`, `APPROVAL_REQUIRED` |
+| 3 | Initialize the execution root and resolve credentials | `@identity` (credential names), input (the rebuildable execution root) | — | `CREDENTIAL_UNAVAILABLE` |
+| 4 | Prepare the host, publish the artifact, migrate, and reconcile the domain | `@oci/<image>` (the artifact published by digest), `@workflow-run/<runId>` (each boundary's observed revision before and after) | — | `HOST_UNAVAILABLE`, `ARTIFACT_MISSING`, `MIGRATION_BLOCKED`, `DOMAIN_UNRECONCILED` |
+| 5 | Roll out | `@oci/<image>` (the target revision before and after), `@workflow-run/<runId>` (the compiled plan's rollout evidence) | — | `ROLLOUT_FAILED` |
+| 6 | Monitor under a bounded deadline and backoff | `@workflow-run/<runId>` (probe observations across the window) | — | — |
+| 7 | Detect concurrent drift before acting | `@oci/<image>` (the active release, this release, and the one it replaces, by digest) | — | `CONCURRENT_DRIFT` |
+| 8 | Take the recovery branch when the failure persists | input (the approved reversible actions), `@oci/<image>` (the same release identity) | — | `RECOVERY_EXHAUSTED` |
+| 9 | Take the rollback branch when recovery cannot hold | `@oci/<image>` (the exact safe release, by digest), input (current data and schema state) | — | `ROLLBACK_IDENTITY_MISSING` |
+| 10 | Prove the steady state and stop | `@oci/<image>` (the immutable digest), input (declared and superseded targets), `@workflow-run/<runId>` (every declared probe) | `@artifacts/deployment-receipt.json` | `STEADY_STATE_UNPROVEN` |
 
 Validation rejects a foreign or expired authorization, a manifest pinned elsewhere, an observation of
 another target, a replacement identity that disagrees with the observed active release, a deadline
