@@ -21,5 +21,10 @@ localUatBrowserOwnership: centralized-lease
 localUatBrowserControlPlane: control-panel
 localUatBrowserLeaseRegistry: .worktrees/sessions/central-uat-browser/leases
 localUatBrowserDelivery: materialize-or-broker-execute
+localUatAccountProvisioning: control-panel-auto-create
+localUatAccountStores: keycloak-and-application-db
+localUatAccountRecord: canonical-snapshot-account
+localUatCredentialCustody: control-panel-ephemeral
+localUatManualAuthentication: forbidden
 crossTaskBrowserHandleAssumption: forbidden
 featureTaskCredentialHandling: forbidden

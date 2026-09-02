@@ -26,6 +26,11 @@
     "localUatBrowserControlPlane",
     "localUatBrowserLeaseRegistry",
     "localUatBrowserDelivery",
+    "localUatAccountProvisioning",
+    "localUatAccountStores",
+    "localUatAccountRecord",
+    "localUatCredentialCustody",
+    "localUatManualAuthentication",
     "crossTaskBrowserHandleAssumption",
     "featureTaskCredentialHandling"
   ],
@@ -56,6 +61,11 @@
     "localUatBrowserControlPlane": { "const": "control-panel" },
     "localUatBrowserLeaseRegistry": { "const": ".worktrees/sessions/central-uat-browser/leases" },
     "localUatBrowserDelivery": { "const": "materialize-or-broker-execute" },
+    "localUatAccountProvisioning": { "const": "control-panel-auto-create" },
+    "localUatAccountStores": { "const": "keycloak-and-application-db" },
+    "localUatAccountRecord": { "const": "canonical-snapshot-account" },
+    "localUatCredentialCustody": { "const": "control-panel-ephemeral" },
+    "localUatManualAuthentication": { "const": "forbidden" },
     "crossTaskBrowserHandleAssumption": { "const": "forbidden" },
     "featureTaskCredentialHandling": { "const": "forbidden" }
   }

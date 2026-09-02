@@ -72,7 +72,8 @@ test('verification-only Quality rejects debt and source drift, and UAT cannot pu
   const featureRoot=new URL(`../../.worktrees/uat/${feature}/`,import.meta.url);
   t.after(()=>fs.rmSync(featureRoot,{recursive:true,force:true}));
   fs.mkdirSync(artifactRoot,{recursive:true});
-  const snapshotDocument={version:'7.6.0-beta.1',feature,flow:'happy',sourceHeads:['git:one'],cases:['happy']};
+  const account={accountRef:`account://fresh/${feature}/happy/run-1`,provisioningMode:'control-panel-auto-create',provisioningOwnerRef:'thread://control-panel',identityRecordRef:`keycloak-user://uat/${feature}-run-1`,applicationRecordRef:`database-user://uat/${feature}-run-1`,principalFingerprint:`sha256:${'a'.repeat(64)}`,fixtureNamespace:`uat-${feature}-happy-run-1`,credentialCustody:'control-panel-ephemeral',state:'authenticated'};
+  const snapshotDocument={version:'7.6.0-beta.1',feature,flow:'happy',sourceHeads:['git:one'],cases:['happy'],account};
   const snapshotFingerprint=uatContentFingerprint(snapshotDocument);
   fs.writeFileSync(new URL('snapshot.json',artifactRoot),`${JSON.stringify(snapshotDocument)}\n`);
   const stage=(receiptId,operatorId,input,output,timestamp)=>registry.record(operatorId,{output},{receiptId,missionId:'mission:chain',timestamp,trace:{input,sourceHeads:['git:one']}});
@@ -104,7 +105,7 @@ test('all owned machines are v7 and start with analyze-input',()=>{const validat
 test('platform intents discriminate operators and emitted outcomes',()=>{const m=load('starci-platform-operate');assert.equal(nextState(m,'select-intent',{}, {mission:{intent:'sonar'}}),'sonar');assert.equal(route(m,'sonar','proved'),'complete');assert.equal(route(m,'tunnel-plan','ready'),'complete');});
 test('release recovery and rollback execute instead of terminal blocking',()=>{const m=load('starci-release-manage');assert.equal(route(m,'monitor','recover'),'recover');assert.equal(route(m,'recover','rollback'),'rollback');assert.equal(route(m,'rollback','rolled-back'),'proof');});
 test('quality findings, rules, and debt are measured loops',()=>{const m=load('starci-quality-assure');assert.equal(route(m,'inventory','findings',{debtPolicy:'allowed'}),'repair');assert.equal(route(m,'repair','repaired'),'inventory');assert.equal(route(m,'debt','progress'),'debt');});
-test('workspace routes provenance and checkpoint intents',()=>{const m=load('starci-workspace-manage');assert.equal(nextState(m,'select-intent',{}, {mission:{intent:'provenance-query'}}),'query');assert.equal(nextState(m,'select-intent',{}, {mission:{intent:'checkpoint'}}),'checkpoint');});
+test('workspace routes provenance, checkpoint, and automatic UAT account intents',()=>{const m=load('starci-workspace-manage');assert.equal(nextState(m,'select-intent',{}, {mission:{intent:'provenance-query'}}),'query');assert.equal(nextState(m,'select-intent',{}, {mission:{intent:'checkpoint'}}),'checkpoint');assert.equal(nextState(m,'select-intent',{}, {mission:{intent:'uat-account'}}),'uat-account');});
 const selection=(skillId)=>({analyzerVersion:2,skillId,confidence:'exact',interactionPolicy:'ask-only-when-stuck',activeInputRefs:['request:1'],passiveContextRefs:[]});
 const scope=()=>({status:'frozen',unit:'revision',targetRefs:['git:abc'],inclusionRefs:[],exclusionRefs:[],writeRoots:[],externalMutation:true,approvalRef:'approval:1',completionProofRefs:['proof:published-head'],dimensions:[],ambiguityRefs:[]});
 test('git publication requires approved exact heads and canonical progressing receipts',()=>{

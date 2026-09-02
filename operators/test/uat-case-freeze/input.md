@@ -17,5 +17,6 @@
 - `input.sessionLease`: Opaque authenticated, unexpired mission/account/context/runtime-generation
   binding reused across visual rounds. For a project-bound runtime it carries the exact project,
   application, owner, and endpoint-authority fingerprint and its origin equals the owner FE origin;
-  it never contains credentials, cookies, or OTPs.
+  it also binds `snapshot.json#account` plus both Keycloak and application-database provisioning
+  evidence; it never contains credentials, cookies, or OTPs.
 - `input.accountRef`: Fresh isolated account or explicit anonymous identity.

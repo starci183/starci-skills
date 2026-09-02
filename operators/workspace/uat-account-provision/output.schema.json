@@ -1,0 +1,39 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://starci.dev/v7/operators/workspace/uat-account-provision/output.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "operatorId", "output"],
+  "properties": {
+    "schemaVersion": { "const": 7 },
+    "operatorId": { "const": "workspace/uat-account-provision" },
+    "output": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["outcome", "accountRecord", "browserLeaseRef", "evidenceRefs", "reason"],
+      "properties": {
+        "outcome": { "description": "Typed provisioning and authentication result.", "enum": ["provisioned", "blocked"] },
+        "accountRecord": {
+          "description": "Complete non-secret account record to freeze into the canonical UAT snapshot.",
+          "type": ["object", "null"],
+          "additionalProperties": false,
+          "required": ["accountRef", "provisioningMode", "provisioningOwnerRef", "identityRecordRef", "applicationRecordRef", "principalFingerprint", "fixtureNamespace", "credentialCustody", "state"],
+          "properties": {
+            "accountRef": { "type": "string", "pattern": "^account://fresh(?:[/?#].*)?$" },
+            "provisioningMode": { "const": "control-panel-auto-create" },
+            "provisioningOwnerRef": { "type": "string", "minLength": 1 },
+            "identityRecordRef": { "type": "string", "pattern": "^keycloak-user://.+$" },
+            "applicationRecordRef": { "type": "string", "pattern": "^database-user://.+$" },
+            "principalFingerprint": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
+            "fixtureNamespace": { "type": "string", "minLength": 1 },
+            "credentialCustody": { "const": "control-panel-ephemeral" },
+            "state": { "const": "authenticated" }
+          }
+        },
+        "browserLeaseRef": { "description": "Opaque authenticated Browser lease reference, or null when blocked.", "type": ["string", "null"], "pattern": "^browser-lease://.+$" },
+        "evidenceRefs": { "description": "Exact Keycloak, database, and broker-authentication evidence references.", "type": "array", "maxItems": 64, "uniqueItems": true, "items": { "type": "string", "minLength": 1 } },
+        "reason": { "description": "Exact blocker explanation, otherwise null.", "type": ["string", "null"], "minLength": 1, "maxLength": 2048 }
+      }
+    }
+  }
+}

@@ -10,6 +10,19 @@
     "missionRef": { "type": "string", "minLength": 1 },
     "purpose": { "enum": ["read-only-visual-audit", "product-uat"] },
     "accountRef": { "type": "string", "pattern": "^account://(?:fresh|uat-pool)(?:[/?#].*)?$" },
+    "accountRecordRef": { "type": "string", "pattern": "^\\.worktrees/uat/[a-z0-9][a-z0-9-]*/[a-z0-9][a-z0-9-]*/snapshot\\.json#account$" },
+    "provisioningEvidenceRefs": {
+      "type": "array",
+      "minItems": 2,
+      "maxItems": 8,
+      "uniqueItems": true,
+      "items": { "type": "string", "pattern": "^(?:keycloak-user|database-user|provisioning-evidence)://.+$" },
+      "allOf": [
+        { "contains": { "type": "string", "pattern": "^keycloak-user://.+$" } },
+        { "contains": { "type": "string", "pattern": "^database-user://.+$" } }
+      ]
+    },
+    "credentialCustody": { "const": "control-panel-ephemeral" },
     "reuseAttestations": {
       "anyOf": [
         { "type": "null" },
@@ -53,7 +66,10 @@
     },
     {
       "if": { "properties": { "purpose": { "const": "product-uat" } } },
-      "then": { "properties": { "accountRef": { "pattern": "^account://fresh" }, "reuseAttestations": { "type": "null" } } }
+      "then": {
+        "required": ["accountRecordRef", "provisioningEvidenceRefs", "credentialCustody"],
+        "properties": { "accountRef": { "pattern": "^account://fresh" }, "reuseAttestations": { "type": "null" } }
+      }
     },
     {
       "if": { "properties": { "accountRef": { "pattern": "^account://uat-pool" } } },

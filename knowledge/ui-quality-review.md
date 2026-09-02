@@ -23,6 +23,7 @@ Each result names one stable rule ID, applicability, severity, observable eviden
 | `uiq.a11y.non-color-signal` | Meaningful status, validation, selection, or chart | Meaning remains understandable without color alone and text/non-text contrast is measured against the actual composed background. | error | Do not choose brand colors. |
 | `uiq.a11y.zoom-text-reflow` | Responsive web or scalable-text app | Increased text size and compact width preserve content, controls, reading order, and operation without two-dimensional page scrolling. | error | Do not choose typography personality. |
 | `uiq.interaction.target-spacing` | Pointer or touch target | Target size or spacing meets the declared platform baseline and adjacent actions can be selected without precision traps. | error | Do not reuse native units as CSS pixels or invent one cross-platform number. |
+| `uiq.interaction.scope-state-parity` | Interactive or adjacent static surface | Each action declares one observable hit-target scope: inline action changes only its named text/CTA, whole-surface action changes the complete hit target, and static surface has no hover treatment. Hover has keyboard-focus parity; active/pressed is transient; selected, expanded, pending and disabled remain persistent and distinguishable where applicable; reduced motion preserves non-motion feedback. | error | Do not infer scope from title presence, prescribe product color tokens, or turn a static container into an action. |
 | `uiq.interaction.feedback-state` | Action with pending, success, error, disabled, or destructive state | Activation produces prompt feedback; pending prevents accidental duplicate action; errors identify recovery; disabled/read-only/destructive states remain distinct. | error | Do not infer business success or entitlement. |
 | `uiq.motion.preference-stability` | Animated or auto-moving surface | Motion has a functional purpose, respects the platform reduction preference, preserves comprehensible state, and does not shift surrounding layout during control feedback. | warning | Do not prescribe an animation library or a universal duration. |
 | `uiq.layout.viewport-reflow` | Declared compact, intermediate, and wide viewports | Core content and actions remain reachable with no unintended horizontal page overflow; persistent fixed layout regions reserve their owned boundary, while a declared draggable overlay follows its no-spacer constraint/release lifecycle. | error | Do not choose layout direction or ownership. |
@@ -34,6 +35,12 @@ Each result names one stable rule ID, applicability, severity, observable eviden
 ## Evidence contract
 
 Audit the exact declared state at every declared viewport. Evidence may include accessibility-tree snapshots, keyboard traversal records, computed contrast, element rectangles, overflow measurements, reduced-motion observations, layout-shift entries, screenshots, and sanitized traces. The receipt records the browser build, route, surface/state IDs, viewport, source revision, knowledge generation, command/config fingerprint, and applied rule IDs.
+
+For `uiq.interaction.scope-state-parity`, baseline-only evidence is invalid. Record resting, pointer
+hover, keyboard `focus-visible`, and pressed/active observations for every representative interaction
+family; additionally record selected, expanded, pending and disabled states where reachable. Observe
+the complete hit target and its adjacent static surface so a child-only effect or leaked card effect
+cannot pass. When motion exists, repeat the representative transition with reduced motion enabled.
 
 The registry returns typed observations only. It never creates a quality stage, performs repair, or
 routes the mission. Classification is `frontend-local` only when correction preserves the compiled

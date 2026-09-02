@@ -5,6 +5,11 @@ context are reused across audit/repair/recapture rounds of this canonical missio
 origin, principal fingerprint, runtime generation, fixture namespace, or mission identity does not
 match. Never accept raw credentials, cookies, or OTPs as lease data.
 
+Require `accountRecordRef` to point at the current canonical `snapshot.json#account`, require opaque
+evidence for both the Keycloak and application-database records, and require
+`credentialCustody=control-panel-ephemeral`. A signed-out page is not a user-action branch; reject it as
+an unavailable authenticated lease.
+
 For a project-bound runtime, validate the exact ready owner artifact and require the lease project,
 application, generation, owner identity, endpoint-authority fingerprint, and origin to match it. The
 owner endpoints must resolve from canonical workspace routes, port registry, and backend metadata;

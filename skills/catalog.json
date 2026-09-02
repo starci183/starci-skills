@@ -55,7 +55,7 @@
     {
       "id": "starci-workspace-manage",
       "capability": "workspace.manage",
-      "description": "Manage one runtime workspace identity, routed source set, task session, provenance record, or portable checkpoint without becoming product authority."
+      "description": "Manage one runtime workspace identity, routed source set, task session, UAT account/Browser lease, provenance record, or portable checkpoint without becoming product authority."
     },
     {
       "id": "starci-git-publish",

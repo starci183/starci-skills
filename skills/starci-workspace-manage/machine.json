@@ -62,6 +62,14 @@
             }
           },
           "target": "checkpoint"
+        },
+        {
+          "when": {
+            "inputEquals": {
+              "mission.intent": "uat-account"
+            }
+          },
+          "target": "uat-account"
         }
       ]
     },
@@ -255,6 +263,28 @@
           "when": {
             "outputEquals": {
               "outcome": "resumed"
+            }
+          },
+          "target": "complete"
+        },
+        {
+          "when": {
+            "outputEquals": {
+              "outcome": "blocked"
+            }
+          },
+          "target": "blocked"
+        }
+      ]
+    },
+    "uat-account": {
+      "kind": "operator",
+      "ref": "workspace/uat-account-provision",
+      "on": [
+        {
+          "when": {
+            "outputEquals": {
+              "outcome": "provisioned"
             }
           },
           "target": "complete"

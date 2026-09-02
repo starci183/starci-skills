@@ -12,6 +12,8 @@ import { createProjectEndpointBinding } from './contracts/endpoint-authority.mjs
 import { createRuntimeOwnerValidator } from './contracts/runtime-owner.mjs';
 import { createBrowserExecutionLeaseValidator } from './contracts/browser-execution-lease.mjs';
 import { createUatCaseFreezeInputValidator } from '../operators/test/uat-case-freeze/validate-input.mjs';
+import { validateInput as validateUatAccountProvisionInput } from '../operators/workspace/uat-account-provision/validate-input.mjs';
+import { validateOutput as validateUatAccountProvisionOutput } from '../operators/workspace/uat-account-provision/validate-output.mjs';
 
 const base = { receiptId:'receipt:r1', missionId:'m1', skillId:'starci-quality-assure', operatorId:'quality/lint', parentId:'call-parent', childId:'call-child', missionContext:{ project:'starci', objective:'assure' }, context:{ source:'be', invocationRef:'invocation://runtime-v7' }, input:{ exact:true }, expectedOutput:{ outcome:'pass' }, actualOutput:{ outcome:'pass' }, evidenceRefs:['git:abc'], sourceHeads:['git:abc'], transitionRule:{ outcome:'pass', target:'complete' }, resumeState:null, skip:null, error:null };
 const lifecycleFields=(id,hex)=>({missionId:`mission:${id}`,context:{source:'be',invocationRef:`invocation://${id}`,executionRef:`execution://${hex.repeat(64)}`}});
@@ -73,6 +75,11 @@ test('sole YAML config is strict v7.6 with fresh Sol review and centralized runt
   localUatBrowserControlPlane:'control-panel',
   localUatBrowserLeaseRegistry:'.worktrees/sessions/central-uat-browser/leases',
   localUatBrowserDelivery:'materialize-or-broker-execute',
+  localUatAccountProvisioning:'control-panel-auto-create',
+  localUatAccountStores:'keycloak-and-application-db',
+  localUatAccountRecord:'canonical-snapshot-account',
+  localUatCredentialCustody:'control-panel-ephemeral',
+  localUatManualAuthentication:'forbidden',
   crossTaskBrowserHandleAssumption:'forbidden',
   featureTaskCredentialHandling:'forbidden',
 }));
@@ -83,6 +90,11 @@ test('local feature tasks consume one control-panel-owned runtime instead of own
   assert.equal(runtime.localRuntimeControlPlane,'control-panel');
   assert.equal(runtime.featureTaskRuntimeMutation,'forbidden');
   assert.equal(runtime.localRuntimeRegistry,'.worktrees/sessions/central-runtime/owner.json');
+  assert.equal(runtime.localUatAccountProvisioning,'control-panel-auto-create');
+  assert.equal(runtime.localUatAccountStores,'keycloak-and-application-db');
+  assert.equal(runtime.localUatAccountRecord,'canonical-snapshot-account');
+  assert.equal(runtime.localUatCredentialCustody,'control-panel-ephemeral');
+  assert.equal(runtime.localUatManualAuthentication,'forbidden');
   assert.deepEqual(
     [runtime.localFrontendUrl,runtime.localApiUrl,runtime.localIdentityUrl],
     ['http://localhost:3000','http://localhost:3001','http://localhost:8080']
@@ -121,13 +133,15 @@ test('central runtime registry binds one owner generation and canonical localhos
 
 test('authenticated Browser work requires materialization proof or broker execution',()=>{
   const validateLease=createBrowserExecutionLeaseValidator({now:()=>Date.parse('2026-08-31T09:00:00.000Z')});
-  const base={schemaVersion:1,leaseRef:'browser-lease://mission-1',missionRef:'mission://dashboard',purpose:'product-uat',accountRef:'account://fresh/dashboard/run-1',reuseAttestations:null,principalFingerprint:`sha256:${'a'.repeat(64)}`,runtimeGeneration:1,origin:'http://localhost:3000',fixtureNamespace:'uat-dashboard-run-1',expiresAt:'2026-08-31T09:29:40.167Z',state:'authenticated'};
+  const base={schemaVersion:1,leaseRef:'browser-lease://mission-1',missionRef:'mission://dashboard',purpose:'product-uat',accountRef:'account://fresh/dashboard/run-1',accountRecordRef:'.worktrees/uat/dashboard/happy/snapshot.json#account',provisioningEvidenceRefs:['keycloak-user://uat/dashboard-run-1','database-user://uat/dashboard-run-1'],credentialCustody:'control-panel-ephemeral',reuseAttestations:null,principalFingerprint:`sha256:${'a'.repeat(64)}`,runtimeGeneration:1,origin:'http://localhost:3000',fixtureNamespace:'uat-dashboard-run-1',expiresAt:'2026-08-31T09:29:40.167Z',state:'authenticated'};
   const materialized={...base,executionMode:'consumer-materialized',executionOwnerRef:'thread://dashboard',browserContextRef:'browser-context://dashboard/1',consumerTabRef:'browser-tab://dashboard/4',evidenceBrokerRef:null,materializationStatus:'materialized',materializationEvidenceRefs:['browser-observation://dashboard/tab-4']};
   assert.equal(validateLease(materialized).valid,true);
   assert.equal(validateLease({...materialized,consumerTabRef:null,materializationEvidenceRefs:[]}).valid,false);
   const brokered={...base,executionMode:'broker-executed',executionOwnerRef:'thread://control-panel',browserContextRef:'browser-context://broker/1',consumerTabRef:null,evidenceBrokerRef:'browser-broker://control-panel/dashboard',materializationStatus:'not-applicable',materializationEvidenceRefs:['browser-observation://consumer/no-tabs']};
   assert.equal(validateLease(brokered).valid,true);
   assert.equal(validateLease({...brokered,evidenceBrokerRef:null}).valid,false);
+  assert.equal(validateLease({...brokered,provisioningEvidenceRefs:['keycloak-user://uat/dashboard-run-1']}).valid,false);
+  assert.equal(validateLease({...brokered,credentialCustody:'persistent-plaintext'}).valid,false);
   const reuseAttestations=['previous-lease-released','role-compatible','locale-resettable','fixture-readable','origin-matches','runtime-generation-matches'];
   const readOnlyReuse={...brokered,leaseRef:'browser-lease://profile-audit',missionRef:'mission://profile-audit',purpose:'read-only-visual-audit',accountRef:'account://uat-pool/learner/default',reuseAttestations,fixtureNamespace:'read-only-profile'};
   assert.equal(validateLease(readOnlyReuse).valid,true);
@@ -136,6 +150,17 @@ test('authenticated Browser work requires materialization proof or broker execut
   assert.equal(validateLease({...materialized,expiresAt:'not-a-date'}).valid,false);
   assert.equal(validateLease({...materialized,expiresAt:'2026-08-31T09:00:00.000Z'}).valid,false);
   assert.equal(validateLease({...materialized,accountRef:'account://freshness'}).valid,false);
+});
+
+test('local UAT account provisioning creates Keycloak and database evidence without persisting secrets',()=>{
+  const input={schemaVersion:7,operatorId:'workspace/uat-account-provision',context:{authorityRefs:['runtime-owner://generation-5'],runtimeOwnerRef:'thread://central-runtime',sourceFingerprint:`sha256:${'b'.repeat(64)}`},input:{missionRef:'mission://pro-subscription',project:'starci-academy',feature:'pro-subscription',flow:'purchase',runId:'run-1',role:'learner',origin:'http://localhost:3000',accountRecordRef:'.worktrees/uat/pro-subscription/purchase/snapshot.json#account',fixtureNamespace:'uat-pro-subscription-purchase-run-1'}};
+  assert.deepEqual(validateUatAccountProvisionInput(input),{valid:true,errors:[]});
+  assert.equal(validateUatAccountProvisionInput({...input,input:{...input.input,password:'secret'}}).valid,false);
+  const accountRecord={accountRef:'account://fresh/pro-subscription/purchase/run-1',provisioningMode:'control-panel-auto-create',provisioningOwnerRef:'thread://control-panel',identityRecordRef:'keycloak-user://uat/pro-run-1',applicationRecordRef:'database-user://uat/pro-run-1',principalFingerprint:`sha256:${'c'.repeat(64)}`,fixtureNamespace:'uat-pro-subscription-purchase-run-1',credentialCustody:'control-panel-ephemeral',state:'authenticated'};
+  const output={schemaVersion:7,operatorId:'workspace/uat-account-provision',output:{outcome:'provisioned',accountRecord,browserLeaseRef:'browser-lease://pro-subscription/run-1',evidenceRefs:[accountRecord.identityRecordRef,accountRecord.applicationRecordRef,'browser-observation://pro/run-1/authenticated'],reason:null}};
+  assert.deepEqual(validateUatAccountProvisionOutput(output),{valid:true,errors:[]});
+  assert.equal(validateUatAccountProvisionOutput({...output,output:{...output.output,accountRecord:{...accountRecord,password:'secret'}}}).valid,false);
+  assert.equal(validateUatAccountProvisionOutput({...output,output:{...output.output,evidenceRefs:[accountRecord.identityRecordRef]}}).valid,false);
 });
 
 test('Nivo endpoint authority binds owner, authenticated lease, and UAT freeze to 3067/3068/8147',t=>{
@@ -152,7 +177,7 @@ test('Nivo endpoint authority binds owner, authenticated lease, and UAT freeze t
   assert.equal(validateOwner({...owner,updatedAt:'not-a-date'}).valid,false);
 
   const runtimeBinding={project:'nivo',application:'core',ownerThreadId:owner.ownerThreadId,endpointAuthorityFingerprint:endpointBinding.authorityFingerprint};
-  const leaseBase={schemaVersion:1,leaseRef:'browser-lease://nivo-visual-proof',missionRef:'mission://nivo-visual-proof',purpose:'product-uat',accountRef:'account://fresh/nivo/run-1',reuseAttestations:null,principalFingerprint:`sha256:${'a'.repeat(64)}`,runtimeGeneration:7,runtimeBinding,origin:endpoints.frontend,fixtureNamespace:'nivo-visual-run-1',expiresAt:'2026-09-02T09:00:00.000Z',state:'authenticated'};
+  const leaseBase={schemaVersion:1,leaseRef:'browser-lease://nivo-visual-proof',missionRef:'mission://nivo-visual-proof',purpose:'product-uat',accountRef:'account://fresh/nivo/run-1',accountRecordRef:'.worktrees/uat/nivo/visual/snapshot.json#account',provisioningEvidenceRefs:['keycloak-user://uat/nivo-run-1','database-user://uat/nivo-run-1'],credentialCustody:'control-panel-ephemeral',reuseAttestations:null,principalFingerprint:`sha256:${'a'.repeat(64)}`,runtimeGeneration:7,runtimeBinding,origin:endpoints.frontend,fixtureNamespace:'nivo-visual-run-1',expiresAt:'2026-09-02T09:00:00.000Z',state:'authenticated'};
   const lease={...leaseBase,executionMode:'broker-executed',executionOwnerRef:'thread://control-panel/browser',browserContextRef:'browser-context://nivo/1',consumerTabRef:null,evidenceBrokerRef:'browser-broker://control-panel/nivo',materializationStatus:'not-applicable',materializationEvidenceRefs:['browser-observation://nivo/broker']};
   const validateLease=createBrowserExecutionLeaseValidator({runtimeOwner:owner,sourceRoot,now:()=>Date.parse('2026-09-02T08:30:00.000Z')});
   assert.deepEqual(validateLease(lease),{valid:true,errors:[]});
@@ -165,12 +190,13 @@ test('Nivo endpoint authority binds owner, authenticated lease, and UAT freeze t
   assert.equal(validateLease({...lease,runtimeBinding:{...runtimeBinding,endpointAuthorityFingerprint:`sha256:${'f'.repeat(64)}`}}).valid,false);
   assert.equal(createBrowserExecutionLeaseValidator({sourceRoot,now:()=>Date.parse('2026-09-02T08:30:00.000Z')})(lease).valid,false);
 
-  const sessionLease={leaseRef:lease.leaseRef,missionRef:lease.missionRef,accountRef:lease.accountRef,browserContextRef:lease.browserContextRef,principalFingerprint:lease.principalFingerprint,runtimeGeneration:lease.runtimeGeneration,runtimeBinding:lease.runtimeBinding,origin:lease.origin,fixtureNamespace:lease.fixtureNamespace,expiresAt:lease.expiresAt,state:lease.state,executionMode:lease.executionMode,executionOwnerRef:lease.executionOwnerRef,consumerTabRef:lease.consumerTabRef,evidenceBrokerRef:lease.evidenceBrokerRef,materializationStatus:lease.materializationStatus,materializationEvidenceRefs:lease.materializationEvidenceRefs};
+  const sessionLease={leaseRef:lease.leaseRef,missionRef:lease.missionRef,accountRef:lease.accountRef,accountRecordRef:lease.accountRecordRef,provisioningEvidenceRefs:lease.provisioningEvidenceRefs,credentialCustody:lease.credentialCustody,browserContextRef:lease.browserContextRef,principalFingerprint:lease.principalFingerprint,runtimeGeneration:lease.runtimeGeneration,runtimeBinding:lease.runtimeBinding,origin:lease.origin,fixtureNamespace:lease.fixtureNamespace,expiresAt:lease.expiresAt,state:lease.state,executionMode:lease.executionMode,executionOwnerRef:lease.executionOwnerRef,consumerTabRef:lease.consumerTabRef,evidenceBrokerRef:lease.evidenceBrokerRef,materializationStatus:lease.materializationStatus,materializationEvidenceRefs:lease.materializationEvidenceRefs};
   const uatInput={schemaVersion:7,operatorId:'test/uat-case-freeze',context:{snapshotRef:'.worktrees/uat/nivo/visual/snapshot.json',snapshotReturnReceiptRef:'receipt:nivo-snapshot',sourceFingerprint:`sha256:${'b'.repeat(64)}`,missionRef:lease.missionRef,runtimeOwner:owner},input:{evidenceRefs:['browser-observation://nivo/broker'],browserSessionRef:'browser-context://nivo/1',accountRef:lease.accountRef,sessionLease}};
   const validateUat=createUatCaseFreezeInputValidator({sourceRoot,now:()=>Date.parse('2026-09-02T08:30:00.000Z')});
   assert.deepEqual(validateUat(uatInput),{valid:true,errors:[]});
   assert.equal(validateUat({...uatInput,context:{...uatInput.context,missionRef:'mission://foreign'}}).valid,false);
   assert.equal(validateUat({...uatInput,input:{...uatInput.input,accountRef:'account://fresh/nivo/other'}}).valid,false);
+  assert.equal(validateUat({...uatInput,input:{...uatInput.input,sessionLease:{...sessionLease,accountRecordRef:'.worktrees/uat/nivo/other/snapshot.json#account'}}}).valid,false);
   assert.equal(validateUat({...uatInput,input:{...uatInput.input,sessionLease:{...sessionLease,state:'invalidated'}}}).valid,false);
   assert.equal(validateUat({...uatInput,input:{...uatInput.input,sessionLease:{...sessionLease,expiresAt:'2026-09-02T08:00:00.000Z'}}}).valid,false);
 

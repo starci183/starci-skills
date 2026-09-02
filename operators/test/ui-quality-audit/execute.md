@@ -16,6 +16,14 @@ Require full-viewport screenshots from the latest source revision at each declar
 
 When the surface owns drag, page/internal scroll, sticky/fixed positioning, zoom-sensitive reflow, or overlays, require post-interaction screenshots after the applicable lifecycle in `knowledge/ui-render-review.md`. A static resting screenshot cannot prove those behaviors.
 
+Apply the `uiq.interaction.scope-state-parity` gate to every representative interactive family. Freeze
+whether the action is inline or whole-surface, then require resting, pointer-hover, keyboard
+`focus-visible`, and pressed/active evidence; require selected, expanded, pending and disabled evidence
+when those states are reachable. Fail when feedback leaks outside an inline target, covers only a child
+of a whole-surface target, appears on a static surface, lacks keyboard parity, conflates transient
+active with persistent selected/expanded state, or disappears under reduced motion. Baseline pixels,
+DOM class presence, and source intent cannot pass this gate.
+
 Audit by falsification. Require the complete adversarial probe matrix from
 `knowledge/ui-render-review.md`, including viewport extremes and breakpoint-adjacent widths. Attempt
 every applicable probe, and inspect the surrounding parent, preceding and following siblings, and

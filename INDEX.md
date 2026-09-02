@@ -74,7 +74,8 @@ There is no `.worktrees/<project>/` layer. Frontend and other routed sources pro
 and runtime evidence but do not own business, UAT, session, or debt authority.
 
 `businesses/` publishes approved business heads. `uat/` contains only the canonical frozen input and
-result pair for one feature flow. `sessions/` contains resumable execution state and normalized call
+result pair for one feature flow; its `snapshot.json` also owns the non-secret, run-scoped UAT account
+record. `sessions/` contains resumable execution state and normalized call
 receipts, never hidden reasoning. `debts/` contains explicitly declared quality debt. Runtime schemas
 and copyable templates live under `.claude/templates/`; the backend `_templates/` directory is their
 version-bound project instance.
@@ -250,6 +251,15 @@ fingerprint, and exact FE origin.
 Feature, audit, quality, and UAT tasks are consumers: they communicate runtime needs to that owner and
 must not start, stop, restart, replace, or claim any shared listener. UAT identity is isolated by
 account and Browser session, never by rebinding server environment or launching a per-feature API.
+For authenticated local UAT, the Control Panel automatically creates one fresh run-scoped learner in
+both Keycloak and the application database, authenticates its brokered Browser context, and writes the
+non-secret account record into the canonical UAT snapshot. Routine UAT never asks the user to sign in,
+lend a personal account, or paste credentials. Plaintext credentials, cookies, tokens, and OTPs are
+never written under `.worktrees/uat`; the Control Panel holds any temporary secret only long enough to
+authenticate and returns opaque account, principal, lease, and provisioning evidence references. If
+the Browser requires action-time confirmation to transmit the synthetic credential, request only that
+narrow agent-action confirmation; never ask the user to sign in or handle the credential. If automatic
+provisioning or broker authentication is unavailable, the exact result is `BLOCKED`.
 Only the Control Panel
 may create or replace the runtime-owner task. A verified service failure is reported to that task;
 feature work pauses without mutating shared processes.

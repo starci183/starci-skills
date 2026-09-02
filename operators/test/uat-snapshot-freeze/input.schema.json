@@ -52,7 +52,8 @@
       "additionalProperties": false,
       "required": [
         "feature",
-        "flow"
+        "flow",
+        "account"
       ],
       "properties": {
         "feature": {
@@ -64,6 +65,23 @@
           "description": "Canonical flow key.",
           "type": "string",
           "pattern": "^[a-z0-9][a-z0-9-]*$"
+        },
+        "account": {
+          "description": "Non-secret Control-Panel-provisioned account record to persist in the canonical snapshot.",
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["accountRef", "provisioningMode", "provisioningOwnerRef", "identityRecordRef", "applicationRecordRef", "principalFingerprint", "fixtureNamespace", "credentialCustody", "state"],
+          "properties": {
+            "accountRef": { "type": "string", "pattern": "^account://fresh(?:[/?#].*)?$" },
+            "provisioningMode": { "const": "control-panel-auto-create" },
+            "provisioningOwnerRef": { "type": "string", "minLength": 1 },
+            "identityRecordRef": { "type": "string", "pattern": "^keycloak-user://.+$" },
+            "applicationRecordRef": { "type": "string", "pattern": "^database-user://.+$" },
+            "principalFingerprint": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
+            "fixtureNamespace": { "type": "string", "minLength": 1 },
+            "credentialCustody": { "const": "control-panel-ephemeral" },
+            "state": { "const": "authenticated" }
+          }
         }
       }
     }

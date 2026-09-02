@@ -7,6 +7,11 @@ description: Verify one product-decision flow and publish its canonical backend-
 
 Verify one product-decision flow and publish its canonical backend-owned UAT snapshot and result contract.
 
+For an authenticated local flow, consume a Control-Panel-issued account/Browser lease that proves one
+fresh run-scoped learner was created in both Keycloak and the application database and broker-login
+completed. Freeze its non-secret account record into `snapshot.json`. Never branch to user sign-in or
+accept personal credentials; provisioning or authentication unavailability is `BLOCKED`.
+
 Predeclare product-decision cases and consume runtime/template authority without editing it. Store canonical snapshots and results only under the routed backend Source at `.worktrees/uat/<feature>/<flow>/`; never write checkout-local UAT authority or add an extra project directory. A canonical ref is valid only when the exact `snapshot.json` or `result.json` exists, passes its template schema, and matches its returned content fingerprint. Independent Behavior, UX, and UI evidence determines the result.
 
 Publish `complete` only from the final `test/uat-result-publish=passed` route. A fresh finding may

@@ -20,3 +20,13 @@ restart, or environment request to the declared runtime-owner task; never let it
 start, stop, restart, replace, or kill shared processes. Account and UAT isolation belong to the
 Browser/session boundary, not to a server process. Only the Control Panel may create or replace the
 runtime-owner task.
+
+For authenticated local UAT, the Control Panel automatically provisions one fresh run-scoped account
+in Keycloak and the application database, establishes an authenticated Browser lease, and returns only
+opaque identity/provisioning references. Persist the non-secret account record in the canonical
+`.worktrees/uat/<feature>/<flow>/snapshot.json`; keep generated credentials in ephemeral Control Panel
+custody and never write them to UAT artifacts, session traces, chat, or feature-task state. A signed-out
+consumer triggers auto-provision plus broker login, not a request for the user to authenticate.
+If Browser safety mandates action-time confirmation for synthetic credential transmission, request only
+permission for the Control Panel to perform that exact local submission; never ask the user to sign in,
+reveal, paste, or handle the credential. Provisioner or broker failure returns `BLOCKED` with evidence.

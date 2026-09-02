@@ -17,7 +17,8 @@ test('canonical UAT snapshot and result require exact existing schema-valid fing
   const artifactRoot = path.join(featureRoot, flow);
   const snapshotRef = `.worktrees/uat/${feature}/${flow}/snapshot.json`;
   const resultRef = `.worktrees/uat/${feature}/${flow}/result.json`;
-  const snapshotDocument = { version:'7.6.0-beta.1', feature, flow, sourceHeads:['git:one'], cases:['happy'] };
+  const account={accountRef:`account://fresh/${feature}/${flow}/run-1`,provisioningMode:'control-panel-auto-create',provisioningOwnerRef:'thread://control-panel',identityRecordRef:`keycloak-user://uat/${feature}-run-1`,applicationRecordRef:`database-user://uat/${feature}-run-1`,principalFingerprint:`sha256:${'a'.repeat(64)}`,fixtureNamespace:`uat-${feature}-${flow}-run-1`,credentialCustody:'control-panel-ephemeral',state:'authenticated'};
+  const snapshotDocument = { version:'7.6.0-beta.1', feature, flow, sourceHeads:['git:one'], cases:['happy'], account };
   const snapshotFingerprint = uatContentFingerprint(snapshotDocument);
   const evidenceRefs = ['evidence://behavior','evidence://ux','evidence://ui'];
   const snapshotOutput = { schemaVersion:7, operatorId:'test/uat-snapshot-freeze', output:{ outcome:'frozen', canonicalRef:snapshotRef, contentFingerprint:snapshotFingerprint, evidenceRefs:['evidence://snapshot'], gaps:[] } };

@@ -143,11 +143,24 @@
           "description": "Opaque mission-scoped browser/auth continuity contract; contains no secret.",
           "type": "object",
           "additionalProperties": false,
-          "required": ["leaseRef", "missionRef", "accountRef", "browserContextRef", "principalFingerprint", "runtimeGeneration", "origin", "fixtureNamespace", "expiresAt", "state", "executionMode", "executionOwnerRef", "consumerTabRef", "evidenceBrokerRef", "materializationStatus", "materializationEvidenceRefs"],
+          "required": ["leaseRef", "missionRef", "accountRef", "accountRecordRef", "provisioningEvidenceRefs", "credentialCustody", "browserContextRef", "principalFingerprint", "runtimeGeneration", "origin", "fixtureNamespace", "expiresAt", "state", "executionMode", "executionOwnerRef", "consumerTabRef", "evidenceBrokerRef", "materializationStatus", "materializationEvidenceRefs"],
           "properties": {
             "leaseRef": { "type": "string", "pattern": "^browser-lease://.+$" },
             "missionRef": { "type": "string", "minLength": 1 },
             "accountRef": { "type": "string", "pattern": "^(?:account://fresh(?:[/?#].*)?|anonymous://explicit(?:[/?#].*)?)$" },
+            "accountRecordRef": { "type": "string", "pattern": "^\\.worktrees/uat/[a-z0-9][a-z0-9-]*/[a-z0-9][a-z0-9-]*/snapshot\\.json#account$" },
+            "provisioningEvidenceRefs": {
+              "type": "array",
+              "minItems": 2,
+              "maxItems": 8,
+              "uniqueItems": true,
+              "items": { "type": "string", "pattern": "^(?:keycloak-user|database-user|provisioning-evidence)://.+$" },
+              "allOf": [
+                { "contains": { "type": "string", "pattern": "^keycloak-user://.+$" } },
+                { "contains": { "type": "string", "pattern": "^database-user://.+$" } }
+              ]
+            },
+            "credentialCustody": { "const": "control-panel-ephemeral" },
             "browserContextRef": { "type": "string", "minLength": 1 },
             "principalFingerprint": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
             "runtimeGeneration": { "type": "integer", "minimum": 1 },
