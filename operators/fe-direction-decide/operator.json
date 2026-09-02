@@ -32,9 +32,14 @@
       "purpose": "Technical authority when boundaries are in question."
     },
     {
-      "alias": "@grammar",
+      "alias": "@grammar-src",
       "required": true,
       "purpose": "Published Grammar: the compositions a direction may bind."
+    },
+    {
+      "alias": "@grammar-law/starci",
+      "required": false,
+      "purpose": "Family realization rules: how the Core family is meant to realize Common. Law about the Grammar, never the Grammar itself."
     },
     {
       "alias": "@knowledge/ui/composition",
@@ -42,7 +47,7 @@
       "purpose": "What a tree must contain before it exists."
     },
     {
-      "alias": "@source/starci-academy/fe",
+      "alias": "@fe",
       "required": true,
       "purpose": "Current implementation as evidence, never as the requested direction."
     },

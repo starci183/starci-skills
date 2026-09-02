@@ -10,17 +10,17 @@ trong và không implement.
 
 | # | Bước | Đọc | Ghi | Dừng với |
 | --- | --- | --- | --- | --- |
-| 1 | Validate input và resume | input, receipt trước đó, binding source đã đóng băng | — | `INVALID_INPUT`, `SOURCE_DRIFT`, `NO_PROGRESS` |
-| 2 | Bind authority | request, business receipt, backend và architecture receipt tuỳ trường hợp, Grammar đã publish, project, target, change level, owner ceiling | — | `ROUTE_UNVERIFIED`, `SCOPE_UNFROZEN`, `CHANGE_LEVEL_AMBIGUOUS`, `OWNER_CEILING_INVALID`, `BUSINESS_REQUIRED`, `BACKEND_REQUIRED`, `ARCHITECTURE_REQUIRED` |
-| 3 | Quan sát context hiện có | artifact trực tiếp của target, hoặc host và product family được cấp authority | — | `EVIDENCE_MISSING` |
-| 4 | Compile một UI contract | authority đã bind, context đã quan sát | — | — |
-| 5 | Giải quyết nhu cầu reference | các exact reference bên ngoài, giới hạn trong đúng khoảng trống cần lấp | — | `REFERENCE_EVIDENCE_EXHAUSTED` |
-| 6 | Tạo candidate | UI contract, change level, quyền so sánh | — | `NO_VIABLE_DIRECTION` |
-| 7 | Áp dụng Grammar filter | các candidate, Grammar đã publish, owner ceiling | — | `GRAMMAR_REQUIRED` |
-| 8 | Render decision evidence | các candidate còn lại và UI contract | `<candidateId>.html` | — |
-| 9 | Falsify | decision evidence đã render, business và backend receipt | — | — |
-| 10 | Chốt hoặc block | các candidate đã bị falsify, chế độ đang chạy | — | `DIRECTION_CHOICE_REQUIRED` |
-| 11 | Phát output rồi dừng | tất cả những gì ở trên | — | — |
+| 1 | Validate input và resume | input, `@receipt/fe-direction-decision/<invocationId>`, `@fe` (binding head đã đóng băng) | — | `INVALID_INPUT`, `SOURCE_DRIFT`, `NO_PROGRESS` |
+| 2 | Bind authority | input (request, project, target, change level, owner ceiling), `@receipt/business-promise-authority/<invocationId>`, `@receipt/backend-implementation/<invocationId>`, `@receipt/architecture-decision/<invocationId>`, `@grammar-src` | — | `ROUTE_UNVERIFIED`, `SCOPE_UNFROZEN`, `CHANGE_LEVEL_AMBIGUOUS`, `OWNER_CEILING_INVALID`, `BUSINESS_REQUIRED`, `BACKEND_REQUIRED`, `ARCHITECTURE_REQUIRED` |
+| 3 | Quan sát context hiện có | `@fe` (artifact trực tiếp của target, hoặc host và product family được cấp authority), `@screenshots`, `@uat/<flow>/<case>` | — | `EVIDENCE_MISSING` |
+| 4 | Compile một UI contract | `@knowledge/ui/composition`, `@receipt/business-promise-authority/<invocationId>`, `@fe` (context đã quan sát) | — | — |
+| 5 | Giải quyết nhu cầu reference | input (các exact reference bên ngoài), `@knowledge/ui/composition` (khoảng trống cần lấp) | — | `REFERENCE_EVIDENCE_EXHAUSTED` |
+| 6 | Tạo candidate | `@knowledge/ui/composition` (UI contract đã compile), input (change level, quyền so sánh) | — | `NO_VIABLE_DIRECTION` |
+| 7 | Áp dụng Grammar filter | `@grammar-src` (component sở hữu gì và có những prop nào), `@grammar-law/starci` (luật hiện thực hoá của family), input (owner ceiling) | — | `GRAMMAR_REQUIRED` |
+| 8 | Render decision evidence | `@grammar-src`, `@knowledge/ui/composition` (UI contract mà các candidate còn lại phải trả lời) | `@artifacts/<candidateId>.html` | — |
+| 9 | Falsify | `@artifacts/<candidateId>.html`, `@receipt/business-promise-authority/<invocationId>`, `@receipt/backend-implementation/<invocationId>` | — | — |
+| 10 | Chốt hoặc block | `@artifacts/<candidateId>.html`, input (chế độ đang chạy) | — | `DIRECTION_CHOICE_REQUIRED` |
+| 11 | Phát output rồi dừng | tất cả những gì ở trên | `@artifacts/fe-direction-decision.json` | — |
 
 Khâu validate từ chối authority stale, source drift, owner overlap, tổ hợp change level sai, compare
 chưa được cấp quyền và progress không đổi. Evidence có thể phản bác authority nhưng không bao giờ thay
