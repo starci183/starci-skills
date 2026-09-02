@@ -6,7 +6,7 @@ Sinh bởi `scripts/generate-operators-index.mjs` từ mọi `operator.json`, b�
 
 | Operator | Profile | Đọc (tĩnh) | Đọc (động, trong phiên) | Ghi | Số bước | Mã dừng |
 | --- | --- | --- | --- | --- | --- | --- |
-| `architecture.decide` | `sol-fresh` | `@knowledge/patterns`, `@workspaces/be`, `@worktrees/businesses/<featureId>` | — | `@dynamic/<decisionId>-alternatives.html`, `@dynamic/architecture-decision.json`, `@dynamic/current-state.json`, `@dynamic/independent-critique.json`, `@dynamic/stack-model.json` | 11 | `INVALID_INPUT`, `SOURCE_DRIFT`, `CURRENT_STATE_UNOBSERVED`, `BUSINESS_AUTHORITY_REQUIRED`, `EVIDENCE_MISSING`, `CONSTRAINT_CONTRADICTION`, `NO_VIABLE_ALTERNATIVE`, `CHOICE_REQUIRED`, `COMPATIBILITY_UNVERIFIED`, `DATA_OWNERSHIP_UNASSIGNED`, `CRITIQUE_UNRESOLVED`, `NO_PROGRESS` |
+| `architecture.decide` | `sol-fresh` | `@knowledge/patterns`, `@workspaces/be`, `@worktrees/businesses/<featureId>` | `kind:architecture-decision` | `kind:alternatives`, `kind:architecture-decision`, `kind:current-state`, `kind:independent-critique`, `kind:stack-model` | 10 | `INVALID_INPUT`, `SOURCE_DRIFT`, `NO_PROGRESS`, `EVIDENCE_MISSING`, `CURRENT_STATE_UNOBSERVED`, `BUSINESS_AUTHORITY_REQUIRED`, `CONSTRAINT_CONTRADICTION`, `NO_VIABLE_ALTERNATIVE`, `CHOICE_REQUIRED`, `COMPATIBILITY_UNVERIFIED`, `DATA_OWNERSHIP_UNASSIGNED`, `CRITIQUE_UNRESOLVED` |
 | `backend.implement` | `opus` | `@knowledge/patterns/be`, `@worktrees/businesses/<featureId>` | `@dynamic/architecture-decision.json` | `@dynamic/backend-implementation.json`, `@dynamic/changes.md`, `@dynamic/conformance/<operationId>.<facet>.json`, `@dynamic/proofs/<operationId>.<kind>.json`, `@workspaces/be` | 8 | `INVALID_INPUT`, `SOURCE_DRIFT`, `CONTRACT_UNFROZEN`, `CONTRACT_WIDENED`, `BUSINESS_AUTHORITY_MISSING`, `OWNER_CONFLICT`, `PATTERN_UNBOUND`, `PROOF_UNAVAILABLE`, `NO_PROGRESS` |
 | `business.decide` | `sol-fresh` | `@workspaces/be` | `@dynamic/architecture-decision.json` | `@dynamic/business-promise-authority.json`, `@dynamic/coverage-matrix.json`, `@worktrees/businesses/<featureId>` | 9 | `INVALID_INPUT`, `SOURCE_DRIFT`, `EVIDENCE_MISSING`, `CONTRADICTION_UNRESOLVED`, `COVERAGE_INCOMPLETE`, `CONSUMER_UNPROVEN`, `LIFECYCLE_TRANSITION_INVALID`, `AUTHORITY_CONFLICT`, `RECONCILIATION_DISCREPANCY`, `APPROVAL_REQUIRED`, `NO_PROGRESS` |
 | `content.generate` | `luna` | `@remote/minio/<contentId>/<locale>`, `@worktrees/sessions/central-runtime` | — | `@dynamic/<briefTargetRef>`, `@dynamic/<imageTargetRef>`, `@dynamic/<language>.articleRef`, `@dynamic/<reviewTargetRef>`, `@dynamic/<track>.sourceRef`, `@dynamic/content-generation-receipt.json` | 9 | `INVALID_INPUT`, `SOURCE_DRIFT`, `BRIEF_UNBOUND`, `OUTCOME_UNCOVERED`, `CODE_BUILD_FAILED`, `E2E_FAILED`, `CONTRACT_WEAKENED`, `IMAGE_UNAVAILABLE`, `REVIEW_REVISION_REQUIRED`, `REVIEW_ROUNDS_EXHAUSTED`, `NO_PROGRESS` |
@@ -29,6 +29,7 @@ Mọi file chỉ tồn tại trong phiên, ai ghi nó, ai đọc nó kế tiếp
 | --- | --- | --- |
 | `@dynamic/<matrixId>.capture.json` | `fe.surface.audit` | — |
 | `@dynamic/<receiptType>.json` | — | `quality.verify` |
+| `@dynamic/alternatives.json` | `architecture.decide` | — |
 | `@dynamic/architecture-decision.json` | `architecture.decide` | `backend.implement`, `business.decide`, `fe.direction.decide` |
 | `@dynamic/backend-implementation.json` | `backend.implement` | `fe.direction.decide` |
 | `@dynamic/business-promise-authority.json` | `business.decide` | `fe.direction.decide` |
@@ -56,7 +57,7 @@ Mọi file chỉ tồn tại trong phiên, ai ghi nó, ai đọc nó kế tiếp
 
 | Operator | Việc duy nhất |
 | --- | --- |
-| `architecture.decide` | Decide one architecture with its tech stack, system boundaries, and data ownership, and prove it against observed current state, rejected alternatives, verified compatibility, and an independent critique. |
+| `architecture.decide` | Decide one architecture with its tech stack, system boundaries, and data ownership, and prove it against the observed current state, the rejected alternatives, verified compatibility, and an independent critique. |
 | `backend.implement` | Implement one backend outcome inside a frozen mutation contract, following the observed sibling family, and return the measured conformance and proof receipt that shows the boundary was not widened. |
 | `business.decide` | Decide and publish one evidence-backed business promise as durable backend-owned authority, frozen behind a complete promise-to-enforcement coverage matrix. |
 | `content.generate` | Generate or refactor one educational content unit in one linear pass: a teacher brief that constrains everything after it, one written edition per declared language, images made to a stated claim, code and executable checks that actually run, and an independent critique that receives the artifact without the producer's rationale. |

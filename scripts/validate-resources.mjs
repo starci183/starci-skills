@@ -1,3 +1,4 @@
+import { existsSync } from 'node:fs';
 import { readdir, readFile } from 'node:fs/promises';
 import path from 'node:path';
 import process from 'node:process';
@@ -56,7 +57,8 @@ for (const entry of await readdir(operatorsDir, { withFileTypes: true })) {
   if (!entry.isDirectory()) continue;
   const dir = path.join(operatorsDir, entry.name);
   const manifest = JSON.parse(await readFile(path.join(dir, 'operator.json'), 'utf8'));
-  const schemas = await Promise.all(['input.schema.json', 'output.schema.json'].map((f) => readFile(path.join(dir, f), 'utf8')));
+  // An operator.md package has no per-operator schemas; the step gates under templates/step pin no model.
+  const schemas = await Promise.all(['input.schema.json', 'output.schema.json'].filter((f) => existsSync(path.join(dir, f))).map((f) => readFile(path.join(dir, f), 'utf8')));
   const pinned = new Set([...schemas.join('\n').matchAll(/"model"\s*:\s*\{\s*"const"\s*:\s*"([^"]+)"/g)].map((m) => m[1]));
   operators.set(manifest.id, { resources: manifest.resources, pinned, dir: entry.name });
 }

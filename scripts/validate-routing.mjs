@@ -1,7 +1,10 @@
+import { existsSync } from 'node:fs';
 import { readdir, readFile } from 'node:fs/promises';
 import path from 'node:path';
 import process from 'node:process';
 import { fileURLToPath } from 'node:url';
+import { parseOperatorMd, cellCodes } from './operator-md.mjs';
+import { loadErrorsRegistry } from './errors-registry.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const operatorsDir = path.join(root, 'operators');
@@ -10,11 +13,28 @@ const errors = [];
 
 const kinds = new Set(Object.keys(routing.kinds));
 const operators = new Map();
+const registry = await loadErrorsRegistry(root);
+errors.push(...registry.errors);
 
 for (const entry of await readdir(operatorsDir, { withFileTypes: true })) {
   if (!entry.isDirectory()) continue;
-  const manifest = JSON.parse(await readFile(path.join(operatorsDir, entry.name, 'operator.json'), 'utf8'));
-  const schema = await readFile(path.join(operatorsDir, entry.name, 'output.schema.json'), 'utf8');
+  const dir = path.join(operatorsDir, entry.name);
+  const manifest = JSON.parse(await readFile(path.join(dir, 'operator.json'), 'utf8'));
+  if (existsSync(path.join(dir, 'operator.md'))) {
+    // An operator.md package emits exactly the domains of the stop codes its Stops table lists; `self`
+    // is the operator's own domain, which routing.json answers with kind "resume".
+    const op = parseOperatorMd(await readFile(path.join(dir, 'operator.md'), 'utf8'), 'en');
+    const domains = new Set();
+    for (const row of op.tables.stops?.rows ?? []) {
+      const code = cellCodes(row.code)[0] ?? row.code.trim();
+      const domain = registry.codes[code]?.domain;
+      if (!domain) continue; // validate-operator reports the unknown code
+      domains.add(domain === 'self' ? manifest.domain : domain);
+    }
+    operators.set(manifest.id, domains.size ? domains : null);
+    continue;
+  }
+  const schema = await readFile(path.join(dir, 'output.schema.json'), 'utf8');
   const match = /"owningDomain"\s*:\s*\{[^}]*"enum"\s*:\s*(\[[^\]]*\])/s.exec(schema);
   operators.set(manifest.id, match ? new Set(JSON.parse(match[1])) : null);
 }

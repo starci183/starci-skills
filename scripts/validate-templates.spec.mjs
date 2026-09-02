@@ -3,7 +3,7 @@ import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import test from 'node:test';
-import { validateTree } from './validate-templates.mjs';
+import { validateTree, checkDocument } from './validate-templates.mjs';
 
 // A synthetic tree: one template of each shape the validator understands, and documents that
 // satisfy or break it in exactly one way each.
@@ -117,6 +117,23 @@ test('a missing Vietnamese mirror is rejected and the English document is still 
   const result = await run((f) => { f['kb/proof/focus.vi.md'] = null; });
   assert.ok(result.errors.some((e) => e.includes('no Vietnamese mirror kb/proof/focus.vi.md')));
   assert.equal(result.checked, 3);
+});
+
+test('row-level shape: minRows, exactRows, rows and cell are enforced, and a kind contract may be single-language', () => {
+  const contract = {
+    kind: 'critique', applies: [],
+    title: '^# critique$',
+    sections: [{ en: '^## Attacks$', table: '| Path | Verdict |', exactRows: 2, rows: ['a', 'b'], cell: { Verdict: '^(holds|fails)$' } }],
+    rules: null,
+  };
+  const good = '# critique\n\n## Attacks\n\n| Path | Verdict |\n| --- | --- |\n| `a` | holds |\n| b | fails |\n';
+  assert.deepEqual(checkDocument('c.md', good, contract, 'en'), []);
+  const tooFew = checkDocument('c.md', good.replace('| b | fails |\n', ''), contract, 'en');
+  assert.ok(tooFew.some((e) => e.includes('exactly 2 rows, found 1')) && tooFew.some((e) => e.includes('lacks a row for b')));
+  const badCell = checkDocument('c.md', good.replace('| b | fails |', '| b | maybe |'), contract, 'en');
+  assert.ok(badCell.some((e) => e.includes('cell Verdict "maybe" does not match')));
+  const min = checkDocument('c.md', good, { ...contract, sections: [{ en: '^## Attacks$', table: '| Path | Verdict |', minRows: 3 }] }, 'en');
+  assert.ok(min.some((e) => e.includes('at least 3 rows, found 2')));
 });
 
 test('a template whose kind does not match its file name is refused', async () => {

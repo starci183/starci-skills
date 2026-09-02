@@ -4,11 +4,13 @@
 // the context table omits, a writer that is not an operator, and a context row that names an alias
 // the operator did not declare. Disk existence is not checked here: most locations are
 // machine-local (`.worktrees`, `.workspaces/local`) and absent on a fresh clone by design.
+import { existsSync } from 'node:fs';
 import { readdir, readFile } from 'node:fs/promises';
 import path from 'node:path';
 import process from 'node:process';
 import { fileURLToPath } from 'node:url';
 import { loadAliasRegistry, baseOf as baseOfIn } from './alias-registry.mjs';
+import { parseOperatorMd, cellAliases, isYes } from './operator-md.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const registry = await loadAliasRegistry(root);
@@ -62,9 +64,43 @@ function tableAliases(text, heading) {
   return out;
 }
 
+// An operator.md package declares its aliases in the Context table and routes by them in the Steps
+// table; both languages are checked. Dynamic inputs are kinds, not aliases, so the @dynamic rule of
+// the old shape does not apply.
+async function checkOperatorMd(dir, id) {
+  let count = 0;
+  const seen = new Set();
+  const en = parseOperatorMd(await readFile(path.join(dir, 'operator.md'), 'utf8'), 'en');
+  const rows = en.tables.context?.rows ?? [];
+  if (rows.length === 0) { errors.push(`${id}: operator.md Context table is empty`); return 0; }
+  const declaredBases = new Set();
+  const requiredBases = new Set();
+  for (const row of rows) {
+    const alias = cellAliases(row.alias)[0];
+    if (!alias) { errors.push(`${id}: operator.md Context row "${row.alias}" names no alias`); continue; }
+    const base = baseOf(alias);
+    if (!base) errors.push(`${id}: ref ${alias} is not registered in alias/alias.json`);
+    if (seen.has(alias)) errors.push(`${id}: ref ${alias} is declared twice`);
+    seen.add(alias);
+    if (base) { declaredBases.add(base); if (isYes(row.required)) requiredBases.add(base); }
+    count += 1;
+  }
+  for (const [file, lang] of [['operator.md', 'en'], ['operator.vi.md', 'vi']]) {
+    if (!existsSync(path.join(dir, file))) continue;
+    const op = lang === 'en' ? en : parseOperatorMd(await readFile(path.join(dir, file), 'utf8'), 'vi');
+    const used = new Set();
+    for (const step of op.tables.steps?.rows ?? []) for (const a of [...cellAliases(step.reads), ...cellAliases(step.writes)]) { if (a.startsWith('@dynamic')) { errors.push(`${id}: ${file} step ${step.n} names ${a}; an operator.md package passes dynamic files as kinds, not aliases`); continue; } used.add(baseOf(a) ?? a); }
+    for (const u of used) if (!declaredBases.has(u)) errors.push(`${id}: ${file} Steps read or write ${u}, which the Context table does not declare`);
+    for (const r of requiredBases) if (!used.has(r)) errors.push(`${id}: ${file} Steps never read or write required ${r}`);
+    if (used.size === 0) errors.push(`${id}: ${file} Steps name no alias at all`);
+  }
+  return count;
+}
+
 let declared = 0;
 for (const { dir, manifest } of manifests) {
   const id = manifest.id;
+  if (existsSync(path.join(dir, 'operator.md'))) { declared += await checkOperatorMd(dir, id); continue; }
   const refs = manifest.refs;
   if (!Array.isArray(refs) || refs.length === 0) { errors.push(`${id}: operator.json must declare refs`); continue; }
   const seen = new Set();

@@ -1,590 +1,226 @@
+// Proves validate.mjs on a synthetic session step: one conforming step under the defaults
+// (alternatives = 1, automatic), one with three alternatives under approval-required, and one
+// mutation per law, each of which must fail with a line that names the defect.
 import assert from 'node:assert/strict';
-import { validateInput } from './validate-input.mjs';
-import { validateOutput } from './validate-output.mjs';
+import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import path from 'node:path';
+import { validateArchitectureStep } from './validate.mjs';
 
-const hash = `sha256:${'a'.repeat(64)}`;
-const otherHash = `sha256:${'c'.repeat(64)}`;
-const sourceHead = 'b'.repeat(40);
-const otherHead = 'd'.repeat(40);
-const observedAt = '2026-09-02T00:00:00.000Z';
-const backendSource = 'source://starci-academy-be';
-const manifestRef = 'source://starci-academy-be/package.json';
-const composeRef = 'source://starci-academy-be/compose.yaml';
-const artifactRoot = '.v8/artifacts/invocation-entitlement-1';
-const contextRef = (ref, head = null) => ({ ref, fingerprint: hash, sourceHead: head, observedAt });
+const head = 'b'.repeat(40);
+const fp = `sha256:${'a'.repeat(64)}`;
+const ev = (p) => `${p}@${head}`;
 
-const tradeoffAxes = ['correctness', 'consistency', 'operability', 'latency', 'migration'];
-const compatibilityAxes = [
-  'runtime-version',
-  'deployable-unit',
-  'communication-failure',
-  'datastore-ownership',
-  'backup-restore',
-];
-
-const validInput = {
-  schemaVersion: 8,
-  operatorId: 'architecture.decide',
-  context: {
-    businessRefs: [contextRef('business://pro-full-access')],
-    sourceRefs: [contextRef(backendSource, sourceHead), contextRef(manifestRef, sourceHead), contextRef(composeRef, sourceHead)],
-    inventory: {
-      inventoryRef: 'inventory://starci-academy-be',
-      fingerprint: hash,
-      components: [
-        { componentId: 'nestjs', layer: 'framework', name: 'NestJS', version: '10.4.0', evidenceRef: manifestRef },
-        { componentId: 'postgres', layer: 'persistence', name: 'PostgreSQL', version: '16.2', evidenceRef: composeRef },
-        { componentId: 'redis-entitlement-cache', layer: 'persistence', name: 'Redis', version: '7.2', evidenceRef: composeRef },
-      ],
-    },
-    patternRefs: [contextRef('pattern://single-writer-store')],
-    priorDecisionRefs: [],
-  },
-  input: {
-    invocationId: 'invocation-entitlement-1',
-    missionId: 'mission-entitlement',
-    project: {
-      id: 'starci-academy',
-      backendSourceRef: backendSource,
-      sourceHead,
-      artifactRootRef: artifactRoot,
-    },
-    objective: {
-      objectiveRef: 'objective://one-entitlement-read-path',
-      decisionId: 'entitlement-read-path',
-      tradeoffAxes,
-    },
-    constraints: [
-      {
-        constraintId: 'one-answer-per-viewer',
-        kind: 'fixed-intent',
-        statement: 'Every consumer of paid access must reach the same answer for the same viewer.',
-      },
-      {
-        constraintId: 'read-budget',
-        kind: 'measurable',
-        statement: 'An entitlement read completes within 40ms at the ninety-ninth percentile.',
-      },
-      {
-        constraintId: 'no-new-datastore-vendor',
-        kind: 'measurable',
-        statement: 'The decision adds no persistence vendor beyond the two already operated.',
-      },
-      {
-        constraintId: 'operator-familiarity',
-        kind: 'preference',
-        statement: 'Operators prefer components they already run in production.',
-      },
-      {
-        constraintId: 'quota-growth',
-        kind: 'assumption',
-        statement: 'AI quota reads grow faster than course reads over the next two terms.',
-      },
+function currentState() {
+  return {
+    observedHead: head, fingerprint: fp,
+    components: [
+      { componentId: 'nestjs', layer: 'framework', name: 'NestJS', version: '10.4.0', evidence: ev('package.json:12') },
+      { componentId: 'postgres', layer: 'persistence', name: 'PostgreSQL', version: '16.2', evidence: ev('compose.yaml:30-41') },
     ],
-    selectionPolicy: 'approval-required',
-    approval: {
-      approvalRef: 'approval://owner/entitlement-read-path',
-      approvedAlternativeId: 'shared-entitlement-service',
-      fingerprint: hash,
-    },
-    resume: null,
-  },
-};
+    boundaries: [{ boundaryId: 'entitlement', responsibility: 'answers who may read a course', stores: ['entitlement-store'], evidence: ev('src/entitlement/index.ts:1-40') }],
+  };
+}
+const verdicts = () => ['runtime-version', 'deployable-unit', 'communication-failure', 'datastore-ownership', 'backup-restore'].map((axis) => ({ axis, verified: true, evidence: ev('compose.yaml:30') }));
+function stackModel({ alternatives = 1 } = {}) {
+  const alts = [{ alternativeId: 'shared-boundary', status: 'selected', scores: { cost: 4, complexity: 3, reversibility: 4 }, rejectedBecause: null }];
+  if (alternatives > 1) alts.push({ alternativeId: 'per-feature-guards', status: 'rejected', scores: { cost: 2, complexity: 2, reversibility: 3 }, rejectedBecause: 'three boundaries derive one answer' });
+  if (alternatives > 2) alts.push({ alternativeId: 'edge-cache', status: 'rejected', scores: { cost: 3, complexity: 1, reversibility: 1 }, rejectedBecause: 'stale claims after revocation' });
+  return {
+    decisionId: 'entitlement-read-path', selectedAlternativeId: 'shared-boundary', alternatives: alts,
+    boundaries: [
+      { boundaryId: 'entitlement', responsibility: 'one entitlement answer', owner: 'platform-team', interfaces: ['EntitlementQuery'], ownsData: true },
+      { boundaryId: 'course-api', responsibility: 'serves course content', owner: 'learning-team', interfaces: ['CourseQuery'], ownsData: false },
+    ],
+    stores: [{ storeId: 'entitlement-store', owningBoundaryId: 'entitlement', writers: ['entitlement'], readers: ['course-api'], migrators: ['entitlement'], transactionScope: 'per request', backup: 'nightly snapshot', restore: 'tested weekly', sharedWriteJustification: null }],
+    components: [
+      { componentId: 'nestjs', status: 'existing', justification: 'observed-evidence', evidence: ev('package.json:12'), compatibility: verdicts() },
+      { componentId: 'postgres', status: 'existing', justification: 'measured-constraint', evidence: ev('compose.yaml:30'), compatibility: verdicts() },
+      { componentId: 'redis-cache', status: 'removed', justification: null, evidence: null, compatibility: [] },
+    ],
+  };
+}
+function response({ alternatives = 1, policy = 'automatic', handoffDetail = 'EntitlementQuery contract returns one answer per viewer', stackStatus = 'existing' } = {}) {
+  const altRows = ['| `shared-boundary` | selected | cost 4 · complexity 3 · reversibility 4 | — |'];
+  if (alternatives > 1) altRows.push('| `per-feature-guards` | rejected | cost 2 · complexity 2 · reversibility 3 | three boundaries derive one answer |');
+  if (alternatives > 2) altRows.push('| `edge-cache` | rejected | cost 3 · complexity 1 · reversibility 1 | stale claims after revocation |');
+  return `# architecture-decision — entitlement-read-path
 
-const criteriaFor = (id) =>
-  tradeoffAxes.map((axis) => ({ axis, assessment: `${id} assessed for ${axis} against the frozen constraints.` }));
+## Decision
 
-const alternatives = [
-  {
-    id: 'shared-entitlement-service',
-    summary: 'One entitlement boundary answers every consumer over a synchronous read interface.',
-    materialDifference: 'A single boundary owns the entitlement store and every other boundary reads through it.',
-    verdict: 'selected',
-    rejectionReason: null,
-    criteria: criteriaFor('shared-entitlement-service'),
-  },
-  {
-    id: 'per-feature-guards',
-    summary: 'Each feature keeps its own guard and reads the subscription tables directly.',
-    materialDifference: 'No boundary owns the answer; every feature derives it independently.',
-    verdict: 'rejected',
-    rejectionReason: 'Independent derivation is what let the published promise disagree with the guards.',
-    criteria: criteriaFor('per-feature-guards'),
-  },
-  {
-    id: 'edge-cached-claims',
-    summary: 'Entitlements are minted into signed claims and cached at the edge.',
-    materialDifference: 'The answer becomes a token with a lifetime instead of a read.',
-    verdict: 'rejected',
-    rejectionReason: 'Cancellation and denial cannot take effect inside the claim lifetime.',
-    criteria: criteriaFor('edge-cached-claims'),
-  },
-];
+| Field | Value |
+| --- | --- |
+| Objective | one entitlement read path |
+| Decision id | \`entitlement-read-path\` |
+| Selected alternative | \`shared-boundary\` |
+| Selection policy | \`${policy}\` |
 
-const boundaries = [
-  {
-    boundaryId: 'entitlement-authority',
-    responsibility: 'Owns whether a viewer currently holds paid access and answers every consumer.',
-    ownerRef: 'team://backend-core',
-    interfaceRefs: ['contract://entitlement/read'],
-    ownsData: true,
-  },
-  {
-    boundaryId: 'course-delivery',
-    responsibility: 'Serves course content once entitlement has answered.',
-    ownerRef: 'team://backend-learning',
-    interfaceRefs: ['contract://course/read'],
-    ownsData: false,
-  },
-  {
-    boundaryId: 'payment-settlement',
-    responsibility: 'Settles external payments and records the ledger entry that grants access.',
-    ownerRef: 'team://backend-payments',
-    interfaceRefs: ['contract://settlement/webhook'],
-    ownsData: true,
-  },
-];
+## Current state
 
-const dataOwnership = [
-  {
-    storeId: 'entitlement-db',
-    owningBoundaryId: 'entitlement-authority',
-    writerBoundaryIds: ['entitlement-authority'],
-    readerBoundaryIds: ['entitlement-authority'],
-    migratorBoundaryIds: ['entitlement-authority'],
-    transactionScope: 'One transaction per entitlement grant, revoke, or expiry.',
-    backupRef: 'runbook://backup/entitlement-db',
-    restoreRef: 'runbook://restore/entitlement-db',
-    sharedWriteJustification: null,
-  },
-  {
-    storeId: 'settlement-ledger',
-    owningBoundaryId: 'payment-settlement',
-    writerBoundaryIds: ['payment-settlement', 'entitlement-authority'],
-    readerBoundaryIds: ['payment-settlement', 'entitlement-authority'],
-    migratorBoundaryIds: ['payment-settlement'],
-    transactionScope: 'One transaction per settled payment, keyed by the gateway reference.',
-    backupRef: 'runbook://backup/settlement-ledger',
-    restoreRef: 'runbook://restore/settlement-ledger',
-    sharedWriteJustification:
-      'Entitlement writes the compensating reversal row in the same transaction that revokes access, so the ledger and the grant cannot diverge.',
-  },
-];
+| Boundary | Responsibility | Stores | Evidence |
+| --- | --- | --- | --- |
+| \`entitlement\` | answers who may read a course | \`entitlement-store\` | \`src/entitlement/index.ts:1-40@${head}\` |
 
-const component = (componentId, name, version, role, status, justificationKind, justification) => ({
-  componentId,
-  name,
-  version,
-  role,
-  status,
-  justificationKind,
-  justification,
-  evidenceRefs: [manifestRef, composeRef],
-  compatibility: {
-    verdict: 'verified',
-    checkedAxes: [...compatibilityAxes],
-    evidenceRefs: [`proof://compatibility/${componentId}`],
-  },
-});
+## Alternatives
 
-const stackComponents = [
-  component('nestjs', 'NestJS', '10.4.0', 'Hosts every boundary as a module.', 'existing', 'observed-evidence', 'The framework is observed in the manifest and satisfies the module boundary requirement.'),
-  component('postgres', 'PostgreSQL', '16.2', 'Holds the entitlement store and the settlement ledger.', 'existing', 'measured-constraint', 'Transactional single-writer ownership is required and measured at the read budget.'),
-  component('kafka-debezium', 'Kafka with Debezium', '3.7.0', 'Feeds the entitlement projection from settlement changes.', 'added', 'requirement-fit', 'Change capture is the only path that keeps the projection consistent without a second writer.'),
-  {
-    ...component('redis-entitlement-cache', 'Redis', '7.2', 'Previously cached derived entitlement answers.', 'removed', 'observed-evidence', 'The cache is removed because the owning boundary now answers directly.'),
-    compatibility: { verdict: 'unverified', checkedAxes: [], evidenceRefs: [] },
-  },
-];
+| Alternative | Status | Assessment | Rejected because |
+| --- | --- | --- | --- |
+${altRows.join('\n')}
 
-const attacks = [
-  ['partial-failure', 'The settlement write succeeds while the projection feed is down.', 'The grant stays unread until the projection catches up, and the read returns denied rather than a guess.'],
-  ['retry-idempotency', 'A gateway webhook is delivered twice for one payment.', 'The ledger is keyed by the gateway reference, so the second delivery updates nothing.'],
-  ['concurrency', 'A renewal and a cancellation are processed at the same instant.', 'Both take the store row lock in the owning boundary, so the later one observes the earlier.'],
-  ['stale-state', 'A consumer holds a read answer from before a revocation.', 'The read carries no lifetime, so the next consumer read observes the revocation immediately.'],
-  ['deletion', 'A learner account is deleted while entitlements remain.', 'Deletion cascades from the owning boundary and the ledger keeps an anonymised settlement row.'],
-  ['recovery', 'The entitlement store is restored from backup after corruption.', 'The projection is rebuilt from the ledger, which is the durable record of every grant.'],
-  ['dependency-outage', 'The change-capture pipeline is unavailable for an hour.', 'Reads continue against the last consistent projection and settlement queues rather than failing open.'],
-  ['rollback', 'The decision is reverted after partial migration.', 'Per-feature guards are still readable during the migration window, so the rollback restores them without data loss.'],
-].map(([adversePath, statement, resolution]) => ({
-  adversePath,
-  targetAlternativeId: 'shared-entitlement-service',
-  statement,
-  resolution,
-  residualRisk: null,
-}));
+## Boundaries
 
-attacks.push({
-  adversePath: 'stale-state',
-  targetAlternativeId: 'edge-cached-claims',
-  statement: 'A cancelled viewer keeps a valid signed claim until it expires.',
-  resolution: 'The alternative was rejected for exactly this reason.',
-  residualRisk: null,
-});
+| Boundary | Responsibility | Owner | Interfaces | Owns data |
+| --- | --- | --- | --- | --- |
+| \`entitlement\` | one entitlement answer | platform-team | EntitlementQuery | yes |
+| \`course-api\` | serves course content | learning-team | CourseQuery | no |
 
-const comparisonArtifactRef = `${artifactRoot}/entitlement-alternatives.html`;
-const currentStateRef = `${artifactRoot}/current-state.json`;
-const stackModelRef = `${artifactRoot}/stack-model.json`;
-const critiqueRef = `${artifactRoot}/independent-critique.json`;
-const artifactRefs = [currentStateRef, comparisonArtifactRef, stackModelRef, critiqueRef];
-const evidenceRefs = ['business://pro-full-access', backendSource, manifestRef, composeRef, 'inventory://starci-academy-be'];
+## Data ownership
 
-const binding = {
-  projectId: 'starci-academy',
-  backendSourceRef: backendSource,
-  sourceHead,
-  artifactRootRef: artifactRoot,
-  decisionId: 'entitlement-read-path',
-  objectiveRef: 'objective://one-entitlement-read-path',
-  tradeoffAxes,
-  selectionPolicy: 'approval-required',
-  approvedAlternativeId: 'shared-entitlement-service',
-  businessFingerprint: hash,
-  inventoryFingerprint: hash,
-  constraintFingerprint: hash,
-  currentStateFingerprint: hash,
-  inputFingerprint: hash,
-  progressFingerprint: hash,
-};
+| Store | Owning boundary | Writers | Readers | Migrators | Transaction scope | Backup | Restore |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| \`entitlement-store\` | \`entitlement\` | \`entitlement\` | \`course-api\` | \`entitlement\` | per request | nightly snapshot | tested weekly |
 
-const validDecidedOutput = {
-  schemaVersion: 8,
-  operatorId: 'architecture.decide',
-  output: {
-    outcome: 'decided',
-    receipt: {
-      receiptType: 'architecture-decision',
-      receiptId: 'receipt:entitlement-read-path',
-      invocationId: validInput.input.invocationId,
-      missionId: validInput.input.missionId,
-      status: 'decided',
-      binding,
-      decision: {
-        authorRef: 'role://architecture-decider',
-        selectedAlternativeId: 'shared-entitlement-service',
-        comparisonArtifactRef,
-        currentState: {
-          observedRef: currentStateRef,
-          fingerprint: hash,
-          observedSourceHead: sourceHead,
-          boundaries: [
-            {
-              name: 'course guard',
-              responsibility: 'Derives paid access from subscription rows inside the course resolver.',
-              evidenceRef: backendSource,
-            },
-            {
-              name: 'community guard',
-              responsibility: 'Derives paid access again, with a different expiry comparison.',
-              evidenceRef: backendSource,
-            },
-            {
-              name: 'settlement worker',
-              responsibility: 'Writes the ledger row and updates the subscription state.',
-              evidenceRef: backendSource,
-            },
-          ],
-        },
-        alternatives,
-        boundaries,
-        dataOwnership,
-        stack: { modelRef: stackModelRef, fingerprint: hash, components: stackComponents },
-        critique: {
-          critiqueRef,
-          fingerprint: hash,
-          reviewerRef: 'role://architecture-reviewer',
-          attacks,
-        },
-        migration: {
-          steps: [
-            'Stand up the entitlement boundary behind the existing guards and compare answers.',
-            'Move each consumer to the boundary read one at a time.',
-            'Remove the derived guards and the cache once no consumer reads them.',
-          ],
-          rollbackRef: 'runbook://rollback/entitlement-read-path',
-        },
-        invariants: [
-          'Exactly one boundary answers whether a viewer holds paid access.',
-          'The settlement ledger stays the durable record from which entitlements can be rebuilt.',
-        ],
-        risks: [
-          'The projection lag becomes visible to a viewer immediately after payment.',
-          'Two writers on the settlement ledger require the compensating write to stay in one transaction.',
-        ],
-        affectedContractRefs: ['contract://entitlement/read', 'contract://settlement/webhook'],
-        proofExpectations: [
-          'A denied read is proved for an expired, a cancelled, and a never-purchased viewer.',
-          'A restore from backup rebuilds the projection from the ledger alone.',
-        ],
-        unknowns: ['The quota read growth assumption has no measurement behind it yet.'],
-      },
-      findings: [
-        {
-          code: 'PROJECTION_LAG',
-          severity: 'warning',
-          statement: 'A viewer may observe denial for the duration of the projection lag immediately after settlement.',
-          evidenceRefs: [backendSource],
-        },
-      ],
-      evidenceRefs,
-      failure: null,
-      resume: null,
-      createdAt: observedAt,
-    },
-    evidenceRefs,
-    artifactRefs,
-    handoff: null,
-  },
-};
+## Stack delta
 
-const validBlockedOutput = {
-  schemaVersion: 8,
-  operatorId: 'architecture.decide',
-  output: {
-    outcome: 'blocked',
-    receipt: {
-      receiptType: 'architecture-decision',
-      receiptId: 'receipt:entitlement-read-path-blocked',
-      invocationId: validInput.input.invocationId,
-      missionId: validInput.input.missionId,
-      status: 'blocked',
-      binding: { ...binding, approvedAlternativeId: null, currentStateFingerprint: hash },
-      decision: null,
-      findings: [
-        {
-          code: 'ALTERNATIVES_MATERIAL',
-          severity: 'error',
-          statement: 'The shared boundary and the edge claims differ on latency and on cancellation timing, and neither dominates.',
-          evidenceRefs: [backendSource],
-        },
-      ],
-      evidenceRefs,
-      failure: {
-        code: 'CHOICE_REQUIRED',
-        message: 'Two alternatives survive the frozen constraints and product authority must choose between them.',
-        missingRefs: ['approval://owner/entitlement-read-path'],
-        retryable: true,
-        owningDomain: 'architecture',
-      },
-      resume: {
-        resumeToken: 'resume-entitlement-read-path-1',
-        requiredDelta: ['Bind the owner approval naming one surviving alternative.'],
-        candidateAlternativeIds: ['shared-entitlement-service', 'edge-cached-claims'],
-      },
-      createdAt: observedAt,
-    },
-    evidenceRefs,
-    artifactRefs: [comparisonArtifactRef],
-    handoff: null,
-  },
-};
+| Component | Status | Justification | Evidence | Compatibility |
+| --- | --- | --- | --- | --- |
+| \`nestjs\` | ${stackStatus} | observed-evidence | \`package.json:12@${head}\` | 5/5 verified |
+| \`postgres\` | existing | measured-constraint | \`compose.yaml:30@${head}\` | 5/5 verified |
+| \`redis-cache\` | removed | — | — | — |
 
-assert.deepEqual(validateInput(validInput), { valid: true, errors: [] });
-assert.deepEqual(validateOutput(validDecidedOutput), { valid: true, errors: [] });
-assert.deepEqual(validateOutput(validBlockedOutput), { valid: true, errors: [] });
+## Handoff
 
-// --- input negatives -------------------------------------------------------
+| Item | Kind | Detail |
+| --- | --- | --- |
+| one answer per viewer | invariant | every entitlement read returns the same answer within one request |
+| entitlement query | contract | ${handoffDetail} |
+| cache removal | migration | drop the cache after the shared boundary serves all readers |
+| revert | rollback | restore the cache reader behind a flag |
+| proof | proof | integration test asserting one answer across three readers |
 
-// Without a measurable constraint no alternative can be compared on any axis.
-const noMeasurable = structuredClone(validInput);
-noMeasurable.input.constraints = noMeasurable.input.constraints.filter((item) => item.kind !== 'measurable');
-const noMeasurableResult = validateInput(noMeasurable);
-assert.equal(noMeasurableResult.valid, false);
-assert.ok(noMeasurableResult.errors.some((error) => error.includes('measurable constraint')));
+## Fallbacks taken
 
-// An inventory entry nobody evidenced is a component somebody remembers, not one that exists.
-const unevidencedComponent = structuredClone(validInput);
-unevidencedComponent.context.inventory.components[0].evidenceRef = 'source://never-bound';
-assert.equal(validateInput(unevidencedComponent).valid, false);
+| Code | Action |
+| --- | --- |
+`;
+}
+function critique({ failing = false, selection = 'keep', inherited = 'none' } = {}) {
+  const paths = ['partial-failure', 'retry-idempotency', 'concurrency', 'stale-state', 'deletion', 'recovery', 'dependency-outage', 'rollback'];
+  return `# independent-critique — entitlement-read-path
 
-// Carrying an approval under an automatic policy hides which one actually decided.
-const automaticWithApproval = structuredClone(validInput);
-automaticWithApproval.input.selectionPolicy = 'automatic';
-assert.equal(validateInput(automaticWithApproval).valid, false);
+## Execution
 
-// Evidence observed at another head cannot bind this decision.
-const driftedSource = structuredClone(validInput);
-driftedSource.context.sourceRefs[0].sourceHead = otherHead;
-assert.equal(validateInput(driftedSource).valid, false);
+| Field | Value |
+| --- | --- |
+| Reviewer execution | exec://critique-7f3a |
+| Inherited turns | ${inherited} |
+| Given | data/stack-model.json, response.md claims |
 
-// A resume with no added material is NO_PROGRESS wearing a token.
-const emptyResume = structuredClone(validInput);
-emptyResume.input.resume = {
-  blockedReceiptRef: 'receipt:entitlement-read-path-blocked',
-  resumeToken: 'resume-entitlement-read-path-1',
-  addedContextRefs: [],
-};
-assert.equal(validateInput(emptyResume).valid, false);
+## Attacks
 
-// --- output negatives ------------------------------------------------------
+| Adverse path | Attack | Resolution | Verdict |
+| --- | --- | --- | --- |
+${paths.map((p, i) => `| ${p} | what if ${p} hits the shared boundary | idempotent read, single writer | ${failing && i === 3 ? 'fails' : 'holds'} |`).join('\n')}
 
-// A proposal built on an observation of a different head describes a system that no longer exists.
-const staleObservation = structuredClone(validDecidedOutput);
-staleObservation.output.receipt.decision.currentState.observedSourceHead = otherHead;
-const staleResult = validateOutput(staleObservation);
-assert.equal(staleResult.valid, false);
-assert.ok(staleResult.errors.some((error) => error.includes('different source head')));
+## Verdict
 
-// One option dressed as a comparison: nothing was genuinely considered and rejected.
-const noRejectedAlternative = structuredClone(validDecidedOutput);
-noRejectedAlternative.output.receipt.decision.alternatives = [
-  alternatives[0],
-  { ...alternatives[1], verdict: 'selected', rejectionReason: null },
-];
-const noRejectedResult = validateOutput(noRejectedAlternative);
-assert.equal(noRejectedResult.valid, false);
-assert.ok(noRejectedResult.errors.some((error) => error.includes('rejected with a reason')));
+| Field | Value |
+| --- | --- |
+| Selection | ${selection} |
+`;
+}
+function request({ alternatives = 1, policy = 'automatic', approval = '—', extra = '' } = {}) {
+  return `# request — architecture.decide step-1-1
 
-// A rejection with no reason records a preference, not an analysis.
-const reasonlessRejection = structuredClone(validDecidedOutput);
-reasonlessRejection.output.receipt.decision.alternatives[1].rejectionReason = null;
-assert.equal(validateOutput(reasonlessRejection).valid, false);
+## Context
 
-// Alternatives compared on different criteria cannot be compared at all.
-const unevenCriteria = structuredClone(validDecidedOutput);
-unevenCriteria.output.receipt.decision.alternatives[2].criteria =
-  unevenCriteria.output.receipt.decision.alternatives[2].criteria.filter((item) => item.axis !== 'latency');
-const unevenResult = validateOutput(unevenCriteria);
-assert.equal(unevenResult.valid, false);
-assert.ok(unevenResult.errors.some((error) => error.includes('same criteria')));
+| Alias | Head |
+| --- | --- |
+| \`@workspaces/be\` | \`${head}\` |
+| \`@worktrees/businesses/pro-subscription\` | — |
 
-// Incumbency is not a justification: an existing framework is a constraint or evidence, never truth.
-const incumbentJustification = structuredClone(validDecidedOutput);
-incumbentJustification.output.receipt.decision.stack.components[0].justificationKind = 'incumbency';
-const incumbentResult = validateOutput(incumbentJustification);
-assert.equal(incumbentResult.valid, false);
-assert.ok(incumbentResult.errors.some((error) => error.includes('incumbency')));
+## Requirements
 
-// Compatibility assumed rather than verified is the defect the tech-stack check exists to catch.
-const assumedCompatibility = structuredClone(validDecidedOutput);
-assumedCompatibility.output.receipt.decision.stack.components[2].compatibility.verdict = 'unverified';
-assert.equal(validateOutput(assumedCompatibility).valid, false);
+| Field | Value |
+| --- | --- |
+| \`objective\` | one entitlement read path |
+| \`decisionId\` | entitlement-read-path |
+| \`alternatives\` | ${alternatives} |
+| \`tradeoffAxes\` | cost, complexity, reversibility |
+| \`constraints\` | fi-1 fixed-intent one answer per viewer; m-1 measurable p95 read under 50ms |
+| \`selectionPolicy\` | ${policy} |
+| \`approval\` | ${approval} |
+| \`resume\` | null |
+${extra}
+## Inputs
 
-// A verdict of verified that skipped an axis is a partial check wearing a complete label.
-const skippedAxis = structuredClone(validDecidedOutput);
-skippedAxis.output.receipt.decision.stack.components[2].compatibility.checkedAxes =
-  skippedAxis.output.receipt.decision.stack.components[2].compatibility.checkedAxes.filter(
-    (axis) => axis !== 'backup-restore',
-  );
-const skippedAxisResult = validateOutput(skippedAxis);
-assert.equal(skippedAxisResult.valid, false);
-assert.ok(skippedAxisResult.errors.some((error) => error.includes('backup-restore')));
+| Kind | From |
+| --- | --- |
+| \`architecture-decision\` | — |
+`;
+}
+const input = { schemaVersion: 9, operatorId: 'architecture.decide', step: '1-1', sessionId: 's-test', contexts: [{ alias: '@workspaces/be', head }, { alias: '@worktrees/businesses/pro-subscription', head: null }], fields: { requirements: 'request.md#requirements' }, resume: null };
+function output({ status = 'done', stop, fallbacks = [], withAlternatives = false, next = ['backend.implement'] } = {}) {
+  const fields = { 'architecture-decision': 'response.md', 'current-state': 'data/current-state.json', 'stack-model': 'data/stack-model.json', 'independent-critique': 'critique.md' };
+  if (withAlternatives) fields.alternatives = 'artifacts/entitlement-read-path-alternatives.html';
+  return { schemaVersion: 9, operatorId: 'architecture.decide', step: '1-1', status, ...(stop ? { stop } : {}), fallbacks, fields, commits: [], next };
+}
 
-// A boundary that claims data without owning a store leaves the data question unanswered.
-const unownedData = structuredClone(validDecidedOutput);
-unownedData.output.receipt.decision.boundaries[1].ownsData = true;
-const unownedResult = validateOutput(unownedData);
-assert.equal(unownedResult.valid, false);
-assert.ok(unownedResult.errors.some((error) => error.includes('course-delivery')));
+function writeStep(files) {
+  const session = mkdtempSync(path.join(tmpdir(), 'arch-step-'));
+  const dir = path.join(session, 'step-1-1');
+  mkdirSync(path.join(dir, 'data'), { recursive: true });
+  mkdirSync(path.join(dir, 'artifacts'), { recursive: true });
+  for (const [name, content] of Object.entries(files)) writeFileSync(path.join(dir, name), typeof content === 'string' ? content : JSON.stringify(content, null, 2));
+  return { dir, session };
+}
+const baseline = () => ({ 'input.json': input, 'output.json': output(), 'request.md': request(), 'response.md': response(), 'critique.md': critique(), 'data/current-state.json': currentState(), 'data/stack-model.json': stackModel() });
 
-// Two writers with no justification is how a store ends up with no real owner.
-const unjustifiedSharedWrite = structuredClone(validDecidedOutput);
-unjustifiedSharedWrite.output.receipt.decision.dataOwnership[1].sharedWriteJustification = null;
-const sharedWriteResult = validateOutput(unjustifiedSharedWrite);
-assert.equal(sharedWriteResult.valid, false);
-assert.ok(sharedWriteResult.errors.some((error) => error.includes('shared-write justification')));
+async function expectValid(files, label) {
+  const { dir, session } = writeStep(files);
+  const { errors } = await validateArchitectureStep(dir);
+  rmSync(session, { recursive: true, force: true });
+  assert.deepEqual(errors, [], `${label} should be valid`);
+}
+async function expectError(files, needle, label) {
+  const { dir, session } = writeStep(files);
+  const { errors } = await validateArchitectureStep(dir);
+  rmSync(session, { recursive: true, force: true });
+  assert.ok(errors.some((e) => e.includes(needle)), `${label}: expected an error containing "${needle}", got:\n${errors.join('\n') || '(none)'}`);
+}
 
-// A store owned by a boundary that never writes it names an owner in title only.
-const nonWritingOwner = structuredClone(validDecidedOutput);
-nonWritingOwner.output.receipt.decision.dataOwnership[0].writerBoundaryIds = ['course-delivery'];
-assert.equal(validateOutput(nonWritingOwner).valid, false);
+await expectValid(baseline(), 'defaults (one alternative, automatic)');
+await expectValid({
+  ...baseline(),
+  'request.md': request({ alternatives: 3, policy: 'approval-required', approval: 'shared-boundary' }),
+  'response.md': response({ alternatives: 3, policy: 'approval-required' }),
+  'data/stack-model.json': stackModel({ alternatives: 3 }),
+  'output.json': output({ withAlternatives: true }),
+  'artifacts/entitlement-read-path-alternatives.html': '<!doctype html><title>alternatives</title>',
+}, 'three alternatives under approval-required');
+await expectValid({ ...baseline(), 'output.json': output({ status: 'blocked', stop: 'DATA_OWNERSHIP_UNASSIGNED', next: [] }) }, 'blocked with a terminate code');
 
-// A critique that skips an adverse path has described the decision under good weather.
-const missingRollbackAttack = structuredClone(validDecidedOutput);
-missingRollbackAttack.output.receipt.decision.critique.attacks =
-  missingRollbackAttack.output.receipt.decision.critique.attacks.filter(
-    (attack) => !(attack.adversePath === 'rollback' && attack.targetAlternativeId === 'shared-entitlement-service'),
-  );
-missingRollbackAttack.output.receipt.decision.critique.attacks.push({
-  adversePath: 'concurrency',
-  targetAlternativeId: 'per-feature-guards',
-  statement: 'Two guards disagree during a concurrent renewal.',
-  resolution: 'The alternative was rejected for this reason.',
-  residualRisk: null,
-});
-const missingRollbackResult = validateOutput(missingRollbackAttack);
-assert.equal(missingRollbackResult.valid, false);
-assert.ok(missingRollbackResult.errors.some((error) => error.includes('rollback')));
+await expectError({ ...baseline(), 'output.json': { ...output(), stop: 'CHOICE_REQUIRED' } }, 'status done may not carry a stop', 'done with stop');
+await expectError({ ...baseline(), 'output.json': output({ status: 'blocked', stop: 'MADE_UP_CODE', next: [] }) }, 'not a registered code', 'unknown stop code');
+await expectError({ ...baseline(), 'output.json': output({ status: 'blocked', stop: 'CHOICE_REQUIRED', next: [] }) }, 'has disposition fallback under these Requirements', 'terminating on a fallback code under automatic');
+await expectValid({ ...baseline(), 'request.md': request({ alternatives: 3, policy: 'approval-required' }), 'response.md': response({ alternatives: 3, policy: 'approval-required' }), 'data/stack-model.json': stackModel({ alternatives: 3 }), 'output.json': output({ status: 'blocked', stop: 'CHOICE_REQUIRED', next: [], withAlternatives: true }), 'artifacts/entitlement-read-path-alternatives.html': '<!doctype html><title>alternatives</title>' }, 'CHOICE_REQUIRED terminates under approval-required');
+await expectError({ ...baseline(), 'output.json': output({ fallbacks: ['DATA_OWNERSHIP_UNASSIGNED'] }) }, 'has disposition terminate under these Requirements; it cannot be taken as a fallback', 'fallback on a terminate code');
+await expectError({ ...baseline(), 'output.json': output({ fallbacks: ['COMPATIBILITY_UNVERIFIED'] }) }, 'not recorded under ## Fallbacks taken', 'fallback missing from response');
+await expectError({ ...baseline(), 'request.md': request({ extra: '| `mystery` | 1 |\n' }) }, 'which architecture.decide does not declare', 'undeclared requirement');
+await expectError({ ...baseline(), 'request.md': request().replace('| `objective` | one entitlement read path |', '| `objective` | |') }, 'required field objective has no value', 'missing required objective');
+await expectError({ ...baseline(), 'critique.md': critique().replace('| rollback |', '| rollbak |') }, 'lacks a row for rollback', 'critique missing an adverse path');
+await expectError({ ...baseline(), 'critique.md': critique({ failing: true }) }, 'attacks stale-state fail', 'done with a failing attack');
+await expectError({ ...baseline(), 'critique.md': critique({ inherited: 'author thread' }) }, 'no inherited turns', 'critique inherited turns');
+await expectError({ ...baseline(), 'data/stack-model.json': { ...stackModel(), stores: [{ ...stackModel().stores[0], writers: ['course-api'] }] } }, 'is not among its writers', 'owner does not write its store');
+await expectError({ ...baseline(), 'data/stack-model.json': { ...stackModel(), stores: [{ ...stackModel().stores[0], writers: ['entitlement', 'course-api'] }] } }, 'no shared-write justification', 'unjustified second writer');
+await expectError({ ...baseline(), 'data/stack-model.json': { ...stackModel(), components: stackModel().components.map((c) => (c.componentId === 'nestjs' ? { ...c, compatibility: c.compatibility.slice(0, 4) } : c)) } }, 'compatibility unverified on backup-restore', 'retained component missing an axis');
+await expectError({ ...baseline(), 'data/stack-model.json': { ...stackModel(), alternatives: [{ ...stackModel().alternatives[0], status: 'rejected', rejectedBecause: 'x' }] } }, 'exactly one alternative must be selected', 'no selected alternative');
+await expectError({ ...baseline(), 'data/stack-model.json': stackModel({ alternatives: 2 }) }, 'but the request asked for 1', 'more alternatives than asked');
+await expectError({ ...baseline(), 'response.md': response({ handoffDetail: 'src/entitlement/query.ts returns one answer' }) }, 'names an implementation file', 'handoff names a file');
+await expectError({ ...baseline(), 'response.md': response().replace('| Selected alternative | `shared-boundary` |', '| Selected alternative | `edge-cache` |') }, 'Decision names edge-cache', 'response and model disagree on the selection');
+await expectError({ ...baseline(), 'response.md': response().replace('## Handoff', '## Hand-off') }, 'missing section ^## Handoff$', 'response section renamed');
+await expectError({ ...baseline(), 'data/current-state.json': { ...currentState(), observedHead: 'nope' } }, 'observedHead', 'current-state schema');
+await expectError({ ...baseline(), 'request.md': request({ approval: 'shared-boundary' }) }, 'approval is bound under automatic policy', 'approval under automatic');
+await expectError({ ...baseline(), 'output.json': (() => { const o = output(); delete o.fields['independent-critique']; return o; })() }, 'required output independent-critique is not in fields', 'missing required output');
 
-// Attacking only the options that lost is restating the decision, not testing it.
-const attacksOnLosersOnly = structuredClone(validDecidedOutput);
-attacksOnLosersOnly.output.receipt.decision.critique.attacks =
-  attacksOnLosersOnly.output.receipt.decision.critique.attacks.map((attack) => ({
-    ...attack,
-    targetAlternativeId: 'per-feature-guards',
-  }));
-const losersResult = validateOutput(attacksOnLosersOnly);
-assert.equal(losersResult.valid, false);
-assert.ok(losersResult.errors.length >= 8);
-
-// A critique written by the decider is a second draft, not a review.
-const selfCritique = structuredClone(validDecidedOutput);
-selfCritique.output.receipt.decision.critique.reviewerRef = 'role://architecture-decider';
-const selfCritiqueResult = validateOutput(selfCritique);
-assert.equal(selfCritiqueResult.valid, false);
-assert.ok(selfCritiqueResult.errors.some((error) => error.includes('inherited the author rationale')));
-
-// CHOICE_REQUIRED without candidates hands the owner a question with no options in it.
-const choiceWithoutCandidates = structuredClone(validBlockedOutput);
-choiceWithoutCandidates.output.receipt.resume.candidateAlternativeIds = [];
-const choiceResult = validateOutput(choiceWithoutCandidates);
-assert.equal(choiceResult.valid, false);
-assert.ok(choiceResult.errors.some((error) => error.includes('surviving candidate alternatives')));
-
-// Prose alone is not architecture proof; the comparison must be inspectable.
-const proseComparison = structuredClone(validDecidedOutput);
-proseComparison.output.receipt.decision.comparisonArtifactRef = `${artifactRoot}/entitlement-alternatives.md`;
-proseComparison.output.artifactRefs = [
-  currentStateRef,
-  `${artifactRoot}/entitlement-alternatives.md`,
-  stackModelRef,
-  critiqueRef,
-];
-const proseResult = validateOutput(proseComparison);
-assert.equal(proseResult.valid, false);
-assert.ok(proseResult.errors.some((error) => error.includes('inspectable HTML page')));
-
-// The handoff freezes contracts. Naming source files hands implementation choices to the decider.
-const implementationHandoff = structuredClone(validDecidedOutput);
-implementationHandoff.output.receipt.decision.affectedContractRefs = [
-  'contract://entitlement/read',
-  'src/features/api/core/entitlement.service.ts',
-];
-const implementationResult = validateOutput(implementationHandoff);
-assert.equal(implementationResult.valid, false);
-assert.ok(implementationResult.errors.some((error) => error.includes('implementation file')));
-
-// Selecting something other than what the owner approved bypasses the approval.
-const unapprovedSelection = structuredClone(validDecidedOutput);
-unapprovedSelection.output.receipt.binding.approvedAlternativeId = 'edge-cached-claims';
-const unapprovedResult = validateOutput(unapprovedSelection);
-assert.equal(unapprovedResult.valid, false);
-assert.ok(unapprovedResult.errors.some((error) => error.includes('the owner approved')));
-
-// A fingerprint that does not match the observed state lets a later reader bind the wrong snapshot.
-const driftedCurrentState = structuredClone(validDecidedOutput);
-driftedCurrentState.output.receipt.binding.currentStateFingerprint = otherHash;
-assert.equal(validateOutput(driftedCurrentState).valid, false);
-
-// An artifact written outside the invocation root escapes the operator's declared boundary.
-const escapedArtifact = structuredClone(validDecidedOutput);
-escapedArtifact.output.artifactRefs = [...artifactRefs, '.v8/artifacts/another-invocation/notes.json'];
-const escapedResult = validateOutput(escapedArtifact);
-assert.equal(escapedResult.valid, false);
-assert.ok(escapedResult.errors.some((error) => error.includes('artifactRootRef')));
-
-// A blocked receipt that still carries a decision publishes architecture through the failure path.
-const blockedWithDecision = structuredClone(validBlockedOutput);
-blockedWithDecision.output.receipt.decision = validDecidedOutput.output.receipt.decision;
-const blockedDecisionResult = validateOutput(blockedWithDecision);
-assert.equal(blockedDecisionResult.valid, false);
-assert.ok(blockedDecisionResult.errors.some((error) => error.includes('blocked receipt cannot carry a decision')));
-
-// A non-retryable failure with a resume token invites an endless retry of a dead end.
-const nonRetryableResume = structuredClone(validBlockedOutput);
-nonRetryableResume.output.receipt.failure.retryable = false;
-const nonRetryableResult = validateOutput(nonRetryableResume);
-assert.equal(nonRetryableResult.valid, false);
-assert.ok(nonRetryableResult.errors.some((error) => error.includes('non-retryable failure forbids one')));
-
-console.log('architecture.decide self-test passed');
+process.stdout.write('architecture.decide self-test: 3 valid steps, 22 rejected mutations\n');

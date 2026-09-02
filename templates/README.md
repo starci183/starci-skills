@@ -16,7 +16,11 @@ is how a person reads it.
 | `ui-proof.template.md` | `knowledge/ui/proof/*.md` | title; only rule sections, each with one `Case \| When \| Observe` table; closing section |
 | `grammars.template.md` | `knowledge/grammars/*/*.md` | title; any sections; every rule section carries one `Case \| Rule \| Common owner \| Core realization` table |
 | `patterns.template.md` | `knowledge/patterns/*/*.md` | title; any sections; every rule section carries one `Case \| When \| Write` table |
-| `changes.template.md` | `templates/changes.example.md` (the enforced example; real files live in `@dynamic`) | title; Binding table, Files table, What the next step must know |
+| `kinds/changes.template.md` | `changes.md` inside a session step; `templates/changes.example.md` is its enforced example | title; Binding table, Files table, What the next step must know |
+| `operator.template.md` | `operators/*/operator.md` | title `# <operator.id>`; Job, free law sections, Context, Inputs, Requirements, Steps, Outputs, Stops, Next, each with its table; `scripts/validate-operator.mjs` then checks the tables against each other, `errors/`, and `templates/kinds` |
+| `kinds/<kind>.template.md` | files inside a session step (`response.md`, `critique.md`, `request.md`); `applies` is empty | the sections and tables of one markdown kind; `scripts/validate-step.mjs` loads them by kind |
+| `kinds/<kind>.schema.json` | `data/<name>.json` inside a session step | JSON Schema of one machine kind |
+| `step/input.schema.json`, `step/output.schema.json` | `input.json` and `output.json` of every step | the two gates shared by every operator |
 
 ## Contract vocabulary
 
@@ -26,6 +30,10 @@ is how a person reads it.
 - `sections`: the ordered `##` headings a document must carry. `{ "free": true }` marks a zone where a
   document may add its own sections; outside a free zone an extra section is an error. A section may
   carry `table`, the exact header row that must open it.
+- A section with a `table` may also carry `minRows` / `exactRows` (how many data rows), `rows` (first-column
+  values that must appear, backticks ignored), and `cell` (`{ "<Column>": "<regex>" }`, every data row's
+  cell under that column must match; a column absent from this language's header is skipped). A kind
+  template under `kinds/` is single-language: its `title`, section and `table` values may be plain strings.
 - `rules`: `heading` is the regular expression of a rule section, `table` the one header row each rule
   must carry (exactly one table per rule), `closing` the section that must come last, `required`
   whether the document must publish at least one rule. Rule and closing headings are excluded from

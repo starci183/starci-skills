@@ -9,108 +9,284 @@
   },
   "routes": {
     "architecture.decide": {
-      "architecture": { "kind": "resume" },
-      "business": { "kind": "operator", "target": "business.decide" },
-      "backend": { "kind": "operator", "target": "backend.implement" },
-      "frontend": { "kind": "operator", "target": "fe.direction.decide" },
-      "platform": { "kind": "operator", "target": "platform.operate" },
-      "workspace": { "kind": "operator", "target": "workspace.bind" },
-      "caller": { "kind": "user" }
+      "architecture": {
+        "kind": "resume"
+      },
+      "business": {
+        "kind": "operator",
+        "target": "business.decide"
+      },
+      "workspace": {
+        "kind": "operator",
+        "target": "workspace.bind"
+      },
+      "caller": {
+        "kind": "user"
+      }
     },
     "backend.implement": {
-      "backend": { "kind": "resume" },
-      "business": { "kind": "operator", "target": "business.decide" },
-      "contract": { "kind": "user" },
-      "platform": { "kind": "operator", "target": "platform.operate" },
-      "workspace": { "kind": "operator", "target": "workspace.bind" },
-      "caller": { "kind": "user" }
+      "backend": {
+        "kind": "resume"
+      },
+      "business": {
+        "kind": "operator",
+        "target": "business.decide"
+      },
+      "contract": {
+        "kind": "user"
+      },
+      "platform": {
+        "kind": "operator",
+        "target": "platform.operate"
+      },
+      "workspace": {
+        "kind": "operator",
+        "target": "workspace.bind"
+      },
+      "caller": {
+        "kind": "user"
+      }
     },
     "business.decide": {
-      "business": { "kind": "resume" },
-      "backend": { "kind": "operator", "target": "backend.implement" },
-      "frontend": { "kind": "operator", "target": "fe.direction.decide" },
-      "architecture": { "kind": "operator", "target": "architecture.decide" },
-      "workspace": { "kind": "operator", "target": "workspace.bind" },
-      "caller": { "kind": "user" }
+      "business": {
+        "kind": "resume"
+      },
+      "backend": {
+        "kind": "operator",
+        "target": "backend.implement"
+      },
+      "frontend": {
+        "kind": "operator",
+        "target": "fe.direction.decide"
+      },
+      "architecture": {
+        "kind": "operator",
+        "target": "architecture.decide"
+      },
+      "workspace": {
+        "kind": "operator",
+        "target": "workspace.bind"
+      },
+      "caller": {
+        "kind": "user"
+      }
     },
     "content.generate": {
-      "content": { "kind": "resume" },
-      "curriculum": { "kind": "user" },
-      "engineering": { "kind": "user" },
-      "workspace": { "kind": "operator", "target": "workspace.bind" },
-      "caller": { "kind": "user" }
+      "content": {
+        "kind": "resume"
+      },
+      "curriculum": {
+        "kind": "user"
+      },
+      "engineering": {
+        "kind": "user"
+      },
+      "workspace": {
+        "kind": "operator",
+        "target": "workspace.bind"
+      },
+      "caller": {
+        "kind": "user"
+      }
     },
     "fe.direction.decide": {
-      "frontend": { "kind": "resume" },
-      "business": { "kind": "operator", "target": "business.decide" },
-      "backend": { "kind": "operator", "target": "backend.implement" },
-      "architecture": { "kind": "operator", "target": "architecture.decide" },
-      "grammar": { "kind": "user" },
-      "workspace": { "kind": "operator", "target": "workspace.bind" }
+      "frontend": {
+        "kind": "resume"
+      },
+      "business": {
+        "kind": "operator",
+        "target": "business.decide"
+      },
+      "backend": {
+        "kind": "operator",
+        "target": "backend.implement"
+      },
+      "architecture": {
+        "kind": "operator",
+        "target": "architecture.decide"
+      },
+      "grammar": {
+        "kind": "user"
+      },
+      "workspace": {
+        "kind": "operator",
+        "target": "workspace.bind"
+      }
     },
     "fe.presentation.resolve": {
-      "frontend": { "kind": "operator", "target": "fe.direction.decide" },
-      "grammar": { "kind": "user" },
-      "knowledge": { "kind": "user" },
-      "workspace": { "kind": "operator", "target": "workspace.bind" },
-      "caller": { "kind": "user" }
+      "frontend": {
+        "kind": "operator",
+        "target": "fe.direction.decide"
+      },
+      "grammar": {
+        "kind": "user"
+      },
+      "knowledge": {
+        "kind": "user"
+      },
+      "workspace": {
+        "kind": "operator",
+        "target": "workspace.bind"
+      },
+      "caller": {
+        "kind": "user"
+      }
     },
     "fe.source.apply": {
-      "frontend": { "kind": "operator", "target": "fe.direction.decide" },
-      "resolution": { "kind": "operator", "target": "fe.presentation.resolve" },
-      "workspace": { "kind": "operator", "target": "workspace.bind" },
-      "caller": { "kind": "user" }
+      "frontend": {
+        "kind": "operator",
+        "target": "fe.direction.decide"
+      },
+      "resolution": {
+        "kind": "operator",
+        "target": "fe.presentation.resolve"
+      },
+      "workspace": {
+        "kind": "operator",
+        "target": "workspace.bind"
+      },
+      "caller": {
+        "kind": "user"
+      }
     },
     "fe.surface.audit": {
-      "frontend": { "kind": "operator", "target": "fe.presentation.resolve" },
-      "knowledge": { "kind": "user" },
-      "runtime": { "kind": "external" },
-      "workspace": { "kind": "operator", "target": "workspace.bind" },
-      "caller": { "kind": "user" }
+      "frontend": {
+        "kind": "operator",
+        "target": "fe.presentation.resolve"
+      },
+      "knowledge": {
+        "kind": "user"
+      },
+      "runtime": {
+        "kind": "external"
+      },
+      "workspace": {
+        "kind": "operator",
+        "target": "workspace.bind"
+      },
+      "caller": {
+        "kind": "user"
+      }
     },
     "git.publish": {
-      "workspace": { "kind": "operator", "target": "workspace.bind" },
-      "source": { "kind": "operator", "target": "workspace.bind" },
-      "remote": { "kind": "external" },
-      "caller": { "kind": "user" }
+      "workspace": {
+        "kind": "operator",
+        "target": "workspace.bind"
+      },
+      "source": {
+        "kind": "operator",
+        "target": "workspace.bind"
+      },
+      "remote": {
+        "kind": "external"
+      },
+      "caller": {
+        "kind": "user"
+      }
     },
     "platform.operate": {
-      "platform": { "kind": "resume" },
-      "provider": { "kind": "external" },
-      "product": { "kind": "user" },
-      "knowledge": { "kind": "user" },
-      "workspace": { "kind": "operator", "target": "workspace.bind" },
-      "caller": { "kind": "user" }
+      "platform": {
+        "kind": "resume"
+      },
+      "provider": {
+        "kind": "external"
+      },
+      "product": {
+        "kind": "user"
+      },
+      "knowledge": {
+        "kind": "user"
+      },
+      "workspace": {
+        "kind": "operator",
+        "target": "workspace.bind"
+      },
+      "caller": {
+        "kind": "user"
+      }
     },
     "quality.verify": {
-      "backend": { "kind": "operator", "target": "backend.implement" },
-      "frontend": { "kind": "operator", "target": "fe.direction.decide" },
-      "platform": { "kind": "operator", "target": "platform.operate" },
-      "workspace": { "kind": "operator", "target": "workspace.bind" },
-      "caller": { "kind": "user" }
+      "backend": {
+        "kind": "operator",
+        "target": "backend.implement"
+      },
+      "frontend": {
+        "kind": "operator",
+        "target": "fe.direction.decide"
+      },
+      "platform": {
+        "kind": "operator",
+        "target": "platform.operate"
+      },
+      "workspace": {
+        "kind": "operator",
+        "target": "workspace.bind"
+      },
+      "caller": {
+        "kind": "user"
+      }
     },
     "release.deploy": {
-      "deployment": { "kind": "resume" },
-      "platform": { "kind": "operator", "target": "platform.operate" },
-      "provider": { "kind": "external" },
-      "backend": { "kind": "operator", "target": "backend.implement" },
-      "approval": { "kind": "user" },
-      "caller": { "kind": "user" }
+      "deployment": {
+        "kind": "resume"
+      },
+      "platform": {
+        "kind": "operator",
+        "target": "platform.operate"
+      },
+      "provider": {
+        "kind": "external"
+      },
+      "backend": {
+        "kind": "operator",
+        "target": "backend.implement"
+      },
+      "approval": {
+        "kind": "user"
+      },
+      "caller": {
+        "kind": "user"
+      }
     },
     "uat.verify": {
-      "control-panel": { "kind": "external" },
-      "runtime": { "kind": "external" },
-      "frontend": { "kind": "operator", "target": "fe.presentation.resolve" },
-      "backend": { "kind": "operator", "target": "backend.implement" },
-      "quality": { "kind": "operator", "target": "quality.verify" },
-      "caller": { "kind": "user" }
+      "control-panel": {
+        "kind": "external"
+      },
+      "runtime": {
+        "kind": "external"
+      },
+      "frontend": {
+        "kind": "operator",
+        "target": "fe.presentation.resolve"
+      },
+      "backend": {
+        "kind": "operator",
+        "target": "backend.implement"
+      },
+      "quality": {
+        "kind": "operator",
+        "target": "quality.verify"
+      },
+      "caller": {
+        "kind": "user"
+      }
     },
     "workspace.bind": {
-      "workspace": { "kind": "resume" },
-      "source": { "kind": "resume" },
-      "runtime": { "kind": "external" },
-      "identity": { "kind": "external" },
-      "caller": { "kind": "user" }
+      "workspace": {
+        "kind": "resume"
+      },
+      "source": {
+        "kind": "resume"
+      },
+      "runtime": {
+        "kind": "external"
+      },
+      "identity": {
+        "kind": "external"
+      },
+      "caller": {
+        "kind": "user"
+      }
     }
   }
 }

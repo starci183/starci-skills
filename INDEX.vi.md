@@ -11,7 +11,9 @@ operator dựa trên kết quả có kiểu.
    được kiểm đối chiếu với chính schema của các operator, nên thiếu một route là lỗi build.
 3. `resources/`: profile thực thi nào chạy từng vai trò của operator, nó được dùng quyền nào lúc
    chạy, và câu trả lời thường trực về tìm mạng, ràng Grammar, sinh hình. Cũng được kiểm.
-4. Đúng một operator mà nhiệm vụ cần: `operator.json`, `context.md`, `input.md`, `execute.md`.
+4. Đúng một operator mà nhiệm vụ cần: `operator.md` (Việc, Context, Đầu vào, Yêu cầu, Các bước, Đầu ra,
+   Dừng, Kế tiếp) cùng `operator.json` cho resources; gói chưa chuyển vẫn đọc `context.md`, `input.md`,
+   `execute.md`. Mã dừng tra ở `errors/INDEX.md`.
 5. Chỉ những topic knowledge mà operator đó bind.
 
 Không nạp trước cả cây. Một operator bind tập topic nhỏ nhất mà quyết định của nó cần, mỗi topic kèm
@@ -21,19 +23,22 @@ fingerprint và danh sách rule đầy đủ, và không được phát ra mã n
 
 ```text
 SKILL.md                 một cửa vào, mười bốn operator, một bảng định tuyến
-routing.json             14 operator, 76 route, bốn loại: operator | resume | user | external
+routing.json             14 operator, 73 route, bốn loại: operator | resume | user | external
 alias/                   alias.json (sổ cho máy: vị trí, scheme, bind, ai ghi, vùng) + INDEX.md (bản đồ sinh theo vùng); operator chỉ đọc qua alias
 resources/               agents/profiles/{openai,claude}.json (6 profile) + orchestrator.json (mỗi operator một agent, tối đa 3); có kiểm
 operators/INDEX.md       ma trận sinh tự động: mỗi operator đọc gì (tĩnh, động), ghi gì, các bước và mã dừng
-operators/<id>/          mười lăm file mỗi gói; operator.json mang resources và refs; self-test.mjs phải xanh
+errors/                  errors.json (mã dừng dùng chung cho nhiều operator, có scope) + INDEX.md (sinh, gộp với từng operators/<id>/errors.json): mỗi mã một cách xử lý, terminate hoặc fallback
+operators/<id>/          operator.md (+vi) một file viết tay cho mỗi operator, operator.json (resources), errors.json (mã riêng), validate.mjs, self-test.mjs;
+                         gói chưa chuyển vẫn giữ dạng mười lăm file (context/input/execute/output + schema + validator)
 knowledge/
   ui/composition/        cây phải chứa gì, trước khi nó tồn tại      -> fe.direction.decide
   ui/presentation/       ranh giới do app sở hữu lấy giá trị CSS nào -> fe.presentation.resolve
   ui/proof/              thứ chỉ đúng sai sau khi đã render          -> fe.surface.audit
   patterns/fe, be        quy ước code trích từ hai source thật
   grammars/<họ>/         cách một họ hình ảnh hiện thực Common
-templates/               mỗi loại tài liệu một template; mỗi template mang khối json template-contract dùng để kiểm cả cây
-scripts/                 validate-routing.mjs, validate-resources.mjs, validate-knowledge-citations.mjs, validate-templates.mjs, run-operator-self-tests.mjs;
+templates/               mỗi loại tài liệu một template; mỗi template mang khối json template-contract dùng để kiểm cả cây;
+                         kinds/ định kiểu mọi file đi qua giữa các bước (<kind>.template.md cho markdown, <kind>.schema.json cho dữ liệu); step/ giữ hai gate input.json và output.json
+scripts/                 validate-routing.mjs, validate-resources.mjs, validate-knowledge-citations.mjs, validate-alias.mjs, validate-templates.mjs, validate-operator.mjs, validate-step.mjs, run-operator-self-tests.mjs;
                          device-state.mjs và workspace-portable.mjs (+ spec), thứ package.json của backend gọi tới
 readiness/               các schema workspaces/ mà khai báo route portable và hydrate gọi tên trong $schema
 audits/<phiên bản>/      hồ sơ chạy khô cùng artifact input và output đã qua validator

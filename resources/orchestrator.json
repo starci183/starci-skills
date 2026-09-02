@@ -1,40 +1,40 @@
 {
   "schemaVersion": 8,
-  "note": "How operators become agents. One invocation of one operator is one agent, created fresh on the operator's own profile (operator.json → resources) with the refs its operator.json declares and nothing else. The orchestrator owns dispatch: it validates the input, starts the agent, validates the output, and follows routing.json to the next operator, user, or external party. It never merges two operators into one agent and never lets an agent start another.",
+  "note": "How operators become agents. One invocation of one operator is one agent, created fresh on the operator's own profile (operator.json → resources) with the aliases its Context table declares and nothing else. The orchestrator owns dispatch: it writes the step's input.json and request.md, starts the agent, validates the step (scripts/validate-step.mjs, then the operator's validate.mjs), and follows routing.json to the next operator, user, or external party. It never merges two operators into one agent and never lets an agent start another; a fresh critique agent inside architecture.decide is the one exception, spawned by the orchestrator for that step and given only the step's artifacts.",
   "agentPerOperator": true,
   "maxConcurrentAgents": 3,
   "dispatch": "routing.json",
   "agent": {
     "profile": "operator.json → resources.profile",
     "grants": "operator.json → resources.requires, and nothing the profile would otherwise permit",
-    "refs": "operator.json → refs, resolved through alias/alias.json; an unlisted location is unreadable",
-    "isolation": "fresh, no inherited turns; a critique inside an operator is a step of the same agent",
-    "writes": "only @dynamic/<file> in its own step folder, registered in output.artifactRefs"
+    "refs": "operator.md → Context table (an old-shape package: operator.json → refs), resolved through alias/alias.json; an unlisted location is unreadable",
+    "requirements": "operator.md → Requirements table; the orchestrator fills defaults and asks a person only for fields whose Default is — or whose value the stop code names",
+    "isolation": "fresh, no inherited turns",
+    "writes": "only its own step folder step-N-M/: response.md, data/, artifacts/, output.json; the old shape writes @dynamic/<file> in steps/<n>.<operator.id>/"
   },
   "concurrency": {
-    "rule": "at most maxConcurrentAgents agents at once, and never two agents whose refs share a writable location",
+    "rule": "at most maxConcurrentAgents agents at once; steps sharing N run concurrently only when their Writes touch no common alias",
     "sharedCheckout": "two agents may read one checkout; only one may hold it for writing (backend.implement, fe.source.apply, git.publish are exclusive per checkout)",
     "sharedRoot": "business.decide is exclusive per businesses root; platform.operate is exclusive per runtime owner"
   },
   "handoff": {
-    "carrier": "the typed receipt <receiptType>.json (and changes.md where source was written) in the step folder; the next agent reads them as @dynamic/<file>, nearest earlier producer wins",
-    "resume": "a blocked receipt with a resume token re-enters the same operator as a new agent",
-    "stop": "routing.json kind user or external ends automation; the orchestrator reports and waits"
+    "carrier": "output.json fields: kind → file inside the step folder; the next agent's request.md Inputs table points at ../step-N-M/<file>, nearest earlier producer wins",
+    "stop": "output.json status blocked with stop = code; errors/ says whether the code terminates or falls back, and routing.json says where a terminated step hands to",
+    "resume": "a blocked step re-enters the same operator as a new agent in a new step folder, with resume naming the blocked step and its token"
   },
   "session": {
     "root": "<Source>/.worktrees/sessions/<sessionId>/",
     "id": "<yyyymmdd-HHMMss>-<project>-<first operator>, e.g. 20260903-142200-starci-academy-fe.direction.decide",
-    "files": {
-      "session.json": "id, project, startedAt, status (running | blocked | done), steps[] in order: {n, operator, invocationId, startedAt, outcome, receipt}",
-      "leases/": "one file per writable location this session holds (checkout, businesses root, runtime owner); the orchestrator refuses a second session that needs the same lease",
-      "steps/<n>.<operator.id>/": "that step's @dynamic folder: <receiptType>.json always; changes.md when the step wrote source; the artifacts its Sequence names; input.project.artifactRootRef equals this path"
-    },
-    "read": "@dynamic/<file> resolves to the nearest earlier step that wrote <file>; two writers in one session (backend.implement then fe.source.apply) therefore have two changes.md, and quality.verify after fe.source.apply reads the frontend one; @dynamic/steps/<n>/<file> pins a specific step when a consumer needs the earlier one",
+    "manifest": "session.json: id, project, startedAt, status (running | blocked | done), chain [[\"1-1\"], [\"2-1\", \"2-2\"], ...], steps { \"N-M\": operatorId }, current, leases { \"N-M\": agent }",
+    "step": "step-<N>-<M>/ — N is the position in the chain, M the parallel branch",
+    "stepLayout": ["input.json", "request.md", "response.md", "critique.md when the operator has one", "data/", "artifacts/", "output.json"],
+    "read": "an Input kind resolves to the nearest earlier step whose output.json fields lists it; two producers of one kind in one session (backend.implement then fe.source.apply both produce changes) therefore resolve to the later one unless request.md pins an earlier step",
     "lifecycle": [
       "create: the orchestrator writes session.json and takes the leases before the first agent starts",
-      "step: each agent gets a fresh steps/<n>.<operator.id>/ folder and writes only there",
-      "block: a blocked receipt keeps the session on disk with status blocked so a resume re-enters the same step folder as step n+1",
-      "done: when routing reaches user or external, or the last operator emits, the orchestrator releases the leases and deletes the session folder; what survives is what the steps published (commits, business heads, UAT pairs, remote runs) and any audit record the owner copies out first"
+      "step: each agent gets a fresh step-N-M/ folder with input.json and request.md already written, and writes only there",
+      "advance: output.json status done and both validators green; the orchestrator writes the next step's input.json from the Next table and routing.json",
+      "block: status blocked keeps the session on disk; the orchestrator asks the person for the field the stop names, then re-enters the operator in step-(N+1)-1 with resume set",
+      "done: when routing reaches user or external, or git.publish emits done, the orchestrator releases the leases and deletes the session folder; what survives is what the steps published (commits, business heads, UAT pairs, remote runs) and any audit record the owner copies out first"
     ]
   }
 }

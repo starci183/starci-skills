@@ -1,8 +1,12 @@
 {
-  "schemaVersion": 8,
+  "schemaVersion": 9,
   "id": "architecture.decide",
   "domain": "architecture",
-  "job": "Decide one architecture with its tech stack, system boundaries, and data ownership, and prove it against observed current state, rejected alternatives, verified compatibility, and an independent critique.",
+  "job": "Decide one architecture with its tech stack, system boundaries, and data ownership, and prove it against the observed current state, the rejected alternatives, verified compatibility, and an independent critique.",
+  "package": "operator.md",
+  "errors": "errors.json",
+  "validator": "validate.mjs",
+  "selfTest": "self-test.mjs",
   "resources": {
     "profile": "sol-fresh",
     "requires": [
@@ -13,59 +17,5 @@
       "grammarBound": false,
       "imageGeneration": "never"
     }
-  },
-  "refs": [
-    {
-      "alias": "@worktrees/businesses/<featureId>",
-      "required": true,
-      "purpose": "The promise the architecture must keep."
-    },
-    {
-      "alias": "@workspaces/be",
-      "required": true,
-      "purpose": "The routed checkout observed at the frozen head; the inventory comes from its manifests and deployment files."
-    },
-    {
-      "alias": "@knowledge/patterns",
-      "required": false,
-      "purpose": "Reusable patterns the scope may bind; a shape, not a selection."
-    },
-    {
-      "alias": "@dynamic/architecture-decision.json",
-      "required": true,
-      "purpose": "A prior decision on the same or an adjacent boundary; lineage."
-    }
-  ],
-  "contextContract": "context.md",
-  "inputSchema": "input.schema.json",
-  "outputSchema": "output.schema.json",
-  "inputValidator": "validate-input.mjs",
-  "outputValidator": "validate-output.mjs",
-  "selfTest": "self-test.mjs",
-  "sideEffects": [
-    "write only the typed decision receipt, the stack model, the data-ownership model, the rendered alternative comparison, and the critique under input.project.artifactRootRef"
-  ],
-  "forbiddenSideEffects": [
-    "propose a target before the current state is observed at the frozen source head",
-    "justify a component by incumbency",
-    "claim compatibility that no evidence checked",
-    "leave a boundary without a stated data-ownership answer",
-    "publish a critique that inherited the deciding execution's turns or rationale",
-    "name implementation files in the downstream handoff",
-    "mutate routed product source, business authority, or frontend authority",
-    "start, stop, or reconfigure runtime services",
-    "claim implementation, quality-gate, or UAT completion"
-  ],
-  "stopConditions": [
-    "the current state cannot be observed at the frozen source head",
-    "required business authority is missing or stale",
-    "no alternative survives the frozen constraints",
-    "several alternatives remain material and product authority must choose",
-    "a retained stack component has no compatibility evidence",
-    "a physical store has no owning boundary",
-    "an independent critique attack has no resolution",
-    "the selection policy requires an approval that was never bound",
-    "the observed source head differs from the frozen head",
-    "a resume adds no effective evidence, constraint, inventory, or approval delta"
-  ]
+  }
 }

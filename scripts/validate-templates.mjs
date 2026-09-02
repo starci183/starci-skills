@@ -29,6 +29,23 @@ export async function loadTemplates(root) {
   return templates;
 }
 
+// Kind templates describe files that only exist inside a session (templates/kinds/<kind>.template.md);
+// they claim nothing in the tree, so validateTree ignores them and validate-step loads them by kind.
+export async function loadKindTemplates(root) {
+  const dir = path.join(root, 'templates', 'kinds');
+  const kinds = new Map();
+  for (const name of (await readdir(dir)).filter((f) => f.endsWith('.template.md')).sort()) {
+    const text = await readFile(path.join(dir, name), 'utf8');
+    const m = CONTRACT_FENCE.exec(text);
+    if (!m) throw new Error(`templates/kinds/${name}: no template-contract block`);
+    const contract = JSON.parse(m[1]);
+    if (contract.kind !== name.replace(/\.template\.md$/, '')) throw new Error(`templates/kinds/${name}: contract.kind must equal the file name`);
+    if (contract.applies?.length) throw new Error(`templates/kinds/${name}: a kind template applies to session files only; applies must be empty`);
+    kinds.set(contract.kind, contract);
+  }
+  return kinds;
+}
+
 async function walk(dir) {
   const out = [];
   for (const entry of await readdir(dir, { withFileTypes: true })) {
@@ -67,16 +84,26 @@ function tableHeadersBetween(lines, from, to) {
   return out;
 }
 
-function checkDocument(rel, text, contract, lang) {
+// Data rows of the table whose header sits at `headerLine` (1-based): one array of trimmed cells per row.
+function tableRowsAt(lines, headerLine) {
+  const rows = [];
+  for (let i = headerLine + 1; i < lines.length && lines[i].startsWith('|'); i += 1) rows.push(lines[i].split('|').slice(1, -1).map((c) => c.trim()));
+  return rows;
+}
+const unquote = (s) => s.replace(/^`|`$/g, '');
+
+// A contract value is either one string (a single-language kind template) or { en, vi }.
+export function checkDocument(rel, text, contract, lang) {
+  const L = (v) => (typeof v === 'string' ? v : v?.[lang] ?? v?.en);
   const errors = [];
   const lines = text.split(/\r?\n/);
   const title = lines[0] ?? '';
-  const titleRe = new RegExp(contract.title[lang], 'u');
-  if (!titleRe.test(title)) errors.push(`${rel}:1: title must match ${contract.title[lang]}`);
+  const titleRe = new RegExp(L(contract.title), 'u');
+  if (!titleRe.test(title)) errors.push(`${rel}:1: title must match ${L(contract.title)}`);
 
   const all = headings(lines);
   const ruleRe = contract.rules ? new RegExp(contract.rules.heading, 'u') : null;
-  const closingRe = contract.rules?.closing ? new RegExp(contract.rules.closing[lang], 'u') : null;
+  const closingRe = contract.rules?.closing ? new RegExp(L(contract.rules.closing), 'u') : null;
   const frame = all.filter((h) => !(ruleRe && ruleRe.test(h.text)) && !(closingRe && closingRe.test(h.text)));
 
   // Walk the ordered section contract against the frame headings.
@@ -84,19 +111,35 @@ function checkDocument(rel, text, contract, lang) {
   let freeZone = false;
   for (const section of contract.sections ?? []) {
     if (section.free) { freeZone = true; continue; }
-    const re = new RegExp(section[lang], 'u');
+    const re = new RegExp(L(section), 'u');
     let found = -1;
     for (let i = cursor; i < frame.length; i += 1) if (re.test(frame[i].text)) { found = i; break; }
-    if (found === -1) { errors.push(`${rel}: missing section ${section[lang]}`); continue; }
+    if (found === -1) { errors.push(`${rel}: missing section ${L(section)}`); continue; }
     if (found > cursor && !freeZone) {
-      for (let i = cursor; i < found; i += 1) errors.push(`${rel}:${frame[i].line}: unexpected section "${frame[i].text}" before ${section[lang]}`);
+      for (let i = cursor; i < found; i += 1) errors.push(`${rel}:${frame[i].line}: unexpected section "${frame[i].text}" before ${L(section)}`);
     }
     if (section.table) {
       const start = frame[found].line;
       const next = all.find((h) => h.line > start);
       const tables = tableHeadersBetween(lines, start, next ? next.line - 1 : lines.length);
-      if (tables.length === 0 || tables[0].text !== section.table[lang]) {
-        errors.push(`${rel}:${start}: section must open with the table ${section.table[lang]}`);
+      const header = L(section.table);
+      if (tables.length === 0 || tables[0].text !== header) {
+        errors.push(`${rel}:${start}: section must open with the table ${header}`);
+      } else {
+        // Row-level shape: how many rows, which first-column values must appear, which cells must match.
+        const cols = header.split('|').slice(1, -1).map((c) => c.trim());
+        const rows = tableRowsAt(lines, tables[0].line);
+        const at = `${rel}:${tables[0].line}`;
+        if (section.minRows !== undefined && rows.length < section.minRows) errors.push(`${at}: table needs at least ${section.minRows} rows, found ${rows.length}`);
+        if (section.exactRows !== undefined && rows.length !== section.exactRows) errors.push(`${at}: table needs exactly ${section.exactRows} rows, found ${rows.length}`);
+        const firsts = new Set(rows.map((r) => unquote(r[0] ?? '')));
+        for (const need of section.rows ?? []) if (!firsts.has(need)) errors.push(`${at}: table lacks a row for ${need}`);
+        for (const [col, pattern] of Object.entries(section.cell ?? {})) {
+          const idx = cols.indexOf(col);
+          if (idx === -1) continue; // the column belongs to the other language's header
+          const cellRe = new RegExp(pattern, 'u');
+          rows.forEach((r, i) => { if (!cellRe.test(r[idx] ?? '')) errors.push(`${at}: row ${i + 1} cell ${col} "${r[idx] ?? ''}" does not match ${pattern}`); });
+        }
       }
     }
     cursor = found + 1;
@@ -114,11 +157,11 @@ function checkDocument(rel, text, contract, lang) {
       const next = all.find((h) => h.line > rule.line);
       const tables = tableHeadersBetween(lines, rule.line, next ? next.line - 1 : lines.length);
       if (tables.length !== 1) errors.push(`${rel}:${rule.line}: rule must carry exactly one table, found ${tables.length}`);
-      else if (tables[0].text !== contract.rules.table[lang]) errors.push(`${rel}:${tables[0].line}: rule table must be ${contract.rules.table[lang]}`);
+      else if (tables[0].text !== L(contract.rules.table)) errors.push(`${rel}:${tables[0].line}: rule table must be ${L(contract.rules.table)}`);
     });
     if (closingRe) {
       const last = all[all.length - 1];
-      if (!last || !closingRe.test(last.text)) errors.push(`${rel}: last section must be ${contract.rules.closing[lang]}`);
+      if (!last || !closingRe.test(last.text)) errors.push(`${rel}: last section must be ${L(contract.rules.closing)}`);
     }
   }
   return errors;
@@ -147,7 +190,17 @@ export async function validateTree(root) {
       checked += 1;
     }
   }
-  return { errors, checked, templates: templates.length };
+  // A kind template may name one enforced example in the tree, so the shape a session file must take
+  // is visible to a reader before any session exists.
+  let kinds = new Map();
+  try { kinds = await loadKindTemplates(root); } catch (e) { if (e.code !== 'ENOENT') throw e; }
+  for (const contract of kinds.values()) {
+    if (!contract.example) continue;
+    if (!files.includes(contract.example)) { errors.push(`${contract.example}: example named by kind ${contract.kind} is missing`); continue; }
+    errors.push(...checkDocument(contract.example, await readFile(path.join(root, contract.example), 'utf8'), contract, 'en'));
+    checked += 1;
+  }
+  return { errors, checked, templates: templates.length + kinds.size };
 }
 
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {

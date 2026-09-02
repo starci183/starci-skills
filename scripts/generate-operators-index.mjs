@@ -3,10 +3,12 @@
 // the one table that says, for every operator, what it needs, what it produces, and which of those
 // things only exist inside the session. `--check` regenerates in memory and fails when the committed
 // file differs, so the matrix cannot drift from the packages it summarises.
+import { existsSync } from 'node:fs';
 import { readdir, readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import process from 'node:process';
 import { fileURLToPath } from 'node:url';
+import { parseOperatorMd, cellCodes, kindOf } from './operator-md.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const operatorsDir = path.join(root, 'operators');
@@ -29,6 +31,21 @@ const ops = [];
 for (const entry of (await readdir(operatorsDir, { withFileTypes: true })).filter((e) => e.isDirectory()).sort((a, b) => a.name.localeCompare(b.name))) {
   const dir = path.join(operatorsDir, entry.name);
   const manifest = JSON.parse(await readFile(path.join(dir, 'operator.json'), 'utf8'));
+  if (existsSync(path.join(dir, 'operator.md'))) {
+    // operator.md package: static reads from Steps, dynamic inputs and outputs as kinds.
+    const op = parseOperatorMd(await readFile(path.join(dir, 'operator.md'), 'utf8'), 'en');
+    const readsStatic = new Set();
+    for (const r of op.tables.steps?.rows ?? []) for (const m of r.reads.matchAll(ALIAS)) if (!m[0].startsWith('@dynamic')) readsStatic.add(m[0]);
+    ops.push({
+      id: manifest.id, dir: entry.name, job: op.job || manifest.job, profile: manifest.resources?.profile ?? '?',
+      refs: [], steps: op.tables.steps?.rows.length ?? 0, codes: (op.tables.stops?.rows ?? []).map((r) => cellCodes(r.code)[0] ?? r.code.trim()),
+      readsStatic: [...readsStatic].sort(),
+      readsDynamic: (op.tables.inputs?.rows ?? []).map((r) => kindOf(r.kind)).filter((k) => k && k !== '—').map((k) => `kind:${k}`).sort(),
+      readsOwn: [],
+      writes: (op.tables.outputs?.rows ?? []).map((r) => `kind:${kindOf(r.kind)}`).sort(),
+    });
+    continue;
+  }
   const outSchema = JSON.parse(await readFile(path.join(dir, 'output.schema.json'), 'utf8'));
   const codes = outSchema.$defs?.failure?.properties?.code?.enum ?? [];
   const rows = sequenceRows(await readFile(path.join(dir, 'execute.md'), 'utf8'), '## Sequence');
@@ -51,7 +68,15 @@ for (const entry of (await readdir(operatorsDir, { withFileTypes: true })).filte
 
 // Which operator produces each dynamic file, so a consumer's row can name its producer.
 const producers = new Map();
-for (const op of ops) for (const w of op.writes) if (w.startsWith('@dynamic/')) producers.set(w, [...(producers.get(w) ?? []), op.id]);
+for (const op of ops) for (const w of op.writes) {
+  if (w.startsWith('@dynamic/')) producers.set(w, [...(producers.get(w) ?? []), op.id]);
+  else if (w.startsWith('kind:')) {
+    producers.set(w, [...(producers.get(w) ?? []), op.id]);
+    // Migration bridge: an old-shape consumer reads @dynamic/<kind>.json; the operator.md producer of kind:<kind> satisfies it.
+    const bridge = `@dynamic/${w.slice('kind:'.length)}.json`;
+    producers.set(bridge, [...(producers.get(bridge) ?? []), op.id]);
+  }
+}
 
 const code = (s) => `\`${s}\``;
 const list = (arr) => (arr.length ? arr.map(code).join(', ') : '—');

@@ -16,8 +16,9 @@ result.
    question, not a guess.
 2. Run `workspace.bind` for any mission that reads or writes routed source. Nothing else may resolve a
    checkout, and a similar directory name is never route authority.
-3. Select the first operator from the table below. Read only that operator's `operator.json`,
-   `context.md`, `input.md`, and `execute.md`.
+3. Select the first operator from the table below. Read only that operator's `operator.md` and
+   `operator.json` (a package not yet migrated: `operator.json`, `context.md`, `input.md`,
+   `execute.md`).
 4. Run that operator, end to end, on the one profile its `operator.json` names under `resources`, with
    only the grants it lists. An operator has no other model, no inherited turns, and no grant the
    assignment omits.

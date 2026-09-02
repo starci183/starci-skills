@@ -11,7 +11,9 @@ typed results.
    is validated against the operators' own schemas, so a missing route is a build failure.
 3. `resources/` — which execution profile runs each operator role, which runtime grants it may use,
    and its standing answers on web search, Grammar binding, and image generation. Also validated.
-4. The one operator the mission needs: its `operator.json`, `context.md`, `input.md`, `execute.md`.
+4. The one operator the mission needs: its `operator.md` (Job, Context, Inputs, Requirements, Steps,
+   Outputs, Stops, Next) plus `operator.json` for resources; a package not yet migrated still reads
+   `context.md`, `input.md`, `execute.md`. Stop codes resolve through `errors/INDEX.md`.
 5. Only the knowledge topics that operator binds.
 
 Do not preload the tree. An operator binds the smallest set of topics its decision needs, each with
@@ -21,19 +23,22 @@ its fingerprint and complete rule inventory, and may emit no identifier outside 
 
 ```text
 SKILL.md                 one entry, fourteen operators, one routing map
-routing.json             14 operators, 76 routes, four kinds: operator | resume | user | external
+routing.json             14 operators, 73 routes, four kinds: operator | resume | user | external
 alias/                   alias.json (machine registry: location, scheme, binding, writers, zone) + INDEX.md (generated map by zone); every operator reads by alias only
 resources/               agents/profiles/{openai,claude}.json (6 profiles) + orchestrator.json (one agent per operator, max 3); validated
 operators/INDEX.md       generated matrix: what each operator reads (static, dynamic), writes, its steps and stop codes
-operators/<id>/          fifteen files each; operator.json carries resources and refs; self-test.mjs must pass
+errors/                  errors.json (stop codes shared by several operators, with scope) + INDEX.md (generated, merged with each operators/<id>/errors.json): one disposition per code, terminate or fallback
+operators/<id>/          operator.md (+vi) one authored file per operator, operator.json (resources), errors.json (its own codes), validate.mjs, self-test.mjs;
+                         packages not yet migrated keep the fifteen-file shape (context/input/execute/output + schemas + validators)
 knowledge/
   ui/composition/        what a tree must contain, before it exists   -> fe.direction.decide
   ui/presentation/       which CSS value an app-owned boundary takes  -> fe.presentation.resolve
   ui/proof/              what is only true once rendered              -> fe.surface.audit
   patterns/fe, be        code conventions extracted from the two live sources
   grammars/<family>/     one visual family's realization of Common
-templates/               one template per document kind; each carries the json template-contract the tree is checked against
-scripts/                 validate-routing.mjs, validate-resources.mjs, validate-knowledge-citations.mjs, validate-templates.mjs, run-operator-self-tests.mjs;
+templates/               one template per document kind; each carries the json template-contract the tree is checked against;
+                         kinds/ types every file that crosses between steps (<kind>.template.md for markdown, <kind>.schema.json for data); step/ holds the input.json and output.json gates
+scripts/                 validate-routing.mjs, validate-resources.mjs, validate-knowledge-citations.mjs, validate-alias.mjs, validate-templates.mjs, validate-operator.mjs, validate-step.mjs, run-operator-self-tests.mjs;
                          device-state.mjs and workspace-portable.mjs (+ specs), which the backend package.json calls
 readiness/               workspaces/ schemas that the portable and hydrated route declarations name as $schema
 audits/<version>/        dry-run records with their validated input and output artifacts

@@ -1,0 +1,123 @@
+# architecture.decide
+
+## Job
+
+Decide one architecture with its tech stack, system boundaries, and data ownership, and prove it
+against the observed current state, the rejected alternatives, verified compatibility, and an
+independent critique.
+
+## Observe before proposing
+
+Nothing is proposed before the current state has been observed at the frozen head of
+`@workspaces/be` and written to `data/current-state.json` with its own fingerprint. A proposal
+written before the observation describes a system simpler than the real one, and every later
+comparison inherits that simplification. An observation taken at another head is worse: it looks
+rigorous while describing code that no longer exists.
+
+## Incumbency is not authority
+
+The inventory says what the system runs today; that is the most useful and the most dangerous
+context this operator receives. An existing framework, datastore, broker, or deployment shape enters
+the decision in exactly two roles: as a measurable constraint the target must satisfy, or as observed
+evidence about behaviour already proved. It never enters as a reason by itself. A component
+justified because it is already there is rejected outright.
+
+## Prove, do not assume
+
+An alternative is counted only when it is materially different, different in ownership or
+mechanism, not in wording, and assessed on exactly the trade-off axes the person named. Every
+retained component carries a verified verdict with evidence across runtime version, deployable
+unit, communication failure, datastore ownership, and backup and restore; a verdict that skipped an
+axis is a partial check wearing a complete label. Every boundary answers the data question: it owns
+at least one store or states that it owns none; a store names one owning boundary that writes it,
+and a second writer exists only with an explicit shared-write justification.
+
+## Boundary
+
+Context is read-only. The operator writes only its own step folder: `response.md`,
+`data/current-state.json`, `data/stack-model.json`, `critique.md`, the alternatives page when more
+than one alternative was asked for, and `output.json`. It does not mutate routed source, publish
+business authority, start or reconfigure runtime services, name implementation files in the handoff,
+or claim that an implementation, a quality gate, or a UAT run has passed.
+
+## Context
+
+| Alias | Bind | Required |
+| --- | --- | --- |
+| `@workspaces/be` | the routed backend checkout read at the frozen head; the inventory comes from its manifests and deployment files | yes |
+| `@worktrees/businesses/<featureId>` | the published business head, the promise the architecture must keep | yes |
+| `@knowledge/patterns` | reusable shapes the scope may bind; a shape, never a selection | no |
+
+## Inputs
+
+| Kind | From | Required |
+| --- | --- | --- |
+| `architecture-decision` | a prior run of `architecture.decide` on the same or an adjacent boundary; lineage that may be contradicted, never ignored | no |
+
+## Requirements
+
+| Field | Type | Default | Ask |
+| --- | --- | --- | --- |
+| `objective` | prompt | — | The objective the architecture must achieve, in the person's words |
+| `decisionId` | id | slug of `objective` | The name the artifacts carry |
+| `alternatives` | number 1–4 | 1 | How many materially different designs to generate; more than one only when a comparison was asked for |
+| `tradeoffAxes` | list | cost, complexity, reversibility | The axes every alternative is scored on and the critique attacks along |
+| `constraints` | list of `{id, kind, statement}` | — | kind is fixed-intent, measurable, preference, assumption or unknown; at least one fixed-intent |
+| `selectionPolicy` | choice | automatic | `automatic`: the operator selects and records why; `approval-required`: the person selects |
+| `approval` | id | null | The approved alternative id; required only under `approval-required`, supplied on resume after `CHOICE_REQUIRED` |
+| `resume` | token | null | The blocked step's token when re-entering after a stop |
+
+## Steps
+
+| # | Step | Params | Reads | Writes | Stops with |
+| --- | --- | --- | --- | --- | --- |
+| 1 | Validate the gate and resume | `resume`, `approval` | `input.json`, `request.md`, input `architecture-decision` when present, @workspaces/be at the frozen head | — | `INVALID_INPUT`, `SOURCE_DRIFT`, `NO_PROGRESS` |
+| 2 | Observe the current state | — | @workspaces/be at the frozen head: manifests, configuration, deployment files | `data/current-state.json` | `CURRENT_STATE_UNOBSERVED` |
+| 3 | Bind the inventory to the business promise | — | `data/current-state.json`, @worktrees/businesses/<featureId> at its published head | — | `BUSINESS_AUTHORITY_REQUIRED`, `EVIDENCE_MISSING` |
+| 4 | Frame the decision | `objective`, `decisionId`, `constraints`, `tradeoffAxes` | `request.md` | — | `CONSTRAINT_CONTRADICTION` |
+| 5 | Generate the alternatives | `alternatives` | `data/current-state.json`, @knowledge/patterns | `artifacts/<decisionId>-alternatives.html` only when more than one alternative was asked for | `NO_VIABLE_ALTERNATIVE` |
+| 6 | Select | `selectionPolicy`, `tradeoffAxes`, `approval` | `artifacts/<decisionId>-alternatives.html` when present | — | `CHOICE_REQUIRED` |
+| 7 | Deepen the selected alternative | `constraints` | `data/current-state.json` | `data/stack-model.json` | `DATA_OWNERSHIP_UNASSIGNED`, `COMPATIBILITY_UNVERIFIED` |
+| 8 | Critique independently: a fresh agent on this operator's profile with no inherited turns | — | `data/stack-model.json` and the claims it makes, never the author's rationale | `critique.md` | `CRITIQUE_UNRESOLVED` |
+| 9 | Confirm or return the selection | `selectionPolicy` | `critique.md`, `data/stack-model.json` | — | `CHOICE_REQUIRED`, `NO_VIABLE_ALTERNATIVE` |
+| 10 | Write the handoff and emit | — | everything above | `response.md`, `output.json` | — |
+
+Under the defaults, step 5 produces one design and no comparison page, step 6 has nothing to
+choose, and the decision's quality rests on step 8. When the only alternative fails an attack, step 9
+stops with `NO_VIABLE_ALTERNATIVE`, not `CHOICE_REQUIRED`. The handoff names contracts, never
+implementation files, because choosing the files is the next domain's job.
+
+## Outputs
+
+| Kind | File | Type | Required |
+| --- | --- | --- | --- |
+| `architecture-decision` | `response.md` | md | yes |
+| `current-state` | `data/current-state.json` | data | yes |
+| `stack-model` | `data/stack-model.json` | data | yes |
+| `alternatives` | `artifacts/<decisionId>-alternatives.html` | artifact | no |
+| `independent-critique` | `critique.md` | md | yes |
+
+## Stops
+
+| Code | Disposition |
+| --- | --- |
+| `INVALID_INPUT` | terminate |
+| `SOURCE_DRIFT` | terminate |
+| `NO_PROGRESS` | terminate |
+| `EVIDENCE_MISSING` | terminate |
+| `CURRENT_STATE_UNOBSERVED` | terminate |
+| `BUSINESS_AUTHORITY_REQUIRED` | terminate |
+| `CONSTRAINT_CONTRADICTION` | terminate |
+| `NO_VIABLE_ALTERNATIVE` | terminate |
+| `CHOICE_REQUIRED` | fallback |
+| `COMPATIBILITY_UNVERIFIED` | fallback |
+| `DATA_OWNERSHIP_UNASSIGNED` | terminate |
+| `CRITIQUE_UNRESOLVED` | terminate |
+
+## Next
+
+| When | Operator |
+| --- | --- |
+| the business promise must be modelled again against the decided boundaries | `business.decide` |
+| the decision is confirmed and a backend contract changes | `backend.implement` |
+| the decision is confirmed and a frontend surface changes | `fe.direction.decide` |

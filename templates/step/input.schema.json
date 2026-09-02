@@ -1,0 +1,40 @@
+{
+  "$id": "step:input",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "operatorId", "step", "sessionId", "contexts", "fields", "resume"],
+  "properties": {
+    "schemaVersion": { "const": 9 },
+    "operatorId": { "type": "string", "pattern": "^[a-z]+(?:\\.[a-z]+)+$" },
+    "step": { "type": "string", "pattern": "^\\d+-\\d+$" },
+    "sessionId": { "type": "string", "minLength": 1, "maxLength": 128 },
+    "contexts": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["alias", "head"],
+        "properties": {
+          "alias": { "type": "string", "pattern": "^@[a-z][a-z-]*(?:/[A-Za-z0-9_<>.@#:-]+)*$" },
+          "head": { "type": ["string", "null"], "pattern": "^[0-9a-f]{40}$" }
+        }
+      }
+    },
+    "fields": {
+      "type": "object",
+      "additionalProperties": { "type": "string", "pattern": "^(request\\.md#[a-z-]+|\\.\\./step-\\d+-\\d+/([a-z][a-z-]*\\.md|data/[A-Za-z0-9_.-]+\\.json|artifacts/[A-Za-z0-9_.-]+))$" }
+    },
+    "resume": {
+      "oneOf": [
+        { "type": "null" },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["fromStep", "token"],
+          "properties": { "fromStep": { "type": "string", "pattern": "^\\d+-\\d+$" }, "token": { "type": "string", "minLength": 1 } }
+        }
+      ]
+    }
+  }
+}

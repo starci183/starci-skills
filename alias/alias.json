@@ -280,16 +280,16 @@
     },
     "@dynamic": {
       "params": [
-        "file"
+        "kind"
       ],
       "kind": "dir",
-      "resolvesTo": "<Source>/.worktrees/sessions/<sessionId>/steps/<n>.<operator.id>/<file>. Writing: <n>.<operator.id> is the current step, and input.project.artifactRootRef must equal that folder. Reading: the nearest earlier step of the same session that wrote <file>; @dynamic/steps/<n>/<file> names a specific step. The session folder is created by the orchestrator and deleted when the run completes; a blocked run keeps it for resume",
-      "scheme": "artifact://<sessionId>/<n>.<operator.id>/<file>",
-      "bind": "fingerprint per file; every file written is registered in output.artifactRefs",
+      "resolvesTo": "<Source>/.worktrees/sessions/<sessionId>/step-<N>-<M>/ — the current step folder. Inside it: input.json (gate in), request.md, response.md, data/<name>.json, artifacts/<file>, output.json (gate out). Reading: a kind resolves to the nearest earlier step whose output.json fields lists it; the path is relative, ../step-N-M/<file>. Operator.md packages pass dynamic files as kinds (templates/kinds/<kind>), not as aliases; the old shape still names @dynamic/<file> until each package migrates. The session folder is created by the orchestrator and deleted when git.publish finishes; a blocked run keeps it for resume",
+      "scheme": "step://<sessionId>/<N>-<M>/<file>",
+      "bind": "kind template or schema under templates/kinds; output.json fields is the registry of what a step produced",
       "writers": [
         "*"
       ],
-      "purpose": "Everything produced inside the session and nothing that existed before it: <receiptType>.json, changes.md, named artifacts, captures. Always dynamic."
+      "purpose": "Everything produced inside the session and nothing that existed before it. Always dynamic; typed by kind."
     }
   }
 }
