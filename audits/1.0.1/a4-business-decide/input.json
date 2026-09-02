@@ -1,0 +1,242 @@
+{
+  "schemaVersion": 8,
+  "operatorId": "business.decide",
+  "context": {
+    "evidence": {
+      "indexRef": "business://evidence/pro-subscription",
+      "fingerprint": "sha256:5002530d00635179978cbf9cdc43c950ff14ecba71ff095309767f75ca39f878",
+      "claims": [
+        {
+          "claimId": "claim-settlement-idempotent",
+          "kind": "fact",
+          "role": "enforcement source",
+          "statement": "A transaction that is no longer Pending is left untouched by the reconcile worker; the webhook result wins.",
+          "sourceRef": "source://starci-academy-be",
+          "path": "src/features/api/processors/reconcile-transaction/reconcile-transaction.worker.ts",
+          "lineStart": 141,
+          "lineEnd": 142,
+          "sourceHead": "0b540dd21e250a346e6206c70225849cc31ead8e"
+        },
+        {
+          "claimId": "claim-settlement-unpaid",
+          "kind": "fact",
+          "role": "enforcement source",
+          "statement": "The reconcile worker moves a still-Pending transaction to Unpaid only from the expected Pending state.",
+          "sourceRef": "source://starci-academy-be",
+          "path": "src/features/api/processors/reconcile-transaction/reconcile-transaction.worker.ts",
+          "lineStart": 194,
+          "lineEnd": 195,
+          "sourceHead": "0b540dd21e250a346e6206c70225849cc31ead8e"
+        },
+        {
+          "claimId": "claim-reconcile-decision",
+          "kind": "fact",
+          "role": "enforcement source",
+          "statement": "decideReconcileAction returns finalize, unpaid, fast-retry, slow-underpaid, or slow-retry; there is no other settlement branch.",
+          "sourceRef": "source://starci-academy-be",
+          "path": "src/features/api/processors/reconcile-transaction/decide-reconcile-action.ts",
+          "lineStart": 13,
+          "lineEnd": 36,
+          "sourceHead": "0b540dd21e250a346e6206c70225849cc31ead8e"
+        },
+        {
+          "claimId": "claim-grant-dispatch",
+          "kind": "fact",
+          "role": "enforcement source",
+          "statement": "grantForTransaction dispatches on ActionType AiSubscriptionPurchase, MembershipPurchase, and Enroll; no Pro subscription action type is granted at this head.",
+          "sourceRef": "source://starci-academy-be",
+          "path": "src/modules/bussiness/transactions/atomic/transaction-grant.service.ts",
+          "lineStart": 146,
+          "lineEnd": 158,
+          "sourceHead": "0b540dd21e250a346e6206c70225849cc31ead8e"
+        },
+        {
+          "claimId": "claim-consumer-chat-membership",
+          "kind": "fact",
+          "role": "enforcement source",
+          "statement": "Global chat denies a user whose membership is not active; it does not read a Pro subscription.",
+          "sourceRef": "source://starci-academy-be",
+          "path": "src/modules/bussiness/chat/global-chat-policy.service.ts",
+          "lineStart": 44,
+          "lineEnd": 45,
+          "sourceHead": "0b540dd21e250a346e6206c70225849cc31ead8e"
+        },
+        {
+          "claimId": "claim-consumer-community-membership",
+          "kind": "fact",
+          "role": "enforcement source",
+          "statement": "The community post quota short-circuits for active members and rate-limits everyone else; it does not read a Pro subscription.",
+          "sourceRef": "source://starci-academy-be",
+          "path": "src/modules/bussiness/community/community-post-quota.service.ts",
+          "lineStart": 53,
+          "lineEnd": 54,
+          "sourceHead": "0b540dd21e250a346e6206c70225849cc31ead8e"
+        },
+        {
+          "claimId": "claim-consumer-blog-membership",
+          "kind": "fact",
+          "role": "enforcement source",
+          "statement": "Blog post gating asks membershipService.isActive; it does not read a Pro subscription.",
+          "sourceRef": "source://starci-academy-be",
+          "path": "src/features/api/core/graphql/queries/blog/blog-post/blog-post.resolver.ts",
+          "lineStart": 157,
+          "lineEnd": 164,
+          "sourceHead": "0b540dd21e250a346e6206c70225849cc31ead8e"
+        },
+        {
+          "claimId": "claim-ai-quota",
+          "kind": "fact",
+          "role": "enforcement source",
+          "statement": "AI entitlement throws AiQuotaExhaustedException against 5-hour and weekly limits.",
+          "sourceRef": "source://starci-academy-be",
+          "path": "src/modules/ai/ai-entitlement.service.ts",
+          "lineStart": 195,
+          "lineEnd": 209,
+          "sourceHead": "0b540dd21e250a346e6206c70225849cc31ead8e"
+        },
+        {
+          "claimId": "claim-offer-entry",
+          "kind": "unknown",
+          "role": "untracked working-tree source",
+          "statement": "proOffer reads appConfig().proSubscription and throws ProSubscriptionNotAvailableException when absent. The file is untracked at the bound head.",
+          "sourceRef": "source://starci-academy-be",
+          "path": "src/features/api/core/graphql/queries/pro-subscription/pro-subscription.resolver.ts",
+          "lineStart": 44,
+          "lineEnd": 55,
+          "sourceHead": null
+        },
+        {
+          "claimId": "claim-read-entry",
+          "kind": "unknown",
+          "role": "untracked working-tree source",
+          "statement": "myProSubscription returns the subscription and isActive for the authenticated user. The file is untracked at the bound head.",
+          "sourceRef": "source://starci-academy-be",
+          "path": "src/features/api/core/graphql/queries/pro-subscription/pro-subscription.resolver.ts",
+          "lineStart": 57,
+          "lineEnd": 70,
+          "sourceHead": null
+        },
+        {
+          "claimId": "claim-purchase-entry",
+          "kind": "unknown",
+          "role": "untracked working-tree source",
+          "statement": "A Pro subscription purchase mutation exists only in the working tree; nothing at the bound head creates a Pro purchase transaction.",
+          "sourceRef": "source://starci-academy-be",
+          "path": "src/features/api/core/graphql/mutations/pro-subscription/pro-subscription.resolver.ts",
+          "lineStart": 1,
+          "lineEnd": 1,
+          "sourceHead": null
+        },
+        {
+          "claimId": "claim-expiry",
+          "kind": "unknown",
+          "role": "untracked working-tree source",
+          "statement": "isActive excludes ProSubscriptionStatus.Expired. The file is untracked at the bound head.",
+          "sourceRef": "source://starci-academy-be",
+          "path": "src/modules/bussiness/pro-subscription/pro-subscription.service.ts",
+          "lineStart": 64,
+          "lineEnd": 64,
+          "sourceHead": null
+        },
+        {
+          "claimId": "claim-cancellation",
+          "kind": "unknown",
+          "role": "untracked working-tree source",
+          "statement": "Cancellation sets CancelledAtPeriodEnd and a later pass marks Expired. The file is untracked at the bound head.",
+          "sourceRef": "source://starci-academy-be",
+          "path": "src/modules/bussiness/pro-subscription/pro-subscription.service.ts",
+          "lineStart": 151,
+          "lineEnd": 167,
+          "sourceHead": null
+        }
+      ]
+    },
+    "authority": {
+      "businessesRootRef": ".worktrees/businesses",
+      "fingerprint": "sha256:023a6c8f20e0e7ab1070de818fbcc880cd44de5f1212820eba0ee5950f6a4964",
+      "heads": [
+        {
+          "featureId": "pro-subscription",
+          "headRef": ".worktrees/businesses/features/pro-subscription",
+          "state": "pending",
+          "fingerprint": "sha256:eccaeaadb6a4cf2c0a915a0589f46e9c3ae1ed661cfd86c6e75e688fe3fa40b1"
+        }
+      ]
+    },
+    "sourceRefs": [
+      {
+        "ref": "source://starci-academy-be",
+        "fingerprint": "sha256:1da3df04012120a2e2067776a5133a672be60ddef5af04369b0f23a05034b0a2",
+        "sourceHead": "0b540dd21e250a346e6206c70225849cc31ead8e",
+        "observedAt": "2026-09-02T12:30:13.000Z"
+      }
+    ],
+    "architectureRefs": []
+  },
+  "input": {
+    "invocationId": "invocation-a4-pro-subscription-1",
+    "missionId": "audit-1.0.1-a4",
+    "project": {
+      "id": "starci-academy",
+      "backendSourceRef": "source://starci-academy-be",
+      "sourceHead": "0b540dd21e250a346e6206c70225849cc31ead8e",
+      "businessesRootRef": ".worktrees/businesses"
+    },
+    "objective": {
+      "objectiveRef": "objective://sell-pro-subscription",
+      "featureId": "pro-subscription",
+      "intent": "revise"
+    },
+    "discovery": {
+      "consumers": [
+        {
+          "consumerId": "ai-entitlement-quota",
+          "dimension": "quota-consumer",
+          "sourceRef": "source://starci-academy-be"
+        },
+        {
+          "consumerId": "global-chat-policy",
+          "dimension": "entitlement-consumer",
+          "sourceRef": "source://starci-academy-be"
+        },
+        {
+          "consumerId": "community-post-quota",
+          "dimension": "quota-consumer",
+          "sourceRef": "source://starci-academy-be"
+        },
+        {
+          "consumerId": "blog-post-gate",
+          "dimension": "entitlement-consumer",
+          "sourceRef": "source://starci-academy-be"
+        },
+        {
+          "consumerId": "reconcile-transaction-worker",
+          "dimension": "settlement",
+          "sourceRef": "source://starci-academy-be"
+        },
+        {
+          "consumerId": "courses-checkout",
+          "dimension": "legacy-create",
+          "sourceRef": "source://starci-academy-be"
+        },
+        {
+          "consumerId": "refund-course-purchase",
+          "dimension": "refund",
+          "sourceRef": "source://starci-academy-be"
+        }
+      ],
+      "lifecycleBranches": [
+        "expiry",
+        "cancellation",
+        "recovery",
+        "legacy-settle"
+      ]
+    },
+    "publication": {
+      "targetState": "in-progress",
+      "headRef": ".worktrees/businesses/features/pro-subscription",
+      "approvalRef": null
+    },
+    "resume": null
+  }
+}

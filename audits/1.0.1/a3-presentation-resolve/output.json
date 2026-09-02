@@ -1,0 +1,53 @@
+{
+  "schemaVersion": 8,
+  "operatorId": "fe.presentation.resolve",
+  "output": {
+    "outcome": "blocked",
+    "receipt": {
+      "receiptType": "fe-presentation-resolution",
+      "receiptId": "receipt:a3-continue-learning-presentation-blocked",
+      "invocationId": "invocation-a3-continue-learning-1",
+      "missionId": "audit-1.0.1-a3",
+      "status": "blocked",
+      "binding": {
+        "projectId": "starci-academy",
+        "frontendSourceRef": "source://starci-academy-fe",
+        "sourceHead": "6f764b1ab968213b6cfca85aa9b2f77734c92a67",
+        "artifactRootRef": "audits/1.0.1/a3/continue-learning",
+        "targetId": "dashboard/ContinueLearning",
+        "treeFingerprint": "sha256:c73ce1969e9952158264463557aec9f901ea55d847d9d8adb99af6552c4a6339",
+        "knowledgeFingerprint": "sha256:9b07cef123c56d1c4fca7b81470dc12c9ae7c1138fecaf43af2541b5ed960544",
+        "grammarFingerprint": "sha256:341ce982b25666fce7b85df52d64b055ae3ecab48f9f401cf3769a529e76b85d",
+        "inputFingerprint": "sha256:96213eeefbdb5635340ff4037bb47fdf28fc168dcf3b2df17fa6047a7ce8a7a0",
+        "progressFingerprint": "sha256:71e1e5a4560888eba564ca526aaa0034b3dd968c639646f2debafc697aa8d62f"
+      },
+      "resolution": null,
+      "findings": [],
+      "evidenceRefs": ["knowledge://ui/presentation/gap", "source://starci-academy-fe/packages/grammar/package.json", "source://starci-academy-fe/src/components/blocks/dashboard/ContinueLearning/component.tsx"],
+      "failure": {
+        "code": "RULE_MISSING",
+        "message": "No published gap case matches a leading IconTile beside a copy block inside a card (featured gap-3 and compact gap-2 grids), nor a copy column that separates a destination identity from the action that follows it (gap-3).",
+        "nodePaths": [
+          "SurfaceCard[1]/div.grid[1]/div.item[1]/SurfaceCard[1]/div.content[1]",
+          "SurfaceCard[1]/div.grid[1]/div.item[n>1]/SurfaceCard[1]/div.content[1]",
+          "SurfaceCard[1]/div.grid[1]/div.item[*]/SurfaceCard[1]/div.content[1]/div.copy[1]"
+        ],
+        "missingRefs": ["knowledge://ui/presentation/gap"],
+        "retryable": true,
+        "owningDomain": "knowledge"
+      },
+      "resume": {
+        "resumeToken": "resume-a3-continue-learning-1",
+        "requiredDelta": [
+          "Publish a gap case for a leading mark (IconTile) beside a content block inside one card, naming its owner: App with one step, or a Common component if one already owns it.",
+          "Publish a gap case for a stacked copy column whose last child is the action bound to that copy.",
+          "Rebind the gap topic fingerprint and re-run the same tree."
+        ]
+      },
+      "createdAt": "2026-09-02T12:12:49.000Z"
+    },
+    "evidenceRefs": ["knowledge://ui/presentation/gap", "source://starci-academy-fe/packages/grammar/package.json", "source://starci-academy-fe/src/components/blocks/dashboard/ContinueLearning/component.tsx"],
+    "artifactRefs": [],
+    "handoff": null
+  }
+}
