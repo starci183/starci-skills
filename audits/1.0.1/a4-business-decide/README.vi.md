@@ -59,6 +59,12 @@ package đang sống. Phát hiện 2 đóng bởi `6aa4d3b8`: `workspace.bind` s
 `route.authorityRoots.businesses` từ checkout và từ chối giá trị gõ tay lệch với nó. Phát hiện 3 đã
 được nêu trong `business.decide/context.md` qua phần mô tả registry.
 
+## Cập nhật, cuối ngày 2026-09-02
+
+Chủ đã commit source Pro subscription lên `mtp` trong ba commit (`18c05cfe5`, `5c490cfad`, `0b0b81466`),
+nên các claim fact mà lần chạy này chưa bind được giờ đã có head. Bước tiếp là chạy lại với head đó;
+bản thân head nghiệp vụ vẫn chưa commit trong worktree businesses.
+
 ## Sự thật cho chủ sản phẩm
 
 - Phần backend của Pro subscription chưa commit trên `mtp`: ba thư mục mới cộng sửa đổi ở worker đối

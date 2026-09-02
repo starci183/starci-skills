@@ -60,6 +60,12 @@ against the live package. Finding 2 closed by `6aa4d3b8`: `workspace.bind` deriv
 `route.authorityRoots.businesses` from the checkout and rejects a typed value that disagrees. Finding 3
 is stated in `business.decide/context.md` through the registry description.
 
+## Update, later on 2026-09-02
+
+The owner committed the Pro subscription source to `mtp` in three commits (`18c05cfe5`, `5c490cfad`,
+`0b0b81466`), so the fact claims this run could not bind now have a head. A re-run against that head is
+the next step; the business head itself is still uncommitted in the businesses worktree.
+
 ## Facts for the product owner
 
 - The Pro subscription backend work is uncommitted on `mtp`: three new directories plus edits to the
