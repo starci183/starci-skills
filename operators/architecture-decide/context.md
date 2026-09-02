@@ -63,4 +63,4 @@ or claim that an implementation, a quality gate, or a UAT run has passed.
 
 ## Resources
 
-This operator runs end to end on the `sol-fresh` profile (`gpt-5.6-sol`, runtime `codex`), declared under `resources` in `operator.json` and validated by `scripts/validate-resources.mjs`. Grants it requires: web search. It may search the web, bounded by the exact gap it must close and recorded, is not bound to Grammar, and generates no image. A grant absent from `requires` is unavailable even if the profile would permit it.
+This operator runs end to end on the `sol-fresh` profile (`gpt-5.6-sol`, runtime `openai`), declared under `resources` in `operator.json` and validated by `scripts/validate-resources.mjs`. Grants it requires: web search. It may search the web, bounded by the exact gap it must close and recorded, is not bound to Grammar, and generates no image. A grant absent from `requires` is unavailable even if the profile would permit it.

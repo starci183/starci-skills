@@ -67,4 +67,4 @@ chứng chụp được và receipt của nó dưới `input.project.artifactRoo
 
 ## Tài nguyên
 
-Operator này chạy trọn trên profile `sol-reviewer` (`gpt-5.6-sol`, runtime `codex`), khai dưới `resources` trong `operator.json` và được `scripts/validate-resources.mjs` kiểm. Quyền nó cần: trình duyệt. Nó không bao giờ tìm trên mạng, tuân thủ Grammar đã publish, và không sinh hình. Một quyền không nằm trong `requires` thì không dùng được dù profile có cho phép.
+Operator này chạy trọn trên profile `sol-reviewer` (`gpt-5.6-sol`, runtime `openai`), khai dưới `resources` trong `operator.json` và được `scripts/validate-resources.mjs` kiểm. Quyền nó cần: trình duyệt. Nó không bao giờ tìm trên mạng, tuân thủ Grammar đã publish, và không sinh hình. Một quyền không nằm trong `requires` thì không dùng được dù profile có cho phép.

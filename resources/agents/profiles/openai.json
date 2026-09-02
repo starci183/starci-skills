@@ -1,8 +1,8 @@
 {
   "schemaVersion": 8,
-  "runtime": "codex",
+  "runtime": "openai",
   "provider": "openai",
-  "note": "Execution profiles run by the codex runtime. Profile ids are unique across every file in this directory and are what each operator binds under `resources` in its operator.json. `capabilities` states what the model can do in this workspace; `permits` states what a role on this profile may use, and must be a subset of capabilities.",
+  "note": "Execution profiles run by the OpenAI runtime: Sol 5.6 and Luna 5.6. These models do not run through Codex; a Codex runtime (Terra 5.6) gets its own file here only when an operator binds it. Profile ids are unique across every file in this directory and are what each operator binds under `resources` in its operator.json. `capabilities` states what the model can do in this workspace; `permits` states what a role on this profile may use, and must be a subset of capabilities.",
   "profiles": {
     "sol-fresh": {
       "model": "gpt-5.6-sol",

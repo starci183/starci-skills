@@ -55,4 +55,4 @@ unit, or claim any readiness beyond the checks it actually ran.
 
 ## Resources
 
-This operator runs end to end on the `luna` profile (`gpt-5.6-luna`, runtime `codex`), declared under `resources` in `operator.json` and validated by `scripts/validate-resources.mjs`. Grants it requires: web search, image generation, source write. It may search the web, bounded by the exact gap it must close and recorded, is not bound to Grammar, and must generate images to a stated claim. A grant absent from `requires` is unavailable even if the profile would permit it.
+This operator runs end to end on the `luna` profile (`gpt-5.6-luna`, runtime `openai`), declared under `resources` in `operator.json` and validated by `scripts/validate-resources.mjs`. Grants it requires: web search, image generation, source write. It may search the web, bounded by the exact gap it must close and recorded, is not bound to Grammar, and must generate images to a stated claim. A grant absent from `requires` is unavailable even if the profile would permit it.

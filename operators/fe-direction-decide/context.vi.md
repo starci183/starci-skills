@@ -73,4 +73,4 @@ architecture decision, Grammar package, UAT và audit history đều read-only.
 
 ## Tài nguyên
 
-Operator này chạy trọn trên profile `sol-fresh` (`gpt-5.6-sol`, runtime `codex`), khai dưới `resources` trong `operator.json` và được `scripts/validate-resources.mjs` kiểm. Quyền nó cần: tìm trên mạng, trình duyệt. Nó được tìm trên mạng trong giới hạn đúng khoảng trống phải lấp, có ghi lại, tuân thủ Grammar đã publish, và chỉ sinh artwork sản phẩm khi thẩm quyền sản phẩm gọi tên. Một quyền không nằm trong `requires` thì không dùng được dù profile có cho phép.
+Operator này chạy trọn trên profile `sol-fresh` (`gpt-5.6-sol`, runtime `openai`), khai dưới `resources` trong `operator.json` và được `scripts/validate-resources.mjs` kiểm. Quyền nó cần: tìm trên mạng, trình duyệt. Nó được tìm trên mạng trong giới hạn đúng khoảng trống phải lấp, có ghi lại, tuân thủ Grammar đã publish, và chỉ sinh artwork sản phẩm khi thẩm quyền sản phẩm gọi tên. Một quyền không nằm trong `requires` thì không dùng được dù profile có cho phép.

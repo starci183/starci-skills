@@ -68,4 +68,4 @@ evidence and its receipt under `input.project.artifactRootRef`.
 
 ## Resources
 
-This operator runs end to end on the `sol-reviewer` profile (`gpt-5.6-sol`, runtime `codex`), declared under `resources` in `operator.json` and validated by `scripts/validate-resources.mjs`. Grants it requires: browser. It never searches the web, is bound to published Grammar, and generates no image. A grant absent from `requires` is unavailable even if the profile would permit it.
+This operator runs end to end on the `sol-reviewer` profile (`gpt-5.6-sol`, runtime `openai`), declared under `resources` in `operator.json` and validated by `scripts/validate-resources.mjs`. Grants it requires: browser. It never searches the web, is bound to published Grammar, and generates no image. A grant absent from `requires` is unavailable even if the profile would permit it.

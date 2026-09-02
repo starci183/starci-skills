@@ -2,7 +2,7 @@
 
 Who runs each operator, with what, and under which standing policies. Two closed places carry it:
 
-- `agents/profiles/<runtime>.json` — one file per runtime (`codex.json`, `claude.json`); the file owns
+- `agents/profiles/<runtime>.json` — one file per runtime (`openai.json`, `claude.json`); the file owns
   its provider, a profile carries model, isolation, what the model can do here
   (`capabilities`), and what an operator on that profile is allowed to use (`permits`).
 - `operators/<id>/operator.json` → `resources` — inside each operator: the one profile that runs it
@@ -69,7 +69,7 @@ A summary of what each `operator.json` declares; the validator rejects a row tha
 
 ## Profiles
 
-### Runtime `codex` (provider `openai`)
+### Runtime `openai` (provider `openai`)
 
 | Profile | Model | Capabilities | Permits | Used for |
 | --- | --- | --- | --- | --- |

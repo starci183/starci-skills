@@ -2,7 +2,7 @@
 
 Ai chạy operator nào, bằng gì, và dưới những chính sách thường trực nào. Hai chỗ đóng mang việc đó:
 
-- `agents/profiles/<runtime>.json`: mỗi runtime một file (`codex.json`, `claude.json`); file giữ provider,
+- `agents/profiles/<runtime>.json`: mỗi runtime một file (`openai.json`, `claude.json`); file giữ provider,
   profile mang model, cách cô lập, model làm được gì ở đây
   (`capabilities`), và một operator trên profile đó được phép dùng gì (`permits`).
 - `operators/<id>/operator.json` → `resources`: nằm trong chính operator: đúng một profile chạy nó từ
@@ -71,7 +71,7 @@ Bản tóm tắt những gì mỗi `operator.json` khai; validator từ chối d
 
 ## Profile
 
-### Runtime `codex` (provider `openai`)
+### Runtime `openai` (provider `openai`)
 
 | Profile | Model | Năng lực | Được cấp | Dùng cho |
 | --- | --- | --- | --- | --- |

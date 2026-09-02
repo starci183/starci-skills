@@ -55,4 +55,4 @@ bất kỳ mức sẵn sàng nào vượt quá những kiểm tra nó thật s�
 
 ## Tài nguyên
 
-Operator này chạy trọn trên profile `luna` (`gpt-5.6-luna`, runtime `codex`), khai dưới `resources` trong `operator.json` và được `scripts/validate-resources.mjs` kiểm. Quyền nó cần: tìm trên mạng, sinh hình, ghi source. Nó được tìm trên mạng trong giới hạn đúng khoảng trống phải lấp, có ghi lại, không ràng với Grammar, và bắt buộc sinh hình theo tuyên bố đã nêu. Một quyền không nằm trong `requires` thì không dùng được dù profile có cho phép.
+Operator này chạy trọn trên profile `luna` (`gpt-5.6-luna`, runtime `openai`), khai dưới `resources` trong `operator.json` và được `scripts/validate-resources.mjs` kiểm. Quyền nó cần: tìm trên mạng, sinh hình, ghi source. Nó được tìm trên mạng trong giới hạn đúng khoảng trống phải lấp, có ghi lại, không ràng với Grammar, và bắt buộc sinh hình theo tuyên bố đã nêu. Một quyền không nằm trong `requires` thì không dùng được dù profile có cho phép.
