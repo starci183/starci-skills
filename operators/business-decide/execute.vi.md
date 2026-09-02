@@ -37,15 +37,15 @@ Phần vật liệu còn thiếu được báo cáo như một failure và trả
 
 | # | Bước | Đọc | Ghi | Dừng với |
 | --- | --- | --- | --- | --- |
-| 1 | Kiểm tra input và resume | input, receipt trước đó, binding source đã đóng băng | — | `INVALID_INPUT`, `SOURCE_DRIFT`, `NO_PROGRESS` |
-| 2 | Chuẩn hoá bằng chứng | từng claim kèm vai trò, đường dẫn, khoảng dòng và head | — | `EVIDENCE_MISSING`, `CONTRADICTION_UNRESOLVED` |
-| 3 | Kiểm tra head đã publish | head hiện tại của feature, bằng chứng đã đóng băng, trạng thái đích được yêu cầu | — | `LIFECYCLE_TRANSITION_INVALID`, `AUTHORITY_CONFLICT`, `APPROVAL_REQUIRED` |
-| 4 | Mô hình hoá lời hứa | chỉ các claim loại fact | — | — |
-| 5 | Đóng băng ma trận coverage | các chiều, các consumer đã phát hiện, các claim đã chuẩn hoá | `coverage-matrix.json` | `COVERAGE_INCOMPLETE`, `CONSUMER_UNPROVEN` |
-| 6 | Định đoạt phần cùng tồn tại với di sản | các dòng tạo, đọc, tất toán di sản cùng bằng chứng của chúng | — | — |
-| 7 | Đối chiếu khi đích là implemented | source đã giao, ma trận đã đóng băng | — | `RECONCILIATION_DISCREPANCY` |
-| 8 | Publish đúng một head | ma trận đã đóng băng, lời hứa đã mô hình hoá, head trước đó | `model.json` | — |
-| 9 | Phát ra và dừng | tất cả những gì ở trên | — | — |
+| 1 | Kiểm tra input và resume | input, `@be` (binding head đã đóng băng) | — | `INVALID_INPUT`, `SOURCE_DRIFT`, `NO_PROGRESS` |
+| 2 | Chuẩn hoá bằng chứng | `@be` (từng claim kèm vai trò, đường dẫn, khoảng dòng và head), `@receipt/architecture-decision/<invocationId>` (chỉ là bằng chứng kiến trúc) | — | `EVIDENCE_MISSING`, `CONTRADICTION_UNRESOLVED` |
+| 3 | Kiểm tra head đã publish | `@business/<featureId>` (head hiện tại và bằng chứng đã đóng băng), input (trạng thái đích được yêu cầu) | — | `LIFECYCLE_TRANSITION_INVALID`, `AUTHORITY_CONFLICT`, `APPROVAL_REQUIRED` |
+| 4 | Mô hình hoá lời hứa | `@be` (chỉ các claim loại fact) | — | — |
+| 5 | Đóng băng ma trận coverage | input (các chiều), `@be` (các consumer đã phát hiện, các claim đã chuẩn hoá) | `@artifacts/coverage-matrix.json` | `COVERAGE_INCOMPLETE`, `CONSUMER_UNPROVEN` |
+| 6 | Định đoạt phần cùng tồn tại với di sản | `@artifacts/coverage-matrix.json` (các dòng tạo, đọc, tất toán di sản cùng bằng chứng của chúng) | — | — |
+| 7 | Đối chiếu khi đích là implemented | `@be` (source đã giao), `@artifacts/coverage-matrix.json` (ma trận đã đóng băng) | — | `RECONCILIATION_DISCREPANCY` |
+| 8 | Publish đúng một head | `@artifacts/coverage-matrix.json`, `@business/<featureId>` (head trước đó) | `@business/<featureId>` (head `model.json` mới) | — |
+| 9 | Phát ra và dừng | tất cả những gì ở trên | `@artifacts/business-promise-authority.json` | — |
 
 Khâu kiểm tra từ chối binding source đã cũ, claim trích tới source không được bind, head không đúng
 bằng `features/<featureId>` dưới gốc businesses, consumer trùng, trạng thái đích không hợp lệ với head

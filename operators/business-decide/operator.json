@@ -21,7 +21,7 @@
       "purpose": "The promise head and its lifecycle state, by content address."
     },
     {
-      "alias": "@source/starci-academy/be",
+      "alias": "@be",
       "required": true,
       "purpose": "The backend checkout every fact claim cites by path, line range, and head."
     },
