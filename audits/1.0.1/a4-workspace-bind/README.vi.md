@@ -36,7 +36,11 @@ cùng bốn file khai báo `.workspaces/projects/*`. Receipt gọi tên cả 54 
 2. **Cả hai khai báo trỏ vào schema v7.** `be.json` và `config.json` mang `$schema` dưới
    `.claude/readiness/initialization/workspaces/`, và route hydrate gọi `source.skills` là
    `.claude/skills`. Không đường dẫn nào tồn tại trong cây v8. Hai file vẫn phân giải được vì không gì
-   đọc `$schema`; độ lệch thuộc về công cụ ghi ra các khai báo này, không thuộc `workspace.bind`.
+   đọc `$schema`; độ lệch thuộc về đợt cutover, không thuộc `workspace.bind`: `package.json` của backend vẫn
+   chạy `.claude/scripts/workspace-portable.mjs`, `device-state.mjs` và `node --test .claude/scripts/*.spec.mjs`,
+   tất cả đã rơi cùng v7. Đã khôi phục ở `8f645ee1` cùng năm file `readiness/initialization/workspaces/`,
+   nên các liên kết `$schema` phân giải lại được và `workspace-portable.mjs check --source ..` xác thực cả
+   mười route thật (báo hai route FE đã hydrate là cũ, điều này đúng).
 3. **Hình dạng danh tính.** v8 bind một `credentialRosterRef` với `rosterEncrypted: true`. Workspace
    giữ từng khoá `.key.enc` dưới `.workspaces/local/credentials` và một `masterIdentity` trong
    `device-state.json`; thư mục được bind làm roster. Hoặc hợp đồng chấp nhận một thư mục khoá đã niêm

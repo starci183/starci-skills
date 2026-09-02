@@ -30,10 +30,13 @@ knowledge/
   ui/proof/              thứ chỉ đúng sai sau khi đã render          -> fe.surface.audit
   patterns/fe, be        quy ước code trích từ hai source thật
   grammars/<họ>/         cách một họ hình ảnh hiện thực Common
-scripts/                 validate-routing.mjs, validate-resources.mjs, run-operator-self-tests.mjs
+scripts/                 validate-routing.mjs, validate-resources.mjs, validate-knowledge-citations.mjs, run-operator-self-tests.mjs;
+                         device-state.mjs và workspace-portable.mjs (+ spec), thứ package.json của backend gọi tới
+readiness/               các schema workspaces/ mà khai báo route portable và hydrate gọi tên trong $schema
+audits/<phiên bản>/      hồ sơ chạy khô cùng artifact input và output đã qua validator
 ```
 
-`npm test` chạy kiểm định tuyến, kiểm resources, và mọi self-test của operator. Head đã publish phải xanh, không xanh
+`npm test` chạy kiểm định tuyến, kiểm resources, kiểm trích dẫn knowledge, mọi self-test của operator, và hai spec của script. Head đã publish phải xanh, không xanh
 thì không được publish.
 
 ## Luật áp dụng khắp nơi

@@ -37,7 +37,11 @@ all 54 as subjects.
 2. **Both declarations point at v7 schemas.** `be.json` and `config.json` carry `$schema` paths under
    `.claude/readiness/initialization/workspaces/`, and the hydrated route names `source.skills` as
    `.claude/skills`. Neither path exists in the v8 tree. The files still resolve because nothing reads
-   `$schema`; the drift belongs to whatever tooling writes these declarations, not to `workspace.bind`.
+   `$schema`; the drift belonged to the cutover, not to `workspace.bind`: the backend's `package.json` still
+   runs `.claude/scripts/workspace-portable.mjs`, `device-state.mjs`, and `node --test .claude/scripts/*.spec.mjs`,
+   all dropped with v7. Restored in `8f645ee1` together with the five `readiness/initialization/workspaces/`
+   files, so the `$schema` links resolve again and `workspace-portable.mjs check --source ..` validates all
+   ten real routes (reporting two hydrated FE routes as stale, which is true).
 3. **Identity shape.** v8 binds one `credentialRosterRef` with `rosterEncrypted: true`. The workspace
    holds per-key `.key.enc` files under `.workspaces/local/credentials` and a `masterIdentity` in
    `device-state.json`; the directory was bound as the roster. Either the contract accepts a directory
