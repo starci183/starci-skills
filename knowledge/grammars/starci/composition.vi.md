@@ -10,7 +10,7 @@ Hook ổn định: `data-grammar-surface-card`, `data-grammar-surface-labelled`,
 
 ## Ownership layout vô danh
 
-`WorkspaceShell`, `Sidebar`, `PrimaryRailLayout`, `Rail`, `NavigationFeatureNav`, `Subnav`, `Tabs`, `ChatWorkspace` và scroll region sở hữu geometry dùng lại. Binding: [LAYOUT-1..5](../../ui/composition/layout.vi.md), [RESPONSIVE-1..5](../../ui/composition/responsive.vi.md) và [MEASURE-1..5](../../ui/presentation/measure.vi.md).
+`WorkspaceShell`, `Sidebar`, `PrimaryRailLayout`, `Rail`, `NavigationFeatureNav`, `Subnav`, `Tabs`, `ChatWorkspace` và scroll region sở hữu geometry dùng lại. Binding: [LAYOUT-1..4](../../ui/composition/layout.vi.md), [RESPONSIVE-1..4](../../ui/composition/responsive.vi.md) và [MEASURE-1..5](../../ui/presentation/measure.vi.md).
 
 ```tsx
 import { Sidebar, WorkspaceShell } from "@starci/grammar/common"
@@ -41,4 +41,4 @@ Core CSS bind Common anatomy vào intrinsic track, container/media transition, c
 
 Feature/content workflow sở hữu quyết định có cần image hay không, có generate hay không, generation brief, factual provenance, alt meaning và chọn asset. Grammar không bao giờ quyết định gọi image generation.
 
-Sau khi chọn asset, Common `MediaFrame` sở hữu aspect, fit, treatment, caption, frame semantics và geometry ổn định. Core chỉ sở hữu family presentation—crop discipline, border/radius/material và theme behavior. Dùng `contain` khi crop có thể làm mất meaning. Prop loading/error còn thiếu vẫn là Common gap. Binding: [MEDIA-1..6](media.vi.md), [ICON-1..6](icon.vi.md) và [TRUTH-1..4](../../ui/proof/render-truth.vi.md).
+Sau khi chọn asset, Common `MediaFrame` sở hữu aspect, fit, treatment, caption, frame semantics và geometry ổn định. Core chỉ sở hữu family presentation—crop discipline, border/radius/material và theme behavior. Dùng `contain` khi crop có thể làm mất meaning. Prop loading/error còn thiếu vẫn là Common gap. Binding: [TRUTH-1..4](../../ui/proof/render-truth.vi.md) và idiom [Generated art is a band, not a card](idioms.vi.md).

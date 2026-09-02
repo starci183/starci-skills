@@ -2,7 +2,7 @@
 
 `@starci/grammar@0.4.0` · checkout `14e0c20f4746ae08f00a84a4eac18aa78ded987b` · sinh ngày 2026-09-02
 
-File này được sinh ra từ package `@starci/grammar` đang chạy, không viết tay: danh tính, token, renderer, prop công bố, claim `data-contract` và class phát ra đều đọc thẳng từ `src/`, còn danh sách gap đọc từ sáu topic giải phẫu trong thư mục này. Hãy mồi cho agent định hướng bằng đúng file này, và chỉ mở topic tương ứng khi một dòng làm nảy ra câu hỏi. Sinh lại bằng `node scripts/generate-grammar-dna.mjs`, kiểm bằng `--check`; lệnh này cần checkout FE đã định tuyến nên không nằm trong `npm test`.
+File này được sinh ra từ package `@starci/grammar` đang chạy, không viết tay: danh tính, token, renderer, prop công bố, claim `data-contract` và class phát ra đều đọc thẳng từ `src/`, còn danh sách gap được chép từ bảng `## Gap` trong [Family và DNA](family.vi.md). Hãy mồi cho agent định hướng bằng đúng file này: nó nói cái gì đang tồn tại. [Idiom](idioms.vi.md) nói StarCi ghép chúng ra sao, còn [Playbook](playbook.vi.md) nói hình dạng nghiệp vụ nào cần chuỗi idiom nào. Sinh lại bằng `node scripts/generate-grammar-dna.mjs`, kiểm bằng `--check`; lệnh này cần checkout FE đã định tuyến nên không nằm trong `npm test`.
 
 ## Danh tính
 
@@ -129,18 +129,18 @@ File này được sinh ra từ package `@starci/grammar` đang chạy, không v
 
 ## Gap
 
-| Luật | Năng lực còn thiếu |
-| --- | --- |
-| `CORE-SURFACE-5` | không có cấp heading có kiểu và không có khả năng gắn nhãn bằng heading bên ngoài, nên một surface mà cấp đúng không phải 3 thì không có owner |
-| `CORE-BOUNDARY-4` | Common không công bố prop overlay hay độ nâng tổng quát nào |
-| `ICON-2` | `Badge` chấp nhận thiếu `children` và render một khoảng trắng không ngắt, nên chip chỉ có glyph vẫn biểu diễn được và sự hiện diện của chữ không được kiểu dữ liệu ép |
-| `ICON-3` | `leading` là `ReactNode` tuỳ chọn, không phải `Icon` có kiểu, nên không gì ép glyph hay `usage` của nó lên từng mục |
-| `ICON-4` | không action nào công bố neo hay thuộc tính chuyển động cho phần trang trí của nó, nên family không có gì để animate ngoài `data-component` |
-| `ICON-4` | `Icon` không có hợp đồng soi gương theo hướng; registry của app chọn glyph nguyên nghĩa |
-| `ICON-5` | `isActive` chỉ phát `data-active="true"`, không có `aria-pressed`, nên một tiện ích đang active chỉ là thị giác |
-| `ICON-5` | `aria-describedby` được đặt lên `span` bọc của tooltip, không lên control nhận focus, nên mô tả không được gắn theo chương trình vào nút |
-| `ICON-6` | `Icon` chỉ nhận `source`; không có hợp đồng dự phòng hay lỗi, nên một ánh xạ registry thiếu phải được app giải quyết trước khi render |
-| `MEDIA-2` | không có prop `object-position` hay tiêu điểm, và `className` chạm tới figure chứ không tới con của viewport, nên một crop lệch tâm bắt buộc không có owner |
-| `MEDIA-5` | `MediaFrame` không công bố prop loading hay error và không render state nào; cùng gap này được ghi trong [Family và DNA](family.vi.md) |
-| `CONTROL-STATE-2` | `OtpInput` công bố `disabled` và `invalid` (không phải tên `isDisabled`/`isError`) và không có đầu vào skeleton, nên state chưa phân giải của nó không có owner |
-| `FIELD-1` | `OtpInput` không công bố slot `label`, `hint` hay `errorMessage`; chỉ `describedBy` nối tới chữ bên ngoài, nên danh tính nhìn thấy của nó không có owner Common |
+| Component | Năng lực còn thiếu | Bằng chứng |
+| --- | --- | --- |
+| `SurfaceCard`, `SurfaceListCard`, `SurfaceAccordionCard` | không có cấp heading có kiểu và không có khả năng gắn nhãn bằng heading bên ngoài, nên một surface mà cấp đúng không phải 3 thì không có owner | `packages/grammar/src/core/primitive/Label/index.tsx`; `packages/grammar/src/core/branch/SurfaceCard/index.tsx` |
+| Owner overlay của Common | Common không công bố prop overlay hay độ nâng tổng quát nào | `packages/grammar/src/core/branch/Tooltip/index.tsx`; `packages/grammar/src/common/styles.css` |
+| `Badge` | `Badge` chấp nhận thiếu `children` và render một khoảng trắng không ngắt, nên chip chỉ có glyph vẫn biểu diễn được và sự hiện diện của chữ không được kiểu dữ liệu ép | `packages/grammar/src/core/primitive/Badge/index.tsx` |
+| `Tabs` | `leading` là `ReactNode` tuỳ chọn, không phải `Icon` có kiểu, nên không gì ép glyph hay `usage` của nó lên từng mục | `packages/grammar/src/core/branch/Tabs/index.tsx` |
+| `Button`, `TextAction` | không action nào công bố neo hay thuộc tính chuyển động cho phần trang trí của nó, nên family không có gì để animate ngoài `data-component` | `packages/grammar/src/core/primitive/Button/index.tsx`; `packages/grammar/src/core/primitive/TextAction/index.tsx` |
+| `Icon` | `Icon` không có hợp đồng soi gương theo hướng; registry của app chọn glyph nguyên nghĩa | `packages/grammar/src/core/primitive/Icon/index.tsx` |
+| `IconButton` | `isActive` chỉ phát `data-active="true"`, không có `aria-pressed`, nên một tiện ích đang active chỉ là thị giác | `packages/grammar/src/core/primitive/IconButton/index.tsx` |
+| `Tooltip` | `aria-describedby` được đặt lên `span` bọc của tooltip, không lên control nhận focus, nên mô tả không được gắn theo chương trình vào nút | `packages/grammar/src/core/branch/Tooltip/index.tsx` |
+| `Icon` | `Icon` chỉ nhận `source`; không có hợp đồng dự phòng hay lỗi, nên một ánh xạ registry thiếu phải được app giải quyết trước khi render | `packages/grammar/src/core/primitive/Icon/index.tsx` |
+| `MediaFrame` | không có prop `object-position` hay tiêu điểm, và `className` chạm tới figure chứ không tới con của viewport, nên một crop lệch tâm bắt buộc không có owner | `packages/grammar/src/core/primitive/MediaFrame/index.tsx`; `packages/grammar/src/common/styles.css` |
+| `MediaFrame` | `MediaFrame` không công bố prop loading hay error và không render state nào | `packages/grammar/src/core/primitive/MediaFrame/index.tsx` |
+| `OtpInput` | `OtpInput` công bố `disabled` và `invalid` (không phải tên `isDisabled`/`isError`) và không có đầu vào skeleton, nên state chưa phân giải của nó không có owner | `packages/grammar/src/core/OtpInput.tsx` |
+| `OtpInput` | `OtpInput` không công bố slot `label`, `hint` hay `errorMessage`; chỉ `describedBy` nối tới chữ bên ngoài, nên danh tính nhìn thấy của nó không có owner Common | `packages/grammar/src/core/OtpInput.tsx` |

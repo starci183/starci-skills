@@ -6,11 +6,10 @@
 // `src/common/renderers.ts`, and each renderer folder's own `.ts`/`.tsx`. Nothing here is inferred:
 // a value that the regexes cannot resolve is printed as the type name, never guessed.
 //
-// The one knowledge input is the gap inventory: every table row in the six anatomy topics
-// (surface, boundary, icon, media, control-state, field) whose Common-owner or Core-realization
-// cell opens with `gap`. The topics' own preamble says "the last column", but the live rows put
-// `gap` in whichever of the two owner cells is missing, so both are scanned; scanning only the last
-// cell would publish 2 of the 13 recorded gaps.
+// The one knowledge input is the gap inventory: the `## Gaps` table in `family.md` (and its mirror
+// in `family.vi.md`), whose rows are `| Component | Missing capability | Evidence |`. That table is
+// the single home of the family's gaps, so this script copies it rather than re-deriving it; a gap
+// recorded anywhere else is not published.
 //
 // Usage:
 //   node scripts/generate-grammar-dna.mjs [--grammar <path to packages/grammar>]
@@ -236,7 +235,6 @@ for (const { component, types, modulePath } of exports) {
 }
 
 // ---------------------------------------------------------------- gaps
-const GAP_TOPICS = ['surface', 'boundary', 'icon', 'media', 'control-state', 'field'];
 function splitCells(line) {
   const trimmed = line.trim().replace(/^\|/, '').replace(/\|$/, '');
   const cells = [];
@@ -250,33 +248,27 @@ function splitCells(line) {
   cells.push(cur.trim());
   return cells;
 }
+// The gap table is the first table in `family.md` whose header row opens with `| Component |`; its
+// body runs until the first line that is no longer a table row.
 function readGaps(suffix) {
+  const file = path.join(outDir, `family${suffix}`);
+  if (!existsSync(file)) throw new Error(`${file} is missing: it owns the gap inventory`);
+  const lines = read(file).split(/\r?\n/);
+  const start = lines.findIndex((line) => /^\|\s*Component\s*\|/.test(line.trim()));
+  if (start === -1) throw new Error(`${file}: no gap table (a header row opening with "| Component |")`);
   const rows = [];
-  for (const topic of GAP_TOPICS) {
-    const file = path.join(outDir, `${topic}${suffix}`);
-    if (!existsSync(file)) continue;
-    let rule = '';
-    for (const line of read(file).split(/\r?\n/)) {
-      const h = HEADING.exec(line);
-      if (h) rule = h[1];
-      if (!line.trim().startsWith('|')) continue;
-      const cell = splitCells(line).find((c) => /^`?gap`?\b/i.test(c));
-      if (!cell) continue;
-      rows.push({ rule, clause: cell.replace(/^`?gap`?\s*(?:—|-|:)?\s*/i, '').trim() });
-    }
+  for (let i = start + 2; i < lines.length; i += 1) {
+    if (!lines[i].trim().startsWith('|')) break;
+    const cells = splitCells(lines[i]);
+    rows.push({ component: cells[0], clause: cells[1], evidence: cells[2] ?? '—' });
   }
   return rows;
 }
 const gapRows = readGaps('.md');
-// The Vietnamese mirror carries the same rows in the house voice; pair by rule and ordinal so a
-// row the mirror has not caught up with still prints its English clause rather than nothing.
+// The Vietnamese mirror carries the same rows in the house voice, in the same order. A mirror that
+// has not caught up prints the English row rather than nothing.
 const viGaps = readGaps('.vi.md');
-const ordinal = new Map();
-for (const row of gapRows) {
-  const n = (ordinal.get(row.rule) ?? 0) + 1;
-  ordinal.set(row.rule, n);
-  row.vi = viGaps.filter((g) => g.rule === row.rule)[n - 1]?.clause ?? row.clause;
-}
+gapRows.forEach((row, i) => { row.vi = viGaps[i] ?? row; });
 
 // ---------------------------------------------------------------- render
 const today = new Date().toISOString().slice(0, 10);
@@ -296,14 +288,14 @@ function document(en) {
   const t = en
     ? {
       title: '# StarCi Core — DNA',
-      intro: `This file is generated from the live \`@starci/grammar\` package, never written by hand: identity, tokens, renderers, published props, \`data-contract\` claims, and emitted classes are read out of \`src/\`, and the gap list is read out of the six anatomy topics in this folder. Prime a direction agent with this file; open the topic a row belongs to only when that row raises a question. Regenerate with \`node scripts/generate-grammar-dna.mjs\`, and verify with \`--check\`; it needs the routed FE checkout, so it is not part of \`npm test\`.`,
+      intro: `This file is generated from the live \`@starci/grammar\` package, never written by hand: identity, tokens, renderers, published props, \`data-contract\` claims, and emitted classes are read out of \`src/\`, and the gap list is copied from the \`## Gaps\` table in [Family and DNA](family.md). Prime a direction agent with this file: it says what exists. [Idioms](idioms.md) says how StarCi composes it, and [Playbook](playbook.md) says which idioms a business shape needs. Regenerate with \`node scripts/generate-grammar-dna.mjs\`, and verify with \`--check\`; it needs the routed FE checkout, so it is not part of \`npm test\`.`,
       identity: '## Identity',
       identityHeader: '| Fact | Value |',
       tokens: '## Tokens',
       tokensHeader: '| Token | Default |',
       renderersHead: '## Renderers',
       gaps: '## Gaps',
-      gapsHeader: '| Rule | Missing capability |',
+      gapsHeader: '| Component | Missing capability | Evidence |',
       facts: [
         ['Package', `\`${pkg.name}\``],
         ['Version', `\`${pkg.version}\``],
@@ -317,14 +309,14 @@ function document(en) {
     }
     : {
       title: '# StarCi Core — DNA',
-      intro: `File này được sinh ra từ package \`@starci/grammar\` đang chạy, không viết tay: danh tính, token, renderer, prop công bố, claim \`data-contract\` và class phát ra đều đọc thẳng từ \`src/\`, còn danh sách gap đọc từ sáu topic giải phẫu trong thư mục này. Hãy mồi cho agent định hướng bằng đúng file này, và chỉ mở topic tương ứng khi một dòng làm nảy ra câu hỏi. Sinh lại bằng \`node scripts/generate-grammar-dna.mjs\`, kiểm bằng \`--check\`; lệnh này cần checkout FE đã định tuyến nên không nằm trong \`npm test\`.`,
+      intro: `File này được sinh ra từ package \`@starci/grammar\` đang chạy, không viết tay: danh tính, token, renderer, prop công bố, claim \`data-contract\` và class phát ra đều đọc thẳng từ \`src/\`, còn danh sách gap được chép từ bảng \`## Gap\` trong [Family và DNA](family.vi.md). Hãy mồi cho agent định hướng bằng đúng file này: nó nói cái gì đang tồn tại. [Idiom](idioms.vi.md) nói StarCi ghép chúng ra sao, còn [Playbook](playbook.vi.md) nói hình dạng nghiệp vụ nào cần chuỗi idiom nào. Sinh lại bằng \`node scripts/generate-grammar-dna.mjs\`, kiểm bằng \`--check\`; lệnh này cần checkout FE đã định tuyến nên không nằm trong \`npm test\`.`,
       identity: '## Danh tính',
       identityHeader: '| Dữ kiện | Giá trị |',
       tokens: '## Token',
       tokensHeader: '| Token | Mặc định |',
       renderersHead: '## Renderer',
       gaps: '## Gap',
-      gapsHeader: '| Luật | Năng lực còn thiếu |',
+      gapsHeader: '| Component | Năng lực còn thiếu | Bằng chứng |',
       facts: [
         ['Package', `\`${pkg.name}\``],
         ['Phiên bản', `\`${pkg.version}\``],
@@ -363,8 +355,10 @@ function document(en) {
     t.gaps,
     '',
     t.gapsHeader,
-    '| --- | --- |',
-    ...gapRows.map((g) => `| \`${g.rule}\` | ${en ? g.clause : g.vi} |`),
+    '| --- | --- | --- |',
+    ...gapRows.map((g) => (en
+      ? `| ${g.component} | ${g.clause} | ${g.evidence} |`
+      : `| ${g.vi.component} | ${g.vi.clause} | ${g.vi.evidence} |`)),
     '',
   ].join('\n');
 }

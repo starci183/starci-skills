@@ -10,7 +10,7 @@ Stable hooks: `data-grammar-surface-card`, `data-grammar-surface-labelled`, `dat
 
 ## Anonymous layout ownership
 
-`WorkspaceShell`, `Sidebar`, `PrimaryRailLayout`, `Rail`, `NavigationFeatureNav`, `Subnav`, `Tabs`, `ChatWorkspace`, and scroll regions own reusable geometry. Bindings: [LAYOUT-1..5](../../ui/composition/layout.md), [RESPONSIVE-1..5](../../ui/composition/responsive.md), and [MEASURE-1..5](../../ui/presentation/measure.md).
+`WorkspaceShell`, `Sidebar`, `PrimaryRailLayout`, `Rail`, `NavigationFeatureNav`, `Subnav`, `Tabs`, `ChatWorkspace`, and scroll regions own reusable geometry. Bindings: [LAYOUT-1..4](../../ui/composition/layout.md), [RESPONSIVE-1..4](../../ui/composition/responsive.md), and [MEASURE-1..5](../../ui/presentation/measure.md).
 
 ```tsx
 import { Sidebar, WorkspaceShell } from "@starci/grammar/common"
@@ -41,4 +41,4 @@ Core CSS binds Common anatomy to intrinsic tracks, container/media transitions, 
 
 Feature/content workflow owns whether an image should exist, whether it is generated, the generation brief, factual provenance, alt meaning, and asset selection. Grammar never decides to call image generation.
 
-After selection, Common `MediaFrame` owns aspect, fit, treatment, caption, frame semantics, and stable geometry. Core owns only family presentation—crop discipline, border/radius/material, and theme behavior. Use `contain` when cropping could remove meaning. The missing loading/error prop remains a Common gap. Bindings: [MEDIA-1..6](media.md), [ICON-1..6](icon.md), and [TRUTH-1..4](../../ui/proof/render-truth.md).
+After selection, Common `MediaFrame` owns aspect, fit, treatment, caption, frame semantics, and stable geometry. Core owns only family presentation—crop discipline, border/radius/material, and theme behavior. Use `contain` when cropping could remove meaning. The missing loading/error prop remains a Common gap. Bindings: [TRUTH-1..4](../../ui/proof/render-truth.md) and the [Generated art is a band, not a card](idioms.md) idiom.
