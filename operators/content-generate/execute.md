@@ -58,15 +58,15 @@ separate refusals: shared executions, inherited turns, and producer rationale.
 
 | # | Step | Reads | Writes | Stops with |
 | --- | --- | --- | --- | --- |
-| 1 | Validate input and resume | input, prior receipt, frozen source binding | — | `INVALID_INPUT`, `SOURCE_DRIFT`, `NO_PROGRESS` |
-| 2 | Bind authority | curriculum and style references, routed source head, AI runtime configuration | — | — |
-| 3 | Write and freeze the brief | curriculum and source evidence | `briefTargetRef` | `BRIEF_UNBOUND` |
-| 4 | Write every declared edition | frozen brief, per-language destination | `<language>.articleRef` | `OUTCOME_UNCOVERED` |
-| 5 | Generate the image to its claims | the brief's claims, the stated image intent | `imageTargetRef` | `IMAGE_UNAVAILABLE` |
-| 6 | Implement every declared track | frozen brief, each track's exact build command | `<track>.sourceRef` | `CODE_BUILD_FAILED` |
-| 7 | Run the executable check | executable contract, each track's declared command | — | `E2E_FAILED`, `CONTRACT_WEAKENED` |
-| 8 | Take the independent critique | every produced artifact and the claims it makes | `reviewTargetRef` | `REVIEW_REVISION_REQUIRED`, `REVIEW_ROUNDS_EXHAUSTED` |
-| 9 | Emit and stop | everything above | — | — |
+| 1 | Validate input and resume | input, `@receipt/content-generation-receipt/<invocationId>`, `@content/<contentId>/<locale>` (the frozen unit binding) | — | `INVALID_INPUT`, `SOURCE_DRIFT`, `NO_PROGRESS` |
+| 2 | Bind authority | `@content/<contentId>/<locale>` (curriculum and style references as served), `@runtime` (AI runtime configuration) | — | — |
+| 3 | Write and freeze the brief | `@content/<contentId>/<locale>` (curriculum and source evidence) | `@artifacts/<briefTargetRef>` | `BRIEF_UNBOUND` |
+| 4 | Write every declared edition | `@artifacts/<briefTargetRef>` (the frozen brief), input (the per-language destination) | `@artifacts/<language>.articleRef` | `OUTCOME_UNCOVERED` |
+| 5 | Generate the image to its claims | `@artifacts/<briefTargetRef>` (the brief's claims and the stated image intent) | `@artifacts/<imageTargetRef>` | `IMAGE_UNAVAILABLE` |
+| 6 | Implement every declared track | `@artifacts/<briefTargetRef>`, input (each track's exact build command) | `@artifacts/<track>.sourceRef` | `CODE_BUILD_FAILED` |
+| 7 | Run the executable check | `@artifacts/<track>.sourceRef` (the executable contract), `@runtime` (where each declared command runs) | — | `E2E_FAILED`, `CONTRACT_WEAKENED` |
+| 8 | Take the independent critique | `@artifacts` (every produced artifact and the claims it makes) | `@artifacts/<reviewTargetRef>` | `REVIEW_REVISION_REQUIRED`, `REVIEW_ROUNDS_EXHAUSTED` |
+| 9 | Emit and stop | everything above | `@artifacts/content-generation-receipt.json` | — |
 
 Validation rejects a stale source binding, a language without a destination, an executable check with
 no code behind it, an image without its prompt, a refactor with no unit, a shared brief and critique
