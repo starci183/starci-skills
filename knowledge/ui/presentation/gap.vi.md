@@ -40,27 +40,37 @@ Viết class ở chỗ owner là một component chính là `APP_REIMPLEMENTATIO
 
 ## Gap mà Common đã sở hữu
 
-Tra bảng này trước khi viết bất kỳ gap nào. Nếu quan hệ đã có ở đây thì ứng dụng chỉ ghép component
-và không viết gì thêm.
+Sinh từ claim của `@grammar/core` bằng `scripts/generate-presentation-owned.mjs`; muốn đổi thì sửa component, đừng sửa bảng này.
 
-| Component Common | Gap bên trong | Rule |
+| Component | Phần tử hoặc điều kiện | Rule |
 | --- | --- | --- |
-| `Text` có `startContent` | `.5rem` | GAP-2 |
-| `MediaFrame` | `.5rem` | GAP-2 |
-| Hàng label của `SurfaceCard` | `.5rem` | GAP-2 |
-| Nội dung tab của `Tabs` | `.5rem` | GAP-2 |
-| `SurfaceCopyGroup` | `.5rem`, hoặc `.75rem` khi `density="comfortable"` | GAP-2, GAP-3 |
-| `StaticStateRow` | `.5rem` giữa các phần, `.25rem` bên trong phần copy | GAP-2, GAP-1 |
-| `SectionHeader` | `.75rem` | GAP-3 |
-| `SurfaceAccordionCard` | `.75rem` | GAP-3 |
-| `Subnav` | `.75rem` | GAP-3 |
-| `EmptyNotice` | `.75rem` | GAP-3 |
-| `Sidebar` và `NavigationFeatureNav` | `.75rem` phần chính, `.5rem` phần action | GAP-3, GAP-2 |
-| `MarkdownArticle` | `1rem`, hoặc `.75rem` ở chế độ compact | GAP-4, GAP-3 |
-| `Rail` | `1rem` | GAP-4 |
-| `PrimaryRailLayout` | `1.5rem` | GAP-5 |
-| `WorkspaceShell` | `1.5rem` | GAP-5 |
-| `ChatWorkspace` | `1.5rem` | GAP-5 |
+| `ChatWorkspace` | layout | GAP-5 |
+| `Divider` | root | GAP-3 |
+| `EmptyNotice` | root | GAP-3 |
+| `Input` | root | GAP-2 |
+| `MediaFrame` | root | GAP-2 |
+| `NavigationFeatureNav` | actions, actions!=undefined | GAP-2 |
+| `NavigationFeatureNav` | primary | GAP-3 |
+| `PrimaryRailLayout` | root | GAP-5 |
+| `Rail` | frame | GAP-4 |
+| `Sidebar` | list box | GAP-1 |
+| `Sidebar` | list box item, not collapsed | GAP-3 |
+| `Sidebar` | list box section | GAP-1 |
+| `StaticStateRow` | root | GAP-2 |
+| `StaticStateRow` | row copy | GAP-1 |
+| `Subnav` | identity | GAP-2 |
+| `Subnav` | root | GAP-3 |
+| `SurfaceAccordionCard` | label, label!=undefined | GAP-2 |
+| `SurfaceCard` | card content, composition="joined" | GAP-0 |
+| `SurfaceCard` | label, label!=undefined | GAP-2 |
+| `SurfaceCopyGroup` | root, density!="comfortable" | GAP-2 |
+| `SurfaceCopyGroup` | root, density="comfortable" | GAP-3 |
+| `SurfaceListCard` | label, not (label === undefined || labelHidden) | GAP-2 |
+| `Tabs` | tab content | GAP-2 |
+| `Text` | root, not isSkeleton, showsStartContent | GAP-2 |
+| `TextAction` | root | GAP-2 |
+| `WorkspaceShell` | layout | GAP-5 |
+| `WorkspaceShell` | primary | GAP-5 |
 
 ## GAP-0 — `gap-0` / `0`
 
@@ -106,7 +116,7 @@ nhau.
 | Case 1 | Một field và action gửi nó, đặt cạnh nhau | `App` | `<div className="flex items-end gap-3">` với `<Input>` và `<Button>` |
 | Case 2 | Tiêu đề và phần giải thích cần thoáng hơn mức compact mặc định | `SurfaceCopyGroup` | `<SurfaceCopyGroup density="comfortable">` |
 | Case 3 | Hai control ngang hàng phục vụ chung một quyết định, kiểu một cặp bộ lọc | `App` | `<div className="flex gap-3">` |
-| Case 4 | Eyebrow, tiêu đề và mô tả đặt trên một section | `SectionHeader` | Ghép header, không viết gap |
+| Case 4 | Section header có phần copy và action xếp chồng vì container hẹp | `SectionHeader` | Ghép header, không viết gap |
 
 Không phải rule này: các khối mà mỗi khối tự mang tiêu đề riêng thì dùng GAP-4.
 

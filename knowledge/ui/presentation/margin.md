@@ -47,25 +47,16 @@ to a parent gap that already expresses the same distance is `DOUBLE_OWNER`.
 
 ## Margin Common already owns
 
-Check this table before writing any margin. Most entries are resets: Common has already removed the
-native margin so the parent gap is the single owner.
+Generated from `@grammar/core` claims by `scripts/generate-presentation-owned.mjs`; edit the component, not this table.
 
-| Common component | Margin | Rule |
+| Component | Element or condition | Rule |
 | --- | --- | --- |
-| `PageContainer` | `auto` inline, centring the page measure | MARGIN-AUTO |
-| `Heading` inside `SectionHeader` | `0` | MARGIN-0 |
-| `Label` | `0` | MARGIN-0 |
-| `MediaFrame` | `0` | MARGIN-0 |
-| First child of a `SurfaceCard` label | `0` | MARGIN-0 |
-| `EmptyNotice` | `0` | MARGIN-0 |
-| `SurfaceAccordionCard` heading | `0` | MARGIN-0 |
-| `MarkdownArticle` paragraphs, lists, quotes, tables | `0` | MARGIN-0 |
-| `MarkdownArticle` first and last child | `0` on the outer edge | MARGIN-0 |
-| `MarkdownArticle` headings | `1.5rem` top, and a bottom value off the scale | MARGIN-5, off scale |
-| `MarkdownArticle` rule | `1rem` block | MARGIN-4 |
-| `MarkdownArticle` consecutive list items | a value off the scale | off scale |
-| `FencedCodeBlock` | `1rem` bottom | MARGIN-4 |
-| `WorkspaceShell` header | `1.5rem` block end | MARGIN-5 |
+| `Label` | root | MARGIN-0 |
+| `MediaFrame` | root | MARGIN-0 |
+| `PageContainer` | root | MARGIN-AUTO |
+| `SectionHeader` | title | MARGIN-0 |
+| `SurfaceAccordionCard` | accordion trigger wrapper | MARGIN-0 |
+| `WorkspaceShell` | header, hasHeader | MARGIN-5 |
 
 ## MARGIN-0 — `m-0` / `0`
 

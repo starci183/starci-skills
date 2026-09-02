@@ -47,25 +47,16 @@ khi cha đã có gap diễn đạt đúng khoảng cách đó là `DOUBLE_OWNER`
 
 ## Margin mà Common đã sở hữu
 
-Tra bảng này trước khi viết bất kỳ margin nào. Phần lớn là reset: Common đã gỡ margin mặc định để
-gap của cha là chủ duy nhất.
+Sinh từ claim của `@grammar/core` bằng `scripts/generate-presentation-owned.mjs`; muốn đổi thì sửa component, đừng sửa bảng này.
 
-| Component Common | Margin | Rule |
+| Component | Phần tử hoặc điều kiện | Rule |
 | --- | --- | --- |
-| `PageContainer` | `auto` theo trục inline, canh giữa khổ trang | MARGIN-AUTO |
-| `Heading` trong `SectionHeader` | `0` | MARGIN-0 |
-| `Label` | `0` | MARGIN-0 |
-| `MediaFrame` | `0` | MARGIN-0 |
-| Con đầu tiên trong label của `SurfaceCard` | `0` | MARGIN-0 |
-| `EmptyNotice` | `0` | MARGIN-0 |
-| Heading của `SurfaceAccordionCard` | `0` | MARGIN-0 |
-| Đoạn văn, danh sách, trích dẫn, bảng trong `MarkdownArticle` | `0` | MARGIN-0 |
-| Con đầu và con cuối của `MarkdownArticle` | `0` ở cạnh ngoài | MARGIN-0 |
-| Heading trong `MarkdownArticle` | `1.5rem` phía trên, phía dưới là một giá trị ngoài thang | MARGIN-5, ngoài thang |
-| Đường kẻ ngang trong `MarkdownArticle` | `1rem` trục block | MARGIN-4 |
-| Hai list item liền nhau trong `MarkdownArticle` | một giá trị ngoài thang | ngoài thang |
-| `FencedCodeBlock` | `1rem` phía dưới | MARGIN-4 |
-| Header của `WorkspaceShell` | `1.5rem` ở cạnh cuối trục block | MARGIN-5 |
+| `Label` | root | MARGIN-0 |
+| `MediaFrame` | root | MARGIN-0 |
+| `PageContainer` | root | MARGIN-AUTO |
+| `SectionHeader` | title | MARGIN-0 |
+| `SurfaceAccordionCard` | accordion trigger wrapper | MARGIN-0 |
+| `WorkspaceShell` | header, hasHeader | MARGIN-5 |
 
 ## MARGIN-0 — `m-0` / `0`
 

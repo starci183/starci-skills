@@ -41,27 +41,37 @@ is `—` stays linked to `COMMON_CAPABILITY_MISSING`.
 
 ## Gaps Common already owns
 
-Check this table before writing any gap. If the relationship appears here, the application composes
-the component and writes nothing.
+Generated from `@grammar/core` claims by `scripts/generate-presentation-owned.mjs`; edit the component, not this table.
 
-| Common component | Internal gap | Rule |
+| Component | Element or condition | Rule |
 | --- | --- | --- |
-| `Text` with `startContent` | `.5rem` | GAP-2 |
-| `MediaFrame` | `.5rem` | GAP-2 |
-| `SurfaceCard` label row | `.5rem` | GAP-2 |
-| `Tabs` tab content | `.5rem` | GAP-2 |
-| `SurfaceCopyGroup` | `.5rem`, or `.75rem` at `density="comfortable"` | GAP-2, GAP-3 |
-| `StaticStateRow` | `.5rem` between row parts, `.25rem` inside its copy | GAP-2, GAP-1 |
-| `SectionHeader` | `.75rem` | GAP-3 |
-| `SurfaceAccordionCard` | `.75rem` | GAP-3 |
-| `Subnav` | `.75rem` | GAP-3 |
-| `EmptyNotice` | `.75rem` | GAP-3 |
-| `Sidebar` and `NavigationFeatureNav` | `.75rem` primary, `.5rem` actions | GAP-3, GAP-2 |
-| `MarkdownArticle` | `1rem`, or `.75rem` at compact measure | GAP-4, GAP-3 |
-| `Rail` | `1rem` | GAP-4 |
-| `PrimaryRailLayout` | `1.5rem` | GAP-5 |
-| `WorkspaceShell` | `1.5rem` | GAP-5 |
-| `ChatWorkspace` | `1.5rem` | GAP-5 |
+| `ChatWorkspace` | layout | GAP-5 |
+| `Divider` | root | GAP-3 |
+| `EmptyNotice` | root | GAP-3 |
+| `Input` | root | GAP-2 |
+| `MediaFrame` | root | GAP-2 |
+| `NavigationFeatureNav` | actions, actions!=undefined | GAP-2 |
+| `NavigationFeatureNav` | primary | GAP-3 |
+| `PrimaryRailLayout` | root | GAP-5 |
+| `Rail` | frame | GAP-4 |
+| `Sidebar` | list box | GAP-1 |
+| `Sidebar` | list box item, not collapsed | GAP-3 |
+| `Sidebar` | list box section | GAP-1 |
+| `StaticStateRow` | root | GAP-2 |
+| `StaticStateRow` | row copy | GAP-1 |
+| `Subnav` | identity | GAP-2 |
+| `Subnav` | root | GAP-3 |
+| `SurfaceAccordionCard` | label, label!=undefined | GAP-2 |
+| `SurfaceCard` | card content, composition="joined" | GAP-0 |
+| `SurfaceCard` | label, label!=undefined | GAP-2 |
+| `SurfaceCopyGroup` | root, density!="comfortable" | GAP-2 |
+| `SurfaceCopyGroup` | root, density="comfortable" | GAP-3 |
+| `SurfaceListCard` | label, not (label === undefined || labelHidden) | GAP-2 |
+| `Tabs` | tab content | GAP-2 |
+| `Text` | root, not isSkeleton, showsStartContent | GAP-2 |
+| `TextAction` | root | GAP-2 |
+| `WorkspaceShell` | layout | GAP-5 |
+| `WorkspaceShell` | primary | GAP-5 |
 
 ## GAP-0 — `gap-0` / `0`
 
@@ -107,7 +117,7 @@ together.
 | Case 1 | A field and the action that submits it, side by side | `App` | `<div className="flex items-end gap-3">` with `<Input>` and `<Button>` |
 | Case 2 | A title and its explanation that need more air than the compact default | `SurfaceCopyGroup` | `<SurfaceCopyGroup density="comfortable">` |
 | Case 3 | Two peer controls sharing one decision, such as a pair of filters | `App` | `<div className="flex gap-3">` |
-| Case 4 | An eyebrow, title, and description above a section | `SectionHeader` | Compose the header; no gap |
+| Case 4 | A section header whose copy and action stack because its container is narrow | `SectionHeader` | Compose the header; no gap |
 
 Not this rule: blocks that each carry their own heading use GAP-4.
 

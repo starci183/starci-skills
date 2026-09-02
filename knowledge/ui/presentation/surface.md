@@ -44,24 +44,24 @@ or a passed class to repaint it is `APP_OVERRIDE`.
 
 ## Surfaces Common already owns
 
-Check this table before writing any surface. If the face appears here, the application composes the
-component and writes nothing.
+Generated from `@grammar/core` claims by `scripts/generate-presentation-owned.mjs`; edit the component, not this table.
 
-| Common component | Face it paints | Rule |
+| Component | Element or condition | Rule |
 | --- | --- | --- |
-| `SurfaceCard` | `--surface` with `--surface-foreground` | SURFACE-2 |
-| `SurfaceCard` at `frame="frameless"` | transparent, colour inherited | SURFACE-1 |
-| `SurfaceListCard` and `SurfaceAccordionCard` | The same card face as `SurfaceCard` | SURFACE-2 |
-| `MediaFrame` viewport | `--surface-secondary` | SURFACE-3 |
-| `MediaFrame` at `treatment="plain"` | transparent | SURFACE-1 |
-| `SurfaceCard` at `interaction="whole-action"`, hovered or focused | `--accent-soft` | SURFACE-4 |
-| `Tooltip` content | `--foreground` inverted against `--background` | off catalog |
-| `NavigationFeatureNav`, `Subnav`, `ChatWorkspace` | `--background` with `--foreground` | off catalog |
-| `MarkdownArticle` inline code | `--muted-surface` | off catalog |
-| `FencedCodeBlock` and `MarkdownTableFrame` | `--code-surface` | off catalog |
-
-The off-catalog rows are page-chrome and content-material faces. They are named so a reader can rule
-out writing anything, not so an application may reach for those tokens directly.
+| `ChatWorkspace` | drawer close, hasRail, isCompactRail | SURFACE-2 |
+| `ChatWorkspace` | rail trigger, hasRail, isCompactRail | SURFACE-2 |
+| `IconTile` | root, not (isSkeleton || showsArtwork), tone="accent" | SURFACE-4 |
+| `IconTile` | root, not (isSkeleton || showsArtwork), tone="success" | SURFACE-5 |
+| `MediaFrame` | root, treatment!="plain" | SURFACE-3 |
+| `MediaFrame` | root, treatment="plain" | SURFACE-1 |
+| `Sidebar` | list box item | SURFACE-4 |
+| `SurfaceAccordionCard` | accordion shell, bounded | SURFACE-2 |
+| `SurfaceAccordionCard` | accordion shell, not bounded | SURFACE-1 |
+| `SurfaceCard` | card content, frame!="frameless" | SURFACE-2 |
+| `SurfaceCard` | card content, frame="frameless" | SURFACE-1 |
+| `SurfaceCard` | root, wholeAction!=undefined | SURFACE-4 |
+| `SurfaceListCard` | root | SURFACE-2 |
+| `TextAction` | root, isCurrent, appearance="choice"|"route"|"section" | SURFACE-4 |
 
 ## SURFACE-1 — no surface / inherited foreground
 

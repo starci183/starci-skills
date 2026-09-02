@@ -47,25 +47,52 @@ component with a selector or a passed class to change its inset is `APP_OVERRIDE
 
 ## Padding Common already owns
 
-Check this table before writing any padding. If the boundary appears here, the application composes
-the component and writes nothing.
+Generated from `@grammar/core` claims by `scripts/generate-presentation-owned.mjs`; edit the component, not this table.
 
-| Common component | Internal inset | Rule |
+| Component | Element or condition | Rule |
 | --- | --- | --- |
-| `PageContainer` | `clamp(1rem, 3vw, 2rem)` inline, plus centring | off scale |
-| `Tooltip` content | `.25rem` block, `.5rem` inline | PADDING-1, PADDING-2 |
-| `HorizontalScrollRegion` | `.25rem` block | PADDING-1 |
-| `Tabs` tab | `.75rem` inline | PADDING-3 |
-| `Tabs` frame at `inset="page"` | `1.5rem` inline | PADDING-5 |
-| `Subnav` | `.75rem` inline | PADDING-3 |
-| `NavigationFeatureNav` | `.75rem` inline | PADDING-3 |
-| `SurfaceCard` content | `1rem` | PADDING-4 |
-| `SurfaceCard` at `composition="joined"` | `0` | PADDING-0 |
-| `SurfaceListCard` shell | `0` | PADDING-0 |
-| `SurfaceAccordionCard` trigger | `1rem` | PADDING-4 |
-| `SurfaceAccordionCard` panel | `0` top, `1rem` inline and bottom | PADDING-0, PADDING-4 |
-| `EmptyNotice` | `1rem` | PADDING-4 |
-| `FencedCodeBlock` | `1rem` | PADDING-4 |
+| `ChatWorkspace` | drawer body, hasRail, isCompactRail | PADDING-0 |
+| `ChatWorkspace` | overlay rail, hasRail, isCompactRail | PADDING-4 |
+| `ChatWorkspace` | overlay rail, hasRail, not isCompactRail | PADDING-4 |
+| `ChatWorkspace` | rail trigger boundary, hasRail, isCompactRail | PADDING-2 |
+| `ChatWorkspace` | rail trigger boundary, hasRail, isCompactRail | PADDING-4 |
+| `ChatWorkspace` | rail trigger, hasRail, isCompactRail | PADDING-3 |
+| `EmptyNotice` | root | PADDING-4 |
+| `NavigationFeatureNav` | primary | PADDING-3 |
+| `OtpInput` | root | PADDING-1 |
+| `Rail` | body, inset="content" | PADDING-3 |
+| `Rail` | body, inset="content" | PADDING-5 |
+| `Sidebar` | footer, not (collapsed || footer == null) | PADDING-0 |
+| `Sidebar` | footer, not (collapsed || footer == null) | PADDING-3 |
+| `Sidebar` | group label, group.label!=undefined, not collapsed | PADDING-1 |
+| `Sidebar` | group label, group.label!=undefined, not collapsed | PADDING-2 |
+| `Sidebar` | group label, group.label!=undefined, not collapsed | PADDING-3 |
+| `Sidebar` | header, not (collapsed || header == null) | PADDING-3 |
+| `Sidebar` | icon button wrapper, canToggle | PADDING-2 |
+| `Sidebar` | list box item, not collapsed | PADDING-2 |
+| `Sidebar` | list box item, not collapsed | PADDING-3 |
+| `Sidebar` | list box, collapsed | PADDING-2 |
+| `Sidebar` | list box, not collapsed | PADDING-3 |
+| `StaticStateRow` | root | PADDING-2 |
+| `Subnav` | root | PADDING-3 |
+| `SurfaceAccordionCard` | accordion body | PADDING-8 |
+| `SurfaceAccordionCard` | accordion body wrapper | PADDING-0 |
+| `SurfaceAccordionCard` | accordion trigger | PADDING-3 |
+| `SurfaceAccordionCard` | accordion trigger | PADDING-4 |
+| `SurfaceCard` | card content, composition!="joined" | PADDING-4 |
+| `SurfaceCard` | card content, composition="joined" | PADDING-0 |
+| `SurfaceListCard` | root | PADDING-0 |
+| `Tabs` | hero tabs tab | PADDING-3 |
+| `Tabs` | root, inset="page" | PADDING-5 |
+| `TextAction` | root, appearance="choice" | PADDING-1 |
+| `TextAction` | root, appearance="choice" | PADDING-2 |
+| `TextAction` | root, appearance="route" | PADDING-2 |
+| `TextAction` | root, appearance="route" | PADDING-3 |
+| `TextAction` | root, appearance="section" | PADDING-2 |
+| `TextAction` | root, appearance="section" | PADDING-3 |
+| `TextAction` | root, appearance="tab" | PADDING-3 |
+| `Tooltip` | content | PADDING-1 |
+| `Tooltip` | content | PADDING-2 |
 
 ## Side contact
 

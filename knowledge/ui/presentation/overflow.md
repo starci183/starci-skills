@@ -33,18 +33,32 @@ a region with no height cap never overflows and its scroll class does nothing.
 
 ## Overflow Common already owns
 
-| Common component | Boundary | Rule |
+Generated from `@grammar/core` claims by `scripts/generate-presentation-owned.mjs`; edit the component, not this table.
+
+| Component | Element or condition | Rule |
 | --- | --- | --- |
-| `SurfaceCard` | Clips its own corners so bands stay inside the radius | OVERFLOW-2 |
-| `SurfaceCard` frameless | Stays visible; only its content clips | OVERFLOW-1, OVERFLOW-2 |
-| `MediaFrame` viewport | Clips the image to the frame | OVERFLOW-2 |
-| `HorizontalScrollRegion` | Scrolls the inline axis, contained | OVERFLOW-3, OVERFLOW-5 |
-| `VerticalScrollRegion` | Scrolls the block axis, contained | OVERFLOW-3, OVERFLOW-5 |
-| `Tabs` strip | Scrolls the inline axis when tabs exceed the width | OVERFLOW-4 |
-| `MarkdownTableFrame` | Scrolls a wide table on the inline axis | OVERFLOW-4 |
-| `FencedCodeBlock` | Scrolls long lines on the inline axis | OVERFLOW-4 |
-| `Rail` body | Scrolls the block axis | OVERFLOW-3 |
-| `WorkspaceShell` floating layer | Scrolls when its content exceeds the viewport | OVERFLOW-4 |
+| `ChatWorkspace` | conversation | OVERFLOW-4 |
+| `ChatWorkspace` | conversation | OVERFLOW-5 |
+| `ChatWorkspace` | drawer body, hasRail, isCompactRail | OVERFLOW-2 |
+| `ChatWorkspace` | overlay rail, hasRail, isCompactRail | OVERFLOW-4 |
+| `ChatWorkspace` | overlay rail, hasRail, isCompactRail | OVERFLOW-5 |
+| `ChatWorkspace` | overlay rail, hasRail, not isCompactRail | OVERFLOW-4 |
+| `ChatWorkspace` | overlay rail, hasRail, not isCompactRail | OVERFLOW-5 |
+| `FencedCodeBlock` | root | OVERFLOW-4 |
+| `IconTile` | root | OVERFLOW-2 |
+| `MarkdownTableFrame` | root | OVERFLOW-4 |
+| `MediaFrame` | root | OVERFLOW-2 |
+| `OtpInput` | root | OVERFLOW-3 |
+| `OtpInput` | root | OVERFLOW-5 |
+| `Rail` | body, height!="fill" | OVERFLOW-3 |
+| `Sidebar` | root | OVERFLOW-2 |
+| `SurfaceAccordionCard` | accordion shell | OVERFLOW-2 |
+| `SurfaceAccordionCard` | accordion shell, not bounded | OVERFLOW-1 |
+| `SurfaceCard` | card content | OVERFLOW-2 |
+| `SurfaceCard` | card content, frame="frameless" | OVERFLOW-1 |
+| `SurfaceListCard` | root | OVERFLOW-2 |
+| `Tabs` | scroll | OVERFLOW-4 |
+| `WorkspaceShell` | floating layer, hasFloatingLayer | OVERFLOW-4 |
 
 ## OVERFLOW-1 — Visible
 

@@ -39,6 +39,34 @@ Typography belongs to Grammar. The owner cell names which component renders the 
 There is no `App` owner in this file. An application typography class is `APP_OVERRIDE`, and a raw
 `font-size` or `font-weight` that changes semantic rank is rejected even when the pixels match.
 
+## Font Common already owns
+
+Generated from `@grammar/core` claims by `scripts/generate-presentation-owned.mjs`; edit the component, not this table.
+
+| Component | Element or condition | Rule |
+| --- | --- | --- |
+| `ChatWorkspace` | rail trigger, hasRail, isCompactRail | FONT-2 |
+| `Heading` | root, scale!="display", level=1 | FONT-4 |
+| `Heading` | root, scale!="display", level=2 | FONT-3 |
+| `Heading` | root, scale!="display", level=3 | FONT-2 |
+| `Heading` | root, scale!="display", level=4 | FONT-1 |
+| `Heading` | root, scale="display" | FONT-6 |
+| `Input` | toggle label, not (!isSecret || toggleLabel === undefined), ToggleIcon=undefined | FONT-1 |
+| `Label` | root, depth!="nested" | FONT-2 |
+| `Label` | root, depth="nested" | FONT-1 |
+| `Sidebar` | group label, group.label!=undefined, not collapsed | FONT-1 |
+| `Sidebar` | item label, not collapsed | FONT-2 |
+| `SurfaceListCard` | fact, not (label === undefined || labelHidden), fact!=undefined, depth!="nested" | FONT-2 |
+| `SurfaceListCard` | fact, not (label === undefined || labelHidden), fact!=undefined, depth="nested" | FONT-1 |
+| `Text` | root, size="md" | FONT-3 |
+| `Text` | root, size="metric-lead" | FONT-5 |
+| `Text` | root, size="sm" | FONT-2 |
+| `Text` | root, size="xs" | FONT-1 |
+| `TextAction` | root, size="md" | FONT-3 |
+| `TextAction` | root, size="sm" | FONT-2 |
+| `TextAction` | root, size="xs" | FONT-1 |
+| `Tooltip` | content | FONT-1 |
+
 ## FONT-1 — `text-xs` / `leading-4`
 
 The smallest public size, for the lowest rank of supporting information.

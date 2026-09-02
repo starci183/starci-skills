@@ -44,24 +44,24 @@ truyền xuống để sơn lại nó là `APP_OVERRIDE`.
 
 ## Surface mà Common đã sở hữu
 
-Tra bảng này trước khi viết bất kỳ surface nào. Nếu cái mặt đã có ở đây thì ứng dụng chỉ ghép
-component và không viết gì thêm.
+Sinh từ claim của `@grammar/core` bằng `scripts/generate-presentation-owned.mjs`; muốn đổi thì sửa component, đừng sửa bảng này.
 
-| Component Common | Mặt mà nó sơn | Rule |
+| Component | Phần tử hoặc điều kiện | Rule |
 | --- | --- | --- |
-| `SurfaceCard` | `--surface` với `--surface-foreground` | SURFACE-2 |
-| `SurfaceCard` khi `frame="frameless"` | trong suốt, màu chữ kế thừa | SURFACE-1 |
-| `SurfaceListCard` và `SurfaceAccordionCard` | Cùng mặt card như `SurfaceCard` | SURFACE-2 |
-| Viewport của `MediaFrame` | `--surface-secondary` | SURFACE-3 |
-| `MediaFrame` khi `treatment="plain"` | trong suốt | SURFACE-1 |
-| `SurfaceCard` khi `interaction="whole-action"`, lúc hover hoặc focus | `--accent-soft` | SURFACE-4 |
-| Nội dung `Tooltip` | `--foreground` đảo ngược trên `--background` | ngoài danh mục |
-| `NavigationFeatureNav`, `Subnav`, `ChatWorkspace` | `--background` với `--foreground` | ngoài danh mục |
-| Inline code của `MarkdownArticle` | `--muted-surface` | ngoài danh mục |
-| `FencedCodeBlock` và `MarkdownTableFrame` | `--code-surface` | ngoài danh mục |
-
-Các dòng ngoài danh mục là mặt của chrome trang và của vật liệu nội dung. Chúng được gọi tên để người
-đọc loại trừ việc phải viết gì, không phải để ứng dụng với tay lấy những token đó.
+| `ChatWorkspace` | drawer close, hasRail, isCompactRail | SURFACE-2 |
+| `ChatWorkspace` | rail trigger, hasRail, isCompactRail | SURFACE-2 |
+| `IconTile` | root, not (isSkeleton || showsArtwork), tone="accent" | SURFACE-4 |
+| `IconTile` | root, not (isSkeleton || showsArtwork), tone="success" | SURFACE-5 |
+| `MediaFrame` | root, treatment!="plain" | SURFACE-3 |
+| `MediaFrame` | root, treatment="plain" | SURFACE-1 |
+| `Sidebar` | list box item | SURFACE-4 |
+| `SurfaceAccordionCard` | accordion shell, bounded | SURFACE-2 |
+| `SurfaceAccordionCard` | accordion shell, not bounded | SURFACE-1 |
+| `SurfaceCard` | card content, frame!="frameless" | SURFACE-2 |
+| `SurfaceCard` | card content, frame="frameless" | SURFACE-1 |
+| `SurfaceCard` | root, wholeAction!=undefined | SURFACE-4 |
+| `SurfaceListCard` | root | SURFACE-2 |
+| `TextAction` | root, isCurrent, appearance="choice"|"route"|"section" | SURFACE-4 |
 
 ## SURFACE-1 — không có surface / foreground kế thừa
 

@@ -39,6 +39,34 @@ Typography thuộc về Grammar. Ô owner gọi tên component nào render hạn
 File này không có owner `App`. Một class typography do ứng dụng viết là `APP_OVERRIDE`, và một
 `font-size` hay `font-weight` thô làm đổi hạng ngữ nghĩa thì bị từ chối kể cả khi pixel trùng khớp.
 
+## Font mà Common đã sở hữu
+
+Sinh từ claim của `@grammar/core` bằng `scripts/generate-presentation-owned.mjs`; muốn đổi thì sửa component, đừng sửa bảng này.
+
+| Component | Phần tử hoặc điều kiện | Rule |
+| --- | --- | --- |
+| `ChatWorkspace` | rail trigger, hasRail, isCompactRail | FONT-2 |
+| `Heading` | root, scale!="display", level=1 | FONT-4 |
+| `Heading` | root, scale!="display", level=2 | FONT-3 |
+| `Heading` | root, scale!="display", level=3 | FONT-2 |
+| `Heading` | root, scale!="display", level=4 | FONT-1 |
+| `Heading` | root, scale="display" | FONT-6 |
+| `Input` | toggle label, not (!isSecret || toggleLabel === undefined), ToggleIcon=undefined | FONT-1 |
+| `Label` | root, depth!="nested" | FONT-2 |
+| `Label` | root, depth="nested" | FONT-1 |
+| `Sidebar` | group label, group.label!=undefined, not collapsed | FONT-1 |
+| `Sidebar` | item label, not collapsed | FONT-2 |
+| `SurfaceListCard` | fact, not (label === undefined || labelHidden), fact!=undefined, depth!="nested" | FONT-2 |
+| `SurfaceListCard` | fact, not (label === undefined || labelHidden), fact!=undefined, depth="nested" | FONT-1 |
+| `Text` | root, size="md" | FONT-3 |
+| `Text` | root, size="metric-lead" | FONT-5 |
+| `Text` | root, size="sm" | FONT-2 |
+| `Text` | root, size="xs" | FONT-1 |
+| `TextAction` | root, size="md" | FONT-3 |
+| `TextAction` | root, size="sm" | FONT-2 |
+| `TextAction` | root, size="xs" | FONT-1 |
+| `Tooltip` | content | FONT-1 |
+
 ## FONT-1 — `text-xs` / `leading-4`
 
 Cỡ công khai nhỏ nhất, cho hạng thông tin phụ thấp nhất.

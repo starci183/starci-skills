@@ -33,18 +33,32 @@ một vùng không có chặn chiều cao thì không bao giờ tràn, và class
 
 ## Overflow mà Common đã sở hữu
 
-| Component Common | Ranh giới | Rule |
+Sinh từ claim của `@grammar/core` bằng `scripts/generate-presentation-owned.mjs`; muốn đổi thì sửa component, đừng sửa bảng này.
+
+| Component | Phần tử hoặc điều kiện | Rule |
 | --- | --- | --- |
-| `SurfaceCard` | Cắt theo góc bo của chính nó để các dải nằm gọn trong bán kính | OVERFLOW-2 |
-| `SurfaceCard` dạng frameless | Giữ hiện ra ngoài, chỉ phần nội dung mới bị cắt | OVERFLOW-1, OVERFLOW-2 |
-| Viewport của `MediaFrame` | Cắt ảnh theo khung | OVERFLOW-2 |
-| `HorizontalScrollRegion` | Cuộn trục ngang, có giữ lại trong vùng | OVERFLOW-3, OVERFLOW-5 |
-| `VerticalScrollRegion` | Cuộn trục dọc, có giữ lại trong vùng | OVERFLOW-3, OVERFLOW-5 |
-| Dải tab của `Tabs` | Cuộn trục ngang khi tab vượt quá chiều rộng | OVERFLOW-4 |
-| `MarkdownTableFrame` | Cuộn ngang một bảng rộng | OVERFLOW-4 |
-| `FencedCodeBlock` | Cuộn ngang những dòng code dài | OVERFLOW-4 |
-| Thân `Rail` | Cuộn trục dọc | OVERFLOW-3 |
-| Lớp nổi của `WorkspaceShell` | Cuộn khi nội dung vượt quá viewport | OVERFLOW-4 |
+| `ChatWorkspace` | conversation | OVERFLOW-4 |
+| `ChatWorkspace` | conversation | OVERFLOW-5 |
+| `ChatWorkspace` | drawer body, hasRail, isCompactRail | OVERFLOW-2 |
+| `ChatWorkspace` | overlay rail, hasRail, isCompactRail | OVERFLOW-4 |
+| `ChatWorkspace` | overlay rail, hasRail, isCompactRail | OVERFLOW-5 |
+| `ChatWorkspace` | overlay rail, hasRail, not isCompactRail | OVERFLOW-4 |
+| `ChatWorkspace` | overlay rail, hasRail, not isCompactRail | OVERFLOW-5 |
+| `FencedCodeBlock` | root | OVERFLOW-4 |
+| `IconTile` | root | OVERFLOW-2 |
+| `MarkdownTableFrame` | root | OVERFLOW-4 |
+| `MediaFrame` | root | OVERFLOW-2 |
+| `OtpInput` | root | OVERFLOW-3 |
+| `OtpInput` | root | OVERFLOW-5 |
+| `Rail` | body, height!="fill" | OVERFLOW-3 |
+| `Sidebar` | root | OVERFLOW-2 |
+| `SurfaceAccordionCard` | accordion shell | OVERFLOW-2 |
+| `SurfaceAccordionCard` | accordion shell, not bounded | OVERFLOW-1 |
+| `SurfaceCard` | card content | OVERFLOW-2 |
+| `SurfaceCard` | card content, frame="frameless" | OVERFLOW-1 |
+| `SurfaceListCard` | root | OVERFLOW-2 |
+| `Tabs` | scroll | OVERFLOW-4 |
+| `WorkspaceShell` | floating layer, hasFloatingLayer | OVERFLOW-4 |
 
 ## OVERFLOW-1 — Hiện ra ngoài
 

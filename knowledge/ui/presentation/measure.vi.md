@@ -40,15 +40,18 @@ xuyên suốt các renderer của mình; một vùng của ứng dụng có bọ
 
 ## Measure mà Common đã sở hữu
 
-| Component Common | Ràng buộc | Rule |
+Sinh từ claim của `@grammar/core` bằng `scripts/generate-presentation-owned.mjs`; muốn đổi thì sửa component, đừng sửa bảng này.
+
+| Component | Phần tử hoặc điều kiện | Rule |
 | --- | --- | --- |
-| `PageContainer` khi `measure="reading"` | `min(100%, 72ch)` | MEASURE-1 |
-| `PageContainer` khi `measure="product"` | Khổ product đóng gói sẵn, mặc định | MEASURE-1 |
-| `PageContainer` khi `measure="full"` | `100%` | MEASURE-1 |
-| `HorizontalScrollRegion` | Các con lấy `max-content` | MEASURE-3 |
-| `VerticalScrollRegion` | Ranh giới chiều cao cuộn được | MEASURE-7 |
-| `Rail` khi `height="fill"` | Thân rail lấp đầy shell của nó | MEASURE-6 |
-| `WorkspaceShell` | Chiều rộng các vùng qua từng breakpoint | MEASURE-1 |
+| `NavigationFeatureNav` | root | MEASURE-2 |
+| `PageContainer` | root | MEASURE-1 |
+| `Progress` | root | MEASURE-2 |
+| `Rail` | body, height="fill" | MEASURE-6 |
+| `Sidebar` | root, presentation!="drawer" | MEASURE-6 |
+| `Sidebar` | root, presentation="drawer" | MEASURE-2 |
+| `TextAction` | root | MEASURE-3 |
+| `WorkspaceShell` | layout | MEASURE-1 |
 
 ## MEASURE-1 — Khổ trang
 

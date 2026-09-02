@@ -78,9 +78,13 @@ The owner cell is one of three values, and every topic states them once near the
 - `—`, so Common exposes no public path. The class is a recorded workaround linked to
   `COMMON_CAPABILITY_MISSING`.
 
-Each topic also carries one table of the relationships Common already owns, mapping component to
-internal value to rule, so a reader can rule out writing anything before reaching the cases. Those
-claims must resolve to current source.
+Each topic also carries one table of the relationships Common already owns, mapping component to the
+element or prop condition that carries the claim, to rule, so a reader can rule out writing anything
+before reaching the cases. That table is generated from the `data-contract` claims the package
+publishes, by `scripts/generate-presentation-owned.mjs`, so it is never edited by hand: a wrong row
+is repaired in the component. A case below it is added only when two authorized evidence blocks show
+the situation, the same evidence rule the family idioms use; one occurrence is a product decision,
+not a rule.
 
 A case belonging to a neighbouring value is not a table row. It goes on one line after the table, as
 `Not this rule: <condition> uses GAP-n`.

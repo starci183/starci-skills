@@ -34,14 +34,16 @@ silently without it, because the region never becomes narrower than its longest 
 
 ## Text flow Common already owns
 
-| Common component | Behaviour | Rule |
+Generated from `@grammar/core` claims by `scripts/generate-presentation-owned.mjs`; edit the component, not this table.
+
+| Component | Element or condition | Rule |
 | --- | --- | --- |
-| `SectionHeader` title | Breaks inside long unbroken strings | FLOW-3 |
-| `MediaFrame` caption | Breaks inside long unbroken strings | FLOW-3 |
-| `MarkdownArticle` | Breaks inside long unbroken strings | FLOW-3 |
-| `FencedCodeBlock` | Preserves whitespace, scrolls rather than wraps | FLOW-2 |
-| `Subnav` title | Truncates to one line with an ellipsis | FLOW-4 |
-| `Badge`, `Tabs` tab, control labels | Stay on one line | FLOW-2 |
+| `MediaFrame` | caption, caption!=undefined | FLOW-3 |
+| `SectionHeader` | title | FLOW-3 |
+| `Sidebar` | item label, not collapsed | FLOW-4 |
+| `Subnav` | title | FLOW-4 |
+| `Tabs` | hero tabs list container wrapper | FLOW-2 |
+| `Tooltip` | content | FLOW-2 |
 
 ## FLOW-1 — Alignment
 

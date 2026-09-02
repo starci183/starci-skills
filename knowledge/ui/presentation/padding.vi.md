@@ -46,25 +46,52 @@ component bằng selector hoặc bằng class truyền vào để đổi inset c
 
 ## Padding mà Common đã sở hữu
 
-Tra bảng này trước khi viết bất kỳ padding nào. Nếu ranh giới đã có ở đây thì ứng dụng chỉ ghép
-component và không viết gì thêm.
+Sinh từ claim của `@grammar/core` bằng `scripts/generate-presentation-owned.mjs`; muốn đổi thì sửa component, đừng sửa bảng này.
 
-| Component Common | Inset bên trong | Rule |
+| Component | Phần tử hoặc điều kiện | Rule |
 | --- | --- | --- |
-| `PageContainer` | `clamp(1rem, 3vw, 2rem)` theo trục inline, kèm canh giữa | ngoài thang |
-| Nội dung `Tooltip` | `.25rem` trục block, `.5rem` trục inline | PADDING-1, PADDING-2 |
-| `HorizontalScrollRegion` | `.25rem` trục block | PADDING-1 |
-| Tab của `Tabs` | `.75rem` trục inline | PADDING-3 |
-| Khung `Tabs` khi `inset="page"` | `1.5rem` trục inline | PADDING-5 |
-| `Subnav` | `.75rem` trục inline | PADDING-3 |
-| `NavigationFeatureNav` | `.75rem` trục inline | PADDING-3 |
-| Nội dung `SurfaceCard` | `1rem` | PADDING-4 |
-| `SurfaceCard` khi `composition="joined"` | `0` | PADDING-0 |
-| Vỏ `SurfaceListCard` | `0` | PADDING-0 |
-| Trigger của `SurfaceAccordionCard` | `1rem` | PADDING-4 |
-| Panel của `SurfaceAccordionCard` | `0` phía trên, `1rem` hai bên và dưới | PADDING-0, PADDING-4 |
-| `EmptyNotice` | `1rem` | PADDING-4 |
-| `FencedCodeBlock` | `1rem` | PADDING-4 |
+| `ChatWorkspace` | drawer body, hasRail, isCompactRail | PADDING-0 |
+| `ChatWorkspace` | overlay rail, hasRail, isCompactRail | PADDING-4 |
+| `ChatWorkspace` | overlay rail, hasRail, not isCompactRail | PADDING-4 |
+| `ChatWorkspace` | rail trigger boundary, hasRail, isCompactRail | PADDING-2 |
+| `ChatWorkspace` | rail trigger boundary, hasRail, isCompactRail | PADDING-4 |
+| `ChatWorkspace` | rail trigger, hasRail, isCompactRail | PADDING-3 |
+| `EmptyNotice` | root | PADDING-4 |
+| `NavigationFeatureNav` | primary | PADDING-3 |
+| `OtpInput` | root | PADDING-1 |
+| `Rail` | body, inset="content" | PADDING-3 |
+| `Rail` | body, inset="content" | PADDING-5 |
+| `Sidebar` | footer, not (collapsed || footer == null) | PADDING-0 |
+| `Sidebar` | footer, not (collapsed || footer == null) | PADDING-3 |
+| `Sidebar` | group label, group.label!=undefined, not collapsed | PADDING-1 |
+| `Sidebar` | group label, group.label!=undefined, not collapsed | PADDING-2 |
+| `Sidebar` | group label, group.label!=undefined, not collapsed | PADDING-3 |
+| `Sidebar` | header, not (collapsed || header == null) | PADDING-3 |
+| `Sidebar` | icon button wrapper, canToggle | PADDING-2 |
+| `Sidebar` | list box item, not collapsed | PADDING-2 |
+| `Sidebar` | list box item, not collapsed | PADDING-3 |
+| `Sidebar` | list box, collapsed | PADDING-2 |
+| `Sidebar` | list box, not collapsed | PADDING-3 |
+| `StaticStateRow` | root | PADDING-2 |
+| `Subnav` | root | PADDING-3 |
+| `SurfaceAccordionCard` | accordion body | PADDING-8 |
+| `SurfaceAccordionCard` | accordion body wrapper | PADDING-0 |
+| `SurfaceAccordionCard` | accordion trigger | PADDING-3 |
+| `SurfaceAccordionCard` | accordion trigger | PADDING-4 |
+| `SurfaceCard` | card content, composition!="joined" | PADDING-4 |
+| `SurfaceCard` | card content, composition="joined" | PADDING-0 |
+| `SurfaceListCard` | root | PADDING-0 |
+| `Tabs` | hero tabs tab | PADDING-3 |
+| `Tabs` | root, inset="page" | PADDING-5 |
+| `TextAction` | root, appearance="choice" | PADDING-1 |
+| `TextAction` | root, appearance="choice" | PADDING-2 |
+| `TextAction` | root, appearance="route" | PADDING-2 |
+| `TextAction` | root, appearance="route" | PADDING-3 |
+| `TextAction` | root, appearance="section" | PADDING-2 |
+| `TextAction` | root, appearance="section" | PADDING-3 |
+| `TextAction` | root, appearance="tab" | PADDING-3 |
+| `Tooltip` | content | PADDING-1 |
+| `Tooltip` | content | PADDING-2 |
 
 ## Tiếp xúc theo cạnh
 

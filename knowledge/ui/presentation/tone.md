@@ -36,6 +36,33 @@ There is no `App` owner in this file. A `text-*` colour class written by the app
 Status colour is not tone. Success, warning, danger, and information are semantic states owned by the
 components that carry them, and they are never expressed by choosing a text colour.
 
+## Tone Common already owns
+
+Generated from `@grammar/core` claims by `scripts/generate-presentation-owned.mjs`; edit the component, not this table.
+
+| Component | Element or condition | Rule |
+| --- | --- | --- |
+| `ChatWorkspace` | drawer close, hasRail, isCompactRail | TONE-1 |
+| `ChatWorkspace` | rail trigger, hasRail, isCompactRail | TONE-1 |
+| `Heading` | root, scale!="display", level=4 | TONE-2 |
+| `IconTile` | root, not (isSkeleton || showsArtwork), tone="neutral" | TONE-2 |
+| `Input` | button, not (!isSecret || toggleLabel === undefined) | TONE-2 |
+| `Sidebar` | group label, group.label!=undefined, not collapsed | TONE-2 |
+| `Sidebar` | list box item | TONE-1 |
+| `SurfaceAccordionCard` | accordion body | TONE-1 |
+| `SurfaceListCard` | fact, not (label === undefined || labelHidden), fact!=undefined | TONE-2 |
+| `Text` | root, not isSkeleton, resolvedTone="accent" | TONE-3 |
+| `Text` | root, not isSkeleton, resolvedTone="default" | TONE-1 |
+| `Text` | root, not isSkeleton, resolvedTone="muted" | TONE-2 |
+| `TextAction` | root, appearance="disclosure" | TONE-3 |
+| `TextAction` | root, appearance="muted" | TONE-2 |
+| `TextAction` | root, appearance="plain" | TONE-1 |
+| `TextAction` | root, appearance="route", isCurrent | TONE-3 |
+| `TextAction` | root, appearance="route", not isCurrent | TONE-2 |
+| `TextAction` | root, appearance="section", isCurrent | TONE-3 |
+| `TextAction` | root, appearance="section", not isCurrent | TONE-1 |
+| `TextAction` | root, appearance="tab", not isCurrent | TONE-2 |
+
 ## TONE-1 — `tone="default"`
 
 The line reads at ordinary attention. This is the resolved tone when none is given, except at the

@@ -36,6 +36,33 @@ hex hay giá trị palette thô thì bị từ chối kể cả khi nó trùng t
 Màu trạng thái không phải tone. Thành công, cảnh báo, nguy hiểm và thông tin là những trạng thái ngữ
 nghĩa do chính component mang chúng sở hữu, và không bao giờ được diễn đạt bằng cách chọn màu chữ.
 
+## Tone mà Common đã sở hữu
+
+Sinh từ claim của `@grammar/core` bằng `scripts/generate-presentation-owned.mjs`; muốn đổi thì sửa component, đừng sửa bảng này.
+
+| Component | Phần tử hoặc điều kiện | Rule |
+| --- | --- | --- |
+| `ChatWorkspace` | drawer close, hasRail, isCompactRail | TONE-1 |
+| `ChatWorkspace` | rail trigger, hasRail, isCompactRail | TONE-1 |
+| `Heading` | root, scale!="display", level=4 | TONE-2 |
+| `IconTile` | root, not (isSkeleton || showsArtwork), tone="neutral" | TONE-2 |
+| `Input` | button, not (!isSecret || toggleLabel === undefined) | TONE-2 |
+| `Sidebar` | group label, group.label!=undefined, not collapsed | TONE-2 |
+| `Sidebar` | list box item | TONE-1 |
+| `SurfaceAccordionCard` | accordion body | TONE-1 |
+| `SurfaceListCard` | fact, not (label === undefined || labelHidden), fact!=undefined | TONE-2 |
+| `Text` | root, not isSkeleton, resolvedTone="accent" | TONE-3 |
+| `Text` | root, not isSkeleton, resolvedTone="default" | TONE-1 |
+| `Text` | root, not isSkeleton, resolvedTone="muted" | TONE-2 |
+| `TextAction` | root, appearance="disclosure" | TONE-3 |
+| `TextAction` | root, appearance="muted" | TONE-2 |
+| `TextAction` | root, appearance="plain" | TONE-1 |
+| `TextAction` | root, appearance="route", isCurrent | TONE-3 |
+| `TextAction` | root, appearance="route", not isCurrent | TONE-2 |
+| `TextAction` | root, appearance="section", isCurrent | TONE-3 |
+| `TextAction` | root, appearance="section", not isCurrent | TONE-1 |
+| `TextAction` | root, appearance="tab", not isCurrent | TONE-2 |
+
 ## TONE-1 — `tone="default"`
 
 Dòng chữ đọc ở mức chú ý thông thường. Đây là tone mặc định khi không truyền gì, trừ ở cỡ nhỏ nhất.

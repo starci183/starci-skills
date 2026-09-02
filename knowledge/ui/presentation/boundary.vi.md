@@ -42,31 +42,24 @@ vẽ là `DOUBLE_OWNER`, và nó hiện ra thành một đường mảnh đôi n
 
 ## Boundary mà Common đã sở hữu
 
-Tra bảng này trước khi viết bất kỳ border nào. Nếu cạnh đã có ở đây thì ứng dụng chỉ ghép component và
-không viết gì thêm.
+Sinh từ claim của `@grammar/core` bằng `scripts/generate-presentation-owned.mjs`; muốn đổi thì sửa component, đừng sửa bảng này.
 
-| Component Common | Cạnh mà nó vẽ | Rule |
+| Component | Phần tử hoặc điều kiện | Rule |
 | --- | --- | --- |
-| Hàng của `SurfaceListCard` | Một separator phía trên mọi hàng sau hàng đầu | BOUNDARY-3 |
-| Hàng của `SurfaceAccordionCard` | Một separator phía trên mọi hàng sau hàng đầu | BOUNDARY-3 |
-| `NavigationFeatureNav` | Một separator ở mép block cuối | BOUNDARY-1 |
-| `Subnav` | Một separator ở mép block cuối | BOUNDARY-1 |
-| Composer của `ChatWorkspace` | Một separator ở mép block đầu | BOUNDARY-1 |
-| Vùng rail-trigger của `ChatWorkspace` | Một separator ở mép block cuối | BOUNDARY-1 |
-| Navigation compact của `WorkspaceShell` | Một separator ở mép block đầu | BOUNDARY-1 |
-| Đường dẫn đầu của `WorkspaceShell` | Một cột separator `1px` trong grid track | BOUNDARY-4 |
-| Đường kẻ ngang của `MarkdownArticle` | Một separator chạy hết bề rộng đọc | BOUNDARY-1 |
-| Ô bảng của `MarkdownArticle` | Một separator dưới mỗi ô | BOUNDARY-3 |
-| Trích dẫn của `MarkdownArticle` | Border `3px` ở mép inline đầu, trên `--border` | BOUNDARY-5 |
-| Viewport của `MediaFrame` | Border `1px` trên `--border` | BOUNDARY-5 |
-| `FencedCodeBlock` và `MarkdownTableFrame` | Border `1px` trên `--border` | BOUNDARY-5 |
-| `SurfaceCard` khi `depth="nested"` | Border `1px` trên `--border` | BOUNDARY-5 |
-| `SurfaceCard` khi `depth="top"` | Không border, thay bằng bóng đổ của surface | BOUNDARY-6 |
-| `Divider` | Cặp đường mảnh có nhãn, trên `--border` | BOUNDARY-5 |
-
-`Divider` là một ranh giới thay thế có nhãn, không phải một đường kẻ trơn: nó render một từ nhìn thấy
-được nằm giữa hai đường mảnh và mang `role="separator"`. Một đường không nhãn giữa hai dải là
-BOUNDARY-1.
+| `ChatWorkspace` | composer | BOUNDARY-1 |
+| `ChatWorkspace` | rail trigger boundary, hasRail, isCompactRail | BOUNDARY-1 |
+| `Divider` | span | BOUNDARY-5 |
+| `MediaFrame` | root, treatment!="plain" | BOUNDARY-5 |
+| `NavigationFeatureNav` | root | BOUNDARY-1 |
+| `StaticStateRow` | root | BOUNDARY-3 |
+| `Subnav` | root | BOUNDARY-1 |
+| `SurfaceAccordionCard` | accordion row | BOUNDARY-3 |
+| `SurfaceAccordionCard` | accordion shell, depth="nested" | BOUNDARY-5 |
+| `SurfaceAccordionCard` | accordion shell, depth="top" | BOUNDARY-6 |
+| `SurfaceCard` | card content, depth!="nested" | BOUNDARY-6 |
+| `SurfaceCard` | card content, depth="nested" | BOUNDARY-5 |
+| `WorkspaceShell` | compact navigation, hasCompactNavigation | BOUNDARY-1 |
+| `WorkspaceShell` | leading rule, railPosition="leading" | BOUNDARY-4 |
 
 ## BOUNDARY-1 — `border-t border-separator` / `--separator`
 
@@ -110,7 +103,7 @@ không hàng nào render được một đường mà tập không định vẽ.
 | --- | --- | --- | --- |
 | Case 1 | Một list mà các hàng đồng nhất và không cần ngoại lệ theo hàng | `—` | `<ul className="m-0 list-none p-0 divide-y divide-separator">` |
 | Case 2 | Một lưới các số đo ngang hàng xếp chồng trên một trục | `—` | `<div className="grid min-w-0 grid-cols-1 divide-y divide-separator">` |
-| Case 3 | Một list hay disclosure mà Common đã tách hàng sẵn | `SurfaceListCard`, `SurfaceAccordionCard` | Ghép card, không viết class divide |
+| Case 3 | Một list hay disclosure mà Common đã tách hàng sẵn | `StaticStateRow`, `SurfaceAccordionCard` | Ghép hàng, không viết class divide |
 
 Không phải rule này: một tập mà từng hàng cần cạnh khác nhau thì dùng BOUNDARY-2.
 

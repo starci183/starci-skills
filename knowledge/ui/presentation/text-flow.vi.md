@@ -34,14 +34,16 @@ dòng hỏng trong im lặng, vì vùng không bao giờ hẹp hơn từ dài nh
 
 ## Text flow mà Common đã sở hữu
 
-| Component Common | Hành vi | Rule |
+Sinh từ claim của `@grammar/core` bằng `scripts/generate-presentation-owned.mjs`; muốn đổi thì sửa component, đừng sửa bảng này.
+
+| Component | Phần tử hoặc điều kiện | Rule |
 | --- | --- | --- |
-| Tiêu đề của `SectionHeader` | Ngắt bên trong chuỗi dài liền | FLOW-3 |
-| Chú thích của `MediaFrame` | Ngắt bên trong chuỗi dài liền | FLOW-3 |
-| `MarkdownArticle` | Ngắt bên trong chuỗi dài liền | FLOW-3 |
-| `FencedCodeBlock` | Giữ nguyên khoảng trắng, cuộn chứ không xuống dòng | FLOW-2 |
-| Tiêu đề của `Subnav` | Cắt cụt còn một dòng kèm dấu ba chấm | FLOW-4 |
-| `Badge`, tab của `Tabs`, nhãn control | Giữ trên một dòng | FLOW-2 |
+| `MediaFrame` | caption, caption!=undefined | FLOW-3 |
+| `SectionHeader` | title | FLOW-3 |
+| `Sidebar` | item label, not collapsed | FLOW-4 |
+| `Subnav` | title | FLOW-4 |
+| `Tabs` | hero tabs list container wrapper | FLOW-2 |
+| `Tooltip` | content | FLOW-2 |
 
 ## FLOW-1 — Canh lề
 

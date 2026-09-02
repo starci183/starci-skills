@@ -43,30 +43,24 @@ already draws is `DOUBLE_OWNER`, and it renders as a visible double hairline.
 
 ## Boundaries Common already owns
 
-Check this table before writing any border. If the edge appears here, the application composes the
-component and writes nothing.
+Generated from `@grammar/core` claims by `scripts/generate-presentation-owned.mjs`; edit the component, not this table.
 
-| Common component | Edge it draws | Rule |
+| Component | Element or condition | Rule |
 | --- | --- | --- |
-| `SurfaceListCard` rows | A separator above every row after the first | BOUNDARY-3 |
-| `SurfaceAccordionCard` rows | A separator above every row after the first | BOUNDARY-3 |
-| `NavigationFeatureNav` | A separator along its block end | BOUNDARY-1 |
-| `Subnav` | A separator along its block end | BOUNDARY-1 |
-| `ChatWorkspace` composer | A separator along its block start | BOUNDARY-1 |
-| `ChatWorkspace` rail-trigger boundary | A separator along its block end | BOUNDARY-1 |
-| `WorkspaceShell` compact navigation | A separator along its block start | BOUNDARY-1 |
-| `WorkspaceShell` leading rule | A `1px` separator column in the grid track | BOUNDARY-4 |
-| `MarkdownArticle` rule | A separator across the article measure | BOUNDARY-1 |
-| `MarkdownArticle` table cells | A separator under every cell | BOUNDARY-3 |
-| `MarkdownArticle` quote | A `3px` border on the inline start, on `--border` | BOUNDARY-5 |
-| `MediaFrame` viewport | A `1px` border on `--border` | BOUNDARY-5 |
-| `FencedCodeBlock` and `MarkdownTableFrame` | A `1px` border on `--border` | BOUNDARY-5 |
-| `SurfaceCard` at `depth="nested"` | A `1px` border on `--border` | BOUNDARY-5 |
-| `SurfaceCard` at `depth="top"` | No border; a surface shadow instead | BOUNDARY-6 |
-| `Divider` | A labelled hairline pair on `--border` | BOUNDARY-5 |
-
-`Divider` is a labelled alternative boundary, not a plain rule: it renders a visible word between two
-hairlines and carries `role="separator"`. An unlabelled line between two bands is BOUNDARY-1.
+| `ChatWorkspace` | composer | BOUNDARY-1 |
+| `ChatWorkspace` | rail trigger boundary, hasRail, isCompactRail | BOUNDARY-1 |
+| `Divider` | span | BOUNDARY-5 |
+| `MediaFrame` | root, treatment!="plain" | BOUNDARY-5 |
+| `NavigationFeatureNav` | root | BOUNDARY-1 |
+| `StaticStateRow` | root | BOUNDARY-3 |
+| `Subnav` | root | BOUNDARY-1 |
+| `SurfaceAccordionCard` | accordion row | BOUNDARY-3 |
+| `SurfaceAccordionCard` | accordion shell, depth="nested" | BOUNDARY-5 |
+| `SurfaceAccordionCard` | accordion shell, depth="top" | BOUNDARY-6 |
+| `SurfaceCard` | card content, depth!="nested" | BOUNDARY-6 |
+| `SurfaceCard` | card content, depth="nested" | BOUNDARY-5 |
+| `WorkspaceShell` | compact navigation, hasCompactNavigation | BOUNDARY-1 |
+| `WorkspaceShell` | leading rule, railPosition="leading" | BOUNDARY-4 |
 
 ## BOUNDARY-1 — `border-t border-separator` / `--separator`
 
@@ -110,7 +104,7 @@ missed and no row can render a line the set did not intend.
 | --- | --- | --- | --- |
 | Case 1 | A list whose rows are uniform and need no per-row exception | `—` | `<ul className="m-0 list-none p-0 divide-y divide-separator">` |
 | Case 2 | A grid of peer measures stacked on one axis | `—` | `<div className="grid min-w-0 grid-cols-1 divide-y divide-separator">` |
-| Case 3 | A list or disclosure whose rows Common already separates | `SurfaceListCard`, `SurfaceAccordionCard` | Compose the card; no divide class |
+| Case 3 | A list or disclosure whose rows Common already separates | `StaticStateRow`, `SurfaceAccordionCard` | Compose the rows; no divide class |
 
 Not this rule: a set where individual rows need a different edge. Use BOUNDARY-2.
 

@@ -40,15 +40,18 @@ throughout its own renderers; an application region that wraps text must do the 
 
 ## Measure Common already owns
 
-| Common component | Constraint | Rule |
+Generated from `@grammar/core` claims by `scripts/generate-presentation-owned.mjs`; edit the component, not this table.
+
+| Component | Element or condition | Rule |
 | --- | --- | --- |
-| `PageContainer` at `measure="reading"` | `min(100%, 72ch)` | MEASURE-1 |
-| `PageContainer` at `measure="product"` | The packaged product width, the default | MEASURE-1 |
-| `PageContainer` at `measure="full"` | `100%` | MEASURE-1 |
-| `HorizontalScrollRegion` | Children take `max-content` | MEASURE-3 |
-| `VerticalScrollRegion` | The scrollable height boundary | MEASURE-7 |
-| `Rail` at `height="fill"` | The rail body fills its shell | MEASURE-6 |
-| `WorkspaceShell` | Region widths across breakpoints | MEASURE-1 |
+| `NavigationFeatureNav` | root | MEASURE-2 |
+| `PageContainer` | root | MEASURE-1 |
+| `Progress` | root | MEASURE-2 |
+| `Rail` | body, height="fill" | MEASURE-6 |
+| `Sidebar` | root, presentation!="drawer" | MEASURE-6 |
+| `Sidebar` | root, presentation="drawer" | MEASURE-2 |
+| `TextAction` | root | MEASURE-3 |
+| `WorkspaceShell` | layout | MEASURE-1 |
 
 ## MEASURE-1 — Page measure
 

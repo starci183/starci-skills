@@ -52,6 +52,12 @@ không phải recommendation của presentation.
 `GAP-1`, `FONT-1` và các tên `PREFIX-n` khác là địa chỉ thứ tự ổn định. Con số không phải bước
 Tailwind, giá trị CSS, component variant hay mức độ nghiêm trọng.
 
+Bảng "Common đã sở hữu" trong mỗi topic được sinh ra từ claim `data-contract` mà package công bố,
+bằng `scripts/generate-presentation-owned.mjs`, nên không ai sửa tay: một hàng sai thì sửa component,
+không sửa bảng. Một case bên dưới bảng chỉ được thêm khi hai block bằng chứng được uỷ quyền cùng cho
+thấy tình huống đó, đúng luật bằng chứng mà các idiom của family đang dùng; xuất hiện một lần là
+quyết định sản phẩm, chưa phải rule.
+
 Mỗi rule chỉ có heading và đúng một bảng:
 
 | Case | When | Common render |
