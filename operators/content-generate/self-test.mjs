@@ -18,9 +18,9 @@ const validInput = {
     aiRuntime: {
       configRef: '.claude/config.yaml',
       fingerprint: hash,
-      brief: { model: 'gpt-5.6-sol', count: 1, isolation: 'fresh', forkTurns: 'none' },
+      brief: { model: 'gpt-5.6-luna', count: 1, isolation: 'fresh', forkTurns: 'none' },
       production: { model: 'gpt-5.6-luna' },
-      critique: { model: 'gpt-5.6-sol', count: 1, isolation: 'fresh', forkTurns: 'none' },
+      critique: { model: 'gpt-5.6-luna', count: 1, isolation: 'fresh', forkTurns: 'none' },
     },
     auditRefs: [],
   },
@@ -121,7 +121,7 @@ const validGeneratedOutput = {
         brief: {
           briefRef,
           fingerprint: hash,
-          execution: execution('execution://teacher-brief', 'gpt-5.6-sol'),
+          execution: execution('execution://teacher-brief', 'gpt-5.6-luna'),
           learnerInputRefs: ['prerequisite://http-methods'],
           learnerOutcomeRefs: [outcomeA, outcomeB],
           claimRefs: [claimA, claimB],
@@ -194,7 +194,7 @@ const validGeneratedOutput = {
         },
         critique: {
           reviewRef,
-          execution: execution('execution://independent-critique', 'gpt-5.6-sol'),
+          execution: execution('execution://independent-critique', 'gpt-5.6-luna'),
           verdict: 'approved',
           scores: {
             correctness: 92,

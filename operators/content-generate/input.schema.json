@@ -27,7 +27,7 @@
               "additionalProperties": false,
               "required": ["model", "count", "isolation", "forkTurns"],
               "properties": {
-                "model": { "const": "gpt-5.6-sol" },
+                "model": { "const": "gpt-5.6-luna" },
                 "count": { "const": 1 },
                 "isolation": { "const": "fresh" },
                 "forkTurns": { "const": "none" }
@@ -44,7 +44,7 @@
               "additionalProperties": false,
               "required": ["model", "count", "isolation", "forkTurns"],
               "properties": {
-                "model": { "const": "gpt-5.6-sol" },
+                "model": { "const": "gpt-5.6-luna" },
                 "count": { "const": 1 },
                 "isolation": { "const": "fresh" },
                 "forkTurns": { "const": "none" }
