@@ -25,4 +25,4 @@ Core supports light, explicit dark, system dark, forced colors, focus-visible, a
 - Core keeps the Common `SurfaceCard` renderer/props/semantics and uses family-scoped CSS plus the neutral `data-grammar-surface-labelled` hook to paint the outer labelled card as one material box. The inner bounded frame becomes transparent/no-shadow, so the label is visually inside Core material. Heritage's symmetric test paints only its inner frame, keeping the label outside without creating a second contract.
 - `ButtonVariant` has no destructive/danger variant ([CTA-4](../../ui/composition/cta.md)).
 - Common has no general modal focus-containment/restoration owner ([FOCUS-3](../../ui/proof/focus.md)).
-- `MediaFrame` has no explicit loading/error state prop ([MEDIA-5](../../ui/_pending-grammars-media.md)).
+- `MediaFrame` has no explicit loading/error state prop ([MEDIA-5](media.md)).

@@ -2,7 +2,7 @@
 
 ## Field
 
-Business code truyền label, value, hint/error, validity, disabled state và change effect vào Common `Input` hay `OtpInput`. Core cung cấp scoped field material; không tự suy validation. Binding: [FIELD-1..4](../../ui/_pending-grammars-field.vi.md), [FEEDBACK-1](../../ui/composition/feedback.vi.md) và [ACCESSIBILITY-1](../../ui/proof/accessibility.vi.md).
+Business code truyền label, value, hint/error, validity, disabled state và change effect vào Common `Input` hay `OtpInput`. Core cung cấp scoped field material; không tự suy validation. Binding: [FIELD-1..4](field.vi.md), [FEEDBACK-1](../../ui/composition/feedback.vi.md) và [ACCESSIBILITY-1](../../ui/proof/accessibility.vi.md).
 
 ```tsx
 <Input
@@ -20,7 +20,7 @@ Core render kỳ vọng: một field stack có label ổn định, quan hệ des
 
 ## Destination và command
 
-Binding: [ACTION-1..4](../../ui/composition/action.vi.md), [STATE-1](../../ui/composition/state.vi.md) và [CONTROL-STATE-1..2](../../ui/_pending-grammars-control-state.vi.md).
+Binding: [ACTION-1..4](../../ui/composition/action.vi.md), [STATE-1](../../ui/composition/state.vi.md) và [CONTROL-STATE-1..2](control-state.vi.md).
 
 ```tsx
 <TextAction href="/courses/foundations">Xem khóa học</TextAction>
@@ -38,7 +38,7 @@ Chỉ dùng `EmptyNotice` sau khi feature authority resolve truth empty/failure/
 
 ## Focus và accessibility
 
-Core giữ native DOM, label, controlled selection và focus-visible treatment của Common. `Tooltip` chỉ bổ sung. Modal focus containment/restoration tổng quát vẫn là Common gap. Binding: [ACCESSIBILITY-1..4](../../ui/proof/accessibility.vi.md), [FOCUS-1..4](../../ui/proof/focus.vi.md) và [ICON-5..6](../../ui/_pending-grammars-icon.vi.md).
+Core giữ native DOM, label, controlled selection và focus-visible treatment của Common. `Tooltip` chỉ bổ sung. Modal focus containment/restoration tổng quát vẫn là Common gap. Binding: [ACCESSIBILITY-1..4](../../ui/proof/accessibility.vi.md), [FOCUS-1..4](../../ui/proof/focus.vi.md) và [ICON-5..6](icon.vi.md).
 
 ## Motion
 

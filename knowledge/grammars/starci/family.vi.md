@@ -25,4 +25,4 @@ Core hỗ trợ light, explicit dark, system dark, forced colors, focus-visible 
 - Core giữ Common `SurfaceCard` renderer/props/semantics và dùng family-scoped CSS cùng hook neutral `data-grammar-surface-labelled` để paint outer labelled card thành một material box. Inner bounded frame trở thành transparent/không shadow nên label visually inside Core material. Test đối xứng của Heritage chỉ paint inner frame, giữ label ở ngoài mà không tạo contract thứ hai.
 - `ButtonVariant` chưa có destructive/danger variant ([CTA-4](../../ui/composition/cta.vi.md)).
 - Common chưa có owner tổng quát cho modal focus containment/restoration ([FOCUS-3](../../ui/proof/focus.vi.md)).
-- `MediaFrame` chưa có prop loading/error explicit ([MEDIA-5](../../ui/_pending-grammars-media.vi.md)).
+- `MediaFrame` chưa có prop loading/error explicit ([MEDIA-5](media.vi.md)).
