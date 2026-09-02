@@ -45,16 +45,16 @@ luật.
 
 | # | Bước | Đọc | Ghi | Dừng với |
 | --- | --- | --- | --- | --- |
-| 1 | Kiểm tra input và resume | input, receipt trước đó, source head đã đóng băng, lease | — | `INVALID_INPUT`, `SOURCE_DRIFT`, `NO_PROGRESS` |
-| 2 | Xác nhận giấy phép vào | blind visual PASS cuối, quality PASS cuối | — | `ADMISSION_MISSING` |
-| 3 | Chạy preflight ràng buộc | danh tính tài khoản và fixture, mọi kho vật lý | — | `PROVISIONING_UNAVAILABLE` |
-| 4 | Đóng băng snapshot | định nghĩa luồng, schema template của snapshot | `snapshot.json` | `CANONICAL_WRITE_DENIED` |
-| 5 | Chuẩn bị fixture | snapshot đã đóng băng, namespace của lần chạy | — | `FIXTURE_VIOLATION` |
-| 6 | Chạy các case đã đóng băng theo đúng thứ tự đã khai | thứ tự case đã đóng băng, origin, fingerprint principal, generation runtime và hạn của lease | — | `LEASE_INVALID`, `RUNTIME_UNAVAILABLE` |
-| 7 | Chụp theo những khẳng định có tên | khẳng định có tên và bằng chứng runtime trực tiếp nhất hiện có | — | `EVIDENCE_UNAVAILABLE` |
-| 8 | Phán ba làn độc lập | bằng chứng behavior, UX và UI, mỗi làn giữ riêng | — | — |
-| 9 | Xác minh chỉ đọc, rồi dọn dẹp | các bản ghi mang cả `is_uat=true` lẫn namespace đã đóng băng | — | — |
-| 10 | Công bố rồi dừng | tất cả những gì ở trên | `result.json` | — |
+| 1 | Kiểm tra input và resume | input (lease), `@uat/<flow>/<case>` (kết quả lần trước), `@be` (source head đã đóng băng) | — | `INVALID_INPUT`, `SOURCE_DRIFT`, `NO_PROGRESS` |
+| 2 | Xác nhận giấy phép vào | input (blind visual PASS cuối, quality PASS cuối) | — | `ADMISSION_MISSING` |
+| 3 | Chạy preflight ràng buộc | `@runtime` (danh tính tài khoản và fixture, mọi kho vật lý) | — | `PROVISIONING_UNAVAILABLE` |
+| 4 | Đóng băng snapshot | input (định nghĩa luồng), `@templates` (schema template của snapshot) | `@uat/<flow>/<case>` (`snapshot.json`) | `CANONICAL_WRITE_DENIED` |
+| 5 | Chuẩn bị fixture | `@uat/<flow>/<case>` (snapshot đã đóng băng), input (namespace của lần chạy) | — | `FIXTURE_VIOLATION` |
+| 6 | Chạy các case đã đóng băng theo đúng thứ tự đã khai | `@uat/<flow>/<case>` (thứ tự case đã đóng băng), `@runtime` (generation của runtime), input (origin, fingerprint principal, hạn của lease) | — | `LEASE_INVALID`, `RUNTIME_UNAVAILABLE` |
+| 7 | Chụp theo những khẳng định có tên | `@uat/<flow>/<case>` (khẳng định có tên), `@runtime` (bằng chứng runtime trực tiếp nhất hiện có) | `@artifacts` (các bản chụp) | `EVIDENCE_UNAVAILABLE` |
+| 8 | Phán ba làn độc lập | `@artifacts` (bằng chứng behavior, UX và UI, mỗi làn giữ riêng) | — | — |
+| 9 | Xác minh chỉ đọc, rồi dọn dẹp | `@be` (các bản ghi mang `is_uat=true`), `@uat/<flow>/<case>` (namespace đã đóng băng) | — | — |
+| 10 | Công bố rồi dừng | tất cả những gì ở trên | `@uat/<flow>/<case>` (`result.json`), `@artifacts/uat-flow-verification.json` | — |
 
 Khâu kiểm tra từ chối source head cũ, danh tính đã đăng nhập mà thiếu lease, lease ràng vào principal,
 mission, generation, origin hay flow khác, thứ tự case không liên tục, và resume không đổi gì. UAT sản

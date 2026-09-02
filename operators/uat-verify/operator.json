@@ -31,7 +31,7 @@
       "purpose": "A runtime that can be observed; readiness is proved, not assumed."
     },
     {
-      "alias": "@source/starci-academy/be",
+      "alias": "@be",
       "required": true,
       "purpose": "The checkout whose behaviour the flow verifies."
     },

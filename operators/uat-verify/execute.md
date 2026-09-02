@@ -43,16 +43,16 @@ token, or OTP has nowhere to go, so custody is a shape rather than a discipline.
 
 | # | Step | Reads | Writes | Stops with |
 | --- | --- | --- | --- | --- |
-| 1 | Validate input and resume | input, prior receipt, frozen source head, the lease | — | `INVALID_INPUT`, `SOURCE_DRIFT`, `NO_PROGRESS` |
-| 2 | Confirm admission | the final blind visual PASS, the final quality PASS | — | `ADMISSION_MISSING` |
-| 3 | Run the constraint preflight | account and fixture identities, every physical store | — | `PROVISIONING_UNAVAILABLE` |
-| 4 | Freeze the snapshot | the flow definition, the snapshot template schema | `snapshot.json` | `CANONICAL_WRITE_DENIED` |
-| 5 | Prepare fixtures | the frozen snapshot, the run namespace | — | `FIXTURE_VIOLATION` |
-| 6 | Execute the frozen cases in the declared order | the frozen case order, the lease origin, principal fingerprint, runtime generation, and expiry | — | `LEASE_INVALID`, `RUNTIME_UNAVAILABLE` |
-| 7 | Capture against named assertions | the named assertion and the most direct runtime evidence available | — | `EVIDENCE_UNAVAILABLE` |
-| 8 | Judge the three lanes independently | behavior, UX, and UI evidence, each kept apart | — | — |
-| 9 | Verify read-only, then clean up | the persisted records carrying `is_uat=true` and the frozen namespace | — | — |
-| 10 | Publish and stop | everything above | `result.json` | — |
+| 1 | Validate input and resume | input (the lease), `@uat/<flow>/<case>` (the prior result), `@be` (the frozen source head) | — | `INVALID_INPUT`, `SOURCE_DRIFT`, `NO_PROGRESS` |
+| 2 | Confirm admission | input (the final blind visual PASS, the final quality PASS) | — | `ADMISSION_MISSING` |
+| 3 | Run the constraint preflight | `@runtime` (account and fixture identities, every physical store) | — | `PROVISIONING_UNAVAILABLE` |
+| 4 | Freeze the snapshot | input (the flow definition), `@templates` (the snapshot template schema) | `@uat/<flow>/<case>` (`snapshot.json`) | `CANONICAL_WRITE_DENIED` |
+| 5 | Prepare fixtures | `@uat/<flow>/<case>` (the frozen snapshot), input (the run namespace) | — | `FIXTURE_VIOLATION` |
+| 6 | Execute the frozen cases in the declared order | `@uat/<flow>/<case>` (the frozen case order), `@runtime` (the runtime generation), input (lease origin, principal fingerprint, expiry) | — | `LEASE_INVALID`, `RUNTIME_UNAVAILABLE` |
+| 7 | Capture against named assertions | `@uat/<flow>/<case>` (the named assertion), `@runtime` (the most direct runtime evidence available) | `@artifacts` (the captures) | `EVIDENCE_UNAVAILABLE` |
+| 8 | Judge the three lanes independently | `@artifacts` (behavior, UX, and UI evidence, each kept apart) | — | — |
+| 9 | Verify read-only, then clean up | `@be` (the persisted records carrying `is_uat=true`), `@uat/<flow>/<case>` (the frozen namespace) | — | — |
+| 10 | Publish and stop | everything above | `@uat/<flow>/<case>` (`result.json`), `@artifacts/uat-flow-verification.json` | — |
 
 Validation rejects a stale source head, an authenticated identity with no lease, a lease bound to
 another principal, mission, generation, origin, or flow, a non-contiguous case order, and an unchanged

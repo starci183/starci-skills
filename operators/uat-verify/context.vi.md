@@ -41,7 +41,7 @@ phẩm.
 | `@uat/<flow>/<case>` | `<Source>/.worktrees/uat/<flow>/<case>/` | fingerprint of snapshot.json and result.json | Bắt buộc: The canonical snapshot and result pair for the flow. |
 | `@templates` | `<Source>/.worktrees/_templates/{businesses,debts,sessions,uat}/` | fingerprint per file | Bắt buộc: UAT protocol and template authority; consumed, never modified. |
 | `@runtime` | `<Source>/.worktrees/sessions/central-runtime/owner.json` | fingerprint + generation | Bắt buộc: A runtime that can be observed; readiness is proved, not assumed. |
-| `@source/starci-academy/be` | `<checkout:project/role>` | fingerprint + sourceHead (git rev-parse HEAD of the checkout) | Bắt buộc: The checkout whose behaviour the flow verifies. |
+| `@be` | `<checkout:input.project.id/be>  (the backend checkout of the project this invocation binds)` | fingerprint + sourceHead (git rev-parse HEAD of the checkout) | Bắt buộc: The checkout whose behaviour the flow verifies. |
 | `@artifacts` | `input.project.artifactRootRef; convention <Source>/.worktrees/sessions/<invocationId>/artifacts/` | fingerprint per artifact; every artifact an operator writes is registered in output.artifactRefs | Bắt buộc: Where captures and the verification receipt are written. |
 
 ## Danh tính được cấp tự động, không bao giờ đi xin
