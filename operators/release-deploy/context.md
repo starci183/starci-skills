@@ -35,6 +35,19 @@ A missing or foreign-scoped authorization is `AUTHORIZATION_MISSING`. A manifest
 release is `MANIFEST_INVALID`. Neither is repaired here: an unauthorized deployment does not become
 authorized by being useful.
 
+## Refs
+
+Every location this operator may read, by alias. `refs.json` at the root of `.claude` resolves each alias;
+a location not in this table is unreadable for this operator, and `@artifacts` is the only one it writes.
+
+| Alias | Resolves to | Bind | Required |
+| --- | --- | --- | --- |
+| `@receipt/quality-verification/<invocationId>` | <@artifacts of the producing invocation>/<receipt file> | fingerprint + the sourceHead the receipt binds | Required: Verification precedes an immutable build. |
+| `@oci/<image>` | ghcr.io/<image>@<digest> | digest | Required: The immutable image, by digest. |
+| `@identity` | <Source>/.workspaces/device-state.json | fingerprint; the sealed keys under <Source>/.workspaces/local/credentials/*.key.enc are bound by name and never read | Required: Credential handles by name; values never appear. |
+| `@workflow-run/<runId>` | GitHub Actions run <runId> of the routed repository | run id + conclusion | Optional: CI evidence of the build and rollout. |
+| `@artifacts` | input.project.artifactRootRef; convention <Source>/.worktrees/sessions/<invocationId>/artifacts/ | fingerprint per artifact; every artifact an operator writes is registered in output.artifactRefs | Required: Where the deployment receipt is written. |
+
 ## Credentials are names, never values
 
 `context.credentials` carries `secret-ref://` handles and their custody references. There is no field

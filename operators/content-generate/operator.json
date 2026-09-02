@@ -16,6 +16,28 @@
       "imageGeneration": "required"
     }
   },
+  "refs": [
+    {
+      "alias": "@content/<contentId>/<locale>",
+      "required": true,
+      "purpose": "The lesson as served; the unit being authored or revised."
+    },
+    {
+      "alias": "@runtime",
+      "required": true,
+      "purpose": "The AI runtime that runs, reads, and repairs generated code."
+    },
+    {
+      "alias": "@receipt/content-generation-receipt/<invocationId>",
+      "required": false,
+      "purpose": "A prior audit of the same unit; regression history."
+    },
+    {
+      "alias": "@artifacts",
+      "required": true,
+      "purpose": "Where the brief, articles, code tracks, images, review, and receipt are written."
+    }
+  ],
   "contextContract": "context.md",
   "inputSchema": "input.schema.json",
   "outputSchema": "output.schema.json",

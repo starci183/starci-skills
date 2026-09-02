@@ -106,3 +106,12 @@ Operators bind their own knowledge; this file does not preload it.
 
 English `.md` files are the only runtime authority. Same-stem `.vi.md` files are human mirrors and
 never enter a context manifest, a dependency list, a validator input, or an operator binding.
+
+## Orchestration
+
+One invocation of one operator is one agent, created fresh on the profile its `operator.json` names,
+with the grants and the refs it declares and nothing else. `resources/orchestrator.json` fixes the
+rules: at most three agents at once, never two agents sharing a writable location, dispatch by
+`routing.json`, hand-off only through the typed receipt under `@artifacts`. An agent never starts
+another agent; a critique inside an operator is a step of the same agent. `refs.json` is the one
+place an alias resolves to a location; an operator reads only what its Refs table names.

@@ -22,8 +22,9 @@ its fingerprint and complete rule inventory, and may emit no identifier outside 
 ```text
 SKILL.md                 one entry, fourteen operators, one routing map
 routing.json             14 operators, 76 routes, four kinds: operator | resume | user | external
-resources/               agents/profiles/{openai,claude}.json (6 profiles); each operator.json binds one of them under resources; validated
-operators/<id>/          fifteen files each; operator.json carries resources; self-test.mjs must pass
+refs.json                alias -> exact location, scheme, binding, writers; every operator reads by alias only
+resources/               agents/profiles/{openai,claude}.json (6 profiles) + orchestrator.json (one agent per operator, max 3); validated
+operators/<id>/          fifteen files each; operator.json carries resources and refs; self-test.mjs must pass
 knowledge/
   ui/composition/        what a tree must contain, before it exists   -> fe.direction.decide
   ui/presentation/       which CSS value an app-owned boundary takes  -> fe.presentation.resolve

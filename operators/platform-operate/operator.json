@@ -14,6 +14,33 @@
       "imageGeneration": "never"
     }
   },
+  "refs": [
+    {
+      "alias": "@runtime",
+      "required": true,
+      "purpose": "The shared runtime owner: inventory, generation, health."
+    },
+    {
+      "alias": "@ports/<project>",
+      "required": true,
+      "purpose": "Port projection the runtime binds to."
+    },
+    {
+      "alias": "@identity",
+      "required": true,
+      "purpose": "Credential handles by name; values never appear."
+    },
+    {
+      "alias": "@declaration/<project>/<role>",
+      "required": false,
+      "purpose": "Which projects the shared services serve."
+    },
+    {
+      "alias": "@artifacts",
+      "required": true,
+      "purpose": "Where the operation receipt is written."
+    }
+  ],
   "contextContract": "context.md",
   "inputSchema": "input.schema.json",
   "outputSchema": "output.schema.json",

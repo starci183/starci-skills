@@ -29,6 +29,20 @@ Mỗi lần gọi đều cần:
 3. ít nhất một pattern anh em được bind;
 4. tham chiếu backend source đã route, với head bằng đúng `input.project.sourceHead`.
 
+## Ref
+
+Mọi nơi operator này được đọc, theo alias. `refs.json` ở gốc `.claude` phân giải từng alias; nơi nào
+không có trong bảng thì operator này không được đọc, và `@artifacts` là nơi duy nhất nó ghi.
+
+| Alias | Trỏ tới | Bind | Bắt buộc |
+| --- | --- | --- | --- |
+| `@business/<featureId>` | <Source>/.worktrees/businesses/features/<featureId>/model.json | content address from <Source>/.worktrees/businesses/business-registry-v1.json (featureHeads.<featureId>.head) with its authorityStatus | Bắt buộc: The only source of business behaviour. |
+| `@receipt/architecture-decision/<invocationId>` | <@artifacts of the producing invocation>/<receipt file> | fingerprint + the sourceHead the receipt binds | Bắt buộc: The frozen mutation contract the implementation fills and may not widen. |
+| `@knowledge/patterns/be/<topic>` | <Source>/.claude/knowledge/<group>/<topic>.md | fingerprint; the rule inventory is the set of `## PREFIX-n` headings of the file | Bắt buộc: Sibling patterns: the only source of valid conventions. |
+| `@source/starci-academy/be` | <checkout:project/role> | fingerprint + sourceHead (git rev-parse HEAD of the checkout) | Bắt buộc: The backend checkout the boundary belongs to; the one place this operator writes product source. |
+| `@receipt/backend-implementation/<invocationId>` | <@artifacts of the producing invocation>/<receipt file> | fingerprint + the sourceHead the receipt binds | Tuỳ chọn: Prior implementation receipts; regression history. |
+| `@artifacts` | input.project.artifactRootRef; convention <Source>/.worktrees/sessions/<invocationId>/artifacts/ | fingerprint per artifact; every artifact an operator writes is registered in output.artifactRefs | Bắt buộc: Where conformance, proofs, and the receipt are written. |
+
 ## Contract đóng băng trước khi có code
 
 `input.contract` đến với `status: "frozen"` và một fingerprint. Ranh giới đã chốt trước lần ghi sản

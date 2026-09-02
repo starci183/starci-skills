@@ -6,7 +6,7 @@ vào, cùng bản `.vi.md` của file ấy. Hợp đồng là thẩm quyền; b�
 
 | Khuôn | Áp vào | Ép gì |
 | --- | --- | --- |
-| `context.template.md` | `operators/*/context.md` | tiêu đề; Mục đích, Các lớp context, Context bắt buộc, các mục luật tự do, Ranh giới, Tài nguyên |
+| `context.template.md` | `operators/*/context.md` | tiêu đề; Mục đích, Các lớp context, Context bắt buộc, Ref kèm bảng alias, các mục luật tự do, Ranh giới, Tài nguyên |
 | `input.template.md` | `operators/*/input.md` | tiêu đề; Vỏ ngoài, Các binding context, mục tự do, Input khi resume |
 | `execute.template.md` | `operators/*/execute.md` | tiêu đề; Một việc duy nhất, các mục luật tự do, Trình tự kèm bảng bước, tự do, Thực thi khi resume, Các đòn tấn công bắt buộc |
 | `output.template.md` | `operators/*/output.md` | tiêu đề; một mục `Receipt khi …`, tự do, Receipt khi blocked, Mã lỗi, Bất biến liên trường, Kết quả thực tế |

@@ -14,6 +14,28 @@
       "imageGeneration": "never"
     }
   },
+  "refs": [
+    {
+      "alias": "@receipt/fe-presentation-resolution/<invocationId>",
+      "required": true,
+      "purpose": "The only source of values this operator may write."
+    },
+    {
+      "alias": "@source/starci-academy/fe",
+      "required": true,
+      "purpose": "The checkout the declared write set lands on; the one place this operator writes product source."
+    },
+    {
+      "alias": "@receipt/fe-direction-decision/<invocationId>",
+      "required": false,
+      "purpose": "Intent; never a source of values."
+    },
+    {
+      "alias": "@artifacts",
+      "required": true,
+      "purpose": "Where the application receipt is written."
+    }
+  ],
   "contextContract": "context.md",
   "inputSchema": "input.schema.json",
   "outputSchema": "output.schema.json",

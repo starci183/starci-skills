@@ -14,6 +14,28 @@
       "imageGeneration": "never"
     }
   },
+  "refs": [
+    {
+      "alias": "@business/<featureId>",
+      "required": true,
+      "purpose": "The promise head and its lifecycle state, by content address."
+    },
+    {
+      "alias": "@source/starci-academy/be",
+      "required": true,
+      "purpose": "The backend checkout every fact claim cites by path, line range, and head."
+    },
+    {
+      "alias": "@receipt/architecture-decision/<invocationId>",
+      "required": false,
+      "purpose": "Architecture evidence; never a source of business behaviour."
+    },
+    {
+      "alias": "@artifacts",
+      "required": true,
+      "purpose": "Where the coverage matrix and the published head copy are written."
+    }
+  ],
   "contextContract": "context.md",
   "inputSchema": "input.schema.json",
   "outputSchema": "output.schema.json",

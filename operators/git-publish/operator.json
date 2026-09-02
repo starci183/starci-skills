@@ -14,6 +14,33 @@
       "imageGeneration": "never"
     }
   },
+  "refs": [
+    {
+      "alias": "@receipt/workspace-route-binding/<invocationId>",
+      "required": true,
+      "purpose": "A publish never resolves its own checkout."
+    },
+    {
+      "alias": "@route/<project>/<role>",
+      "required": true,
+      "purpose": "The checkout and mutation branch being published."
+    },
+    {
+      "alias": "@hooks/<project>/<role>",
+      "required": true,
+      "purpose": "pre-commit and pre-push, which always run."
+    },
+    {
+      "alias": "@remote/<project>/<role>",
+      "required": true,
+      "purpose": "The publication target and its observed head."
+    },
+    {
+      "alias": "@artifacts",
+      "required": true,
+      "purpose": "Where the publication receipt is written."
+    }
+  ],
   "contextContract": "context.md",
   "inputSchema": "input.schema.json",
   "outputSchema": "output.schema.json",

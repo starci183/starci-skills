@@ -12,6 +12,38 @@
       "imageGeneration": "never"
     }
   },
+  "refs": [
+    {
+      "alias": "@knowledge/ui/presentation/<topic>",
+      "required": true,
+      "purpose": "The closed rule inventory; the only source of valid identifiers."
+    },
+    {
+      "alias": "@grammar",
+      "required": true,
+      "purpose": "Which relationships a component already owns."
+    },
+    {
+      "alias": "@source/starci-academy/fe",
+      "required": true,
+      "purpose": "The checkout the composed tree belongs to."
+    },
+    {
+      "alias": "@receipt/fe-direction-decision/<invocationId>",
+      "required": false,
+      "purpose": "Intent; never a source of presentation values."
+    },
+    {
+      "alias": "@receipt/fe-surface-audit/<invocationId>",
+      "required": false,
+      "purpose": "Regression history."
+    },
+    {
+      "alias": "@artifacts",
+      "required": true,
+      "purpose": "Where the resolved tree and the resolution receipt are written."
+    }
+  ],
   "contextContract": "context.md",
   "inputSchema": "input.schema.json",
   "outputSchema": "output.schema.json",

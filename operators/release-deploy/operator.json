@@ -14,6 +14,33 @@
       "imageGeneration": "never"
     }
   },
+  "refs": [
+    {
+      "alias": "@receipt/quality-verification/<invocationId>",
+      "required": true,
+      "purpose": "Verification precedes an immutable build."
+    },
+    {
+      "alias": "@oci/<image>",
+      "required": true,
+      "purpose": "The immutable image, by digest."
+    },
+    {
+      "alias": "@identity",
+      "required": true,
+      "purpose": "Credential handles by name; values never appear."
+    },
+    {
+      "alias": "@workflow-run/<runId>",
+      "required": false,
+      "purpose": "CI evidence of the build and rollout."
+    },
+    {
+      "alias": "@artifacts",
+      "required": true,
+      "purpose": "Where the deployment receipt is written."
+    }
+  ],
   "contextContract": "context.md",
   "inputSchema": "input.schema.json",
   "outputSchema": "output.schema.json",

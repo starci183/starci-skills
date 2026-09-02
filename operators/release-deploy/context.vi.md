@@ -35,6 +35,19 @@ Thiếu sự cho phép hoặc cho phép sai phạm vi là `AUTHORIZATION_MISSING
 là `MANIFEST_INVALID`. Không cái nào được sửa ở đây: một lần triển khai không được phép sẽ không trở
 thành được phép chỉ vì nó hữu ích.
 
+## Ref
+
+Mọi nơi operator này được đọc, theo alias. `refs.json` ở gốc `.claude` phân giải từng alias; nơi nào
+không có trong bảng thì operator này không được đọc, và `@artifacts` là nơi duy nhất nó ghi.
+
+| Alias | Trỏ tới | Bind | Bắt buộc |
+| --- | --- | --- | --- |
+| `@receipt/quality-verification/<invocationId>` | <@artifacts of the producing invocation>/<receipt file> | fingerprint + the sourceHead the receipt binds | Bắt buộc: Verification precedes an immutable build. |
+| `@oci/<image>` | ghcr.io/<image>@<digest> | digest | Bắt buộc: The immutable image, by digest. |
+| `@identity` | <Source>/.workspaces/device-state.json | fingerprint; the sealed keys under <Source>/.workspaces/local/credentials/*.key.enc are bound by name and never read | Bắt buộc: Credential handles by name; values never appear. |
+| `@workflow-run/<runId>` | GitHub Actions run <runId> of the routed repository | run id + conclusion | Tuỳ chọn: CI evidence of the build and rollout. |
+| `@artifacts` | input.project.artifactRootRef; convention <Source>/.worktrees/sessions/<invocationId>/artifacts/ | fingerprint per artifact; every artifact an operator writes is registered in output.artifactRefs | Bắt buộc: Where the deployment receipt is written. |
+
 ## Credential là cái tên, không bao giờ là giá trị
 
 `context.credentials` mang các handle `secret-ref://` cùng tham chiếu custody của chúng. Không có

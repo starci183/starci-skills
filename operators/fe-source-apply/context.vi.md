@@ -29,6 +29,18 @@ Mỗi lần gọi đều cần:
 
 `context.directionRefs` và `context.auditRefs` là bằng chứng và được phép rỗng.
 
+## Ref
+
+Mọi nơi operator này được đọc, theo alias. `refs.json` ở gốc `.claude` phân giải từng alias; nơi nào
+không có trong bảng thì operator này không được đọc, và `@artifacts` là nơi duy nhất nó ghi.
+
+| Alias | Trỏ tới | Bind | Bắt buộc |
+| --- | --- | --- | --- |
+| `@receipt/fe-presentation-resolution/<invocationId>` | <@artifacts of the producing invocation>/<receipt file> | fingerprint + the sourceHead the receipt binds | Bắt buộc: The only source of values this operator may write. |
+| `@source/starci-academy/fe` | <checkout:project/role> | fingerprint + sourceHead (git rev-parse HEAD of the checkout) | Bắt buộc: The checkout the declared write set lands on; the one place this operator writes product source. |
+| `@receipt/fe-direction-decision/<invocationId>` | <@artifacts of the producing invocation>/<receipt file> | fingerprint + the sourceHead the receipt binds | Tuỳ chọn: Intent; never a source of values. |
+| `@artifacts` | input.project.artifactRootRef; convention <Source>/.worktrees/sessions/<invocationId>/artifacts/ | fingerprint per artifact; every artifact an operator writes is registered in output.artifactRefs | Bắt buộc: Where the application receipt is written. |
+
 ## Resolution là danh sách giá trị
 
 `context.resolution.classNames` là danh sách đầy đủ và đã đóng băng những chuỗi class operator này

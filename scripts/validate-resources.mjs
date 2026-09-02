@@ -116,6 +116,14 @@ for (const [id, { resources }] of operators) {
 }
 for (const id of rows.keys()) if (!operators.has(id)) errors.push(`resources/INDEX.md: row for unknown operator ${id}`);
 
+// The orchestrator record turns operators into agents; its two numbers are the whole contract.
+const orchestrator = JSON.parse(await readFile(path.join(root, 'resources', 'orchestrator.json'), 'utf8'));
+if (orchestrator.agentPerOperator !== true) errors.push('orchestrator.json: agentPerOperator must be true');
+if (!Number.isInteger(orchestrator.maxConcurrentAgents) || orchestrator.maxConcurrentAgents < 1 || orchestrator.maxConcurrentAgents > 3) {
+  errors.push('orchestrator.json: maxConcurrentAgents must be an integer from 1 to 3');
+}
+if (orchestrator.dispatch !== 'routing.json') errors.push('orchestrator.json: dispatch must be routing.json');
+
 if (errors.length > 0) {
   process.stderr.write(`${errors.join('\n')}\n`);
   process.exitCode = 1;

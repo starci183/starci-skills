@@ -14,6 +14,15 @@ One paragraph: what this operator exists to decide or produce, and what it must 
 
 The exact refs, fingerprints, and heads the input must bind before the operator may start.
 
+## Refs
+
+| Alias | Resolves to | Bind | Required |
+| --- | --- | --- | --- |
+| `@<alias>/<params>` | from `refs.json` | how it is fingerprinted | Required or Optional: purpose |
+
+Generated from `operator.json` → `refs` through `refs.json`. A location not in this table is unreadable
+for the operator; `@artifacts` is the only one it writes.
+
 ## <Law section, optional, repeatable>
 
 A boundary or ownership law specific to this operator, stated as an enforced rule with its reason.
@@ -36,6 +45,7 @@ required, and the three standing answers (web search, Grammar binding, image gen
     { "en": "^## Purpose$", "vi": "^## Mục đích$" },
     { "en": "^## Context classes$", "vi": "^## Các lớp context$" },
     { "en": "^## Required context$", "vi": "^## Context bắt buộc$" },
+    { "en": "^## Refs$", "vi": "^## Ref$", "table": { "en": "| Alias | Resolves to | Bind | Required |", "vi": "| Alias | Trỏ tới | Bind | Bắt buộc |" } },
     { "free": true },
     { "en": "^## Boundary$", "vi": "^## Ranh giới$" },
     { "en": "^## Resources$", "vi": "^## Tài nguyên$" }

@@ -14,6 +14,33 @@
       "imageGeneration": "never"
     }
   },
+  "refs": [
+    {
+      "alias": "@business/<featureId>",
+      "required": true,
+      "purpose": "The promise the architecture must keep."
+    },
+    {
+      "alias": "@source/<project>/<role>",
+      "required": true,
+      "purpose": "The routed checkout observed at the frozen head; the inventory comes from its manifests and deployment files."
+    },
+    {
+      "alias": "@knowledge/patterns/<topic>",
+      "required": false,
+      "purpose": "Reusable patterns the scope may bind; a shape, not a selection."
+    },
+    {
+      "alias": "@receipt/architecture-decision/<invocationId>",
+      "required": false,
+      "purpose": "A prior decision on the same or an adjacent boundary; lineage."
+    },
+    {
+      "alias": "@artifacts",
+      "required": true,
+      "purpose": "Where current state, alternatives, stack model, critique, and receipt are written."
+    }
+  ],
   "contextContract": "context.md",
   "inputSchema": "input.schema.json",
   "outputSchema": "output.schema.json",

@@ -33,6 +33,20 @@ Mỗi lần gọi đều cần:
 
 Bên gọi nào tiêu thụ runtime dùng chung thì cần thêm binding của chủ sở hữu runtime.
 
+## Ref
+
+Mọi nơi operator này được đọc, theo alias. `refs.json` ở gốc `.claude` phân giải từng alias; nơi nào
+không có trong bảng thì operator này không được đọc, và `@artifacts` là nơi duy nhất nó ghi.
+
+| Alias | Trỏ tới | Bind | Bắt buộc |
+| --- | --- | --- | --- |
+| `@declaration/<project>/<role>` | <Source>/.workspaces/projects/<project>/<role>.json | fingerprint | Bắt buộc: The portable route declaration; the only route authority. |
+| `@route/<project>/<role>` | <Source>/.workspaces/local/routes/<project>/<role>/config.json | fingerprint | Bắt buộc: The hydrated route this machine projects the declaration onto. |
+| `@identity` | <Source>/.workspaces/device-state.json | fingerprint; the sealed keys under <Source>/.workspaces/local/credentials/*.key.enc are bound by name and never read | Bắt buộc: Machine identity and the sealed roster, bound by name. |
+| `@ports/<project>` | <Source>/.workspaces/ports/<project>.json | fingerprint | Tuỳ chọn: Port projection when the caller consumes the runtime. |
+| `@runtime` | <Source>/.worktrees/sessions/central-runtime/owner.json | fingerprint + generation | Tuỳ chọn: Runtime owner registry, bound only when runtimeNeed is consume. |
+| `@artifacts` | input.project.artifactRootRef; convention <Source>/.worktrees/sessions/<invocationId>/artifacts/ | fingerprint per artifact; every artifact an operator writes is registered in output.artifactRefs | Bắt buộc: Where the route receipt is written. |
+
 ## Thẩm quyền route nằm ở khai báo, không nằm ở sự giống nhau
 
 Một route tồn tại vì `.workspaces/projects/<project>/<role>.json` khai nó ra, và route cục bộ đã

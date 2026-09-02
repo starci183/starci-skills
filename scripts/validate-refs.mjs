@@ -1,0 +1,95 @@
+// Every reference an operator reads is named by an alias that refs.json resolves to an exact
+// location. An operator declares its aliases in operator.json (`refs`), and its context.md states
+// the same table for the reader. This script rejects an alias nobody registered, a required alias
+// the context table omits, a writer that is not an operator, and a context row that names an alias
+// the operator did not declare. Disk existence is not checked here: most locations are
+// machine-local (`.worktrees`, `.workspaces/local`) and absent on a fresh clone by design.
+import { readdir, readFile } from 'node:fs/promises';
+import path from 'node:path';
+import process from 'node:process';
+import { fileURLToPath } from 'node:url';
+
+const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+const registry = JSON.parse(await readFile(path.join(root, 'refs.json'), 'utf8'));
+const errors = [];
+
+if (registry.schemaVersion !== 8) errors.push('refs.json: schemaVersion must be 8');
+const aliases = registry.aliases ?? {};
+const KINDS = new Set(['file', 'dir', 'checkout', 'service', 'caller-supplied']);
+for (const [alias, def] of Object.entries(aliases)) {
+  if (!/^@[a-z][a-z-]*$/.test(alias)) errors.push(`refs.json: alias ${alias} must look like @name`);
+  for (const key of ['params', 'kind', 'resolvesTo', 'scheme', 'bind', 'writers', 'purpose']) {
+    if (def[key] === undefined) errors.push(`refs.json: ${alias} lacks ${key}`);
+  }
+  if (!KINDS.has(def.kind)) errors.push(`refs.json: ${alias} kind ${def.kind} is not one of ${[...KINDS].join(', ')}`);
+  for (const p of def.params ?? []) {
+    if (!def.resolvesTo.includes(`<${p}>`) && !def.resolvesTo.includes(`${p}/`) && !def.resolvesTo.includes(`/${p}`)) {
+      errors.push(`refs.json: ${alias} declares param ${p} that resolvesTo never uses`);
+    }
+  }
+}
+
+const operatorsDir = path.join(root, 'operators');
+const operatorIds = new Set();
+const manifests = [];
+for (const entry of await readdir(operatorsDir, { withFileTypes: true })) {
+  if (!entry.isDirectory()) continue;
+  const dir = path.join(operatorsDir, entry.name);
+  const manifest = JSON.parse(await readFile(path.join(dir, 'operator.json'), 'utf8'));
+  operatorIds.add(manifest.id);
+  manifests.push({ dir, manifest });
+}
+for (const [alias, def] of Object.entries(aliases)) {
+  for (const w of def.writers ?? []) {
+    if (w !== '*' && !operatorIds.has(w)) errors.push(`refs.json: ${alias} names writer ${w}, which is not an operator`);
+  }
+}
+
+// A context table row: | `@alias/...` | resolves to | bind | Required/Optional |
+const ROW = /^\|\s*`(@[a-z][a-z-]*)[^`]*`\s*\|/;
+function tableAliases(text, heading) {
+  const lines = text.split(/\r?\n/);
+  const start = lines.findIndex((l) => l.trim() === heading);
+  if (start === -1) return null;
+  const out = [];
+  for (let i = start + 1; i < lines.length && !lines[i].startsWith('## '); i += 1) {
+    const m = ROW.exec(lines[i]);
+    if (m) out.push(m[1]);
+  }
+  return out;
+}
+
+let declared = 0;
+for (const { dir, manifest } of manifests) {
+  const id = manifest.id;
+  const refs = manifest.refs;
+  if (!Array.isArray(refs) || refs.length === 0) { errors.push(`${id}: operator.json must declare refs`); continue; }
+  const seen = new Set();
+  for (const ref of refs) {
+    const base = /^(@[a-z][a-z-]*)/.exec(ref.alias ?? '')?.[1];
+    if (!base || !aliases[base]) errors.push(`${id}: ref ${ref.alias} is not registered in refs.json`);
+    if (typeof ref.required !== 'boolean') errors.push(`${id}: ref ${ref.alias} must say required true or false`);
+    if (typeof ref.purpose !== 'string' || ref.purpose.length === 0) errors.push(`${id}: ref ${ref.alias} needs a purpose`);
+    if (seen.has(ref.alias)) errors.push(`${id}: ref ${ref.alias} is declared twice`);
+    seen.add(ref.alias);
+    declared += 1;
+  }
+  if (!refs.some((r) => /^@artifacts\b/.test(r.alias) && r.required)) {
+    errors.push(`${id}: @artifacts must be a required ref; it is the only place an operator writes`);
+  }
+  for (const [file, heading] of [['context.md', '## Refs'], ['context.vi.md', '## Ref']]) {
+    const text = await readFile(path.join(dir, file), 'utf8');
+    const rows = tableAliases(text, heading);
+    if (rows === null) { errors.push(`${id}: ${file} has no ${heading} section`); continue; }
+    const declaredBases = new Set(refs.map((r) => /^(@[a-z][a-z-]*)/.exec(r.alias)[1]));
+    for (const r of refs) if (r.required && !rows.some((row) => r.alias.startsWith(row))) errors.push(`${id}: ${file} ${heading} table omits required ${r.alias}`);
+    for (const row of rows) if (!declaredBases.has(row)) errors.push(`${id}: ${file} ${heading} table names ${row}, which operator.json does not declare`);
+  }
+}
+
+if (errors.length > 0) {
+  process.stderr.write(`${errors.join('\n')}\n`);
+  process.exitCode = 1;
+} else {
+  process.stdout.write(`refs closed: ${Object.keys(aliases).length} aliases, ${declared} bindings across ${manifests.length} operators\n`);
+}

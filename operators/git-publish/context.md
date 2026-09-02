@@ -30,6 +30,19 @@ Every invocation requires:
 4. a hook inventory containing `pre-push`;
 5. one remote observation for exactly the ref being published.
 
+## Refs
+
+Every location this operator may read, by alias. `refs.json` at the root of `.claude` resolves each alias;
+a location not in this table is unreadable for this operator, and `@artifacts` is the only one it writes.
+
+| Alias | Resolves to | Bind | Required |
+| --- | --- | --- | --- |
+| `@receipt/workspace-route-binding/<invocationId>` | <@artifacts of the producing invocation>/<receipt file> | fingerprint + the sourceHead the receipt binds | Required: A publish never resolves its own checkout. |
+| `@route/<project>/<role>` | <Source>/.workspaces/local/routes/<project>/<role>/config.json | fingerprint | Required: The checkout and mutation branch being published. |
+| `@hooks/<project>/<role>` | <checkout:project/role>/.husky/ | fingerprint per hook file at the checkout head | Required: pre-commit and pre-push, which always run. |
+| `@remote/<project>/<role>` | the origin URL recorded in @route/<project>/<role> (repository.gitRepository) | observed remote head (git ls-remote) at invocation time | Required: The publication target and its observed head. |
+| `@artifacts` | input.project.artifactRootRef; convention <Source>/.worktrees/sessions/<invocationId>/artifacts/ | fingerprint per artifact; every artifact an operator writes is registered in output.artifactRefs | Required: Where the publication receipt is written. |
+
 ## The route is read, never rediscovered
 
 This operator does not resolve a project to a checkout. `workspace.bind` does that, and its receipt

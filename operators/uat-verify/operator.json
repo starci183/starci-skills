@@ -14,6 +14,33 @@
       "imageGeneration": "never"
     }
   },
+  "refs": [
+    {
+      "alias": "@uat/<flow>/<case>",
+      "required": true,
+      "purpose": "The canonical snapshot and result pair for the flow."
+    },
+    {
+      "alias": "@templates",
+      "required": true,
+      "purpose": "UAT protocol and template authority; consumed, never modified."
+    },
+    {
+      "alias": "@runtime",
+      "required": true,
+      "purpose": "A runtime that can be observed; readiness is proved, not assumed."
+    },
+    {
+      "alias": "@source/starci-academy/be",
+      "required": true,
+      "purpose": "The checkout whose behaviour the flow verifies."
+    },
+    {
+      "alias": "@artifacts",
+      "required": true,
+      "purpose": "Where captures and the verification receipt are written."
+    }
+  ],
   "contextContract": "context.md",
   "inputSchema": "input.schema.json",
   "outputSchema": "output.schema.json",

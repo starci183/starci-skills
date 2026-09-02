@@ -7,7 +7,7 @@ is how a person reads it.
 
 | Template | Applies to | Enforces |
 | --- | --- | --- |
-| `context.template.md` | `operators/*/context.md` | title; Purpose, Context classes, Required context, free law sections, Boundary, Resources |
+| `context.template.md` | `operators/*/context.md` | title; Purpose, Context classes, Required context, Refs with its alias table, free law sections, Boundary, Resources |
 | `input.template.md` | `operators/*/input.md` | title; Envelope, Context bindings, free sections, Resume input |
 | `execute.template.md` | `operators/*/execute.md` | title; Single job, free law sections, Sequence with the step table, free, Resume execution, Mandatory attacks |
 | `output.template.md` | `operators/*/output.md` | title; one `<State> receipt` section, free, Blocked receipt, Failure codes, Cross-field invariants, Practical outcomes |

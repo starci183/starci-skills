@@ -42,6 +42,24 @@ Backend and architecture receipts are required when the direction consumes or ch
 contracts. Their absence is a typed gap, not permission to create fixtures, fake controls, invented
 states, or visual-only behavior.
 
+## Refs
+
+Every location this operator may read, by alias. `refs.json` at the root of `.claude` resolves each alias;
+a location not in this table is unreadable for this operator, and `@artifacts` is the only one it writes.
+
+| Alias | Resolves to | Bind | Required |
+| --- | --- | --- | --- |
+| `@receipt/business-promise-authority/<invocationId>` | <@artifacts of the producing invocation>/<receipt file> | fingerprint + the sourceHead the receipt binds | Required: Business authority for the requested outcome. |
+| `@receipt/backend-implementation/<invocationId>` | <@artifacts of the producing invocation>/<receipt file> | fingerprint + the sourceHead the receipt binds | Optional: Technical authority when the direction touches a delivered contract. |
+| `@receipt/architecture-decision/<invocationId>` | <@artifacts of the producing invocation>/<receipt file> | fingerprint + the sourceHead the receipt binds | Optional: Technical authority when boundaries are in question. |
+| `@grammar` | <checkout:starci-academy/fe>/packages/grammar | fingerprint of packages/grammar/package.json (manifestRef) + the checkout head | Required: Published Grammar: the compositions a direction may bind. |
+| `@knowledge/ui/composition/<topic>` | <Source>/.claude/knowledge/<group>/<topic>.md | fingerprint; the rule inventory is the set of `## PREFIX-n` headings of the file | Required: What a tree must contain before it exists. |
+| `@source/starci-academy/fe` | <checkout:project/role> | fingerprint + sourceHead (git rev-parse HEAD of the checkout) | Required: Current implementation as evidence, never as the requested direction. |
+| `@uat/<flow>/<case>` | <Source>/.worktrees/uat/<flow>/<case>/ | fingerprint of snapshot.json and result.json | Optional: Evidence and counterevidence; a prior PASS is not current authority. |
+| `@screenshots` | <Source>/.artifacts/ | fingerprint per image | Optional: Pixel evidence only. |
+| `@receipt/fe-direction-decision/<invocationId>` | <@artifacts of the producing invocation>/<receipt file> | fingerprint + the sourceHead the receipt binds | Optional: A previous direction; evidence unless the exact identity and fingerprint match. |
+| `@artifacts` | input.project.artifactRootRef; convention <Source>/.worktrees/sessions/<invocationId>/artifacts/ | fingerprint per artifact; every artifact an operator writes is registered in output.artifactRefs | Required: Where candidate renders and the decision receipt are written. |
+
 ## Selection rules
 
 - Read the current target for `modify`, `audit-repair`, and `reconcile`. For `new`, verify that the

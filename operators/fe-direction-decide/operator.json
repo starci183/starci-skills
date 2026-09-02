@@ -15,6 +15,58 @@
       "imageGeneration": "authority-only"
     }
   },
+  "refs": [
+    {
+      "alias": "@receipt/business-promise-authority/<invocationId>",
+      "required": true,
+      "purpose": "Business authority for the requested outcome."
+    },
+    {
+      "alias": "@receipt/backend-implementation/<invocationId>",
+      "required": false,
+      "purpose": "Technical authority when the direction touches a delivered contract."
+    },
+    {
+      "alias": "@receipt/architecture-decision/<invocationId>",
+      "required": false,
+      "purpose": "Technical authority when boundaries are in question."
+    },
+    {
+      "alias": "@grammar",
+      "required": true,
+      "purpose": "Published Grammar: the compositions a direction may bind."
+    },
+    {
+      "alias": "@knowledge/ui/composition/<topic>",
+      "required": true,
+      "purpose": "What a tree must contain before it exists."
+    },
+    {
+      "alias": "@source/starci-academy/fe",
+      "required": true,
+      "purpose": "Current implementation as evidence, never as the requested direction."
+    },
+    {
+      "alias": "@uat/<flow>/<case>",
+      "required": false,
+      "purpose": "Evidence and counterevidence; a prior PASS is not current authority."
+    },
+    {
+      "alias": "@screenshots",
+      "required": false,
+      "purpose": "Pixel evidence only."
+    },
+    {
+      "alias": "@receipt/fe-direction-decision/<invocationId>",
+      "required": false,
+      "purpose": "A previous direction; evidence unless the exact identity and fingerprint match."
+    },
+    {
+      "alias": "@artifacts",
+      "required": true,
+      "purpose": "Where candidate renders and the decision receipt are written."
+    }
+  ],
   "contextContract": "context.md",
   "inputSchema": "input.schema.json",
   "outputSchema": "output.schema.json",

@@ -14,6 +14,38 @@
       "imageGeneration": "never"
     }
   },
+  "refs": [
+    {
+      "alias": "@business/<featureId>",
+      "required": true,
+      "purpose": "The only source of business behaviour."
+    },
+    {
+      "alias": "@receipt/architecture-decision/<invocationId>",
+      "required": true,
+      "purpose": "The frozen mutation contract the implementation fills and may not widen."
+    },
+    {
+      "alias": "@knowledge/patterns/be/<topic>",
+      "required": true,
+      "purpose": "Sibling patterns: the only source of valid conventions."
+    },
+    {
+      "alias": "@source/starci-academy/be",
+      "required": true,
+      "purpose": "The backend checkout the boundary belongs to; the one place this operator writes product source."
+    },
+    {
+      "alias": "@receipt/backend-implementation/<invocationId>",
+      "required": false,
+      "purpose": "Prior implementation receipts; regression history."
+    },
+    {
+      "alias": "@artifacts",
+      "required": true,
+      "purpose": "Where conformance, proofs, and the receipt are written."
+    }
+  ],
   "contextContract": "context.md",
   "inputSchema": "input.schema.json",
   "outputSchema": "output.schema.json",

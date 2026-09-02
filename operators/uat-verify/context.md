@@ -32,6 +32,19 @@ Every invocation requires:
 A missing admission receipt is `ADMISSION_MISSING`. A runtime owner that is not ready is
 `RUNTIME_UNAVAILABLE`. Neither is repaired here: UAT observes a product, it does not build one.
 
+## Refs
+
+Every location this operator may read, by alias. `refs.json` at the root of `.claude` resolves each alias;
+a location not in this table is unreadable for this operator, and `@artifacts` is the only one it writes.
+
+| Alias | Resolves to | Bind | Required |
+| --- | --- | --- | --- |
+| `@uat/<flow>/<case>` | <Source>/.worktrees/uat/<flow>/<case>/ | fingerprint of snapshot.json and result.json | Required: The canonical snapshot and result pair for the flow. |
+| `@templates` | <Source>/.worktrees/_templates/{businesses,debts,sessions,uat}/ | fingerprint per file | Required: UAT protocol and template authority; consumed, never modified. |
+| `@runtime` | <Source>/.worktrees/sessions/central-runtime/owner.json | fingerprint + generation | Required: A runtime that can be observed; readiness is proved, not assumed. |
+| `@source/starci-academy/be` | <checkout:project/role> | fingerprint + sourceHead (git rev-parse HEAD of the checkout) | Required: The checkout whose behaviour the flow verifies. |
+| `@artifacts` | input.project.artifactRootRef; convention <Source>/.worktrees/sessions/<invocationId>/artifacts/ | fingerprint per artifact; every artifact an operator writes is registered in output.artifactRefs | Required: Where captures and the verification receipt are written. |
+
 ## Identity is provisioned, never requested
 
 An authenticated flow consumes one run-scoped identity the control plane created in both Keycloak and

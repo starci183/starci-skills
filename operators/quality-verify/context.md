@@ -27,6 +27,19 @@ Every invocation requires:
 2. one gate configuration reference per planned gate;
 3. the routed source reference whose head equals `input.project.sourceHead`.
 
+## Refs
+
+Every location this operator may read, by alias. `refs.json` at the root of `.claude` resolves each alias;
+a location not in this table is unreadable for this operator, and `@artifacts` is the only one it writes.
+
+| Alias | Resolves to | Bind | Required |
+| --- | --- | --- | --- |
+| `@receipt/<receiptType>/<invocationId>` | <@artifacts of the producing invocation>/<receipt file> | fingerprint + the sourceHead the receipt binds | Required: The producer's receipt; fixes the head every gate runs against. |
+| `@gates/<project>/<role>` | <checkout:project/role>/package.json#scripts plus the configs it names (eslint, tsconfig, jest/vitest, sonar-project.properties) | fingerprint of each file at the checkout head | Required: The pinned gate commands and configuration. |
+| `@source/<project>/<role>` | <checkout:project/role> | fingerprint + sourceHead (git rev-parse HEAD of the checkout) | Required: The subject every gate measures. |
+| `@debts` | <Source>/.worktrees/debts/ | fingerprint per file | Optional: Owner-approved debts a red gate may carry. |
+| `@artifacts` | input.project.artifactRootRef; convention <Source>/.worktrees/sessions/<invocationId>/artifacts/ | fingerprint per artifact; every artifact an operator writes is registered in output.artifactRefs | Required: Where gate evidence, coverage, and the receipt are written. |
+
 ## The predecessor is consumed, not re-derived
 
 `context.predecessors` arrives with each receipt's reference, type, fingerprint, and observed head.

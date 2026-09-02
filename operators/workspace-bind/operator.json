@@ -12,6 +12,38 @@
       "imageGeneration": "never"
     }
   },
+  "refs": [
+    {
+      "alias": "@declaration/<project>/<role>",
+      "required": true,
+      "purpose": "The portable route declaration; the only route authority."
+    },
+    {
+      "alias": "@route/<project>/<role>",
+      "required": true,
+      "purpose": "The hydrated route this machine projects the declaration onto."
+    },
+    {
+      "alias": "@identity",
+      "required": true,
+      "purpose": "Machine identity and the sealed roster, bound by name."
+    },
+    {
+      "alias": "@ports/<project>",
+      "required": false,
+      "purpose": "Port projection when the caller consumes the runtime."
+    },
+    {
+      "alias": "@runtime",
+      "required": false,
+      "purpose": "Runtime owner registry, bound only when runtimeNeed is consume."
+    },
+    {
+      "alias": "@artifacts",
+      "required": true,
+      "purpose": "Where the route receipt is written."
+    }
+  ],
   "contextContract": "context.md",
   "inputSchema": "input.schema.json",
   "outputSchema": "output.schema.json",

@@ -1,0 +1,24 @@
+{
+  "schemaVersion": 8,
+  "note": "How operators become agents. One invocation of one operator is one agent, created fresh on the operator's own profile (operator.json → resources) with the refs its operator.json declares and nothing else. The orchestrator owns dispatch: it validates the input, starts the agent, validates the output, and follows routing.json to the next operator, user, or external party. It never merges two operators into one agent and never lets an agent start another.",
+  "agentPerOperator": true,
+  "maxConcurrentAgents": 3,
+  "dispatch": "routing.json",
+  "agent": {
+    "profile": "operator.json → resources.profile",
+    "grants": "operator.json → resources.requires, and nothing the profile would otherwise permit",
+    "refs": "operator.json → refs, resolved through refs.json; an unlisted location is unreadable",
+    "isolation": "fresh, no inherited turns; a critique inside an operator is a step of the same agent",
+    "writes": "only @artifacts of its own invocation, registered in output.artifactRefs"
+  },
+  "concurrency": {
+    "rule": "at most maxConcurrentAgents agents at once, and never two agents whose refs share a writable location",
+    "sharedCheckout": "two agents may read one checkout; only one may hold it for writing (backend.implement, fe.source.apply, git.publish are exclusive per checkout)",
+    "sharedRoot": "business.decide is exclusive per businesses root; platform.operate is exclusive per runtime owner"
+  },
+  "handoff": {
+    "carrier": "the typed receipt under @artifacts; the next agent binds it as @receipt and re-validates",
+    "resume": "a blocked receipt with a resume token re-enters the same operator as a new agent",
+    "stop": "routing.json kind user or external ends automation; the orchestrator reports and waits"
+  }
+}

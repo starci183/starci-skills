@@ -29,6 +29,18 @@ Mỗi lần gọi đều cần:
 
 Tham chiếu style và audit là bằng chứng và được phép rỗng.
 
+## Ref
+
+Mọi nơi operator này được đọc, theo alias. `refs.json` ở gốc `.claude` phân giải từng alias; nơi nào
+không có trong bảng thì operator này không được đọc, và `@artifacts` là nơi duy nhất nó ghi.
+
+| Alias | Trỏ tới | Bind | Bắt buộc |
+| --- | --- | --- | --- |
+| `@content/<contentId>/<locale>` | MinIO object contents/<contentId>/<locale>.json through the routed runtime | fingerprint of the fetched object | Bắt buộc: The lesson as served; the unit being authored or revised. |
+| `@runtime` | <Source>/.worktrees/sessions/central-runtime/owner.json | fingerprint + generation | Bắt buộc: The AI runtime that runs, reads, and repairs generated code. |
+| `@receipt/content-generation-receipt/<invocationId>` | <@artifacts of the producing invocation>/<receipt file> | fingerprint + the sourceHead the receipt binds | Tuỳ chọn: A prior audit of the same unit; regression history. |
+| `@artifacts` | input.project.artifactRootRef; convention <Source>/.worktrees/sessions/<invocationId>/artifacts/ | fingerprint per artifact; every artifact an operator writes is registered in output.artifactRefs | Bắt buộc: Where the brief, articles, code tracks, images, review, and receipt are written. |
+
 ## Binding runtime là ranh giới, không phải sở thích
 
 `context.aiRuntime` chép lại đúng thứ mà cấu hình workspace đã ấn định: brief của người dạy và phần

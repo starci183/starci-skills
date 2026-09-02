@@ -29,6 +29,19 @@ Mỗi lần gọi đều cần:
 
 Đọc source đã route là việc thu thập bằng chứng. Nó không bao giờ là giấy phép để sửa source đó.
 
+## Ref
+
+Mọi nơi operator này được đọc, theo alias. `refs.json` ở gốc `.claude` phân giải từng alias; nơi nào
+không có trong bảng thì operator này không được đọc, và `@artifacts` là nơi duy nhất nó ghi.
+
+| Alias | Trỏ tới | Bind | Bắt buộc |
+| --- | --- | --- | --- |
+| `@business/<featureId>` | <Source>/.worktrees/businesses/features/<featureId>/model.json | content address from <Source>/.worktrees/businesses/business-registry-v1.json (featureHeads.<featureId>.head) with its authorityStatus | Bắt buộc: The promise the architecture must keep. |
+| `@source/<project>/<role>` | <checkout:project/role> | fingerprint + sourceHead (git rev-parse HEAD of the checkout) | Bắt buộc: The routed checkout observed at the frozen head; the inventory comes from its manifests and deployment files. |
+| `@knowledge/patterns/<topic>` | <Source>/.claude/knowledge/<group>/<topic>.md | fingerprint; the rule inventory is the set of `## PREFIX-n` headings of the file | Tuỳ chọn: Reusable patterns the scope may bind; a shape, not a selection. |
+| `@receipt/architecture-decision/<invocationId>` | <@artifacts of the producing invocation>/<receipt file> | fingerprint + the sourceHead the receipt binds | Tuỳ chọn: A prior decision on the same or an adjacent boundary; lineage. |
+| `@artifacts` | input.project.artifactRootRef; convention <Source>/.worktrees/sessions/<invocationId>/artifacts/ | fingerprint per artifact; every artifact an operator writes is registered in output.artifactRefs | Bắt buộc: Where current state, alternatives, stack model, critique, and receipt are written. |
+
 ## Sự tồn tại sẵn không phải là thẩm quyền
 
 Inventory nói hệ thống hôm nay chạy bằng gì. Đó vừa là phần context hữu ích nhất vừa là phần nguy hiểm

@@ -12,6 +12,33 @@
       "imageGeneration": "never"
     }
   },
+  "refs": [
+    {
+      "alias": "@receipt/<receiptType>/<invocationId>",
+      "required": true,
+      "purpose": "The producer's receipt; fixes the head every gate runs against."
+    },
+    {
+      "alias": "@gates/<project>/<role>",
+      "required": true,
+      "purpose": "The pinned gate commands and configuration."
+    },
+    {
+      "alias": "@source/<project>/<role>",
+      "required": true,
+      "purpose": "The subject every gate measures."
+    },
+    {
+      "alias": "@debts",
+      "required": false,
+      "purpose": "Owner-approved debts a red gate may carry."
+    },
+    {
+      "alias": "@artifacts",
+      "required": true,
+      "purpose": "Where gate evidence, coverage, and the receipt are written."
+    }
+  ],
   "contextContract": "context.md",
   "inputSchema": "input.schema.json",
   "outputSchema": "output.schema.json",

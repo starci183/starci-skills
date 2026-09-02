@@ -1,0 +1,265 @@
+{
+  "schemaVersion": 8,
+  "note": "Closed registry of reference aliases. An operator names what it reads by alias; the alias says exactly where that thing lives, how it is bound, and who may write it. `<Source>` is the host repository that owns this .claude (its parent directory). `<checkout:project/role>` is the diskPath of the hydrated route .workspaces/local/routes/<project>/<role>/config.json. A segment in angle brackets is a parameter the invocation supplies. `kind` file/dir/checkout resolve on disk; service resolves through a runtime endpoint; caller-supplied comes from the input.",
+  "aliases": {
+    "@source": {
+      "params": [
+        "project",
+        "role"
+      ],
+      "kind": "checkout",
+      "resolvesTo": "<checkout:project/role>",
+      "scheme": "source://<repository>",
+      "bind": "fingerprint + sourceHead (git rev-parse HEAD of the checkout)",
+      "writers": [
+        "backend.implement",
+        "fe.source.apply"
+      ],
+      "purpose": "The routed repository checkout. Observation is evidence discovery, never permission to mutate."
+    },
+    "@declaration": {
+      "params": [
+        "project",
+        "role"
+      ],
+      "kind": "file",
+      "resolvesTo": "<Source>/.workspaces/projects/<project>/<role>.json",
+      "scheme": "workspace://declarations/<project>",
+      "bind": "fingerprint",
+      "writers": [],
+      "purpose": "Portable route declaration, tracked. The only place a route is declared."
+    },
+    "@route": {
+      "params": [
+        "project",
+        "role"
+      ],
+      "kind": "file",
+      "resolvesTo": "<Source>/.workspaces/local/routes/<project>/<role>/config.json",
+      "scheme": "workspace://routes/<project>/<role>",
+      "bind": "fingerprint",
+      "writers": [
+        "workspace.bind"
+      ],
+      "purpose": "Machine-local hydrated route; projects the declaration onto this disk. Ignored by Git."
+    },
+    "@ports": {
+      "params": [
+        "project"
+      ],
+      "kind": "file",
+      "resolvesTo": "<Source>/.workspaces/ports/<project>.json",
+      "scheme": "workspace://ports/<project>",
+      "bind": "fingerprint",
+      "writers": [],
+      "purpose": "Port projection: project offset and application slots. Endpoints are derived, never typed."
+    },
+    "@identity": {
+      "params": [],
+      "kind": "file",
+      "resolvesTo": "<Source>/.workspaces/device-state.json",
+      "scheme": "workspace://identity/device",
+      "bind": "fingerprint; the sealed keys under <Source>/.workspaces/local/credentials/*.key.enc are bound by name and never read",
+      "writers": [],
+      "purpose": "Machine identity and the encrypted credential roster reference."
+    },
+    "@runtime": {
+      "params": [],
+      "kind": "file",
+      "resolvesTo": "<Source>/.worktrees/sessions/central-runtime/owner.json",
+      "scheme": "runtime://owner",
+      "bind": "fingerprint + generation",
+      "writers": [
+        "platform.operate"
+      ],
+      "purpose": "The shared runtime owner registry: generation, status, endpoints, health evidence. Callers consume, never own."
+    },
+    "@knowledge": {
+      "params": [
+        "group",
+        "topic"
+      ],
+      "kind": "file",
+      "resolvesTo": "<Source>/.claude/knowledge/<group>/<topic>.md",
+      "scheme": "knowledge://<group>/<topic>",
+      "bind": "fingerprint; the rule inventory is the set of `## PREFIX-n` headings of the file",
+      "writers": [],
+      "purpose": "Canonical English knowledge: ui/composition, ui/presentation, ui/proof, grammars/<family>, patterns/fe, patterns/be. The .vi.md mirror is never bound."
+    },
+    "@grammar": {
+      "params": [],
+      "kind": "dir",
+      "resolvesTo": "<checkout:starci-academy/fe>/packages/grammar",
+      "scheme": "grammar://starci-core",
+      "bind": "fingerprint of packages/grammar/package.json (manifestRef) + the checkout head",
+      "writers": [],
+      "purpose": "The published @starci/grammar package: Common renderers, props, owned relationships, and the Core family."
+    },
+    "@business": {
+      "params": [
+        "featureId"
+      ],
+      "kind": "file",
+      "resolvesTo": "<Source>/.worktrees/businesses/features/<featureId>/model.json",
+      "scheme": "business://<featureId>",
+      "bind": "content address from <Source>/.worktrees/businesses/business-registry-v1.json (featureHeads.<featureId>.head) with its authorityStatus",
+      "writers": [
+        "business.decide"
+      ],
+      "purpose": "The business promise head. The businesses root is its own git worktree; a head binds by content address even before its commit lands."
+    },
+    "@session": {
+      "params": [
+        "sessionId"
+      ],
+      "kind": "dir",
+      "resolvesTo": "<Source>/.worktrees/sessions/<sessionId>/",
+      "scheme": "session://<sessionId>",
+      "bind": "fingerprint per file read",
+      "writers": [
+        "*"
+      ],
+      "purpose": "Per-session working records: leases, inventories, blockers, and the artifacts of that session's invocations."
+    },
+    "@artifacts": {
+      "params": [],
+      "kind": "caller-supplied",
+      "resolvesTo": "input.project.artifactRootRef; convention <Source>/.worktrees/sessions/<invocationId>/artifacts/",
+      "scheme": "artifact://<invocationId>/<name>",
+      "bind": "fingerprint per artifact; every artifact an operator writes is registered in output.artifactRefs",
+      "writers": [
+        "*"
+      ],
+      "purpose": "The only place an operator writes: its receipt and named artifacts. Nothing else is a write."
+    },
+    "@receipt": {
+      "params": [
+        "receiptType",
+        "invocationId"
+      ],
+      "kind": "file",
+      "resolvesTo": "<@artifacts of invocation <invocationId>>/<receiptType>.json (the receipt file that invocation registered in output.artifactRefs)",
+      "scheme": "receipt://<receiptType>/<invocationId>",
+      "bind": "fingerprint + the sourceHead the receipt binds",
+      "writers": [],
+      "purpose": "A predecessor's typed receipt, consumed unchanged: business-promise-authority, architecture-decision, fe-direction-decision, fe-presentation-resolution, fe-source-application, fe-surface-audit, backend-implementation, quality-verification, uat-flow-verification, release-deployment, platform-operation-receipt, content-generation-receipt, git-publication, workspace-route-binding."
+    },
+    "@uat": {
+      "params": [
+        "flow",
+        "case"
+      ],
+      "kind": "dir",
+      "resolvesTo": "<Source>/.worktrees/uat/<flow>/<case>/",
+      "scheme": "uat://<flow>/<case>",
+      "bind": "fingerprint of snapshot.json and result.json",
+      "writers": [
+        "uat.verify"
+      ],
+      "purpose": "Canonical UAT pair per flow and case: the frozen snapshot and the published result. Never carries a credential."
+    },
+    "@debts": {
+      "params": [],
+      "kind": "dir",
+      "resolvesTo": "<Source>/.worktrees/debts/",
+      "scheme": "debt://<file>",
+      "bind": "fingerprint per file",
+      "writers": [],
+      "purpose": "Owner-approved quality debts (be.md, fe.md, and per-item files). A debt without a live approval here is not a debt."
+    },
+    "@templates": {
+      "params": [],
+      "kind": "dir",
+      "resolvesTo": "<Source>/.worktrees/_templates/{businesses,debts,sessions,uat}/",
+      "scheme": "template://<kind>",
+      "bind": "fingerprint per file",
+      "writers": [],
+      "purpose": "Authority templates for new business heads, debts, sessions, and UAT pairs. Consumed, never modified."
+    },
+    "@screenshots": {
+      "params": [],
+      "kind": "dir",
+      "resolvesTo": "<Source>/.artifacts/",
+      "scheme": "visual://<file>",
+      "bind": "fingerprint per image",
+      "writers": [],
+      "purpose": "Pixel evidence from earlier audits. Evidence only; never a layout template."
+    },
+    "@hooks": {
+      "params": [
+        "project",
+        "role"
+      ],
+      "kind": "dir",
+      "resolvesTo": "<checkout:project/role>/.husky/",
+      "scheme": "source://<repository>/.husky",
+      "bind": "fingerprint per hook file at the checkout head",
+      "writers": [],
+      "purpose": "The pre-commit and pre-push hooks a publish must run. A blocked hook is a typed failure, never a reason to bypass."
+    },
+    "@gates": {
+      "params": [
+        "project",
+        "role"
+      ],
+      "kind": "file",
+      "resolvesTo": "<checkout:project/role>/package.json#scripts plus the configs it names (eslint, tsconfig, jest/vitest, sonar-project.properties)",
+      "scheme": "config://<repository>/<gate>",
+      "bind": "fingerprint of each file at the checkout head",
+      "writers": [],
+      "purpose": "The pinned gate commands and their configuration. A gate is measured with these, never with a substitute."
+    },
+    "@remote": {
+      "params": [
+        "project",
+        "role"
+      ],
+      "kind": "service",
+      "resolvesTo": "the origin URL recorded in @route/<project>/<role> (repository.gitRepository)",
+      "scheme": "remote://<repository>/<branch>",
+      "bind": "observed remote head (git ls-remote) at invocation time",
+      "writers": [
+        "git.publish"
+      ],
+      "purpose": "The publication target. Fast-forwardness is decided against this observation."
+    },
+    "@content": {
+      "params": [
+        "contentId",
+        "locale"
+      ],
+      "kind": "service",
+      "resolvesTo": "MinIO object contents/<contentId>/<locale>.json through the routed runtime",
+      "scheme": "content://<contentId>/<locale>",
+      "bind": "fingerprint of the fetched object",
+      "writers": [
+        "content.generate"
+      ],
+      "purpose": "Authored lesson content as served, not as drafted."
+    },
+    "@oci": {
+      "params": [
+        "image"
+      ],
+      "kind": "service",
+      "resolvesTo": "ghcr.io/<image>@<digest>",
+      "scheme": "oci://ghcr.io/<image>",
+      "bind": "digest",
+      "writers": [
+        "release.deploy"
+      ],
+      "purpose": "Immutable release images. A tag is never a binding; a digest is."
+    },
+    "@workflow-run": {
+      "params": [
+        "runId"
+      ],
+      "kind": "service",
+      "resolvesTo": "GitHub Actions run <runId> of the routed repository",
+      "scheme": "workflow-run://github-actions/<runId>",
+      "bind": "run id + conclusion",
+      "writers": [],
+      "purpose": "Deployment and verification evidence produced by CI, read only."
+    }
+  }
+}
