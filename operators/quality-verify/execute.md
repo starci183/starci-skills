@@ -59,14 +59,14 @@ was proved.
 
 | # | Step | Reads | Writes | Stops with |
 | --- | --- | --- | --- | --- |
-| 1 | Validate input and resume | input, prior receipt, frozen source binding | — | `INVALID_INPUT`, `SOURCE_DRIFT`, `NO_PROGRESS` |
-| 2 | Consume the predecessors unchanged | each upstream receipt by reference, type, fingerprint, and head | — | `PREDECESSOR_MIXED`, `PREDECESSOR_STALE` |
-| 3 | Verify the head | observed source head, frozen head | — | — |
-| 4 | Run the gates in declared order | the declared gate plan and repository entrypoints | `gates/<gate>.json` | `GATE_UNAVAILABLE` |
-| 5 | Apply the coverage policy | the unit gate's coverage output and the four thresholds | `gates/unit-coverage.coverage.json` | — |
-| 6 | Classify each failure | structured diagnostics from every red gate | — | — |
-| 7 | Apply approved debt | owner-approved debt records and their expiry | — | `DEBT_UNAPPROVED` |
-| 8 | Emit and stop | everything above | `quality-receipt.json` | — |
+| 1 | Validate input and resume | input, `@receipt/<receiptType>/<invocationId>`, `@fe` or `@be` (the frozen head of the verified boundary) | — | `INVALID_INPUT`, `SOURCE_DRIFT`, `NO_PROGRESS` |
+| 2 | Consume the predecessors unchanged | `@receipt/<receiptType>/<invocationId>` (each upstream receipt by reference, type, fingerprint, and head) | — | `PREDECESSOR_MIXED`, `PREDECESSOR_STALE` |
+| 3 | Verify the head | `@fe` or `@be` (the observed head of the verified boundary, against the frozen head) | — | — |
+| 4 | Run the gates in declared order | `@gates/<project>/<role>` (the declared gate plan and repository entrypoints), `@fe` or `@be` (the subject each gate measures) | `@artifacts/gates/<gate>.json` | `GATE_UNAVAILABLE` |
+| 5 | Apply the coverage policy | `@artifacts/gates/<gate>.json` (the unit gate's coverage output), `@gates/<project>/<role>` (the four thresholds) | `@artifacts/gates/unit-coverage.coverage.json` | — |
+| 6 | Classify each failure | `@artifacts/gates/<gate>.json` (structured diagnostics from every red gate) | — | — |
+| 7 | Apply approved debt | `@debts` (owner-approved debt records and their expiry) | — | `DEBT_UNAPPROVED` |
+| 8 | Emit and stop | everything above | `@artifacts/quality-receipt.json` | — |
 
 Validation rejects predecessor heads that disagree, a stale source binding, an unrequested e2e plan, a
 Sonar plan that contradicts its scope, a debt whose approval has expired, a frontend delivery carrying

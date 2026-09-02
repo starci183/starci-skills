@@ -58,14 +58,14 @@ cầu trong chính lần gọi này. Ngoài ra, gate được ghi thành `skippe
 
 | # | Bước | Đọc | Ghi | Dừng với |
 | --- | --- | --- | --- | --- |
-| 1 | Kiểm tra input và resume | input, receipt trước đó, binding source đã đóng băng | — | `INVALID_INPUT`, `SOURCE_DRIFT`, `NO_PROGRESS` |
-| 2 | Tiêu thụ tiền nhiệm nguyên trạng | từng receipt thượng nguồn theo tham chiếu, loại, fingerprint và head | — | `PREDECESSOR_MIXED`, `PREDECESSOR_STALE` |
-| 3 | Xác minh head | head quan sát được, head đã đóng băng | — | — |
-| 4 | Chạy các gate theo thứ tự đã khai | kế hoạch gate đã khai và các entrypoint của repo | `gates/<gate>.json` | `GATE_UNAVAILABLE` |
-| 5 | Áp chính sách độ phủ | kết quả độ phủ của cổng unit và bốn ngưỡng | `gates/unit-coverage.coverage.json` | — |
-| 6 | Phân loại từng thất bại | chẩn đoán có cấu trúc của mọi gate đỏ | — | — |
-| 7 | Áp nợ đã duyệt | các khoản nợ đã được chủ sở hữu duyệt cùng hạn của chúng | — | `DEBT_UNAPPROVED` |
-| 8 | Phát và dừng | tất cả những gì ở trên | `quality-receipt.json` | — |
+| 1 | Kiểm tra input và resume | input, `@receipt/<receiptType>/<invocationId>`, `@fe` hoặc `@be` (head đã đóng băng của ranh giới đang kiểm) | — | `INVALID_INPUT`, `SOURCE_DRIFT`, `NO_PROGRESS` |
+| 2 | Tiêu thụ tiền nhiệm nguyên trạng | `@receipt/<receiptType>/<invocationId>` (từng receipt thượng nguồn theo tham chiếu, loại, fingerprint và head) | — | `PREDECESSOR_MIXED`, `PREDECESSOR_STALE` |
+| 3 | Xác minh head | `@fe` hoặc `@be` (head quan sát được của ranh giới đang kiểm, đối chiếu head đã đóng băng) | — | — |
+| 4 | Chạy các gate theo thứ tự đã khai | `@gates/<project>/<role>` (kế hoạch gate đã khai và các entrypoint của repo), `@fe` hoặc `@be` (đối tượng mà từng gate đo) | `@artifacts/gates/<gate>.json` | `GATE_UNAVAILABLE` |
+| 5 | Áp chính sách độ phủ | `@artifacts/gates/<gate>.json` (kết quả độ phủ của cổng unit), `@gates/<project>/<role>` (bốn ngưỡng) | `@artifacts/gates/unit-coverage.coverage.json` | — |
+| 6 | Phân loại từng thất bại | `@artifacts/gates/<gate>.json` (chẩn đoán có cấu trúc của mọi gate đỏ) | — | — |
+| 7 | Áp nợ đã duyệt | `@debts` (các khoản nợ đã được chủ sở hữu duyệt cùng hạn của chúng) | — | `DEBT_UNAPPROVED` |
+| 8 | Phát và dừng | tất cả những gì ở trên | `@artifacts/quality-receipt.json` | — |
 
 Khâu kiểm tra từ chối các head tiền nhiệm bất đồng, binding source đã cũ, kế hoạch e2e không được yêu
 cầu, kế hoạch Sonar mâu thuẫn với phạm vi của nó, khoản nợ có phê duyệt đã hết hạn, bản giao frontend

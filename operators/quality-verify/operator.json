@@ -24,9 +24,14 @@
       "purpose": "The pinned gate commands and configuration."
     },
     {
-      "alias": "@source/<project>/<role>",
+      "alias": "@fe",
       "required": true,
-      "purpose": "The subject every gate measures."
+      "purpose": "The subject every gate measures when the verified boundary is a frontend."
+    },
+    {
+      "alias": "@be",
+      "required": true,
+      "purpose": "The subject every gate measures when the verified boundary is a backend."
     },
     {
       "alias": "@debts",
