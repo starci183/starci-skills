@@ -42,7 +42,7 @@ a location not in this table is unreadable for this operator, and `@artifacts` i
 
 | Alias | Resolves to | Bind | Required |
 | --- | --- | --- | --- |
-| `@receipt/quality-verification/<invocationId>` | <@artifacts of the producing invocation>/<receipt file> | fingerprint + the sourceHead the receipt binds | Required: Verification precedes an immutable build. |
+| `@receipt/quality-verification/<invocationId>` | <@artifacts of invocation <invocationId>>/<receiptType>.json (the receipt file that invocation registered in output.artifactRefs) | fingerprint + the sourceHead the receipt binds | Required: Verification precedes an immutable build. |
 | `@oci/<image>` | ghcr.io/<image>@<digest> | digest | Required: The immutable image, by digest. |
 | `@identity` | <Source>/.workspaces/device-state.json | fingerprint; the sealed keys under <Source>/.workspaces/local/credentials/*.key.enc are bound by name and never read | Required: Credential handles by name; values never appear. |
 | `@workflow-run/<runId>` | GitHub Actions run <runId> of the routed repository | run id + conclusion | Optional: CI evidence of the build and rollout. |

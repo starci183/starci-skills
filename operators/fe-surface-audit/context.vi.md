@@ -37,7 +37,7 @@ không có trong bảng thì operator này không được đọc, và `@artifac
 | Alias | Trỏ tới | Bind | Bắt buộc |
 | --- | --- | --- | --- |
 | `@knowledge/ui/proof/<topic>` | <Source>/.claude/knowledge/<group>/<topic>.md | fingerprint; the rule inventory is the set of `## PREFIX-n` headings of the file | Bắt buộc: What only becomes true once rendered; the audit's rule inventory. |
-| `@receipt/fe-source-application/<invocationId>` | <@artifacts of the producing invocation>/<receipt file> | fingerprint + the sourceHead the receipt binds | Bắt buộc: The stated intention this audit exists to contradict. |
+| `@receipt/fe-source-application/<invocationId>` | <@artifacts of invocation <invocationId>>/<receiptType>.json (the receipt file that invocation registered in output.artifactRefs) | fingerprint + the sourceHead the receipt binds | Bắt buộc: The stated intention this audit exists to contradict. |
 | `@source/starci-academy/fe` | <checkout:project/role> | fingerprint + sourceHead (git rev-parse HEAD of the checkout) | Bắt buộc: Proves the observed surface is the applied surface. |
 | `@runtime` | <Source>/.worktrees/sessions/central-runtime/owner.json | fingerprint + generation | Bắt buộc: The endpoint that serves the route under observation. |
 | `@artifacts` | input.project.artifactRootRef; convention <Source>/.worktrees/sessions/<invocationId>/artifacts/ | fingerprint per artifact; every artifact an operator writes is registered in output.artifactRefs | Bắt buộc: Where captures and the audit receipt are written. |

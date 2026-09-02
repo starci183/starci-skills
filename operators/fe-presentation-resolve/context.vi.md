@@ -44,8 +44,8 @@ không có trong bảng thì operator này không được đọc, và `@artifac
 | `@knowledge/ui/presentation/<topic>` | <Source>/.claude/knowledge/<group>/<topic>.md | fingerprint; the rule inventory is the set of `## PREFIX-n` headings of the file | Bắt buộc: The closed rule inventory; the only source of valid identifiers. |
 | `@grammar` | <checkout:starci-academy/fe>/packages/grammar | fingerprint of packages/grammar/package.json (manifestRef) + the checkout head | Bắt buộc: Which relationships a component already owns. |
 | `@source/starci-academy/fe` | <checkout:project/role> | fingerprint + sourceHead (git rev-parse HEAD of the checkout) | Bắt buộc: The checkout the composed tree belongs to. |
-| `@receipt/fe-direction-decision/<invocationId>` | <@artifacts of the producing invocation>/<receipt file> | fingerprint + the sourceHead the receipt binds | Tuỳ chọn: Intent; never a source of presentation values. |
-| `@receipt/fe-surface-audit/<invocationId>` | <@artifacts of the producing invocation>/<receipt file> | fingerprint + the sourceHead the receipt binds | Tuỳ chọn: Regression history. |
+| `@receipt/fe-direction-decision/<invocationId>` | <@artifacts of invocation <invocationId>>/<receiptType>.json (the receipt file that invocation registered in output.artifactRefs) | fingerprint + the sourceHead the receipt binds | Tuỳ chọn: Intent; never a source of presentation values. |
+| `@receipt/fe-surface-audit/<invocationId>` | <@artifacts of invocation <invocationId>>/<receiptType>.json (the receipt file that invocation registered in output.artifactRefs) | fingerprint + the sourceHead the receipt binds | Tuỳ chọn: Regression history. |
 | `@artifacts` | input.project.artifactRootRef; convention <Source>/.worktrees/sessions/<invocationId>/artifacts/ | fingerprint per artifact; every artifact an operator writes is registered in output.artifactRefs | Bắt buộc: Where the resolved tree and the resolution receipt are written. |
 
 ## Danh sách mã rule

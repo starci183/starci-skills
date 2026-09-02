@@ -34,7 +34,7 @@ a location not in this table is unreadable for this operator, and `@artifacts` i
 
 | Alias | Resolves to | Bind | Required |
 | --- | --- | --- | --- |
-| `@receipt/<receiptType>/<invocationId>` | <@artifacts of the producing invocation>/<receipt file> | fingerprint + the sourceHead the receipt binds | Required: The producer's receipt; fixes the head every gate runs against. |
+| `@receipt/<receiptType>/<invocationId>` | <@artifacts of invocation <invocationId>>/<receiptType>.json (the receipt file that invocation registered in output.artifactRefs) | fingerprint + the sourceHead the receipt binds | Required: The producer's receipt; fixes the head every gate runs against. |
 | `@gates/<project>/<role>` | <checkout:project/role>/package.json#scripts plus the configs it names (eslint, tsconfig, jest/vitest, sonar-project.properties) | fingerprint of each file at the checkout head | Required: The pinned gate commands and configuration. |
 | `@source/<project>/<role>` | <checkout:project/role> | fingerprint + sourceHead (git rev-parse HEAD of the checkout) | Required: The subject every gate measures. |
 | `@debts` | <Source>/.worktrees/debts/ | fingerprint per file | Optional: Owner-approved debts a red gate may carry. |

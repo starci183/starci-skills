@@ -42,7 +42,7 @@ không có trong bảng thì operator này không được đọc, và `@artifac
 
 | Alias | Trỏ tới | Bind | Bắt buộc |
 | --- | --- | --- | --- |
-| `@receipt/quality-verification/<invocationId>` | <@artifacts of the producing invocation>/<receipt file> | fingerprint + the sourceHead the receipt binds | Bắt buộc: Verification precedes an immutable build. |
+| `@receipt/quality-verification/<invocationId>` | <@artifacts of invocation <invocationId>>/<receiptType>.json (the receipt file that invocation registered in output.artifactRefs) | fingerprint + the sourceHead the receipt binds | Bắt buộc: Verification precedes an immutable build. |
 | `@oci/<image>` | ghcr.io/<image>@<digest> | digest | Bắt buộc: The immutable image, by digest. |
 | `@identity` | <Source>/.workspaces/device-state.json | fingerprint; the sealed keys under <Source>/.workspaces/local/credentials/*.key.enc are bound by name and never read | Bắt buộc: Credential handles by name; values never appear. |
 | `@workflow-run/<runId>` | GitHub Actions run <runId> of the routed repository | run id + conclusion | Tuỳ chọn: CI evidence of the build and rollout. |

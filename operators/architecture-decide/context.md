@@ -39,7 +39,7 @@ a location not in this table is unreadable for this operator, and `@artifacts` i
 | `@business/<featureId>` | <Source>/.worktrees/businesses/features/<featureId>/model.json | content address from <Source>/.worktrees/businesses/business-registry-v1.json (featureHeads.<featureId>.head) with its authorityStatus | Required: The promise the architecture must keep. |
 | `@source/<project>/<role>` | <checkout:project/role> | fingerprint + sourceHead (git rev-parse HEAD of the checkout) | Required: The routed checkout observed at the frozen head; the inventory comes from its manifests and deployment files. |
 | `@knowledge/patterns/<topic>` | <Source>/.claude/knowledge/<group>/<topic>.md | fingerprint; the rule inventory is the set of `## PREFIX-n` headings of the file | Optional: Reusable patterns the scope may bind; a shape, not a selection. |
-| `@receipt/architecture-decision/<invocationId>` | <@artifacts of the producing invocation>/<receipt file> | fingerprint + the sourceHead the receipt binds | Optional: A prior decision on the same or an adjacent boundary; lineage. |
+| `@receipt/architecture-decision/<invocationId>` | <@artifacts of invocation <invocationId>>/<receiptType>.json (the receipt file that invocation registered in output.artifactRefs) | fingerprint + the sourceHead the receipt binds | Optional: A prior decision on the same or an adjacent boundary; lineage. |
 | `@artifacts` | input.project.artifactRootRef; convention <Source>/.worktrees/sessions/<invocationId>/artifacts/ | fingerprint per artifact; every artifact an operator writes is registered in output.artifactRefs | Required: Where current state, alternatives, stack model, critique, and receipt are written. |
 
 ## Incumbency is not authority
