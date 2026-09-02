@@ -31,12 +31,12 @@ Mỗi lần gọi đều cần:
 
 | Alias | Trỏ tới | Bind | Bắt buộc |
 | --- | --- | --- | --- |
-| `@receipt/<receiptType>/<invocationId>` | `<@artifacts of invocation <invocationId>>/<receiptType>.json (the receipt file that invocation registered in output.artifactRefs)` | fingerprint + the sourceHead the receipt binds | Bắt buộc: The producer's receipt; fixes the head every gate runs against. |
-| `@gates/<project>/<role>` | `<checkout:project/role>/package.json#scripts plus the configs it names (eslint, tsconfig, jest/vitest, sonar-project.properties)` | fingerprint of each file at the checkout head | Bắt buộc: The pinned gate commands and configuration. |
-| `@fe` | `<checkout:input.project.id/fe>  (the frontend checkout of the project this invocation binds)` | fingerprint + sourceHead (git rev-parse HEAD of the checkout) | Bắt buộc: The subject every gate measures when the verified boundary is a frontend. |
-| `@be` | `<checkout:input.project.id/be>  (the backend checkout of the project this invocation binds)` | fingerprint + sourceHead (git rev-parse HEAD of the checkout) | Bắt buộc: The subject every gate measures when the verified boundary is a backend. |
-| `@debts` | `<Source>/.worktrees/debts/` | fingerprint per file | Tuỳ chọn: Owner-approved debts a red gate may carry. |
-| `@artifacts` | `input.project.artifactRootRef; convention <Source>/.worktrees/sessions/<invocationId>/artifacts/` | fingerprint per artifact; every artifact an operator writes is registered in output.artifactRefs | Bắt buộc: Where gate evidence, coverage, and the receipt are written. |
+| `@receipt/<receiptType>/<invocationId>` | `<@artifacts of invocation <invocationId>>/<receiptType>.json  (the receipt file that invocation registered in output.artifactRefs)` | fingerprint + the sourceHead the receipt binds | Bắt buộc: The producer's receipt; fixes the head every gate runs against. |
+| `@workspaces/<project>/<role>/package.json#scripts` | `<checkout:project/role>  (any routed checkout named explicitly, for cross-project reads: @workspaces/nivo/fe)` | fingerprint + sourceHead (git rev-parse HEAD of the checkout) | Bắt buộc: The pinned gate commands and configuration. |
+| `@workspaces/fe` | `<checkout:input.project.id/fe>  (diskPath from <Source>/.workspaces/local/routes/<project>/fe/config.json); a sub-path narrows: @workspaces/fe/.husky, @workspaces/fe/package.json#scripts` | fingerprint + sourceHead (git rev-parse HEAD of the checkout) | Bắt buộc: The subject every gate measures when the verified boundary is a frontend. |
+| `@workspaces/be` | `<checkout:input.project.id/be>  (diskPath from <Source>/.workspaces/local/routes/<project>/be/config.json); a sub-path narrows: @workspaces/be/.husky, @workspaces/be/package.json#scripts` | fingerprint + sourceHead (git rev-parse HEAD of the checkout) | Bắt buộc: The subject every gate measures when the verified boundary is a backend. |
+| `@worktrees/debts` | `<Source>/.worktrees/debts/  (be.md, fe.md, per-item files)` | fingerprint per file | Tuỳ chọn: Owner-approved debts a red gate may carry. |
+| `@artifacts` | `input.project.artifactRootRef; convention <Source>/.worktrees/sessions/<invocationId>/artifacts/  (receipt, named artifacts, captures)` | fingerprint per artifact; every artifact written is registered in output.artifactRefs | Bắt buộc: Where gate evidence, coverage, and the receipt are written. |
 
 ## Tiền nhiệm được tiêu thụ, không phải dựng lại
 

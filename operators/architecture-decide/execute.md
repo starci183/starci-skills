@@ -45,9 +45,9 @@ Four prohibitions carry the decision, and each is enforced rather than advised:
 
 | # | Step | Reads | Writes | Stops with |
 | --- | --- | --- | --- | --- |
-| 1 | Validate input and resume | input, `@receipt/architecture-decision/<invocationId>`, `@be` (the frozen head binding) | — | `INVALID_INPUT`, `SOURCE_DRIFT`, `NO_PROGRESS` |
-| 2 | Observe the current state | `@be` (observed at the frozen head) | `@artifacts/current-state.json` | `CURRENT_STATE_UNOBSERVED` |
-| 3 | Bind the observed inventory and the business authority | `@artifacts/current-state.json` (inventory components and their evidence), `@business/<featureId>` (the published head) | — | `BUSINESS_AUTHORITY_REQUIRED`, `EVIDENCE_MISSING` |
+| 1 | Validate input and resume | input, `@receipt/architecture-decision/<invocationId>`, `@workspaces/be` (the frozen head binding) | — | `INVALID_INPUT`, `SOURCE_DRIFT`, `NO_PROGRESS` |
+| 2 | Observe the current state | `@workspaces/be` (observed at the frozen head) | `@artifacts/current-state.json` | `CURRENT_STATE_UNOBSERVED` |
+| 3 | Bind the observed inventory and the business authority | `@artifacts/current-state.json` (inventory components and their evidence), `@worktrees/businesses/<featureId>` (the published head) | — | `BUSINESS_AUTHORITY_REQUIRED`, `EVIDENCE_MISSING` |
 | 4 | Frame the decision | input (objective, trade-off axes, separated constraints) | — | `CONSTRAINT_CONTRADICTION` |
 | 5 | Generate alternatives | `@artifacts/current-state.json`, `@knowledge/patterns` | `@artifacts/<decisionId>-alternatives.html` | `NO_VIABLE_ALTERNATIVE` |
 | 6 | Select provisionally | `@artifacts/<decisionId>-alternatives.html`, input (selection policy, owner approval) | — | `CHOICE_REQUIRED` |

@@ -35,11 +35,11 @@ Every invocation requires:
 
 | Alias | Resolves to | Bind | Required |
 | --- | --- | --- | --- |
-| `@runtime` | `<Source>/.worktrees/sessions/central-runtime/owner.json` | fingerprint + generation | Required: The shared runtime owner: inventory, generation, health. |
-| `@ports/<project>` | `<Source>/.workspaces/ports/<project>.json` | fingerprint | Required: Port projection the runtime binds to. |
-| `@identity` | `<Source>/.workspaces/device-state.json` | fingerprint; the sealed keys under &lt;Source&gt;/.workspaces/local/credentials/*.key.enc are bound by name and never read | Required: Credential handles by name; values never appear. |
-| `@declaration/<project>/<role>` | `<Source>/.workspaces/projects/<project>/<role>.json` | fingerprint | Optional: Which projects the shared services serve. |
-| `@artifacts` | `input.project.artifactRootRef; convention <Source>/.worktrees/sessions/<invocationId>/artifacts/` | fingerprint per artifact; every artifact an operator writes is registered in output.artifactRefs | Required: Where the operation receipt is written. |
+| `@worktrees/sessions/central-runtime` | `<Source>/.worktrees/sessions/central-runtime/owner.json  (generation-<n>-ready.json and logs/ beside it)` | fingerprint + generation | Required: The shared runtime owner: inventory, generation, health. |
+| `@workspaces/ports/<project>` | `<Source>/.workspaces/ports/<project>.json` | fingerprint | Required: Port projection the runtime binds to. |
+| `@workspaces/device-state` | `<Source>/.workspaces/device-state.json  (sealed keys live in <Source>/.workspaces/local/credentials/*.key.enc and are bound by name, never read)` | fingerprint | Required: Credential handles by name; values never appear. |
+| `@workspaces/projects/<project>/<role>` | `<Source>/.workspaces/projects/<project>/<role>.json` | fingerprint | Optional: Which projects the shared services serve. |
+| `@artifacts` | `input.project.artifactRootRef; convention <Source>/.worktrees/sessions/<invocationId>/artifacts/  (receipt, named artifacts, captures)` | fingerprint per artifact; every artifact written is registered in output.artifactRefs | Required: Where the operation receipt is written. |
 
 ## Shared infrastructure only
 

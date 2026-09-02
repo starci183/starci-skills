@@ -14,13 +14,13 @@ operator only performs the write, or reports precisely why it did not.
 
 | # | Step | Reads | Writes | Stops with |
 | --- | --- | --- | --- | --- |
-| 1 | Validate input and resume | input, `@receipt/workspace-route-binding/<invocationId>`, `@route/<project>/<role>` (the frozen head), `@remote/<project>/<role>` (the remote observation) | — | `INVALID_INPUT`, `SOURCE_DRIFT`, `NO_PROGRESS` |
-| 2 | Bind the route | `@receipt/workspace-route-binding/<invocationId>` (verified checkout, its head, its routed policy), `@route/<project>/<role>` | — | `ROUTE_UNVERIFIED` |
+| 1 | Validate input and resume | input, `@receipt/workspace-route-binding/<invocationId>`, `@workspaces/local/routes/<project>/<role>` (the frozen head), `@external/remote/<project>/<role>` (the remote observation) | — | `INVALID_INPUT`, `SOURCE_DRIFT`, `NO_PROGRESS` |
+| 2 | Bind the route | `@receipt/workspace-route-binding/<invocationId>` (verified checkout, its head, its routed policy), `@workspaces/local/routes/<project>/<role>` | — | `ROUTE_UNVERIFIED` |
 | 3 | Bind the approval | input (the approval naming this boundary unit, completion proof) | — | `APPROVAL_MISSING` |
-| 4 | Verify the tree | `@route/<project>/<role>` (observed head, dirty paths, declared write roots, every branch, routed policy) | — | `DIRTY_OUTSIDE_BOUNDARY`, `BRANCH_POLICY_VIOLATION` |
-| 5 | Run the hooks | `@hooks/<project>/<role>` (the hook inventory, including `pre-push`) | — | `HOOK_BLOCKED` |
-| 6 | Push non-force | `@route/<project>/<role>` (approved heads, declared ref), `@remote/<project>/<role>` (the observed remote head) | `@remote/<project>/<role>` | `NON_FAST_FORWARD` |
-| 7 | Push the continuation tag | input (the requested tag), `@remote/<project>/<role>` (the heads this publication pushed) | `@remote/<project>/<role>` (the continuation tag) | — |
+| 4 | Verify the tree | `@workspaces/local/routes/<project>/<role>` (observed head, dirty paths, declared write roots, every branch, routed policy) | — | `DIRTY_OUTSIDE_BOUNDARY`, `BRANCH_POLICY_VIOLATION` |
+| 5 | Run the hooks | `@workspaces/<project>/<role>/.husky` (the hook inventory, including `pre-push`) | — | `HOOK_BLOCKED` |
+| 6 | Push non-force | `@workspaces/local/routes/<project>/<role>` (approved heads, declared ref), `@external/remote/<project>/<role>` (the observed remote head) | `@external/remote/<project>/<role>` | `NON_FAST_FORWARD` |
+| 7 | Push the continuation tag | input (the requested tag), `@external/remote/<project>/<role>` (the heads this publication pushed) | `@external/remote/<project>/<role>` (the continuation tag) | — |
 | 8 | Emit and stop | everything above | `@artifacts/publication.json` | — |
 
 Validation rejects a route receipt bound elsewhere, an approval for another unit, an inventory without

@@ -1,23 +1,11 @@
 {
   "schemaVersion": 8,
-  "note": "Closed registry of reference aliases. An operator names what it reads by alias; the alias says exactly where that thing lives, how it is bound, and who may write it. `<Source>` is the host repository that owns this .claude (its parent directory). `<checkout:project/role>` is the diskPath of the hydrated route .workspaces/local/routes/<project>/<role>/config.json. A segment in angle brackets is a parameter the invocation supplies. `kind` file/dir/checkout resolve on disk; service resolves through a runtime endpoint; caller-supplied comes from the input.",
+  "note": "Closed registry of reference aliases. An alias reads like the place it names: @workspaces/fe and @workspaces/be are the bound project's routed checkouts, @knowledge/ui and @worktrees/businesses mirror the folders, @npm is the registry, @external/{remote,ghcr,github-actions,minio} are services, @grammar is the @starci/grammar package as the app resolves it. `<Source>` is the host repository that owns this .claude. A sub-path after a registered alias narrows it; a segment in angle brackets is supplied by the invocation. Resolution picks the longest registered prefix.",
   "aliases": {
-    "@source": {
-      "params": [
-        "project",
-        "role"
-      ],
-      "kind": "checkout",
-      "resolvesTo": "<checkout:project/role>",
-      "scheme": "source://<repository>",
-      "bind": "fingerprint + sourceHead (git rev-parse HEAD of the checkout)",
-      "writers": [],
-      "purpose": "A routed repository checkout named by explicit project and role. Use it only for a cross-project read; the checkouts of the bound project are @fe and @be. Observation is evidence discovery, never permission to mutate."
-    },
-    "@fe": {
+    "@workspaces/fe": {
       "params": [],
       "kind": "checkout",
-      "resolvesTo": "<checkout:input.project.id/fe>  (the frontend checkout of the project this invocation binds)",
+      "resolvesTo": "<checkout:input.project.id/fe>  (diskPath from <Source>/.workspaces/local/routes/<project>/fe/config.json); a sub-path narrows: @workspaces/fe/.husky, @workspaces/fe/package.json#scripts",
       "scheme": "source://<repository>",
       "bind": "fingerprint + sourceHead (git rev-parse HEAD of the checkout)",
       "writers": [
@@ -25,10 +13,10 @@
       ],
       "purpose": "The routed frontend checkout of the bound project."
     },
-    "@be": {
+    "@workspaces/be": {
       "params": [],
       "kind": "checkout",
-      "resolvesTo": "<checkout:input.project.id/be>  (the backend checkout of the project this invocation binds)",
+      "resolvesTo": "<checkout:input.project.id/be>  (diskPath from <Source>/.workspaces/local/routes/<project>/be/config.json); a sub-path narrows: @workspaces/be/.husky, @workspaces/be/package.json#scripts",
       "scheme": "source://<repository>",
       "bind": "fingerprint + sourceHead (git rev-parse HEAD of the checkout)",
       "writers": [
@@ -36,130 +24,175 @@
       ],
       "purpose": "The routed backend checkout of the bound project."
     },
-    "@declaration": {
+    "@workspaces": {
       "params": [
         "project",
         "role"
       ],
-      "kind": "file",
+      "kind": "checkout",
+      "resolvesTo": "<checkout:project/role>  (any routed checkout named explicitly, for cross-project reads: @workspaces/nivo/fe)",
+      "scheme": "source://<repository>",
+      "bind": "fingerprint + sourceHead (git rev-parse HEAD of the checkout)",
+      "writers": [],
+      "purpose": "A checkout of another project. The bound project's own are @workspaces/fe and @workspaces/be."
+    },
+    "@workspaces/projects": {
+      "params": [],
+      "kind": "dir",
       "resolvesTo": "<Source>/.workspaces/projects/<project>/<role>.json",
       "scheme": "workspace://declarations/<project>",
       "bind": "fingerprint",
       "writers": [],
-      "purpose": "Portable route declaration, tracked. The only place a route is declared."
+      "purpose": "Portable route declarations, tracked. The only place a route is declared."
     },
-    "@route": {
-      "params": [
-        "project",
-        "role"
-      ],
-      "kind": "file",
+    "@workspaces/local/routes": {
+      "params": [],
+      "kind": "dir",
       "resolvesTo": "<Source>/.workspaces/local/routes/<project>/<role>/config.json",
       "scheme": "workspace://routes/<project>/<role>",
       "bind": "fingerprint",
       "writers": [
         "workspace.bind"
       ],
-      "purpose": "Machine-local hydrated route; projects the declaration onto this disk. Ignored by Git."
+      "purpose": "Machine-local hydrated routes; project the declarations onto this disk. Ignored by Git."
     },
-    "@ports": {
-      "params": [
-        "project"
-      ],
-      "kind": "file",
+    "@workspaces/ports": {
+      "params": [],
+      "kind": "dir",
       "resolvesTo": "<Source>/.workspaces/ports/<project>.json",
       "scheme": "workspace://ports/<project>",
       "bind": "fingerprint",
       "writers": [],
       "purpose": "Port projection: project offset and application slots. Endpoints are derived, never typed."
     },
-    "@identity": {
+    "@workspaces/device-state": {
       "params": [],
       "kind": "file",
-      "resolvesTo": "<Source>/.workspaces/device-state.json",
+      "resolvesTo": "<Source>/.workspaces/device-state.json  (sealed keys live in <Source>/.workspaces/local/credentials/*.key.enc and are bound by name, never read)",
       "scheme": "workspace://identity/device",
-      "bind": "fingerprint; the sealed keys under <Source>/.workspaces/local/credentials/*.key.enc are bound by name and never read",
+      "bind": "fingerprint",
       "writers": [],
       "purpose": "Machine identity and the encrypted credential roster reference."
     },
-    "@runtime": {
-      "params": [],
-      "kind": "file",
-      "resolvesTo": "<Source>/.worktrees/sessions/central-runtime/owner.json",
-      "scheme": "runtime://owner",
-      "bind": "fingerprint + generation",
-      "writers": [
-        "platform.operate"
-      ],
-      "purpose": "The shared runtime owner registry: generation, status, endpoints, health evidence. Callers consume, never own."
-    },
-    "@knowledge": {
+    "@npm": {
       "params": [
-        "group"
+        "package"
       ],
-      "kind": "dir",
-      "resolvesTo": "<Source>/.claude/knowledge/<group>/  (every canonical .md inside; a single file may be named as <group>/<topic>.md)",
-      "scheme": "knowledge://<group>/<topic>",
-      "bind": "fingerprint per file; the rule inventory is the set of `## PREFIX-n` headings across the folder's canonical files",
+      "kind": "service",
+      "resolvesTo": "the npm registry entry for <package>, e.g. @npm/@starci/grammar@0.3.0",
+      "scheme": "npm://<package>@<version>",
+      "bind": "version + tarball integrity",
       "writers": [],
-      "purpose": "Canonical English knowledge: ui/composition, ui/presentation, ui/proof, grammars/<family>, patterns/fe, patterns/be. The .vi.md mirror is never bound."
+      "purpose": "Published packages. A version is the binding; latest is never a binding."
     },
-    "@grammar-src": {
+    "@grammar": {
       "params": [],
       "kind": "checkout",
-      "resolvesTo": "<@fe>/packages/grammar  (the published @starci/grammar package source: renderers, props, data-contract claims, core/styles.css)",
-      "scheme": "grammar://starci-core",
-      "bind": "fingerprint of packages/grammar/package.json + the @fe checkout head",
+      "resolvesTo": "the @starci/grammar package as the bound app resolves it: `file:packages/grammar` inside @workspaces/fe today (source 0.4.0), or @npm/@starci/grammar@<version> (0.3.0 published); the receipt records which",
+      "scheme": "grammar://starci-core@<version>",
+      "bind": "package.json version + the resolved location's fingerprint (checkout head for file:, tarball integrity for npm)",
       "writers": [],
-      "purpose": "The Grammar as it runs. The only authority for what a component owns, what it claims, and what props exist."
+      "purpose": "The Grammar as it runs: renderers, props, owned relationships, data-contract claims, core/styles.css. The only fact about what a component owns."
     },
-    "@grammar-law": {
-      "params": [
-        "family"
-      ],
+    "@knowledge/ui": {
+      "params": [],
       "kind": "dir",
-      "resolvesTo": "<Source>/.claude/knowledge/grammars/<family>/  (the family's knowledge: family, consumption, components, states, composition, and the CORE-* anatomy topics)",
-      "scheme": "knowledge://grammars/<family>",
-      "bind": "fingerprint per file; rule inventory = every `## PREFIX-n` heading across the folder",
+      "resolvesTo": "<Source>/.claude/knowledge/ui/  (composition/, presentation/, proof/; a sub-path narrows: @knowledge/ui/presentation)",
+      "scheme": "knowledge://ui/<group>/<topic>",
+      "bind": "fingerprint per file; rule inventory = every `## PREFIX-n` heading in the folder",
       "writers": [],
-      "purpose": "How the family is meant to realize Common. Law about the Grammar, never the Grammar itself; where the two disagree, @grammar-src is the fact and @grammar-law is the finding."
+      "purpose": "Universal UI law: what a tree must contain, which value an app boundary takes, what is only true once rendered."
     },
-    "@business": {
-      "params": [
-        "featureId"
-      ],
-      "kind": "file",
-      "resolvesTo": "<Source>/.worktrees/businesses/features/<featureId>/model.json",
+    "@knowledge/grammars": {
+      "params": [],
+      "kind": "dir",
+      "resolvesTo": "<Source>/.claude/knowledge/grammars/  (one folder per family: @knowledge/grammars/starci)",
+      "scheme": "knowledge://grammars/<family>/<topic>",
+      "bind": "fingerprint per file; rule inventory = every `## PREFIX-n` heading in the folder",
+      "writers": [],
+      "purpose": "Law about a family: how it realizes Common. Never the Grammar itself; where it disagrees with @grammar, @grammar is the fact and this is the finding."
+    },
+    "@knowledge/patterns": {
+      "params": [],
+      "kind": "dir",
+      "resolvesTo": "<Source>/.claude/knowledge/patterns/  (fe/, be/)",
+      "scheme": "knowledge://patterns/<side>/<topic>",
+      "bind": "fingerprint per file; rule inventory = every `## PREFIX-n` heading in the folder",
+      "writers": [],
+      "purpose": "Code conventions counted from the two live sources; a rule cites two real paths."
+    },
+    "@worktrees/businesses": {
+      "params": [],
+      "kind": "dir",
+      "resolvesTo": "<Source>/.worktrees/businesses/  (features/<featureId>/model.json; business-registry-v1.json is the head index; objects/sha256/ the content store)",
       "scheme": "business://<featureId>",
-      "bind": "content address from <Source>/.worktrees/businesses/business-registry-v1.json (featureHeads.<featureId>.head) with its authorityStatus",
+      "bind": "content address from business-registry-v1.json featureHeads.<featureId>.head, with authorityStatus",
       "writers": [
         "business.decide"
       ],
-      "purpose": "The business promise head. The businesses root is its own git worktree; a head binds by content address even before its commit lands."
+      "purpose": "Business promise heads. Its own git worktree; a head binds by content address even before its commit lands."
     },
-    "@session": {
-      "params": [
-        "sessionId"
-      ],
+    "@worktrees/sessions": {
+      "params": [],
       "kind": "dir",
-      "resolvesTo": "<Source>/.worktrees/sessions/<sessionId>/",
+      "resolvesTo": "<Source>/.worktrees/sessions/<sessionId>/  (leases, inventories, blockers, and each invocation's artifacts/)",
       "scheme": "session://<sessionId>",
       "bind": "fingerprint per file read",
       "writers": [
         "*"
       ],
-      "purpose": "Per-session working records: leases, inventories, blockers, and the artifacts of that session's invocations."
+      "purpose": "Per-session working records."
+    },
+    "@worktrees/sessions/central-runtime": {
+      "params": [],
+      "kind": "file",
+      "resolvesTo": "<Source>/.worktrees/sessions/central-runtime/owner.json  (generation-<n>-ready.json and logs/ beside it)",
+      "scheme": "runtime://owner",
+      "bind": "fingerprint + generation",
+      "writers": [
+        "platform.operate"
+      ],
+      "purpose": "The shared runtime owner: generation, status, endpoints, health evidence. Callers consume, never own."
+    },
+    "@worktrees/uat": {
+      "params": [],
+      "kind": "dir",
+      "resolvesTo": "<Source>/.worktrees/uat/<flow>/<case>/  (snapshot.json, result.json)",
+      "scheme": "uat://<flow>/<case>",
+      "bind": "fingerprint of snapshot.json and result.json",
+      "writers": [
+        "uat.verify"
+      ],
+      "purpose": "Canonical UAT pair per flow and case. Never carries a credential."
+    },
+    "@worktrees/debts": {
+      "params": [],
+      "kind": "dir",
+      "resolvesTo": "<Source>/.worktrees/debts/  (be.md, fe.md, per-item files)",
+      "scheme": "debt://<file>",
+      "bind": "fingerprint per file",
+      "writers": [],
+      "purpose": "Owner-approved quality debts. A debt without a live approval here is not a debt."
+    },
+    "@worktrees/_templates": {
+      "params": [],
+      "kind": "dir",
+      "resolvesTo": "<Source>/.worktrees/_templates/  (businesses/, debts/, sessions/, uat/)",
+      "scheme": "template://<kind>",
+      "bind": "fingerprint per file",
+      "writers": [],
+      "purpose": "Authority templates for new heads, debts, sessions, and UAT pairs. Consumed, never modified."
     },
     "@artifacts": {
       "params": [],
       "kind": "caller-supplied",
-      "resolvesTo": "input.project.artifactRootRef; convention <Source>/.worktrees/sessions/<invocationId>/artifacts/",
+      "resolvesTo": "input.project.artifactRootRef; convention <Source>/.worktrees/sessions/<invocationId>/artifacts/  (receipt, named artifacts, captures)",
       "scheme": "artifact://<invocationId>/<name>",
-      "bind": "fingerprint per artifact; every artifact an operator writes is registered in output.artifactRefs",
+      "bind": "fingerprint per artifact; every artifact written is registered in output.artifactRefs",
       "writers": [
         "*"
       ],
-      "purpose": "The only place an operator writes: its receipt and named artifacts. Nothing else is a write."
+      "purpose": "The only place an operator writes: its receipt and named artifacts, including audit captures."
     },
     "@receipt": {
       "params": [
@@ -167,106 +200,27 @@
         "invocationId"
       ],
       "kind": "file",
-      "resolvesTo": "<@artifacts of invocation <invocationId>>/<receiptType>.json (the receipt file that invocation registered in output.artifactRefs)",
+      "resolvesTo": "<@artifacts of invocation <invocationId>>/<receiptType>.json  (the receipt file that invocation registered in output.artifactRefs)",
       "scheme": "receipt://<receiptType>/<invocationId>",
       "bind": "fingerprint + the sourceHead the receipt binds",
       "writers": [],
-      "purpose": "A predecessor's typed receipt, consumed unchanged: business-promise-authority, architecture-decision, fe-direction-decision, fe-presentation-resolution, fe-source-application, fe-surface-audit, backend-implementation, quality-verification, uat-flow-verification, release-deployment, platform-operation-receipt, content-generation-receipt, git-publication, workspace-route-binding."
+      "purpose": "A predecessor's typed receipt, read whole and unchanged."
     },
-    "@uat": {
-      "params": [
-        "flow",
-        "case"
-      ],
-      "kind": "dir",
-      "resolvesTo": "<Source>/.worktrees/uat/<flow>/<case>/",
-      "scheme": "uat://<flow>/<case>",
-      "bind": "fingerprint of snapshot.json and result.json",
-      "writers": [
-        "uat.verify"
-      ],
-      "purpose": "Canonical UAT pair per flow and case: the frozen snapshot and the published result. Never carries a credential."
-    },
-    "@debts": {
-      "params": [],
-      "kind": "dir",
-      "resolvesTo": "<Source>/.worktrees/debts/",
-      "scheme": "debt://<file>",
-      "bind": "fingerprint per file",
-      "writers": [],
-      "purpose": "Owner-approved quality debts (be.md, fe.md, and per-item files). A debt without a live approval here is not a debt."
-    },
-    "@templates": {
-      "params": [],
-      "kind": "dir",
-      "resolvesTo": "<Source>/.worktrees/_templates/{businesses,debts,sessions,uat}/",
-      "scheme": "template://<kind>",
-      "bind": "fingerprint per file",
-      "writers": [],
-      "purpose": "Authority templates for new business heads, debts, sessions, and UAT pairs. Consumed, never modified."
-    },
-    "@screenshots": {
-      "params": [],
-      "kind": "dir",
-      "resolvesTo": "<Source>/.artifacts/",
-      "scheme": "visual://<file>",
-      "bind": "fingerprint per image",
-      "writers": [],
-      "purpose": "Pixel evidence from earlier audits. Evidence only; never a layout template."
-    },
-    "@hooks": {
-      "params": [
-        "project",
-        "role"
-      ],
-      "kind": "dir",
-      "resolvesTo": "<checkout:project/role>/.husky/",
-      "scheme": "source://<repository>/.husky",
-      "bind": "fingerprint per hook file at the checkout head",
-      "writers": [],
-      "purpose": "The pre-commit and pre-push hooks a publish must run. A blocked hook is a typed failure, never a reason to bypass."
-    },
-    "@gates": {
-      "params": [
-        "project",
-        "role"
-      ],
-      "kind": "file",
-      "resolvesTo": "<checkout:project/role>/package.json#scripts plus the configs it names (eslint, tsconfig, jest/vitest, sonar-project.properties)",
-      "scheme": "config://<repository>/<gate>",
-      "bind": "fingerprint of each file at the checkout head",
-      "writers": [],
-      "purpose": "The pinned gate commands and their configuration. A gate is measured with these, never with a substitute."
-    },
-    "@remote": {
+    "@external/remote": {
       "params": [
         "project",
         "role"
       ],
       "kind": "service",
-      "resolvesTo": "the origin URL recorded in @route/<project>/<role> (repository.gitRepository)",
+      "resolvesTo": "the origin URL in @workspaces/local/routes/<project>/<role> (repository.gitRepository)",
       "scheme": "remote://<repository>/<branch>",
       "bind": "observed remote head (git ls-remote) at invocation time",
       "writers": [
         "git.publish"
       ],
-      "purpose": "The publication target. Fast-forwardness is decided against this observation."
+      "purpose": "The publication target; fast-forwardness is decided against this observation."
     },
-    "@content": {
-      "params": [
-        "contentId",
-        "locale"
-      ],
-      "kind": "service",
-      "resolvesTo": "MinIO object contents/<contentId>/<locale>.json through the routed runtime",
-      "scheme": "content://<contentId>/<locale>",
-      "bind": "fingerprint of the fetched object",
-      "writers": [
-        "content.generate"
-      ],
-      "purpose": "Authored lesson content as served, not as drafted."
-    },
-    "@oci": {
+    "@external/ghcr": {
       "params": [
         "image"
       ],
@@ -279,7 +233,7 @@
       ],
       "purpose": "Immutable release images. A tag is never a binding; a digest is."
     },
-    "@workflow-run": {
+    "@external/github-actions": {
       "params": [
         "runId"
       ],
@@ -288,7 +242,21 @@
       "scheme": "workflow-run://github-actions/<runId>",
       "bind": "run id + conclusion",
       "writers": [],
-      "purpose": "Deployment and verification evidence produced by CI, read only."
+      "purpose": "CI evidence of a build or rollout, read only."
+    },
+    "@external/minio": {
+      "params": [
+        "contentId",
+        "locale"
+      ],
+      "kind": "service",
+      "resolvesTo": "MinIO object contents/<contentId>/<locale>.json through the routed runtime",
+      "scheme": "content://<contentId>/<locale>",
+      "bind": "fingerprint of the fetched object",
+      "writers": [
+        "content.generate"
+      ],
+      "purpose": "Authored lesson content as served, not as drafted."
     }
   }
 }

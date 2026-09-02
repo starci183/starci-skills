@@ -43,13 +43,13 @@ receipt is durable, and a durable record of a capability is a leaked credential 
 
 | # | Step | Reads | Writes | Stops with |
 | --- | --- | --- | --- | --- |
-| 1 | Validate input and resume | input, `@runtime` (the frozen generation binding) | — | `INVALID_INPUT`, `SOURCE_DRIFT`, `NO_PROGRESS` |
-| 2 | Bind authority | `@runtime` (the inventory fingerprint and generation), `@identity` (each capability handle with its custody evidence), `@declaration/<project>/<role>` (which projects the shared services serve), input (the approval and its plan hash) | — | `AUTHORITY_DRIFT`, `CAPABILITY_MISSING` |
-| 3 | Recheck the inventory | `@runtime` (the declared resources, re-observed once) | — | `INVENTORY_DRIFT` |
-| 4 | Resolve the port claims | `@ports/<project>` (the claimed ports), `@runtime` (their observed holders) | — | `PORT_CONFLICT` |
-| 5 | Derive the delta | `@runtime` (the observed state), input (the desired state) | — | — |
-| 6 | Apply the approved delta | `@runtime` (one resource at a time), `@identity` (credential handles by name) | `@runtime` | `EFFECT_UNAUTHORIZED`, `SERVICE_UNAVAILABLE` |
-| 7 | Prove every required check | `@runtime` (the re-read service and the branch's complete proof set) | — | `PROOF_FAILED` |
+| 1 | Validate input and resume | input, `@worktrees/sessions/central-runtime` (the frozen generation binding) | — | `INVALID_INPUT`, `SOURCE_DRIFT`, `NO_PROGRESS` |
+| 2 | Bind authority | `@worktrees/sessions/central-runtime` (the inventory fingerprint and generation), `@workspaces/device-state` (each capability handle with its custody evidence), `@workspaces/projects/<project>/<role>` (which projects the shared services serve), input (the approval and its plan hash) | — | `AUTHORITY_DRIFT`, `CAPABILITY_MISSING` |
+| 3 | Recheck the inventory | `@worktrees/sessions/central-runtime` (the declared resources, re-observed once) | — | `INVENTORY_DRIFT` |
+| 4 | Resolve the port claims | `@workspaces/ports/<project>` (the claimed ports), `@worktrees/sessions/central-runtime` (their observed holders) | — | `PORT_CONFLICT` |
+| 5 | Derive the delta | `@worktrees/sessions/central-runtime` (the observed state), input (the desired state) | — | — |
+| 6 | Apply the approved delta | `@worktrees/sessions/central-runtime` (one resource at a time), `@workspaces/device-state` (credential handles by name) | `@worktrees/sessions/central-runtime` | `EFFECT_UNAUTHORIZED`, `SERVICE_UNAVAILABLE` |
+| 7 | Prove every required check | `@worktrees/sessions/central-runtime` (the re-read service and the branch's complete proof set) | — | `PROOF_FAILED` |
 | 8 | Emit and stop | everything above | `@artifacts/<branch>.receipt.json` | — |
 
 Validation rejects a stale source binding, a cross-filed effect or check, a narrowed proof set, an

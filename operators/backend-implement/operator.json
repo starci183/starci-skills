@@ -16,7 +16,7 @@
   },
   "refs": [
     {
-      "alias": "@business/<featureId>",
+      "alias": "@worktrees/businesses/<featureId>",
       "required": true,
       "purpose": "The only source of business behaviour."
     },
@@ -31,7 +31,7 @@
       "purpose": "Sibling patterns: the only source of valid conventions."
     },
     {
-      "alias": "@be",
+      "alias": "@workspaces/be",
       "required": true,
       "purpose": "The backend checkout the boundary belongs to; the one place this operator writes product source."
     },

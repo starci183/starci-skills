@@ -25,12 +25,12 @@ written down is a hint that gets followed the moment the declared route looks in
 
 | # | Step | Reads | Writes | Stops with |
 | --- | --- | --- | --- | --- |
-| 1 | Validate input and resume | input, `@route/<project>/<role>` (the observed Source head) | — | `INVALID_INPUT`, `SOURCE_DRIFT`, `NO_PROGRESS` |
-| 2 | Bind bootstrap and identity | `@identity` (machine identity and the sealed credential roster), input (Source bootstrap entries, agent discovery) | — | `IDENTITY_UNVERIFIED` |
-| 3 | Resolve the route | `@declaration/<project>/<role>` (the portable declaration for exactly this project and role), `@route/<project>/<role>` (the hydrated local route) | — | `ROUTE_UNDECLARED`, `ROUTE_UNHYDRATED`, `ROUTE_MISMATCH` |
+| 1 | Validate input and resume | input, `@workspaces/local/routes/<project>/<role>` (the observed Source head) | — | `INVALID_INPUT`, `SOURCE_DRIFT`, `NO_PROGRESS` |
+| 2 | Bind bootstrap and identity | `@workspaces/device-state` (machine identity and the sealed credential roster), input (Source bootstrap entries, agent discovery) | — | `IDENTITY_UNVERIFIED` |
+| 3 | Resolve the route | `@workspaces/projects/<project>/<role>` (the portable declaration for exactly this project and role), `@workspaces/local/routes/<project>/<role>` (the hydrated local route) | — | `ROUTE_UNDECLARED`, `ROUTE_UNHYDRATED`, `ROUTE_MISMATCH` |
 | 4 | Reject every hint | input (`context.hints`) | — | — |
-| 5 | Verify the checkout | `@route/<project>/<role>` (the resolved route, the observed checkout, the routed Git policy, the working tree) | — | `BRANCH_POLICY_VIOLATION`, `CHECKOUT_DIRTY` |
-| 6 | Bind the runtime the caller consumes | `@runtime` (the owner registry, its generation and health evidence), `@ports/<project>` (`workspace-route-port-projection`) | — | `ENDPOINT_AUTHORITY_STALE`, `RUNTIME_NOT_READY` |
+| 5 | Verify the checkout | `@workspaces/local/routes/<project>/<role>` (the resolved route, the observed checkout, the routed Git policy, the working tree) | — | `BRANCH_POLICY_VIOLATION`, `CHECKOUT_DIRTY` |
+| 6 | Bind the runtime the caller consumes | `@worktrees/sessions/central-runtime` (the owner registry, its generation and health evidence), `@workspaces/ports/<project>` (`workspace-route-port-projection`) | — | `ENDPOINT_AUTHORITY_STALE`, `RUNTIME_NOT_READY` |
 | 7 | Bind provenance and freshness | input (the redacted conversation head), `@artifacts` (the cached receipt) | — | — |
 | 8 | Emit and stop | everything above | `@artifacts/route-receipt.json` | — |
 

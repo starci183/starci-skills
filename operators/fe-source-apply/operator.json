@@ -21,7 +21,7 @@
       "purpose": "The only source of values this operator may write."
     },
     {
-      "alias": "@fe",
+      "alias": "@workspaces/fe",
       "required": true,
       "purpose": "The checkout the declared write set lands on; the one place this operator writes product source."
     },

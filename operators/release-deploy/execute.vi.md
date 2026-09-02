@@ -40,15 +40,15 @@ người cố tình.
 | # | Bước | Đọc | Ghi | Dừng với |
 | --- | --- | --- | --- | --- |
 | 1 | Kiểm tra input và resume | input, `@receipt/quality-verification/<invocationId>` (giấy phép đã khai) | — | `INVALID_INPUT`, `AUTHORIZATION_MISSING`, `NO_PROGRESS` |
-| 2 | Ràng release và kế hoạch | input (ý định đã khai), `@oci/<image>` (release và target đã đóng băng), `@workflow-run/<runId>` (trạng thái quan sát được) | — | `MANIFEST_INVALID`, `APPROVAL_REQUIRED` |
-| 3 | Khởi tạo execution root và phân giải credential | `@identity` (tên các credential), input (execution root dựng lại được) | — | `CREDENTIAL_UNAVAILABLE` |
-| 4 | Chuẩn bị host, publish artifact, migrate, và hoà hợp domain | `@oci/<image>` (artifact đã publish theo digest), `@workflow-run/<runId>` (revision quan sát được của từng ranh giới trước và sau) | — | `HOST_UNAVAILABLE`, `ARTIFACT_MISSING`, `MIGRATION_BLOCKED`, `DOMAIN_UNRECONCILED` |
-| 5 | Rollout | `@oci/<image>` (revision của target trước và sau), `@workflow-run/<runId>` (bằng chứng rollout của kế hoạch đã biên dịch) | — | `ROLLOUT_FAILED` |
-| 6 | Giám sát dưới deadline có chặn và backoff | `@workflow-run/<runId>` (các lần quan sát probe suốt cửa sổ) | — | — |
-| 7 | Phát hiện trôi dạt đồng thời trước khi hành động | `@oci/<image>` (release đang hoạt động, release này, release nó thay thế, theo digest) | — | `CONCURRENT_DRIFT` |
-| 8 | Đi vào nhánh phục hồi khi thất bại kéo dài | input (các hành động thuận nghịch đã duyệt), `@oci/<image>` (chính danh tính release đó) | — | `RECOVERY_EXHAUSTED` |
-| 9 | Đi vào nhánh rollback khi phục hồi không giữ nổi | `@oci/<image>` (đúng release an toàn đó, theo digest), input (trạng thái dữ liệu và schema hiện tại) | — | `ROLLBACK_IDENTITY_MISSING` |
-| 10 | Chứng minh trạng thái ổn định rồi dừng | `@oci/<image>` (digest bất biến), input (các target đã khai và bị thay thế), `@workflow-run/<runId>` (mọi probe đã khai) | `@artifacts/deployment-receipt.json` | `STEADY_STATE_UNPROVEN` |
+| 2 | Ràng release và kế hoạch | input (ý định đã khai), `@external/ghcr/<image>` (release và target đã đóng băng), `@external/github-actions/<runId>` (trạng thái quan sát được) | — | `MANIFEST_INVALID`, `APPROVAL_REQUIRED` |
+| 3 | Khởi tạo execution root và phân giải credential | `@workspaces/device-state` (tên các credential), input (execution root dựng lại được) | — | `CREDENTIAL_UNAVAILABLE` |
+| 4 | Chuẩn bị host, publish artifact, migrate, và hoà hợp domain | `@external/ghcr/<image>` (artifact đã publish theo digest), `@external/github-actions/<runId>` (revision quan sát được của từng ranh giới trước và sau) | — | `HOST_UNAVAILABLE`, `ARTIFACT_MISSING`, `MIGRATION_BLOCKED`, `DOMAIN_UNRECONCILED` |
+| 5 | Rollout | `@external/ghcr/<image>` (revision của target trước và sau), `@external/github-actions/<runId>` (bằng chứng rollout của kế hoạch đã biên dịch) | — | `ROLLOUT_FAILED` |
+| 6 | Giám sát dưới deadline có chặn và backoff | `@external/github-actions/<runId>` (các lần quan sát probe suốt cửa sổ) | — | — |
+| 7 | Phát hiện trôi dạt đồng thời trước khi hành động | `@external/ghcr/<image>` (release đang hoạt động, release này, release nó thay thế, theo digest) | — | `CONCURRENT_DRIFT` |
+| 8 | Đi vào nhánh phục hồi khi thất bại kéo dài | input (các hành động thuận nghịch đã duyệt), `@external/ghcr/<image>` (chính danh tính release đó) | — | `RECOVERY_EXHAUSTED` |
+| 9 | Đi vào nhánh rollback khi phục hồi không giữ nổi | `@external/ghcr/<image>` (đúng release an toàn đó, theo digest), input (trạng thái dữ liệu và schema hiện tại) | — | `ROLLBACK_IDENTITY_MISSING` |
+| 10 | Chứng minh trạng thái ổn định rồi dừng | `@external/ghcr/<image>` (digest bất biến), input (các target đã khai và bị thay thế), `@external/github-actions/<runId>` (mọi probe đã khai) | `@artifacts/deployment-receipt.json` | `STEADY_STATE_UNPROVEN` |
 
 Khâu kiểm tra từ chối giấy phép lạ hoặc hết hạn, manifest ghim nơi khác, quan sát của target khác,
 danh tính bị thay thế không khớp release đang chạy, deadline không chứa nổi cửa sổ của nó, danh tính

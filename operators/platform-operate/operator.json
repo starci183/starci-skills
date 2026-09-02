@@ -16,22 +16,22 @@
   },
   "refs": [
     {
-      "alias": "@runtime",
+      "alias": "@worktrees/sessions/central-runtime",
       "required": true,
       "purpose": "The shared runtime owner: inventory, generation, health."
     },
     {
-      "alias": "@ports/<project>",
+      "alias": "@workspaces/ports/<project>",
       "required": true,
       "purpose": "Port projection the runtime binds to."
     },
     {
-      "alias": "@identity",
+      "alias": "@workspaces/device-state",
       "required": true,
       "purpose": "Credential handles by name; values never appear."
     },
     {
-      "alias": "@declaration/<project>/<role>",
+      "alias": "@workspaces/projects/<project>/<role>",
       "required": false,
       "purpose": "Which projects the shared services serve."
     },

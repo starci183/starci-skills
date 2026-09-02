@@ -14,27 +14,27 @@
   },
   "refs": [
     {
-      "alias": "@declaration/<project>/<role>",
+      "alias": "@workspaces/projects/<project>/<role>",
       "required": true,
       "purpose": "The portable route declaration; the only route authority."
     },
     {
-      "alias": "@route/<project>/<role>",
+      "alias": "@workspaces/local/routes/<project>/<role>",
       "required": true,
       "purpose": "The hydrated route this machine projects the declaration onto."
     },
     {
-      "alias": "@identity",
+      "alias": "@workspaces/device-state",
       "required": true,
       "purpose": "Machine identity and the sealed roster, bound by name."
     },
     {
-      "alias": "@ports/<project>",
+      "alias": "@workspaces/ports/<project>",
       "required": false,
       "purpose": "Port projection when the caller consumes the runtime."
     },
     {
-      "alias": "@runtime",
+      "alias": "@worktrees/sessions/central-runtime",
       "required": false,
       "purpose": "Runtime owner registry, bound only when runtimeNeed is consume."
     },

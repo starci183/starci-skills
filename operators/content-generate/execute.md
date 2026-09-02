@@ -58,13 +58,13 @@ separate refusals: shared executions, inherited turns, and producer rationale.
 
 | # | Step | Reads | Writes | Stops with |
 | --- | --- | --- | --- | --- |
-| 1 | Validate input and resume | input, `@receipt/content-generation-receipt/<invocationId>`, `@content/<contentId>/<locale>` (the frozen unit binding) | — | `INVALID_INPUT`, `SOURCE_DRIFT`, `NO_PROGRESS` |
-| 2 | Bind authority | `@content/<contentId>/<locale>` (curriculum and style references as served), `@runtime` (AI runtime configuration) | — | — |
-| 3 | Write and freeze the brief | `@content/<contentId>/<locale>` (curriculum and source evidence) | `@artifacts/<briefTargetRef>` | `BRIEF_UNBOUND` |
+| 1 | Validate input and resume | input, `@receipt/content-generation-receipt/<invocationId>`, `@external/minio/contents/<contentId>/<locale>` (the frozen unit binding) | — | `INVALID_INPUT`, `SOURCE_DRIFT`, `NO_PROGRESS` |
+| 2 | Bind authority | `@external/minio/contents/<contentId>/<locale>` (curriculum and style references as served), `@worktrees/sessions/central-runtime` (AI runtime configuration) | — | — |
+| 3 | Write and freeze the brief | `@external/minio/contents/<contentId>/<locale>` (curriculum and source evidence) | `@artifacts/<briefTargetRef>` | `BRIEF_UNBOUND` |
 | 4 | Write every declared edition | `@artifacts/<briefTargetRef>` (the frozen brief), input (the per-language destination) | `@artifacts/<language>.articleRef` | `OUTCOME_UNCOVERED` |
 | 5 | Generate the image to its claims | `@artifacts/<briefTargetRef>` (the brief's claims and the stated image intent) | `@artifacts/<imageTargetRef>` | `IMAGE_UNAVAILABLE` |
 | 6 | Implement every declared track | `@artifacts/<briefTargetRef>`, input (each track's exact build command) | `@artifacts/<track>.sourceRef` | `CODE_BUILD_FAILED` |
-| 7 | Run the executable check | `@artifacts/<track>.sourceRef` (the executable contract), `@runtime` (where each declared command runs) | — | `E2E_FAILED`, `CONTRACT_WEAKENED` |
+| 7 | Run the executable check | `@artifacts/<track>.sourceRef` (the executable contract), `@worktrees/sessions/central-runtime` (where each declared command runs) | — | `E2E_FAILED`, `CONTRACT_WEAKENED` |
 | 8 | Take the independent critique | `@artifacts` (every produced artifact and the claims it makes) | `@artifacts/<reviewTargetRef>` | `REVIEW_REVISION_REQUIRED`, `REVIEW_ROUNDS_EXHAUSTED` |
 | 9 | Emit and stop | everything above | `@artifacts/content-generation-receipt.json` | — |
 

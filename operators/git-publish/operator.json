@@ -21,17 +21,17 @@
       "purpose": "A publish never resolves its own checkout."
     },
     {
-      "alias": "@route/<project>/<role>",
+      "alias": "@workspaces/local/routes/<project>/<role>",
       "required": true,
       "purpose": "The checkout and mutation branch being published."
     },
     {
-      "alias": "@hooks/<project>/<role>",
+      "alias": "@workspaces/<project>/<role>/.husky",
       "required": true,
       "purpose": "pre-commit and pre-push, which always run."
     },
     {
-      "alias": "@remote/<project>/<role>",
+      "alias": "@external/remote/<project>/<role>",
       "required": true,
       "purpose": "The publication target and its observed head."
     },

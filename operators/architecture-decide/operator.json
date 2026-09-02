@@ -16,12 +16,12 @@
   },
   "refs": [
     {
-      "alias": "@business/<featureId>",
+      "alias": "@worktrees/businesses/<featureId>",
       "required": true,
       "purpose": "The promise the architecture must keep."
     },
     {
-      "alias": "@be",
+      "alias": "@workspaces/be",
       "required": true,
       "purpose": "The routed checkout observed at the frozen head; the inventory comes from its manifests and deployment files."
     },

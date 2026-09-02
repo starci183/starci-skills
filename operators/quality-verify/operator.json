@@ -19,22 +19,22 @@
       "purpose": "The producer's receipt; fixes the head every gate runs against."
     },
     {
-      "alias": "@gates/<project>/<role>",
+      "alias": "@workspaces/<project>/<role>/package.json#scripts",
       "required": true,
       "purpose": "The pinned gate commands and configuration."
     },
     {
-      "alias": "@fe",
+      "alias": "@workspaces/fe",
       "required": true,
       "purpose": "The subject every gate measures when the verified boundary is a frontend."
     },
     {
-      "alias": "@be",
+      "alias": "@workspaces/be",
       "required": true,
       "purpose": "The subject every gate measures when the verified boundary is a backend."
     },
     {
-      "alias": "@debts",
+      "alias": "@worktrees/debts",
       "required": false,
       "purpose": "Owner-approved debts a red gate may carry."
     },

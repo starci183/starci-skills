@@ -18,12 +18,12 @@
   },
   "refs": [
     {
-      "alias": "@content/<contentId>/<locale>",
+      "alias": "@external/minio/contents/<contentId>/<locale>",
       "required": true,
       "purpose": "The lesson as served; the unit being authored or revised."
     },
     {
-      "alias": "@runtime",
+      "alias": "@worktrees/sessions/central-runtime",
       "required": true,
       "purpose": "The AI runtime that runs, reads, and repairs generated code."
     },

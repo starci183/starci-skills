@@ -32,12 +32,12 @@
       "purpose": "Technical authority when boundaries are in question."
     },
     {
-      "alias": "@grammar-src",
+      "alias": "@grammar",
       "required": true,
       "purpose": "Published Grammar: the compositions a direction may bind."
     },
     {
-      "alias": "@grammar-law/starci",
+      "alias": "@knowledge/grammars/starci",
       "required": false,
       "purpose": "Family realization rules: how the Core family is meant to realize Common. Law about the Grammar, never the Grammar itself."
     },
@@ -47,19 +47,14 @@
       "purpose": "What a tree must contain before it exists."
     },
     {
-      "alias": "@fe",
+      "alias": "@workspaces/fe",
       "required": true,
       "purpose": "Current implementation as evidence, never as the requested direction."
     },
     {
-      "alias": "@uat/<flow>/<case>",
+      "alias": "@worktrees/uat/<flow>/<case>",
       "required": false,
       "purpose": "Evidence and counterevidence; a prior PASS is not current authority."
-    },
-    {
-      "alias": "@screenshots",
-      "required": false,
-      "purpose": "Pixel evidence only."
     },
     {
       "alias": "@receipt/fe-direction-decision/<invocationId>",

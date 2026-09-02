@@ -21,17 +21,17 @@
       "purpose": "Verification precedes an immutable build."
     },
     {
-      "alias": "@oci/<image>",
+      "alias": "@external/ghcr/<image>",
       "required": true,
       "purpose": "The immutable image, by digest."
     },
     {
-      "alias": "@identity",
+      "alias": "@workspaces/device-state",
       "required": true,
       "purpose": "Credential handles by name; values never appear."
     },
     {
-      "alias": "@workflow-run/<runId>",
+      "alias": "@external/github-actions/<runId>",
       "required": false,
       "purpose": "CI evidence of the build and rollout."
     },

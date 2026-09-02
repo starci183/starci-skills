@@ -37,12 +37,12 @@ A caller that consumes the shared runtime additionally requires the runtime owne
 
 | Alias | Resolves to | Bind | Required |
 | --- | --- | --- | --- |
-| `@declaration/<project>/<role>` | `<Source>/.workspaces/projects/<project>/<role>.json` | fingerprint | Required: The portable route declaration; the only route authority. |
-| `@route/<project>/<role>` | `<Source>/.workspaces/local/routes/<project>/<role>/config.json` | fingerprint | Required: The hydrated route this machine projects the declaration onto. |
-| `@identity` | `<Source>/.workspaces/device-state.json` | fingerprint; the sealed keys under &lt;Source&gt;/.workspaces/local/credentials/*.key.enc are bound by name and never read | Required: Machine identity and the sealed roster, bound by name. |
-| `@ports/<project>` | `<Source>/.workspaces/ports/<project>.json` | fingerprint | Optional: Port projection when the caller consumes the runtime. |
-| `@runtime` | `<Source>/.worktrees/sessions/central-runtime/owner.json` | fingerprint + generation | Optional: Runtime owner registry, bound only when runtimeNeed is consume. |
-| `@artifacts` | `input.project.artifactRootRef; convention <Source>/.worktrees/sessions/<invocationId>/artifacts/` | fingerprint per artifact; every artifact an operator writes is registered in output.artifactRefs | Required: Where the route receipt is written. |
+| `@workspaces/projects/<project>/<role>` | `<Source>/.workspaces/projects/<project>/<role>.json` | fingerprint | Required: The portable route declaration; the only route authority. |
+| `@workspaces/local/routes/<project>/<role>` | `<Source>/.workspaces/local/routes/<project>/<role>/config.json` | fingerprint | Required: The hydrated route this machine projects the declaration onto. |
+| `@workspaces/device-state` | `<Source>/.workspaces/device-state.json  (sealed keys live in <Source>/.workspaces/local/credentials/*.key.enc and are bound by name, never read)` | fingerprint | Required: Machine identity and the sealed roster, bound by name. |
+| `@workspaces/ports/<project>` | `<Source>/.workspaces/ports/<project>.json` | fingerprint | Optional: Port projection when the caller consumes the runtime. |
+| `@worktrees/sessions/central-runtime` | `<Source>/.worktrees/sessions/central-runtime/owner.json  (generation-<n>-ready.json and logs/ beside it)` | fingerprint + generation | Optional: Runtime owner registry, bound only when runtimeNeed is consume. |
+| `@artifacts` | `input.project.artifactRootRef; convention <Source>/.worktrees/sessions/<invocationId>/artifacts/  (receipt, named artifacts, captures)` | fingerprint per artifact; every artifact written is registered in output.artifactRefs | Required: Where the route receipt is written. |
 
 ## Route authority is the declaration, never the resemblance
 

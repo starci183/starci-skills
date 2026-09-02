@@ -45,13 +45,13 @@ lâu dài, và một bản ghi lâu dài của capability chính là credential 
 
 | # | Bước | Đọc | Ghi | Dừng với |
 | --- | --- | --- | --- | --- |
-| 1 | Validate input và resume | input, `@runtime` (binding generation đã đóng băng) | — | `INVALID_INPUT`, `SOURCE_DRIFT`, `NO_PROGRESS` |
-| 2 | Bind authority | `@runtime` (fingerprint của inventory và generation), `@identity` (từng capability handle kèm bằng chứng custody), `@declaration/<project>/<role>` (các project mà dịch vụ dùng chung phục vụ), input (phê duyệt cùng plan hash) | — | `AUTHORITY_DRIFT`, `CAPABILITY_MISSING` |
-| 3 | Kiểm lại inventory | `@runtime` (các resource đã khai, quan sát lại đúng một lượt) | — | `INVENTORY_DRIFT` |
-| 4 | Xử lý các claim cổng | `@ports/<project>` (các cổng được claim), `@runtime` (những tiến trình đang giữ) | — | `PORT_CONFLICT` |
-| 5 | Suy ra delta | `@runtime` (trạng thái quan sát được), input (trạng thái mong muốn) | — | — |
-| 6 | Áp delta đã duyệt | `@runtime` (mỗi lần một resource), `@identity` (credential handle theo tên) | `@runtime` | `EFFECT_UNAUTHORIZED`, `SERVICE_UNAVAILABLE` |
-| 7 | Chứng minh mọi check bắt buộc | `@runtime` (dịch vụ đã đọc lại, trọn bộ chứng minh của nhánh) | — | `PROOF_FAILED` |
+| 1 | Validate input và resume | input, `@worktrees/sessions/central-runtime` (binding generation đã đóng băng) | — | `INVALID_INPUT`, `SOURCE_DRIFT`, `NO_PROGRESS` |
+| 2 | Bind authority | `@worktrees/sessions/central-runtime` (fingerprint của inventory và generation), `@workspaces/device-state` (từng capability handle kèm bằng chứng custody), `@workspaces/projects/<project>/<role>` (các project mà dịch vụ dùng chung phục vụ), input (phê duyệt cùng plan hash) | — | `AUTHORITY_DRIFT`, `CAPABILITY_MISSING` |
+| 3 | Kiểm lại inventory | `@worktrees/sessions/central-runtime` (các resource đã khai, quan sát lại đúng một lượt) | — | `INVENTORY_DRIFT` |
+| 4 | Xử lý các claim cổng | `@workspaces/ports/<project>` (các cổng được claim), `@worktrees/sessions/central-runtime` (những tiến trình đang giữ) | — | `PORT_CONFLICT` |
+| 5 | Suy ra delta | `@worktrees/sessions/central-runtime` (trạng thái quan sát được), input (trạng thái mong muốn) | — | — |
+| 6 | Áp delta đã duyệt | `@worktrees/sessions/central-runtime` (mỗi lần một resource), `@workspaces/device-state` (credential handle theo tên) | `@worktrees/sessions/central-runtime` | `EFFECT_UNAUTHORIZED`, `SERVICE_UNAVAILABLE` |
+| 7 | Chứng minh mọi check bắt buộc | `@worktrees/sessions/central-runtime` (dịch vụ đã đọc lại, trọn bộ chứng minh của nhánh) | — | `PROOF_FAILED` |
 | 8 | Phát ra rồi dừng | tất cả những gì ở trên | `@artifacts/<branch>.receipt.json` | — |
 
 Khâu validate từ chối binding source cũ, effect hay check xếp nhầm nhánh, bộ chứng minh bị thu hẹp,

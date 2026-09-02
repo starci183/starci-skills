@@ -16,22 +16,22 @@
   },
   "refs": [
     {
-      "alias": "@uat/<flow>/<case>",
+      "alias": "@worktrees/uat/<flow>/<case>",
       "required": true,
       "purpose": "The canonical snapshot and result pair for the flow."
     },
     {
-      "alias": "@templates",
+      "alias": "@worktrees/_templates",
       "required": true,
       "purpose": "UAT protocol and template authority; consumed, never modified."
     },
     {
-      "alias": "@runtime",
+      "alias": "@worktrees/sessions/central-runtime",
       "required": true,
       "purpose": "A runtime that can be observed; readiness is proved, not assumed."
     },
     {
-      "alias": "@be",
+      "alias": "@workspaces/be",
       "required": true,
       "purpose": "The checkout whose behaviour the flow verifies."
     },

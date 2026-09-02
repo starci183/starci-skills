@@ -34,14 +34,14 @@ Missing substance is reported as a failure and returned to its owner.
 
 | # | Step | Reads | Writes | Stops with |
 | --- | --- | --- | --- | --- |
-| 1 | Validate input and resume | input, `@be` (the frozen head binding) | — | `INVALID_INPUT`, `SOURCE_DRIFT`, `NO_PROGRESS` |
-| 2 | Normalize the evidence | `@be` (every claim with its role, path, line range, and head), `@receipt/architecture-decision/<invocationId>` (architecture evidence only) | — | `EVIDENCE_MISSING`, `CONTRADICTION_UNRESOLVED` |
-| 3 | Check the published head | `@business/<featureId>` (the current head and the frozen evidence), input (the requested target state) | — | `LIFECYCLE_TRANSITION_INVALID`, `AUTHORITY_CONFLICT`, `APPROVAL_REQUIRED` |
-| 4 | Model the promise | `@be` (fact claims only) | — | — |
-| 5 | Freeze the coverage matrix | input (dimensions), `@be` (discovered consumers, normalized claims) | `@artifacts/coverage-matrix.json` | `COVERAGE_INCOMPLETE`, `CONSUMER_UNPROVEN` |
+| 1 | Validate input and resume | input, `@workspaces/be` (the frozen head binding) | — | `INVALID_INPUT`, `SOURCE_DRIFT`, `NO_PROGRESS` |
+| 2 | Normalize the evidence | `@workspaces/be` (every claim with its role, path, line range, and head), `@receipt/architecture-decision/<invocationId>` (architecture evidence only) | — | `EVIDENCE_MISSING`, `CONTRADICTION_UNRESOLVED` |
+| 3 | Check the published head | `@worktrees/businesses/<featureId>` (the current head and the frozen evidence), input (the requested target state) | — | `LIFECYCLE_TRANSITION_INVALID`, `AUTHORITY_CONFLICT`, `APPROVAL_REQUIRED` |
+| 4 | Model the promise | `@workspaces/be` (fact claims only) | — | — |
+| 5 | Freeze the coverage matrix | input (dimensions), `@workspaces/be` (discovered consumers, normalized claims) | `@artifacts/coverage-matrix.json` | `COVERAGE_INCOMPLETE`, `CONSUMER_UNPROVEN` |
 | 6 | Dispose legacy coexistence | `@artifacts/coverage-matrix.json` (legacy create, read, and settle rows and their proof) | — | — |
-| 7 | Reconcile when the target is implemented | `@be` (delivered source), `@artifacts/coverage-matrix.json` (the frozen matrix) | — | `RECONCILIATION_DISCREPANCY` |
-| 8 | Publish one head | `@artifacts/coverage-matrix.json`, `@business/<featureId>` (the previous head) | `@business/<featureId>` (the new `model.json` head) | — |
+| 7 | Reconcile when the target is implemented | `@workspaces/be` (delivered source), `@artifacts/coverage-matrix.json` (the frozen matrix) | — | `RECONCILIATION_DISCREPANCY` |
+| 8 | Publish one head | `@artifacts/coverage-matrix.json`, `@worktrees/businesses/<featureId>` (the previous head) | `@worktrees/businesses/<featureId>` (the new `model.json` head) | — |
 | 9 | Emit and stop | everything above | `@artifacts/business-promise-authority.json` | — |
 
 Validation rejects a stale source binding, unbound claim citations, a head that is not

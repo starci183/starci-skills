@@ -38,12 +38,12 @@ rule nào đứng sau.
 
 | Alias | Trỏ tới | Bind | Bắt buộc |
 | --- | --- | --- | --- |
-| `@knowledge/ui/presentation` | `<Source>/.claude/knowledge/<group>/  (every canonical .md inside; a single file may be named as <group>/<topic>.md)` | fingerprint per file; the rule inventory is the set of `## PREFIX-n` headings across the folder's canonical files | Bắt buộc: The closed rule inventory; the only source of valid identifiers. |
-| `@grammar-src` | `<@fe>/packages/grammar  (the published @starci/grammar package source: renderers, props, data-contract claims, core/styles.css)` | fingerprint of packages/grammar/package.json + the @fe checkout head | Bắt buộc: Which relationships a component already owns. |
-| `@fe` | `<checkout:input.project.id/fe>  (the frontend checkout of the project this invocation binds)` | fingerprint + sourceHead (git rev-parse HEAD of the checkout) | Bắt buộc: The checkout the composed tree belongs to. |
-| `@receipt/fe-direction-decision/<invocationId>` | `<@artifacts of invocation <invocationId>>/<receiptType>.json (the receipt file that invocation registered in output.artifactRefs)` | fingerprint + the sourceHead the receipt binds | Tuỳ chọn: Intent; never a source of presentation values. |
-| `@receipt/fe-surface-audit/<invocationId>` | `<@artifacts of invocation <invocationId>>/<receiptType>.json (the receipt file that invocation registered in output.artifactRefs)` | fingerprint + the sourceHead the receipt binds | Tuỳ chọn: Regression history. |
-| `@artifacts` | `input.project.artifactRootRef; convention <Source>/.worktrees/sessions/<invocationId>/artifacts/` | fingerprint per artifact; every artifact an operator writes is registered in output.artifactRefs | Bắt buộc: Where the resolved tree and the resolution receipt are written. |
+| `@knowledge/ui/presentation` | `<Source>/.claude/knowledge/ui/  (composition/, presentation/, proof/; a sub-path narrows: @knowledge/ui/presentation)` | fingerprint per file; rule inventory = every `## PREFIX-n` heading in the folder | Bắt buộc: The closed rule inventory; the only source of valid identifiers. |
+| `@grammar` | `the @starci/grammar package as the bound app resolves it: file:packages/grammar inside @workspaces/fe today (source 0.4.0), or @npm/@starci/grammar@<version> (0.3.0 published); the receipt records which` | package.json version + the resolved location's fingerprint (checkout head for file:, tarball integrity for npm) | Bắt buộc: Which relationships a component already owns. |
+| `@workspaces/fe` | `<checkout:input.project.id/fe>  (diskPath from <Source>/.workspaces/local/routes/<project>/fe/config.json); a sub-path narrows: @workspaces/fe/.husky, @workspaces/fe/package.json#scripts` | fingerprint + sourceHead (git rev-parse HEAD of the checkout) | Bắt buộc: The checkout the composed tree belongs to. |
+| `@receipt/fe-direction-decision/<invocationId>` | `<@artifacts of invocation <invocationId>>/<receiptType>.json  (the receipt file that invocation registered in output.artifactRefs)` | fingerprint + the sourceHead the receipt binds | Tuỳ chọn: Intent; never a source of presentation values. |
+| `@receipt/fe-surface-audit/<invocationId>` | `<@artifacts of invocation <invocationId>>/<receiptType>.json  (the receipt file that invocation registered in output.artifactRefs)` | fingerprint + the sourceHead the receipt binds | Tuỳ chọn: Regression history. |
+| `@artifacts` | `input.project.artifactRootRef; convention <Source>/.worktrees/sessions/<invocationId>/artifacts/  (receipt, named artifacts, captures)` | fingerprint per artifact; every artifact written is registered in output.artifactRefs | Bắt buộc: Where the resolved tree and the resolution receipt are written. |
 
 ## Danh sách mã rule
 

@@ -43,14 +43,14 @@ its fingerprint is rebound.
 
 | # | Step | Reads | Writes | Stops with |
 | --- | --- | --- | --- | --- |
-| 1 | Validate input and resume | input, `@receipt/fe-presentation-resolution/<invocationId>`, `@fe` (the frozen head binding) | — | `INVALID_INPUT`, `SOURCE_DRIFT`, `NO_PROGRESS` |
-| 2 | Bind authority | `@receipt/fe-presentation-resolution/<invocationId>` (fingerprint, `classNames` inventory, rule inventory, resolved tree), `@fe` (routed head, declared write set and its owner roots), `@receipt/fe-direction-decision/<invocationId>` (intent) | — | `RESOLUTION_STALE`, `OWNER_CONFLICT` |
-| 3 | Confirm the head | `@fe` (the observed checkout at the routed route) | — | — |
-| 4 | Fingerprint before | `@fe` (every declared path that already exists) | — | — |
-| 5 | Project the resolved tree onto the declared paths | `@receipt/fe-presentation-resolution/<invocationId>` (the resolved tree), `@fe` (the declared paths) | — | — |
+| 1 | Validate input and resume | input, `@receipt/fe-presentation-resolution/<invocationId>`, `@workspaces/fe` (the frozen head binding) | — | `INVALID_INPUT`, `SOURCE_DRIFT`, `NO_PROGRESS` |
+| 2 | Bind authority | `@receipt/fe-presentation-resolution/<invocationId>` (fingerprint, `classNames` inventory, rule inventory, resolved tree), `@workspaces/fe` (routed head, declared write set and its owner roots), `@receipt/fe-direction-decision/<invocationId>` (intent) | — | `RESOLUTION_STALE`, `OWNER_CONFLICT` |
+| 3 | Confirm the head | `@workspaces/fe` (the observed checkout at the routed route) | — | — |
+| 4 | Fingerprint before | `@workspaces/fe` (every declared path that already exists) | — | — |
+| 5 | Project the resolved tree onto the declared paths | `@receipt/fe-presentation-resolution/<invocationId>` (the resolved tree), `@workspaces/fe` (the declared paths) | — | — |
 | 6 | Check every produced value against the inventory | `@receipt/fe-presentation-resolution/<invocationId>` (the frozen class and rule inventories) | — | `WRITE_REJECTED` |
-| 7 | Write, then fingerprint after | `@fe` (the current content of each path) | `@fe` (`<declared write-set path>`) | — |
-| 8 | Report every declared path | `@fe` (the write set and every write outcome) | — | — |
+| 7 | Write, then fingerprint after | `@workspaces/fe` (the current content of each path) | `@workspaces/fe` (`<declared write-set path>`) | — |
+| 8 | Report every declared path | `@workspaces/fe` (the write set and every write outcome) | — | — |
 | 9 | Emit and stop | everything above | `@artifacts/application-receipt.json` | — |
 
 Validation rejects a stale source binding, a resolution named but not bound, owner overlap, a

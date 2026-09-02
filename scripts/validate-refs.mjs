@@ -17,7 +17,7 @@ if (registry.schemaVersion !== 8) errors.push('refs.json: schemaVersion must be 
 const aliases = registry.aliases ?? {};
 const KINDS = new Set(['file', 'dir', 'checkout', 'service', 'caller-supplied']);
 for (const [alias, def] of Object.entries(aliases)) {
-  if (!/^@[a-z][a-z-]*$/.test(alias)) errors.push(`refs.json: alias ${alias} must look like @name`);
+  if (!/^@[a-z][a-z-]*(?:\/[a-z_][a-z0-9_-]*)*$/.test(alias)) errors.push(`refs.json: alias ${alias} must look like @name or @name/sub/path`);
   for (const key of ['params', 'kind', 'resolvesTo', 'scheme', 'bind', 'writers', 'purpose']) {
     if (def[key] === undefined) errors.push(`refs.json: ${alias} lacks ${key}`);
   }
@@ -46,7 +46,9 @@ for (const [alias, def] of Object.entries(aliases)) {
 }
 
 // A context table row: | `@alias/...` | resolves to | bind | Required/Optional |
-const ROW = /^\|\s*`(@[a-z][a-z-]*)[^`]*`\s*\|/;
+const ROW = /^\|\s*`(@[a-z][a-z-]*(?:\/[A-Za-z0-9_<>.@#:-]+)*)`\s*\|/;
+// The registered alias an alias string belongs to is its longest registered prefix.
+const baseOf = (alias) => Object.keys(aliases).filter((k) => alias === k || alias.startsWith(`${k}/`)).sort((a, b) => b.length - a.length)[0] ?? null;
 function tableAliases(text, heading) {
   const lines = text.split(/\r?\n/);
   const start = lines.findIndex((l) => l.trim() === heading);
@@ -66,8 +68,8 @@ for (const { dir, manifest } of manifests) {
   if (!Array.isArray(refs) || refs.length === 0) { errors.push(`${id}: operator.json must declare refs`); continue; }
   const seen = new Set();
   for (const ref of refs) {
-    const base = /^(@[a-z][a-z-]*)/.exec(ref.alias ?? '')?.[1];
-    if (!base || !aliases[base]) errors.push(`${id}: ref ${ref.alias} is not registered in refs.json`);
+    const base = baseOf(ref.alias ?? '');
+    if (!base) errors.push(`${id}: ref ${ref.alias} is not registered in refs.json`);
     if (typeof ref.required !== 'boolean') errors.push(`${id}: ref ${ref.alias} must say required true or false`);
     if (typeof ref.purpose !== 'string' || ref.purpose.length === 0) errors.push(`${id}: ref ${ref.alias} needs a purpose`);
     if (seen.has(ref.alias)) errors.push(`${id}: ref ${ref.alias} is declared twice`);
@@ -89,12 +91,12 @@ for (const { dir, manifest } of manifests) {
     for (let i = start + 1; i < lines.length && !lines[i].startsWith('## '); i += 1) {
       const cells = lines[i].split('|').map((c) => c.trim());
       if (cells.length < 6 || !/^\d+$/.test(cells[1])) continue;
-      for (const cell of [cells[3], cells[4]]) for (const m of cell.matchAll(/@[a-z][a-z-]*/g)) used.add(m[0]);
+      for (const cell of [cells[3], cells[4]]) for (const m of cell.matchAll(/@[a-z][a-z-]*(?:\/[A-Za-z0-9_<>.@#:-]+)*/g)) { const b = baseOf(m[0]); used.add(b ?? m[0]); }
     }
-    const declaredBases = new Set(refs.map((r) => /^(@[a-z][a-z-]*)/.exec(r.alias)[1]));
+    const declaredBases = new Set(refs.map((r) => baseOf(r.alias)));
     for (const u of used) if (!declaredBases.has(u)) errors.push(`${id}: ${file} Sequence reads or writes ${u}, which operator.json does not declare`);
     for (const r of refs) {
-      const b = /^(@[a-z][a-z-]*)/.exec(r.alias)[1];
+      const b = baseOf(r.alias);
       if (r.required && !used.has(b)) errors.push(`${id}: ${file} Sequence never reads or writes required ${r.alias}`);
     }
     if (used.size === 0) errors.push(`${id}: ${file} Sequence names no alias at all`);
@@ -103,9 +105,9 @@ for (const { dir, manifest } of manifests) {
     const text = await readFile(path.join(dir, file), 'utf8');
     const rows = tableAliases(text, heading);
     if (rows === null) { errors.push(`${id}: ${file} has no ${heading} section`); continue; }
-    const declaredBases = new Set(refs.map((r) => /^(@[a-z][a-z-]*)/.exec(r.alias)[1]));
-    for (const r of refs) if (r.required && !rows.some((row) => r.alias.startsWith(row))) errors.push(`${id}: ${file} ${heading} table omits required ${r.alias}`);
-    for (const row of rows) if (!declaredBases.has(row)) errors.push(`${id}: ${file} ${heading} table names ${row}, which operator.json does not declare`);
+    const declaredAliases = new Set(refs.map((r) => r.alias));
+    for (const r of refs) if (r.required && !rows.includes(r.alias)) errors.push(`${id}: ${file} ${heading} table omits required ${r.alias}`);
+    for (const row of rows) if (!declaredAliases.has(row)) errors.push(`${id}: ${file} ${heading} table names ${row}, which operator.json does not declare`);
   }
 }
 

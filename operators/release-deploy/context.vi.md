@@ -39,11 +39,11 @@ thành được phép chỉ vì nó hữu ích.
 
 | Alias | Trỏ tới | Bind | Bắt buộc |
 | --- | --- | --- | --- |
-| `@receipt/quality-verification/<invocationId>` | `<@artifacts of invocation <invocationId>>/<receiptType>.json (the receipt file that invocation registered in output.artifactRefs)` | fingerprint + the sourceHead the receipt binds | Bắt buộc: Verification precedes an immutable build. |
-| `@oci/<image>` | `ghcr.io/<image>@<digest>` | digest | Bắt buộc: The immutable image, by digest. |
-| `@identity` | `<Source>/.workspaces/device-state.json` | fingerprint; the sealed keys under &lt;Source&gt;/.workspaces/local/credentials/*.key.enc are bound by name and never read | Bắt buộc: Credential handles by name; values never appear. |
-| `@workflow-run/<runId>` | `GitHub Actions run <runId> of the routed repository` | run id + conclusion | Tuỳ chọn: CI evidence of the build and rollout. |
-| `@artifacts` | `input.project.artifactRootRef; convention <Source>/.worktrees/sessions/<invocationId>/artifacts/` | fingerprint per artifact; every artifact an operator writes is registered in output.artifactRefs | Bắt buộc: Where the deployment receipt is written. |
+| `@receipt/quality-verification/<invocationId>` | `<@artifacts of invocation <invocationId>>/<receiptType>.json  (the receipt file that invocation registered in output.artifactRefs)` | fingerprint + the sourceHead the receipt binds | Bắt buộc: Verification precedes an immutable build. |
+| `@external/ghcr/<image>` | `ghcr.io/<image>@<digest>` | digest | Bắt buộc: The immutable image, by digest. |
+| `@workspaces/device-state` | `<Source>/.workspaces/device-state.json  (sealed keys live in <Source>/.workspaces/local/credentials/*.key.enc and are bound by name, never read)` | fingerprint | Bắt buộc: Credential handles by name; values never appear. |
+| `@external/github-actions/<runId>` | `GitHub Actions run <runId> of the routed repository` | run id + conclusion | Tuỳ chọn: CI evidence of the build and rollout. |
+| `@artifacts` | `input.project.artifactRootRef; convention <Source>/.worktrees/sessions/<invocationId>/artifacts/  (receipt, named artifacts, captures)` | fingerprint per artifact; every artifact written is registered in output.artifactRefs | Bắt buộc: Where the deployment receipt is written. |
 
 ## Credential là cái tên, không bao giờ là giá trị
 

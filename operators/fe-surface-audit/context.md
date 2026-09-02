@@ -33,12 +33,12 @@ Every invocation requires:
 
 | Alias | Resolves to | Bind | Required |
 | --- | --- | --- | --- |
-| `@knowledge/ui/proof` | `<Source>/.claude/knowledge/<group>/  (every canonical .md inside; a single file may be named as <group>/<topic>.md)` | fingerprint per file; the rule inventory is the set of `## PREFIX-n` headings across the folder's canonical files | Required: What only becomes true once rendered; the audit's rule inventory. |
-| `@grammar-law/starci` | `<Source>/.claude/knowledge/grammars/<family>/  (the family's knowledge: family, consumption, components, states, composition, and the CORE-* anatomy topics)` | fingerprint per file; rule inventory = every `## PREFIX-n` heading across the folder | Optional: Family realization rules: how the Core family is meant to realize Common. Law about the Grammar, never the Grammar itself. |
-| `@receipt/fe-source-application/<invocationId>` | `<@artifacts of invocation <invocationId>>/<receiptType>.json (the receipt file that invocation registered in output.artifactRefs)` | fingerprint + the sourceHead the receipt binds | Required: The stated intention this audit exists to contradict. |
-| `@fe` | `<checkout:input.project.id/fe>  (the frontend checkout of the project this invocation binds)` | fingerprint + sourceHead (git rev-parse HEAD of the checkout) | Required: Proves the observed surface is the applied surface. |
-| `@runtime` | `<Source>/.worktrees/sessions/central-runtime/owner.json` | fingerprint + generation | Required: The endpoint that serves the route under observation. |
-| `@artifacts` | `input.project.artifactRootRef; convention <Source>/.worktrees/sessions/<invocationId>/artifacts/` | fingerprint per artifact; every artifact an operator writes is registered in output.artifactRefs | Required: Where captures and the audit receipt are written. |
+| `@knowledge/ui/proof` | `<Source>/.claude/knowledge/ui/  (composition/, presentation/, proof/; a sub-path narrows: @knowledge/ui/presentation)` | fingerprint per file; rule inventory = every `## PREFIX-n` heading in the folder | Required: What only becomes true once rendered; the audit's rule inventory. |
+| `@knowledge/grammars/starci` | `<Source>/.claude/knowledge/grammars/  (one folder per family: @knowledge/grammars/starci)` | fingerprint per file; rule inventory = every `## PREFIX-n` heading in the folder | Optional: Family realization rules: how the Core family is meant to realize Common. Law about the Grammar, never the Grammar itself. |
+| `@receipt/fe-source-application/<invocationId>` | `<@artifacts of invocation <invocationId>>/<receiptType>.json  (the receipt file that invocation registered in output.artifactRefs)` | fingerprint + the sourceHead the receipt binds | Required: The stated intention this audit exists to contradict. |
+| `@workspaces/fe` | `<checkout:input.project.id/fe>  (diskPath from <Source>/.workspaces/local/routes/<project>/fe/config.json); a sub-path narrows: @workspaces/fe/.husky, @workspaces/fe/package.json#scripts` | fingerprint + sourceHead (git rev-parse HEAD of the checkout) | Required: Proves the observed surface is the applied surface. |
+| `@worktrees/sessions/central-runtime` | `<Source>/.worktrees/sessions/central-runtime/owner.json  (generation-<n>-ready.json and logs/ beside it)` | fingerprint + generation | Required: The endpoint that serves the route under observation. |
+| `@artifacts` | `input.project.artifactRootRef; convention <Source>/.worktrees/sessions/<invocationId>/artifacts/  (receipt, named artifacts, captures)` | fingerprint per artifact; every artifact written is registered in output.artifactRefs | Required: Where captures and the audit receipt are written. |
 
 ## Rule inventory
 

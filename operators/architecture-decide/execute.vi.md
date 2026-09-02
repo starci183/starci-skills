@@ -47,9 +47,9 @@ Bốn điều cấm gánh quyết định này, và mỗi điều đều đượ
 
 | # | Bước | Đọc | Ghi | Dừng với |
 | --- | --- | --- | --- | --- |
-| 1 | Kiểm tra input và resume | input, `@receipt/architecture-decision/<invocationId>`, `@be` (binding head đã đóng băng) | — | `INVALID_INPUT`, `SOURCE_DRIFT`, `NO_PROGRESS` |
-| 2 | Quan sát hiện trạng | `@be` (quan sát tại head đã đóng băng) | `@artifacts/current-state.json` | `CURRENT_STATE_UNOBSERVED` |
-| 3 | Ràng inventory quan sát được và thẩm quyền nghiệp vụ | `@artifacts/current-state.json` (các thành phần inventory cùng bằng chứng), `@business/<featureId>` (head đã publish) | — | `BUSINESS_AUTHORITY_REQUIRED`, `EVIDENCE_MISSING` |
+| 1 | Kiểm tra input và resume | input, `@receipt/architecture-decision/<invocationId>`, `@workspaces/be` (binding head đã đóng băng) | — | `INVALID_INPUT`, `SOURCE_DRIFT`, `NO_PROGRESS` |
+| 2 | Quan sát hiện trạng | `@workspaces/be` (quan sát tại head đã đóng băng) | `@artifacts/current-state.json` | `CURRENT_STATE_UNOBSERVED` |
+| 3 | Ràng inventory quan sát được và thẩm quyền nghiệp vụ | `@artifacts/current-state.json` (các thành phần inventory cùng bằng chứng), `@worktrees/businesses/<featureId>` (head đã publish) | — | `BUSINESS_AUTHORITY_REQUIRED`, `EVIDENCE_MISSING` |
 | 4 | Đóng khung quyết định | input (mục tiêu, các trục đánh đổi, các ràng buộc đã tách) | — | `CONSTRAINT_CONTRADICTION` |
 | 5 | Sinh phương án | `@artifacts/current-state.json`, `@knowledge/patterns` | `@artifacts/<decisionId>-alternatives.html` | `NO_VIABLE_ALTERNATIVE` |
 | 6 | Chọn tạm thời | `@artifacts/<decisionId>-alternatives.html`, input (chính sách chọn, phê duyệt của chủ sở hữu) | — | `CHOICE_REQUIRED` |

@@ -34,13 +34,13 @@ tree is resolved again once the case is published and the topic fingerprint is r
 
 | # | Step | Reads | Writes | Stops with |
 | --- | --- | --- | --- | --- |
-| 1 | Validate input and resume | input, `@receipt/fe-surface-audit/<invocationId>` (regression history), `@fe` (the frozen head binding) | — | `INVALID_INPUT`, `SOURCE_DRIFT`, `NO_PROGRESS` |
-| 2 | Bind authority | `@knowledge/ui/presentation` (every topic with its fingerprint and inventory), `@grammar-src` (the published package and the relationships it owns), `@fe` (routed head, frozen tree), `@receipt/fe-direction-decision/<invocationId>` (intent) | — | `KNOWLEDGE_UNBOUND`, `GRAMMAR_UNPUBLISHED` |
-| 3 | Walk the tree once | `@fe` (the frozen tree), input (the mutable owner ceiling) | — | `OWNER_CONFLICT` |
-| 4 | Determine the owner for each present property | `@grammar-src` (the owned relationships), `@fe` (the properties the node presently carries) | — | — |
+| 1 | Validate input and resume | input, `@receipt/fe-surface-audit/<invocationId>` (regression history), `@workspaces/fe` (the frozen head binding) | — | `INVALID_INPUT`, `SOURCE_DRIFT`, `NO_PROGRESS` |
+| 2 | Bind authority | `@knowledge/ui/presentation` (every topic with its fingerprint and inventory), `@grammar` (the published package and the relationships it owns), `@workspaces/fe` (routed head, frozen tree), `@receipt/fe-direction-decision/<invocationId>` (intent) | — | `KNOWLEDGE_UNBOUND`, `GRAMMAR_UNPUBLISHED` |
+| 3 | Walk the tree once | `@workspaces/fe` (the frozen tree), input (the mutable owner ceiling) | — | `OWNER_CONFLICT` |
+| 4 | Determine the owner for each present property | `@grammar` (the owned relationships), `@workspaces/fe` (the properties the node presently carries) | — | — |
 | 5 | Select one rule per remaining property | `@knowledge/ui/presentation` (the cases the bound topic publishes) | — | `RULE_MISSING` |
-| 6 | Classify a missing public path | `@grammar-src` (the relationship under question), `@knowledge/ui/presentation` (the capability-gap marking) | — | — |
-| 7 | Remove what the tree should not carry | `@fe` (the application classes on the node), `@grammar-src` (Grammar anatomy and the closed scale) | — | — |
+| 6 | Classify a missing public path | `@grammar` (the relationship under question), `@knowledge/ui/presentation` (the capability-gap marking) | — | — |
+| 7 | Remove what the tree should not carry | `@workspaces/fe` (the application classes on the node), `@grammar` (Grammar anatomy and the closed scale) | — | — |
 | 8 | Emit contracts | `@knowledge/ui/presentation` (the frozen rule inventory), input (`contractEmission`) | — | `UNKNOWN_RULE` |
 | 9 | Emit and stop | everything above | `@artifacts/<target>.resolved.tsx` | — |
 
