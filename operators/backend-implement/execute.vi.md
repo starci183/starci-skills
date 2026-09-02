@@ -48,14 +48,14 @@ làm tiếp chính là mâu thuẫn mà phép kiểm tra này sinh ra để bắ
 
 | # | Bước | Đọc | Ghi | Dừng với |
 | --- | --- | --- | --- | --- |
-| 1 | Kiểm tra input và resume | input, receipt trước đó, source head đã route | — | `INVALID_INPUT`, `SOURCE_DRIFT`, `NO_PROGRESS` |
-| 2 | Ràng thẩm quyền | thẩm quyền nghiệp vụ đã duyệt cùng các quyết định của nó, contract đã đóng băng cùng mọi operation, từng pattern anh em kèm khía cạnh của nó | — | `CONTRACT_UNFROZEN`, `BUSINESS_AUTHORITY_MISSING`, `PATTERN_UNBOUND` |
-| 3 | Lấp từng operation một | một operation của contract, các pattern đã bind cho nó, `input.scope.mutableFileRefs` | — | `CONTRACT_WIDENED`, `OWNER_CONFLICT` |
-| 4 | Ghi lại mọi mutation | các file bị chạm, hash trước và hash sau | — | — |
-| 5 | Kiểm lại snapshot đã lưu khi đọc | snapshot đã lưu và những luật trôi đi sau lúc tạo nó | — | — |
-| 6 | Chứng minh từng mặt đã khai | các mặt operation khai và phép đo của chúng | `conformance/<operationId>.<facet>.json` | — |
-| 7 | Chạy từng proof đã khai | các loại proof đã khai cùng lệnh đã ghim | `proofs/<operationId>.<kind>.json` | `PROOF_UNAVAILABLE` |
-| 8 | Phát ra và dừng | tất cả những gì ở trên | — | — |
+| 1 | Kiểm tra input và resume | input, `@receipt/backend-implementation/<invocationId>`, `@be` (source head đã route) | — | `INVALID_INPUT`, `SOURCE_DRIFT`, `NO_PROGRESS` |
+| 2 | Ràng thẩm quyền | `@business/<featureId>`, `@receipt/architecture-decision/<invocationId>` (contract đã đóng băng cùng mọi operation), `@knowledge/patterns/be` (từng pattern anh em kèm khía cạnh của nó) | — | `CONTRACT_UNFROZEN`, `BUSINESS_AUTHORITY_MISSING`, `PATTERN_UNBOUND` |
+| 3 | Lấp từng operation một | `@receipt/architecture-decision/<invocationId>` (một operation của contract), `@knowledge/patterns/be` (các pattern đã bind cho nó), `@be` (`input.scope.mutableFileRefs`) | `@be` | `CONTRACT_WIDENED`, `OWNER_CONFLICT` |
+| 4 | Ghi lại mọi mutation | `@be` (các file bị chạm, hash trước và hash sau) | — | — |
+| 5 | Kiểm lại snapshot đã lưu khi đọc | `@be` (snapshot đã lưu), `@knowledge/patterns/be` (những luật trôi đi sau lúc tạo nó) | — | — |
+| 6 | Chứng minh từng mặt đã khai | `@receipt/architecture-decision/<invocationId>` (các mặt operation khai), `@be` (phép đo của chúng) | `@artifacts/conformance/<operationId>.<facet>.json` | — |
+| 7 | Chạy từng proof đã khai | `@receipt/architecture-decision/<invocationId>` (các loại proof đã khai cùng lệnh đã ghim), `@be` | `@artifacts/proofs/<operationId>.<kind>.json` | `PROOF_UNAVAILABLE` |
+| 8 | Phát ra và dừng | tất cả những gì ở trên | `@artifacts/backend-implementation.json` | — |
 
 Khâu kiểm tra từ chối binding source đã cũ, writer nằm ngoài trần được sửa, migration không có proof
 chạy lại, operation read-only mang migration, event consumer không có idempotency, mã quyết định mà

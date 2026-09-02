@@ -47,14 +47,14 @@ question and implementing anyway is the exact contradiction the check exists to 
 
 | # | Step | Reads | Writes | Stops with |
 | --- | --- | --- | --- | --- |
-| 1 | Validate input and resume | input, prior receipt, routed source head | — | `INVALID_INPUT`, `SOURCE_DRIFT`, `NO_PROGRESS` |
-| 2 | Bind authority | approved business authority and its decisions, the frozen contract and every operation, each sibling pattern with its aspect | — | `CONTRACT_UNFROZEN`, `BUSINESS_AUTHORITY_MISSING`, `PATTERN_UNBOUND` |
-| 3 | Fill one operation at a time | one contract operation, its bound patterns, `input.scope.mutableFileRefs` | — | `CONTRACT_WIDENED`, `OWNER_CONFLICT` |
-| 4 | Record every mutation | the touched files, before and after hashes | — | — |
-| 5 | Revalidate persisted snapshots on read | the persisted snapshot and the rules that drift after it | — | — |
-| 6 | Prove each declared facet | the operation's declared facets and their measurements | `conformance/<operationId>.<facet>.json` | — |
-| 7 | Run each declared proof | the declared proof kinds and their pinned commands | `proofs/<operationId>.<kind>.json` | `PROOF_UNAVAILABLE` |
-| 8 | Emit and stop | everything above | — | — |
+| 1 | Validate input and resume | input, `@receipt/backend-implementation/<invocationId>`, `@be` (the routed head) | — | `INVALID_INPUT`, `SOURCE_DRIFT`, `NO_PROGRESS` |
+| 2 | Bind authority | `@business/<featureId>`, `@receipt/architecture-decision/<invocationId>` (the frozen contract and every operation), `@knowledge/patterns/be` (each sibling pattern with its aspect) | — | `CONTRACT_UNFROZEN`, `BUSINESS_AUTHORITY_MISSING`, `PATTERN_UNBOUND` |
+| 3 | Fill one operation at a time | `@receipt/architecture-decision/<invocationId>` (one contract operation), `@knowledge/patterns/be` (its bound patterns), `@be` (`input.scope.mutableFileRefs`) | `@be` | `CONTRACT_WIDENED`, `OWNER_CONFLICT` |
+| 4 | Record every mutation | `@be` (the touched files, before and after hashes) | — | — |
+| 5 | Revalidate persisted snapshots on read | `@be` (the persisted snapshot), `@knowledge/patterns/be` (the rules that drift after it) | — | — |
+| 6 | Prove each declared facet | `@receipt/architecture-decision/<invocationId>` (the operation's declared facets), `@be` (their measurements) | `@artifacts/conformance/<operationId>.<facet>.json` | — |
+| 7 | Run each declared proof | `@receipt/architecture-decision/<invocationId>` (the declared proof kinds and their pinned commands), `@be` | `@artifacts/proofs/<operationId>.<kind>.json` | `PROOF_UNAVAILABLE` |
+| 8 | Emit and stop | everything above | `@artifacts/backend-implementation.json` | — |
 
 Validation rejects a stale source binding, a writer outside the mutable ceiling, a migration with no
 replay proof, a read-only operation carrying a migration, an event consumer with no idempotency, a
