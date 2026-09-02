@@ -41,37 +41,46 @@ Bản ghi tài khoản đóng băng vào snapshot là một tập trường đó
 token hay OTP không có chỗ nào để đi, nên việc giữ credential là một hình dạng chứ không phải một kỷ
 luật.
 
-## Trình tự thực thi
+## Trình tự
 
-1. **Kiểm tra input và resume.** Áp `input.schema.json` cùng kiểm tra ngữ nghĩa. Từ chối source head
-   cũ, danh tính đã đăng nhập mà thiếu lease, lease ràng vào principal, mission, generation, origin hay
-   flow khác, thứ tự case không liên tục, và resume không đổi gì.
-2. **Xác nhận giấy phép vào.** Ràng blind visual PASS cuối và quality PASS cuối. UAT sản phẩm chỉ bắt
-   đầu sau cả hai. Những lần chụp hay preflight trước đó chỉ chuẩn bị bằng chứng thị giác tái dùng
-   được; chúng không phải một lần thực thi và không phải phán quyết.
-3. **Chạy preflight ràng buộc.** Kiểm tra danh tính tài khoản và fixture với mọi kho vật lý trước khi
-   danh tính ngoại vi đầu tiên tồn tại.
-4. **Đóng băng snapshot.** Ghi `.worktrees/uat/<feature>/<flow>/snapshot.json` dưới backend Source đã
-   route, kiểm với schema template, đọc lại, và ghi fingerprint nội dung của nó. Một chuỗi đường dẫn mà
-   không có file hợp lệ đọc lại được thì không phải snapshot đã đóng băng.
-5. **Chuẩn bị fixture.** Gieo tập nhỏ nhất mang namespace của lần chạy, đủ để render có nghĩa, rồi dừng
-   trước khi Browser thực thi. Không bao giờ tạo ra kết cục đang kiểm chứng.
-6. **Chạy các case đã đóng băng theo đúng thứ tự đã khai.** Mỗi lúc chỉ một lease đã xác thực hành động
-   trên Browser mà người dùng nhìn thấy. Trước mỗi lần chụp có đăng nhập, kiểm origin, fingerprint
-   principal, generation runtime và hạn của lease; khi lệch thì chỉ vô hiệu phần bằng chứng bị ảnh
-   hưởng rồi lấy lại lease. Không bao giờ khởi động lại API hay frontend để sửa danh tính.
-7. **Chụp theo những khẳng định có tên.** Mỗi ảnh chụp chứng minh đúng một khẳng định có tên và được
-   ghép với bằng chứng runtime trực tiếp nhất hiện có. Các checkpoint lối vào, cam kết vật chất, phản
-   hồi chờ hoặc thất bại vật chất, phục hồi và trạng thái cuối đều đòi ảnh full-viewport; ảnh cắt chỉ
-   là bổ trợ và không bao giờ thay thế được checkpoint bắt buộc.
-8. **Phán ba làn độc lập.** Behavior, UX và UI giữ bằng chứng riêng và không bao giờ được mượn kết luận
-   của nhau. Mâu thuẫn giữa chúng là `FAIL`. Runtime không dùng được hay một làn không có bằng chứng là
-   `BLOCKED`.
-9. **Xác minh chỉ đọc, rồi dọn dẹp.** Bước xác minh chỉ đọc, không ghi. Dọn dẹp chỉ xoá những bản ghi
-   mang cả `is_uat=true` lẫn đúng namespace đã đóng băng.
-10. **Công bố rồi dừng.** Ghi `result.json` bên cạnh snapshot đã kiểm, ràng fingerprint snapshot của
-    nó, đọc lại, ghi fingerprint nội dung, phát đúng một output theo `output.schema.json`, rồi dừng.
-    Trường hợp bị chặn thì không công bố result nào cả.
+| # | Bước | Đọc | Ghi | Dừng với |
+| --- | --- | --- | --- | --- |
+| 1 | Kiểm tra input và resume | input, receipt trước đó, source head đã đóng băng, lease | — | `INVALID_INPUT`, `SOURCE_DRIFT`, `NO_PROGRESS` |
+| 2 | Xác nhận giấy phép vào | blind visual PASS cuối, quality PASS cuối | — | `ADMISSION_MISSING` |
+| 3 | Chạy preflight ràng buộc | danh tính tài khoản và fixture, mọi kho vật lý | — | `PROVISIONING_UNAVAILABLE` |
+| 4 | Đóng băng snapshot | định nghĩa luồng, schema template của snapshot | `snapshot.json` | `CANONICAL_WRITE_DENIED` |
+| 5 | Chuẩn bị fixture | snapshot đã đóng băng, namespace của lần chạy | — | `FIXTURE_VIOLATION` |
+| 6 | Chạy các case đã đóng băng theo đúng thứ tự đã khai | thứ tự case đã đóng băng, origin, fingerprint principal, generation runtime và hạn của lease | — | `LEASE_INVALID`, `RUNTIME_UNAVAILABLE` |
+| 7 | Chụp theo những khẳng định có tên | khẳng định có tên và bằng chứng runtime trực tiếp nhất hiện có | — | `EVIDENCE_UNAVAILABLE` |
+| 8 | Phán ba làn độc lập | bằng chứng behavior, UX và UI, mỗi làn giữ riêng | — | — |
+| 9 | Xác minh chỉ đọc, rồi dọn dẹp | các bản ghi mang cả `is_uat=true` lẫn namespace đã đóng băng | — | — |
+| 10 | Công bố rồi dừng | tất cả những gì ở trên | `result.json` | — |
+
+Khâu kiểm tra từ chối source head cũ, danh tính đã đăng nhập mà thiếu lease, lease ràng vào principal,
+mission, generation, origin hay flow khác, thứ tự case không liên tục, và resume không đổi gì. UAT sản
+phẩm chỉ bắt đầu sau khi cả hai giấy phép vào được ràng: những lần chụp hay preflight trước đó chỉ
+chuẩn bị bằng chứng thị giác tái dùng được, chúng không phải một lần thực thi và không phải phán
+quyết. Preflight chạy trước khi danh tính ngoại vi đầu tiên tồn tại.
+
+Snapshot được ghi tại `.worktrees/uat/<feature>/<flow>/snapshot.json` dưới backend Source đã route,
+kiểm với schema template, đọc lại, và lấy fingerprint nội dung; một chuỗi đường dẫn mà không có file
+hợp lệ đọc lại được thì không phải snapshot đã đóng băng. Fixture gieo tập nhỏ nhất mang namespace của
+lần chạy, đủ để render có nghĩa, rồi dừng trước khi Browser thực thi — không bao giờ tạo ra kết cục
+đang kiểm chứng.
+
+Mỗi lúc chỉ một lease đã xác thực hành động trên Browser mà người dùng nhìn thấy. Trước mỗi lần chụp
+có đăng nhập, origin, fingerprint principal, generation runtime và hạn của lease đều được kiểm; khi
+lệch thì chỉ phần bằng chứng bị ảnh hưởng bị vô hiệu rồi lease được lấy lại, và không bao giờ khởi
+động lại API hay frontend để sửa danh tính. Mỗi ảnh chụp chứng minh đúng một khẳng định có tên và được
+ghép với bằng chứng runtime trực tiếp nhất hiện có; các checkpoint lối vào, cam kết vật chất, phản hồi
+chờ hoặc thất bại vật chất, phục hồi và trạng thái cuối đều đòi ảnh full-viewport, còn ảnh cắt chỉ là
+bổ trợ và không bao giờ thay thế được checkpoint bắt buộc.
+
+Behavior, UX và UI không bao giờ được mượn kết luận của nhau: mâu thuẫn giữa chúng là `FAIL`, còn
+runtime không dùng được hay một làn không có bằng chứng là `BLOCKED`. Bước xác minh chỉ đọc, không
+ghi, và bước dọn dẹp chỉ xoá những bản ghi mang cả `is_uat=true` lẫn đúng namespace đã đóng băng. Khâu
+công bố ghi `result.json` bên cạnh snapshot đã kiểm, ràng fingerprint snapshot của nó, đọc lại, rồi
+ghi fingerprint nội dung. Trường hợp bị chặn thì không công bố result nào cả.
 
 ## Result là phán quyết về một luồng, không phải lệnh sửa
 

@@ -39,37 +39,46 @@ or unavailable broker authentication returns `PROVISIONING_UNAVAILABLE` as `BLOC
 The account record frozen into the snapshot is a closed set of non-secret fields. A password, cookie,
 token, or OTP has nowhere to go, so custody is a shape rather than a discipline.
 
-## Execution sequence
+## Sequence
 
-1. **Validate input and resume.** Apply `input.schema.json` and semantic validation. Reject a stale
-   source head, an authenticated identity with no lease, a lease bound to another principal, mission,
-   generation, origin, or flow, a non-contiguous case order, and an unchanged resume.
-2. **Confirm admission.** Bind the final blind visual PASS and the final quality PASS. Product UAT
-   begins only after both. Earlier capture or preflight prepared reusable visual evidence; it was not
-   an execution and it is not a verdict.
-3. **Run the constraint preflight.** Validate the account and fixture identities against every
-   physical store before the first external identity exists.
-4. **Freeze the snapshot.** Write `.worktrees/uat/<feature>/<flow>/snapshot.json` under the routed
-   backend Source, validate it against the template schema, reparse it, and record its content
-   fingerprint. A path string without a valid reparsed file is not a frozen snapshot.
-5. **Prepare fixtures.** Seed the smallest run-namespaced set needed for a meaningful render and stop
-   before Browser execution. Never create the outcome under test.
-6. **Execute the frozen cases in the declared order.** One authenticated lease acts at a time on the
-   user-visible Browser. Before each authenticated capture, verify the lease origin, principal
-   fingerprint, runtime generation, and expiry; on mismatch invalidate only the affected evidence and
-   reacquire the lease. Never restart the API or the frontend to repair identity.
-7. **Capture against named assertions.** Every capture proves one named assertion and is paired with
-   the most direct runtime evidence available. Entry, material commitment, material pending or failure
-   feedback, recovery, and terminal checkpoints require a full-viewport capture; a crop is
-   supplementary and never satisfies a required checkpoint.
-8. **Judge the three lanes independently.** Behavior, UX, and UI keep separate evidence and are never
-   allowed to borrow each other's conclusions. A contradiction between them is `FAIL`. An unavailable
-   runtime or an unavailable evidence lane is `BLOCKED`.
-9. **Verify read-only, then clean up.** Verification reads; it does not write. Cleanup deletes only
-   records carrying both `is_uat=true` and the exact frozen namespace.
-10. **Publish and stop.** Write `result.json` beside the validated snapshot, bind its snapshot
-    fingerprint, reparse it, record its content fingerprint, emit one output conforming to
-    `output.schema.json`, and stop. Blocking publishes no result at all.
+| # | Step | Reads | Writes | Stops with |
+| --- | --- | --- | --- | --- |
+| 1 | Validate input and resume | input, prior receipt, frozen source head, the lease | — | `INVALID_INPUT`, `SOURCE_DRIFT`, `NO_PROGRESS` |
+| 2 | Confirm admission | the final blind visual PASS, the final quality PASS | — | `ADMISSION_MISSING` |
+| 3 | Run the constraint preflight | account and fixture identities, every physical store | — | `PROVISIONING_UNAVAILABLE` |
+| 4 | Freeze the snapshot | the flow definition, the snapshot template schema | `snapshot.json` | `CANONICAL_WRITE_DENIED` |
+| 5 | Prepare fixtures | the frozen snapshot, the run namespace | — | `FIXTURE_VIOLATION` |
+| 6 | Execute the frozen cases in the declared order | the frozen case order, the lease origin, principal fingerprint, runtime generation, and expiry | — | `LEASE_INVALID`, `RUNTIME_UNAVAILABLE` |
+| 7 | Capture against named assertions | the named assertion and the most direct runtime evidence available | — | `EVIDENCE_UNAVAILABLE` |
+| 8 | Judge the three lanes independently | behavior, UX, and UI evidence, each kept apart | — | — |
+| 9 | Verify read-only, then clean up | the persisted records carrying `is_uat=true` and the frozen namespace | — | — |
+| 10 | Publish and stop | everything above | `result.json` | — |
+
+Validation rejects a stale source head, an authenticated identity with no lease, a lease bound to
+another principal, mission, generation, origin, or flow, a non-contiguous case order, and an unchanged
+resume. Product UAT begins only after both admissions are bound: earlier capture or preflight prepared
+reusable visual evidence, but it was not an execution and it is not a verdict. The preflight runs
+before the first external identity exists.
+
+The snapshot is written at `.worktrees/uat/<feature>/<flow>/snapshot.json` under the routed backend
+Source, validated against the template schema, reparsed, and content-fingerprinted; a path string
+without a valid reparsed file is not a frozen snapshot. Fixtures seed the smallest run-namespaced set
+needed for a meaningful render and stop before Browser execution — never creating the outcome under
+test.
+
+One authenticated lease acts at a time on the user-visible Browser. Before each authenticated capture
+the lease origin, principal fingerprint, runtime generation, and expiry are verified; on mismatch only
+the affected evidence is invalidated and the lease is reacquired, and neither the API nor the frontend
+is ever restarted to repair identity. Every capture proves one named assertion and is paired with the
+most direct runtime evidence available; entry, material commitment, material pending or failure
+feedback, recovery, and terminal checkpoints require a full-viewport capture, and a crop is
+supplementary and never satisfies a required checkpoint.
+
+Behavior, UX, and UI are never allowed to borrow each other's conclusions: a contradiction between
+them is `FAIL`, and an unavailable runtime or evidence lane is `BLOCKED`. Verification reads and does
+not write, and cleanup deletes only records carrying both `is_uat=true` and the exact frozen
+namespace. Publication writes `result.json` beside the validated snapshot, binds its snapshot
+fingerprint, reparses it, and records its content fingerprint. Blocking publishes no result at all.
 
 ## The result is a verdict about a flow, not a repair order
 
