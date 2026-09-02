@@ -4,7 +4,16 @@ import process from 'node:process';
 import { fileURLToPath } from 'node:url';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const agents = JSON.parse(await readFile(path.join(root, 'resources', 'agents.json'), 'utf8'));
+// One file per runtime under resources/agents/profiles; the file name is the runtime id.
+const profilesDir = path.join(root, 'resources', 'agents', 'profiles');
+const agents = { runtimes: {} };
+for (const file of (await readdir(profilesDir)).filter((f) => f.endsWith('.json')).sort()) {
+  const runtime = file.slice(0, -'.json'.length);
+  const group = JSON.parse(await readFile(path.join(profilesDir, file), 'utf8'));
+  if (group.runtime !== runtime) throw new Error(`${file}: runtime must be "${runtime}", got "${group.runtime}"`);
+  if (group.schemaVersion !== 8) throw new Error(`${file}: schemaVersion must be 8`);
+  agents.runtimes[runtime] = group;
+}
 const assignments = JSON.parse(await readFile(path.join(root, 'resources', 'assignments.json'), 'utf8'));
 const errors = [];
 

@@ -22,7 +22,7 @@ its fingerprint and complete rule inventory, and may emit no identifier outside 
 ```text
 SKILL.md                 one entry, fourteen operators, one routing map
 routing.json             14 operators, 76 routes, four kinds: operator | resume | user | external
-resources/               agents.json (2 runtimes: codex, claude; 6 profiles) + assignments.json (14 operators, 21 roles); validated
+resources/               agents/profiles/{codex,claude}.json (6 profiles) + assignments.json (14 operators, 21 roles); validated
 operators/<id>/          fifteen files each; self-test.mjs must pass
 knowledge/
   ui/composition/        what a tree must contain, before it exists   -> fe.direction.decide

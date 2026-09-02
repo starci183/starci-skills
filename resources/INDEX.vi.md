@@ -1,8 +1,8 @@
 # Resources
 
-Ai chạy operator nào, bằng gì, và dưới những chính sách thường trực nào. Hai file đóng mang việc đó:
+Ai chạy operator nào, bằng gì, và dưới những chính sách thường trực nào. Hai chỗ đóng mang việc đó:
 
-- `agents.json`: các profile thực thi, gom theo runtime (`codex`, `claude`); runtime giữ provider,
+- `agents/profiles/<runtime>.json`: mỗi runtime một file (`codex.json`, `claude.json`); file giữ provider,
   profile mang model, cách cô lập, model làm được gì ở đây
   (`capabilities`), và một vai trò trên profile đó được phép dùng gì (`permits`).
 - `assignments.json`: mỗi operator một mục, ghi profile nào chạy từng vai trò, operator thật sự cần

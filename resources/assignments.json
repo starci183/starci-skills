@@ -1,6 +1,6 @@
 {
   "schemaVersion": 8,
-  "note": "One entry per operator. `roles` binds each execution role to a profile id in agents.json. `requires` lists the runtime grants the operator's execute.md actually uses; the validator rejects a role whose profile does not permit them. `policy` answers the three standing questions for every operator: does it search the web when no reference exists in the tree, is it bound to published Grammar, does it generate images.",
+  "note": "One entry per operator. `roles` binds each execution role to a profile id declared in agents/profiles/*.json. `requires` lists the runtime grants the operator's execute.md actually uses; the validator rejects a role whose profile does not permit them. `policy` answers the three standing questions for every operator: does it search the web when no reference exists in the tree, is it bound to published Grammar, does it generate images.",
   "operators": {
     "workspace.bind": {
       "roles": { "resolve": "sonnet" },

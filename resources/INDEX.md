@@ -1,8 +1,8 @@
 # Resources
 
-Who runs each operator, with what, and under which standing policies. Two closed files carry it:
+Who runs each operator, with what, and under which standing policies. Two closed places carry it:
 
-- `agents.json` — the execution profiles grouped by runtime (`codex`, `claude`); a runtime owns
+- `agents/profiles/<runtime>.json` — one file per runtime (`codex.json`, `claude.json`); the file owns
   its provider, a profile carries model, isolation, what the model can do here
   (`capabilities`), and what a role on that profile is allowed to use (`permits`).
 - `assignments.json` — one entry per operator: which profile runs each role, which grants the

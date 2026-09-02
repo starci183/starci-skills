@@ -1,0 +1,65 @@
+{
+  "schemaVersion": 8,
+  "runtime": "codex",
+  "provider": "openai",
+  "note": "Execution profiles run by the codex runtime. Profile ids are unique across every file in this directory and are what assignments.json binds. `capabilities` states what the model can do in this workspace; `permits` states what a role on this profile may use, and must be a subset of capabilities.",
+  "profiles": {
+    "sol-fresh": {
+      "model": "gpt-5.6-sol",
+      "isolation": "fresh",
+      "forkTurns": "none",
+      "count": 1,
+      "role": "One fresh execution that completes a material brainstorm or decision end to end with no inherited turns.",
+      "capabilities": {
+        "webSearch": true,
+        "imageGeneration": true,
+        "browser": true,
+        "sourceWrite": true
+      },
+      "permits": {
+        "webSearch": true,
+        "imageGeneration": true,
+        "browser": true,
+        "sourceWrite": true
+      }
+    },
+    "sol-reviewer": {
+      "model": "gpt-5.6-sol",
+      "isolation": "fresh",
+      "forkTurns": "none",
+      "count": 1,
+      "role": "One fresh reviewer that receives artifacts and claims only, never the producer's rationale, and returns findings without repairing anything. The model can write and draw; this role is forbidden to, by policy.",
+      "capabilities": {
+        "webSearch": true,
+        "imageGeneration": true,
+        "browser": true,
+        "sourceWrite": true
+      },
+      "permits": {
+        "webSearch": false,
+        "imageGeneration": false,
+        "browser": true,
+        "sourceWrite": false
+      }
+    },
+    "luna": {
+      "model": "gpt-5.6-luna",
+      "isolation": "fresh",
+      "forkTurns": "none",
+      "count": 1,
+      "role": "Production execution for authored content: writing, per-language code tracks, image prompts, and the bounded run-read-repair loop.",
+      "capabilities": {
+        "webSearch": true,
+        "imageGeneration": true,
+        "browser": false,
+        "sourceWrite": true
+      },
+      "permits": {
+        "webSearch": false,
+        "imageGeneration": true,
+        "browser": false,
+        "sourceWrite": true
+      }
+    }
+  }
+}
