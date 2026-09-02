@@ -15,7 +15,12 @@ const IMAGE = new Set(['never', 'authority-only', 'required']);
 // Every profile declares every grant explicitly, so a missing key cannot read as "allowed".
 for (const [id, profile] of Object.entries(agents.profiles)) {
   for (const grant of GRANTS) {
+    if (typeof profile.capabilities?.[grant] !== 'boolean') errors.push(`profile ${id}: capabilities.${grant} must be true or false`);
     if (typeof profile.permits?.[grant] !== 'boolean') errors.push(`profile ${id}: permits.${grant} must be true or false`);
+    // A profile may not permit what the model cannot do here; policy narrows capability, never widens it.
+    if (profile.permits?.[grant] === true && profile.capabilities?.[grant] !== true) {
+      errors.push(`profile ${id}: permits.${grant} but capabilities.${grant} is false`);
+    }
   }
   if (profile.isolation !== 'fresh' || profile.forkTurns !== 'none') {
     errors.push(`profile ${id}: material executions are fresh with no inherited turns`);

@@ -1,6 +1,6 @@
 {
   "schemaVersion": 8,
-  "note": "Closed registry of execution profiles. An operator role binds exactly one profile id from here. `permits` lists runtime grants a profile may use in this workspace; it is a policy statement checked against each operator's `requires`, not a claim about what a model can do in the abstract.",
+  "note": "Closed registry of execution profiles. `capabilities` states what the model can do in this workspace; `permits` states what a role on this profile is allowed to use, and must be a subset of capabilities. An operator's `requires` must then be a subset of `permits`.",
   "profiles": {
     "sol-fresh": {
       "provider": "openai",
@@ -9,7 +9,18 @@
       "forkTurns": "none",
       "count": 1,
       "role": "One fresh execution that completes a material brainstorm or decision end to end with no inherited turns.",
-      "permits": { "webSearch": true, "imageGeneration": false, "browser": false, "sourceWrite": false }
+      "capabilities": {
+        "webSearch": true,
+        "imageGeneration": true,
+        "browser": true,
+        "sourceWrite": true
+      },
+      "permits": {
+        "webSearch": true,
+        "imageGeneration": true,
+        "browser": true,
+        "sourceWrite": true
+      }
     },
     "sol-reviewer": {
       "provider": "openai",
@@ -17,8 +28,19 @@
       "isolation": "fresh",
       "forkTurns": "none",
       "count": 1,
-      "role": "One fresh reviewer that receives artifacts and claims only, never the producer's rationale, and returns findings without repairing anything.",
-      "permits": { "webSearch": false, "imageGeneration": false, "browser": true, "sourceWrite": false }
+      "role": "One fresh reviewer that receives artifacts and claims only, never the producer's rationale, and returns findings without repairing anything. The model can write and draw; this role is forbidden to, by policy.",
+      "capabilities": {
+        "webSearch": true,
+        "imageGeneration": true,
+        "browser": true,
+        "sourceWrite": true
+      },
+      "permits": {
+        "webSearch": false,
+        "imageGeneration": false,
+        "browser": true,
+        "sourceWrite": false
+      }
     },
     "luna": {
       "provider": "openai",
@@ -27,7 +49,18 @@
       "forkTurns": "none",
       "count": 1,
       "role": "Production execution for authored content: writing, per-language code tracks, image prompts, and the bounded run-read-repair loop.",
-      "permits": { "webSearch": false, "imageGeneration": true, "browser": false, "sourceWrite": true }
+      "capabilities": {
+        "webSearch": true,
+        "imageGeneration": true,
+        "browser": false,
+        "sourceWrite": true
+      },
+      "permits": {
+        "webSearch": false,
+        "imageGeneration": true,
+        "browser": false,
+        "sourceWrite": true
+      }
     },
     "opus": {
       "provider": "anthropic",
@@ -36,7 +69,18 @@
       "forkTurns": "none",
       "count": 1,
       "role": "Heavy authoring and high-stakes mutation inside a frozen boundary: source apply, backend implementation, release and platform operations.",
-      "permits": { "webSearch": false, "imageGeneration": false, "browser": true, "sourceWrite": true }
+      "capabilities": {
+        "webSearch": true,
+        "imageGeneration": false,
+        "browser": true,
+        "sourceWrite": true
+      },
+      "permits": {
+        "webSearch": false,
+        "imageGeneration": false,
+        "browser": true,
+        "sourceWrite": true
+      }
     },
     "sonnet": {
       "provider": "anthropic",
@@ -45,7 +89,18 @@
       "forkTurns": "none",
       "count": 1,
       "role": "Deterministic and mechanical work: lookups against a closed inventory, gate execution, route verification, non-force publication.",
-      "permits": { "webSearch": false, "imageGeneration": false, "browser": false, "sourceWrite": true }
+      "capabilities": {
+        "webSearch": true,
+        "imageGeneration": false,
+        "browser": true,
+        "sourceWrite": true
+      },
+      "permits": {
+        "webSearch": false,
+        "imageGeneration": false,
+        "browser": false,
+        "sourceWrite": true
+      }
     },
     "fable": {
       "provider": "anthropic",
@@ -54,7 +109,18 @@
       "forkTurns": "none",
       "count": 1,
       "role": "Long-form extraction and documentation grounded in source, such as pattern catalogs and audits that must count rather than assert.",
-      "permits": { "webSearch": false, "imageGeneration": false, "browser": false, "sourceWrite": true }
+      "capabilities": {
+        "webSearch": true,
+        "imageGeneration": false,
+        "browser": true,
+        "sourceWrite": true
+      },
+      "permits": {
+        "webSearch": false,
+        "imageGeneration": false,
+        "browser": false,
+        "sourceWrite": true
+      }
     }
   }
 }
