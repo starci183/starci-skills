@@ -3,6 +3,18 @@
   "id": "fe.direction.decide",
   "domain": "fe",
   "job": "Decide one evidence-backed, implementation-ready frontend direction for one authorized target.",
+  "resources": {
+    "profile": "sol-fresh",
+    "requires": [
+      "webSearch",
+      "browser"
+    ],
+    "policy": {
+      "webSearch": "bounded",
+      "grammarBound": true,
+      "imageGeneration": "authority-only"
+    }
+  },
   "contextContract": "context.md",
   "inputSchema": "input.schema.json",
   "outputSchema": "output.schema.json",

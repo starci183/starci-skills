@@ -61,3 +61,7 @@ Context là chỉ đọc. Operator chỉ ghi feature head và ma trận coverage
 receipt có kiểu của chính nó. Nó không sửa thẩm quyền kiến trúc, thẩm quyền frontend hay phần hiện thực
 backend, và không bao giờ khẳng định rằng một lần hiện thực, một cổng chất lượng hay một lượt UAT đã
 đạt.
+
+## Tài nguyên
+
+Operator này chạy trọn trên profile `sol-fresh` (`gpt-5.6-sol`, runtime `codex`), khai dưới `resources` trong `operator.json` và được `scripts/validate-resources.mjs` kiểm. Quyền nó cần: tìm trên mạng. Nó được tìm trên mạng trong giới hạn đúng khoảng trống phải lấp, có ghi lại, không ràng với Grammar, và không sinh hình. Một quyền không nằm trong `requires` thì không dùng được dù profile có cho phép.

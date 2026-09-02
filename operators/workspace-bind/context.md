@@ -76,3 +76,7 @@ authorises a replacement.
 Context is read-only apart from the machine-local hydrated route state, which is ignored by Git. The
 operator writes only its route receipt under `input.artifactRootRef`. It does not repair a route,
 initialize a workspace, provision an account, publish anything, or record a product decision.
+
+## Resources
+
+This operator runs end to end on the `sonnet` profile (`claude-sonnet-5`, runtime `claude`), declared under `resources` in `operator.json` and validated by `scripts/validate-resources.mjs`. Grants it requires: none. It never searches the web, is not bound to Grammar, and generates no image. A grant absent from `requires` is unavailable even if the profile would permit it.

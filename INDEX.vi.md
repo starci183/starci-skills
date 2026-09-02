@@ -22,8 +22,8 @@ fingerprint và danh sách rule đầy đủ, và không được phát ra mã n
 ```text
 SKILL.md                 một cửa vào, mười bốn operator, một bảng định tuyến
 routing.json             14 operator, 76 route, bốn loại: operator | resume | user | external
-resources/               agents/profiles/{codex,claude}.json (6 profile) + assignments.json (14 operator, mỗi cái một profile); có kiểm
-operators/<id>/          mười lăm file mỗi gói; self-test.mjs phải xanh
+resources/               agents/profiles/{codex,claude}.json (6 profile); mỗi operator.json ràng một profile dưới resources; có kiểm
+operators/<id>/          mười lăm file mỗi gói; operator.json mang resources; self-test.mjs phải xanh
 knowledge/
   ui/composition/        cây phải chứa gì, trước khi nó tồn tại      -> fe.direction.decide
   ui/presentation/       ranh giới do app sở hữu lấy giá trị CSS nào -> fe.presentation.resolve

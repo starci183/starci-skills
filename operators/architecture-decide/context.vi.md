@@ -60,3 +60,7 @@ Context là chỉ đọc. Operator chỉ ghi receipt của nó, hiện trạng q
 render, mô hình stack và bản phản biện, tất cả dưới `input.project.artifactRootRef`. Nó không sửa source
 đã route, không publish thẩm quyền nghiệp vụ, không khởi động hay cấu hình lại dịch vụ runtime, và
 không khẳng định rằng một lần hiện thực, một cổng chất lượng hay một lượt UAT đã đạt.
+
+## Tài nguyên
+
+Operator này chạy trọn trên profile `sol-fresh` (`gpt-5.6-sol`, runtime `codex`), khai dưới `resources` trong `operator.json` và được `scripts/validate-resources.mjs` kiểm. Quyền nó cần: tìm trên mạng. Nó được tìm trên mạng trong giới hạn đúng khoảng trống phải lấp, có ghi lại, không ràng với Grammar, và không sinh hình. Một quyền không nằm trong `requires` thì không dùng được dù profile có cho phép.

@@ -3,6 +3,15 @@
   "id": "fe.presentation.resolve",
   "domain": "fe",
   "job": "Resolve every application-owned presentation property on one already-composed tree to exactly one published rule, emit its class and verifiable contract claim, and stop at the smallest owning gap instead of inventing a value.",
+  "resources": {
+    "profile": "sonnet",
+    "requires": [],
+    "policy": {
+      "webSearch": "never",
+      "grammarBound": true,
+      "imageGeneration": "never"
+    }
+  },
   "contextContract": "context.md",
   "inputSchema": "input.schema.json",
   "outputSchema": "output.schema.json",

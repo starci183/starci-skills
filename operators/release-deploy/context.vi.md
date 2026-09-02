@@ -59,3 +59,7 @@ Context là chỉ đọc. Operator chỉ áp những thay đổi đã khai về 
 đúng release đã đóng băng, ghi receipt dưới `input.project.artifactRootRef`, và khôi phục đúng release
 rollback đã khai khi đi vào nhánh đó. Nó không sửa ý định, không kiểm lại manifest thành một thứ khác,
 không dựng lại artifact bất biến, và không nhận nuôi một release do lần chạy khác sinh ra.
+
+## Tài nguyên
+
+Operator này chạy trọn trên profile `opus` (`claude-opus-5`, runtime `claude`), khai dưới `resources` trong `operator.json` và được `scripts/validate-resources.mjs` kiểm. Quyền nó cần: ghi source. Nó không bao giờ tìm trên mạng, không ràng với Grammar, và không sinh hình. Một quyền không nằm trong `requires` thì không dùng được dù profile có cho phép.

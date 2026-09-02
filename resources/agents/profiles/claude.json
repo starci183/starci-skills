@@ -2,7 +2,7 @@
   "schemaVersion": 8,
   "runtime": "claude",
   "provider": "anthropic",
-  "note": "Execution profiles run by the claude runtime. Profile ids are unique across every file in this directory and are what assignments.json binds. `capabilities` states what the model can do in this workspace; `permits` states what a role on this profile may use, and must be a subset of capabilities.",
+  "note": "Execution profiles run by the claude runtime. Profile ids are unique across every file in this directory and are what each operator binds under `resources` in its operator.json. `capabilities` states what the model can do in this workspace; `permits` states what a role on this profile may use, and must be a subset of capabilities.",
   "profiles": {
     "opus": {
       "model": "claude-opus-5",

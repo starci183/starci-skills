@@ -60,3 +60,7 @@ Context is read-only. The operator writes only the feature head and its coverage
 businesses root, plus its own typed receipt. It does not edit architecture authority, frontend
 authority, or backend implementation, and it never claims that an implementation, a quality gate, or
 a UAT run has passed.
+
+## Resources
+
+This operator runs end to end on the `sol-fresh` profile (`gpt-5.6-sol`, runtime `codex`), declared under `resources` in `operator.json` and validated by `scripts/validate-resources.mjs`. Grants it requires: web search. It may search the web, bounded by the exact gap it must close and recorded, is not bound to Grammar, and generates no image. A grant absent from `requires` is unavailable even if the profile would permit it.

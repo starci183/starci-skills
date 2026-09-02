@@ -3,6 +3,17 @@
   "id": "git.publish",
   "domain": "git",
   "job": "Publish one approved Git boundary from exact mission-owned source heads with non-force, fast-forward-only semantics, and stop with a typed failure rather than reaching for a bypass.",
+  "resources": {
+    "profile": "sonnet",
+    "requires": [
+      "sourceWrite"
+    ],
+    "policy": {
+      "webSearch": "never",
+      "grammarBound": false,
+      "imageGeneration": "never"
+    }
+  },
   "contextContract": "context.md",
   "inputSchema": "input.schema.json",
   "outputSchema": "output.schema.json",

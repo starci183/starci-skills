@@ -79,3 +79,7 @@ failure belongs to whoever owns the boundary and cannot be owed away here.
 
 Context is read-only. The operator writes gate evidence and the receipt under
 `input.project.artifactRootRef`, and nothing else anywhere.
+
+## Resources
+
+This operator runs end to end on the `sonnet` profile (`claude-sonnet-5`, runtime `claude`), declared under `resources` in `operator.json` and validated by `scripts/validate-resources.mjs`. Grants it requires: none. It never searches the web, is not bound to Grammar, and generates no image. A grant absent from `requires` is unavailable even if the profile would permit it.

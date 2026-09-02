@@ -61,3 +61,7 @@ step at all.
 Context is read-only. The operator writes only the resolved tree and its receipt under
 `input.project.artifactRootRef`. It does not edit knowledge, publish Grammar, mutate product source
 outside the resolved artifact, or record a verdict on any node.
+
+## Resources
+
+This operator runs end to end on the `sonnet` profile (`claude-sonnet-5`, runtime `claude`), declared under `resources` in `operator.json` and validated by `scripts/validate-resources.mjs`. Grants it requires: none. It never searches the web, is bound to published Grammar, and generates no image. A grant absent from `requires` is unavailable even if the profile would permit it.

@@ -3,6 +3,15 @@
   "id": "workspace.bind",
   "domain": "workspace",
   "job": "Resolve one project and role into a verified checkout identity, its exact source head, and the closed runtime binding it may consume, and return that as one typed route receipt.",
+  "resources": {
+    "profile": "sonnet",
+    "requires": [],
+    "policy": {
+      "webSearch": "never",
+      "grammarBound": false,
+      "imageGeneration": "never"
+    }
+  },
   "contextContract": "context.md",
   "inputSchema": "input.schema.json",
   "outputSchema": "output.schema.json",

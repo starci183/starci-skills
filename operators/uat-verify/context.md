@@ -62,3 +62,7 @@ Context is read-only. The operator writes the canonical snapshot and result unde
 Source, its receipt under `input.project.artifactRootRef`, and deletes only fixture records carrying
 both `is_uat=true` and the exact frozen namespace. It does not edit the protocol, publish templates,
 repair product source, or promote UI evidence over Behavior or UX evidence.
+
+## Resources
+
+This operator runs end to end on the `sol-reviewer` profile (`gpt-5.6-sol`, runtime `codex`), declared under `resources` in `operator.json` and validated by `scripts/validate-resources.mjs`. Grants it requires: browser. It never searches the web, is not bound to Grammar, and generates no image. A grant absent from `requires` is unavailable even if the profile would permit it.

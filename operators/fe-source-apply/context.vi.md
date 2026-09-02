@@ -59,3 +59,7 @@ Context là chỉ đọc. Operator này là ranh giới đột biến duy nhất
 duy nhất ghi product source, và nó không ghi gì khác. Nó không quyết giá trị, không chọn component,
 không dựng lại cấu trúc cây, không sửa knowledge, không publish Grammar, không chạy service, và không
 ghi phán quyết lên thứ nó vừa ghi.
+
+## Tài nguyên
+
+Operator này chạy trọn trên profile `opus` (`claude-opus-5`, runtime `claude`), khai dưới `resources` trong `operator.json` và được `scripts/validate-resources.mjs` kiểm. Quyền nó cần: ghi source. Nó không bao giờ tìm trên mạng, tuân thủ Grammar đã publish, và không sinh hình. Một quyền không nằm trong `requires` thì không dùng được dù profile có cho phép.

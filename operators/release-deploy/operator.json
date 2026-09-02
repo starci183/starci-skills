@@ -3,6 +3,17 @@
   "id": "release.deploy",
   "domain": "deployment",
   "job": "Deploy one immutable release to one declared target under its declared authorization and prove the steady state it reached, taking the recovery or rollback branch inside the same pass rather than assuming the rollout succeeded.",
+  "resources": {
+    "profile": "opus",
+    "requires": [
+      "sourceWrite"
+    ],
+    "policy": {
+      "webSearch": "never",
+      "grammarBound": false,
+      "imageGeneration": "never"
+    }
+  },
   "contextContract": "context.md",
   "inputSchema": "input.schema.json",
   "outputSchema": "output.schema.json",

@@ -64,3 +64,7 @@ Context là chỉ đọc. Operator ghi snapshot và result chuẩn dưới backe
 dưới `input.project.artifactRootRef`, và chỉ xoá những bản ghi fixture mang cả `is_uat=true` lẫn đúng
 namespace đã đóng băng. Nó không sửa giao thức, không publish template, không sửa product source, và
 không nâng bằng chứng UI lên trên bằng chứng Behavior hay UX.
+
+## Tài nguyên
+
+Operator này chạy trọn trên profile `sol-reviewer` (`gpt-5.6-sol`, runtime `codex`), khai dưới `resources` trong `operator.json` và được `scripts/validate-resources.mjs` kiểm. Quyền nó cần: trình duyệt. Nó không bao giờ tìm trên mạng, không ràng với Grammar, và không sinh hình. Một quyền không nằm trong `requires` thì không dùng được dù profile có cho phép.

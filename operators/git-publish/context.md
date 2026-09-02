@@ -68,3 +68,7 @@ not this operator.
 Context is read-only. The operator writes only its publication receipt under
 `input.artifactRootRef`, plus the push itself: the approved heads on the declared ref, and at most
 one annotated continuation tag pointing at a head this same publication pushed.
+
+## Resources
+
+This operator runs end to end on the `sonnet` profile (`claude-sonnet-5`, runtime `claude`), declared under `resources` in `operator.json` and validated by `scripts/validate-resources.mjs`. Grants it requires: source write. It never searches the web, is not bound to Grammar, and generates no image. A grant absent from `requires` is unavailable even if the profile would permit it.

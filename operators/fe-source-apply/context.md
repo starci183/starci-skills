@@ -59,3 +59,7 @@ Context is read-only. This operator is the single mutation boundary of the front
 the only operator that writes product source, and it writes nothing else. It does not decide values,
 choose components, restructure the tree, edit knowledge, publish Grammar, run a service, or record a
 verdict on what it wrote.
+
+## Resources
+
+This operator runs end to end on the `opus` profile (`claude-opus-5`, runtime `claude`), declared under `resources` in `operator.json` and validated by `scripts/validate-resources.mjs`. Grants it requires: source write. It never searches the web, is bound to published Grammar, and generates no image. A grant absent from `requires` is unavailable even if the profile would permit it.

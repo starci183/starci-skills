@@ -68,3 +68,7 @@ Context là chỉ đọc. Operator chỉ ghi source sản phẩm bên trong `inp
 receipt cùng mọi kết quả proof dưới `input.project.artifactRootRef`. Nó không sửa contract, không
 publish thẩm quyền nghiệp vụ, không đụng file chỉ quan sát, và không ghi phán quyết chất lượng, thị
 giác hay UAT.
+
+## Tài nguyên
+
+Operator này chạy trọn trên profile `opus` (`claude-opus-5`, runtime `claude`), khai dưới `resources` trong `operator.json` và được `scripts/validate-resources.mjs` kiểm. Quyền nó cần: ghi source. Nó không bao giờ tìm trên mạng, không ràng với Grammar, và không sinh hình. Một quyền không nằm trong `requires` thì không dùng được dù profile có cho phép.

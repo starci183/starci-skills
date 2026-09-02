@@ -79,3 +79,7 @@ Một khoản nợ chỉ phủ được một thất bại `in-boundary`, loại
 
 Context là chỉ đọc. Operator ghi bằng chứng gate và receipt dưới `input.project.artifactRootRef`, và
 không ghi gì khác ở bất kỳ đâu.
+
+## Tài nguyên
+
+Operator này chạy trọn trên profile `sonnet` (`claude-sonnet-5`, runtime `claude`), khai dưới `resources` trong `operator.json` và được `scripts/validate-resources.mjs` kiểm. Quyền nó cần: không có. Nó không bao giờ tìm trên mạng, không ràng với Grammar, và không sinh hình. Một quyền không nằm trong `requires` thì không dùng được dù profile có cho phép.

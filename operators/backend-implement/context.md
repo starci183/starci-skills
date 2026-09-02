@@ -69,3 +69,7 @@ Context is read-only. The operator writes product source only inside `input.scop
 and writes the receipt with every proof result under `input.project.artifactRootRef`. It does not edit
 the contract, publish business authority, touch an observation-only file, or record a quality, visual,
 or UAT verdict.
+
+## Resources
+
+This operator runs end to end on the `opus` profile (`claude-opus-5`, runtime `claude`), declared under `resources` in `operator.json` and validated by `scripts/validate-resources.mjs`. Grants it requires: source write. It never searches the web, is not bound to Grammar, and generates no image. A grant absent from `requires` is unavailable even if the profile would permit it.

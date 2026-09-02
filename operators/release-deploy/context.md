@@ -58,3 +58,7 @@ mutations against the frozen release, writes its receipt under `input.project.ar
 restores the exact declared rollback release when that branch is taken. It does not edit the intent,
 revalidate the manifest into something else, rebuild the immutable artifact, or adopt a release that
 appeared from another run.
+
+## Resources
+
+This operator runs end to end on the `opus` profile (`claude-opus-5`, runtime `claude`), declared under `resources` in `operator.json` and validated by `scripts/validate-resources.mjs`. Grants it requires: source write. It never searches the web, is not bound to Grammar, and generates no image. A grant absent from `requires` is unavailable even if the profile would permit it.

@@ -3,6 +3,17 @@
   "id": "fe.source.apply",
   "domain": "fe",
   "job": "Write one already-resolved tree into product source inside a frozen owner ceiling and a declared file set, emitting only values the bound resolution receipt already contains.",
+  "resources": {
+    "profile": "opus",
+    "requires": [
+      "sourceWrite"
+    ],
+    "policy": {
+      "webSearch": "never",
+      "grammarBound": true,
+      "imageGeneration": "never"
+    }
+  },
   "contextContract": "context.md",
   "inputSchema": "input.schema.json",
   "outputSchema": "output.schema.json",

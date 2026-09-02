@@ -65,3 +65,7 @@ wrong, and the audit says so.
 Context is read-only, and so is this operator. It repairs nothing, restyles nothing, writes no product
 source, edits no knowledge, publishes no Grammar, and starts no service. It writes only its capture
 evidence and its receipt under `input.project.artifactRootRef`.
+
+## Resources
+
+This operator runs end to end on the `sol-reviewer` profile (`gpt-5.6-sol`, runtime `codex`), declared under `resources` in `operator.json` and validated by `scripts/validate-resources.mjs`. Grants it requires: browser. It never searches the web, is bound to published Grammar, and generates no image. A grant absent from `requires` is unavailable even if the profile would permit it.

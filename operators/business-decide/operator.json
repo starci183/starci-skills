@@ -3,6 +3,17 @@
   "id": "business.decide",
   "domain": "business",
   "job": "Decide and publish one evidence-backed business promise as durable backend-owned authority, frozen behind a complete promise-to-enforcement coverage matrix.",
+  "resources": {
+    "profile": "sol-fresh",
+    "requires": [
+      "webSearch"
+    ],
+    "policy": {
+      "webSearch": "bounded",
+      "grammarBound": false,
+      "imageGeneration": "never"
+    }
+  },
   "contextContract": "context.md",
   "inputSchema": "input.schema.json",
   "outputSchema": "output.schema.json",

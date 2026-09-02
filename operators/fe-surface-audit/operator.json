@@ -3,6 +3,17 @@
   "id": "fe.surface.audit",
   "domain": "fe",
   "job": "Observe one rendered surface across a declared viewport and state matrix, measure every presentation value it actually produces, compare each measurement against the contract claim on that node, and return findings drawn only from the bound rule inventory.",
+  "resources": {
+    "profile": "sol-reviewer",
+    "requires": [
+      "browser"
+    ],
+    "policy": {
+      "webSearch": "never",
+      "grammarBound": true,
+      "imageGeneration": "never"
+    }
+  },
   "contextContract": "context.md",
   "inputSchema": "input.schema.json",
   "outputSchema": "output.schema.json",

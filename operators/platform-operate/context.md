@@ -59,3 +59,7 @@ by people.
 Context is read-only. The operator writes the approved effect delta on the inventoried service and
 its typed receipt under `input.project.artifactRootRef`. It does not edit knowledge, grant its own
 approval, deploy product, or free a port by stopping the process that holds it.
+
+## Resources
+
+This operator runs end to end on the `opus` profile (`claude-opus-5`, runtime `claude`), declared under `resources` in `operator.json` and validated by `scripts/validate-resources.mjs`. Grants it requires: source write. It never searches the web, is not bound to Grammar, and generates no image. A grant absent from `requires` is unavailable even if the profile would permit it.

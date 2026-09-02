@@ -3,6 +3,17 @@
   "id": "uat.verify",
   "domain": "test",
   "job": "Verify one product-decision flow against inputs frozen before execution and publish its canonical backend-owned snapshot and result pair, or stop at the exact unavailability instead of manufacturing a verdict.",
+  "resources": {
+    "profile": "sol-reviewer",
+    "requires": [
+      "browser"
+    ],
+    "policy": {
+      "webSearch": "never",
+      "grammarBound": false,
+      "imageGeneration": "never"
+    }
+  },
   "contextContract": "context.md",
   "inputSchema": "input.schema.json",
   "outputSchema": "output.schema.json",

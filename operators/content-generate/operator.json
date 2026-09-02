@@ -3,6 +3,19 @@
   "id": "content.generate",
   "domain": "content",
   "job": "Generate or refactor one educational content unit in one linear pass: a teacher brief that constrains everything after it, one written edition per declared language, images made to a stated claim, code and executable checks that actually run, and an independent critique that receives the artifact without the producer's rationale.",
+  "resources": {
+    "profile": "luna",
+    "requires": [
+      "webSearch",
+      "imageGeneration",
+      "sourceWrite"
+    ],
+    "policy": {
+      "webSearch": "bounded",
+      "grammarBound": false,
+      "imageGeneration": "required"
+    }
+  },
   "contextContract": "context.md",
   "inputSchema": "input.schema.json",
   "outputSchema": "output.schema.json",

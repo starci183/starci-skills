@@ -3,6 +3,15 @@
   "id": "quality.verify",
   "domain": "quality",
   "job": "Verify one bounded delivery by running its declared static gates against an unchanged upstream fingerprint and return the exact measured receipt, repairing nothing.",
+  "resources": {
+    "profile": "sonnet",
+    "requires": [],
+    "policy": {
+      "webSearch": "never",
+      "grammarBound": false,
+      "imageGeneration": "never"
+    }
+  },
   "contextContract": "context.md",
   "inputSchema": "input.schema.json",
   "outputSchema": "output.schema.json",

@@ -3,6 +3,17 @@
   "id": "backend.implement",
   "domain": "be",
   "job": "Implement one backend outcome inside a frozen mutation contract, following the observed sibling family, and return the measured conformance and proof receipt that shows the boundary was not widened.",
+  "resources": {
+    "profile": "opus",
+    "requires": [
+      "sourceWrite"
+    ],
+    "policy": {
+      "webSearch": "never",
+      "grammarBound": false,
+      "imageGeneration": "never"
+    }
+  },
   "contextContract": "context.md",
   "inputSchema": "input.schema.json",
   "outputSchema": "output.schema.json",

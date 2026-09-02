@@ -64,3 +64,7 @@ cách nhất quán, và audit nói thẳng ra điều đó.
 Context là chỉ đọc, và operator này cũng vậy. Nó không sửa gì, không restyle gì, không ghi product
 source, không sửa knowledge, không publish Grammar, và không khởi động service nào. Nó chỉ ghi bằng
 chứng chụp được và receipt của nó dưới `input.project.artifactRootRef`.
+
+## Tài nguyên
+
+Operator này chạy trọn trên profile `sol-reviewer` (`gpt-5.6-sol`, runtime `codex`), khai dưới `resources` trong `operator.json` và được `scripts/validate-resources.mjs` kiểm. Quyền nó cần: trình duyệt. Nó không bao giờ tìm trên mạng, tuân thủ Grammar đã publish, và không sinh hình. Một quyền không nằm trong `requires` thì không dùng được dù profile có cho phép.

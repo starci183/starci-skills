@@ -58,3 +58,7 @@ còn output contract từ chối cả cái handle, vì receipt là bản ghi lâ
 Context chỉ để đọc. Operator ghi phần delta effect đã duyệt lên dịch vụ đã kiểm kê, cùng receipt có
 kiểu dưới `input.project.artifactRootRef`. Nó không sửa knowledge, không tự cấp phê duyệt cho mình,
 không deploy product, và không giải phóng một cổng bằng cách dừng tiến trình đang giữ cổng đó.
+
+## Tài nguyên
+
+Operator này chạy trọn trên profile `opus` (`claude-opus-5`, runtime `claude`), khai dưới `resources` trong `operator.json` và được `scripts/validate-resources.mjs` kiểm. Quyền nó cần: ghi source. Nó không bao giờ tìm trên mạng, không ràng với Grammar, và không sinh hình. Một quyền không nằm trong `requires` thì không dùng được dù profile có cho phép.

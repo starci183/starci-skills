@@ -5,21 +5,23 @@ Who runs each operator, with what, and under which standing policies. Two closed
 - `agents/profiles/<runtime>.json` — one file per runtime (`codex.json`, `claude.json`); the file owns
   its provider, a profile carries model, isolation, what the model can do here
   (`capabilities`), and what an operator on that profile is allowed to use (`permits`).
-- `assignments.json` — one entry per operator: the one profile that runs it end to end, which grants
-  the operator actually requires, and its answer to the three standing questions.
+- `operators/<id>/operator.json` → `resources` — inside each operator: the one profile that runs it
+  end to end, which grants it actually requires, and its answers to the three standing questions.
+  Each operator's `context.md` states the same binding in prose. There is no central assignment file.
 
-`scripts/validate-resources.mjs` runs inside `npm test`. It rejects an operator with no assignment, an
-operator bound to an unknown profile or split across several, a required grant no assigned profile permits, a profile that permits
+`scripts/validate-resources.mjs` runs inside `npm test`. It rejects an operator whose `operator.json` declares no
+`resources`, an operator bound to an unknown profile, a required grant no assigned profile permits, a profile that permits
 what its model cannot do, a policy answer that
-contradicts the grants, and a model an operator's own schema pins that no assigned profile uses. The
-registry and the operator contracts therefore cannot drift apart silently.
+contradicts the grants, a model an operator's own schema pins that is not its profile's model, and a row of the
+process matrix below that disagrees with the operator it summarises. The registry, the operators,
+and this summary therefore cannot drift apart silently.
 
 ## Binding rule
 
 An operator binds exactly one profile and runs on it end to end, never per invocation and never
 split across profiles: a critique, review, or judgement inside an operator is a step of that one
 execution, and a second model for it would be a workflow. The profile decides the model and the
-isolation; the operator's `execute.md` decides the work; the assignment decides which grants that
+isolation; the operator's `execute.md` decides the work; `resources.requires` decides which grants that
 work may touch. A grant absent from `requires` is unavailable to the operator even if the profile
 would permit it. Capability is a fact about the model; permission is a policy about the
 operator: `gpt-5.6-sol` can search, draw, drive a browser, and write source, so `sol-fresh` may use all
@@ -45,6 +47,8 @@ itself renders an inspectable page, and product artwork is generated only when p
 names it. Everywhere else, `never`.
 
 ## Process matrix
+
+A summary of what each `operator.json` declares; the validator rejects a row that disagrees.
 
 | Operator | Profile | Web | Grammar | Images | Why this shape |
 | --- | --- | --- | --- | --- | --- |
@@ -87,5 +91,6 @@ it today.
 ## What may change here
 
 A profile's model or grants, an operator's profile, and any policy answer are owner decisions.
-Changing one is a one-line edit in the JSON plus a green `npm test`. Adding a grant kind means adding
+Changing one is an edit in the profile file or the operator's `operator.json`, the matching line in
+its `context.md`, and a green `npm test`. Adding a grant kind means adding
 it to every profile explicitly, because the validator refuses a profile that leaves a grant unstated.

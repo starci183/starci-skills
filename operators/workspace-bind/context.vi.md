@@ -74,3 +74,7 @@ không bao giờ cho phép dựng một task thay thế.
 Context là chỉ đọc, trừ phần route đã hydrate cục bộ theo máy vốn bị Git bỏ qua. Operator chỉ ghi
 receipt route của nó dưới `input.artifactRootRef`. Nó không sửa route, không khởi tạo workspace, không
 cấp tài khoản, không publish gì, và không ghi một quyết định sản phẩm nào.
+
+## Tài nguyên
+
+Operator này chạy trọn trên profile `sonnet` (`claude-sonnet-5`, runtime `claude`), khai dưới `resources` trong `operator.json` và được `scripts/validate-resources.mjs` kiểm. Quyền nó cần: không có. Nó không bao giờ tìm trên mạng, không ràng với Grammar, và không sinh hình. Một quyền không nằm trong `requires` thì không dùng được dù profile có cho phép.

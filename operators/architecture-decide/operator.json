@@ -3,6 +3,17 @@
   "id": "architecture.decide",
   "domain": "architecture",
   "job": "Decide one architecture with its tech stack, system boundaries, and data ownership, and prove it against observed current state, rejected alternatives, verified compatibility, and an independent critique.",
+  "resources": {
+    "profile": "sol-fresh",
+    "requires": [
+      "webSearch"
+    ],
+    "policy": {
+      "webSearch": "bounded",
+      "grammarBound": false,
+      "imageGeneration": "never"
+    }
+  },
   "contextContract": "context.md",
   "inputSchema": "input.schema.json",
   "outputSchema": "output.schema.json",

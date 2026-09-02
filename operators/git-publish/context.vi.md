@@ -68,3 +68,7 @@ operator này.
 Context là chỉ đọc. Operator chỉ ghi receipt publication dưới `input.artifactRootRef`, cộng với chính
 cú push: các head đã duyệt trên ref đã khai, và nhiều nhất một tag continuation có chú thích trỏ vào
 một head do chính lần publish này đẩy lên.
+
+## Tài nguyên
+
+Operator này chạy trọn trên profile `sonnet` (`claude-sonnet-5`, runtime `claude`), khai dưới `resources` trong `operator.json` và được `scripts/validate-resources.mjs` kiểm. Quyền nó cần: ghi source. Nó không bao giờ tìm trên mạng, không ràng với Grammar, và không sinh hình. Một quyền không nằm trong `requires` thì không dùng được dù profile có cho phép.

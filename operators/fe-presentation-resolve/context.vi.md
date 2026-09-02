@@ -61,3 +61,7 @@ tới bước khớp case.
 Context là chỉ đọc. Operator chỉ ghi cây kết quả và receipt của nó dưới
 `input.project.artifactRootRef`. Nó không sửa knowledge, không publish Grammar, không đụng vào product
 source ngoài phần artifact kết quả, và không ghi phán quyết lên bất kỳ node nào.
+
+## Tài nguyên
+
+Operator này chạy trọn trên profile `sonnet` (`claude-sonnet-5`, runtime `claude`), khai dưới `resources` trong `operator.json` và được `scripts/validate-resources.mjs` kiểm. Quyền nó cần: không có. Nó không bao giờ tìm trên mạng, tuân thủ Grammar đã publish, và không sinh hình. Một quyền không nằm trong `requires` thì không dùng được dù profile có cho phép.

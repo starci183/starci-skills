@@ -5,21 +5,23 @@ Ai chạy operator nào, bằng gì, và dưới những chính sách thường 
 - `agents/profiles/<runtime>.json`: mỗi runtime một file (`codex.json`, `claude.json`); file giữ provider,
   profile mang model, cách cô lập, model làm được gì ở đây
   (`capabilities`), và một operator trên profile đó được phép dùng gì (`permits`).
-- `assignments.json`: mỗi operator một mục, ghi đúng một profile chạy nó từ đầu tới cuối, operator
-  thật sự cần những quyền nào, và câu trả lời của nó cho ba câu hỏi thường trực.
+- `operators/<id>/operator.json` → `resources`: nằm trong chính operator: đúng một profile chạy nó từ
+  đầu tới cuối, những quyền nó thật sự cần, và câu trả lời cho ba câu hỏi thường trực. `context.md`
+  của mỗi operator nói cùng ràng buộc đó bằng văn xuôi. Không có file assignment trung tâm.
 
-`scripts/validate-resources.mjs` chạy bên trong `npm test`. Nó từ chối operator không có assignment,
-operator trỏ tới profile không tồn tại hay bị chia cho nhiều profile, một id profile khai ở hai runtime, quyền được yêu cầu mà không profile nào được cấp, profile cho phép
+`scripts/validate-resources.mjs` chạy bên trong `npm test`. Nó từ chối operator mà `operator.json` không khai
+`resources`, operator trỏ tới profile không tồn tại, một id profile khai ở hai runtime, quyền được yêu cầu mà không profile nào được cấp, profile cho phép
 thứ model không làm được, câu trả lời
-chính sách mâu thuẫn với quyền, và model mà schema của operator đã ghim nhưng không profile nào dùng.
-Nhờ vậy sổ đăng ký và hợp đồng operator không thể lặng lẽ lệch nhau.
+chính sách mâu thuẫn với quyền, model mà schema của operator đã ghim nhưng không phải model của profile nó, và một dòng trong ma
+trận bên dưới lệch với operator mà nó tóm tắt. Nhờ vậy sổ đăng ký, các operator và bản tóm tắt này
+không thể lặng lẽ lệch nhau.
 
 ## Luật ràng buộc
 
 Operator ràng đúng một profile và chạy trọn trên đó, không theo từng lần gọi và không chia cho
 nhiều profile: một bước phản biện, review hay phán xét bên trong operator là một bước của chính lần
 thực thi đó, và đưa model thứ hai vào là thành workflow. Profile quyết model và cách cô lập;
-`execute.md` của operator quyết công việc; assignment quyết công việc đó được chạm tới quyền nào.
+`execute.md` của operator quyết công việc; `resources.requires` quyết công việc đó được chạm tới quyền nào.
 Một quyền không nằm trong `requires` thì operator không dùng được dù profile có cho phép. Năng lực là sự thật về model; quyền là chính sách về operator:
 `gpt-5.6-sol` tìm được, vẽ được, lái được trình duyệt và ghi được source, nên `sol-fresh` được dùng cả
 bốn, còn `sol-reviewer` trên cùng model đó chỉ được trình duyệt, vì một reviewer mà tự tạo ra thì
@@ -47,6 +49,8 @@ direction render một trang xem được, còn artwork sản phẩm chỉ đư�
 tên nó. Mọi nơi khác, `never`.
 
 ## Ma trận quy trình
+
+Bản tóm tắt những gì mỗi `operator.json` khai; validator từ chối dòng nào lệch.
 
 | Operator | Profile | Mạng | Grammar | Hình | Vì sao hình dạng này |
 | --- | --- | --- | --- | --- | --- |
@@ -89,6 +93,7 @@ ràng nó.
 ## Thứ được phép đổi ở đây
 
 Model hay quyền của một profile, profile của một operator, và bất kỳ câu trả lời chính sách nào đều
-là quyết định của chủ. Đổi một thứ là sửa một dòng JSON cộng `npm test` xanh. Thêm một loại quyền
+là quyết định của chủ. Đổi một thứ là sửa file profile hay `operator.json` của operator, dòng tương ứng trong `context.md`
+của nó, cộng `npm test` xanh. Thêm một loại quyền
 nghĩa là phải thêm nó tường minh vào mọi profile, vì validator từ chối profile nào bỏ trống một
 quyền.

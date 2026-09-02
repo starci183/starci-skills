@@ -71,3 +71,7 @@ failure, unresolved adverse state, or materially stronger reversible alternative
 The operator may read only the declared context references. It may write only its receipt and
 inspectable visual artifacts under `input.project.artifactRootRef`. Product source, business heads,
 backend contracts, architecture decisions, Grammar packages, UAT, and audit history are read-only.
+
+## Resources
+
+This operator runs end to end on the `sol-fresh` profile (`gpt-5.6-sol`, runtime `codex`), declared under `resources` in `operator.json` and validated by `scripts/validate-resources.mjs`. Grants it requires: web search, browser. It may search the web, bounded by the exact gap it must close and recorded, is bound to published Grammar, and generates product artwork only when product authority names it. A grant absent from `requires` is unavailable even if the profile would permit it.
