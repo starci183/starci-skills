@@ -10,33 +10,37 @@ Nó không quyết định gì về bản thân thay đổi. Việc công việc
 `completionProofRefs` chốt lại, còn việc nó có được publish hay không đã do phê duyệt chốt lại.
 Operator này chỉ thực hiện cú ghi, hoặc báo chính xác vì sao nó không ghi.
 
-## Trình tự thực thi
+## Trình tự
 
-1. **Kiểm tra input và resume.** Áp `input.schema.json` cùng kiểm tra ngữ nghĩa. Từ chối một receipt
-   route ràng ở nơi khác, một phê duyệt cho đơn vị khác, một danh mục thiếu `pre-push`, một quan sát
-   remote của ref khác, một checkout liệt kê hai lần, một branch mà chính sách đã route cấm, một lần
-   publish không có gì đi trước upstream, một đường dẫn bẩn ngoài ranh giới, và một resume không đổi
-   gì.
-2. **Ràng route.** Đọc receipt route đã ràng: checkout đã xác minh, head của nó, và chính sách đã
-   route. Không phân giải đường dẫn nào. Một receipt không ở trạng thái `bound`, hoặc thuộc project
-   khác, là `ROUTE_UNVERIFIED`.
-3. **Ràng phê duyệt.** Xác nhận đúng một phê duyệt gọi tên chính đơn vị ranh giới này, nếu không thì
-   trả `APPROVAL_MISSING`. Bằng chứng hoàn thành cho thấy công việc đã xong; nó không bao giờ cho thấy
-   công việc được phép publish.
-4. **Xác minh cây làm việc.** Đối chiếu head quan sát được với head đã đóng băng, nếu lệch thì trả
-   `SOURCE_DRIFT`. Xác nhận mọi đường dẫn bẩn nằm dưới một write root đã khai, nếu không thì trả
-   `DIRTY_OUTSIDE_BOUNDARY`, và ghi `BOUNDARY_CLEAN` khi không có gì đi lạc. Đối chiếu mọi branch với
-   chính sách đã route, nếu không thì trả `BRANCH_POLICY_VIOLATION`.
-5. **Chạy hook.** Push với hook được thi hành. Ghi một finding `HOOK_ENFORCED` cho mỗi hook đã chạy.
-   Một hook hỏng là `HOOK_BLOCKED` kèm tên hook đó, do source sở hữu.
-6. **Push không force.** Đẩy các head đã duyệt lên ref đã khai. Một remote từ chối cú push vì nó mang
-   những commit mà ref cục bộ không có là `NON_FAST_FORWARD`, kèm tên head remote đã quan sát, do
-   remote sở hữu. Ghi `REMOTE_FAST_FORWARDED` cho mỗi ref đã tiến lên và `REMOTE_REF_CREATED` cho mỗi
-   ref do lần publish này tạo ra.
-7. **Push tag continuation.** Khi có yêu cầu, đẩy đúng một tag có chú thích trỏ vào một head do chính
-   lần publish này đẩy lên, rồi ghi `CONTINUATION_TAG_PUBLISHED`.
-8. **Phát ra và dừng.** Ghi bản ghi publication dưới `input.artifactRootRef`, phát đúng một output hợp
-   với `output.schema.json`, và ràng mọi fingerprint.
+| # | Bước | Đọc | Ghi | Dừng với |
+| --- | --- | --- | --- | --- |
+| 1 | Kiểm tra input và resume | input, receipt trước đó, head đã đóng băng, quan sát remote | — | `INVALID_INPUT`, `SOURCE_DRIFT`, `NO_PROGRESS` |
+| 2 | Ràng route | receipt route đã ràng: checkout đã xác minh, head của nó, chính sách đã route | — | `ROUTE_UNVERIFIED` |
+| 3 | Ràng phê duyệt | phê duyệt gọi tên đơn vị ranh giới này, bằng chứng hoàn thành | — | `APPROVAL_MISSING` |
+| 4 | Xác minh cây làm việc | head quan sát được, các đường dẫn bẩn, các write root đã khai, mọi branch, chính sách đã route | — | `DIRTY_OUTSIDE_BOUNDARY`, `BRANCH_POLICY_VIOLATION` |
+| 5 | Chạy hook | danh mục hook, trong đó có `pre-push` | — | `HOOK_BLOCKED` |
+| 6 | Push không force | các head đã duyệt, ref đã khai, head remote quan sát được | — | `NON_FAST_FORWARD` |
+| 7 | Push tag continuation | tag được yêu cầu và các head mà lần publish này đã đẩy | — | — |
+| 8 | Phát ra và dừng | tất cả những gì ở trên | `publication.json` | — |
+
+Khâu kiểm tra từ chối một receipt route ràng ở nơi khác, một phê duyệt cho đơn vị khác, một danh mục
+thiếu `pre-push`, một quan sát remote của ref khác, một checkout liệt kê hai lần, một branch mà chính
+sách đã route cấm, một lần publish không có gì đi trước upstream, một đường dẫn bẩn ngoài ranh giới,
+và một resume không đổi gì. Head quan sát được còn được đối chiếu lại với head đã đóng băng trong lúc
+xác minh cây làm việc, và một khác biệt ở đó trả về đúng lỗi trôi ấy trước khi có gì được đẩy lên.
+
+Việc ràng route không tự phân giải đường dẫn nào: một receipt không ở trạng thái `bound`, hoặc thuộc
+project khác, thì bị từ chối. Bằng chứng hoàn thành cho thấy công việc đã xong; nó không bao giờ cho
+thấy công việc được phép publish, nên phải có đúng một phê duyệt gọi tên chính đơn vị ranh giới này.
+
+Khâu xác minh ghi `BOUNDARY_CLEAN` khi không có gì đi lạc ra ngoài một write root đã khai. Hook được
+thi hành trên cú push và mỗi hook đã chạy ghi một `HOOK_ENFORCED`; một hook hỏng thì kèm tên hook đó
+và do source sở hữu. Một remote từ chối cú push vì nó mang những commit mà ref cục bộ không có thì kèm
+tên head remote đã quan sát và do remote sở hữu, còn mỗi ref đã tiến lên ghi `REMOTE_FAST_FORWARDED`
+và mỗi ref do lần publish này tạo ra ghi `REMOTE_REF_CREATED`. Khi có yêu cầu tag continuation, đúng
+một tag có chú thích được đẩy lên tại một head do chính lần publish này đẩy, rồi ghi
+`CONTINUATION_TAG_PUBLISHED`. Khâu phát ra ghi bản ghi publication dưới `input.artifactRootRef`, phát
+đúng một output hợp với `output.schema.json`, và ràng mọi fingerprint.
 
 ## Hook chặn là một failure có kiểu, không phải cái cớ để thử lại
 

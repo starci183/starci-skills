@@ -10,33 +10,38 @@ It decides nothing about the change itself. Whether the work is correct was sett
 produced `completionProofRefs`, and whether it may be published was settled by the approval. This
 operator only performs the write, or reports precisely why it did not.
 
-## Execution sequence
+## Sequence
 
-1. **Validate input and resume.** Apply `input.schema.json` and semantic validation. Reject a route
-   receipt bound elsewhere, an approval for another unit, an inventory without `pre-push`, a remote
-   observation of a different ref, a checkout listed twice, a branch the routed policy forbids, a
-   publication with nothing ahead of upstream, a dirty path outside the boundary, and an unchanged
-   resume.
-2. **Bind the route.** Read the bound route receipt: the verified checkout, its head, and its routed
-   policy. Do not resolve a path. A receipt that is not `bound`, or that belongs to another project,
-   is `ROUTE_UNVERIFIED`.
-3. **Bind the approval.** Confirm one approval naming exactly this boundary unit, or return
-   `APPROVAL_MISSING`. Completion proof is evidence that the work is finished; it is never evidence
-   that it may be published.
-4. **Verify the tree.** Confirm the observed head against the frozen head, or return `SOURCE_DRIFT`.
-   Confirm every dirty path lies under a declared write root, or return `DIRTY_OUTSIDE_BOUNDARY`,
-   and record `BOUNDARY_CLEAN` when nothing strays. Confirm every branch against the routed policy,
-   or return `BRANCH_POLICY_VIOLATION`.
-5. **Run the hooks.** Push with hooks enforced. Record one `HOOK_ENFORCED` finding per hook that ran.
-   A failing hook is `HOOK_BLOCKED` naming that hook, owned by the source.
-6. **Push non-force.** Push the approved heads onto the declared ref. A remote that rejects the push
-   because it carries commits the local ref does not is `NON_FAST_FORWARD`, naming the observed
-   remote head, owned by the remote. Record `REMOTE_FAST_FORWARDED` for each ref that advanced and
-   `REMOTE_REF_CREATED` for each ref this publication created.
-7. **Push the continuation tag.** When one is requested, push exactly one annotated tag pointing at a
-   head this same publication pushed, and record `CONTINUATION_TAG_PUBLISHED`.
-8. **Emit and stop.** Write the publication record under `input.artifactRootRef`, emit one output
-   conforming to `output.schema.json`, and bind every fingerprint.
+| # | Step | Reads | Writes | Stops with |
+| --- | --- | --- | --- | --- |
+| 1 | Validate input and resume | input, prior receipt, frozen head, remote observation | — | `INVALID_INPUT`, `SOURCE_DRIFT`, `NO_PROGRESS` |
+| 2 | Bind the route | bound route receipt: verified checkout, its head, its routed policy | — | `ROUTE_UNVERIFIED` |
+| 3 | Bind the approval | the approval naming this boundary unit, completion proof | — | `APPROVAL_MISSING` |
+| 4 | Verify the tree | observed head, dirty paths, declared write roots, every branch, routed policy | — | `DIRTY_OUTSIDE_BOUNDARY`, `BRANCH_POLICY_VIOLATION` |
+| 5 | Run the hooks | hook inventory including `pre-push` | — | `HOOK_BLOCKED` |
+| 6 | Push non-force | approved heads, declared ref, observed remote head | — | `NON_FAST_FORWARD` |
+| 7 | Push the continuation tag | the requested tag and the heads this publication pushed | — | — |
+| 8 | Emit and stop | everything above | `publication.json` | — |
+
+Validation rejects a route receipt bound elsewhere, an approval for another unit, an inventory without
+`pre-push`, a remote observation of a different ref, a checkout listed twice, a branch the routed
+policy forbids, a publication with nothing ahead of upstream, a dirty path outside the boundary, and
+an unchanged resume. The observed head is confirmed against the frozen head again while verifying the
+tree, and a difference returns the same drift failure before anything is pushed.
+
+Binding the route resolves no path of its own: a receipt that is not `bound`, or that belongs to
+another project, is refused. Completion proof is evidence that the work is finished; it is never
+evidence that it may be published, so exactly one approval must name this boundary unit.
+
+Verification records `BOUNDARY_CLEAN` when nothing strays outside a declared write root. Hooks are
+enforced on the push and each hook that ran records `HOOK_ENFORCED`; a failing hook names that hook
+and is owned by the source. A remote that rejects the push because it carries commits the local ref
+does not names the observed remote head and is owned by the remote, while each ref that advanced
+records `REMOTE_FAST_FORWARDED` and each ref this publication created records `REMOTE_REF_CREATED`.
+When a continuation tag is requested, exactly one annotated tag is pushed at a head this same
+publication pushed and `CONTINUATION_TAG_PUBLISHED` is recorded. Emission writes the publication
+record under `input.artifactRootRef`, returns one output conforming to `output.schema.json`, and binds
+every fingerprint.
 
 ## A blocked hook is a typed failure, not a retry
 
