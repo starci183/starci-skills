@@ -45,9 +45,9 @@ A topic lives with the operator that reads it. A topic no operator reads has no 
 
 | Group | Decides | Read by |
 | --- | --- | --- |
-| [`composition/`](composition/INDEX.md) | Constraints a direction must satisfy, after taste is decided in grammars | `fe.direction.decide` |
-| [`presentation/`](presentation/INDEX.md) | Which CSS value an app-owned boundary takes | `fe.presentation.resolve` |
-| [`proof/`](proof/INDEX.md) | What only becomes true once rendered | `fe.surface.audit` |
+| [`composition/`](composition/INDEX.md) | Constraints a direction must satisfy, after taste is decided in grammars | `frontend.direction.decide` |
+| [`presentation/`](presentation/INDEX.md) | Which CSS value an app-owned boundary takes | `frontend.presentation.resolve` |
+| [`proof/`](proof/INDEX.md) | What only becomes true once rendered | `frontend.surface.audit` |
 
 The test that places a topic is whether reading source answers it. A spacing value is readable from a
 class, so it is presentation. The number of dominant actions is settled before any tree exists, so it

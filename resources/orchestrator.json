@@ -15,7 +15,7 @@
   },
   "concurrency": {
     "rule": "at most maxConcurrentAgents agents at once; branches of one step run concurrently only when their Writes touch no common alias",
-    "sharedCheckout": "two agents may read one checkout; only one may hold it for writing (backend.implement, fe.source.apply, git.publish are exclusive per checkout)",
+    "sharedCheckout": "two agents may read one checkout; only one may hold it for writing (backend.source.apply, frontend.source.apply, git.publish are exclusive per checkout)",
     "sharedRoot": "business.decide is exclusive per businesses root; platform.operate is exclusive per runtime owner"
   },
   "handoff": {
@@ -26,10 +26,18 @@
   },
   "session": {
     "root": "<Source>/.worktrees/sessions/<sessionId>/",
-    "id": "<yyyymmdd-HHMMss>-<project>-<first operator>, e.g. 20260903-142200-starci-academy-fe.direction.decide",
+    "id": "<yyyymmdd-HHMMss>-<project>-<first operator>, e.g. 20260903-142200-starci-academy-frontend.direction.decide",
     "manifest": "state.json: id, project, startedAt, status (running | blocked | done), chain [[\"1/1\"], [\"2/1\", \"2/2\"], ...], steps { \"N/M\": operatorId }, current, leases { \"N/M\": { agent, holds } }, requestHashes { \"N/M\": sha256 of request/request.json }",
     "branch": "step-<N>/parallel-<M>/ — N is the position in the chain, M the parallel branch; parallel-1 always exists",
-    "branchLayout": ["request/request.json", "response/response.json", "response/response.md", "response/<other>.md when the operator has one", "response/data/", "response/artifacts/", "<exchange>/request/request.json and <exchange>/response/ for a nested exchange"],
+    "branchLayout": [
+      "request/request.json",
+      "response/response.json",
+      "response/response.md",
+      "response/<other>.md when the operator has one",
+      "response/data/",
+      "response/artifacts/",
+      "<exchange>/request/request.json and <exchange>/response/ for a nested exchange"
+    ],
     "paths": "inside request.json inputs: from the session root (step-1/parallel-1/response/response.md); inside response.json fields and operator.md Outputs: from the branch (response/response.md, critique/response/critique.md)",
     "lifecycle": [
       "create: the orchestrator writes state.json and takes the leases before the first agent starts",
@@ -39,5 +47,11 @@
       "block: status blocked keeps the session on disk; the orchestrator asks the person for the field the stop names, then re-enters the operator in step-(N+1)/parallel-1 with resume set",
       "done: when routing reaches user or external, or git.publish emits done, the orchestrator releases the leases and deletes the session folder; what survives is what the steps published (commits, business heads, UAT pairs, remote runs) and any audit record the owner copies out first"
     ]
+  },
+  "sourceWrites": {
+    "rule": "an operator that writes source (frontend.source.apply, backend.source.apply) writes only on the session branch session/<sessionId> of the routed checkout, in a git worktree the orchestrator prepared from the frozen head; it commits the declared write set once and records the sha in response.json.commits; the person's checked-out branch is never touched",
+    "track": "changes.md names every path with before/after hashes and the commit; the next requests pin @workspaces/<role> at that sha (contexts[].head) so quality.verify and frontend.surface.audit verify exactly what was written",
+    "publish": "git.publish merges the session branch into the target branch: fast-forward when the target has not moved; a merge commit only when there is no conflict and the gates are re-run on the merge result; a conflict is NON_FAST_FORWARD and a person resolves it; never rebase, never force",
+    "cleanup": "after a successful publish the worktree and the session branch are removed together with the session folder; a blocked session keeps both"
   }
 }

@@ -1,0 +1,44 @@
+{
+  "$id": "kind:checks",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["serviceRef", "serviceKind", "requiredCheckNames", "checks", "findings"],
+  "properties": {
+    "serviceRef": { "type": "string", "minLength": 1 },
+    "serviceKind": { "enum": ["observability", "sonar", "tunnel"] },
+    "requiredCheckNames": { "type": "array", "minItems": 1, "uniqueItems": true, "items": { "$ref": "#/$defs/checkName" } },
+    "checks": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["name", "resourceRef", "status", "evidenceRef"],
+        "properties": {
+          "name": { "$ref": "#/$defs/checkName" },
+          "resourceRef": { "type": "string", "minLength": 1 },
+          "status": { "enum": ["passed", "failed"] },
+          "evidenceRef": { "type": "string", "minLength": 1 }
+        }
+      }
+    },
+    "findings": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["code", "resourceRef", "port", "holderRef", "statement"],
+        "properties": {
+          "code": { "enum": ["SHARED_SERVICE_INVENTORIED", "PORT_COORDINATION_REQUIRED", "ALREADY_CONVERGED", "PARTIAL_MUTATION", "PRODUCT_DEPLOYMENT_DECLINED"] },
+          "resourceRef": { "type": "string", "minLength": 1 },
+          "port": { "oneOf": [{ "type": "integer", "minimum": 1, "maximum": 65535 }, { "type": "null" }] },
+          "holderRef": { "oneOf": [{ "type": "string", "minLength": 1 }, { "type": "null" }] },
+          "statement": { "type": "string", "minLength": 1 }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "checkName": { "enum": ["service-health", "target-boundary", "label-boundary", "remote-write-delivery", "sample-ordering", "retry-backoff", "sensitive-data-filter", "service-available", "project-exists", "source-revision", "profile-assigned", "gate-assigned", "enforcement-active", "dns-target", "tunnel-route", "tls", "public-https"] }
+  }
+}

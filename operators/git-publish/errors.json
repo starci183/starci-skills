@@ -1,0 +1,54 @@
+{
+  "schemaVersion": 9,
+  "note": "Stop codes only git.publish emits. Same entry shape as errors/errors.json, scope implicit. Shared codes (INVALID_INPUT, SOURCE_DRIFT, NO_PROGRESS) come from errors/errors.json; ROUTE_UNVERIFIED is defined by frontend.direction.decide and BRANCH_POLICY_VIOLATION is also emitted by workspace.bind; both belong in errors/errors.json with every emitting operator in scope.",
+  "codes": {
+    "APPROVAL_MISSING": {
+      "domain": "caller",
+      "disposition": "terminate",
+      "meaning": {
+        "en": "No approval covers this exact boundary unit; completion proof is not approval.",
+        "vi": "Không phê duyệt nào phủ đúng đơn vị ranh giới này; bằng chứng hoàn thành không phải phê duyệt."
+      },
+      "resume": {
+        "en": "Supply an approval issued for this unit.",
+        "vi": "Cấp một phê duyệt cấp cho đúng đơn vị này."
+      }
+    },
+    "DIRTY_OUTSIDE_BOUNDARY": {
+      "domain": "source",
+      "disposition": "terminate",
+      "meaning": {
+        "en": "Something dirty lies outside the declared write roots, so the publish would carry work this boundary does not own.",
+        "vi": "Có thứ bẩn nằm ngoài các write root đã khai, nên lần publish sẽ mang theo công việc ranh giới này không sở hữu."
+      },
+      "resume": {
+        "en": "Clean the tree, or correct the write roots.",
+        "vi": "Dọn sạch cây làm việc, hoặc sửa lại các write root."
+      }
+    },
+    "HOOK_BLOCKED": {
+      "domain": "source",
+      "disposition": "terminate",
+      "meaning": {
+        "en": "A Git hook rejected the publication, and no bypass is representable.",
+        "vi": "Một Git hook từ chối lần publish, và không có đường vòng nào biểu diễn được."
+      },
+      "resume": {
+        "en": "Fix the boundary and bring a new head.",
+        "vi": "Sửa ranh giới và mang một head mới."
+      }
+    },
+    "NON_FAST_FORWARD": {
+      "domain": "remote",
+      "disposition": "terminate",
+      "meaning": {
+        "en": "The remote carries commits the local ref does not, so the push is not fast-forward.",
+        "vi": "Remote mang những commit mà ref cục bộ không có, nên cú push không phải fast-forward."
+      },
+      "resume": {
+        "en": "The branch owner reconciles the divergence and a new head arrives.",
+        "vi": "Người sở hữu nhánh hoà giải phần phân kỳ và một head mới tới."
+      }
+    }
+  }
+}

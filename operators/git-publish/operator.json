@@ -1,8 +1,12 @@
 {
-  "schemaVersion": 8,
+  "schemaVersion": 9,
   "id": "git.publish",
   "domain": "git",
-  "job": "Publish one approved Git boundary from exact mission-owned source heads with non-force, fast-forward-only semantics, and stop with a typed failure rather than reaching for a bypass.",
+  "job": "Publish one approved Git boundary from the exact commit quality verified, with non-force, fast-forward-only semantics, and stop with a typed failure rather than reaching for a bypass.",
+  "package": "operator.md",
+  "errors": "errors.json",
+  "validator": "validate.mjs",
+  "selfTest": "self-test.mjs",
   "resources": {
     "profile": "sonnet",
     "requires": [
@@ -13,68 +17,5 @@
       "grammarBound": false,
       "imageGeneration": "never"
     }
-  },
-  "refs": [
-    {
-      "alias": "@dynamic/workspace-route-binding.json",
-      "required": true,
-      "purpose": "A publish never resolves its own checkout."
-    },
-    {
-      "alias": "@workspaces/local/routes/<project>/<role>",
-      "required": true,
-      "purpose": "The checkout and mutation branch being published."
-    },
-    {
-      "alias": "@workspaces/<project>/<role>/husky",
-      "required": true,
-      "purpose": "pre-commit and pre-push, which always run."
-    },
-    {
-      "alias": "@remote/git/<project>/<role>",
-      "required": true,
-      "purpose": "The publication target and its observed head."
-    },
-    {
-      "alias": "@dynamic/git-publication.json",
-      "required": true,
-      "purpose": "This step's own receipt, and beside it every artifact the Sequence names; the folder input.project.artifactRootRef must equal."
-    },
-    {
-      "alias": "@dynamic/changes.md",
-      "required": true,
-      "purpose": "The producer's changes.md: the exact file set this publication carries."
-    }
-  ],
-  "contextContract": "context.md",
-  "inputSchema": "input.schema.json",
-  "outputSchema": "output.schema.json",
-  "inputValidator": "validate-input.mjs",
-  "outputValidator": "validate-output.mjs",
-  "selfTest": "self-test.mjs",
-  "sideEffects": [
-    "push already approved mission-owned heads to the declared remote ref without force",
-    "push one annotated continuation tag pointing at a head this publication pushed",
-    "write only the typed publication receipt under input.artifactRootRef"
-  ],
-  "forbiddenSideEffects": [
-    "force push, lease-force push, or rewrite published history",
-    "run reset --hard, clean, or stash",
-    "delete a branch, local or remote",
-    "bypass, skip, or disable a Git hook",
-    "amend, rebase, or squash a commit in order to make a rejected push succeed",
-    "create or switch to a task, feature, or worktree branch under a forbidden worktree policy",
-    "publish a head outside the approved boundary or its declared write roots",
-    "publish without a verified route or an approval bound to this exact boundary"
-  ],
-  "stopConditions": [
-    "the route receipt is missing, blocked, or bound to another project and role",
-    "no approval covers this exact boundary unit",
-    "the active branch violates the routed Git mutation policy",
-    "the working tree is dirty outside the declared boundary",
-    "a Git hook blocks the publication",
-    "the remote rejects the push as non-fast-forward",
-    "the observed source head differs from the frozen head",
-    "a resume adds no effective head, approval, hook, or remote delta"
-  ]
+  }
 }

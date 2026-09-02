@@ -1,0 +1,87 @@
+{
+  "kind": "quality-verification",
+  "title": "^# quality-verification — [0-9a-f]{40}$",
+  "sections": [
+    {
+      "heading": "^## Binding$",
+      "table": "| Field | Value |",
+      "rows": [
+        "Operator",
+        "Step",
+        "Checkout",
+        "Head",
+        "Session branch",
+        "Predecessors"
+      ],
+      "cell": {
+        "Value": "\\S"
+      }
+    },
+    {
+      "heading": "^## Gate plan$",
+      "table": "| Gate | Required | Command | Configuration |",
+      "minRows": 1,
+      "cell": {
+        "Gate": "^`(format|lint|typecheck|build|unit-coverage|integration|e2e|sonar)`$",
+        "Required": "^(yes|no)$"
+      }
+    },
+    {
+      "heading": "^## Results$",
+      "table": "| Gate | Status | Exit code | Evidence | Classification | Statement |",
+      "minRows": 1,
+      "cell": {
+        "Gate": "^`(format|lint|typecheck|build|unit-coverage|integration|e2e|sonar)`$",
+        "Status": "^(pass|fail|external-blocker|skipped-not-requested)$",
+        "Classification": "^(in-boundary|boundary-drift|flaky|external-blocker|—)$",
+        "Statement": "\\S"
+      }
+    },
+    {
+      "heading": "^## Coverage$",
+      "table": "| Metric | Measured | Threshold | Verdict |",
+      "cell": {
+        "Metric": "^(statements|lines|functions|branches)$",
+        "Verdict": "^(at-or-above|below)$"
+      }
+    },
+    {
+      "heading": "^## Sonar$",
+      "table": "| Field | Value |",
+      "rows": [
+        "Scope",
+        "Finding"
+      ],
+      "cell": {
+        "Value": "\\S"
+      }
+    },
+    {
+      "heading": "^## Debts$",
+      "table": "| Debt | Gate | Approval | Owner | Expires | Statement |",
+      "cell": {
+        "Gate": "^`(format|lint|typecheck|build|unit-coverage|integration|e2e|sonar)`$"
+      }
+    },
+    {
+      "heading": "^## Findings$",
+      "table": "| Code | Gate | Statement |",
+      "minRows": 1,
+      "cell": {
+        "Code": "^`(PREDECESSOR_CONSUMED|SONAR_NEW_CODE_ONLY|E2E_NOT_REQUESTED|COVERAGE_BELOW_THRESHOLD|FLAKY_CONFIRMED|DEBT_DECLARED)`$",
+        "Statement": "\\S"
+      }
+    },
+    {
+      "heading": "^## Verdict$",
+      "table": "| Field | Value |",
+      "exactRows": 1,
+      "rows": [
+        "Verdict"
+      ],
+      "cell": {
+        "Value": "^`(pass|fail)`$"
+      }
+    }
+  ]
+}

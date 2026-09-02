@@ -1,0 +1,78 @@
+{
+  "schemaVersion": 9,
+  "note": "Stop codes only business.decide emits. Same entry shape as errors/errors.json, scope implicit. Shared codes (INVALID_INPUT, SOURCE_DRIFT, NO_PROGRESS, EVIDENCE_MISSING) come from errors/errors.json, and APPROVAL_REQUIRED is not defined here because more than one operator emits it: a code two operators emit belongs in errors/errors.json with both ids in scope. Every domain here is the routing domain the old package's owningDomain enum published for this operator: business, backend, frontend, architecture, workspace, caller.",
+  "codes": {
+    "CONTRADICTION_UNRESOLVED": {
+      "domain": "caller",
+      "disposition": "terminate",
+      "meaning": {
+        "en": "Two claims about the same behaviour disagree and nothing resolves them.",
+        "vi": "Hai claim về cùng một hành vi mâu thuẫn và không có gì giải quyết chúng."
+      },
+      "resume": {
+        "en": "The owner resolves the contradiction.",
+        "vi": "Người chủ giải quyết mâu thuẫn."
+      }
+    },
+    "COVERAGE_INCOMPLETE": {
+      "domain": "business",
+      "disposition": "terminate",
+      "meaning": {
+        "en": "A declared coverage dimension carries no disposition.",
+        "vi": "Một chiều phủ đã khai không mang disposition nào."
+      },
+      "resume": {
+        "en": "Add the missing disposition.",
+        "vi": "Bổ sung disposition còn thiếu."
+      }
+    },
+    "CONSUMER_UNPROVEN": {
+      "domain": "business",
+      "disposition": "terminate",
+      "meaning": {
+        "en": "A discovered enforcement consumer has no disposition or no proof.",
+        "vi": "Một consumer thực thi đã phát hiện không có disposition hoặc không có bằng chứng."
+      },
+      "resume": {
+        "en": "Dispose the consumer with positive and negative proof, then publish the promise again.",
+        "vi": "Xử lý consumer đó kèm positive và negative proof, rồi publish lại lời hứa."
+      }
+    },
+    "LIFECYCLE_TRANSITION_INVALID": {
+      "domain": "caller",
+      "disposition": "terminate",
+      "meaning": {
+        "en": "The requested target state is unreachable from the observed head.",
+        "vi": "Trạng thái đích được yêu cầu không tới được từ head đã quan sát."
+      },
+      "resume": {
+        "en": "Ask for a legal transition, or publish the intermediate state first.",
+        "vi": "Yêu cầu một chuyển trạng thái hợp lệ, hoặc publish trạng thái trung gian trước."
+      }
+    },
+    "AUTHORITY_CONFLICT": {
+      "domain": "workspace",
+      "disposition": "terminate",
+      "meaning": {
+        "en": "The head or the businesses root contradicts published authority.",
+        "vi": "Head hoặc gốc businesses mâu thuẫn với thẩm quyền đã publish."
+      },
+      "resume": {
+        "en": "Correct the authority binding.",
+        "vi": "Sửa binding thẩm quyền."
+      }
+    },
+    "RECONCILIATION_DISCREPANCY": {
+      "domain": "backend",
+      "disposition": "terminate",
+      "meaning": {
+        "en": "Delivered source differs from the frozen coverage matrix.",
+        "vi": "Source đã giao khác với ma trận phủ đã đóng băng."
+      },
+      "resume": {
+        "en": "Correct the source, or revise the matrix.",
+        "vi": "Sửa source, hoặc sửa lại ma trận."
+      }
+    }
+  }
+}

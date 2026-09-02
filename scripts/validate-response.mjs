@@ -121,7 +121,7 @@ export async function validateResponse(root, dir, { requirements = {}, exchange 
     for (const c of taken) if (!declaredTaken.has(c)) errors.push(`${rel('response/response.md')}: Fallbacks taken lists ${c}, which response.json does not`);
     for (const c of declaredTaken) if (!taken.includes(c)) errors.push(`${rel('response/response.json')}: fallback ${c} is not recorded under ## Fallbacks taken in response.md`);
   }
-  for (const nextId of response.next ?? []) if (!packages.some((p) => p.manifest.id === nextId)) errors.push(`${rel('response/response.json')}: next names unknown operator ${nextId}`);
+  for (const nextId of response.next ?? []) if (nextId !== 'user' && nextId !== 'external' && !packages.some((p) => p.manifest.id === nextId)) errors.push(`${rel('response/response.json')}: next names unknown operator ${nextId}`);
   if (exchange && (response.next ?? []).length) errors.push(`${rel('response/response.json')}: a nested exchange does not route; next must be empty`);
   return { errors, response, present, pkg };
 }

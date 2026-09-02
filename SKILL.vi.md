@@ -12,7 +12,7 @@ phán xét một kết quả.
 2. Chạy `workspace.bind` cho mọi nhiệm vụ có đọc hoặc ghi source đã route. Không thứ gì khác được
    phép tự tìm checkout, và một thư mục trùng tên không bao giờ là thẩm quyền route.
 3. Chọn operator đầu tiên theo bảng dưới. Chỉ đọc `operator.md` và `operator.json` của đúng
-   operator đó (gói chưa chuyển: `operator.json`, `context.md`, `input.md`, `execute.md`).
+   operator đó.
 4. Chạy operator đó, từ đầu tới cuối, trên đúng một profile mà `operator.json` của nó gọi tên dưới
    `resources`, với đúng những quyền nó liệt kê. Một operator không có model khác, không thừa hưởng lượt nào,
    và không có quyền nào mà assignment bỏ sót.
@@ -24,11 +24,11 @@ phán xét một kết quả.
 | Dự án nào, checkout nào, hay binding runtime nào | `workspace.bind` |
 | Sản phẩm hứa gì, ai được hưởng, hỏng thì ra sao | `business.decide` |
 | Ranh giới hệ thống, quyền sở hữu dữ liệu, hay tech stack | `architecture.decide` |
-| Hành vi phía server, một hợp đồng API, lưu trữ, hay một job | `backend.implement` |
-| Tạo mới, dựng lại, hay thiết kế lại một trang hoặc một surface | `fe.direction.decide` |
-| Một cây đã dựng xong lấy giá trị CSS nào | `fe.presentation.resolve` |
-| Ghi một cây đã resolve vào product source | `fe.source.apply` |
-| Một surface đã render có thật sự đứng vững không | `fe.surface.audit` |
+| Hành vi phía server, một hợp đồng API, lưu trữ, hay một job | `backend.source.apply` |
+| Tạo mới, dựng lại, hay thiết kế lại một trang hoặc một surface | `frontend.direction.decide` |
+| Một cây đã dựng xong lấy giá trị CSS nào | `frontend.presentation.resolve` |
+| Ghi một cây đã resolve vào product source | `frontend.source.apply` |
+| Một surface đã render có thật sự đứng vững không | `frontend.surface.audit` |
 | Build, lint, typecheck, coverage, hay Sonar | `quality.verify` |
 | Một người thật có hoàn thành được một hành trình thật không | `uat.verify` |
 | Phát hành, hay khôi phục một bản phát hành | `release.deploy` |
@@ -83,7 +83,7 @@ này không nới rộng được:
 - `release.deploy` đòi authorization đã khai của nó, đúng môi trường và còn hạn.
 - `uat.verify` không nhận chuỗi tự do nào trong bản ghi tài khoản, nên một credential không thể được
   ghi vào snapshot.
-- `fe.presentation.resolve` và `fe.surface.audit` chỉ được gọi tên những mã rule mà knowledge được
+- `frontend.presentation.resolve` và `frontend.surface.audit` chỉ được gọi tên những mã rule mà knowledge được
   bind có publish.
 
 Nếu một nhiệm vụ có vẻ cần nhiều hơn những gì một operator cho phép, thì đó chính là câu trả lời,
@@ -95,10 +95,10 @@ Operator tự bind knowledge của mình; file này không nạp trước.
 
 | Thư mục | Được bind bởi |
 | --- | --- |
-| `knowledge/ui/composition/` | `fe.direction.decide` |
-| `knowledge/ui/presentation/` | `fe.presentation.resolve` |
-| `knowledge/ui/proof/` | `fe.surface.audit` |
-| `knowledge/patterns/fe/`, `knowledge/patterns/be/` | `fe.source.apply`, `backend.implement` |
+| `knowledge/ui/composition/` | `frontend.direction.decide` |
+| `knowledge/ui/presentation/` | `frontend.presentation.resolve` |
+| `knowledge/ui/proof/` | `frontend.surface.audit` |
+| `knowledge/patterns/fe/`, `knowledge/patterns/be/` | `frontend.source.apply`, `backend.source.apply` |
 | `knowledge/grammars/<họ>/` | mọi operator có dựng họ đó |
 
 File `.md` tiếng Anh là authority duy nhất lúc chạy. File `.vi.md` cùng tên là bản đọc cho người và

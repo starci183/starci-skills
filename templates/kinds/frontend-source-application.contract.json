@@ -1,0 +1,10 @@
+{
+  "kind": "frontend-source-application",
+  "title": "^# frontend-source-application — [a-z0-9][a-z0-9-]*$",
+  "sections": [
+    { "heading": "^## Binding$", "table": "| Field | Value |", "rows": ["Target", "Mode", "Branch", "Base", "Commit"], "cell": { "Value": "\\S" } },
+    { "heading": "^## Projection$", "table": "| Path | Change | Classes | Claims | Why |", "minRows": 1, "cell": { "Path": "^`[^`]+`$", "Change": "^(created|modified|deleted|unchanged)$", "Why": "\\S" } },
+    { "heading": "^## Rejections$", "table": "| Path | Value | Because |", "cell": { "Path": "^`[^`]+`$", "Because": "^(outside the declared write set|outside the owner root|absent from the resolution inventory|the committed tree is not the resolved tree)$" } },
+    { "heading": "^## Fallbacks taken$", "table": "| Code | Action |", "cell": { "Code": "^`[A-Z][A-Z0-9_]+`$" } }
+  ]
+}

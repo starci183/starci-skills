@@ -1,0 +1,121 @@
+# frontend.surface.audit
+
+## Job
+
+Observe the committed surface at the served route across the matrix the direction's coverage implies,
+measure every node that carries a claim, and judge each measurement against the published proof rules
+by the owner of the node it stands on.
+
+## Readiness, capture and judgement are one job
+
+Splitting them produced a familiar failure: a capture taken before the surface was ready, judged by a
+step that could no longer tell, against evidence it had not itself collected. One operator that
+waits, measures and judges under one receipt cannot lose that connection.
+
+## The surface must be the committed surface
+
+The applied receipt names the commit it wrote, the pinned head equals that commit, and the preview
+serves the session worktree at it. A head that differs is `SOURCE_DRIFT` with nothing captured,
+because a measurement of another tree proves nothing about this one.
+
+## Measurement beats claim, always
+
+Each node carries the identifiers it claims to satisfy, and the audit measures what the surface
+actually renders. A claim is never evidence of passing: a node claiming `GAP-4` while the computed
+gap measures `1.5rem` is a failure, and no amount of claiming changes the measurement. That is the
+whole mechanic, and it is why the claim exists.
+
+## The owner decides where a failure goes
+
+A failing claim on an application-owned node is a value the resolution has to publish again, so it
+routes back to `frontend.presentation.resolve`, which is the operator that caps the rounds. A failing claim
+on a Grammar component's own render is a Grammar gap: it goes to a person and into the family's own
+gap table, never into a resolve loop, because no application value can fix a component. The interior
+of an application-owned node carries no claim and is not audited at all; only that node's own measure
+rules are.
+
+## The audit changes nothing
+
+No verdict is a repair, a workaround or an instruction. A failure stays a failure in the receipt
+until a resolution publishes a new value and the applier writes it, and the same surface is audited
+again. That separation is why the receipt is worth anything: an operator that could fix what it found
+would always be able to report a clean surface.
+
+## Boundary
+
+Context is read-only, and the runtime is consumed, never owned. The operator writes only `response/`
+of its own branch: the audit receipt, its captures, its screenshots and its verdicts. It does not
+modify product source, the applied tree, knowledge or Grammar, repair, restyle or work around
+anything it observes, start, stop, deploy or reconfigure a runtime service, cite a rule identifier
+absent from the bound inventory, judge a node it did not measure, or accept a claim as evidence that
+a node passes.
+
+## Context
+
+| Alias | Bind | Required |
+| --- | --- | --- |
+| `@knowledge/ui/proof` | what only becomes true once rendered; the audit's whole rule inventory | yes |
+| `@workspaces/fe` | the routed checkout at the commit the application wrote; the owners and identifiers observed there | yes |
+| `@worktrees/sessions/central-runtime` | the shared runtime owner: the preview serving the session worktree at that commit | yes |
+| `@knowledge/grammars/starci` | how the Core family is meant to realize Common, and where its gaps are recorded | no |
+
+## Inputs
+
+| Kind | From | Required |
+| --- | --- | --- |
+| `frontend-source-application` | `frontend.source.apply`, the commit under observation and the claims it wrote | yes |
+| `frontend-presentation-resolution` | `frontend.presentation.resolve`, the owner of every node | yes |
+| `frontend-direction-decision` | `frontend.direction.decide`, the route and the coverage the matrix is derived from | yes |
+
+## Requirements
+
+| Field | Type | Default | Ask |
+| --- | --- | --- | --- |
+| `matrix` | list | every coverage entry | The matrix entries to capture; the person may only narrow what the coverage implies |
+| `readinessProbe` | choice | route-served | The floor for readiness; a state that needs data rises to `route-and-data-served` on its own |
+| `resume` | token | null | The blocked branch's token when re-entering after a stop |
+
+## Steps
+
+| # | Step | Params | Reads | Writes | Stops with |
+| --- | --- | --- | --- | --- | --- |
+| 1 | Validate the gate and resume, and confirm the head and the served route | `resume` | `request/request.json`, input `frontend-source-application` (its commit must equal the pinned head), @workspaces/fe at the frozen head, @worktrees/sessions/central-runtime (the preview serving the session worktree at that commit) | — | `INVALID_INPUT`, `SOURCE_DRIFT`, `NO_PROGRESS` |
+| 2 | Bind the authority | — | @knowledge/ui/proof (every topic with its fingerprint and inventory), input `frontend-source-application` (the claims), input `frontend-presentation-resolution` (the owner of every node), @worktrees/sessions/central-runtime | — | — |
+| 3 | Select the matrix entries | `matrix` | input `frontend-direction-decision` (the coverage: state by viewport by colour scheme) | — | — |
+| 4 | Reach readiness for each entry | `readinessProbe` | @worktrees/sessions/central-runtime | — | `RUNTIME_UNAVAILABLE` |
+| 5 | Capture and measure each entry | — | @worktrees/sessions/central-runtime, @workspaces/fe (the observed owners and the identifiers each node carries) | `response/artifacts/<matrixId>.png`, `response/data/captures/<matrixId>.json` | `EVIDENCE_MISSING` |
+| 6 | Compare against the claims and the proof rules, judge by owner, and emit | — | @knowledge/ui/proof, @knowledge/grammars/starci, the captures | `response/data/verdicts.json`, `response/response.md`, `response/response.json` | `UNKNOWN_RULE` |
+
+The matrix is the direction's coverage, not a new decision: `matrix` may only narrow it, and the
+orchestrator may split the entries across up to three parallel branches of the same step. Every entry
+produces one screenshot and one capture, and an entry that produced neither is `EVIDENCE_MISSING`
+rather than a quiet omission. Every node carrying a claim is measured; a verdict is never recorded
+for a node that was not.
+
+## Outputs
+
+| Kind | File | Type | Required |
+| --- | --- | --- | --- |
+| `frontend-surface-audit` | `response/response.md` | md | yes |
+| `capture` | `response/data/captures/<matrixId>.json` | data | yes |
+| `screenshot` | `response/artifacts/<matrixId>.png` | artifact | yes |
+| `verdicts` | `response/data/verdicts.json` | data | yes |
+
+## Stops
+
+| Code | Disposition |
+| --- | --- |
+| `INVALID_INPUT` | terminate |
+| `SOURCE_DRIFT` | terminate |
+| `RUNTIME_UNAVAILABLE` | terminate |
+| `EVIDENCE_MISSING` | terminate |
+| `UNKNOWN_RULE` | terminate |
+| `NO_PROGRESS` | terminate |
+
+## Next
+
+| When | Operator |
+| --- | --- |
+| a claim fails on an application-owned node, so a value must be published again | `frontend.presentation.resolve` |
+| every claim holds and the checkout's own gates must run | `quality.verify` |
+| a claim fails on a Grammar component's own render, so a person records the family gap and publishes | `frontend.surface.audit` |

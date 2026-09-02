@@ -1,0 +1,106 @@
+{
+  "schemaVersion": 9,
+  "note": "Stop codes only content.generate emits. Same entry shape as errors/errors.json, scope implicit. Shared codes (INVALID_INPUT, SOURCE_DRIFT, NO_PROGRESS) come from errors/errors.json. Every domain below is the one the old package's owningDomain enum published for this operator: content, curriculum, engineering, workspace, caller. routing.json answers content with a resume of this operator, and curriculum and engineering each with a person, which is not the same person as caller: the curriculum owner and the engineer who owns the generator are named separately on purpose.",
+  "codes": {
+    "BRIEF_UNBOUND": {
+      "domain": "curriculum",
+      "disposition": "terminate",
+      "meaning": {
+        "en": "The teacher brief cannot be frozen from the bound curriculum and source evidence.",
+        "vi": "Không đóng băng được brief người dạy từ chương trình học và bằng chứng nguồn đã ràng."
+      },
+      "resume": {
+        "en": "Supply the missing curriculum or source evidence.",
+        "vi": "Bổ sung chương trình học hoặc bằng chứng nguồn còn thiếu."
+      }
+    },
+    "OUTCOME_UNCOVERED": {
+      "domain": "content",
+      "disposition": "terminate",
+      "meaning": {
+        "en": "A declared language edition leaves a published learning outcome uncovered.",
+        "vi": "Một bản viết đã khai bỏ trống một kết quả học tập đã công bố."
+      },
+      "resume": {
+        "en": "Rewrite the edition, or narrow the brief.",
+        "vi": "Viết lại bản đó, hoặc thu hẹp brief."
+      }
+    },
+    "IMAGE_UNAVAILABLE": {
+      "domain": "engineering",
+      "disposition": "terminate",
+      "meaning": {
+        "en": "A required image cannot be generated to the brief's claims.",
+        "vi": "Không sinh được hình ảnh bắt buộc theo các tuyên bố của brief."
+      },
+      "resume": {
+        "en": "Provide a working generator, or turn the image stage off.",
+        "vi": "Cấp một bộ sinh chạy được, hoặc tắt giai đoạn hình ảnh."
+      }
+    },
+    "CODE_BUILD_FAILED": {
+      "domain": "content",
+      "disposition": "terminate",
+      "meaning": {
+        "en": "A declared implementation track does not build.",
+        "vi": "Một track cài đặt đã khai không build được."
+      },
+      "resume": {
+        "en": "Repair the track, then build it again.",
+        "vi": "Sửa track đó, rồi build lại."
+      }
+    },
+    "E2E_FAILED": {
+      "domain": "content",
+      "disposition": "terminate",
+      "meaning": {
+        "en": "A declared executable check still fails when maxE2eIterations is spent.",
+        "vi": "Một phép kiểm chạy được đã khai vẫn hỏng khi đã tiêu hết maxE2eIterations."
+      },
+      "resume": {
+        "en": "Repair the implementation, or approve more iterations.",
+        "vi": "Sửa phần cài đặt, hoặc duyệt thêm số vòng."
+      }
+    },
+    "CONTRACT_WEAKENED": {
+      "domain": "content",
+      "disposition": "terminate",
+      "meaning": {
+        "en": "The executable contract moved during the repair loop, so the proof measures nothing.",
+        "vi": "Contract chạy được bị dời trong vòng lặp sửa, nên bằng chứng không đo được gì."
+      },
+      "resume": {
+        "en": "Restore the contract and rerun without touching it.",
+        "vi": "Khôi phục contract và chạy lại mà không đụng vào nó."
+      }
+    },
+    "REVIEW_REVISION_REQUIRED": {
+      "domain": "content",
+      "disposition": "fallback",
+      "meaning": {
+        "en": "The independent review returned a revision.",
+        "vi": "Phản biện độc lập trả về yêu cầu sửa."
+      },
+      "fallback": {
+        "en": "Repair exactly the artifacts the review's findings name, by owning stage, record the round under ## Fallbacks taken, and reopen the review exchange for the next round.",
+        "vi": "Sửa đúng những artifact mà các finding của phản biện nêu tên, theo giai đoạn chủ, ghi vòng đó dưới ## Fallbacks taken, rồi mở lại cuộc trao đổi phản biện cho vòng kế."
+      },
+      "resume": {
+        "en": "Nothing is asked of anyone; the branch revises and reviews again until maxReviewRounds is spent.",
+        "vi": "Không hỏi ai cả; nhánh tự sửa và phản biện lại cho tới khi hết maxReviewRounds."
+      }
+    },
+    "REVIEW_ROUNDS_EXHAUSTED": {
+      "domain": "caller",
+      "disposition": "terminate",
+      "meaning": {
+        "en": "maxReviewRounds is spent and the review still returns a revision.",
+        "vi": "Đã tiêu hết maxReviewRounds mà phản biện vẫn trả về yêu cầu sửa."
+      },
+      "resume": {
+        "en": "Approve more rounds, or narrow the unit.",
+        "vi": "Duyệt thêm vòng, hoặc thu hẹp đơn vị."
+      }
+    }
+  }
+}

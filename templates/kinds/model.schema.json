@@ -1,0 +1,99 @@
+{
+  "$id": "kind:model",
+  "title": "The one published head of one feature: the promise, its lineage, and the fingerprints the head is frozen behind.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "featureId",
+    "mode",
+    "headRef",
+    "headFingerprint",
+    "state",
+    "promise",
+    "lineage",
+    "claimsFingerprint",
+    "coverageFingerprint",
+    "reconciliation"
+  ],
+  "properties": {
+    "featureId": { "$ref": "#/$defs/identifier" },
+    "mode": { "enum": ["model", "reconcile"] },
+    "headRef": { "type": "string", "minLength": 1, "maxLength": 1024 },
+    "headFingerprint": { "$ref": "#/$defs/fingerprint" },
+    "state": { "$ref": "#/$defs/authorityState" },
+    "promise": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["statement", "actorStatement", "eligibilityStatement"],
+      "properties": {
+        "statement": { "type": "string", "minLength": 1, "maxLength": 4096 },
+        "actorStatement": { "type": "string", "minLength": 1, "maxLength": 4096 },
+        "eligibilityStatement": { "type": "string", "minLength": 1, "maxLength": 4096 }
+      }
+    },
+    "lineage": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["previousHeadRef", "previousState", "transition"],
+      "properties": {
+        "previousHeadRef": {
+          "oneOf": [{ "type": "string", "minLength": 1, "maxLength": 1024 }, { "type": "null" }]
+        },
+        "previousState": {
+          "oneOf": [{ "$ref": "#/$defs/authorityState" }, { "type": "null" }]
+        },
+        "transition": {
+          "enum": [
+            "absent->pending",
+            "pending->in-progress",
+            "pending->rejected",
+            "in-progress->implemented",
+            "in-progress->rejected",
+            "implemented->in-progress",
+            "implemented->rejected",
+            "rejected->pending"
+          ]
+        }
+      }
+    },
+    "claimsFingerprint": { "$ref": "#/$defs/fingerprint" },
+    "coverageFingerprint": {
+      "oneOf": [{ "$ref": "#/$defs/fingerprint" }, { "type": "null" }]
+    },
+    "reconciliation": {
+      "oneOf": [{ "$ref": "#/$defs/reconciliation" }, { "type": "null" }]
+    }
+  },
+  "$defs": {
+    "identifier": { "type": "string", "pattern": "^[a-z0-9][a-z0-9-]*$" },
+    "fingerprint": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
+    "authorityState": { "enum": ["pending", "in-progress", "implemented", "rejected"] },
+    "reconciliation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["deliveredEvidenceRefs", "discrepancies"],
+      "properties": {
+        "deliveredEvidenceRefs": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 256,
+          "uniqueItems": true,
+          "items": { "type": "string", "minLength": 1, "maxLength": 1024 }
+        },
+        "discrepancies": {
+          "type": "array",
+          "maxItems": 128,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["dimension", "statement"],
+            "properties": {
+              "dimension": { "$ref": "#/$defs/identifier" },
+              "statement": { "type": "string", "minLength": 1, "maxLength": 4096 }
+            }
+          }
+        }
+      }
+    }
+  }
+}

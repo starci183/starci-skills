@@ -126,5 +126,5 @@ nêu file implementation, vì chọn file là việc của domain kế tiếp.
 | Khi | Operator |
 | --- | --- |
 | lời hứa nghiệp vụ phải được mô hình lại theo các boundary đã quyết | `business.decide` |
-| quyết định đã xác nhận và một contract backend thay đổi | `backend.implement` |
-| quyết định đã xác nhận và một bề mặt frontend thay đổi | `fe.direction.decide` |
+| quyết định đã xác nhận và một contract backend thay đổi | `backend.source.apply` |
+| quyết định đã xác nhận và một bề mặt frontend thay đổi | `frontend.direction.decide` |

@@ -25,7 +25,7 @@
     "requirements": { "type": "object", "additionalProperties": { "type": ["string", "number", "boolean", "null", "array", "object"] } },
     "inputs": {
       "type": "object",
-      "additionalProperties": { "type": "string", "pattern": "^step-\\d+/parallel-\\d+/(?:[a-z][a-z-]*/)?response/(?:[a-z][a-z-]*\\.md|data/[A-Za-z0-9_./-]+\\.json|artifacts/[A-Za-z0-9_./-]+)$" }
+      "additionalProperties": { "type": "string", "pattern": "^step-\\d+/parallel-\\d+/(?:[a-z][a-z-]*/)?response/(?:(?:[a-z][a-z-]*/)*[A-Za-z0-9_.-]+\\.md|data/[A-Za-z0-9_./-]+\\.json|artifacts/[A-Za-z0-9_./-]+)$" }
     },
     "resume": {
       "oneOf": [

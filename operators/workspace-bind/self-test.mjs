@@ -1,421 +1,205 @@
+// Proves validate.mjs on a synthetic session branch: one conforming bind of a source checkout with no
+// runtime, one bind that consumes the shared runtime, one branch blocked on a terminate code, and one
+// mutation per law, each of which must fail with a line that names the defect.
 import assert from 'node:assert/strict';
-import { validateInput } from './validate-input.mjs';
-import { validateOutput } from './validate-output.mjs';
+import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import path from 'node:path';
+import { validateWorkspaceStep } from './validate.mjs';
 
-const hash = `sha256:${'a'.repeat(64)}`;
-const otherHash = `sha256:${'c'.repeat(64)}`;
-const sourceHead = 'b'.repeat(40);
-const observedAt = '2026-09-02T00:00:00.000Z';
-const contextRef = (ref, head = null) => ({ ref, fingerprint: hash, sourceHead: head, observedAt });
+const head = 'd'.repeat(40);
+const fp = (c) => `sha256:${c.repeat(64)}`;
+const SOURCE = 'D:/Repositories/starci-academy-backend';
+const PORTABLE = '.workspaces/projects/starci-academy/be.json';
+const HYDRATED = '.workspaces/local/routes/starci-academy/be/config.json';
+const OWNER = 'task-runtime-owner-1';
 
-const sourceRoot = 'D:/Repositories/starci-academy-backend';
-
-const validInput = {
-  schemaVersion: 8,
-  operatorId: 'workspace.bind',
-  context: {
-    bootstrapRefs: [contextRef('source://starci-academy-backend/CLAUDE.md', sourceHead)],
-    declarationRefs: [contextRef('workspace://declarations/starci-academy')],
-    portableRoute: {
-      ref: '.workspaces/projects/starci-academy/be.json',
-      fingerprint: hash,
-      project: 'starci-academy',
-      role: 'be',
-      repository: {
-        kind: 'source',
-        directory: null,
-        gitRepository: 'git@github.com:starci183/starci-academy-backend.git',
-        branch: 'mtp',
-      },
-    },
-    hydratedRoute: {
-      ref: '.workspaces/local/routes/starci-academy/be/config.json',
-      fingerprint: hash,
-      project: 'starci-academy',
-      role: 'be',
-      sourceRootPath: sourceRoot,
-      workspaceRootPath: `${sourceRoot}/.workspaces`,
-      repository: {
-        diskPath: sourceRoot,
-        gitRoot: sourceRoot,
-        gitRepository: 'git@github.com:starci183/starci-academy-backend.git',
-        branch: 'mtp',
-      },
-    },
-    identity: {
-      ref: 'workspace://identity/device',
-      fingerprint: hash,
-      machineId: 'starci-workstation',
-      credentialRosterRef: 'workspace://identity/roster.age',
-      rosterEncrypted: true,
-    },
-    runtime: {
-      registryRef: '.worktrees/sessions/central-runtime/owner.json',
-      fingerprint: hash,
-      ownerTaskId: 'task-central-runtime',
-      generation: 4,
-      status: 'ready',
-      endpointBinding: {
-        authority: 'workspace-route-port-projection',
-        project: 'starci-academy',
-        application: 'academy',
-        services: { frontend: 'webApp', api: 'api', identity: 'keycloak' },
-        authorityFingerprint: otherHash,
-      },
-      endpoints: {
-        frontend: 'http://localhost:3000',
-        api: 'http://localhost:3001',
-        identity: 'http://localhost:8080',
-      },
-      healthEvidenceRefs: ['runtime://probe/frontend', 'runtime://probe/api', 'runtime://probe/identity'],
-    },
-    provenance: {
-      headRef: 'provenance://starci-academy/be/head',
-      headSha256: hash,
-      snapshotSha256: otherHash,
-      sourceRevision: sourceHead,
-      redacted: true,
-    },
-    cachedRouteReceipt: {
-      receiptRef: 'session://tasks/bind/previous-receipt.json',
-      project: 'starci-academy',
-      role: 'be',
-      routeFingerprint: hash,
-      sourceHead,
-      status: 'fresh',
-    },
-    hints: [
-      { ref: 'D:/Repositories/starci-academy-frontend', kind: 'similar-name', authoritative: false },
-      { ref: 'http://localhost:3000/dashboard', kind: 'browser-url', authoritative: false },
-    ],
-  },
-  input: {
-    invocationId: 'invocation-bind-1',
-    missionId: 'mission-dashboard',
+const runtimeConsumption = (overrides = {}) => ({
+  ownerTaskId: OWNER,
+  generation: 3,
+  status: 'ready',
+  consumerRole: 'consumer',
+  endpointBinding: {
+    authority: 'workspace-route-port-projection',
     project: 'starci-academy',
-    role: 'be',
-    frozenSourceHead: sourceHead,
+    application: 'academy',
+    services: { frontend: 'web', api: 'api', identity: 'keycloak' },
+    authorityFingerprint: fp('b'),
+  },
+  endpoints: { frontend: 'http://localhost:3000', api: 'http://localhost:3001', identity: 'http://localhost:8089' },
+  ...overrides,
+});
+function routeBinding(overrides = {}) {
+  return {
+    project: 'starci-academy', role: 'be',
+    portableRouteRef: PORTABLE, hydratedRouteRef: HYDRATED,
+    routeFingerprint: fp('a'), identityFingerprint: fp('c'), sourceHead: head,
+    checkout: { diskPath: SOURCE, gitRoot: SOURCE, gitRepository: 'git@github.com:starci/academy-backend.git', branch: 'mtp', repositoryKind: 'source', directory: null, sourceHead: head },
     gitPolicy: { worktreeBranches: 'forbidden', mutationBranch: 'mtp' },
-    observedCheckout: {
-      diskPath: sourceRoot,
-      branch: 'mtp',
-      head: sourceHead,
-      originUrl: 'git@github.com:starci183/starci-academy-backend.git',
-      dirtyPaths: ['src/features/api/core/graphql/queries/queries.module.ts'],
-    },
-    declaredWriteRoots: ['src/features/api/core'],
-    runtimeNeed: 'consume',
-    artifactRootRef: '.v8/artifacts/invocation-bind-1',
-    resume: null,
-  },
-};
+    mutationReadiness: 'ready',
+    writeRoots: ['src', 'test'],
+    authorityRoots: { businesses: `${SOURCE}/.worktrees/businesses` },
+    runtime: null,
+    provenanceHeadRef: null,
+    ...overrides,
+  };
+}
 
-const routeArtifactRef = `${validInput.input.artifactRootRef}/route-receipt.json`;
-const evidenceRefs = [
-  '.workspaces/projects/starci-academy/be.json',
-  '.workspaces/local/routes/starci-academy/be/config.json',
-  '.worktrees/sessions/central-runtime/owner.json',
-];
+function responseMd({ binding = routeBinding(), findings = null, runtimeRows = null } = {}) {
+  const defaultFindings = [
+    ['ROUTE_HYDRATED_FROM_PORTABLE', binding.hydratedRouteRef, 'the portable declaration resolved to this local route'],
+    ['IDENTITY_ROSTER_SEALED', 'the credential roster reference', 'the roster was bound by name and never read'],
+    ...(binding.gitPolicy.worktreeBranches === 'forbidden' ? [['WORKTREE_BRANCH_FORBIDDEN', binding.gitPolicy.mutationBranch, 'the routed policy forbids task and worktree branches']] : []),
+    ...(binding.provenanceHeadRef ? [['PROVENANCE_HEAD_BOUND', binding.provenanceHeadRef, 'a redacted conversation head was attached']] : []),
+    ...(binding.runtime ? [['RUNTIME_CONSUMED_NOT_OWNED', binding.runtime.ownerTaskId, 'the caller consumes the owner endpoints and owns no lifecycle']] : []),
+  ];
+  const rows = (findings ?? defaultFindings).map(([code, subject, statement]) => `| \`${code}\` | ${subject} | ${statement} |`).join('\n');
+  const runtime = runtimeRows ?? (binding.runtime
+    ? [['Owner task', binding.runtime.ownerTaskId], ['Status', binding.runtime.status], ['Consumer role', binding.runtime.consumerRole], ['Frontend', binding.runtime.endpoints.frontend], ['Api', binding.runtime.endpoints.api], ['Identity', binding.runtime.endpoints.identity]]
+    : []);
+  const runtimeTable = runtime.map(([k, v]) => `| ${k} | ${v} |`).join('\n');
+  const writeRootRows = binding.writeRoots.map((p) => `| ${p} | the only paths later work may write |`).join('\n');
+  return `# workspace-route-binding — ${binding.project}/${binding.role}
 
-const binding = {
-  projectId: 'starci-academy',
-  role: 'be',
-  portableRouteRef: '.workspaces/projects/starci-academy/be.json',
-  hydratedRouteRef: '.workspaces/local/routes/starci-academy/be/config.json',
-  routeFingerprint: hash,
-  identityFingerprint: hash,
-  sourceHead,
-  artifactRootRef: validInput.input.artifactRootRef,
-  inputFingerprint: hash,
-  progressFingerprint: otherHash,
-};
+The routed backend checkout of this project, bound at the frozen head with its declared write roots.
 
-const validBoundOutput = {
-  schemaVersion: 8,
-  operatorId: 'workspace.bind',
-  output: {
-    outcome: 'bound',
-    receipt: {
-      receiptType: 'workspace-route-binding',
-      receiptId: 'receipt:starci-academy-be-route',
-      invocationId: validInput.input.invocationId,
-      missionId: validInput.input.missionId,
-      status: 'bound',
-      binding,
-      route: {
-        routeArtifactRef,
-        checkout: {
-          diskPath: sourceRoot,
-          gitRoot: sourceRoot,
-          gitRepository: 'git@github.com:starci183/starci-academy-backend.git',
-          branch: 'mtp',
-          repositoryKind: 'source',
-          directory: null,
-          sourceHead,
-        },
-        gitPolicy: { worktreeBranches: 'forbidden', mutationBranch: 'mtp' },
-        mutationReadiness: 'ready',
-        writeRoots: ['src/features/api/core'],
-        authorityRoots: { businesses: `${sourceRoot}/.worktrees/businesses` },
-        runtime: {
-          ownerTaskId: 'task-central-runtime',
-          generation: 4,
-          status: 'ready',
-          consumerRole: 'consumer',
-          endpointBinding: {
-            authority: 'workspace-route-port-projection',
-            project: 'starci-academy',
-            application: 'academy',
-            services: { frontend: 'webApp', api: 'api', identity: 'keycloak' },
-            authorityFingerprint: otherHash,
-          },
-          endpoints: {
-            frontend: 'http://localhost:3000',
-            api: 'http://localhost:3001',
-            identity: 'http://localhost:8080',
-          },
-        },
-        provenanceHeadRef: 'provenance://starci-academy/be/head',
-      },
-      findings: [
-        {
-          code: 'ROUTE_HYDRATED_FROM_PORTABLE',
-          subject: '.workspaces/local/routes/starci-academy/be/config.json',
-          statement: 'The portable declaration resolved to this machine-local route.',
-        },
-        {
-          code: 'HINT_REJECTED',
-          subject: 'D:/Repositories/starci-academy-frontend',
-          statement: 'A directory whose name resembles the project decided nothing.',
-        },
-        {
-          code: 'HINT_REJECTED',
-          subject: 'http://localhost:3000/dashboard',
-          statement: 'The origin open in a browser decided nothing.',
-        },
-        {
-          code: 'IDENTITY_ROSTER_SEALED',
-          subject: 'workspace://identity/roster.age',
-          statement: 'The credential roster was bound by reference and never read.',
-        },
-        {
-          code: 'RUNTIME_CONSUMED_NOT_OWNED',
-          subject: 'task-central-runtime',
-          statement: 'The caller consumes generation 4 and owns no port or process lifecycle.',
-        },
-        {
-          code: 'WORKTREE_BRANCH_FORBIDDEN',
-          subject: 'mtp',
-          statement: 'The routed policy forbids task, feature, and worktree branches.',
-        },
-        {
-          code: 'PROVENANCE_HEAD_BOUND',
-          subject: 'provenance://starci-academy/be/head',
-          statement: 'The redacted conversation head was attached to this binding.',
-        },
-        {
-          code: 'CACHED_ROUTE_REUSED',
-          subject: 'session://tasks/bind/previous-receipt.json',
-          statement: 'The cached receipt matched the same identity and fingerprints.',
-        },
-      ],
-      evidenceRefs,
-      failure: null,
-      resume: null,
-      createdAt: observedAt,
-    },
-    evidenceRefs,
-    artifactRefs: [routeArtifactRef],
-    handoff: null,
-  },
-};
+## Binding
 
-const validBlockedOutput = {
-  schemaVersion: 8,
-  operatorId: 'workspace.bind',
-  output: {
-    outcome: 'blocked',
-    receipt: {
-      receiptType: 'workspace-route-binding',
-      receiptId: 'receipt:starci-academy-be-route-blocked',
-      invocationId: validInput.input.invocationId,
-      missionId: validInput.input.missionId,
-      status: 'blocked',
-      binding,
-      route: null,
-      findings: [
-        {
-          code: 'HINT_REJECTED',
-          subject: 'D:/Repositories/starci-academy-frontend',
-          statement: 'A directory whose name resembles the project decided nothing.',
-        },
-      ],
-      evidenceRefs,
-      failure: {
-        code: 'RUNTIME_NOT_READY',
-        message: 'The registered runtime owner is still starting; a listening port is not readiness.',
-        subjects: ['task-central-runtime'],
-        missingRefs: ['.worktrees/sessions/central-runtime/owner.json'],
-        retryable: true,
-        owningDomain: 'runtime',
-      },
-      resume: {
-        resumeToken: 'resume-workspace-bind-1',
-        requiredDelta: ['A ready owner generation with passing probes for all three endpoints.'],
-      },
-      createdAt: observedAt,
-    },
-    evidenceRefs,
-    artifactRefs: [],
-    handoff: null,
-  },
-};
+| Field | Value |
+| --- | --- |
+| Project | ${binding.project} |
+| Role | ${binding.role} |
+| Portable route | ${binding.portableRouteRef} |
+| Hydrated route | ${binding.hydratedRouteRef} |
+| Source head | ${binding.sourceHead} |
 
-assert.deepEqual(validateInput(validInput), { valid: true, errors: [] });
-assert.deepEqual(validateOutput(validBoundOutput), { valid: true, errors: [] });
-assert.deepEqual(validateOutput(validBlockedOutput), { valid: true, errors: [] });
+## Checkout
 
-// A source route lives at the Source root and owns no directory. One that carries a directory is a
-// sibling checkout wearing the Source route's filename.
-const sourceRouteWithDirectory = structuredClone(validInput);
-sourceRouteWithDirectory.context.portableRoute.repository.directory = 'starci-academy-frontend';
-assert.equal(validateInput(sourceRouteWithDirectory).valid, false);
+| Field | Value |
+| --- | --- |
+| Disk path | ${binding.checkout.diskPath} |
+| Git root | ${binding.checkout.gitRoot} |
+| Git repository | ${binding.checkout.gitRepository} |
+| Branch | ${binding.checkout.branch} |
+| Repository kind | ${binding.checkout.repositoryKind} |
+| Directory | ${binding.checkout.directory ?? '—'} |
+| Source head | ${binding.checkout.sourceHead} |
+| Mutation readiness | ${binding.mutationReadiness} |
+| Businesses root | ${binding.authorityRoots.businesses ?? '—'} |
 
-// A sibling route is portable because its directory is relative. An absolute one pins the route
-// to one machine's disk and escapes the closed portable declaration entirely.
-const absoluteSibling = structuredClone(validInput);
-absoluteSibling.context.portableRoute.repository.kind = 'sibling';
-absoluteSibling.context.portableRoute.repository.directory = 'D:/Repositories/elsewhere';
-const absoluteSiblingResult = validateInput(absoluteSibling);
-assert.equal(absoluteSiblingResult.valid, false);
-assert.ok(absoluteSiblingResult.errors.some((error) => error.includes('must be relative')));
+## Policy
 
-// A hydrated route whose workspace root is not `.workspaces` under its own Source belongs to
-// another machine's Source, and following it lands the work in a foreign checkout.
-const foreignSource = structuredClone(validInput);
-foreignSource.context.hydratedRoute.workspaceRootPath = 'D:/Repositories/other-source/.workspaces';
-assert.equal(validateInput(foreignSource).valid, false);
+| Field | Value |
+| --- | --- |
+| Worktree branches | ${binding.gitPolicy.worktreeBranches} |
+| Mutation branch | ${binding.gitPolicy.mutationBranch} |
 
-// The two route halves must agree. A branch difference is a hydration that silently drifted.
-const branchDisagreement = structuredClone(validInput);
-branchDisagreement.context.hydratedRoute.repository.branch = 'main';
-assert.equal(validateInput(branchDisagreement).valid, false);
+## Write roots
 
-// A hint is never route authority: the observed checkout must be the hydrated one, not the
-// similarly named sibling directory next to it.
-const observedSibling = structuredClone(validInput);
-observedSibling.input.observedCheckout.diskPath = 'D:/Repositories/starci-academy-frontend';
-assert.equal(validateInput(observedSibling).valid, false);
+| Path | Why |
+| --- | --- |
+${writeRootRows}
 
-// The routed policy forbids worktree branches, so a task branch is not a bindable state.
-const taskBranch = structuredClone(validInput);
-taskBranch.input.observedCheckout.branch = 'feature/dashboard';
-taskBranch.context.hydratedRoute.repository.branch = 'feature/dashboard';
-taskBranch.context.portableRoute.repository.branch = 'feature/dashboard';
-assert.equal(validateInput(taskBranch).valid, false);
+## Runtime
 
-// Something dirty outside the declared write roots is a condition the operator reports as
-// CHECKOUT_DIRTY; the observation itself is valid input, otherwise that failure is unreachable.
-const dirtyOutside = structuredClone(validInput);
-dirtyOutside.input.observedCheckout.dirtyPaths.push('src/features/socketio/gateway.ts');
-assert.deepEqual(validateInput(dirtyOutside), { valid: true, errors: [] });
-const checkoutDirty = structuredClone(validBlockedOutput);
-checkoutDirty.output.receipt.failure = {
-  code: 'CHECKOUT_DIRTY',
-  message: 'One dirty path lies outside the declared write roots.',
-  subjects: ['src/features/socketio/gateway.ts'],
-  missingRefs: [],
-  retryable: true,
-  owningDomain: 'source',
-};
-assert.deepEqual(validateOutput(checkoutDirty), { valid: true, errors: [] });
+| Field | Value |
+| --- | --- |
+${runtimeTable}${runtimeTable ? '\n' : ''}
+## Findings
 
-// A caller that consumes the shared runtime must bind the owner, not assume it.
-const consumeWithoutOwner = structuredClone(validInput);
-consumeWithoutOwner.context.runtime = null;
-assert.equal(validateInput(consumeWithoutOwner).valid, false);
+| Code | Subject | Statement |
+| --- | --- | --- |
+${rows}
+`;
+}
 
-// A hint can never be supplied as authoritative; the constant makes it unrepresentable.
-const authoritativeHint = structuredClone(validInput);
-authoritativeHint.context.hints[0].authoritative = true;
-assert.equal(validateInput(authoritativeHint).valid, false);
+const requestJson = ({ runtimeNeed = 'none', extra = {} } = {}) => ({
+  schemaVersion: 9, operatorId: 'workspace.bind', step: 1, parallel: 1, sessionId: 's-test',
+  contexts: [{ alias: '@workspaces/projects/starci-academy/be', head: null }, { alias: '@workspaces/local/routes/starci-academy/be', head }, { alias: '@workspaces/device-state', head: null }],
+  requirements: { project: 'starci-academy', role: 'be', gitPolicy: { worktreeBranches: 'forbidden', mutationBranch: 'mtp' }, declaredWriteRoots: ['src', 'test'], runtimeNeed, resume: null, ...extra },
+  inputs: {}, resume: null,
+});
+function responseJson({ status = 'done', stop, fallbacks = [], fields = null, next = [] } = {}) {
+  return {
+    schemaVersion: 9, operatorId: 'workspace.bind', step: 1, parallel: 1, status, ...(stop ? { stop } : {}), fallbacks,
+    fields: fields ?? { 'workspace-route-binding': 'response/response.md', route: 'response/data/route.json' },
+    commits: [], next,
+  };
+}
 
-// The receipt must bind the head of the checkout it actually verified.
-// The businesses root is derived from the checkout; a typed one that disagrees is not a route.
-const typedAuthorityRoot = structuredClone(validBoundOutput);
-typedAuthorityRoot.output.receipt.route.authorityRoots.businesses = 'D:/elsewhere/.worktrees/businesses';
-const typedAuthorityRootResult = validateOutput(typedAuthorityRoot);
-assert.equal(typedAuthorityRootResult.valid, false);
-assert.ok(typedAuthorityRootResult.errors.some((error) => error.includes('derived from the checkout')));
+function writeBranch(files) {
+  const session = mkdtempSync(path.join(tmpdir(), 'workspace-session-'));
+  const branch = path.join(session, 'step-1', 'parallel-1');
+  for (const d of ['request', 'response/data', 'response/artifacts']) mkdirSync(path.join(branch, d), { recursive: true });
+  writeFileSync(path.join(session, 'state.json'), JSON.stringify({ id: 's-test', chain: [['1/1']], steps: { '1/1': 'workspace.bind' }, current: '1/1', status: 'running' }));
+  for (const [name, content] of Object.entries(files)) {
+    if (content === null) continue;
+    writeFileSync(path.join(branch, name), typeof content === 'string' ? content : JSON.stringify(content, null, 2));
+  }
+  return { branch, session };
+}
+const baseline = () => ({
+  'request/request.json': requestJson(),
+  'response/response.json': responseJson(),
+  'response/response.md': responseMd(),
+  'response/data/route.json': routeBinding(),
+});
+const withBinding = (binding, requestOverrides = {}) => ({
+  ...baseline(),
+  'request/request.json': requestJson(requestOverrides),
+  'response/data/route.json': binding,
+  'response/response.md': responseMd({ binding }),
+});
 
-const headDisagreement = structuredClone(validBoundOutput);
-headDisagreement.output.receipt.route.checkout.sourceHead = 'd'.repeat(40);
-assert.equal(validateOutput(headDisagreement).valid, false);
+async function expectValid(files, label) {
+  const { branch, session } = writeBranch(files);
+  const { errors } = await validateWorkspaceStep(branch);
+  rmSync(session, { recursive: true, force: true });
+  assert.deepEqual(errors, [], `${label} should be valid`);
+}
+async function expectError(files, needle, label) {
+  const { branch, session } = writeBranch(files);
+  const { errors } = await validateWorkspaceStep(branch);
+  rmSync(session, { recursive: true, force: true });
+  assert.ok(errors.some((e) => e.includes(needle)), `${label}: expected an error containing "${needle}", got:\n${errors.join('\n') || '(none)'}`);
+}
 
-// Mutation readiness is claimable only on the declared mutation branch.
-const readyOffBranch = structuredClone(validBoundOutput);
-readyOffBranch.output.receipt.route.checkout.branch = 'feature/dashboard';
-const readyOffBranchResult = validateOutput(readyOffBranch);
-assert.equal(readyOffBranchResult.valid, false);
-assert.ok(readyOffBranchResult.errors.some((error) => error.includes('mutation is ready only on mtp')));
+const consuming = () => withBinding(routeBinding({ runtime: runtimeConsumption() }), { runtimeNeed: 'consume' });
 
-// A loopback alias is not the closed localhost projection, however well it happens to work.
-const loopbackAlias = structuredClone(validBoundOutput);
-loopbackAlias.output.receipt.route.runtime.endpoints.api = 'http://127.0.0.1:3001';
-assert.equal(validateOutput(loopbackAlias).valid, false);
+await expectValid(baseline(), 'a source checkout bound with no runtime');
+await expectValid(consuming(), 'a bind that consumes the shared runtime');
+await expectValid({ ...baseline(), 'response/response.json': responseJson({ status: 'blocked', stop: 'ROUTE_UNDECLARED', fields: {} }), 'response/response.md': null, 'response/data/route.json': null }, 'blocked on an undeclared route');
 
-// Neither is a URL with a path; an endpoint is an origin.
-const endpointWithPath = structuredClone(validBoundOutput);
-endpointWithPath.output.receipt.route.runtime.endpoints.frontend = 'http://localhost:3000/dashboard';
-assert.equal(validateOutput(endpointWithPath).valid, false);
+await expectError({ ...baseline(), 'response/response.json': { ...responseJson(), stop: 'ROUTE_UNDECLARED' } }, 'only a blocked response carries a stop', 'done with a stop');
+await expectError({ ...baseline(), 'response/response.json': responseJson({ status: 'blocked', stop: 'MADE_UP_CODE', fields: {} }), 'response/response.md': null, 'response/data/route.json': null }, 'not a registered code', 'unknown stop code');
+await expectError({ ...baseline(), 'response/response.json': responseJson({ fallbacks: ['CHECKOUT_DIRTY'] }) }, 'has disposition terminate under these requirements; it cannot be taken as a fallback', 'fallback on a terminate code');
+await expectError({ ...baseline(), 'response/response.json': responseJson({ status: 'blocked', stop: 'ROUTE_MISMATCH' }) }, 'a blocked branch cannot carry a route', 'blocked while binding a route');
+await expectError({ ...baseline(), 'request/request.json': requestJson({ extra: { mystery: 1 } }) }, 'requirements.mystery is not a field', 'undeclared requirement');
+await expectError({ ...baseline(), 'request/request.json': requestJson({ extra: { project: '' } }) }, 'required field project has no value', 'missing required project');
+await expectError(withBinding(routeBinding({ checkout: { ...routeBinding().checkout, directory: 'academy' } })), 'a source checkout must report a null directory', 'a source checkout carrying a directory');
+await expectError(withBinding(routeBinding({ checkout: { ...routeBinding().checkout, repositoryKind: 'sibling' } })), 'a sibling checkout carries no business authority root', 'a sibling checkout claiming business authority');
+await expectError(withBinding(routeBinding({ authorityRoots: { businesses: '.worktrees/businesses' } })), 'must be derived from the checkout as', 'a typed businesses root');
+await expectError(withBinding(routeBinding({ checkout: { ...routeBinding().checkout, branch: 'feature/x' } })), 'a forbidden worktree policy cannot bind a route on another branch', 'a forbidden policy on a task branch');
+await expectError(withBinding(routeBinding({ gitPolicy: { worktreeBranches: 'allowed', mutationBranch: 'mtp' }, checkout: { ...routeBinding().checkout, branch: 'feature/x' } }), { extra: { gitPolicy: { worktreeBranches: 'allowed', mutationBranch: 'mtp' } } }), 'mutation is ready only on mtp, not on feature/x', 'mutation ready off the mutation branch');
+await expectError(withBinding(routeBinding({ checkout: { ...routeBinding().checkout, gitRoot: `${SOURCE}/api` } })), 'the checkout disk path and Git root must be the same checkout', 'the checkout and its Git root disagree');
+await expectError(withBinding(routeBinding({ sourceHead: 'e'.repeat(40) })), 'must name the same source head', 'the binding and the checkout disagree on the head');
+await expectError({ ...baseline(), 'request/request.json': requestJson({ runtimeNeed: 'consume' }) }, 'must bind the runtime owner', 'consuming with no runtime bound');
+await expectError(withBinding(routeBinding({ writeRoots: ['src'] })), 'which the binding does not carry', 'a declared write root the binding drops');
+await expectError(withBinding(routeBinding({ runtime: runtimeConsumption() })), 'runtimeNeed is none, so step 5 never ran and no runtime may be bound', 'a runtime bound without need');
+await expectError(withBinding(routeBinding({ runtime: runtimeConsumption({ status: 'starting' }) }), { runtimeNeed: 'consume' }), 'cannot bind a starting runtime owner for consumption', 'a runtime that is not ready');
+await expectError(withBinding(routeBinding({ runtime: runtimeConsumption({ endpoints: { frontend: 'http://127.0.0.1:3000', api: 'http://localhost:3001', identity: 'http://localhost:8089' } }) }), { runtimeNeed: 'consume' }), 'is not an origin-only localhost projection', 'a loopback alias as an endpoint');
+await expectError(withBinding(routeBinding({ runtime: runtimeConsumption({ endpoints: { frontend: 'http://localhost:3000', api: 'http://localhost:3000', identity: 'http://localhost:8089' } }) }), { runtimeNeed: 'consume' }), 'must resolve to distinct ports', 'two services on one port');
+await expectError(withBinding(routeBinding({ runtime: runtimeConsumption({ endpointBinding: { ...runtimeConsumption().endpointBinding, services: { frontend: 'web', api: 'web', identity: 'keycloak' } } }) }), { runtimeNeed: 'consume' }), 'service keys must be distinct', 'two services under one key');
+await expectError(withBinding(routeBinding({ runtime: runtimeConsumption({ endpointBinding: { ...runtimeConsumption().endpointBinding, project: 'other-project' } }) }), { runtimeNeed: 'consume' }), 'belongs to another project than the bound route', 'an endpoint binding from another project');
+await expectError({ ...consuming(), 'response/response.md': responseMd({ binding: routeBinding({ runtime: runtimeConsumption() }), findings: [['ROUTE_HYDRATED_FROM_PORTABLE', HYDRATED, 'resolved'], ['IDENTITY_ROSTER_SEALED', 'roster', 'sealed'], ['WORKTREE_BRANCH_FORBIDDEN', 'mtp', 'forbidden']] }) }, 'must record that the caller does not own it', 'a consumed runtime with no ownership finding');
+await expectError({ ...baseline(), 'response/response.md': responseMd({ findings: [['IDENTITY_ROSTER_SEALED', 'roster', 'sealed'], ['WORKTREE_BRANCH_FORBIDDEN', 'mtp', 'forbidden']] }) }, 'must record the hydrated route it resolved from', 'a bound route with no hydration finding');
+await expectError({ ...baseline(), 'response/response.md': responseMd({ findings: [['ROUTE_HYDRATED_FROM_PORTABLE', HYDRATED, 'resolved'], ['IDENTITY_ROSTER_SEALED', 'roster', 'sealed'], ['WORKTREE_BRANCH_FORBIDDEN', 'mtp', 'forbidden'], ['HINT_REJECTED', 'D:/Repositories/starci-academy', 'a similar directory name']] }) }, 'a hint is INVALID_INPUT at the gate', 'a receipt that weighs a hint');
+await expectError({ ...baseline(), 'response/response.md': responseMd({ findings: [['ROUTE_HYDRATED_FROM_PORTABLE', HYDRATED, 'resolved'], ['WORKTREE_BRANCH_FORBIDDEN', 'mtp', 'forbidden']] }) }, 'the credential roster was sealed and never read', 'no sealed roster finding');
+await expectError({ ...baseline(), 'response/response.md': responseMd({ findings: [['ROUTE_HYDRATED_FROM_PORTABLE', HYDRATED, 'resolved'], ['IDENTITY_ROSTER_SEALED', 'roster', 'sealed']] }) }, 'a forbidden worktree policy must be recorded', 'a forbidden policy that was never recorded');
+await expectError({ ...baseline(), 'response/response.md': responseMd({ findings: [['ROUTE_HYDRATED_FROM_PORTABLE', HYDRATED, 'resolved'], ['ROUTE_HYDRATED_FROM_PORTABLE', HYDRATED, 'resolved again'], ['IDENTITY_ROSTER_SEALED', 'roster', 'sealed'], ['WORKTREE_BRANCH_FORBIDDEN', 'mtp', 'forbidden']] }) }, 'repeats subject', 'a repeated finding subject');
+await expectError({ ...baseline(), 'response/response.md': responseMd().replace('## Policy', '## Git policy') }, 'missing section ^## Policy$', 'response section renamed');
+await expectError({ ...baseline(), 'response/response.md': responseMd().replace('| Branch | mtp |', '| Branch | feature/x |') }, 'differs from the route binding', 'the receipt and the binding disagree on the branch');
+await expectError({ ...baseline(), 'response/data/route.json': routeBinding({ sourceHead: 'not-a-head' }) }, 'sourceHead', 'route schema');
+await expectError({ ...baseline(), 'response/response.json': (() => { const o = responseJson(); delete o.fields.route; return o; })() }, 'required output route is not in fields', 'missing required output');
 
-// A consumer may only run against a ready owner generation; a degraded one is evidence, not a route.
-const degradedRuntime = structuredClone(validBoundOutput);
-degradedRuntime.output.receipt.route.runtime.status = 'degraded';
-assert.equal(validateOutput(degradedRuntime).valid, false);
-
-// The caller is never the runtime owner, and the constant makes the claim unrepresentable.
-const claimedOwnership = structuredClone(validBoundOutput);
-claimedOwnership.output.receipt.route.runtime.consumerRole = 'owner';
-assert.equal(validateOutput(claimedOwnership).valid, false);
-
-// Consuming a runtime without recording that the caller does not own it would read as ownership.
-const unrecordedConsumption = structuredClone(validBoundOutput);
-unrecordedConsumption.output.receipt.findings = unrecordedConsumption.output.receipt.findings.filter(
-  (item) => item.code !== 'RUNTIME_CONSUMED_NOT_OWNED',
-);
-assert.equal(validateOutput(unrecordedConsumption).valid, false);
-
-// The portable-to-hydrated resolution is the whole authority of the receipt, so it is never implicit.
-const unstatedHydration = structuredClone(validBoundOutput);
-unstatedHydration.output.receipt.findings = unstatedHydration.output.receipt.findings.filter(
-  (item) => item.code !== 'ROUTE_HYDRATED_FROM_PORTABLE',
-);
-assert.equal(validateOutput(unstatedHydration).valid, false);
-
-// Three endpoints on one port means two services were never actually projected.
-const collidingPorts = structuredClone(validBoundOutput);
-collidingPorts.output.receipt.route.runtime.endpoints.identity = 'http://localhost:3001';
-assert.equal(validateOutput(collidingPorts).valid, false);
-
-// A runtime failure filed against the caller returns to someone who cannot supply the delta.
-const misfiledOwner = structuredClone(validBlockedOutput);
-misfiledOwner.output.receipt.failure.owningDomain = 'caller';
-assert.equal(validateOutput(misfiledOwner).valid, false);
-
-// A blocked receipt never carries a route.
-const blockedWithRoute = structuredClone(validBlockedOutput);
-blockedWithRoute.output.receipt.route = validBoundOutput.output.receipt.route;
-assert.equal(validateOutput(blockedWithRoute).valid, false);
-
-// A retryable failure without a resume strands the caller with no way back in.
-const retryableWithoutResume = structuredClone(validBlockedOutput);
-retryableWithoutResume.output.receipt.resume = null;
-assert.equal(validateOutput(retryableWithoutResume).valid, false);
-
-// The route receipt must be registered as an artifact, or nothing later can cite it.
-const unregisteredArtifact = structuredClone(validBoundOutput);
-unregisteredArtifact.output.artifactRefs = [];
-assert.equal(validateOutput(unregisteredArtifact).valid, false);
-
-console.log('workspace.bind self-test passed');
+process.stdout.write('workspace.bind self-test: 3 valid branches, 29 rejected mutations\n');

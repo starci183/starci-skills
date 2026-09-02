@@ -46,9 +46,9 @@ Một topic sống cùng operator đọc nó. Topic nào không operator nào đ
 
 | Nhóm | Quyết định | Ai đọc |
 | --- | --- | --- |
-| [`composition/`](composition/INDEX.vi.md) | Ràng buộc mà một direction phải thoả, sau khi gu thẩm mỹ đã quyết ở grammars | `fe.direction.decide` |
-| [`presentation/`](presentation/INDEX.vi.md) | Ranh giới do app sở hữu lấy giá trị CSS nào | `fe.presentation.resolve` |
-| [`proof/`](proof/INDEX.vi.md) | Thứ chỉ đúng sau khi đã render | `fe.surface.audit` |
+| [`composition/`](composition/INDEX.vi.md) | Ràng buộc mà một direction phải thoả, sau khi gu thẩm mỹ đã quyết ở grammars | `frontend.direction.decide` |
+| [`presentation/`](presentation/INDEX.vi.md) | Ranh giới do app sở hữu lấy giá trị CSS nào | `frontend.presentation.resolve` |
+| [`proof/`](proof/INDEX.vi.md) | Thứ chỉ đúng sau khi đã render | `frontend.surface.audit` |
 
 Phép thử để xếp một topic là: đọc source có trả lời được không. Giá trị khoảng cách đọc được từ class
 nên thuộc presentation. Số hành động trội đã chốt trước khi có cây nên thuộc composition. Thứ tự bàn

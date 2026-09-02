@@ -1,0 +1,14 @@
+{
+  "kind": "frontend-direction-decision",
+  "title": "^# frontend-direction-decision — [a-z0-9][a-z0-9-]*$",
+  "sections": [
+    { "heading": "^## Decision$", "table": "| Field | Value |", "rows": ["Direction id", "Target", "Intent", "Change level", "Owner ceiling", "Classification", "Selection policy", "Selected candidate"], "cell": { "Value": "\\S" } },
+    { "heading": "^## Observed$", "table": "| Item | Evidence |", "minRows": 1, "cell": { "Evidence": "^`[^`]+@[0-9a-f]{7,40}`$" } },
+    { "heading": "^## UI contract$", "table": "| Element | Kind | Responsibility |", "minRows": 1, "cell": { "Kind": "^(region|action|state|responsive|content|accessibility)$", "Responsibility": "\\S" } },
+    { "heading": "^## Coverage$", "table": "| Concern | Enumerated |", "rows": ["Actions", "Regions", "States", "Responsive"], "cell": { "Enumerated": "\\S" } },
+    { "heading": "^## References$", "table": "| Source | URL | Limitation |", "cell": { "URL": "^https?://\\S+$", "Limitation": "\\S" } },
+    { "heading": "^## Falsification$", "table": "| Attack | Candidate | Verdict | Evidence |", "minRows": 1, "cell": { "Candidate": "^`[a-z0-9][a-z0-9-]*`$", "Verdict": "^(holds|fails)$", "Evidence": "\\S" } },
+    { "heading": "^## Why not the others$", "table": "| Candidate | Rejected because |", "cell": { "Candidate": "^`[a-z0-9][a-z0-9-]*`$", "Rejected because": "\\S" } },
+    { "heading": "^## Fallbacks taken$", "table": "| Code | Action |", "cell": { "Code": "^`[A-Z][A-Z0-9_]+`$" } }
+  ]
+}

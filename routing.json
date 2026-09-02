@@ -24,7 +24,7 @@
         "kind": "user"
       }
     },
-    "backend.implement": {
+    "backend.source.apply": {
       "backend": {
         "kind": "resume"
       },
@@ -53,15 +53,7 @@
       },
       "backend": {
         "kind": "operator",
-        "target": "backend.implement"
-      },
-      "frontend": {
-        "kind": "operator",
-        "target": "fe.direction.decide"
-      },
-      "architecture": {
-        "kind": "operator",
-        "target": "architecture.decide"
+        "target": "backend.source.apply"
       },
       "workspace": {
         "kind": "operator",
@@ -89,17 +81,14 @@
         "kind": "user"
       }
     },
-    "fe.direction.decide": {
-      "frontend": {
-        "kind": "resume"
-      },
+    "frontend.direction.decide": {
       "business": {
         "kind": "operator",
         "target": "business.decide"
       },
       "backend": {
         "kind": "operator",
-        "target": "backend.implement"
+        "target": "backend.source.apply"
       },
       "architecture": {
         "kind": "operator",
@@ -111,13 +100,15 @@
       "workspace": {
         "kind": "operator",
         "target": "workspace.bind"
+      },
+      "caller": {
+        "kind": "user"
+      },
+      "frontend": {
+        "kind": "resume"
       }
     },
-    "fe.presentation.resolve": {
-      "frontend": {
-        "kind": "operator",
-        "target": "fe.direction.decide"
-      },
+    "frontend.presentation.resolve": {
       "grammar": {
         "kind": "user"
       },
@@ -130,16 +121,15 @@
       },
       "caller": {
         "kind": "user"
+      },
+      "frontend": {
+        "kind": "resume"
       }
     },
-    "fe.source.apply": {
-      "frontend": {
-        "kind": "operator",
-        "target": "fe.direction.decide"
-      },
+    "frontend.source.apply": {
       "resolution": {
         "kind": "operator",
-        "target": "fe.presentation.resolve"
+        "target": "frontend.presentation.resolve"
       },
       "workspace": {
         "kind": "operator",
@@ -149,23 +139,20 @@
         "kind": "user"
       }
     },
-    "fe.surface.audit": {
-      "frontend": {
-        "kind": "operator",
-        "target": "fe.presentation.resolve"
-      },
-      "knowledge": {
-        "kind": "user"
-      },
-      "runtime": {
-        "kind": "external"
-      },
+    "frontend.surface.audit": {
       "workspace": {
         "kind": "operator",
         "target": "workspace.bind"
       },
       "caller": {
         "kind": "user"
+      },
+      "platform": {
+        "kind": "operator",
+        "target": "platform.operate"
+      },
+      "frontend": {
+        "kind": "resume"
       }
     },
     "git.publish": {
@@ -194,9 +181,6 @@
       "product": {
         "kind": "user"
       },
-      "knowledge": {
-        "kind": "user"
-      },
       "workspace": {
         "kind": "operator",
         "target": "workspace.bind"
@@ -206,14 +190,6 @@
       }
     },
     "quality.verify": {
-      "backend": {
-        "kind": "operator",
-        "target": "backend.implement"
-      },
-      "frontend": {
-        "kind": "operator",
-        "target": "fe.direction.decide"
-      },
       "platform": {
         "kind": "operator",
         "target": "platform.operate"
@@ -239,7 +215,7 @@
       },
       "backend": {
         "kind": "operator",
-        "target": "backend.implement"
+        "target": "backend.source.apply"
       },
       "approval": {
         "kind": "user"
@@ -255,13 +231,9 @@
       "runtime": {
         "kind": "external"
       },
-      "frontend": {
-        "kind": "operator",
-        "target": "fe.presentation.resolve"
-      },
       "backend": {
         "kind": "operator",
-        "target": "backend.implement"
+        "target": "backend.source.apply"
       },
       "quality": {
         "kind": "operator",
@@ -269,6 +241,14 @@
       },
       "caller": {
         "kind": "user"
+      },
+      "platform": {
+        "kind": "operator",
+        "target": "platform.operate"
+      },
+      "workspace": {
+        "kind": "operator",
+        "target": "workspace.bind"
       }
     },
     "workspace.bind": {

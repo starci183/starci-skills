@@ -1,0 +1,106 @@
+// git.publish's own law over one branch, on top of the shared step check: the receipt names the
+// boundary and the approval the request bound; the published head is the commit the
+// quality-verification input measured; the mode is fast-forward only and nothing was forced; the
+// session branch was merged, never rebased, and a merge commit exists only when the target moved;
+// every hook ran and passed, `pre-push` among them; the head actually advanced; a continuation tag
+// exists exactly when the request asked for one and points at the head this run pushed; and the
+// worktree and the session branch were cleaned up on a done branch.
+import { existsSync } from 'node:fs';
+import { readFile } from 'node:fs/promises';
+import path from 'node:path';
+import process from 'node:process';
+import { fileURLToPath } from 'node:url';
+import { validateStep } from '../../scripts/validate-step.mjs';
+import { tableUnder } from '../../scripts/validate-response.mjs';
+
+const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
+const SHA = /^[0-9a-f]{40}$/;
+const empty = (v) => v === undefined || v === null || v === '' || v === '—';
+const rows = (text, heading) => tableUnder(text, heading) ?? [];
+const fields = (text, heading) => Object.fromEntries(rows(text, heading).map(([k, v]) => [k, v]));
+
+export async function validateGitPublishStep(branchDir, root = ROOT, { verifiedCommit = null } = {}) {
+  const base = await validateStep(root, branchDir);
+  const errors = [...base.errors];
+  const { response, request, requirements = {}, present = new Set() } = base;
+  if (!response || response.operatorId !== 'git.publish') return { errors };
+  const read = (f) => readFile(path.join(branchDir, f), 'utf8');
+
+  // Nothing destructive can be asked for, because no field can carry it.
+  for (const forbidden of ['force', 'forceWithLease', 'noVerify', 'rebase', 'amend', 'reset', 'clean', 'stash', 'deleteBranch']) {
+    if (requirements[forbidden] !== undefined) errors.push(`request.json: ${forbidden} is not a field git.publish declares; a destructive act must stay unrepresentable`);
+  }
+  if (empty(requirements.approval)) errors.push('request.json: approval has no default; publishing outward is always something a person said yes to');
+  const wantsTag = !empty(requirements.tag);
+
+  if (!(present.has('git-publication') && existsSync(path.join(branchDir, 'response/response.md')))) {
+    if (response.status === 'done') errors.push('response/response.md: a done branch needs the publication receipt');
+    return { errors };
+  }
+  const text = await read('response/response.md');
+  const binding = fields(text, '## Binding');
+  const publication = fields(text, '## Publication');
+  const heads = rows(text, '## Published heads');
+  const hooks = rows(text, '## Hooks');
+  const tag = fields(text, '## Continuation tag');
+  const findings = new Set(rows(text, '## Findings').map(([code]) => code));
+
+  if (!empty(requirements.boundary) && binding.Boundary !== requirements.boundary) errors.push(`response/response.md: Binding publishes ${binding.Boundary} but the request bound ${requirements.boundary}`);
+  if (!empty(requirements.approval) && binding.Approval !== requirements.approval) errors.push('response/response.md: Binding names an approval the request did not bind; an approval for another boundary is somebody else\'s');
+
+  if (publication.Mode !== 'fast-forward-only') errors.push(`response/response.md: Mode is ${publication.Mode}; the publication mode is always fast-forward only`);
+  if (publication.Forced !== 'no') errors.push('response/response.md: Forced is not no; a forced push rewrites what other people have already pulled');
+  if (!/^session\//.test(publication['Session branch'] ?? '')) errors.push('response/response.md: the producer wrote on a session branch, and the receipt must name it');
+  if (!['fast-forward', 'merge-commit'].includes(publication.Merge)) errors.push(`response/response.md: Merge is ${publication.Merge}; the session branch is merged, never rebased or squashed`);
+
+  // The published head is the commit quality measured, not one commit further on.
+  const verified = verifiedCommit ?? (publication['Verified commit'] ?? '');
+  if (!SHA.test(verified)) errors.push('response/response.md: Verified commit is not a commit sha; the receipt must say which commit the gates measured');
+  if (heads.length === 0) errors.push('response/response.md: Published heads is empty; a publication that advances nothing is not a publication');
+  for (const [checkout, branch, head, previous, commits] of heads) {
+    const at = `response/response.md: published head ${checkout}`;
+    if (SHA.test(verified) && head !== verified) errors.push(`${at} is ${head} but quality verified ${verified}; a head past the verified commit carries change no gate saw`);
+    if (head === previous) errors.push(`${at} equals the remote head it claims to advance`);
+    if (!/^[1-9][0-9]*$/.test(commits)) errors.push(`${at} publishes ${commits} commits`);
+    if (publication.Merge === 'fast-forward' && previous !== '—' && !SHA.test(previous)) errors.push(`${at} fast-forwarded from a previous head that is not a sha`);
+    if (branch === '—') errors.push(`${at} names no branch`);
+  }
+
+  // Hooks are enforced, always, and pre-push is the last gate before the remote.
+  const hookNames = hooks.map(([hook]) => hook);
+  if (!hookNames.includes('pre-push')) errors.push('response/response.md: Hooks lacks the pre-push result; the last gate before the remote cannot be missing');
+  for (const [hook, , outcome] of hooks) if (outcome !== 'passed') errors.push(`response/response.md: hook ${hook} is ${outcome}; a publication carrying a failed hook is HOOK_BLOCKED, not a receipt`);
+  if (hooks.length && !findings.has('HOOK_ENFORCED')) errors.push('response/response.md: the hooks ran but the receipt records no HOOK_ENFORCED finding');
+
+  // A tag exists exactly when the person asked for one, and it points at a head this run pushed.
+  const pushedHeads = new Set(heads.map(([, , head]) => head));
+  if (wantsTag) {
+    if (tag.Tag === '—') errors.push('response/response.md: the request asked for a continuation tag and the receipt records none');
+    else {
+      const name = (requirements.tag?.name ?? '').toString();
+      if (name && tag.Tag !== name) errors.push(`response/response.md: the tag is ${tag.Tag} but the request named ${name}`);
+      if (!/^refs\/tags\//.test(tag.Ref ?? '')) errors.push('response/response.md: a continuation tag is annotated and lives under refs/tags/');
+      if (!pushedHeads.has(tag.Head)) errors.push(`response/response.md: the tag points at ${tag.Head}, which this publication did not push`);
+      if (!findings.has('CONTINUATION_TAG_PUBLISHED')) errors.push('response/response.md: a published tag must record CONTINUATION_TAG_PUBLISHED');
+    }
+  } else if (tag.Tag !== '—') errors.push('response/response.md: a continuation tag was published without the request asking for one');
+
+  // Cleanup is part of the publish, and only on a done branch.
+  if (response.status === 'done' && !/removed/i.test(publication.Cleanup ?? '')) errors.push('response/response.md: a published branch removes the worktree and the session branch');
+
+  // The commit the response registers is the commit the receipt published.
+  const commits = new Set(response.commits ?? []);
+  for (const head of pushedHeads) if (!commits.has(head)) errors.push(`response/response.json: commits does not register the published head ${head}`);
+  for (const c of commits) if (!pushedHeads.has(c)) errors.push(`response/response.json: commits carries ${c}, which the receipt did not publish`);
+
+  // The verified commit comes from the quality receipt, so the input must be there to compare against.
+  if (response.status === 'done' && !(request?.inputs ?? {})['quality-verification']) errors.push('request.json: a publish needs the quality-verification input whose commit it pushes');
+  return { errors };
+}
+
+if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+  const target = process.argv[2];
+  if (!target) { process.stderr.write('usage: node validate.mjs <session>/step-N/parallel-M\n'); process.exit(2); }
+  const { errors } = await validateGitPublishStep(path.resolve(target));
+  if (errors.length) { process.stderr.write(`${errors.join('\n')}\n`); process.exitCode = 1; } else process.stdout.write('valid git.publish branch\n');
+}

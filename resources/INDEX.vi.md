@@ -57,11 +57,11 @@ Bản tóm tắt những gì mỗi `operator.json` khai; validator từ chối d
 | `workspace.bind` | sonnet | không | không | không | Đọc file chuẩn và sổ đăng ký; không phán đoán |
 | `business.decide` | sol-fresh | giới hạn | không | không | Mô hình kinh doanh lạ có thể cần tra cứu trước khi đóng băng độ phủ |
 | `architecture.decide` | sol-fresh | giới hạn | không | không | Phương án thay thế và tương thích cần bằng chứng ngoài repo; schema đã ghim model |
-| `backend.implement` | opus | không | không | không | Ghi trong hợp đồng đã đóng băng, theo patterns/be |
-| `fe.direction.decide` | sol-fresh | giới hạn | có | chỉ khi có thẩm quyền | Chỉ tra cứu khi lĩnh vực lạ; render một trang, không phải một bức hình |
-| `fe.presentation.resolve` | sonnet | không | có | không | Tra cứu trên một danh sách đóng |
-| `fe.source.apply` | opus | không | có | không | Chỉ ghi thứ resolution đã chứa, theo patterns/fe |
-| `fe.surface.audit` | sol-reviewer | không | có | không | Chỉ trình duyệt, không ghi source: người audit không sửa được thứ mình đo |
+| `backend.source.apply` | opus | không | không | không | Ghi trong hợp đồng đã đóng băng, theo patterns/be |
+| `frontend.direction.decide` | sol-fresh | giới hạn | có | chỉ khi có thẩm quyền | Chỉ tra cứu khi lĩnh vực lạ; render một trang, không phải một bức hình |
+| `frontend.presentation.resolve` | sonnet | không | có | không | Tra cứu trên một danh sách đóng |
+| `frontend.source.apply` | opus | không | có | không | Chỉ ghi thứ resolution đã chứa, theo patterns/fe |
+| `frontend.surface.audit` | sol-reviewer | không | có | không | Chỉ trình duyệt, không ghi source: người audit không sửa được thứ mình đo |
 | `quality.verify` | sonnet | không | không | không | Chạy cổng, không sửa |
 | `uat.verify` | sol-reviewer | không | không | không | Lái hành trình thật trong trình duyệt và không được ghi gì; phán quyết mới cho từng lane |
 | `release.deploy` | opus | không | không | không | Phát hành bất biến dưới authorization đã khai |

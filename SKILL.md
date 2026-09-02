@@ -17,8 +17,7 @@ result.
 2. Run `workspace.bind` for any mission that reads or writes routed source. Nothing else may resolve a
    checkout, and a similar directory name is never route authority.
 3. Select the first operator from the table below. Read only that operator's `operator.md` and
-   `operator.json` (a package not yet migrated: `operator.json`, `context.md`, `input.md`,
-   `execute.md`).
+   `operator.json`.
 4. Run that operator, end to end, on the one profile its `operator.json` names under `resources`, with
    only the grants it lists. An operator has no other model, no inherited turns, and no grant the
    assignment omits.
@@ -30,11 +29,11 @@ result.
 | Which project, checkout, or runtime binding applies | `workspace.bind` |
 | What the product promises, who may have it, what happens when it fails | `business.decide` |
 | System boundaries, data ownership, or the tech stack | `architecture.decide` |
-| Server behaviour, an API contract, persistence, or a job | `backend.implement` |
-| Creating, restructuring, or redesigning a page or surface | `fe.direction.decide` |
-| Which CSS value an already-composed tree takes | `fe.presentation.resolve` |
-| Writing an already-resolved tree into product source | `fe.source.apply` |
-| Whether a rendered surface actually holds up | `fe.surface.audit` |
+| Server behaviour, an API contract, persistence, or a job | `backend.source.apply` |
+| Creating, restructuring, or redesigning a page or surface | `frontend.direction.decide` |
+| Which CSS value an already-composed tree takes | `frontend.presentation.resolve` |
+| Writing an already-resolved tree into product source | `frontend.source.apply` |
+| Whether a rendered surface actually holds up | `frontend.surface.audit` |
 | Build, lint, typecheck, coverage, or Sonar | `quality.verify` |
 | Whether a real person can complete a real journey | `uat.verify` |
 | Shipping a release, or recovering one | `release.deploy` |
@@ -87,7 +86,7 @@ this file cannot widen:
 - `release.deploy` requires its declared authorization, scoped to the environment and unexpired.
 - `uat.verify` accepts no free-form string in its account record, so a credential cannot be written
   into a snapshot.
-- `fe.presentation.resolve` and `fe.surface.audit` may name only rule identifiers the bound knowledge
+- `frontend.presentation.resolve` and `frontend.surface.audit` may name only rule identifiers the bound knowledge
   publishes.
 
 If a mission seems to need more than an operator allows, that is the answer, not an obstacle to route
@@ -99,10 +98,10 @@ Operators bind their own knowledge; this file does not preload it.
 
 | Folder | Bound by |
 | --- | --- |
-| `knowledge/ui/composition/` | `fe.direction.decide` |
-| `knowledge/ui/presentation/` | `fe.presentation.resolve` |
-| `knowledge/ui/proof/` | `fe.surface.audit` |
-| `knowledge/patterns/fe/`, `knowledge/patterns/be/` | `fe.source.apply`, `backend.implement` |
+| `knowledge/ui/composition/` | `frontend.direction.decide` |
+| `knowledge/ui/presentation/` | `frontend.presentation.resolve` |
+| `knowledge/ui/proof/` | `frontend.surface.audit` |
+| `knowledge/patterns/fe/`, `knowledge/patterns/be/` | `frontend.source.apply`, `backend.source.apply` |
 | `knowledge/grammars/<family>/` | every operator that composes that family |
 
 English `.md` files are the only runtime authority. Same-stem `.vi.md` files are human mirrors and

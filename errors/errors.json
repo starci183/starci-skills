@@ -76,6 +76,103 @@
         "en": "Register the code or fix the operator.",
         "vi": "Đăng ký mã hoặc sửa operator."
       }
+    },
+    "OWNER_CONFLICT": {
+      "scope": [
+        "backend.source.apply",
+        "frontend.presentation.resolve",
+        "frontend.source.apply"
+      ],
+      "domain": "caller",
+      "disposition": "terminate",
+      "meaning": {
+        "en": "A node that must be mutated lies outside the mutable owner ceiling, or the owner sets overlap.",
+        "vi": "Một node cần sửa nằm ngoài trần owner được sửa, hoặc hai tập owner chồng nhau."
+      },
+      "resume": {
+        "en": "Correct the owner authority.",
+        "vi": "Sửa thẩm quyền owner."
+      }
+    },
+    "ROUTE_UNVERIFIED": {
+      "scope": [
+        "frontend.direction.decide",
+        "git.publish"
+      ],
+      "domain": "workspace",
+      "disposition": "terminate",
+      "meaning": {
+        "en": "The project or the routed frontend checkout identity is not verified.",
+        "vi": "Danh tính project hoặc checkout frontend được route chưa được xác minh."
+      },
+      "resume": {
+        "en": "Bind the route again.",
+        "vi": "Bind lại route."
+      }
+    },
+    "UNKNOWN_RULE": {
+      "scope": [
+        "frontend.presentation.resolve",
+        "frontend.surface.audit"
+      ],
+      "domain": "self",
+      "disposition": "terminate",
+      "meaning": {
+        "en": "An identifier outside the bound rule inventory was reached for.",
+        "vi": "Một identifier ngoài kho luật đã bind bị với tới."
+      },
+      "resume": {
+        "en": "Bind the topic that publishes it, or correct the identifier.",
+        "vi": "Bind topic publish nó, hoặc sửa lại identifier."
+      }
+    },
+    "RUNTIME_UNAVAILABLE": {
+      "scope": [
+        "frontend.surface.audit",
+        "uat.verify"
+      ],
+      "domain": "platform",
+      "disposition": "terminate",
+      "meaning": {
+        "en": "The endpoint does not serve the bound route, or the surface never reaches readiness.",
+        "vi": "Endpoint không phục vụ route đã bind, hoặc bề mặt không bao giờ sẵn sàng."
+      },
+      "resume": {
+        "en": "Whoever runs the service serves the bound route; this operator never starts one.",
+        "vi": "Người vận hành dịch vụ cho route đã bind chạy; operator này không bao giờ tự khởi động."
+      }
+    },
+    "APPROVAL_REQUIRED": {
+      "scope": [
+        "business.decide",
+        "release.deploy"
+      ],
+      "domain": "caller",
+      "disposition": "terminate",
+      "meaning": {
+        "en": "The transition or the release needs an approval that no request bound.",
+        "vi": "Chuyển trạng thái hoặc release cần một phê duyệt mà request chưa ràng."
+      },
+      "resume": {
+        "en": "A person supplies the approval.",
+        "vi": "Người cấp phê duyệt."
+      }
+    },
+    "BRANCH_POLICY_VIOLATION": {
+      "scope": [
+        "git.publish",
+        "workspace.bind"
+      ],
+      "domain": "workspace",
+      "disposition": "terminate",
+      "meaning": {
+        "en": "The checkout is on a branch the routed Git policy forbids for this operation.",
+        "vi": "Checkout đang ở nhánh mà chính sách Git của route cấm với thao tác này."
+      },
+      "resume": {
+        "en": "Move to a permitted branch or change the routed policy.",
+        "vi": "Chuyển sang nhánh được phép hoặc đổi chính sách của route."
+      }
     }
   }
 }

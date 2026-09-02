@@ -1,7 +1,7 @@
 # <Topic> proof
 
 One or two paragraphs: what only becomes true once the page has rendered, and that
-`fe.surface.audit` reads it.
+`frontend.surface.audit` reads it.
 
 ## PREFIX-1 — <what the rule governs>
 

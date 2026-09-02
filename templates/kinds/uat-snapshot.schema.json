@@ -1,0 +1,96 @@
+{
+  "$id": "kind:uat-snapshot",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "runId", "requestedBy", "feature", "flow", "commit", "frozenAt", "flowRoot", "snapshotRef",
+    "snapshotFingerprint", "lease", "admission", "account", "fixtureNamespace", "seed", "cases"
+  ],
+  "properties": {
+    "runId": { "$ref": "#/$defs/runId" },
+    "requestedBy": { "type": "string", "minLength": 1 },
+    "feature": { "$ref": "#/$defs/slug" },
+    "flow": { "$ref": "#/$defs/slug" },
+    "commit": { "type": "string", "pattern": "^[0-9a-f]{40}$" },
+    "frozenAt": { "type": "string", "format": "date-time" },
+    "flowRoot": { "type": "string", "minLength": 1 },
+    "snapshotRef": { "type": "string", "pattern": "^\\.worktrees/uat/[a-z0-9][a-z0-9-]*/[a-z0-9][a-z0-9-]*/snapshot\\.json$" },
+    "snapshotFingerprint": { "$ref": "#/$defs/fingerprint" },
+    "lease": {
+      "description": "The exclusive lease on the flow directory. One run writes it at a time; the lease is granted by the orchestrator and is never asked of a person.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["leaseRef", "exclusive", "expiresAt"],
+      "properties": {
+        "leaseRef": { "type": "string", "pattern": "^uat-lease://[A-Za-z0-9._~/-]+$" },
+        "exclusive": { "const": true },
+        "expiresAt": { "type": "string", "format": "date-time" }
+      }
+    },
+    "admission": {
+      "description": "The two receipts that admit product UAT, each pinned at the commit this run verifies.",
+      "type": "array",
+      "minItems": 2,
+      "maxItems": 2,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["kind", "ref", "commit"],
+        "properties": {
+          "kind": { "enum": ["frontend-surface-audit", "quality-verification"] },
+          "ref": { "type": "string", "minLength": 1 },
+          "commit": { "type": "string", "pattern": "^[0-9a-f]{40}$" }
+        }
+      }
+    },
+    "account": {
+      "description": "A dedicated UAT username per flow and one shared password, sealed under the master identity. Every field is a name or a reference, so a password has nowhere to live even by accident.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["username", "role", "credentialName", "credentialRef", "custody", "isUat", "plaintextRecorded"],
+      "properties": {
+        "username": { "type": "string", "pattern": "^uat-[A-Za-z0-9._-]+$" },
+        "role": { "type": "string", "minLength": 1 },
+        "credentialName": { "type": "string", "pattern": "^[a-z][a-z0-9-]*$" },
+        "credentialRef": { "type": "string", "pattern": "^\\.stacks/[a-z0-9][a-z0-9-]*/secrets/uat\\.enc$" },
+        "custody": { "const": "sealed-shared-master-identity" },
+        "isUat": { "const": true },
+        "plaintextRecorded": { "const": false }
+      }
+    },
+    "fixtureNamespace": { "$ref": "#/$defs/namespace" },
+    "seed": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["recordsRef", "expectedRef", "fingerprint", "namespace", "isUat"],
+      "properties": {
+        "recordsRef": { "type": "string", "pattern": "^\\.worktrees/uat/[a-z0-9][a-z0-9-]*/[a-z0-9][a-z0-9-]*/seed/records\\.json$" },
+        "expectedRef": { "type": "string", "pattern": "^\\.worktrees/uat/[a-z0-9][a-z0-9-]*/[a-z0-9][a-z0-9-]*/seed/expected\\.json$" },
+        "fingerprint": { "$ref": "#/$defs/fingerprint" },
+        "namespace": { "$ref": "#/$defs/namespace" },
+        "isUat": { "const": true }
+      }
+    },
+    "cases": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 64,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["caseId", "order", "assertions"],
+        "properties": {
+          "caseId": { "$ref": "#/$defs/slug" },
+          "order": { "type": "integer", "minimum": 1 },
+          "assertions": { "type": "array", "minItems": 1, "maxItems": 32, "uniqueItems": true, "items": { "type": "string", "minLength": 1 } }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "fingerprint": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
+    "slug": { "type": "string", "pattern": "^[a-z0-9][a-z0-9-]*$" },
+    "runId": { "type": "string", "pattern": "^[A-Za-z0-9._-]+$" },
+    "namespace": { "type": "string", "pattern": "^uat-[A-Za-z0-9._-]+$" }
+  }
+}

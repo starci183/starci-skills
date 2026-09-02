@@ -1,0 +1,54 @@
+{
+  "schemaVersion": 9,
+  "note": "Stop codes only quality.verify emits. Same entry shape as errors/errors.json, scope implicit. Shared codes (INVALID_INPUT, SOURCE_DRIFT, NO_PROGRESS) come from errors/errors.json.",
+  "codes": {
+    "PREDECESSOR_MIXED": {
+      "domain": "caller",
+      "disposition": "terminate",
+      "meaning": {
+        "en": "Two predecessor receipts describe different source heads, so their union is a delivery nobody built.",
+        "vi": "Hai biên bản tiền nhiệm mô tả hai source head khác nhau, nên hợp của chúng là một delivery chẳng ai xây."
+      },
+      "resume": {
+        "en": "Supply one coherent predecessor set on one head.",
+        "vi": "Cấp một bộ tiền nhiệm nhất quán trên cùng một head."
+      }
+    },
+    "PREDECESSOR_STALE": {
+      "domain": "caller",
+      "disposition": "terminate",
+      "meaning": {
+        "en": "A predecessor fingerprint no longer matches the frozen source.",
+        "vi": "Fingerprint của một tiền nhiệm không còn khớp source đã đóng băng."
+      },
+      "resume": {
+        "en": "Bring a refreshed upstream receipt.",
+        "vi": "Mang biên bản thượng nguồn đã làm mới."
+      }
+    },
+    "GATE_UNAVAILABLE": {
+      "domain": "platform",
+      "disposition": "terminate",
+      "meaning": {
+        "en": "A required gate cannot be executed at all in this environment, and an unmeasurable gate is not a passed one.",
+        "vi": "Một cổng bắt buộc hoàn toàn không chạy được ở môi trường này, và cổng không đo được không phải cổng đã qua."
+      },
+      "resume": {
+        "en": "Provide a working gate environment.",
+        "vi": "Cấp một môi trường chạy cổng hoạt động được."
+      }
+    },
+    "DEBT_UNAPPROVED": {
+      "domain": "caller",
+      "disposition": "terminate",
+      "meaning": {
+        "en": "A declared debt has no live owner approval, or it covers a gate that passed or a boundary-drift failure.",
+        "vi": "Một khoản nợ đã khai không có phê duyệt còn sống của chủ, hoặc phủ lên một cổng đã pass hay một lỗi boundary-drift."
+      },
+      "resume": {
+        "en": "Supply the unexpired owner approval, or drop the debt.",
+        "vi": "Cấp phê duyệt của chủ còn hạn, hoặc bỏ khoản nợ."
+      }
+    }
+  }
+}

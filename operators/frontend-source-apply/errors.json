@@ -1,0 +1,30 @@
+{
+  "schemaVersion": 9,
+  "note": "Stop codes frontend.source.apply emits. Same entry shape as errors/errors.json, scope implicit. Shared codes (INVALID_INPUT, SOURCE_DRIFT, NO_PROGRESS) come from errors/errors.json. OWNER_CONFLICT is also emitted here but is defined in operators/frontend-presentation-resolve/errors.json; it belongs in errors/errors.json with every emitting operator in scope.",
+  "codes": {
+    "RESOLUTION_STALE": {
+      "domain": "resolution",
+      "disposition": "terminate",
+      "meaning": {
+        "en": "The resolution actually read differs from the resolution the request bound.",
+        "vi": "Resolution thực sự đọc được khác resolution mà request đã bind."
+      },
+      "resume": {
+        "en": "Bind the current resolution, or resolve the tree again.",
+        "vi": "Bind resolution hiện tại, hoặc resolve lại cây."
+      }
+    },
+    "WRITE_REJECTED": {
+      "domain": "caller",
+      "disposition": "terminate",
+      "meaning": {
+        "en": "A file or a value the write would produce lies outside what was authorized, or the committed tree is not the resolved tree.",
+        "vi": "Một file hay một giá trị lần ghi sẽ tạo ra nằm ngoài phần đã được uỷ quyền, hoặc cây đã commit không phải cây đã resolve."
+      },
+      "resume": {
+        "en": "Declare a corrected write set, or publish a resolution that carries the value.",
+        "vi": "Khai lại write set cho đúng, hoặc publish một resolution có mang giá trị đó."
+      }
+    }
+  }
+}

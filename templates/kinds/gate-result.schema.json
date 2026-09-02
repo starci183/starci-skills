@@ -1,0 +1,64 @@
+{
+  "$id": "kind:gate-result",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "gate",
+    "required",
+    "sourceHead",
+    "sessionBranch",
+    "predecessorCommit",
+    "observedAt",
+    "commandRef",
+    "configRef",
+    "status",
+    "exitCode",
+    "evidenceRef",
+    "classification",
+    "sonarScope",
+    "debt",
+    "statement"
+  ],
+  "properties": {
+    "gate": { "$ref": "#/$defs/gate" },
+    "required": { "type": "boolean" },
+    "sourceHead": { "$ref": "#/$defs/gitHead" },
+    "sessionBranch": { "type": "string", "pattern": "^session/[A-Za-z0-9._-]+$" },
+    "predecessorCommit": { "$ref": "#/$defs/gitHead" },
+    "observedAt": { "type": "string", "format": "date-time" },
+    "commandRef": { "type": "string", "minLength": 1 },
+    "configRef": { "type": "string", "minLength": 1 },
+    "status": { "enum": ["pass", "fail", "external-blocker", "skipped-not-requested"] },
+    "exitCode": { "oneOf": [{ "type": "integer" }, { "type": "null" }] },
+    "evidenceRef": { "oneOf": [{ "type": "string", "minLength": 1 }, { "type": "null" }] },
+    "classification": {
+      "oneOf": [
+        { "enum": ["in-boundary", "boundary-drift", "flaky", "external-blocker"] },
+        { "type": "null" }
+      ]
+    },
+    "sonarScope": { "oneOf": [{ "enum": ["new-code", "overall"] }, { "type": "null" }] },
+    "debt": {
+      "oneOf": [
+        { "type": "null" },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["debtId", "approvalRef", "ownerRef", "expiresAt", "statement"],
+          "properties": {
+            "debtId": { "type": "string", "pattern": "^[a-z0-9][a-z0-9-]*$" },
+            "approvalRef": { "type": "string", "minLength": 1 },
+            "ownerRef": { "type": "string", "minLength": 1 },
+            "expiresAt": { "type": "string", "format": "date-time" },
+            "statement": { "type": "string", "minLength": 1 }
+          }
+        }
+      ]
+    },
+    "statement": { "type": "string", "minLength": 1 }
+  },
+  "$defs": {
+    "gate": { "enum": ["format", "lint", "typecheck", "build", "unit-coverage", "integration", "e2e", "sonar"] },
+    "gitHead": { "type": "string", "pattern": "^[0-9a-f]{40}$" }
+  }
+}

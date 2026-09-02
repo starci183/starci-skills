@@ -8,11 +8,21 @@ import { readdir, readFile } from 'node:fs/promises';
 import path from 'node:path';
 
 export const DISPOSITIONS = new Set(['terminate', 'fallback']);
-export const DOMAINS = new Set(['self', 'architecture', 'business', 'backend', 'frontend', 'platform', 'workspace', 'caller']);
+
+// The domains a code may hand to are exactly the domains routing.json routes, plus `self` (the
+// emitting operator's own domain, answered with kind resume). Deriving the set from routing.json keeps
+// a code's true owner (identity, contract, curriculum, …) instead of forcing it into a smaller list.
+export async function loadDomains(root) {
+  const routing = JSON.parse(await readFile(path.join(root, 'routing.json'), 'utf8'));
+  const domains = new Set(['self']);
+  for (const table of Object.values(routing.routes ?? {})) for (const d of Object.keys(table)) domains.add(d);
+  return domains;
+}
 
 export async function loadErrorsRegistry(root) {
   const errors = [];
   const codes = {};
+  const DOMAINS = await loadDomains(root);
   const define = (id, entry, scope, home) => {
     if (codes[id]) { errors.push(`${home}: ${id} is already defined in ${codes[id].home}; a code two operators emit belongs in errors/errors.json with both ids in scope`); return; }
     if (!/^[A-Z][A-Z0-9_]+$/.test(id)) errors.push(`${home}: code ${id} must be UPPER_SNAKE`);

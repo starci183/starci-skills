@@ -1,8 +1,12 @@
 {
-  "schemaVersion": 8,
+  "schemaVersion": 9,
   "id": "workspace.bind",
   "domain": "workspace",
   "job": "Resolve one project and role into a verified checkout identity, its exact source head, and the closed runtime binding it may consume, and return that as one typed route receipt.",
+  "package": "operator.md",
+  "errors": "errors.json",
+  "validator": "validate.mjs",
+  "selfTest": "self-test.mjs",
   "resources": {
     "profile": "sonnet",
     "requires": [],
@@ -11,67 +15,5 @@
       "grammarBound": false,
       "imageGeneration": "never"
     }
-  },
-  "refs": [
-    {
-      "alias": "@workspaces/projects/<project>/<role>",
-      "required": true,
-      "purpose": "The portable route declaration; the only route authority."
-    },
-    {
-      "alias": "@workspaces/local/routes/<project>/<role>",
-      "required": true,
-      "purpose": "The hydrated route this machine projects the declaration onto."
-    },
-    {
-      "alias": "@workspaces/device-state",
-      "required": true,
-      "purpose": "Machine identity and the sealed roster, bound by name."
-    },
-    {
-      "alias": "@workspaces/ports/<project>",
-      "required": false,
-      "purpose": "Port projection when the caller consumes the runtime."
-    },
-    {
-      "alias": "@worktrees/sessions/central-runtime",
-      "required": false,
-      "purpose": "Runtime owner registry, bound only when runtimeNeed is consume."
-    },
-    {
-      "alias": "@dynamic/workspace-route-binding.json",
-      "required": true,
-      "purpose": "This step's own receipt, and beside it every artifact the Sequence names; the folder input.project.artifactRootRef must equal."
-    }
-  ],
-  "contextContract": "context.md",
-  "inputSchema": "input.schema.json",
-  "outputSchema": "output.schema.json",
-  "inputValidator": "validate-input.mjs",
-  "outputValidator": "validate-output.mjs",
-  "selfTest": "self-test.mjs",
-  "sideEffects": [
-    "write only the typed route receipt under input.artifactRootRef",
-    "write ignored machine-local hydrated route state for the resolved project and role"
-  ],
-  "forbiddenSideEffects": [
-    "accept a similar name, a sibling directory, the current working directory, or a browser URL as route authority",
-    "accept a caller-selected URL, loopback alias, or merely listening port as an endpoint",
-    "start, stop, restart, replace, or kill a shared runtime process",
-    "claim a port, PID, or runtime lifecycle for a feature task",
-    "create or switch to a task, feature, or worktree branch under a forbidden worktree policy",
-    "write a credential, token, cookie, or password into the receipt or any evidence",
-    "repair a missing route, initialize a workspace, or provision a UAT account"
-  ],
-  "stopConditions": [
-    "no portable route declares the requested project and role",
-    "the hydrated route is missing, belongs to another Source, or disagrees with the closed portable route",
-    "the machine identity or its encrypted credential roster is unverified",
-    "the active checkout branch violates the routed Git mutation policy",
-    "the checkout is dirty outside the declared write roots",
-    "the observed checkout head differs from the mission-frozen head",
-    "the endpoint binding is not the closed workspace-route-port-projection or its fingerprint is stale",
-    "the runtime owner registry is missing, stale, or not ready while the caller must consume it",
-    "a resume adds no effective route, identity, runtime, or provenance delta"
-  ]
+  }
 }

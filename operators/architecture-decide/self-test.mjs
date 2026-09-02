@@ -138,7 +138,7 @@ const requestJson = ({ alternatives = 1, policy = 'automatic', approval = null, 
 });
 const critiqueRequest = (inputs = { 'stack-model': 'step-1/parallel-1/response/data/stack-model.json' }) => ({ schemaVersion: 9, operatorId: 'architecture.decide', step: 1, parallel: 1, sessionId: 's-test', exchange: 'critique', contexts: [], requirements: {}, inputs, resume: null });
 const critiqueResponse = () => ({ schemaVersion: 9, operatorId: 'architecture.decide', step: 1, parallel: 1, exchange: 'critique', status: 'done', fallbacks: [], fields: { 'independent-critique': 'response/critique.md' }, commits: [], next: [] });
-function responseJson({ status = 'done', stop, fallbacks = [], withAlternatives = false, next = ['backend.implement'] } = {}) {
+function responseJson({ status = 'done', stop, fallbacks = [], withAlternatives = false, next = ['backend.source.apply'] } = {}) {
   const fields = { 'architecture-decision': 'response/response.md', 'current-state': 'response/data/current-state.json', 'stack-model': 'response/data/stack-model.json' };
   if (withAlternatives) fields.alternatives = 'response/artifacts/entitlement-read-path-alternatives.html';
   return { schemaVersion: 9, operatorId: 'architecture.decide', step: 1, parallel: 1, status, ...(stop ? { stop } : {}), fallbacks, fields, commits: [], next };

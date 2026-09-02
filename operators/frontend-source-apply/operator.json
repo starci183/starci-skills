@@ -1,0 +1,21 @@
+{
+  "schemaVersion": 9,
+  "id": "frontend.source.apply",
+  "domain": "frontend",
+  "job": "Write one already-resolved tree into product source inside a frozen owner ceiling and a declared file set, emitting only values the bound resolution receipt already contains.",
+  "package": "operator.md",
+  "errors": "errors.json",
+  "validator": "validate.mjs",
+  "selfTest": "self-test.mjs",
+  "resources": {
+    "profile": "opus",
+    "requires": [
+      "sourceWrite"
+    ],
+    "policy": {
+      "webSearch": "never",
+      "grammarBound": true,
+      "imageGeneration": "never"
+    }
+  }
+}

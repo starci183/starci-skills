@@ -1,0 +1,21 @@
+{
+  "schemaVersion": 9,
+  "id": "frontend.surface.audit",
+  "domain": "frontend",
+  "job": "Observe one rendered surface across a declared viewport and state matrix, measure every presentation value it actually produces, compare each measurement against the contract claim on that node, and return findings drawn only from the bound rule inventory.",
+  "package": "operator.md",
+  "errors": "errors.json",
+  "validator": "validate.mjs",
+  "selfTest": "self-test.mjs",
+  "resources": {
+    "profile": "sol-reviewer",
+    "requires": [
+      "browser"
+    ],
+    "policy": {
+      "webSearch": "never",
+      "grammarBound": true,
+      "imageGeneration": "never"
+    }
+  }
+}

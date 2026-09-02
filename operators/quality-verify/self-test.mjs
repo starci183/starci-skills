@@ -1,352 +1,210 @@
+// Proves validate.mjs on a synthetic session branch: one green verification, one red one that is a
+// verdict and not a stop, one blocked on an unavailable gate, and one mutation per law, each of which
+// must fail with a line that names the defect.
 import assert from 'node:assert/strict';
-import { validateInput } from './validate-input.mjs';
-import { validateOutput } from './validate-output.mjs';
+import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import path from 'node:path';
+import { validateQualityStep } from './validate.mjs';
 
-const hash = `sha256:${'a'.repeat(64)}`;
-const sourceHead = 'b'.repeat(40);
-const otherHead = 'd'.repeat(40);
-const observedAt = '2026-09-02T00:00:00.000Z';
-const contextRef = (ref, head = null) => ({ ref, fingerprint: hash, sourceHead: head, observedAt });
+const HEAD = '1'.repeat(40);
+const OTHER_HEAD = '2'.repeat(40);
+const BRANCH = 'session/s-test';
+const OBSERVED = '2026-01-10T00:00:00.000Z';
+const PLAN = [
+  { gate: 'format', commandRef: 'package.json#scripts.format', configRef: '.prettierrc', required: true },
+  { gate: 'lint', commandRef: 'package.json#scripts.lint', configRef: 'eslint.config.mjs', required: true },
+  { gate: 'unit-coverage', commandRef: 'package.json#scripts.test', configRef: 'jest.config.ts', required: true },
+];
+const THRESHOLDS = { statements: 80, lines: 80, functions: 80, branches: 80 };
+const DEBT = { debtId: 'lint-debt', gate: 'lint', approvalRef: '@worktrees/debts/be.md#lint', ownerRef: 'be-team', expiresAt: '2026-06-01T00:00:00.000Z' };
 
-const validInput = {
-  schemaVersion: 8,
-  operatorId: 'quality.verify',
-  context: {
-    predecessors: [
-      {
-        receiptRef: 'receipt://course-enrol-implementation',
-        receiptType: 'backend-implementation',
-        fingerprint: hash,
-        sourceHead,
-      },
-    ],
-    gateConfigRefs: [contextRef('config://package.json#scripts'), contextRef('config://sonar-project.properties')],
-    sourceRefs: [contextRef('source://starci-academy-backend', sourceHead)],
-    knowledgeRefs: [contextRef('knowledge://quality/source-gates')],
-    approvalRefs: [],
-  },
-  input: {
-    invocationId: 'invocation-quality-1',
-    missionId: 'mission-course-enrol',
-    observedAt,
-    project: {
-      id: 'starci-academy',
-      sourceRef: 'source://starci-academy-backend',
-      sourceHead,
-      artifactRootRef: '.v8/artifacts/invocation-quality-1',
-    },
-    delivery: {
-      id: 'course-enrol-gateway-capability',
-      kind: 'backend',
-      boundaryRefs: ['src/features/api/core/graphql/mutations/courses/course-enroll'],
-    },
-    gates: [
-      { gate: 'format', commandRef: 'npx prettier --check', configRef: 'config://prettier', required: true },
-      { gate: 'lint', commandRef: 'npm run lint:check', configRef: 'config://eslint', required: true },
-      { gate: 'typecheck', commandRef: 'npm run typecheck', configRef: 'config://tsconfig', required: true },
-      { gate: 'build', commandRef: 'npm run build', configRef: 'config://nest-cli', required: true },
-      { gate: 'unit-coverage', commandRef: 'npm run test:ci', configRef: 'config://jest', required: true },
-      { gate: 'e2e', commandRef: 'npm run test:e2e', configRef: 'config://e2e-runner', required: false },
-      { gate: 'sonar', commandRef: 'npm run sonar:check', configRef: 'config://sonar', required: true },
-    ],
-    thresholds: { statements: 80, lines: 80, functions: 75, branches: 65 },
-    explicitE2eRequest: true,
-    sonarScope: 'new-code',
-    cachePolicy: 'fingerprint-exact',
-    declaredDebts: [],
-    resume: null,
-  },
-};
+const gateResult = (gate, over = {}) => ({
+  gate, required: true, sourceHead: HEAD, sessionBranch: BRANCH, predecessorCommit: HEAD, observedAt: OBSERVED,
+  commandRef: PLAN.find((g) => g.gate === gate)?.commandRef ?? 'package.json#scripts.x',
+  configRef: PLAN.find((g) => g.gate === gate)?.configRef ?? 'config.json',
+  status: 'pass', exitCode: 0, evidenceRef: `gates/${gate}.log`, classification: null, sonarScope: null, debt: null,
+  statement: `${gate} measured at the frozen head`, ...over,
+});
+const failing = (gate, over = {}) => gateResult(gate, { status: 'fail', exitCode: 1, classification: 'in-boundary', ...over });
 
-const artifactRoot = validInput.input.project.artifactRootRef;
-const evidenceFor = (gate) => `${artifactRoot}/gates/${gate}.json`;
-const coverageEvidenceRef = `${artifactRoot}/gates/unit-coverage.coverage.json`;
-const evidenceRefs = ['receipt://course-enrol-implementation', 'source://starci-academy-backend'];
+const coverage = (over = {}) => ({ statements: 90, lines: 90, functions: 90, branches: 81.4, thresholds: THRESHOLDS, evidenceRef: 'gates/unit-coverage.log', ...over });
 
-const binding = {
-  projectId: 'starci-academy',
-  sourceRef: 'source://starci-academy-backend',
-  sourceHead,
-  artifactRootRef: artifactRoot,
-  deliveryId: 'course-enrol-gateway-capability',
-  deliveryKind: 'backend',
-  predecessorRefs: ['receipt://course-enrol-implementation'],
-  predecessorFingerprint: hash,
-  gatePlanFingerprint: hash,
-  inputFingerprint: hash,
-  progressFingerprint: hash,
-};
+function responseMd({ results = PLAN.map((g) => [g.gate, 'pass']), verdict = 'pass', findings = [['PREDECESSOR_CONSUMED', '—', 'the producer receipt was consumed unchanged']], plan = PLAN, sonarScope = 'new-code', head = HEAD, cov = coverage() } = {}) {
+  return `# quality-verification — ${head}
 
-const passResult = (gate, commandRef, statement) => ({
-  gate,
-  status: 'pass',
-  commandRef,
-  evidenceRef: evidenceFor(gate),
-  exitCode: 0,
-  classification: null,
-  statement,
+The delivery was verified at one frozen head against the routed gate plan, and the verdict rests on
+the measured gate files alone.
+
+## Binding
+
+| Field | Value |
+| --- | --- |
+| Operator | \`quality.verify\` |
+| Step | \`step-1/parallel-1\` |
+| Checkout | \`@workspaces/be\` |
+| Head | \`${head}\` |
+| Session branch | \`${BRANCH}\` |
+| Predecessors | \`step-1/parallel-1/response/changes.md\` |
+
+## Gate plan
+
+| Gate | Required | Command | Configuration |
+| --- | --- | --- | --- |
+${plan.map((g) => `| \`${g.gate}\` | ${g.required === false ? 'no' : 'yes'} | \`${g.commandRef}\` | \`${g.configRef}\` |`).join('\n')}
+
+## Results
+
+| Gate | Status | Exit code | Evidence | Classification | Statement |
+| --- | --- | --- | --- | --- | --- |
+${results.map(([gate, status]) => `| \`${gate}\` | ${status} | ${status === 'pass' ? 0 : status === 'skipped-not-requested' ? '—' : 1} | \`gates/${gate}.log\` | ${status === 'fail' ? 'in-boundary' : '—'} | ${gate} measured |`).join('\n')}
+
+## Coverage
+
+| Metric | Measured | Threshold | Verdict |
+| --- | --- | --- | --- |
+| branches | ${cov.branches} | ${cov.thresholds.branches} | ${cov.branches < cov.thresholds.branches ? 'below' : 'at-or-above'} |
+
+## Sonar
+
+| Field | Value |
+| --- | --- |
+| Scope | ${sonarScope} |
+| Finding | — |
+
+## Debts
+
+| Debt | Gate | Approval | Owner | Expires | Statement |
+| --- | --- | --- | --- | --- | --- |
+
+## Findings
+
+| Code | Gate | Statement |
+| --- | --- | --- |
+${findings.map(([code, gate, statement]) => `| \`${code}\` | ${gate} | ${statement} |`).join('\n')}
+
+## Verdict
+
+| Field | Value |
+| --- | --- |
+| Verdict | \`${verdict}\` |
+`;
+}
+
+const requestJson = ({ gates = PLAN, thresholds = THRESHOLDS, e2e = false, sonarScope = 'new-code', debts = [], head = HEAD, inputs = { changes: 'step-1/parallel-1/response/changes.md' }, extra = {} } = {}) => ({
+  schemaVersion: 9, operatorId: 'quality.verify', step: 1, parallel: 1, sessionId: 's-test',
+  contexts: [{ alias: '@workspaces/be', head }],
+  requirements: { gates, thresholds, explicitE2eRequest: e2e, sonarScope, declaredDebts: debts, resume: null, ...extra },
+  inputs, resume: null,
 });
 
-const validVerifiedOutput = {
-  schemaVersion: 8,
-  operatorId: 'quality.verify',
-  output: {
-    outcome: 'verified',
-    receipt: {
-      receiptType: 'quality-verification',
-      receiptId: 'receipt:course-enrol-quality',
-      invocationId: validInput.input.invocationId,
-      missionId: validInput.input.missionId,
-      status: 'verified',
-      binding,
-      verification: {
-        plannedGates: ['format', 'lint', 'typecheck', 'build', 'unit-coverage', 'e2e', 'sonar'],
-        requiredGates: ['format', 'lint', 'typecheck', 'build', 'unit-coverage', 'sonar'],
-        results: [
-          passResult('format', 'npx prettier --check', 'Formatting is check-only and clean.'),
-          passResult('lint', 'npm run lint:check', 'Zero errors and zero warnings.'),
-          passResult('typecheck', 'npm run typecheck', 'tsc --noEmit reports no diagnostic.'),
-          passResult('build', 'npm run build', 'The repository build entrypoint completed.'),
-          passResult('unit-coverage', 'npm run test:ci', 'Every metric meets its own threshold.'),
-          {
-            gate: 'e2e',
-            status: 'skipped-not-requested',
-            commandRef: 'npm run test:e2e',
-            evidenceRef: null,
-            exitCode: null,
-            classification: null,
-            statement: 'The end-to-end suite was not requested for this verification.',
-          },
-          passResult('sonar', 'npm run sonar:check', 'The pinned quality gate passed on the new code.'),
-        ],
-        coverage: {
-          statements: 86.4,
-          lines: 86.1,
-          functions: 79.2,
-          branches: 68.5,
-          thresholds: { statements: 80, lines: 80, functions: 75, branches: 65 },
-          evidenceRef: coverageEvidenceRef,
-        },
-        sonarScope: 'new-code',
-        debts: [],
-        verdict: 'pass',
-      },
-      findings: [
-        {
-          code: 'PREDECESSOR_CONSUMED',
-          gate: null,
-          statement: 'The backend implementation receipt was consumed unchanged on the same head.',
-        },
-        {
-          code: 'E2E_NOT_REQUESTED',
-          gate: 'e2e',
-          statement: 'No behaviour was proved end to end, because the suite was not requested.',
-        },
-        {
-          code: 'SONAR_NEW_CODE_ONLY',
-          gate: 'sonar',
-          statement: 'The gate measured new code only; the project beneath it is not covered by this result.',
-        },
-      ],
-      evidenceRefs,
-      failure: null,
-      resume: null,
-      createdAt: observedAt,
-    },
-    evidenceRefs,
-    artifactRefs: [
-      evidenceFor('format'),
-      evidenceFor('lint'),
-      evidenceFor('typecheck'),
-      evidenceFor('build'),
-      evidenceFor('unit-coverage'),
-      evidenceFor('sonar'),
-      coverageEvidenceRef,
-    ],
-    handoff: null,
-  },
-};
-
-const validBlockedOutput = {
-  schemaVersion: 8,
-  operatorId: 'quality.verify',
-  output: {
-    outcome: 'blocked',
-    receipt: {
-      receiptType: 'quality-verification',
-      receiptId: 'receipt:course-enrol-quality-blocked',
-      invocationId: validInput.input.invocationId,
-      missionId: validInput.input.missionId,
-      status: 'blocked',
-      binding,
-      verification: null,
-      findings: [],
-      evidenceRefs,
-      failure: {
-        code: 'PREDECESSOR_STALE',
-        message: 'The implementation receipt fingerprint no longer matches the frozen source.',
-        gates: [],
-        missingRefs: ['receipt://course-enrol-implementation'],
-        retryable: true,
-        owningDomain: 'backend',
-      },
-      resume: {
-        resumeToken: 'resume-quality-1',
-        requiredDelta: ['Re-emit the implementation receipt on the current head, then rebind it.'],
-      },
-      createdAt: observedAt,
-    },
-    evidenceRefs,
-    artifactRefs: [],
-    handoff: null,
-  },
-};
-
-assert.deepEqual(validateInput(validInput), { valid: true, errors: [] });
-assert.deepEqual(validateOutput(validVerifiedOutput), { valid: true, errors: [] });
-assert.deepEqual(validateOutput(validBlockedOutput), { valid: true, errors: [] });
-
-// Two predecessors on different heads describe two different deliveries.
-const mixedPredecessor = structuredClone(validInput);
-mixedPredecessor.context.predecessors.push({
-  receiptRef: 'receipt://fe-presentation-resolution',
-  receiptType: 'fe-presentation-resolution',
-  fingerprint: hash,
-  sourceHead: otherHead,
+const responseJson = ({ status = 'done', stop, gates = PLAN.map((g) => `response/data/gates/${g.gate}.json`), coverageField = 'response/data/coverage.json', next = ['git.publish'] } = {}) => ({
+  schemaVersion: 9, operatorId: 'quality.verify', step: 1, parallel: 1, status, ...(stop ? { stop } : {}),
+  fallbacks: [],
+  fields: status === 'blocked' ? {} : { 'quality-verification': 'response/response.md', 'gate-result': gates, ...(coverageField ? { coverage: coverageField } : {}) },
+  commits: [], next,
 });
-const mixedResult = validateInput(mixedPredecessor);
-assert.equal(mixedResult.valid, false);
-assert.ok(mixedResult.errors.some((error) => error.includes('disagree about the source head')));
 
-// The e2e suite is never run unless this invocation explicitly asked for it.
-const unrequestedE2e = structuredClone(validInput);
-unrequestedE2e.input.explicitE2eRequest = false;
-const e2eResult = validateInput(unrequestedE2e);
-assert.equal(e2eResult.valid, false);
-assert.ok(e2eResult.errors.some((error) => error.includes('without an explicit request')));
+function writeBranch(files) {
+  const session = mkdtempSync(path.join(tmpdir(), 'quality-session-'));
+  const branch = path.join(session, 'step-1', 'parallel-1');
+  for (const d of ['request', 'response/data/gates', 'response/artifacts']) mkdirSync(path.join(branch, d), { recursive: true });
+  writeFileSync(path.join(session, 'state.json'), JSON.stringify({ id: 's-test', chain: [['1/1']], steps: { '1/1': 'quality.verify' }, current: '1/1', status: 'running' }));
+  mkdirSync(path.join(session, 'step-1', 'parallel-1', 'response'), { recursive: true });
+  writeFileSync(path.join(session, 'step-1', 'parallel-1', 'response', 'changes.md'), '# changes\n');
+  for (const [name, content] of Object.entries(files)) {
+    if (content === null) continue;
+    writeFileSync(path.join(branch, name), typeof content === 'string' ? content : JSON.stringify(content, null, 2));
+  }
+  return { branch, session };
+}
 
-// A Sonar gate with no declared scope leaves the receipt unable to say what was measured.
-const undeclaredSonarScope = structuredClone(validInput);
-undeclaredSonarScope.input.sonarScope = 'not-planned';
-assert.equal(validateInput(undeclaredSonarScope).valid, false);
-
-// An expired approval is not a debt.
-const expiredDebt = structuredClone(validInput);
-expiredDebt.input.declaredDebts = [
-  {
-    debtId: 'debt-lint-1',
-    gate: 'lint',
-    approvalRef: 'approval://backend-owner/lint-debt',
-    ownerRef: 'owner://backend',
-    expiresAt: '2026-08-01T00:00:00.000Z',
-  },
-];
-const expiredResult = validateInput(expiredDebt);
-assert.equal(expiredResult.valid, false);
-assert.ok(expiredResult.errors.some((error) => error.includes('expired before this verification')));
-
-// A frontend delivery reaching quality is verification-only and cannot owe a gate away.
-const frontendDebt = structuredClone(validInput);
-frontendDebt.input.delivery.kind = 'frontend';
-frontendDebt.input.declaredDebts = [
-  {
-    debtId: 'debt-lint-2',
-    gate: 'lint',
-    approvalRef: 'approval://fe-owner/lint-debt',
-    ownerRef: 'owner://frontend',
-    expiresAt: '2026-12-01T00:00:00.000Z',
-  },
-];
-const frontendResult = validateInput(frontendDebt);
-assert.equal(frontendResult.valid, false);
-assert.ok(frontendResult.errors.some((error) => error.includes('verification-only')));
-
-// A pass with a non-zero exit code is a narrated result, not a measured one.
-const narratedPass = structuredClone(validVerifiedOutput);
-narratedPass.output.receipt.verification.results[1].exitCode = 1;
-const narratedResult = validateOutput(narratedPass);
-assert.equal(narratedResult.valid, false);
-assert.ok(narratedResult.errors.some((error) => error.includes('non-zero exit code')));
-
-// A green new-code Sonar gate read as project health is the misreading to prevent.
-const silentSonarScope = structuredClone(validVerifiedOutput);
-silentSonarScope.output.receipt.findings = silentSonarScope.output.receipt.findings.filter(
-  (item) => item.code !== 'SONAR_NEW_CODE_ONLY',
-);
-const sonarResult = validateOutput(silentSonarScope);
-assert.equal(sonarResult.valid, false);
-assert.ok(sonarResult.errors.some((error) => error.includes('SONAR_NEW_CODE_ONLY')));
-
-// A gate that quietly did not run reads exactly like a gate that passed.
-const silentSkip = structuredClone(validVerifiedOutput);
-silentSkip.output.receipt.findings = silentSkip.output.receipt.findings.filter(
-  (item) => item.code !== 'E2E_NOT_REQUESTED',
-);
-assert.equal(validateOutput(silentSkip).valid, false);
-
-// Only e2e may be skipped as not requested; any other silent gate is a hole in the receipt.
-const skippedBuild = structuredClone(validVerifiedOutput);
-const buildResult = skippedBuild.output.receipt.verification.results.find((item) => item.gate === 'build');
-buildResult.status = 'skipped-not-requested';
-buildResult.exitCode = null;
-buildResult.evidenceRef = null;
-skippedBuild.output.artifactRefs = skippedBuild.output.artifactRefs.filter((ref) => ref !== evidenceFor('build'));
-const skippedBuildResult = validateOutput(skippedBuild);
-assert.equal(skippedBuildResult.valid, false);
-assert.ok(skippedBuildResult.errors.some((error) => error.includes('cannot be skipped as not requested')));
-
-// A branch metric under its own threshold cannot sit beside a green unit gate.
-const coverageRegression = structuredClone(validVerifiedOutput);
-coverageRegression.output.receipt.verification.coverage.branches = 61.2;
-const coverageResult = validateOutput(coverageRegression);
-assert.equal(coverageResult.valid, false);
-assert.ok(coverageResult.errors.some((error) => error.includes('below their own threshold')));
-
-// A debt on a boundary-drift failure owes away something that belongs to the boundary owner.
-const misdirectedDebt = structuredClone(validVerifiedOutput);
-const lintResult = misdirectedDebt.output.receipt.verification.results.find((item) => item.gate === 'lint');
-lintResult.status = 'fail';
-lintResult.exitCode = 1;
-lintResult.classification = 'boundary-drift';
-misdirectedDebt.output.receipt.verification.debts = [
-  {
-    debtId: 'debt-lint-3',
-    gate: 'lint',
-    approvalRef: 'approval://backend-owner/lint-debt',
-    ownerRef: 'owner://backend',
-    expiresAt: '2026-12-01T00:00:00.000Z',
-    statement: 'The lint failure is accepted for now.',
-  },
-];
-misdirectedDebt.output.receipt.findings.push({
-  code: 'DEBT_DECLARED',
-  gate: 'lint',
-  statement: 'An approved debt keeps the lint gate red.',
+const baseline = (over = {}) => ({
+  'request/request.json': requestJson(),
+  'response/response.json': responseJson(),
+  'response/response.md': responseMd(),
+  'response/data/gates/format.json': gateResult('format'),
+  'response/data/gates/lint.json': gateResult('lint'),
+  'response/data/gates/unit-coverage.json': gateResult('unit-coverage'),
+  'response/data/coverage.json': coverage(),
+  ...over,
 });
-const misdirectedResult = validateOutput(misdirectedDebt);
-assert.equal(misdirectedResult.valid, false);
-assert.ok(misdirectedResult.errors.some((error) => error.includes('belongs to the boundary owner')));
 
-// A required gate that failed with no debt cannot produce a green verdict.
-const greenOverRed = structuredClone(validVerifiedOutput);
-const typecheckResult = greenOverRed.output.receipt.verification.results.find((item) => item.gate === 'typecheck');
-typecheckResult.status = 'fail';
-typecheckResult.exitCode = 2;
-typecheckResult.classification = 'in-boundary';
-const greenOverRedResult = validateOutput(greenOverRed);
-assert.equal(greenOverRedResult.valid, false);
-assert.ok(greenOverRedResult.errors.some((error) => error.includes('neither passed nor carry a debt')));
+// A red gate is a verdict, not a stop: the branch is done and the receipt says fail.
+const red = () => baseline({
+  'response/data/gates/lint.json': failing('lint'),
+  'response/response.md': responseMd({ results: [['format', 'pass'], ['lint', 'fail'], ['unit-coverage', 'pass']], verdict: 'fail' }),
+  'response/response.json': responseJson({ next: ['backend.source.apply'] }),
+});
 
-// Quality writes nothing but gate evidence; a stray artifact is a repair it may not make.
-const strayWrite = structuredClone(validVerifiedOutput);
-strayWrite.output.artifactRefs.push('src/features/api/core/graphql/mutations/courses/course-enroll/course-enroll.handler.ts');
-const strayResult = validateOutput(strayWrite);
-assert.equal(strayResult.valid, false);
-assert.ok(strayResult.errors.some((error) => error.includes('which no gate result produced')));
+async function expectValid(files, label) {
+  const { branch, session } = writeBranch(files);
+  const { errors } = await validateQualityStep(branch);
+  rmSync(session, { recursive: true, force: true });
+  assert.deepEqual(errors, [], `${label} should be valid`);
+}
+async function expectError(files, needle, label) {
+  const { branch, session } = writeBranch(files);
+  const { errors } = await validateQualityStep(branch);
+  rmSync(session, { recursive: true, force: true });
+  assert.ok(errors.some((e) => e.includes(needle)), `${label}: expected an error containing "${needle}", got:\n${errors.join('\n') || '(none)'}`);
+}
 
-// A blocked receipt never carries a verification.
-const blockedWithVerification = structuredClone(validBlockedOutput);
-blockedWithVerification.output.receipt.verification = validVerifiedOutput.output.receipt.verification;
-assert.equal(validateOutput(blockedWithVerification).valid, false);
+await expectValid(baseline(), 'a green verification with one file per gate');
+await expectValid(red(), 'a red gate returned as a verdict, not a stop');
+await expectValid({
+  'request/request.json': requestJson(),
+  'response/response.json': responseJson({ status: 'blocked', stop: 'GATE_UNAVAILABLE', next: [] }),
+  'response/response.md': null, 'response/data/coverage.json': null,
+}, 'blocked because a required gate could not be executed');
 
-console.log('quality.verify self-test passed');
+await expectError(baseline({ 'response/response.json': { ...responseJson(), stop: 'DEBT_UNAPPROVED' } }), 'only a blocked response carries a stop', 'done with a stop');
+await expectError(baseline({ 'response/response.json': responseJson({ status: 'blocked', stop: 'GATE_RED', next: [] }) }), 'not a registered code', 'unknown stop code');
+await expectError(baseline({ 'request/request.json': requestJson({ extra: { cachePolicy: 'fresh' } }) }), 'requirements.cachePolicy is not a field', 'a field the operator no longer declares');
+await expectError(baseline({ 'request/request.json': requestJson({ gates: [...PLAN, { gate: 'e2e', commandRef: 'p#e2e', configRef: 'e2e.config.ts', required: false }] }) }), 'cannot be planned without an explicit request', 'e2e planned with no person asking');
+await expectError(baseline({
+  'request/request.json': requestJson({ gates: [...PLAN, { gate: 'e2e', commandRef: 'p#e2e', configRef: 'e2e.config.ts', required: false }] }),
+  'response/data/gates/e2e.json': gateResult('e2e', { required: false, status: 'pass' }),
+  'response/response.json': responseJson({ gates: [...PLAN.map((g) => `response/data/gates/${g.gate}.json`), 'response/data/gates/e2e.json'] }),
+  'response/response.md': responseMd({ plan: [...PLAN, { gate: 'e2e', commandRef: 'p#e2e', configRef: 'e2e.config.ts', required: false }], results: [...PLAN.map((g) => [g.gate, 'pass']), ['e2e', 'pass']] }),
+}), 'ran without an explicit request', 'the e2e suite run unasked');
+await expectError(baseline({ 'request/request.json': requestJson({ gates: PLAN, e2e: true }), 'response/data/gates/e2e.json': gateResult('e2e', { status: 'skipped-not-requested', exitCode: null, evidenceRef: null }) }), 'never planned it', 'a gate result for a gate nobody planned');
+await expectError(baseline({ 'response/data/gates/lint.json': gateResult('lint', { exitCode: 1 }) }), 'passed with a non-zero exit code', 'a pass over a failing command');
+await expectError(baseline({ 'response/data/gates/lint.json': gateResult('lint', { evidenceRef: null }) }), 'passed with no evidence to open', 'a pass with nothing to open');
+await expectError(baseline({ 'response/data/gates/lint.json': failing('lint', { classification: null }), 'response/response.md': responseMd({ results: [['format', 'pass'], ['lint', 'fail'], ['unit-coverage', 'pass']], verdict: 'fail' }) }), 'without an in-boundary, boundary-drift, or flaky classification', 'a failure nobody classified');
+await expectError(baseline({ 'response/data/gates/format.json': gateResult('format', { status: 'skipped-not-requested', exitCode: null, evidenceRef: null }) }), 'cannot be skipped as not requested', 'a gate other than e2e quietly skipped');
+await expectError(baseline({ 'response/data/gates/lint.json': gateResult('lint', { sourceHead: OTHER_HEAD, predecessorCommit: OTHER_HEAD }) }), 'different heads', 'two gates standing on two heads');
+await expectError(baseline({ 'request/request.json': requestJson({ head: OTHER_HEAD }), 'response/response.md': responseMd({ head: OTHER_HEAD }) }), 'but the request pinned', 'gates measured off the pinned commit');
+await expectError(baseline({ 'response/data/gates/lint.json': gateResult('lint', { predecessorCommit: OTHER_HEAD }) }), 'which is not the head', 'a predecessor describing another commit');
+await expectError(baseline({ 'response/data/gates/lint.json': gateResult('lint', { sonarScope: 'new-code' }) }), 'belongs to the sonar gate alone', 'a sonar scope on a lint result');
+await expectError(baseline({ 'response/data/gates/unit-coverage.json': gateResult('unit-coverage', { gate: 'unit-coverage' }), 'response/data/coverage.json': coverage({ branches: 40 }), 'response/response.md': responseMd({ cov: coverage({ branches: 40 }) }) }), 'sit below their own threshold', 'a green unit gate over a red branch metric');
+await expectError(baseline({ 'response/data/coverage.json': coverage({ thresholds: { ...THRESHOLDS, branches: 50 } }) }), 'but the request pinned', 'a threshold lowered under the request');
+await expectError(baseline({ 'response/data/coverage.json': null, 'response/response.json': responseJson({ coverageField: null }) }), 'reports no coverage measurement', 'a passing unit gate with no coverage');
+await expectError(baseline({ 'response/response.md': responseMd({ verdict: 'fail' }) }), 'every required gate passed or is debt-covered', 'a red verdict over green gates');
+await expectError({ ...red(), 'response/response.md': responseMd({ results: [['format', 'pass'], ['lint', 'fail'], ['unit-coverage', 'pass']], verdict: 'pass' }) }, 'neither passed nor carry a debt', 'a green verdict over a red required gate');
+await expectError(baseline({
+  'request/request.json': requestJson({ debts: [DEBT] }),
+  'response/data/gates/lint.json': failing('lint', { debt: { debtId: 'lint-debt', approvalRef: DEBT.approvalRef, ownerRef: DEBT.ownerRef, expiresAt: '2025-01-01T00:00:00.000Z', statement: 'carried' } }),
+  'response/response.md': responseMd({ results: [['format', 'pass'], ['lint', 'fail'], ['unit-coverage', 'pass']], findings: [['DEBT_DECLARED', 'lint', 'the lint failure is owed']] }),
+}), 'expired before the gate was measured', 'a debt whose approval has run out');
+await expectError(baseline({
+  'request/request.json': requestJson({ debts: [{ ...DEBT, gate: 'format' }] }),
+  'response/data/gates/format.json': failing('format', { classification: 'boundary-drift', debt: { debtId: 'lint-debt', approvalRef: DEBT.approvalRef, ownerRef: DEBT.ownerRef, expiresAt: DEBT.expiresAt, statement: 'carried' } }),
+  'response/response.md': responseMd({ results: [['format', 'fail'], ['lint', 'pass'], ['unit-coverage', 'pass']], findings: [['DEBT_DECLARED', 'format', 'owed']] }),
+}), 'belongs to the boundary owner', 'a boundary-drift failure owed away');
+await expectError(baseline({ 'response/data/gates/lint.json': failing('lint', { debt: { debtId: 'ghost-debt', approvalRef: 'x', ownerRef: 'y', expiresAt: DEBT.expiresAt, statement: 'z' } }), 'response/response.md': responseMd({ results: [['format', 'pass'], ['lint', 'fail'], ['unit-coverage', 'pass']], findings: [['DEBT_DECLARED', 'lint', 'owed']] }) }), 'was never declared in the request', 'a debt nobody declared');
+await expectError({
+  ...baseline({
+    'request/request.json': requestJson({ gates: [...PLAN, { gate: 'sonar', commandRef: 'p#sonar', configRef: 'sonar-project.properties', required: false }] }),
+    'response/data/gates/sonar.json': gateResult('sonar', { required: false, sonarScope: 'new-code' }),
+    'response/response.json': responseJson({ gates: [...PLAN.map((g) => `response/data/gates/${g.gate}.json`), 'response/data/gates/sonar.json'] }),
+    'response/response.md': responseMd({ plan: [...PLAN, { gate: 'sonar', commandRef: 'p#sonar', configRef: 'sonar-project.properties', required: false }], results: [...PLAN.map((g) => [g.gate, 'pass']), ['sonar', 'pass']] }),
+  }),
+}, 'must record SONAR_NEW_CODE_ONLY', 'a green new-code Sonar gate read as project health');
+await expectError(baseline({ 'response/response.md': responseMd({ results: [['format', 'pass'], ['lint', 'pass']] }) }), 'Results has 2 rows', 'a receipt that drops a measured gate');
+await expectError(baseline({ 'response/response.md': responseMd().replace('## Verdict', '## Result') }), 'missing section ^## Verdict$', 'receipt section renamed');
+await expectError(baseline({ 'response/data/gates/lint.json': { ...gateResult('lint'), sourceHead: 'nope' } }), 'sourceHead', 'gate-result schema');
+await expectError(baseline({ 'response/response.json': responseJson({ gates: ['response/data/gates/format.json', 'response/data/gates/lint.json'] }) }), 'gate-result does not list', 'a gate file the response never lists');
+await expectError(baseline({ 'request/request.json': requestJson({ inputs: {} }) }), 'needs at least one of', 'a verification with no producer receipt');
+
+process.stdout.write('quality.verify self-test: 3 valid branches, 25 rejected mutations\n');

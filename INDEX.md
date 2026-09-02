@@ -12,8 +12,8 @@ typed results.
 3. `resources/` — which execution profile runs each operator role, which runtime grants it may use,
    and its standing answers on web search, Grammar binding, and image generation. Also validated.
 4. The one operator the mission needs: its `operator.md` (Job, Context, Inputs, Requirements, Steps,
-   Outputs, Stops, Next) plus `operator.json` for resources; a package not yet migrated still reads
-   `context.md`, `input.md`, `execute.md`. Stop codes resolve through `errors/INDEX.md`.
+   Outputs, Stops, Next) plus `operator.json` (id, domain, resources). Stop codes resolve through
+   `errors/INDEX.md`.
 5. Only the knowledge topics that operator binds.
 
 Do not preload the tree. An operator binds the smallest set of topics its decision needs, each with
@@ -28,12 +28,11 @@ alias/                   alias.json (machine registry: location, scheme, binding
 resources/               agents/profiles/{openai,claude}.json (6 profiles) + orchestrator.json (one agent per operator, max 3); validated
 operators/INDEX.md       generated matrix: what each operator reads (static, dynamic), writes, its steps and stop codes
 errors/                  errors.json (stop codes shared by several operators, with scope) + INDEX.md (generated, merged with each operators/<id>/errors.json): one disposition per code, terminate or fallback
-operators/<id>/          operator.md (+vi) one authored file per operator, operator.json (resources), errors.json (its own codes), validate.mjs, self-test.mjs;
-                         packages not yet migrated keep the fifteen-file shape (context/input/execute/output + schemas + validators)
+operators/<id>/          operator.md (+vi) one authored file per operator, operator.json (id, domain, resources), errors.json (its own codes), validate.mjs, self-test.mjs
 knowledge/
-  ui/composition/        what a tree must contain, before it exists   -> fe.direction.decide
-  ui/presentation/       which CSS value an app-owned boundary takes  -> fe.presentation.resolve
-  ui/proof/              what is only true once rendered              -> fe.surface.audit
+  ui/composition/        what a tree must contain, before it exists   -> frontend.direction.decide
+  ui/presentation/       which CSS value an app-owned boundary takes  -> frontend.presentation.resolve
+  ui/proof/              what is only true once rendered              -> frontend.surface.audit
   patterns/fe, be        code conventions extracted from the two live sources
   grammars/<family>/     one visual family's realization of Common
 templates/               one template per document kind; each carries the json template-contract the tree is checked against;

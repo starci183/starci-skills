@@ -1,0 +1,82 @@
+{
+  "kind": "git-publication",
+  "title": "^# git-publication — [a-z][a-z0-9.-]*$",
+  "sections": [
+    {
+      "heading": "^## Binding$",
+      "table": "| Field | Value |",
+      "rows": [
+        "Operator",
+        "Step",
+        "Project",
+        "Boundary",
+        "Approval",
+        "Route receipt",
+        "Worktree branches",
+        "Mutation branch",
+        "Frozen head"
+      ],
+      "cell": {
+        "Value": "\\S"
+      }
+    },
+    {
+      "heading": "^## Publication$",
+      "table": "| Field | Value |",
+      "rows": [
+        "Remote",
+        "Ref",
+        "Mode",
+        "Forced",
+        "Session branch",
+        "Target branch",
+        "Merge",
+        "Verified commit",
+        "Cleanup"
+      ],
+      "cell": {
+        "Value": "\\S"
+      }
+    },
+    {
+      "heading": "^## Published heads$",
+      "table": "| Checkout | Branch | Head | Previous remote head | Commits |",
+      "minRows": 1,
+      "cell": {
+        "Head": "^`[0-9a-f]{40}`$",
+        "Commits": "^[1-9][0-9]*$"
+      }
+    },
+    {
+      "heading": "^## Hooks$",
+      "table": "| Hook | Reference | Outcome |",
+      "minRows": 1,
+      "cell": {
+        "Hook": "^`(pre-commit|commit-msg|pre-push)`$",
+        "Outcome": "^(passed|failed)$"
+      }
+    },
+    {
+      "heading": "^## Continuation tag$",
+      "table": "| Field | Value |",
+      "rows": [
+        "Tag",
+        "Ref",
+        "Head"
+      ],
+      "cell": {
+        "Value": "\\S"
+      }
+    },
+    {
+      "heading": "^## Findings$",
+      "table": "| Code | Subject | Statement |",
+      "minRows": 1,
+      "cell": {
+        "Code": "^`(HOOK_ENFORCED|BOUNDARY_CLEAN|REMOTE_FAST_FORWARDED|REMOTE_REF_CREATED|CONTINUATION_TAG_PUBLISHED)`$",
+        "Subject": "\\S",
+        "Statement": "\\S"
+      }
+    }
+  ]
+}

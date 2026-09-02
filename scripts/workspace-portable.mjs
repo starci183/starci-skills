@@ -14,7 +14,7 @@ import {
 } from 'node:fs';
 import { dirname, isAbsolute, join, relative, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { validatorFor } from '../operators/workspace-bind/validation.mjs';
+import { validatorFor } from './json-schema.mjs';
 
 const scriptRoot = dirname(fileURLToPath(import.meta.url));
 const starciRoot = resolve(scriptRoot, '..');

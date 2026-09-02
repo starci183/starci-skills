@@ -1,0 +1,13 @@
+{
+  "kind": "business-promise-authority",
+  "title": "^# business-promise-authority — [a-z0-9][a-z0-9-]*$",
+  "sections": [
+    { "heading": "^## Binding$", "table": "| Field | Value |", "rows": ["Feature", "Mode", "Target state", "Head", "Claims fingerprint", "Coverage fingerprint"], "cell": { "Value": "\\S" } },
+    { "heading": "^## Promise$", "table": "| Field | Value |", "rows": ["Promise", "Actor", "Eligibility"], "cell": { "Value": "\\S" } },
+    { "heading": "^## Lineage$", "table": "| Field | Value |", "rows": ["Previous head", "Previous state", "Transition"], "cell": { "Value": "\\S" } },
+    { "heading": "^## Cited claims$", "table": "| Claim | Kind | Role | Source | Lines | Head |", "minRows": 1, "cell": { "Claim": "^`[a-z0-9][a-z0-9-]*`$", "Kind": "^(fact|intent|example|unknown|contradiction)$", "Lines": "^\\d+-\\d+$" } },
+    { "heading": "^## Coverage$", "table": "| Dimension | Disposition | Statement | Consumers |", "cell": { "Dimension": "^`[a-z0-9][a-z0-9-]*`$", "Disposition": "^(preserve|replace|retire|defer|not-applicable)$", "Statement": "\\S" } },
+    { "heading": "^## Reconciliation$", "table": "| Dimension | Delivered evidence | Discrepancy |" },
+    { "heading": "^## Findings$", "table": "| Code | Severity | Dimension | Statement |", "cell": { "Code": "^`[A-Z][A-Z0-9_]*`$", "Severity": "^(info|warning|error)$" } }
+  ]
+}

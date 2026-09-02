@@ -1,0 +1,90 @@
+{
+  "schemaVersion": 9,
+  "note": "Stop codes only platform.operate emits. Same entry shape as errors/errors.json, scope implicit. Shared codes (INVALID_INPUT, SOURCE_DRIFT, NO_PROGRESS) come from errors/errors.json.",
+  "codes": {
+    "AUTHORITY_DRIFT": {
+      "domain": "caller",
+      "disposition": "terminate",
+      "meaning": {
+        "en": "The approval, the plan hash, or the allowed effect set no longer matches the requested delta.",
+        "vi": "Phê duyệt, hash kế hoạch hay tập effect được phép không còn khớp phần delta được yêu cầu."
+      },
+      "resume": {
+        "en": "Bring a fresh approval for this exact plan.",
+        "vi": "Mang một phê duyệt mới cho đúng kế hoạch này."
+      }
+    },
+    "CAPABILITY_MISSING": {
+      "domain": "caller",
+      "disposition": "terminate",
+      "meaning": {
+        "en": "The capability the service kind requires is absent or names no custody evidence.",
+        "vi": "Capability mà service kind đòi hỏi đang thiếu, hoặc không nêu bằng chứng custody nào."
+      },
+      "resume": {
+        "en": "Supply the missing capability handle with its custody.",
+        "vi": "Cấp handle capability còn thiếu cùng custody của nó."
+      }
+    },
+    "INVENTORY_DRIFT": {
+      "domain": "platform",
+      "disposition": "terminate",
+      "meaning": {
+        "en": "A declared resource moved since the inventory was bound, so the plan describes a service that no longer exists.",
+        "vi": "Một tài nguyên đã khai đã đổi kể từ khi inventory được ràng, nên kế hoạch mô tả một dịch vụ không còn tồn tại."
+      },
+      "resume": {
+        "en": "Re-observe the inventory; it must arrive with a new fingerprint.",
+        "vi": "Quan sát lại inventory; nó phải tới với một fingerprint mới."
+      }
+    },
+    "PORT_CONFLICT": {
+      "domain": "product",
+      "disposition": "terminate",
+      "meaning": {
+        "en": "A claimed port is already held by another declared process, and holding it is not permission to reclaim it.",
+        "vi": "Một cổng được claim đang bị một tiến trình đã khai khác giữ, và việc nó bị giữ không phải giấy phép giành lại."
+      },
+      "resume": {
+        "en": "Agree a port, or the holder's owner releases it.",
+        "vi": "Thoả thuận một cổng khác, hoặc chủ của kẻ đang giữ nhả nó ra."
+      }
+    },
+    "EFFECT_UNAUTHORIZED": {
+      "domain": "caller",
+      "disposition": "terminate",
+      "meaning": {
+        "en": "A required effect lies outside the approved effect set or outside the branch.",
+        "vi": "Một effect cần thiết nằm ngoài tập effect đã duyệt hoặc ngoài nhánh."
+      },
+      "resume": {
+        "en": "Approve the effect, or bring a narrower plan.",
+        "vi": "Duyệt effect đó, hoặc mang một kế hoạch hẹp hơn."
+      }
+    },
+    "SERVICE_UNAVAILABLE": {
+      "domain": "provider",
+      "disposition": "terminate",
+      "meaning": {
+        "en": "The shared service or its provider cannot be reached.",
+        "vi": "Dịch vụ dùng chung hoặc provider của nó không tới được."
+      },
+      "resume": {
+        "en": "Restore the provider.",
+        "vi": "Khôi phục provider."
+      }
+    },
+    "PROOF_FAILED": {
+      "domain": "platform",
+      "disposition": "terminate",
+      "meaning": {
+        "en": "A required check is missing, unreadable, or failed after apply, and an unproved operation is not an operated one.",
+        "vi": "Một phép kiểm bắt buộc thiếu, không đọc được, hoặc hỏng sau khi áp, và một lần vận hành chưa chứng minh được thì chưa phải đã vận hành."
+      },
+      "resume": {
+        "en": "Repair the service, then invoke again.",
+        "vi": "Sửa dịch vụ, rồi gọi lại."
+      }
+    }
+  }
+}

@@ -1,0 +1,66 @@
+{
+  "schemaVersion": 9,
+  "note": "Stop codes only backend.source.apply emits. Same entry shape as errors/errors.json, scope implicit. Shared codes (INVALID_INPUT, SOURCE_DRIFT, NO_PROGRESS) come from errors/errors.json, and OWNER_CONFLICT is not defined here because frontend.presentation.resolve emits it too: a code two operators emit belongs in errors/errors.json with both ids in scope. Every domain below is the one the old package's owningDomain enum published for this operator: backend, business, contract, platform, workspace, caller. `contract` is a routing domain of its own, answered with a person, and it is not spelled caller: the person who reopens a frozen contract is not the person who wrote the request.",
+  "codes": {
+    "CONTRACT_UNFROZEN": {
+      "domain": "contract",
+      "disposition": "terminate",
+      "meaning": {
+        "en": "The mutation contract is not frozen, or its fingerprint is stale.",
+        "vi": "Contract mutation chưa đóng băng, hoặc fingerprint của nó đã cũ."
+      },
+      "resume": {
+        "en": "Bring the frozen contract.",
+        "vi": "Mang contract đã đóng băng tới."
+      }
+    },
+    "CONTRACT_WIDENED": {
+      "domain": "contract",
+      "disposition": "terminate",
+      "meaning": {
+        "en": "The outcome cannot be reached without a boundary the contract does not carry.",
+        "vi": "Không đạt được kết quả nếu không có một ranh giới mà contract không mang."
+      },
+      "resume": {
+        "en": "The contract owner reopens and refreezes the contract, then the same outcome is implemented again.",
+        "vi": "Chủ contract mở lại và đóng băng lại contract, rồi cài đặt lại cùng kết quả đó."
+      }
+    },
+    "BUSINESS_AUTHORITY_MISSING": {
+      "domain": "business",
+      "disposition": "terminate",
+      "meaning": {
+        "en": "A business question is open and no approved decision settles it.",
+        "vi": "Một câu hỏi nghiệp vụ còn mở và không quyết định đã duyệt nào giải nó."
+      },
+      "resume": {
+        "en": "Publish the decision and rebind the authority fingerprint.",
+        "vi": "Publish quyết định và ràng lại fingerprint thẩm quyền."
+      }
+    },
+    "PATTERN_UNBOUND": {
+      "domain": "backend",
+      "disposition": "terminate",
+      "meaning": {
+        "en": "A touched aspect has no sibling family bound for it.",
+        "vi": "Một khía cạnh bị chạm không có họ anh em nào được ràng cho nó."
+      },
+      "resume": {
+        "en": "Bind the missing pattern; guessing the family from memory is refused.",
+        "vi": "Ràng pattern còn thiếu; đoán họ từ trí nhớ bị từ chối."
+      }
+    },
+    "PROOF_UNAVAILABLE": {
+      "domain": "platform",
+      "disposition": "terminate",
+      "meaning": {
+        "en": "A declared proof could not be executed in this environment.",
+        "vi": "Một proof đã khai không chạy được trong môi trường này."
+      },
+      "resume": {
+        "en": "Provide a working proof environment; a proof that could not run never becomes a pass.",
+        "vi": "Cung cấp môi trường chạy proof; một proof không chạy được không bao giờ thành pass."
+      }
+    }
+  }
+}

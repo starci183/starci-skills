@@ -1,8 +1,12 @@
 {
-  "schemaVersion": 8,
+  "schemaVersion": 9,
   "id": "business.decide",
   "domain": "business",
   "job": "Decide and publish one evidence-backed business promise as durable backend-owned authority, frozen behind a complete promise-to-enforcement coverage matrix.",
+  "package": "operator.md",
+  "errors": "errors.json",
+  "validator": "validate.mjs",
+  "selfTest": "self-test.mjs",
   "resources": {
     "profile": "sol-fresh",
     "requires": [
@@ -13,55 +17,5 @@
       "grammarBound": false,
       "imageGeneration": "never"
     }
-  },
-  "refs": [
-    {
-      "alias": "@worktrees/businesses/<featureId>",
-      "required": true,
-      "purpose": "The promise head and its lifecycle state, by content address."
-    },
-    {
-      "alias": "@workspaces/be",
-      "required": true,
-      "purpose": "The backend checkout every fact claim cites by path, line range, and head."
-    },
-    {
-      "alias": "@dynamic/architecture-decision.json",
-      "required": false,
-      "purpose": "Architecture evidence; never a source of business behaviour."
-    },
-    {
-      "alias": "@dynamic/business-promise-authority.json",
-      "required": true,
-      "purpose": "This step's own receipt, and beside it every artifact the Sequence names; the folder input.project.artifactRootRef must equal."
-    }
-  ],
-  "contextContract": "context.md",
-  "inputSchema": "input.schema.json",
-  "outputSchema": "output.schema.json",
-  "inputValidator": "validate-input.mjs",
-  "outputValidator": "validate-output.mjs",
-  "selfTest": "self-test.mjs",
-  "sideEffects": [
-    "write only the typed authority receipt and the one feature head at input.publication.headRef under input.project.businessesRootRef"
-  ],
-  "forbiddenSideEffects": [
-    "publish a promise while a discovered consumer or lifecycle branch carries no disposition",
-    "promote an example, screenshot, or intent claim into product truth",
-    "invent an actor, entitlement, quota, payment, settlement, or lifecycle behaviour the evidence does not state",
-    "advance a feature head through a transition the lifecycle does not allow",
-    "write a head below a project segment under the businesses root",
-    "modify product source, architecture authority, frontend authority, or backend implementation",
-    "claim implementation, quality-gate, or UAT completion"
-  ],
-  "stopConditions": [
-    "a discovered enforcement consumer or lifecycle branch has no disposition",
-    "a mandatory coverage dimension is unproven or marked not applicable",
-    "the evidence set contradicts itself and the contradiction is unresolved",
-    "the requested lifecycle transition is illegal for the observed head",
-    "the target state is implemented and delivered source does not reconcile",
-    "publication needs an owner approval that was never bound",
-    "the observed backend source head differs from the frozen head",
-    "a resume adds no effective evidence, authority, discovery, or approval delta"
-  ]
+  }
 }

@@ -1,0 +1,135 @@
+{
+  "schemaVersion": 9,
+  "note": "Stop codes frontend.direction.decide emits. Same entry shape as errors/errors.json, scope implicit. Shared codes (INVALID_INPUT, SOURCE_DRIFT, NO_PROGRESS, EVIDENCE_MISSING) come from errors/errors.json.",
+  "codes": {
+    "SCOPE_UNFROZEN": {
+      "domain": "caller",
+      "disposition": "terminate",
+      "meaning": {
+        "en": "The target or the boundary of the surface is incomplete, so the UI contract cannot be closed.",
+        "vi": "Target hay ranh giới của bề mặt còn thiếu, nên không đóng được UI contract."
+      },
+      "resume": {
+        "en": "Freeze the scope.",
+        "vi": "Đóng băng scope."
+      }
+    },
+    "CHANGE_LEVEL_AMBIGUOUS": {
+      "domain": "caller",
+      "disposition": "terminate",
+      "meaning": {
+        "en": "The authority for new, reconstruct or refine is unresolved or contradicts the intent.",
+        "vi": "Thẩm quyền cho new, reconstruct hay refine chưa rõ hoặc chỏi với intent."
+      },
+      "resume": {
+        "en": "State the exact change level.",
+        "vi": "Nêu đúng change level."
+      }
+    },
+    "OWNER_CEILING_INVALID": {
+      "domain": "caller",
+      "disposition": "terminate",
+      "meaning": {
+        "en": "The direction needs an owner the declared ceiling does not authorize.",
+        "vi": "Hướng cần một owner mà trần đã khai không uỷ quyền."
+      },
+      "resume": {
+        "en": "Correct the owner ceiling.",
+        "vi": "Sửa trần owner."
+      }
+    },
+    "BUSINESS_REQUIRED": {
+      "domain": "business",
+      "disposition": "terminate",
+      "meaning": {
+        "en": "An actor, promise, permission, adverse outcome or recovery truth the change level requires is unresolved.",
+        "vi": "Một actor, lời hứa, quyền, kết cục bất lợi hay đường phục hồi mà change level đòi vẫn chưa được giải quyết."
+      },
+      "resume": {
+        "en": "Run business.decide first.",
+        "vi": "Chạy business.decide trước."
+      }
+    },
+    "BACKEND_REQUIRED": {
+      "domain": "backend",
+      "disposition": "terminate",
+      "meaning": {
+        "en": "The direction changes a data contract nobody delivered.",
+        "vi": "Hướng làm đổi một contract dữ liệu chưa ai giao."
+      },
+      "resume": {
+        "en": "Run backend.source.apply first.",
+        "vi": "Chạy backend.source.apply trước."
+      }
+    },
+    "ARCHITECTURE_REQUIRED": {
+      "domain": "architecture",
+      "disposition": "terminate",
+      "meaning": {
+        "en": "The direction changes a system or data boundary nobody decided.",
+        "vi": "Hướng làm đổi một ranh giới hệ thống hay dữ liệu chưa ai quyết."
+      },
+      "resume": {
+        "en": "Run architecture.decide first.",
+        "vi": "Chạy architecture.decide trước."
+      }
+    },
+    "GRAMMAR_REQUIRED": {
+      "domain": "grammar",
+      "disposition": "terminate",
+      "meaning": {
+        "en": "A family component the direction needs is unpublished; a composite is never assembled in its place.",
+        "vi": "Một component của họ mà hướng cần chưa được publish; không bao giờ được ghép tạm một cái thay thế."
+      },
+      "resume": {
+        "en": "A person publishes the component, and the same direction runs again.",
+        "vi": "Người publish component đó, rồi chính hướng ấy chạy lại."
+      }
+    },
+    "REFERENCE_EVIDENCE_EXHAUSTED": {
+      "domain": "caller",
+      "disposition": "terminate",
+      "meaning": {
+        "en": "Bounded research cannot close the business or interaction question the decision rests on.",
+        "vi": "Nghiên cứu có giới hạn không lấp được câu hỏi nghiệp vụ hay tương tác mà quyết định dựa vào."
+      },
+      "resume": {
+        "en": "Supply the owning authority or a materially new reference.",
+        "vi": "Cấp thẩm quyền có chủ hoặc một tham chiếu mới về bản chất."
+      }
+    },
+    "NO_VIABLE_DIRECTION": {
+      "domain": "caller",
+      "disposition": "terminate",
+      "meaning": {
+        "en": "Every candidate contradicts authority or fails a mandatory attack.",
+        "vi": "Mọi phương án đều chỏi thẩm quyền hoặc chết dưới một đòn tấn công bắt buộc."
+      },
+      "resume": {
+        "en": "Change the authority or the constraints; cosmetic variants are not a delta.",
+        "vi": "Đổi thẩm quyền hoặc ràng buộc; biến thể bề ngoài không phải delta."
+      }
+    },
+    "DIRECTION_CHOICE_REQUIRED": {
+      "domain": "caller",
+      "disposition": "fallback",
+      "meaning": {
+        "en": "Several candidates survive falsification and none dominates.",
+        "vi": "Nhiều phương án cùng sống sót qua phản chứng và không cái nào trội."
+      },
+      "fallback": {
+        "en": "Select the candidate that survived the most falsification attacks; on a tie, the one that introduces the fewest new nodes; record the table under ## Decision.",
+        "vi": "Chọn phương án sống sót qua nhiều đòn phản chứng nhất; hòa thì chọn phương án thêm ít node mới nhất; ghi bảng vào mục ## Decision."
+      },
+      "unless": {
+        "param": "selectionPolicy",
+        "equals": "approval-required",
+        "then": "terminate"
+      },
+      "resume": {
+        "en": "The person supplies approval naming one candidate.",
+        "vi": "Người nhập approval gọi tên một phương án."
+      }
+    }
+  }
+}

@@ -1,0 +1,78 @@
+{
+  "schemaVersion": 9,
+  "note": "Stop codes only uat.verify emits. Same entry shape as errors/errors.json, scope implicit. Shared codes (INVALID_INPUT, SOURCE_DRIFT, NO_PROGRESS) come from errors/errors.json. RUNTIME_UNAVAILABLE is emitted here too but is defined in operators/frontend-surface-audit/errors.json; it belongs in errors/errors.json with both operators in scope, and until that move validate-operator reports it as out of scope here. No code asks a person for a credential: the shared UAT password is resolved by name at login, and unavailable provisioning blocks instead of prompting.",
+  "codes": {
+    "ADMISSION_MISSING": {
+      "domain": "quality",
+      "disposition": "terminate",
+      "meaning": {
+        "en": "The surface audit or the quality verification that admits product UAT is absent, or one of them was taken at another commit than the pinned head.",
+        "vi": "Lượt soi bề mặt hoặc lượt kiểm chất lượng cho phép UAT sản phẩm đang thiếu, hoặc một trong hai được lấy ở commit khác commit đã ghim."
+      },
+      "resume": {
+        "en": "Re-run the missing admission at the pinned commit.",
+        "vi": "Chạy lại admission còn thiếu tại đúng commit đã ghim."
+      }
+    },
+    "PROVISIONING_UNAVAILABLE": {
+      "domain": "control-panel",
+      "disposition": "terminate",
+      "meaning": {
+        "en": "The sealed UAT credential cannot be resolved by name, or the flow's dedicated account does not exist; asking a person to sign in is forbidden in every branch.",
+        "vi": "Không giải được thông tin đăng nhập UAT niêm phong theo tên, hoặc tài khoản riêng của luồng không tồn tại; nhờ người đăng nhập bị cấm ở mọi nhánh."
+      },
+      "resume": {
+        "en": "Restore the sealed credential or the account; never a person's sign-in.",
+        "vi": "Khôi phục thông tin đăng nhập niêm phong hoặc tài khoản; không bao giờ nhờ người đăng nhập."
+      }
+    },
+    "LEASE_INVALID": {
+      "domain": "control-panel",
+      "disposition": "terminate",
+      "meaning": {
+        "en": "The exclusive lease on the flow directory is expired, foreign, or bound to another run, generation or origin.",
+        "vi": "Lease độc quyền trên thư mục luồng đã hết hạn, thuộc chỗ khác, hoặc gắn vào lượt chạy, generation hay origin khác."
+      },
+      "resume": {
+        "en": "The orchestrator grants the lease again for this run.",
+        "vi": "Orchestrator cấp lại lease cho đúng lượt chạy này."
+      }
+    },
+    "EVIDENCE_UNAVAILABLE": {
+      "domain": "runtime",
+      "disposition": "terminate",
+      "meaning": {
+        "en": "A case produced no capture, no screenshot, or no screenshot whose login field could be masked, so a lane has nothing to be judged on.",
+        "vi": "Một case không sinh ra capture, không sinh ra ảnh chụp, hoặc không ảnh nào che được ô mật khẩu, nên một làn không có gì để xét."
+      },
+      "resume": {
+        "en": "Restore the dependency and run the frozen case again under a new runId.",
+        "vi": "Khôi phục phụ thuộc rồi chạy lại case đã đóng băng dưới một runId mới."
+      }
+    },
+    "FIXTURE_VIOLATION": {
+      "domain": "caller",
+      "disposition": "terminate",
+      "meaning": {
+        "en": "The seed, the run namespace or the cleanup scope could not be satisfied: a seed would have created the outcome under test, or cleanup would have reached outside the namespace.",
+        "vi": "Seed, namespace lượt chạy hay phạm vi dọn dẹp không thoả được: seed sẽ tạo ra chính kết quả cần kiểm, hoặc dọn dẹp sẽ với ra ngoài namespace."
+      },
+      "resume": {
+        "en": "Correct the fixture boundary in seed/records.json.",
+        "vi": "Sửa ranh giới fixture trong seed/records.json."
+      }
+    },
+    "CANONICAL_WRITE_DENIED": {
+      "domain": "backend",
+      "disposition": "terminate",
+      "meaning": {
+        "en": "The flow directory cannot be written and read back under the exclusive lease, or the write would have rewritten an existing run record.",
+        "vi": "Không ghi rồi đọc lại được thư mục luồng dưới lease độc quyền, hoặc lần ghi sẽ đè lên một hồ sơ lượt chạy đã có."
+      },
+      "resume": {
+        "en": "Restore write authority on the flow directory, or publish under a new runId.",
+        "vi": "Khôi phục quyền ghi trên thư mục luồng, hoặc phát hành dưới một runId mới."
+      }
+    }
+  }
+}

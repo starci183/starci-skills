@@ -1,0 +1,90 @@
+{
+  "schemaVersion": 9,
+  "note": "Stop codes only workspace.bind emits. Same entry shape as errors/errors.json, scope implicit. Shared codes (INVALID_INPUT, SOURCE_DRIFT, NO_PROGRESS) come from errors/errors.json, and BRANCH_POLICY_VIOLATION is not defined here because git.publish emits it too: a code two operators emit belongs in errors/errors.json with both ids in scope. Every domain below is the one the old package's OWNING_DOMAIN table published, and routing.json answers each of them for this operator: workspace resumes, source resumes, identity and runtime are external, caller is a person.",
+  "codes": {
+    "IDENTITY_UNVERIFIED": {
+      "domain": "identity",
+      "disposition": "terminate",
+      "meaning": {
+        "en": "The machine identity or its encrypted credential roster is missing or stale.",
+        "vi": "Định danh máy hoặc roster credential đã mã hoá của nó thiếu hoặc cũ."
+      },
+      "resume": {
+        "en": "Verify the machine identity and seal its roster.",
+        "vi": "Xác minh định danh máy và niêm phong roster của nó."
+      }
+    },
+    "ROUTE_UNDECLARED": {
+      "domain": "workspace",
+      "disposition": "terminate",
+      "meaning": {
+        "en": "No portable declaration names this project and role.",
+        "vi": "Không khai báo portable nào gọi tên project và role này."
+      },
+      "resume": {
+        "en": "Declare the route; this operator never repairs one.",
+        "vi": "Khai báo route; operator này không bao giờ tự sửa."
+      }
+    },
+    "ROUTE_UNHYDRATED": {
+      "domain": "workspace",
+      "disposition": "terminate",
+      "meaning": {
+        "en": "The declaration exists but no local route projects it onto this machine.",
+        "vi": "Khai báo có tồn tại nhưng không route local nào chiếu nó xuống máy này."
+      },
+      "resume": {
+        "en": "Hydrate the route on this machine.",
+        "vi": "Hydrate route trên máy này."
+      }
+    },
+    "ROUTE_MISMATCH": {
+      "domain": "workspace",
+      "disposition": "terminate",
+      "meaning": {
+        "en": "The hydrated route disagrees with the closed portable route, or belongs to another Source.",
+        "vi": "Route đã hydrate mâu thuẫn với route portable đóng, hoặc thuộc về một Source khác."
+      },
+      "resume": {
+        "en": "Correct the hydration.",
+        "vi": "Sửa lại phần hydrate."
+      }
+    },
+    "CHECKOUT_DIRTY": {
+      "domain": "source",
+      "disposition": "terminate",
+      "meaning": {
+        "en": "Something is dirty outside the declared write roots.",
+        "vi": "Có thứ đang bẩn ngoài các write root đã khai báo."
+      },
+      "resume": {
+        "en": "Clean the boundary, or declare the write roots that cover it; this operator never stashes.",
+        "vi": "Dọn sạch ranh giới, hoặc khai báo write root bao được nó; operator này không bao giờ stash."
+      }
+    },
+    "ENDPOINT_AUTHORITY_STALE": {
+      "domain": "runtime",
+      "disposition": "terminate",
+      "meaning": {
+        "en": "The endpoint binding is not the closed port projection, or its fingerprint is stale.",
+        "vi": "Ràng buộc endpoint không phải phép chiếu port đóng, hoặc fingerprint của nó đã cũ."
+      },
+      "resume": {
+        "en": "Recompute the authority fingerprint at its owner.",
+        "vi": "Tính lại fingerprint thẩm quyền ở phía chủ của nó."
+      }
+    },
+    "RUNTIME_NOT_READY": {
+      "domain": "runtime",
+      "disposition": "terminate",
+      "meaning": {
+        "en": "The runtime owner registry is missing, stale, or not ready while the caller must consume it.",
+        "vi": "Registry chủ runtime thiếu, cũ hoặc chưa sẵn sàng trong khi người gọi phải tiêu thụ nó."
+      },
+      "resume": {
+        "en": "Raise one coordination request to the registered owner and wait for a ready generation.",
+        "vi": "Nêu một yêu cầu phối hợp tới chủ đã đăng ký và chờ một generation sẵn sàng."
+      }
+    }
+  }
+}

@@ -13,7 +13,7 @@ check them.
 
 ## COVERAGE-1 — What the receipt must enumerate
 
-Governs the fields a decided `fe-direction-decision.json` must carry before it may be emitted.
+Governs the fields a decided `frontend-direction-decision.json` must carry before it may be emitted.
 
 | Case | When | Assert |
 | --- | --- | --- |

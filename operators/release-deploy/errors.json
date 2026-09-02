@@ -1,0 +1,158 @@
+{
+  "schemaVersion": 9,
+  "note": "Stop codes only release.deploy emits. Same entry shape as errors/errors.json, scope implicit. Shared codes (INVALID_INPUT, NO_PROGRESS) come from errors/errors.json; APPROVAL_REQUIRED is defined by business.decide and belongs in errors/errors.json with both operators in scope. ROLLOUT_FAILED and RECOVERY_EXHAUSTED are the two ordered fallbacks: a failed rollout takes the recovery branch, and exhausted recovery takes the rollback branch; everything after that terminates.",
+  "codes": {
+    "AUTHORIZATION_MISSING": {
+      "domain": "approval",
+      "disposition": "terminate",
+      "meaning": {
+        "en": "No declared grant covers this project, environment, target, or the deploy action, or it had expired when the target was observed.",
+        "vi": "Không grant nào đã khai phủ project, môi trường, target hay hành động deploy này, hoặc nó đã hết hạn lúc target được quan sát."
+      },
+      "resume": {
+        "en": "Supply the declared authorization, still valid.",
+        "vi": "Cấp thẩm quyền đã khai và còn hiệu lực."
+      }
+    },
+    "MANIFEST_INVALID": {
+      "domain": "caller",
+      "disposition": "terminate",
+      "meaning": {
+        "en": "The validated manifest is pinned to another release, and that substitution is how an unreviewed image reaches a reviewed target.",
+        "vi": "Manifest đã kiểm được ghim vào một release khác, và phép thay thế đó chính là cách một image chưa duyệt tới được target đã duyệt."
+      },
+      "resume": {
+        "en": "Bring a manifest validated against this release.",
+        "vi": "Mang một manifest đã kiểm đúng với release này."
+      }
+    },
+    "ARTIFACT_MISSING": {
+      "domain": "provider",
+      "disposition": "terminate",
+      "meaning": {
+        "en": "The immutable digest cannot be resolved, and no replacement may be built and called the same release.",
+        "vi": "Digest bất biến không phân giải được, và không được build một cái thay thế rồi gọi nó là cùng release."
+      },
+      "resume": {
+        "en": "Publish the artifact at that digest.",
+        "vi": "Publish artifact ở đúng digest đó."
+      }
+    },
+    "CREDENTIAL_UNAVAILABLE": {
+      "domain": "platform",
+      "disposition": "terminate",
+      "meaning": {
+        "en": "A declared handle cannot be resolved through existing custody.",
+        "vi": "Một handle đã khai không phân giải được qua custody đang có."
+      },
+      "resume": {
+        "en": "Restore the custody; never an inline value.",
+        "vi": "Khôi phục custody; không bao giờ nhập giá trị trực tiếp."
+      }
+    },
+    "HOST_UNAVAILABLE": {
+      "domain": "provider",
+      "disposition": "terminate",
+      "meaning": {
+        "en": "The declared host cannot be prepared.",
+        "vi": "Host đã khai không chuẩn bị được."
+      },
+      "resume": {
+        "en": "Provide a reachable, prepared host.",
+        "vi": "Cấp một host tới được và đã chuẩn bị."
+      }
+    },
+    "MIGRATION_BLOCKED": {
+      "domain": "backend",
+      "disposition": "terminate",
+      "meaning": {
+        "en": "The declared migration cannot be applied safely.",
+        "vi": "Migration đã khai không thể áp một cách an toàn."
+      },
+      "resume": {
+        "en": "Approve a migration boundary the backend owner can apply.",
+        "vi": "Duyệt một ranh giới migration mà chủ backend áp được."
+      }
+    },
+    "DOMAIN_UNRECONCILED": {
+      "domain": "provider",
+      "disposition": "terminate",
+      "meaning": {
+        "en": "Domain or TLS state cannot be brought to the declaration.",
+        "vi": "Trạng thái domain hay TLS không đưa về đúng khai báo được."
+      },
+      "resume": {
+        "en": "Fix the provider state, or the provider authority.",
+        "vi": "Sửa trạng thái phía provider, hoặc thẩm quyền với provider."
+      }
+    },
+    "ROLLOUT_FAILED": {
+      "domain": "deployment",
+      "disposition": "fallback",
+      "meaning": {
+        "en": "The rollout could not place the release on the target.",
+        "vi": "Rollout không đặt được release lên target."
+      },
+      "resume": {
+        "en": "Correct the target or the plan and roll out again.",
+        "vi": "Sửa target hoặc plan rồi roll out lại."
+      },
+      "fallback": {
+        "en": "Take the recovery branch: apply only the approved reversible actions against the same release identity, one at a time, and record each attempt with its outcome under ## Fallbacks taken.",
+        "vi": "Đi nhánh phục hồi: chỉ áp những hành động đảo ngược được đã duyệt trên cùng release identity, từng cái một, và ghi mỗi lần thử cùng kết quả dưới ## Fallbacks taken."
+      }
+    },
+    "STEADY_STATE_UNPROVEN": {
+      "domain": "deployment",
+      "disposition": "terminate",
+      "meaning": {
+        "en": "The steady window never closed before the bounded deadline, and an assumed rollout is not a deployment.",
+        "vi": "Cửa sổ ổn định không khép lại trước deadline có chặn trên, và một rollout được giả định không phải một lần deploy."
+      },
+      "resume": {
+        "en": "Observe a fresh series after the target recovers.",
+        "vi": "Quan sát một chuỗi mới sau khi target hồi phục."
+      }
+    },
+    "CONCURRENT_DRIFT": {
+      "domain": "deployment",
+      "disposition": "terminate",
+      "meaning": {
+        "en": "A release that is neither this one nor its predecessor became active during execution.",
+        "vi": "Một release không phải release này và cũng không phải release trước nó đã trở nên active giữa lượt chạy."
+      },
+      "resume": {
+        "en": "Replan against the new observed state.",
+        "vi": "Lập kế hoạch lại theo trạng thái quan sát mới."
+      }
+    },
+    "RECOVERY_EXHAUSTED": {
+      "domain": "approval",
+      "disposition": "fallback",
+      "meaning": {
+        "en": "The approved reversible actions ran out.",
+        "vi": "Các hành động đảo ngược được đã duyệt đã cạn."
+      },
+      "resume": {
+        "en": "Grant rollback authority, or approve an unsafe action.",
+        "vi": "Cấp thẩm quyền rollback, hoặc duyệt một hành động không an toàn."
+      },
+      "fallback": {
+        "en": "Take the rollback branch: restore rollbackIdentity by its exact digest, never by tag, and record the restored release under ## Fallbacks taken.",
+        "vi": "Đi nhánh rollback: khôi phục rollbackIdentity theo đúng digest của nó, không bao giờ theo tag, và ghi release đã khôi phục dưới ## Fallbacks taken."
+      }
+    },
+    "ROLLBACK_IDENTITY_MISSING": {
+      "domain": "provider",
+      "disposition": "terminate",
+      "meaning": {
+        "en": "Rollback is required and its exact safe release no longer exists.",
+        "vi": "Cần rollback nhưng đúng release an toàn của nó không còn tồn tại."
+      },
+      "resume": {
+        "en": "Restore the safe release at its exact digest.",
+        "vi": "Khôi phục release an toàn ở đúng digest của nó."
+      }
+    }
+  }
+}

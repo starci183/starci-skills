@@ -1,0 +1,35 @@
+{
+  "$id": "kind:inventory",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["treeFingerprint", "classNames", "ruleIds", "gaps"],
+  "properties": {
+    "treeFingerprint": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
+    "classNames": {
+      "type": "array",
+      "maxItems": 512,
+      "uniqueItems": true,
+      "items": { "type": "string", "minLength": 1, "pattern": "^[A-Za-z0-9_:./>\\[\\]-]+$" }
+    },
+    "ruleIds": {
+      "type": "array",
+      "maxItems": 256,
+      "uniqueItems": true,
+      "items": { "type": "string", "pattern": "^[A-Z][A-Z0-9-]*-[0-9]+$" }
+    },
+    "gaps": {
+      "type": "array",
+      "maxItems": 128,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["nodePath", "property", "missingPath"],
+        "properties": {
+          "nodePath": { "type": "string", "minLength": 1 },
+          "property": { "type": "string", "minLength": 1 },
+          "missingPath": { "type": "string", "minLength": 1 }
+        }
+      }
+    }
+  }
+}

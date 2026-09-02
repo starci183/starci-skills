@@ -1,402 +1,288 @@
+// Proves validate.mjs on a synthetic session branch: one conforming unit under the defaults with its
+// review exchange, one unit with an image and two tracks, one unit that spent the revision fallback,
+// one branch blocked on a terminate code, one branch waiting for the review, and one mutation per law,
+// each of which must fail with a line that names the defect.
 import assert from 'node:assert/strict';
-import { validateInput } from './validate-input.mjs';
-import { validateOutput } from './validate-output.mjs';
+import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import path from 'node:path';
+import { validateContentStep } from './validate.mjs';
 
-const hash = `sha256:${'a'.repeat(64)}`;
-const otherHash = `sha256:${'c'.repeat(64)}`;
-const sourceHead = 'b'.repeat(40);
-const observedAt = '2026-09-02T00:00:00.000Z';
-const contextRef = (ref, head = null) => ({ ref, fingerprint: hash, sourceHead: head, observedAt });
+const head = 'a'.repeat(40);
+const fp = (c) => `sha256:${c.repeat(64)}`;
+const UNIT = 'idempotent-writes';
+const BRIEF_FP = fp('b');
+const OUTCOMES = ['explain-idempotency', 'apply-request-token'];
+const CLAIMS = ['retry-is-safe'];
+const ARTICLE = (language) => `response/artifacts/article.${language}.md`;
+const TRACK = { typescript: 'response/artifacts/track.typescript.ts', go: 'response/artifacts/track.go.go' };
+const IMAGE = 'response/artifacts/image.retry.png';
+const PROMPT = 'response/artifacts/prompt.retry.txt';
+const COMMANDS = [
+  { language: 'typescript', buildCommand: 'build-typescript', checkCommand: 'check-typescript' },
+  { language: 'go', buildCommand: 'build-go', checkCommand: 'check-go' },
+];
 
-const validInput = {
-  schemaVersion: 8,
-  operatorId: 'content.generate',
-  context: {
-    curriculumRefs: [contextRef('curriculum://backend/transactions')],
-    styleRefs: [contextRef('style://starci/editorial')],
-    sourceRefs: [contextRef('source://starci-academy-content', sourceHead)],
-    aiRuntime: {
-      configRef: '.claude/config.yaml',
-      fingerprint: hash,
-      brief: { model: 'gpt-5.6-luna', count: 1, isolation: 'fresh', forkTurns: 'none' },
-      production: { model: 'gpt-5.6-luna' },
-      critique: { model: 'gpt-5.6-luna', count: 1, isolation: 'fresh', forkTurns: 'none' },
-    },
-    auditRefs: [],
+const e2eJson = (overrides = {}) => ({
+  unitId: UNIT, contractFingerprintBefore: fp('c'), contractFingerprintAfter: fp('c'), iterations: 1, maxIterations: 2,
+  tracks: COMMANDS.map((c) => ({ language: c.language, sourceRef: TRACK[c.language], buildCommand: c.buildCommand, exitCode: 0 })),
+  runs: COMMANDS.map((c) => ({ language: c.language, command: c.checkCommand, exitCode: 0, assertions: [{ name: `${c.language}-retry-is-safe`, held: true }] })),
+  ...overrides,
+});
+
+const briefMd = ({ fingerprint = BRIEF_FP, outcomes = OUTCOMES, claims = CLAIMS, dispositions = [['add', '—', 'this unit adds the idempotent write lesson']] } = {}) => `# content-brief — ${UNIT}
+
+The unit that teaches a learner why a retried write is safe.
+
+## Binding
+
+| Field | Value |
+| --- | --- |
+| Unit | ${UNIT} |
+| Objective | teach idempotent writes |
+| Audience | backend learners past the transactions unit |
+| Fingerprint | ${fingerprint} |
+
+## Learner inputs
+
+| Input | Statement |
+| --- | --- |
+| transactions | the learner already knows what a transaction is |
+
+## Outcomes
+
+| Outcome | Statement |
+| --- | --- |
+${outcomes.map((id) => `| \`${id}\` | what the learner can do: ${id} |`).join('\n')}
+
+## Claims
+
+| Claim | Statement |
+| --- | --- |
+${claims.map((id) => `| \`${id}\` | the statement the visual may encode: ${id} |`).join('\n')}
+
+## Examples
+
+| Example | Statement |
+| --- | --- |
+| retry-example | the same request token applied twice |
+
+## Dispositions
+
+| Kind | Target | Statement |
+| --- | --- | --- |
+${dispositions.map(([kind, target, statement]) => `| ${kind} | ${target} | ${statement} |`).join('\n')}
+`;
+
+const reviewMd = ({ received = [ARTICLE('vi')], scores = [90, 88, 86, 92, '—', '—', '—'], findings = [['write', 'improvement', 'one section could open faster', `${ARTICLE('vi')}:20`]], verdict = 'approved', inherited = 'none', rationale = 'withheld', reviewer = 'exec://review-1', round = 1 } = {}) => `# content-review — ${UNIT}
+
+The reviewer read the produced artifacts and nothing else.
+
+## Execution
+
+| Field | Value |
+| --- | --- |
+| Reviewer execution | ${reviewer} |
+| Inherited turns | ${inherited} |
+| Producer rationale | ${rationale} |
+| Round | ${round} |
+
+## Received
+
+| Artifact | Kind |
+| --- | --- |
+${received.map((ref) => `| ${ref} | ${ref.includes('article') ? 'article' : ref.includes('image') ? 'image' : ref.includes('prompt') ? 'prompt' : 'track'} |`).join('\n')}
+
+## Scores
+
+| Dimension | Score |
+| --- | --- |
+${['correctness', 'pedagogy', 'interview-value', 'language', 'visual-fidelity', 'code-quality', 'e2e-proof'].map((d, i) => `| ${d} | ${scores[i]} |`).join('\n')}
+
+## Findings
+
+| Owning stage | Severity | Statement | Evidence |
+| --- | --- | --- | --- |
+${findings.map(([stage, severity, statement, evidence]) => `| ${stage} | ${severity} | ${statement} | ${evidence} |`).join('\n')}
+
+## Verdict
+
+| Field | Value |
+| --- | --- |
+| Verdict | ${verdict} |
+`;
+
+const receiptMd = ({ verdict = 'approved', round = 1, editions = [['vi', ARTICLE('vi'), OUTCOMES]], approved = [ARTICLE('vi')], disabled = ['image', 'code', 'e2e'], briefFingerprint = BRIEF_FP, fallbacks = [] } = {}) => `# content-generation-receipt — ${UNIT}
+
+The unit was built against a frozen brief and read by an independent review.
+
+## Binding
+
+| Field | Value |
+| --- | --- |
+| Unit | ${UNIT} |
+| Brief fingerprint | ${briefFingerprint} |
+| Verdict | ${verdict} |
+| Round | ${round} |
+| Source head | ${head} |
+
+## Editions
+
+| Language | Article | Outcomes covered |
+| --- | --- | --- |
+${editions.map(([language, ref, covered]) => `| ${language} | ${ref} | ${covered.join(', ')} |`).join('\n')}
+
+## Approved artifacts
+
+| Artifact | Stage |
+| --- | --- |
+${approved.map((ref) => `| ${ref} | ${ref.includes('article') ? 'write' : ref.includes('image') || ref.includes('prompt') ? 'image' : 'code'} |`).join('\n')}
+
+## Findings
+
+| Code | Stage | Ref | Statement |
+| --- | --- | --- | --- |
+${disabled.map((stage) => `| \`STAGE_DISABLED\` | ${stage} | — | the ${stage} stage never ran for this unit |`).join('\n')}${disabled.length ? '\n' : ''}
+## Fallbacks taken
+
+| Code | Action |
+| --- | --- |
+${fallbacks.map(([code, action]) => `| \`${code}\` | ${action} |`).join('\n')}${fallbacks.length ? '\n' : ''}`;
+
+const requestJson = ({ extra = {} } = {}) => ({
+  schemaVersion: 9, operatorId: 'content.generate', step: 1, parallel: 1, sessionId: 's-test',
+  contexts: [{ alias: '@remote/minio/idempotent-writes/vi', head: null }, { alias: '@worktrees/sessions/central-runtime', head: null }],
+  requirements: {
+    unit: UNIT, naturalLanguages: ['vi'], implementationLanguages: [], stageModes: { image: 'off' },
+    commands: [], maxE2eIterations: 2, maxReviewRounds: 2, resume: null, ...extra,
   },
-  input: {
-    invocationId: 'invocation-idempotency-1',
-    missionId: 'mission-content',
-    project: {
-      id: 'starci-academy',
-      contentSourceRef: 'source://starci-academy-content',
-      sourceHead,
-      artifactRootRef: '.v8/artifacts/invocation-idempotency-1',
+  inputs: {}, resume: null,
+});
+const reviewRequest = (inputs = { article: 'step-1/parallel-1/response/artifacts/article.vi.md' }) => ({ schemaVersion: 9, operatorId: 'content.generate', step: 1, parallel: 1, sessionId: 's-test', exchange: 'review', contexts: [], requirements: {}, inputs, resume: null });
+const reviewResponse = () => ({ schemaVersion: 9, operatorId: 'content.generate', step: 1, parallel: 1, exchange: 'review', status: 'done', fallbacks: [], fields: { 'content-review': 'response/review.md' }, commits: [], next: [] });
+function responseJson({ status = 'done', stop, fallbacks = [], fields = null, next = [] } = {}) {
+  return {
+    schemaVersion: 9, operatorId: 'content.generate', step: 1, parallel: 1, status, ...(stop ? { stop } : {}), fallbacks,
+    fields: fields ?? {
+      'content-generation-receipt': 'response/response.md',
+      'content-brief': 'response/brief.md',
+      article: [ARTICLE('vi')],
     },
-    unit: {
-      id: 'lesson-idempotency',
-      mode: 'generate',
-      objectiveRef: 'objective://backend/idempotent-writes',
-      audienceRef: 'audience://junior-backend',
-      existingUnitRef: null,
-    },
-    naturalLanguages: ['vi', 'en'],
-    implementationLanguages: ['typescript', 'go'],
-    stageModes: { image: 'required', code: 'required', e2e: 'required' },
-    maxE2eIterations: 3,
-    review: { round: 1, maxRounds: 3, minimumScore: 85 },
-    targets: {
-      briefTargetRef: 'content://lesson-idempotency/brief',
-      articleTargets: [
-        { language: 'vi', ref: 'content://lesson-idempotency/vi' },
-        { language: 'en', ref: 'content://lesson-idempotency/en' },
-      ],
-      imageTargetRef: 'content://lesson-idempotency/diagram',
-      promptTargetRef: 'content://lesson-idempotency/diagram-prompt',
-      trackTargets: [
-        { language: 'typescript', ref: 'content://lesson-idempotency/ts' },
-        { language: 'go', ref: 'content://lesson-idempotency/go' },
-      ],
-      reviewTargetRef: 'content://lesson-idempotency/critique',
-    },
-    commands: [
-      { language: 'typescript', command: 'npm run test:e2e' },
-      { language: 'go', command: 'go test ./e2e/...' },
-    ],
-    resume: null,
-  },
+    commits: [], next,
+  };
+}
+
+function writeBranch(files) {
+  const session = mkdtempSync(path.join(tmpdir(), 'content-session-'));
+  const branch = path.join(session, 'step-1', 'parallel-1');
+  for (const d of ['request', 'response/data', 'response/artifacts', 'review/request', 'review/response']) mkdirSync(path.join(branch, d), { recursive: true });
+  writeFileSync(path.join(session, 'state.json'), JSON.stringify({ id: 's-test', chain: [['1/1']], steps: { '1/1': 'content.generate' }, current: '1/1', status: 'running' }));
+  for (const [name, content] of Object.entries(files)) {
+    if (content === null) continue;
+    writeFileSync(path.join(branch, name), typeof content === 'string' ? content : JSON.stringify(content, null, 2));
+  }
+  return { branch, session };
+}
+const baseline = () => ({
+  'request/request.json': requestJson(),
+  'response/response.json': responseJson(),
+  'response/response.md': receiptMd(),
+  'response/brief.md': briefMd(),
+  [ARTICLE('vi')]: 'the vietnamese edition',
+  'review/request/request.json': reviewRequest(),
+  'review/response/response.json': reviewResponse(),
+  'review/response/review.md': reviewMd(),
+});
+
+async function expectValid(files, label) {
+  const { branch, session } = writeBranch(files);
+  const { errors } = await validateContentStep(branch);
+  rmSync(session, { recursive: true, force: true });
+  assert.deepEqual(errors, [], `${label} should be valid`);
+}
+async function expectError(files, needle, label) {
+  const { branch, session } = writeBranch(files);
+  const { errors } = await validateContentStep(branch);
+  rmSync(session, { recursive: true, force: true });
+  assert.ok(errors.some((e) => e.includes(needle)), `${label}: expected an error containing "${needle}", got:\n${errors.join('\n') || '(none)'}`);
+}
+
+const FULL_REFS = [ARTICLE('vi'), TRACK.typescript, TRACK.go, IMAGE, PROMPT];
+const fullFields = () => ({
+  'content-generation-receipt': 'response/response.md',
+  'content-brief': 'response/brief.md',
+  e2e: 'response/data/e2e.json',
+  article: [ARTICLE('vi')],
+  image: [IMAGE],
+  'image-prompt': [PROMPT],
+  track: [TRACK.typescript, TRACK.go],
+});
+const fullUnit = (overrides = {}) => {
+  const files = {
+    ...baseline(),
+    'request/request.json': requestJson({ extra: { implementationLanguages: ['typescript', 'go'], stageModes: { image: 'on' }, commands: COMMANDS } }),
+    'response/data/e2e.json': e2eJson(),
+    'response/response.json': responseJson({ fields: fullFields() }),
+    'response/response.md': receiptMd({ approved: [ARTICLE('vi'), IMAGE], disabled: [] }),
+    'review/response/review.md': reviewMd({ received: FULL_REFS, scores: [90, 88, 86, 92, 91, 89, 90] }),
+  };
+  for (const ref of FULL_REFS) files[ref] = 'artifact';
+  return { ...files, ...overrides };
 };
+const revised = () => ({
+  ...baseline(),
+  'response/response.json': responseJson({ fallbacks: ['REVIEW_REVISION_REQUIRED'] }),
+  'response/response.md': receiptMd({ round: 2, fallbacks: [['REVIEW_REVISION_REQUIRED', 'the write stage was repaired and the review exchange was reopened']] }),
+  'review/response/review.md': reviewMd({ round: 2 }),
+});
 
-const briefRef = 'content://lesson-idempotency/brief';
-const reviewRef = 'content://lesson-idempotency/critique';
-const viRef = 'content://lesson-idempotency/vi';
-const enRef = 'content://lesson-idempotency/en';
-const imageRef = 'content://lesson-idempotency/diagram';
-const promptRef = 'content://lesson-idempotency/diagram-prompt';
-const tsRef = 'content://lesson-idempotency/ts';
-const goRef = 'content://lesson-idempotency/go';
-const tsAssertions = 'evidence://e2e/typescript-assertions';
-const goAssertions = 'evidence://e2e/go-assertions';
+await expectValid(baseline(), 'the defaults: one Vietnamese edition and its review');
+await expectValid(fullUnit(), 'an image, two tracks and their executable check');
+await expectValid(revised(), 'a second round after the revision fallback');
+await expectValid({ ...baseline(), 'response/response.json': responseJson({ status: 'blocked', stop: 'OUTCOME_UNCOVERED', fields: {} }), 'response/response.md': null, 'response/brief.md': null, 'review/request/request.json': null, 'review/response/response.json': null, 'review/response/review.md': null }, 'blocked on an uncovered outcome');
+await expectValid({ ...baseline(), 'response/response.json': { ...responseJson(), status: 'waiting', awaiting: { exchange: 'review', kind: 'content-review' }, fields: { 'content-brief': 'response/brief.md', article: [ARTICLE('vi')] } }, 'response/response.md': null, 'review/request/request.json': null, 'review/response/response.json': null, 'review/response/review.md': null }, 'waiting for the review');
 
-const outcomeA = 'outcome://explain-retry-safety';
-const outcomeB = 'outcome://implement-idempotency-key';
-const claimA = 'claim://duplicate-request-same-effect';
-const claimB = 'claim://key-scope-is-the-caller';
+await expectError({ ...baseline(), 'response/response.json': { ...responseJson(), stop: 'E2E_FAILED' } }, 'only a blocked response carries a stop', 'done with a stop');
+await expectError({ ...baseline(), 'response/response.json': responseJson({ status: 'blocked', stop: 'MADE_UP_CODE', fields: {} }), 'response/response.md': null, 'response/brief.md': null, 'review/request/request.json': null, 'review/response/response.json': null, 'review/response/review.md': null }, 'not a registered code', 'unknown stop code');
+await expectError({ ...baseline(), 'response/response.json': responseJson({ fallbacks: ['E2E_FAILED'] }) }, 'has disposition terminate under these requirements; it cannot be taken as a fallback', 'fallback on a terminate code');
+await expectError({ ...baseline(), 'response/response.json': responseJson({ status: 'blocked', stop: 'BRIEF_UNBOUND' }) }, 'a blocked branch carries no unit', 'blocked while carrying a unit');
+await expectError({ ...baseline(), 'request/request.json': requestJson({ extra: { mystery: 1 } }) }, 'requirements.mystery is not a field', 'undeclared requirement');
+await expectError({ ...baseline(), 'request/request.json': requestJson({ extra: { unit: '' } }) }, 'required field unit has no value', 'missing required unit');
+await expectError({ ...baseline(), 'request/request.json': requestJson({ extra: { naturalLanguages: [] } }) }, 'a unit is written in at least one natural language', 'a unit in no language');
+await expectError({ ...baseline(), 'request/request.json': requestJson({ extra: { commands: COMMANDS } }) }, 'commands must cover exactly the declared implementationLanguages', 'commands for code nobody writes');
+await expectError({ ...baseline(), 'request/request.json': requestJson({ extra: { implementationLanguages: ['typescript'], commands: COMMANDS } }) }, 'commands must cover exactly the declared implementationLanguages', 'a command for an undeclared language');
+await expectError({ ...baseline(), 'response/response.json': responseJson({ fields: { ...responseJson().fields, article: [ARTICLE('vi'), ARTICLE('en')] } }), [ARTICLE('en')]: 'the english edition' }, 'must cover exactly the declared natural languages', 'an edition in an undeclared language');
+await expectError({ ...baseline(), 'response/response.json': responseJson({ fields: { ...responseJson().fields, image: [IMAGE] } }), [IMAGE]: 'artifact' }, 'stageModes turns the image off, so no image and no prompt may be produced', 'an image from a stage that is off');
+await expectError(fullUnit({ 'response/response.json': responseJson({ fields: (() => { const f = fullFields(); delete f.image; delete f['image-prompt']; return f; })() }), 'response/response.md': receiptMd({ approved: [ARTICLE('vi')], disabled: [] }), 'review/response/review.md': reviewMd({ received: [ARTICLE('vi'), TRACK.typescript, TRACK.go], scores: [90, 88, 86, 92, 91, 89, 90] }) }), 'stageModes turns the image on', 'an image stage that produced nothing');
+await expectError({ ...baseline(), 'response/data/e2e.json': e2eJson(), 'response/response.json': responseJson({ fields: { ...responseJson().fields, e2e: 'response/data/e2e.json' } }) }, 'no implementation language is declared, so nothing was built and nothing ran', 'an executable record with no code');
+await expectError(fullUnit({ 'response/response.json': responseJson({ fields: (() => { const f = fullFields(); delete f.e2e; return f; })() }) }), 'a unit that ships code ships the record of building and running it', 'code with no executable record');
+await expectError(fullUnit({ 'response/data/e2e.json': e2eJson({ contractFingerprintAfter: fp('d') }) }), 'the executable contract changed during the repair loop', 'a contract moved during repair');
+await expectError(fullUnit({ 'response/data/e2e.json': e2eJson({ iterations: 3 }) }), 'past the bound of 2', 'a repair loop past its bound');
+await expectError(fullUnit({ 'response/data/e2e.json': e2eJson({ maxIterations: 4 }) }), 'maxIterations 4 differs from the request', 'an iteration bound nobody approved');
+await expectError(fullUnit({ 'response/data/e2e.json': e2eJson({ tracks: e2eJson().tracks.map((t) => (t.language === 'go' ? { ...t, exitCode: 2 } : t)) }) }), 'exits 2 and cannot be shipped as working code', 'a track that does not build');
+await expectError(fullUnit({ 'response/data/e2e.json': e2eJson({ runs: [e2eJson().runs[0]] }) }), 'every implementation track must be exercised by the executable check', 'a track never exercised');
+await expectError(fullUnit({ 'response/data/e2e.json': e2eJson({ runs: e2eJson().runs.map((r) => (r.language === 'go' ? { ...r, exitCode: 1 } : r)) }) }), 'executable check exits 1 and proves nothing', 'a failing executable check');
+await expectError(fullUnit({ 'response/data/e2e.json': e2eJson({ runs: e2eJson().runs.map((r) => (r.language === 'go' ? { ...r, assertions: [{ name: 'go-retry-is-safe', held: false }] } : r)) }) }), 'did not hold, so the check proves nothing', 'an assertion that did not hold');
+await expectError(fullUnit({ 'response/data/e2e.json': e2eJson({ runs: e2eJson().runs.map((r) => (r.language === 'go' ? { ...r, command: 'go test ./...' } : r)) }) }), 'the request declared check-go', 'a check that ran another command');
+await expectError({ ...baseline(), 'review/response/review.md': reviewMd({ inherited: 'producer thread' }) }, 'no inherited turns', 'a review that inherited turns');
+await expectError({ ...baseline(), 'review/response/review.md': reviewMd({ rationale: 'received' }) }, "may not receive the producer's rationale", 'a review given the rationale');
+await expectError({ ...baseline(), 'review/response/review.md': reviewMd({ received: [] }) }, 'the review never received', 'an artifact nobody reviewed');
+await expectError({ ...baseline(), 'review/response/review.md': reviewMd({ scores: [90, 84, 86, 92, '—', '—', '—'] }) }, 'while a score sits at 84, below 85', 'approval below the minimum score');
+await expectError({ ...baseline(), 'review/response/review.md': reviewMd({ findings: [['write', 'error', 'the second outcome is wrong', `${ARTICLE('vi')}:40`]] }) }, 'while an error finding remains open', 'approval with an open error finding');
+await expectError({ ...baseline(), 'review/response/review.md': reviewMd({ verdict: 'revision', findings: [['write', 'improvement', 'nothing serious', `${ARTICLE('vi')}:40`]] }) }, 'a revision verdict must name at least one error finding', 'a revision with no error finding');
+await expectError({ ...baseline(), 'review/response/review.md': reviewMd({ findings: [['code', 'improvement', 'the track could be shorter', 'x']] }) }, 'cannot be assigned to the code stage, which never ran', 'a finding on a stage that never ran');
+await expectError({ ...baseline(), 'review/response/review.md': reviewMd({ verdict: 'revision', findings: [['write', 'error', 'the second outcome is wrong', `${ARTICLE('vi')}:40`]] }), 'response/response.md': receiptMd({ verdict: 'revision' }) }, 'while the independent review demands a revision', 'shipping against a revision verdict');
+await expectError({ ...baseline(), 'review/response/review.md': reviewMd({ round: 3 }), 'response/response.md': receiptMd({ round: 3 }), 'response/response.json': responseJson({ fallbacks: ['REVIEW_REVISION_REQUIRED'] }) }, 'past the approved maxReviewRounds of 2', 'a round past the approved rounds');
+await expectError({ ...revised(), 'response/response.json': responseJson() }, 'the REVIEW_REVISION_REQUIRED fallback that reopened the exchange must be recorded', 'a second round nobody recorded');
+await expectError({ ...baseline(), 'response/response.json': responseJson({ fallbacks: ['REVIEW_REVISION_REQUIRED'] }), 'response/response.md': receiptMd({ fallbacks: [['REVIEW_REVISION_REQUIRED', 'the write stage was repaired']] }) }, 'so the review that answered it is at least the second round', 'a revision fallback with no second round');
+await expectError({ ...baseline(), 'response/brief.md': briefMd({ dispositions: [['change', '—', 'this unit changes something unnamed']] }) }, 'a change disposition must name what it acts on', 'a disposition with no target');
+await expectError({ ...baseline(), 'response/response.md': receiptMd({ briefFingerprint: fp('9') }) }, 'Brief fingerprint differs from the frozen brief', 'a receipt measured against another brief');
+await expectError({ ...baseline(), 'response/response.md': receiptMd({ editions: [['vi', ARTICLE('vi'), [OUTCOMES[0]]]] }) }, 'leaves published outcome apply-request-token uncovered', 'an edition covering half the brief');
+await expectError({ ...baseline(), 'response/response.md': receiptMd({ editions: [['vi', ARTICLE('vi'), [...OUTCOMES, 'invented-outcome']]] }) }, 'which the brief never published', 'an edition claiming an unpublished outcome');
+await expectError({ ...baseline(), 'response/response.md': receiptMd({ disabled: ['image', 'code'] }) }, 'the e2e stage never ran and must be recorded as a STAGE_DISABLED finding', 'a stage that never ran and left no record');
+await expectError({ ...baseline(), 'response/response.md': receiptMd({ approved: [] }) }, 'must name the artifacts the review approved', 'a generated unit approving nothing');
+await expectError({ ...baseline(), 'response/response.md': receiptMd().replace('## Editions', '## Articles') }, 'missing section ^## Editions$', 'response section renamed');
+await expectError({ ...baseline(), 'review/request/request.json': null, 'review/response/response.json': null, 'review/response/review.md': null }, 'the branch is done, but it never ran', 'done without the review exchange');
+await expectError({ ...baseline(), 'response/response.json': (() => { const o = responseJson(); delete o.fields['content-brief']; return o; })() }, 'required output content-brief is not in fields', 'missing required output');
 
-const evidenceRefs = ['curriculum://backend/transactions', 'evidence://build/typescript', 'evidence://review/round-1'];
-
-const binding = {
-  projectId: 'starci-academy',
-  contentSourceRef: 'source://starci-academy-content',
-  sourceHead,
-  artifactRootRef: validInput.input.project.artifactRootRef,
-  unitId: 'lesson-idempotency',
-  mode: 'generate',
-  naturalLanguages: ['vi', 'en'],
-  implementationLanguages: ['typescript', 'go'],
-  stageModes: { image: 'required', code: 'required', e2e: 'required' },
-  minimumScore: 85,
-  reviewRound: 1,
-  curriculumFingerprint: hash,
-  briefFingerprint: hash,
-  inputFingerprint: hash,
-  progressFingerprint: hash,
-};
-
-const execution = (executionRef, model) => ({ executionRef, model, isolation: 'fresh', forkTurns: 'none' });
-
-const validGeneratedOutput = {
-  schemaVersion: 8,
-  operatorId: 'content.generate',
-  output: {
-    outcome: 'generated',
-    receipt: {
-      receiptType: 'content-generation-receipt',
-      receiptId: 'receipt:lesson-idempotency',
-      invocationId: validInput.input.invocationId,
-      missionId: validInput.input.missionId,
-      status: 'generated',
-      binding,
-      unit: {
-        brief: {
-          briefRef,
-          fingerprint: hash,
-          execution: execution('execution://teacher-brief', 'gpt-5.6-luna'),
-          learnerInputRefs: ['prerequisite://http-methods'],
-          learnerOutcomeRefs: [outcomeA, outcomeB],
-          claimRefs: [claimA, claimB],
-          exampleRefs: ['example://double-charge', 'example://key-collision'],
-          dispositions: [
-            {
-              kind: 'remove',
-              targetRef: 'section://old-retry-advice',
-              statement: 'The old retry section contradicts the new key scope and is removed.',
-            },
-          ],
-        },
-        articles: [
-          {
-            language: 'vi',
-            articleRef: viRef,
-            coveredOutcomeRefs: [outcomeA, outcomeB],
-            interviewQuestionCount: 6,
-            execution: execution('execution://write-vi', 'gpt-5.6-luna'),
-          },
-          {
-            language: 'en',
-            articleRef: enRef,
-            coveredOutcomeRefs: [outcomeA, outcomeB],
-            interviewQuestionCount: 6,
-            execution: execution('execution://write-en', 'gpt-5.6-luna'),
-          },
-        ],
-        image: {
-          imageRef,
-          promptRef,
-          generator: 'builtin-image-generator',
-          claimRefs: [claimA],
-          inspection: {
-            legible: true,
-            hierarchyReadable: true,
-            claimFidelity: true,
-            evidenceRef: 'evidence://image/inspection',
-          },
-        },
-        tracks: [
-          {
-            language: 'typescript',
-            sourceRef: tsRef,
-            buildCommand: 'npm run build',
-            exitCode: 0,
-            evidenceRef: 'evidence://build/typescript',
-          },
-          {
-            language: 'go',
-            sourceRef: goRef,
-            buildCommand: 'go build ./...',
-            exitCode: 0,
-            evidenceRef: 'evidence://build/go',
-          },
-        ],
-        e2e: {
-          contractFingerprintBefore: hash,
-          contractFingerprintAfter: hash,
-          iterations: 2,
-          runs: [
-            {
-              language: 'typescript',
-              command: 'npm run test:e2e',
-              exitCode: 0,
-              assertionsRef: tsAssertions,
-            },
-            { language: 'go', command: 'go test ./e2e/...', exitCode: 0, assertionsRef: goAssertions },
-          ],
-        },
-        critique: {
-          reviewRef,
-          execution: execution('execution://independent-critique', 'gpt-5.6-luna'),
-          verdict: 'approved',
-          scores: {
-            correctness: 92,
-            pedagogy: 88,
-            interviewValue: 87,
-            language: 90,
-            visualFidelity: 86,
-            codeQuality: 89,
-            e2eProof: 94,
-          },
-          findings: [
-            {
-              owningStage: 'write',
-              severity: 'improvement',
-              statement: 'The Vietnamese edition could name the failure case earlier.',
-              evidenceRef: 'evidence://review/vi-paragraph-3',
-            },
-          ],
-          receivedArtifactRefs: [viRef, enRef, imageRef, promptRef, tsRef, goRef, tsAssertions, goAssertions],
-          producerRationaleReceived: false,
-        },
-        approvedArtifactRefs: [viRef, enRef, imageRef, tsRef, goRef],
-      },
-      findings: [
-        {
-          code: 'DISPOSITION_APPLIED',
-          stage: 'brief',
-          ref: 'section://old-retry-advice',
-          statement: 'The superseded retry section was removed as the brief directed.',
-        },
-      ],
-      evidenceRefs,
-      failure: null,
-      resume: null,
-      createdAt: observedAt,
-    },
-    evidenceRefs,
-    artifactRefs: [briefRef, viRef, enRef, imageRef, promptRef, tsRef, goRef, reviewRef],
-    handoff: null,
-  },
-};
-
-const validBlockedOutput = {
-  schemaVersion: 8,
-  operatorId: 'content.generate',
-  output: {
-    outcome: 'blocked',
-    receipt: {
-      receiptType: 'content-generation-receipt',
-      receiptId: 'receipt:lesson-idempotency-blocked',
-      invocationId: validInput.input.invocationId,
-      missionId: validInput.input.missionId,
-      status: 'blocked',
-      binding,
-      unit: null,
-      findings: [],
-      evidenceRefs,
-      failure: {
-        code: 'E2E_FAILED',
-        stage: 'e2e',
-        message: 'The Go track still returns a duplicate effect on the second request after three repair iterations.',
-        refs: [goRef],
-        missingRefs: ['evidence://e2e/go-passing-run'],
-        retryable: true,
-        owningDomain: 'content',
-      },
-      resume: {
-        resumeToken: 'resume-lesson-idempotency-1',
-        requiredDelta: ['Repair the Go idempotency key scope, then rerun the executable check.'],
-      },
-      createdAt: observedAt,
-    },
-    evidenceRefs,
-    artifactRefs: [briefRef],
-    handoff: null,
-  },
-};
-
-assert.deepEqual(validateInput(validInput), { valid: true, errors: [] });
-assert.deepEqual(validateOutput(validGeneratedOutput), { valid: true, errors: [] });
-assert.deepEqual(validateOutput(validBlockedOutput), { valid: true, errors: [] });
-
-// A declared edition with no destination is a language the writing stage cannot deliver.
-const missingArticleTarget = structuredClone(validInput);
-missingArticleTarget.input.targets.articleTargets.pop();
-assert.equal(validateInput(missingArticleTarget).valid, false);
-
-// Implementation tracks cannot be declared for a disabled code stage.
-const disabledCodeWithTracks = structuredClone(validInput);
-disabledCodeWithTracks.input.stageModes.code = 'disabled';
-assert.equal(validateInput(disabledCodeWithTracks).valid, false);
-
-// An executable check cannot be required for code that is never written.
-const e2eWithoutCode = structuredClone(validInput);
-e2eWithoutCode.input.stageModes.code = 'disabled';
-e2eWithoutCode.input.implementationLanguages = [];
-e2eWithoutCode.input.targets.trackTargets = [];
-const e2eWithoutCodeResult = validateInput(e2eWithoutCode);
-assert.equal(e2eWithoutCodeResult.valid, false);
-assert.ok(e2eWithoutCodeResult.errors.some((error) => error.includes('never written')));
-
-// An image needs the prompt that states its intent, not just a place to put the picture.
-const imageWithoutPrompt = structuredClone(validInput);
-imageWithoutPrompt.input.targets.promptTargetRef = null;
-assert.equal(validateInput(imageWithoutPrompt).valid, false);
-
-// A refactor must name the unit it refactors.
-const refactorWithoutUnit = structuredClone(validInput);
-refactorWithoutUnit.input.unit.mode = 'refactor';
-assert.equal(validateInput(refactorWithoutUnit).valid, false);
-
-// The critique cannot be written over the brief; producing intent and judgement stay separate.
-const sharedTarget = structuredClone(validInput);
-sharedTarget.input.targets.reviewTargetRef = sharedTarget.input.targets.briefTargetRef;
-assert.equal(validateInput(sharedTarget).valid, false);
-
-// The brief constrains the writing: an edition cannot claim an outcome the brief never published.
-const inventedOutcome = structuredClone(validGeneratedOutput);
-inventedOutcome.output.receipt.unit.articles[0].coveredOutcomeRefs.push('outcome://invented');
-const inventedResult = validateOutput(inventedOutcome);
-assert.equal(inventedResult.valid, false);
-assert.ok(inventedResult.errors.some((error) => error.includes('never published')));
-
-// Nor can an edition ship while a published outcome stays uncovered.
-const uncoveredOutcome = structuredClone(validGeneratedOutput);
-uncoveredOutcome.output.receipt.unit.articles[1].coveredOutcomeRefs = [outcomeA];
-const uncoveredResult = validateOutput(uncoveredOutcome);
-assert.equal(uncoveredResult.valid, false);
-assert.ok(uncoveredResult.errors.some((error) => error.includes('uncovered')));
-
-// Generated code in a lesson must actually run.
-const brokenBuild = structuredClone(validGeneratedOutput);
-brokenBuild.output.receipt.unit.tracks[1].exitCode = 2;
-const brokenBuildResult = validateOutput(brokenBuild);
-assert.equal(brokenBuildResult.valid, false);
-assert.ok(brokenBuildResult.errors.some((error) => error.includes('working code')));
-
-// So must the executable check, and every declared track must be exercised by it.
-const untestedTrack = structuredClone(validGeneratedOutput);
-untestedTrack.output.receipt.unit.e2e.runs.pop();
-assert.equal(validateOutput(untestedTrack).valid, false);
-
-// The repair loop may fix the implementation; it may never move the contract it is measured by.
-const weakenedContract = structuredClone(validGeneratedOutput);
-weakenedContract.output.receipt.unit.e2e.contractFingerprintAfter = otherHash;
-const weakenedResult = validateOutput(weakenedContract);
-assert.equal(weakenedResult.valid, false);
-assert.ok(weakenedResult.errors.some((error) => error.includes('measures nothing')));
-
-// An image carries the brief's claims; anything else is decoration added afterwards.
-const inventedClaim = structuredClone(validGeneratedOutput);
-inventedClaim.output.receipt.unit.image.claimRefs = ['claim://invented'];
-assert.equal(validateOutput(inventedClaim).valid, false);
-
-// A unit reviewed by its own producer has not been reviewed.
-const selfReview = structuredClone(validGeneratedOutput);
-selfReview.output.receipt.unit.critique.execution.executionRef = 'execution://teacher-brief';
-const selfReviewResult = validateOutput(selfReview);
-assert.equal(selfReviewResult.valid, false);
-assert.ok(selfReviewResult.errors.some((error) => error.includes('produced the unit')));
-
-// Nor has one whose reviewer inherited the producing conversation.
-const inheritedReview = structuredClone(validGeneratedOutput);
-inheritedReview.output.receipt.unit.critique.execution.forkTurns = 'inherited';
-assert.equal(validateOutput(inheritedReview).valid, false);
-
-// The reviewer must actually receive every artifact, or something shipped unlooked at.
-const hiddenArtifact = structuredClone(validGeneratedOutput);
-hiddenArtifact.output.receipt.unit.critique.receivedArtifactRefs =
-  hiddenArtifact.output.receipt.unit.critique.receivedArtifactRefs.filter((ref) => ref !== imageRef);
-assert.equal(validateOutput(hiddenArtifact).valid, false);
-
-// Approval below the published minimum is not approval.
-const lowScoreApproval = structuredClone(validGeneratedOutput);
-lowScoreApproval.output.receipt.unit.critique.scores.pedagogy = 71;
-const lowScoreResult = validateOutput(lowScoreApproval);
-assert.equal(lowScoreResult.valid, false);
-assert.ok(lowScoreResult.errors.some((error) => error.includes('below 85')));
-
-// Nor is approval while an error finding remains open.
-const openErrorApproval = structuredClone(validGeneratedOutput);
-openErrorApproval.output.receipt.unit.critique.findings[0].severity = 'error';
-assert.equal(validateOutput(openErrorApproval).valid, false);
-
-// A unit cannot be generated while the independent critique demands a revision.
-const revisionShipped = structuredClone(validGeneratedOutput);
-revisionShipped.output.receipt.unit.critique.verdict = 'revision-required';
-revisionShipped.output.receipt.unit.critique.findings[0].severity = 'error';
-const revisionResult = validateOutput(revisionShipped);
-assert.equal(revisionResult.valid, false);
-assert.ok(revisionResult.errors.some((error) => error.includes('demands a revision')));
-
-// A disabled stage must be recorded, or a later reader cannot tell it from an omission.
-const unrecordedDisabledStage = structuredClone(validBlockedOutput);
-unrecordedDisabledStage.output.receipt.binding.stageModes.image = 'disabled';
-const unrecordedResult = validateOutput(unrecordedDisabledStage);
-assert.equal(unrecordedResult.valid, false);
-assert.ok(unrecordedResult.errors.some((error) => error.includes('STAGE_DISABLED')));
-
-// A blocked receipt never carries a unit.
-const blockedWithUnit = structuredClone(validBlockedOutput);
-blockedWithUnit.output.receipt.unit = validGeneratedOutput.output.receipt.unit;
-assert.equal(validateOutput(blockedWithUnit).valid, false);
-
-console.log('content.generate self-test passed');
+process.stdout.write('content.generate self-test: 5 valid branches, 38 rejected mutations\n');

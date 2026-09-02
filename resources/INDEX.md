@@ -55,11 +55,11 @@ A summary of what each `operator.json` declares; the validator rejects a row tha
 | `workspace.bind` | sonnet | never | no | never | Reads canonical files and a registry; no judgement |
 | `business.decide` | sol-fresh | bounded | no | never | An unfamiliar business model may need reference research before coverage can be frozen |
 | `architecture.decide` | sol-fresh | bounded | no | never | Alternatives and compatibility need evidence beyond the repo; schema pins the model |
-| `backend.implement` | opus | never | no | never | Writes inside a frozen contract following patterns/be |
-| `fe.direction.decide` | sol-fresh | bounded | yes | authority-only | Research only for an unfamiliar domain; renders a page, not a picture |
-| `fe.presentation.resolve` | sonnet | never | yes | never | A lookup against a closed inventory |
-| `fe.source.apply` | opus | never | yes | never | Writes only what the resolution already contains, following patterns/fe |
-| `fe.surface.audit` | sol-reviewer | never | yes | never | Browser only, no source write: the auditor cannot repair what it measures |
+| `backend.source.apply` | opus | never | no | never | Writes inside a frozen contract following patterns/be |
+| `frontend.direction.decide` | sol-fresh | bounded | yes | authority-only | Research only for an unfamiliar domain; renders a page, not a picture |
+| `frontend.presentation.resolve` | sonnet | never | yes | never | A lookup against a closed inventory |
+| `frontend.source.apply` | opus | never | yes | never | Writes only what the resolution already contains, following patterns/fe |
+| `frontend.surface.audit` | sol-reviewer | never | yes | never | Browser only, no source write: the auditor cannot repair what it measures |
 | `quality.verify` | sonnet | never | no | never | Runs gates, repairs nothing |
 | `uat.verify` | sol-reviewer | never | no | never | Drives the real journey in a browser and may write nothing; fresh verdict per lane |
 | `release.deploy` | opus | never | no | never | Immutable release under declared authorization |

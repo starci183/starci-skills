@@ -1,509 +1,235 @@
+// Proves validate.mjs on a synthetic session branch: one steady deployment, one that took the
+// recovery fallback, one that took both fallbacks and ended rolled back, one blocked on an unproven
+// steady state, and one mutation per law, each of which must fail with a line that names the defect.
 import assert from 'node:assert/strict';
-import { validateInput } from './validate-input.mjs';
-import { validateOutput } from './validate-output.mjs';
+import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import path from 'node:path';
+import { validateReleaseStep } from './validate.mjs';
 
-const hash = (seed) => `sha256:${seed.repeat(64).slice(0, 64)}`;
-const sourceHead = 'c'.repeat(40);
-const digest = hash('a');
-const previousDigest = hash('b');
-const releaseId = 'release:2026-09-02.1';
-const previousReleaseId = 'release:2026-09-01.3';
-const authorizationRef = 'authorization://starci-academy/production/deploy-2026-09-02';
-const targetRef = 'target://starci-academy/production/api';
+const RELEASE = 'release:2026.01.10-1';
+const PREVIOUS = 'release:2026.01.03-2';
+const DIGEST = `sha256:${'1'.repeat(64)}`;
+const SAFE_DIGEST = `sha256:${'2'.repeat(64)}`;
+const TARGET = 'production/api';
+const APPROVAL = '@worktrees/businesses/features/release/model.json#deploy-grant';
+const MANIFEST = '.stacks/production/api.manifest.json';
+const ARTIFACT = '@remote/ghcr/starci/academy-api';
+const DEADLINE = 600;
+const PROBES = [
+  { probeId: 'public-graphql-typename', kind: 'public', endpointRef: 'https://api.example/graphql', expectStatus: 200 },
+];
+const ROLLBACK = { releaseId: PREVIOUS, artifactRef: ARTIFACT, digest: SAFE_DIGEST, dataCompatible: true };
 
-const validInput = {
-  schemaVersion: 8,
-  operatorId: 'release.deploy',
-  context: {
-    intent: {
-      stackRef: '.stacks/production/starci-academy.yaml',
-      fingerprint: hash('d'),
-      environment: 'production',
-      topology: 'compose',
-    },
-    lifecycle: { ref: 'knowledge://deployment/lifecycle', fingerprint: hash('e') },
-    manifest: {
-      ref: '.infra/production/manifest.yaml',
-      fingerprint: hash('f'),
-      validatedAgainstReleaseId: releaseId,
-    },
-    authorization: {
-      ref: authorizationRef,
-      action: 'deploy',
-      scope: { projectId: 'starci-academy', environment: 'production', targetRef },
-      grantedAt: '2026-09-02T08:00:00.000Z',
-      expiresAt: '2026-09-02T20:00:00.000Z',
-    },
-    credentials: [
-      { handle: 'secret-ref://registry/ghcr-push', custodyRef: 'custody://sops/production', scope: 'registry' },
-      { handle: 'secret-ref://host/deploy-key', custodyRef: 'custody://sops/production', scope: 'host' },
-    ],
-    observed: {
-      targetRef,
-      revision: 4,
-      activeReleaseId: previousReleaseId,
-      activeDigest: previousDigest,
-      observedAt: '2026-09-02T09:00:00.000Z',
-    },
-    evidenceRefs: [
-      { ref: 'workflow-run://github-actions/deploy/8821', fingerprint: hash('1'), sourceHead, observedAt: '2026-09-02T09:00:00.000Z' },
-    ],
-  },
-  input: {
-    invocationId: 'invocation-release-8821',
-    missionId: 'mission-release-2026-09-02',
-    project: { id: 'starci-academy', artifactRootRef: '.v8/artifacts/invocation-release-8821' },
-    release: {
-      releaseId,
-      artifactRef: 'oci://ghcr.io/starci/academy-api@sha256:deadbeef',
-      digest,
-      sourceHead,
-      immutable: true,
-    },
-    target: {
-      targetRef,
-      environment: 'production',
-      strategy: 'rolling',
-      declaredTargets: 2,
-      replacedReleaseId: previousReleaseId,
-    },
-    steady: { windowSeconds: 300, deadlineSeconds: 900, backoffSeconds: 15 },
-    probes: [
-      {
-        probeId: 'graphql-typename',
-        kind: 'public-graphql-typename',
-        endpointRef: 'https://api.starci.dev/graphql',
-        expectStatus: 200,
-      },
-      {
-        probeId: 'landing-http',
-        kind: 'public-http',
-        endpointRef: 'https://starci.dev/',
-        expectStatus: 200,
-      },
-    ],
-    rollbackIdentity: {
-      releaseId: previousReleaseId,
-      artifactRef: 'oci://ghcr.io/starci/academy-api@sha256:cafebabe',
-      digest: previousDigest,
-      dataCompatible: true,
-    },
-    resume: null,
-  },
-};
-
-const binding = {
-  projectId: 'starci-academy',
-  releaseId,
-  artifactRef: 'oci://ghcr.io/starci/academy-api@sha256:deadbeef',
-  digest,
-  sourceHead,
-  targetRef,
-  environment: 'production',
-  strategy: 'rolling',
-  declaredTargets: 2,
-  replacedReleaseId: previousReleaseId,
-  authorizationRef,
-  manifestFingerprint: hash('f'),
-  intentFingerprint: hash('d'),
-  steadyWindowSeconds: 300,
-  deadlineSeconds: 900,
-  artifactRootRef: '.v8/artifacts/invocation-release-8821',
-  inputFingerprint: hash('2'),
-  progressFingerprint: hash('3'),
-};
-
-const readStep = (step, statement) => ({
-  step,
-  state: 'applied',
-  revisionBefore: null,
-  revisionAfter: null,
-  statement,
-  evidenceRefs: [],
+const observation = (at, condition, status = 'pass') => ({
+  observedAt: at, condition, activeReleaseIds: [RELEASE], activeDigest: DIGEST, availableTargets: 1,
+  probeResults: [{ probeId: 'public-graphql-typename', status, observedStatus: status === 'pass' ? 200 : 502, observedAt: at }],
 });
 
-const probePass = (probeId, observedAt) => ({ probeId, status: 'pass', observedStatus: 200, observedAt });
-const probeFail = (probeId, observedAt) => ({ probeId, status: 'fail', observedStatus: 503, observedAt });
+const probesJson = ({ observations = [observation('2026-01-10T00:01:00.000Z', 'progressing'), observation('2026-01-10T00:07:00.000Z', 'steady')], finalCondition = 'steady', deadlineSeconds = DEADLINE, elapsedSeconds = 420, backoffSeconds = 30 } = {}) => ({
+  deadlineSeconds, elapsedSeconds, backoffSeconds, observations, finalCondition,
+});
 
-const evidenceRefs = [authorizationRef, 'workflow-run://github-actions/deploy/8821', 'probe://graphql-typename/8821'];
-
-const validDeployedOutput = {
-  schemaVersion: 8,
-  operatorId: 'release.deploy',
-  output: {
-    outcome: 'deployed',
-    receipt: {
-      receiptType: 'release-deployment',
-      receiptId: 'receipt:release-2026-09-02-1',
-      invocationId: 'invocation-release-8821',
-      missionId: 'mission-release-2026-09-02',
-      status: 'deployed',
-      binding,
-      credentialRefs: ['secret-ref://registry/ghcr-push', 'secret-ref://host/deploy-key'],
-      declaredProbeIds: ['graphql-typename', 'landing-http'],
-      steps: [
-        readStep('authorize', 'The declared production deploy authorization covers this target and has not expired.'),
-        readStep('manifest-validate', 'The manifest is pinned to this release and matches the frozen intent.'),
-        readStep('plan', 'The plan compiles the declared intent against the observed revision 4.'),
-        readStep('credential-resolve', 'Both handles resolved through existing custody; no value entered the plan.'),
-        {
-          step: 'host-prepare',
-          state: 'no-op',
-          revisionBefore: 7,
-          revisionAfter: 7,
-          statement: 'The host already matches its declared preparation, so the desired state is a proved no-op.',
-          evidenceRefs: ['host://starci-prod/state'],
-        },
-        {
-          step: 'artifact-publish',
-          state: 'applied',
-          revisionBefore: 11,
-          revisionAfter: 12,
-          statement: 'The immutable digest was published once to the approved registry.',
-          evidenceRefs: ['registry://ghcr/academy-api/12'],
-        },
-        {
-          step: 'migrate',
-          state: 'applied',
-          revisionBefore: 3,
-          revisionAfter: 4,
-          statement: 'One additive migration applied ahead of the rollout.',
-          evidenceRefs: ['migration://academy/4'],
-        },
-        {
-          step: 'domain-reconcile',
-          state: 'no-op',
-          revisionBefore: 2,
-          revisionAfter: 2,
-          statement: 'Domain and TLS already match the declared state.',
-          evidenceRefs: ['domain://starci.dev/state'],
-        },
-        {
-          step: 'rollout',
-          state: 'applied',
-          revisionBefore: 4,
-          revisionAfter: 5,
-          statement: 'The push to main triggered the workflow and the target moved to revision 5.',
-          evidenceRefs: ['workflow-run://github-actions/deploy/8821'],
-        },
-        readStep('monitor', 'The target was observed under backoff until the steady window closed.'),
-        readStep('proof', 'Public probes and the active digest were reread after the window.'),
-      ],
-      monitoring: {
-        deadlineSeconds: 900,
-        elapsedSeconds: 540,
-        backoffSeconds: 15,
-        observations: [
-          {
-            observedAt: '2026-09-02T09:01:00.000Z',
-            condition: 'progressing',
-            activeReleaseIds: [previousReleaseId, releaseId],
-            activeDigest: previousDigest,
-            availableTargets: 1,
-            probeResults: [probeFail('graphql-typename', '2026-09-02T09:01:00.000Z')],
-          },
-          {
-            observedAt: '2026-09-02T09:06:00.000Z',
-            condition: 'progressing',
-            activeReleaseIds: [releaseId],
-            activeDigest: digest,
-            availableTargets: 2,
-            probeResults: [
-              probePass('graphql-typename', '2026-09-02T09:06:00.000Z'),
-              probePass('landing-http', '2026-09-02T09:06:00.000Z'),
-            ],
-          },
-          {
-            observedAt: '2026-09-02T09:09:00.000Z',
-            condition: 'steady',
-            activeReleaseIds: [releaseId],
-            activeDigest: digest,
-            availableTargets: 2,
-            probeResults: [
-              probePass('graphql-typename', '2026-09-02T09:09:00.000Z'),
-              probePass('landing-http', '2026-09-02T09:09:00.000Z'),
-            ],
-          },
-        ],
-        finalCondition: 'steady',
-      },
-      steadyState: {
-        provedAt: '2026-09-02T09:11:00.000Z',
-        windowSeconds: 300,
-        activeDigest: digest,
-        availableTargets: 2,
-        declaredTargets: 2,
-        supersededActive: 0,
-        probeResults: [
-          probePass('graphql-typename', '2026-09-02T09:11:00.000Z'),
-          probePass('landing-http', '2026-09-02T09:11:00.000Z'),
-        ],
-      },
-      branch: 'none',
-      recovery: null,
-      rollback: null,
-      findings: [
-        {
-          code: 'IDEMPOTENT_NO_OP',
-          step: 'host-prepare',
-          statement: 'The host already matched its declared preparation.',
-        },
-      ],
-      evidenceRefs,
-      failure: null,
-      resume: null,
-      createdAt: '2026-09-02T09:12:00.000Z',
-    },
-    evidenceRefs,
-    artifactRefs: ['.v8/artifacts/invocation-release-8821/deployment-receipt.json'],
-    handoff: null,
-  },
-};
-
-const validRolledBackOutput = structuredClone(validDeployedOutput);
-{
-  const receipt = validRolledBackOutput.output.receipt;
-  validRolledBackOutput.output.outcome = 'rolled-back';
-  receipt.receiptId = 'receipt:release-2026-09-02-1-rolled-back';
-  receipt.status = 'rolled-back';
-  receipt.steadyState = null;
-  receipt.branch = 'rollback';
-  receipt.monitoring.finalCondition = 'failing';
-  receipt.monitoring.elapsedSeconds = 780;
-  receipt.monitoring.observations[1].condition = 'failing';
-  receipt.monitoring.observations[1].probeResults = [probeFail('graphql-typename', '2026-09-02T09:06:00.000Z')];
-  receipt.monitoring.observations[2].condition = 'failing';
-  receipt.monitoring.observations[2].probeResults = [probeFail('graphql-typename', '2026-09-02T09:09:00.000Z')];
-  receipt.monitoring.observations[2].availableTargets = 1;
-  receipt.recovery = {
-    attempts: [
-      {
-        attempt: 1,
-        action: 'resume-rollout',
-        releaseId,
-        outcome: 'failed',
-        evidenceRefs: ['workflow-run://github-actions/deploy/8821'],
-      },
-      {
-        attempt: 2,
-        action: 'restart-target',
-        releaseId,
-        outcome: 'failed',
-        evidenceRefs: ['host://starci-prod/restart/2'],
-      },
-    ],
-    exhausted: true,
-  };
-  receipt.rollback = {
-    toReleaseId: previousReleaseId,
-    toDigest: previousDigest,
-    revisionBefore: 5,
-    revisionAfter: 6,
-    dataBoundaryPreserved: true,
-    verifiedAt: '2026-09-02T09:20:00.000Z',
-    evidenceRefs: ['workflow-run://github-actions/rollback/8822'],
-  };
-  receipt.steps.push({
-    step: 'recover',
-    state: 'failed',
-    revisionBefore: 5,
-    revisionAfter: 5,
-    statement: 'Two approved reversible actions were repeated and the target stayed unavailable.',
-    evidenceRefs: ['host://starci-prod/restart/2'],
-  });
-  receipt.steps.push({
-    step: 'rollback',
-    state: 'applied',
-    revisionBefore: 5,
-    revisionAfter: 6,
-    statement: 'The previous release was restored and its data boundary was preserved.',
-    evidenceRefs: ['workflow-run://github-actions/rollback/8822'],
-  });
-  receipt.findings = [
-    {
-      code: 'TARGET_UNAVAILABLE',
-      step: 'monitor',
-      statement: 'One of two targets never became available under the new digest.',
-    },
-  ];
-}
-
-const validBlockedOutput = structuredClone(validDeployedOutput);
-{
-  const receipt = validBlockedOutput.output.receipt;
-  validBlockedOutput.output.outcome = 'blocked';
-  receipt.receiptId = 'receipt:release-2026-09-02-1-blocked';
-  receipt.status = 'blocked';
-  receipt.steadyState = null;
-  receipt.monitoring.finalCondition = 'deadline-exceeded';
-  receipt.monitoring.elapsedSeconds = 960;
-  receipt.monitoring.observations[2].condition = 'progressing';
-  receipt.failure = {
-    code: 'STEADY_STATE_UNPROVEN',
-    message: 'The declared steady window never closed before the deadline; boot normally completes in eight to nine minutes.',
-    steps: ['monitor'],
-    missingRefs: ['probe://landing-http/8821'],
-    retryable: true,
-    owningDomain: 'deployment',
-  };
-  receipt.resume = {
-    resumeToken: 'resume-release-8821-1',
-    requiredDelta: ['Extend the observation with a fresh probe series after the platform restores the target.'],
-  };
-}
-
-assert.deepEqual(validateInput(validInput), { valid: true, errors: [] });
-assert.deepEqual(validateOutput(validDeployedOutput), { valid: true, errors: [] });
-assert.deepEqual(validateOutput(validRolledBackOutput), { valid: true, errors: [] });
-assert.deepEqual(validateOutput(validBlockedOutput), { valid: true, errors: [] });
-
-// Deployment authority is declared. Authority for another environment is the same as none.
-const foreignScope = structuredClone(validInput);
-foreignScope.context.authorization.scope.environment = 'staging';
-assert.equal(validateInput(foreignScope).valid, false);
-
-// An authorization that had already expired when the target was observed authorizes nothing.
-const expiredAuthorization = structuredClone(validInput);
-expiredAuthorization.context.authorization.expiresAt = '2026-09-02T08:30:00.000Z';
-assert.equal(validateInput(expiredAuthorization).valid, false);
-
-// A manifest pinned to another release is how an unreviewed image reaches a reviewed target.
-const foreignManifest = structuredClone(validInput);
-foreignManifest.context.manifest.validatedAgainstReleaseId = 'release:2026-08-30.7';
-assert.equal(validateInput(foreignManifest).valid, false);
-
-// A credential value can never take the place of a handle.
-const inlineCredential = structuredClone(validInput);
-inlineCredential.context.credentials[0].handle = 'ghp_realTokenValue0000';
-assert.equal(validateInput(inlineCredential).valid, false);
-
-// Steady state is public, so a run with only runtime probes proves nothing a user could see.
-const privateProbesOnly = structuredClone(validInput);
-privateProbesOnly.input.probes = [
-  { probeId: 'container-health', kind: 'runtime', endpointRef: 'docker://api/health', expectStatus: 200 },
+const NL = String.fromCharCode(10);
+const STEPS = [
+  ['`authorize`', 'applied', '—', '—', 'the declared grant covers this project, environment and target'],
+  ['`rollout`', 'applied', '4', '5', 'the target moved to the immutable digest'],
+  ['`monitor`', 'applied', '—', '—', 'the window was observed to its end'],
 ];
-const privateProbeResult = validateInput(privateProbesOnly);
-assert.equal(privateProbeResult.valid, false);
-assert.ok(privateProbeResult.errors.some((error) => error.includes('typename probe returning 200')));
 
-// A deadline shorter than the window it must contain is a guaranteed false failure.
-const shortDeadline = structuredClone(validInput);
-shortDeadline.input.steady.deadlineSeconds = 200;
-assert.equal(validateInput(shortDeadline).valid, false);
+function responseMd({
+  release = RELEASE, digest = DIGEST, target = TARGET, approval = APPROVAL, deadline = DEADLINE,
+  rollbackId = PREVIOUS, outcome = 'deployed', branch = 'none', steps = STEPS,
+  monitoring = { Deadline: DEADLINE, Elapsed: 420, Backoff: 30, 'Final condition': 'steady' },
+  steady = { 'Active digest': DIGEST, 'Available targets': '1 of 1', 'Superseded active': '0', 'Window elapsed': '300' },
+  fallbacksTaken = [],
+} = {}) {
+  return `# release-deployment — ${release}
 
-// A rollback identity naming the release under deployment is not a rollback target.
-const selfRollback = structuredClone(validInput);
-selfRollback.input.rollbackIdentity.releaseId = releaseId;
-assert.equal(validateInput(selfRollback).valid, false);
+The immutable release reached its declared target under the declared grant, and the steady state
+rests on the observed digest, the available targets and every declared probe across the window.
 
-// The release being replaced must be the one actually observed as active.
-const mismatchedReplacement = structuredClone(validInput);
-mismatchedReplacement.input.target.replacedReleaseId = 'release:2026-08-30.7';
-assert.equal(validateInput(mismatchedReplacement).valid, false);
+## Binding
 
-// A resume that adds nothing is NO_PROGRESS.
-const emptyResume = structuredClone(validInput);
-emptyResume.input.resume = {
-  blockedReceiptRef: 'receipt:release-2026-09-02-1-blocked',
-  resumeToken: 'resume-release-8821-1',
-  addedContextRefs: [],
-};
-assert.equal(validateInput(emptyResume).valid, false);
+| Field | Value |
+| --- | --- |
+| Operator | \`release.deploy\` |
+| Step | \`step-1/parallel-1\` |
+| Project | \`starci-academy\` |
+| Release | ${release} |
+| Artifact | \`${ARTIFACT}\` |
+| Digest | \`${digest}\` |
+| Target | ${target} |
+| Environment | production |
+| Replaced release | \`${PREVIOUS}\` |
+| Approval | ${approval} |
+| Manifest | \`${MANIFEST}\` |
+| Steady deadline | ${deadline} |
+| Rollback identity | ${rollbackId} |
 
-// A matching desired state is a proved idempotent no-op, never a claimed application.
-const falseApplication = structuredClone(validDeployedOutput);
-falseApplication.output.receipt.steps[4].state = 'applied';
-const falseApplicationResult = validateOutput(falseApplication);
-assert.equal(falseApplicationResult.valid, false);
-assert.ok(falseApplicationResult.errors.some((error) => error.includes('without moving the observed revision')));
+## Outcome
 
-// A read step that reports a revision has invented a fact about a boundary it never touched.
-const inventedRevision = structuredClone(validDeployedOutput);
-inventedRevision.output.receipt.steps[2].revisionBefore = 4;
-inventedRevision.output.receipt.steps[2].revisionAfter = 5;
-assert.equal(validateOutput(inventedRevision).valid, false);
+| Field | Value |
+| --- | --- |
+| Outcome | ${outcome} |
+| Branch | ${branch} |
 
-// Steady state means this release's immutable digest is the active one.
-const foreignDigestSteady = structuredClone(validDeployedOutput);
-foreignDigestSteady.output.receipt.steadyState.activeDigest = previousDigest;
-assert.equal(validateOutput(foreignDigestSteady).valid, false);
+## Steps
 
-// Every declared probe has to pass; a probe quietly dropped from the window proves less than claimed.
-const droppedProbe = structuredClone(validDeployedOutput);
-droppedProbe.output.receipt.steadyState.probeResults =
-  droppedProbe.output.receipt.steadyState.probeResults.slice(0, 1);
-assert.equal(validateOutput(droppedProbe).valid, false);
+| Step | State | Revision before | Revision after | Statement |
+| --- | --- | --- | --- | --- |
+${steps.map((s) => `| ${s[0]} | ${s[1]} | ${s[2]} | ${s[3]} | ${s[4]} |`).join('\n')}
 
-// Steady state requires every declared target, not most of them.
-const partialAvailability = structuredClone(validDeployedOutput);
-partialAvailability.output.receipt.steadyState.availableTargets = 1;
-assert.equal(validateOutput(partialAvailability).valid, false);
+## Monitoring
 
-// A rolling strategy does not permit a superseded target to stay active.
-const lingeringTarget = structuredClone(validDeployedOutput);
-lingeringTarget.output.receipt.steadyState.supersededActive = 1;
-assert.equal(validateOutput(lingeringTarget).valid, false);
+| Field | Value |
+| --- | --- |
+| Deadline | ${monitoring.Deadline} |
+| Elapsed | ${monitoring.Elapsed} |
+| Backoff | ${monitoring.Backoff} |
+| Final condition | ${monitoring['Final condition']} |
 
-// The steady window has to elapse before steady state is declared.
-const shortWindow = structuredClone(validDeployedOutput);
-shortWindow.output.receipt.steadyState.windowSeconds = 60;
-assert.equal(validateOutput(shortWindow).valid, false);
+## Steady state
 
-// Monitoring proves steady state; a deployment cannot assume it.
-const assumedSteady = structuredClone(validDeployedOutput);
-assumedSteady.output.receipt.steadyState = null;
-assert.equal(validateOutput(assumedSteady).valid, false);
+| Metric | Value |
+| --- | --- |
+${Object.entries(steady).map(([k, v]) => `| ${k} | ${/^sha256:/.test(String(v)) ? `\`${v}\`` : v} |`).join('\n')}
 
-// One transient probe never becomes recovery.
-const transientRecovery = structuredClone(validRolledBackOutput);
-transientRecovery.output.receipt.monitoring.observations[1].condition = 'progressing';
-const transientResult = validateOutput(transientRecovery);
-assert.equal(transientResult.valid, false);
-assert.ok(transientResult.errors.some((error) => error.includes('one transient probe is not a failure')));
+## Findings
 
-// Recovery preserves the release identity it is recovering.
-const foreignRecovery = structuredClone(validRolledBackOutput);
-foreignRecovery.output.receipt.recovery.attempts[1].releaseId = 'release:hotfix.9';
-assert.equal(validateOutput(foreignRecovery).valid, false);
+| Code | Step | Statement |
+| --- | --- | --- |
+| \`IDEMPOTENT_NO_OP\` | \`host-prepare\` | the host already matched the declaration |
 
-// A release that appears mid-run and belongs to nobody here is drift, not something to recover.
-const drift = structuredClone(validDeployedOutput);
-drift.output.receipt.monitoring.observations[1].activeReleaseIds = [releaseId, 'release:hotfix.9'];
-const driftResult = validateOutput(drift);
-assert.equal(driftResult.valid, false);
-assert.ok(driftResult.errors.some((error) => error.includes('CONCURRENT_DRIFT')));
+## Fallbacks taken
 
-// A rolled-back run is its own terminal outcome and never reports delivery of the rejected release.
-const rollbackAsDelivery = structuredClone(validRolledBackOutput);
-rollbackAsDelivery.output.receipt.rollback.toReleaseId = releaseId;
-assert.equal(validateOutput(rollbackAsDelivery).valid, false);
+| Code | Action |
+| --- | --- |
+${fallbacksTaken.map((c) => `| \`${c}\` | the branch was taken and recorded |`).join(NL)}
+`;
+}
 
-// A rolled-back run never reaches steady state for the release it rejected.
-const rolledBackSteady = structuredClone(validRolledBackOutput);
-rolledBackSteady.output.receipt.steadyState = validDeployedOutput.output.receipt.steadyState;
-assert.equal(validateOutput(rolledBackSteady).valid, false);
+const requestJson = ({ release = RELEASE, target = TARGET, approval = APPROVAL, probes = PROBES, deadline = DEADLINE, rollbackIdentity = ROLLBACK, extra = {} } = {}) => ({
+  schemaVersion: 9, operatorId: 'release.deploy', step: 1, parallel: 1, sessionId: 's-test',
+  contexts: [{ alias: '@remote/ghcr/starci/academy-api', head: null }],
+  requirements: { release, target, approval, probes, steadyDeadline: deadline, rollbackIdentity, resume: null, ...extra },
+  inputs: { 'quality-verification': 'step-1/parallel-1/response/quality.md' }, resume: null,
+});
 
-// A blocked receipt cannot claim the state it failed to prove.
-const blockedSteady = structuredClone(validBlockedOutput);
-blockedSteady.output.receipt.steadyState = validDeployedOutput.output.receipt.steadyState;
-assert.equal(validateOutput(blockedSteady).valid, false);
+const responseJson = ({ status = 'done', stop, fallbacks = [], next = ['platform.operate'] } = {}) => ({
+  schemaVersion: 9, operatorId: 'release.deploy', step: 1, parallel: 1, status, ...(stop ? { stop } : {}),
+  fallbacks,
+  fields: status === 'blocked' ? {} : { 'release-deployment': 'response/response.md', probes: 'response/data/probes.json' },
+  commits: [], next,
+});
 
-// A deployment must carry the authorization that permitted it.
-const unauthorizedEvidence = structuredClone(validDeployedOutput);
-unauthorizedEvidence.output.receipt.evidenceRefs = evidenceRefs.filter((ref) => ref !== authorizationRef);
-assert.equal(validateOutput(unauthorizedEvidence).valid, false);
+function writeBranch(files) {
+  const session = mkdtempSync(path.join(tmpdir(), 'release-session-'));
+  const branch = path.join(session, 'step-1', 'parallel-1');
+  for (const d of ['request', 'response/data', 'response/artifacts']) mkdirSync(path.join(branch, d), { recursive: true });
+  writeFileSync(path.join(session, 'state.json'), JSON.stringify({ id: 's-test', chain: [['1/1']], steps: { '1/1': 'release.deploy' }, current: '1/1', status: 'running' }));
+  writeFileSync(path.join(branch, 'response', 'quality.md'), '# quality\n');
+  for (const [name, content] of Object.entries(files)) {
+    if (content === null) continue;
+    writeFileSync(path.join(branch, name), typeof content === 'string' ? content : JSON.stringify(content, null, 2));
+  }
+  return { branch, session };
+}
 
-// Exhausted recovery cannot end in a successful deployment.
-const exhaustedDeployed = structuredClone(validDeployedOutput);
-exhaustedDeployed.output.receipt.branch = 'recover';
-exhaustedDeployed.output.receipt.monitoring.observations[0].condition = 'failing';
-exhaustedDeployed.output.receipt.monitoring.observations[1].condition = 'failing';
-exhaustedDeployed.output.receipt.recovery = {
-  attempts: [{ attempt: 1, action: 'restart-target', releaseId, outcome: 'failed', evidenceRefs: [] }],
-  exhausted: true,
-};
-const exhaustedResult = validateOutput(exhaustedDeployed);
-assert.equal(exhaustedResult.valid, false);
-assert.ok(exhaustedResult.errors.some((error) => error.includes('exhausted recovery cannot end')));
+const baseline = (over = {}) => ({
+  'request/request.json': requestJson(),
+  'response/response.json': responseJson(),
+  'response/response.md': responseMd(),
+  'response/data/probes.json': probesJson(),
+  ...over,
+});
 
-console.log('release.deploy self-test passed');
+
+// The recovery fallback: two failing observations, then steady again on the same release.
+const recovered = () => baseline({
+  'response/response.json': responseJson({ fallbacks: ['ROLLOUT_FAILED'] }),
+  'response/data/probes.json': probesJson({
+    observations: [observation('2026-01-10T00:01:00.000Z', 'failing', 'fail'), observation('2026-01-10T00:03:00.000Z', 'failing', 'fail'), observation('2026-01-10T00:07:00.000Z', 'steady')],
+  }),
+  'response/response.md': responseMd({
+    branch: 'recover',
+    steps: [...STEPS, ['`recover`', 'applied', '5', '6', 'the approved reversible action restored the target']],
+    fallbacksTaken: ['ROLLOUT_FAILED'],
+  }),
+});
+
+// Both fallbacks in order: the recovery ran out and the safe release was restored by digest.
+const rolledBack = () => baseline({
+  'response/response.json': responseJson({ fallbacks: ['ROLLOUT_FAILED', 'RECOVERY_EXHAUSTED'] }),
+  'response/data/probes.json': probesJson({
+    observations: [observation('2026-01-10T00:01:00.000Z', 'failing', 'fail'), observation('2026-01-10T00:03:00.000Z', 'failing', 'fail'), observation('2026-01-10T00:09:00.000Z', 'steady')],
+  }),
+  'response/response.md': responseMd({
+    outcome: 'rolled-back', branch: 'rollback',
+    steps: [...STEPS, ['`recover`', 'applied', '5', '6', 'the approved actions ran out'], ['`rollback`', 'applied', '6', '7', 'the safe release was restored by digest']],
+    steady: { 'Active digest': SAFE_DIGEST, 'Available targets': '1 of 1', 'Superseded active': '0', 'Window elapsed': '300' },
+    fallbacksTaken: ['ROLLOUT_FAILED', 'RECOVERY_EXHAUSTED'],
+  }),
+});
+
+async function expectValid(files, label) {
+  const { branch, session } = writeBranch(files);
+  const { errors } = await validateReleaseStep(branch);
+  rmSync(session, { recursive: true, force: true });
+  assert.deepEqual(errors, [], `${label} should be valid`);
+}
+async function expectError(files, needle, label) {
+  const { branch, session } = writeBranch(files);
+  const { errors } = await validateReleaseStep(branch);
+  rmSync(session, { recursive: true, force: true });
+  assert.ok(errors.some((e) => e.includes(needle)), `${label}: expected an error containing "${needle}", got:\n${errors.join('\n') || '(none)'}`);
+}
+
+await expectValid(baseline(), 'a steady deployment of the immutable release');
+await expectValid(recovered(), 'the recovery fallback taken after a persistent failure');
+await expectValid(rolledBack(), 'both fallbacks in order, ending in a restored release');
+await expectValid({
+  'request/request.json': requestJson(),
+  'response/response.json': responseJson({ status: 'blocked', stop: 'STEADY_STATE_UNPROVEN', next: [] }),
+  'response/response.md': null, 'response/data/probes.json': null,
+}, 'blocked because the steady window never closed');
+
+await expectError(baseline({ 'response/response.json': { ...responseJson(), stop: 'ROLLOUT_FAILED' } }), 'only a blocked response carries a stop', 'done with a stop');
+await expectError(baseline({ 'response/response.json': responseJson({ status: 'blocked', stop: 'ROLLOUT_FAILED', next: [] }) }), 'has disposition fallback under these requirements', 'a fallback code used to block the branch');
+await expectError(baseline({ 'response/response.json': responseJson({ fallbacks: ['STEADY_STATE_UNPROVEN'] }) }), 'cannot be taken as a fallback', 'a terminate code taken as a fallback');
+await expectError(baseline({
+  'response/response.json': responseJson({ fallbacks: ['RECOVERY_EXHAUSTED'] }),
+  'response/response.md': responseMd({ outcome: 'rolled-back', branch: 'rollback', steps: [...STEPS, ['`rollback`', 'applied', '6', '7', 'restored']], steady: { 'Active digest': SAFE_DIGEST, 'Available targets': '1 of 1', 'Superseded active': '0', 'Window elapsed': '300' }, fallbacksTaken: ['RECOVERY_EXHAUSTED'] }),
+}), 'reached only through an exhausted recovery', 'a rollback that skipped the recovery branch');
+await expectError(baseline({ 'request/request.json': requestJson({ extra: { strategy: 'rolling' } }) }), 'requirements.strategy is not a field', 'a field the operator no longer declares');
+await expectError(baseline({ 'request/request.json': requestJson({ approval: null }) }), 'required field approval has no value', 'a production deploy nobody approved');
+await expectError(baseline({ 'request/request.json': requestJson({ probes: [{ probeId: 'container-health', kind: 'internal', endpointRef: 'unix:///health', expectStatus: 200 }] }), 'response/data/probes.json': probesJson({ observations: [{ ...observation('2026-01-10T00:01:00.000Z', 'progressing'), probeResults: [{ probeId: 'container-health', status: 'pass', observedStatus: 200, observedAt: '2026-01-10T00:01:00.000Z' }] }, { ...observation('2026-01-10T00:07:00.000Z', 'steady'), probeResults: [{ probeId: 'container-health', status: 'pass', observedStatus: 200, observedAt: '2026-01-10T00:07:00.000Z' }] }] }) }), 'at least one declared probe is public', 'a run proving only container health');
+await expectError(baseline({ 'request/request.json': requestJson({ rollbackIdentity: { ...ROLLBACK, digest: 'v1.4.0' } }) }), 'a rollback by tag restores whatever the tag now points at', 'a rollback identity named by tag');
+await expectError(baseline({ 'request/request.json': requestJson({ extra: { release: RELEASE }, target: TARGET, approval: 'ghp_abcdefghijklmnopqrstuvwxyz' }) }), 'looks like a resolved credential value', 'a token where a handle belongs');
+await expectError(baseline({ 'request/request.json': requestJson({ deadline: 120 }) }), 'but the request pinned 120s', 'monitoring measured against another deadline');
+await expectError(baseline({ 'response/data/probes.json': probesJson({ elapsedSeconds: 900 }) }), 'ran past its own bounded deadline', 'monitoring that outran its deadline');
+await expectError(baseline({ 'response/data/probes.json': probesJson({ backoffSeconds: 900 }) }), 'backoff cannot exceed the deadline', 'a backoff wider than the window');
+await expectError({
+  ...recovered(),
+  'response/data/probes.json': probesJson({ observations: [observation('2026-01-10T00:01:00.000Z', 'failing', 'fail'), observation('2026-01-10T00:07:00.000Z', 'steady')] }),
+}, 'one transient probe is not a persistent failure', 'recovery entered on a single failing probe');
+await expectError(baseline({ 'response/data/probes.json': probesJson({ finalCondition: 'deadline-exceeded' }) }), 'which is STEADY_STATE_UNPROVEN, not a deployment', 'a deployment over an exceeded deadline');
+await expectError(baseline({ 'response/response.md': responseMd({ release: 'release:someone-elses' }) }), 'but the request bound', 'a receipt for another release');
+await expectError(baseline({ 'response/response.md': responseMd({ digest: 'latest' }) }), 'identified by its digest, never by a tag', 'a release named by tag');
+await expectError(baseline({ 'response/response.md': responseMd({ approval: '`someone-elses-grant`' }) }), 'names an approval the request did not bind', 'a grant borrowed from another deployment');
+await expectError(baseline({ 'response/response.md': responseMd({ branch: 'recover' }) }), 'but the fallbacks taken say none', 'a branch the fallbacks never recorded');
+await expectError({
+  ...rolledBack(),
+  'response/response.md': responseMd({ outcome: 'deployed', branch: 'rollback', steps: [...STEPS, ['`recover`', 'applied', '5', '6', 'x'], ['`rollback`', 'applied', '6', '7', 'y']], fallbacksTaken: ['ROLLOUT_FAILED', 'RECOVERY_EXHAUSTED'] }),
+}, 'a restored release is its own terminal', 'a rollback reported as delivery');
+await expectError(baseline({ 'response/response.md': responseMd({ steps: [['`authorize`', 'applied', '—', '—', 'x'], ['`rollout`', 'applied', '4', '4', 'y'], ['`monitor`', 'applied', '—', '—', 'z']] }) }), 'claims it applied without moving a revision', 'an application that moved nothing');
+await expectError(baseline({ 'response/response.md': responseMd({ steps: [['`authorize`', 'applied', '2', '3', 'x'], ['`rollout`', 'applied', '4', '5', 'y'], ['`monitor`', 'applied', '—', '—', 'z']] }) }), 'reports a revision for a boundary it never touched', 'a reading step inventing a revision');
+await expectError(baseline({ 'response/response.md': responseMd({ steady: { 'Active digest': SAFE_DIGEST, 'Available targets': '1 of 1', 'Superseded active': '0', 'Window elapsed': '300' } }) }), 'while another digest is active', 'a deployment over the old digest');
+await expectError(baseline({ 'response/response.md': responseMd({ steady: { 'Active digest': DIGEST, 'Available targets': '1 of 2', 'Superseded active': '0', 'Window elapsed': '300' } }) }), 'a partly available target set is not steady state', 'one target absorbing the load for two');
+await expectError(baseline({ 'response/response.md': responseMd({ steady: { 'Active digest': DIGEST, 'Available targets': '1 of 1', 'Superseded active': '1', 'Window elapsed': '300' } }) }), 'still serving traffic', 'a superseded target left active');
+await expectError(baseline({ 'response/data/probes.json': probesJson({ observations: [observation('2026-01-10T00:07:00.000Z', 'steady')] }) }), 'claimed from a single observation', 'steady state read off one probe');
+await expectError(baseline({ 'response/response.md': responseMd({ monitoring: { Deadline: DEADLINE, Elapsed: 420, Backoff: 30, 'Final condition': 'progressing' } }) }), 'but the series ended steady', 'a receipt disagreeing with its own series');
+await expectError(baseline({ 'response/data/probes.json': { ...probesJson(), finalCondition: 'nope' } }), 'finalCondition', 'probes schema');
+await expectError(baseline({ 'response/response.md': responseMd().replace('## Steady state', '## Stable state') }), 'missing section ^## Steady state$', 'receipt section renamed');
+
+process.stdout.write('release.deploy self-test: 4 valid branches, 26 rejected mutations\n');

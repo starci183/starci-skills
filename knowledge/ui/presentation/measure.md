@@ -41,7 +41,7 @@ throughout its own renderers; an application region that wraps text must do the 
 ## Width scale
 
 A capped width takes one step of this closed scale and nothing else; an arbitrary width such as
-`max-w-[720px]` is outside the scale and is removed by `fe.presentation.resolve`. The prose cap
+`max-w-[720px]` is outside the scale and is removed by `frontend.presentation.resolve`. The prose cap
 `max-w-[65ch]` is the one character-based step, because line length follows the text. Owner ruling
 2026-09-03: the scale is fixed for every application, not derived per project.
 

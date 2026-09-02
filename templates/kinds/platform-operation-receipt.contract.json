@@ -1,0 +1,76 @@
+{
+  "kind": "platform-operation-receipt",
+  "title": "^# platform-operation-receipt — (observability|sonar|tunnel) [A-Za-z0-9._/-]+$",
+  "sections": [
+    {
+      "heading": "^## Binding$",
+      "table": "| Field | Value |",
+      "rows": [
+        "Operator",
+        "Step",
+        "Project",
+        "Service",
+        "Service kind",
+        "Owner",
+        "Approval",
+        "Desired state",
+        "Inventory fingerprint"
+      ],
+      "cell": {
+        "Value": "\\S"
+      }
+    },
+    {
+      "heading": "^## Convergence$",
+      "table": "| Field | Value |",
+      "exactRows": 1,
+      "rows": [
+        "Convergence"
+      ],
+      "cell": {
+        "Value": "^(converged|already-converged)$"
+      }
+    },
+    {
+      "heading": "^## Inventoried resources$",
+      "table": "| Resource | Kind | Revision | Owner |",
+      "minRows": 1,
+      "cell": {
+        "Kind": "^(observability|sonar|tunnel)$",
+        "Revision": "\\S"
+      }
+    },
+    {
+      "heading": "^## Port holders$",
+      "table": "| Port | Holder | Evidence |",
+      "cell": {
+        "Port": "^[0-9]{1,5}$"
+      }
+    },
+    {
+      "heading": "^## Mutations$",
+      "table": "| Effect | Resource | Before | After |",
+      "cell": {
+        "Effect": "^`(update-config|restart-service|upsert-dashboard|update-remote-write|create-project|assign-profile|assign-gate|enforce-setting|create-tunnel|update-tunnel-route|upsert-proxied-dns)`$"
+      }
+    },
+    {
+      "heading": "^## Checks$",
+      "table": "| Check | Resource | Status | Evidence |",
+      "minRows": 1,
+      "cell": {
+        "Status": "^(passed|failed)$",
+        "Evidence": "\\S"
+      }
+    },
+    {
+      "heading": "^## Findings$",
+      "table": "| Code | Resource | Port | Holder | Statement |",
+      "minRows": 1,
+      "cell": {
+        "Code": "^`(SHARED_SERVICE_INVENTORIED|PORT_COORDINATION_REQUIRED|ALREADY_CONVERGED|PARTIAL_MUTATION|PRODUCT_DEPLOYMENT_DECLINED)`$",
+        "Statement": "\\S"
+      }
+    }
+  ]
+}

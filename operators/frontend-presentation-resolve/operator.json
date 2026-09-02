@@ -1,0 +1,19 @@
+{
+  "schemaVersion": 9,
+  "id": "frontend.presentation.resolve",
+  "domain": "frontend",
+  "job": "Resolve every application-owned presentation property on one already-composed tree to exactly one published rule, emit its class and verifiable contract claim, and stop at the smallest owning gap instead of inventing a value.",
+  "package": "operator.md",
+  "errors": "errors.json",
+  "validator": "validate.mjs",
+  "selfTest": "self-test.mjs",
+  "resources": {
+    "profile": "sonnet",
+    "requires": [],
+    "policy": {
+      "webSearch": "never",
+      "grammarBound": true,
+      "imageGeneration": "never"
+    }
+  }
+}

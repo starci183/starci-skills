@@ -1,0 +1,39 @@
+{
+  "$id": "kind:claims",
+  "title": "Every observation the decision rests on, separated by role and bound to the source that shows it.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["featureId", "sourceHead", "fingerprint", "claims"],
+  "properties": {
+    "featureId": { "$ref": "#/$defs/identifier" },
+    "sourceHead": { "$ref": "#/$defs/sourceHead" },
+    "fingerprint": { "$ref": "#/$defs/fingerprint" },
+    "claims": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 256,
+      "items": { "$ref": "#/$defs/claim" }
+    }
+  },
+  "$defs": {
+    "identifier": { "type": "string", "pattern": "^[a-z0-9][a-z0-9-]*$" },
+    "fingerprint": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
+    "sourceHead": { "type": "string", "pattern": "^[0-9a-f]{40,64}$" },
+    "claim": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["claimId", "kind", "role", "path", "lineStart", "lineEnd", "sourceHead"],
+      "properties": {
+        "claimId": { "$ref": "#/$defs/identifier" },
+        "kind": { "enum": ["fact", "intent", "example", "unknown", "contradiction"] },
+        "role": { "type": "string", "minLength": 1, "maxLength": 256 },
+        "path": { "type": "string", "minLength": 1, "maxLength": 1024 },
+        "lineStart": { "type": "integer", "minimum": 1 },
+        "lineEnd": { "type": "integer", "minimum": 1 },
+        "sourceHead": {
+          "oneOf": [{ "$ref": "#/$defs/sourceHead" }, { "type": "null" }]
+        }
+      }
+    }
+  }
+}

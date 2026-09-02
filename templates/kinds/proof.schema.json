@@ -1,0 +1,17 @@
+{
+  "$id": "kind:proof",
+  "title": "One declared proof of one operation, with the command that was run and what came back; the file is named <operationId>.<proofKind>.json.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["operationId", "proofKind", "commandRef", "exitCode", "result", "output", "statement", "contractFingerprint"],
+  "properties": {
+    "operationId": { "type": "string", "pattern": "^[a-z0-9][a-z0-9-]*$" },
+    "proofKind": { "enum": ["unit", "integration", "migration-replay", "conformance-read", "runtime-probe"] },
+    "commandRef": { "type": "string", "minLength": 1, "maxLength": 1024 },
+    "exitCode": { "type": "integer", "minimum": 0, "maximum": 255 },
+    "result": { "enum": ["passed", "failed"] },
+    "output": { "type": "string", "minLength": 1, "maxLength": 8192 },
+    "statement": { "type": "string", "minLength": 1, "maxLength": 4096 },
+    "contractFingerprint": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" }
+  }
+}

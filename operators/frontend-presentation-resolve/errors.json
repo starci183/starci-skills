@@ -1,0 +1,42 @@
+{
+  "schemaVersion": 9,
+  "note": "Stop codes frontend.presentation.resolve emits. Same entry shape as errors/errors.json, scope implicit. Shared codes (INVALID_INPUT, SOURCE_DRIFT, NO_PROGRESS) come from errors/errors.json. OWNER_CONFLICT and UNKNOWN_RULE are defined here and also emitted by frontend.source.apply and frontend.surface.audit; they belong in errors/errors.json with a scope list.",
+  "codes": {
+    "KNOWLEDGE_UNBOUND": {
+      "domain": "knowledge",
+      "disposition": "terminate",
+      "meaning": {
+        "en": "A presentation property is present in the tree and no knowledge topic is bound for it.",
+        "vi": "Một thuộc tính trình bày có trong cây mà không topic kiến thức nào được bind cho nó."
+      },
+      "resume": {
+        "en": "Bind the missing topic.",
+        "vi": "Bind topic còn thiếu."
+      }
+    },
+    "RULE_MISSING": {
+      "domain": "knowledge",
+      "disposition": "terminate",
+      "meaning": {
+        "en": "No published case matches the observed condition on a node.",
+        "vi": "Không case nào đã publish khớp điều kiện quan sát được trên một node."
+      },
+      "resume": {
+        "en": "The knowledge owner publishes the case, and the tree is resolved again.",
+        "vi": "Chủ knowledge publish case, rồi cây được resolve lại."
+      }
+    },
+    "GRAMMAR_UNPUBLISHED": {
+      "domain": "grammar",
+      "disposition": "terminate",
+      "meaning": {
+        "en": "The Grammar package is unpublished or the bound fingerprint is stale.",
+        "vi": "Gói Grammar chưa publish hoặc fingerprint đã bind là cũ."
+      },
+      "resume": {
+        "en": "A person publishes the exact Grammar package.",
+        "vi": "Người publish đúng gói Grammar."
+      }
+    }
+  }
+}

@@ -1,0 +1,121 @@
+# frontend.surface.audit
+
+## Việc
+
+Quan sát bề mặt đã commit ở route đang được phục vụ, qua đúng ma trận mà coverage của hướng suy ra,
+đo mọi node có mang lời khai, và phán quyết từng phép đo theo luật proof đã publish, dựa trên chủ sở
+hữu của node mà nó đứng lên.
+
+## Sẵn sàng, chụp và phán quyết là một việc
+
+Tách chúng ra đã sinh ra một kiểu hỏng quen thuộc: một bức chụp lấy trước khi bề mặt sẵn sàng, bị
+phán quyết bởi một bước không còn cách nào biết điều đó, dựa trên bằng chứng mà chính nó không thu.
+Một operator vừa chờ, vừa đo, vừa phán quyết dưới một biên nhận thì không đánh mất mối nối ấy.
+
+## Bề mặt phải là bề mặt đã commit
+
+Biên nhận áp dụng gọi tên commit nó đã ghi, head được ghim bằng đúng commit đó, và preview phục vụ
+worktree phiên ở chính commit ấy. Head khác là `SOURCE_DRIFT` và không chụp gì cả, vì đo một cây khác
+thì không chứng minh được gì về cây này.
+
+## Phép đo thắng lời khai, luôn luôn
+
+Mỗi node mang những identifier nó khai là mình thoả, và lượt audit đo thứ bề mặt thực sự render ra.
+Lời khai không bao giờ là bằng chứng của việc pass: một node khai `GAP-4` trong khi gap tính được đo
+ra `1.5rem` là một lần hỏng, và khai bao nhiêu cũng không đổi được phép đo. Đó là toàn bộ cơ chế, và
+đó là lý do lời khai tồn tại.
+
+## Chủ sở hữu quyết định chỗ hỏng đi về đâu
+
+Một lời khai hỏng trên node do ứng dụng sở hữu là một giá trị mà resolution phải publish lại, nên nó
+quay về `frontend.presentation.resolve`, chính operator giữ số vòng. Một lời khai hỏng trên phần render của
+chính một component Grammar là một khoảng trống Grammar: nó đi tới một con người và vào bảng gap của
+họ, không bao giờ đi vào vòng lặp resolve, vì không giá trị ứng dụng nào sửa được một component. Phần
+ruột của node do ứng dụng sở hữu không mang lời khai nào và không bị audit; chỉ các luật đo của chính
+node ấy bị audit.
+
+## Audit không đổi gì cả
+
+Không phán quyết nào là một lần sửa, một cách chữa cháy hay một mệnh lệnh. Một chỗ hỏng vẫn là chỗ
+hỏng trong biên nhận cho tới khi một lượt resolution publish giá trị mới và người ghi viết nó xuống,
+rồi chính bề mặt ấy được audit lại. Sự tách bạch đó là lý do biên nhận này có giá trị: một operator
+có thể tự sửa thứ nó tìm ra thì lúc nào cũng báo được một bề mặt sạch.
+
+## Ranh giới
+
+Context chỉ đọc, và runtime là thứ được tiêu thụ chứ không được sở hữu. Operator chỉ ghi `response/`
+của nhánh mình: biên nhận audit, các bức chụp, các ảnh màn hình và các phán quyết. Nó không sửa source
+sản phẩm, cây đã áp dụng, knowledge hay Grammar, không sửa chữa, không tô lại, không chữa cháy bất cứ
+thứ gì nó thấy, không khởi động, dừng, deploy hay cấu hình lại dịch vụ runtime, không trích một
+identifier vắng mặt trong kho đã bind, không phán quyết một node nó chưa đo, và không nhận lời khai
+làm bằng chứng rằng node đã pass.
+
+## Context
+
+| Alias | Bind | Bắt buộc |
+| --- | --- | --- |
+| `@knowledge/ui/proof` | thứ chỉ thành thật khi đã render; toàn bộ kho luật của lượt audit | có |
+| `@workspaces/fe` | checkout được route ở commit mà lần áp dụng đã ghi; chủ sở hữu và identifier được quan sát ở đó | có |
+| `@worktrees/sessions/central-runtime` | chủ runtime dùng chung: preview đang phục vụ worktree phiên ở commit ấy | có |
+| `@knowledge/grammars/starci` | họ Core được kỳ vọng hiện thực hoá Common ra sao, và gap của họ được ghi ở đâu | không |
+
+## Đầu vào
+
+| Kind | Từ đâu | Bắt buộc |
+| --- | --- | --- |
+| `frontend-source-application` | `frontend.source.apply`, commit đang được quan sát và các lời khai nó đã ghi | có |
+| `frontend-presentation-resolution` | `frontend.presentation.resolve`, chủ sở hữu của từng node | có |
+| `frontend-direction-decision` | `frontend.direction.decide`, route và coverage mà ma trận suy ra từ đó | có |
+
+## Yêu cầu
+
+| Field | Kiểu | Mặc định | Hỏi |
+| --- | --- | --- | --- |
+| `matrix` | list | every coverage entry | Các mục ma trận cần chụp; người dùng chỉ được thu hẹp thứ coverage đã suy ra |
+| `readinessProbe` | choice | route-served | Mức sàn của sẵn sàng; một state cần dữ liệu tự nâng lên `route-and-data-served` |
+| `resume` | token | null | Token của nhánh bị chặn khi vào lại sau một mã dừng |
+
+## Các bước
+
+| # | Bước | Tham số | Đọc | Ghi | Dừng với |
+| --- | --- | --- | --- | --- | --- |
+| 1 | Kiểm gate, chạy lại, và xác nhận head cùng route đang phục vụ | `resume` | `request/request.json`, đầu vào `frontend-source-application` (commit của nó phải bằng head đã ghim), @workspaces/fe ở head đóng băng, @worktrees/sessions/central-runtime (preview phục vụ worktree phiên ở commit ấy) | — | `INVALID_INPUT`, `SOURCE_DRIFT`, `NO_PROGRESS` |
+| 2 | Bind thẩm quyền | — | @knowledge/ui/proof (mọi topic kèm fingerprint và kho luật), đầu vào `frontend-source-application` (các lời khai), đầu vào `frontend-presentation-resolution` (chủ sở hữu của từng node), @worktrees/sessions/central-runtime | — | — |
+| 3 | Chọn các mục ma trận | `matrix` | đầu vào `frontend-direction-decision` (coverage: state nhân viewport nhân bảng màu) | — | — |
+| 4 | Chờ từng mục tới lúc sẵn sàng | `readinessProbe` | @worktrees/sessions/central-runtime | — | `RUNTIME_UNAVAILABLE` |
+| 5 | Chụp và đo từng mục | — | @worktrees/sessions/central-runtime, @workspaces/fe (các owner được quan sát và identifier từng node mang) | `response/artifacts/<matrixId>.png`, `response/data/captures/<matrixId>.json` | `EVIDENCE_MISSING` |
+| 6 | Đối chiếu với lời khai và luật proof, phán quyết theo chủ sở hữu, rồi phát | — | @knowledge/ui/proof, @knowledge/grammars/starci, các bức chụp | `response/data/verdicts.json`, `response/response.md`, `response/response.json` | `UNKNOWN_RULE` |
+
+Ma trận là coverage của hướng, không phải một quyết định mới: `matrix` chỉ được thu hẹp nó, và
+orchestrator có thể chia các mục ra tối đa ba nhánh song song của cùng một bậc. Mỗi mục cho đúng một
+ảnh màn hình và một bức chụp, và một mục không cho cái nào là `EVIDENCE_MISSING` chứ không phải một
+chỗ khuyết lặng lẽ. Mọi node mang lời khai đều được đo; không bao giờ có phán quyết cho một node chưa
+được đo.
+
+## Đầu ra
+
+| Kind | File | Kiểu | Bắt buộc |
+| --- | --- | --- | --- |
+| `frontend-surface-audit` | `response/response.md` | md | có |
+| `capture` | `response/data/captures/<matrixId>.json` | data | có |
+| `screenshot` | `response/artifacts/<matrixId>.png` | artifact | có |
+| `verdicts` | `response/data/verdicts.json` | data | có |
+
+## Dừng
+
+| Code | Xử lý |
+| --- | --- |
+| `INVALID_INPUT` | terminate |
+| `SOURCE_DRIFT` | terminate |
+| `RUNTIME_UNAVAILABLE` | terminate |
+| `EVIDENCE_MISSING` | terminate |
+| `UNKNOWN_RULE` | terminate |
+| `NO_PROGRESS` | terminate |
+
+## Kế tiếp
+
+| Khi | Operator |
+| --- | --- |
+| một lời khai hỏng trên node do ứng dụng sở hữu, nên phải publish lại một giá trị | `frontend.presentation.resolve` |
+| mọi lời khai đều đứng vững và các cổng của chính checkout phải chạy | `quality.verify` |
+| một lời khai hỏng trên phần render của chính component Grammar, nên một người ghi gap của họ rồi publish | `frontend.surface.audit` |

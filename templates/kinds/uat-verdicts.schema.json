@@ -1,0 +1,41 @@
+{
+  "$id": "kind:uat-verdicts",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["runId", "commit", "resultRef", "latestRef", "lanes", "cleanup"],
+  "properties": {
+    "runId": { "type": "string", "pattern": "^[A-Za-z0-9._-]+$" },
+    "commit": { "type": "string", "pattern": "^[0-9a-f]{40}$" },
+    "resultRef": { "type": "string", "pattern": "^\\.worktrees/uat/[a-z0-9][a-z0-9-]*/[a-z0-9][a-z0-9-]*/runs/[A-Za-z0-9._-]+/result\\.json$" },
+    "latestRef": { "type": "string", "pattern": "^\\.worktrees/uat/[a-z0-9][a-z0-9-]*/[a-z0-9][a-z0-9-]*/latest$" },
+    "lanes": {
+      "description": "Three independent lanes, judged apart on their own evidence. There is no fourth lane and no lane may be omitted.",
+      "type": "array",
+      "minItems": 3,
+      "maxItems": 3,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["lane", "verdict", "evidenceRefs", "statement"],
+        "properties": {
+          "lane": { "enum": ["behavior", "ux", "ui"] },
+          "verdict": { "enum": ["pass", "fail"] },
+          "evidenceRefs": { "type": "array", "minItems": 1, "maxItems": 64, "uniqueItems": true, "items": { "type": "string", "minLength": 1 } },
+          "statement": { "type": "string", "minLength": 1 }
+        }
+      }
+    },
+    "cleanup": {
+      "description": "Cleanup deletes the run namespace and nothing else; a run record is history and is never deleted.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["performed", "isUat", "namespace", "runRecordsDeleted"],
+      "properties": {
+        "performed": { "type": "boolean" },
+        "isUat": { "const": true },
+        "namespace": { "type": "string", "pattern": "^uat-[A-Za-z0-9._-]+$" },
+        "runRecordsDeleted": { "const": false }
+      }
+    }
+  }
+}

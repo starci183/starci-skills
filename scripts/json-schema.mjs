@@ -2,6 +2,8 @@
 // (types, enum, const, $ref local, allOf/oneOf/anyOf, if/then/else, string, number, array and object
 // keywords), lifted to scripts/ so validate-step, the kind schemas under templates/kinds, and the step
 // gates under templates/step share one implementation.
+import { readFileSync } from 'node:fs';
+
 function isObject(value) { return value !== null && typeof value === 'object' && !Array.isArray(value); }
 function jsonType(value) {
   if (value === null) return 'null';
@@ -78,4 +80,15 @@ export function validateAgainst(schema, value, at = '$') {
   inspect(schema, schema, value, at, errors);
   if (errors.length === 0) errors.push(...hygiene(value));
   return errors;
+}
+
+// The shape the old per-operator validation.mjs exported; scripts/workspace-portable.mjs (called by the
+// backend package.json) still builds its route validators this way.
+export function validatorFor(schemaUrl, semantic = () => []) {
+  const schema = JSON.parse(readFileSync(schemaUrl, 'utf8'));
+  return (value) => {
+    const errors = validateAgainst(schema, value);
+    if (errors.length === 0) errors.push(...semantic(value));
+    return { valid: errors.length === 0, errors };
+  };
 }

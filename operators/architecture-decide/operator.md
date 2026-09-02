@@ -129,5 +129,5 @@ implementation files, because choosing the files is the next domain's job.
 | When | Operator |
 | --- | --- |
 | the business promise must be modelled again against the decided boundaries | `business.decide` |
-| the decision is confirmed and a backend contract changes | `backend.implement` |
-| the decision is confirmed and a frontend surface changes | `fe.direction.decide` |
+| the decision is confirmed and a backend contract changes | `backend.source.apply` |
+| the decision is confirmed and a frontend surface changes | `frontend.direction.decide` |

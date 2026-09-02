@@ -5,53 +5,111 @@
     "CURRENT_STATE_UNOBSERVED": {
       "domain": "workspace",
       "disposition": "terminate",
-      "meaning": { "en": "The system today could not be read at the frozen head.", "vi": "Không đọc được hiện trạng hệ thống ở head đã đóng băng." },
-      "resume": { "en": "Fix the route or the checkout.", "vi": "Sửa route hoặc checkout." }
+      "meaning": {
+        "en": "The system today could not be read at the frozen head.",
+        "vi": "Không đọc được hiện trạng hệ thống ở head đã đóng băng."
+      },
+      "resume": {
+        "en": "Fix the route or the checkout.",
+        "vi": "Sửa route hoặc checkout."
+      }
     },
     "BUSINESS_AUTHORITY_REQUIRED": {
       "domain": "business",
       "disposition": "terminate",
-      "meaning": { "en": "The published business head the architecture must keep is missing or stale.", "vi": "Head nghiệp vụ đã publish mà kiến trúc phải giữ đang thiếu hoặc cũ." },
-      "resume": { "en": "Run business.decide first.", "vi": "Chạy business.decide trước." }
+      "meaning": {
+        "en": "The published business head the architecture must keep is missing or stale.",
+        "vi": "Head nghiệp vụ đã publish mà kiến trúc phải giữ đang thiếu hoặc cũ."
+      },
+      "resume": {
+        "en": "Run business.decide first.",
+        "vi": "Chạy business.decide trước."
+      }
     },
     "CONSTRAINT_CONTRADICTION": {
       "domain": "caller",
       "disposition": "terminate",
-      "meaning": { "en": "Two fixed-intent constraints cannot both hold.", "vi": "Hai ràng buộc fixed-intent không thể cùng đúng." },
-      "resume": { "en": "A person resolves the constraints.", "vi": "Người sửa ràng buộc." }
+      "meaning": {
+        "en": "Two fixed-intent constraints cannot both hold.",
+        "vi": "Hai ràng buộc fixed-intent không thể cùng đúng."
+      },
+      "resume": {
+        "en": "A person resolves the constraints.",
+        "vi": "Người sửa ràng buộc."
+      }
     },
     "NO_VIABLE_ALTERNATIVE": {
       "domain": "caller",
       "disposition": "terminate",
-      "meaning": { "en": "No alternative survives the frozen constraints, or the only alternative fails an attack.", "vi": "Không phương án nào qua được ràng buộc, hoặc phương án duy nhất chết dưới một đòn tấn công." },
-      "resume": { "en": "Relax a constraint or stop.", "vi": "Nới ràng buộc hoặc dừng." }
+      "meaning": {
+        "en": "No alternative survives the frozen constraints, or the only alternative fails an attack.",
+        "vi": "Không phương án nào qua được ràng buộc, hoặc phương án duy nhất chết dưới một đòn tấn công."
+      },
+      "resume": {
+        "en": "Relax a constraint or stop.",
+        "vi": "Nới ràng buộc hoặc dừng."
+      }
     },
     "CHOICE_REQUIRED": {
       "domain": "caller",
       "disposition": "fallback",
-      "meaning": { "en": "Several alternatives remain material after assessment.", "vi": "Nhiều phương án còn material sau khi chấm." },
-      "fallback": { "en": "Select the alternative with the highest score across tradeoffAxes; on a tie, the one that changes the fewest stack components; record the score table under ## Decision.", "vi": "Chọn phương án điểm cao nhất theo tradeoffAxes; hòa thì chọn phương án đổi ít component stack nhất; ghi bảng điểm dưới ## Decision." },
-      "unless": { "param": "selectionPolicy", "equals": "approval-required", "then": "terminate" },
-      "resume": { "en": "The person supplies approval.", "vi": "Người nhập approval." }
+      "meaning": {
+        "en": "Several alternatives remain material after assessment.",
+        "vi": "Nhiều phương án còn material sau khi chấm."
+      },
+      "fallback": {
+        "en": "Select the alternative with the highest score across tradeoffAxes; on a tie, the one that changes the fewest stack components; record the score table under ## Decision.",
+        "vi": "Chọn phương án điểm cao nhất theo tradeoffAxes; hòa thì chọn phương án đổi ít component stack nhất; ghi bảng điểm dưới ## Decision."
+      },
+      "unless": {
+        "param": "selectionPolicy",
+        "equals": "approval-required",
+        "then": "terminate"
+      },
+      "resume": {
+        "en": "The person supplies approval.",
+        "vi": "Người nhập approval."
+      }
     },
     "COMPATIBILITY_UNVERIFIED": {
       "domain": "self",
       "disposition": "fallback",
-      "meaning": { "en": "A retained stack component has no compatibility evidence on at least one axis.", "vi": "Một component stack giữ lại không có bằng chứng tương thích ở ít nhất một trục." },
-      "fallback": { "en": "Mark the component replaced-candidate in the stack delta and list the unverified axes under Handoff as unknown.", "vi": "Đánh dấu component là replaced-candidate trong stack delta và liệt kê các trục chưa kiểm vào Handoff dạng unknown." },
-      "resume": { "en": "Add the compatibility evidence.", "vi": "Bổ sung bằng chứng tương thích." }
+      "meaning": {
+        "en": "A retained stack component has no compatibility evidence on at least one axis.",
+        "vi": "Một component stack giữ lại không có bằng chứng tương thích ở ít nhất một trục."
+      },
+      "fallback": {
+        "en": "Mark the component replaced-candidate in the stack delta and list the unverified axes under Handoff as unknown.",
+        "vi": "Đánh dấu component là replaced-candidate trong stack delta và liệt kê các trục chưa kiểm vào Handoff dạng unknown."
+      },
+      "resume": {
+        "en": "Add the compatibility evidence.",
+        "vi": "Bổ sung bằng chứng tương thích."
+      }
     },
     "DATA_OWNERSHIP_UNASSIGNED": {
       "domain": "self",
       "disposition": "terminate",
-      "meaning": { "en": "A physical store has no owning boundary.", "vi": "Một store vật lý không có boundary sở hữu." },
-      "resume": { "en": "Assign the owner.", "vi": "Gán chủ sở hữu." }
+      "meaning": {
+        "en": "A physical store has no owning boundary.",
+        "vi": "Một store vật lý không có boundary sở hữu."
+      },
+      "resume": {
+        "en": "Assign the owner.",
+        "vi": "Gán chủ sở hữu."
+      }
     },
     "CRITIQUE_UNRESOLVED": {
       "domain": "self",
       "disposition": "terminate",
-      "meaning": { "en": "An attack on the selected alternative has no resolution.", "vi": "Một đòn tấn công vào phương án đã chọn không có lời giải." },
-      "resume": { "en": "Resolve the attack or select differently.", "vi": "Giải quyết đòn tấn công hoặc chọn khác." }
+      "meaning": {
+        "en": "An attack on the selected alternative has no resolution.",
+        "vi": "Một đòn tấn công vào phương án đã chọn không có lời giải."
+      },
+      "resume": {
+        "en": "Resolve the attack or select differently.",
+        "vi": "Giải quyết đòn tấn công hoặc chọn khác."
+      }
     }
   }
 }

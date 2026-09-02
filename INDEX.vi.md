@@ -12,8 +12,7 @@ operator dựa trên kết quả có kiểu.
 3. `resources/`: profile thực thi nào chạy từng vai trò của operator, nó được dùng quyền nào lúc
    chạy, và câu trả lời thường trực về tìm mạng, ràng Grammar, sinh hình. Cũng được kiểm.
 4. Đúng một operator mà nhiệm vụ cần: `operator.md` (Việc, Context, Đầu vào, Yêu cầu, Các bước, Đầu ra,
-   Dừng, Kế tiếp) cùng `operator.json` cho resources; gói chưa chuyển vẫn đọc `context.md`, `input.md`,
-   `execute.md`. Mã dừng tra ở `errors/INDEX.md`.
+   Dừng, Kế tiếp) cùng `operator.json` (id, domain, resources). Mã dừng tra ở `errors/INDEX.md`.
 5. Chỉ những topic knowledge mà operator đó bind.
 
 Không nạp trước cả cây. Một operator bind tập topic nhỏ nhất mà quyết định của nó cần, mỗi topic kèm
@@ -28,12 +27,11 @@ alias/                   alias.json (sổ cho máy: vị trí, scheme, bind, ai 
 resources/               agents/profiles/{openai,claude}.json (6 profile) + orchestrator.json (mỗi operator một agent, tối đa 3); có kiểm
 operators/INDEX.md       ma trận sinh tự động: mỗi operator đọc gì (tĩnh, động), ghi gì, các bước và mã dừng
 errors/                  errors.json (mã dừng dùng chung cho nhiều operator, có scope) + INDEX.md (sinh, gộp với từng operators/<id>/errors.json): mỗi mã một cách xử lý, terminate hoặc fallback
-operators/<id>/          operator.md (+vi) một file viết tay cho mỗi operator, operator.json (resources), errors.json (mã riêng), validate.mjs, self-test.mjs;
-                         gói chưa chuyển vẫn giữ dạng mười lăm file (context/input/execute/output + schema + validator)
+operators/<id>/          operator.md (+vi) một file viết tay cho mỗi operator, operator.json (id, domain, resources), errors.json (mã riêng), validate.mjs, self-test.mjs
 knowledge/
-  ui/composition/        cây phải chứa gì, trước khi nó tồn tại      -> fe.direction.decide
-  ui/presentation/       ranh giới do app sở hữu lấy giá trị CSS nào -> fe.presentation.resolve
-  ui/proof/              thứ chỉ đúng sai sau khi đã render          -> fe.surface.audit
+  ui/composition/        cây phải chứa gì, trước khi nó tồn tại      -> frontend.direction.decide
+  ui/presentation/       ranh giới do app sở hữu lấy giá trị CSS nào -> frontend.presentation.resolve
+  ui/proof/              thứ chỉ đúng sai sau khi đã render          -> frontend.surface.audit
   patterns/fe, be        quy ước code trích từ hai source thật
   grammars/<họ>/         cách một họ hình ảnh hiện thực Common
 templates/               mỗi loại tài liệu một template; mỗi template mang khối json template-contract dùng để kiểm cả cây;

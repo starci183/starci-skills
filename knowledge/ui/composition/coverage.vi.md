@@ -13,7 +13,7 @@ cũng kiểm được.
 
 ## COVERAGE-1 — Receipt phải liệt kê những gì
 
-Chi phối những trường mà một `fe-direction-decision.json` đã quyết phải mang trước khi được phát ra.
+Chi phối những trường mà một `frontend-direction-decision.json` đã quyết phải mang trước khi được phát ra.
 
 | Case | Dùng khi | Khẳng định |
 | --- | --- | --- |

@@ -1,380 +1,177 @@
+// Proves validate.mjs on a synthetic session branch: one fast-forward publication, one merge-commit
+// publication, one that carries the continuation tag it was asked for, one blocked on a rejected
+// push, and one mutation per law, each of which must fail with a line that names the defect.
 import assert from 'node:assert/strict';
-import { validateInput } from './validate-input.mjs';
-import { validateOutput } from './validate-output.mjs';
+import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import path from 'node:path';
+import { validateGitPublishStep } from './validate.mjs';
 
-const hash = `sha256:${'a'.repeat(64)}`;
-const otherHash = `sha256:${'c'.repeat(64)}`;
-const localHead = 'b'.repeat(40);
-const remoteHead = 'e'.repeat(40);
-const observedAt = '2026-09-02T00:00:00.000Z';
+const HEAD = '1'.repeat(40);
+const REMOTE = '2'.repeat(40);
+const OTHER = '3'.repeat(40);
+const BOUNDARY = 'api.core';
+const APPROVAL = '@worktrees/businesses/features/api-core/model.json#approval';
+const SESSION = 'session/s-test';
+const TAG = { name: 'v1.4.0', message: 'continuation' };
 
-const validInput = {
-  schemaVersion: 8,
-  operatorId: 'git.publish',
-  context: {
-    routeReceipt: {
-      ref: '.v8/artifacts/invocation-bind-1/route-receipt.json',
-      fingerprint: hash,
-      status: 'bound',
-      project: 'starci-academy',
-      role: 'be',
-      checkoutDiskPath: 'D:/Repositories/starci-academy-backend',
-      sourceHead: localHead,
-    },
-    approval: {
-      ref: 'approval://mission-dashboard/api.core',
-      fingerprint: hash,
-      scopeUnit: 'api.core',
-      approvedAt: observedAt,
-    },
-    gitPolicy: {
-      worktreeBranches: 'forbidden',
-      mutationBranch: 'mtp',
-      forcePush: false,
-      historyRewrite: false,
-    },
-    hookInventory: [
-      { hook: 'pre-commit', ref: '.husky/pre-commit', fingerprint: hash, enforced: true },
-      { hook: 'pre-push', ref: '.husky/pre-push', fingerprint: otherHash, enforced: true },
-    ],
-    remote: {
-      name: 'origin',
-      ref: 'refs/heads/mtp',
-      remoteHead,
-      observedAt,
-    },
-    completionProofRefs: ['quality://mission-dashboard/lint', 'quality://mission-dashboard/typecheck'],
-  },
-  input: {
-    invocationId: 'invocation-publish-1',
-    missionId: 'mission-dashboard',
-    project: 'starci-academy',
-    boundary: {
-      unit: 'api.core',
-      targetRefs: ['src/features/api/core'],
-      writeRoots: ['src/features/api/core'],
-      exclusionRefs: ['src/features/socketio'],
-    },
-    sourceHeads: [
-      {
-        checkoutRef: '.v8/artifacts/invocation-bind-1/route-receipt.json',
-        branch: 'mtp',
-        head: localHead,
-        upstreamHead: remoteHead,
-        aheadCount: 4,
-        behindCount: 0,
-      },
-    ],
-    workingTree: {
-      dirtyPaths: [],
-      untrackedPaths: [],
-    },
-    publication: {
-      branchRef: 'refs/heads/mtp',
-      mode: 'fast-forward-only',
-      annotatedTag: {
-        name: 'continuation-mission-dashboard-1',
-        message: 'Continuation checkpoint for the api.core boundary.',
-        annotated: true,
-      },
-    },
-    destructiveOperations: {
-      forcePush: false,
-      historyRewrite: false,
-      resetHard: false,
-      clean: false,
-      stash: false,
-      branchDelete: false,
-      hookBypass: false,
-    },
-    artifactRootRef: '.v8/artifacts/invocation-publish-1',
-    resume: null,
-  },
-};
+function responseMd({
+  boundary = BOUNDARY, approval = APPROVAL, mode = 'fast-forward-only', forced = 'no', merge = 'fast-forward',
+  verified = HEAD, heads = [['`@workspaces/be`', '`mtp`', HEAD, REMOTE, '4']], hooks = [['`pre-push`', '`.husky/pre-push`', 'passed']],
+  tag = null, cleanup = 'worktree and session branch removed',
+  findings = [['HOOK_ENFORCED', '`pre-push`', 'the hook ran and was not bypassed'], ['REMOTE_FAST_FORWARDED', '`@workspaces/be`', 'the ref advanced from the remote head it carried']],
+} = {}) {
+  return `# git-publication — ${boundary}
 
-const publicationRecordRef = `${validInput.input.artifactRootRef}/publication.json`;
-const evidenceRefs = [
-  '.v8/artifacts/invocation-bind-1/route-receipt.json',
-  'approval://mission-dashboard/api.core',
-  '.husky/pre-push',
-];
+The boundary was published from the commit quality verified onto the routed ref, under enforced
+hooks, without force.
 
-const binding = {
-  projectId: 'starci-academy',
-  routeReceiptRef: '.v8/artifacts/invocation-bind-1/route-receipt.json',
-  approvalRef: 'approval://mission-dashboard/api.core',
-  boundaryUnit: 'api.core',
-  worktreeBranches: 'forbidden',
-  mutationBranch: 'mtp',
-  frozenSourceHead: localHead,
-  artifactRootRef: validInput.input.artifactRootRef,
-  inputFingerprint: hash,
-  progressFingerprint: otherHash,
-};
+## Binding
 
-const validPublishedOutput = {
-  schemaVersion: 8,
-  operatorId: 'git.publish',
-  output: {
-    outcome: 'published',
-    receipt: {
-      receiptType: 'git-publication',
-      receiptId: 'receipt:api-core-publication',
-      invocationId: validInput.input.invocationId,
-      missionId: validInput.input.missionId,
-      status: 'published',
-      binding,
-      publication: {
-        publicationRecordRef,
-        remoteName: 'origin',
-        branchRef: 'refs/heads/mtp',
-        mode: 'fast-forward-only',
-        forced: false,
-        publishedHeads: [
-          {
-            checkoutRef: '.v8/artifacts/invocation-bind-1/route-receipt.json',
-            branch: 'mtp',
-            head: localHead,
-            previousRemoteHead: remoteHead,
-            commitCount: 4,
-          },
-        ],
-        annotatedTag: {
-          name: 'continuation-mission-dashboard-1',
-          ref: 'refs/tags/continuation-mission-dashboard-1',
-          head: localHead,
-          annotated: true,
-        },
-        hookResults: [
-          { hook: 'pre-commit', ref: '.husky/pre-commit', outcome: 'passed' },
-          { hook: 'pre-push', ref: '.husky/pre-push', outcome: 'passed' },
-        ],
-      },
-      findings: [
-        {
-          code: 'HOOK_ENFORCED',
-          subject: 'pre-commit',
-          statement: 'The pre-commit hook ran and was not bypassed.',
-        },
-        {
-          code: 'HOOK_ENFORCED',
-          subject: 'pre-push',
-          statement: 'The pre-push hook ran and was not bypassed.',
-        },
-        {
-          code: 'BOUNDARY_CLEAN',
-          subject: 'src/features/api/core',
-          statement: 'Nothing dirty lay outside the declared boundary.',
-        },
-        {
-          code: 'REMOTE_FAST_FORWARDED',
-          subject: '.v8/artifacts/invocation-bind-1/route-receipt.json',
-          statement: 'The remote ref advanced by four commits from the head it carried.',
-        },
-        {
-          code: 'CONTINUATION_TAG_PUBLISHED',
-          subject: 'continuation-mission-dashboard-1',
-          statement: 'One annotated tag was pushed on the published head.',
-        },
-      ],
-      evidenceRefs,
-      failure: null,
-      resume: null,
-      createdAt: observedAt,
-    },
-    evidenceRefs,
-    artifactRefs: [publicationRecordRef],
-    handoff: null,
-  },
-};
+| Field | Value |
+| --- | --- |
+| Operator | \`git.publish\` |
+| Step | \`step-1/parallel-1\` |
+| Project | \`starci-academy\` |
+| Boundary | ${boundary} |
+| Approval | ${approval} |
+| Route receipt | \`step-1/parallel-1/response/response.md\` |
+| Worktree branches | forbidden |
+| Mutation branch | \`mtp\` |
+| Frozen head | \`${HEAD}\` |
 
-const validBlockedOutput = {
-  schemaVersion: 8,
-  operatorId: 'git.publish',
-  output: {
-    outcome: 'blocked',
-    receipt: {
-      receiptType: 'git-publication',
-      receiptId: 'receipt:api-core-publication-blocked',
-      invocationId: validInput.input.invocationId,
-      missionId: validInput.input.missionId,
-      status: 'blocked',
-      binding,
-      publication: null,
-      findings: [
-        {
-          code: 'BOUNDARY_CLEAN',
-          subject: 'src/features/api/core',
-          statement: 'Nothing dirty lay outside the declared boundary.',
-        },
-      ],
-      evidenceRefs,
-      failure: {
-        code: 'NON_FAST_FORWARD',
-        message: 'The remote carries commits the local ref does not; reconciling that history is the branch owner\u2019s decision.',
-        subjects: ['f'.repeat(40)],
-        missingRefs: ['refs/heads/mtp'],
-        retryable: true,
-        owningDomain: 'remote',
-      },
-      resume: {
-        resumeToken: 'resume-git-publish-1',
-        requiredDelta: ['A reconciled mtp branch and a re-observed remote head.'],
-      },
-      createdAt: observedAt,
-    },
-    evidenceRefs,
-    artifactRefs: [],
-    handoff: null,
-  },
-};
+## Publication
 
-assert.deepEqual(validateInput(validInput), { valid: true, errors: [] });
-assert.deepEqual(validateOutput(validPublishedOutput), { valid: true, errors: [] });
-assert.deepEqual(validateOutput(validBlockedOutput), { valid: true, errors: [] });
+| Field | Value |
+| --- | --- |
+| Remote | origin |
+| Ref | \`refs/heads/mtp\` |
+| Mode | ${mode} |
+| Forced | ${forced} |
+| Session branch | \`${SESSION}\` |
+| Target branch | \`mtp\` |
+| Merge | ${merge} |
+| Verified commit | \`${verified}\` |
+| Cleanup | ${cleanup} |
 
-// A publish never resolves its own checkout; an unbound route receipt is unrepresentable.
-const unboundRoute = structuredClone(validInput);
-unboundRoute.context.routeReceipt.status = 'blocked';
-assert.equal(validateInput(unboundRoute).valid, false);
+## Published heads
 
-// Completion is not approval, and an approval for another unit is somebody else's boundary.
-const foreignApproval = structuredClone(validInput);
-foreignApproval.context.approval.scopeUnit = 'socketio.gateway';
-const foreignApprovalResult = validateInput(foreignApproval);
-assert.equal(foreignApprovalResult.valid, false);
-assert.ok(foreignApprovalResult.errors.some((error) => error.includes('covers socketio.gateway')));
+| Checkout | Branch | Head | Previous remote head | Commits |
+| --- | --- | --- | --- | --- |
+${heads.map((h) => `| ${h[0]} | ${h[1]} | \`${h[2]}\` | \`${h[3]}\` | ${h[4]} |`).join('\n')}
 
-// The pre-push hook is the last gate before the remote; an inventory without it describes a
-// checkout where that gate does not exist.
-const noPrePushHook = structuredClone(validInput);
-noPrePushHook.context.hookInventory = noPrePushHook.context.hookInventory.filter((item) => item.hook !== 'pre-push');
-assert.equal(validateInput(noPrePushHook).valid, false);
+## Hooks
 
-// A bypass is not a request this contract can express, under any justification.
-const requestedBypass = structuredClone(validInput);
-requestedBypass.input.destructiveOperations.hookBypass = true;
-assert.equal(validateInput(requestedBypass).valid, false);
+| Hook | Reference | Outcome |
+| --- | --- | --- |
+${hooks.map((h) => `| ${h[0]} | ${h[1]} | ${h[2]} |`).join('\n')}
 
-// Neither is a force push, which is what a rejected publish invites.
-const requestedForce = structuredClone(validInput);
-requestedForce.input.destructiveOperations.forcePush = true;
-assert.equal(validateInput(requestedForce).valid, false);
+## Continuation tag
 
-// Nor reset --hard, clean, or stash, which each destroy or hide evidence no receipt recorded.
-for (const operation of ['resetHard', 'clean', 'stash', 'branchDelete']) {
-  const requested = structuredClone(validInput);
-  requested.input.destructiveOperations[operation] = true;
-  assert.equal(validateInput(requested).valid, false, `${operation} must be unrepresentable`);
+| Field | Value |
+| --- | --- |
+| Tag | ${tag ? `\`${tag.name}\`` : '—'} |
+| Ref | ${tag ? `\`refs/tags/${tag.name}\`` : '—'} |
+| Head | ${tag ? `\`${tag.head}\`` : '—'} |
+
+## Findings
+
+| Code | Subject | Statement |
+| --- | --- | --- |
+${findings.map(([code, subject, statement]) => `| \`${code}\` | ${subject} | ${statement} |`).join('\n')}
+`;
 }
 
-// The routed policy forbids worktree branches, so a feature branch cannot be a publish source.
-const featureBranch = structuredClone(validInput);
-featureBranch.input.sourceHeads[0].branch = 'feature/dashboard';
-featureBranch.input.publication.branchRef = 'refs/heads/feature/dashboard';
-featureBranch.context.remote.ref = 'refs/heads/feature/dashboard';
-assert.equal(validateInput(featureBranch).valid, false);
-
-// A publication that advances nothing is not a publication.
-const nothingAhead = structuredClone(validInput);
-nothingAhead.input.sourceHeads[0].aheadCount = 0;
-nothingAhead.input.sourceHeads[0].head = remoteHead;
-assert.equal(validateInput(nothingAhead).valid, false);
-
-// Something dirty outside the boundary would ride along on the push, unreviewed.
-const dirtyOutside = structuredClone(validInput);
-dirtyOutside.input.workingTree.dirtyPaths = ['src/features/socketio/gateway.ts'];
-assert.equal(validateInput(dirtyOutside).valid, false);
-
-// The observed remote must be the ref being published, or the fast-forward check watched the
-// wrong branch.
-const remoteRefMismatch = structuredClone(validInput);
-remoteRefMismatch.context.remote.ref = 'refs/heads/main';
-assert.equal(validateInput(remoteRefMismatch).valid, false);
-
-// A failed hook and a publication cannot coexist; shipping over a red gate is the defect.
-const publishedOverRedHook = structuredClone(validPublishedOutput);
-publishedOverRedHook.output.receipt.publication.hookResults[1].outcome = 'failed';
-const redHookResult = validateOutput(publishedOverRedHook);
-assert.equal(redHookResult.valid, false);
-assert.ok(redHookResult.errors.some((error) => error.includes('pre-push hook failed')));
-
-// A publication without the pre-push result either bypassed it or never ran it.
-const missingPrePushResult = structuredClone(validPublishedOutput);
-missingPrePushResult.output.receipt.publication.hookResults =
-  missingPrePushResult.output.receipt.publication.hookResults.filter((item) => item.hook !== 'pre-push');
-missingPrePushResult.output.receipt.findings = missingPrePushResult.output.receipt.findings.filter(
-  (item) => !(item.code === 'HOOK_ENFORCED' && item.subject === 'pre-push'),
-);
-assert.equal(validateOutput(missingPrePushResult).valid, false);
-
-// A hook that ran without its enforcement recorded reads exactly like one that was skipped.
-const unrecordedHook = structuredClone(validPublishedOutput);
-unrecordedHook.output.receipt.findings = unrecordedHook.output.receipt.findings.filter(
-  (item) => !(item.code === 'HOOK_ENFORCED' && item.subject === 'pre-commit'),
-);
-assert.equal(validateOutput(unrecordedHook).valid, false);
-
-// A force push is unrepresentable in the receipt as well as in the request.
-const forcedPublication = structuredClone(validPublishedOutput);
-forcedPublication.output.receipt.publication.forced = true;
-assert.equal(validateOutput(forcedPublication).valid, false);
-
-// A ref that ends where it started did not move, so reporting it hides a push that never happened.
-const unmovedRef = structuredClone(validPublishedOutput);
-unmovedRef.output.receipt.publication.publishedHeads[0].previousRemoteHead = localHead;
-assert.equal(validateOutput(unmovedRef).valid, false);
-
-// Creating a remote ref and fast-forwarding one are different acts, and the receipt must say which.
-const misreportedCreation = structuredClone(validPublishedOutput);
-misreportedCreation.output.receipt.publication.publishedHeads[0].previousRemoteHead = null;
-const misreportedResult = validateOutput(misreportedCreation);
-assert.equal(misreportedResult.valid, false);
-assert.ok(misreportedResult.errors.some((error) => error.includes('REMOTE_REF_CREATED')));
-
-// A continuation tag is portable only if it points at something this publication pushed.
-const danglingTag = structuredClone(validPublishedOutput);
-danglingTag.output.receipt.publication.annotatedTag.head = 'd'.repeat(40);
-assert.equal(validateOutput(danglingTag).valid, false);
-
-// Under a forbidden worktree policy no published head may come from another branch.
-const publishedFromFeature = structuredClone(validPublishedOutput);
-publishedFromFeature.output.receipt.publication.publishedHeads[0].branch = 'feature/dashboard';
-assert.equal(validateOutput(publishedFromFeature).valid, false);
-
-// A rejected push must name the remote head it saw, or the reconciliation has no address.
-const anonymousRejection = structuredClone(validBlockedOutput);
-anonymousRejection.output.receipt.failure.subjects = [];
-assert.equal(validateOutput(anonymousRejection).valid, false);
-
-// A remote divergence filed against the caller returns to someone who cannot reconcile it.
-const misfiledRejection = structuredClone(validBlockedOutput);
-misfiledRejection.output.receipt.failure.owningDomain = 'caller';
-assert.equal(validateOutput(misfiledRejection).valid, false);
-
-// A blocked hook belongs to the source, not to the caller who requested the publish.
-const misfiledHookBlock = structuredClone(validBlockedOutput);
-misfiledHookBlock.output.receipt.failure.code = 'HOOK_BLOCKED';
-misfiledHookBlock.output.receipt.failure.owningDomain = 'caller';
-assert.equal(validateOutput(misfiledHookBlock).valid, false);
-
-// A blocked receipt never carries a publication.
-const blockedWithPublication = structuredClone(validBlockedOutput);
-blockedWithPublication.output.receipt.publication = validPublishedOutput.output.receipt.publication;
-assert.equal(validateOutput(blockedWithPublication).valid, false);
-
-// Nor a finding that describes a write it never performed.
-const blockedClaimingPush = structuredClone(validBlockedOutput);
-blockedClaimingPush.output.receipt.findings.push({
-  code: 'REMOTE_FAST_FORWARDED',
-  subject: '.v8/artifacts/invocation-bind-1/route-receipt.json',
-  statement: 'The remote ref advanced.',
+const requestJson = ({ boundary = BOUNDARY, approval = APPROVAL, tag = null, inputs = {
+  'workspace-route-binding': 'step-1/parallel-1/response/response.md',
+  changes: 'step-1/parallel-1/response/changes.md',
+  'quality-verification': 'step-1/parallel-1/response/quality.md',
+}, extra = {} } = {}) => ({
+  schemaVersion: 9, operatorId: 'git.publish', step: 1, parallel: 1, sessionId: 's-test',
+  contexts: [{ alias: '@workspaces/local/routes/starci-academy/be', head: HEAD }],
+  requirements: { boundary, approval, tag, resume: null, ...extra },
+  inputs, resume: null,
 });
-assert.equal(validateOutput(blockedClaimingPush).valid, false);
 
-// The publication record must be registered, or nothing later can cite what was pushed.
-const unregisteredRecord = structuredClone(validPublishedOutput);
-unregisteredRecord.output.artifactRefs = [];
-assert.equal(validateOutput(unregisteredRecord).valid, false);
+const responseJson = ({ status = 'done', stop, commits = [HEAD], next = ['release.deploy'] } = {}) => ({
+  schemaVersion: 9, operatorId: 'git.publish', step: 1, parallel: 1, status, ...(stop ? { stop } : {}),
+  fallbacks: [], fields: status === 'blocked' ? {} : { 'git-publication': 'response/response.md' }, commits, next,
+});
 
-console.log('git.publish self-test passed');
+function writeBranch(files) {
+  const session = mkdtempSync(path.join(tmpdir(), 'publish-session-'));
+  const branch = path.join(session, 'step-1', 'parallel-1');
+  for (const d of ['request', 'response/data', 'response/artifacts']) mkdirSync(path.join(branch, d), { recursive: true });
+  writeFileSync(path.join(session, 'state.json'), JSON.stringify({ id: 's-test', chain: [['1/1']], steps: { '1/1': 'git.publish' }, current: '1/1', status: 'running' }));
+  for (const name of ['response.md', 'changes.md', 'quality.md']) writeFileSync(path.join(branch, 'response', name), '# placeholder\n');
+  for (const [name, content] of Object.entries(files)) {
+    if (content === null) continue;
+    writeFileSync(path.join(branch, name), typeof content === 'string' ? content : JSON.stringify(content, null, 2));
+  }
+  return { branch, session };
+}
+
+const baseline = (over = {}) => ({
+  'request/request.json': requestJson(),
+  'response/response.json': responseJson(),
+  'response/response.md': responseMd(),
+  ...over,
+});
+
+async function expectValid(files, label) {
+  const { branch, session } = writeBranch(files);
+  const { errors } = await validateGitPublishStep(branch);
+  rmSync(session, { recursive: true, force: true });
+  assert.deepEqual(errors, [], `${label} should be valid`);
+}
+async function expectError(files, needle, label) {
+  const { branch, session } = writeBranch(files);
+  const { errors } = await validateGitPublishStep(branch);
+  rmSync(session, { recursive: true, force: true });
+  assert.ok(errors.some((e) => e.includes(needle)), `${label}: expected an error containing "${needle}", got:\n${errors.join('\n') || '(none)'}`);
+}
+
+await expectValid(baseline(), 'a fast-forward publication of the verified commit');
+await expectValid(baseline({ 'response/response.md': responseMd({ merge: 'merge-commit' }) }), 'a merge commit onto a target that moved');
+await expectValid(baseline({
+  'request/request.json': requestJson({ tag: TAG }),
+  'response/response.md': responseMd({
+    tag: { ...TAG, head: HEAD },
+    findings: [['HOOK_ENFORCED', '`pre-push`', 'the hook ran'], ['CONTINUATION_TAG_PUBLISHED', '`v1.4.0`', 'the tag points at the head this run pushed']],
+  }),
+}), 'a continuation tag the person asked for');
+await expectValid({
+  'request/request.json': requestJson(),
+  'response/response.json': responseJson({ status: 'blocked', stop: 'NON_FAST_FORWARD', commits: [], next: [] }),
+  'response/response.md': null,
+}, 'blocked because the remote had moved');
+
+await expectError(baseline({ 'response/response.json': { ...responseJson(), stop: 'HOOK_BLOCKED' } }), 'only a blocked response carries a stop', 'done with a stop');
+await expectError(baseline({ 'response/response.json': responseJson({ status: 'blocked', stop: 'PUSH_REJECTED', commits: [], next: [] }) }), 'not a registered code', 'unknown stop code');
+await expectError(baseline({ 'request/request.json': requestJson({ extra: { force: true } }) }), 'requirements.force is not a field', 'force asked for in the request');
+await expectError(baseline({ 'request/request.json': requestJson({ extra: { writeRoots: ['src'] } }) }), 'requirements.writeRoots is not a field', 'a field the operator no longer declares');
+await expectError(baseline({ 'request/request.json': requestJson({ approval: null }) }), 'required field approval has no value', 'a publish with nobody approving it');
+await expectError(baseline({ 'response/response.md': responseMd({ boundary: 'other.boundary' }) }), 'but the request bound', 'a receipt for another boundary');
+await expectError(baseline({ 'response/response.md': responseMd({ approval: '`someone-elses-approval`' }) }), 'names an approval the request did not bind', 'an approval borrowed from another boundary');
+await expectError(baseline({ 'response/response.md': responseMd({ mode: 'force' }) }), 'the publication mode is always fast-forward only', 'a forced publication mode');
+await expectError(baseline({ 'response/response.md': responseMd({ forced: 'yes' }) }), 'a forced push rewrites', 'a push that was forced');
+await expectError(baseline({ 'response/response.md': responseMd({ merge: 'rebase' }) }), 'merged, never rebased', 'a session branch rebased onto the target');
+await expectError(baseline({ 'response/response.md': responseMd({ verified: OTHER }) }), 'but quality verified', 'a head past the commit the gates measured');
+await expectError(baseline({ 'response/response.md': responseMd({ verified: 'not-a-sha' }) }), 'Verified commit is not a commit sha', 'a receipt that never says what was verified');
+await expectError(baseline({ 'response/response.md': responseMd({ heads: [['`@workspaces/be`', '`mtp`', HEAD, HEAD, '4']] }) }), 'equals the remote head it claims to advance', 'a publication that advanced nothing');
+await expectError(baseline({ 'response/response.md': responseMd({ hooks: [['`pre-commit`', '`.husky/pre-commit`', 'passed']] }) }), 'lacks the pre-push result', 'a publish with no pre-push result');
+await expectError(baseline({ 'response/response.md': responseMd({ hooks: [['`pre-push`', '`.husky/pre-push`', 'failed']] }) }), 'is HOOK_BLOCKED, not a receipt', 'a receipt over a failed hook');
+await expectError(baseline({ 'response/response.md': responseMd({ findings: [['BOUNDARY_CLEAN', '`api.core`', 'nothing dirty lay outside the boundary']] }) }), 'records no HOOK_ENFORCED finding', 'hooks run but never recorded');
+await expectError(baseline({ 'request/request.json': requestJson({ tag: TAG }) }), 'asked for a continuation tag and the receipt records none', 'a tag asked for and never pushed');
+await expectError(baseline({ 'response/response.md': responseMd({ tag: { ...TAG, head: HEAD }, findings: [['HOOK_ENFORCED', '`pre-push`', 'ran'], ['CONTINUATION_TAG_PUBLISHED', '`v1.4.0`', 'pushed']] }) }), 'without the request asking for one', 'a tag nobody asked for');
+await expectError(baseline({
+  'request/request.json': requestJson({ tag: TAG }),
+  'response/response.md': responseMd({ tag: { ...TAG, head: OTHER }, findings: [['HOOK_ENFORCED', '`pre-push`', 'ran'], ['CONTINUATION_TAG_PUBLISHED', '`v1.4.0`', 'pushed']] }),
+}), 'which this publication did not push', 'a tag on somebody else\'s commit');
+await expectError(baseline({ 'response/response.md': responseMd({ cleanup: 'worktree kept for inspection' }) }), 'removes the worktree and the session branch', 'a published branch that never cleaned up');
+await expectError(baseline({ 'response/response.json': responseJson({ commits: [] }) }), 'commits does not register the published head', 'a receipt whose commit the response hides');
+await expectError(baseline({ 'response/response.json': responseJson({ commits: [HEAD, OTHER] }) }), 'which the receipt did not publish', 'a commit the receipt never published');
+await expectError(baseline({ 'request/request.json': requestJson({ inputs: { 'workspace-route-binding': 'step-1/parallel-1/response/response.md', changes: 'step-1/parallel-1/response/changes.md' } }) }), 'required input quality-verification is absent', 'a publish with nothing verified');
+await expectError(baseline({ 'response/response.md': responseMd().replace('## Hooks', '## Checks') }), 'missing section ^## Hooks$', 'receipt section renamed');
+
+process.stdout.write('git.publish self-test: 4 valid branches, 22 rejected mutations\n');

@@ -1,0 +1,95 @@
+{
+  "$id": "kind:delta",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "serviceRef", "serviceKind", "ownerRef", "approvalRef", "planSha256",
+    "inventoryFingerprint", "generation", "observedAt",
+    "inventoriedResources", "observedPortHolders", "portClaims",
+    "mutableResourceRefs", "observationOnlyResourceRefs",
+    "allowedEffects", "appliedEffects", "capabilities", "convergence", "mutations"
+  ],
+  "properties": {
+    "serviceRef": { "type": "string", "minLength": 1 },
+    "serviceKind": { "$ref": "#/$defs/serviceKind" },
+    "ownerRef": { "type": "string", "minLength": 1 },
+    "approvalRef": { "type": "string", "minLength": 1 },
+    "planSha256": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
+    "inventoryFingerprint": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
+    "generation": { "type": "integer", "minimum": 0 },
+    "observedAt": { "type": "string", "format": "date-time" },
+    "inventoriedResources": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["resourceRef", "kind", "revision", "ownerRef"],
+        "properties": {
+          "resourceRef": { "type": "string", "minLength": 1 },
+          "kind": { "$ref": "#/$defs/serviceKind" },
+          "revision": { "type": "string", "minLength": 1 },
+          "ownerRef": { "type": "string", "minLength": 1 }
+        }
+      }
+    },
+    "observedPortHolders": { "type": "array", "items": { "$ref": "#/$defs/portHolder" } },
+    "portClaims": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["port", "resourceRef"],
+        "properties": {
+          "port": { "type": "integer", "minimum": 1, "maximum": 65535 },
+          "resourceRef": { "type": "string", "minLength": 1 }
+        }
+      }
+    },
+    "mutableResourceRefs": { "type": "array", "minItems": 1, "items": { "type": "string", "minLength": 1 } },
+    "observationOnlyResourceRefs": { "type": "array", "items": { "type": "string", "minLength": 1 } },
+    "allowedEffects": { "type": "array", "uniqueItems": true, "items": { "$ref": "#/$defs/effect" } },
+    "appliedEffects": { "type": "array", "uniqueItems": true, "items": { "$ref": "#/$defs/effect" } },
+    "capabilities": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["capability", "custodyEvidenceRef"],
+        "properties": {
+          "capability": { "enum": ["metrics:remote-write", "sonar:project-admin", "tunnel:write", "dns:write"] },
+          "custodyEvidenceRef": { "type": "string", "minLength": 1 }
+        }
+      }
+    },
+    "convergence": { "enum": ["converged", "already-converged"] },
+    "mutations": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["effect", "resourceRef", "beforeRevision", "afterRevision"],
+        "properties": {
+          "effect": { "$ref": "#/$defs/effect" },
+          "resourceRef": { "type": "string", "minLength": 1 },
+          "beforeRevision": { "oneOf": [{ "type": "string", "minLength": 1 }, { "type": "null" }] },
+          "afterRevision": { "type": "string", "minLength": 1 }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "serviceKind": { "enum": ["observability", "sonar", "tunnel"] },
+    "effect": { "enum": ["update-config", "restart-service", "upsert-dashboard", "update-remote-write", "create-project", "assign-profile", "assign-gate", "enforce-setting", "create-tunnel", "update-tunnel-route", "upsert-proxied-dns"] },
+    "portHolder": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["port", "holderRef", "evidenceRef"],
+      "properties": {
+        "port": { "type": "integer", "minimum": 1, "maximum": 65535 },
+        "holderRef": { "type": "string", "minLength": 1 },
+        "evidenceRef": { "type": "string", "minLength": 1 }
+      }
+    }
+  }
+}

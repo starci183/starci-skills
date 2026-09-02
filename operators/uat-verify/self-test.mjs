@@ -1,450 +1,270 @@
+// Proves validate.mjs on a synthetic session branch: a run a person asked for, admitted by both
+// receipts at the pinned commit, with a capture and a screenshot per frozen case, three independent
+// lanes, an appended run record and a moved latest pointer; a behaviour failure that routes to the
+// backend; a UX failure that routes to a person; a run blocked before it published anything; and one
+// mutation per law, each of which must fail with a line that names the defect. Two of the mutations
+// are the custody proof: the placeholder for the shared UAT password may appear in no file this
+// operator writes.
 import assert from 'node:assert/strict';
-import { validateInput } from './validate-input.mjs';
-import { validateOutput } from './validate-output.mjs';
+import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import path from 'node:path';
+import { validateUatStep } from './validate.mjs';
 
-const hash = (seed) => `sha256:${seed.repeat(64).slice(0, 64)}`;
-const sourceHead = 'b'.repeat(40);
-const observedAt = '2026-09-02T00:00:00.000Z';
+const FEATURE = 'enrollment';
+const FLOW = 'paid-enrollment';
+const RUN = 'run-2026-01-10-1';
+const NS = `uat-${RUN}`;
+const COMMIT = '1'.repeat(40);
+const OTHER_COMMIT = '2'.repeat(40);
+const FP = (c) => `sha256:${String(c).repeat(64)}`;
+const DIR = `.worktrees/uat/${FEATURE}/${FLOW}`;
+const SNAPSHOT_REF = `${DIR}/snapshot.json`;
+const T = (m) => new Date(Date.UTC(2026, 0, 10, 0, m, 0)).toISOString();
+const CASES = ['pay-and-enrol', 'abandon-checkout'];
+const ASSERTIONS = { 'pay-and-enrol': ['entry', 'commitment', 'terminal'], 'abandon-checkout': ['entry', 'recovery'] };
+const AUDIT_IN = 'step-1/parallel-1/response/response.md';
+const QUALITY_IN = 'step-2/parallel-1/response/response.md';
+// The placeholder this operator's law forbids anywhere it writes.
+const LEAK = 'UAT-SHARED-PASSWORD';
 
-const account = {
-  identityKind: 'account',
-  accountRef: 'account://fresh/course-enroll/run-8821',
-  provisioningMode: 'control-panel-auto-create',
-  provisioningOwnerRef: 'control-panel://starci-academy/uat',
-  identityRecordRef: 'keycloak-user://academy/uat-learner-8821',
-  applicationRecordRef: 'database-user://academy/uat-learner-8821',
-  principalFingerprint: hash('c'),
-  fixtureNamespace: 'uat-course-enroll-8821',
-  credentialCustody: 'control-panel-ephemeral',
-  state: 'authenticated',
-};
+const frozenCase = (caseId, i, over = {}) => ({ caseId, order: i + 1, assertions: [...ASSERTIONS[caseId]], ...over });
 
-const lease = {
-  leaseRef: 'browser-lease://starci-academy/uat/8821',
-  missionRef: 'mission-course-enroll',
-  accountRef: account.accountRef,
-  accountRecordRef: '.worktrees/uat/course-enroll/paid-enrollment/snapshot.json#account',
-  provisioningEvidenceRefs: [
-    'keycloak-user://academy/uat-learner-8821',
-    'database-user://academy/uat-learner-8821',
-  ],
-  credentialCustody: 'control-panel-ephemeral',
-  browserContextRef: 'browser-context://uat/8821',
-  principalFingerprint: account.principalFingerprint,
-  runtimeGeneration: 4,
-  origin: 'http://localhost:3000',
-  fixtureNamespace: account.fixtureNamespace,
-  expiresAt: '2026-09-02T02:00:00.000Z',
-  state: 'authenticated',
-  executionMode: 'consumer-materialized',
-  executionOwnerRef: 'mission-course-enroll',
-  consumerTabRef: 'tab://uat/8821',
-  evidenceBrokerRef: null,
-  materializationStatus: 'materialized',
-};
-
-const validInput = {
-  schemaVersion: 8,
-  operatorId: 'uat.verify',
-  context: {
-    backendSource: { ref: 'source://starci-academy-be', sourceHead, fingerprint: hash('a') },
-    protocol: { ref: 'knowledge://uat/protocol', fingerprint: hash('d'), revision: '8.0.0' },
-    templates: { ref: 'templates://uat', fingerprint: hash('e') },
-    admission: {
-      blindVisualPassRef: 'receipt:blind-visual-course-enroll',
-      blindVisualPassedAt: '2026-09-01T22:00:00.000Z',
-      qualityPassRef: 'receipt:quality-course-enroll',
-      qualityPassedAt: '2026-09-01T23:00:00.000Z',
-    },
-    runtime: {
-      ownerRef: 'runtime-owner://starci-academy/4',
-      generation: 4,
-      status: 'ready',
-      frontendOrigin: 'http://localhost:3000',
-      apiOrigin: 'http://localhost:3001',
-      identityOrigin: 'http://localhost:8080',
-      authorityFingerprint: hash('f'),
-    },
-    evidenceRefs: [
-      { ref: 'receipt:blind-visual-course-enroll', fingerprint: hash('1'), sourceHead, observedAt },
+function snapshot(over = {}) {
+  return {
+    runId: RUN, requestedBy: 'the product owner', feature: FEATURE, flow: FLOW, commit: COMMIT, frozenAt: T(10),
+    flowRoot: 'PATCHED-BY-WRITE-BRANCH', snapshotRef: SNAPSHOT_REF, snapshotFingerprint: FP(3),
+    lease: { leaseRef: `uat-lease://s-test/${FLOW}`, exclusive: true, expiresAt: T(180) },
+    admission: [
+      { kind: 'frontend-surface-audit', ref: AUDIT_IN, commit: COMMIT },
+      { kind: 'quality-verification', ref: QUALITY_IN, commit: COMMIT },
     ],
-  },
-  input: {
-    invocationId: 'invocation-uat-8821',
-    missionId: 'mission-course-enroll',
-    project: { id: 'starci-academy', artifactRootRef: '.v8/artifacts/invocation-uat-8821' },
-    feature: 'course-enroll',
-    flow: 'paid-enrollment',
-    runId: 'run-8821',
-    sourceHead,
-    identity: account,
-    lease,
-    fixture: {
-      namespace: 'uat-course-enroll-8821',
-      preflightRef: 'fixture://preflight/8821',
-      prepareRefs: ['fixture://prepare/course-8821'],
-      cleanupSelector: { usesUatFlag: true, namespace: 'uat-course-enroll-8821' },
+    account: {
+      username: `uat-${FLOW}`, role: 'learner', credentialName: 'uat-shared', credentialRef: '.stacks/local/secrets/uat.enc',
+      custody: 'sealed-shared-master-identity', isUat: true, plaintextRecorded: false,
     },
-    cases: [
-      {
-        caseId: 'enrol-paid-course',
-        order: 1,
-        actorKind: 'authenticated',
-        entryRef: 'route://courses/checkout',
-        precondition: 'A fresh learner holds no enrollment for the target course.',
-        expectedOutcome: 'The enrollment exists and the course opens from the learner dashboard.',
-        requiredCheckpoints: ['entry', 'commitment', 'terminal'],
-      },
-      {
-        caseId: 'recover-declined-payment',
-        order: 2,
-        actorKind: 'authenticated',
-        entryRef: 'route://courses/checkout',
-        precondition: 'The same learner reaches checkout with a gateway that declines once.',
-        expectedOutcome: 'The decline is shown and a retry reaches the enrolled terminal state.',
-        requiredCheckpoints: ['entry', 'feedback', 'recovery', 'terminal'],
-      },
-    ],
-    resume: null,
-  },
-};
+    fixtureNamespace: NS,
+    seed: { recordsRef: `${DIR}/seed/records.json`, expectedRef: `${DIR}/seed/expected.json`, fingerprint: FP(4), namespace: NS, isUat: true },
+    cases: CASES.map((c, i) => frozenCase(c, i)),
+    ...over,
+  };
+}
 
-const snapshotRef = '.worktrees/uat/course-enroll/paid-enrollment/snapshot.json';
-const resultRef = '.worktrees/uat/course-enroll/paid-enrollment/result.json';
-const snapshotFingerprint = hash('2');
-
-const binding = {
-  projectId: 'starci-academy',
-  backendSourceRef: 'source://starci-academy-be',
-  sourceHead,
-  feature: 'course-enroll',
-  flow: 'paid-enrollment',
-  runId: 'run-8821',
-  artifactRootRef: '.v8/artifacts/invocation-uat-8821',
-  protocolFingerprint: hash('d'),
-  templateFingerprint: hash('e'),
-  runtimeGeneration: 4,
-  blindVisualPassRef: 'receipt:blind-visual-course-enroll',
-  qualityPassRef: 'receipt:quality-course-enroll',
-  inputFingerprint: hash('3'),
-  progressFingerprint: hash('4'),
-};
-
-const freeze = {
-  snapshotRef,
-  snapshotFingerprint,
-  frozenAt: '2026-09-02T00:10:00.000Z',
-  fixtureNamespace: 'uat-course-enroll-8821',
-  account,
-  frozenCases: [
-    { caseId: 'enrol-paid-course', order: 1, requiredCheckpoints: ['entry', 'commitment', 'terminal'] },
-    {
-      caseId: 'recover-declined-payment',
-      order: 2,
-      requiredCheckpoints: ['entry', 'feedback', 'recovery', 'terminal'],
-    },
-  ],
-};
-
-const capture = (caseId, checkpoint) => ({
-  captureRef: `capture://${caseId}/${checkpoint}`,
-  checkpoint,
-  framing: 'full-viewport',
-  assertionId: `${caseId}-${checkpoint}`,
-  runtimeEvidenceRef: `runtime-evidence://${caseId}/${checkpoint}`,
+const capture = (caseId, over = {}) => ({
+  caseId, runId: RUN, order: CASES.indexOf(caseId) + 1, executedAt: T(20 + CASES.indexOf(caseId)),
+  screenshotRef: `response/artifacts/${caseId}.png`, loginFieldMasked: true, outcome: 'pass',
+  assertions: ASSERTIONS[caseId].map((a) => ({ assertionId: a, lane: a === 'entry' ? 'ui' : 'behavior', observed: `the ${a} state was reached`, evidenceRef: `response/artifacts/${caseId}.png`, outcome: 'pass' })),
+  ...over,
 });
 
-const evidenceRefs = [
-  'receipt:blind-visual-course-enroll',
-  'receipt:quality-course-enroll',
-  'browser-lease://starci-academy/uat/8821',
-];
+const lane = (name, verdict = 'pass') => ({ lane: name, verdict, evidenceRefs: [`response/data/captures/${CASES[0]}.json`], statement: `the ${name} lane was judged on its own evidence` });
+const lanes = (over = {}) => ['behavior', 'ux', 'ui'].map((l) => lane(l, over[l] ?? 'pass'));
 
-const validPassedOutput = {
-  schemaVersion: 8,
-  operatorId: 'uat.verify',
-  output: {
-    outcome: 'passed',
-    receipt: {
-      receiptType: 'uat-flow-verification',
-      receiptId: 'receipt:uat-course-enroll-paid',
-      invocationId: 'invocation-uat-8821',
-      missionId: 'mission-course-enroll',
-      status: 'passed',
-      binding,
-      freeze,
-      publication: {
-        resultRef,
-        resultFingerprint: hash('5'),
-        snapshotFingerprint,
-        verdict: 'passed',
-        publishedAt: '2026-09-02T00:45:00.000Z',
-      },
-      lanes: [
-        {
-          lane: 'behavior',
-          verdict: 'pass',
-          statement: 'The enrollment row exists once and the payment settles once.',
-          evidenceRefs: ['runtime-evidence://enrol-paid-course/terminal'],
-        },
-        {
-          lane: 'ux',
-          verdict: 'pass',
-          statement: 'The decline is announced before the retry and the retry reaches the same terminal.',
-          evidenceRefs: ['capture://recover-declined-payment/feedback'],
-        },
-        {
-          lane: 'ui',
-          verdict: 'pass',
-          statement: 'Ownership, order, and reachability hold at every declared viewport.',
-          evidenceRefs: ['capture://enrol-paid-course/terminal'],
-        },
-      ],
-      caseResults: [
-        {
-          caseId: 'enrol-paid-course',
-          order: 1,
-          executedAt: '2026-09-02T00:20:00.000Z',
-          outcome: 'pass',
-          postExecutionMutation: false,
-          captures: [
-            capture('enrol-paid-course', 'entry'),
-            capture('enrol-paid-course', 'commitment'),
-            capture('enrol-paid-course', 'terminal'),
-          ],
-          statement: 'The learner enrolled and the course opened from the dashboard.',
-        },
-        {
-          caseId: 'recover-declined-payment',
-          order: 2,
-          executedAt: '2026-09-02T00:32:00.000Z',
-          outcome: 'pass',
-          postExecutionMutation: false,
-          captures: [
-            capture('recover-declined-payment', 'entry'),
-            capture('recover-declined-payment', 'feedback'),
-            capture('recover-declined-payment', 'recovery'),
-            capture('recover-declined-payment', 'terminal'),
-          ],
-          statement: 'The decline was shown and the retry reached the enrolled terminal state.',
-        },
-      ],
-      cleanup: { performed: true, usesUatFlag: true, namespace: 'uat-course-enroll-8821' },
-      findings: [],
-      evidenceRefs,
-      failure: null,
-      resume: null,
-      createdAt: '2026-09-02T00:45:00.000Z',
-    },
-    evidenceRefs,
-    artifactRefs: [snapshotRef, resultRef],
-    handoff: null,
-  },
-};
+function verdicts(over = {}) {
+  return {
+    runId: RUN, commit: COMMIT, resultRef: `${DIR}/runs/${RUN}/result.json`, latestRef: `${DIR}/latest`,
+    lanes: lanes(), cleanup: { performed: true, isUat: true, namespace: NS, runRecordsDeleted: false },
+    ...over,
+  };
+}
 
-const validFailedOutput = structuredClone(validPassedOutput);
-validFailedOutput.output.outcome = 'failed';
-validFailedOutput.output.receipt.status = 'failed';
-validFailedOutput.output.receipt.receiptId = 'receipt:uat-course-enroll-paid-failed';
-validFailedOutput.output.receipt.publication.verdict = 'failed';
-validFailedOutput.output.receipt.lanes[1].verdict = 'fail';
-validFailedOutput.output.receipt.lanes[1].statement =
-  'The decline is never announced, so the learner retries against an unexplained failure.';
-validFailedOutput.output.receipt.caseResults[1].outcome = 'fail';
-validFailedOutput.output.receipt.findings = [
-  {
-    code: 'UX_CONTRADICTION',
-    severity: 'hard',
-    state: 'open',
-    caseId: 'recover-declined-payment',
-    lane: 'ux',
-    statement: 'Behavior records the decline while the surface shows no failure feedback.',
-  },
-];
+function responseMd({ snap = snapshot(), verd = verdicts(), outcomes = { 'pay-and-enrol': 'pass', 'abandon-checkout': 'pass' }, note = 'The shared credential is named, never printed, and every login field is masked.' } = {}) {
+  return `# uat-flow-verification — ${snap.feature}/${snap.flow}
 
-const validBlockedOutput = {
-  schemaVersion: 8,
-  operatorId: 'uat.verify',
-  output: {
-    outcome: 'blocked',
-    receipt: {
-      receiptType: 'uat-flow-verification',
-      receiptId: 'receipt:uat-course-enroll-paid-blocked',
-      invocationId: 'invocation-uat-8821',
-      missionId: 'mission-course-enroll',
-      status: 'blocked',
-      binding,
-      freeze,
-      publication: null,
-      lanes: [
-        {
-          lane: 'behavior',
-          verdict: 'pass',
-          statement: 'The enrollment row exists once.',
-          evidenceRefs: ['runtime-evidence://enrol-paid-course/terminal'],
-        },
-        {
-          lane: 'ux',
-          verdict: 'unavailable',
-          statement: 'The gateway sandbox stopped answering before the decline case ran.',
-          evidenceRefs: [],
-        },
-      ],
-      caseResults: [
-        {
-          caseId: 'enrol-paid-course',
-          order: 1,
-          executedAt: '2026-09-02T00:20:00.000Z',
-          outcome: 'pass',
-          postExecutionMutation: false,
-          captures: [
-            capture('enrol-paid-course', 'entry'),
-            capture('enrol-paid-course', 'commitment'),
-            capture('enrol-paid-course', 'terminal'),
-          ],
-          statement: 'The learner enrolled and the course opened from the dashboard.',
-        },
-      ],
-      cleanup: { performed: false, usesUatFlag: false, namespace: null },
-      findings: [],
-      evidenceRefs,
-      failure: {
-        code: 'EVIDENCE_UNAVAILABLE',
-        message: 'The payment sandbox is unreachable, so the decline case produced no runtime evidence.',
-        caseIds: ['recover-declined-payment'],
-        missingRefs: ['runtime-evidence://recover-declined-payment/feedback'],
-        retryable: true,
-        owningDomain: 'runtime',
-      },
-      resume: {
-        resumeToken: 'resume-uat-8821-1',
-        requiredDelta: ['Restore the payment sandbox, then rerun the frozen decline case.'],
-      },
-      createdAt: '2026-09-02T00:40:00.000Z',
-    },
-    evidenceRefs,
-    artifactRefs: [snapshotRef],
-    handoff: null,
-  },
-};
+The product owner asked for this run; it was admitted at one commit, executed case by case in the
+frozen order, and judged on three independent lanes. ${note}
 
-assert.deepEqual(validateInput(validInput), { valid: true, errors: [] });
-assert.deepEqual(validateOutput(validPassedOutput), { valid: true, errors: [] });
-assert.deepEqual(validateOutput(validFailedOutput), { valid: true, errors: [] });
-assert.deepEqual(validateOutput(validBlockedOutput), { valid: true, errors: [] });
+## Admission
 
-// The account record is a closed set of non-secret fields, so a password has nowhere to live.
-const secretInRecord = structuredClone(validInput);
-secretInRecord.input.identity.password = 'Uat-Temp-1!';
-assert.equal(validateInput(secretInRecord).valid, false);
+| Kind | Ref | Commit |
+| --- | --- | --- |
+${snap.admission.map((a) => `| \`${a.kind}\` | \`${a.ref}\` | \`${a.commit}\` |`).join('\n')}
 
-// An authenticated flow with no Control-Panel lease is the shape that would be repaired by asking the
-// user to sign in. Provisioning unavailability is BLOCKED instead.
-const noLease = structuredClone(validInput);
-noLease.input.lease = null;
-const noLeaseResult = validateInput(noLease);
-assert.equal(noLeaseResult.valid, false);
-assert.ok(noLeaseResult.errors.some((error) => error.includes('never a sign-in request')));
+## Snapshot
 
-// A lease bound to a different principal is another run's identity.
-const foreignPrincipal = structuredClone(validInput);
-foreignPrincipal.input.lease.principalFingerprint = hash('9');
-assert.equal(validateInput(foreignPrincipal).valid, false);
+| Field | Value |
+| --- | --- |
+| Run | \`${snap.runId}\` |
+| Requested by | ${snap.requestedBy} |
+| Feature | \`${snap.feature}\` |
+| Flow | \`${snap.flow}\` |
+| Commit | \`${snap.commit}\` |
+| Snapshot | \`${snap.snapshotRef}\` |
+| Namespace | \`${snap.fixtureNamespace}\` |
+| Credential | \`${snap.account.credentialRef}\`, resolved by name at login only |
+| Run record | \`${verd.resultRef}\` |
+| Latest | \`${snap.runId}\` |
 
-// A lease whose account fragment names another flow would freeze this run into a foreign snapshot.
-const foreignFragment = structuredClone(validInput);
-foreignFragment.input.lease.accountRecordRef =
-  '.worktrees/uat/course-enroll/free-enrollment/snapshot.json#account';
-assert.equal(validateInput(foreignFragment).valid, false);
+## Cases
 
-// Anonymous entry records no account and therefore holds no authenticated lease.
-const anonymousWithLease = structuredClone(validInput);
-anonymousWithLease.input.identity = {
-  identityKind: 'anonymous',
-  anonymousRef: 'anonymous://explicit/course-browse',
-  fixtureNamespace: 'uat-course-enroll-8821',
-};
-assert.equal(validateInput(anonymousWithLease).valid, false);
+| Case | Order | Assertions | Capture | Screenshot | Outcome |
+| --- | --- | --- | --- | --- | --- |
+${snap.cases.map((c) => `| \`${c.caseId}\` | ${c.order} | ${c.assertions.join(', ')} | \`response/data/captures/${c.caseId}.json\` | \`response/artifacts/${c.caseId}.png\` | ${outcomes[c.caseId] ?? 'pass'} |`).join('\n')}
 
-// Sequential execution is declared, so the frozen order is a complete sequence, not a set of hints.
-const gappedOrder = structuredClone(validInput);
-gappedOrder.input.cases[1].order = 3;
-assert.equal(validateInput(gappedOrder).valid, false);
+## Lanes
 
-// A resume that adds nothing is NO_PROGRESS.
-const emptyResume = structuredClone(validInput);
-emptyResume.input.resume = {
-  blockedReceiptRef: 'receipt:uat-course-enroll-paid-blocked',
-  resumeToken: 'resume-uat-8821-1',
-  addedContextRefs: [],
-};
-assert.equal(validateInput(emptyResume).valid, false);
+| Lane | Verdict | Evidence |
+| --- | --- | --- |
+${verd.lanes.map((l) => `| \`${l.lane}\` | ${l.verdict} | \`${l.evidenceRefs[0]}\` |`).join('\n')}
 
-// Inputs freeze before execution: a case executed at or before the freeze proves nothing.
-const executedBeforeFreeze = structuredClone(validPassedOutput);
-executedBeforeFreeze.output.receipt.caseResults[0].executedAt = '2026-09-02T00:05:00.000Z';
-const beforeFreezeResult = validateOutput(executedBeforeFreeze);
-assert.equal(beforeFreezeResult.valid, false);
-assert.ok(beforeFreezeResult.errors.some((error) => error.includes('before the snapshot freeze')));
+## Fallbacks taken
 
-// A case the snapshot never froze cannot contribute a result.
-const unfrozenCase = structuredClone(validPassedOutput);
-unfrozenCase.output.receipt.caseResults[1].caseId = 'enrol-with-coupon';
-assert.equal(validateOutput(unfrozenCase).valid, false);
+| Code | Action |
+| --- | --- |
+`;
+}
 
-// A contradicted lane is FAIL; it can never be narrated into a pass.
-const contradictionPassed = structuredClone(validPassedOutput);
-contradictionPassed.output.receipt.lanes[2].verdict = 'fail';
-const contradictionResult = validateOutput(contradictionPassed);
-assert.equal(contradictionResult.valid, false);
-assert.ok(contradictionResult.errors.some((error) => error.includes('is FAIL, not passed')));
+const requestJson = ({ extra = {}, inputs, cases = [...CASES] } = {}) => ({
+  schemaVersion: 9, operatorId: 'uat.verify', step: 3, parallel: 1, sessionId: 's-test',
+  contexts: [{ alias: '@workspaces/be', head: COMMIT }, { alias: '@worktrees/uat/enrollment/paid-enrollment', head: null }],
+  requirements: { requestedBy: 'the product owner', feature: FEATURE, flow: FLOW, cases, runId: RUN, lease: `uat-lease://s-test/${FLOW}`, resume: null, ...extra },
+  inputs: inputs ?? { 'frontend-surface-audit': AUDIT_IN, 'quality-verification': QUALITY_IN },
+  resume: null,
+});
 
-// Unavailable evidence is BLOCKED; charging it as FAIL would blame a product nobody observed.
-const unavailableFailed = structuredClone(validFailedOutput);
-unavailableFailed.output.receipt.lanes[2].verdict = 'unavailable';
-const unavailableResult = validateOutput(unavailableFailed);
-assert.equal(unavailableResult.valid, false);
-assert.ok(unavailableResult.errors.some((error) => error.includes('is BLOCKED, not failed')));
+function responseJson({ status = 'done', stop, next = ['git.publish'], captures = CASES.map((c) => `response/data/captures/${c}.json`), shots = CASES.map((c) => `response/artifacts/${c}.png`), drop } = {}) {
+  const fields = {
+    'uat-flow-verification': 'response/response.md',
+    'uat-snapshot': 'response/data/snapshot.json',
+    'uat-capture': captures,
+    'uat-verdicts': 'response/data/verdicts.json',
+    screenshot: shots,
+    sheet: 'response/artifacts/sheet.png',
+  };
+  if (drop) delete fields[drop];
+  return { schemaVersion: 9, operatorId: 'uat.verify', step: 3, parallel: 1, status, ...(stop ? { stop } : {}), fallbacks: [], fields, commits: [], next };
+}
 
-// A crop is supplementary; a required checkpoint needs the full viewport.
-const cropOnly = structuredClone(validPassedOutput);
-cropOnly.output.receipt.caseResults[1].captures[1].framing = 'crop';
-const cropResult = validateOutput(cropOnly);
-assert.equal(cropResult.valid, false);
-assert.ok(cropResult.errors.some((error) => error.includes('crops are supplementary only')));
+// history: 'match' appends the record this run publishes; 'none' leaves no flow directory on disk;
+// 'missing-run' leaves the directory without the record; 'rewritten' leaves another result under the
+// same runId; 'stale-latest' points latest at another run.
+function writeBranch(files, history = 'match') {
+  const session = mkdtempSync(path.join(tmpdir(), 'uat-session-'));
+  const branch = path.join(session, 'step-3', 'parallel-1');
+  for (const d of ['request', 'response/data/captures', 'response/artifacts']) mkdirSync(path.join(branch, d), { recursive: true });
+  for (const input of [AUDIT_IN, QUALITY_IN]) {
+    mkdirSync(path.dirname(path.join(session, input)), { recursive: true });
+    writeFileSync(path.join(session, input), '# admitting receipt\n');
+  }
+  writeFileSync(path.join(session, 'state.json'), JSON.stringify({ id: 's-test', chain: [['3/1']], steps: { '3/1': 'uat.verify' }, current: '3/1', status: 'running' }));
+  for (const c of CASES) writeFileSync(path.join(branch, 'response', 'artifacts', `${c}.png`), 'png');
+  writeFileSync(path.join(branch, 'response', 'artifacts', 'sheet.png'), 'png');
 
-// Post-journey mutation can manufacture the expected outcome, so it cannot pass.
-const manufactured = structuredClone(validPassedOutput);
-manufactured.output.receipt.caseResults[0].postExecutionMutation = true;
-assert.equal(validateOutput(manufactured).valid, false);
+  const flowRoot = path.join(session, 'flow-root');
+  const prepared = { ...files };
+  const snap = prepared['response/data/snapshot.json'];
+  if (snap && typeof snap === 'object') prepared['response/data/snapshot.json'] = { ...snap, flowRoot };
+  for (const [name, content] of Object.entries(prepared)) {
+    if (content === null) continue;
+    writeFileSync(path.join(branch, name), typeof content === 'string' ? content : JSON.stringify(content, null, 2));
+  }
 
-// A result must bind the parsed sibling snapshot, not a fingerprint of its own choosing.
-const unboundResult = structuredClone(validPassedOutput);
-unboundResult.output.receipt.publication.snapshotFingerprint = hash('7');
-assert.equal(validateOutput(unboundResult).valid, false);
+  if (history !== 'none') {
+    mkdirSync(flowRoot, { recursive: true });
+    const verd = prepared['response/data/verdicts.json'];
+    if (history !== 'missing-run' && verd && typeof verd === 'object') {
+      const runDir = path.join(flowRoot, 'runs', verd.runId);
+      mkdirSync(runDir, { recursive: true });
+      const recorded = history === 'rewritten'
+        ? { runId: verd.runId, commit: OTHER_COMMIT, lanes: verd.lanes }
+        : { runId: verd.runId, commit: verd.commit, lanes: verd.lanes };
+      writeFileSync(path.join(runDir, 'result.json'), JSON.stringify(recorded, null, 2));
+    }
+    writeFileSync(path.join(flowRoot, 'latest'), history === 'stale-latest' ? 'run-2026-01-09-1' : RUN);
+  }
+  return { branch, session };
+}
 
-// Blocking publishes nothing; a half-published result reads as a decision.
-const blockedWithPublication = structuredClone(validBlockedOutput);
-blockedWithPublication.output.receipt.publication = validPassedOutput.output.receipt.publication;
-assert.equal(validateOutput(blockedWithPublication).valid, false);
+const baseline = () => ({
+  'request/request.json': requestJson(),
+  'response/response.json': responseJson(),
+  'response/response.md': responseMd(),
+  'response/data/snapshot.json': snapshot(),
+  'response/data/verdicts.json': verdicts(),
+  ...Object.fromEntries(CASES.map((c) => [`response/data/captures/${c}.json`, capture(c)])),
+});
 
-// Cleanup without the UAT flag reaches records this run does not own.
-const unscopedCleanup = structuredClone(validPassedOutput);
-unscopedCleanup.output.receipt.cleanup.usesUatFlag = false;
-assert.equal(validateOutput(unscopedCleanup).valid, false);
+function withVerdicts(over, { next, outcomes } = {}) {
+  const verd = verdicts({ lanes: lanes(over) });
+  return {
+    ...baseline(),
+    'response/data/verdicts.json': verd,
+    'response/response.md': responseMd({ verd, outcomes }),
+    'response/response.json': responseJson({ next }),
+  };
+}
 
-// A pass published without its admitting receipts is a UAT that started before it was allowed to.
-const unadmittedPass = structuredClone(validPassedOutput);
-unadmittedPass.output.receipt.evidenceRefs = evidenceRefs.filter(
-  (ref) => ref !== 'receipt:blind-visual-course-enroll',
-);
-assert.equal(validateOutput(unadmittedPass).valid, false);
+const blocked = () => ({
+  'request/request.json': requestJson(),
+  'response/response.json': { schemaVersion: 9, operatorId: 'uat.verify', step: 3, parallel: 1, status: 'blocked', stop: 'ADMISSION_MISSING', fallbacks: [], fields: {}, commits: [], next: [] },
+});
 
-// One authenticated lease runs one case at a time, so the clock must follow the frozen order.
-const outOfOrder = structuredClone(validPassedOutput);
-outOfOrder.output.receipt.caseResults[1].executedAt = '2026-09-02T00:15:00.000Z';
-const orderResult = validateOutput(outOfOrder);
-assert.equal(orderResult.valid, false);
-assert.ok(orderResult.errors.some((error) => error.includes('did not execute after')));
+async function expectValid(files, label, history) {
+  const { branch, session } = writeBranch(files, history);
+  const { errors } = await validateUatStep(branch);
+  rmSync(session, { recursive: true, force: true });
+  assert.deepEqual(errors, [], `${label} should be valid`);
+}
+async function expectError(files, needle, label, history) {
+  const { branch, session } = writeBranch(files, history);
+  const { errors } = await validateUatStep(branch);
+  rmSync(session, { recursive: true, force: true });
+  assert.ok(errors.some((e) => e.includes(needle)), `${label}: expected an error containing "${needle}", got:\n${errors.join('\n') || '(none)'}`);
+}
 
-console.log('uat.verify self-test passed');
+await expectValid(baseline(), 'a run a person asked for, admitted at the pinned commit, three lanes passing');
+await expectValid(withVerdicts({ behavior: 'fail' }, { next: ['backend.source.apply'], outcomes: { 'pay-and-enrol': 'fail', 'abandon-checkout': 'pass' } }), 'a behaviour failure routed to the backend');
+await expectValid(withVerdicts({ ux: 'fail' }, { next: ['user'], outcomes: { 'pay-and-enrol': 'fail', 'abandon-checkout': 'pass' } }), 'a UX failure routed to a person');
+await expectValid(blocked(), 'blocked on a missing admission, publishing nothing', 'none');
+
+// The gate and the person behind the run.
+await expectError({ ...baseline(), 'response/response.json': { ...responseJson(), stop: 'LEASE_INVALID' } }, 'only a blocked response carries a stop', 'a done branch carrying a stop');
+await expectValid({ ...blocked(), 'response/response.json': { schemaVersion: 9, operatorId: 'uat.verify', step: 3, parallel: 1, status: 'blocked', stop: 'RUNTIME_UNAVAILABLE', fallbacks: [], fields: {}, commits: [], next: [] } }, 'blocked on the shared RUNTIME_UNAVAILABLE code');
+await expectError({ ...baseline(), 'request/request.json': requestJson({ extra: { password: 'x' } }) }, 'requirements.password is not a field', 'a credential has nowhere to go in a request');
+await expectError({ ...baseline(), 'request/request.json': requestJson({ extra: { requestedBy: '' } }) }, 'required field requestedBy has no value', 'a run nobody asked for');
+await expectError({ ...baseline(), 'request/request.json': requestJson({ inputs: { 'frontend-surface-audit': AUDIT_IN } }) }, 'required input quality-verification is absent', 'a run admitted by one receipt only');
+
+// Admission at the pinned commit.
+await expectError({ ...baseline(), 'response/data/snapshot.json': snapshot({ admission: [{ kind: 'frontend-surface-audit', ref: AUDIT_IN, commit: COMMIT }, { kind: 'quality-verification', ref: QUALITY_IN, commit: OTHER_COMMIT }] }) }, 'ADMISSION_MISSING — quality-verification was taken at', 'an admission from another commit');
+await expectError({ ...baseline(), 'response/data/snapshot.json': snapshot({ admission: [{ kind: 'frontend-surface-audit', ref: AUDIT_IN, commit: COMMIT }, { kind: 'frontend-surface-audit', ref: AUDIT_IN, commit: COMMIT }] }) }, 'ADMISSION_MISSING — quality-verification is absent', 'a missing admission');
+await expectError({ ...baseline(), 'response/data/snapshot.json': snapshot({ admission: [{ kind: 'frontend-surface-audit', ref: 'step-9/parallel-1/response/response.md', commit: COMMIT }, { kind: 'quality-verification', ref: QUALITY_IN, commit: COMMIT }] }) }, 'but the request handed in', 'an admission the request never handed in');
+await expectError({ ...baseline(), 'response/data/snapshot.json': snapshot({ commit: OTHER_COMMIT }) }, 'but the request pinned @workspaces/be at', 'a snapshot frozen at another commit');
+await expectError({ ...baseline(), 'response/data/verdicts.json': verdicts({ commit: OTHER_COMMIT }) }, 'is not the pinned head', 'a result carrying another commit');
+
+// Three lanes, judged apart.
+await expectError({ ...baseline(), 'response/data/verdicts.json': verdicts({ lanes: [lane('behavior'), lane('ux')] }) }, 'the ui lane is missing', 'two lanes instead of three');
+await expectError({ ...baseline(), 'response/data/verdicts.json': verdicts({ lanes: [lane('behavior'), lane('behavior'), lane('ui')] }) }, 'a lane may report at most one verdict', 'one lane judged twice');
+await expectError({ ...baseline(), 'response/data/verdicts.json': verdicts({ lanes: [lane('behavior'), { ...lane('ux'), verdict: 'unavailable' }, lane('ui')] }) }, 'outside the allowed enum', 'a lane that is neither pass nor fail');
+await expectError({ ...baseline(), 'response/data/verdicts.json': verdicts({ lanes: [lane('behavior'), { ...lane('ux'), evidenceRefs: [] }, lane('ui')] }) }, 'array is too short', 'a lane with no evidence');
+await expectError({ ...withVerdicts({ behavior: 'fail' }, { next: ['git.publish'] }) }, 'a failing lane cannot hand to git.publish', 'a failing run handed to publication');
+await expectError({ ...baseline(), 'response/response.json': responseJson({ next: [] }) }, 'hands to git.publish', 'a passing run that routes nowhere');
+await expectError({ ...withVerdicts({ ux: 'fail' }, { next: ['backend.source.apply'] }) }, 'it hands to a person', 'a UX failure routed away from the person');
+
+// Evidence per case.
+await expectError({ ...baseline(), 'response/response.json': responseJson({ captures: [`response/data/captures/${CASES[0]}.json`] }), [`response/data/captures/${CASES[1]}.json`]: null }, `case ${CASES[1]} has no capture registered`, 'a frozen case with no capture');
+await expectError({ ...baseline(), 'response/response.json': responseJson({ shots: [`response/artifacts/${CASES[0]}.png`] }) }, `case ${CASES[1]} has no screenshot registered`, 'a frozen case with no screenshot');
+await expectError({ ...baseline(), [`response/data/captures/${CASES[0]}.json`]: capture(CASES[0], { loginFieldMasked: false }) }, 'expected true', 'a capture that cannot say the login field was masked');
+await expectError({ ...baseline(), [`response/data/captures/${CASES[0]}.json`]: capture(CASES[0], { executedAt: T(5) }) }, 'executed at or before the snapshot freeze', 'a case executed before the freeze');
+await expectError({ ...baseline(), [`response/data/captures/${CASES[0]}.json`]: capture(CASES[0], { assertions: capture(CASES[0]).assertions.slice(0, 2) }) }, 'was never observed', 'a frozen assertion nobody observed');
+await expectError({ ...baseline(), 'response/data/snapshot.json': snapshot({ cases: [frozenCase(CASES[0], 1), frozenCase(CASES[1], 2)] }) }, 'contiguous order starting at 1', 'a frozen order that starts at two');
+await expectError({ ...baseline(), 'request/request.json': requestJson({ cases: [CASES[0], 'ghost-case'] }) }, 'requested case ghost-case was never frozen', 'a case the snapshot never froze');
+
+// Custody: the password may appear in nothing this operator writes.
+await expectError({ ...baseline(), 'response/response.md': responseMd({ note: `The tester signed in with ${LEAK} and continued.` }) }, 'the shared UAT password appears in a file this operator writes', 'the password published in the receipt');
+await expectError({ ...baseline(), [`response/data/captures/${CASES[0]}.json`]: capture(CASES[0], { assertions: [{ assertionId: 'entry', lane: 'ui', observed: `the login form held ${LEAK}`, evidenceRef: 'x', outcome: 'pass' }, { assertionId: 'commitment', lane: 'behavior', observed: 'ok', evidenceRef: 'x', outcome: 'pass' }, { assertionId: 'terminal', lane: 'behavior', observed: 'ok', evidenceRef: 'x', outcome: 'pass' }] }) }, 'the shared UAT password appears in a file this operator writes', 'the password recorded in a capture');
+await expectError({ ...baseline(), 'response/data/snapshot.json': snapshot({ account: { ...snapshot().account, password: 'x' } }) }, 'unexpected property', 'an account record with a place to hold a secret');
+await expectError({ ...baseline(), 'response/data/snapshot.json': snapshot({ account: { ...snapshot().account, credentialRef: '.stacks/local/secrets/uat.txt' } }) }, 'string does not match', 'a credential outside the sealed file');
+
+// Namespace and append-only history.
+await expectError({ ...baseline(), 'response/data/verdicts.json': verdicts({ cleanup: { performed: true, isUat: true, namespace: 'uat-anything', runRecordsDeleted: false } }) }, 'cleanup must name the exact run fixture namespace', 'a cleanup wider than the run');
+await expectError({ ...baseline(), 'response/data/verdicts.json': verdicts({ cleanup: { performed: true, isUat: true, namespace: NS, runRecordsDeleted: true } }) }, 'expected false', 'a cleanup that deleted a run record');
+await expectError(baseline(), 'runs are append-only', 'a run record rewritten with another result', 'rewritten');
+await expectError(baseline(), 'appends its record under runs/', 'a decided run that appended nothing', 'missing-run');
+await expectError(baseline(), 'but this run published', 'a latest pointer left on another run', 'stale-latest');
+
+// The receipt agrees with the machine record.
+await expectError({ ...baseline(), 'response/response.md': responseMd().replace(`| Commit | \`${COMMIT}\` |`, `| Commit | \`${OTHER_COMMIT}\` |`) }, 'Snapshot names another commit', 'a receipt naming another commit');
+await expectError({ ...baseline(), 'response/response.md': responseMd().replace('## Cases', '## Case list') }, 'missing section ^## Cases$', 'a receipt section renamed');
+await expectError({ ...baseline(), 'response/response.json': responseJson({ drop: 'uat-verdicts' }) }, 'required output uat-verdicts is not in fields', 'a decided run that published no verdicts');
+
+process.stdout.write('uat.verify self-test: 4 valid branches, 36 rejected mutations\n');

@@ -1,0 +1,126 @@
+# frontend.source.apply
+
+## Việc
+
+Ghi một cây đã resolve vào source sản phẩm trên nhánh phiên, bên trong một trần owner đã đóng băng và
+một tập file đã khai, chỉ phát ra những giá trị mà resolution được bind đã chứa sẵn, và chịu trách
+nhiệm cho từng byte đã vào repository trong đúng một commit.
+
+## Người ghi duy nhất
+
+Đây là operator duy nhất trong chuỗi frontend ghi source sản phẩm. Direction quyết dựng cái gì và
+không ghi gì; resolution quyết mọi giá trị và chỉ ghi artifact của chính nó; audit quan sát và không
+ghi gì. Một người ghi duy nhất tồn tại để một biên nhận duy nhất chịu trách nhiệm cho từng byte đã vào
+repository, điều bất khả thi khi ba operator mỗi anh ghi một ít. Vì là người ghi duy nhất, nó cũng là
+chỗ duy nhất một giá trị bịa có thể lọt vào source, nên nó không có đường nào để tạo ra một giá trị
+như vậy.
+
+## Nhánh phiên
+
+Operator không bao giờ ghi lên nhánh mà người dùng đang checkout. Nó chỉ ghi trên
+`session/<sessionId>` của checkout được route, trong git worktree mà orchestrator đã dựng sẵn từ head
+đóng băng, và nó giữ một lease độc quyền trên worktree ấy suốt lúc ghi. Write set đã khai được commit
+đúng một lần; `response.json` mang đúng một sha đó trong `commits`, dòng Checkout của `changes.md` ghi
+`@workspaces/fe` ở head gốc rồi tới sha mới trên `session/<sessionId>`, và các request sau ghim
+`@workspaces/fe` ở sha đó. Ở đây không push và không merge: `git.publish` sở hữu cả hai việc ấy.
+
+## Không có giá trị tự nghĩ ra
+
+Mọi class mà lần ghi tạo ra đều đã có sẵn trong kho class của resolution được bind, và mọi identifier
+nó mang vào một lời khai đều đã có sẵn trong kho luật đã áp dụng. Cả hai danh sách đều đầy đủ và đóng
+băng. Một class không có trong resolution là `WRITE_REJECTED`: không làm tròn về giá trị gần, không
+chép từ file bên cạnh, không định dạng lại theo kiểu đổi mất một bước thang. Một file mà lần ghi sẽ
+chạm tới nhưng write set không khai cũng là `WRITE_REJECTED`, kể cả khi rõ ràng nó cần đổi; bước đúng
+tiếp theo là sửa write set, không phải ghi rộng ra. Một path đã khai mà gốc owner của nó không chứa là
+`OWNER_CONFLICT`, vì thuộc về owner nào chưa phải là trần. Phép kiểm kho chạy trên bản chiếu, trước
+khi ghi bất cứ thứ gì, nên một lần áp dụng bị từ chối để source y nguyên.
+
+## Node do ứng dụng sở hữu thành một file lá rỗng
+
+Khi hướng đánh dấu một node là do ứng dụng sở hữu, chẳng hạn một canvas, bản chiếu ghi ra một file lá
+rỗng mang contract của node đó, tức props và states của nó, để cây biên dịch được và bề mặt render ra
+đo được. Operator không bao giờ viết phần logic của file lá ấy: contract là thứ hướng đã quyết, còn
+hành vi phía sau nó thuộc về ai sở hữu node.
+
+## Không đổi là một phép đo
+
+Mọi path đã khai đều được băm trước bản chiếu và sau commit. Path có bản chiếu khác nội dung hiện tại
+thì được tạo hoặc sửa; path có bản chiếu bằng đúng nội dung hiện tại được ghi `unchanged`. Sau commit,
+cây được đọc lại và đối chiếu với cây đã resolve, và một chỗ lệch là `WRITE_REJECTED` chứ không phải
+một thành công lặng lẽ. Dưới `mode = dry` không có gì được ghi cả: nhánh phát ra bản kế hoạch trong
+`response/data/writes.json` với commit rỗng rồi dừng ở đó.
+
+## Ranh giới
+
+Operator ghi các path trong write set đã khai trên nhánh phiên của `@workspaces/fe`, mỗi path nằm
+dưới một gốc owner được sửa, và ghi `response/` của chính nó. Nó không ghi class, giá trị hay
+identifier vắng mặt trong resolution được bind, không quyết một giá trị trình bày, không chọn
+component Grammar, không dựng lại cây, không viết logic của file lá do ứng dụng sở hữu, không chạm
+file ngoài write set đã khai, không commit lên nhánh nào khác, không push, không merge, không sửa
+knowledge, không publish Grammar, không đổi resolution, không khởi động hay cấu hình lại dịch vụ
+runtime, và không ghi phán quyết, điểm số hay tuyên bố pass lên source đã áp dụng. Nó biết nó ghi gì,
+không bao giờ biết nó render ra sao.
+
+## Context
+
+| Alias | Bind | Bắt buộc |
+| --- | --- | --- |
+| `@workspaces/fe` | checkout frontend được route ở head đóng băng; lần ghi đáp xuống nhánh phiên của nó và không đâu khác | có |
+
+## Đầu vào
+
+| Kind | Từ đâu | Bắt buộc |
+| --- | --- | --- |
+| `frontend-presentation-resolution` | `frontend.presentation.resolve`, cây đã resolve và, ngay bên cạnh, kho class và kho luật đã đóng băng | có |
+| `frontend-direction-decision` | `frontend.direction.decide`, ý đồ và trần owner; không bao giờ là nguồn giá trị | có |
+
+## Yêu cầu
+
+| Field | Kiểu | Mặc định | Hỏi |
+| --- | --- | --- | --- |
+| `mode` | choice | apply | `apply` ghi rồi commit, `dry` chỉ phát bản kế hoạch và không ghi gì |
+| `resume` | token | null | Token của nhánh bị chặn khi vào lại sau một mã dừng |
+
+## Các bước
+
+| # | Bước | Tham số | Đọc | Ghi | Dừng với |
+| --- | --- | --- | --- | --- | --- |
+| 1 | Kiểm gate, chạy lại, và xác nhận head | `resume`, `mode` | `request/request.json`, đầu vào `frontend-presentation-resolution`, @workspaces/fe ở head đóng băng | — | `INVALID_INPUT`, `SOURCE_DRIFT`, `NO_PROGRESS` |
+| 2 | Bind resolution, direction và write set đã khai | — | đầu vào `frontend-presentation-resolution` (fingerprint cây, kho class và kho luật, cây đã resolve) và `frontend-direction-decision` (ý đồ và trần owner), @workspaces/fe (các path đã khai và gốc owner của chúng) | — | `RESOLUTION_STALE`, `OWNER_CONFLICT` |
+| 3 | Chiếu cây đã resolve lên các path đã khai | — | đầu vào `frontend-presentation-resolution` (cây đã resolve), @workspaces/fe (write set đã khai) | — | — |
+| 4 | Đối chiếu mọi giá trị tạo ra với kho | `mode` | đầu vào `frontend-presentation-resolution` (kho nằm cạnh biên nhận) | `response/data/writes.json` | `WRITE_REJECTED` |
+| 5 | Ghi nguyên khối trên nhánh phiên và commit một lần | — | @workspaces/fe (nội dung hiện tại của từng path đã khai, dưới một lease độc quyền) | @workspaces/fe/branch/session, `response/data/writes.json` | — |
+| 6 | Đọc lại cây ở commit | — | @workspaces/fe ở commit | — | `WRITE_REJECTED` |
+| 7 | Phát | — | mọi thứ ở trên | `response/response.md`, `response/changes.md`, `response/response.json` | — |
+
+Dưới `mode = dry`, nhánh dừng sau bước 4 với riêng bản kế hoạch: `writes.json` mang commit rỗng,
+`response.json` không mang commit nào, và checkout y nguyên. Dưới `apply`, bước 5 ghi rồi commit đúng
+một lần và bước 6 chứng minh rằng cây đã commit đúng là cây đã resolve. `changes.md` là bản ghi mà
+các bước sau đọc: path nào đã dịch chuyển, chúng mang lời khai nào, checkout ghim cổng nào cho chúng,
+và bề mặt nào bây giờ phải được quan sát.
+
+## Đầu ra
+
+| Kind | File | Kiểu | Bắt buộc |
+| --- | --- | --- | --- |
+| `frontend-source-application` | `response/response.md` | md | có |
+| `changes` | `response/changes.md` | md | có |
+| `writes` | `response/data/writes.json` | data | có |
+
+## Dừng
+
+| Code | Xử lý |
+| --- | --- |
+| `INVALID_INPUT` | terminate |
+| `SOURCE_DRIFT` | terminate |
+| `OWNER_CONFLICT` | terminate |
+| `RESOLUTION_STALE` | terminate |
+| `WRITE_REJECTED` | terminate |
+| `NO_PROGRESS` | terminate |
+
+## Kế tiếp
+
+| Khi | Operator |
+| --- | --- |
+| source đã commit và bề mặt render ra phải được đo | `frontend.surface.audit` |
+| source đã commit và các cổng của chính checkout phải chạy | `quality.verify` |

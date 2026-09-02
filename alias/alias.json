@@ -32,7 +32,9 @@
     "husky": ".husky/  (pre-commit, pre-push)",
     "package": "package.json  (scripts, dependencies, the package version)",
     "gates": "package.json#scripts plus the configs it names (eslint.config.*, tsconfig*.json, jest.config.*/vitest.config.*, sonar-project.properties)",
-    "grammar": "packages/grammar  (the @starci/grammar source inside @workspaces/fe)"
+    "grammar": "packages/grammar  (the @starci/grammar source inside @workspaces/fe)",
+    "/branch/session": "the session branch session/<sessionId> of that checkout, in its own git worktree prepared from the frozen head; the only branch a source-writing operator may commit to",
+    "/commit/<sha>": "that checkout at one commit; how a later step names exactly what an earlier step wrote (response.json.commits[])"
   },
   "tree": {
     "@workspaces": {
@@ -53,7 +55,7 @@
         "scheme": "source://<repository>",
         "bind": "fingerprint + sourceHead (git rev-parse HEAD of the checkout)",
         "writers": [
-          "fe.source.apply"
+          "frontend.source.apply"
         ],
         "purpose": "The routed frontend checkout of the bound project."
       },
@@ -64,7 +66,7 @@
         "scheme": "source://<repository>",
         "bind": "fingerprint + sourceHead (git rev-parse HEAD of the checkout)",
         "writers": [
-          "backend.implement"
+          "backend.source.apply"
         ],
         "purpose": "The routed backend checkout of the bound project."
       },
@@ -175,13 +177,13 @@
       "uat": {
         "params": [],
         "kind": "dir",
-        "resolvesTo": "<Source>/.worktrees/uat/<flow>/<case>/  (snapshot.json, result.json)",
+        "resolvesTo": "<Source>/.worktrees/uat/<flow>/  (flow.md: cases in order and named assertions; account.json: username, role, credential name of the single shared UAT password sealed at .stacks/<env>/secrets/uat.enc; seed/records.json and seed/expected.json; runs/<runId>/ append-only: result.json, verdicts.json, captures/<case>.png, sheet.png; latest -> the newest run). <case> narrows to one case of the flow",
         "scheme": "uat://<flow>/<case>",
         "bind": "fingerprint of snapshot.json and result.json",
         "writers": [
           "uat.verify"
         ],
-        "purpose": "Canonical UAT pair per flow and case. Never carries a credential."
+        "purpose": "UAT authority per flow: the frozen flow, its dedicated account, its seed, and the append-only history of every run with the commit it verified."
       },
       "debts": {
         "params": [],

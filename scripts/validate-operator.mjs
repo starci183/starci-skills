@@ -88,7 +88,9 @@ export async function validateOperators(root) {
       if (kind === '—' || kind === '') continue;
       if (!kinds.has(kind) && !existsSync(path.join(root, 'templates', 'kinds', `${kind}.schema.json`))) errors.push(`${at}:${r._line}: input ${kind} has no contract or schema under templates/kinds`);
     }
-    for (const r of op.tables.next.rows) { const target = unquote(r.operator); if (!ids.has(target)) errors.push(`${at}:${r._line}: next names unknown operator ${target}`); }
+    // Next may hand to another operator, or end automation the way routing.json does: `user` (a person
+    // decides or publishes) or `external` (the blocker is outside the runtime).
+    for (const r of op.tables.next.rows) { const target = unquote(r.operator); if (!ids.has(target) && target !== 'user' && target !== 'external') errors.push(`${at}:${r._line}: next names unknown operator ${target}`); }
 
     // en ↔ vi.
     if (!pkg.vi) { errors.push(`operators/${pkg.name}/operator.vi.md: missing`); continue; }

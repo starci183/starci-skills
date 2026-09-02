@@ -1,0 +1,52 @@
+{
+  "kind": "frontend-surface-audit",
+  "title": "^# frontend-surface-audit — [a-z0-9][a-z0-9-]*$",
+  "sections": [
+    {
+      "heading": "^## Matrix$",
+      "table": "| Matrix | Viewport | Scheme | State | Screenshot |",
+      "minRows": 1,
+      "cell": {
+        "Matrix": "^`[a-z0-9][a-z0-9-]*`$",
+        "Viewport": "^[0-9]{3,4}x[0-9]{3,4}$",
+        "Scheme": "^(light|dark)$",
+        "Screenshot": "^`response/artifacts/[A-Za-z0-9_.-]+[.]png`$"
+      }
+    },
+    {
+      "heading": "^## Verdicts by owner$",
+      "table": "| Matrix | Owner | Node | Rule | Measured | Verdict |",
+      "minRows": 1,
+      "cell": {
+        "Owner": "^(app|grammar)$",
+        "Node": "^`[^`]+`$",
+        "Rule": "^`[A-Z][A-Z0-9-]*-[0-9]+`$",
+        "Verdict": "^(pass|fail)$",
+        "Matrix": "^`[a-z0-9][a-z0-9-]*`$"
+      }
+    },
+    {
+      "heading": "^## Regressions$",
+      "table": "| Matrix | Node | Rule | Measured | Routes to |",
+      "cell": {
+        "Node": "^`[^`]+`$",
+        "Routes to": "^(resolve|grammar-gap)$",
+        "Matrix": "^`[a-z0-9][a-z0-9-]*`$"
+      }
+    },
+    {
+      "heading": "^## Grammar gaps$",
+      "table": "| Component | Rule | What the family lacks |",
+      "cell": {
+        "What the family lacks": "\\S"
+      }
+    },
+    {
+      "heading": "^## Fallbacks taken$",
+      "table": "| Code | Action |",
+      "cell": {
+        "Code": "^`[A-Z][A-Z0-9_]+`$"
+      }
+    }
+  ]
+}

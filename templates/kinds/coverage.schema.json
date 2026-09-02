@@ -1,0 +1,62 @@
+{
+  "$id": "kind:coverage",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "statements",
+    "lines",
+    "functions",
+    "branches",
+    "thresholds",
+    "evidenceRef"
+  ],
+  "properties": {
+    "statements": {
+      "$ref": "#/$defs/percentage"
+    },
+    "lines": {
+      "$ref": "#/$defs/percentage"
+    },
+    "functions": {
+      "$ref": "#/$defs/percentage"
+    },
+    "branches": {
+      "$ref": "#/$defs/percentage"
+    },
+    "thresholds": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "statements",
+        "lines",
+        "functions",
+        "branches"
+      ],
+      "properties": {
+        "statements": {
+          "$ref": "#/$defs/percentage"
+        },
+        "lines": {
+          "$ref": "#/$defs/percentage"
+        },
+        "functions": {
+          "$ref": "#/$defs/percentage"
+        },
+        "branches": {
+          "$ref": "#/$defs/percentage"
+        }
+      }
+    },
+    "evidenceRef": {
+      "type": "string",
+      "minLength": 1
+    }
+  },
+  "$defs": {
+    "percentage": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 100
+    }
+  }
+}
