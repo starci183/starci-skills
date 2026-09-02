@@ -1,6 +1,6 @@
 # StarCi Core Grammar — mục lục đọc
 
-Nhánh này mô tả một visual family: StarCi Core. Luật UI universal vẫn canonical tại [knowledge/ui](../../ui/INDEX.vi.md); nhánh này chỉ map các luật X-n đó vào family Core đang chạy.
+Nhánh này mô tả một visual family: StarCi Core, và cái gu chỉ đạo cách ghép nó. Luật UI universal vẫn canonical tại [knowledge/ui](../../ui/INDEX.vi.md); nhánh này map các luật X-n đó vào family Core đang chạy và ghi lại những idiom StarCi thực sự dựng bằng. Nó không kể lại giải phẫu renderer — [DNA](DNA.vi.md), sinh ra từ package, đã nói cái gì tồn tại và mỗi renderer sở hữu cái gì.
 
 ## Chuỗi authority
 
@@ -13,18 +13,16 @@ Nhánh này mô tả một visual family: StarCi Core. Luật UI universal vẫn
 
 ## Thứ tự đọc
 
-0. [DNA](DNA.vi.md) — sinh ra từ package; mồi cho agent định hướng bằng file này, và đọc các topic khi một dòng làm nảy ra câu hỏi.
-1. [Family và DNA](family.vi.md) — identity, token, hướng CSS, binding X-n và gap đã biết.
-2. [Cách dùng](consumption.vi.md) — import, chọn root, family factory và boundary ownership.
-3. [Ma trận component](components.vi.md) — đủ 41 Common public renderer và cách Core hiện thực.
-4. [Field, action và state](states.vi.md) — input, command, destination, pending, feedback, focus và motion.
-5. [Surface và composition](composition.vi.md) — material, vị trí label, layout, navigation, responsive và media/art direction.
-6. [Surface](surface.vi.md) — giải phẫu CORE-SURFACE-1..5: một compound card duy nhất, nơi Core sơn vật liệu duy nhất, prop hình học đóng, quyền sở hữu state/action toàn mặt/cuộn/highlight, và gap cấp heading.
-7. [Boundary](boundary.vi.md) — giải phẫu CORE-BOUNDARY-1..5: owner nào vẽ, lồng, đặt tên, nâng và cắt một vùng, và cái gì sống sót qua đổi state và viewport.
-8. [Icon](icon.vi.md) — cơ chế ICON-1..6: hộp `Icon usage`, chip trạng thái, danh tính tab, mũi tên action, tiện ích chỉ có glyph, và đặt tên truy cập được.
-9. [Media](media.vi.md) — cơ chế MEDIA-1..6: tỉ lệ, fit, treatment, caption của `MediaFrame`, và gap loading/error lẫn tiêu điểm.
-10. [Control state](control-state.vi.md) — CONTROL-STATE-1..4: pending, không dùng được, skeleton và lựa chọn bền vững qua các prop đã công bố.
-11. [Field](field.vi.md) — FIELD-1..4: nhãn, hướng dẫn, lỗi, tính khả dụng của `Input` và `OtpInput`, và bằng chứng chứng minh quan hệ đó.
+0. [DNA](DNA.vi.md) — sinh ra từ package: cái gì đang tồn tại. Mồi cho agent định hướng bằng đúng file này.
+1. [Idiom](idioms.vi.md) — StarCi ghép những thứ đang tồn tại ra sao, mỗi idiom có ít nhất hai bằng chứng trong block đang chạy.
+2. [Playbook](playbook.vi.md) — hình dạng nghiệp vụ nào đòi chuỗi idiom nào, và tham chiếu được góp gì.
+3. [Family và DNA](family.vi.md) — danh tính riêng của visual family, token, hướng CSS, binding theme, và bảng gap duy nhất mà cả family công bố.
+4. [Cách dùng](consumption.vi.md) — import, chọn root, family factory và boundary ownership.
+5. [Ma trận component](components.vi.md) — đủ 41 Common public renderer và cách Core hiện thực.
+6. [Field, action và state](states.vi.md) — input, command, destination, pending, feedback, focus và motion.
+7. [Surface và composition](composition.vi.md) — material, đặt label, layout, navigation, hành vi responsive và hướng media/art.
+
+Đọc 0 tới 2 để quyết định dựng cái gì; đọc 3 tới 7 khi một dòng làm nảy ra câu hỏi về chính family.
 
 ## Gate review
 
