@@ -45,14 +45,14 @@ lâu dài, và một bản ghi lâu dài của capability chính là credential 
 
 | # | Bước | Đọc | Ghi | Dừng với |
 | --- | --- | --- | --- | --- |
-| 1 | Validate input và resume | input, receipt trước đó, binding source đã đóng băng | — | `INVALID_INPUT`, `SOURCE_DRIFT`, `NO_PROGRESS` |
-| 2 | Bind authority | knowledge record của nhánh, phê duyệt cùng plan hash, từng capability handle kèm bằng chứng custody, fingerprint của inventory, source head đã route | — | `AUTHORITY_DRIFT`, `CAPABILITY_MISSING` |
-| 3 | Kiểm lại inventory | các resource đã khai, quan sát lại đúng một lượt | — | `INVENTORY_DRIFT` |
-| 4 | Xử lý các claim cổng | các cổng được claim, những tiến trình đang giữ | — | `PORT_CONFLICT` |
-| 5 | Suy ra delta | trạng thái mong muốn, trạng thái quan sát được | — | — |
-| 6 | Áp delta đã duyệt | tập effect đã duyệt, mỗi lần một resource | — | `EFFECT_UNAUTHORIZED`, `SERVICE_UNAVAILABLE` |
-| 7 | Chứng minh mọi check bắt buộc | dịch vụ đã đọc lại, trọn bộ chứng minh của nhánh | — | `PROOF_FAILED` |
-| 8 | Phát ra rồi dừng | tất cả những gì ở trên | `<branch>.receipt.json` | — |
+| 1 | Validate input và resume | input, `@runtime` (binding generation đã đóng băng) | — | `INVALID_INPUT`, `SOURCE_DRIFT`, `NO_PROGRESS` |
+| 2 | Bind authority | `@runtime` (fingerprint của inventory và generation), `@identity` (từng capability handle kèm bằng chứng custody), `@declaration/<project>/<role>` (các project mà dịch vụ dùng chung phục vụ), input (phê duyệt cùng plan hash) | — | `AUTHORITY_DRIFT`, `CAPABILITY_MISSING` |
+| 3 | Kiểm lại inventory | `@runtime` (các resource đã khai, quan sát lại đúng một lượt) | — | `INVENTORY_DRIFT` |
+| 4 | Xử lý các claim cổng | `@ports/<project>` (các cổng được claim), `@runtime` (những tiến trình đang giữ) | — | `PORT_CONFLICT` |
+| 5 | Suy ra delta | `@runtime` (trạng thái quan sát được), input (trạng thái mong muốn) | — | — |
+| 6 | Áp delta đã duyệt | `@runtime` (mỗi lần một resource), `@identity` (credential handle theo tên) | `@runtime` | `EFFECT_UNAUTHORIZED`, `SERVICE_UNAVAILABLE` |
+| 7 | Chứng minh mọi check bắt buộc | `@runtime` (dịch vụ đã đọc lại, trọn bộ chứng minh của nhánh) | — | `PROOF_FAILED` |
+| 8 | Phát ra rồi dừng | tất cả những gì ở trên | `@artifacts/<branch>.receipt.json` | — |
 
 Khâu validate từ chối binding source cũ, effect hay check xếp nhầm nhánh, bộ chứng minh bị thu hẹp,
 resource chưa kiểm kê, capability còn thiếu, vật liệu credential lọt vào contract, và tiến độ không
