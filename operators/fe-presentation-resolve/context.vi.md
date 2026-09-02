@@ -39,8 +39,8 @@ rule nào đứng sau.
 | Alias | Trỏ tới | Bind | Bắt buộc |
 | --- | --- | --- | --- |
 | `@knowledge/ui/presentation` | `<Source>/.claude/knowledge/<group>/  (every canonical .md inside; a single file may be named as <group>/<topic>.md)` | fingerprint per file; the rule inventory is the set of `## PREFIX-n` headings across the folder's canonical files | Bắt buộc: The closed rule inventory; the only source of valid identifiers. |
-| `@grammar` | `<checkout:starci-academy/fe>/packages/grammar` | fingerprint of packages/grammar/package.json (manifestRef) + the checkout head | Bắt buộc: Which relationships a component already owns. |
-| `@source/starci-academy/fe` | `<checkout:project/role>` | fingerprint + sourceHead (git rev-parse HEAD of the checkout) | Bắt buộc: The checkout the composed tree belongs to. |
+| `@grammar-src` | `<@fe>/packages/grammar  (the published @starci/grammar package source: renderers, props, data-contract claims, core/styles.css)` | fingerprint of packages/grammar/package.json + the @fe checkout head | Bắt buộc: Which relationships a component already owns. |
+| `@fe` | `<checkout:input.project.id/fe>  (the frontend checkout of the project this invocation binds)` | fingerprint + sourceHead (git rev-parse HEAD of the checkout) | Bắt buộc: The checkout the composed tree belongs to. |
 | `@receipt/fe-direction-decision/<invocationId>` | `<@artifacts of invocation <invocationId>>/<receiptType>.json (the receipt file that invocation registered in output.artifactRefs)` | fingerprint + the sourceHead the receipt binds | Tuỳ chọn: Intent; never a source of presentation values. |
 | `@receipt/fe-surface-audit/<invocationId>` | `<@artifacts of invocation <invocationId>>/<receiptType>.json (the receipt file that invocation registered in output.artifactRefs)` | fingerprint + the sourceHead the receipt binds | Tuỳ chọn: Regression history. |
 | `@artifacts` | `input.project.artifactRootRef; convention <Source>/.worktrees/sessions/<invocationId>/artifacts/` | fingerprint per artifact; every artifact an operator writes is registered in output.artifactRefs | Bắt buộc: Where the resolved tree and the resolution receipt are written. |

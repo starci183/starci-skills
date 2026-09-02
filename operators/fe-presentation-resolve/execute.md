@@ -34,15 +34,15 @@ tree is resolved again once the case is published and the topic fingerprint is r
 
 | # | Step | Reads | Writes | Stops with |
 | --- | --- | --- | --- | --- |
-| 1 | Validate input and resume | input, prior receipt, frozen source binding | — | `INVALID_INPUT`, `SOURCE_DRIFT`, `NO_PROGRESS` |
-| 2 | Bind authority | knowledge index and every topic with its fingerprint and inventory, published Grammar package and its relationships, routed source head, frozen tree | — | `KNOWLEDGE_UNBOUND`, `GRAMMAR_UNPUBLISHED` |
-| 3 | Walk the tree once | frozen tree, mutable owner ceiling | — | `OWNER_CONFLICT` |
-| 4 | Determine the owner for each present property | Grammar relationships, the node's present properties | — | — |
-| 5 | Select one rule per remaining property | observed condition, the cases the bound topic publishes | — | `RULE_MISSING` |
-| 6 | Classify a missing public path | the relationship, the knowledge's capability-gap marking | — | — |
-| 7 | Remove what the tree should not carry | application classes on the node, Grammar anatomy, the closed scale | — | — |
-| 8 | Emit contracts | resolved properties, `contractEmission`, the frozen rule inventory | — | `UNKNOWN_RULE` |
-| 9 | Emit and stop | everything above | `<target>.resolved.tsx` | — |
+| 1 | Validate input and resume | input, `@receipt/fe-surface-audit/<invocationId>` (regression history), `@fe` (the frozen head binding) | — | `INVALID_INPUT`, `SOURCE_DRIFT`, `NO_PROGRESS` |
+| 2 | Bind authority | `@knowledge/ui/presentation` (every topic with its fingerprint and inventory), `@grammar-src` (the published package and the relationships it owns), `@fe` (routed head, frozen tree), `@receipt/fe-direction-decision/<invocationId>` (intent) | — | `KNOWLEDGE_UNBOUND`, `GRAMMAR_UNPUBLISHED` |
+| 3 | Walk the tree once | `@fe` (the frozen tree), input (the mutable owner ceiling) | — | `OWNER_CONFLICT` |
+| 4 | Determine the owner for each present property | `@grammar-src` (the owned relationships), `@fe` (the properties the node presently carries) | — | — |
+| 5 | Select one rule per remaining property | `@knowledge/ui/presentation` (the cases the bound topic publishes) | — | `RULE_MISSING` |
+| 6 | Classify a missing public path | `@grammar-src` (the relationship under question), `@knowledge/ui/presentation` (the capability-gap marking) | — | — |
+| 7 | Remove what the tree should not carry | `@fe` (the application classes on the node), `@grammar-src` (Grammar anatomy and the closed scale) | — | — |
+| 8 | Emit contracts | `@knowledge/ui/presentation` (the frozen rule inventory), input (`contractEmission`) | — | `UNKNOWN_RULE` |
+| 9 | Emit and stop | everything above | `@artifacts/<target>.resolved.tsx` | — |
 
 Validation rejects a stale source binding, owner overlap, duplicate topics, cross-filed identifiers,
 and unchanged progress. The walk visits every node in document order and records a stable `nodePath`;

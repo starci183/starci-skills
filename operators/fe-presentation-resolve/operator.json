@@ -19,12 +19,12 @@
       "purpose": "The closed rule inventory; the only source of valid identifiers."
     },
     {
-      "alias": "@grammar",
+      "alias": "@grammar-src",
       "required": true,
       "purpose": "Which relationships a component already owns."
     },
     {
-      "alias": "@source/starci-academy/fe",
+      "alias": "@fe",
       "required": true,
       "purpose": "The checkout the composed tree belongs to."
     },
