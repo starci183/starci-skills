@@ -41,9 +41,10 @@ image is not decoration added at the end; it is one of the claims, drawn.
 
 ## The critique is independent
 
-The final critique runs as one fresh execution that inherits no turns, and it must not be the
-execution that produced the brief or any edition. It receives every produced artifact and none of the
-producer's rationale: the artifact has to stand up on its own reading.
+The final critique is a fresh execution on this operator's own profile with no inherited turns, and
+it is never the execution that produced the brief or any edition. It is given the produced artifacts
+and the claims those artifacts make, and none of the producer's rationale: the artifact has to stand
+up on its own reading.
 
 It scores correctness, pedagogy, interview value, language, and, where those stages ran, visual
 fidelity, code quality, and executable proof. Approval requires every applicable score at or above
@@ -53,29 +54,39 @@ assigned to a stage that was disabled.
 A unit that passes its own author's review has not been reviewed. The contract enforces that as three
 separate refusals: shared executions, inherited turns, and producer rationale.
 
-## Execution sequence
+## Sequence
 
-1. **Validate input and resume.** Apply `input.schema.json` and semantic validation. Reject a stale
-   source binding, a language without a destination, an executable check with no code behind it, an
-   image without its prompt, a refactor with no unit, a shared brief and critique target, and
-   unchanged progress.
-2. **Bind authority.** Bind the curriculum and style references, the routed source head, and the AI
-   runtime configuration with its fingerprint.
-3. **Write and freeze the brief.** One fresh teacher execution. Publish outcomes, claims, examples,
-   and dispositions, then fingerprint the brief. Nothing downstream may extend it.
-4. **Write every declared edition.** One edition per natural language, each covering the whole
-   published outcome set, each recording its own execution.
-5. **Generate the image to its claims.** Persist the prompt, copy the result to its target, and
-   inspect it. A disabled stage produces nothing and is recorded as disabled.
-6. **Implement every declared track.** One shared behaviour, idiomatic per language, built with the
-   exact command and the exit code read.
-7. **Run the executable check.** Fingerprint the contract, run each track's command, repair only the
-   implementation or harness within the iteration bound, and fingerprint the contract again.
-8. **Take the independent critique.** One fresh reviewing execution, given every artifact and no
-   rationale, returning scores, findings assigned to owning stages, and one verdict.
-9. **Emit and stop.** Write the receipt under `input.project.artifactRootRef`, emit one output
-   conforming to `output.schema.json`, and bind every fingerprint. Do not claim publication, learner
-   outcomes in production, or acceptance beyond the checks actually run.
+| # | Step | Reads | Writes | Stops with |
+| --- | --- | --- | --- | --- |
+| 1 | Validate input and resume | input, prior receipt, frozen source binding | — | `INVALID_INPUT`, `SOURCE_DRIFT`, `NO_PROGRESS` |
+| 2 | Bind authority | curriculum and style references, routed source head, AI runtime configuration | — | — |
+| 3 | Write and freeze the brief | curriculum and source evidence | `briefTargetRef` | `BRIEF_UNBOUND` |
+| 4 | Write every declared edition | frozen brief, per-language destination | `<language>.articleRef` | `OUTCOME_UNCOVERED` |
+| 5 | Generate the image to its claims | the brief's claims, the stated image intent | `imageTargetRef` | `IMAGE_UNAVAILABLE` |
+| 6 | Implement every declared track | frozen brief, each track's exact build command | `<track>.sourceRef` | `CODE_BUILD_FAILED` |
+| 7 | Run the executable check | executable contract, each track's declared command | — | `E2E_FAILED`, `CONTRACT_WEAKENED` |
+| 8 | Take the independent critique | every produced artifact and the claims it makes | `reviewTargetRef` | `REVIEW_REVISION_REQUIRED`, `REVIEW_ROUNDS_EXHAUSTED` |
+| 9 | Emit and stop | everything above | — | — |
+
+Validation rejects a stale source binding, a language without a destination, an executable check with
+no code behind it, an image without its prompt, a refactor with no unit, a shared brief and critique
+target, and unchanged progress.
+
+The brief is one fresh execution with no inherited turns: it publishes outcomes, claims, examples, and
+dispositions, and is then fingerprinted so nothing downstream may extend it. Each edition covers the
+whole published outcome set and records its own execution. The image step persists the prompt that
+states its intent alongside the result, copies the result to its target, and inspects it; a disabled
+stage produces nothing and is recorded as disabled. Each track builds one shared behaviour, idiomatic
+per language, with the exit code read rather than assumed.
+
+The executable check fingerprints the contract before the first run and again after the last one, and
+inside the bounded run-read-repair loop it may repair only the implementation or the harness. The
+critique is a fresh execution on this operator's own profile with no inherited turns, given every
+produced artifact and the claims those artifacts make, never the producer's rationale; it returns
+scores, findings assigned to owning stages, and one verdict. Emission writes the receipt under
+`input.project.artifactRootRef`, returns one output conforming to `output.schema.json`, binds every
+fingerprint, and claims no publication, no learner outcomes in production, and no acceptance beyond
+the checks actually run.
 
 ## Resume execution
 
@@ -94,7 +105,6 @@ The unit cannot be reported as generated while any applicable item remains unres
 - a track was never built, or its build exits non-zero;
 - a declared track is never exercised by the executable check, or a check exits non-zero;
 - the executable contract fingerprint moved during the repair loop;
-- the critique shares an execution with a producer, inherits turns, or was handed the producer's
-  rationale;
+- the critique received the author's rationale or inherited turns;
 - an artifact was shipped that the critique never received;
 - a score sits below `85`, or an error finding is still open, while the verdict says approved.
