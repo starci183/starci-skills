@@ -17,12 +17,8 @@ This branch documents one visual family: StarCi Core, and the taste that directs
 1. [Idioms](idioms.md) — how StarCi composes what exists, each idiom evidenced at least twice in the live blocks.
 2. [Playbook](playbook.md) — which idiom sequence a business shape asks for, and what a supplied reference may contribute.
 3. [Family and DNA](family.md) — the visual family's own identity, tokens, CSS direction, theme binding, and the one gap table the whole family publishes.
-4. [Consumption](consumption.md) — imports, root selection, family factory, and ownership boundary.
-5. [Component matrix](components.md) — all 41 Common public renderers and their Core realization.
-6. [Fields, actions, and states](states.md) — inputs, commands, destinations, pending, feedback, focus, and motion.
-7. [Surfaces and compositions](composition.md) — material, label placement, layout, navigation, responsive behavior, and media/art direction.
 
-Read 0 through 2 to decide what to build; read 3 through 7 when a row raises a question about the family itself.
+Read 0 through 2 to decide what to build; read 3 when a row raises a question about the family itself. How the package is consumed in code (imports, one family root, forbidden clones) is FE-IMPORTS-5 and FE-IMPORTS-7 in knowledge/patterns/fe.
 
 ## Review gates
 

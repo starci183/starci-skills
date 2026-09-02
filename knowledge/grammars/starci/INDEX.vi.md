@@ -17,12 +17,8 @@ Nhánh này mô tả một visual family: StarCi Core, và cái gu chỉ đạo 
 1. [Idiom](idioms.vi.md) — StarCi ghép những thứ đang tồn tại ra sao, mỗi idiom có ít nhất hai bằng chứng trong block đang chạy.
 2. [Playbook](playbook.vi.md) — hình dạng nghiệp vụ nào đòi chuỗi idiom nào, và tham chiếu được góp gì.
 3. [Family và DNA](family.vi.md) — danh tính riêng của visual family, token, hướng CSS, binding theme, và bảng gap duy nhất mà cả family công bố.
-4. [Cách dùng](consumption.vi.md) — import, chọn root, family factory và boundary ownership.
-5. [Ma trận component](components.vi.md) — đủ 41 Common public renderer và cách Core hiện thực.
-6. [Field, action và state](states.vi.md) — input, command, destination, pending, feedback, focus và motion.
-7. [Surface và composition](composition.vi.md) — material, đặt label, layout, navigation, hành vi responsive và hướng media/art.
 
-Đọc 0 tới 2 để quyết định dựng cái gì; đọc 3 tới 7 khi một dòng làm nảy ra câu hỏi về chính family.
+Đọc 0 tới 2 để quyết định dựng gì; đọc 3 khi một dòng đặt câu hỏi về chính family. Cách tiêu thụ gói trong code (import, một root family, cấm clone) là FE-IMPORTS-5 và FE-IMPORTS-7 trong knowledge/patterns/fe.
 
 ## Gate review
 

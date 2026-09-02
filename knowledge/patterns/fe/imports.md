@@ -74,6 +74,10 @@ imports alphabetically by binding instead; the order above is dominant, not univ
 | Case 2 | Default export from `src/components` | 0 exist |
 | Case 3 | Inline lint config | `eslint-disable` appears in 0 files; `src/components/blocks/**/{index,component}.tsx` run with `noInlineConfig: true` |
 | Case 4 | `namespace` | only `src/modules/api/graphql/clients/options.ts`, by config exception |
+| Case 5 | A renderer or prop type from `@starci/grammar/core` | renderers and prop types come from `@starci/grammar/common`; `@starci/grammar/core` exports only `CoreGrammarRoot` and its stylesheet |
+| Case 6 | A second family stylesheet under one root | one `CoreGrammarRoot` at the composition root, one `@starci/grammar/core/styles.css`; the family is selected once |
+| Case 7 | An app-local clone of a Common renderer or an anonymous layout | `TextLink`, `NavLink`, `SeeMoreLink`, a local `Sidebar` or shell geometry: use the Common renderer and pass props; a product adapter such as `LearnShellLayout` maps routes and state into Common, it owns no geometry |
+| Case 8 | A product name in a Grammar public export, or business logic inside Common/Core | `Learn`, `Console`, `Dashboard` stay in product code; routes, permissions, persistence and effects never enter the package |
 
 ## Open questions
 

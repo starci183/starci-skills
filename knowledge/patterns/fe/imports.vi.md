@@ -74,6 +74,10 @@ của 417 tệp component, là framework, rồi Grammar, rồi tầng của mìn
 | Case 2 | Default export trong `src/components` | 0 tồn tại |
 | Case 3 | Cấu hình lint nội tuyến | `eslint-disable` xuất hiện trong 0 tệp; `src/components/blocks/**/{index,component}.tsx` chạy với `noInlineConfig: true` |
 | Case 4 | `namespace` | chỉ `src/modules/api/graphql/clients/options.ts`, theo ngoại lệ ghi trong cấu hình |
+| Case 5 | Renderer hay kiểu props lấy từ `@starci/grammar/core` | renderer và kiểu props lấy từ `@starci/grammar/common`; `@starci/grammar/core` chỉ xuất `CoreGrammarRoot` và stylesheet của nó |
+| Case 6 | Stylesheet của family thứ hai dưới cùng một root | một `CoreGrammarRoot` ở root của composition, một `@starci/grammar/core/styles.css`; family được chọn đúng một lần |
+| Case 7 | Bản sao cục bộ của một renderer Common hay một layout vô danh | `TextLink`, `NavLink`, `SeeMoreLink`, `Sidebar` hay hình học shell tự dựng: dùng renderer của Common và truyền prop; adapter sản phẩm như `LearnShellLayout` chỉ ánh xạ route và state vào Common, không sở hữu hình học |
+| Case 8 | Tên sản phẩm trong export công khai của Grammar, hay logic nghiệp vụ bên trong Common/Core | `Learn`, `Console`, `Dashboard` ở lại code sản phẩm; route, quyền, persistence và effect không bao giờ vào gói |
 
 ## Câu hỏi để ngỏ
 
