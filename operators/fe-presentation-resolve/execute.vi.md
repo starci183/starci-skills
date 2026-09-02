@@ -30,35 +30,41 @@ Bốn điều cấm gánh việc này, và mỗi điều đều được kiểm 
 Operator không bao giờ sửa knowledge. Một case còn thiếu được trả về cho chủ knowledge, và chính cây
 đó được resolve lại sau khi case được publish và fingerprint của topic được bind lại.
 
-## Trình tự thực thi
+## Trình tự
 
-1. **Validate input và resume.** Áp `input.schema.json` cùng validate ngữ nghĩa. Từ chối binding
-   source cũ, owner chồng lấn, topic trùng, mã xếp nhầm topic, và tiến độ không đổi.
-2. **Bind authority.** Bind knowledge index và từng topic kèm fingerprint với danh sách mã, package
-   Grammar đã publish cùng các quan hệ nó đã sở hữu, source head đã route, và cây đã đóng băng.
-3. **Duyệt cây đúng một lượt.** Đi qua mọi node theo thứ tự tài liệu và ghi một `nodePath` ổn định.
-   Node nằm ngoài trần owner được phép sửa thì chỉ quan sát, không bao giờ đụng vào; cần sửa nó là
-   `OWNER_CONFLICT`.
-4. **Xác định chủ của từng thuộc tính đang có.** Tra các quan hệ Grammar trước. Thuộc tính mà một
-   component đã sở hữu thì quy về `owner: "grammar"`, không phát class nào, gọi tên rule mà component
-   đó thoả, và ghi `GRAMMAR_OWNED`. Thứ tự này là cố ý: nó làm cho việc dựng lại thành bất khả thi
-   chứ không chỉ là bị khuyên can.
-5. **Chọn đúng một rule cho mỗi thuộc tính còn lại.** Đối chiếu điều kiện quan sát được với các case
-   mà topic đã publish. Chỉ đúng một case được khớp. Hai case cùng khớp nghĩa là knowledge mơ hồ, và
-   lần gọi dừng lại thay vì tự chọn.
-6. **Phân loại đường công khai còn thiếu.** Khi quan hệ đó không có chủ trong Common và knowledge
-   đánh dấu là thiếu capability, quy về `owner: "none"`, phát class mà rule khai báo, và ghi
-   `COMMON_CAPABILITY_MISSING`. Class đó là workaround có ghi nhận, không bao giờ là một cái pass
-   thầm lặng.
-7. **Gỡ những thứ cây không được mang.** Xoá class của ứng dụng nếu nó dựng lại một quan hệ Grammar
-   đã sở hữu, ghi đè ruột Grammar, hoặc nằm ngoài thang đóng, và ghi finding tương ứng. Việc xoá
-   được báo cáo theo từng node, không bao giờ làm im lặng.
-8. **Phát contract.** Mọi node do ứng dụng sở hữu đều công bố các mã nó khai. Với
-   `contractEmission: "attribute"`, cây kết quả mang `data-contract` dưới dạng danh sách token cách
-   nhau bằng khoảng trắng. Với `receipt-only`, cây không mang gì và chỉ receipt giữ các lời khai.
-9. **Phát ra rồi dừng.** Ghi cây kết quả dưới `input.project.artifactRootRef`, phát đúng một output
-   theo `output.schema.json`, và bind mọi fingerprint. Không được claim đã có bằng chứng visual,
-   quality hay UAT.
+| # | Bước | Đọc | Ghi | Dừng với |
+| --- | --- | --- | --- | --- |
+| 1 | Validate input và resume | input, receipt trước đó, binding source đã đóng băng | — | `INVALID_INPUT`, `SOURCE_DRIFT`, `NO_PROGRESS` |
+| 2 | Bind authority | knowledge index và từng topic kèm fingerprint với danh sách mã, package Grammar đã publish cùng các quan hệ nó sở hữu, source head đã route, cây đã đóng băng | — | `KNOWLEDGE_UNBOUND`, `GRAMMAR_UNPUBLISHED` |
+| 3 | Duyệt cây đúng một lượt | cây đã đóng băng, trần owner được phép sửa | — | `OWNER_CONFLICT` |
+| 4 | Xác định chủ của từng thuộc tính đang có | các quan hệ Grammar, những thuộc tính node đang mang | — | — |
+| 5 | Chọn đúng một rule cho mỗi thuộc tính còn lại | điều kiện quan sát được, các case mà topic đã publish | — | `RULE_MISSING` |
+| 6 | Phân loại đường công khai còn thiếu | quan hệ đang xét, dấu thiếu capability trong knowledge | — | — |
+| 7 | Gỡ những thứ cây không được mang | các class của ứng dụng trên node, ruột Grammar, thang đóng | — | — |
+| 8 | Phát contract | các thuộc tính đã quy chủ, `contractEmission`, danh sách mã đã đóng băng | — | `UNKNOWN_RULE` |
+| 9 | Phát ra rồi dừng | tất cả những gì ở trên | `<target>.resolved.tsx` | — |
+
+Khâu validate từ chối binding source cũ, owner chồng lấn, topic trùng, mã xếp nhầm topic, và tiến độ
+không đổi. Lượt duyệt đi qua mọi node theo thứ tự tài liệu và ghi một `nodePath` ổn định; node nằm
+ngoài trần owner được phép sửa thì chỉ được quan sát, không bao giờ bị đụng vào.
+
+Các quan hệ Grammar được tra trước, nên thuộc tính mà một component đã sở hữu thì quy về
+`owner: "grammar"`, không phát class nào, gọi tên rule mà component đó thoả, và ghi `GRAMMAR_OWNED`.
+Thứ tự này là cố ý: nó làm cho việc dựng lại thành bất khả thi chứ không chỉ là bị khuyên can. Chỉ
+đúng một case đã publish được khớp với một điều kiện quan sát được; hai case cùng khớp nghĩa là
+knowledge mơ hồ, và lần gọi dừng lại thay vì tự chọn.
+
+Khi quan hệ đó không có chủ trong Common và knowledge đánh dấu là thiếu capability, thuộc tính quy về
+`owner: "none"`, phát class mà rule khai báo, và ghi `COMMON_CAPABILITY_MISSING`; class đó là
+workaround có ghi nhận, không bao giờ là một cái pass thầm lặng. Một class của ứng dụng dựng lại quan
+hệ Grammar đã sở hữu, ghi đè ruột Grammar, hoặc nằm ngoài thang đóng thì bị xoá kèm finding tương
+ứng, báo cáo theo từng node và không bao giờ làm im lặng.
+
+Mọi node do ứng dụng sở hữu đều công bố các mã nó khai. Với `contractEmission: "attribute"`, cây kết
+quả mang `data-contract` dưới dạng danh sách token cách nhau bằng khoảng trắng; với `receipt-only`,
+cây không mang gì và chỉ receipt giữ các lời khai. Khâu phát ra ghi cây kết quả dưới
+`input.project.artifactRootRef`, phát đúng một output theo `output.schema.json`, bind mọi fingerprint,
+và không claim đã có bằng chứng visual, quality hay UAT.
 
 ## Contract là lời khai, không phải phán quyết
 

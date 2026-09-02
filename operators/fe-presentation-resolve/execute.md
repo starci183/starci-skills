@@ -30,35 +30,41 @@ Four prohibitions carry this, and each is enforced rather than advised:
 The operator never edits knowledge. A missing case is returned to the knowledge owner, and the same
 tree is resolved again once the case is published and the topic fingerprint is rebound.
 
-## Execution sequence
+## Sequence
 
-1. **Validate input and resume.** Apply `input.schema.json` and semantic validation. Reject stale
-   source binding, owner overlap, duplicate topics, cross-filed identifiers, and unchanged progress.
-2. **Bind authority.** Bind the knowledge index and every topic with its fingerprint and inventory,
-   the published Grammar package with the relationships it already owns, the routed source head, and
-   the frozen tree.
-3. **Walk the tree once.** Visit every node in document order and record a stable `nodePath`. A node
-   outside the mutable owner ceiling is observed and never mutated; needing to mutate one is
-   `OWNER_CONFLICT`.
-4. **Determine the owner for each present property.** Consult the Grammar relationships first. A
-   property a component already owns resolves to `owner: "grammar"`, emits no class, names the rule
-   the component satisfies, and records `GRAMMAR_OWNED`. This ordering is deliberate: it makes
-   reimplementation impossible rather than merely discouraged.
-5. **Select one rule per remaining property.** Match the observed condition against the cases the
-   bound topic publishes. Exactly one case may match. Two matching cases mean the knowledge is
-   ambiguous and the invocation stops rather than choosing.
-6. **Classify a missing public path.** When the relationship has no Common owner and the knowledge
-   marks it a capability gap, resolve `owner: "none"`, emit the class the rule declares, and record
-   `COMMON_CAPABILITY_MISSING`. The class is a recorded workaround, never a silent pass.
-7. **Remove what the tree should not carry.** Delete an application class that reimplements a
-   Grammar-owned relationship, overrides Grammar anatomy, or sits off the closed scale, and record
-   the matching finding. Removal is reported per node; it is never silent.
-8. **Emit contracts.** Every application-owned node publishes the identifiers it claims. With
-   `contractEmission: "attribute"` the resolved tree carries `data-contract` as a space-separated
-   token list. With `receipt-only` the tree carries nothing and the receipt alone holds the claims.
-9. **Emit and stop.** Write the resolved tree under `input.project.artifactRootRef`, emit one output
-   conforming to `output.schema.json`, and bind every fingerprint. Do not claim visual, quality, or
-   UAT proof.
+| # | Step | Reads | Writes | Stops with |
+| --- | --- | --- | --- | --- |
+| 1 | Validate input and resume | input, prior receipt, frozen source binding | — | `INVALID_INPUT`, `SOURCE_DRIFT`, `NO_PROGRESS` |
+| 2 | Bind authority | knowledge index and every topic with its fingerprint and inventory, published Grammar package and its relationships, routed source head, frozen tree | — | `KNOWLEDGE_UNBOUND`, `GRAMMAR_UNPUBLISHED` |
+| 3 | Walk the tree once | frozen tree, mutable owner ceiling | — | `OWNER_CONFLICT` |
+| 4 | Determine the owner for each present property | Grammar relationships, the node's present properties | — | — |
+| 5 | Select one rule per remaining property | observed condition, the cases the bound topic publishes | — | `RULE_MISSING` |
+| 6 | Classify a missing public path | the relationship, the knowledge's capability-gap marking | — | — |
+| 7 | Remove what the tree should not carry | application classes on the node, Grammar anatomy, the closed scale | — | — |
+| 8 | Emit contracts | resolved properties, `contractEmission`, the frozen rule inventory | — | `UNKNOWN_RULE` |
+| 9 | Emit and stop | everything above | `<target>.resolved.tsx` | — |
+
+Validation rejects a stale source binding, owner overlap, duplicate topics, cross-filed identifiers,
+and unchanged progress. The walk visits every node in document order and records a stable `nodePath`;
+a node outside the mutable owner ceiling is observed and never mutated.
+
+Grammar relationships are consulted first, so a property a component already owns resolves to
+`owner: "grammar"`, emits no class, names the rule the component satisfies, and records
+`GRAMMAR_OWNED`. That ordering is deliberate: it makes reimplementation impossible rather than merely
+discouraged. Exactly one published case may match an observed condition; two matching cases mean the
+knowledge is ambiguous and the invocation stops rather than choosing.
+
+When the relationship has no Common owner and the knowledge marks it a capability gap, the property
+resolves to `owner: "none"`, emits the class the rule declares, and records
+`COMMON_CAPABILITY_MISSING`; that class is a recorded workaround, never a silent pass. An application
+class that reimplements a Grammar-owned relationship, overrides Grammar anatomy, or sits off the
+closed scale is deleted with its matching finding, reported per node and never silently.
+
+Every application-owned node publishes the identifiers it claims. With `contractEmission: "attribute"`
+the resolved tree carries `data-contract` as a space-separated token list; with `receipt-only` the
+tree carries nothing and the receipt alone holds the claims. Emission writes the resolved tree under
+`input.project.artifactRootRef`, returns one output conforming to `output.schema.json`, binds every
+fingerprint, and claims no visual, quality, or UAT proof.
 
 ## The contract is a claim, not a verdict
 
