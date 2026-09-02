@@ -33,38 +33,44 @@ huỷ và phục hồi — chưa được chứng minh đầy đủ. Lời hứa
 Operator không bao giờ bịa ra chủ thể, quyền lợi, hạn mức, thanh toán, tất toán hay hành vi vòng đời.
 Phần vật liệu còn thiếu được báo cáo như một failure và trả về cho chủ sở hữu của nó.
 
-## Trình tự thực thi
+## Trình tự
 
-1. **Kiểm tra input và resume.** Áp `input.schema.json` và kiểm tra ngữ nghĩa. Từ chối binding source
-   đã cũ, claim trích tới source không được bind, head không đúng bằng `features/<featureId>` dưới gốc
-   businesses, consumer trùng, trạng thái đích không hợp lệ với head quan sát được, và tiến độ không
-   đổi.
-2. **Chuẩn hoá bằng chứng.** Tách mỗi claim thành fact, intent, example, unknown hay contradiction,
-   mỗi cái trích vai trò, đường dẫn, khoảng dòng và head. Một mâu thuẫn chưa giải quyết làm lần gọi
-   dừng với `CONTRADICTION_UNRESOLVED`; nó không bao giờ được lấy trung bình cho qua.
-3. **Kiểm tra head đã publish.** Đọc head hiện tại của feature và phân loại nó là chưa có, còn mới hay
-   đã cũ so với bằng chứng và source head đã đóng băng. Phân loại đó quyết định bước chuyển vòng đời
-   nào hợp lệ, và một bước chuyển không hợp lệ là `LIFECYCLE_TRANSITION_INVALID`.
-4. **Mô hình hoá lời hứa.** Phát biểu lời hứa, chủ thể của nó và điều kiện hưởng, mỗi thứ một câu, chỉ
-   từ các claim loại fact. Claim ý định có thể định hình câu chữ; chúng không bao giờ trở thành sự thực
-   thi.
-5. **Đóng băng ma trận coverage.** Ghi đúng một dòng cho mỗi chiều. Mỗi dòng nêu disposition, chủ sở
-   hữu thực thi, source thực thi, bằng chứng khẳng định và phủ định, các consumer nó định đoạt, và các
-   claim đứng sau. Đánh địa chỉ theo nội dung cho ma trận và mang fingerprint của nó vào phần binding,
-   để hiện thực backend, tích hợp chất lượng và UAT chứng minh được rằng họ đọc đúng ma trận đó chứ
-   không phải một bản diễn giải lại.
-6. **Định đoạt phần cùng tồn tại với di sản.** Tạo, đọc và tất toán di sản mỗi thứ chiếm một dòng
-   riêng. Một đường bán mới chỉ được khai tử phần tạo di sản khi các quyền đã mua vẫn đọc được và phần
-   tất toán di sản còn treo vẫn chạy xong, và việc khai tử phải kèm bằng chứng rằng đường tạo đã đóng.
-7. **Đối chiếu khi đích là implemented.** So source đã giao với ma trận đã đóng băng. Mọi sai lệch làm
-   lần gọi dừng với `RECONCILIATION_DISCREPANCY`; `implemented` không bao giờ được publish dựa trên
-   một bản kế hoạch.
-8. **Publish đúng một head.** Ghi `model.json` tại `<businessesRootRef>/features/<featureId>`, lưu
-   phiên bản dưới `objects/sha256/`, cập nhật `business-registry-v1.json` và `history/by-id.json`, rồi
-   đăng ký head và ma trận vào `artifactRefs`. Việc từ chối giữ lại phả hệ bằng cách gọi tên
-   head trước đó thay vì xoá nó đi.
-9. **Phát ra và dừng.** Trả về một output đúng `output.schema.json` với mọi fingerprint đã ràng. Không
-   khẳng định bằng chứng hiện thực, chất lượng hay UAT.
+| # | Bước | Đọc | Ghi | Dừng với |
+| --- | --- | --- | --- | --- |
+| 1 | Kiểm tra input và resume | input, receipt trước đó, binding source đã đóng băng | — | `INVALID_INPUT`, `SOURCE_DRIFT`, `NO_PROGRESS` |
+| 2 | Chuẩn hoá bằng chứng | từng claim kèm vai trò, đường dẫn, khoảng dòng và head | — | `EVIDENCE_MISSING`, `CONTRADICTION_UNRESOLVED` |
+| 3 | Kiểm tra head đã publish | head hiện tại của feature, bằng chứng đã đóng băng, trạng thái đích được yêu cầu | — | `LIFECYCLE_TRANSITION_INVALID`, `AUTHORITY_CONFLICT`, `APPROVAL_REQUIRED` |
+| 4 | Mô hình hoá lời hứa | chỉ các claim loại fact | — | — |
+| 5 | Đóng băng ma trận coverage | các chiều, các consumer đã phát hiện, các claim đã chuẩn hoá | `coverage-matrix.json` | `COVERAGE_INCOMPLETE`, `CONSUMER_UNPROVEN` |
+| 6 | Định đoạt phần cùng tồn tại với di sản | các dòng tạo, đọc, tất toán di sản cùng bằng chứng của chúng | — | — |
+| 7 | Đối chiếu khi đích là implemented | source đã giao, ma trận đã đóng băng | — | `RECONCILIATION_DISCREPANCY` |
+| 8 | Publish đúng một head | ma trận đã đóng băng, lời hứa đã mô hình hoá, head trước đó | `model.json` | — |
+| 9 | Phát ra và dừng | tất cả những gì ở trên | — | — |
+
+Khâu kiểm tra từ chối binding source đã cũ, claim trích tới source không được bind, head không đúng
+bằng `features/<featureId>` dưới gốc businesses, consumer trùng, trạng thái đích không hợp lệ với head
+quan sát được, và tiến độ không đổi. Việc chuẩn hoá tách mỗi claim thành fact, intent, example,
+unknown hay contradiction; một mâu thuẫn chưa giải quyết làm lần gọi dừng lại và không bao giờ được
+lấy trung bình cho qua. Head được phân loại là chưa có, còn mới hay đã cũ so với bằng chứng và source
+head đã đóng băng, và phân loại đó quyết định bước chuyển vòng đời nào hợp lệ.
+
+Lời hứa, chủ thể của nó và điều kiện hưởng mỗi thứ một câu và chỉ đến từ các claim loại fact: claim ý
+định có thể định hình câu chữ, nhưng chúng không bao giờ trở thành sự thực thi. Ma trận coverage mang
+đúng một dòng cho mỗi chiều, mỗi dòng nêu disposition, chủ sở hữu thực thi, source thực thi, bằng
+chứng khẳng định và phủ định, các consumer nó định đoạt, và các claim đứng sau. Ma trận được đánh địa
+chỉ theo nội dung và fingerprint của nó đi cùng phần binding, để hiện thực backend, tích hợp chất
+lượng và UAT chứng minh được rằng họ đọc đúng ma trận đó chứ không phải một bản diễn giải lại.
+
+Tạo, đọc và tất toán di sản mỗi thứ chiếm một dòng riêng. Một đường bán mới chỉ được khai tử phần tạo
+di sản khi các quyền đã mua vẫn đọc được và phần tất toán di sản còn treo vẫn chạy xong, và việc khai
+tử phải kèm bằng chứng rằng đường tạo đã đóng. `implemented` không bao giờ được publish dựa trên một
+bản kế hoạch: source đã giao phải được so với ma trận đã đóng băng trước đã.
+
+Khâu publish ghi `model.json` tại `<businessesRootRef>/features/<featureId>`, lưu phiên bản dưới
+`objects/sha256/`, cập nhật `business-registry-v1.json` và `history/by-id.json`, rồi đăng ký head và
+ma trận vào `artifactRefs`. Việc từ chối giữ lại phả hệ bằng cách gọi tên head trước đó thay vì xoá nó
+đi. Khâu phát ra trả về một output đúng `output.schema.json` với mọi fingerprint đã ràng, và không
+khẳng định bằng chứng hiện thực, chất lượng hay UAT.
 
 ## Các disposition
 

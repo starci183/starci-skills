@@ -30,37 +30,44 @@ guard. Four prohibitions carry the repair, and each is enforced rather than advi
 The operator never invents an actor, entitlement, quota, payment, settlement, or lifecycle behaviour.
 Missing substance is reported as a failure and returned to its owner.
 
-## Execution sequence
+## Sequence
 
-1. **Validate input and resume.** Apply `input.schema.json` and semantic validation. Reject stale
-   source binding, unbound claim citations, a head that is not `features/<featureId>` below the businesses
-   root, a duplicate consumer, an illegal target state for the observed head, and unchanged progress.
-2. **Normalize the evidence.** Separate every claim into fact, intent, example, unknown, or
-   contradiction, each cited by role, path, line range, and head. An unresolved contradiction stops
-   the invocation with `CONTRADICTION_UNRESOLVED`; it is never averaged away.
-3. **Check the published head.** Read the current head for the feature and classify it as absent,
-   fresh, or stale against the frozen evidence and source head. The classification decides which
-   lifecycle transition is legal, and an illegal transition is `LIFECYCLE_TRANSITION_INVALID`.
-4. **Model the promise.** State the promise, its actor, and its eligibility in one sentence each, from
-   fact claims only. Intent claims may shape wording; they never become enforcement.
-5. **Freeze the coverage matrix.** Write exactly one row per dimension. Each row states its
-   disposition, the enforcement owner, the enforcing source, its positive and negative proof, the
-   consumers it disposes, and the claims behind it. Content-address the matrix and carry its
-   fingerprint into the binding, so backend implementation, quality integration, and UAT can prove
-   they consumed the same matrix rather than a paraphrase of it.
-6. **Dispose legacy coexistence.** Legacy create, read, and settle each take their own row. A new sale
-   path may retire legacy creation only while already-purchased rights stay readable and pending
-   legacy settlement still completes, and the retirement carries proof that the creation path is
-   closed.
-7. **Reconcile when the target is implemented.** Compare delivered source against the frozen matrix.
-   Any discrepancy stops the invocation with `RECONCILIATION_DISCREPANCY`; `implemented` is never
-   published on the strength of a plan.
-8. **Publish one head.** Write `model.json` at `<businessesRootRef>/features/<featureId>`, store the
-   version under `objects/sha256/`, update `business-registry-v1.json` and `history/by-id.json`, then
-   register the head and the matrix in `artifactRefs`. Rejection preserves lineage by
-   naming the previous head rather than erasing it.
-9. **Emit and stop.** Return one output conforming to `output.schema.json` with every fingerprint
-   bound. Do not claim implementation, quality, or UAT proof.
+| # | Step | Reads | Writes | Stops with |
+| --- | --- | --- | --- | --- |
+| 1 | Validate input and resume | input, prior receipt, frozen source binding | — | `INVALID_INPUT`, `SOURCE_DRIFT`, `NO_PROGRESS` |
+| 2 | Normalize the evidence | every claim with its role, path, line range, and head | — | `EVIDENCE_MISSING`, `CONTRADICTION_UNRESOLVED` |
+| 3 | Check the published head | current head for the feature, frozen evidence, requested target state | — | `LIFECYCLE_TRANSITION_INVALID`, `AUTHORITY_CONFLICT`, `APPROVAL_REQUIRED` |
+| 4 | Model the promise | fact claims only | — | — |
+| 5 | Freeze the coverage matrix | dimensions, discovered consumers, normalized claims | `coverage-matrix.json` | `COVERAGE_INCOMPLETE`, `CONSUMER_UNPROVEN` |
+| 6 | Dispose legacy coexistence | legacy create, read, and settle rows and their proof | — | — |
+| 7 | Reconcile when the target is implemented | delivered source, frozen matrix | — | `RECONCILIATION_DISCREPANCY` |
+| 8 | Publish one head | frozen matrix, modelled promise, previous head | `model.json` | — |
+| 9 | Emit and stop | everything above | — | — |
+
+Validation rejects a stale source binding, unbound claim citations, a head that is not
+`features/<featureId>` below the businesses root, a duplicate consumer, an illegal target state for
+the observed head, and unchanged progress. Normalization separates every claim into fact, intent,
+example, unknown, or contradiction; an unresolved contradiction stops the invocation and is never
+averaged away. The head is classified absent, fresh, or stale against the frozen evidence and source
+head, and that classification decides which lifecycle transition is legal.
+
+The promise, its actor, and its eligibility are one sentence each and come from fact claims only:
+intent claims may shape wording, but they never become enforcement. The coverage matrix carries
+exactly one row per dimension, each stating its disposition, the enforcement owner, the enforcing
+source, its positive and negative proof, the consumers it disposes, and the claims behind it. It is
+content-addressed and its fingerprint travels in the binding, so backend implementation, quality
+integration, and UAT can prove they consumed the same matrix rather than a paraphrase of it.
+
+Legacy create, read, and settle each take their own row. A new sale path may retire legacy creation
+only while already-purchased rights stay readable and pending legacy settlement still completes, and
+the retirement carries proof that the creation path is closed. `implemented` is never published on
+the strength of a plan: delivered source is compared against the frozen matrix first.
+
+Publication writes `model.json` at `<businessesRootRef>/features/<featureId>`, stores the version
+under `objects/sha256/`, updates `business-registry-v1.json` and `history/by-id.json`, and registers
+the head and the matrix in `artifactRefs`. Rejection preserves lineage by naming the previous head
+rather than erasing it. Emission returns one output conforming to `output.schema.json` with every
+fingerprint bound, and claims no implementation, quality, or UAT proof.
 
 ## Dispositions
 
