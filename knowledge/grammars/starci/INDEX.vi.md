@@ -13,6 +13,7 @@ Nhánh này mô tả một visual family: StarCi Core. Luật UI universal vẫn
 
 ## Thứ tự đọc
 
+0. [DNA](DNA.vi.md) — sinh ra từ package; mồi cho agent định hướng bằng file này, và đọc các topic khi một dòng làm nảy ra câu hỏi.
 1. [Family và DNA](family.vi.md) — identity, token, hướng CSS, binding X-n và gap đã biết.
 2. [Cách dùng](consumption.vi.md) — import, chọn root, family factory và boundary ownership.
 3. [Ma trận component](components.vi.md) — đủ 41 Common public renderer và cách Core hiện thực.

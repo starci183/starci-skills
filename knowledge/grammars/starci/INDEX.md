@@ -13,6 +13,7 @@ This branch documents one visual family: StarCi Core. Universal UI law remains c
 
 ## Read order
 
+0. [DNA](DNA.md) — generated from the package; prime a direction agent with this, read the topics when a row raises a question.
 1. [Family and DNA](family.md) — identity, tokens, CSS direction, X-n bindings, and known gaps.
 2. [Consumption](consumption.md) — imports, root selection, family factory, and ownership boundary.
 3. [Component matrix](components.md) — all 41 Common public renderers and their Core realization.
