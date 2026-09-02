@@ -47,7 +47,7 @@
       "isolation": "fresh",
       "forkTurns": "none",
       "count": 1,
-      "role": "Production execution for authored content: writing, per-language code tracks, image prompts, and the bounded run-read-repair loop.",
+      "role": "Authored content end to end: bounded brief research, writing, per-language code tracks, image generation to a stated claim, and the bounded run-read-repair loop.",
       "capabilities": {
         "webSearch": true,
         "imageGeneration": true,
@@ -55,7 +55,7 @@
         "sourceWrite": true
       },
       "permits": {
-        "webSearch": false,
+        "webSearch": true,
         "imageGeneration": true,
         "browser": false,
         "sourceWrite": true

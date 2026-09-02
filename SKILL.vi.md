@@ -13,9 +13,9 @@ phán xét một kết quả.
    phép tự tìm checkout, và một thư mục trùng tên không bao giờ là thẩm quyền route.
 3. Chọn operator đầu tiên theo bảng dưới. Chỉ đọc `operator.json`, `context.md`, `input.md` và
    `execute.md` của đúng operator đó.
-4. Chạy từng vai trò của operator đó trên profile mà `resources/assignments.json` ràng cho nó, với
-   đúng những quyền nó liệt kê. Một vai trò không có model khác, không thừa hưởng lượt nào, và không
-   có quyền nào mà assignment bỏ sót.
+4. Chạy operator đó, từ đầu tới cuối, trên đúng một profile mà `resources/assignments.json` ràng cho
+   nó, với đúng những quyền nó liệt kê. Một operator không có model khác, không thừa hưởng lượt nào,
+   và không có quyền nào mà assignment bỏ sót.
 
 ## Cửa vào
 

@@ -68,8 +68,10 @@ for (const id of Object.keys(assignments.operators)) {
 
 for (const [id, entry] of Object.entries(assignments.operators)) {
   if (!onDisk.has(id)) continue;
-  const roles = Object.entries(entry.roles ?? {});
-  if (roles.length === 0) errors.push(`${id}: at least one role must bind a profile`);
+  // One operator, one profile, end to end. A split across profiles is a workflow, not an operator.
+  const roles = typeof entry.profile === 'string' ? [['operator', entry.profile]] : [];
+  if (roles.length === 0) errors.push(`${id}: profile must name the single execution profile`);
+  if (entry.roles !== undefined) errors.push(`${id}: roles is retired; bind one profile`);
 
   const permitted = new Set();
   const assignedModels = new Set();
@@ -111,6 +113,6 @@ if (errors.length > 0) {
   process.stderr.write(`${errors.join('\n')}\n`);
   process.exitCode = 1;
 } else {
-  const roles = Object.values(assignments.operators).reduce((n, e) => n + Object.keys(e.roles).length, 0);
-  process.stdout.write(`resources bound: ${Object.keys(agents.runtimes).length} runtimes, ${Object.keys(agents.profiles).length} profiles, ${onDisk.size} operators, ${roles} roles\n`);
+  const roles = new Set(Object.values(assignments.operators).map((e) => e.profile)).size;
+  process.stdout.write(`resources bound: ${Object.keys(agents.runtimes).length} runtimes, ${Object.keys(agents.profiles).length} profiles, ${onDisk.size} operators on ${roles} profiles\n`);
 }
