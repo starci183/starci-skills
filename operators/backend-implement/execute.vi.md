@@ -44,37 +44,45 @@ dạng một failure có kiểu gửi tới người sở hữu nghiệp vụ, c
 Vì vậy một receipt đã hiện thực không được mang finding `BUSINESS_QUESTION_RAISED`. Nêu câu hỏi rồi vẫn
 làm tiếp chính là mâu thuẫn mà phép kiểm tra này sinh ra để bắt.
 
-## Trình tự thi hành
+## Trình tự
 
-1. **Kiểm tra input và resume.** Áp `input.schema.json` cùng phần kiểm tra ngữ nghĩa. Từ chối binding
-   source đã cũ, writer nằm ngoài trần được sửa, migration không có proof chạy lại, operation read-only
-   mang migration, event consumer không có idempotency, mã quyết định mà thẩm quyền đã duyệt không
-   publish, và resume không đổi gì.
-2. **Ràng thẩm quyền.** Ràng thẩm quyền nghiệp vụ đã duyệt cùng các quyết định của nó, contract đã đóng
-   băng cùng mọi operation, từng pattern anh em kèm khía cạnh của nó, và source head đã route. Xác minh
-   lại head ngay trước lần ghi sản phẩm đầu tiên; khác biệt là `SOURCE_DRIFT`.
-3. **Lấp từng operation một.** Với mỗi operation, viết transport, validation, kiểm tra phân quyền, truy
-   cập dữ liệu và các đường thất bại vào writer đã khai cùng những file mà thay đổi thật sự cần, soi
-   theo pattern đã bind cho từng khía cạnh. Từ chối to và sớm thay vì âm thầm bỏ qua một trường hợp:
-   một tổ hợp không được hỗ trợ thì ném đúng exception mà pattern danh tính exception publish, trước
-   khi tạo bất kỳ dòng dữ liệu hay phiên thanh toán bên ngoài nào.
-4. **Ghi lại mọi mutation.** Mỗi file bị chạm sinh ra một bản ghi thay đổi kèm loại, hash trước, hash
-   sau, operation nó phục vụ và nội dung đã đổi. Một file `modified` mà hai hash bằng nhau là ghi nhận
-   một mutation chưa từng xảy ra.
-5. **Kiểm lại snapshot đã lưu khi đọc.** Khi outcome lưu một workflow, session, giỏ hàng, bản nháp hay
-   snapshot khác, hãy cưỡng chế tính dùng được một lần nữa ngay tại chỗ đọc, vì quyền lợi, tư cách
-   thành viên, bản ghi được tham chiếu và luật schema đều trôi đi sau lúc tạo. Hoà giải phía máy chủ,
-   giữ thứ tự ổn định, ánh xạ lại chỉ số một cách nguyên tử, và chọn một trạng thái kết thúc tường minh
-   khi không còn gì hành động được. Ghi lại thành `SNAPSHOT_REVALIDATED`.
-6. **Chứng minh từng mặt đã khai.** Mỗi mặt mà operation khai đều nhận đúng một bản ghi đối chiếu, nêu
-   tên bằng chứng đã đo nó. Một mặt không có bản ghi là đối chiếu được khẳng định chứ không được chứng
-   minh, còn một mặt có phán quyết `widened` hoặc `narrowed` thì chặn receipt lại.
-7. **Chạy từng proof đã khai.** Mỗi loại proof đã khai đều chạy lệnh đã ghim và ghi kết quả dưới
-   artifact root. Một proof không chạy được là `PROOF_UNAVAILABLE`; nó không bao giờ biến thành lời
-   khẳng định rằng hành vi vẫn ổn. Một proof trượt thì chặn receipt chứ không được phân loại lại.
-8. **Phát và dừng.** Ghi receipt dưới `input.project.artifactRootRef`, đăng ký mọi kết quả proof vào
-   `artifactRefs`, phát đúng một output tuân theo `output.schema.json`, và ràng mọi fingerprint. Không
-   tuyên bố bằng chứng chất lượng, thị giác hay UAT; đó là những việc khác với những cổng riêng.
+| # | Bước | Đọc | Ghi | Dừng với |
+| --- | --- | --- | --- | --- |
+| 1 | Kiểm tra input và resume | input, receipt trước đó, source head đã route | — | `INVALID_INPUT`, `SOURCE_DRIFT`, `NO_PROGRESS` |
+| 2 | Ràng thẩm quyền | thẩm quyền nghiệp vụ đã duyệt cùng các quyết định của nó, contract đã đóng băng cùng mọi operation, từng pattern anh em kèm khía cạnh của nó | — | `CONTRACT_UNFROZEN`, `BUSINESS_AUTHORITY_MISSING`, `PATTERN_UNBOUND` |
+| 3 | Lấp từng operation một | một operation của contract, các pattern đã bind cho nó, `input.scope.mutableFileRefs` | — | `CONTRACT_WIDENED`, `OWNER_CONFLICT` |
+| 4 | Ghi lại mọi mutation | các file bị chạm, hash trước và hash sau | — | — |
+| 5 | Kiểm lại snapshot đã lưu khi đọc | snapshot đã lưu và những luật trôi đi sau lúc tạo nó | — | — |
+| 6 | Chứng minh từng mặt đã khai | các mặt operation khai và phép đo của chúng | `conformance/<operationId>.<facet>.json` | — |
+| 7 | Chạy từng proof đã khai | các loại proof đã khai cùng lệnh đã ghim | `proofs/<operationId>.<kind>.json` | `PROOF_UNAVAILABLE` |
+| 8 | Phát ra và dừng | tất cả những gì ở trên | — | — |
+
+Khâu kiểm tra từ chối binding source đã cũ, writer nằm ngoài trần được sửa, migration không có proof
+chạy lại, operation read-only mang migration, event consumer không có idempotency, mã quyết định mà
+thẩm quyền đã duyệt không publish, và resume không đổi gì. Head đã route được xác minh lại ngay trước
+lần ghi sản phẩm đầu tiên, nên độ trôi phát hiện ở đó làm lần gọi dừng trước khi có gì được ghi ra.
+
+Việc lấp một operation viết transport, validation, kiểm tra phân quyền, truy cập dữ liệu và các đường
+thất bại vào writer đã khai cùng những file mà thay đổi thật sự cần, soi theo pattern đã bind cho từng
+khía cạnh. Nó từ chối to và sớm thay vì âm thầm bỏ qua một trường hợp: một tổ hợp không được hỗ trợ
+thì ném đúng exception mà pattern danh tính exception publish, trước khi tạo bất kỳ dòng dữ liệu hay
+phiên thanh toán bên ngoài nào, còn một quy ước mà không pattern nào đã bind publish thì được ghi lại
+thành `NEW_CONVENTION_REFUSED` chứ không được nhận vào.
+
+Mỗi file bị chạm sinh ra một bản ghi thay đổi kèm loại, hash trước, hash sau, operation nó phục vụ và
+nội dung đã đổi; một file `modified` mà hai hash bằng nhau là ghi nhận một mutation chưa từng xảy ra.
+Khi outcome lưu một workflow, session, giỏ hàng, bản nháp hay snapshot khác, tính dùng được được cưỡng
+chế lại ngay tại chỗ đọc — hoà giải phía máy chủ, giữ thứ tự ổn định, ánh xạ lại chỉ số một cách
+nguyên tử, và chọn một trạng thái kết thúc tường minh khi không còn gì hành động được — rồi ghi lại
+thành `SNAPSHOT_REVALIDATED`.
+
+Mỗi mặt đã khai nhận đúng một bản ghi đối chiếu nêu tên bằng chứng đã đo nó; một mặt không có bản ghi
+là đối chiếu được khẳng định chứ không được chứng minh, còn một mặt có phán quyết `widened` hoặc
+`narrowed` thì chặn receipt lại. Một proof không chạy được không bao giờ biến thành lời khẳng định
+rằng hành vi vẫn ổn, và một proof trượt thì chặn receipt chứ không được phân loại lại. Khâu phát ra
+ghi receipt dưới `input.project.artifactRootRef`, đăng ký mọi kết quả proof vào `artifactRefs`, trả
+đúng một output tuân theo `output.schema.json`, ràng mọi fingerprint, và không tuyên bố bằng chứng
+chất lượng, thị giác hay UAT; đó là những việc khác với những cổng riêng.
 
 ## Đối chiếu là đo được, không phải khẳng định
 

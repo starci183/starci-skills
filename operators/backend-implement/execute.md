@@ -43,38 +43,46 @@ typed failure addressed to the business owner and never as a default.
 An implemented receipt therefore cannot carry a `BUSINESS_QUESTION_RAISED` finding. Raising the
 question and implementing anyway is the exact contradiction the check exists to catch.
 
-## Execution sequence
+## Sequence
 
-1. **Validate input and resume.** Apply `input.schema.json` and semantic validation. Reject a stale
-   source binding, a writer outside the mutable ceiling, a migration with no replay proof, a
-   read-only operation carrying a migration, an event consumer with no idempotency, a decision
-   identifier no approved authority publishes, and an unchanged resume.
-2. **Bind authority.** Bind the approved business authority and its decisions, the frozen contract and
-   every operation, each sibling pattern with its aspect, and the routed source head. Reverify the
-   head immediately before the first product write; a difference is `SOURCE_DRIFT`.
-3. **Fill one operation at a time.** For each operation, write the transport, the validation, the
-   authorization check, the data access, and the failure paths into the declared writer and the files
-   the change genuinely requires, mirroring the bound pattern for each aspect. Refuse loudly and early
-   rather than dropping a case silently: an unsupported combination raises the exception the
-   exception-identity pattern publishes, before any row or external checkout is created.
-4. **Record every mutation.** Each touched file produces one change record with its kind, its before
-   hash, its after hash, the operation it serves, and what changed. A modified file whose two hashes
-   agree recorded a mutation that did not happen.
-5. **Revalidate persisted snapshots on read.** When the outcome persists a workflow, session, cart,
-   draft, or other snapshot, enforce usability again where it is read, because entitlement, membership,
-   referenced records, and schema rules drift after creation. Reconcile server-side, preserve stable
-   order, remap indexes atomically, and choose an explicit terminal state when nothing actionable
-   remains. Record it as `SNAPSHOT_REVALIDATED`.
-6. **Prove each declared facet.** Every facet the operation declares gets exactly one conformance
-   record naming the evidence that measured it. A facet with no record is conformance asserted rather
-   than proved, and a facet whose verdict is `widened` or `narrowed` blocks the receipt.
-7. **Run each declared proof.** Every declared proof kind runs its pinned command and writes its
-   result under the artifact root. A proof that could not run is `PROOF_UNAVAILABLE`; it never becomes
-   an assertion that the behaviour is fine. A failed proof blocks the receipt rather than being
-   reclassified.
-8. **Emit and stop.** Write the receipt under `input.project.artifactRootRef`, register every proof
-   result in `artifactRefs`, emit one output conforming to `output.schema.json`, and bind every
-   fingerprint. Do not claim quality, visual, or UAT proof; those are other jobs with their own gates.
+| # | Step | Reads | Writes | Stops with |
+| --- | --- | --- | --- | --- |
+| 1 | Validate input and resume | input, prior receipt, routed source head | — | `INVALID_INPUT`, `SOURCE_DRIFT`, `NO_PROGRESS` |
+| 2 | Bind authority | approved business authority and its decisions, the frozen contract and every operation, each sibling pattern with its aspect | — | `CONTRACT_UNFROZEN`, `BUSINESS_AUTHORITY_MISSING`, `PATTERN_UNBOUND` |
+| 3 | Fill one operation at a time | one contract operation, its bound patterns, `input.scope.mutableFileRefs` | — | `CONTRACT_WIDENED`, `OWNER_CONFLICT` |
+| 4 | Record every mutation | the touched files, before and after hashes | — | — |
+| 5 | Revalidate persisted snapshots on read | the persisted snapshot and the rules that drift after it | — | — |
+| 6 | Prove each declared facet | the operation's declared facets and their measurements | `conformance/<operationId>.<facet>.json` | — |
+| 7 | Run each declared proof | the declared proof kinds and their pinned commands | `proofs/<operationId>.<kind>.json` | `PROOF_UNAVAILABLE` |
+| 8 | Emit and stop | everything above | — | — |
+
+Validation rejects a stale source binding, a writer outside the mutable ceiling, a migration with no
+replay proof, a read-only operation carrying a migration, an event consumer with no idempotency, a
+decision identifier no approved authority publishes, and an unchanged resume. The routed head is
+reverified immediately before the first product write, so drift found there stops the invocation
+before anything is written.
+
+Filling an operation writes the transport, the validation, the authorization check, the data access,
+and the failure paths into the declared writer and the files the change genuinely requires, mirroring
+the bound pattern for each aspect. It refuses loudly and early rather than dropping a case silently:
+an unsupported combination raises the exception the exception-identity pattern publishes, before any
+row or external checkout is created, and a convention no bound pattern publishes is recorded as
+`NEW_CONVENTION_REFUSED` rather than adopted.
+
+Each touched file produces one change record with its kind, its before hash, its after hash, the
+operation it serves, and what changed; a modified file whose two hashes agree recorded a mutation that
+did not happen. When the outcome persists a workflow, session, cart, draft, or other snapshot,
+usability is enforced again where it is read — reconciled server-side, in stable order, with indexes
+remapped atomically and an explicit terminal state when nothing actionable remains — and recorded as
+`SNAPSHOT_REVALIDATED`.
+
+Every declared facet gets exactly one conformance record naming the evidence that measured it; a facet
+with no record is conformance asserted rather than proved, and a facet whose verdict is `widened` or
+`narrowed` blocks the receipt. A proof that could not run never becomes an assertion that the
+behaviour is fine, and a failed proof blocks the receipt rather than being reclassified. Emission
+writes the receipt under `input.project.artifactRootRef`, registers every proof result in
+`artifactRefs`, returns one output conforming to `output.schema.json`, binds every fingerprint, and
+claims no quality, visual, or UAT proof; those are other jobs with their own gates.
 
 ## Conformance is measured, not asserted
 
