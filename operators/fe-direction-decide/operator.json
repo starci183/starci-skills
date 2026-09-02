@@ -1,0 +1,30 @@
+{
+  "schemaVersion": 8,
+  "id": "fe.direction.decide",
+  "domain": "fe",
+  "job": "Decide one evidence-backed, implementation-ready frontend direction for one authorized target.",
+  "contextContract": "context.md",
+  "inputSchema": "input.schema.json",
+  "outputSchema": "output.schema.json",
+  "inputValidator": "validate-input.mjs",
+  "outputValidator": "validate-output.mjs",
+  "selfTest": "self-test.mjs",
+  "sideEffects": [
+    "write only the typed decision receipt and inspectable direction artifacts under input.project.artifactRootRef"
+  ],
+  "forbiddenSideEffects": [
+    "modify product or authority source",
+    "invent business, backend, architecture, authentication, persistence, or data behavior",
+    "publish shared UI Grammar",
+    "start, stop, or reconfigure runtime services",
+    "claim implementation, visual quality, quality-gate, or UAT completion"
+  ],
+  "stopConditions": [
+    "required authority is missing, stale, contradictory, or outside the frozen scope",
+    "the frontend change level or owner ceiling is ambiguous",
+    "a reusable Grammar contract is missing",
+    "no candidate survives mandatory falsification",
+    "several material candidates remain and product authority must choose",
+    "a resume adds no effective authority, evidence, or exact selection"
+  ]
+}

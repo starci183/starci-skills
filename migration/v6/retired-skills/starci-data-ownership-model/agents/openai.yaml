@@ -1,6 +1,0 @@
-interface:
-  display_name: "StarCi Data Ownership Model"
-  short_description: "Qualify datastore and mutation ownership"
-  default_prompt: "Use $starci-data-ownership-model for this selected flow and execute its state machine."
-policy:
-  allow_implicit_invocation: true

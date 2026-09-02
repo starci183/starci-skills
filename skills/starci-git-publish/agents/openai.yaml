@@ -1,6 +1,0 @@
-interface:
-  display_name: "StarCi Git Publish"
-  short_description: "Publish approved Git heads without force"
-  default_prompt: "Use $starci-git-publish to publish these approved mission-owned Git heads."
-policy:
-  allow_implicit_invocation: true

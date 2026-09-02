@@ -1,0 +1,35 @@
+{
+  "schemaVersion": 8,
+  "id": "release.deploy",
+  "domain": "deployment",
+  "job": "Deploy one immutable release to one declared target under its declared authorization and prove the steady state it reached, taking the recovery or rollback branch inside the same pass rather than assuming the rollout succeeded.",
+  "contextContract": "context.md",
+  "inputSchema": "input.schema.json",
+  "outputSchema": "output.schema.json",
+  "inputValidator": "validate-input.mjs",
+  "outputValidator": "validate-output.mjs",
+  "selfTest": "self-test.mjs",
+  "sideEffects": [
+    "apply the declared host, migration, domain, and rollout mutations against the frozen release identity",
+    "write the typed deployment receipt and its evidence index under input.project.artifactRootRef",
+    "restore the exact declared rollback release when the rollback branch is taken"
+  ],
+  "forbiddenSideEffects": [
+    "log, persist, echo, or return a resolved credential value",
+    "deploy a release the declared authorization does not cover",
+    "rebuild, retag, or otherwise alter the immutable artifact identified by the frozen digest",
+    "recover or roll back a release that appeared during execution and does not belong to this run",
+    "report a rolled-back run as successful delivery of the rejected release",
+    "declare steady state from a single probe observation or from an assumed rollout"
+  ],
+  "stopConditions": [
+    "the declared authorization is absent, expired, or scoped to another project, environment, or target",
+    "the validated manifest was pinned to a different release",
+    "a declared credential handle cannot be resolved through existing custody",
+    "a release other than the frozen release or the release it replaces becomes active during execution",
+    "the steady window cannot be proved before the declared deadline",
+    "recovery exhausts its approved reversible actions",
+    "rollback is required but its exact safe release no longer exists",
+    "a resume adds no authorization, manifest, credential, or observation delta"
+  ]
+}

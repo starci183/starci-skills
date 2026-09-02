@@ -1,6 +1,0 @@
-interface:
-  display_name: "StarCi Static Quality Gates"
-  short_description: "Run lint, typecheck and Sonar before commit"
-  default_prompt: "Use $starci-static-quality-gates for this selected flow and execute its state machine."
-policy:
-  allow_implicit_invocation: true

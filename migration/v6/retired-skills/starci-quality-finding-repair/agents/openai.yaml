@@ -1,6 +1,0 @@
-interface:
-  display_name: "StarCi Quality Finding Repair"
-  short_description: "Repair one approved measured quality finding"
-  default_prompt: "Use $starci-quality-finding-repair for this selected flow and execute its state machine."
-policy:
-  allow_implicit_invocation: true

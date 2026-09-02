@@ -1,6 +1,0 @@
-interface:
-  display_name: "StarCi Workspace Ready"
-  short_description: "Prepare and verify a routed StarCi workspace"
-  default_prompt: "Use $starci-workspace-ready for this selected flow and execute its state machine."
-policy:
-  allow_implicit_invocation: true

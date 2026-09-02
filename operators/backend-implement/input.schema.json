@@ -1,0 +1,242 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://starci.dev/v8/operators/backend-implement/input.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "operatorId", "context", "input"],
+  "properties": {
+    "schemaVersion": { "const": 8 },
+    "operatorId": { "const": "backend.implement" },
+    "context": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["authority", "patterns", "sourceRefs", "knowledgeRefs", "priorReceiptRefs"],
+      "properties": {
+        "authority": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["authorityRef", "fingerprint", "status", "decisions"],
+          "properties": {
+            "authorityRef": { "type": "string", "minLength": 1 },
+            "fingerprint": { "$ref": "#/$defs/fingerprint" },
+            "status": { "const": "approved" },
+            "decisions": {
+              "type": "array",
+              "minItems": 1,
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["decisionId", "statement"],
+                "properties": {
+                  "decisionId": { "$ref": "#/$defs/decisionId" },
+                  "statement": { "type": "string", "minLength": 1 }
+                }
+              }
+            }
+          }
+        },
+        "patterns": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["aspect", "patternRef", "fingerprint"],
+            "properties": {
+              "aspect": { "$ref": "#/$defs/patternAspect" },
+              "patternRef": { "type": "string", "minLength": 1 },
+              "fingerprint": { "$ref": "#/$defs/fingerprint" }
+            }
+          }
+        },
+        "sourceRefs": { "$ref": "#/$defs/nonEmptyContextRefArray" },
+        "knowledgeRefs": { "$ref": "#/$defs/contextRefArray" },
+        "priorReceiptRefs": { "$ref": "#/$defs/contextRefArray" }
+      }
+    },
+    "input": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "invocationId",
+        "missionId",
+        "project",
+        "outcome",
+        "contract",
+        "scope",
+        "resume"
+      ],
+      "properties": {
+        "invocationId": { "type": "string", "minLength": 1 },
+        "missionId": { "type": "string", "minLength": 1 },
+        "project": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["id", "backendSourceRef", "sourceHead", "artifactRootRef"],
+          "properties": {
+            "id": { "type": "string", "minLength": 1 },
+            "backendSourceRef": { "type": "string", "minLength": 1 },
+            "sourceHead": { "type": "string", "pattern": "^[0-9a-f]{40}$" },
+            "artifactRootRef": { "type": "string", "minLength": 1 }
+          }
+        },
+        "outcome": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["id", "kind", "statement"],
+          "properties": {
+            "id": { "type": "string", "minLength": 1 },
+            "kind": { "enum": ["feature", "repair", "migration", "integration"] },
+            "statement": { "type": "string", "minLength": 1 }
+          }
+        },
+        "contract": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["contractRef", "fingerprint", "status", "operations"],
+          "properties": {
+            "contractRef": { "type": "string", "minLength": 1 },
+            "fingerprint": { "$ref": "#/$defs/fingerprint" },
+            "status": { "const": "frozen" },
+            "operations": {
+              "type": "array",
+              "minItems": 1,
+              "items": { "$ref": "#/$defs/operation" }
+            }
+          }
+        },
+        "scope": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["mutableFileRefs", "observationOnlyFileRefs"],
+          "properties": {
+            "mutableFileRefs": { "$ref": "#/$defs/nonEmptyRefArray" },
+            "observationOnlyFileRefs": { "$ref": "#/$defs/refArray" }
+          }
+        },
+        "resume": {
+          "oneOf": [
+            { "type": "null" },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["blockedReceiptRef", "resumeToken", "addedContextRefs"],
+              "properties": {
+                "blockedReceiptRef": { "type": "string", "minLength": 1 },
+                "resumeToken": { "type": "string", "minLength": 1 },
+                "addedContextRefs": { "$ref": "#/$defs/refArray" }
+              }
+            }
+          ]
+        }
+      }
+    }
+  },
+  "$defs": {
+    "fingerprint": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
+    "decisionId": { "type": "string", "pattern": "^BA-[0-9]+$" },
+    "patternAspect": {
+      "enum": [
+        "module-layering",
+        "transport",
+        "validation",
+        "authorization",
+        "data-access",
+        "transaction-boundary",
+        "concurrency",
+        "idempotency",
+        "event-delivery",
+        "exception-identity",
+        "naming",
+        "type-safety"
+      ]
+    },
+    "contractFacet": {
+      "enum": [
+        "transport",
+        "writer",
+        "store",
+        "transaction",
+        "idempotency",
+        "migration",
+        "exception-identity",
+        "authorization",
+        "concurrency"
+      ]
+    },
+    "proofKind": {
+      "enum": ["unit", "integration", "migration-replay", "conformance-read", "runtime-probe"]
+    },
+    "operation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "operationId",
+        "name",
+        "transport",
+        "writerRef",
+        "storeRefs",
+        "transactionBoundary",
+        "idempotencyKind",
+        "migrationRefs",
+        "authorityDecisionIds",
+        "facets",
+        "proofKinds"
+      ],
+      "properties": {
+        "operationId": { "type": "string", "minLength": 1 },
+        "name": { "type": "string", "minLength": 1 },
+        "transport": {
+          "enum": ["graphql-mutation", "graphql-query", "rest", "worker", "cron", "event-consumer"]
+        },
+        "writerRef": { "type": "string", "minLength": 1 },
+        "storeRefs": { "$ref": "#/$defs/refArray" },
+        "transactionBoundary": {
+          "enum": ["single-transaction", "per-item", "read-only", "none"]
+        },
+        "idempotencyKind": { "enum": ["none", "natural-key", "request-token", "event-id"] },
+        "migrationRefs": { "$ref": "#/$defs/refArray" },
+        "authorityDecisionIds": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "#/$defs/decisionId" }
+        },
+        "facets": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "#/$defs/contractFacet" }
+        },
+        "proofKinds": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "#/$defs/proofKind" }
+        }
+      }
+    },
+    "contextRef": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["ref", "fingerprint", "sourceHead", "observedAt"],
+      "properties": {
+        "ref": { "type": "string", "minLength": 1 },
+        "fingerprint": { "$ref": "#/$defs/fingerprint" },
+        "sourceHead": {
+          "oneOf": [{ "type": "string", "pattern": "^[0-9a-f]{40}$" }, { "type": "null" }]
+        },
+        "observedAt": { "type": "string", "format": "date-time" }
+      }
+    },
+    "contextRefArray": { "type": "array", "items": { "$ref": "#/$defs/contextRef" } },
+    "nonEmptyContextRefArray": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/contextRef" }
+    },
+    "refArray": { "type": "array", "items": { "type": "string", "minLength": 1 } },
+    "nonEmptyRefArray": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "type": "string", "minLength": 1 }
+    }
+  }
+}

@@ -1,3 +1,0 @@
-import { validatorFor, runValidatorCli } from '../../validation.mjs';
-export const validateOutput=validatorFor(new URL('./output.schema.json',import.meta.url),(v)=>{const e=[];const o=v.output;if(o.outcome==='ready'&&(!o.articleRefs.length||!o.coveredOutcomeRefs.length||o.interviewQuestionCount<5||o.articleRefs.some(x=>!o.evidenceRefs.includes(x))||o.reason!==null))e.push('ready writing requires registered articles, covered outcomes, at least five interview questions, and no reason');if(o.outcome==='blocked'&&(o.articleRefs.length||!o.reason))e.push('blocked writing requires no articles and a reason');return e;});
-if(process.argv[1]?.endsWith('validate-output.mjs'))await runValidatorCli(validateOutput,'node validate-output.mjs <artifact.json>');

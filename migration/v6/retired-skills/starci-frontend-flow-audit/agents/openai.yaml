@@ -1,6 +1,0 @@
-interface:
-  display_name: "StarCi Frontend Flow Audit"
-  short_description: "Compile happy and unhappy UAT coverage"
-  default_prompt: "Use $starci-frontend-flow-audit for this selected flow and execute its state machine."
-policy:
-  allow_implicit_invocation: true

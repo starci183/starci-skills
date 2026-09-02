@@ -1,0 +1,34 @@
+{
+  "schemaVersion": 8,
+  "id": "business.decide",
+  "domain": "business",
+  "job": "Decide and publish one evidence-backed business promise as durable backend-owned authority, frozen behind a complete promise-to-enforcement coverage matrix.",
+  "contextContract": "context.md",
+  "inputSchema": "input.schema.json",
+  "outputSchema": "output.schema.json",
+  "inputValidator": "validate-input.mjs",
+  "outputValidator": "validate-output.mjs",
+  "selfTest": "self-test.mjs",
+  "sideEffects": [
+    "write only the typed authority receipt and the one feature head at input.publication.headRef under input.project.businessesRootRef"
+  ],
+  "forbiddenSideEffects": [
+    "publish a promise while a discovered consumer or lifecycle branch carries no disposition",
+    "promote an example, screenshot, or intent claim into product truth",
+    "invent an actor, entitlement, quota, payment, settlement, or lifecycle behaviour the evidence does not state",
+    "advance a feature head through a transition the lifecycle does not allow",
+    "write a head below a project segment under the businesses root",
+    "modify product source, architecture authority, frontend authority, or backend implementation",
+    "claim implementation, quality-gate, or UAT completion"
+  ],
+  "stopConditions": [
+    "a discovered enforcement consumer or lifecycle branch has no disposition",
+    "a mandatory coverage dimension is unproven or marked not applicable",
+    "the evidence set contradicts itself and the contradiction is unresolved",
+    "the requested lifecycle transition is illegal for the observed head",
+    "the target state is implemented and delivered source does not reconcile",
+    "publication needs an owner approval that was never bound",
+    "the observed backend source head differs from the frozen head",
+    "a resume adds no effective evidence, authority, discovery, or approval delta"
+  ]
+}

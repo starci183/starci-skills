@@ -1,0 +1,33 @@
+{
+  "schemaVersion": 8,
+  "id": "platform.operate",
+  "domain": "platform",
+  "job": "Operate one bounded shared observability, Sonar, or tunnel service from exact evidence: inventory it, converge only the approved delta, prove every check the bound knowledge requires, and stop at the smallest owning gap instead of taking product deployment ownership.",
+  "contextContract": "context.md",
+  "inputSchema": "input.schema.json",
+  "outputSchema": "output.schema.json",
+  "inputValidator": "validate-input.mjs",
+  "outputValidator": "validate-output.mjs",
+  "selfTest": "self-test.mjs",
+  "sideEffects": [
+    "apply only the approved effect delta on the inventoried shared service",
+    "write only the typed operation receipt under input.project.artifactRootRef"
+  ],
+  "forbiddenSideEffects": [
+    "deploy, restart, migrate, or otherwise take ownership of a product service",
+    "mutate a resource that the bound inventory does not list",
+    "emit an effect or a check the bound service kind does not publish",
+    "free a port by stopping, killing, or reconfiguring the process that already holds it",
+    "record a credential value, capability handle, or secret-shaped token anywhere in the output",
+    "claim an operated outcome while any required check is absent or failed"
+  ],
+  "stopConditions": [
+    "the approval, plan hash, or allowed effect set no longer matches the requested delta",
+    "the observed inventory fingerprint differs from the bound one",
+    "the capability the service kind requires is absent or names no custody evidence",
+    "a port the desired state claims is already held by another declared process",
+    "a required proof check is missing, unreadable, or failed after apply",
+    "the observed source head differs from the frozen head",
+    "a resume adds no effective authority, inventory, desired-state, or scope delta"
+  ]
+}

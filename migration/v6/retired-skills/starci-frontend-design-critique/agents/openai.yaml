@@ -1,6 +1,0 @@
-interface:
-  display_name: "StarCi Frontend Design Critique"
-  short_description: "Challenge frontend design with fresh evidence"
-  default_prompt: "Use $starci-frontend-design-critique to independently challenge this design."
-policy:
-  allow_implicit_invocation: true

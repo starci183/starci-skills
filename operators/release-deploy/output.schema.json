@@ -1,0 +1,375 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://starci.dev/v8/operators/release-deploy/output.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "operatorId", "output"],
+  "properties": {
+    "schemaVersion": { "const": 8 },
+    "operatorId": { "const": "release.deploy" },
+    "output": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["outcome", "receipt", "evidenceRefs", "artifactRefs", "handoff"],
+      "properties": {
+        "outcome": { "enum": ["deployed", "rolled-back", "blocked"] },
+        "receipt": { "$ref": "#/$defs/receipt" },
+        "evidenceRefs": { "$ref": "#/$defs/nonEmptyRefArray" },
+        "artifactRefs": { "$ref": "#/$defs/refArray" },
+        "handoff": { "type": "null" }
+      }
+    }
+  },
+  "$defs": {
+    "fingerprint": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
+    "digest": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
+    "sourceHead": { "type": "string", "pattern": "^[0-9a-f]{40}$" },
+    "slug": { "type": "string", "pattern": "^[a-z0-9][a-z0-9-]*$" },
+    "releaseId": { "type": "string", "pattern": "^release:[A-Za-z0-9._-]+$" },
+    "environment": { "enum": ["development", "staging", "production"] },
+    "secretHandle": { "type": "string", "pattern": "^secret-ref://[A-Za-z0-9._~/-]+$" },
+    "refArray": { "type": "array", "items": { "type": "string", "minLength": 1 } },
+    "nonEmptyRefArray": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "type": "string", "minLength": 1 }
+    },
+    "receipt": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "receiptType",
+        "receiptId",
+        "invocationId",
+        "missionId",
+        "status",
+        "binding",
+        "credentialRefs",
+        "declaredProbeIds",
+        "steps",
+        "monitoring",
+        "steadyState",
+        "branch",
+        "recovery",
+        "rollback",
+        "findings",
+        "evidenceRefs",
+        "failure",
+        "resume",
+        "createdAt"
+      ],
+      "properties": {
+        "receiptType": { "const": "release-deployment" },
+        "receiptId": { "type": "string", "minLength": 1 },
+        "invocationId": { "type": "string", "minLength": 1 },
+        "missionId": { "type": "string", "minLength": 1 },
+        "status": { "enum": ["deployed", "rolled-back", "blocked"] },
+        "binding": { "$ref": "#/$defs/binding" },
+        "credentialRefs": {
+          "description": "Resolved credentials are named by opaque handle only. No field in this receipt can hold a value.",
+          "type": "array",
+          "maxItems": 32,
+          "items": { "$ref": "#/$defs/secretHandle" }
+        },
+        "declaredProbeIds": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 16,
+          "items": { "$ref": "#/$defs/slug" }
+        },
+        "steps": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/step" } },
+        "monitoring": { "oneOf": [{ "$ref": "#/$defs/monitoring" }, { "type": "null" }] },
+        "steadyState": { "oneOf": [{ "$ref": "#/$defs/steadyState" }, { "type": "null" }] },
+        "branch": { "enum": ["none", "recover", "rollback"] },
+        "recovery": { "oneOf": [{ "$ref": "#/$defs/recovery" }, { "type": "null" }] },
+        "rollback": { "oneOf": [{ "$ref": "#/$defs/rollback" }, { "type": "null" }] },
+        "findings": { "type": "array", "items": { "$ref": "#/$defs/finding" } },
+        "evidenceRefs": { "$ref": "#/$defs/nonEmptyRefArray" },
+        "failure": { "oneOf": [{ "$ref": "#/$defs/failure" }, { "type": "null" }] },
+        "resume": { "oneOf": [{ "$ref": "#/$defs/resume" }, { "type": "null" }] },
+        "createdAt": { "type": "string", "format": "date-time" }
+      }
+    },
+    "binding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "projectId",
+        "releaseId",
+        "artifactRef",
+        "digest",
+        "sourceHead",
+        "targetRef",
+        "environment",
+        "strategy",
+        "declaredTargets",
+        "replacedReleaseId",
+        "authorizationRef",
+        "manifestFingerprint",
+        "intentFingerprint",
+        "steadyWindowSeconds",
+        "deadlineSeconds",
+        "artifactRootRef",
+        "inputFingerprint",
+        "progressFingerprint"
+      ],
+      "properties": {
+        "projectId": { "$ref": "#/$defs/slug" },
+        "releaseId": { "$ref": "#/$defs/releaseId" },
+        "artifactRef": { "type": "string", "minLength": 1 },
+        "digest": { "$ref": "#/$defs/digest" },
+        "sourceHead": { "$ref": "#/$defs/sourceHead" },
+        "targetRef": { "type": "string", "minLength": 1 },
+        "environment": { "$ref": "#/$defs/environment" },
+        "strategy": { "enum": ["rolling", "recreate", "blue-green"] },
+        "declaredTargets": { "type": "integer", "minimum": 1 },
+        "replacedReleaseId": {
+          "oneOf": [{ "$ref": "#/$defs/releaseId" }, { "type": "null" }]
+        },
+        "authorizationRef": { "type": "string", "minLength": 1 },
+        "manifestFingerprint": { "$ref": "#/$defs/fingerprint" },
+        "intentFingerprint": { "$ref": "#/$defs/fingerprint" },
+        "steadyWindowSeconds": { "type": "integer", "minimum": 1 },
+        "deadlineSeconds": { "type": "integer", "minimum": 1 },
+        "artifactRootRef": { "type": "string", "minLength": 1 },
+        "inputFingerprint": { "$ref": "#/$defs/fingerprint" },
+        "progressFingerprint": { "$ref": "#/$defs/fingerprint" }
+      }
+    },
+    "step": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["step", "state", "revisionBefore", "revisionAfter", "statement", "evidenceRefs"],
+      "properties": {
+        "step": {
+          "enum": [
+            "authorize",
+            "manifest-validate",
+            "plan",
+            "execution-root-init",
+            "credential-resolve",
+            "host-prepare",
+            "artifact-build",
+            "artifact-publish",
+            "migrate",
+            "domain-reconcile",
+            "rollout",
+            "monitor",
+            "recover",
+            "rollback",
+            "proof"
+          ]
+        },
+        "state": { "enum": ["applied", "no-op", "skipped", "failed"] },
+        "revisionBefore": { "oneOf": [{ "type": "integer", "minimum": 0 }, { "type": "null" }] },
+        "revisionAfter": { "oneOf": [{ "type": "integer", "minimum": 0 }, { "type": "null" }] },
+        "statement": { "type": "string", "minLength": 1 },
+        "evidenceRefs": { "$ref": "#/$defs/refArray" }
+      }
+    },
+    "monitoring": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["deadlineSeconds", "elapsedSeconds", "backoffSeconds", "observations", "finalCondition"],
+      "properties": {
+        "deadlineSeconds": { "type": "integer", "minimum": 1 },
+        "elapsedSeconds": { "type": "integer", "minimum": 0 },
+        "backoffSeconds": { "type": "integer", "minimum": 1 },
+        "observations": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 256,
+          "items": { "$ref": "#/$defs/observation" }
+        },
+        "finalCondition": { "enum": ["progressing", "failing", "steady", "deadline-exceeded"] }
+      }
+    },
+    "observation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["observedAt", "condition", "activeReleaseIds", "activeDigest", "availableTargets", "probeResults"],
+      "properties": {
+        "observedAt": { "type": "string", "format": "date-time" },
+        "condition": { "enum": ["progressing", "failing", "steady"] },
+        "activeReleaseIds": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 8,
+          "uniqueItems": true,
+          "items": { "$ref": "#/$defs/releaseId" }
+        },
+        "activeDigest": { "oneOf": [{ "$ref": "#/$defs/digest" }, { "type": "null" }] },
+        "availableTargets": { "type": "integer", "minimum": 0 },
+        "probeResults": { "type": "array", "items": { "$ref": "#/$defs/probeResult" } }
+      }
+    },
+    "probeResult": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["probeId", "status", "observedStatus", "observedAt"],
+      "properties": {
+        "probeId": { "$ref": "#/$defs/slug" },
+        "status": { "enum": ["pass", "fail"] },
+        "observedStatus": { "oneOf": [{ "type": "integer", "minimum": 100, "maximum": 599 }, { "type": "null" }] },
+        "observedAt": { "type": "string", "format": "date-time" }
+      }
+    },
+    "steadyState": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "provedAt",
+        "windowSeconds",
+        "activeDigest",
+        "availableTargets",
+        "declaredTargets",
+        "supersededActive",
+        "probeResults"
+      ],
+      "properties": {
+        "provedAt": { "type": "string", "format": "date-time" },
+        "windowSeconds": { "type": "integer", "minimum": 1 },
+        "activeDigest": { "$ref": "#/$defs/digest" },
+        "availableTargets": { "type": "integer", "minimum": 0 },
+        "declaredTargets": { "type": "integer", "minimum": 1 },
+        "supersededActive": { "type": "integer", "minimum": 0 },
+        "probeResults": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/probeResult" } }
+      }
+    },
+    "recovery": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["attempts", "exhausted"],
+      "properties": {
+        "attempts": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 16,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["attempt", "action", "releaseId", "outcome", "evidenceRefs"],
+            "properties": {
+              "attempt": { "type": "integer", "minimum": 1 },
+              "action": {
+                "description": "Recovery repeats only approved reversible actions.",
+                "enum": [
+                  "restart-target",
+                  "reapply-manifest",
+                  "resume-rollout",
+                  "reresolve-credential",
+                  "reprobe"
+                ]
+              },
+              "releaseId": { "$ref": "#/$defs/releaseId" },
+              "outcome": { "enum": ["recovered", "unchanged", "failed"] },
+              "evidenceRefs": { "$ref": "#/$defs/refArray" }
+            }
+          }
+        },
+        "exhausted": { "type": "boolean" }
+      }
+    },
+    "rollback": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "toReleaseId",
+        "toDigest",
+        "revisionBefore",
+        "revisionAfter",
+        "dataBoundaryPreserved",
+        "verifiedAt",
+        "evidenceRefs"
+      ],
+      "properties": {
+        "toReleaseId": { "$ref": "#/$defs/releaseId" },
+        "toDigest": { "$ref": "#/$defs/digest" },
+        "revisionBefore": { "type": "integer", "minimum": 0 },
+        "revisionAfter": { "type": "integer", "minimum": 0 },
+        "dataBoundaryPreserved": { "const": true },
+        "verifiedAt": { "type": "string", "format": "date-time" },
+        "evidenceRefs": { "$ref": "#/$defs/nonEmptyRefArray" }
+      }
+    },
+    "finding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["code", "step", "statement"],
+      "properties": {
+        "code": {
+          "enum": [
+            "IDEMPOTENT_NO_OP",
+            "PROBE_TRANSIENT",
+            "TARGET_UNAVAILABLE",
+            "SUPERSEDED_TARGET_ACTIVE",
+            "FOREIGN_RELEASE_OBSERVED",
+            "APPROVED_ACTION_REPEATED"
+          ]
+        },
+        "step": {
+          "enum": [
+            "authorize",
+            "manifest-validate",
+            "plan",
+            "execution-root-init",
+            "credential-resolve",
+            "host-prepare",
+            "artifact-build",
+            "artifact-publish",
+            "migrate",
+            "domain-reconcile",
+            "rollout",
+            "monitor",
+            "recover",
+            "rollback",
+            "proof"
+          ]
+        },
+        "statement": { "type": "string", "minLength": 1 }
+      }
+    },
+    "failure": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["code", "message", "steps", "missingRefs", "retryable", "owningDomain"],
+      "properties": {
+        "code": {
+          "enum": [
+            "INVALID_INPUT",
+            "AUTHORIZATION_MISSING",
+            "MANIFEST_INVALID",
+            "ARTIFACT_MISSING",
+            "CREDENTIAL_UNAVAILABLE",
+            "HOST_UNAVAILABLE",
+            "MIGRATION_BLOCKED",
+            "DOMAIN_UNRECONCILED",
+            "ROLLOUT_FAILED",
+            "STEADY_STATE_UNPROVEN",
+            "CONCURRENT_DRIFT",
+            "RECOVERY_EXHAUSTED",
+            "ROLLBACK_IDENTITY_MISSING",
+            "APPROVAL_REQUIRED",
+            "NO_PROGRESS"
+          ]
+        },
+        "message": { "type": "string", "minLength": 1 },
+        "steps": { "type": "array", "items": { "type": "string", "minLength": 1 } },
+        "missingRefs": { "$ref": "#/$defs/refArray" },
+        "retryable": { "type": "boolean" },
+        "owningDomain": {
+          "enum": ["deployment", "platform", "provider", "backend", "approval", "caller"]
+        }
+      }
+    },
+    "resume": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["resumeToken", "requiredDelta"],
+      "properties": {
+        "resumeToken": { "type": "string", "minLength": 1 },
+        "requiredDelta": { "$ref": "#/$defs/nonEmptyRefArray" }
+      }
+    }
+  }
+}

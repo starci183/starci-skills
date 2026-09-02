@@ -1,0 +1,34 @@
+{
+  "schemaVersion": 8,
+  "id": "content.generate",
+  "domain": "content",
+  "job": "Generate or refactor one educational content unit in one linear pass: a teacher brief that constrains everything after it, one written edition per declared language, images made to a stated claim, code and executable checks that actually run, and an independent critique that receives the artifact without the producer's rationale.",
+  "contextContract": "context.md",
+  "inputSchema": "input.schema.json",
+  "outputSchema": "output.schema.json",
+  "inputValidator": "validate-input.mjs",
+  "outputValidator": "validate-output.mjs",
+  "selfTest": "self-test.mjs",
+  "sideEffects": [
+    "write only the brief, article, image, prompt, implementation, and critique artifacts under the declared targets",
+    "run only the declared build and executable-check commands"
+  ],
+  "forbiddenSideEffects": [
+    "write an article before the brief is frozen, or beyond what the brief published",
+    "claim a learning outcome, example, or visual claim the brief does not publish",
+    "report a build or executable check that was not run, or whose exit code was not read",
+    "change the executable contract during a repair loop",
+    "let the producer of an artifact perform, steer, or brief its own critique",
+    "approve a unit while any applicable score sits below the published minimum"
+  ],
+  "stopConditions": [
+    "the teacher brief cannot be frozen from the bound curriculum and source evidence",
+    "a declared language edition leaves a published learning outcome uncovered",
+    "a declared implementation track does not build",
+    "a declared executable check fails, or the contract fingerprint moved during repair",
+    "a required image cannot be generated to the brief's claims",
+    "the independent critique returns a revision, or the approved review rounds are exhausted",
+    "the observed source head differs from the frozen head",
+    "a resume adds no effective curriculum, source, finding, or scope delta"
+  ]
+}

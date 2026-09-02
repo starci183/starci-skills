@@ -1,6 +1,0 @@
-interface:
-  display_name: "StarCi Release Manage"
-  short_description: "Manage one release through steady-state proof"
-  default_prompt: "Use $starci-release-manage to manage this approved release lifecycle to proof."
-policy:
-  allow_implicit_invocation: true

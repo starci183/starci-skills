@@ -1,6 +1,0 @@
-interface:
-  display_name: "StarCi Surface Reconcile"
-  short_description: "Align closed product surfaces across all roles"
-  default_prompt: "Use $starci-frontend-surface-reconcile for this selected flow and execute its state machine."
-policy:
-  allow_implicit_invocation: true

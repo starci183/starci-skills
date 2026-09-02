@@ -1,0 +1,392 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://starci.dev/v8/operators/business-decide/output.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "operatorId", "output"],
+  "properties": {
+    "schemaVersion": { "const": 8 },
+    "operatorId": { "const": "business.decide" },
+    "output": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["outcome", "receipt", "evidenceRefs", "artifactRefs", "handoff"],
+      "properties": {
+        "outcome": { "enum": ["published", "blocked"] },
+        "receipt": { "$ref": "#/$defs/receipt" },
+        "evidenceRefs": { "$ref": "#/$defs/nonEmptyRefArray" },
+        "artifactRefs": { "$ref": "#/$defs/refArray" },
+        "handoff": { "type": "null" }
+      }
+    }
+  },
+  "$defs": {
+    "fingerprint": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
+    "nullableFingerprint": {
+      "oneOf": [{ "$ref": "#/$defs/fingerprint" }, { "type": "null" }]
+    },
+    "sourceHead": { "type": "string", "pattern": "^[0-9a-f]{40,64}$" },
+    "identifier": { "type": "string", "pattern": "^[a-z0-9][a-z0-9-]*$" },
+    "authorityState": { "enum": ["pending", "in-progress", "implemented", "rejected"] },
+    "claimKind": { "enum": ["fact", "intent", "example", "unknown", "contradiction"] },
+    "disposition": { "enum": ["preserve", "replace", "retire", "defer", "not-applicable"] },
+    "coverageDimension": {
+      "enum": [
+        "actor-eligibility",
+        "offer-entry",
+        "read-entry",
+        "purchase-side-effect",
+        "external-payment",
+        "settlement",
+        "idempotency",
+        "entitlement-consumer",
+        "quota-consumer",
+        "renewal",
+        "cancellation",
+        "expiry",
+        "denial",
+        "recovery",
+        "refund",
+        "legacy-create",
+        "legacy-read",
+        "legacy-settle"
+      ]
+    },
+    "nullableRef": {
+      "oneOf": [{ "type": "string", "minLength": 1, "maxLength": 1024 }, { "type": "null" }]
+    },
+    "refArray": {
+      "type": "array",
+      "maxItems": 256,
+      "uniqueItems": true,
+      "items": { "type": "string", "minLength": 1, "maxLength": 1024 }
+    },
+    "nonEmptyRefArray": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 256,
+      "uniqueItems": true,
+      "items": { "type": "string", "minLength": 1, "maxLength": 1024 }
+    },
+    "identifierArray": {
+      "type": "array",
+      "maxItems": 256,
+      "uniqueItems": true,
+      "items": { "$ref": "#/$defs/identifier" }
+    },
+    "receipt": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "receiptType",
+        "receiptId",
+        "invocationId",
+        "missionId",
+        "status",
+        "binding",
+        "decision",
+        "findings",
+        "evidenceRefs",
+        "failure",
+        "resume",
+        "createdAt"
+      ],
+      "properties": {
+        "receiptType": { "const": "business-promise-authority" },
+        "receiptId": { "type": "string", "pattern": "^receipt:[A-Za-z0-9._-]+$" },
+        "invocationId": { "type": "string", "minLength": 1, "maxLength": 128 },
+        "missionId": { "type": "string", "minLength": 1, "maxLength": 128 },
+        "status": { "enum": ["published", "blocked"] },
+        "binding": { "$ref": "#/$defs/binding" },
+        "decision": {
+          "oneOf": [{ "$ref": "#/$defs/decision" }, { "type": "null" }]
+        },
+        "findings": {
+          "type": "array",
+          "maxItems": 256,
+          "items": { "$ref": "#/$defs/finding" }
+        },
+        "evidenceRefs": { "$ref": "#/$defs/nonEmptyRefArray" },
+        "failure": {
+          "oneOf": [{ "$ref": "#/$defs/failure" }, { "type": "null" }]
+        },
+        "resume": {
+          "oneOf": [{ "$ref": "#/$defs/resume" }, { "type": "null" }]
+        },
+        "createdAt": { "type": "string", "format": "date-time" }
+      }
+    },
+    "binding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "projectId",
+        "backendSourceRef",
+        "sourceHead",
+        "businessesRootRef",
+        "featureId",
+        "objectiveRef",
+        "intent",
+        "targetState",
+        "evidenceFingerprint",
+        "authorityFingerprint",
+        "discoveryFingerprint",
+        "coverageFingerprint",
+        "inputFingerprint",
+        "progressFingerprint"
+      ],
+      "properties": {
+        "projectId": { "$ref": "#/$defs/identifier" },
+        "backendSourceRef": { "type": "string", "minLength": 1 },
+        "sourceHead": { "$ref": "#/$defs/sourceHead" },
+        "businessesRootRef": { "type": "string", "pattern": "\\.worktrees/businesses$" },
+        "featureId": { "$ref": "#/$defs/identifier" },
+        "objectiveRef": { "type": "string", "minLength": 1 },
+        "intent": { "enum": ["create", "revise", "reconcile", "retire"] },
+        "targetState": { "$ref": "#/$defs/authorityState" },
+        "evidenceFingerprint": { "$ref": "#/$defs/fingerprint" },
+        "authorityFingerprint": { "$ref": "#/$defs/fingerprint" },
+        "discoveryFingerprint": { "$ref": "#/$defs/fingerprint" },
+        "coverageFingerprint": { "$ref": "#/$defs/nullableFingerprint" },
+        "inputFingerprint": { "$ref": "#/$defs/fingerprint" },
+        "progressFingerprint": { "$ref": "#/$defs/fingerprint" }
+      }
+    },
+    "decision": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "featureId",
+        "headRef",
+        "headFingerprint",
+        "state",
+        "promise",
+        "lineage",
+        "citedClaims",
+        "coverage",
+        "reconciliation"
+      ],
+      "properties": {
+        "featureId": { "$ref": "#/$defs/identifier" },
+        "headRef": { "type": "string", "minLength": 1, "maxLength": 1024 },
+        "headFingerprint": { "$ref": "#/$defs/fingerprint" },
+        "state": { "$ref": "#/$defs/authorityState" },
+        "promise": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["statement", "actorStatement", "eligibilityStatement"],
+          "properties": {
+            "statement": { "type": "string", "minLength": 1, "maxLength": 4096 },
+            "actorStatement": { "type": "string", "minLength": 1, "maxLength": 4096 },
+            "eligibilityStatement": { "type": "string", "minLength": 1, "maxLength": 4096 }
+          }
+        },
+        "lineage": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["previousHeadRef", "previousState", "transition"],
+          "properties": {
+            "previousHeadRef": { "$ref": "#/$defs/nullableRef" },
+            "previousState": {
+              "oneOf": [{ "$ref": "#/$defs/authorityState" }, { "type": "null" }]
+            },
+            "transition": {
+              "enum": [
+                "absent->pending",
+                "pending->in-progress",
+                "pending->rejected",
+                "in-progress->implemented",
+                "in-progress->rejected",
+                "implemented->in-progress",
+                "implemented->rejected",
+                "rejected->pending"
+              ]
+            }
+          }
+        },
+        "citedClaims": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 256,
+          "items": { "$ref": "#/$defs/citedClaim" }
+        },
+        "coverage": { "$ref": "#/$defs/coverage" },
+        "reconciliation": {
+          "oneOf": [{ "$ref": "#/$defs/reconciliation" }, { "type": "null" }]
+        }
+      }
+    },
+    "citedClaim": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["claimId", "kind", "role", "sourceRef", "path", "lineStart", "lineEnd", "sourceHead"],
+      "properties": {
+        "claimId": { "$ref": "#/$defs/identifier" },
+        "kind": { "$ref": "#/$defs/claimKind" },
+        "role": { "type": "string", "minLength": 1, "maxLength": 256 },
+        "sourceRef": { "type": "string", "minLength": 1 },
+        "path": { "type": "string", "minLength": 1 },
+        "lineStart": { "type": "integer", "minimum": 1 },
+        "lineEnd": { "type": "integer", "minimum": 1 },
+        "sourceHead": {
+          "oneOf": [{ "$ref": "#/$defs/sourceHead" }, { "type": "null" }]
+        }
+      }
+    },
+    "coverage": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "matrixRef",
+        "matrixFingerprint",
+        "discoveredConsumers",
+        "discoveredLifecycleBranches",
+        "rows"
+      ],
+      "properties": {
+        "matrixRef": { "type": "string", "minLength": 1, "maxLength": 1024 },
+        "matrixFingerprint": { "$ref": "#/$defs/fingerprint" },
+        "discoveredConsumers": {
+          "type": "array",
+          "maxItems": 256,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["consumerId", "dimension", "sourceRef"],
+            "properties": {
+              "consumerId": { "$ref": "#/$defs/identifier" },
+              "dimension": { "$ref": "#/$defs/coverageDimension" },
+              "sourceRef": { "type": "string", "minLength": 1 }
+            }
+          }
+        },
+        "discoveredLifecycleBranches": {
+          "type": "array",
+          "maxItems": 32,
+          "uniqueItems": true,
+          "items": { "$ref": "#/$defs/coverageDimension" }
+        },
+        "rows": {
+          "type": "array",
+          "minItems": 18,
+          "maxItems": 18,
+          "items": { "$ref": "#/$defs/coverageRow" }
+        }
+      }
+    },
+    "coverageRow": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "dimension",
+        "disposition",
+        "statement",
+        "enforcementOwner",
+        "sourceRef",
+        "positiveProofRef",
+        "negativeProofRef",
+        "deferralRef",
+        "consumerIds",
+        "claimIds"
+      ],
+      "properties": {
+        "dimension": { "$ref": "#/$defs/coverageDimension" },
+        "disposition": { "$ref": "#/$defs/disposition" },
+        "statement": { "type": "string", "minLength": 1, "maxLength": 4096 },
+        "enforcementOwner": {
+          "oneOf": [{ "type": "string", "minLength": 1, "maxLength": 256 }, { "type": "null" }]
+        },
+        "sourceRef": { "$ref": "#/$defs/nullableRef" },
+        "positiveProofRef": { "$ref": "#/$defs/nullableRef" },
+        "negativeProofRef": { "$ref": "#/$defs/nullableRef" },
+        "deferralRef": { "$ref": "#/$defs/nullableRef" },
+        "consumerIds": { "$ref": "#/$defs/identifierArray" },
+        "claimIds": { "$ref": "#/$defs/identifierArray" }
+      }
+    },
+    "reconciliation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["deliveredEvidenceRefs", "discrepancies"],
+      "properties": {
+        "deliveredEvidenceRefs": { "$ref": "#/$defs/nonEmptyRefArray" },
+        "discrepancies": {
+          "type": "array",
+          "maxItems": 128,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["dimension", "statement"],
+            "properties": {
+              "dimension": { "$ref": "#/$defs/coverageDimension" },
+              "statement": { "type": "string", "minLength": 1, "maxLength": 4096 }
+            }
+          }
+        }
+      }
+    },
+    "finding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["code", "severity", "dimension", "statement", "evidenceRefs"],
+      "properties": {
+        "code": { "type": "string", "pattern": "^[A-Z][A-Z0-9_]*$" },
+        "severity": { "enum": ["info", "warning", "error"] },
+        "dimension": {
+          "oneOf": [{ "$ref": "#/$defs/coverageDimension" }, { "type": "null" }]
+        },
+        "statement": { "type": "string", "minLength": 1, "maxLength": 4096 },
+        "evidenceRefs": { "$ref": "#/$defs/nonEmptyRefArray" }
+      }
+    },
+    "failure": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["code", "message", "dimensions", "missingRefs", "retryable", "owningDomain"],
+      "properties": {
+        "code": {
+          "enum": [
+            "INVALID_INPUT",
+            "SOURCE_DRIFT",
+            "EVIDENCE_MISSING",
+            "CONTRADICTION_UNRESOLVED",
+            "COVERAGE_INCOMPLETE",
+            "CONSUMER_UNPROVEN",
+            "LIFECYCLE_TRANSITION_INVALID",
+            "AUTHORITY_CONFLICT",
+            "RECONCILIATION_DISCREPANCY",
+            "APPROVAL_REQUIRED",
+            "NO_PROGRESS"
+          ]
+        },
+        "message": { "type": "string", "minLength": 1, "maxLength": 4096 },
+        "dimensions": {
+          "type": "array",
+          "maxItems": 32,
+          "uniqueItems": true,
+          "items": { "$ref": "#/$defs/coverageDimension" }
+        },
+        "missingRefs": { "$ref": "#/$defs/refArray" },
+        "retryable": { "type": "boolean" },
+        "owningDomain": {
+          "enum": ["business", "backend", "frontend", "architecture", "workspace", "caller"]
+        }
+      }
+    },
+    "resume": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["resumeToken", "requiredDelta"],
+      "properties": {
+        "resumeToken": { "type": "string", "minLength": 1 },
+        "requiredDelta": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 128,
+          "uniqueItems": true,
+          "items": { "type": "string", "minLength": 1, "maxLength": 2048 }
+        }
+      }
+    }
+  }
+}

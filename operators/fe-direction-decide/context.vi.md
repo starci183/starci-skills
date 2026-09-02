@@ -1,0 +1,72 @@
+# Context của `fe.direction.decide`
+
+## Mục đích
+
+Context là toàn bộ vật liệu chính xác đã có để chốt direction frontend. Nó trả lời câu hỏi “operator
+được dùng những gì?” trước khi brainstorm. Context không được mở rộng mission scope và không biến
+evidence thành authority.
+
+Operator chỉ đọc các reference được truyền trong top-level `context`. Mỗi reference là immutable trong
+invocation và được bind bằng fingerprint `sha256:`. Observation lấy từ source còn phải bind đúng source
+head đã quan sát.
+
+## Các nhóm context
+
+| Context | Vai trò trong quyết định | Trạng thái authority |
+| --- | --- | --- |
+| Request | Objective, yêu cầu compare rõ ràng, target, inclusion và exclusion. | Chỉ có authority cho outcome và boundary user đã yêu cầu. |
+| Business receipt | Actor, promise, permission, entitlement, negative outcome, recovery và product behavior đã duyệt. | Business authority bắt buộc. |
+| Backend receipt | API, state, auth/session, persistence và failure contract mà UI sử dụng. | Technical authority có điều kiện. |
+| Architecture receipt | System boundary, data ownership, stack hoặc topology ràng buộc UI. | Technical authority có điều kiện. |
+| Grammar đã publish | Reusable component, composition, token, state, responsive interface và semantic role. | Reusable UI authority bắt buộc. |
+| Knowledge | Luật UX/UI trung lập, accessibility guidance, direction guidance và product Grammar knowledge. | Guidance và reusable law, không sở hữu product behavior. |
+| Frontend source | Target hiện tại, route-local layout, owner lồng trực tiếp, shared consumer và test/story liên quan. | Evidence của implementation hiện tại, không phải authority cho direction mới. |
+| Product-family source | Sibling surface và shared visual signature như hierarchy, shell rhythm, navigation, semantic color. | Evidence về family coherence, không phải template. |
+| UAT | Observation behavior, UX và UI trước đó, gồm failure/recovery path. | Evidence và counterevidence; PASS cũ không phải authority hiện tại. |
+| Owner audit | Lịch sử `audit.md` cạnh page, layout, modal hoặc drawer owner. | Evidence và regression history. |
+| Visual evidence | Screenshot, render, benchmark raster hoặc counterexample user cung cấp. | Chỉ là pixel evidence. |
+| Previous direction | Decision receipt và artifact cũ. | Chỉ là evidence nếu thiếu đúng direction identity, fingerprint và direction-specific approval. |
+| External reference | Research có giới hạn cho domain hoặc interaction model còn lạ. | Chỉ là evidence; không phải layout, brand hay business template. |
+
+## Context bắt buộc
+
+Mọi invocation cần:
+
+1. ít nhất một request reference;
+2. một accepted business receipt khớp project và target scope;
+3. một published Grammar binding;
+4. ít nhất một knowledge reference áp dụng được;
+5. frontend source context chính xác của project, kể cả khi target là mới.
+
+Backend và architecture receipt là bắt buộc khi direction consume hoặc thay contract thuộc các domain
+đó. Thiếu receipt phải trở thành typed gap; operator không được tạo fixture, fake control, state tự bịa
+hay behavior chỉ để trình diễn.
+
+## Luật chọn context
+
+- Đọc target hiện tại với `modify`, `audit-repair` và `reconcile`. Với `new`, verify target chưa tồn tại
+  và chỉ quan sát host cùng product-family context đã được cấp authority.
+- Chỉ đọc sibling surface chứng minh một shared relationship liên quan. Không copy page.
+- Dùng UAT và audit để tìm state, regression và counterevidence. Không kế thừa verdict của chúng.
+- Chỉ research bên ngoài khi business authority và product-family evidence chưa giải thích được cách
+  user nhận ra offer, ra quyết định, hiểu risk, hoàn thành task hoặc recovery.
+- Dừng research khi material interaction pattern đã hội tụ, hoặc sau một lần mở rộng tìm kiếm vẫn chỉ
+  gặp evidence inaccessible, duplicate, irrelevant hay không material.
+- Thiếu reusable component, token, state hoặc responsive interface là `GRAMMAR_REQUIRED`, không phải cơ
+  hội styling cục bộ.
+
+## Kỷ luật quan sát
+
+Quan sát artifact trực tiếp trước producer rationale. Ghi fact nhỏ nhất áp dụng được cùng exact
+reference. Code hiện có, test xanh, DOM, measurement, screenshot và PASS cũ có thể support hoặc phản
+bác claim, nhưng không được tự trở thành business/direction authority vì đã tồn tại.
+
+Mọi proposal material phải có disposition add/change/remove. Direction không hợp lệ khi còn business
+contradiction, owner leak, Grammar invention, responsive/accessibility failure, adverse state chưa giải
+quyết hoặc một reversible alternative mạnh hơn rõ ràng.
+
+## Ranh giới đọc và ghi
+
+Operator chỉ được đọc context reference đã khai báo. Nó chỉ được ghi receipt và inspectable visual
+artifact dưới `input.project.artifactRootRef`. Product source, business head, backend contract,
+architecture decision, Grammar package, UAT và audit history đều read-only.

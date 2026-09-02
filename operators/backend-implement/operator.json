@@ -1,0 +1,35 @@
+{
+  "schemaVersion": 8,
+  "id": "backend.implement",
+  "domain": "be",
+  "job": "Implement one backend outcome inside a frozen mutation contract, following the observed sibling family, and return the measured conformance and proof receipt that shows the boundary was not widened.",
+  "contextContract": "context.md",
+  "inputSchema": "input.schema.json",
+  "outputSchema": "output.schema.json",
+  "inputValidator": "validate-input.mjs",
+  "outputValidator": "validate-output.mjs",
+  "selfTest": "self-test.mjs",
+  "sideEffects": [
+    "write product source only inside input.scope.mutableFileRefs",
+    "write the typed implementation receipt and every proof result under input.project.artifactRootRef"
+  ],
+  "forbiddenSideEffects": [
+    "add an operation, writer, store, transaction, migration, or event the frozen contract does not carry",
+    "decide a business rule that the approved authority does not state",
+    "introduce a convention no bound sibling pattern publishes",
+    "weaken, skip, suppress, or substitute a declared proof to make a run go green",
+    "edit the contract, the business authority, or a file outside the mutable ceiling",
+    "claim conformance without naming the evidence that measured it",
+    "record a quality, visual, or UAT verdict"
+  ],
+  "stopConditions": [
+    "the contract is not frozen or its fingerprint is stale",
+    "the outcome cannot be reached without a boundary the contract does not carry",
+    "a business question is open and no approved authority decides it",
+    "a file needing mutation lies outside the mutable ceiling",
+    "a contract aspect has no bound sibling pattern to follow",
+    "a declared proof cannot be executed in this environment",
+    "the observed source head differs from the frozen head",
+    "a resume adds no effective authority, contract, pattern, or scope delta"
+  ]
+}

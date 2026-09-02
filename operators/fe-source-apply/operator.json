@@ -1,0 +1,34 @@
+{
+  "schemaVersion": 8,
+  "id": "fe.source.apply",
+  "domain": "fe",
+  "job": "Write one already-resolved tree into product source inside a frozen owner ceiling and a declared file set, emitting only values the bound resolution receipt already contains.",
+  "contextContract": "context.md",
+  "inputSchema": "input.schema.json",
+  "outputSchema": "output.schema.json",
+  "inputValidator": "validate-input.mjs",
+  "outputValidator": "validate-output.mjs",
+  "selfTest": "self-test.mjs",
+  "sideEffects": [
+    "write the files declared in input.writeSet, each under a mutable owner root",
+    "write only the typed application receipt under input.project.artifactRootRef"
+  ],
+  "forbiddenSideEffects": [
+    "write a class, value, or rule identifier absent from the bound resolution receipt",
+    "decide a presentation value, choose a Grammar component, or restructure the tree",
+    "touch a file outside the declared write set",
+    "touch a file under an observation-only owner",
+    "edit knowledge, publish Grammar, or change the resolution receipt",
+    "start, stop, or reconfigure runtime services",
+    "record a verdict, score, or pass claim on the applied source"
+  ],
+  "stopConditions": [
+    "the observed source head differs from the frozen head",
+    "a file that must change lies outside the declared write set",
+    "a declared write set path lies outside every mutable owner root",
+    "the bound resolution fingerprint differs from the one actually read",
+    "the resolution does not contain a class the write would produce",
+    "no declared path produces an effective content change",
+    "a resume adds no effective resolution, write set, or scope delta"
+  ]
+}

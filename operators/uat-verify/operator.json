@@ -1,0 +1,35 @@
+{
+  "schemaVersion": 8,
+  "id": "uat.verify",
+  "domain": "test",
+  "job": "Verify one product-decision flow against inputs frozen before execution and publish its canonical backend-owned snapshot and result pair, or stop at the exact unavailability instead of manufacturing a verdict.",
+  "contextContract": "context.md",
+  "inputSchema": "input.schema.json",
+  "outputSchema": "output.schema.json",
+  "inputValidator": "validate-input.mjs",
+  "outputValidator": "validate-output.mjs",
+  "selfTest": "self-test.mjs",
+  "sideEffects": [
+    "write the canonical snapshot.json and result.json under the routed backend Source at .worktrees/uat/<feature>/<flow>/",
+    "write the typed verification receipt and its evidence index under input.project.artifactRootRef",
+    "delete only fixture records carrying both is_uat=true and the exact frozen fixture namespace"
+  ],
+  "forbiddenSideEffects": [
+    "store a password, cookie, token, OTP, or any recoverable secret in the account record",
+    "ask the user to sign in, lend an account, or paste a credential",
+    "mutate the frozen snapshot, cases, or fixtures after execution begins",
+    "create the outcome under test during fixture preparation",
+    "repair product source or open a writer on a root cause",
+    "promote UI evidence over Behavior or UX evidence",
+    "write checkout-local UAT authority or a UAT root belonging to another backend route"
+  ],
+  "stopConditions": [
+    "the Control Panel cannot auto-provision the run-scoped account or complete broker authentication",
+    "the Browser lease is absent, expired, foreign to the mission, or bound to another principal",
+    "the declared runtime owner is not ready or its origin does not match the lease",
+    "the admitted blind visual PASS or final quality PASS is missing",
+    "any evidence lane is unavailable rather than contradicted",
+    "the canonical snapshot or result cannot be written and reparsed under the routed backend Source",
+    "a resume adds no admission, lease, evidence, or case delta"
+  ]
+}

@@ -1,0 +1,182 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://starci.dev/v8/operators/quality-verify/input.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "operatorId", "context", "input"],
+  "properties": {
+    "schemaVersion": { "const": 8 },
+    "operatorId": { "const": "quality.verify" },
+    "context": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["predecessors", "gateConfigRefs", "sourceRefs", "knowledgeRefs", "approvalRefs"],
+      "properties": {
+        "predecessors": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["receiptRef", "receiptType", "fingerprint", "sourceHead"],
+            "properties": {
+              "receiptRef": { "type": "string", "minLength": 1 },
+              "receiptType": { "type": "string", "minLength": 1 },
+              "fingerprint": { "$ref": "#/$defs/fingerprint" },
+              "sourceHead": { "type": "string", "pattern": "^[0-9a-f]{40}$" }
+            }
+          }
+        },
+        "gateConfigRefs": { "$ref": "#/$defs/nonEmptyContextRefArray" },
+        "sourceRefs": { "$ref": "#/$defs/nonEmptyContextRefArray" },
+        "knowledgeRefs": { "$ref": "#/$defs/contextRefArray" },
+        "approvalRefs": { "$ref": "#/$defs/contextRefArray" }
+      }
+    },
+    "input": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "invocationId",
+        "missionId",
+        "observedAt",
+        "project",
+        "delivery",
+        "gates",
+        "thresholds",
+        "explicitE2eRequest",
+        "sonarScope",
+        "cachePolicy",
+        "declaredDebts",
+        "resume"
+      ],
+      "properties": {
+        "invocationId": { "type": "string", "minLength": 1 },
+        "missionId": { "type": "string", "minLength": 1 },
+        "observedAt": { "type": "string", "format": "date-time" },
+        "project": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["id", "sourceRef", "sourceHead", "artifactRootRef"],
+          "properties": {
+            "id": { "type": "string", "minLength": 1 },
+            "sourceRef": { "type": "string", "minLength": 1 },
+            "sourceHead": { "type": "string", "pattern": "^[0-9a-f]{40}$" },
+            "artifactRootRef": { "type": "string", "minLength": 1 }
+          }
+        },
+        "delivery": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["id", "kind", "boundaryRefs"],
+          "properties": {
+            "id": { "type": "string", "minLength": 1 },
+            "kind": { "enum": ["backend", "frontend", "shared", "content"] },
+            "boundaryRefs": { "$ref": "#/$defs/nonEmptyRefArray" }
+          }
+        },
+        "gates": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["gate", "commandRef", "configRef", "required"],
+            "properties": {
+              "gate": { "$ref": "#/$defs/gate" },
+              "commandRef": { "type": "string", "minLength": 1 },
+              "configRef": { "type": "string", "minLength": 1 },
+              "required": { "type": "boolean" }
+            }
+          }
+        },
+        "thresholds": { "$ref": "#/$defs/thresholds" },
+        "explicitE2eRequest": { "type": "boolean" },
+        "sonarScope": { "enum": ["new-code", "overall", "not-planned"] },
+        "cachePolicy": { "enum": ["fresh", "fingerprint-exact"] },
+        "declaredDebts": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["debtId", "gate", "approvalRef", "ownerRef", "expiresAt"],
+            "properties": {
+              "debtId": { "type": "string", "minLength": 1 },
+              "gate": { "$ref": "#/$defs/gate" },
+              "approvalRef": { "type": "string", "minLength": 1 },
+              "ownerRef": { "type": "string", "minLength": 1 },
+              "expiresAt": { "type": "string", "format": "date-time" }
+            }
+          }
+        },
+        "resume": {
+          "oneOf": [
+            { "type": "null" },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["blockedReceiptRef", "resumeToken", "addedContextRefs"],
+              "properties": {
+                "blockedReceiptRef": { "type": "string", "minLength": 1 },
+                "resumeToken": { "type": "string", "minLength": 1 },
+                "addedContextRefs": { "$ref": "#/$defs/refArray" }
+              }
+            }
+          ]
+        }
+      }
+    }
+  },
+  "$defs": {
+    "fingerprint": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
+    "gate": {
+      "enum": [
+        "format",
+        "lint",
+        "typecheck",
+        "build",
+        "unit-coverage",
+        "integration",
+        "e2e",
+        "sonar"
+      ]
+    },
+    "percentage": { "type": "number", "minimum": 0, "maximum": 100 },
+    "thresholds": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["statements", "lines", "functions", "branches"],
+      "properties": {
+        "statements": { "$ref": "#/$defs/percentage" },
+        "lines": { "$ref": "#/$defs/percentage" },
+        "functions": { "$ref": "#/$defs/percentage" },
+        "branches": { "$ref": "#/$defs/percentage" }
+      }
+    },
+    "contextRef": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["ref", "fingerprint", "sourceHead", "observedAt"],
+      "properties": {
+        "ref": { "type": "string", "minLength": 1 },
+        "fingerprint": { "$ref": "#/$defs/fingerprint" },
+        "sourceHead": {
+          "oneOf": [{ "type": "string", "pattern": "^[0-9a-f]{40}$" }, { "type": "null" }]
+        },
+        "observedAt": { "type": "string", "format": "date-time" }
+      }
+    },
+    "contextRefArray": { "type": "array", "items": { "$ref": "#/$defs/contextRef" } },
+    "nonEmptyContextRefArray": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/contextRef" }
+    },
+    "refArray": { "type": "array", "items": { "type": "string", "minLength": 1 } },
+    "nonEmptyRefArray": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "type": "string", "minLength": 1 }
+    }
+  }
+}

@@ -1,0 +1,241 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://starci.dev/v8/operators/content-generate/input.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "operatorId", "context", "input"],
+  "properties": {
+    "schemaVersion": { "const": 8 },
+    "operatorId": { "const": "content.generate" },
+    "context": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["curriculumRefs", "styleRefs", "sourceRefs", "aiRuntime", "auditRefs"],
+      "properties": {
+        "curriculumRefs": { "$ref": "#/$defs/nonEmptyContextRefArray" },
+        "styleRefs": { "$ref": "#/$defs/contextRefArray" },
+        "sourceRefs": { "$ref": "#/$defs/nonEmptyContextRefArray" },
+        "aiRuntime": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["configRef", "fingerprint", "brief", "production", "critique"],
+          "properties": {
+            "configRef": { "type": "string", "minLength": 1 },
+            "fingerprint": { "$ref": "#/$defs/fingerprint" },
+            "brief": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["model", "count", "isolation", "forkTurns"],
+              "properties": {
+                "model": { "const": "gpt-5.6-sol" },
+                "count": { "const": 1 },
+                "isolation": { "const": "fresh" },
+                "forkTurns": { "const": "none" }
+              }
+            },
+            "production": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["model"],
+              "properties": { "model": { "const": "gpt-5.6-luna" } }
+            },
+            "critique": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["model", "count", "isolation", "forkTurns"],
+              "properties": {
+                "model": { "const": "gpt-5.6-sol" },
+                "count": { "const": 1 },
+                "isolation": { "const": "fresh" },
+                "forkTurns": { "const": "none" }
+              }
+            }
+          }
+        },
+        "auditRefs": { "$ref": "#/$defs/contextRefArray" }
+      }
+    },
+    "input": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "invocationId",
+        "missionId",
+        "project",
+        "unit",
+        "naturalLanguages",
+        "implementationLanguages",
+        "stageModes",
+        "maxE2eIterations",
+        "review",
+        "targets",
+        "commands",
+        "resume"
+      ],
+      "properties": {
+        "invocationId": { "type": "string", "minLength": 1 },
+        "missionId": { "type": "string", "minLength": 1 },
+        "project": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["id", "contentSourceRef", "sourceHead", "artifactRootRef"],
+          "properties": {
+            "id": { "type": "string", "minLength": 1 },
+            "contentSourceRef": { "type": "string", "minLength": 1 },
+            "sourceHead": { "type": "string", "pattern": "^[0-9a-f]{40}$" },
+            "artifactRootRef": { "type": "string", "minLength": 1 }
+          }
+        },
+        "unit": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["id", "mode", "objectiveRef", "audienceRef", "existingUnitRef"],
+          "properties": {
+            "id": { "type": "string", "minLength": 1 },
+            "mode": { "enum": ["generate", "refactor"] },
+            "objectiveRef": { "type": "string", "minLength": 1 },
+            "audienceRef": { "type": "string", "minLength": 1 },
+            "existingUnitRef": {
+              "oneOf": [{ "type": "string", "minLength": 1 }, { "type": "null" }]
+            }
+          }
+        },
+        "naturalLanguages": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 8,
+          "items": { "$ref": "#/$defs/naturalLanguage" }
+        },
+        "implementationLanguages": {
+          "type": "array",
+          "maxItems": 4,
+          "items": { "$ref": "#/$defs/implementationLanguage" }
+        },
+        "stageModes": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["image", "code", "e2e"],
+          "properties": {
+            "image": { "$ref": "#/$defs/stageMode" },
+            "code": { "$ref": "#/$defs/stageMode" },
+            "e2e": { "$ref": "#/$defs/stageMode" }
+          }
+        },
+        "maxE2eIterations": { "type": "integer", "minimum": 1, "maximum": 20 },
+        "review": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["round", "maxRounds", "minimumScore"],
+          "properties": {
+            "round": { "type": "integer", "minimum": 1 },
+            "maxRounds": { "type": "integer", "minimum": 1 },
+            "minimumScore": { "const": 85 }
+          }
+        },
+        "targets": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "briefTargetRef",
+            "articleTargets",
+            "imageTargetRef",
+            "promptTargetRef",
+            "trackTargets",
+            "reviewTargetRef"
+          ],
+          "properties": {
+            "briefTargetRef": { "type": "string", "minLength": 1 },
+            "articleTargets": {
+              "type": "array",
+              "minItems": 1,
+              "items": { "$ref": "#/$defs/naturalLanguageTarget" }
+            },
+            "imageTargetRef": {
+              "oneOf": [{ "type": "string", "minLength": 1 }, { "type": "null" }]
+            },
+            "promptTargetRef": {
+              "oneOf": [{ "type": "string", "minLength": 1 }, { "type": "null" }]
+            },
+            "trackTargets": {
+              "type": "array",
+              "items": { "$ref": "#/$defs/implementationLanguageTarget" }
+            },
+            "reviewTargetRef": { "type": "string", "minLength": 1 }
+          }
+        },
+        "commands": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/trackCommand" }
+        },
+        "resume": {
+          "oneOf": [
+            { "type": "null" },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["blockedReceiptRef", "resumeToken", "addedContextRefs"],
+              "properties": {
+                "blockedReceiptRef": { "type": "string", "minLength": 1 },
+                "resumeToken": { "type": "string", "minLength": 1 },
+                "addedContextRefs": { "$ref": "#/$defs/refArray" }
+              }
+            }
+          ]
+        }
+      }
+    }
+  },
+  "$defs": {
+    "fingerprint": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
+    "naturalLanguage": { "type": "string", "pattern": "^[a-z]{2}(?:-[A-Z]{2})?$" },
+    "implementationLanguage": { "type": "string", "pattern": "^[a-z][a-z0-9+#.-]*$" },
+    "stageMode": { "enum": ["required", "optional", "disabled"] },
+    "naturalLanguageTarget": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["language", "ref"],
+      "properties": {
+        "language": { "$ref": "#/$defs/naturalLanguage" },
+        "ref": { "type": "string", "minLength": 1 }
+      }
+    },
+    "implementationLanguageTarget": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["language", "ref"],
+      "properties": {
+        "language": { "$ref": "#/$defs/implementationLanguage" },
+        "ref": { "type": "string", "minLength": 1 }
+      }
+    },
+    "trackCommand": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["language", "command"],
+      "properties": {
+        "language": { "$ref": "#/$defs/implementationLanguage" },
+        "command": { "type": "string", "minLength": 1 }
+      }
+    },
+    "contextRef": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["ref", "fingerprint", "sourceHead", "observedAt"],
+      "properties": {
+        "ref": { "type": "string", "minLength": 1 },
+        "fingerprint": { "$ref": "#/$defs/fingerprint" },
+        "sourceHead": {
+          "oneOf": [{ "type": "string", "pattern": "^[0-9a-f]{40}$" }, { "type": "null" }]
+        },
+        "observedAt": { "type": "string", "format": "date-time" }
+      }
+    },
+    "contextRefArray": { "type": "array", "items": { "$ref": "#/$defs/contextRef" } },
+    "nonEmptyContextRefArray": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/contextRef" }
+    },
+    "refArray": { "type": "array", "items": { "type": "string", "minLength": 1 } }
+  }
+}

@@ -1,6 +1,0 @@
-interface:
-  display_name: "StarCi Tunnel Reconcile"
-  short_description: "Reconcile one bounded tunnel and DNS route"
-  default_prompt: "Use $starci-tunnel-reconcile for this selected flow and execute its state machine."
-policy:
-  allow_implicit_invocation: true

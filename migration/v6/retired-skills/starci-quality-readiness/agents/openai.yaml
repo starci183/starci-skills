@@ -1,6 +1,0 @@
-interface:
-  display_name: "StarCi Quality Readiness"
-  short_description: "Inventory and close measured readiness findings"
-  default_prompt: "Use $starci-quality-readiness for this selected flow and execute its state machine."
-policy:
-  allow_implicit_invocation: true

@@ -1,0 +1,32 @@
+{
+  "schemaVersion": 8,
+  "id": "fe.presentation.resolve",
+  "domain": "fe",
+  "job": "Resolve every application-owned presentation property on one already-composed tree to exactly one published rule, emit its class and verifiable contract claim, and stop at the smallest owning gap instead of inventing a value.",
+  "contextContract": "context.md",
+  "inputSchema": "input.schema.json",
+  "outputSchema": "output.schema.json",
+  "inputValidator": "validate-input.mjs",
+  "outputValidator": "validate-output.mjs",
+  "selfTest": "self-test.mjs",
+  "sideEffects": [
+    "write only the typed resolution receipt and the resolved tree under input.project.artifactRootRef"
+  ],
+  "forbiddenSideEffects": [
+    "emit a rule identifier absent from the bound knowledge inventory",
+    "emit a class the bound rule does not declare",
+    "choose a value when no case matches the observed condition",
+    "change DOM structure, element order, Grammar component selection, copy, or behavior",
+    "write a class for a property a Grammar component already owns",
+    "reach into Grammar anatomy with a selector, passed class, or style",
+    "record a verdict, score, or pass claim on any node"
+  ],
+  "stopConditions": [
+    "a presentation property appears in the tree and no knowledge topic is bound for it",
+    "no case in the bound rule matches the observed condition",
+    "the bound Grammar package is unpublished or its fingerprint is stale",
+    "a node needing mutation lies outside the mutable owner ceiling",
+    "the observed source head differs from the frozen head",
+    "a resume adds no effective knowledge, Grammar, tree, or scope delta"
+  ]
+}

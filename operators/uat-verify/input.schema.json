@@ -1,0 +1,311 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://starci.dev/v8/operators/uat-verify/input.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "operatorId", "context", "input"],
+  "properties": {
+    "schemaVersion": { "const": 8 },
+    "operatorId": { "const": "uat.verify" },
+    "context": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["backendSource", "protocol", "templates", "admission", "runtime", "evidenceRefs"],
+      "properties": {
+        "backendSource": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["ref", "sourceHead", "fingerprint"],
+          "properties": {
+            "ref": { "type": "string", "minLength": 1 },
+            "sourceHead": { "$ref": "#/$defs/sourceHead" },
+            "fingerprint": { "$ref": "#/$defs/fingerprint" }
+          }
+        },
+        "protocol": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["ref", "fingerprint", "revision"],
+          "properties": {
+            "ref": { "type": "string", "minLength": 1 },
+            "fingerprint": { "$ref": "#/$defs/fingerprint" },
+            "revision": { "type": "string", "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$" }
+          }
+        },
+        "templates": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["ref", "fingerprint"],
+          "properties": {
+            "ref": { "type": "string", "minLength": 1 },
+            "fingerprint": { "$ref": "#/$defs/fingerprint" }
+          }
+        },
+        "admission": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["blindVisualPassRef", "blindVisualPassedAt", "qualityPassRef", "qualityPassedAt"],
+          "properties": {
+            "blindVisualPassRef": { "type": "string", "minLength": 1 },
+            "blindVisualPassedAt": { "type": "string", "format": "date-time" },
+            "qualityPassRef": { "type": "string", "minLength": 1 },
+            "qualityPassedAt": { "type": "string", "format": "date-time" }
+          }
+        },
+        "runtime": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "ownerRef",
+            "generation",
+            "status",
+            "frontendOrigin",
+            "apiOrigin",
+            "identityOrigin",
+            "authorityFingerprint"
+          ],
+          "properties": {
+            "ownerRef": { "type": "string", "minLength": 1 },
+            "generation": { "type": "integer", "minimum": 1 },
+            "status": { "const": "ready" },
+            "frontendOrigin": { "$ref": "#/$defs/localOrigin" },
+            "apiOrigin": { "$ref": "#/$defs/localOrigin" },
+            "identityOrigin": { "$ref": "#/$defs/localOrigin" },
+            "authorityFingerprint": { "$ref": "#/$defs/fingerprint" }
+          }
+        },
+        "evidenceRefs": { "type": "array", "items": { "$ref": "#/$defs/contextRef" } }
+      }
+    },
+    "input": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "invocationId",
+        "missionId",
+        "project",
+        "feature",
+        "flow",
+        "runId",
+        "sourceHead",
+        "identity",
+        "lease",
+        "fixture",
+        "cases",
+        "resume"
+      ],
+      "properties": {
+        "invocationId": { "type": "string", "minLength": 1 },
+        "missionId": { "type": "string", "minLength": 1 },
+        "project": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["id", "artifactRootRef"],
+          "properties": {
+            "id": { "$ref": "#/$defs/slug" },
+            "artifactRootRef": { "type": "string", "minLength": 1 }
+          }
+        },
+        "feature": { "$ref": "#/$defs/slug" },
+        "flow": { "$ref": "#/$defs/slug" },
+        "runId": { "type": "string", "pattern": "^[A-Za-z0-9._-]+$" },
+        "sourceHead": { "$ref": "#/$defs/sourceHead" },
+        "identity": {
+          "oneOf": [{ "$ref": "#/$defs/accountRecord" }, { "$ref": "#/$defs/anonymousRecord" }]
+        },
+        "lease": {
+          "oneOf": [{ "type": "null" }, { "$ref": "#/$defs/lease" }]
+        },
+        "fixture": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["namespace", "preflightRef", "prepareRefs", "cleanupSelector"],
+          "properties": {
+            "namespace": { "$ref": "#/$defs/fixtureNamespace" },
+            "preflightRef": { "type": "string", "minLength": 1 },
+            "prepareRefs": { "$ref": "#/$defs/refArray" },
+            "cleanupSelector": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["usesUatFlag", "namespace"],
+              "properties": {
+                "usesUatFlag": { "const": true },
+                "namespace": { "$ref": "#/$defs/fixtureNamespace" }
+              }
+            }
+          }
+        },
+        "cases": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 64,
+          "items": { "$ref": "#/$defs/frozenCase" }
+        },
+        "resume": {
+          "oneOf": [
+            { "type": "null" },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["blockedReceiptRef", "resumeToken", "addedContextRefs"],
+              "properties": {
+                "blockedReceiptRef": { "type": "string", "minLength": 1 },
+                "resumeToken": { "type": "string", "minLength": 1 },
+                "addedContextRefs": { "$ref": "#/$defs/refArray" }
+              }
+            }
+          ]
+        }
+      }
+    }
+  },
+  "$defs": {
+    "fingerprint": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
+    "sourceHead": { "type": "string", "pattern": "^[0-9a-f]{40}$" },
+    "slug": { "type": "string", "pattern": "^[a-z0-9][a-z0-9-]*$" },
+    "localOrigin": { "type": "string", "pattern": "^http://localhost:[1-9][0-9]{0,4}$" },
+    "fixtureNamespace": { "type": "string", "pattern": "^uat-[A-Za-z0-9._-]+$" },
+    "refArray": { "type": "array", "items": { "type": "string", "minLength": 1 } },
+    "checkpoint": { "enum": ["entry", "commitment", "feedback", "recovery", "terminal"] },
+    "accountRecord": {
+      "description": "Closed non-secret record. Every field is a const, a fingerprint, or a scheme-bound opaque reference, so no field can hold a password, cookie, token, or OTP.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "identityKind",
+        "accountRef",
+        "provisioningMode",
+        "provisioningOwnerRef",
+        "identityRecordRef",
+        "applicationRecordRef",
+        "principalFingerprint",
+        "fixtureNamespace",
+        "credentialCustody",
+        "state"
+      ],
+      "properties": {
+        "identityKind": { "const": "account" },
+        "accountRef": { "type": "string", "pattern": "^account://fresh/[A-Za-z0-9._~/-]+$" },
+        "provisioningMode": { "const": "control-panel-auto-create" },
+        "provisioningOwnerRef": { "type": "string", "pattern": "^control-panel://[A-Za-z0-9._~/-]+$" },
+        "identityRecordRef": { "type": "string", "pattern": "^keycloak-user://[A-Za-z0-9._~/-]+$" },
+        "applicationRecordRef": { "type": "string", "pattern": "^database-user://[A-Za-z0-9._~/-]+$" },
+        "principalFingerprint": { "$ref": "#/$defs/fingerprint" },
+        "fixtureNamespace": { "$ref": "#/$defs/fixtureNamespace" },
+        "credentialCustody": { "const": "control-panel-ephemeral" },
+        "state": { "const": "authenticated" }
+      }
+    },
+    "anonymousRecord": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["identityKind", "anonymousRef", "fixtureNamespace"],
+      "properties": {
+        "identityKind": { "const": "anonymous" },
+        "anonymousRef": { "type": "string", "pattern": "^anonymous://explicit/[A-Za-z0-9._~/-]+$" },
+        "fixtureNamespace": { "$ref": "#/$defs/fixtureNamespace" }
+      }
+    },
+    "lease": {
+      "description": "Opaque Control-Panel Browser lease. It binds identity and context and carries no secret.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "leaseRef",
+        "missionRef",
+        "accountRef",
+        "accountRecordRef",
+        "provisioningEvidenceRefs",
+        "credentialCustody",
+        "browserContextRef",
+        "principalFingerprint",
+        "runtimeGeneration",
+        "origin",
+        "fixtureNamespace",
+        "expiresAt",
+        "state",
+        "executionMode",
+        "executionOwnerRef",
+        "consumerTabRef",
+        "evidenceBrokerRef",
+        "materializationStatus"
+      ],
+      "properties": {
+        "leaseRef": { "type": "string", "pattern": "^browser-lease://[A-Za-z0-9._~/-]+$" },
+        "missionRef": { "type": "string", "minLength": 1 },
+        "accountRef": { "type": "string", "pattern": "^account://fresh/[A-Za-z0-9._~/-]+$" },
+        "accountRecordRef": {
+          "type": "string",
+          "pattern": "^\\.worktrees/uat/[a-z0-9][a-z0-9-]*/[a-z0-9][a-z0-9-]*/snapshot\\.json#account$"
+        },
+        "provisioningEvidenceRefs": {
+          "type": "array",
+          "minItems": 2,
+          "maxItems": 8,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "pattern": "^(?:keycloak-user|database-user|provisioning-evidence)://[A-Za-z0-9._~/-]+$"
+          }
+        },
+        "credentialCustody": { "const": "control-panel-ephemeral" },
+        "browserContextRef": { "type": "string", "minLength": 1 },
+        "principalFingerprint": { "$ref": "#/$defs/fingerprint" },
+        "runtimeGeneration": { "type": "integer", "minimum": 1 },
+        "origin": { "$ref": "#/$defs/localOrigin" },
+        "fixtureNamespace": { "$ref": "#/$defs/fixtureNamespace" },
+        "expiresAt": { "type": "string", "format": "date-time" },
+        "state": { "const": "authenticated" },
+        "executionMode": { "enum": ["consumer-materialized", "broker-executed"] },
+        "executionOwnerRef": { "type": "string", "minLength": 1 },
+        "consumerTabRef": {
+          "oneOf": [{ "type": "string", "minLength": 1 }, { "type": "null" }]
+        },
+        "evidenceBrokerRef": {
+          "oneOf": [{ "type": "string", "minLength": 1 }, { "type": "null" }]
+        },
+        "materializationStatus": { "enum": ["materialized", "failed", "not-applicable"] }
+      }
+    },
+    "frozenCase": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "caseId",
+        "order",
+        "actorKind",
+        "entryRef",
+        "precondition",
+        "expectedOutcome",
+        "requiredCheckpoints"
+      ],
+      "properties": {
+        "caseId": { "type": "string", "pattern": "^[a-z0-9][a-z0-9-]*$" },
+        "order": { "type": "integer", "minimum": 1 },
+        "actorKind": { "enum": ["authenticated", "anonymous"] },
+        "entryRef": { "type": "string", "minLength": 1 },
+        "precondition": { "type": "string", "minLength": 1 },
+        "expectedOutcome": { "type": "string", "minLength": 1 },
+        "requiredCheckpoints": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": { "$ref": "#/$defs/checkpoint" }
+        }
+      }
+    },
+    "contextRef": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["ref", "fingerprint", "sourceHead", "observedAt"],
+      "properties": {
+        "ref": { "type": "string", "minLength": 1 },
+        "fingerprint": { "$ref": "#/$defs/fingerprint" },
+        "sourceHead": {
+          "oneOf": [{ "$ref": "#/$defs/sourceHead" }, { "type": "null" }]
+        },
+        "observedAt": { "type": "string", "format": "date-time" }
+      }
+    }
+  }
+}

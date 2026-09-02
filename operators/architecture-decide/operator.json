@@ -1,0 +1,38 @@
+{
+  "schemaVersion": 8,
+  "id": "architecture.decide",
+  "domain": "architecture",
+  "job": "Decide one architecture with its tech stack, system boundaries, and data ownership, and prove it against observed current state, rejected alternatives, verified compatibility, and an independent critique.",
+  "contextContract": "context.md",
+  "inputSchema": "input.schema.json",
+  "outputSchema": "output.schema.json",
+  "inputValidator": "validate-input.mjs",
+  "outputValidator": "validate-output.mjs",
+  "selfTest": "self-test.mjs",
+  "sideEffects": [
+    "write only the typed decision receipt, the stack model, the data-ownership model, the rendered alternative comparison, and the critique under input.project.artifactRootRef"
+  ],
+  "forbiddenSideEffects": [
+    "propose a target before the current state is observed at the frozen source head",
+    "justify a component by incumbency",
+    "claim compatibility that no evidence checked",
+    "leave a boundary without a stated data-ownership answer",
+    "publish a critique authored by the deciding role",
+    "name implementation files in the downstream handoff",
+    "mutate routed product source, business authority, or frontend authority",
+    "start, stop, or reconfigure runtime services",
+    "claim implementation, quality-gate, or UAT completion"
+  ],
+  "stopConditions": [
+    "the current state cannot be observed at the frozen source head",
+    "required business authority is missing or stale",
+    "no alternative survives the frozen constraints",
+    "several alternatives remain material and product authority must choose",
+    "a retained stack component has no compatibility evidence",
+    "a physical store has no owning boundary",
+    "an independent critique attack has no resolution",
+    "the selection policy requires an approval that was never bound",
+    "the observed source head differs from the frozen head",
+    "a resume adds no effective evidence, constraint, inventory, or approval delta"
+  ]
+}

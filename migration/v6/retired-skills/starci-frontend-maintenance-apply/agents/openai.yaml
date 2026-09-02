@@ -1,6 +1,0 @@
-interface:
-  display_name: "StarCi Product Maintenance"
-  short_description: "Apply approved maintenance across affected roles"
-  default_prompt: "Use $starci-frontend-maintenance-apply for this selected flow and execute its state machine."
-policy:
-  allow_implicit_invocation: true

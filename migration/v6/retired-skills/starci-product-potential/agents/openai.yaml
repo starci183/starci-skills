@@ -1,6 +1,0 @@
-interface:
-  display_name: "StarCi Product Potential"
-  short_description: "Assess and route discovered product opportunities"
-  default_prompt: "Use $starci-product-potential to assess these discovered opportunities."
-policy:
-  allow_implicit_invocation: true

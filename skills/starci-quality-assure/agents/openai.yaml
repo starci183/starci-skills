@@ -1,6 +1,0 @@
-interface:
-  display_name: "StarCi Quality Assure"
-  short_description: "Assure measured source quality end to end"
-  default_prompt: "Use $starci-quality-assure to bring this bounded delivery to proven quality."
-policy:
-  allow_implicit_invocation: true

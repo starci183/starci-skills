@@ -1,0 +1,235 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://starci.dev/v8/operators/release-deploy/input.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "operatorId", "context", "input"],
+  "properties": {
+    "schemaVersion": { "const": 8 },
+    "operatorId": { "const": "release.deploy" },
+    "context": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["intent", "lifecycle", "manifest", "authorization", "credentials", "observed", "evidenceRefs"],
+      "properties": {
+        "intent": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["stackRef", "fingerprint", "environment", "topology"],
+          "properties": {
+            "stackRef": { "type": "string", "minLength": 1 },
+            "fingerprint": { "$ref": "#/$defs/fingerprint" },
+            "environment": { "$ref": "#/$defs/environment" },
+            "topology": { "enum": ["single-host", "compose", "kubernetes"] }
+          }
+        },
+        "lifecycle": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["ref", "fingerprint"],
+          "properties": {
+            "ref": { "type": "string", "minLength": 1 },
+            "fingerprint": { "$ref": "#/$defs/fingerprint" }
+          }
+        },
+        "manifest": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["ref", "fingerprint", "validatedAgainstReleaseId"],
+          "properties": {
+            "ref": { "type": "string", "minLength": 1 },
+            "fingerprint": { "$ref": "#/$defs/fingerprint" },
+            "validatedAgainstReleaseId": { "$ref": "#/$defs/releaseId" }
+          }
+        },
+        "authorization": {
+          "description": "Deployment authority is declared. It is never implied by an ordinary task.",
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["ref", "action", "scope", "grantedAt", "expiresAt"],
+          "properties": {
+            "ref": { "type": "string", "minLength": 1 },
+            "action": { "const": "deploy" },
+            "scope": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["projectId", "environment", "targetRef"],
+              "properties": {
+                "projectId": { "$ref": "#/$defs/slug" },
+                "environment": { "$ref": "#/$defs/environment" },
+                "targetRef": { "type": "string", "minLength": 1 }
+              }
+            },
+            "grantedAt": { "type": "string", "format": "date-time" },
+            "expiresAt": { "type": "string", "format": "date-time" }
+          }
+        },
+        "credentials": {
+          "description": "Credentials are declared by name through existing custody. No value is ever carried here.",
+          "type": "array",
+          "maxItems": 32,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["handle", "custodyRef", "scope"],
+            "properties": {
+              "handle": { "$ref": "#/$defs/secretHandle" },
+              "custodyRef": { "type": "string", "minLength": 1 },
+              "scope": { "enum": ["registry", "host", "database", "domain-provider", "runtime"] }
+            }
+          }
+        },
+        "observed": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["targetRef", "revision", "activeReleaseId", "activeDigest", "observedAt"],
+          "properties": {
+            "targetRef": { "type": "string", "minLength": 1 },
+            "revision": { "type": "integer", "minimum": 0 },
+            "activeReleaseId": {
+              "oneOf": [{ "$ref": "#/$defs/releaseId" }, { "type": "null" }]
+            },
+            "activeDigest": {
+              "oneOf": [{ "$ref": "#/$defs/digest" }, { "type": "null" }]
+            },
+            "observedAt": { "type": "string", "format": "date-time" }
+          }
+        },
+        "evidenceRefs": { "type": "array", "items": { "$ref": "#/$defs/contextRef" } }
+      }
+    },
+    "input": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "invocationId",
+        "missionId",
+        "project",
+        "release",
+        "target",
+        "steady",
+        "probes",
+        "rollbackIdentity",
+        "resume"
+      ],
+      "properties": {
+        "invocationId": { "type": "string", "minLength": 1 },
+        "missionId": { "type": "string", "minLength": 1 },
+        "project": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["id", "artifactRootRef"],
+          "properties": {
+            "id": { "$ref": "#/$defs/slug" },
+            "artifactRootRef": { "type": "string", "minLength": 1 }
+          }
+        },
+        "release": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["releaseId", "artifactRef", "digest", "sourceHead", "immutable"],
+          "properties": {
+            "releaseId": { "$ref": "#/$defs/releaseId" },
+            "artifactRef": { "type": "string", "minLength": 1 },
+            "digest": { "$ref": "#/$defs/digest" },
+            "sourceHead": { "$ref": "#/$defs/sourceHead" },
+            "immutable": { "const": true }
+          }
+        },
+        "target": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["targetRef", "environment", "strategy", "declaredTargets", "replacedReleaseId"],
+          "properties": {
+            "targetRef": { "type": "string", "minLength": 1 },
+            "environment": { "$ref": "#/$defs/environment" },
+            "strategy": { "enum": ["rolling", "recreate", "blue-green"] },
+            "declaredTargets": { "type": "integer", "minimum": 1 },
+            "replacedReleaseId": {
+              "oneOf": [{ "$ref": "#/$defs/releaseId" }, { "type": "null" }]
+            }
+          }
+        },
+        "steady": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["windowSeconds", "deadlineSeconds", "backoffSeconds"],
+          "properties": {
+            "windowSeconds": { "type": "integer", "minimum": 1 },
+            "deadlineSeconds": { "type": "integer", "minimum": 1 },
+            "backoffSeconds": { "type": "integer", "minimum": 1 }
+          }
+        },
+        "probes": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 16,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["probeId", "kind", "endpointRef", "expectStatus"],
+            "properties": {
+              "probeId": { "$ref": "#/$defs/slug" },
+              "kind": { "enum": ["public-graphql-typename", "public-http", "runtime"] },
+              "endpointRef": { "type": "string", "minLength": 1 },
+              "expectStatus": { "type": "integer", "minimum": 100, "maximum": 599 }
+            }
+          }
+        },
+        "rollbackIdentity": {
+          "oneOf": [
+            { "type": "null" },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["releaseId", "artifactRef", "digest", "dataCompatible"],
+              "properties": {
+                "releaseId": { "$ref": "#/$defs/releaseId" },
+                "artifactRef": { "type": "string", "minLength": 1 },
+                "digest": { "$ref": "#/$defs/digest" },
+                "dataCompatible": { "type": "boolean" }
+              }
+            }
+          ]
+        },
+        "resume": {
+          "oneOf": [
+            { "type": "null" },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["blockedReceiptRef", "resumeToken", "addedContextRefs"],
+              "properties": {
+                "blockedReceiptRef": { "type": "string", "minLength": 1 },
+                "resumeToken": { "type": "string", "minLength": 1 },
+                "addedContextRefs": { "type": "array", "items": { "type": "string", "minLength": 1 } }
+              }
+            }
+          ]
+        }
+      }
+    }
+  },
+  "$defs": {
+    "fingerprint": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
+    "digest": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
+    "sourceHead": { "type": "string", "pattern": "^[0-9a-f]{40}$" },
+    "slug": { "type": "string", "pattern": "^[a-z0-9][a-z0-9-]*$" },
+    "releaseId": { "type": "string", "pattern": "^release:[A-Za-z0-9._-]+$" },
+    "environment": { "enum": ["development", "staging", "production"] },
+    "secretHandle": { "type": "string", "pattern": "^secret-ref://[A-Za-z0-9._~/-]+$" },
+    "contextRef": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["ref", "fingerprint", "sourceHead", "observedAt"],
+      "properties": {
+        "ref": { "type": "string", "minLength": 1 },
+        "fingerprint": { "$ref": "#/$defs/fingerprint" },
+        "sourceHead": {
+          "oneOf": [{ "$ref": "#/$defs/sourceHead" }, { "type": "null" }]
+        },
+        "observedAt": { "type": "string", "format": "date-time" }
+      }
+    }
+  }
+}

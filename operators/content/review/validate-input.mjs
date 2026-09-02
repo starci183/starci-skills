@@ -1,3 +1,0 @@
-import { validatorFor, runValidatorCli } from '../../validation.mjs';
-export const validateInput=validatorFor(new URL('./input.schema.json',import.meta.url),(v)=>{const e=[];if(v.input.reviewRound>v.input.maxReviewRounds)e.push('review round exceeds maximum');const k=v.input.requiredArtifactKinds,c=v.context;if(k.includes('image')&&!c.imageRefs.length)e.push('required image evidence is missing');if(k.includes('code')&&!c.codeRefs.length)e.push('required code evidence is missing');if(k.includes('e2e')&&!c.e2eEvidenceRefs.length)e.push('required E2E evidence is missing');return e;});
-if(process.argv[1]?.endsWith('validate-input.mjs'))await runValidatorCli(validateInput,'node validate-input.mjs <artifact.json>');

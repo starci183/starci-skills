@@ -1,7 +1,0 @@
-interface:
-  display_name: "Workflow Diagnose"
-  short_description: "Diagnose one workflow failure without repairing source."
-  default_prompt: "Use $starci-workflow-diagnose for one bounded mission intent."
-policy:
-  allow_implicit_invocation: true
-

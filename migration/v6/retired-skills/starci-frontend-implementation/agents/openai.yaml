@@ -1,6 +1,0 @@
-interface:
-  display_name: "StarCi Frontend Implementation"
-  short_description: "Implement one frozen frontend source"
-  default_prompt: "Use $starci-frontend-implementation for this selected flow and execute its state machine."
-policy:
-  allow_implicit_invocation: true

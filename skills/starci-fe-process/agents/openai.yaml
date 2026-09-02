@@ -1,6 +1,0 @@
-interface:
-  display_name: "StarCi Frontend Process"
-  short_description: "Compile and prove one UI-only frontend outcome"
-  default_prompt: "Use $starci-fe-process to compile, apply, capture, blind-review, and gate this UI-only frontend outcome."
-policy:
-  allow_implicit_invocation: true

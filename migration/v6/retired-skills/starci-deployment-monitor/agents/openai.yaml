@@ -1,6 +1,0 @@
-interface:
-  display_name: "StarCi Deployment Monitor"
-  short_description: "Monitor one existing rollout to steady state"
-  default_prompt: "Use $starci-deployment-monitor for this selected flow and execute its state machine."
-policy:
-  allow_implicit_invocation: true

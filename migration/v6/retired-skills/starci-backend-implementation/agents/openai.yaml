@@ -1,6 +1,0 @@
-interface:
-  display_name: "StarCi Backend Implementation"
-  short_description: "Implement one approved backend contract"
-  default_prompt: "Use $starci-backend-implementation for this selected flow and execute its state machine."
-policy:
-  allow_implicit_invocation: true

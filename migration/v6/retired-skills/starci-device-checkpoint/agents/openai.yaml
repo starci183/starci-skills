@@ -1,6 +1,0 @@
-interface:
-  display_name: "StarCi Device Checkpoint"
-  short_description: "Push proven work and encrypted local service state"
-  default_prompt: "Use $starci-device-checkpoint for this selected flow and execute its state machine."
-policy:
-  allow_implicit_invocation: true

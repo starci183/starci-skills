@@ -1,21 +1,8 @@
-node_modules/
-coverage/
-__pycache__/
-*.py[cod]
-.pytest_cache/
-.workspaces/local/
-.sessions/
-*.log
+dist/
 
-# Per-device runtime and agent state. Portable policy, operators, schemas and
-# knowledge stay tracked; these are rebuilt after pull on each trusted device.
-/cache/
-/contexts/
-/worktrees/
-/launch.json
-/settings.local.json
-/scheduled_tasks.lock
-/docs/
-/.venv/
-/.tmp/
-/.tmp-*.json
+
+# v7 local artifacts that must stay out of the v8 tree
+.venv/
+mcp/
+runtime/
+sites/

@@ -1,6 +1,0 @@
-interface:
-  display_name: "StarCi Backend Contract Critique"
-  short_description: "Challenge one backend contract independently"
-  default_prompt: "Use $starci-backend-contract-critique for this selected flow and execute its state machine."
-policy:
-  allow_implicit_invocation: true

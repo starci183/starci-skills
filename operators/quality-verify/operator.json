@@ -1,0 +1,33 @@
+{
+  "schemaVersion": 8,
+  "id": "quality.verify",
+  "domain": "quality",
+  "job": "Verify one bounded delivery by running its declared static gates against an unchanged upstream fingerprint and return the exact measured receipt, repairing nothing.",
+  "contextContract": "context.md",
+  "inputSchema": "input.schema.json",
+  "outputSchema": "output.schema.json",
+  "inputValidator": "validate-input.mjs",
+  "outputValidator": "validate-output.mjs",
+  "selfTest": "self-test.mjs",
+  "sideEffects": [
+    "run the declared pinned gate commands against the frozen checkout",
+    "write only gate evidence and the typed verification receipt under input.project.artifactRootRef"
+  ],
+  "forbiddenSideEffects": [
+    "modify product source, configuration, or a gate command to change a result",
+    "redesign, repair, or reclassify a measured failure into a pass",
+    "run the end-to-end suite when it was not explicitly requested",
+    "add, weaken, skip, suppress, or substitute a declared gate",
+    "read a project-level Sonar verdict out of a new-code quality gate",
+    "carry a debt that no owner approved or whose approval has expired",
+    "narrate a gate result instead of measuring it"
+  ],
+  "stopConditions": [
+    "the predecessor receipts disagree about the source head",
+    "a predecessor fingerprint no longer matches the frozen source",
+    "the observed source head differs from the frozen head",
+    "a required gate cannot be executed at all in this environment",
+    "a declared debt has no approval or its approval has expired",
+    "a resume adds no effective predecessor, gate, debt, or source delta"
+  ]
+}

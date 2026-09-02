@@ -1,6 +1,0 @@
-interface:
-  display_name: "StarCi Frontend UI Audit"
-  short_description: "Prove rendered UI states and authority"
-  default_prompt: "Use $starci-frontend-ui-audit for this selected flow and execute its state machine."
-policy:
-  allow_implicit_invocation: true

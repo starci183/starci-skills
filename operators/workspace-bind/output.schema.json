@@ -1,0 +1,257 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://starci.dev/v8/operators/workspace-bind/output.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "operatorId", "output"],
+  "properties": {
+    "schemaVersion": { "const": 8 },
+    "operatorId": { "const": "workspace.bind" },
+    "output": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["outcome", "receipt", "evidenceRefs", "artifactRefs", "handoff"],
+      "properties": {
+        "outcome": { "enum": ["bound", "blocked"] },
+        "receipt": { "$ref": "#/$defs/receipt" },
+        "evidenceRefs": { "$ref": "#/$defs/nonEmptyRefArray" },
+        "artifactRefs": { "$ref": "#/$defs/refArray" },
+        "handoff": { "type": "null" }
+      }
+    }
+  },
+  "$defs": {
+    "fingerprint": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
+    "gitHead": { "type": "string", "pattern": "^[0-9a-f]{40}$" },
+    "slug": { "type": "string", "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$" },
+    "serviceKey": { "type": "string", "pattern": "^[A-Za-z][A-Za-z0-9]*$" },
+    "refArray": { "type": "array", "items": { "type": "string", "minLength": 1 } },
+    "nonEmptyRefArray": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "type": "string", "minLength": 1 }
+    },
+    "receipt": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "receiptType",
+        "receiptId",
+        "invocationId",
+        "missionId",
+        "status",
+        "binding",
+        "route",
+        "findings",
+        "evidenceRefs",
+        "failure",
+        "resume",
+        "createdAt"
+      ],
+      "properties": {
+        "receiptType": { "const": "workspace-route-binding" },
+        "receiptId": { "type": "string", "minLength": 1 },
+        "invocationId": { "type": "string", "minLength": 1 },
+        "missionId": { "type": "string", "minLength": 1 },
+        "status": { "enum": ["bound", "blocked"] },
+        "binding": { "$ref": "#/$defs/binding" },
+        "route": { "oneOf": [{ "$ref": "#/$defs/route" }, { "type": "null" }] },
+        "findings": { "type": "array", "items": { "$ref": "#/$defs/finding" } },
+        "evidenceRefs": { "$ref": "#/$defs/nonEmptyRefArray" },
+        "failure": { "oneOf": [{ "$ref": "#/$defs/failure" }, { "type": "null" }] },
+        "resume": { "oneOf": [{ "$ref": "#/$defs/resume" }, { "type": "null" }] },
+        "createdAt": { "type": "string", "format": "date-time" }
+      }
+    },
+    "binding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "projectId",
+        "role",
+        "portableRouteRef",
+        "hydratedRouteRef",
+        "routeFingerprint",
+        "identityFingerprint",
+        "sourceHead",
+        "artifactRootRef",
+        "inputFingerprint",
+        "progressFingerprint"
+      ],
+      "properties": {
+        "projectId": { "$ref": "#/$defs/slug" },
+        "role": { "$ref": "#/$defs/slug" },
+        "portableRouteRef": { "type": "string", "minLength": 1 },
+        "hydratedRouteRef": { "type": "string", "minLength": 1 },
+        "routeFingerprint": { "$ref": "#/$defs/fingerprint" },
+        "identityFingerprint": { "$ref": "#/$defs/fingerprint" },
+        "sourceHead": { "$ref": "#/$defs/gitHead" },
+        "artifactRootRef": { "type": "string", "minLength": 1 },
+        "inputFingerprint": { "$ref": "#/$defs/fingerprint" },
+        "progressFingerprint": { "$ref": "#/$defs/fingerprint" }
+      }
+    },
+    "route": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "routeArtifactRef",
+        "checkout",
+        "gitPolicy",
+        "mutationReadiness",
+        "writeRoots",
+        "runtime",
+        "provenanceHeadRef"
+      ],
+      "properties": {
+        "routeArtifactRef": { "type": "string", "minLength": 1 },
+        "checkout": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "diskPath",
+            "gitRoot",
+            "gitRepository",
+            "branch",
+            "repositoryKind",
+            "directory",
+            "sourceHead"
+          ],
+          "properties": {
+            "diskPath": { "type": "string", "minLength": 1 },
+            "gitRoot": { "type": "string", "minLength": 1 },
+            "gitRepository": { "type": "string", "minLength": 1 },
+            "branch": { "type": "string", "minLength": 1 },
+            "repositoryKind": { "enum": ["source", "sibling"] },
+            "directory": {
+              "oneOf": [{ "type": "string", "minLength": 1 }, { "type": "null" }]
+            },
+            "sourceHead": { "$ref": "#/$defs/gitHead" }
+          }
+        },
+        "gitPolicy": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["worktreeBranches", "mutationBranch"],
+          "properties": {
+            "worktreeBranches": { "enum": ["forbidden", "allowed"] },
+            "mutationBranch": { "type": "string", "minLength": 1 }
+          }
+        },
+        "mutationReadiness": { "enum": ["ready", "read-only"] },
+        "writeRoots": { "$ref": "#/$defs/nonEmptyRefArray" },
+        "runtime": { "oneOf": [{ "$ref": "#/$defs/runtimeConsumption" }, { "type": "null" }] },
+        "provenanceHeadRef": {
+          "oneOf": [{ "type": "string", "minLength": 1 }, { "type": "null" }]
+        }
+      }
+    },
+    "runtimeConsumption": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "ownerTaskId",
+        "generation",
+        "status",
+        "consumerRole",
+        "endpointBinding",
+        "endpoints"
+      ],
+      "properties": {
+        "ownerTaskId": { "type": "string", "minLength": 1 },
+        "generation": { "type": "integer", "minimum": 1 },
+        "status": { "enum": ["starting", "ready", "degraded", "stopped"] },
+        "consumerRole": { "const": "consumer" },
+        "endpointBinding": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["authority", "project", "application", "services", "authorityFingerprint"],
+          "properties": {
+            "authority": { "const": "workspace-route-port-projection" },
+            "project": { "$ref": "#/$defs/slug" },
+            "application": { "$ref": "#/$defs/slug" },
+            "services": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["frontend", "api", "identity"],
+              "properties": {
+                "frontend": { "$ref": "#/$defs/serviceKey" },
+                "api": { "$ref": "#/$defs/serviceKey" },
+                "identity": { "$ref": "#/$defs/serviceKey" }
+              }
+            },
+            "authorityFingerprint": { "$ref": "#/$defs/fingerprint" }
+          }
+        },
+        "endpoints": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["frontend", "api", "identity"],
+          "properties": {
+            "frontend": { "type": "string", "minLength": 1 },
+            "api": { "type": "string", "minLength": 1 },
+            "identity": { "type": "string", "minLength": 1 }
+          }
+        }
+      }
+    },
+    "finding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["code", "subject", "statement"],
+      "properties": {
+        "code": {
+          "enum": [
+            "ROUTE_HYDRATED_FROM_PORTABLE",
+            "HINT_REJECTED",
+            "RUNTIME_CONSUMED_NOT_OWNED",
+            "IDENTITY_ROSTER_SEALED",
+            "PROVENANCE_HEAD_BOUND",
+            "CACHED_ROUTE_REUSED",
+            "WORKTREE_BRANCH_FORBIDDEN"
+          ]
+        },
+        "subject": { "type": "string", "minLength": 1 },
+        "statement": { "type": "string", "minLength": 1 }
+      }
+    },
+    "failure": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["code", "message", "subjects", "missingRefs", "retryable", "owningDomain"],
+      "properties": {
+        "code": {
+          "enum": [
+            "INVALID_INPUT",
+            "ROUTE_UNDECLARED",
+            "ROUTE_UNHYDRATED",
+            "ROUTE_MISMATCH",
+            "IDENTITY_UNVERIFIED",
+            "BRANCH_POLICY_VIOLATION",
+            "CHECKOUT_DIRTY",
+            "SOURCE_DRIFT",
+            "ENDPOINT_AUTHORITY_STALE",
+            "RUNTIME_NOT_READY",
+            "NO_PROGRESS"
+          ]
+        },
+        "message": { "type": "string", "minLength": 1 },
+        "subjects": { "$ref": "#/$defs/refArray" },
+        "missingRefs": { "$ref": "#/$defs/refArray" },
+        "retryable": { "type": "boolean" },
+        "owningDomain": {
+          "enum": ["workspace", "source", "runtime", "identity", "caller"]
+        }
+      }
+    },
+    "resume": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["resumeToken", "requiredDelta"],
+      "properties": {
+        "resumeToken": { "type": "string", "minLength": 1 },
+        "requiredDelta": { "$ref": "#/$defs/nonEmptyRefArray" }
+      }
+    }
+  }
+}

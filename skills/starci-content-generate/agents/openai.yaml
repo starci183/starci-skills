@@ -1,5 +1,0 @@
-interface:
-  display_name: "Content Generation"
-  short_description: "Generate reviewed lessons with visuals, code, and executable E2E proof."
-  default_prompt: "Use $starci-content-generate to produce one reviewed educational content bundle."
-  allow_implicit_invocation: true

@@ -1,3 +1,0 @@
-# Execute `content/e2e`
-
-Use fresh `gpt-5.6-luna` executions for a bounded run-read-repair loop. Fingerprint the frozen test authority before the first run. For each track, execute the exact command, capture assertions and exit code, diagnose failures, repair only declared implementation or E2E harness artifacts, and run again. The shared behavioral assertions must remain unchanged; never delete, skip, loosen, or special-case a test merely to pass. Stop with `failed` for a repairable implementation failure so the Skill routes through code, or `blocked` when required runtime/authority is unavailable or the iteration limit is exhausted.

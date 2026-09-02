@@ -1,7 +1,0 @@
-# Analyze starci-feature-deliver
-
-Compile and validate a complete frozen mission `scope` against `scope.yaml`. If any material
-dimension is unclear, ask one focused boundary question before Skill execution or target-source
-inspection.
-
-Validate the mission and fixed first state.
