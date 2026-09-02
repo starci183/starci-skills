@@ -2,8 +2,8 @@
 
 This tree holds the universal UI law shared by every published Grammar family, split into three
 groups by the operator that reads each one.
-It owns 87 stable X-n laws, observable selection conditions, ownership decisions, deterministic
-verdicts, and audit vectors. It is not an implementation or consumer cookbook. It does not own business facts, page copy,
+It owns 118 stable X-n laws (40 in composition, 59 in presentation, 19 in proof), observable
+selection conditions, ownership decisions, deterministic verdicts, and audit vectors. It is not an implementation or consumer cookbook. It does not own business facts, page copy,
 routes, permissions, artwork identity, product effects, or family material choices.
 
 ## Runtime policy
@@ -54,20 +54,6 @@ is composition. Whether keyboard order matches visual order needs a running page
 
 Code conventions for the source that produces all of this live in [`patterns/`](../patterns/fe/INDEX.md).
 Family realization lives in [`grammars/`](../grammars/starci/INDEX.md).
-
-## Awaiting relocation
-
-Files prefixed `_pending-` are retired legacy topics kept because part of their substance has no
-successor yet. They are not runtime authority and no operator binds them.
-
-| File | Where its substance belongs |
-| --- | --- |
-| `_pending-contrast.md` | Measured-contrast rules, for `proof/` once that topic is authored |
-| `_pending-grammars-surface.md`, `_pending-grammars-boundary.md` | Component anatomy, for `grammars/<family>/` |
-| `_pending-grammars-icon.md`, `_pending-grammars-media.md` | Glyph and asset mechanics, for `grammars/<family>/` |
-| `_pending-grammars-control-state.md`, `_pending-grammars-field.md` | Control and field anatomy, for `grammars/<family>/` |
-
-Delete one only after its substance has a home. A file removed without a successor removes the law.
 
 ## Rule binding architecture
 
