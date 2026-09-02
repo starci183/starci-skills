@@ -45,9 +45,9 @@ is an observation of a different repository.
 branch must be `mutationBranch`; creating or switching to a task, feature, or worktree branch is not
 a state this input can describe.
 
-`input.declaredWriteRoots` is non-empty, and every path in `observedCheckout.dirtyPaths` must lie
-under one of them. Anything dirty outside the declared boundary belongs to work this invocation does
-not own.
+`input.declaredWriteRoots` is non-empty. `observedCheckout.dirtyPaths` reports the checkout as it
+is; a path outside the declared boundary belongs to work this invocation does not own, and the
+operator answers it with `CHECKOUT_DIRTY` rather than by refusing the observation.
 
 `input.frozenSourceHead` is the head the mission froze. It is compared against
 `observedCheckout.head` during execution, and a difference is `SOURCE_DRIFT` rather than a silent

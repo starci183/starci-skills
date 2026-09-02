@@ -314,10 +314,21 @@ taskBranch.context.hydratedRoute.repository.branch = 'feature/dashboard';
 taskBranch.context.portableRoute.repository.branch = 'feature/dashboard';
 assert.equal(validateInput(taskBranch).valid, false);
 
-// Something dirty outside the declared write roots belongs to work this invocation does not own.
+// Something dirty outside the declared write roots is a condition the operator reports as
+// CHECKOUT_DIRTY; the observation itself is valid input, otherwise that failure is unreachable.
 const dirtyOutside = structuredClone(validInput);
 dirtyOutside.input.observedCheckout.dirtyPaths.push('src/features/socketio/gateway.ts');
-assert.equal(validateInput(dirtyOutside).valid, false);
+assert.deepEqual(validateInput(dirtyOutside), { valid: true, errors: [] });
+const checkoutDirty = structuredClone(validBlockedOutput);
+checkoutDirty.output.receipt.failure = {
+  code: 'CHECKOUT_DIRTY',
+  message: 'One dirty path lies outside the declared write roots.',
+  subjects: ['src/features/socketio/gateway.ts'],
+  missingRefs: [],
+  retryable: true,
+  owningDomain: 'source',
+};
+assert.deepEqual(validateOutput(checkoutDirty), { valid: true, errors: [] });
 
 // A caller that consumes the shared runtime must bind the owner, not assume it.
 const consumeWithoutOwner = structuredClone(validInput);

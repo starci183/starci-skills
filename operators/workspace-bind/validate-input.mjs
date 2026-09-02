@@ -76,14 +76,9 @@ export const validateInput = validatorFor(new URL('./input.schema.json', import.
     errors.push(`the routed policy forbids worktree branches, so the checkout must stay on ${input.gitPolicy.mutationBranch}`);
   }
 
-  // Anything dirty outside the declared write roots belongs to somebody else's work.
-  const writeRoots = input.declaredWriteRoots.map(comparablePath);
-  for (const dirty of input.observedCheckout.dirtyPaths) {
-    const candidate = comparablePath(dirty);
-    if (!writeRoots.some((root) => candidate === root || candidate.startsWith(`${root}/`))) {
-      errors.push(`dirty path ${dirty} lies outside the declared write roots`);
-    }
-  }
+  // Dirty paths outside the declared write roots are a real condition of the checkout, not a
+  // malformed input. The operator answers them with the typed CHECKOUT_DIRTY failure (execute.md
+  // step 5), so the observation is accepted here and judged there.
 
   if (input.runtimeNeed === 'consume' && runtime === null) {
     errors.push('a caller that consumes the shared runtime must bind the runtime owner');

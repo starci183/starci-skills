@@ -26,8 +26,7 @@ written down is a hint that gets followed the moment the declared route looks in
 1. **Validate input and resume.** Apply `input.schema.json` and semantic validation. Reject a route
    that declares another identity, a source route carrying a directory, a sibling route that
    traverses, a hydrated route with a foreign workspace root, an observation of a different
-   checkout, a dirty path outside the declared write roots, a runtime bound without need, and an
-   unchanged resume.
+   checkout, a runtime bound without need, and an unchanged resume.
 2. **Bind bootstrap and identity.** Confirm the bootstrap entries and agent discovery for this
    Source, then the machine identity and its encrypted credential roster. An unverified identity is
    `IDENTITY_UNVERIFIED`. No credential is read, copied, or recorded; only the sealed roster

@@ -25,8 +25,8 @@ giờ được ghi ra là một gợi ý sẽ được đi theo ngay khi route �
 
 1. **Kiểm tra input và resume.** Áp `input.schema.json` cùng kiểm tra ngữ nghĩa. Từ chối một route
    khai danh tính khác, một source route mang directory, một sibling route đi ngược lên, một route đã
-   hydrate có workspace root ngoại lai, một quan sát của checkout khác, một đường dẫn bẩn nằm ngoài
-   write root đã khai, một runtime được ràng mà không có nhu cầu, và một resume không đổi gì.
+   hydrate có workspace root ngoại lai, một quan sát của checkout khác, một runtime được ràng mà
+   không có nhu cầu, và một resume không đổi gì.
 2. **Ràng bootstrap và danh tính.** Xác nhận các entry bootstrap và việc phát hiện agent cho Source
    này, rồi tới danh tính máy cùng roster credential đã mã hoá của nó. Danh tính chưa xác minh là
    `IDENTITY_UNVERIFIED`. Không credential nào được đọc, sao chép hay ghi lại; chỉ tham chiếu roster

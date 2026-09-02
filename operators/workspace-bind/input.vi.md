@@ -42,9 +42,9 @@ quan sát của một kho khác.
 được phải là `mutationBranch`; việc tạo hay chuyển sang một branch task, feature hay worktree không
 phải là trạng thái mà input này mô tả được.
 
-`input.declaredWriteRoots` không được rỗng, và mọi đường dẫn trong `observedCheckout.dirtyPaths` phải
-nằm dưới một trong số đó. Thứ gì bẩn ngoài ranh giới đã khai là thuộc về phần việc mà lần gọi này
-không sở hữu.
+`input.declaredWriteRoots` không được rỗng. `observedCheckout.dirtyPaths` ghi checkout đúng như nó
+đang có; một đường dẫn ngoài ranh giới đã khai thuộc về phần việc mà lần gọi này không sở hữu, và
+operator trả lời bằng `CHECKOUT_DIRTY` thay vì từ chối bản quan sát.
 
 ## Input khi resume
 
