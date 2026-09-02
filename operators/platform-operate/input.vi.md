@@ -61,7 +61,7 @@ inventory ghi ai đang giữ nó, còn phần thực thi mới quyết điều �
 vụ đang vận hành nằm trong tập được sửa, và mọi resource mong muốn cũng vậy. Một dịch vụ product tình
 cờ có mặt trong inventory thì thuộc về tập chỉ quan sát.
 
-## Resume
+## Input khi resume
 
 `resume` là `null` cho lần gọi mới. Lần gọi resume cung cấp đúng receipt đã blocked, token dùng một
 lần của nó, và những tham chiếu được thêm vào từ lúc đó. Project, source head, dịch vụ, plan hash và

@@ -70,7 +70,7 @@ tiêu thụ đúng phần delta. Một resume không thêm được thay đổi 
 sẽ trả `NO_PROGRESS`. Một remote được quan sát lại phải đến dưới dạng một remote head mới; cùng một
 quan sát không thể cho ra một kết quả khác.
 
-## Những đòn tấn công bắt buộc
+## Các đòn tấn công bắt buộc
 
 Operator không được phép publish khi còn bất kỳ mục nào áp dụng được mà chưa xử lý:
 

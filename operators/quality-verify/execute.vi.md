@@ -1,4 +1,4 @@
-# Thi hành `quality.verify`
+# Thực thi `quality.verify`
 
 ## Một việc duy nhất
 
@@ -92,14 +92,14 @@ Mọi hình dạng khác là `verdict: "fail"`, kể cả một gate bắt buộ
 Một gate không bắt buộc mà trượt thì được ghi lại và tự nó không làm phán quyết đỏ. Đó chính là lý do
 `required` tồn tại, và nó là lời khai của người gọi chứ không bao giờ là phán đoán của operator này.
 
-## Thi hành khi resume
+## Thực thi khi resume
 
 Một resume bắt đầu lại từ khâu kiểm tra, chỉ tái dùng những quan sát có fingerprint không đổi, và tiêu
 thụ đúng phần delta. Resume không thêm thay đổi nào về tiền nhiệm, gate, nợ hay source thì trả
 `NO_PROGRESS`. Một bản giao đã sửa sẽ đến dưới dạng head mới và fingerprint tiền nhiệm mới; cùng một
 fingerprint không thể cho ra một đáp án khác.
 
-## Những đòn tấn công bắt buộc
+## Các đòn tấn công bắt buộc
 
 Operator không được báo cáo một lần thẩm định khi còn bất kỳ mục nào áp dụng được mà chưa giải quyết:
 

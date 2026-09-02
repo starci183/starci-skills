@@ -67,13 +67,13 @@ thứ giữ cho nợ đã khai khác biệt với nợ âm thầm.
 là `fail`, kể cả một gate bắt buộc bị môi trường chặn: một gate không đo được thì không phải một gate
 đã đạt.
 
-## Receipt bị chặn
+## Receipt khi blocked
 
 Một receipt bị chặn không có phần thẩm định. Nó chứa đúng một failure có kiểu, những gate và tham chiếu
 liên quan, miền sở hữu, khả năng thử lại, và chỉ khi thử lại được thì có thêm một token dùng một lần
 kèm phần delta vật liệu cần thiết.
 
-## Mã thất bại
+## Mã lỗi
 
 | Mã | Vấn đề thuộc về | Delta vật liệu hợp lệ |
 | --- | --- | --- |

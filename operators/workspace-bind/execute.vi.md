@@ -76,7 +76,7 @@ tiêu thụ đúng phần delta. Một resume không thêm được thay đổi 
 provenance sẽ trả `NO_PROGRESS`. Một route được publish lại phải đến dưới dạng fingerprint mới; cùng
 một fingerprint không thể cho ra một binding khác.
 
-## Những đòn tấn công bắt buộc
+## Các đòn tấn công bắt buộc
 
 Operator không được phép ràng khi còn bất kỳ mục nào áp dụng được mà chưa xử lý:
 

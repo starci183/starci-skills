@@ -25,12 +25,6 @@ release, its digest, the revisions before and after, the preserved data boundary
 time. It never carries a steady state for the release it rejected, and it must never be read as
 successful delivery of that release.
 
-## Blocked receipt
-
-A blocked receipt claims no steady state. It carries one typed failure, the steps and references
-involved, the owning domain, retryability, and, only when retryable, a single-use resume token with the
-required material delta.
-
 ## Steps and revisions
 
 A step either mutates a boundary or it does not.
@@ -49,6 +43,12 @@ a fact about a boundary it never touched.
 `credentialRefs` holds `secret-ref://` handles and nothing else. There is no field in the receipt that
 accepts a credential value, so "never log the secret" is a shape rather than a discipline: a token
 written where a handle belongs is rejected as malformed.
+
+## Blocked receipt
+
+A blocked receipt claims no steady state. It carries one typed failure, the steps and references
+involved, the owning domain, retryability, and, only when retryable, a single-use resume token with the
+required material delta.
 
 ## Failure codes
 

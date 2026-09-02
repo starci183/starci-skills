@@ -56,7 +56,14 @@ Mâu thuẫn là `FAIL`, còn không dùng được là `BLOCKED`. Hai thứ nà
 tính việc không dùng được thành thất bại là đổ lỗi cho một sản phẩm chưa ai quan sát, còn kể một mâu
 thuẫn thành bị chặn là che đi một khiếm khuyết có thật.
 
-## Mã thất bại
+## Receipt khi blocked
+
+Receipt blocked mang cùng `binding` và `freeze`, `publication: null`, các lane và kết quả case đã
+chạm tới với `unavailable` ở chỗ runtime ngừng trả lời, đúng một failure có kiểu gọi tên chủ thể
+không sẵn sàng, và một resume khi failure đó retry được. Không publish gì: sự không sẵn sàng không
+bao giờ bị tính là lỗi của sản phẩm.
+
+## Mã lỗi
 
 | Mã | Vấn đề sở hữu | Delta vật liệu hợp lệ |
 | --- | --- | --- |
@@ -100,7 +107,7 @@ cấp tự động, hoặc bị chặn; nó không bao giờ là một lời th�
 - `passed` cấm còn phát hiện cứng đang mở và đòi cả hai receipt cho phép vào nằm trong bằng chứng.
 - `handoff` luôn là `null`.
 
-## Kết cục thực tế
+## Kết quả thực tế
 
 Kiểm chứng luồng ghi danh trả phí: hai case đã đóng băng chạy đúng thứ tự sau thời điểm đóng băng, các
 checkpoint lối vào, cam kết, phản hồi, phục hồi và trạng thái cuối đều có ảnh full-viewport ghép với

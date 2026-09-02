@@ -53,7 +53,7 @@ là một phần của contract, không phải một tuỳ chọn theo từng l�
 `targets.reviewTargetRef` phải khác `targets.briefTargetRef`. Ý đồ sản xuất và phán quyết độc lập là
 hai bản ghi, và gộp chúng lại sẽ để cái này ghi đè cái kia.
 
-## Resume
+## Input khi resume
 
 `resume` là `null` cho lần gọi mới. Lần gọi resume cung cấp đúng receipt đã blocked, token dùng một
 lần của nó, và những tham chiếu được thêm vào từ lúc đó. Project, source head, đơn vị, mode và các

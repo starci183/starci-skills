@@ -89,7 +89,7 @@ Resume bắt đầu lại từ bước kiểm tra, chỉ tái dùng những quan
 trả `NO_PROGRESS`. Một lần chạy tiếp nối giữ nguyên danh tính release; một release khác là một lần
 triển khai khác.
 
-## Những mũi tấn công bắt buộc
+## Các đòn tấn công bắt buộc
 
 Operator không được báo là đã triển khai khi còn bất kỳ mục nào áp dụng được mà chưa xử lý:
 

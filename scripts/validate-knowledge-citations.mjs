@@ -29,7 +29,8 @@ const files = (await walk(root)).sort();
 const canonical = files.filter((f) => !f.endsWith('.vi.md'));
 
 // Inventory: one heading per published rule. Prefixes may contain hyphens (CONTROL-STATE, CORE-SURFACE).
-const HEADING = /^## ([A-Z][A-Z]*(?:-[A-Z]+)*)-(\d+)\b/;
+// A prefix may carry digits (A11Y); the trailing number is always the ordinal.
+const HEADING = /^## ([A-Z][A-Z0-9]*(?:-[A-Z][A-Z0-9]*)*)-(\d+)\b/;
 const published = new Map(); // prefix -> Set(number)
 const ownerOf = new Map(); // prefix -> file
 for (const file of canonical) {
@@ -48,7 +49,7 @@ for (const file of canonical) {
 
 // Citations: PREFIX-n or PREFIX-a..b, where PREFIX is a published prefix or looks like one.
 // Tokens whose prefix is unknown are reported once per file so a fabricated family cannot hide.
-const CITATION = /\b([A-Z][A-Z]*(?:-[A-Z]+)*)-(\d+)(?:\.\.(\d+))?\b/g;
+const CITATION = /\b([A-Z][A-Z0-9]*(?:-[A-Z][A-Z0-9]*)*)-(\d+)(?:\.\.(\d+))?\b/g;
 const IGNORE_PREFIXES = new Set(['SHA', 'UTF', 'ISO', 'RFC', 'HTTP', 'ES', 'V', 'H', 'CVE', 'X', 'GPT']);
 const errors = [];
 for (const file of files) {

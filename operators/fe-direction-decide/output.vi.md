@@ -3,7 +3,7 @@
 Operator trả một closed envelope có `outcome` bằng `decided` hoặc `blocked`. Nó không phát handoff hay
 free-form routing instruction.
 
-## Decided receipt
+## Receipt khi decided
 
 Decided receipt chứa:
 
@@ -21,7 +21,7 @@ Decided receipt chứa:
 Receipt cho phép downstream implementation áp dụng direction trong frozen owner ceiling. Nó không
 chứng minh implementation đã tồn tại hay đã PASS visual, quality hoặc UAT.
 
-## Blocked receipt
+## Receipt khi blocked
 
 Blocked receipt không có decision. Nó chứa một typed failure, exact reference thiếu hoặc mâu thuẫn,
 owning domain, retryability và—chỉ khi retry được—single-use resume token cùng material delta bắt buộc.
@@ -30,7 +30,7 @@ owning domain, retryability và—chỉ khi retry được—single-use resume t
 kết thúc, không phải internal wait. Caller lấy một lựa chọn có exact product authority rồi gọi lại
 chính operator bằng correlated resume payload.
 
-## Failure code
+## Mã lỗi
 
 | Code | Vấn đề sở hữu | Material delta hợp lệ |
 | --- | --- | --- |
@@ -50,7 +50,7 @@ chính operator bằng correlated resume payload.
 | `DIRECTION_CHOICE_REQUIRED` | Còn ba/bốn material direction hợp lệ mà không có lựa chọn trội hơn. | Chọn đúng một candidate với product authority. |
 | `NO_PROGRESS` | Resume không thêm delta có hiệu lực. | Authority, evidence, source, Grammar hoặc selection mới có tính material. |
 
-## Cross-field invariant
+## Bất biến liên trường
 
 - `outcome="decided"` yêu cầu `receipt.status="decided"`, `decision` khác null, `failure` null,
   `resume` null, không có error finding và có ít nhất một evidence reference.
@@ -67,7 +67,7 @@ chính operator bằng correlated resume payload.
   reference phải đăng ký trong `output.evidenceRefs`.
 - `handoff` luôn là `null`.
 
-## Outcome thực dụng
+## Kết quả thực tế
 
 Tạo trang A: `intent=create`, `changeLevel=new` và `dominant` mode mặc định tạo một realistic,
 reversible direction receipt khi business, backend và Grammar authority đã đầy đủ.

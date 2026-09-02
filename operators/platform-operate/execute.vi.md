@@ -1,4 +1,4 @@
-# Execute `platform.operate`
+# Thực thi `platform.operate`
 
 ## Một việc duy nhất
 
@@ -64,14 +64,14 @@ lâu dài, và một bản ghi lâu dài của capability chính là credential 
    `output.schema.json`, và ràng mọi fingerprint. Không claim sự sẵn sàng của product, không claim
    phê duyệt release hay bằng chứng UAT.
 
-## Resume
+## Thực thi khi resume
 
 Một lần resume bắt đầu lại từ validate, chỉ tái dùng những quan sát có fingerprint không đổi, và tiêu
 thụ đúng phần delta. Resume không thêm thay đổi nào về thẩm quyền, inventory, desired state hay phạm
 vi thì trả về `NO_PROGRESS`. Inventory quan sát lại phải đến dưới một fingerprint mới; cùng một
 fingerprint không thể cho ra câu trả lời khác.
 
-## Những đòn phải tự đánh
+## Các đòn tấn công bắt buộc
 
 Lần vận hành không được báo cáo là đã vận hành khi còn bất kỳ mục nào áp dụng được mà chưa giải quyết:
 

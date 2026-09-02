@@ -3,14 +3,14 @@
 Input có hai phần đóng: `context` khai báo đúng phần vật liệu sẵn có mà operator được đọc, và `input`
 khai báo quyết định cần lấy cùng ranh giới nó được phép ghi. Trường không khai báo là không hợp lệ.
 
-## Vỏ bọc
+## Vỏ ngoài
 
 - `schemaVersion`: đúng bằng `8`.
 - `operatorId`: đúng bằng `architecture.decide`.
 - `context`: các binding thẩm quyền và bằng chứng.
 - `input`: đúng một quyết định kiến trúc đã đóng băng.
 
-## Binding context
+## Các binding context
 
 `context.businessRefs` ràng lời hứa mà kiến trúc phục vụ và không được rỗng. `context.sourceRefs` phải
 chứa source đã route, với `sourceHead` bằng đúng `input.project.sourceHead`.

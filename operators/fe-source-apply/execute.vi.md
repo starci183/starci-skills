@@ -1,4 +1,4 @@
-# Execute `fe.source.apply`
+# Thực thi `fe.source.apply`
 
 ## Một việc duy nhất
 

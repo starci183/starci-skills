@@ -187,11 +187,9 @@ One boundary keeps its meaning across widths but takes more room once the width 
 compact value and the wide value are adjacent rules, never a jump of two steps, and the block axis
 follows only where the boundary itself is the owner.
 
-| Side | Compact | Wide | Rule |
-| --- | --- | --- | --- |
-| Inline sides of the surface | `1rem` | `1.5rem` | PADDING-4, PADDING-5 |
-| A block side meeting the outer edge | `1rem` | `1.5rem` | PADDING-4, PADDING-5 |
-| A block side meeting a separator | `.75rem` | `.75rem` | PADDING-3 |
+Composed from: inline sides of the surface `1rem` → `1.5rem` (PADDING-4 → PADDING-5); a block side
+meeting the outer edge `1rem` → `1.5rem` (PADDING-4 → PADDING-5); a block side meeting a separator
+`.75rem` at both widths (PADDING-3).
 
 | Case | When | Owner | Render |
 | --- | --- | --- | --- |
@@ -208,11 +206,9 @@ Content that belongs under the row above it, rather than beside it, indents one 
 start. Only the start edge carries the hierarchy. The end edge has no such meaning, so it stays
 aligned with its parent and the reading measure is not squeezed from both sides.
 
-| Side | Value | Rule |
-| --- | --- | --- |
-| Inline start | One step above the surface inset, `1.5rem` against a `1rem` surface | PADDING-5 |
-| Inline end | The surface inset, unchanged | PADDING-4 |
-| Block sides | Whatever the side meets, by the side-contact rule | PADDING-3, PADDING-4 |
+Composed from: inline start one step above the surface inset, `1.5rem` against a `1rem` surface
+(PADDING-5); inline end the surface inset, unchanged (PADDING-4); block sides whatever each side
+meets, by the side-contact rule (PADDING-3, PADDING-4).
 
 | Case | When | Owner | Render |
 | --- | --- | --- | --- |

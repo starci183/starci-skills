@@ -24,12 +24,6 @@ khôi phục, digest của nó, revision trước và sau, ranh giới dữ li�
 minh. Nó không bao giờ mang trạng thái ổn định cho release mà nó vừa từ chối, và tuyệt đối không được
 đọc như một lần giao hàng thành công của release đó.
 
-## Receipt bị chặn
-
-Receipt bị chặn không khai trạng thái ổn định nào. Nó mang đúng một thất bại có kiểu, các bước và tham
-chiếu liên quan, miền sở hữu, khả năng thử lại, và chỉ khi thử lại được mới kèm một token resume dùng
-một lần cùng phần vật liệu bắt buộc phải thêm.
-
 ## Các bước và revision
 
 Một bước hoặc làm thay đổi một ranh giới, hoặc không.
@@ -49,7 +43,13 @@ của nó; bước báo `no-op` hay `skipped` thì không được dịch chuy�
 nhận một giá trị credential, nên "đừng bao giờ log bí mật" là một hình dạng chứ không phải một kỷ luật:
 một token viết vào chỗ của handle sẽ bị loại như dữ liệu hỏng.
 
-## Mã thất bại
+## Receipt khi blocked
+
+Receipt bị chặn không khai trạng thái ổn định nào. Nó mang đúng một thất bại có kiểu, các bước và tham
+chiếu liên quan, miền sở hữu, khả năng thử lại, và chỉ khi thử lại được mới kèm một token resume dùng
+một lần cùng phần vật liệu bắt buộc phải thêm.
+
+## Mã lỗi
 
 | Mã | Vấn đề sở hữu | Delta vật liệu hợp lệ |
 | --- | --- | --- |
@@ -93,7 +93,7 @@ một token viết vào chỗ của handle sẽ bị loại như dữ liệu h�
 - `blocked` đòi đúng một thất bại có kiểu và không trạng thái ổn định. Thất bại thử lại được thì đòi
   resume; thất bại không thử lại được thì cấm resume.
 
-## Kết cục thực tế
+## Kết quả thực tế
 
 Triển khai API production: host vốn đã chuẩn bị nên ghi một no-op, digest được publish đúng một lần,
 một migration cộng thêm được áp, domain không đổi, cú đẩy `main` dời target từ revision 4 sang 5, giám

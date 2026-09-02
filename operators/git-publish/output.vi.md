@@ -33,13 +33,13 @@ chứng minh gì về chất lượng thay đổi, và không mang phán quyết
 `BOUNDARY_CLEAN` là finding duy nhất mà một receipt bị chặn được mang, vì nó là finding duy nhất mô tả
 một quan sát chứ không phải một cú ghi.
 
-## Receipt khi bị chặn
+## Receipt khi blocked
 
 Một receipt bị chặn không có publication. Nó chứa đúng một failure có kiểu, các chủ thể và tham chiếu
 liên quan, domain sở hữu, khả năng thử lại, và chỉ khi thử lại được thì mới kèm token dùng một lần
 cùng phần vật liệu còn thiếu.
 
-## Các mã failure
+## Mã lỗi
 
 | Mã | Vấn đề sở hữu | Chủ sở hữu | Delta hợp lệ |
 | --- | --- | --- | --- |
@@ -57,7 +57,7 @@ cùng phần vật liệu còn thiếu.
 cả hai là kết quả chứ không phải chướng ngại. Mỗi cái gọi tên chủ thể của mình để phần sửa có địa chỉ:
 hook đã từ chối cú push, và head remote đã phân nhánh.
 
-## Bất biến xuyên trường
+## Bất biến liên trường
 
 - `outcome="published"` đòi `receipt.status="published"`, `publication` khác null, `failure` null và
   `resume` null.

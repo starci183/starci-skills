@@ -1,16 +1,16 @@
-# Input của `fe.direction.decide`
+# Input cho `fe.direction.decide`
 
 Input có hai phần đóng: `context` khai báo chính xác vật liệu đã có mà operator được đọc, còn `input`
 khai báo decision boundary cần thực thi. Field không được khai báo là invalid.
 
-## Envelope
+## Vỏ ngoài
 
 - `schemaVersion`: đúng bằng `8`.
 - `operatorId`: đúng bằng `fe.direction.decide`.
 - `context`: authority và evidence binding theo contract context.
 - `input`: một frontend direction decision đã đóng băng.
 
-## Context binding
+## Các binding context
 
 `context.business` và `context.grammar` luôn bắt buộc. `context.backend` và
 `context.architecture` phải là binding accepted đầy đủ hoặc `null`; binding chỉ có reference hay chỉ có
@@ -54,7 +54,7 @@ reuse.
   primary/secondary span.
 - `reconstruct` có thể thay cấu trúc UI hiện tại nhưng không được thay business/backend authority.
 
-## Resume input
+## Input khi resume
 
 `resume` là `null` với invocation mới. Invocation resume truyền exact blocked receipt, single-use
 token, context reference mới thêm và tùy trường hợp một selected alternative ID.

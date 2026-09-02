@@ -1,4 +1,4 @@
-# Thi hành `backend.implement`
+# Thực thi `backend.implement`
 
 ## Một việc duy nhất
 
@@ -85,14 +85,14 @@ với mọi mặt, kể cả những mặt đã đạt.
 Cùng lý lẽ ấy khiến một proof phải mang cả lệnh lẫn kết quả: lệnh nói cái gì đã chạy, kết quả nói cái
 gì trả về. Chỉ một trong hai thì người chưa chạy gì cũng viết ra được.
 
-## Thi hành khi resume
+## Thực thi khi resume
 
 Một resume bắt đầu lại từ khâu kiểm tra, chỉ tái dùng những quan sát có fingerprint không đổi, và tiêu
 thụ đúng phần delta. Resume không thêm thay đổi nào về thẩm quyền, contract, pattern hay scope thì trả
 `NO_PROGRESS`. Một quyết định nghiệp vụ được duyệt phải đến dưới dạng fingerprint mới của thẩm quyền;
 cùng một fingerprint không thể cho ra một đáp án khác.
 
-## Những đòn tấn công bắt buộc
+## Các đòn tấn công bắt buộc
 
 Operator không được báo cáo một lần hiện thực khi còn bất kỳ mục nào áp dụng được mà chưa giải quyết:
 

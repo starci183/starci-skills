@@ -1,4 +1,4 @@
-# Execute `fe.presentation.resolve`
+# Thực thi `fe.presentation.resolve`
 
 ## Một việc duy nhất
 

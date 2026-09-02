@@ -1,6 +1,6 @@
 # Thực thi `fe.direction.decide`
 
-## Công việc duy nhất
+## Một việc duy nhất
 
 Biến input đã validate cùng exact context thành một typed frontend direction receipt. Đây là một
 operator invocation tuyến tính. Nó không gọi operator khác, không route workflow, không pause bên
@@ -43,14 +43,14 @@ trong và không implement.
 11. **Phát output rồi dừng.** Output phải theo output schema và bind mọi fingerprint source, authority,
     context, scope, artifact, input và progress. Không mutate source hay claim downstream proof.
 
-## Thực thi resume
+## Thực thi khi resume
 
 Resume bắt đầu lại tại validation, chỉ reuse observation/artifact còn nguyên fingerprint, rồi consume
 exact delta. Alternative selection phải là candidate trong blocked receipt và có exact product
 authority. Operator không brainstorm lại trước khi phát selected decision. Resume stale hoặc không có
 delta trả `NO_PROGRESS` hay failure stale-binding tương ứng.
 
-## Mandatory attack
+## Các đòn tấn công bắt buộc
 
 Operator không được chốt khi còn bất kỳ mục áp dụng nào chưa giải quyết:
 

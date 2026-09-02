@@ -56,13 +56,13 @@ hai thì người chưa chạy gì cũng viết ra được.
 Một receipt đã hiện thực đòi mọi proof đều đạt, và `artifactRefs` đăng ký mọi kết quả proof để người
 audit mở được mà không phải đi hỏi.
 
-## Receipt bị chặn
+## Receipt khi blocked
 
 Một receipt bị chặn không có phần hiện thực. Nó chứa đúng một failure có kiểu, chính xác những
 operation, file và tham chiếu liên quan, miền sở hữu, khả năng thử lại, và chỉ khi thử lại được thì có
 thêm một token dùng một lần kèm phần delta vật liệu cần thiết.
 
-## Mã thất bại
+## Mã lỗi
 
 | Mã | Vấn đề thuộc về | Delta vật liệu hợp lệ |
 | --- | --- | --- |

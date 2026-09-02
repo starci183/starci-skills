@@ -1,4 +1,4 @@
-# Context của `fe.direction.decide`
+# Context cho `fe.direction.decide`
 
 ## Mục đích
 
@@ -10,7 +10,7 @@ Operator chỉ đọc các reference được truyền trong top-level `context`
 invocation và được bind bằng fingerprint `sha256:`. Observation lấy từ source còn phải bind đúng source
 head đã quan sát.
 
-## Các nhóm context
+## Các lớp context
 
 | Context | Vai trò trong quyết định | Trạng thái authority |
 | --- | --- | --- |
@@ -65,7 +65,7 @@ Mọi proposal material phải có disposition add/change/remove. Direction khô
 contradiction, owner leak, Grammar invention, responsive/accessibility failure, adverse state chưa giải
 quyết hoặc một reversible alternative mạnh hơn rõ ràng.
 
-## Ranh giới đọc và ghi
+## Ranh giới
 
 Operator chỉ được đọc context reference đã khai báo. Nó chỉ được ghi receipt và inspectable visual
 artifact dưới `input.project.artifactRootRef`. Product source, business head, backend contract,

@@ -186,11 +186,9 @@ Cùng một ranh giới giữ nguyên ý nghĩa qua các khổ màn hình nhưng
 khổ hẹp và khổ rộng là hai rule liền kề, không bao giờ nhảy hai bậc, và trục block chỉ nhích theo ở
 những cạnh mà chính ranh giới đó làm chủ.
 
-| Cạnh | Khổ hẹp | Khổ rộng | Rule |
-| --- | --- | --- | --- |
-| Hai cạnh ngang của surface | `1rem` | `1.5rem` | PADDING-4, PADDING-5 |
-| Cạnh trục block chạm mép ngoài | `1rem` | `1.5rem` | PADDING-4, PADDING-5 |
-| Cạnh trục block chạm separator | `.75rem` | `.75rem` | PADDING-3 |
+Ghép từ: hai cạnh ngang của surface `1rem` → `1.5rem` (PADDING-4 → PADDING-5); cạnh trục block chạm
+mép ngoài `1rem` → `1.5rem` (PADDING-4 → PADDING-5); cạnh trục block chạm separator giữ `.75rem` ở cả
+hai khổ (PADDING-3).
 
 | Case | Dùng khi | Owner | Render |
 | --- | --- | --- | --- |
@@ -207,11 +205,9 @@ Nội dung thuộc về hàng nằm trên nó, chứ không phải đứng ngang
 trục inline. Chỉ cạnh đầu mang nghĩa phân cấp. Cạnh cuối không mang nghĩa đó nên giữ thẳng hàng với
 cha, và khổ đọc không bị bóp từ cả hai phía.
 
-| Cạnh | Giá trị | Rule |
-| --- | --- | --- |
-| Đầu trục inline | Cao hơn inset của surface một bậc, `1.5rem` khi surface là `1rem` | PADDING-5 |
-| Cuối trục inline | Đúng inset của surface, giữ nguyên | PADDING-4 |
-| Hai cạnh trục block | Theo thứ mà cạnh đó chạm, dùng luật tiếp xúc | PADDING-3, PADDING-4 |
+Ghép từ: đầu trục inline cao hơn inset của surface một bậc, `1.5rem` khi surface là `1rem`
+(PADDING-5); cuối trục inline đúng inset của surface, giữ nguyên (PADDING-4); hai cạnh trục block theo
+thứ mà cạnh đó chạm, dùng luật tiếp xúc (PADDING-3, PADDING-4).
 
 | Case | Dùng khi | Owner | Render |
 | --- | --- | --- | --- |

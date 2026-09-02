@@ -47,13 +47,13 @@ một generation runtime.
 | `PROVENANCE_HEAD_BOUND` | Một head hội thoại đã redact được gắn vào. Bắt buộc mỗi khi có head. |
 | `CACHED_ROUTE_REUSED` | Một receipt cache khớp danh tính và fingerprint đã được tái dùng. |
 
-## Receipt khi bị chặn
+## Receipt khi blocked
 
 Một receipt bị chặn không có route. Nó chứa đúng một failure có kiểu, các chủ thể và tham chiếu liên
 quan, domain sở hữu, khả năng thử lại, và chỉ khi thử lại được thì mới kèm token dùng một lần cùng
 phần vật liệu còn thiếu.
 
-## Các mã failure
+## Mã lỗi
 
 | Mã | Vấn đề sở hữu | Chủ sở hữu | Delta hợp lệ |
 | --- | --- | --- | --- |
@@ -73,7 +73,7 @@ phần vật liệu còn thiếu.
 phải lỗi của yêu cầu. Khởi tạo và sửa route là công việc riêng, không bao giờ là hành vi âm thầm bên
 trong operator này.
 
-## Bất biến xuyên trường
+## Bất biến liên trường
 
 - `outcome="bound"` đòi `receipt.status="bound"`, `route` khác null, `failure` null và `resume` null.
 - `outcome="blocked"` đòi `receipt.status="blocked"`, `route` null và `failure` khác null. Failure thử

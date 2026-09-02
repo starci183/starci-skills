@@ -1,4 +1,4 @@
-# Execute `content.generate`
+# Thực thi `content.generate`
 
 ## Một việc duy nhất
 
@@ -78,14 +78,14 @@ Một đơn vị qua được lần review của chính tác giả nó thì chư
    `output.schema.json`, và ràng mọi fingerprint. Không claim đã publish, không claim kết quả học tập
    ngoài đời, không claim nghiệm thu vượt quá những kiểm tra đã thật sự chạy.
 
-## Resume
+## Thực thi khi resume
 
 Một lần resume bắt đầu lại từ validate, chỉ tái dùng những quan sát có fingerprint không đổi, và tiêu
 thụ đúng phần delta. Resume không thêm thay đổi nào về curriculum, source, finding hay phạm vi thì trả
 về `NO_PROGRESS`. Brief đã sửa phải đến dưới một fingerprint mới; cùng một fingerprint không thể cho
 ra câu trả lời khác.
 
-## Những đòn phải tự đánh
+## Các đòn tấn công bắt buộc
 
 Đơn vị không được báo cáo là đã dựng xong khi còn bất kỳ mục nào áp dụng được mà chưa giải quyết:
 

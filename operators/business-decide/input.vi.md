@@ -3,14 +3,14 @@
 Input có hai phần đóng: `context` khai báo đúng phần vật liệu sẵn có mà operator được đọc, và `input`
 khai báo lời hứa cần quyết cùng ranh giới nó được phép ghi. Trường không khai báo là không hợp lệ.
 
-## Vỏ bọc
+## Vỏ ngoài
 
 - `schemaVersion`: đúng bằng `8`.
 - `operatorId`: đúng bằng `business.decide`.
 - `context`: các binding thẩm quyền và bằng chứng.
 - `input`: đúng một quyết định nghiệp vụ đã đóng băng.
 
-## Binding context
+## Các binding context
 
 `context.evidence` ràng tập claim đã chuẩn hoá. Mỗi claim mang mã, loại, vai trò, phát biểu, tham chiếu
 source, đường dẫn, khoảng dòng và head quan sát được. Một claim chỉ xuất hiện một lần, khoảng dòng chạy

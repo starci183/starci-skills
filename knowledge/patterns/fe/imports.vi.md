@@ -8,72 +8,72 @@ Nguồn: `tsconfig.json` (`paths`), `eslint.config.mjs`, `src/hooks/index.ts`,
 
 ## FE-IMPORTS-1 — Đường dẫn
 
-| Trường hợp | Khi nào | Viết |
+| Case | Dùng khi | Viết |
 | --- | --- | --- |
-| Trường hợp 1 | Bất cứ thứ gì dưới `src/` từ thư mục khác | `@/…` — alias duy nhất (`"@/*": ["./src/*"]`); 459 tệp dùng nó |
-| Trường hợp 2 | Một đối tượng Grammar | `import { SurfaceCard, Text, Heading, Badge, Button } from "@starci/grammar/common"` (553 import, tất cả qua `/common`) |
-| Trường hợp 3 | HeroUI | `import { cn } from "@heroui/react"` trong `classNames.ts` (136 trên 151); component nhà cung cấp trong leaf (48) và block (74); `component.tsx` của page không bao giờ (0/49) |
-| Trường hợp 4 | Tệp trong cùng đơn vị | `./component`, `./classNames`, `./index` |
-| Trường hợp 5 | Chỉ kiểu | `import type { AuthMode } from "@/hooks/auth/useAuthPanel"`, `import { type CourseDetail } from "…"` (274 tệp) |
+| Case 1 | Bất cứ thứ gì dưới `src/` từ thư mục khác | `@/…` — alias duy nhất (`"@/*": ["./src/*"]`); 459 tệp dùng nó |
+| Case 2 | Một đối tượng Grammar | `import { SurfaceCard, Text, Heading, Badge, Button } from "@starci/grammar/common"` (553 import, tất cả qua `/common`) |
+| Case 3 | HeroUI | `import { cn } from "@heroui/react"` trong `classNames.ts` (136 trên 151); component nhà cung cấp trong leaf (48) và block (74); `component.tsx` của page không bao giờ (0/49) |
+| Case 4 | Tệp trong cùng đơn vị | `./component`, `./classNames`, `./index` |
+| Case 5 | Chỉ kiểu | `import type { AuthMode } from "@/hooks/auth/useAuthPanel"`, `import { type CourseDetail } from "…"` (274 tệp) |
 
 ## FE-IMPORTS-2 — Thứ tự
 
 Không bị lint ép (không cấu hình luật `import/order`). Thứ tự chiếm ưu thế, đọc từ import đầu tiên
 của 417 tệp component, là framework, rồi Grammar, rồi tầng của mình, rồi đơn vị của mình.
 
-| Trường hợp | Khi nào | Viết |
+| Case | Dùng khi | Viết |
 | --- | --- | --- |
-| Trường hợp 1 | Framework trước | `react` (108 tệp), `next-intl` (45), `next` / `next/navigation` (16), `swr` |
-| Trường hợp 2 | Rồi Grammar | `@starci/grammar/common` (95 tệp bắt đầu ở đây khi không có import framework) |
-| Trường hợp 3 | Rồi tầng của mình | `@/components/branches/…`, `@/components/leaves/…`, `@/hooks`, `@/modules/…` (88 tệp bắt đầu bằng `@/components`) |
-| Trường hợp 4 | Đơn vị của mình sau cùng | `import { aiChatClassNames, getAiChatBubbleClassName } from "./classNames"`, `import { AuthenticationPageBase } from "./component"` |
+| Case 1 | Framework trước | `react` (108 tệp), `next-intl` (45), `next` / `next/navigation` (16), `swr` |
+| Case 2 | Rồi Grammar | `@starci/grammar/common` (95 tệp bắt đầu ở đây khi không có import framework) |
+| Case 3 | Rồi tầng của mình | `@/components/branches/…`, `@/components/leaves/…`, `@/hooks`, `@/modules/…` (88 tệp bắt đầu bằng `@/components`) |
+| Case 4 | Đơn vị của mình sau cùng | `import { aiChatClassNames, getAiChatBubbleClassName } from "./classNames"`, `import { AuthenticationPageBase } from "./component"` |
 
 `blocks/ai/StarCiAiChat/component.tsx` lại xen kẽ import `@starci/grammar/common` và
 `@/components/…` theo thứ tự chữ cái của tên binding; thứ tự trên là ưu thế, không phải toàn thể.
 
 ## FE-IMPORTS-3 — Dữ liệu vào block qua barrel hooks
 
-| Trường hợp | Khi nào | Viết |
+| Case | Dùng khi | Viết |
 | --- | --- | --- |
-| Trường hợp 1 | Block đọc hoặc ghi | `import { useQueryCourseSwr } from "@/hooks"` (82 tệp block import `@/hooks`); docblock của barrel nói rõ block import `@/hooks`, không bao giờ `@/hooks/swr/useQuerySomethingSwr` |
-| Trường hợp 2 | Hook chạm tới tầng vận chuyển | `import { queryCourse } from "../../modules/api/graphql/queries/query-course"` (57 tệp hook) hoặc `from "@/modules/api/…"` (56 tệp hook) — chia đều, xem câu hỏi để ngỏ |
-| Trường hợp 3 | Một kiểu từ tầng dữ liệu | `import type { CourseAdvisorRecommendation } from "@/modules/ai/course-advisor-response"` — barrel không re-export kiểu |
-| Trường hợp 4 | Danh tính xác thực | `import { useViewerKey } from "@/hooks/auth/useViewerKey"` bên trong hook; component giả lập `@/hooks/auth/useSessionToken` trong spec |
+| Case 1 | Block đọc hoặc ghi | `import { useQueryCourseSwr } from "@/hooks"` (82 tệp block import `@/hooks`); docblock của barrel nói rõ block import `@/hooks`, không bao giờ `@/hooks/swr/useQuerySomethingSwr` |
+| Case 2 | Hook chạm tới tầng vận chuyển | `import { queryCourse } from "../../modules/api/graphql/queries/query-course"` (57 tệp hook) hoặc `from "@/modules/api/…"` (56 tệp hook) — chia đều, xem câu hỏi để ngỏ |
+| Case 3 | Một kiểu từ tầng dữ liệu | `import type { CourseAdvisorRecommendation } from "@/modules/ai/course-advisor-response"` — barrel không re-export kiểu |
+| Case 4 | Danh tính xác thực | `import { useViewerKey } from "@/hooks/auth/useViewerKey"` bên trong hook; component giả lập `@/hooks/auth/useSessionToken` trong spec |
 
 ## FE-IMPORTS-4 — Chiều giữa các tầng
 
-| Trường hợp | Khi nào | Viết |
+| Case | Dùng khi | Viết |
 | --- | --- | --- |
-| Trường hợp 1 | Page → block | `import { AuthenticationPanel } from "@/components/blocks/auth/AuthenticationPanel"` (48 trên 50 page import block; 11 import leaf; 8 import hooks; 1 import modules) |
-| Trường hợp 2 | Block → leaf, branch, Grammar, hooks, modules | `import { CodeBlock } from "@/components/leaves/CodeBlock"`, `import { Article } from "@/components/branches/Article"` (82 block import hooks, 67 import modules) |
-| Trường hợp 3 | Leaf → chỉ Grammar và nhà cung cấp | `import type { ButtonVariant } from "@starci/grammar/common"`, `import { buttonVariants } from "@heroui/styles"` (1 leaf import hooks, 1 import block: ngoại lệ) |
-| Trường hợp 4 | Import ngược lên | block → page thấy một lần; leaf → block thấy một lần; không cái nào là mẫu |
-| Trường hợp 5 | Nửa thuần → tầng dữ liệu | không bao giờ lúc chạy; 18 tệp `component.tsx` chỉ dùng `import type` từ `@/modules/api/graphql/queries/…` |
+| Case 1 | Page → block | `import { AuthenticationPanel } from "@/components/blocks/auth/AuthenticationPanel"` (48 trên 50 page import block; 11 import leaf; 8 import hooks; 1 import modules) |
+| Case 2 | Block → leaf, branch, Grammar, hooks, modules | `import { CodeBlock } from "@/components/leaves/CodeBlock"`, `import { Article } from "@/components/branches/Article"` (82 block import hooks, 67 import modules) |
+| Case 3 | Leaf → chỉ Grammar và nhà cung cấp | `import type { ButtonVariant } from "@starci/grammar/common"`, `import { buttonVariants } from "@heroui/styles"` (1 leaf import hooks, 1 import block: ngoại lệ) |
+| Case 4 | Import ngược lên | block → page thấy một lần; leaf → block thấy một lần; không cái nào là mẫu |
+| Case 5 | Nửa thuần → tầng dữ liệu | không bao giờ lúc chạy; 18 tệp `component.tsx` chỉ dùng `import type` từ `@/modules/api/graphql/queries/…` |
 
 ## FE-IMPORTS-5 — Ranh giới nhà cung cấp
 
-| Trường hợp | Khi nào | Viết |
+| Case | Dùng khi | Viết |
 | --- | --- | --- |
-| Trường hợp 1 | Ký tự biểu tượng | chỉ leaf Icon import `@heroicons/react` (1 tệp component); mọi nơi khác nhận `Icon` của Grammar với một prop nguồn (lint `no-vendor-icon-outside-icon-leaf`, `heroicons-is-the-glyph-vendor`) |
-| Trường hợp 2 | Tiêu đề | `Heading` từ Grammar, không bao giờ `<h2>` trần (lint `no-heading-tag-outside-heading-component`) |
-| Trường hợp 3 | Phụ thuộc của gói Grammar | `peerDependencies` đúng là `@heroui/react` và `react`; `dependencies` rỗng (`package-boundary.test.mjs`) |
+| Case 1 | Ký tự biểu tượng | chỉ leaf Icon import `@heroicons/react` (1 tệp component); mọi nơi khác nhận `Icon` của Grammar với một prop nguồn (lint `no-vendor-icon-outside-icon-leaf`, `heroicons-is-the-glyph-vendor`) |
+| Case 2 | Tiêu đề | `Heading` từ Grammar, không bao giờ `<h2>` trần (lint `no-heading-tag-outside-heading-component`) |
+| Case 3 | Phụ thuộc của gói Grammar | `peerDependencies` đúng là `@heroui/react` và `react`; `dependencies` rỗng (`package-boundary.test.mjs`) |
 
 ## FE-IMPORTS-6 — Re-export
 
-| Trường hợp | Khi nào | Viết |
+| Case | Dùng khi | Viết |
 | --- | --- | --- |
-| Trường hợp 1 | Barrel hooks | `export { useMutateAddToCartSwr } from "./swr/useMutateAddToCartSwr"` — một dòng cho mỗi hook, không `export *` |
-| Trường hợp 2 | Cửa vào họ Grammar | `export { COMMON_SPACING_SCALE, COMMON_SPACING_TOKENS, type CommonSpacingStep, … } from "./spacing.js"` — có tên, kèm hậu tố `.js` |
-| Trường hợp 3 | Index của block re-export bản sao | `export * from "./component"` ở cuối `index.tsx` — 19 trên 95 index block và 19 trên 49 index page làm vậy; đa số không |
+| Case 1 | Barrel hooks | `export { useMutateAddToCartSwr } from "./swr/useMutateAddToCartSwr"` — một dòng cho mỗi hook, không `export *` |
+| Case 2 | Cửa vào họ Grammar | `export { COMMON_SPACING_SCALE, COMMON_SPACING_TOKENS, type CommonSpacingStep, … } from "./spacing.js"` — có tên, kèm hậu tố `.js` |
+| Case 3 | Index của block re-export bản sao | `export * from "./component"` ở cuối `index.tsx` — 19 trên 95 index block và 19 trên 49 index page làm vậy; đa số không |
 
 ## FE-IMPORTS-7 — Bị cấm
 
-| Trường hợp | Khi nào | Viết |
+| Case | Dùng khi | Viết |
 | --- | --- | --- |
-| Trường hợp 1 | Đường dẫn sâu tới hook từ component | `@/hooks/swr/useQueryCourseSwr` — thoát khỏi `vi.mock("@/hooks")` |
-| Trường hợp 2 | Default export trong `src/components` | 0 tồn tại |
-| Trường hợp 3 | Cấu hình lint nội tuyến | `eslint-disable` xuất hiện trong 0 tệp; `src/components/blocks/**/{index,component}.tsx` chạy với `noInlineConfig: true` |
-| Trường hợp 4 | `namespace` | chỉ `src/modules/api/graphql/clients/options.ts`, theo ngoại lệ ghi trong cấu hình |
+| Case 1 | Đường dẫn sâu tới hook từ component | `@/hooks/swr/useQueryCourseSwr` — thoát khỏi `vi.mock("@/hooks")` |
+| Case 2 | Default export trong `src/components` | 0 tồn tại |
+| Case 3 | Cấu hình lint nội tuyến | `eslint-disable` xuất hiện trong 0 tệp; `src/components/blocks/**/{index,component}.tsx` chạy với `noInlineConfig: true` |
+| Case 4 | `namespace` | chỉ `src/modules/api/graphql/clients/options.ts`, theo ngoại lệ ghi trong cấu hình |
 
 ## Câu hỏi để ngỏ
 

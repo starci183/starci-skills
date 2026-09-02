@@ -55,6 +55,13 @@ A contradiction is a `FAIL`, and unavailability is a `BLOCKED`. The two are neve
 other: charging unavailability as a failure blames a product nobody observed, and narrating a
 contradiction as a block hides a real defect.
 
+## Blocked receipt
+
+A blocked receipt carries the same `binding` and `freeze`, `publication: null`, the lanes and case
+results that were reached with `unavailable` where the runtime stopped answering, one typed failure
+naming the unavailable subject, and a resume when the failure is retryable. Nothing is published:
+unavailability is never charged to the product as a failure.
+
 ## Failure codes
 
 | Code | Owning issue | Valid material delta |

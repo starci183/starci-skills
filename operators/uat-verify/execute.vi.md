@@ -89,7 +89,7 @@ Resume bắt đầu lại từ bước kiểm tra, chỉ tái dùng những quan
 trả `NO_PROGRESS`. Việc tiếp nối nối thêm vào cùng lần chạy đang giữ lease; một lần chạy bất biến mới
 chỉ bắt đầu khi đã chứng minh được tính liên tục đã mất.
 
-## Những mũi tấn công bắt buộc
+## Các đòn tấn công bắt buộc
 
 Operator không được công bố pass khi còn bất kỳ mục nào áp dụng được mà chưa xử lý:
 

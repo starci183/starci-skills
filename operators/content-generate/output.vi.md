@@ -45,7 +45,7 @@ Duyệt đòi mọi điểm áp dụng được đều từ `minimumScore` đã 
 nào mở. Phán quyết đòi sửa phải gọi tên ít nhất một finding lỗi, gán cho đúng một khâu sở hữu, và khâu
 đó phải là khâu đã thật sự chạy.
 
-## Receipt khi bị chặn
+## Receipt khi blocked
 
 Receipt `blocked` không có phần đơn vị. Nó chứa đúng một failure có kiểu, gọi tên khâu sở hữu, các
 tham chiếu liên quan, domain sở hữu, tính retry được, và chỉ khi retry được mới có token resume dùng
@@ -96,7 +96,7 @@ tên khâu sở hữu để lần gọi sau sửa đúng chỗ thay vì viết l
 - `artifactRefs` đăng ký brief, phần phê bình, và mọi artifact được duyệt.
 - `handoff` luôn là `null`.
 
-## Kết cục thực tế
+## Kết quả thực tế
 
 Dựng một bài về ghi idempotent: brief publish hai outcome và hai claim, cả bản tiếng Việt lẫn bản
 tiếng Anh đều phủ cả hai outcome, sơ đồ mã hoá một claim, track TypeScript và track Go đều build được

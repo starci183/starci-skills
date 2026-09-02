@@ -66,7 +66,7 @@ Every material proposal receives add/change/remove dispositions. A direction is 
 applicable business contradiction, owner leak, Grammar invention, responsive failure, accessibility
 failure, unresolved adverse state, or materially stronger reversible alternative remains.
 
-## Read and write boundary
+## Boundary
 
 The operator may read only the declared context references. It may write only its receipt and
 inspectable visual artifacts under `input.project.artifactRootRef`. Product source, business heads,

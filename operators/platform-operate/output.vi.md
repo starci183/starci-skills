@@ -32,7 +32,7 @@ Không mutation nào được nhắm vào những tiến trình đó. Xung độ
 `PORT_COORDINATION_REQUIRED` gọi tên cả cổng lẫn người giữ, và nó chỉ xuất hiện trên receipt
 `blocked` mang `PORT_CONFLICT`. Không có kết cục nào trong đó operator này đã đòi lại một cổng.
 
-## Receipt khi bị chặn
+## Receipt khi blocked
 
 Receipt `blocked` không có phần vận hành. Nó chứa đúng một failure có kiểu, các resource và tham
 chiếu liên quan, domain sở hữu, tính retry được, và chỉ khi retry được mới có token resume dùng một
@@ -78,7 +78,7 @@ thuộc về hai chủ sở hữu dịch vụ cùng lúc, và thống nhất c�
 - `artifactRefs` đăng ký artifact receipt của lần vận hành.
 - `handoff` luôn là `null`.
 
-## Kết cục thực tế
+## Kết quả thực tế
 
 Hội tụ metrics stack: cấu hình scrape và đích remote-write được cập nhật trên một Prometheus đã kiểm
 kê, cả bảy check đều đạt trên bằng chứng riêng của mình, và receipt ghi cả hai revision của từng thay
