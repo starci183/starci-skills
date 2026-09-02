@@ -1,41 +1,81 @@
 {
   "schemaVersion": 9,
-  "note": "Stop codes shared by more than one operator. `scope` is the list of operator ids that may emit the code, or [\"*\"] for every operator. A code only one operator emits lives in that operator's own operators/<id>/errors.json with the same entry shape and no scope; scripts/errors-registry.mjs merges both into one registry and refuses a code defined twice. A code has exactly one disposition: `terminate` ends the step with output.json status blocked and stop = code; `fallback` performs the named action, records it under `## Fallbacks taken` in response.md, and continues. `unless` is the only way a disposition changes: it names one Requirements param and the value that flips the code to `then`. `domain` is the routing.json domain the code hands to; `self` means the emitting operator's own domain (a resume). A runtime that meets a code the merged registry does not list terminates with UNKNOWN_STOP.",
+  "note": "Stop codes shared by more than one operator. `scope` is the list of operator ids that may emit the code, or [\"*\"] for every operator. A code only one operator emits lives in that operator's own operators/<id>/errors.json with the same entry shape and no scope; scripts/errors-registry.mjs merges both into one registry and refuses a code defined twice. A code has exactly one disposition: `terminate` ends the step with response.json status blocked and stop = code; `fallback` performs the named action, records it under `## Fallbacks taken` in response.md, and continues. `unless` is the only way a disposition changes: it names one Requirements param and the value that flips the code to `then`. `domain` is the routing.json domain the code hands to; `self` means the emitting operator's own domain (a resume). A runtime that meets a code the merged registry does not list terminates with UNKNOWN_STOP.",
   "codes": {
     "INVALID_INPUT": {
-      "scope": ["*"],
+      "scope": [
+        "*"
+      ],
       "domain": "caller",
       "disposition": "terminate",
-      "meaning": { "en": "input.json or request.md fails the gate or the operator's Requirements.", "vi": "input.json hoặc request.md không qua gate hoặc bảng Yêu cầu của operator." },
-      "resume": { "en": "Correct request.md.", "vi": "Sửa request.md." }
+      "meaning": {
+        "en": "request.json fails the gate or the operator's Requirements.",
+        "vi": "request.json không qua gate hoặc bảng Yêu cầu của operator."
+      },
+      "resume": {
+        "en": "Correct request.json.",
+        "vi": "Sửa request.json."
+      }
     },
     "SOURCE_DRIFT": {
-      "scope": ["*"],
+      "scope": [
+        "*"
+      ],
       "domain": "workspace",
       "disposition": "terminate",
-      "meaning": { "en": "The observed checkout head differs from the head input.json froze.", "vi": "Head quan sát được của checkout khác head mà input.json đã đóng băng." },
-      "resume": { "en": "The orchestrator freezes the head again.", "vi": "Orchestrator đóng băng head lại." }
+      "meaning": {
+        "en": "The observed checkout head differs from the head request.json froze.",
+        "vi": "Head quan sát được của checkout khác head mà request.json đã đóng băng."
+      },
+      "resume": {
+        "en": "The orchestrator freezes the head again.",
+        "vi": "Orchestrator đóng băng head lại."
+      }
     },
     "NO_PROGRESS": {
-      "scope": ["*"],
+      "scope": [
+        "*"
+      ],
       "domain": "caller",
       "disposition": "terminate",
-      "meaning": { "en": "A resume adds no evidence, constraint, inventory, or approval delta.", "vi": "Lần chạy lại không thêm bằng chứng, ràng buộc, inventory hay phê duyệt nào." },
-      "resume": { "en": "Bring a real delta.", "vi": "Mang một delta thật." }
+      "meaning": {
+        "en": "A resume adds no evidence, constraint, inventory, or approval delta.",
+        "vi": "Lần chạy lại không thêm bằng chứng, ràng buộc, inventory hay phê duyệt nào."
+      },
+      "resume": {
+        "en": "Bring a real delta.",
+        "vi": "Mang một delta thật."
+      }
     },
     "EVIDENCE_MISSING": {
-      "scope": ["*"],
+      "scope": [
+        "*"
+      ],
       "domain": "self",
       "disposition": "terminate",
-      "meaning": { "en": "A claim about the system has no file, line, or head behind it.", "vi": "Một khẳng định về hệ thống không có file, dòng hay head nào đứng sau." },
-      "resume": { "en": "Add the evidence.", "vi": "Bổ sung bằng chứng." }
+      "meaning": {
+        "en": "A claim about the system has no file, line, or head behind it.",
+        "vi": "Một khẳng định về hệ thống không có file, dòng hay head nào đứng sau."
+      },
+      "resume": {
+        "en": "Add the evidence.",
+        "vi": "Bổ sung bằng chứng."
+      }
     },
     "UNKNOWN_STOP": {
-      "scope": ["*"],
+      "scope": [
+        "*"
+      ],
       "domain": "caller",
       "disposition": "terminate",
-      "meaning": { "en": "The runtime met a code the merged registry does not list.", "vi": "Runtime gặp một mã mà sổ gộp không có." },
-      "resume": { "en": "Register the code or fix the operator.", "vi": "Đăng ký mã hoặc sửa operator." }
+      "meaning": {
+        "en": "The runtime met a code the merged registry does not list.",
+        "vi": "Runtime gặp một mã mà sổ gộp không có."
+      },
+      "resume": {
+        "en": "Register the code or fix the operator.",
+        "vi": "Đăng ký mã hoặc sửa operator."
+      }
     }
   }
 }

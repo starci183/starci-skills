@@ -9,10 +9,10 @@ independent critique.
 ## Observe before proposing
 
 Nothing is proposed before the current state has been observed at the frozen head of
-`@workspaces/be` and written to `data/current-state.json` with its own fingerprint. A proposal
-written before the observation describes a system simpler than the real one, and every later
-comparison inherits that simplification. An observation taken at another head is worse: it looks
-rigorous while describing code that no longer exists.
+`@workspaces/be` and written to `response/data/current-state.json` with its own fingerprint. A
+proposal written before the observation describes a system simpler than the real one, and every
+later comparison inherits that simplification. An observation taken at another head is worse: it
+looks rigorous while describing code that no longer exists.
 
 ## Incumbency is not authority
 
@@ -32,13 +32,23 @@ axis is a partial check wearing a complete label. Every boundary answers the dat
 at least one store or states that it owns none; a store names one owning boundary that writes it,
 and a second writer exists only with an explicit shared-write justification.
 
+## The critique is a nested exchange
+
+After the selected alternative is deepened, the branch pauses: it emits `response/response.json`
+with status `waiting` and `awaiting { exchange: critique, kind: independent-critique }`. The
+orchestrator writes `critique/request/request.json` with only `response/data/stack-model.json` as
+input, never the author's rationale, and runs a fresh agent on this operator's own profile with no
+inherited turns. That agent writes only `critique/response/`. When its response is done the paused
+agent resumes at the confirmation step. Other branches of the same step keep running throughout.
+
 ## Boundary
 
-Context is read-only. The operator writes only its own step folder: `response.md`,
-`data/current-state.json`, `data/stack-model.json`, `critique.md`, the alternatives page when more
-than one alternative was asked for, and `output.json`. It does not mutate routed source, publish
-business authority, start or reconfigure runtime services, name implementation files in the handoff,
-or claim that an implementation, a quality gate, or a UAT run has passed.
+Context is read-only. The operator writes only `response/` of its own branch: `response.md`,
+`data/current-state.json`, `data/stack-model.json`, the alternatives page when more than one
+alternative was asked for, and `response.json`; the critique agent writes only
+`critique/response/`. It does not mutate routed source, publish business authority, start or
+reconfigure runtime services, name implementation files in the handoff, or claim that an
+implementation, a quality gate, or a UAT run has passed.
 
 ## Context
 
@@ -65,22 +75,22 @@ or claim that an implementation, a quality gate, or a UAT run has passed.
 | `constraints` | list of `{id, kind, statement}` | — | kind is fixed-intent, measurable, preference, assumption or unknown; at least one fixed-intent |
 | `selectionPolicy` | choice | automatic | `automatic`: the operator selects and records why; `approval-required`: the person selects |
 | `approval` | id | null | The approved alternative id; required only under `approval-required`, supplied on resume after `CHOICE_REQUIRED` |
-| `resume` | token | null | The blocked step's token when re-entering after a stop |
+| `resume` | token | null | The blocked branch's token when re-entering after a stop |
 
 ## Steps
 
 | # | Step | Params | Reads | Writes | Stops with |
 | --- | --- | --- | --- | --- | --- |
-| 1 | Validate the gate and resume | `resume`, `approval` | `input.json`, `request.md`, input `architecture-decision` when present, @workspaces/be at the frozen head | — | `INVALID_INPUT`, `SOURCE_DRIFT`, `NO_PROGRESS` |
-| 2 | Observe the current state | — | @workspaces/be at the frozen head: manifests, configuration, deployment files | `data/current-state.json` | `CURRENT_STATE_UNOBSERVED` |
-| 3 | Bind the inventory to the business promise | — | `data/current-state.json`, @worktrees/businesses/<featureId> at its published head | — | `BUSINESS_AUTHORITY_REQUIRED`, `EVIDENCE_MISSING` |
-| 4 | Frame the decision | `objective`, `decisionId`, `constraints`, `tradeoffAxes` | `request.md` | — | `CONSTRAINT_CONTRADICTION` |
-| 5 | Generate the alternatives | `alternatives` | `data/current-state.json`, @knowledge/patterns | `artifacts/<decisionId>-alternatives.html` only when more than one alternative was asked for | `NO_VIABLE_ALTERNATIVE` |
-| 6 | Select | `selectionPolicy`, `tradeoffAxes`, `approval` | `artifacts/<decisionId>-alternatives.html` when present | — | `CHOICE_REQUIRED` |
-| 7 | Deepen the selected alternative | `constraints` | `data/current-state.json` | `data/stack-model.json` | `DATA_OWNERSHIP_UNASSIGNED`, `COMPATIBILITY_UNVERIFIED` |
-| 8 | Critique independently: a fresh agent on this operator's profile with no inherited turns | — | `data/stack-model.json` and the claims it makes, never the author's rationale | `critique.md` | `CRITIQUE_UNRESOLVED` |
-| 9 | Confirm or return the selection | `selectionPolicy` | `critique.md`, `data/stack-model.json` | — | `CHOICE_REQUIRED`, `NO_VIABLE_ALTERNATIVE` |
-| 10 | Write the handoff and emit | — | everything above | `response.md`, `output.json` | — |
+| 1 | Validate the gate and resume | `resume`, `approval` | `request/request.json`, input `architecture-decision` when present, @workspaces/be at the frozen head | — | `INVALID_INPUT`, `SOURCE_DRIFT`, `NO_PROGRESS` |
+| 2 | Observe the current state | — | @workspaces/be at the frozen head: manifests, configuration, deployment files | `response/data/current-state.json` | `CURRENT_STATE_UNOBSERVED` |
+| 3 | Bind the inventory to the business promise | — | `response/data/current-state.json`, @worktrees/businesses/<featureId> at its published head | — | `BUSINESS_AUTHORITY_REQUIRED`, `EVIDENCE_MISSING` |
+| 4 | Frame the decision | `objective`, `decisionId`, `constraints`, `tradeoffAxes` | `request/request.json` requirements | — | `CONSTRAINT_CONTRADICTION` |
+| 5 | Generate the alternatives | `alternatives` | `response/data/current-state.json`, @knowledge/patterns | `response/artifacts/<decisionId>-alternatives.html` only when more than one alternative was asked for | `NO_VIABLE_ALTERNATIVE` |
+| 6 | Select | `selectionPolicy`, `tradeoffAxes`, `approval` | `response/artifacts/<decisionId>-alternatives.html` when present | — | `CHOICE_REQUIRED` |
+| 7 | Deepen the selected alternative | `constraints` | `response/data/current-state.json` | `response/data/stack-model.json` | `DATA_OWNERSHIP_UNASSIGNED`, `COMPATIBILITY_UNVERIFIED` |
+| 8 | Await the critique: pause, a fresh agent attacks the selection, resume when it answers | — | `critique/response/critique.md` once the exchange is done | `response/response.json` (waiting, awaiting critique) | `CRITIQUE_UNRESOLVED` |
+| 9 | Confirm or return the selection | `selectionPolicy` | `critique/response/critique.md`, `response/data/stack-model.json` | — | `CHOICE_REQUIRED`, `NO_VIABLE_ALTERNATIVE` |
+| 10 | Write the handoff and emit | — | everything above | `response/response.md`, `response/response.json` | — |
 
 Under the defaults, step 5 produces one design and no comparison page, step 6 has nothing to
 choose, and the decision's quality rests on step 8. When the only alternative fails an attack, step 9
@@ -91,11 +101,11 @@ implementation files, because choosing the files is the next domain's job.
 
 | Kind | File | Type | Required |
 | --- | --- | --- | --- |
-| `architecture-decision` | `response.md` | md | yes |
-| `current-state` | `data/current-state.json` | data | yes |
-| `stack-model` | `data/stack-model.json` | data | yes |
-| `alternatives` | `artifacts/<decisionId>-alternatives.html` | artifact | no |
-| `independent-critique` | `critique.md` | md | yes |
+| `architecture-decision` | `response/response.md` | md | yes |
+| `current-state` | `response/data/current-state.json` | data | yes |
+| `stack-model` | `response/data/stack-model.json` | data | yes |
+| `alternatives` | `response/artifacts/<decisionId>-alternatives.html` | artifact | no |
+| `independent-critique` | `critique/response/critique.md` | md | yes |
 
 ## Stops
 

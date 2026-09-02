@@ -15,65 +15,70 @@ phần B đi từng operator theo thứ tự chain; mỗi operator chỉ đượ
 
 JSON không kể chuyện, markdown không chứa số cần so từng bit. Gate hai đầu là JSON vì gate là thứ máy đọc.
 
-### A2. Một bước trong phiên
+### A2. Một phiên, một bước, một nhánh (CHỐT 2026-09-03 theo lệnh thầy)
 
 ```text
 .worktrees/sessions/<sessionId>/
-├─ session.json                 chain [[1-1],[2-1,2-2],[3-1]] · map step→operatorId · lease · trạng thái
-└─ step-N-M/                    N = vị trí trong chain, M = nhánh song song (≤3 agent)
-   ├─ input.json                GATE VÀO: operatorId, step, contexts (alias tĩnh), fields (tên → đường dẫn)
-   ├─ request.md                Context đã bind · Requirements người nhập · Inputs (trỏ md/data bước trước)
-   ├─ response.md               kết quả theo khuôn kind
-   ├─ data/                     json máy
-   ├─ artifacts/                html, tsx, png …
-   └─ output.json               GATE RA: status done|blocked, stop, fields (kind → file), commits, next
+├─ state.json                    chain [["1/1"],["2/1","2/2"]], steps {"N/M": operatorId}, current, leases, requestHashes
+└─ step-N/                       N = vị trí trong chain
+   └─ parallel-M/                M = nhánh song song (≤3); parallel-1 luôn có
+      ├─ request/
+      │  └─ request.json         GATE VÀO, orchestrator ghi: operatorId, step, parallel, contexts, requirements, inputs, resume
+      ├─ response/               agent ghi, và chỉ ghi ở đây
+      │  ├─ response.json        GATE RA: status done|blocked|waiting, stop, awaiting, fallbacks, fields, commits, next
+      │  ├─ response.md          kind md chính; kind md khác (changes.md, …) nằm cạnh
+      │  ├─ data/                json máy, có schema
+      │  └─ artifacts/           html, tsx, png; chỉ kiểm tồn tại
+      └─ <exchange>/             cuộc trao đổi lồng (vd critique): request/request.json + response/…, agent mới ghi
 ```
 
-Quy tắc đọc: một Input kind phân giải tới bước gần nhất đứng trước có `output.json.fields` liệt kê kind đó.
-Song song: hai bước cùng N chỉ chạy đồng thời khi cột Writes không chạm chung alias.
-Vòng đời: tạo khi operator đầu được dispatch; tiến khi `status: done`; dừng khi `blocked` và chờ đúng
-field người nhập mà `stop` gọi tên; xóa cả phiên khi `git.publish` done.
+Không có `request.md`: đề bài cho agent render lúc chạy từ `request.json` + `operator.md`, không lưu.
+Đường dẫn trong `request.json.inputs` tính từ gốc phiên (`step-1/parallel-1/response/response.md`), do
+orchestrator ghi tường minh; trong `response.json.fields` và bảng Outputs tính từ nhánh (`response/response.md`,
+`critique/response/critique.md`). Song song: hai nhánh cùng N chỉ chạy đồng thời khi Writes không chạm chung alias.
+`waiting`: nhánh tạm ngưng, orchestrator chạy cuộc trao đổi lồng rồi resume cùng agent; nhánh khác vẫn chạy.
+Resume sau `blocked` là nhánh mới `step-(N+1)/parallel-1`, nhánh bị chặn giữ làm bằng chứng. Xóa cả phiên khi
+`git.publish` done.
 
 ### A3. Một operator = `operator.md` (+ `.vi.md`)
 
 ```text
 # <operator.id>
 ## Job            một câu
+## <luật>         mục tự do bằng văn xuôi
 ## Context        | Alias | Bind | Required |          tĩnh, lấy từ alias/INDEX.md
 ## Inputs         | Kind | From | Required |           động, kind = tên trong templates/kinds
-## Requirements   | Field | Type | Default | Ask |     người nhập: choice / number / prompt / path / id; default = chạy không cần hỏi
-## Steps          | # | Step | Params | Reads | Writes | Stops with |   Params = field nào của Requirements bước này dùng
-## Outputs        | Kind | File | Type |               md / data / artifact
-## Stops          | Code | Disposition |                 chỉ liệt kê; nghĩa và xử lý nằm ở errors/
+## Requirements   | Field | Type | Default | Ask |     người nhập; Default — = bắt buộc
+## Steps          | # | Step | Params | Reads | Writes | Stops with |   Params = field bước này đọc
+## Outputs        | Kind | File | Type | Required |    file tính từ nhánh: response/…, <exchange>/response/…
+## Stops          | Code | Disposition |               nghĩa và xử lý nằm ở errors/
 ## Next           | When | Operator |
 ```
 
-Gói còn 4 file: `operator.md`, `operator.vi.md`, `validate.mjs` (parse `response.md` theo khuôn kind, schema
-cho `data/*`, đối chiếu `output.json` với `## Outputs`), `self-test.mjs`. `operator.json` giữ lại chỉ phần
-máy cần mà markdown không nên chứa: `id`, `resources` (profile, requires, policy). Mọi thứ khác đọc từ
-`operator.md`.
+Gói 6 file: `operator.md`, `operator.vi.md`, `operator.json` (id, domain, resources), `errors.json` (mã riêng),
+`validate.mjs` (gọi `scripts/validate-step.mjs` rồi luật riêng), `self-test.mjs`.
 
-### A4. Gate chung (một cặp cho 14 operator)
+### A4. Gate chung (`templates/step/`)
 
-`templates/step/input.schema.json`: `operatorId`, `step` (`^\d+-\d+$`), `contexts[]` (alias), `heads{}`
-(alias → sha đã đóng băng, do orchestrator điền), `fields{}` (tên → `request.md#…` hoặc `../step-N-M/…`).
+`request.schema.json`: `operatorId`, `step`, `parallel`, `sessionId`, `exchange?`, `contexts[{alias, head}]`,
+`requirements{}`, `inputs{kind → đường dẫn từ gốc phiên}`, `resume`.
+`response.schema.json`: `operatorId`, `step`, `parallel`, `exchange?`, `status`, `stop` (khi blocked),
+`awaiting{exchange, kind}` (khi waiting), `fallbacks[]`, `fields{kind → đường dẫn từ nhánh}`, `commits[]`, `next[]`.
 
-`templates/step/output.schema.json`: `operatorId`, `step`, `status` (`done|blocked`), `stop` (bắt buộc khi
-blocked), `fields{}` (kind → `response.md` | `data/<x>.json` | `artifacts/<x>`), `commits[]`, `next[]`.
+### A5. Hợp đồng kind và ba script kiểm
 
-### A5. `scripts/validate-step.mjs`
+`templates/kinds/<kind>.contract.json` là hợp đồng JSON thuần (kiểm bằng `contract.schema.json`): regex tiêu đề,
+mục theo thứ tự, header bảng, `minRows`/`exactRows`/`rows`/`cell`. `<kind>.skeleton.md` là bộ xương để chép và
+**tự nó phải qua hợp đồng** trong `npm test`. Kind máy: `<kind>.schema.json`.
 
-Gọi `node scripts/validate-step.mjs <đường dẫn step-N-M>`:
+| Script | Chạy khi | Kiểm |
+| --- | --- | --- |
+| `validate-request.mjs <nhánh>` | trước khi spawn agent | gate; requirement ⊆ bảng Requirements, field bắt buộc có giá trị; input bắt buộc có và tồn tại; hash khớp `state.json` |
+| `validate-response.mjs <nhánh>` | sau khi agent phát `response.json` | gate; mỗi Output có khi bắt buộc, md qua contract, data qua schema, artifact tồn tại; stop/fallback đúng disposition sau `unless`; `waiting` trỏ exchange đã khai |
+| `validate-step.mjs <nhánh>` | self-test, audit | hai cái trên + mọi cuộc trao đổi lồng |
 
-1. `output.json` qua schema chung.
-2. tra `operatorId` → `operators/<id>/operator.md`, parse `## Outputs`.
-3. mỗi hàng Outputs: có trong `fields`, tồn tại trên đĩa; md → khuôn `templates/kinds/<kind>.template.md`;
-   data → `<kind>.schema.json`; artifact → tồn tại.
-4. `status: done` mà một Output bắt buộc hỏng → exit 1, một dòng mỗi lỗi.
-
-Cổng cây trong `npm test`: `validate-alias` đọc `## Context`; `generate-operators-index` đọc `## Inputs`,
-`## Outputs`, `## Steps`; thêm "mọi kind được nhắc phải có khuôn trong `templates/kinds/`" và "consumer của
-kind X phải có producer đứng trước trong ít nhất một chain của `routing.json`".
+Cổng cây (`npm test`): `validate-operator` đối chiếu Params↔Requirements, Steps↔Stops↔errors, Writes↔Outputs↔kinds,
+exchange↔bước `waiting`, en↔vi; `validate-alias` đọc bảng Context; `generate-operators-index` đọc Inputs/Outputs/Steps.
 
 ### A6. `errors/` — sổ mã dừng, một nơi
 

@@ -1,0 +1,42 @@
+{
+  "$id": "step:request",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "operatorId", "step", "parallel", "sessionId", "contexts", "requirements", "inputs", "resume"],
+  "properties": {
+    "schemaVersion": { "const": 9 },
+    "operatorId": { "type": "string", "pattern": "^[a-z]+(?:\\.[a-z]+)+$" },
+    "step": { "type": "integer", "minimum": 1 },
+    "parallel": { "type": "integer", "minimum": 1 },
+    "sessionId": { "type": "string", "minLength": 1, "maxLength": 128 },
+    "exchange": { "type": "string", "pattern": "^[a-z][a-z-]*$" },
+    "contexts": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["alias", "head"],
+        "properties": {
+          "alias": { "type": "string", "pattern": "^@[a-z][a-z-]*(?:/[A-Za-z0-9_<>.@#:-]+)*$" },
+          "head": { "type": ["string", "null"], "pattern": "^[0-9a-f]{40}$" }
+        }
+      }
+    },
+    "requirements": { "type": "object", "additionalProperties": { "type": ["string", "number", "boolean", "null", "array", "object"] } },
+    "inputs": {
+      "type": "object",
+      "additionalProperties": { "type": "string", "pattern": "^step-\\d+/parallel-\\d+/(?:[a-z][a-z-]*/)?response/(?:[a-z][a-z-]*\\.md|data/[A-Za-z0-9_./-]+\\.json|artifacts/[A-Za-z0-9_./-]+)$" }
+    },
+    "resume": {
+      "oneOf": [
+        { "type": "null" },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["step", "parallel", "token"],
+          "properties": { "step": { "type": "integer", "minimum": 1 }, "parallel": { "type": "integer", "minimum": 1 }, "token": { "type": "string", "minLength": 1 } }
+        }
+      ]
+    }
+  }
+}

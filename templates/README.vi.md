@@ -15,11 +15,11 @@ vào, cùng bản `.vi.md` của file ấy. Hợp đồng là thẩm quyền; b�
 | `ui-proof.template.md` | `knowledge/ui/proof/*.md` | tiêu đề; chỉ các mục rule, mỗi mục một bảng `Case \| Dùng khi \| Quan sát`; mục đóng |
 | `grammars.template.md` | `knowledge/grammars/*/*.md` | tiêu đề; mục tuỳ ý; mọi mục rule mang một bảng `Case \| Luật \| Owner của Common \| Core hiện thực` |
 | `patterns.template.md` | `knowledge/patterns/*/*.md` | tiêu đề; mục tuỳ ý; mọi mục rule mang một bảng `Case \| Dùng khi \| Viết` |
-| `kinds/changes.template.md` | `changes.md` trong một bước của phiên; `templates/changes.example.md` là ví dụ được ép | tiêu đề; bảng Binding, bảng Files, Bước kế tiếp cần biết gì |
+| `kinds/changes.contract.json` + `kinds/changes.skeleton.md` | `response/changes.md` trong một nhánh của phiên; `templates/changes.example.md` là ví dụ được ép | tiêu đề; bảng Binding, bảng Files, Bước kế tiếp cần biết gì |
 | `operator.template.md` | `operators/*/operator.md` | tiêu đề `# <operator.id>`; Việc, các mục luật tự do, Context, Đầu vào, Yêu cầu, Các bước, Đầu ra, Dừng, Kế tiếp, mỗi mục một bảng; `scripts/validate-operator.mjs` sau đó đối chiếu các bảng với nhau, với `errors/` và với `templates/kinds` |
-| `kinds/<kind>.template.md` | file trong một bước của phiên (`response.md`, `critique.md`, `request.md`); `applies` để trống | các mục và bảng của một kind markdown; `scripts/validate-step.mjs` nạp theo kind |
-| `kinds/<kind>.schema.json` | `data/<name>.json` trong một bước của phiên | JSON Schema của một kind máy |
-| `step/input.schema.json`, `step/output.schema.json` | `input.json` và `output.json` của mọi bước | hai gate dùng chung cho mọi operator |
+| `kinds/<kind>.contract.json` | file markdown trong một nhánh của phiên (`response/response.md`, `critique/response/critique.md`) | JSON thuần, kiểm bằng `kinds/contract.schema.json`: regex tiêu đề, mục theo thứ tự, header từng bảng, số dòng, dòng bắt buộc, regex ô; `kinds/<kind>.skeleton.md` là bộ xương để chép và tự nó phải qua hợp đồng; `scripts/validate-response.mjs` nạp hợp đồng theo kind |
+| `kinds/<kind>.schema.json` | `response/data/<name>.json` trong một nhánh của phiên | JSON Schema của một kind máy |
+| `step/request.schema.json`, `step/response.schema.json` | `request/request.json` và `response/response.json` của mọi nhánh và mọi cuộc trao đổi lồng | hai gate dùng chung cho mọi operator; `scripts/validate-request.mjs` chạy trước agent, `scripts/validate-response.mjs` chạy sau |
 
 ## Từ vựng của hợp đồng
 
@@ -31,8 +31,8 @@ vào, cùng bản `.vi.md` của file ấy. Hợp đồng là thẩm quyền; b�
   header bảng phải mở đầu mục đó.
 - Mục có `table` còn có thể mang `minRows` / `exactRows` (số dòng dữ liệu), `rows` (giá trị cột đầu phải
   xuất hiện, bỏ qua dấu backtick) và `cell` (`{ "<Cột>": "<regex>" }`, ô dưới cột đó ở mọi dòng phải khớp;
-  cột không có trong header của ngôn ngữ này thì bỏ qua). Khuôn kind dưới `kinds/` chỉ có một ngôn ngữ:
-  `title`, mục và `table` của nó có thể là chuỗi trơn.
+  cột không có trong header của ngôn ngữ này thì bỏ qua). Hợp đồng kind dưới `kinds/` là JSON một ngôn ngữ:
+  `title`, `heading` và `table` là chuỗi trơn.
 - `rules`: `heading` là biểu thức của mục rule, `table` là dòng header duy nhất mỗi rule phải mang
   (đúng một bảng cho mỗi rule), `closing` là mục phải đứng cuối, `required` là tài liệu có bắt buộc
   publish ít nhất một rule không. Heading rule và heading đóng không tham gia bước duyệt `sections`.

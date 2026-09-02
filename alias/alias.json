@@ -283,9 +283,9 @@
         "kind"
       ],
       "kind": "dir",
-      "resolvesTo": "<Source>/.worktrees/sessions/<sessionId>/step-<N>-<M>/ — the current step folder. Inside it: input.json (gate in), request.md, response.md, data/<name>.json, artifacts/<file>, output.json (gate out). Reading: a kind resolves to the nearest earlier step whose output.json fields lists it; the path is relative, ../step-N-M/<file>. Operator.md packages pass dynamic files as kinds (templates/kinds/<kind>), not as aliases; the old shape still names @dynamic/<file> until each package migrates. The session folder is created by the orchestrator and deleted when git.publish finishes; a blocked run keeps it for resume",
-      "scheme": "step://<sessionId>/<N>-<M>/<file>",
-      "bind": "kind template or schema under templates/kinds; output.json fields is the registry of what a step produced",
+      "resolvesTo": "<Source>/.worktrees/sessions/<sessionId>/step-<N>/parallel-<M>/ — one branch of one step. request/request.json is the gate in (orchestrator writes it); response/ is the agent's: response.json (gate out), response.md and other markdown kinds, data/<name>.json, artifacts/<file>; a nested exchange adds <exchange>/request/ and <exchange>/response/. A kind is passed by explicit path in request.json inputs, from the session root. Operator.md packages pass dynamic files as kinds (templates/kinds/<kind>), not as aliases; the old shape still names @dynamic/<file> until each package migrates. The session folder is created by the orchestrator and deleted when git.publish finishes; a blocked run keeps it for resume",
+      "scheme": "step://<sessionId>/<N>/<M>/<path>",
+      "bind": "kind contract or schema under templates/kinds; response.json fields is the registry of what a branch produced",
       "writers": [
         "*"
       ],

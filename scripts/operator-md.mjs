@@ -70,7 +70,10 @@ export function parseOperatorMd(text, lang = 'en') {
 export const cellCodes = (cell) => [...cell.matchAll(/`([A-Z][A-Z0-9_]+)`/g)].map((m) => m[1]);
 export const cellParams = (cell) => (cell.trim() === '—' || cell.trim() === '' ? [] : [...cell.matchAll(/`([a-zA-Z][A-Za-z0-9_]*)`/g)].map((m) => m[1]));
 export const cellAliases = (cell) => [...cell.matchAll(ALIAS)].map((m) => m[0]);
-export const cellFiles = (cell) => [...cell.matchAll(/`([a-z][a-z-]*\.md|data\/[A-Za-z0-9_<>.-]+|artifacts\/[A-Za-z0-9_<>.-]+|output\.json)`/g)].map((m) => m[1]);
+// Files are branch-relative: response/<x>.md, response/data/…, response/artifacts/…, response/response.json,
+// or <exchange>/response/… for a nested exchange.
+export const cellFiles = (cell) => [...cell.matchAll(/`((?:[a-z][a-z-]*\/)?response\/(?:[a-z][a-z-]*\.md|data\/[A-Za-z0-9_<>./-]+|artifacts\/[A-Za-z0-9_<>./-]+|response\.json))`/g)].map((m) => m[1]);
+export const exchangeOf = (file) => { const m = /^([a-z][a-z-]*)\/response\//.exec(file); return m ? m[1] : null; };
 export const isYes = (cell) => YES.has(strip(cell).trim().toLowerCase());
 export const kindOf = (cell) => strip(cell.trim());
 

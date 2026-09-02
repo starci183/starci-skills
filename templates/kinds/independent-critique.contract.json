@@ -1,0 +1,9 @@
+{
+  "kind": "independent-critique",
+  "title": "^# independent-critique — [a-z0-9][a-z0-9-]*$",
+  "sections": [
+    { "heading": "^## Execution$", "table": "| Field | Value |", "rows": ["Reviewer execution", "Inherited turns", "Given"], "cell": { "Value": "\\S" } },
+    { "heading": "^## Attacks$", "table": "| Adverse path | Attack | Resolution | Verdict |", "exactRows": 8, "rows": ["partial-failure", "retry-idempotency", "concurrency", "stale-state", "deletion", "recovery", "dependency-outage", "rollback"], "cell": { "Attack": "\\S", "Resolution": "\\S", "Verdict": "^(holds|fails)$" } },
+    { "heading": "^## Verdict$", "table": "| Field | Value |", "rows": ["Selection"], "cell": { "Value": "^(keep|return)$" } }
+  ]
+}

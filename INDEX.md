@@ -37,8 +37,8 @@ knowledge/
   patterns/fe, be        code conventions extracted from the two live sources
   grammars/<family>/     one visual family's realization of Common
 templates/               one template per document kind; each carries the json template-contract the tree is checked against;
-                         kinds/ types every file that crosses between steps (<kind>.template.md for markdown, <kind>.schema.json for data); step/ holds the input.json and output.json gates
-scripts/                 validate-routing.mjs, validate-resources.mjs, validate-knowledge-citations.mjs, validate-alias.mjs, validate-templates.mjs, validate-operator.mjs, validate-step.mjs, run-operator-self-tests.mjs;
+                         kinds/ types every file that crosses between steps (<kind>.contract.json + <kind>.skeleton.md for markdown, <kind>.schema.json for data); step/ holds the request.json and response.json gates
+scripts/                 validate-routing.mjs, validate-resources.mjs, validate-knowledge-citations.mjs, validate-alias.mjs, validate-templates.mjs, validate-operator.mjs, validate-request.mjs, validate-response.mjs, validate-step.mjs, run-operator-self-tests.mjs;
                          device-state.mjs and workspace-portable.mjs (+ specs), which the backend package.json calls
 readiness/               workspaces/ schemas that the portable and hydrated route declarations name as $schema
 audits/<version>/        dry-run records with their validated input and output artifacts

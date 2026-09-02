@@ -5,9 +5,9 @@ Mọi mã một operator có thể dừng với: mã chung trong `errors/errors.
 | Mã | Phạm vi | Vùng | Xử lý | Nghĩa | Fallback | Trừ khi | Chạy lại |
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | `EVIDENCE_MISSING` | `*` | `self` | terminate | Một khẳng định về hệ thống không có file, dòng hay head nào đứng sau. | — | — | Bổ sung bằng chứng. |
-| `INVALID_INPUT` | `*` | `caller` | terminate | input.json hoặc request.md không qua gate hoặc bảng Yêu cầu của operator. | — | — | Sửa request.md. |
+| `INVALID_INPUT` | `*` | `caller` | terminate | request.json không qua gate hoặc bảng Yêu cầu của operator. | — | — | Sửa request.json. |
 | `NO_PROGRESS` | `*` | `caller` | terminate | Lần chạy lại không thêm bằng chứng, ràng buộc, inventory hay phê duyệt nào. | — | — | Mang một delta thật. |
-| `SOURCE_DRIFT` | `*` | `workspace` | terminate | Head quan sát được của checkout khác head mà input.json đã đóng băng. | — | — | Orchestrator đóng băng head lại. |
+| `SOURCE_DRIFT` | `*` | `workspace` | terminate | Head quan sát được của checkout khác head mà request.json đã đóng băng. | — | — | Orchestrator đóng băng head lại. |
 | `UNKNOWN_STOP` | `*` | `caller` | terminate | Runtime gặp một mã mà sổ gộp không có. | — | — | Đăng ký mã hoặc sửa operator. |
 | `BUSINESS_AUTHORITY_REQUIRED` | `architecture.decide` | `business` | terminate | Head nghiệp vụ đã publish mà kiến trúc phải giữ đang thiếu hoặc cũ. | — | — | Chạy business.decide trước. |
 | `CHOICE_REQUIRED` | `architecture.decide` | `caller` | fallback | Nhiều phương án còn material sau khi chấm. | Chọn phương án điểm cao nhất theo tradeoffAxes; hòa thì chọn phương án đổi ít component stack nhất; ghi bảng điểm dưới ## Decision. | `selectionPolicy` = `approval-required` → terminate | Người nhập approval. |

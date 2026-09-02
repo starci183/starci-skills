@@ -19,7 +19,7 @@ treats as a reason, what it must observe before it proposes. Prose, not tables.
 
 | Kind | From | Required |
 | --- | --- | --- |
-| `kind-name` | which earlier operator's step produces it, or "a prior run" | no |
+| `kind-name` | which earlier operator's branch produces it, or "a prior run" | no |
 
 ## Requirements
 
@@ -31,13 +31,14 @@ treats as a reason, what it must observe before it proposes. Prose, not tables.
 
 | # | Step | Params | Reads | Writes | Stops with |
 | --- | --- | --- | --- | --- | --- |
-| 1 | Validate the gate and resume | `resume` | `input.json`, `request.md` | — | `INVALID_INPUT`, `SOURCE_DRIFT`, `NO_PROGRESS` |
+| 1 | Validate the gate and resume | `resume` | `request/request.json` | — | `INVALID_INPUT`, `SOURCE_DRIFT`, `NO_PROGRESS` |
+| 2 | Do the job | `field` | `@zone/path` | `response/response.md`, `response/response.json` | — |
 
 ## Outputs
 
 | Kind | File | Type | Required |
 | --- | --- | --- | --- |
-| `kind-name` | `response.md` | md | yes |
+| `kind-name` | `response/response.md` | md | yes |
 
 ## Stops
 

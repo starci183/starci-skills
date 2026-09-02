@@ -1,16 +1,17 @@
 // An operator.md package is closed when its own tables agree with each other, with the stop-code
-// registry, with the kind templates, and with its Vietnamese mirror. This is the three-way check the
-// old shape spread over four documents and two schemas: Params ↔ Requirements, Steps ↔ Stops ↔
-// errors registry, Writes ↔ Outputs ↔ templates/kinds, Inputs ↔ templates/kinds, en ↔ vi.
+// registry, with the kind contracts, and with its Vietnamese mirror: Params ↔ Requirements, Steps ↔
+// Stops ↔ errors registry, Writes ↔ Outputs ↔ templates/kinds, Inputs ↔ templates/kinds, nested
+// exchanges ↔ a waiting step, en ↔ vi.
 import { existsSync } from 'node:fs';
 import path from 'node:path';
 import process from 'node:process';
 import { fileURLToPath } from 'node:url';
-import { loadOperatorPackages, cellCodes, cellParams, cellFiles, kindOf, isYes } from './operator-md.mjs';
+import { loadOperatorPackages, cellCodes, cellParams, cellFiles, kindOf, isYes, exchangeOf } from './operator-md.mjs';
 import { loadErrorsRegistry } from './errors-registry.mjs';
 import { loadKindTemplates } from './validate-templates.mjs';
 
 const unquote = (s) => String(s ?? '').trim().replace(/^`|`$/g, '');
+const TABLES = ['context', 'inputs', 'requirements', 'steps', 'outputs', 'stops', 'next'];
 
 export async function validateOperators(root) {
   const errors = [];
@@ -26,8 +27,8 @@ export async function validateOperators(root) {
     const at = `operators/${pkg.name}/operator.md`;
     const op = pkg.en;
     if (op.id !== id) errors.push(`${at}: title ${op.id} must equal operator.json id ${id}`);
-    for (const key of ['context', 'inputs', 'requirements', 'steps', 'outputs', 'stops', 'next']) if (!op.tables[key]) errors.push(`${at}: no ${key} table`);
-    if (Object.values(op.tables).some((t) => !t)) continue;
+    for (const key of TABLES) if (!op.tables[key]) errors.push(`${at}: no ${key} table`);
+    if (TABLES.some((k) => !op.tables[k])) continue;
     for (const legacy of ['context.md', 'input.md', 'execute.md', 'output.md', 'input.schema.json', 'output.schema.json', 'validate-input.mjs', 'validate-output.mjs', 'validation.mjs']) {
       if (existsSync(path.join(pkg.dir, legacy))) errors.push(`operators/${pkg.name}/${legacy}: an operator.md package carries no ${legacy}`);
     }
@@ -53,6 +54,7 @@ export async function validateOperators(root) {
     }
     for (const [c, e] of Object.entries(registry.codes)) if (e.scope.length === 1 && e.scope[0] === id && !stops.has(c)) errors.push(`${e.home}: ${c} is defined for ${id} but its Stops table omits it`);
     if (!cellCodes(op.tables.steps.rows[0]?.stops ?? '').includes('INVALID_INPUT')) errors.push(`${at}: step 1 must be the gate and stop with INVALID_INPUT`);
+    if (!cellFiles(op.tables.steps.rows[0]?.reads ?? '').length && !/request\/request\.json/.test(op.tables.steps.rows[0]?.reads ?? '')) errors.push(`${at}: step 1 must read request/request.json`);
 
     // Writes ↔ Outputs ↔ templates/kinds.
     const outputs = new Map();
@@ -60,30 +62,39 @@ export async function validateOperators(root) {
       const kind = kindOf(r.kind); const file = unquote(r.file); const type = r.type.trim();
       if (outputs.has(kind)) errors.push(`${at}:${r._line}: output ${kind} is declared twice`);
       outputs.set(kind, { ...r, file, type });
-      if (type === 'md') { if (!kinds.has(kind)) errors.push(`${at}:${r._line}: output ${kind} is md but templates/kinds/${kind}.template.md is missing`); if (!file.endsWith('.md')) errors.push(`${at}:${r._line}: md output ${kind} must be a .md file`); }
-      if (type === 'data') { if (!existsSync(path.join(root, 'templates', 'kinds', `${kind}.schema.json`))) errors.push(`${at}:${r._line}: output ${kind} is data but templates/kinds/${kind}.schema.json is missing`); if (!/^data\/.+\.json$/.test(file)) errors.push(`${at}:${r._line}: data output ${kind} must live under data/ as .json`); }
-      if (type === 'artifact' && !file.startsWith('artifacts/')) errors.push(`${at}:${r._line}: artifact output ${kind} must live under artifacts/`);
+      const inResponse = /^(?:[a-z][a-z-]*\/)?response\//.test(file);
+      if (!inResponse) errors.push(`${at}:${r._line}: output ${kind} must live under response/ or <exchange>/response/`);
+      if (type === 'md') { if (!kinds.has(kind)) errors.push(`${at}:${r._line}: output ${kind} is md but templates/kinds/${kind}.contract.json is missing`); if (!file.endsWith('.md')) errors.push(`${at}:${r._line}: md output ${kind} must be a .md file`); }
+      if (type === 'data') { if (!existsSync(path.join(root, 'templates', 'kinds', `${kind}.schema.json`))) errors.push(`${at}:${r._line}: output ${kind} is data but templates/kinds/${kind}.schema.json is missing`); if (!/\/data\/.+\.json$/.test(file)) errors.push(`${at}:${r._line}: data output ${kind} must live under response/data/ as .json`); }
+      if (type === 'artifact' && !/\/artifacts\//.test(file)) errors.push(`${at}:${r._line}: artifact output ${kind} must live under response/artifacts/`);
     }
     const written = new Set();
     for (const s of op.tables.steps.rows) for (const f of cellFiles(s.writes)) written.add(f);
     const outputFiles = new Set([...outputs.values()].map((o) => o.file));
-    for (const f of written) if (f !== 'output.json' && !outputFiles.has(f)) errors.push(`${at}: a step writes ${f}, which Outputs does not declare`);
-    for (const f of outputFiles) if (!written.has(f)) errors.push(`${at}: output ${f} is written by no step`);
-    if (!written.has('output.json')) errors.push(`${at}: no step writes output.json`);
+    for (const f of written) if (f !== 'response/response.json' && !outputFiles.has(f) && !exchangeOf(f)) errors.push(`${at}: a step writes ${f}, which Outputs does not declare`);
+    for (const f of outputFiles) if (!written.has(f) && !exchangeOf(f)) errors.push(`${at}: output ${f} is written by no step`);
+    if (!written.has('response/response.json')) errors.push(`${at}: no step writes response/response.json`);
 
-    // Inputs ↔ templates/kinds.
+    // Nested exchanges: an Output under <exchange>/response/ needs one step that waits for it and reads it.
+    for (const ex of new Set([...outputFiles].map(exchangeOf).filter(Boolean))) {
+      const waiting = op.tables.steps.rows.filter((s) => /response\/response\.json/.test(s.writes) && /waiting/.test(s.writes) && s.reads.includes(`${ex}/response/`));
+      if (waiting.length !== 1) errors.push(`${at}: exchange ${ex} needs exactly one step that writes response/response.json (waiting) and reads ${ex}/response/…, found ${waiting.length}`);
+      for (const s of op.tables.steps.rows) for (const f of cellFiles(s.writes)) if (exchangeOf(f) === ex) errors.push(`${at}:${s._line}: step ${s.n} writes ${f}; only the exchange's own agent writes under ${ex}/response/`);
+    }
+
+    // Inputs ↔ templates/kinds; Next ↔ operators.
     for (const r of op.tables.inputs.rows) {
       const kind = kindOf(r.kind);
       if (kind === '—' || kind === '') continue;
-      if (!kinds.has(kind) && !existsSync(path.join(root, 'templates', 'kinds', `${kind}.schema.json`))) errors.push(`${at}:${r._line}: input ${kind} has no template or schema under templates/kinds`);
+      if (!kinds.has(kind) && !existsSync(path.join(root, 'templates', 'kinds', `${kind}.schema.json`))) errors.push(`${at}:${r._line}: input ${kind} has no contract or schema under templates/kinds`);
     }
     for (const r of op.tables.next.rows) { const target = unquote(r.operator); if (!ids.has(target)) errors.push(`${at}:${r._line}: next names unknown operator ${target}`); }
 
-    // en ↔ vi: same rows, same identifiers, same codes and params per step.
+    // en ↔ vi.
     if (!pkg.vi) { errors.push(`operators/${pkg.name}/operator.vi.md: missing`); continue; }
     const vi = pkg.vi;
     if (vi.id !== id) errors.push(`operators/${pkg.name}/operator.vi.md: title must be ${id}`);
-    for (const key of ['context', 'inputs', 'requirements', 'steps', 'outputs', 'stops', 'next']) {
+    for (const key of TABLES) {
       const a = op.tables[key]; const b = vi.tables[key];
       if (!b) { errors.push(`operators/${pkg.name}/operator.vi.md: no ${key} table`); continue; }
       if (a.rows.length !== b.rows.length) { errors.push(`operators/${pkg.name}/operator.vi.md: ${key} has ${b.rows.length} rows, English has ${a.rows.length}`); continue; }
@@ -98,6 +109,7 @@ export async function validateOperators(root) {
         }
         if (key === 'stops' && ra.disposition.trim() !== rb.disposition.trim()) errors.push(`operators/${pkg.name}/operator.vi.md:${rb._line}: ${unquote(ra.code)} disposition differs from English`);
         if (key === 'outputs' && (ra.type.trim() !== rb.type.trim() || unquote(ra.file) !== unquote(rb.file))) errors.push(`operators/${pkg.name}/operator.vi.md:${rb._line}: output ${unquote(ra.kind)} file or type differs from English`);
+        if (key === 'requirements' && unquote(ra.default) !== unquote(rb.default)) errors.push(`operators/${pkg.name}/operator.vi.md:${rb._line}: requirement ${unquote(ra.field)} default differs from English`);
       });
     }
   }

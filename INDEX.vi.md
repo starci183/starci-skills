@@ -37,8 +37,8 @@ knowledge/
   patterns/fe, be        quy ước code trích từ hai source thật
   grammars/<họ>/         cách một họ hình ảnh hiện thực Common
 templates/               mỗi loại tài liệu một template; mỗi template mang khối json template-contract dùng để kiểm cả cây;
-                         kinds/ định kiểu mọi file đi qua giữa các bước (<kind>.template.md cho markdown, <kind>.schema.json cho dữ liệu); step/ giữ hai gate input.json và output.json
-scripts/                 validate-routing.mjs, validate-resources.mjs, validate-knowledge-citations.mjs, validate-alias.mjs, validate-templates.mjs, validate-operator.mjs, validate-step.mjs, run-operator-self-tests.mjs;
+                         kinds/ định kiểu mọi file đi qua giữa các bước (<kind>.contract.json + <kind>.skeleton.md cho markdown, <kind>.schema.json cho dữ liệu); step/ giữ hai gate request.json và response.json
+scripts/                 validate-routing.mjs, validate-resources.mjs, validate-knowledge-citations.mjs, validate-alias.mjs, validate-templates.mjs, validate-operator.mjs, validate-request.mjs, validate-response.mjs, validate-step.mjs, run-operator-self-tests.mjs;
                          device-state.mjs và workspace-portable.mjs (+ spec), thứ package.json của backend gọi tới
 readiness/               các schema workspaces/ mà khai báo route portable và hydrate gọi tên trong $schema
 audits/<phiên bản>/      hồ sơ chạy khô cùng artifact input và output đã qua validator

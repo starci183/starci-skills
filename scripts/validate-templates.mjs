@@ -29,19 +29,28 @@ export async function loadTemplates(root) {
   return templates;
 }
 
-// Kind templates describe files that only exist inside a session (templates/kinds/<kind>.template.md);
-// they claim nothing in the tree, so validateTree ignores them and validate-step loads them by kind.
+// Kind contracts describe markdown files that only exist inside a session: templates/kinds/<kind>.contract.json
+// is the authority (checked against contract.schema.json), <kind>.skeleton.md is the copyable skeleton and
+// must itself pass the contract. They claim nothing in the tree; validate-response loads them by kind.
 export async function loadKindTemplates(root) {
   const dir = path.join(root, 'templates', 'kinds');
+  const { validateAgainst } = await import('./json-schema.mjs');
+  const schema = JSON.parse(await readFile(path.join(dir, 'contract.schema.json'), 'utf8'));
   const kinds = new Map();
-  for (const name of (await readdir(dir)).filter((f) => f.endsWith('.template.md')).sort()) {
-    const text = await readFile(path.join(dir, name), 'utf8');
-    const m = CONTRACT_FENCE.exec(text);
-    if (!m) throw new Error(`templates/kinds/${name}: no template-contract block`);
-    const contract = JSON.parse(m[1]);
-    if (contract.kind !== name.replace(/\.template\.md$/, '')) throw new Error(`templates/kinds/${name}: contract.kind must equal the file name`);
-    if (contract.applies?.length) throw new Error(`templates/kinds/${name}: a kind template applies to session files only; applies must be empty`);
-    kinds.set(contract.kind, contract);
+  for (const name of (await readdir(dir)).filter((f) => f.endsWith('.contract.json')).sort()) {
+    const contract = JSON.parse(await readFile(path.join(dir, name), 'utf8'));
+    const rel = `templates/kinds/${name}`;
+    const errors = validateAgainst(schema, contract, rel);
+    if (errors.length) throw new Error(errors.join('\n'));
+    if (contract.kind !== name.replace(/\.contract\.json$/, '')) throw new Error(`${rel}: contract.kind must equal the file name`);
+    for (const s of contract.sections) {
+      if (!s.table && (s.rows || s.cell || s.minRows !== undefined || s.exactRows !== undefined)) throw new Error(`${rel}: section ${s.heading} has row rules but no table`);
+      if (s.table && s.cell) {
+        const cols = s.table.split('|').slice(1, -1).map((c) => c.trim());
+        for (const col of Object.keys(s.cell)) if (!cols.includes(col)) throw new Error(`${rel}: section ${s.heading} names cell column ${col}, which its table lacks`);
+      }
+    }
+    kinds.set(contract.kind, { ...contract, skeleton: `templates/kinds/${contract.kind}.skeleton.md` });
   }
   return kinds;
 }
@@ -94,7 +103,7 @@ const unquote = (s) => s.replace(/^`|`$/g, '');
 
 // A contract value is either one string (a single-language kind template) or { en, vi }.
 export function checkDocument(rel, text, contract, lang) {
-  const L = (v) => (typeof v === 'string' ? v : v?.[lang] ?? v?.en);
+  const L = (v) => (typeof v === 'string' ? v : v?.[lang] ?? v?.en ?? v?.heading);
   const errors = [];
   const lines = text.split(/\r?\n/);
   const title = lines[0] ?? '';
@@ -192,13 +201,15 @@ export async function validateTree(root) {
   }
   // A kind template may name one enforced example in the tree, so the shape a session file must take
   // is visible to a reader before any session exists.
+  // Every kind's skeleton, and its example when it names one, must pass the kind's own contract.
   let kinds = new Map();
   try { kinds = await loadKindTemplates(root); } catch (e) { if (e.code !== 'ENOENT') throw e; }
   for (const contract of kinds.values()) {
-    if (!contract.example) continue;
-    if (!files.includes(contract.example)) { errors.push(`${contract.example}: example named by kind ${contract.kind} is missing`); continue; }
-    errors.push(...checkDocument(contract.example, await readFile(path.join(root, contract.example), 'utf8'), contract, 'en'));
-    checked += 1;
+    for (const rel of [contract.skeleton, contract.example].filter(Boolean)) {
+      if (!files.includes(rel)) { errors.push(`${rel}: named by kind ${contract.kind} but missing`); continue; }
+      errors.push(...checkDocument(rel, await readFile(path.join(root, rel), 'utf8'), contract, 'en'));
+      checked += 1;
+    }
   }
   return { errors, checked, templates: templates.length + kinds.size };
 }

@@ -1,0 +1,28 @@
+{
+  "$id": "kinds:contract",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["kind", "title", "sections"],
+  "properties": {
+    "kind": { "type": "string", "pattern": "^[a-z][a-z0-9-]*$" },
+    "example": { "type": "string", "pattern": "^templates/[A-Za-z0-9_./-]+\\.md$" },
+    "title": { "type": "string", "minLength": 1 },
+    "sections": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["heading"],
+        "properties": {
+          "heading": { "type": "string", "pattern": "^\\^## " },
+          "table": { "type": "string", "pattern": "^\\| .+ \\|$" },
+          "minRows": { "type": "integer", "minimum": 0 },
+          "exactRows": { "type": "integer", "minimum": 0 },
+          "rows": { "type": "array", "items": { "type": "string", "minLength": 1 }, "uniqueItems": true },
+          "cell": { "type": "object", "additionalProperties": { "type": "string", "minLength": 1 } }
+        }
+      }
+    }
+  }
+}

@@ -5,9 +5,9 @@ Every code an operator may stop with: the shared ones from `errors/errors.json` 
 | Code | Scope | Domain | Disposition | Meaning | Fallback | Unless | Resume |
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | `EVIDENCE_MISSING` | `*` | `self` | terminate | A claim about the system has no file, line, or head behind it. | — | — | Add the evidence. |
-| `INVALID_INPUT` | `*` | `caller` | terminate | input.json or request.md fails the gate or the operator's Requirements. | — | — | Correct request.md. |
+| `INVALID_INPUT` | `*` | `caller` | terminate | request.json fails the gate or the operator's Requirements. | — | — | Correct request.json. |
 | `NO_PROGRESS` | `*` | `caller` | terminate | A resume adds no evidence, constraint, inventory, or approval delta. | — | — | Bring a real delta. |
-| `SOURCE_DRIFT` | `*` | `workspace` | terminate | The observed checkout head differs from the head input.json froze. | — | — | The orchestrator freezes the head again. |
+| `SOURCE_DRIFT` | `*` | `workspace` | terminate | The observed checkout head differs from the head request.json froze. | — | — | The orchestrator freezes the head again. |
 | `UNKNOWN_STOP` | `*` | `caller` | terminate | The runtime met a code the merged registry does not list. | — | — | Register the code or fix the operator. |
 | `BUSINESS_AUTHORITY_REQUIRED` | `architecture.decide` | `business` | terminate | The published business head the architecture must keep is missing or stale. | — | — | Run business.decide first. |
 | `CHOICE_REQUIRED` | `architecture.decide` | `caller` | fallback | Several alternatives remain material after assessment. | Select the alternative with the highest score across tradeoffAxes; on a tie, the one that changes the fewest stack components; record the score table under ## Decision. | `selectionPolicy` = `approval-required` → terminate | The person supplies approval. |

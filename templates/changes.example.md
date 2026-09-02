@@ -1,17 +1,17 @@
-# changes — fe.source.apply step-4-1
+# changes — fe.source.apply step-5/parallel-1
 
 `fe.source.apply` projected the resolved tree for the subscriptions route onto two declared paths of
-the frontend checkout, bound to the direction decided in step 2-1 and the presentation resolved in
-step 3-1. Nothing outside the declared write set was touched.
+the frontend checkout, bound to the direction decided in `step-3/parallel-1` and the presentation
+resolved in `step-4/parallel-1`. Nothing outside the declared write set was touched.
 
 ## Binding
 
 | Field | Value |
 | --- | --- |
 | Operator | `fe.source.apply` |
-| Step | `step-4-1` |
+| Step | `step-5/parallel-1` |
 | Checkout | `@workspaces/fe` at `14e0c20…` → `uncommitted` |
-| Predecessor | `../step-3-1/response.md` |
+| Predecessor | `step-4/parallel-1/response/response.md` |
 
 ## Files
 
