@@ -30,6 +30,13 @@ const validInput = {
           rulePrefix: 'PADDING',
           ruleIds: ['PADDING-4', 'PADDING-5'],
         },
+        {
+          topic: 'contrast',
+          ref: 'knowledge://ui/proof/contrast',
+          fingerprint: hash,
+          rulePrefix: 'COLOR',
+          ruleIds: ['COLOR-3', 'COLOR-5'],
+        },
       ],
     },
     applied: {
@@ -42,6 +49,7 @@ const validInput = {
         { nodePath: 'main', claimedIdentifiers: ['GAP-5'] },
         { nodePath: 'main/section[1]', claimedIdentifiers: ['GAP-4'] },
         { nodePath: 'main/section[2]', claimedIdentifiers: ['GAP-9'] },
+        { nodePath: 'main/section[1]/p', claimedIdentifiers: ['COLOR-5'] },
       ],
     },
     sourceRefs: [contextRef('source://starci-academy-fe', sourceHead)],
@@ -84,7 +92,7 @@ const binding = {
   appliedFingerprint: hash,
   appliedSourceHead: sourceHead,
   knowledgeFingerprint: hash,
-  boundRuleIds: ['GAP-1', 'GAP-2', 'GAP-4', 'GAP-5', 'PADDING-4', 'PADDING-5'],
+  boundRuleIds: ['GAP-1', 'GAP-2', 'GAP-4', 'GAP-5', 'PADDING-4', 'PADDING-5', 'COLOR-3', 'COLOR-5'],
   runtimeEndpointRef: 'runtime://starci-academy-fe/local',
   routePath: '/dashboard',
   inputFingerprint: hash,
@@ -167,6 +175,14 @@ const validAuditedOutput = {
             claimedRuleIds: ['GAP-5'],
             unknownClaimedIdentifiers: [],
           },
+          {
+            matrixId: 'mobile-dark-idle',
+            nodePath: 'main/section[1]/p',
+            property: 'contrast-ratio',
+            measuredValue: '5.1:1 (color oklch(70.5% 0.003 354.13) over composed oklch(21.03% 0.003 354.13))',
+            claimedRuleIds: ['COLOR-5'],
+            unknownClaimedIdentifiers: [],
+          },
         ],
         findings: [
           {
@@ -216,6 +232,18 @@ const validAuditedOutput = {
             claimedIdentifier: 'GAP-9',
             evidenceRef: captureRef('desktop-light-idle'),
             statement: 'The node claims an identifier the bound knowledge does not publish.',
+          },
+          {
+            findingId: 'finding-contrast',
+            matrixId: 'mobile-dark-idle',
+            nodePath: 'main/section[1]/p',
+            property: 'contrast-ratio',
+            verdict: 'PASS',
+            causeTags: [],
+            ruleId: 'COLOR-5',
+            claimedIdentifier: null,
+            evidenceRef: captureRef('mobile-dark-idle'),
+            statement: 'Muted body text measures 5.1:1 over the composed dark surface, clearing the normal-text floor the claimed rule declares.',
           },
         ],
       },
@@ -297,6 +325,13 @@ unknownRuleCited.output.receipt.audit.findings[0].ruleId = 'GAP-42';
 const unknownRuleResult = validateOutput(unknownRuleCited);
 assert.equal(unknownRuleResult.valid, false);
 assert.ok(unknownRuleResult.errors.some((error) => error.includes('does not publish')));
+
+// A topic may publish a non-contiguous series; the retired numbers between them stay unciteable.
+const retiredContrastRule = structuredClone(validAuditedOutput);
+retiredContrastRule.output.receipt.audit.findings[4].ruleId = 'COLOR-4';
+const retiredContrastResult = validateOutput(retiredContrastRule);
+assert.equal(retiredContrastResult.valid, false);
+assert.ok(retiredContrastResult.errors.some((error) => error.includes('COLOR-4, which the bound knowledge does not publish')));
 
 // A published rule cannot be laundered into the unpublished-claim channel, or vice versa.
 const misfiledUnknownClaim = structuredClone(validAuditedOutput);
