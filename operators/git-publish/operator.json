@@ -26,7 +26,7 @@
       "purpose": "The checkout and mutation branch being published."
     },
     {
-      "alias": "@workspaces/<project>/<role>/.husky",
+      "alias": "@workspaces/<project>/<role>/husky",
       "required": true,
       "purpose": "pre-commit and pre-push, which always run."
     },

@@ -36,7 +36,7 @@ Every invocation requires:
 | --- | --- | --- | --- |
 | `@receipt/workspace-route-binding/<invocationId>` | `<@artifacts of invocation <invocationId>>/<receiptType>.json  (the receipt file that invocation registered in output.artifactRefs)` | fingerprint + the sourceHead the receipt binds | Required: A publish never resolves its own checkout. |
 | `@workspaces/local/routes/<project>/<role>` | `<Source>/.workspaces/local/routes/<project>/<role>/config.json` | fingerprint | Required: The checkout and mutation branch being published. |
-| `@workspaces/<project>/<role>/.husky` | `<checkout:project/role>  (any routed checkout named explicitly, for cross-project reads: @workspaces/nivo/fe)` | fingerprint + sourceHead (git rev-parse HEAD of the checkout) | Required: pre-commit and pre-push, which always run. |
+| `@workspaces/<project>/<role>/husky` | `<checkout:project/role>  (any routed checkout named explicitly, for cross-project reads: @workspaces/nivo/fe)` | fingerprint + sourceHead (git rev-parse HEAD of the checkout) | Required: pre-commit and pre-push, which always run. |
 | `@external/remote/<project>/<role>` | `the origin URL in @workspaces/local/routes/<project>/<role> (repository.gitRepository)` | observed remote head (git ls-remote) at invocation time | Required: The publication target and its observed head. |
 | `@artifacts` | `input.project.artifactRootRef; convention <Source>/.worktrees/sessions/<invocationId>/artifacts/  (receipt, named artifacts, captures)` | fingerprint per artifact; every artifact written is registered in output.artifactRefs | Required: Where the publication receipt is written. |
 

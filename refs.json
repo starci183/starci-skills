@@ -5,7 +5,7 @@
     "@workspaces/fe": {
       "params": [],
       "kind": "checkout",
-      "resolvesTo": "<checkout:input.project.id/fe>  (diskPath from <Source>/.workspaces/local/routes/<project>/fe/config.json); a sub-path narrows: @workspaces/fe/.husky, @workspaces/fe/package.json#scripts",
+      "resolvesTo": "<checkout:input.project.id/fe>  (diskPath from <Source>/.workspaces/local/routes/<project>/fe/config.json); friendly segments: /husky, /package, /gates, /grammar (see segments)",
       "scheme": "source://<repository>",
       "bind": "fingerprint + sourceHead (git rev-parse HEAD of the checkout)",
       "writers": [
@@ -16,7 +16,7 @@
     "@workspaces/be": {
       "params": [],
       "kind": "checkout",
-      "resolvesTo": "<checkout:input.project.id/be>  (diskPath from <Source>/.workspaces/local/routes/<project>/be/config.json); a sub-path narrows: @workspaces/be/.husky, @workspaces/be/package.json#scripts",
+      "resolvesTo": "<checkout:input.project.id/be>  (diskPath from <Source>/.workspaces/local/routes/<project>/be/config.json); friendly segments: /husky, /package, /gates (see segments)",
       "scheme": "source://<repository>",
       "bind": "fingerprint + sourceHead (git rev-parse HEAD of the checkout)",
       "writers": [
@@ -258,5 +258,12 @@
       ],
       "purpose": "Authored lesson content as served, not as drafted."
     }
+  },
+  "segments": {
+    "note": "Human-friendly segments inside any checkout alias (@workspaces/fe, @workspaces/be, @workspaces/<project>/<role>), mapped to the exact path. Write the friendly word; the resolver substitutes the path.",
+    "husky": ".husky/  (pre-commit, pre-push)",
+    "package": "package.json  (scripts, dependencies, the package version)",
+    "gates": "package.json#scripts plus the configs it names (eslint.config.*, tsconfig*.json, jest.config.*/vitest.config.*, sonar-project.properties)",
+    "grammar": "packages/grammar  (the @starci/grammar source inside @workspaces/fe)"
   }
 }

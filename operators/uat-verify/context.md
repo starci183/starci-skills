@@ -39,7 +39,7 @@ A missing admission receipt is `ADMISSION_MISSING`. A runtime owner that is not 
 | `@worktrees/uat/<flow>/<case>` | `<Source>/.worktrees/uat/<flow>/<case>/  (snapshot.json, result.json)` | fingerprint of snapshot.json and result.json | Required: The canonical snapshot and result pair for the flow. |
 | `@worktrees/_templates` | `<Source>/.worktrees/_templates/  (businesses/, debts/, sessions/, uat/)` | fingerprint per file | Required: UAT protocol and template authority; consumed, never modified. |
 | `@worktrees/sessions/central-runtime` | `<Source>/.worktrees/sessions/central-runtime/owner.json  (generation-<n>-ready.json and logs/ beside it)` | fingerprint + generation | Required: A runtime that can be observed; readiness is proved, not assumed. |
-| `@workspaces/be` | `<checkout:input.project.id/be>  (diskPath from <Source>/.workspaces/local/routes/<project>/be/config.json); a sub-path narrows: @workspaces/be/.husky, @workspaces/be/package.json#scripts` | fingerprint + sourceHead (git rev-parse HEAD of the checkout) | Required: The checkout whose behaviour the flow verifies. |
+| `@workspaces/be` | `<checkout:input.project.id/be>  (diskPath from <Source>/.workspaces/local/routes/<project>/be/config.json); a sub-path narrows: @workspaces/be/husky, @workspaces/be/gates` | fingerprint + sourceHead (git rev-parse HEAD of the checkout) | Required: The checkout whose behaviour the flow verifies. |
 | `@artifacts` | `input.project.artifactRootRef; convention <Source>/.worktrees/sessions/<invocationId>/artifacts/  (receipt, named artifacts, captures)` | fingerprint per artifact; every artifact written is registered in output.artifactRefs | Required: Where captures and the verification receipt are written. |
 
 ## Identity is provisioned, never requested

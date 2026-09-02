@@ -18,7 +18,7 @@ Operator này chỉ thực hiện cú ghi, hoặc báo chính xác vì sao nó k
 | 2 | Ràng route | `@receipt/workspace-route-binding/<invocationId>` (checkout đã xác minh, head của nó, chính sách đã route), `@workspaces/local/routes/<project>/<role>` | — | `ROUTE_UNVERIFIED` |
 | 3 | Ràng phê duyệt | input (phê duyệt gọi tên đơn vị ranh giới này, bằng chứng hoàn thành) | — | `APPROVAL_MISSING` |
 | 4 | Xác minh cây làm việc | `@workspaces/local/routes/<project>/<role>` (head quan sát được, các đường dẫn bẩn, các write root đã khai, mọi branch, chính sách đã route) | — | `DIRTY_OUTSIDE_BOUNDARY`, `BRANCH_POLICY_VIOLATION` |
-| 5 | Chạy hook | `@workspaces/<project>/<role>/.husky` (danh mục hook, trong đó có `pre-push`) | — | `HOOK_BLOCKED` |
+| 5 | Chạy hook | `@workspaces/<project>/<role>/husky` (danh mục hook, trong đó có `pre-push`) | — | `HOOK_BLOCKED` |
 | 6 | Push không force | `@workspaces/local/routes/<project>/<role>` (các head đã duyệt, ref đã khai), `@external/remote/<project>/<role>` (head remote quan sát được) | `@external/remote/<project>/<role>` | `NON_FAST_FORWARD` |
 | 7 | Push tag continuation | input (tag được yêu cầu), `@external/remote/<project>/<role>` (các head mà lần publish này đã đẩy) | `@external/remote/<project>/<role>` (tag continuation) | — |
 | 8 | Phát ra và dừng | tất cả những gì ở trên | `@artifacts/publication.json` | — |
