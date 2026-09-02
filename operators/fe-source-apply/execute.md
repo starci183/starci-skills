@@ -39,31 +39,40 @@ The operator never edits the resolution. A tree that resolves to something sourc
 returned to the resolver, and the same source is applied again once a new resolution is published and
 its fingerprint is rebound.
 
-## Execution sequence
+## Sequence
 
-1. **Validate input and resume.** Apply `input.schema.json` and semantic validation. Reject a stale
-   source binding, a resolution named but not bound, owner overlap, a duplicated path, a path outside
-   its owner root, and unchanged progress.
-2. **Bind authority.** Bind the resolution receipt with its fingerprint, class inventory, and rule
-   inventory; the resolved tree with its fingerprint; the routed source head; and the declared write
-   set with its owner roots.
-3. **Confirm the head.** Observe the routed checkout. A head that differs from `input.project.sourceHead`
-   is `SOURCE_DRIFT`, and no file is opened.
-4. **Fingerprint before.** Record the current fingerprint of every declared path that exists. This is
-   what makes "unchanged" a measurement instead of an opinion.
-5. **Project the resolved tree onto the declared paths.** For each path, produce the content the
-   resolution already determined. A path the resolution says nothing about produces nothing.
-6. **Check every produced value against the inventory.** A class or identifier outside the resolution
-   stops the invocation before the first byte is written. The check runs on the projection, not after
-   the write, so a rejected application leaves source untouched.
-7. **Write, then fingerprint after.** Create or modify each path whose projection differs from its
-   current content. A path whose projection equals its current content is recorded `unchanged` and
-   emits no classes.
-8. **Report every declared path.** A declared path with no write is reported `WRITE_SET_PATH_UNUSED`.
-   A created file is reported `FILE_CREATED`. Nothing in the write set is dropped silently.
-9. **Emit and stop.** Write the application receipt under `input.project.artifactRootRef`, register
-   every written path in `artifactRefs`, and bind every fingerprint. Do not claim visual, quality, or
-   UAT proof: this operator knows what it wrote, never how it renders.
+| # | Step | Reads | Writes | Stops with |
+| --- | --- | --- | --- | --- |
+| 1 | Validate input and resume | input, prior receipt, frozen source binding | — | `INVALID_INPUT`, `SOURCE_DRIFT`, `NO_PROGRESS` |
+| 2 | Bind authority | resolution receipt with its fingerprint, class inventory, and rule inventory; the resolved tree; the routed source head; the declared write set with its owner roots | — | `RESOLUTION_STALE`, `OWNER_CONFLICT` |
+| 3 | Confirm the head | observed checkout at the routed route | — | — |
+| 4 | Fingerprint before | every declared path that already exists | — | — |
+| 5 | Project the resolved tree onto the declared paths | resolved tree, declared paths | — | — |
+| 6 | Check every produced value against the inventory | the projection, the frozen class and rule inventories | — | `WRITE_REJECTED` |
+| 7 | Write, then fingerprint after | the projection, the current content of each path | `<declared write-set path>` | — |
+| 8 | Report every declared path | write set, write outcomes | — | — |
+| 9 | Emit and stop | everything above | `application-receipt.json` | — |
+
+Validation rejects a stale source binding, a resolution named but not bound, owner overlap, a
+duplicated path, a path outside its owner root, and unchanged progress. The head is observed again at
+step 3 before anything is opened, and a head that differs from `input.project.sourceHead` returns the
+same drift failure with no file touched.
+
+Fingerprinting before the write is what makes "unchanged" a measurement instead of an opinion. The
+projection produces, for each path, the content the resolution already determined; a path the
+resolution says nothing about produces nothing. The inventory check runs on the projection rather than
+after the write, so a rejected application leaves source untouched: a class absent from the resolution
+is rejected with no rounding to a nearby value, no copying from a neighbouring file, and no
+reformatting that changes a step, and a file the write set does not declare is rejected even when it
+plainly needs the change.
+
+Each path whose projection differs from its current content is created or modified; a path whose
+projection equals its current content is recorded `unchanged` and emits no classes. Nothing in the
+write set is dropped silently: a declared path with no write is reported `WRITE_SET_PATH_UNUSED` and a
+created file is reported `FILE_CREATED`. Emission writes the application receipt under
+`input.project.artifactRootRef`, registers every written path in `artifactRefs`, binds every
+fingerprint, and claims no visual, quality, or UAT proof: this operator knows what it wrote, never how
+it renders.
 
 ## Contract emission is inherited
 

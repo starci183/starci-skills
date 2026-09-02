@@ -39,30 +39,38 @@ Operator không bao giờ sửa resolution. Một cây resolve ra thứ mà sour
 trả về cho người resolve, và chính source đó được ghi lại sau khi một resolution mới được publish và
 fingerprint của nó được bind lại.
 
-## Trình tự thực thi
+## Trình tự
 
-1. **Validate input và resume.** Áp `input.schema.json` cùng validate ngữ nghĩa. Từ chối binding
-   source cũ, resolution được nêu tên nhưng không được bind, owner chồng lấn, đường dẫn trùng, đường
-   nằm ngoài gốc owner của nó, và tiến độ không đổi.
-2. **Bind authority.** Bind resolution receipt kèm fingerprint, danh sách class và danh sách rule; cây
-   đã resolve kèm fingerprint; source head đã route; và write set đã khai kèm các gốc owner.
-3. **Xác nhận head.** Quan sát checkout đã route. Head khác `input.project.sourceHead` là
-   `SOURCE_DRIFT`, và không file nào được mở.
-4. **Fingerprint trước.** Ghi fingerprint hiện tại của mọi đường đã khai mà đang tồn tại. Đây là thứ
-   biến "không đổi" thành một phép đo thay vì một ý kiến.
-5. **Chiếu cây đã resolve lên các đường đã khai.** Với mỗi đường, sinh ra nội dung mà resolution đã
-   quyết sẵn. Đường nào resolution không nói gì thì không sinh ra gì.
-6. **Đối chiếu mọi giá trị sinh ra với danh sách.** Một class hoặc mã nằm ngoài resolution làm dừng
-   lần gọi trước khi byte đầu tiên được ghi. Phép kiểm chạy trên bản chiếu chứ không phải sau khi ghi,
-   nên một lần ghi bị từ chối để source y nguyên.
-7. **Ghi, rồi fingerprint sau.** Tạo hoặc sửa từng đường mà bản chiếu khác nội dung hiện tại. Đường có
-   bản chiếu trùng nội dung hiện tại thì ghi nhận là `unchanged` và không phát class nào.
-8. **Báo cáo mọi đường đã khai.** Đường đã khai mà không có lần ghi nào thì báo
-   `WRITE_SET_PATH_UNUSED`. File được tạo mới thì báo `FILE_CREATED`. Không mục nào trong write set bị
-   bỏ qua im lặng.
-9. **Phát ra rồi dừng.** Ghi application receipt dưới `input.project.artifactRootRef`, đăng ký mọi
-   đường đã ghi vào `artifactRefs`, và bind mọi fingerprint. Không được claim đã có bằng chứng visual,
-   quality hay UAT: operator này biết nó đã ghi gì, không bao giờ biết thứ đó render ra sao.
+| # | Bước | Đọc | Ghi | Dừng với |
+| --- | --- | --- | --- | --- |
+| 1 | Validate input và resume | input, receipt trước đó, binding source đã đóng băng | — | `INVALID_INPUT`, `SOURCE_DRIFT`, `NO_PROGRESS` |
+| 2 | Bind authority | resolution receipt kèm fingerprint, danh sách class và danh sách rule; cây đã resolve; source head đã route; write set đã khai kèm các gốc owner | — | `RESOLUTION_STALE`, `OWNER_CONFLICT` |
+| 3 | Xác nhận head | checkout quan sát được tại route đang dùng | — | — |
+| 4 | Fingerprint trước | mọi đường đã khai mà đang tồn tại | — | — |
+| 5 | Chiếu cây đã resolve lên các đường đã khai | cây đã resolve, các đường đã khai | — | — |
+| 6 | Đối chiếu mọi giá trị sinh ra với danh sách | bản chiếu, danh sách class và rule đã đóng băng | — | `WRITE_REJECTED` |
+| 7 | Ghi, rồi fingerprint sau | bản chiếu, nội dung hiện tại của từng đường | `<đường trong write set>` | — |
+| 8 | Báo cáo mọi đường đã khai | write set, kết quả từng lần ghi | — | — |
+| 9 | Phát ra rồi dừng | tất cả những gì ở trên | `application-receipt.json` | — |
+
+Khâu validate từ chối binding source cũ, resolution được nêu tên nhưng không được bind, owner chồng
+lấn, đường dẫn trùng, đường nằm ngoài gốc owner của nó, và tiến độ không đổi. Head được quan sát lại ở
+bước 3 trước khi bất cứ file nào được mở, và một head khác `input.project.sourceHead` trả về đúng lỗi
+trôi đó mà không file nào bị đụng vào.
+
+Việc lấy fingerprint trước khi ghi là thứ biến "không đổi" thành một phép đo thay vì một ý kiến. Bản
+chiếu sinh ra, cho mỗi đường, nội dung mà resolution đã quyết sẵn; đường nào resolution không nói gì
+thì không sinh ra gì. Phép kiểm danh sách chạy trên bản chiếu chứ không phải sau khi ghi, nên một lần
+ghi bị từ chối để source y nguyên: một class nằm ngoài resolution bị từ chối, không làm tròn về giá
+trị gần đó, không chép từ file bên cạnh, và không định dạng lại theo kiểu đổi mất một nấc; còn một
+file mà write set không khai thì bị từ chối ngay cả khi nó rõ ràng cần thay đổi.
+
+Mỗi đường có bản chiếu khác nội dung hiện tại thì được tạo hoặc sửa; đường có bản chiếu trùng nội dung
+hiện tại thì ghi nhận là `unchanged` và không phát class nào. Không mục nào trong write set bị bỏ qua
+im lặng: đường đã khai mà không có lần ghi nào thì báo `WRITE_SET_PATH_UNUSED`, còn file được tạo mới
+thì báo `FILE_CREATED`. Khâu phát ra ghi application receipt dưới `input.project.artifactRootRef`,
+đăng ký mọi đường đã ghi vào `artifactRefs`, bind mọi fingerprint, và không claim đã có bằng chứng
+visual, quality hay UAT: operator này biết nó đã ghi gì, không bao giờ biết thứ đó render ra sao.
 
 ## Chế độ phát contract là thứ thừa hưởng
 
