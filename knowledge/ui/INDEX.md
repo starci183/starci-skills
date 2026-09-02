@@ -80,8 +80,10 @@ claims to satisfy. The claim states an intention so the auditor can contradict i
 `GAP-4` while the computed gap is `1.5rem` is a finding, a node carrying spacing that claims nothing
 is an unowned value, and a claimed identifier absent from published knowledge fails validation. A
 claim never carries a verdict, score, or `PASS`, and a hand-written one is invalid because only the
-operator's receipt makes it verifiable. The receipt remains the durable record, so the attribute may
-be stripped from a production build without weakening any audit.
+operator's receipt makes it verifiable. Grammar emits the same claim on the elements that realize a
+relationship it owns, the rows of each topic's "Common already owns" table, so a Grammar-internal
+value is never an unowned value and the resolver never re-claims those nodes. The receipt remains the
+durable record, so the attribute may be stripped from a production build without weakening any audit.
 
 ## Canonical verdict model
 
