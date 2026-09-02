@@ -28,6 +28,7 @@ phẩm, và không mang phán quyết, điểm số hay tuyên bố đạt nào.
 | `gitPolicy` | Chính sách worktree đã route và branch sửa đổi đã khai. |
 | `mutationReadiness` | `ready` chỉ trên branch sửa đổi; ngoài ra là `read-only`. |
 | `writeRoots` | Những đường dẫn duy nhất mà công việc sau được ghi. |
+| `authorityRoots` | `businesses`: gốc thẩm quyền nghiệp vụ suy ra từ checkout, hoặc null. `business.decide` chép nó làm `businessesRootRef`. |
 | `runtime` | Endpoint của chủ sở hữu, tiêu thụ với tư cách `consumer`, hoặc null. |
 | `provenanceHeadRef` | Head hội thoại đã redact, hoặc null. |
 

@@ -24,6 +24,8 @@ equal `input.project.sourceHead`. `context.architectureRefs` is evidence and may
 ## Decision boundary
 
 - `input.project` binds the verified backend source and the one authority root this invocation writes.
+  `businessesRootRef` is copied from the `workspace.bind` receipt's `route.authorityRoots.businesses`;
+  a value typed by the caller has no authority.
 - `input.objective` names the objective reference, the single `featureId`, and the intent: `create`,
   `revise`, `reconcile`, or `retire`.
 - `input.publication` names the target state and the head reference. The head must be exactly

@@ -44,7 +44,10 @@ written down is a hint that gets followed the moment the declared route looks in
    `SOURCE_DRIFT`. Confirm the branch against the routed Git policy; under
    `worktreeBranches: forbidden` any branch other than `mutationBranch` is
    `BRANCH_POLICY_VIOLATION`, and the bound route records `WORKTREE_BRANCH_FORBIDDEN`. Confirm that
-   nothing dirty lies outside the declared write roots, or return `CHECKOUT_DIRTY`.
+   nothing dirty lies outside the declared write roots, or return `CHECKOUT_DIRTY`. Derive
+   `authorityRoots.businesses` as `<gitRoot>/.worktrees/businesses` when that worktree exists on a
+   source checkout, otherwise `null`; it is never accepted from input, because a typed authority root
+   is how a second business tree is born.
 6. **Bind the runtime when the caller consumes it.** Resolve the owner registry, its generation, and
    its health evidence. Recompute nothing: the `endpointBinding` fingerprint either matches the
    closed `workspace-route-port-projection` or it is `ENDPOINT_AUTHORITY_STALE`. Accept only

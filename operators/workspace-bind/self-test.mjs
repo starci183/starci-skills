@@ -156,6 +156,7 @@ const validBoundOutput = {
         gitPolicy: { worktreeBranches: 'forbidden', mutationBranch: 'mtp' },
         mutationReadiness: 'ready',
         writeRoots: ['src/features/api/core'],
+        authorityRoots: { businesses: `${sourceRoot}/.worktrees/businesses` },
         runtime: {
           ownerTaskId: 'task-central-runtime',
           generation: 4,
@@ -329,6 +330,13 @@ authoritativeHint.context.hints[0].authoritative = true;
 assert.equal(validateInput(authoritativeHint).valid, false);
 
 // The receipt must bind the head of the checkout it actually verified.
+// The businesses root is derived from the checkout; a typed one that disagrees is not a route.
+const typedAuthorityRoot = structuredClone(validBoundOutput);
+typedAuthorityRoot.output.receipt.route.authorityRoots.businesses = 'D:/elsewhere/.worktrees/businesses';
+const typedAuthorityRootResult = validateOutput(typedAuthorityRoot);
+assert.equal(typedAuthorityRootResult.valid, false);
+assert.ok(typedAuthorityRootResult.errors.some((error) => error.includes('derived from the checkout')));
+
 const headDisagreement = structuredClone(validBoundOutput);
 headDisagreement.output.receipt.route.checkout.sourceHead = 'd'.repeat(40);
 assert.equal(validateOutput(headDisagreement).valid, false);

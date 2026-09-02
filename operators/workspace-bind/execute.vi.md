@@ -42,7 +42,10 @@ giờ được ghi ra là một gợi ý sẽ được đi theo ngay khi route �
    `SOURCE_DRIFT`. Đối chiếu branch với chính sách Git đã route; dưới
    `worktreeBranches: forbidden`, mọi branch khác `mutationBranch` là `BRANCH_POLICY_VIOLATION`, và
    route được ràng sẽ ghi `WORKTREE_BRANCH_FORBIDDEN`. Xác nhận không có gì bẩn nằm ngoài write root
-   đã khai, nếu không thì trả `CHECKOUT_DIRTY`.
+   đã khai, nếu không thì trả `CHECKOUT_DIRTY`. Suy ra `authorityRoots.businesses` là
+   `<gitRoot>/.worktrees/businesses` khi worktree đó tồn tại trên một source checkout, ngược lại là
+   `null`; không bao giờ nhận nó từ input, vì một gốc thẩm quyền gõ tay là cách một cây nghiệp vụ thứ
+   hai ra đời.
 6. **Ràng runtime khi bên gọi tiêu thụ nó.** Phân giải registry của chủ sở hữu, generation và bằng
    chứng health của nó. Không tính lại gì cả: fingerprint của `endpointBinding` hoặc khớp phép chiếu
    đóng `workspace-route-port-projection`, hoặc là `ENDPOINT_AUTHORITY_STALE`. Chỉ chấp nhận giá trị

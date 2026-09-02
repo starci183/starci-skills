@@ -70,6 +70,18 @@ export const validateOutput = validatorFor(new URL('./output.schema.json', impor
       errors.push('a sibling checkout must report its relative directory');
     }
 
+    // The businesses root is derived from the checkout, never typed by a caller: on a source checkout
+    // it is <gitRoot>/.worktrees/businesses when that worktree exists, otherwise null; a sibling
+    // checkout carries no business authority. business.decide copies this value.
+    const derivedBusinesses = `${checkout.gitRoot.replace(/[\\/]+$/, '')}/.worktrees/businesses`;
+    const { businesses } = route.authorityRoots;
+    if (checkout.repositoryKind === 'sibling' && businesses !== null) {
+      errors.push('a sibling checkout carries no business authority root');
+    }
+    if (businesses !== null && businesses !== derivedBusinesses) {
+      errors.push(`authorityRoots.businesses must be derived from the checkout as ${derivedBusinesses}`);
+    }
+
     // Mutation is ready only on the declared mutation branch. Reporting readiness anywhere else
     // is how a task branch acquires permission it was never routed.
     if (mutationReadiness === 'ready' && checkout.branch !== gitPolicy.mutationBranch) {

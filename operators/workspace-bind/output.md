@@ -27,6 +27,7 @@ nothing about the product, and it carries no verdict, score, or pass claim.
 | `gitPolicy` | The routed worktree policy and the declared mutation branch. |
 | `mutationReadiness` | `ready` only on the mutation branch; `read-only` otherwise. |
 | `writeRoots` | The only paths later work may write. |
+| `authorityRoots` | `businesses`: the business authority root derived from the checkout, or null. `business.decide` copies it as its `businessesRootRef`. |
 | `runtime` | The owner's endpoints, consumed as `consumer`, or null. |
 | `provenanceHeadRef` | The redacted conversation head, or null. |
 

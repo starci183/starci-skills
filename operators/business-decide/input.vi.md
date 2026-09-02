@@ -23,6 +23,8 @@ thái hiện tại. `context.sourceRefs` phải chứa backend source đã route
 ## Ranh giới quyết định
 
 - `input.project` ràng backend source đã xác minh và gốc thẩm quyền duy nhất mà lần gọi này được ghi.
+  `businessesRootRef` được chép từ `route.authorityRoots.businesses` trong receipt của `workspace.bind`;
+  giá trị do bên gọi gõ tay không có thẩm quyền.
 - `input.objective` nêu tham chiếu mục tiêu, đúng một `featureId`, và ý định: `create`, `revise`,
   `reconcile` hoặc `retire`.
 - `input.publication` nêu trạng thái đích và tham chiếu head. Head phải đúng bằng

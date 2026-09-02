@@ -100,6 +100,7 @@
         "gitPolicy",
         "mutationReadiness",
         "writeRoots",
+        "authorityRoots",
         "runtime",
         "provenanceHeadRef"
       ],
@@ -140,6 +141,16 @@
         },
         "mutationReadiness": { "enum": ["ready", "read-only"] },
         "writeRoots": { "$ref": "#/$defs/nonEmptyRefArray" },
+        "authorityRoots": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["businesses"],
+          "properties": {
+            "businesses": {
+              "oneOf": [{ "type": "string", "pattern": "\\.worktrees/businesses$" }, { "type": "null" }]
+            }
+          }
+        },
         "runtime": { "oneOf": [{ "$ref": "#/$defs/runtimeConsumption" }, { "type": "null" }] },
         "provenanceHeadRef": {
           "oneOf": [{ "type": "string", "minLength": 1 }, { "type": "null" }]
