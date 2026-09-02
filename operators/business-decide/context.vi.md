@@ -15,7 +15,7 @@ dựa trên source thì ràng thêm cả source head đã quan sát được.
 | --- | --- | --- |
 | Evidence index | Tập claim đã chuẩn hoá cho mục tiêu này và fingerprint đóng băng nó. | Bắt buộc. Nơi duy nhất một claim được phép đến từ. |
 | Claim | Một quan sát đã tách bạch: fact, intent, example, unknown hay contradiction, có trích vai trò, đường dẫn, khoảng dòng và head. | Bắt buộc. Chỉ fact mới gánh được sự thực thi. |
-| Gốc thẩm quyền nghiệp vụ | Gốc phẳng `.worktrees/businesses/` cùng mọi feature head đã publish và trạng thái của chúng. | Bắt buộc. Quyết định chuyển trạng thái nào là hợp lệ. |
+| Gốc thẩm quyền nghiệp vụ | Gốc `.worktrees/businesses/`: các head `features/<featureId>/`, chỉ mục head `business-registry-v1.json`, và kho nội dung `objects/sha256/`. | Bắt buộc. Quyết định chuyển trạng thái nào là hợp lệ. |
 | Backend source | Checkout đã route và head của nó. | Bằng chứng rằng mọi claim và consumer thuộc về source đã đóng băng. |
 | Tham chiếu kiến trúc | Các quyết định ranh giới và quyền sở hữu đã duyệt mà lời hứa phải tôn trọng. | Bằng chứng. Không bao giờ là nguồn hành vi nghiệp vụ. |
 
@@ -42,12 +42,17 @@ claim loại `fact`, và mọi claim `fact` phải ràng source head đã quan s
 
 ## Ranh giới thẩm quyền
 
-Head nghiệp vụ được publish dưới gốc phẳng `.worktrees/businesses/` của backend dự án. Một feature sở
-hữu đúng một head, tên là `<businessesRootRef>/<featureId>`.
+Head nghiệp vụ được publish dưới gốc `.worktrees/businesses/` của backend dự án, vốn là một git
+worktree riêng. Một feature sở hữu đúng một thư mục head, `<businessesRootRef>/features/<featureId>`,
+mà `model.json` trong đó là head. `business-registry-v1.json` ở gốc lập chỉ mục mọi feature head theo
+địa chỉ nội dung cùng `authorityStatus`, `baseHead`, `previousHead` và các head source đã bind;
+`objects/sha256/<hash>.json` giữ từng phiên bản đã publish; `history/by-id.json` giữ phả hệ. Fingerprint
+của một head là địa chỉ nội dung của nó, nên thẩm quyền bind được ngay cả trước khi commit của worktree
+hạ cánh.
 
-Gốc này phẳng có chủ đích. Một đoạn tên dự án chèn xuống dưới nó sẽ mở ra một cây thẩm quyền thứ hai mà
-người đọc về sau không bao giờ tìm thấy, nên operator từ chối mọi head không nằm đúng một đoạn bên dưới
-gốc. Runtime Source giữ `<Source>/.workspaces/` của riêng nó; đường dẫn đó không bao giờ là gốc thẩm
+`features/` là đoạn duy nhất giữa gốc và một feature. Một đoạn tên dự án chèn xuống dưới gốc sẽ mở ra
+một cây thẩm quyền thứ hai mà người đọc về sau không bao giờ tìm thấy, nên operator từ chối mọi head
+không đúng bằng `features/<featureId>`. Runtime Source giữ `<Source>/.workspaces/` của riêng nó; đường dẫn đó không bao giờ là gốc thẩm
 quyền nghiệp vụ.
 
 ## Ranh giới

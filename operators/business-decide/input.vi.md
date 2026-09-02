@@ -26,7 +26,7 @@ thái hiện tại. `context.sourceRefs` phải chứa backend source đã route
 - `input.objective` nêu tham chiếu mục tiêu, đúng một `featureId`, và ý định: `create`, `revise`,
   `reconcile` hoặc `retire`.
 - `input.publication` nêu trạng thái đích và tham chiếu head. Head phải đúng bằng
-  `<businessesRootRef>/<featureId>`. `approvalRef` là phê duyệt của chủ sở hữu khi bước chuyển cần nó.
+  `<businessesRootRef>/features/<featureId>`. `approvalRef` là phê duyệt của chủ sở hữu khi bước chuyển cần nó.
 
 Ý định `retire` chỉ được nhắm tới `rejected`. Một publication `pending` bị từ chối khi đã tồn tại một
 head sống ở bất kỳ trạng thái nào khác `rejected`, vì pending sẽ ghi đè lên thẩm quyền đã publish. Mọi

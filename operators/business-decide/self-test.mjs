@@ -8,7 +8,7 @@ const observedAt = '2026-09-02T00:00:00.000Z';
 const backendSource = 'source://starci-academy-be';
 const businessesRoot = '.worktrees/businesses';
 const featureId = 'pro-full-access';
-const headRef = `${businessesRoot}/${featureId}`;
+const headRef = `${businessesRoot}/features/${featureId}`;
 const matrixRef = `${headRef}/coverage-matrix.json`;
 const evidenceRefs = ['business://evidence/pro-full-access', backendSource, 'architecture://entitlement-boundary'];
 const contextRef = (ref, head = null) => ({ ref, fingerprint: hash, sourceHead: head, observedAt });
@@ -293,7 +293,7 @@ assert.equal(validateInput(unboundClaim).valid, false);
 
 // The businesses root is flat. A project segment below it starts a second authority tree.
 const nestedHead = structuredClone(validInput);
-nestedHead.input.publication.headRef = `${businessesRoot}/starci-academy/${featureId}`;
+nestedHead.input.publication.headRef = `${businessesRoot}/starci-academy/features/${featureId}`;
 assert.equal(validateInput(nestedHead).valid, false);
 
 // Publishing pending over a live in-progress head silently discards published authority.
@@ -391,7 +391,7 @@ assert.ok(missingResult.errors.some((error) => error.includes('legacy-read') && 
 
 // A head one segment deeper than the flat root hides authority from every later reader.
 const nestedPublishedHead = structuredClone(validPublishedOutput);
-nestedPublishedHead.output.receipt.decision.headRef = `${businessesRoot}/starci-academy/${featureId}`;
+nestedPublishedHead.output.receipt.decision.headRef = `${businessesRoot}/starci-academy/features/${featureId}`;
 nestedPublishedHead.output.artifactRefs = [nestedPublishedHead.output.receipt.decision.headRef, matrixRef];
 const nestedHeadResult = validateOutput(nestedPublishedHead);
 assert.equal(nestedHeadResult.valid, false);

@@ -67,7 +67,7 @@ publishing the same promise again after the consumer is disposed is the correct 
 - `outcome="blocked"` requires `receipt.status="blocked"`, a null decision, a typed failure, and a null
   `coverageFingerprint`. A retryable failure requires a resume; a non-retryable failure forbids one.
 - `receipt.evidenceRefs` and `output.evidenceRefs` are the same set.
-- The head is exactly `<businessesRootRef>/<featureId>`, is registered in `artifactRefs`, and every
+- The head is exactly `<businessesRootRef>/features/<featureId>`, is registered in `artifactRefs`, and every
   artifact reference stays under the businesses root.
 - `binding.featureId`, `binding.targetState`, and `binding.coverageFingerprint` equal the decision's
   feature, state, and matrix fingerprint.

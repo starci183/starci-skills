@@ -33,7 +33,7 @@ Missing substance is reported as a failure and returned to its owner.
 ## Execution sequence
 
 1. **Validate input and resume.** Apply `input.schema.json` and semantic validation. Reject stale
-   source binding, unbound claim citations, a head that is not one flat segment below the businesses
+   source binding, unbound claim citations, a head that is not `features/<featureId>` below the businesses
    root, a duplicate consumer, an illegal target state for the observed head, and unchanged progress.
 2. **Normalize the evidence.** Separate every claim into fact, intent, example, unknown, or
    contradiction, each cited by role, path, line range, and head. An unresolved contradiction stops
@@ -55,8 +55,9 @@ Missing substance is reported as a failure and returned to its owner.
 7. **Reconcile when the target is implemented.** Compare delivered source against the frozen matrix.
    Any discrepancy stops the invocation with `RECONCILIATION_DISCREPANCY`; `implemented` is never
    published on the strength of a plan.
-8. **Publish one head.** Write the feature head at `<businessesRootRef>/<featureId>` with its
-   lineage, then register the head and the matrix in `artifactRefs`. Rejection preserves lineage by
+8. **Publish one head.** Write `model.json` at `<businessesRootRef>/features/<featureId>`, store the
+   version under `objects/sha256/`, update `business-registry-v1.json` and `history/by-id.json`, then
+   register the head and the matrix in `artifactRefs`. Rejection preserves lineage by
    naming the previous head rather than erasing it.
 9. **Emit and stop.** Return one output conforming to `output.schema.json` with every fingerprint
    bound. Do not claim implementation, quality, or UAT proof.

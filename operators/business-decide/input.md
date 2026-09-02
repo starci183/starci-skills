@@ -27,7 +27,7 @@ equal `input.project.sourceHead`. `context.architectureRefs` is evidence and may
 - `input.objective` names the objective reference, the single `featureId`, and the intent: `create`,
   `revise`, `reconcile`, or `retire`.
 - `input.publication` names the target state and the head reference. The head must be exactly
-  `<businessesRootRef>/<featureId>`. `approvalRef` is the owner approval when the transition needs one.
+  `<businessesRootRef>/features/<featureId>`. `approvalRef` is the owner approval when the transition needs one.
 
 A `retire` intent may only target `rejected`. A `pending` publication is refused when a live head
 already exists in any state other than `rejected`, because pending would overwrite published

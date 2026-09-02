@@ -91,9 +91,9 @@ export const validateOutput = validatorFor(new URL('./output.schema.json', impor
   // Authority boundary. The head is one flat segment below the businesses root, and every artifact
   // this operator writes stays inside that root.
   const root = binding.businessesRootRef.replace(/[\\/]+$/, '');
-  const expectedHeadRef = `${root}/${decision.featureId}`;
+  const expectedHeadRef = `${root}/features/${decision.featureId}`;
   if (decision.headRef !== expectedHeadRef) {
-    errors.push(`head ${decision.headRef} must be exactly ${expectedHeadRef}, with no project segment below the businesses root`);
+    errors.push(`head ${decision.headRef} must be exactly ${expectedHeadRef}: the feature directory, with no project segment below the businesses root`);
   }
   if (!artifactRefs.includes(decision.headRef)) {
     errors.push('artifactRefs must register the published feature head');

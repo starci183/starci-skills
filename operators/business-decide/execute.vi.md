@@ -36,7 +36,7 @@ Phần vật liệu còn thiếu được báo cáo như một failure và trả
 ## Trình tự thực thi
 
 1. **Kiểm tra input và resume.** Áp `input.schema.json` và kiểm tra ngữ nghĩa. Từ chối binding source
-   đã cũ, claim trích tới source không được bind, head không nằm đúng một đoạn phẳng dưới gốc
+   đã cũ, claim trích tới source không được bind, head không đúng bằng `features/<featureId>` dưới gốc
    businesses, consumer trùng, trạng thái đích không hợp lệ với head quan sát được, và tiến độ không
    đổi.
 2. **Chuẩn hoá bằng chứng.** Tách mỗi claim thành fact, intent, example, unknown hay contradiction,
@@ -59,8 +59,9 @@ Phần vật liệu còn thiếu được báo cáo như một failure và trả
 7. **Đối chiếu khi đích là implemented.** So source đã giao với ma trận đã đóng băng. Mọi sai lệch làm
    lần gọi dừng với `RECONCILIATION_DISCREPANCY`; `implemented` không bao giờ được publish dựa trên
    một bản kế hoạch.
-8. **Publish đúng một head.** Ghi feature head tại `<businessesRootRef>/<featureId>` cùng phả hệ của
-   nó, rồi đăng ký head và ma trận vào `artifactRefs`. Việc từ chối giữ lại phả hệ bằng cách gọi tên
+8. **Publish đúng một head.** Ghi `model.json` tại `<businessesRootRef>/features/<featureId>`, lưu
+   phiên bản dưới `objects/sha256/`, cập nhật `business-registry-v1.json` và `history/by-id.json`, rồi
+   đăng ký head và ma trận vào `artifactRefs`. Việc từ chối giữ lại phả hệ bằng cách gọi tên
    head trước đó thay vì xoá nó đi.
 9. **Phát ra và dừng.** Trả về một output đúng `output.schema.json` với mọi fingerprint đã ràng. Không
    khẳng định bằng chứng hiện thực, chất lượng hay UAT.

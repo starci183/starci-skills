@@ -15,7 +15,7 @@ observations additionally bind the observed source head.
 | --- | --- | --- |
 | Evidence index | The normalized claim set for this objective and the fingerprint that freezes it. | Required. The only place a claim may come from. |
 | Claim | One separated observation: fact, intent, example, unknown, or contradiction, cited by role, path, line range, and head. | Required. Only a fact may carry enforcement. |
-| Business authority root | The flat `.worktrees/businesses/` root and every published feature head with its state. | Required. Decides which lifecycle transition is legal. |
+| Business authority root | The `.worktrees/businesses/` root: `features/<featureId>/` heads, the `business-registry-v1.json` head index, and the `objects/sha256/` content store. | Required. Decides which lifecycle transition is legal. |
 | Backend source | The routed checkout and its head. | Evidence that every claim and consumer belongs to the frozen source. |
 | Architecture reference | Approved boundary and ownership decisions the promise must respect. | Evidence. Never a source of business behaviour. |
 
@@ -42,12 +42,17 @@ every `fact` claim must bind the observed source head.
 
 ## Authority boundary
 
-Business heads are published under the project backend's flat `.worktrees/businesses/` root. One
-feature owns exactly one head, named `<businessesRootRef>/<featureId>`.
+Business heads are published under the project backend's `.worktrees/businesses/` root, which is
+its own git worktree. One feature owns exactly one head directory, `<businessesRootRef>/features/<featureId>`,
+whose `model.json` is the head. `business-registry-v1.json` at the root indexes every feature head by
+content address with its `authorityStatus`, `baseHead`, `previousHead`, and bound source heads;
+`objects/sha256/<hash>.json` keeps each published version; `history/by-id.json` keeps lineage. A head's
+fingerprint is its content address, so authority binds even before the worktree commit lands.
 
-The root is flat on purpose. A project segment inserted below it starts a second authority tree that
-later readers never find, so the operator rejects any head that is not exactly one segment deep. The
-runtime Source keeps its own `<Source>/.workspaces/`; that path is never a business authority root.
+`features/` is the only segment between the root and a feature. A project segment inserted below the
+root starts a second authority tree that later readers never find, so the operator rejects any head
+that is not exactly `features/<featureId>`. The runtime Source keeps its own `<Source>/.workspaces/`;
+that path is never a business authority root.
 
 ## Boundary
 

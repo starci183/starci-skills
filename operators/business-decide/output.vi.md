@@ -69,7 +69,7 @@ nghiệp vụ, và publish lại cùng lời hứa sau khi consumer được đ�
   `coverageFingerprint` null. Failure lặp lại được thì cần resume; failure không lặp lại được thì cấm
   có resume.
 - `receipt.evidenceRefs` và `output.evidenceRefs` là cùng một tập.
-- Head đúng bằng `<businessesRootRef>/<featureId>`, được đăng ký trong `artifactRefs`, và mọi tham
+- Head đúng bằng `<businessesRootRef>/features/<featureId>`, được đăng ký trong `artifactRefs`, và mọi tham
   chiếu artifact đều nằm dưới gốc businesses.
 - `binding.featureId`, `binding.targetState` và `binding.coverageFingerprint` bằng đúng feature, trạng
   thái và fingerprint ma trận của quyết định.

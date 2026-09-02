@@ -12,9 +12,10 @@ export const validateInput = validatorFor(new URL('./input.schema.json', import.
   if (authority.businessesRootRef !== project.businessesRootRef) {
     errors.push('context.authority.businessesRootRef must equal input.project.businessesRootRef');
   }
-  const expectedHeadRef = `${project.businessesRootRef}/${objective.featureId}`;
+  // The root stores one directory per feature under features/, indexed by business-registry-v1.json.
+  const expectedHeadRef = `${project.businessesRootRef}/features/${objective.featureId}`;
   if (publication.headRef !== expectedHeadRef) {
-    errors.push(`publication.headRef must be exactly ${expectedHeadRef}, one flat segment below the businesses root`);
+    errors.push(`publication.headRef must be exactly ${expectedHeadRef}, the feature directory below the businesses root`);
   }
 
   const boundSources = new Set(sourceRefs.map((item) => item.ref));
