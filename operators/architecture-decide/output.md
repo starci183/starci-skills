@@ -46,7 +46,8 @@ how a store ends up with no real owner at all.
 
 ## Independent critique
 
-The critique is written by a reviewer other than the deciding author, and it attacks the alternative
+The critique is a fresh execution on this operator's own profile with no inherited turns, given only
+the artifacts and the claims they make and never the author's rationale. It attacks the alternative
 that was actually selected under all eight adverse paths: partial failure, retry and idempotency,
 concurrency, stale state, deletion, recovery, dependency outage, and rollback.
 
@@ -104,7 +105,7 @@ again after the choice is bound is the correct next step.
   forbids it; a boundary owning data owns a store, and one owning no data owns none.
 - Every stack component identifier is unique; none is justified by incumbency; a retained component is
   verified across all five compatibility axes with evidence; a removed component carries no verdict.
-- The critique reviewer differs from the decision author, every attack names a known alternative, and
+- The critique carries its own execution reference rather than the author's, every attack names a known alternative, and
   all eight adverse paths attack the selected alternative.
 - A `CHOICE_REQUIRED` failure names at least one surviving candidate in `resume.candidateAlternativeIds`.
 - No affected contract reference names an implementation file.

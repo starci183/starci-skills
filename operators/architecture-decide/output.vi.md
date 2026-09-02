@@ -45,8 +45,9 @@ biện minh chính là cách một kho rốt cuộc không còn chủ thật nà
 
 ## Phản biện độc lập
 
-Bản phản biện do một người rà soát khác với tác giả quyết định viết, và nó tấn công đúng phương án đã
-được chọn dưới cả tám đường bất lợi: lỗi bộ phận, thử lại và tính bất biến khi lặp, tương tranh, trạng
+Bản phản biện là một lần thực thi mới trên đúng profile của operator này, không thừa hưởng lượt nào,
+chỉ được đưa các artifact cùng những khẳng định trong đó và không bao giờ được đưa lý lẽ của tác giả.
+Nó tấn công đúng phương án đã được chọn dưới cả tám đường bất lợi: lỗi bộ phận, thử lại và tính bất biến khi lặp, tương tranh, trạng
 thái cũ, xoá, phục hồi, phụ thuộc ngoài chết, và quay lui.
 
 Các đòn nhắm vào những phương án đã bị bác được chấp nhận như bối cảnh nhưng không thoả yêu cầu. Kể lại
@@ -105,7 +106,7 @@ lựa chọn được bind là bước tiếp theo đúng đắn.
 - Mọi mã thành phần stack là duy nhất; không cái nào được biện minh bằng sự tồn tại sẵn; thành phần giữ
   lại đã được kiểm chứng trên cả năm trục tương thích kèm bằng chứng; thành phần bị gỡ không mang phán
   quyết nào.
-- Người rà soát khác tác giả quyết định, mọi đòn tấn công gọi tên một phương án đã biết, và cả tám
+- Bản phản biện mang tham chiếu thực thi của riêng nó chứ không phải của tác giả, mọi đòn tấn công gọi tên một phương án đã biết, và cả tám
   đường bất lợi đều tấn công phương án được chọn.
 - Một thất bại `CHOICE_REQUIRED` gọi tên ít nhất một ứng viên còn sống trong `resume.candidateAlternativeIds`.
 - Không tham chiếu hợp đồng bị ảnh hưởng nào gọi tên một file hiện thực.
