@@ -11,11 +11,30 @@
       "resolvesTo": "<checkout:project/role>",
       "scheme": "source://<repository>",
       "bind": "fingerprint + sourceHead (git rev-parse HEAD of the checkout)",
+      "writers": [],
+      "purpose": "A routed repository checkout named by explicit project and role. Use it only for a cross-project read; the checkouts of the bound project are @fe and @be. Observation is evidence discovery, never permission to mutate."
+    },
+    "@fe": {
+      "params": [],
+      "kind": "checkout",
+      "resolvesTo": "<checkout:input.project.id/fe>  (the frontend checkout of the project this invocation binds)",
+      "scheme": "source://<repository>",
+      "bind": "fingerprint + sourceHead (git rev-parse HEAD of the checkout)",
       "writers": [
-        "backend.implement",
         "fe.source.apply"
       ],
-      "purpose": "The routed repository checkout. Observation is evidence discovery, never permission to mutate."
+      "purpose": "The routed frontend checkout of the bound project."
+    },
+    "@be": {
+      "params": [],
+      "kind": "checkout",
+      "resolvesTo": "<checkout:input.project.id/be>  (the backend checkout of the project this invocation binds)",
+      "scheme": "source://<repository>",
+      "bind": "fingerprint + sourceHead (git rev-parse HEAD of the checkout)",
+      "writers": [
+        "backend.implement"
+      ],
+      "purpose": "The routed backend checkout of the bound project."
     },
     "@declaration": {
       "params": [
@@ -85,14 +104,25 @@
       "writers": [],
       "purpose": "Canonical English knowledge: ui/composition, ui/presentation, ui/proof, grammars/<family>, patterns/fe, patterns/be. The .vi.md mirror is never bound."
     },
-    "@grammar": {
+    "@grammar-src": {
       "params": [],
-      "kind": "dir",
-      "resolvesTo": "<checkout:starci-academy/fe>/packages/grammar",
+      "kind": "checkout",
+      "resolvesTo": "<@fe>/packages/grammar  (the published @starci/grammar package source: renderers, props, data-contract claims, core/styles.css)",
       "scheme": "grammar://starci-core",
-      "bind": "fingerprint of packages/grammar/package.json (manifestRef) + the checkout head",
+      "bind": "fingerprint of packages/grammar/package.json + the @fe checkout head",
       "writers": [],
-      "purpose": "The published @starci/grammar package: Common renderers, props, owned relationships, and the Core family."
+      "purpose": "The Grammar as it runs. The only authority for what a component owns, what it claims, and what props exist."
+    },
+    "@grammar-law": {
+      "params": [
+        "family"
+      ],
+      "kind": "dir",
+      "resolvesTo": "<Source>/.claude/knowledge/grammars/<family>/  (the family's knowledge: family, consumption, components, states, composition, and the CORE-* anatomy topics)",
+      "scheme": "knowledge://grammars/<family>",
+      "bind": "fingerprint per file; rule inventory = every `## PREFIX-n` heading across the folder",
+      "writers": [],
+      "purpose": "How the family is meant to realize Common. Law about the Grammar, never the Grammar itself; where the two disagree, @grammar-src is the fact and @grammar-law is the finding."
     },
     "@business": {
       "params": [

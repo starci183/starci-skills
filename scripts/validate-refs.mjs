@@ -77,6 +77,28 @@ for (const { dir, manifest } of manifests) {
   if (!refs.some((r) => /^@artifacts\b/.test(r.alias) && r.required)) {
     errors.push(`${id}: @artifacts must be a required ref; it is the only place an operator writes`);
   }
+  // execute.md routes by alias: every @alias in the Sequence table's Reads/Writes cells must be a
+  // declared ref, and every required ref must be read or written by some step. A step that names a
+  // location the operator never declared is how an agent wanders outside its region.
+  for (const [file, heading] of [['execute.md', '## Sequence'], ['execute.vi.md', '## Trình tự']]) {
+    const text = await readFile(path.join(dir, file), 'utf8');
+    const lines = text.split(/\r?\n/);
+    const start = lines.findIndex((l) => l.trim() === heading);
+    if (start === -1) { errors.push(`${id}: ${file} has no ${heading} section`); continue; }
+    const used = new Set();
+    for (let i = start + 1; i < lines.length && !lines[i].startsWith('## '); i += 1) {
+      const cells = lines[i].split('|').map((c) => c.trim());
+      if (cells.length < 6 || !/^\d+$/.test(cells[1])) continue;
+      for (const cell of [cells[3], cells[4]]) for (const m of cell.matchAll(/@[a-z][a-z-]*/g)) used.add(m[0]);
+    }
+    const declaredBases = new Set(refs.map((r) => /^(@[a-z][a-z-]*)/.exec(r.alias)[1]));
+    for (const u of used) if (!declaredBases.has(u)) errors.push(`${id}: ${file} Sequence reads or writes ${u}, which operator.json does not declare`);
+    for (const r of refs) {
+      const b = /^(@[a-z][a-z-]*)/.exec(r.alias)[1];
+      if (r.required && !used.has(b)) errors.push(`${id}: ${file} Sequence never reads or writes required ${r.alias}`);
+    }
+    if (used.size === 0) errors.push(`${id}: ${file} Sequence names no alias at all`);
+  }
   for (const [file, heading] of [['context.md', '## Refs'], ['context.vi.md', '## Ref']]) {
     const text = await readFile(path.join(dir, file), 'utf8');
     const rows = tableAliases(text, heading);
