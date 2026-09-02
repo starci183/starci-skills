@@ -7,11 +7,11 @@
   "agent": {
     "profile": "operator.json → resources.profile",
     "grants": "operator.json → resources.requires, and nothing the profile would otherwise permit",
-    "refs": "operator.md → Context table (an old-shape package: operator.json → refs), resolved through alias/alias.json; an unlisted location is unreadable",
+    "refs": "operator.md → Context table, resolved through alias/alias.json; an unlisted location is unreadable",
     "requirements": "operator.md → Requirements table; the orchestrator fills defaults into request.json and asks a person only for fields whose Default is — or whose value a stop code names",
     "prompt": "rendered at dispatch from operator.md plus request.json; never stored",
     "isolation": "fresh, no inherited turns",
-    "writes": "only response/ of its own branch (step-N/parallel-M/response/); a nested-exchange agent writes only <exchange>/response/ of that branch; the old shape writes @dynamic/<file> in steps/<n>.<operator.id>/"
+    "writes": "only response/ of its own branch (step-N/parallel-M/response/); a nested-exchange agent writes only <exchange>/response/ of that branch; a source-writing operator also writes the session branch of its checkout under an exclusive lease (see sourceWrites)"
   },
   "concurrency": {
     "rule": "at most maxConcurrentAgents agents at once; branches of one step run concurrently only when their Writes touch no common alias",

@@ -1,109 +1,57 @@
-// operators/INDEX.md is generated from the operators themselves: operator.json (job, profile, refs),
-// execute.md (the Sequence table's Reads and Writes), and output.schema.json (failure codes). It is
-// the one table that says, for every operator, what it needs, what it produces, and which of those
-// things only exist inside the session. `--check` regenerates in memory and fails when the committed
-// file differs, so the matrix cannot drift from the packages it summarises.
-import { existsSync } from 'node:fs';
-import { readdir, readFile, writeFile } from 'node:fs/promises';
+// operators/INDEX.md is generated from every operator.md: the Context table (static reads), the Inputs
+// and Outputs tables (kinds that cross between branches), the Steps table (count) and the Stops table
+// (codes). It is the one table that says, for every operator, what it needs, what it produces, and who
+// consumes it. `--check` regenerates in memory and fails when the committed file differs.
+import { readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import process from 'node:process';
 import { fileURLToPath } from 'node:url';
-import { parseOperatorMd, cellCodes, kindOf } from './operator-md.mjs';
+import { loadOperatorPackages, cellCodes, cellAliases, kindOf, isYes } from './operator-md.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const operatorsDir = path.join(root, 'operators');
-const ALIAS = /@[a-z][a-z-]*(?:\/[A-Za-z0-9_<>.@#:-]+)*/g;
+const packages = (await loadOperatorPackages(root)).filter((p) => p.shape === 'v9');
+const ops = packages.map((p) => {
+  const op = p.en;
+  const reads = new Set();
+  for (const r of op.tables.context?.rows ?? []) for (const a of cellAliases(r.alias)) reads.add(a);
+  return {
+    id: p.manifest.id, job: op.job || p.manifest.job, profile: p.manifest.resources?.profile ?? '?',
+    steps: op.tables.steps?.rows.length ?? 0,
+    codes: (op.tables.stops?.rows ?? []).map((r) => cellCodes(r.code)[0] ?? r.code.trim()),
+    context: [...reads].sort(),
+    inputs: (op.tables.inputs?.rows ?? []).map((r) => ({ kind: kindOf(r.kind), required: isYes(r.required) })).filter((i) => i.kind && i.kind !== '—'),
+    outputs: (op.tables.outputs?.rows ?? []).map((r) => ({ kind: kindOf(r.kind), file: r.file.replace(/`/g, ''), type: r.type.trim(), required: isYes(r.required) })),
+  };
+});
 
-function sequenceRows(text, heading) {
-  const lines = text.split(/\r?\n/);
-  const start = lines.findIndex((l) => l.trim() === heading);
-  const rows = [];
-  if (start === -1) return rows;
-  for (let i = start + 1; i < lines.length && !lines[i].startsWith('## '); i += 1) {
-    const cells = lines[i].split('|').map((c) => c.trim());
-    if (cells.length < 6 || !/^\d+$/.test(cells[1])) continue;
-    rows.push({ n: Number(cells[1]), step: cells[2], reads: cells[3], writes: cells[4], stops: cells[5] });
-  }
-  return rows;
-}
-
-const ops = [];
-for (const entry of (await readdir(operatorsDir, { withFileTypes: true })).filter((e) => e.isDirectory()).sort((a, b) => a.name.localeCompare(b.name))) {
-  const dir = path.join(operatorsDir, entry.name);
-  const manifest = JSON.parse(await readFile(path.join(dir, 'operator.json'), 'utf8'));
-  if (existsSync(path.join(dir, 'operator.md'))) {
-    // operator.md package: static reads from Steps, dynamic inputs and outputs as kinds.
-    const op = parseOperatorMd(await readFile(path.join(dir, 'operator.md'), 'utf8'), 'en');
-    const readsStatic = new Set();
-    for (const r of op.tables.steps?.rows ?? []) for (const m of r.reads.matchAll(ALIAS)) if (!m[0].startsWith('@dynamic')) readsStatic.add(m[0]);
-    ops.push({
-      id: manifest.id, dir: entry.name, job: op.job || manifest.job, profile: manifest.resources?.profile ?? '?',
-      refs: [], steps: op.tables.steps?.rows.length ?? 0, codes: (op.tables.stops?.rows ?? []).map((r) => cellCodes(r.code)[0] ?? r.code.trim()),
-      readsStatic: [...readsStatic].sort(),
-      readsDynamic: (op.tables.inputs?.rows ?? []).map((r) => kindOf(r.kind)).filter((k) => k && k !== '—').map((k) => `kind:${k}`).sort(),
-      readsOwn: [],
-      writes: (op.tables.outputs?.rows ?? []).map((r) => `kind:${kindOf(r.kind)}`).sort(),
-    });
-    continue;
-  }
-  const outSchema = JSON.parse(await readFile(path.join(dir, 'output.schema.json'), 'utf8'));
-  const codes = outSchema.$defs?.failure?.properties?.code?.enum ?? [];
-  const rows = sequenceRows(await readFile(path.join(dir, 'execute.md'), 'utf8'), '## Sequence');
-  const readsAll = new Set(); const writesAll = new Set();
-  for (const r of rows) {
-    for (const m of r.reads.matchAll(ALIAS)) readsAll.add(m[0]);
-    for (const m of r.writes.matchAll(ALIAS)) writesAll.add(m[0]);
-  }
-  const isDyn = (a) => a.startsWith('@dynamic');
-  ops.push({
-    id: manifest.id, dir: entry.name, job: manifest.job, profile: manifest.resources?.profile ?? '?',
-    refs: manifest.refs ?? [], steps: rows.length, codes,
-    readsStatic: [...readsAll].filter((a) => !isDyn(a) && !writesAll.has(a)).sort(),
-    // Own intermediate artifacts (written by an earlier step of the same operator) are not hand-offs.
-    readsDynamic: [...readsAll].filter((a) => isDyn(a) && !writesAll.has(a)).sort(),
-    readsOwn: [...readsAll].filter((a) => isDyn(a) && writesAll.has(a)).sort(),
-    writes: [...writesAll].sort(),
-  });
-}
-
-// Which operator produces each dynamic file, so a consumer's row can name its producer.
+// Who produces and who consumes each kind.
 const producers = new Map();
-for (const op of ops) for (const w of op.writes) {
-  if (w.startsWith('@dynamic/')) producers.set(w, [...(producers.get(w) ?? []), op.id]);
-  else if (w.startsWith('kind:')) {
-    producers.set(w, [...(producers.get(w) ?? []), op.id]);
-    // Migration bridge: an old-shape consumer reads @dynamic/<kind>.json; the operator.md producer of kind:<kind> satisfies it.
-    const bridge = `@dynamic/${w.slice('kind:'.length)}.json`;
-    producers.set(bridge, [...(producers.get(bridge) ?? []), op.id]);
-  }
-}
+for (const op of ops) for (const o of op.outputs) producers.set(o.kind, [...(producers.get(o.kind) ?? []), op.id]);
+const consumers = new Map();
+for (const op of ops) for (const i of op.inputs) consumers.set(i.kind, [...(consumers.get(i.kind) ?? []), `${op.id}${i.required ? '' : ' (optional)'}`]);
 
 const code = (s) => `\`${s}\``;
 const list = (arr) => (arr.length ? arr.map(code).join(', ') : '—');
-const stamp = `${ops.length} operators`;
 
 function render(lang) {
   const t = lang === 'en' ? {
-    title: '# Operators', intro: `Generated by \`scripts/generate-operators-index.mjs\` from every \`operator.json\`, the Sequence table of every \`execute.md\`, and every \`output.schema.json\`; \`--check\` runs inside \`npm test\`, so this table cannot drift from the packages. Static refs exist before the session; dynamic refs (\`@dynamic/<file>\`) are produced by an earlier step of the same session and disappear with it. ${stamp}.`,
-    h1: '## What each operator needs and produces', c1: '| Operator | Profile | Reads (static) | Reads (dynamic, this session) | Writes | Steps | Stop codes |',
-    h2: '## Hand-offs inside a session', c2: '| Dynamic file | Produced by | Consumed by |', intro2: 'Every file that only exists inside a session, who writes it, and who reads it next. A file with no consumer is a receipt kept for audit; a file with no producer is a defect the check reports.',
+    title: '# Operators',
+    intro: `Generated by \`scripts/generate-operators-index.mjs\` from every \`operator.md\`; \`--check\` runs inside \`npm test\`, so this table cannot drift from the packages. Context aliases exist before the session; kinds are produced inside a branch (\`step-N/parallel-M/response/\`) and handed to a later branch by an explicit path in its \`request.json\`. ${ops.length} operators.`,
+    h1: '## What each operator needs and produces', c1: '| Operator | Profile | Context | Inputs (kinds) | Outputs (kinds) | Steps | Stop codes |',
+    h2: '## Hand-offs between branches', c2: '| Kind | Produced by | Consumed by |', intro2: 'Every kind that crosses between operators, who writes it, and who reads it. A kind with no consumer is kept for audit or for a person; a kind with no producer is a defect this check reports.',
     h3: '## Jobs', c3: '| Operator | Single job |',
   } : {
-    title: '# Các operator', intro: `Sinh bởi \`scripts/generate-operators-index.mjs\` từ mọi \`operator.json\`, bảng Trình tự của mọi \`execute.md\` và mọi \`output.schema.json\`; \`--check\` chạy trong \`npm test\`, nên bảng này không thể lệch với các gói. Ref tĩnh có trước phiên; ref động (\`@dynamic/<file>\`) do một bước trước đó trong cùng phiên sinh ra và biến mất cùng phiên. ${stamp}.`,
-    h1: '## Mỗi operator cần gì và tạo ra gì', c1: '| Operator | Profile | Đọc (tĩnh) | Đọc (động, trong phiên) | Ghi | Số bước | Mã dừng |',
-    h2: '## Bàn giao trong một phiên', c2: '| File động | Do bước nào sinh | Bước nào tiêu thụ |', intro2: 'Mọi file chỉ tồn tại trong phiên, ai ghi nó, ai đọc nó kế tiếp. File không có người tiêu thụ là receipt giữ cho audit; file không có người sinh là lỗi mà bước kiểm sẽ báo.',
+    title: '# Các operator',
+    intro: `Sinh bởi \`scripts/generate-operators-index.mjs\` từ mọi \`operator.md\`; \`--check\` chạy trong \`npm test\`, nên bảng này không thể lệch với các gói. Alias trong Context có trước phiên; kind được sinh trong một nhánh (\`step-N/parallel-M/response/\`) và bàn giao cho nhánh sau bằng đường dẫn tường minh trong \`request.json\` của nhánh đó. ${ops.length} operator.`,
+    h1: '## Mỗi operator cần gì và tạo ra gì', c1: '| Operator | Profile | Context | Đầu vào (kind) | Đầu ra (kind) | Số bước | Mã dừng |',
+    h2: '## Bàn giao giữa các nhánh', c2: '| Kind | Do ai sinh | Ai tiêu thụ |', intro2: 'Mọi kind đi qua giữa các operator, ai ghi nó, ai đọc nó. Kind không có người tiêu thụ là giữ cho audit hoặc cho người; kind không có người sinh là lỗi mà bước kiểm sẽ báo.',
     h3: '## Việc duy nhất', c3: '| Operator | Việc duy nhất |',
   };
   const out = [t.title, '', t.intro, '', t.h1, '', t.c1, '| --- | --- | --- | --- | --- | --- | --- |'];
-  for (const op of ops) out.push(`| ${code(op.id)} | ${code(op.profile)} | ${list(op.readsStatic)} | ${list(op.readsDynamic)} | ${list(op.writes)} | ${op.steps} | ${list(op.codes)} |`);
+  for (const op of ops) out.push(`| ${code(op.id)} | ${code(op.profile)} | ${list(op.context)} | ${list(op.inputs.map((i) => i.kind))} | ${list(op.outputs.map((o) => o.kind))} | ${op.steps} | ${list(op.codes)} |`);
   out.push('', t.h2, '', t.intro2, '', t.c2, '| --- | --- | --- |');
-  const dynFiles = new Set([...producers.keys(), ...ops.flatMap((o) => o.readsDynamic)]);
-  for (const f of [...dynFiles].sort()) {
-    const by = producers.get(f) ?? [];
-    const consumers = ops.filter((o) => !by.includes(o.id) && o.readsDynamic.some((r) => r === f)).map((o) => o.id);
-    if (by.length && !consumers.length && !f.endsWith('.json')) continue; // an operator's own intermediate artifact, not a hand-off
-    out.push(`| ${code(f)} | ${list(by)} | ${list(consumers)} |`);
-  }
+  const kinds = new Set([...producers.keys(), ...consumers.keys()]);
+  for (const k of [...kinds].sort()) out.push(`| ${code(k)} | ${list(producers.get(k) ?? [])} | ${list(consumers.get(k) ?? [])} |`);
   out.push('', t.h3, '', t.c3, '| --- | --- |');
   for (const op of ops) out.push(`| ${code(op.id)} | ${op.job} |`);
   return `${out.join('\n')}\n`;
@@ -119,12 +67,10 @@ for (const [rel, lang] of targets) {
     let current = '';
     try { current = (await readFile(file, 'utf8')).replace(/\r\n/g, '\n'); } catch { current = ''; }
     if (current !== next) { drift += 1; process.stderr.write(`${rel}: out of date; run node scripts/generate-operators-index.mjs\n`); }
-  } else {
-    await writeFile(file, next);
-  }
+  } else await writeFile(file, next);
 }
-// A dynamic file somebody reads but nobody in the tree produces is a broken hand-off.
-const orphans = [...new Set(ops.flatMap((o) => o.readsDynamic))].filter((f) => !producers.has(f) && !f.includes('<receiptType>'));
-if (orphans.length) { process.stderr.write(`dynamic files read but produced by no operator: ${orphans.join(', ')}\n`); drift += 1; }
+// A kind somebody consumes but nobody produces is a broken hand-off.
+const orphans = [...consumers.keys()].filter((k) => !producers.has(k));
+if (orphans.length) { process.stderr.write(`kinds consumed but produced by no operator: ${orphans.join(', ')}\n`); drift += 1; }
 if (drift) process.exitCode = 1;
-else process.stdout.write(`${check ? 'operators index current' : 'operators index written'}: ${ops.length} operators, ${producers.size} dynamic files\n`);
+else process.stdout.write(`${check ? 'operators index current' : 'operators index written'}: ${ops.length} operators, ${producers.size} kinds\n`);
