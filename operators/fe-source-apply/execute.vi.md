@@ -43,15 +43,15 @@ fingerprint của nó được bind lại.
 
 | # | Bước | Đọc | Ghi | Dừng với |
 | --- | --- | --- | --- | --- |
-| 1 | Validate input và resume | input, receipt trước đó, binding source đã đóng băng | — | `INVALID_INPUT`, `SOURCE_DRIFT`, `NO_PROGRESS` |
-| 2 | Bind authority | resolution receipt kèm fingerprint, danh sách class và danh sách rule; cây đã resolve; source head đã route; write set đã khai kèm các gốc owner | — | `RESOLUTION_STALE`, `OWNER_CONFLICT` |
-| 3 | Xác nhận head | checkout quan sát được tại route đang dùng | — | — |
-| 4 | Fingerprint trước | mọi đường đã khai mà đang tồn tại | — | — |
-| 5 | Chiếu cây đã resolve lên các đường đã khai | cây đã resolve, các đường đã khai | — | — |
-| 6 | Đối chiếu mọi giá trị sinh ra với danh sách | bản chiếu, danh sách class và rule đã đóng băng | — | `WRITE_REJECTED` |
-| 7 | Ghi, rồi fingerprint sau | bản chiếu, nội dung hiện tại của từng đường | `<đường trong write set>` | — |
-| 8 | Báo cáo mọi đường đã khai | write set, kết quả từng lần ghi | — | — |
-| 9 | Phát ra rồi dừng | tất cả những gì ở trên | `application-receipt.json` | — |
+| 1 | Validate input và resume | input, `@receipt/fe-presentation-resolution/<invocationId>`, `@fe` (binding head đã đóng băng) | — | `INVALID_INPUT`, `SOURCE_DRIFT`, `NO_PROGRESS` |
+| 2 | Bind authority | `@receipt/fe-presentation-resolution/<invocationId>` (fingerprint, danh sách `classNames`, danh sách rule, cây đã resolve), `@fe` (source head đã route, write set đã khai kèm các gốc owner), `@receipt/fe-direction-decision/<invocationId>` (ý đồ) | — | `RESOLUTION_STALE`, `OWNER_CONFLICT` |
+| 3 | Xác nhận head | `@fe` (checkout quan sát được tại route đang dùng) | — | — |
+| 4 | Fingerprint trước | `@fe` (mọi đường đã khai mà đang tồn tại) | — | — |
+| 5 | Chiếu cây đã resolve lên các đường đã khai | `@receipt/fe-presentation-resolution/<invocationId>` (cây đã resolve), `@fe` (các đường đã khai) | — | — |
+| 6 | Đối chiếu mọi giá trị sinh ra với danh sách | `@receipt/fe-presentation-resolution/<invocationId>` (danh sách class và rule đã đóng băng) | — | `WRITE_REJECTED` |
+| 7 | Ghi, rồi fingerprint sau | `@fe` (nội dung hiện tại của từng đường) | `@fe` (`<đường trong write set>`) | — |
+| 8 | Báo cáo mọi đường đã khai | `@fe` (write set và kết quả từng lần ghi) | — | — |
+| 9 | Phát ra rồi dừng | tất cả những gì ở trên | `@artifacts/application-receipt.json` | — |
 
 Khâu validate từ chối binding source cũ, resolution được nêu tên nhưng không được bind, owner chồng
 lấn, đường dẫn trùng, đường nằm ngoài gốc owner của nó, và tiến độ không đổi. Head được quan sát lại ở
