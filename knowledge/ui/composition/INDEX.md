@@ -22,14 +22,18 @@ value, which is exactly why it is decided first.
 
 | Knowledge | What it decides | Rules |
 | --- | --- | --- |
-| [Layout](layout.md) | Which visible task regions exist, who owns their tracks and scrolling | LAYOUT-1 to LAYOUT-5 |
+| [Layout](layout.md) | Which visible task regions exist, who owns their tracks and scrolling | LAYOUT-1 to LAYOUT-4 |
 | [Hierarchy](hierarchy.md) | Which information rank each piece of meaning receives | HIERARCHY-1 to HIERARCHY-5 |
-| [Responsive](responsive.md) | What survives as space changes, and which query owns the change | RESPONSIVE-1 to RESPONSIVE-5 |
+| [Responsive](responsive.md) | What survives as space changes, and which query owns the change | RESPONSIVE-1 to RESPONSIVE-4 |
 | [CTA](cta.md) | Which action carries the decision, and what its emphasis promises | CTA-1 to CTA-5 |
-| [Action](action.md) | What one activation does, and who owns the effect and the pending state | ACTION-1 to ACTION-4 |
+| [Action](action.md) | What one activation does, and who owns the effect and the pending state | ACTION-1 to ACTION-3 |
 | [State](state.md) | Which conditions exist, and which published carrier holds each one | STATE-1 to STATE-7 |
-| [Feedback](feedback.md) | Who reports a failure, a correction, a recovery, and a result | FEEDBACK-1 to FEEDBACK-4 |
+| [Feedback](feedback.md) | Who reports a failure, a correction, a recovery, and a result | FEEDBACK-1 to FEEDBACK-3 |
 | [Accent](accent.md) | Where the scarce strongest emphasis is spent | ACCENT-1 to ACCENT-5 |
+| [Coverage](coverage.md) | What the direction receipt must enumerate before it is emitted | COVERAGE-1 |
+
+Five per-topic coverage rules were merged into COVERAGE-1, and a retired address is never reused:
+retired are `ACTION-4`, `STATE-4`, `FEEDBACK-4`, `LAYOUT-5`, and `RESPONSIVE-5`.
 
 ## Rule shape
 
@@ -38,12 +42,14 @@ topic. The number is not a severity, a component variant, or a value on a scale.
 
 Every rule carries its heading, one line naming what the rule governs, and one table:
 
-| Case | When | Decide |
+| Case | When | Assert |
 | --- | --- | --- |
-| Case 1 | The concrete situation that reaches this rule. | What the direction must settle, in language the product can read. |
+| Case 1 | The concrete situation that reaches this rule. | A falsifiable statement about the direction receipt or the composed tree, in language the product can read. |
 
-The `Decide` cell states a commitment, not a class name. It may name a published component or prop
-where that is the decision, but it never resolves a CSS value; that belongs to presentation.
+The `Assert` cell states a predicate the receipt or the composed tree either satisfies or fails, not
+advice and not a class name. It may name a published component or prop where that is what must be
+carried, but it never resolves a CSS value; that belongs to presentation. Taste and layout are
+decided in `knowledge/grammars/starci`; these rules only say what a direction must satisfy.
 
 A case that belongs to a neighbouring rule is not a table row. It goes on one line after the table,
 as `Not this rule: <condition> is PREFIX-n`. Each file closes with a

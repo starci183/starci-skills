@@ -24,14 +24,14 @@ reusable composition, not to author an application grid.
 
 Governs how many visible task regions the page carries and what justifies each one.
 
-| Case | When | Decide |
+| Case | When | Assert |
 | --- | --- | --- |
-| Case 1 | Business content has one task and no supporting material | One dominant region. A second track is added only for a named task role, never to fill whitespace |
-| Case 2 | A primary task has support the reader consults alongside it | The support is a rail, and the direction names the task role that earns it |
-| Case 3 | Routed page content needs shell chrome around it | `WorkspaceShell` owns the shell regions and which element is the main landmark |
-| Case 4 | Destinations need to be grouped and browsed | `Sidebar` owns the grouping; the direction supplies destinations and labels |
+| Case 1 | Business content has one task and no supporting material | The receipt lists exactly one dominant region, and every further region it lists carries a named task role |
+| Case 2 | A primary task has support the reader consults alongside it | The support is a rail, and the receipt names the task role that earns it |
+| Case 3 | Routed page content needs shell chrome around it | `WorkspaceShell` owns the shell regions, and exactly one element is named as the main landmark |
+| Case 4 | Destinations need to be grouped and browsed | `Sidebar` owns the grouping; the receipt supplies only destinations and labels into it |
 | Case 5 | A conversation needs a composer that stays put | `ChatWorkspace` owns the pairing of conversation and composer |
-| Case 6 | The required arrangement has no published composition | The direction stops and records the missing reusable composition |
+| Case 6 | The required arrangement has no published composition | A `GRAMMAR_REQUIRED` gap names the missing composition, and no substitute arrangement appears in the tree |
 
 Not this rule: which of several regions carries the strongest anchor is HIERARCHY-2.
 
@@ -39,13 +39,13 @@ Not this rule: which of several regions carries the strongest anchor is HIERARCH
 
 Governs which code decides a region's tracks, not which content sits inside them.
 
-| Case | When | Decide |
+| Case | When | Assert |
 | --- | --- | --- |
-| Case 1 | A primary column sits beside a support column | `PrimaryRailLayout` owns both tracks; the direction chooses `railWidth` and `align` and authors no track formula |
-| Case 2 | Shell regions and the main landmark must be named | `WorkspaceShell` owns the slots; the direction supplies `primaryLabel` |
-| Case 3 | A conversation surface needs a bounded height | `ChatWorkspace` owns it, and the host supplies the height it requires |
-| Case 4 | The direction is tempted by a vendor grid or child width arithmetic | It does not. The region either uses the published composition or the gap is recorded |
-| Case 5 | A family wants a region to look different | A family may replace a renderer compatibly; it may not change roles or the number of owners |
+| Case 1 | A primary column sits beside a support column | `PrimaryRailLayout` owns both tracks; the receipt names only `railWidth` and `align`, and no track formula appears against that region |
+| Case 2 | Shell regions and the main landmark must be named | `WorkspaceShell` owns the slots, and the receipt supplies `primaryLabel` |
+| Case 3 | A conversation surface needs a bounded height | `ChatWorkspace` owns the bound, and the host supplies the height it requires |
+| Case 4 | The direction is tempted by a vendor grid or child width arithmetic | Every region resolves to a published composition or to a recorded gap; no vendor grid and no width arithmetic owns a region |
+| Case 5 | A family wants a region to look different | The family delta replaces a renderer with compatible props only; the region's role and its number of owners are unchanged |
 
 Not this rule: how much space separates the objects inside a region is a presentation decision.
 
@@ -53,13 +53,13 @@ Not this rule: how much space separates the objects inside a region is a present
 
 Governs how many things may claim the same region or the same overflow axis.
 
-| Case | When | Decide |
+| Case | When | Assert |
 | --- | --- | --- |
-| Case 1 | Several regions coexist on one page | Each visible region has exactly one composition owner and one intended track |
-| Case 2 | Content is essentially wider than its column, such as a table | One named `HorizontalScrollRegion` owns the inline axis, and the page itself does not scroll sideways |
-| Case 3 | Block flow must be bounded inside a region | `VerticalScrollRegion isScrollable` or the exact composition owns it |
-| Case 4 | A conversation must scroll while its composer stays put | `ChatWorkspace` owns conversation scrolling and the composer is its sibling, outside that scroller |
-| Case 5 | A nested scroller is proposed | It is allowed only when the two owners carry different named axes or different named tasks |
+| Case 1 | Several regions coexist on one page | Each visible region resolves to exactly one composition owner and one intended track |
+| Case 2 | Content is essentially wider than its column, such as a table | Exactly one named `HorizontalScrollRegion` owns the inline axis, and no page-level inline scroll exists |
+| Case 3 | Block flow must be bounded inside a region | `VerticalScrollRegion isScrollable`, or the exact named composition, owns that block axis |
+| Case 4 | A conversation must scroll while its composer stays put | `ChatWorkspace` owns conversation scrolling, and the composer is its sibling outside that scroller |
+| Case 5 | A nested scroller is proposed | Each nested scroller carries a different named axis or a different named task from its ancestor |
 
 Not this rule: whether a scroll region can actually be reached and traversed by keyboard once
 rendered is FOCUS-2.
@@ -68,36 +68,24 @@ rendered is FOCUS-2.
 
 Governs sticky, fixed, drawer, floating, reordered, and conditionally absent regions.
 
-| Case | When | Decide |
+| Case | When | Assert |
 | --- | --- | --- |
-| Case 1 | A support column should stay in view while the primary column scrolls | `Rail mode="sticky"` and its published bound; below the narrow width it returns to normal flow |
-| Case 2 | An overlay needs bounded fixed geometry | `WorkspaceShell.floatingLayer` supplies geometry only. If the overlay also needs focus containment and dismissal, the direction names a modal owner or records the gap |
-| Case 3 | Compact space cannot hold the conversation rail inline | `ChatWorkspace` owns the drawer; the direction supplies `isRailOpen` and `onRailOpenChange` |
-| Case 4 | A region is absent in the current state | Absence contributes no wrapper, track, divider, rule, spacer, or reserved scroll range |
-| Case 5 | The direction wants a different visual order at one width | DOM, reading, focus, and action order stay in task order; the composition changes, not the visual order |
+| Case 1 | A support column should stay in view while the primary column scrolls | `Rail mode="sticky"` carries its published bound, and below the narrow width the region returns to normal flow |
+| Case 2 | An overlay needs bounded fixed geometry | `WorkspaceShell.floatingLayer` supplies geometry only; if focus containment and dismissal are also required, the receipt names a modal owner or records a gap |
+| Case 3 | Compact space cannot hold the conversation rail inline | `ChatWorkspace` owns the drawer, and the receipt supplies `isRailOpen` and `onRailOpenChange` |
+| Case 4 | A region is absent in the current state | No wrapper, track, divider, rule, spacer, or reserved scroll range for that region survives its absence |
+| Case 5 | The direction wants a different visual order at one width | DOM, reading, focus, and action order are identical to task order at every width; the composition differs, the order does not |
 
 Not this rule: whether the projection actually clears the content beneath it at a given viewport is
 observed by the audit operator, not settled here.
 
-## LAYOUT-5 — Coverage the direction commits to
-
-Governs which states and widths the composition promises to hold, so the audit has a fixed matrix
-rather than a guess.
-
-| Case | When | Decide |
-| --- | --- | --- |
-| Case 1 | A region's shape depends on how much content arrives | Empty, sparse, dense, and wrapped states are named as in scope |
-| Case 2 | The page carries a sticky, fixed, or drawer region | The transition widths and the terminal clearance the projection must hold are named |
-| Case 3 | A scroll owner was declared | Start, middle, and end reachability plus scroll restoration are named as in scope |
-| Case 4 | A family or the application adds a delta over the composition | Each layer is isolated separately, so a failure can be attributed |
-
-Not this rule: taking the measurements is the audit operator's work. This rule only fixes what must
-be measured.
+Retired: LAYOUT-5 is retired into COVERAGE-1 and is not reused; the address stays spent.
 
 ## What this file does not decide
 
 Which rank the content inside a region carries is [Hierarchy](hierarchy.md). How a region recomposes
 as space changes is [Responsive](responsive.md). Which action inside a region is dominant is
-[CTA](cta.md) and [Accent](accent.md). Whether the rendered result matches this direction is the
-audit operator's business, in [Focus](../proof/focus.md), [Accessibility](../proof/accessibility.md),
+[CTA](cta.md) and [Accent](accent.md). What the receipt must enumerate about these regions is
+[Coverage](coverage.md). Whether the rendered result matches this direction is the audit operator's
+business, in [Focus](../proof/focus.md), [Accessibility](../proof/accessibility.md),
 [Motion](../proof/motion.md), and [Render truth](../proof/render-truth.md).

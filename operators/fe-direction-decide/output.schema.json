@@ -275,6 +275,7 @@
             }
           }
         },
+        "coverage": { "$ref": "#/$defs/coverage" },
         "accessibilityModel": { "$ref": "#/$defs/nonEmptyTextArray" },
         "contentModel": { "$ref": "#/$defs/nonEmptyTextArray" },
         "mediaDecisions": { "$ref": "#/$defs/refArray" },
@@ -283,6 +284,80 @@
         "changedDecisions": { "$ref": "#/$defs/refArray" },
         "implementationConstraints": { "$ref": "#/$defs/nonEmptyTextArray" },
         "downstreamProofRefs": { "$ref": "#/$defs/nonEmptyRefArray" }
+      }
+    },
+    "coverage": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "actions": {
+          "type": "array",
+          "maxItems": 64,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["action", "pointerRoute", "keyboardRoute", "states"],
+            "properties": {
+              "action": { "type": "string", "minLength": 1 },
+              "pointerRoute": { "type": "string", "minLength": 1 },
+              "keyboardRoute": { "type": "string", "minLength": 1 },
+              "states": { "$ref": "#/$defs/nonEmptyTextArray" },
+              "pendingPaths": {
+                "type": "array",
+                "maxItems": 32,
+                "items": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["path", "settlement"],
+                  "properties": {
+                    "path": { "type": "string", "minLength": 1 },
+                    "settlement": { "type": "string", "minLength": 1 }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "regions": {
+          "type": "array",
+          "maxItems": 64,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["region", "idiomRef", "compositionRef"],
+            "properties": {
+              "region": { "type": "string", "pattern": "^[a-z0-9][a-z0-9-]*$" },
+              "idiomRef": { "type": "string", "minLength": 1 },
+              "compositionRef": { "type": "string", "minLength": 1 }
+            }
+          }
+        },
+        "states": {
+          "type": "array",
+          "maxItems": 64,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["meaning", "carrier"],
+            "properties": {
+              "meaning": { "type": "string", "minLength": 1 },
+              "carrier": { "type": "string", "minLength": 1 }
+            }
+          }
+        },
+        "responsive": {
+          "type": "array",
+          "maxItems": 32,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["branch", "owner"],
+            "properties": {
+              "branch": { "type": "string", "minLength": 1 },
+              "owner": { "type": "string", "minLength": 1 }
+            }
+          }
+        }
       }
     },
     "alternative": {

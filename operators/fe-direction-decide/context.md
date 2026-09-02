@@ -19,7 +19,7 @@ observed source head.
 | Backend receipt | Approved API, state, auth/session, persistence, and failure contracts consumed by the UI. | Conditional technical authority. |
 | Architecture receipt | Approved system boundary, data ownership, stack, or topology that constrains the UI. | Conditional technical authority. |
 | Published Grammar | Reusable components, compositions, tokens, states, responsive interfaces, and semantic roles. | Required reusable UI authority. |
-| Knowledge | Product-neutral UX/UI laws, accessibility guidance, direction-generation guidance, and product Grammar knowledge. | Guidance and reusable law; never product behavior authority. |
+| Knowledge | Product-neutral UX/UI laws, accessibility guidance, direction-generation guidance, and product Grammar knowledge. Read in one fixed order: the family playbook, then the family idioms, then `knowledge/ui/composition` as the assertions the receipt must satisfy, then the family DNA, then `knowledge/ui/presentation`. | Guidance and reusable law; never product behavior authority. |
 | Frontend source | Current target, route-local layouts, directly nested owners, shared consumers, and relevant tests or stories. | Evidence of current implementation, never requested-direction authority. |
 | Product-family source | Sibling surfaces and shared visual signatures such as hierarchy, shell rhythm, navigation, and semantic color roles. | Evidence of family coherence, never a template. |
 | UAT | Prior behavior, UX, and UI observations, including failure and recovery paths. | Evidence and counterevidence; prior PASS is not current authority. |
@@ -41,6 +41,15 @@ Every invocation requires:
 Backend and architecture receipts are required when the direction consumes or changes those owned
 contracts. Their absence is a typed gap, not permission to create fixtures, fake controls, invented
 states, or visual-only behavior.
+
+Knowledge is read in one order, and the order is not a preference. The family playbook comes first,
+because it decides the layout and the taste of the surface. The family idioms come next, because
+they name the recurring shapes that playbook spends. `knowledge/ui/composition` comes third, and it
+no longer says what the tree must contain: every rule there is an assertion the emitted receipt has
+to satisfy, and `COVERAGE-1` is the assertion about the receipt as a whole. The family DNA comes
+fourth, for the material the idioms are made of, and `knowledge/ui/presentation` comes last, because
+a CSS value is resolved by a later operator and never rescues a direction the composition rules
+reject.
 
 ## Refs
 

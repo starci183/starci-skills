@@ -64,6 +64,13 @@ and invokes this same operator with the correlated resume payload.
 - `approved-reuse` binds the exact approved direction triple from input.
 - `dominant` has generated decision artifacts and no alternatives.
 - `selected-alternative` retains all alternatives and selects one of their IDs without regenerating.
+- A decided decision carries `decision.coverage`, and it satisfies COVERAGE-1: `coverage.actions`
+  enumerates every declared action with its pointer route, keyboard route, named states, and a
+  settlement for every pending path; `coverage.regions` covers exactly the declared regions, each
+  with one idiom and one published composition; `coverage.states` gives every meaning its own
+  carrier; `coverage.responsive` names one owner per branch. The schema enum publishes no coverage
+  code, so a receipt that fails this is rejected by the output validator with a message naming
+  COVERAGE-1, on `INVALID_INPUT` semantics.
 - Every decision visual reference is registered in `output.artifactRefs`; every receipt evidence
   reference is registered in `output.evidenceRefs`.
 - `handoff` is always `null`.

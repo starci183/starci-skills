@@ -19,7 +19,7 @@ head đã quan sát.
 | Backend receipt | API, state, auth/session, persistence và failure contract mà UI sử dụng. | Technical authority có điều kiện. |
 | Architecture receipt | System boundary, data ownership, stack hoặc topology ràng buộc UI. | Technical authority có điều kiện. |
 | Grammar đã publish | Reusable component, composition, token, state, responsive interface và semantic role. | Reusable UI authority bắt buộc. |
-| Knowledge | Luật UX/UI trung lập, accessibility guidance, direction guidance và product Grammar knowledge. | Guidance và reusable law, không sở hữu product behavior. |
+| Knowledge | Luật UX/UI trung lập, accessibility guidance, direction guidance và product Grammar knowledge. Đọc theo đúng một thứ tự cố định: playbook của family, rồi idiom của family, rồi `knowledge/ui/composition` với tư cách các khẳng định mà receipt phải thoả, rồi DNA của family, rồi `knowledge/ui/presentation`. | Guidance và reusable law, không sở hữu product behavior. |
 | Frontend source | Target hiện tại, route-local layout, owner lồng trực tiếp, shared consumer và test/story liên quan. | Evidence của implementation hiện tại, không phải authority cho direction mới. |
 | Product-family source | Sibling surface và shared visual signature như hierarchy, shell rhythm, navigation, semantic color. | Evidence về family coherence, không phải template. |
 | UAT | Observation behavior, UX và UI trước đó, gồm failure/recovery path. | Evidence và counterevidence; PASS cũ không phải authority hiện tại. |
@@ -41,6 +41,14 @@ Mọi invocation cần:
 Backend và architecture receipt là bắt buộc khi direction consume hoặc thay contract thuộc các domain
 đó. Thiếu receipt phải trở thành typed gap; operator không được tạo fixture, fake control, state tự bịa
 hay behavior chỉ để trình diễn.
+
+Knowledge được đọc theo đúng một thứ tự, và thứ tự đó không phải sở thích. Playbook của family đứng
+trước, vì nó quyết bố cục và gu thẩm mỹ của surface. Idiom của family theo sau, vì chúng gọi tên
+những hình dạng lặp lại mà playbook tiêu. `knowledge/ui/composition` đứng thứ ba, và nó không còn
+nói cây phải chứa gì nữa: mỗi rule ở đó là một khẳng định mà receipt phát ra phải thoả, còn
+`COVERAGE-1` là khẳng định về cả cái receipt. DNA của family đứng thứ tư, cho phần vật liệu làm nên
+các idiom, và `knowledge/ui/presentation` đứng cuối, vì một giá trị CSS do operator sau chốt và
+không bao giờ cứu được một direction đã trượt luật composition.
 
 ## Ref
 

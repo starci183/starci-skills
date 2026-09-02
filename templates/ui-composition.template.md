@@ -1,15 +1,17 @@
 # <Topic> composition
 
-One or two paragraphs: what this topic decides before any tree exists, and which operator reads it
-(`fe.direction.decide`).
+One or two paragraphs: which universal constraint this topic places on a direction receipt, before
+any tree exists, and which operator checks it (`fe.direction.decide`). Layout and taste are decided
+in `knowledge/grammars/starci`; a composition topic only says what the resulting direction must
+satisfy.
 
 ## PREFIX-1 — <what the rule governs>
 
 One line naming what the rule governs.
 
-| Case | When | Decide |
+| Case | When | Assert |
 | --- | --- | --- |
-| Case 1 | The concrete situation that reaches this rule. | What the direction must settle, in language the product can read. |
+| Case 1 | The concrete situation that reaches this rule. | A falsifiable predicate over the direction receipt or the composed tree, never advice. |
 
 Not this rule: <condition> is PREFIX-n.
 
@@ -26,7 +28,7 @@ decisions.
   "sections": [{ "free": true }],
   "rules": {
     "heading": "^## [A-Z][A-Z0-9-]*-\\d+ — .+$",
-    "table": { "en": "| Case | When | Decide |", "vi": "| Case | Dùng khi | Chốt |" },
+    "table": { "en": "| Case | When | Assert |", "vi": "| Case | Dùng khi | Khẳng định |" },
     "closing": { "en": "^## What this file does not decide$", "vi": "^## File này không quyết định$" },
     "required": true
   }

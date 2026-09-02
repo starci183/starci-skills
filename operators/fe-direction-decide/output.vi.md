@@ -63,6 +63,13 @@ chính operator bằng correlated resume payload.
 - `approved-reuse` bind exact approved direction triple từ input.
 - `dominant` có generated decision artifact và không có alternative.
 - `selected-alternative` giữ mọi alternative và chọn một ID trong đó mà không generate lại.
+- Một decision đã quyết phải mang `decision.coverage` và phải thoả COVERAGE-1: `coverage.actions`
+  liệt kê mọi action đã khai cùng đường chuột, đường bàn phím, các state có tên và điểm kết thúc cho
+  mọi đường pending; `coverage.regions` phủ đúng tập vùng đã khai, mỗi vùng một idiom và một
+  composition công khai; `coverage.states` cho mỗi ý nghĩa một carrier riêng; `coverage.responsive`
+  gọi tên đúng một owner cho mỗi nhánh. Enum của schema không công bố mã lỗi riêng cho coverage, nên
+  receipt trượt điều này bị output validator từ chối kèm thông điệp gọi tên COVERAGE-1, theo ngữ
+  nghĩa `INVALID_INPUT`.
 - Mọi decision visual reference phải đăng ký trong `output.artifactRefs`; mọi receipt evidence
   reference phải đăng ký trong `output.evidenceRefs`.
 - `handoff` luôn là `null`.

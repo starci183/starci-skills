@@ -4,6 +4,69 @@ function sameSet(left, right) {
   return left.length === right.length && left.every((item) => right.includes(item));
 }
 
+// COVERAGE-1 (knowledge/ui/composition/coverage.md): a decided receipt enumerates what a later
+// operator has to exercise. The schema keeps `coverage` optional so older fixtures still parse; a
+// decided decision that declares actions, regions, states, or responsive branches must carry the
+// matching enumeration here. There is no coverage-specific failure code in the schema enum, so a
+// receipt that omits it is rejected with INVALID_INPUT-class semantics: the message names COVERAGE-1.
+function coverageErrors(decision) {
+  const errors = [];
+  const coverage = decision.coverage;
+  const declares =
+    decision.actionModel.length > 0 ||
+    decision.regionModel.length > 0 ||
+    decision.stateMatrix.length > 0 ||
+    decision.responsiveModel.length > 0;
+  if (coverage === undefined || coverage === null) {
+    if (declares) errors.push('COVERAGE-1: a decided decision must carry decision.coverage');
+    return errors;
+  }
+
+  if (decision.actionModel.length > 0) {
+    const actions = coverage.actions ?? [];
+    if (actions.length === 0) errors.push('COVERAGE-1: coverage.actions must enumerate every declared action');
+    for (const entry of actions) {
+      for (const path of entry.pendingPaths ?? []) {
+        if (!path.settlement) errors.push(`COVERAGE-1: pending path without a settlement: ${entry.action}`);
+      }
+    }
+  }
+
+  if (decision.regionModel.length > 0) {
+    const regions = coverage.regions ?? [];
+    if (regions.length === 0) errors.push('COVERAGE-1: coverage.regions must enumerate every declared region');
+    const covered = regions.map((item) => item.region);
+    for (const region of decision.regionModel) {
+      if (!covered.includes(region.id)) errors.push(`COVERAGE-1: region is not covered: ${region.id}`);
+    }
+    for (const region of regions) {
+      if (!decision.regionModel.some((item) => item.id === region.region)) {
+        errors.push(`COVERAGE-1: coverage names a region the direction does not declare: ${region.region}`);
+      }
+    }
+  }
+
+  if (decision.stateMatrix.length > 0) {
+    const states = coverage.states ?? [];
+    if (states.length === 0) errors.push('COVERAGE-1: coverage.states must enumerate every named meaning');
+    const carriers = states.map((item) => item.carrier);
+    if (new Set(carriers).size !== carriers.length) {
+      errors.push('COVERAGE-1: two meanings share one carrier in coverage.states');
+    }
+  }
+
+  if (decision.responsiveModel.length > 0) {
+    const branches = coverage.responsive ?? [];
+    if (branches.length === 0) errors.push('COVERAGE-1: coverage.responsive must enumerate every responsive branch');
+    const names = branches.map((item) => item.branch);
+    if (new Set(names).size !== names.length) {
+      errors.push('COVERAGE-1: a responsive branch is named twice, so it has more than one owner');
+    }
+  }
+
+  return errors;
+}
+
 function findings(receipt) {
   return [
     ...receipt.challenge.add,
@@ -77,6 +140,7 @@ export const validateOutput = validatorFor(new URL('./output.schema.json', impor
     }
     const orders = decision.regionModel.map((item) => item.order);
     if (new Set(orders).size !== orders.length) errors.push('region order values must be unique');
+    errors.push(...coverageErrors(decision));
 
     if (decision.classification === 'locked-refine') {
       if (binding.changeLevel !== 'refine') errors.push('locked-refine requires changeLevel refine');

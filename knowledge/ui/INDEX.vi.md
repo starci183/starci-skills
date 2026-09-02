@@ -2,7 +2,8 @@
 
 Cây này chứa universal UI law dùng chung cho mọi Grammar family đã publish, chia thành ba nhóm theo
 operator đọc từng law.
-Nó sở hữu 118 law X-n ổn định (40 ở composition, 59 ở presentation, 19 ở proof), selection condition
+Nó sở hữu 114 law X-n ổn định đang sống (36 ở composition, 59 ở presentation, 19 ở proof), cộng
+năm id composition đã nghỉ vào COVERAGE-1 và không bao giờ dùng lại, cùng với selection condition
 quan sát được, ownership decision, deterministic verdict và audit vector. Đây không phải implementation hay consumer cookbook. Nó không sở hữu business fact, copy riêng của page, route, permission,
 identity artwork, effect sản phẩm hay lựa chọn material của family.
 
@@ -45,7 +46,7 @@ Một topic sống cùng operator đọc nó. Topic nào không operator nào đ
 
 | Nhóm | Quyết định | Ai đọc |
 | --- | --- | --- |
-| [`composition/`](composition/INDEX.vi.md) | Cây phải chứa gì, quyết trước khi cây tồn tại | `fe.direction.decide` |
+| [`composition/`](composition/INDEX.vi.md) | Ràng buộc mà một direction phải thoả, sau khi gu thẩm mỹ đã quyết ở grammars | `fe.direction.decide` |
 | [`presentation/`](presentation/INDEX.vi.md) | Ranh giới do app sở hữu lấy giá trị CSS nào | `fe.presentation.resolve` |
 | [`proof/`](proof/INDEX.vi.md) | Thứ chỉ đúng sau khi đã render | `fe.surface.audit` |
 

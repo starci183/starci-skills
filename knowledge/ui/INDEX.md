@@ -2,7 +2,8 @@
 
 This tree holds the universal UI law shared by every published Grammar family, split into three
 groups by the operator that reads each one.
-It owns 118 stable X-n laws (40 in composition, 59 in presentation, 19 in proof), observable
+It owns 114 stable live X-n laws (36 in composition, 59 in presentation, 19 in proof), plus five
+composition ids that are retired into COVERAGE-1 and never reused, together with observable
 selection conditions, ownership decisions, deterministic verdicts, and audit vectors. It is not an implementation or consumer cookbook. It does not own business facts, page copy,
 routes, permissions, artwork identity, product effects, or family material choices.
 
@@ -44,7 +45,7 @@ A topic lives with the operator that reads it. A topic no operator reads has no 
 
 | Group | Decides | Read by |
 | --- | --- | --- |
-| [`composition/`](composition/INDEX.md) | What the tree must contain, before it exists | `fe.direction.decide` |
+| [`composition/`](composition/INDEX.md) | Constraints a direction must satisfy, after taste is decided in grammars | `fe.direction.decide` |
 | [`presentation/`](presentation/INDEX.md) | Which CSS value an app-owned boundary takes | `fe.presentation.resolve` |
 | [`proof/`](proof/INDEX.md) | What only becomes true once rendered | `fe.surface.audit` |
 

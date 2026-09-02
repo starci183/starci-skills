@@ -119,6 +119,26 @@ const validDecidedOutput = {
           { state: 'error', entry: 'Request failed', presentation: 'Show bounded error', exit: 'Retry' },
         ],
         responsiveModel: [{ condition: 'constrained', transformation: 'Stack task regions', invariant: 'Preserve action order' }],
+        coverage: {
+          actions: [
+            {
+              action: 'Submit',
+              pointerRoute: 'Press the primary button',
+              keyboardRoute: 'Focus the primary button and press Enter',
+              states: ['enabled', 'disabled', 'pending', 'settled'],
+              pendingPaths: [{ path: 'Submit accepted work', settlement: 'Result or cancellation clears pending' }],
+            },
+          ],
+          regions: [
+            { region: 'orientation', idiomRef: 'idiom://starci/page-opening', compositionRef: 'grammar://starci-core/page' },
+            { region: 'task', idiomRef: 'idiom://starci/primary-task', compositionRef: 'grammar://starci-core/page' },
+          ],
+          states: [
+            { meaning: 'Data ready', carrier: 'PresentationState neutral' },
+            { meaning: 'Request failed', carrier: 'EmptyNotice' },
+          ],
+          responsive: [{ branch: 'constrained', owner: 'PrimaryRailLayout container query at 56rem' }],
+        },
         accessibilityModel: ['Logical heading and focus order'],
         contentModel: ['Representative populated content and long-label stress'],
         mediaDecisions: [],
@@ -186,6 +206,20 @@ assert.equal(validateInput(invalidInput).valid, false);
 const invalidOutput = structuredClone(validDecidedOutput);
 invalidOutput.output.artifactRefs = [];
 assert.equal(validateOutput(invalidOutput).valid, false);
+
+// COVERAGE-1: the enumeration is what a later operator exercises, so a decided receipt that drops a
+// declared region from coverage is rejected, and the complete enumeration above is accepted.
+const missingCoverage = structuredClone(validDecidedOutput);
+delete missingCoverage.output.receipt.decision.coverage;
+const missingCoverageResult = validateOutput(missingCoverage);
+assert.equal(missingCoverageResult.valid, false);
+assert.ok(missingCoverageResult.errors.some((error) => error.includes('COVERAGE-1')));
+
+const partialCoverage = structuredClone(validDecidedOutput);
+partialCoverage.output.receipt.decision.coverage.regions.pop();
+const partialCoverageResult = validateOutput(partialCoverage);
+assert.equal(partialCoverageResult.valid, false);
+assert.ok(partialCoverageResult.errors.some((error) => error.includes('COVERAGE-1: region is not covered: task')));
 
 const invalidChoice = structuredClone(validBlockedChoiceOutput);
 invalidChoice.output.receipt.resume.candidateAlternativeIds.pop();
