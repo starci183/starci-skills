@@ -84,7 +84,8 @@ exchange↔bước `waiting`, en↔vi; `validate-alias` đọc bảng Context; `
 
 ```text
 errors/
-├─ errors.json          sổ máy đọc: code → { meaning, scope, disposition, fallback?, unless?, resume? }
+├─ errors.json          mã dùng chung: code → { scope[], domain, disposition, meaning, fallback?, unless?, resume? }
+│  (mã riêng một operator: operators/<id>/errors.json, cùng hình, không scope)
 └─ INDEX.md (+vi)       sinh từ errors.json, bảng cho người đọc
 ```
 
@@ -92,17 +93,15 @@ Một mã có đúng một trong hai disposition:
 
 | Disposition | Nghĩa | Khi nào |
 | --- | --- | --- |
-| `terminate` | dừng ngay, `output.json.status = blocked`, `stop = <code>`, không Output nào được coi là done | thiếu bằng chứng, mâu thuẫn, head trôi, không còn phương án |
+| `terminate` | dừng ngay, `response.json.status = blocked`, `stop = <code>`, không Output nào được coi là done | thiếu bằng chứng, mâu thuẫn, head trôi, không còn phương án |
 | `fallback` | không dừng; làm đúng hành động ghi trong `fallback`, ghi lại trong `response.md` mục "Fallbacks taken", chạy tiếp | có một lựa chọn máy làm được và ghi được lý do |
 
-`scope` là `shared` (INVALID_INPUT, SOURCE_DRIFT, NO_PROGRESS, EVIDENCE_MISSING dùng chung 14 operator) hoặc tên
-operator. Luật cứng: mã xuất hiện trong `## Steps` mà không có trong `errors.json` → `validate-templates`
-đỏ; runtime gặp mã lạ thì terminate với `UNKNOWN_STOP`. Không có "code tạm".
+`scope` là mảng id operator hoặc `["*"]` cho mã dùng chung (nằm ở `errors/errors.json`); mã chỉ một operator phát nằm trong `operators/<id>/errors.json` không có scope; `scripts/errors-registry.mjs` gộp hai nơi và từ chối mã định nghĩa hai lần. Luật cứng: mã xuất hiện trong `## Steps` mà không có trong sổ gộp → `validate-operator` đỏ; runtime gặp mã lạ thì terminate với `UNKNOWN_STOP`. Không có "code tạm".
 
 Ví dụ hàng:
 
 ```json
-"CHOICE_REQUIRED": { "scope": "architecture.decide", "meaning": "nhiều phương án còn material sau khi chấm",
+"CHOICE_REQUIRED": { "meaning": "nhiều phương án còn material sau khi chấm",
   "disposition": "fallback",
   "fallback": "chọn phương án điểm cao nhất theo tradeoffAxes; hòa thì chọn ít thay đổi stack nhất; ghi bảng điểm vào response.md#decision",
   "unless": { "param": "selectionPolicy", "equals": "approval-required", "then": "terminate" } }
@@ -137,7 +136,7 @@ hỏi người đúng field nào.
 
 Trạng thái: ☐ chờ thầy · ☑ chốt.
 
-### B1. ☐ `architecture.decide` — ĐÃ DỰNG THỬ trong cây (`operators/architecture-decide/`), chờ thầy chốt
+### B1. ☐ `architecture.decide` — ĐÃ DỰNG trong cây theo layout A2 (commit de1492ee) (`operators/architecture-decide/`), chờ thầy chốt
 
 Đã dựng: `operator.md` (+vi) theo đúng bảng dưới; `errors.json` riêng của gói (8 mã) + `errors/errors.json`
 chung (5 mã, `scope` là mảng, `["*"]` = mọi operator); `validate.mjs` gọi `scripts/validate-step.mjs` rồi
