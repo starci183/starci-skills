@@ -53,29 +53,30 @@ One finding carries one base verdict and zero or more cause tags. Several failed
 findings; they are never collapsed into a composite verdict or suppressed by first-match logic. `PASS`
 is valid only where no failure finding stands.
 
-## Execution sequence
+## Sequence
 
-1. **Validate input and resume.** Apply `input.schema.json` and semantic validation. Reject a stale
-   source binding, an applied head that differs from the observed head, duplicate topics, a
-   cross-filed identifier, two matrix ids for one condition, and unchanged progress.
-2. **Bind authority.** Bind the knowledge index and every topic with its fingerprint and inventory,
-   the application receipt with its claims, the routed source head, and the runtime endpoint.
-3. **Confirm the surface.** Observe the routed checkout. A head that differs from the applied head is
-   `SOURCE_DRIFT` and nothing is captured, because the surface would not be the surface that was
-   applied.
-4. **Reach readiness.** For each matrix entry, set the viewport, color scheme, and state, then wait
-   for the declared readiness condition. An endpoint that never serves the route is
-   `RUNTIME_UNAVAILABLE`.
-5. **Capture.** Take one capture per matrix entry, fingerprint it, and write it under
-   `input.project.artifactRootRef`. A declared entry that produced no capture is `EVIDENCE_MISSING`.
-6. **Measure.** For every node inside the observed owners, record the rendered value of each
-   presentation property, together with the identifiers that node claims. Every claimed identifier is
-   resolved against the bound inventory and filed as known or unpublished.
-7. **Compare and judge.** For each measurement, compare it against the claim and record a finding
-   from the canonical vocabulary. A verdict is never recorded for a node that was not measured.
-8. **Emit and stop.** Emit one output conforming to `output.schema.json`, register every capture in
-   `artifactRefs`, and bind every fingerprint. Do not repair anything and do not propose a fix as a
-   verdict.
+| # | Step | Reads | Writes | Stops with |
+| --- | --- | --- | --- | --- |
+| 1 | Validate input and resume | input, prior receipt, frozen source binding, applied head | — | `INVALID_INPUT`, `SOURCE_DRIFT`, `NO_PROGRESS` |
+| 2 | Bind authority | knowledge index and every topic with its fingerprint and inventory, application receipt with its claims, routed source head, runtime endpoint | — | — |
+| 3 | Confirm the surface | observed checkout at the routed route | — | — |
+| 4 | Reach readiness | matrix entry, its viewport, color scheme, state, and declared readiness condition | — | `RUNTIME_UNAVAILABLE` |
+| 5 | Capture | the ready surface for one matrix entry | `<matrixId>.capture.json` | `EVIDENCE_MISSING` |
+| 6 | Measure | captures, nodes inside the observed owners, the identifiers each node claims | — | — |
+| 7 | Compare and judge | measurements, claims, the bound rule inventory | — | `UNKNOWN_RULE` |
+| 8 | Emit and stop | everything above | — | — |
+
+Validation rejects a stale source binding, an applied head that differs from the observed head,
+duplicate topics, a cross-filed identifier, two matrix ids for one condition, and unchanged progress.
+The routed checkout is observed again before anything is captured, and a head that differs from the
+applied head returns the same drift failure with nothing captured, because the surface would not be
+the surface that was applied.
+
+Every claimed identifier is resolved against the bound inventory and filed as known or unpublished; a
+verdict is never recorded for a node that was not measured, and each finding comes from the canonical
+vocabulary. Emission returns one output conforming to `output.schema.json`, registers every capture in
+`artifactRefs`, and binds every fingerprint. It repairs nothing and never turns a proposed fix into a
+verdict.
 
 ## The audit changes nothing
 

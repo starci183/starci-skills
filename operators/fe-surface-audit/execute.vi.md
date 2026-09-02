@@ -54,27 +54,28 @@ chủ sở hữu và trạng thái. Một finding mang đúng một base verdict
 tầng cùng hỏng thì sinh ra các finding liên kết; chúng không bao giờ bị gộp thành một verdict tổng hợp
 hay bị nuốt bởi logic khớp-đầu-tiên. `PASS` chỉ hợp lệ ở nơi không có finding hỏng nào đứng.
 
-## Trình tự thực thi
+## Trình tự
 
-1. **Validate input và resume.** Áp `input.schema.json` cùng validate ngữ nghĩa. Từ chối binding
-   source cũ, applied head khác head quan sát được, topic trùng, mã xếp nhầm topic, hai matrix id cho
-   cùng một điều kiện, và tiến độ không đổi.
-2. **Bind authority.** Bind knowledge index và từng topic kèm fingerprint với danh sách mã,
-   application receipt kèm các lời khai, source head đã route, và runtime endpoint.
-3. **Xác nhận bề mặt.** Quan sát checkout đã route. Head khác applied head là `SOURCE_DRIFT` và không
-   chụp gì cả, vì bề mặt đó sẽ không phải bề mặt đã được ghi.
-4. **Đạt mức sẵn sàng.** Với mỗi mục matrix, đặt viewport, color scheme và trạng thái, rồi chờ điều
-   kiện sẵn sàng đã khai. Endpoint không bao giờ phục vụ được route là `RUNTIME_UNAVAILABLE`.
-5. **Chụp.** Lấy đúng một ảnh chụp cho mỗi mục matrix, fingerprint nó, và ghi dưới
-   `input.project.artifactRootRef`. Mục đã khai mà không sinh ảnh chụp nào là `EVIDENCE_MISSING`.
-6. **Đo.** Với mọi node nằm trong các owner được quan sát, ghi giá trị render ra của từng thuộc tính
-   presentation, cùng những mã node đó khai. Mọi mã được khai đều được tra lại danh sách đã bind và
-   xếp vào nhóm đã biết hoặc chưa publish.
-7. **Đối chiếu và phán xét.** Với mỗi phép đo, so nó với lời khai và ghi một finding lấy từ từ vựng
-   canonical. Không bao giờ ghi phán quyết cho một node chưa được đo.
-8. **Phát ra rồi dừng.** Phát đúng một output theo `output.schema.json`, đăng ký mọi ảnh chụp vào
-   `artifactRefs`, và bind mọi fingerprint. Không sửa gì và không biến một đề xuất sửa thành phán
-   quyết.
+| # | Bước | Đọc | Ghi | Dừng với |
+| --- | --- | --- | --- | --- |
+| 1 | Validate input và resume | input, receipt trước đó, binding source đã đóng băng, applied head | — | `INVALID_INPUT`, `SOURCE_DRIFT`, `NO_PROGRESS` |
+| 2 | Bind authority | knowledge index và từng topic kèm fingerprint với danh sách mã, application receipt kèm các lời khai, source head đã route, runtime endpoint | — | — |
+| 3 | Xác nhận bề mặt | checkout quan sát được tại route đang dùng | — | — |
+| 4 | Đạt mức sẵn sàng | mục matrix cùng viewport, color scheme, trạng thái và điều kiện sẵn sàng đã khai | — | `RUNTIME_UNAVAILABLE` |
+| 5 | Chụp | bề mặt đã sẵn sàng của một mục matrix | `<matrixId>.capture.json` | `EVIDENCE_MISSING` |
+| 6 | Đo | các ảnh chụp, các node nằm trong owner được quan sát, những mã từng node khai | — | — |
+| 7 | Đối chiếu và phán xét | các phép đo, các lời khai, danh sách mã đã bind | — | `UNKNOWN_RULE` |
+| 8 | Phát ra rồi dừng | tất cả những gì ở trên | — | — |
+
+Khâu validate từ chối binding source cũ, applied head khác head quan sát được, topic trùng, mã xếp
+nhầm topic, hai matrix id cho cùng một điều kiện, và tiến độ không đổi. Checkout đã route được quan
+sát lại trước khi chụp bất cứ thứ gì, và một head khác applied head trả về đúng lỗi trôi đó mà không
+chụp gì cả, vì bề mặt đó sẽ không phải bề mặt đã được ghi.
+
+Mọi mã được khai đều được tra lại danh sách đã bind và xếp vào nhóm đã biết hoặc chưa publish; không
+bao giờ ghi phán quyết cho một node chưa được đo, và mỗi finding đều lấy từ từ vựng canonical. Khâu
+phát ra trả đúng một output theo `output.schema.json`, đăng ký mọi ảnh chụp vào `artifactRefs`, và
+bind mọi fingerprint. Nó không sửa gì và không bao giờ biến một đề xuất sửa thành phán quyết.
 
 ## Audit không đổi gì cả
 
