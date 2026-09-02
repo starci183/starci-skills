@@ -34,8 +34,8 @@ còn treo đều có đúng một câu trả lời được ghi lại. Không fi
 | B1 | `packages/grammar/src/common/conformance.ts` | cũ | `RULE_FAMILY_COUNTS` vẫn chép catalog 25 họ đã nghỉ; ba họ đang khẳng định phủ những rule không còn tồn tại | sinh lại từ cây mới hay bỏ bản chép |
 | B2 | starci-academy-fe | 7 commit local, chưa đẩy | `pre-push` chạy lint và unit suite; lint còn 1 lỗi kiến trúc; suite không kết thúc được | xem B4, B5 |
 | B3 | nivo-fe | 4 commit local, chưa đẩy | 2 lỗi lint kiến trúc; unit suite 100% | icon authority sống ở đâu sau migration grammar |
-| B4 | `LearnSpine/component.spec.tsx` | giết worker `forks` | dưới pool `forks` mặc định, worker thoát ngay lúc nạp và pool chờ mãi, nên không lượt chạy đầy đủ nào kết thúc và `pre-push` không bao giờ qua; dưới `--pool=threads` cũng file đó chạy xong trong 38ms và chỉ trượt một assertion thường (nhãn nhóm "Your path" không được render, cùng họ với B5) | không; tìm module giết fork, hoặc chuyển project app sang `threads` |
-| B5 | 33 spec đỏ ở starci | có sẵn | hợp đồng attribute cũ (`data-variant`, `data-tone`), test nhầm lựa chọn với đích đến, trạng thái active của `SourceFileTree` | Grammar nên publish lại hợp đồng cũ nào |
+| B4 | `LearnSpine/component.spec.tsx` | không bao giờ xong khi chạy cả suite | file duy nhất trong 497 không báo xong dưới cả hai pool: `forks` làm worker chết, `threads` làm nó treo. Chạy riêng thì xong trong 38ms và chỉ trượt một assertion thường (nhãn nhóm "Your path" không được render, cùng họ với B5). Treo phụ thuộc thứ tự: một spec chạy trước trong cùng worker để lại timer hoặc handle mà import của file này chờ mãi | không; bisect bằng cách chạy nó sau từng thư mục spec đứng trước, rồi đóng chỗ rò ở nguồn |
+| B5 | 33 test đỏ ở starci, xác nhận dưới cả hai pool | có sẵn | hợp đồng attribute cũ (`data-variant`, `data-tone`), test nhầm lựa chọn với đích đến, trạng thái active của `SourceFileTree` | Grammar nên publish lại hợp đồng cũ nào |
 | B6 | `isPressLabel` trên `Text` | 64 file | một leaf tĩnh mang ngữ nghĩa bấm | giữ, hay dời gạch chân khi hover sang CSS của press target |
 
 ## Thứ tự đề xuất cho các buổi làm chung
