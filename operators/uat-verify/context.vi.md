@@ -38,11 +38,11 @@ phẩm.
 
 | Alias | Trỏ tới | Bind | Bắt buộc |
 | --- | --- | --- | --- |
-| `@worktrees/uat/<flow>/<case>` | `<Source>/.worktrees/uat/<flow>/<case>/  (snapshot.json, result.json)` | fingerprint of snapshot.json and result.json | Bắt buộc: The canonical snapshot and result pair for the flow. |
-| `@worktrees/_templates` | `<Source>/.worktrees/_templates/  (businesses/, debts/, sessions/, uat/)` | fingerprint per file | Bắt buộc: UAT protocol and template authority; consumed, never modified. |
-| `@worktrees/sessions/central-runtime` | `<Source>/.worktrees/sessions/central-runtime/owner.json  (generation-<n>-ready.json and logs/ beside it)` | fingerprint + generation | Bắt buộc: A runtime that can be observed; readiness is proved, not assumed. |
-| `@workspaces/be` | `<checkout:input.project.id/be>  (diskPath from <Source>/.workspaces/local/routes/<project>/be/config.json); a sub-path narrows: @workspaces/be/husky, @workspaces/be/gates` | fingerprint + sourceHead (git rev-parse HEAD of the checkout) | Bắt buộc: The checkout whose behaviour the flow verifies. |
-| `@artifacts` | `input.project.artifactRootRef; convention <Source>/.worktrees/sessions/<invocationId>/artifacts/  (receipt, named artifacts, captures)` | fingerprint per artifact; every artifact written is registered in output.artifactRefs | Bắt buộc: Where captures and the verification receipt are written. |
+| `@worktrees/uat/<flow>/<case>` | `<Source>/.worktrees/uat/<flow>/<case>/  (snapshot.json, result.json)` | fingerprint of snapshot.json and result.json | Bắt buộc · tĩnh: The canonical snapshot and result pair for the flow. |
+| `@worktrees/_templates` | `<Source>/.worktrees/_templates/  (businesses/, debts/, sessions/, uat/)` | fingerprint per file | Bắt buộc · tĩnh: UAT protocol and template authority; consumed, never modified. |
+| `@worktrees/sessions/central-runtime` | `<Source>/.worktrees/sessions/central-runtime/owner.json  (generation-<n>-ready.json and logs/ beside it)` | fingerprint + generation | Bắt buộc · tĩnh: A runtime that can be observed; readiness is proved, not assumed. |
+| `@workspaces/be` | `<checkout:input.project.id/be>  (diskPath from <Source>/.workspaces/local/routes/<project>/be/config.json); friendly segments: /husky, /package, /gates (see segments)` | fingerprint + sourceHead (git rev-parse HEAD of the checkout) | Bắt buộc · tĩnh: The checkout whose behaviour the flow verifies. |
+| `@dynamic/uat-flow-verification.json` | `<Source>/.worktrees/sessions/<sessionId>/steps/<n>.<operator.id>/<file>. Writing: <n>.<operator.id> is the current step, and input.project.artifactRootRef must equal that folder. Reading: the nearest earlier step of the same session that wrote <file>; @dynamic/steps/<n>/<file> names a specific step. The session folder is created by the orchestrator and deleted when the run completes; a blocked run keeps it for resume` | fingerprint per file; every file written is registered in output.artifactRefs | Bắt buộc · động: This step's own receipt, and beside it every artifact the Sequence names; the folder input.project.artifactRootRef must equal. |
 
 ## Danh tính được cấp tự động, không bao giờ đi xin
 

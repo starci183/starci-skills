@@ -40,16 +40,16 @@ value even if someone tried.
 
 | # | Step | Reads | Writes | Stops with |
 | --- | --- | --- | --- | --- |
-| 1 | Validate input and resume | input, `@receipt/quality-verification/<invocationId>` (the declared authorization) | — | `INVALID_INPUT`, `AUTHORIZATION_MISSING`, `NO_PROGRESS` |
-| 2 | Bind the release and the plan | input (the declared intent), `@external/ghcr/<image>` (the frozen release and target), `@external/github-actions/<runId>` (the observed state) | — | `MANIFEST_INVALID`, `APPROVAL_REQUIRED` |
+| 1 | Validate input and resume | input, `@dynamic/quality-verification.json` (the declared authorization) | — | `INVALID_INPUT`, `AUTHORIZATION_MISSING`, `NO_PROGRESS` |
+| 2 | Bind the release and the plan | input (the declared intent), `@remote/ghcr/<image>` (the frozen release and target), `@remote/github-actions/<runId>` (the observed state) | — | `MANIFEST_INVALID`, `APPROVAL_REQUIRED` |
 | 3 | Initialize the execution root and resolve credentials | `@workspaces/device-state` (credential names), input (the rebuildable execution root) | — | `CREDENTIAL_UNAVAILABLE` |
-| 4 | Prepare the host, publish the artifact, migrate, and reconcile the domain | `@external/ghcr/<image>` (the artifact published by digest), `@external/github-actions/<runId>` (each boundary's observed revision before and after) | — | `HOST_UNAVAILABLE`, `ARTIFACT_MISSING`, `MIGRATION_BLOCKED`, `DOMAIN_UNRECONCILED` |
-| 5 | Roll out | `@external/ghcr/<image>` (the target revision before and after), `@external/github-actions/<runId>` (the compiled plan's rollout evidence) | — | `ROLLOUT_FAILED` |
-| 6 | Monitor under a bounded deadline and backoff | `@external/github-actions/<runId>` (probe observations across the window) | — | — |
-| 7 | Detect concurrent drift before acting | `@external/ghcr/<image>` (the active release, this release, and the one it replaces, by digest) | — | `CONCURRENT_DRIFT` |
-| 8 | Take the recovery branch when the failure persists | input (the approved reversible actions), `@external/ghcr/<image>` (the same release identity) | — | `RECOVERY_EXHAUSTED` |
-| 9 | Take the rollback branch when recovery cannot hold | `@external/ghcr/<image>` (the exact safe release, by digest), input (current data and schema state) | — | `ROLLBACK_IDENTITY_MISSING` |
-| 10 | Prove the steady state and stop | `@external/ghcr/<image>` (the immutable digest), input (declared and superseded targets), `@external/github-actions/<runId>` (every declared probe) | `@artifacts/deployment-receipt.json` | `STEADY_STATE_UNPROVEN` |
+| 4 | Prepare the host, publish the artifact, migrate, and reconcile the domain | `@remote/ghcr/<image>` (the artifact published by digest), `@remote/github-actions/<runId>` (each boundary's observed revision before and after) | — | `HOST_UNAVAILABLE`, `ARTIFACT_MISSING`, `MIGRATION_BLOCKED`, `DOMAIN_UNRECONCILED` |
+| 5 | Roll out | `@remote/ghcr/<image>` (the target revision before and after), `@remote/github-actions/<runId>` (the compiled plan's rollout evidence) | — | `ROLLOUT_FAILED` |
+| 6 | Monitor under a bounded deadline and backoff | `@remote/github-actions/<runId>` (probe observations across the window) | — | — |
+| 7 | Detect concurrent drift before acting | `@remote/ghcr/<image>` (the active release, this release, and the one it replaces, by digest) | — | `CONCURRENT_DRIFT` |
+| 8 | Take the recovery branch when the failure persists | input (the approved reversible actions), `@remote/ghcr/<image>` (the same release identity) | — | `RECOVERY_EXHAUSTED` |
+| 9 | Take the rollback branch when recovery cannot hold | `@remote/ghcr/<image>` (the exact safe release, by digest), input (current data and schema state) | — | `ROLLBACK_IDENTITY_MISSING` |
+| 10 | Prove the steady state and stop | `@remote/ghcr/<image>` (the immutable digest), input (declared and superseded targets), `@remote/github-actions/<runId>` (every declared probe) | `@dynamic/release-deployment.json` | `STEADY_STATE_UNPROVEN` |
 
 Validation rejects a foreign or expired authorization, a manifest pinned elsewhere, an observation of
 another target, a replacement identity that disagrees with the observed active release, a deadline

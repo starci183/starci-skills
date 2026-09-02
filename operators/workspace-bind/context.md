@@ -37,12 +37,12 @@ A caller that consumes the shared runtime additionally requires the runtime owne
 
 | Alias | Resolves to | Bind | Required |
 | --- | --- | --- | --- |
-| `@workspaces/projects/<project>/<role>` | `<Source>/.workspaces/projects/<project>/<role>.json` | fingerprint | Required: The portable route declaration; the only route authority. |
-| `@workspaces/local/routes/<project>/<role>` | `<Source>/.workspaces/local/routes/<project>/<role>/config.json` | fingerprint | Required: The hydrated route this machine projects the declaration onto. |
-| `@workspaces/device-state` | `<Source>/.workspaces/device-state.json  (sealed keys live in <Source>/.workspaces/local/credentials/*.key.enc and are bound by name, never read)` | fingerprint | Required: Machine identity and the sealed roster, bound by name. |
-| `@workspaces/ports/<project>` | `<Source>/.workspaces/ports/<project>.json` | fingerprint | Optional: Port projection when the caller consumes the runtime. |
-| `@worktrees/sessions/central-runtime` | `<Source>/.worktrees/sessions/central-runtime/owner.json  (generation-<n>-ready.json and logs/ beside it)` | fingerprint + generation | Optional: Runtime owner registry, bound only when runtimeNeed is consume. |
-| `@artifacts` | `input.project.artifactRootRef; convention <Source>/.worktrees/sessions/<invocationId>/artifacts/  (receipt, named artifacts, captures)` | fingerprint per artifact; every artifact written is registered in output.artifactRefs | Required: Where the route receipt is written. |
+| `@workspaces/projects/<project>/<role>` | `<Source>/.workspaces/projects/<project>/<role>.json` | fingerprint | Required · static: The portable route declaration; the only route authority. |
+| `@workspaces/local/routes/<project>/<role>` | `<Source>/.workspaces/local/routes/<project>/<role>/config.json` | fingerprint | Required · static: The hydrated route this machine projects the declaration onto. |
+| `@workspaces/device-state` | `<Source>/.workspaces/device-state.json  (sealed keys live in <Source>/.workspaces/local/credentials/*.key.enc and are bound by name, never read)` | fingerprint | Required · static: Machine identity and the sealed roster, bound by name. |
+| `@workspaces/ports/<project>` | `<Source>/.workspaces/ports/<project>.json` | fingerprint | Optional · static: Port projection when the caller consumes the runtime. |
+| `@worktrees/sessions/central-runtime` | `<Source>/.worktrees/sessions/central-runtime/owner.json  (generation-<n>-ready.json and logs/ beside it)` | fingerprint + generation | Optional · static: Runtime owner registry, bound only when runtimeNeed is consume. |
+| `@dynamic/workspace-route-binding.json` | `<Source>/.worktrees/sessions/<sessionId>/steps/<n>.<operator.id>/<file>. Writing: <n>.<operator.id> is the current step, and input.project.artifactRootRef must equal that folder. Reading: the nearest earlier step of the same session that wrote <file>; @dynamic/steps/<n>/<file> names a specific step. The session folder is created by the orchestrator and deleted when the run completes; a blocked run keeps it for resume` | fingerprint per file; every file written is registered in output.artifactRefs | Required · dynamic: This step's own receipt, and beside it every artifact the Sequence names; the folder input.project.artifactRootRef must equal. |
 
 ## Route authority is the declaration, never the resemblance
 

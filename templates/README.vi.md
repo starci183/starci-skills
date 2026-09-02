@@ -15,6 +15,7 @@ vào, cùng bản `.vi.md` của file ấy. Hợp đồng là thẩm quyền; b�
 | `ui-proof.template.md` | `knowledge/ui/proof/*.md` | tiêu đề; chỉ các mục rule, mỗi mục một bảng `Case \| Dùng khi \| Quan sát`; mục đóng |
 | `grammars.template.md` | `knowledge/grammars/*/*.md` | tiêu đề; mục tuỳ ý; mọi mục rule mang một bảng `Case \| Luật \| Owner của Common \| Core hiện thực` |
 | `patterns.template.md` | `knowledge/patterns/*/*.md` | tiêu đề; mục tuỳ ý; mọi mục rule mang một bảng `Case \| Dùng khi \| Viết` |
+| `changes.template.md` | `templates/changes.example.md` (ví dụ được ép; file thật nằm trong `@dynamic`) | tiêu đề; bảng Ràng buộc, bảng File, Bước kế tiếp cần biết gì |
 
 ## Từ vựng của hợp đồng
 

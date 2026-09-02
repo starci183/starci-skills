@@ -43,15 +43,15 @@ fingerprint của nó được bind lại.
 
 | # | Bước | Đọc | Ghi | Dừng với |
 | --- | --- | --- | --- | --- |
-| 1 | Validate input và resume | input, `@receipt/fe-presentation-resolution/<invocationId>`, `@workspaces/fe` (binding head đã đóng băng) | — | `INVALID_INPUT`, `SOURCE_DRIFT`, `NO_PROGRESS` |
-| 2 | Bind authority | `@receipt/fe-presentation-resolution/<invocationId>` (fingerprint, danh sách `classNames`, danh sách rule, cây đã resolve), `@workspaces/fe` (source head đã route, write set đã khai kèm các gốc owner), `@receipt/fe-direction-decision/<invocationId>` (ý đồ) | — | `RESOLUTION_STALE`, `OWNER_CONFLICT` |
+| 1 | Validate input và resume | input, `@dynamic/fe-presentation-resolution.json`, `@workspaces/fe` (binding head đã đóng băng) | — | `INVALID_INPUT`, `SOURCE_DRIFT`, `NO_PROGRESS` |
+| 2 | Bind authority | `@dynamic/fe-presentation-resolution.json` (fingerprint, danh sách `classNames`, danh sách rule, cây đã resolve), `@workspaces/fe` (source head đã route, write set đã khai kèm các gốc owner), `@dynamic/fe-direction-decision.json` (ý đồ) | — | `RESOLUTION_STALE`, `OWNER_CONFLICT` |
 | 3 | Xác nhận head | `@workspaces/fe` (checkout quan sát được tại route đang dùng) | — | — |
 | 4 | Fingerprint trước | `@workspaces/fe` (mọi đường đã khai mà đang tồn tại) | — | — |
-| 5 | Chiếu cây đã resolve lên các đường đã khai | `@receipt/fe-presentation-resolution/<invocationId>` (cây đã resolve), `@workspaces/fe` (các đường đã khai) | — | — |
-| 6 | Đối chiếu mọi giá trị sinh ra với danh sách | `@receipt/fe-presentation-resolution/<invocationId>` (danh sách class và rule đã đóng băng) | — | `WRITE_REJECTED` |
+| 5 | Chiếu cây đã resolve lên các đường đã khai | `@dynamic/fe-presentation-resolution.json` (cây đã resolve), `@workspaces/fe` (các đường đã khai) | — | — |
+| 6 | Đối chiếu mọi giá trị sinh ra với danh sách | `@dynamic/fe-presentation-resolution.json` (danh sách class và rule đã đóng băng) | — | `WRITE_REJECTED` |
 | 7 | Ghi, rồi fingerprint sau | `@workspaces/fe` (nội dung hiện tại của từng đường) | `@workspaces/fe` (`<đường trong write set>`) | — |
 | 8 | Báo cáo mọi đường đã khai | `@workspaces/fe` (write set và kết quả từng lần ghi) | — | — |
-| 9 | Phát ra rồi dừng | tất cả những gì ở trên | `@artifacts/application-receipt.json` | — |
+| 9 | Phát ra rồi dừng | tất cả những gì ở trên | `@dynamic/fe-source-application.json`, `@dynamic/changes.md` | — |
 
 Khâu validate từ chối binding source cũ, resolution được nêu tên nhưng không được bind, owner chồng
 lấn, đường dẫn trùng, đường nằm ngoài gốc owner của nó, và tiến độ không đổi. Head được quan sát lại ở

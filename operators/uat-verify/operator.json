@@ -36,9 +36,9 @@
       "purpose": "The checkout whose behaviour the flow verifies."
     },
     {
-      "alias": "@artifacts",
+      "alias": "@dynamic/uat-flow-verification.json",
       "required": true,
-      "purpose": "Where captures and the verification receipt are written."
+      "purpose": "This step's own receipt, and beside it every artifact the Sequence names; the folder input.project.artifactRootRef must equal."
     }
   ],
   "contextContract": "context.md",

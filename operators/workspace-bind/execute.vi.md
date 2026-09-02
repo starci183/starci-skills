@@ -31,8 +31,8 @@ giờ được ghi ra là một gợi ý sẽ được đi theo ngay khi route �
 | 4 | Từ chối mọi gợi ý | input (`context.hints`) | — | — |
 | 5 | Xác minh checkout | `@workspaces/local/routes/<project>/<role>` (route đã phân giải, checkout quan sát được, chính sách Git đã route, cây làm việc) | — | `BRANCH_POLICY_VIOLATION`, `CHECKOUT_DIRTY` |
 | 6 | Ràng runtime mà bên gọi tiêu thụ | `@worktrees/sessions/central-runtime` (registry của chủ sở hữu, generation và bằng chứng health của nó), `@workspaces/ports/<project>` (`workspace-route-port-projection`) | — | `ENDPOINT_AUTHORITY_STALE`, `RUNTIME_NOT_READY` |
-| 7 | Ràng provenance và độ tươi | input (head hội thoại đã redact), `@artifacts` (receipt đã cache) | — | — |
-| 8 | Phát ra và dừng | tất cả những gì ở trên | `@artifacts/route-receipt.json` | — |
+| 7 | Ràng provenance và độ tươi | input (head hội thoại đã redact), `@dynamic/workspace-route-binding.json` (receipt đã cache) | — | — |
+| 8 | Phát ra và dừng | tất cả những gì ở trên | `@dynamic/workspace-route-binding.json` | — |
 
 Khâu kiểm tra từ chối một route khai danh tính khác, một source route mang directory, một sibling
 route đi ngược lên, một route đã hydrate có workspace root ngoại lai, một quan sát của checkout khác,

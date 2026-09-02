@@ -50,7 +50,7 @@ receipt is durable, and a durable record of a capability is a leaked credential 
 | 5 | Derive the delta | `@worktrees/sessions/central-runtime` (the observed state), input (the desired state) | — | — |
 | 6 | Apply the approved delta | `@worktrees/sessions/central-runtime` (one resource at a time), `@workspaces/device-state` (credential handles by name) | `@worktrees/sessions/central-runtime` | `EFFECT_UNAUTHORIZED`, `SERVICE_UNAVAILABLE` |
 | 7 | Prove every required check | `@worktrees/sessions/central-runtime` (the re-read service and the branch's complete proof set) | — | `PROOF_FAILED` |
-| 8 | Emit and stop | everything above | `@artifacts/<branch>.receipt.json` | — |
+| 8 | Emit and stop | everything above | `@dynamic/platform-operation-receipt.json` | — |
 
 Validation rejects a stale source binding, a cross-filed effect or check, a narrowed proof set, an
 uninventoried resource, a missing capability, credential material in the contract, and unchanged

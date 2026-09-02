@@ -16,7 +16,7 @@
   },
   "refs": [
     {
-      "alias": "@receipt/fe-presentation-resolution/<invocationId>",
+      "alias": "@dynamic/fe-presentation-resolution.json",
       "required": true,
       "purpose": "The only source of values this operator may write."
     },
@@ -26,14 +26,19 @@
       "purpose": "The checkout the declared write set lands on; the one place this operator writes product source."
     },
     {
-      "alias": "@receipt/fe-direction-decision/<invocationId>",
+      "alias": "@dynamic/fe-direction-decision.json",
       "required": false,
       "purpose": "Intent; never a source of values."
     },
     {
-      "alias": "@artifacts",
+      "alias": "@dynamic/fe-source-application.json",
       "required": true,
-      "purpose": "Where the application receipt is written."
+      "purpose": "This step's own receipt, and beside it every artifact the Sequence names; the folder input.project.artifactRootRef must equal."
+    },
+    {
+      "alias": "@dynamic/changes.md",
+      "required": true,
+      "purpose": "The change record this step writes for the next: binding, file set with claims, gates and surfaces to check. Shape: templates/changes.template.md."
     }
   ],
   "contextContract": "context.md",

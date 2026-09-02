@@ -59,15 +59,15 @@ Một đơn vị qua được lần review của chính tác giả nó thì chư
 
 | # | Bước | Đọc | Ghi | Dừng với |
 | --- | --- | --- | --- | --- |
-| 1 | Kiểm tra input và resume | input, `@receipt/content-generation-receipt/<invocationId>`, `@external/minio/contents/<contentId>/<locale>` (binding đơn vị đã đóng băng) | — | `INVALID_INPUT`, `SOURCE_DRIFT`, `NO_PROGRESS` |
-| 2 | Ràng thẩm quyền | `@external/minio/contents/<contentId>/<locale>` (tham chiếu chương trình học và style như đang phục vụ), `@worktrees/sessions/central-runtime` (cấu hình AI runtime) | — | — |
-| 3 | Viết và đóng băng brief | `@external/minio/contents/<contentId>/<locale>` (chương trình học và bằng chứng nguồn) | `@artifacts/<briefTargetRef>` | `BRIEF_UNBOUND` |
-| 4 | Viết mọi bản đã khai | `@artifacts/<briefTargetRef>` (brief đã đóng băng), input (đích của từng ngôn ngữ) | `@artifacts/<language>.articleRef` | `OUTCOME_UNCOVERED` |
-| 5 | Sinh hình theo các claim của nó | `@artifacts/<briefTargetRef>` (các claim trong brief, ý đồ hình đã nêu) | `@artifacts/<imageTargetRef>` | `IMAGE_UNAVAILABLE` |
-| 6 | Hiện thực mọi track đã khai | `@artifacts/<briefTargetRef>`, input (lệnh build chính xác của từng track) | `@artifacts/<track>.sourceRef` | `CODE_BUILD_FAILED` |
-| 7 | Chạy phần kiểm thực thi | `@artifacts/<track>.sourceRef` (contract thực thi), `@worktrees/sessions/central-runtime` (nơi từng lệnh đã khai chạy) | — | `E2E_FAILED`, `CONTRACT_WEAKENED` |
-| 8 | Nhận bản phê bình độc lập | `@artifacts` (mọi artifact đã sản xuất và những khẳng định trong đó) | `@artifacts/<reviewTargetRef>` | `REVIEW_REVISION_REQUIRED`, `REVIEW_ROUNDS_EXHAUSTED` |
-| 9 | Phát ra và dừng | tất cả những gì ở trên | `@artifacts/content-generation-receipt.json` | — |
+| 1 | Kiểm tra input và resume | input, `@dynamic/content-generation-receipt.json`, `@remote/minio/<contentId>/<locale>` (binding đơn vị đã đóng băng) | — | `INVALID_INPUT`, `SOURCE_DRIFT`, `NO_PROGRESS` |
+| 2 | Ràng thẩm quyền | `@remote/minio/<contentId>/<locale>` (tham chiếu chương trình học và style như đang phục vụ), `@worktrees/sessions/central-runtime` (cấu hình AI runtime) | — | — |
+| 3 | Viết và đóng băng brief | `@remote/minio/<contentId>/<locale>` (chương trình học và bằng chứng nguồn) | `@dynamic/<briefTargetRef>` | `BRIEF_UNBOUND` |
+| 4 | Viết mọi bản đã khai | `@dynamic/<briefTargetRef>` (brief đã đóng băng), input (đích của từng ngôn ngữ) | `@dynamic/<language>.articleRef` | `OUTCOME_UNCOVERED` |
+| 5 | Sinh hình theo các claim của nó | `@dynamic/<briefTargetRef>` (các claim trong brief, ý đồ hình đã nêu) | `@dynamic/<imageTargetRef>` | `IMAGE_UNAVAILABLE` |
+| 6 | Hiện thực mọi track đã khai | `@dynamic/<briefTargetRef>`, input (lệnh build chính xác của từng track) | `@dynamic/<track>.sourceRef` | `CODE_BUILD_FAILED` |
+| 7 | Chạy phần kiểm thực thi | `@dynamic/<track>.sourceRef` (contract thực thi), `@worktrees/sessions/central-runtime` (nơi từng lệnh đã khai chạy) | — | `E2E_FAILED`, `CONTRACT_WEAKENED` |
+| 8 | Nhận bản phê bình độc lập | `@dynamic/<briefTargetRef>`, `@dynamic/<language>.articleRef`, `@dynamic/<track>.sourceRef`, `@dynamic/<imageTargetRef>` (mọi artifact đã sản xuất và những khẳng định trong đó) | `@dynamic/<reviewTargetRef>` | `REVIEW_REVISION_REQUIRED`, `REVIEW_ROUNDS_EXHAUSTED` |
+| 9 | Phát ra và dừng | tất cả những gì ở trên | `@dynamic/content-generation-receipt.json` | — |
 
 Khâu kiểm tra từ chối binding source đã cũ, một ngôn ngữ không có đích, một phần kiểm thực thi không
 có code đứng sau, một hình thiếu prompt của nó, một lần refactor không có unit, brief và đích phê bình

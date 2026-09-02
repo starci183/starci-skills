@@ -16,6 +16,7 @@ is how a person reads it.
 | `ui-proof.template.md` | `knowledge/ui/proof/*.md` | title; only rule sections, each with one `Case \| When \| Observe` table; closing section |
 | `grammars.template.md` | `knowledge/grammars/*/*.md` | title; any sections; every rule section carries one `Case \| Rule \| Common owner \| Core realization` table |
 | `patterns.template.md` | `knowledge/patterns/*/*.md` | title; any sections; every rule section carries one `Case \| When \| Write` table |
+| `changes.template.md` | `templates/changes.example.md` (the enforced example; real files live in `@dynamic`) | title; Binding table, Files table, What the next step must know |
 
 ## Contract vocabulary
 

@@ -16,7 +16,7 @@
   },
   "refs": [
     {
-      "alias": "@receipt/workspace-route-binding/<invocationId>",
+      "alias": "@dynamic/workspace-route-binding.json",
       "required": true,
       "purpose": "A publish never resolves its own checkout."
     },
@@ -31,14 +31,19 @@
       "purpose": "pre-commit and pre-push, which always run."
     },
     {
-      "alias": "@external/remote/<project>/<role>",
+      "alias": "@remote/git/<project>/<role>",
       "required": true,
       "purpose": "The publication target and its observed head."
     },
     {
-      "alias": "@artifacts",
+      "alias": "@dynamic/git-publication.json",
       "required": true,
-      "purpose": "Where the publication receipt is written."
+      "purpose": "This step's own receipt, and beside it every artifact the Sequence names; the folder input.project.artifactRootRef must equal."
+    },
+    {
+      "alias": "@dynamic/changes.md",
+      "required": true,
+      "purpose": "The producer's changes.md: the exact file set this publication carries."
     }
   ],
   "contextContract": "context.md",

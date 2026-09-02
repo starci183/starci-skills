@@ -16,12 +16,12 @@
   },
   "refs": [
     {
-      "alias": "@receipt/quality-verification/<invocationId>",
+      "alias": "@dynamic/quality-verification.json",
       "required": true,
       "purpose": "Verification precedes an immutable build."
     },
     {
-      "alias": "@external/ghcr/<image>",
+      "alias": "@remote/ghcr/<image>",
       "required": true,
       "purpose": "The immutable image, by digest."
     },
@@ -31,14 +31,14 @@
       "purpose": "Credential handles by name; values never appear."
     },
     {
-      "alias": "@external/github-actions/<runId>",
+      "alias": "@remote/github-actions/<runId>",
       "required": false,
       "purpose": "CI evidence of the build and rollout."
     },
     {
-      "alias": "@artifacts",
+      "alias": "@dynamic/release-deployment.json",
       "required": true,
-      "purpose": "Where the deployment receipt is written."
+      "purpose": "This step's own receipt, and beside it every artifact the Sequence names; the folder input.project.artifactRootRef must equal."
     }
   ],
   "contextContract": "context.md",

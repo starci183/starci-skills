@@ -39,9 +39,9 @@
       "purpose": "Runtime owner registry, bound only when runtimeNeed is consume."
     },
     {
-      "alias": "@artifacts",
+      "alias": "@dynamic/workspace-route-binding.json",
       "required": true,
-      "purpose": "Where the route receipt is written."
+      "purpose": "This step's own receipt, and beside it every artifact the Sequence names; the folder input.project.artifactRootRef must equal."
     }
   ],
   "contextContract": "context.md",

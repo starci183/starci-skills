@@ -58,14 +58,14 @@ hay bị nuốt bởi logic khớp-đầu-tiên. `PASS` chỉ hợp lệ ở nơ
 
 | # | Bước | Đọc | Ghi | Dừng với |
 | --- | --- | --- | --- | --- |
-| 1 | Validate input và resume | input, `@receipt/fe-source-application/<invocationId>`, `@workspaces/fe` (binding head đã đóng băng và applied head) | — | `INVALID_INPUT`, `SOURCE_DRIFT`, `NO_PROGRESS` |
-| 2 | Bind authority | `@knowledge/ui/proof` (từng topic kèm fingerprint và danh sách mã), `@receipt/fe-source-application/<invocationId>` (các lời khai của nó), `@workspaces/fe` (source head đã route), `@worktrees/sessions/central-runtime` (endpoint đang phục vụ) | — | — |
+| 1 | Validate input và resume | input, `@dynamic/fe-source-application.json`, `@workspaces/fe` (binding head đã đóng băng và applied head) | — | `INVALID_INPUT`, `SOURCE_DRIFT`, `NO_PROGRESS` |
+| 2 | Bind authority | `@knowledge/ui/proof` (từng topic kèm fingerprint và danh sách mã), `@dynamic/fe-source-application.json` (các lời khai của nó), `@workspaces/fe` (source head đã route), `@worktrees/sessions/central-runtime` (endpoint đang phục vụ) | — | — |
 | 3 | Xác nhận bề mặt | `@workspaces/fe` (checkout quan sát được tại route đang dùng) | — | — |
 | 4 | Đạt mức sẵn sàng | input (mục matrix cùng viewport, color scheme, trạng thái và điều kiện sẵn sàng đã khai), `@worktrees/sessions/central-runtime` | — | `RUNTIME_UNAVAILABLE` |
-| 5 | Chụp | `@worktrees/sessions/central-runtime` (bề mặt đã sẵn sàng của một mục matrix) | `@artifacts/<matrixId>.capture.json` | `EVIDENCE_MISSING` |
-| 6 | Đo | `@artifacts/<matrixId>.capture.json`, `@workspaces/fe` (các owner được quan sát và những mã từng node khai) | — | — |
-| 7 | Đối chiếu và phán xét | `@artifacts/<matrixId>.capture.json`, `@receipt/fe-source-application/<invocationId>` (các lời khai), `@knowledge/ui/proof` (danh sách mã đã bind), `@knowledge/grammars/starci` (luật hiện thực hoá của family) | — | `UNKNOWN_RULE` |
-| 8 | Phát ra rồi dừng | tất cả những gì ở trên | `@artifacts/fe-surface-audit.json` | — |
+| 5 | Chụp | `@worktrees/sessions/central-runtime` (bề mặt đã sẵn sàng của một mục matrix) | `@dynamic/<matrixId>.capture.json` | `EVIDENCE_MISSING` |
+| 6 | Đo | `@dynamic/<matrixId>.capture.json`, `@workspaces/fe` (các owner được quan sát và những mã từng node khai) | — | — |
+| 7 | Đối chiếu và phán xét | `@dynamic/<matrixId>.capture.json`, `@dynamic/fe-source-application.json` (các lời khai), `@knowledge/ui/proof` (danh sách mã đã bind), `@knowledge/grammars/starci` (luật hiện thực hoá của family) | — | `UNKNOWN_RULE` |
+| 8 | Phát ra rồi dừng | tất cả những gì ở trên | `@dynamic/fe-surface-audit.json` | — |
 
 Khâu validate từ chối binding source cũ, applied head khác head quan sát được, topic trùng, mã xếp
 nhầm topic, hai matrix id cho cùng một điều kiện, và tiến độ không đổi. Checkout đã route được quan

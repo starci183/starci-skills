@@ -48,14 +48,14 @@ làm tiếp chính là mâu thuẫn mà phép kiểm tra này sinh ra để bắ
 
 | # | Bước | Đọc | Ghi | Dừng với |
 | --- | --- | --- | --- | --- |
-| 1 | Kiểm tra input và resume | input, `@receipt/backend-implementation/<invocationId>`, `@workspaces/be` (source head đã route) | — | `INVALID_INPUT`, `SOURCE_DRIFT`, `NO_PROGRESS` |
-| 2 | Ràng thẩm quyền | `@worktrees/businesses/<featureId>`, `@receipt/architecture-decision/<invocationId>` (contract đã đóng băng cùng mọi operation), `@knowledge/patterns/be` (từng pattern anh em kèm khía cạnh của nó) | — | `CONTRACT_UNFROZEN`, `BUSINESS_AUTHORITY_MISSING`, `PATTERN_UNBOUND` |
-| 3 | Lấp từng operation một | `@receipt/architecture-decision/<invocationId>` (một operation của contract), `@knowledge/patterns/be` (các pattern đã bind cho nó), `@workspaces/be` (`input.scope.mutableFileRefs`) | `@workspaces/be` | `CONTRACT_WIDENED`, `OWNER_CONFLICT` |
+| 1 | Kiểm tra input và resume | input, `@dynamic/backend-implementation.json`, `@workspaces/be` (source head đã route) | — | `INVALID_INPUT`, `SOURCE_DRIFT`, `NO_PROGRESS` |
+| 2 | Ràng thẩm quyền | `@worktrees/businesses/<featureId>`, `@dynamic/architecture-decision.json` (contract đã đóng băng cùng mọi operation), `@knowledge/patterns/be` (từng pattern anh em kèm khía cạnh của nó) | — | `CONTRACT_UNFROZEN`, `BUSINESS_AUTHORITY_MISSING`, `PATTERN_UNBOUND` |
+| 3 | Lấp từng operation một | `@dynamic/architecture-decision.json` (một operation của contract), `@knowledge/patterns/be` (các pattern đã bind cho nó), `@workspaces/be` (`input.scope.mutableFileRefs`) | `@workspaces/be` | `CONTRACT_WIDENED`, `OWNER_CONFLICT` |
 | 4 | Ghi lại mọi mutation | `@workspaces/be` (các file bị chạm, hash trước và hash sau) | — | — |
 | 5 | Kiểm lại snapshot đã lưu khi đọc | `@workspaces/be` (snapshot đã lưu), `@knowledge/patterns/be` (những luật trôi đi sau lúc tạo nó) | — | — |
-| 6 | Chứng minh từng mặt đã khai | `@receipt/architecture-decision/<invocationId>` (các mặt operation khai), `@workspaces/be` (phép đo của chúng) | `@artifacts/conformance/<operationId>.<facet>.json` | — |
-| 7 | Chạy từng proof đã khai | `@receipt/architecture-decision/<invocationId>` (các loại proof đã khai cùng lệnh đã ghim), `@workspaces/be` | `@artifacts/proofs/<operationId>.<kind>.json` | `PROOF_UNAVAILABLE` |
-| 8 | Phát ra và dừng | tất cả những gì ở trên | `@artifacts/backend-implementation.json` | — |
+| 6 | Chứng minh từng mặt đã khai | `@dynamic/architecture-decision.json` (các mặt operation khai), `@workspaces/be` (phép đo của chúng) | `@dynamic/conformance/<operationId>.<facet>.json` | — |
+| 7 | Chạy từng proof đã khai | `@dynamic/architecture-decision.json` (các loại proof đã khai cùng lệnh đã ghim), `@workspaces/be` | `@dynamic/proofs/<operationId>.<kind>.json` | `PROOF_UNAVAILABLE` |
+| 8 | Phát ra và dừng | tất cả những gì ở trên | `@dynamic/backend-implementation.json`, `@dynamic/changes.md` | — |
 
 Khâu kiểm tra từ chối binding source đã cũ, writer nằm ngoài trần được sửa, migration không có proof
 chạy lại, operation read-only mang migration, event consumer không có idempotency, mã quyết định mà

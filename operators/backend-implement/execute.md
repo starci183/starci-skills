@@ -47,14 +47,14 @@ question and implementing anyway is the exact contradiction the check exists to 
 
 | # | Step | Reads | Writes | Stops with |
 | --- | --- | --- | --- | --- |
-| 1 | Validate input and resume | input, `@receipt/backend-implementation/<invocationId>`, `@workspaces/be` (the routed head) | — | `INVALID_INPUT`, `SOURCE_DRIFT`, `NO_PROGRESS` |
-| 2 | Bind authority | `@worktrees/businesses/<featureId>`, `@receipt/architecture-decision/<invocationId>` (the frozen contract and every operation), `@knowledge/patterns/be` (each sibling pattern with its aspect) | — | `CONTRACT_UNFROZEN`, `BUSINESS_AUTHORITY_MISSING`, `PATTERN_UNBOUND` |
-| 3 | Fill one operation at a time | `@receipt/architecture-decision/<invocationId>` (one contract operation), `@knowledge/patterns/be` (its bound patterns), `@workspaces/be` (`input.scope.mutableFileRefs`) | `@workspaces/be` | `CONTRACT_WIDENED`, `OWNER_CONFLICT` |
+| 1 | Validate input and resume | input, `@dynamic/backend-implementation.json`, `@workspaces/be` (the routed head) | — | `INVALID_INPUT`, `SOURCE_DRIFT`, `NO_PROGRESS` |
+| 2 | Bind authority | `@worktrees/businesses/<featureId>`, `@dynamic/architecture-decision.json` (the frozen contract and every operation), `@knowledge/patterns/be` (each sibling pattern with its aspect) | — | `CONTRACT_UNFROZEN`, `BUSINESS_AUTHORITY_MISSING`, `PATTERN_UNBOUND` |
+| 3 | Fill one operation at a time | `@dynamic/architecture-decision.json` (one contract operation), `@knowledge/patterns/be` (its bound patterns), `@workspaces/be` (`input.scope.mutableFileRefs`) | `@workspaces/be` | `CONTRACT_WIDENED`, `OWNER_CONFLICT` |
 | 4 | Record every mutation | `@workspaces/be` (the touched files, before and after hashes) | — | — |
 | 5 | Revalidate persisted snapshots on read | `@workspaces/be` (the persisted snapshot), `@knowledge/patterns/be` (the rules that drift after it) | — | — |
-| 6 | Prove each declared facet | `@receipt/architecture-decision/<invocationId>` (the operation's declared facets), `@workspaces/be` (their measurements) | `@artifacts/conformance/<operationId>.<facet>.json` | — |
-| 7 | Run each declared proof | `@receipt/architecture-decision/<invocationId>` (the declared proof kinds and their pinned commands), `@workspaces/be` | `@artifacts/proofs/<operationId>.<kind>.json` | `PROOF_UNAVAILABLE` |
-| 8 | Emit and stop | everything above | `@artifacts/backend-implementation.json` | — |
+| 6 | Prove each declared facet | `@dynamic/architecture-decision.json` (the operation's declared facets), `@workspaces/be` (their measurements) | `@dynamic/conformance/<operationId>.<facet>.json` | — |
+| 7 | Run each declared proof | `@dynamic/architecture-decision.json` (the declared proof kinds and their pinned commands), `@workspaces/be` | `@dynamic/proofs/<operationId>.<kind>.json` | `PROOF_UNAVAILABLE` |
+| 8 | Emit and stop | everything above | `@dynamic/backend-implementation.json`, `@dynamic/changes.md` | — |
 
 Validation rejects a stale source binding, a writer outside the mutable ceiling, a migration with no
 replay proof, a read-only operation carrying a migration, an event consumer with no idempotency, a

@@ -21,7 +21,7 @@
       "purpose": "The only source of business behaviour."
     },
     {
-      "alias": "@receipt/architecture-decision/<invocationId>",
+      "alias": "@dynamic/architecture-decision.json",
       "required": true,
       "purpose": "The frozen mutation contract the implementation fills and may not widen."
     },
@@ -36,14 +36,14 @@
       "purpose": "The backend checkout the boundary belongs to; the one place this operator writes product source."
     },
     {
-      "alias": "@receipt/backend-implementation/<invocationId>",
-      "required": false,
+      "alias": "@dynamic/backend-implementation.json",
+      "required": true,
       "purpose": "Prior implementation receipts; regression history."
     },
     {
-      "alias": "@artifacts",
+      "alias": "@dynamic/changes.md",
       "required": true,
-      "purpose": "Where conformance, proofs, and the receipt are written."
+      "purpose": "The change record this step writes for the next: binding, file set with claims, gates and surfaces to check. Shape: templates/changes.template.md."
     }
   ],
   "contextContract": "context.md",

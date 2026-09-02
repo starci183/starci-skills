@@ -33,10 +33,9 @@ Style and audit references are evidence and may be empty.
 
 | Alias | Resolves to | Bind | Required |
 | --- | --- | --- | --- |
-| `@external/minio/contents/<contentId>/<locale>` | `MinIO object contents/<contentId>/<locale>.json through the routed runtime` | fingerprint of the fetched object | Required: The lesson as served; the unit being authored or revised. |
-| `@worktrees/sessions/central-runtime` | `<Source>/.worktrees/sessions/central-runtime/owner.json  (generation-<n>-ready.json and logs/ beside it)` | fingerprint + generation | Required: The AI runtime that runs, reads, and repairs generated code. |
-| `@receipt/content-generation-receipt/<invocationId>` | `<@artifacts of invocation <invocationId>>/<receiptType>.json  (the receipt file that invocation registered in output.artifactRefs)` | fingerprint + the sourceHead the receipt binds | Optional: A prior audit of the same unit; regression history. |
-| `@artifacts` | `input.project.artifactRootRef; convention <Source>/.worktrees/sessions/<invocationId>/artifacts/  (receipt, named artifacts, captures)` | fingerprint per artifact; every artifact written is registered in output.artifactRefs | Required: Where the brief, articles, code tracks, images, review, and receipt are written. |
+| `@remote/minio/<contentId>/<locale>` | `MinIO object contents/<contentId>/<locale>.json through the routed runtime` | fingerprint of the fetched object | Required · static: The lesson as served; the unit being authored or revised. |
+| `@worktrees/sessions/central-runtime` | `<Source>/.worktrees/sessions/central-runtime/owner.json  (generation-<n>-ready.json and logs/ beside it)` | fingerprint + generation | Required · static: The AI runtime that runs, reads, and repairs generated code. |
+| `@dynamic/content-generation-receipt.json` | `<Source>/.worktrees/sessions/<sessionId>/steps/<n>.<operator.id>/<file>. Writing: <n>.<operator.id> is the current step, and input.project.artifactRootRef must equal that folder. Reading: the nearest earlier step of the same session that wrote <file>; @dynamic/steps/<n>/<file> names a specific step. The session folder is created by the orchestrator and deleted when the run completes; a blocked run keeps it for resume` | fingerprint per file; every file written is registered in output.artifactRefs | Required · dynamic: A prior audit of the same unit; regression history. |
 
 ## The runtime binding is a boundary, not a preference
 

@@ -9,7 +9,7 @@
     "grants": "operator.json → resources.requires, and nothing the profile would otherwise permit",
     "refs": "operator.json → refs, resolved through refs.json; an unlisted location is unreadable",
     "isolation": "fresh, no inherited turns; a critique inside an operator is a step of the same agent",
-    "writes": "only @artifacts of its own invocation, registered in output.artifactRefs"
+    "writes": "only @dynamic/<file> in its own step folder, registered in output.artifactRefs"
   },
   "concurrency": {
     "rule": "at most maxConcurrentAgents agents at once, and never two agents whose refs share a writable location",
@@ -17,8 +17,24 @@
     "sharedRoot": "business.decide is exclusive per businesses root; platform.operate is exclusive per runtime owner"
   },
   "handoff": {
-    "carrier": "the typed receipt under @artifacts; the next agent binds it as @receipt and re-validates",
+    "carrier": "the typed receipt <receiptType>.json (and changes.md where source was written) in the step folder; the next agent reads them as @dynamic/<file>, nearest earlier producer wins",
     "resume": "a blocked receipt with a resume token re-enters the same operator as a new agent",
     "stop": "routing.json kind user or external ends automation; the orchestrator reports and waits"
+  },
+  "session": {
+    "root": "<Source>/.worktrees/sessions/<sessionId>/",
+    "id": "<yyyymmdd-HHMMss>-<project>-<first operator>, e.g. 20260903-142200-starci-academy-fe.direction.decide",
+    "files": {
+      "session.json": "id, project, startedAt, status (running | blocked | done), steps[] in order: {n, operator, invocationId, startedAt, outcome, receipt}",
+      "leases/": "one file per writable location this session holds (checkout, businesses root, runtime owner); the orchestrator refuses a second session that needs the same lease",
+      "steps/<n>.<operator.id>/": "that step's @dynamic folder: <receiptType>.json always; changes.md when the step wrote source; the artifacts its Sequence names; input.project.artifactRootRef equals this path"
+    },
+    "read": "@dynamic/<file> resolves to the nearest earlier step that wrote <file>; two writers in one session (backend.implement then fe.source.apply) therefore have two changes.md, and quality.verify after fe.source.apply reads the frontend one; @dynamic/steps/<n>/<file> pins a specific step when a consumer needs the earlier one",
+    "lifecycle": [
+      "create: the orchestrator writes session.json and takes the leases before the first agent starts",
+      "step: each agent gets a fresh steps/<n>.<operator.id>/ folder and writes only there",
+      "block: a blocked receipt keeps the session on disk with status blocked so a resume re-enters the same step folder as step n+1",
+      "done: when routing reaches user or external, or the last operator emits, the orchestrator releases the leases and deletes the session folder; what survives is what the steps published (commits, business heads, UAT pairs, remote runs) and any audit record the owner copies out first"
+    ]
   }
 }

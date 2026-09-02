@@ -19,7 +19,7 @@
       "purpose": "The closed rule inventory; the only source of valid identifiers."
     },
     {
-      "alias": "@grammar",
+      "alias": "@grammar/core",
       "required": true,
       "purpose": "Which relationships a component already owns."
     },
@@ -29,19 +29,19 @@
       "purpose": "The checkout the composed tree belongs to."
     },
     {
-      "alias": "@receipt/fe-direction-decision/<invocationId>",
+      "alias": "@dynamic/fe-direction-decision.json",
       "required": false,
       "purpose": "Intent; never a source of presentation values."
     },
     {
-      "alias": "@receipt/fe-surface-audit/<invocationId>",
+      "alias": "@dynamic/fe-surface-audit.json",
       "required": false,
       "purpose": "Regression history."
     },
     {
-      "alias": "@artifacts",
+      "alias": "@dynamic/fe-presentation-resolution.json",
       "required": true,
-      "purpose": "Where the resolved tree and the resolution receipt are written."
+      "purpose": "This step's own receipt, and beside it every artifact the Sequence names; the folder input.project.artifactRootRef must equal."
     }
   ],
   "contextContract": "context.md",

@@ -76,8 +76,8 @@ for (const { dir, manifest } of manifests) {
     seen.add(ref.alias);
     declared += 1;
   }
-  if (!refs.some((r) => /^@artifacts\b/.test(r.alias) && r.required)) {
-    errors.push(`${id}: @artifacts must be a required ref; it is the only place an operator writes`);
+  if (!refs.some((r) => r.alias.startsWith('@dynamic/') && r.required)) {
+    errors.push(`${id}: a required @dynamic/<file> ref is missing; every step writes its receipt there`);
   }
   // execute.md routes by alias: every @alias in the Sequence table's Reads/Writes cells must be a
   // declared ref, and every required ref must be read or written by some step. A step that names a

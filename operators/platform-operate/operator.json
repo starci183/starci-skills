@@ -36,9 +36,9 @@
       "purpose": "Which projects the shared services serve."
     },
     {
-      "alias": "@artifacts",
+      "alias": "@dynamic/platform-operation-receipt.json",
       "required": true,
-      "purpose": "Where the operation receipt is written."
+      "purpose": "This step's own receipt, and beside it every artifact the Sequence names; the folder input.project.artifactRootRef must equal."
     }
   ],
   "contextContract": "context.md",

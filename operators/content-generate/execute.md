@@ -58,15 +58,15 @@ separate refusals: shared executions, inherited turns, and producer rationale.
 
 | # | Step | Reads | Writes | Stops with |
 | --- | --- | --- | --- | --- |
-| 1 | Validate input and resume | input, `@receipt/content-generation-receipt/<invocationId>`, `@external/minio/contents/<contentId>/<locale>` (the frozen unit binding) | — | `INVALID_INPUT`, `SOURCE_DRIFT`, `NO_PROGRESS` |
-| 2 | Bind authority | `@external/minio/contents/<contentId>/<locale>` (curriculum and style references as served), `@worktrees/sessions/central-runtime` (AI runtime configuration) | — | — |
-| 3 | Write and freeze the brief | `@external/minio/contents/<contentId>/<locale>` (curriculum and source evidence) | `@artifacts/<briefTargetRef>` | `BRIEF_UNBOUND` |
-| 4 | Write every declared edition | `@artifacts/<briefTargetRef>` (the frozen brief), input (the per-language destination) | `@artifacts/<language>.articleRef` | `OUTCOME_UNCOVERED` |
-| 5 | Generate the image to its claims | `@artifacts/<briefTargetRef>` (the brief's claims and the stated image intent) | `@artifacts/<imageTargetRef>` | `IMAGE_UNAVAILABLE` |
-| 6 | Implement every declared track | `@artifacts/<briefTargetRef>`, input (each track's exact build command) | `@artifacts/<track>.sourceRef` | `CODE_BUILD_FAILED` |
-| 7 | Run the executable check | `@artifacts/<track>.sourceRef` (the executable contract), `@worktrees/sessions/central-runtime` (where each declared command runs) | — | `E2E_FAILED`, `CONTRACT_WEAKENED` |
-| 8 | Take the independent critique | `@artifacts` (every produced artifact and the claims it makes) | `@artifacts/<reviewTargetRef>` | `REVIEW_REVISION_REQUIRED`, `REVIEW_ROUNDS_EXHAUSTED` |
-| 9 | Emit and stop | everything above | `@artifacts/content-generation-receipt.json` | — |
+| 1 | Validate input and resume | input, `@dynamic/content-generation-receipt.json`, `@remote/minio/<contentId>/<locale>` (the frozen unit binding) | — | `INVALID_INPUT`, `SOURCE_DRIFT`, `NO_PROGRESS` |
+| 2 | Bind authority | `@remote/minio/<contentId>/<locale>` (curriculum and style references as served), `@worktrees/sessions/central-runtime` (AI runtime configuration) | — | — |
+| 3 | Write and freeze the brief | `@remote/minio/<contentId>/<locale>` (curriculum and source evidence) | `@dynamic/<briefTargetRef>` | `BRIEF_UNBOUND` |
+| 4 | Write every declared edition | `@dynamic/<briefTargetRef>` (the frozen brief), input (the per-language destination) | `@dynamic/<language>.articleRef` | `OUTCOME_UNCOVERED` |
+| 5 | Generate the image to its claims | `@dynamic/<briefTargetRef>` (the brief's claims and the stated image intent) | `@dynamic/<imageTargetRef>` | `IMAGE_UNAVAILABLE` |
+| 6 | Implement every declared track | `@dynamic/<briefTargetRef>`, input (each track's exact build command) | `@dynamic/<track>.sourceRef` | `CODE_BUILD_FAILED` |
+| 7 | Run the executable check | `@dynamic/<track>.sourceRef` (the executable contract), `@worktrees/sessions/central-runtime` (where each declared command runs) | — | `E2E_FAILED`, `CONTRACT_WEAKENED` |
+| 8 | Take the independent critique | `@dynamic/<briefTargetRef>`, `@dynamic/<language>.articleRef`, `@dynamic/<track>.sourceRef`, `@dynamic/<imageTargetRef>` (every produced artifact and the claims it makes) | `@dynamic/<reviewTargetRef>` | `REVIEW_REVISION_REQUIRED`, `REVIEW_ROUNDS_EXHAUSTED` |
+| 9 | Emit and stop | everything above | `@dynamic/content-generation-receipt.json` | — |
 
 Validation rejects a stale source binding, a language without a destination, an executable check with
 no code behind it, an image without its prompt, a refactor with no unit, a shared brief and critique

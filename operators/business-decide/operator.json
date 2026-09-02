@@ -26,14 +26,14 @@
       "purpose": "The backend checkout every fact claim cites by path, line range, and head."
     },
     {
-      "alias": "@receipt/architecture-decision/<invocationId>",
+      "alias": "@dynamic/architecture-decision.json",
       "required": false,
       "purpose": "Architecture evidence; never a source of business behaviour."
     },
     {
-      "alias": "@artifacts",
+      "alias": "@dynamic/business-promise-authority.json",
       "required": true,
-      "purpose": "Where the coverage matrix and the published head copy are written."
+      "purpose": "This step's own receipt, and beside it every artifact the Sequence names; the folder input.project.artifactRootRef must equal."
     }
   ],
   "contextContract": "context.md",

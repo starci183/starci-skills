@@ -17,22 +17,22 @@
   },
   "refs": [
     {
-      "alias": "@receipt/business-promise-authority/<invocationId>",
+      "alias": "@dynamic/business-promise-authority.json",
       "required": true,
       "purpose": "Business authority for the requested outcome."
     },
     {
-      "alias": "@receipt/backend-implementation/<invocationId>",
+      "alias": "@dynamic/backend-implementation.json",
       "required": false,
       "purpose": "Technical authority when the direction touches a delivered contract."
     },
     {
-      "alias": "@receipt/architecture-decision/<invocationId>",
+      "alias": "@dynamic/architecture-decision.json",
       "required": false,
       "purpose": "Technical authority when boundaries are in question."
     },
     {
-      "alias": "@grammar",
+      "alias": "@grammar/core",
       "required": true,
       "purpose": "Published Grammar: the compositions a direction may bind."
     },
@@ -57,14 +57,9 @@
       "purpose": "Evidence and counterevidence; a prior PASS is not current authority."
     },
     {
-      "alias": "@receipt/fe-direction-decision/<invocationId>",
-      "required": false,
-      "purpose": "A previous direction; evidence unless the exact identity and fingerprint match."
-    },
-    {
-      "alias": "@artifacts",
+      "alias": "@dynamic/fe-direction-decision.json",
       "required": true,
-      "purpose": "Where candidate renders and the decision receipt are written."
+      "purpose": "A previous direction; evidence unless the exact identity and fingerprint match."
     }
   ],
   "contextContract": "context.md",

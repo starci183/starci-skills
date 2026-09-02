@@ -10,17 +10,17 @@ perform implementation.
 
 | # | Step | Reads | Writes | Stops with |
 | --- | --- | --- | --- | --- |
-| 1 | Validate input and resume | input, `@receipt/fe-direction-decision/<invocationId>`, `@workspaces/fe` (the frozen head binding) | — | `INVALID_INPUT`, `SOURCE_DRIFT`, `NO_PROGRESS` |
-| 2 | Bind authority | input (request, project, target, change level, owner ceiling), `@receipt/business-promise-authority/<invocationId>`, `@receipt/backend-implementation/<invocationId>`, `@receipt/architecture-decision/<invocationId>`, `@grammar` | — | `ROUTE_UNVERIFIED`, `SCOPE_UNFROZEN`, `CHANGE_LEVEL_AMBIGUOUS`, `OWNER_CEILING_INVALID`, `BUSINESS_REQUIRED`, `BACKEND_REQUIRED`, `ARCHITECTURE_REQUIRED` |
+| 1 | Validate input and resume | input, `@dynamic/fe-direction-decision.json`, `@workspaces/fe` (the frozen head binding) | — | `INVALID_INPUT`, `SOURCE_DRIFT`, `NO_PROGRESS` |
+| 2 | Bind authority | input (request, project, target, change level, owner ceiling), `@dynamic/business-promise-authority.json`, `@dynamic/backend-implementation.json`, `@dynamic/architecture-decision.json`, `@grammar/core` | — | `ROUTE_UNVERIFIED`, `SCOPE_UNFROZEN`, `CHANGE_LEVEL_AMBIGUOUS`, `OWNER_CEILING_INVALID`, `BUSINESS_REQUIRED`, `BACKEND_REQUIRED`, `ARCHITECTURE_REQUIRED` |
 | 3 | Observe existing context | `@workspaces/fe` (direct artifacts of the target, or the authorized host and product-family context), ``, `@worktrees/uat/<flow>/<case>` | — | `EVIDENCE_MISSING` |
-| 4 | Compile one UI contract | `@knowledge/ui/composition`, `@receipt/business-promise-authority/<invocationId>`, `@workspaces/fe` (the observed context) | — | — |
+| 4 | Compile one UI contract | `@knowledge/ui/composition`, `@dynamic/business-promise-authority.json`, `@workspaces/fe` (the observed context) | — | — |
 | 5 | Resolve reference needs | input (the exact external references), `@knowledge/ui/composition` (the gap they must close) | — | `REFERENCE_EVIDENCE_EXHAUSTED` |
 | 6 | Form candidates | `@knowledge/ui/composition` (the compiled UI contract), input (change level, comparison authorization) | — | `NO_VIABLE_DIRECTION` |
-| 7 | Apply the Grammar filter | `@grammar` (what a component owns and which props exist), `@knowledge/grammars/starci` (family realization rules), input (owner ceiling) | — | `GRAMMAR_REQUIRED` |
-| 8 | Render decision evidence | `@grammar`, `@knowledge/ui/composition` (the UI contract the surviving candidates answer) | `@artifacts/<candidateId>.html` | — |
-| 9 | Falsify | `@artifacts/<candidateId>.html`, `@receipt/business-promise-authority/<invocationId>`, `@receipt/backend-implementation/<invocationId>` | — | — |
-| 10 | Decide or block | `@artifacts/<candidateId>.html`, input (the running mode) | — | `DIRECTION_CHOICE_REQUIRED` |
-| 11 | Emit and stop | everything above | `@artifacts/fe-direction-decision.json` | — |
+| 7 | Apply the Grammar filter | `@grammar/core` (what a component owns and which props exist), `@knowledge/grammars/starci` (family realization rules), input (owner ceiling) | — | `GRAMMAR_REQUIRED` |
+| 8 | Render decision evidence | `@grammar/core`, `@knowledge/ui/composition` (the UI contract the surviving candidates answer) | `@dynamic/<candidateId>.html` | — |
+| 9 | Falsify | `@dynamic/<candidateId>.html`, `@dynamic/business-promise-authority.json`, `@dynamic/backend-implementation.json` | — | — |
+| 10 | Decide or block | `@dynamic/<candidateId>.html`, input (the running mode) | — | `DIRECTION_CHOICE_REQUIRED` |
+| 11 | Emit and stop | everything above | `@dynamic/fe-direction-decision.json` | — |
 
 Validation rejects stale authority, source drift, owner overlap, invalid change-level combinations,
 an unapproved comparison, and unchanged progress. Evidence may contradict authority but never

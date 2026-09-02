@@ -31,14 +31,9 @@
       "purpose": "Reusable patterns the scope may bind; a shape, not a selection."
     },
     {
-      "alias": "@receipt/architecture-decision/<invocationId>",
-      "required": false,
-      "purpose": "A prior decision on the same or an adjacent boundary; lineage."
-    },
-    {
-      "alias": "@artifacts",
+      "alias": "@dynamic/architecture-decision.json",
       "required": true,
-      "purpose": "Where current state, alternatives, stack model, critique, and receipt are written."
+      "purpose": "A prior decision on the same or an adjacent boundary; lineage."
     }
   ],
   "contextContract": "context.md",

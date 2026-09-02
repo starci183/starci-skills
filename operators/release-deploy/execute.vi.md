@@ -39,16 +39,16 @@ người cố tình.
 
 | # | Bước | Đọc | Ghi | Dừng với |
 | --- | --- | --- | --- | --- |
-| 1 | Kiểm tra input và resume | input, `@receipt/quality-verification/<invocationId>` (giấy phép đã khai) | — | `INVALID_INPUT`, `AUTHORIZATION_MISSING`, `NO_PROGRESS` |
-| 2 | Ràng release và kế hoạch | input (ý định đã khai), `@external/ghcr/<image>` (release và target đã đóng băng), `@external/github-actions/<runId>` (trạng thái quan sát được) | — | `MANIFEST_INVALID`, `APPROVAL_REQUIRED` |
+| 1 | Kiểm tra input và resume | input, `@dynamic/quality-verification.json` (giấy phép đã khai) | — | `INVALID_INPUT`, `AUTHORIZATION_MISSING`, `NO_PROGRESS` |
+| 2 | Ràng release và kế hoạch | input (ý định đã khai), `@remote/ghcr/<image>` (release và target đã đóng băng), `@remote/github-actions/<runId>` (trạng thái quan sát được) | — | `MANIFEST_INVALID`, `APPROVAL_REQUIRED` |
 | 3 | Khởi tạo execution root và phân giải credential | `@workspaces/device-state` (tên các credential), input (execution root dựng lại được) | — | `CREDENTIAL_UNAVAILABLE` |
-| 4 | Chuẩn bị host, publish artifact, migrate, và hoà hợp domain | `@external/ghcr/<image>` (artifact đã publish theo digest), `@external/github-actions/<runId>` (revision quan sát được của từng ranh giới trước và sau) | — | `HOST_UNAVAILABLE`, `ARTIFACT_MISSING`, `MIGRATION_BLOCKED`, `DOMAIN_UNRECONCILED` |
-| 5 | Rollout | `@external/ghcr/<image>` (revision của target trước và sau), `@external/github-actions/<runId>` (bằng chứng rollout của kế hoạch đã biên dịch) | — | `ROLLOUT_FAILED` |
-| 6 | Giám sát dưới deadline có chặn và backoff | `@external/github-actions/<runId>` (các lần quan sát probe suốt cửa sổ) | — | — |
-| 7 | Phát hiện trôi dạt đồng thời trước khi hành động | `@external/ghcr/<image>` (release đang hoạt động, release này, release nó thay thế, theo digest) | — | `CONCURRENT_DRIFT` |
-| 8 | Đi vào nhánh phục hồi khi thất bại kéo dài | input (các hành động thuận nghịch đã duyệt), `@external/ghcr/<image>` (chính danh tính release đó) | — | `RECOVERY_EXHAUSTED` |
-| 9 | Đi vào nhánh rollback khi phục hồi không giữ nổi | `@external/ghcr/<image>` (đúng release an toàn đó, theo digest), input (trạng thái dữ liệu và schema hiện tại) | — | `ROLLBACK_IDENTITY_MISSING` |
-| 10 | Chứng minh trạng thái ổn định rồi dừng | `@external/ghcr/<image>` (digest bất biến), input (các target đã khai và bị thay thế), `@external/github-actions/<runId>` (mọi probe đã khai) | `@artifacts/deployment-receipt.json` | `STEADY_STATE_UNPROVEN` |
+| 4 | Chuẩn bị host, publish artifact, migrate, và hoà hợp domain | `@remote/ghcr/<image>` (artifact đã publish theo digest), `@remote/github-actions/<runId>` (revision quan sát được của từng ranh giới trước và sau) | — | `HOST_UNAVAILABLE`, `ARTIFACT_MISSING`, `MIGRATION_BLOCKED`, `DOMAIN_UNRECONCILED` |
+| 5 | Rollout | `@remote/ghcr/<image>` (revision của target trước và sau), `@remote/github-actions/<runId>` (bằng chứng rollout của kế hoạch đã biên dịch) | — | `ROLLOUT_FAILED` |
+| 6 | Giám sát dưới deadline có chặn và backoff | `@remote/github-actions/<runId>` (các lần quan sát probe suốt cửa sổ) | — | — |
+| 7 | Phát hiện trôi dạt đồng thời trước khi hành động | `@remote/ghcr/<image>` (release đang hoạt động, release này, release nó thay thế, theo digest) | — | `CONCURRENT_DRIFT` |
+| 8 | Đi vào nhánh phục hồi khi thất bại kéo dài | input (các hành động thuận nghịch đã duyệt), `@remote/ghcr/<image>` (chính danh tính release đó) | — | `RECOVERY_EXHAUSTED` |
+| 9 | Đi vào nhánh rollback khi phục hồi không giữ nổi | `@remote/ghcr/<image>` (đúng release an toàn đó, theo digest), input (trạng thái dữ liệu và schema hiện tại) | — | `ROLLBACK_IDENTITY_MISSING` |
+| 10 | Chứng minh trạng thái ổn định rồi dừng | `@remote/ghcr/<image>` (digest bất biến), input (các target đã khai và bị thay thế), `@remote/github-actions/<runId>` (mọi probe đã khai) | `@dynamic/release-deployment.json` | `STEADY_STATE_UNPROVEN` |
 
 Khâu kiểm tra từ chối giấy phép lạ hoặc hết hạn, manifest ghim nơi khác, quan sát của target khác,
 danh tính bị thay thế không khớp release đang chạy, deadline không chứa nổi cửa sổ của nó, danh tính

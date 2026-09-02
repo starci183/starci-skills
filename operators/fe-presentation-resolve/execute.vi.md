@@ -34,15 +34,15 @@ Operator không bao giờ sửa knowledge. Một case còn thiếu được tr�
 
 | # | Bước | Đọc | Ghi | Dừng với |
 | --- | --- | --- | --- | --- |
-| 1 | Validate input và resume | input, `@receipt/fe-surface-audit/<invocationId>` (lịch sử hồi quy), `@workspaces/fe` (binding head đã đóng băng) | — | `INVALID_INPUT`, `SOURCE_DRIFT`, `NO_PROGRESS` |
-| 2 | Bind authority | `@knowledge/ui/presentation` (từng topic kèm fingerprint và danh sách mã), `@grammar` (package đã publish cùng các quan hệ nó sở hữu), `@workspaces/fe` (source head đã route, cây đã đóng băng), `@receipt/fe-direction-decision/<invocationId>` (ý đồ) | — | `KNOWLEDGE_UNBOUND`, `GRAMMAR_UNPUBLISHED` |
+| 1 | Validate input và resume | input, `@dynamic/fe-surface-audit.json` (lịch sử hồi quy), `@workspaces/fe` (binding head đã đóng băng) | — | `INVALID_INPUT`, `SOURCE_DRIFT`, `NO_PROGRESS` |
+| 2 | Bind authority | `@knowledge/ui/presentation` (từng topic kèm fingerprint và danh sách mã), `@grammar/core` (package đã publish cùng các quan hệ nó sở hữu), `@workspaces/fe` (source head đã route, cây đã đóng băng), `@dynamic/fe-direction-decision.json` (ý đồ) | — | `KNOWLEDGE_UNBOUND`, `GRAMMAR_UNPUBLISHED` |
 | 3 | Duyệt cây đúng một lượt | `@workspaces/fe` (cây đã đóng băng), input (trần owner được phép sửa) | — | `OWNER_CONFLICT` |
-| 4 | Xác định chủ của từng thuộc tính đang có | `@grammar` (các quan hệ nó sở hữu), `@workspaces/fe` (những thuộc tính node đang mang) | — | — |
+| 4 | Xác định chủ của từng thuộc tính đang có | `@grammar/core` (các quan hệ nó sở hữu), `@workspaces/fe` (những thuộc tính node đang mang) | — | — |
 | 5 | Chọn đúng một rule cho mỗi thuộc tính còn lại | `@knowledge/ui/presentation` (các case mà topic đã publish) | — | `RULE_MISSING` |
-| 6 | Phân loại đường công khai còn thiếu | `@grammar` (quan hệ đang xét), `@knowledge/ui/presentation` (dấu thiếu capability) | — | — |
-| 7 | Gỡ những thứ cây không được mang | `@workspaces/fe` (các class của ứng dụng trên node), `@grammar` (ruột Grammar và thang đóng) | — | — |
+| 6 | Phân loại đường công khai còn thiếu | `@grammar/core` (quan hệ đang xét), `@knowledge/ui/presentation` (dấu thiếu capability) | — | — |
+| 7 | Gỡ những thứ cây không được mang | `@workspaces/fe` (các class của ứng dụng trên node), `@grammar/core` (ruột Grammar và thang đóng) | — | — |
 | 8 | Phát contract | `@knowledge/ui/presentation` (danh sách mã đã đóng băng), input (`contractEmission`) | — | `UNKNOWN_RULE` |
-| 9 | Phát ra rồi dừng | tất cả những gì ở trên | `@artifacts/<target>.resolved.tsx` | — |
+| 9 | Phát ra rồi dừng | tất cả những gì ở trên | `@dynamic/<target>.resolved.tsx`, `@dynamic/fe-presentation-resolution.json` | — |
 
 Khâu validate từ chối binding source cũ, owner chồng lấn, topic trùng, mã xếp nhầm topic, và tiến độ
 không đổi. Lượt duyệt đi qua mọi node theo thứ tự tài liệu và ghi một `nodePath` ổn định; node nằm

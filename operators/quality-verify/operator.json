@@ -14,7 +14,7 @@
   },
   "refs": [
     {
-      "alias": "@receipt/<receiptType>/<invocationId>",
+      "alias": "@dynamic/<receiptType>.json",
       "required": true,
       "purpose": "The producer's receipt; fixes the head every gate runs against."
     },
@@ -39,9 +39,14 @@
       "purpose": "Owner-approved debts a red gate may carry."
     },
     {
-      "alias": "@artifacts",
+      "alias": "@dynamic/quality-verification.json",
       "required": true,
-      "purpose": "Where gate evidence, coverage, and the receipt are written."
+      "purpose": "This step's own receipt, and beside it every artifact the Sequence names; the folder input.project.artifactRootRef must equal."
+    },
+    {
+      "alias": "@dynamic/changes.md",
+      "required": true,
+      "purpose": "The producer's changes.md: which paths moved, which gates and surfaces it names."
     }
   ],
   "contextContract": "context.md",

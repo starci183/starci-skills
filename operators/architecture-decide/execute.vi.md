@@ -47,17 +47,17 @@ Bốn điều cấm gánh quyết định này, và mỗi điều đều đượ
 
 | # | Bước | Đọc | Ghi | Dừng với |
 | --- | --- | --- | --- | --- |
-| 1 | Kiểm tra input và resume | input, `@receipt/architecture-decision/<invocationId>`, `@workspaces/be` (binding head đã đóng băng) | — | `INVALID_INPUT`, `SOURCE_DRIFT`, `NO_PROGRESS` |
-| 2 | Quan sát hiện trạng | `@workspaces/be` (quan sát tại head đã đóng băng) | `@artifacts/current-state.json` | `CURRENT_STATE_UNOBSERVED` |
-| 3 | Ràng inventory quan sát được và thẩm quyền nghiệp vụ | `@artifacts/current-state.json` (các thành phần inventory cùng bằng chứng), `@worktrees/businesses/<featureId>` (head đã publish) | — | `BUSINESS_AUTHORITY_REQUIRED`, `EVIDENCE_MISSING` |
+| 1 | Kiểm tra input và resume | input, `@dynamic/architecture-decision.json`, `@workspaces/be` (binding head đã đóng băng) | — | `INVALID_INPUT`, `SOURCE_DRIFT`, `NO_PROGRESS` |
+| 2 | Quan sát hiện trạng | `@workspaces/be` (quan sát tại head đã đóng băng) | `@dynamic/current-state.json` | `CURRENT_STATE_UNOBSERVED` |
+| 3 | Ràng inventory quan sát được và thẩm quyền nghiệp vụ | `@dynamic/current-state.json` (các thành phần inventory cùng bằng chứng), `@worktrees/businesses/<featureId>` (head đã publish) | — | `BUSINESS_AUTHORITY_REQUIRED`, `EVIDENCE_MISSING` |
 | 4 | Đóng khung quyết định | input (mục tiêu, các trục đánh đổi, các ràng buộc đã tách) | — | `CONSTRAINT_CONTRADICTION` |
-| 5 | Sinh phương án | `@artifacts/current-state.json`, `@knowledge/patterns` | `@artifacts/<decisionId>-alternatives.html` | `NO_VIABLE_ALTERNATIVE` |
-| 6 | Chọn tạm thời | `@artifacts/<decisionId>-alternatives.html`, input (chính sách chọn, phê duyệt của chủ sở hữu) | — | `CHOICE_REQUIRED` |
-| 7 | Đào sâu phương án đã chọn | `@artifacts/<decisionId>-alternatives.html`, `@artifacts/current-state.json` (inventory), input (các ràng buộc) | `@artifacts/stack-model.json` | `DATA_OWNERSHIP_UNASSIGNED`, `COMPATIBILITY_UNVERIFIED` |
-| 8 | Phản biện phương án đã chọn | `@artifacts/stack-model.json` (thiết kế đã đào sâu và các khẳng định của nó) | `@artifacts/independent-critique.json` | `CRITIQUE_UNRESOLVED` |
-| 9 | Xác nhận lựa chọn | `@artifacts/independent-critique.json`, `@artifacts/stack-model.json` | — | — |
-| 10 | Đóng băng handoff | `@artifacts/stack-model.json` (quyết định đã xác nhận) | — | — |
-| 11 | Phát ra và dừng | tất cả những gì ở trên | `@artifacts/architecture-decision.json` | — |
+| 5 | Sinh phương án | `@dynamic/current-state.json`, `@knowledge/patterns` | `@dynamic/<decisionId>-alternatives.html` | `NO_VIABLE_ALTERNATIVE` |
+| 6 | Chọn tạm thời | `@dynamic/<decisionId>-alternatives.html`, input (chính sách chọn, phê duyệt của chủ sở hữu) | — | `CHOICE_REQUIRED` |
+| 7 | Đào sâu phương án đã chọn | `@dynamic/<decisionId>-alternatives.html`, `@dynamic/current-state.json` (inventory), input (các ràng buộc) | `@dynamic/stack-model.json` | `DATA_OWNERSHIP_UNASSIGNED`, `COMPATIBILITY_UNVERIFIED` |
+| 8 | Phản biện phương án đã chọn | `@dynamic/stack-model.json` (thiết kế đã đào sâu và các khẳng định của nó) | `@dynamic/independent-critique.json` | `CRITIQUE_UNRESOLVED` |
+| 9 | Xác nhận lựa chọn | `@dynamic/independent-critique.json`, `@dynamic/stack-model.json` | — | — |
+| 10 | Đóng băng handoff | `@dynamic/stack-model.json` (quyết định đã xác nhận) | — | — |
+| 11 | Phát ra và dừng | tất cả những gì ở trên | `@dynamic/architecture-decision.json` | — |
 
 Khâu kiểm tra từ chối binding source đã cũ, thành phần inventory không có bằng chứng, thiếu ý định cố
 định hay ràng buộc đo được, chính sách automatic mà vẫn mang phê duyệt, và tiến độ không đổi. Không gì

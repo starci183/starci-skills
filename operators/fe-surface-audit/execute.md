@@ -57,14 +57,14 @@ is valid only where no failure finding stands.
 
 | # | Step | Reads | Writes | Stops with |
 | --- | --- | --- | --- | --- |
-| 1 | Validate input and resume | input, `@receipt/fe-source-application/<invocationId>`, `@workspaces/fe` (the frozen head binding and the applied head) | — | `INVALID_INPUT`, `SOURCE_DRIFT`, `NO_PROGRESS` |
-| 2 | Bind authority | `@knowledge/ui/proof` (every topic with its fingerprint and inventory), `@receipt/fe-source-application/<invocationId>` (its claims), `@workspaces/fe` (the routed head), `@worktrees/sessions/central-runtime` (the serving endpoint) | — | — |
+| 1 | Validate input and resume | input, `@dynamic/fe-source-application.json`, `@workspaces/fe` (the frozen head binding and the applied head) | — | `INVALID_INPUT`, `SOURCE_DRIFT`, `NO_PROGRESS` |
+| 2 | Bind authority | `@knowledge/ui/proof` (every topic with its fingerprint and inventory), `@dynamic/fe-source-application.json` (its claims), `@workspaces/fe` (the routed head), `@worktrees/sessions/central-runtime` (the serving endpoint) | — | — |
 | 3 | Confirm the surface | `@workspaces/fe` (the observed checkout at the routed route) | — | — |
 | 4 | Reach readiness | input (matrix entry, its viewport, color scheme, state, and declared readiness condition), `@worktrees/sessions/central-runtime` | — | `RUNTIME_UNAVAILABLE` |
-| 5 | Capture | `@worktrees/sessions/central-runtime` (the ready surface for one matrix entry) | `@artifacts/<matrixId>.capture.json` | `EVIDENCE_MISSING` |
-| 6 | Measure | `@artifacts/<matrixId>.capture.json`, `@workspaces/fe` (the observed owners and the identifiers each node claims) | — | — |
-| 7 | Compare and judge | `@artifacts/<matrixId>.capture.json`, `@receipt/fe-source-application/<invocationId>` (the claims), `@knowledge/ui/proof` (the bound rule inventory), `@knowledge/grammars/starci` (family realization rules) | — | `UNKNOWN_RULE` |
-| 8 | Emit and stop | everything above | `@artifacts/fe-surface-audit.json` | — |
+| 5 | Capture | `@worktrees/sessions/central-runtime` (the ready surface for one matrix entry) | `@dynamic/<matrixId>.capture.json` | `EVIDENCE_MISSING` |
+| 6 | Measure | `@dynamic/<matrixId>.capture.json`, `@workspaces/fe` (the observed owners and the identifiers each node claims) | — | — |
+| 7 | Compare and judge | `@dynamic/<matrixId>.capture.json`, `@dynamic/fe-source-application.json` (the claims), `@knowledge/ui/proof` (the bound rule inventory), `@knowledge/grammars/starci` (family realization rules) | — | `UNKNOWN_RULE` |
+| 8 | Emit and stop | everything above | `@dynamic/fe-surface-audit.json` | — |
 
 Validation rejects a stale source binding, an applied head that differs from the observed head,
 duplicate topics, a cross-filed identifier, two matrix ids for one condition, and unchanged progress.

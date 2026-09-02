@@ -18,7 +18,7 @@ The exact refs, fingerprints, and heads the input must bind before the operator 
 
 | Alias | Resolves to | Bind | Required |
 | --- | --- | --- | --- |
-| `@<alias>/<params>` | `<location from refs.json, code-spanned so placeholders render>` | how it is fingerprinted | Required or Optional: purpose |
+| `@<alias>/<params>` | `<location from refs.json, code-spanned so placeholders render>` | how it is fingerprinted | Required or Optional · static or dynamic: purpose |
 
 ## <Law section, optional, repeatable>
 

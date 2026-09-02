@@ -31,8 +31,8 @@ written down is a hint that gets followed the moment the declared route looks in
 | 4 | Reject every hint | input (`context.hints`) | — | — |
 | 5 | Verify the checkout | `@workspaces/local/routes/<project>/<role>` (the resolved route, the observed checkout, the routed Git policy, the working tree) | — | `BRANCH_POLICY_VIOLATION`, `CHECKOUT_DIRTY` |
 | 6 | Bind the runtime the caller consumes | `@worktrees/sessions/central-runtime` (the owner registry, its generation and health evidence), `@workspaces/ports/<project>` (`workspace-route-port-projection`) | — | `ENDPOINT_AUTHORITY_STALE`, `RUNTIME_NOT_READY` |
-| 7 | Bind provenance and freshness | input (the redacted conversation head), `@artifacts` (the cached receipt) | — | — |
-| 8 | Emit and stop | everything above | `@artifacts/route-receipt.json` | — |
+| 7 | Bind provenance and freshness | input (the redacted conversation head), `@dynamic/workspace-route-binding.json` (the cached receipt) | — | — |
+| 8 | Emit and stop | everything above | `@dynamic/workspace-route-binding.json` | — |
 
 Validation rejects a route that declares another identity, a source route carrying a directory, a
 sibling route that traverses, a hydrated route with a foreign workspace root, an observation of a

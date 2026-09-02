@@ -52,7 +52,7 @@ lâu dài, và một bản ghi lâu dài của capability chính là credential 
 | 5 | Suy ra delta | `@worktrees/sessions/central-runtime` (trạng thái quan sát được), input (trạng thái mong muốn) | — | — |
 | 6 | Áp delta đã duyệt | `@worktrees/sessions/central-runtime` (mỗi lần một resource), `@workspaces/device-state` (credential handle theo tên) | `@worktrees/sessions/central-runtime` | `EFFECT_UNAUTHORIZED`, `SERVICE_UNAVAILABLE` |
 | 7 | Chứng minh mọi check bắt buộc | `@worktrees/sessions/central-runtime` (dịch vụ đã đọc lại, trọn bộ chứng minh của nhánh) | — | `PROOF_FAILED` |
-| 8 | Phát ra rồi dừng | tất cả những gì ở trên | `@artifacts/<branch>.receipt.json` | — |
+| 8 | Phát ra rồi dừng | tất cả những gì ở trên | `@dynamic/platform-operation-receipt.json` | — |
 
 Khâu validate từ chối binding source cũ, effect hay check xếp nhầm nhánh, bộ chứng minh bị thu hẹp,
 resource chưa kiểm kê, capability còn thiếu, vật liệu credential lọt vào contract, và tiến độ không

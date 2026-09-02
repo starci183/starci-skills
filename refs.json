@@ -1,6 +1,6 @@
 {
   "schemaVersion": 8,
-  "note": "Closed registry of reference aliases. An alias reads like the place it names: @workspaces/fe and @workspaces/be are the bound project's routed checkouts, @knowledge/ui and @worktrees/businesses mirror the folders, @npm is the registry, @external/{remote,ghcr,github-actions,minio} are services, @grammar is the @starci/grammar package as the app resolves it. `<Source>` is the host repository that owns this .claude. A sub-path after a registered alias narrows it; a segment in angle brackets is supplied by the invocation. Resolution picks the longest registered prefix.",
+  "note": "Closed registry of reference aliases. An alias reads like the place it names. Static: @workspaces/fe and @workspaces/be (the bound project's routed checkouts), @workspaces/<project>/<role>, @workspaces/{projects,local/routes,ports,device-state}, @grammar/<family>, @knowledge/{ui,grammars,patterns}, @worktrees/{businesses,uat,debts,_templates,sessions/central-runtime}, @remote/{npm,git,ghcr,github-actions,minio}. Dynamic: @dynamic/<file>, produced inside the current session by an earlier step and deleted with the session. `<Source>` is the host repository that owns this .claude. A sub-path after a registered alias narrows it; a segment in angle brackets is supplied by the invocation. Resolution picks the longest registered prefix.",
   "aliases": {
     "@workspaces/fe": {
       "params": [],
@@ -74,26 +74,6 @@
       "writers": [],
       "purpose": "Machine identity and the encrypted credential roster reference."
     },
-    "@npm": {
-      "params": [
-        "package"
-      ],
-      "kind": "service",
-      "resolvesTo": "the npm registry entry for <package>, e.g. @npm/@starci/grammar@0.3.0",
-      "scheme": "npm://<package>@<version>",
-      "bind": "version + tarball integrity",
-      "writers": [],
-      "purpose": "Published packages. A version is the binding; latest is never a binding."
-    },
-    "@grammar": {
-      "params": [],
-      "kind": "checkout",
-      "resolvesTo": "the @starci/grammar package as the bound app resolves it: `file:packages/grammar` inside @workspaces/fe today (source 0.4.0), or @npm/@starci/grammar@<version> (0.3.0 published); the receipt records which",
-      "scheme": "grammar://starci-core@<version>",
-      "bind": "package.json version + the resolved location's fingerprint (checkout head for file:, tarball integrity for npm)",
-      "writers": [],
-      "purpose": "The Grammar as it runs: renderers, props, owned relationships, data-contract claims, core/styles.css. The only fact about what a component owns."
-    },
     "@knowledge/ui": {
       "params": [],
       "kind": "dir",
@@ -135,13 +115,13 @@
     "@worktrees/sessions": {
       "params": [],
       "kind": "dir",
-      "resolvesTo": "<Source>/.worktrees/sessions/<sessionId>/  (leases, inventories, blockers, and each invocation's artifacts/)",
+      "resolvesTo": "<Source>/.worktrees/sessions/<sessionId>/  (session.json, leases/, steps/<n>.<operator.id>/ — see @dynamic; central-runtime/ is the shared runtime owner and is not a session)",
       "scheme": "session://<sessionId>",
       "bind": "fingerprint per file read",
       "writers": [
         "*"
       ],
-      "purpose": "Per-session working records."
+      "purpose": "The session container. Operators do not read it directly; they read @dynamic."
     },
     "@worktrees/sessions/central-runtime": {
       "params": [],
@@ -183,30 +163,29 @@
       "writers": [],
       "purpose": "Authority templates for new heads, debts, sessions, and UAT pairs. Consumed, never modified."
     },
-    "@artifacts": {
-      "params": [],
-      "kind": "caller-supplied",
-      "resolvesTo": "input.project.artifactRootRef; convention <Source>/.worktrees/sessions/<invocationId>/artifacts/  (receipt, named artifacts, captures)",
-      "scheme": "artifact://<invocationId>/<name>",
-      "bind": "fingerprint per artifact; every artifact written is registered in output.artifactRefs",
-      "writers": [
-        "*"
-      ],
-      "purpose": "The only place an operator writes: its receipt and named artifacts, including audit captures."
-    },
-    "@receipt": {
+    "@grammar": {
       "params": [
-        "receiptType",
-        "invocationId"
+        "family"
       ],
-      "kind": "file",
-      "resolvesTo": "<@artifacts of invocation <invocationId>>/<receiptType>.json  (the receipt file that invocation registered in output.artifactRefs)",
-      "scheme": "receipt://<receiptType>/<invocationId>",
-      "bind": "fingerprint + the sourceHead the receipt binds",
+      "kind": "checkout",
+      "resolvesTo": "the @starci/grammar package as the bound app resolves it (`file:packages/grammar` inside @workspaces/fe today, source 0.4.0; @remote/npm publishes 0.3.0), narrowed to one family <family>: @grammar/core, @grammar/heritage, @grammar/offset-pop; @grammar/common is the shared layer every family imports",
+      "scheme": "grammar://<family>@<version>",
+      "bind": "package.json version + the resolved location's fingerprint (checkout head for file:, tarball integrity for npm)",
       "writers": [],
-      "purpose": "A predecessor's typed receipt, read whole and unchanged."
+      "purpose": "The Grammar as it runs: Common renderers, props, owned relationships, data-contract claims, and the family's own CSS. The only fact about what a component owns."
     },
-    "@external/remote": {
+    "@remote/npm": {
+      "params": [
+        "package"
+      ],
+      "kind": "service",
+      "resolvesTo": "the npm registry entry for <package>, e.g. @remote/npm/@starci/grammar@0.3.0",
+      "scheme": "npm://<package>@<version>",
+      "bind": "version + tarball integrity",
+      "writers": [],
+      "purpose": "Published packages. A version is the binding; latest never is."
+    },
+    "@remote/git": {
       "params": [
         "project",
         "role"
@@ -220,7 +199,7 @@
       ],
       "purpose": "The publication target; fast-forwardness is decided against this observation."
     },
-    "@external/ghcr": {
+    "@remote/ghcr": {
       "params": [
         "image"
       ],
@@ -233,7 +212,7 @@
       ],
       "purpose": "Immutable release images. A tag is never a binding; a digest is."
     },
-    "@external/github-actions": {
+    "@remote/github-actions": {
       "params": [
         "runId"
       ],
@@ -244,7 +223,7 @@
       "writers": [],
       "purpose": "CI evidence of a build or rollout, read only."
     },
-    "@external/minio": {
+    "@remote/minio": {
       "params": [
         "contentId",
         "locale"
@@ -257,6 +236,19 @@
         "content.generate"
       ],
       "purpose": "Authored lesson content as served, not as drafted."
+    },
+    "@dynamic": {
+      "params": [
+        "file"
+      ],
+      "kind": "dir",
+      "resolvesTo": "<Source>/.worktrees/sessions/<sessionId>/steps/<n>.<operator.id>/<file>. Writing: <n>.<operator.id> is the current step, and input.project.artifactRootRef must equal that folder. Reading: the nearest earlier step of the same session that wrote <file>; @dynamic/steps/<n>/<file> names a specific step. The session folder is created by the orchestrator and deleted when the run completes; a blocked run keeps it for resume",
+      "scheme": "artifact://<sessionId>/<n>.<operator.id>/<file>",
+      "bind": "fingerprint per file; every file written is registered in output.artifactRefs",
+      "writers": [
+        "*"
+      ],
+      "purpose": "Everything produced inside the session and nothing that existed before it: <receiptType>.json, changes.md, named artifacts, captures. Always dynamic."
     }
   },
   "segments": {

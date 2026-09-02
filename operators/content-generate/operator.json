@@ -18,7 +18,7 @@
   },
   "refs": [
     {
-      "alias": "@external/minio/contents/<contentId>/<locale>",
+      "alias": "@remote/minio/<contentId>/<locale>",
       "required": true,
       "purpose": "The lesson as served; the unit being authored or revised."
     },
@@ -28,14 +28,9 @@
       "purpose": "The AI runtime that runs, reads, and repairs generated code."
     },
     {
-      "alias": "@receipt/content-generation-receipt/<invocationId>",
-      "required": false,
-      "purpose": "A prior audit of the same unit; regression history."
-    },
-    {
-      "alias": "@artifacts",
+      "alias": "@dynamic/content-generation-receipt.json",
       "required": true,
-      "purpose": "Where the brief, articles, code tracks, images, review, and receipt are written."
+      "purpose": "A prior audit of the same unit; regression history."
     }
   ],
   "contextContract": "context.md",
