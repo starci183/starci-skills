@@ -6,44 +6,52 @@ Turn the validated input and its exact context into one typed frontend direction
 linear operator invocation. It does not call another operator, route a workflow, pause internally, or
 perform implementation.
 
-## Execution sequence
+## Sequence
 
-1. **Validate input and resume.** Apply `input.schema.json` and semantic validation. Reject stale
-   authority, source drift, owner overlap, invalid change-level combinations, unapproved comparison,
-   and unchanged progress.
-2. **Bind authority.** Bind the request, business receipt, optional backend/architecture receipts,
-   published Grammar, project, target, change level, and owner ceiling. Evidence may contradict but
-   cannot replace authority.
-3. **Observe existing context.** Inspect direct artifacts without producer rationale. For existing
-   targets, record current regions, actions, states, responsive behavior, and owner boundaries. For new
-   targets, verify absence and observe only the authorized host and product-family context.
-4. **Compile one UI contract.** Freeze purpose, actor tasks, representative content, region
-   responsibilities, information/action order, closed state matrix, exits, responsive rules,
-   accessibility obligations, Grammar bindings, preserved decisions, changed decisions, and non-goals.
-5. **Resolve reference needs.** If the domain or interaction model is unfamiliar, perform bounded
-   external research from exact references. Record useful relationships and limitations; never copy a
-   page, brand, palette, or component anatomy. Stop with the owning gap when evidence cannot close a
-   business or interaction decision.
-6. **Form candidates.** `refine` preserves the approved structure. Exact approved-direction reuse
-   preserves the supplied direction triple. Otherwise form one dominant reversible candidate, or
-   exactly three/four materially different candidates in authorized compare mode.
-7. **Apply the Grammar filter.** Reject every candidate that invents a missing shared interface,
-   bypasses the owner ceiling, imitates unpublished Grammar locally, or contradicts a published
-   composition. `GRAMMAR_REQUIRED` ends this invocation.
-8. **Render decision evidence.** A generated `new` or `reconstruct` candidate is a realistic page or
-   substantial surface with representative content, wide and constrained compositions, and at least
-   one consequential pending, failure, recovery, or boundary state. Compare mode renders every
-   alternative in one inspectable artifact and visibly exposes the material differences.
-9. **Falsify.** Attack business/backend conformance, hierarchy, content density, action feedback,
-   recovery, responsive reflow, content stress, keyboard/focus behavior, accessibility, family
-   coherence, reversibility, and owner leakage. Record add/change/remove dispositions and
-   contradictions.
-10. **Decide or block.** In dominant mode, select the valid materially dominant candidate. In compare
-    mode, or when several valid candidates remain without a dominant answer, emit
-    `DIRECTION_CHOICE_REQUIRED` with exactly three/four alternatives. Do not choose by taste.
-11. **Emit and stop.** Emit one output conforming to `output.schema.json`, bound to all source,
-    authority, context, scope, artifact, input, and progress fingerprints. Do not mutate source or
-    claim downstream proof.
+| # | Step | Reads | Writes | Stops with |
+| --- | --- | --- | --- | --- |
+| 1 | Validate input and resume | input, prior receipt, frozen source binding | — | `INVALID_INPUT`, `SOURCE_DRIFT`, `NO_PROGRESS` |
+| 2 | Bind authority | request, business receipt, optional backend and architecture receipts, published Grammar, project, target, change level, owner ceiling | — | `ROUTE_UNVERIFIED`, `SCOPE_UNFROZEN`, `CHANGE_LEVEL_AMBIGUOUS`, `OWNER_CEILING_INVALID`, `BUSINESS_REQUIRED`, `BACKEND_REQUIRED`, `ARCHITECTURE_REQUIRED` |
+| 3 | Observe existing context | direct artifacts of the target, or the authorized host and product-family context | — | `EVIDENCE_MISSING` |
+| 4 | Compile one UI contract | bound authority, observed context | — | — |
+| 5 | Resolve reference needs | exact external references, bounded by the gap they must close | — | `REFERENCE_EVIDENCE_EXHAUSTED` |
+| 6 | Form candidates | UI contract, change level, comparison authorization | — | `NO_VIABLE_DIRECTION` |
+| 7 | Apply the Grammar filter | candidates, published Grammar, owner ceiling | — | `GRAMMAR_REQUIRED` |
+| 8 | Render decision evidence | surviving candidates and the UI contract | `<candidateId>.html` | — |
+| 9 | Falsify | rendered evidence, business and backend receipts | — | — |
+| 10 | Decide or block | falsified candidates, mode | — | `DIRECTION_CHOICE_REQUIRED` |
+| 11 | Emit and stop | everything above | — | — |
+
+Validation rejects stale authority, source drift, owner overlap, invalid change-level combinations,
+an unapproved comparison, and unchanged progress. Evidence may contradict authority but never
+replaces it. Observation takes the direct artifacts without the producer's rationale: an existing
+target yields its current regions, actions, states, responsive behavior, and owner boundaries, and a
+new target is verified absent before only the authorized host and product-family context is observed.
+
+The UI contract freezes purpose, actor tasks, representative content, region responsibilities,
+information and action order, the closed state matrix, exits, responsive rules, accessibility
+obligations, Grammar bindings, preserved decisions, changed decisions, and non-goals. Bounded external
+research records useful relationships and their limitations and never copies a page, brand, palette,
+or component anatomy; when evidence cannot close a business or interaction decision the invocation
+stops with the owning gap.
+
+`refine` preserves the approved structure and an exact approved-direction reuse preserves the supplied
+direction triple; otherwise the step forms one dominant reversible candidate, or exactly three or four
+materially different candidates in an authorized compare mode. The Grammar filter rejects every
+candidate that invents a missing shared interface, bypasses the owner ceiling, imitates unpublished
+Grammar locally, or contradicts a published composition.
+
+A generated `new` or `reconstruct` candidate is rendered as a realistic page or substantial surface
+with representative content, wide and constrained compositions, and at least one consequential
+pending, failure, recovery, or boundary state; compare mode renders every alternative in one
+inspectable artifact and visibly exposes the material differences. Falsification attacks business and
+backend conformance, hierarchy, content density, action feedback, recovery, responsive reflow, content
+stress, keyboard and focus behavior, accessibility, family coherence, reversibility, and owner
+leakage, and records add, change, and remove dispositions with their contradictions. The decision
+selects the valid materially dominant candidate in dominant mode; in compare mode, or when several
+valid candidates remain with no dominant answer, it returns exactly three or four alternatives rather
+than choosing by taste. Emission binds all source, authority, context, scope, artifact, input, and
+progress fingerprints, mutates no source, and claims no downstream proof.
 
 ## Resume execution
 
