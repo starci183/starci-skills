@@ -1,0 +1,200 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://starci.dev/v6/readiness/initialization/workspaces/portable-route.schema.json",
+  "title": "Portable StarCi workspace route declaration",
+  "description": "Pushable project/role intent. V1 and unrevisioned V6 remain readable for safe migration; schemaRevision 2 is the current V6 contract-aware envelope.",
+  "oneOf": [
+    { "$ref": "#/$defs/v1" },
+    { "$ref": "#/$defs/v6Legacy" },
+    { "$ref": "#/$defs/v6Current" }
+  ],
+  "$defs": {
+    "slug": {
+      "type": "string",
+      "maxLength": 80,
+      "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$"
+    },
+    "relativePath": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 512,
+      "pattern": "^(?!/)(?![A-Za-z]:)(?!.*\\\\)(?!.*(?:^|/)\\.\\.(?:/|$))(?!.*//)[A-Za-z0-9._ -]+(?:/[A-Za-z0-9._ -]+)*$"
+    },
+    "repository": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "directory", "gitRepository", "branch"],
+      "properties": {
+        "kind": { "enum": ["source", "sibling"] },
+        "directory": {
+          "oneOf": [
+            { "$ref": "#/$defs/relativePath" },
+            { "type": "null" }
+          ]
+        },
+        "gitRepository": {
+          "type": "string",
+          "maxLength": 512,
+          "pattern": "^https://github\\.com/[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+(?:\\.git)?$"
+        },
+        "branch": { "type": "string", "minLength": 1, "maxLength": 255 },
+        "gitPolicy": { "$ref": "#/$defs/gitPolicy" }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "kind": { "const": "source" } }, "required": ["kind"] },
+          "then": { "properties": { "directory": { "type": "null" } } },
+          "else": { "properties": { "directory": { "$ref": "#/$defs/relativePath" } } }
+        }
+      ]
+    },
+    "gitPolicy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["mutationBranch", "worktreeBranches", "incomingBranchRefs"],
+      "properties": {
+        "mutationBranch": { "type": "string", "minLength": 1, "maxLength": 255 },
+        "worktreeBranches": { "const": "forbidden" },
+        "incomingBranchRefs": { "const": "merge-into-mutation-branch" }
+      }
+    },
+    "commonContext": {
+      "properties": {
+        "instructions": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": { "$ref": "#/$defs/relativePath" }
+        },
+        "manifests": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": { "$ref": "#/$defs/relativePath" }
+        }
+      }
+    },
+    "v1Context": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["instructions", "manifests", "grammar", "grammarProfile"],
+      "properties": {
+        "instructions": { "$ref": "#/$defs/commonContext/properties/instructions" },
+        "manifests": { "$ref": "#/$defs/commonContext/properties/manifests" },
+        "grammar": {
+          "oneOf": [
+            { "$ref": "#/$defs/slug" },
+            { "type": "null" }
+          ]
+        },
+        "grammarProfile": {
+          "oneOf": [
+            { "$ref": "#/$defs/slug" },
+            { "type": "null" }
+          ]
+        }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "grammar": { "type": "null" } }, "required": ["grammar"] },
+          "then": { "properties": { "grammarProfile": { "type": "null" } } },
+          "else": { "properties": { "grammarProfile": { "$ref": "#/$defs/slug" } } }
+        }
+      ]
+    },
+    "v6PreContractContext": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["instructions", "manifests", "grammarId"],
+      "properties": {
+        "instructions": { "$ref": "#/$defs/commonContext/properties/instructions" },
+        "manifests": { "$ref": "#/$defs/commonContext/properties/manifests" },
+        "grammarId": { "enum": ["core", "offset-pop", null] }
+      }
+    },
+    "v6ContractContext": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["instructions", "contract", "contractSource", "manifests", "grammarId"],
+      "properties": {
+        "instructions": { "$ref": "#/$defs/commonContext/properties/instructions" },
+        "contract": {
+          "oneOf": [
+            { "$ref": "#/$defs/relativePath" },
+            { "type": "null" }
+          ]
+        },
+        "contractSource": {
+          "oneOf": [
+            { "type": "string", "minLength": 1, "maxLength": 1024 },
+            { "type": "null" }
+          ]
+        },
+        "manifests": { "$ref": "#/$defs/commonContext/properties/manifests" },
+        "grammarId": { "enum": ["core", "offset-pop", null] }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "contract": { "type": "null" } }, "required": ["contract"] },
+          "then": { "properties": { "contractSource": { "type": "null" } } },
+          "else": { "properties": { "contractSource": { "type": "string", "minLength": 1 } } }
+        }
+      ]
+    },
+    "v1": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["version", "project", "role", "repository", "context"],
+      "properties": {
+        "$schema": { "type": "string" },
+        "version": { "const": 1 },
+        "project": { "$ref": "#/$defs/slug" },
+        "role": { "$ref": "#/$defs/slug" },
+        "repository": { "$ref": "#/$defs/repository" },
+        "context": { "$ref": "#/$defs/v1Context" }
+      }
+    },
+    "v6Legacy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["schemaVersion", "project", "role", "repository", "context"],
+      "properties": {
+        "$schema": { "type": "string" },
+        "schemaVersion": { "const": 6 },
+        "project": { "$ref": "#/$defs/slug" },
+        "role": { "$ref": "#/$defs/slug" },
+        "repository": { "$ref": "#/$defs/repository" },
+        "context": {
+          "oneOf": [
+            { "$ref": "#/$defs/v6PreContractContext" },
+            { "$ref": "#/$defs/v6ContractContext" }
+          ]
+        }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "role": { "enum": ["be", "chart"] } }, "required": ["role"] },
+          "then": { "properties": { "context": { "properties": { "grammarId": { "type": "null" } } } } }
+        }
+      ]
+    },
+    "v6Current": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["schemaVersion", "schemaRevision", "project", "role", "repository", "context"],
+      "properties": {
+        "$schema": { "type": "string" },
+        "schemaVersion": { "const": 6 },
+        "schemaRevision": { "const": 2 },
+        "project": { "$ref": "#/$defs/slug" },
+        "role": { "$ref": "#/$defs/slug" },
+        "repository": { "$ref": "#/$defs/repository" },
+        "context": { "$ref": "#/$defs/v6ContractContext" }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "role": { "enum": ["be", "chart"] } }, "required": ["role"] },
+          "then": { "properties": { "context": { "properties": { "grammarId": { "type": "null" } } } } }
+        }
+      ]
+    }
+  }
+}
