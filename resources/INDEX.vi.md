@@ -2,13 +2,14 @@
 
 Ai chạy operator nào, bằng gì, và dưới những chính sách thường trực nào. Hai file đóng mang việc đó:
 
-- `agents.json`: các profile thực thi, gồm provider, model, cách cô lập, và những quyền lúc chạy mà
-  mỗi profile được dùng ở đây.
+- `agents.json`: các profile thực thi, gồm provider, model, cách cô lập, model làm được gì ở đây
+  (`capabilities`), và một vai trò trên profile đó được phép dùng gì (`permits`).
 - `assignments.json`: mỗi operator một mục, ghi profile nào chạy từng vai trò, operator thật sự cần
   những quyền nào, và câu trả lời của nó cho ba câu hỏi thường trực.
 
 `scripts/validate-resources.mjs` chạy bên trong `npm test`. Nó từ chối operator không có assignment,
-vai trò trỏ tới profile không tồn tại, quyền được yêu cầu mà không profile nào được cấp, câu trả lời
+vai trò trỏ tới profile không tồn tại, quyền được yêu cầu mà không profile nào được cấp, profile cho phép
+thứ model không làm được, câu trả lời
 chính sách mâu thuẫn với quyền, và model mà schema của operator đã ghim nhưng không profile nào dùng.
 Nhờ vậy sổ đăng ký và hợp đồng operator không thể lặng lẽ lệch nhau.
 
@@ -16,7 +17,10 @@ Nhờ vậy sổ đăng ký và hợp đồng operator không thể lặng lẽ 
 
 Operator ràng profile theo vai trò, không theo từng lần gọi. Profile quyết model và cách cô lập;
 `execute.md` của operator quyết công việc; assignment quyết công việc đó được chạm tới quyền nào.
-Một quyền không nằm trong `requires` thì operator không dùng được dù profile có cho phép. Brainstorm
+Một quyền không nằm trong `requires` thì operator không dùng được dù profile có cho phép. Năng lực là sự thật về model; quyền là chính sách về vai trò:
+`gpt-5.6-sol` tìm được, vẽ được, lái được trình duyệt và ghi được source, nên `sol-fresh` được dùng cả
+bốn, còn `sol-reviewer` trên cùng model đó chỉ được trình duyệt, vì một reviewer mà tự tạo ra thì
+không còn là reviewer. Brainstorm
 và review quan trọng luôn là một lần thực thi mới, không thừa hưởng lượt nào, và reviewer chỉ nhận
 artifact với lời khai, không bao giờ nhận lý lẽ của người tạo ra.
 
@@ -60,14 +64,14 @@ tên nó. Mọi nơi khác, `never`.
 
 ## Profile
 
-| Profile | Model | Được cấp | Dùng cho |
-| --- | --- | --- | --- |
-| `sol-fresh` | `gpt-5.6-sol` | mạng | Một quyết định hay brainstorm mới, từ đầu tới cuối |
-| `sol-reviewer` | `gpt-5.6-sol` | trình duyệt | Một reviewer mới; chỉ artifact và lời khai |
-| `luna` | `gpt-5.6-luna` | hình, source | Sản xuất nội dung có tác giả |
-| `opus` | `claude-opus-5` | trình duyệt, source | Tác giả nặng và mutation rủi ro cao |
-| `sonnet` | `claude-sonnet-5` | source | Việc xác định và cơ học |
-| `fable` | `claude-fable-5-1` | source | Trích xuất và audit bám source |
+| Profile | Model | Năng lực | Được cấp | Dùng cho |
+| --- | --- | --- | --- | --- |
+| `sol-fresh` | `gpt-5.6-sol` | mạng, hình, trình duyệt, source | mạng, hình, trình duyệt, source | Một quyết định hay brainstorm mới, từ đầu tới cuối |
+| `sol-reviewer` | `gpt-5.6-sol` | mạng, hình, trình duyệt, source | trình duyệt | Một reviewer mới; chỉ artifact và lời khai |
+| `luna` | `gpt-5.6-luna` | mạng, hình, source | hình, source | Sản xuất nội dung có tác giả |
+| `opus` | `claude-opus-5` | mạng, trình duyệt, source | trình duyệt, source | Tác giả nặng và mutation rủi ro cao |
+| `sonnet` | `claude-sonnet-5` | mạng, trình duyệt, source | source | Việc xác định và cơ học |
+| `fable` | `claude-fable-5-1` | mạng, trình duyệt, source | source | Trích xuất và audit bám source |
 
 `fable` được đăng ký cho việc audit và trích xuất đã tạo ra `patterns/`; hôm nay chưa vai trò
 operator nào ràng nó.

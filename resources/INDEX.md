@@ -2,13 +2,14 @@
 
 Who runs each operator, with what, and under which standing policies. Two closed files carry it:
 
-- `agents.json` — the execution profiles: provider, model, isolation, and the runtime grants each
-  profile may use here.
+- `agents.json` — the execution profiles: provider, model, isolation, what the model can do here
+  (`capabilities`), and what a role on that profile is allowed to use (`permits`).
 - `assignments.json` — one entry per operator: which profile runs each role, which grants the
   operator actually requires, and its answer to the three standing questions.
 
 `scripts/validate-resources.mjs` runs inside `npm test`. It rejects an operator with no assignment, a
-role bound to an unknown profile, a required grant no assigned profile permits, a policy answer that
+role bound to an unknown profile, a required grant no assigned profile permits, a profile that permits
+what its model cannot do, a policy answer that
 contradicts the grants, and a model an operator's own schema pins that no assigned profile uses. The
 registry and the operator contracts therefore cannot drift apart silently.
 
@@ -17,7 +18,10 @@ registry and the operator contracts therefore cannot drift apart silently.
 An operator binds a profile per role, never per invocation. The profile decides the model and the
 isolation; the operator's `execute.md` decides the work; the assignment decides which grants that
 work may touch. A grant absent from `requires` is unavailable to the operator even if the profile
-would permit it. Material brainstorms and reviews are always one fresh execution with no inherited
+would permit it. Capability is a fact about the model; permission is a policy about the
+role: `gpt-5.6-sol` can search, draw, drive a browser, and write source, so `sol-fresh` may use all
+four, while `sol-reviewer` on the same model is permitted only the browser, because a reviewer that
+produces is no longer a reviewer. Material brainstorms and reviews are always one fresh execution with no inherited
 turns, and a reviewer receives artifacts and claims, never the producer's rationale.
 
 ## The three standing questions
@@ -58,14 +62,14 @@ names it. Everywhere else, `never`.
 
 ## Profiles
 
-| Profile | Model | Permits | Used for |
-| --- | --- | --- | --- |
-| `sol-fresh` | `gpt-5.6-sol` | web | One fresh decision or brainstorm, end to end |
-| `sol-reviewer` | `gpt-5.6-sol` | browser | One fresh reviewer; artifacts and claims only |
-| `luna` | `gpt-5.6-luna` | images, source | Production of authored content |
-| `opus` | `claude-opus-5` | browser, source | Heavy authoring and high-stakes mutation |
-| `sonnet` | `claude-sonnet-5` | source | Deterministic and mechanical work |
-| `fable` | `claude-fable-5-1` | source | Source-grounded extraction and audits |
+| Profile | Model | Capabilities | Permits | Used for |
+| --- | --- | --- | --- | --- |
+| `sol-fresh` | `gpt-5.6-sol` | web, images, browser, source | web, images, browser, source | One fresh decision or brainstorm, end to end |
+| `sol-reviewer` | `gpt-5.6-sol` | web, images, browser, source | browser | One fresh reviewer; artifacts and claims only |
+| `luna` | `gpt-5.6-luna` | web, images, source | images, source | Production of authored content |
+| `opus` | `claude-opus-5` | web, browser, source | browser, source | Heavy authoring and high-stakes mutation |
+| `sonnet` | `claude-sonnet-5` | web, browser, source | source | Deterministic and mechanical work |
+| `fable` | `claude-fable-5-1` | web, browser, source | source | Source-grounded extraction and audits |
 
 `fable` is registered for the audit and extraction work that produced `patterns/`; no operator role
 binds it today.
