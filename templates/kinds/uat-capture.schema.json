@@ -25,11 +25,16 @@
       "items": {
         "type": "object",
         "additionalProperties": false,
-        "required": ["assertionId", "lane", "observed", "evidenceRef", "outcome"],
+        "required": ["assertionId", "lane", "observed", "control", "evidenceRef", "outcome"],
         "properties": {
           "assertionId": { "type": "string", "minLength": 1 },
           "lane": { "enum": ["behavior", "ux", "ui"] },
           "observed": { "type": "string", "minLength": 1 },
+          "control": {
+            "description": "The rendered surface control this step pressed to produce what was observed, identified the way a rendered node is identified elsewhere in this tree (capture.schema.json nodes[].path): a path into the rendered tree. A walk is evidence only for what it pressed, so an assertion produced by any other means — an endpoint, a mutation, a console command called from page context — names no control here and cannot carry this field.",
+            "type": "string",
+            "minLength": 1
+          },
           "evidenceRef": { "type": "string", "minLength": 1 },
           "outcome": { "enum": ["pass", "fail"] }
         }

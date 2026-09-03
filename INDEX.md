@@ -1,4 +1,4 @@
-# StarCi Skills 1.7.6
+# StarCi Skills 1.7.7
 
 This tree is the runtime. Read [SKILL.md](SKILL.md) next; it is the single entry that freezes a
 mission's scope, selects the one operator that owns the outcome, and routes between operators on
@@ -67,6 +67,7 @@ head or the head is not publishable.
 
 ## Lineage
 
+1.7.7 (2026-09-04): a walk is evidence only for what it pressed — every scored assertion of a UAT capture names the surface control the step acted on, so a step that makes something happen other than through the surface cannot be scored.
 1.7.6 (2026-09-04): a score is a claim about the candidate it scores — a decision declares what each candidate does not carry, and a criterion declared unmet cannot be scored at the passing end nor left unscored.
 1.7.5 (2026-09-04): a UAT run is triggered by need and authorised by the environment declaration for its seed and identity classes, not by a person named in the request; a state-reading topic — composition, accessibility, the taste lens — is blocked with its coverage gaps named when the matrix does not cover every state the direction declares, and a narrowed round cannot close a loop or exhaust a budget; the serve rung runs the delivery gates the product declares, patch coverage against the merged base included.
 1.7.4 (2026-09-03): authority comes from the environment declaration — .stacks/<env>/environment.json marks each operation class declared or person, non-production defaults to declared for provisioning and runtime, production to person, and the approval field accepts the declaration reference with its hash; several rendered candidates are ranked by the proof rubric and the dominant one is taken, a person is asked only over a scored tie; a data-volume criterion is measured at the flow's representative seeded volume, routes to seed below it and is data-bound at it; a criterion the person's printed choice was known to fail is person-accepted and does not block quality or uat.

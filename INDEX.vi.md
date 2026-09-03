@@ -1,4 +1,4 @@
-# StarCi Skills 1.7.6
+# StarCi Skills 1.7.7
 
 Cây này chính là runtime. Đọc tiếp `SKILL.md` (bản tiếng Anh là bản được nạp; `SKILL.vi.md` chỉ để người đọc); đó là cửa vào duy nhất,
 đóng băng phạm vi của một nhiệm vụ, chọn đúng một operator sở hữu kết quả, rồi định tuyến giữa các
@@ -68,6 +68,7 @@ thì không được publish.
 
 ## Dòng dõi
 
+1.7.7 (2026-09-04): một lượt đi bộ chỉ là bằng chứng cho thứ nó đã bấm — mỗi khẳng định được chấm trong một capture UAT phải nêu tên control trên bề mặt mà bước đó tác động, nên một bước làm cho việc gì đó xảy ra không qua bề mặt thì không được chấm.
 1.7.6 (2026-09-04): điểm là một lời khẳng định về chính ứng viên được chấm — quyết định khai rõ ứng viên không mang gì, và tiêu chí đã khai là không thoả thì không được chấm ở đầu đạt, cũng không được bỏ trống.
 1.7.5 (2026-09-04): một lần chạy UAT khởi động vì nhu cầu và lấy thẩm quyền từ khai báo môi trường cho lớp seed và định danh, không phải từ một người được nêu tên trong request; topic đọc theo trạng thái — composition, accessibility, lens taste — bị blocked kèm tên các khoảng thiếu khi ma trận không phủ đủ trạng thái direction khai, và một vòng thu hẹp không được chốt vòng lặp hay tuyên đã cạn ngân sách; bậc serve chạy bộ gate giao hàng do sản phẩm khai, gồm patch coverage đo theo base đã merge.
 1.7.4 (2026-09-03): thẩm quyền đến từ khai báo môi trường — .stacks/<env>/environment.json đánh dấu từng lớp thao tác là declared hay person, ngoài production mặc định declared cho cấp tài khoản và runtime, production mặc định person, và trường approval nhận tham chiếu khai báo kèm hash; nhiều ứng viên đã render được xếp hạng theo rubric proof và ứng viên trội được chọn, chỉ hỏi người khi điểm số chứng minh hoà; tiêu chí phụ thuộc khối lượng dữ liệu đo ở khối lượng seed đại diện của flow, thiếu thì route sang seed, đủ mà vẫn fail thì là data-bound; tiêu chí mà lựa chọn in ra của người đã biết là fail thì là person-accepted và không chặn quality hay uat.

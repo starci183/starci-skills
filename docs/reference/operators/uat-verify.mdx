@@ -176,8 +176,12 @@ record under `@worktrees/uat/<flow>/<case>` while it holds the exclusive lease, 
 `data/verdicts.json`, the screenshots and the sheet under `response/artifacts/`, `response.md` and
 `response.json`. It does not read or write the password as a value, does not ask a person to sign in
 or paste a credential, does not repair the product to make a case pass, does not edit the frozen
-snapshot after execution begins, does not rewrite or delete a run record, and does not delete
-anything outside its own fixture namespace.
+snapshot after execution begins, does not rewrite or delete a run record, does not delete anything
+outside its own fixture namespace, and does not make anything happen other than through the control
+each capture names: a walk is evidence only for what it pressed, so a step that reaches the product by
+any other means — an endpoint, a mutation, a console command in place of the rendered control (`UX-1`
+Case 2) — is not a step of the walk, and a criterion scored from it is `EVIDENCE_UNAVAILABLE`, never a
+pass.
 
 ## Context
 

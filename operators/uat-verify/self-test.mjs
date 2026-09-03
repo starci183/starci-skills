@@ -5,7 +5,8 @@
 // authorised by the environment's own declaration and one authorised only by a person's approval id;
 // and one mutation per law, each of which must fail with a line that names the defect. Two of the
 // mutations are the custody proof: the placeholder for the shared UAT password may appear in no file
-// this operator writes.
+// this operator writes. Two more prove a walk is evidence only for what it pressed: a step with no
+// recorded control and a criterion scored from one both fail on the assertion's own required field.
 import assert from 'node:assert/strict';
 import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs';
 import { createHash } from 'node:crypto';
@@ -81,7 +82,7 @@ function snapshot(over = {}) {
 const capture = (caseId, over = {}) => ({
   caseId, runId: RUN, order: CASES.indexOf(caseId) + 1, executedAt: T(20 + CASES.indexOf(caseId)),
   screenshotRef: `response/artifacts/${caseId}.png`, loginFieldMasked: true, captureStartedAfterRedirect: true, outcome: 'pass',
-  assertions: ASSERTIONS[caseId].map((a) => ({ assertionId: a, lane: a === 'entry' ? 'ui' : 'behavior', observed: `the ${a} state was reached`, evidenceRef: `response/artifacts/${caseId}.png`, outcome: 'pass' })),
+  assertions: ASSERTIONS[caseId].map((a) => ({ assertionId: a, lane: a === 'entry' ? 'ui' : 'behavior', observed: `the ${a} state was reached`, control: `${caseId}/${a}-control`, evidenceRef: `response/artifacts/${caseId}.png`, outcome: 'pass' })),
   ...over,
 });
 
@@ -335,6 +336,12 @@ await expectError({ ...withVerdicts({ ux: 'fail' }, { next: ['backend.source.app
 await expectError({ ...baseline(), 'response/response.json': responseJson({ captures: [`response/data/captures/${CASES[0]}.json`] }), [`response/data/captures/${CASES[1]}.json`]: null }, `case ${CASES[1]} has no capture registered`, 'a frozen case with no capture');
 await expectError({ ...baseline(), 'response/response.json': responseJson({ shots: [`response/artifacts/${CASES[0]}.png`] }) }, `case ${CASES[1]} has no screenshot registered`, 'a frozen case with no screenshot');
 await expectError({ ...baseline(), [`response/data/captures/${CASES[0]}.json`]: capture(CASES[0], { loginFieldMasked: false }) }, 'expected true', 'a capture that cannot say the login field was masked');
+
+// A walk is evidence only for what it pressed: every assertion names the surface control it pressed,
+// and the validator refuses a step with no control and a criterion scored from one, the same way it
+// refuses any other missing evidence field, over the generic kind schema.
+await expectError({ ...baseline(), [`response/data/captures/${CASES[0]}.json`]: capture(CASES[0], { assertions: capture(CASES[0]).assertions.map((a, i) => (i === 0 ? { assertionId: a.assertionId, lane: a.lane, observed: a.observed, evidenceRef: a.evidenceRef, outcome: a.outcome } : a)) }) }, 'assertions[0].control: required', 'a step with no control recorded for the surface it acted on');
+await expectError({ ...baseline(), [`response/data/captures/${CASES[0]}.json`]: capture(CASES[0], { assertions: capture(CASES[0]).assertions.map((a, i) => (i === 1 ? { ...a, control: '' } : a)) }) }, 'assertions[1].control: string is too short', 'a criterion scored from a step whose recorded control names nothing — reaching the product past the surface it renders');
 await expectError({ ...baseline(), [`response/data/captures/${CASES[0]}.json`]: capture(CASES[0], { executedAt: T(5) }) }, 'executed at or before the snapshot freeze', 'a case executed before the freeze');
 await expectError({ ...baseline(), [`response/data/captures/${CASES[0]}.json`]: capture(CASES[0], { assertions: capture(CASES[0]).assertions.slice(0, 2) }) }, 'was never observed', 'a frozen assertion nobody observed');
 await expectError({ ...baseline(), 'response/data/snapshot.json': snapshot({ cases: [frozenCase(CASES[0], 1), frozenCase(CASES[1], 2)] }) }, 'contiguous order starting at 1', 'a frozen order that starts at two');
@@ -440,4 +447,4 @@ await expectError(authorityBranch({ approval: TIGHT_REF, env: 'tight' }), 'marks
 await expectError(authorityBranch({ approval: MOVED_REF }), 'the declaration moved since it was read', 'a declaration reference whose hash no longer matches the file', undefined, onHost);
 await expectError(authorityBranch({ approval: DEV_REF, env: 'tight' }), 'authorises its own environment only', 'a dev declaration offered as approval for another environment', undefined, onHost);
 
-process.stdout.write('uat.verify self-test: 10 valid branches, 60 rejected mutations\n');
+process.stdout.write('uat.verify self-test: 10 valid branches, 62 rejected mutations\n');

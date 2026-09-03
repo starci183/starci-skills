@@ -174,7 +174,11 @@ nhánh mình: `data/snapshot.json`, `data/captures/<case>.json`, `data/verdicts.
 tấm ghép dưới `response/artifacts/`, `response.md` và `response.json`. Nó không đọc cũng không ghi mật
 khẩu dưới dạng giá trị, không nhờ người đăng nhập hay đưa thông tin đăng nhập, không sửa sản phẩm cho
 một case đậu, không sửa snapshot đã đóng băng sau khi bắt đầu chạy, không ghi đè hay xoá một hồ sơ
-lượt chạy, và không xoá bất cứ thứ gì ngoài namespace fixture của chính nó.
+lượt chạy, không xoá bất cứ thứ gì ngoài namespace fixture của chính nó, và không làm điều gì xảy ra
+ngoài qua control mà mỗi capture nêu tên: một lượt đi chỉ là bằng chứng cho cái nó đã nhấn, nên một
+bước chạm tới sản phẩm bằng cách khác — một endpoint, một mutation, một lệnh console thay cho control
+đã render (`UX-1` Case 2) — không phải là một bước của lượt đi, và một tiêu chí được chấm từ đó là
+`EVIDENCE_UNAVAILABLE`, không bao giờ là một pass.
 
 ## Context
 

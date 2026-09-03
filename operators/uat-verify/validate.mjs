@@ -6,7 +6,9 @@
 // cleanup deletes the run namespace and never a run record; the run history is append-only; and no
 // capture, snapshot, verdict or published sentence contains the password. Masking is proved, not
 // promised: the chosen placeholder for the shared UAT password may appear nowhere this operator
-// writes.
+// writes. A walk is evidence only for what it pressed: the shared step check already refuses a
+// capture whose assertion names no surface control (templates/kinds/uat-capture.schema.json), which
+// is the whole enforcement — no code here re-derives it.
 import { existsSync, readdirSync, statSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
 import path from 'node:path';
