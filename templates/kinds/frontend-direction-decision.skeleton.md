@@ -61,6 +61,12 @@
 | --- | --- | --- | --- |
 | content stress | `candidate-id` | holds | the widest plan name still fits the decision bar |
 
+## Candidate limits
+
+| Candidate | Criterion | Candidate says |
+| --- | --- | --- |
+| `candidate-id` | `TASTE-10` | the candidate's own description: no rows when a candidate declares no limit of its own |
+
 ## Scores
 
 | Candidate | Viewport | Criterion | Score | Verdict |

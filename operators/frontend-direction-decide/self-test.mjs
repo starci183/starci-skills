@@ -20,7 +20,9 @@ const TASTE = Array.from({ length: 12 }, (_, i) => `TASTE-${i + 1}`);
 // selected candidate's mean highest and fails it on TASTE-2 at the wide viewport, where another
 // candidate scores higher, which is the second shape of a tie; `short` drops TASTE-12 from one
 // candidate so the taste lens is not whole; `uneven` scores one candidate on an extra UX criterion.
-function scoreTable(formed, selected, shape = 'dominant') {
+// `overrides` forces specific (id, rule[, viewport]) cells to a given score/verdict afterwards, used
+// to make a candidate's ## Scores row agree, or disagree, with what ## Candidate limits declares.
+function scoreTable(formed, selected, shape = 'dominant', overrides = []) {
   if (formed.length < 2) return [];
   const rows = [];
   for (const id of formed) {
@@ -30,6 +32,8 @@ function scoreTable(formed, selected, shape = 'dominant') {
         let score = shape === 'tie' ? 4 : id === selected ? 4 : 3;
         let verdict = 'pass';
         if (shape === 'loser' && rule === 'TASTE-2' && viewport === 'wide') { score = id === selected ? 2 : 3; verdict = 'fail'; }
+        const forced = overrides.find((o) => o.id === id && o.rule === rule && (o.viewport ?? viewport) === viewport);
+        if (forced) { score = forced.score; verdict = forced.verdict; }
         rows.push(`| \`${id}\` | ${viewport} | \`${rule}\` | ${score} | ${verdict} |`);
       }
     }
@@ -55,14 +59,15 @@ function responseMd({
   classification = 'dominant', policy = 'automatic', selected = 'one-column', candidates = 1,
   surfaceClass = 'catalog',
   refClass = 'plan-comparison', selectedFails = false, rejectAll = true, references = changeLevel === 'refine' ? 0 : 1, fallbacks = [],
-  printed = null, scores = 'dominant', winner = null,
+  printed = null, scores = 'dominant', winner = null, limits = [], scoreOverrides = [],
 } = {}) {
   const formed = NAMES.slice(0, candidates);
   const shown = printed ?? formed;
-  const scoreRows = scores === 'none' ? [] : scoreTable(formed, winner ?? (selected === '—' ? formed[0] : selected), scores);
+  const scoreRows = scores === 'none' ? [] : scoreTable(formed, winner ?? (selected === '—' ? formed[0] : selected), scores, scoreOverrides);
   const printedRows = shown.flatMap((id) => ['wide', 'narrow'].map((viewport) => `| http://127.0.0.1:60000/${id}.html?viewport=${viewport} | the ${viewport} render of the candidate, shown before the decision was written |`));
   const attacks = formed.map((id) => `| content stress | \`${id}\` | ${selectedFails && id === selected ? 'fails' : 'holds'} | the widest plan name still fits at 360px |`);
   const others = rejectAll ? formed.filter((id) => id !== selected).map((id) => `| \`${id}\` | it loses the offer above the fold on the narrow branch |`) : [];
+  const limitRows = limits.map(({ candidate, criterion, says }) => `| \`${candidate}\` | \`${criterion}\` | ${says} |`);
   const BT = String.fromCharCode(96);
   const refRows = references ? [`| a public plan picker | ${BT}${refClass}${BT} | https://example.com/plans | the two-column offer-then-decision ordering | it settles nothing about entitlement |`] : [];
   return `# frontend-direction-decision — plan-picker
@@ -128,6 +133,12 @@ ${refRows.join('\n')}
 | Attack | Candidate | Verdict | Evidence |
 | --- | --- | --- | --- |
 ${attacks.join('\n')}
+
+## Candidate limits
+
+| Candidate | Criterion | Candidate says |
+| --- | --- | --- |
+${limitRows.join('\n')}
 
 ## Scores
 
@@ -321,6 +332,13 @@ await expectError({ ...threeCandidates({ tie: true }), 'response/response.md': r
 await expectError({ ...threeCandidates(), 'response/response.md': responseMd({ candidates: 3, scores: 'tie' }) }, 'no candidate dominates', 'a tie decided under automatic with no fallback recorded');
 await expectError({ ...threeCandidates(), 'response/response.md': responseMd({ candidates: 3, scores: 'short' }) }, 'the taste lens is scored whole', 'a candidate scored without the whole taste lens');
 await expectError({ ...threeCandidates(), 'response/response.md': responseMd({ candidates: 3, scores: 'uneven' }) }, 'different criterion set', 'candidates scored on different criterion sets');
+// A score is a claim about the candidate it is scored for: a candidate's own description can
+// declare, under ## Candidate limits, that it does not satisfy a criterion, and ## Scores must then
+// score that pairing at the failing end wherever it carries it, and carry it at all.
+const SPLIT_VIEW_LIMIT = [{ candidate: 'split-view', criterion: 'TASTE-10', says: 'the empty state carries no action of its own' }];
+await expectValid({ ...threeCandidates(), 'response/response.md': responseMd({ candidates: 3, limits: SPLIT_VIEW_LIMIT, scoreOverrides: [{ id: 'split-view', rule: 'TASTE-10', score: 2, verdict: 'fail' }] }) }, 'a candidate declares it does not satisfy a criterion and ## Scores fails it at every viewport it carries');
+await expectError({ ...threeCandidates(), 'response/response.md': responseMd({ candidates: 3, limits: SPLIT_VIEW_LIMIT, scoreOverrides: [{ id: 'split-view', rule: 'TASTE-10', viewport: 'wide', score: 2, verdict: 'fail' }] }) }, "a score that contradicts the candidate's own description is refused", 'the same candidate scored at the passing end on the narrow viewport');
+await expectError({ ...threeCandidates(), 'response/response.md': responseMd({ candidates: 3, limits: [{ candidate: 'split-view', criterion: 'UX-9', says: 'the destructive action is never confirmed inline' }] }) }, 'and ## Scores carries no row for that pairing', 'a declared non-satisfaction with no corresponding row in ## Scores');
 await expectError(withCoverage((c) => { c.regions = c.regions.slice(0, 1); }), 'COVERAGE-1: region is not covered: decision', 'region uncovered');
 await expectError(withCoverage((c) => { c.actions = []; }), 'COVERAGE-1: actions must enumerate every declared action', 'actions uncovered');
 await expectError(withCoverage((c) => { c.states[1].carrier = 'the offer region'; }), 'COVERAGE-1: two meanings share one carrier', 'two meanings on one carrier');
@@ -346,4 +364,4 @@ await expectError(printedChoice({ reason: 'http://127.0.0.1:60000/ — one-colum
 await expectError(printedChoice({ scores: 'dominant' }), 'so the choice was the operator\'s', 'a choice handed to the person while the scores name a winner');
 await expectError(printedChoice({ scores: 'none' }), 'with no ## Scores', 'a choice handed to the person with nothing scored');
 
-process.stdout.write('frontend.direction.decide self-test: 11 valid branches, 49 rejected mutations\n');
+process.stdout.write('frontend.direction.decide self-test: 12 valid branches, 51 rejected mutations\n');

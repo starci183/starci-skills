@@ -125,6 +125,7 @@ Khung: [`templates/kinds/frontend-direction-decision.skeleton.md`](https://githu
 | `^## References$` | `\| Standard \| Class \| URL \| What is borrowed \| Limitation \|` | — | `Standard`: `\S`<br />`Class`: `^`[a-z0-9][a-z0-9-]*`$`<br />`URL`: `^(https?://\S+\|—)$`<br />`What is borrowed`: `\S`<br />`Limitation`: `\S` |
 | `^## Images$` | `\| Slot \| Why \| Claim \| File \|` | — | `File`: `^(`response/artifacts/images/[A-Za-z0-9_.-]+`\|—)$` |
 | `^## Falsification$` | `\| Attack \| Candidate \| Verdict \| Evidence \|` | minRows 1 | `Candidate`: `^`[a-z0-9][a-z0-9-]*`$`<br />`Verdict`: `^(holds\|fails)$`<br />`Evidence`: `\S` |
+| `^## Candidate limits$` | `\| Candidate \| Criterion \| Candidate says \|` | — | `Candidate`: `^`[a-z0-9][a-z0-9-]*`$`<br />`Criterion`: `^`(TASTE-([1-9]\|1[0-2])\|UX-([1-9]\|1[01]))`$`<br />`Candidate says`: `\S` |
 | `^## Scores$` | `\| Candidate \| Viewport \| Criterion \| Score \| Verdict \|` | — | `Candidate`: `^`[a-z0-9][a-z0-9-]*`$`<br />`Viewport`: `^[a-z0-9][a-z0-9-]*$`<br />`Criterion`: `^`(TASTE-([1-9]\|1[0-2])\|UX-([1-9]\|1[01]))`$`<br />`Score`: `^[1-5]$`<br />`Verdict`: `^(pass\|fail)$` |
 | `^## Why not the others$` | `\| Candidate \| Rejected because \|` | — | `Candidate`: `^`[a-z0-9][a-z0-9-]*`$`<br />`Rejected because`: `\S` |
 | `^## Printed$` | `\| Artifact \| Why \|` | — | `Artifact`: `^(`[^`]+`\|https?://\S+)$`<br />`Why`: `\S` |

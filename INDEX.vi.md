@@ -1,4 +1,4 @@
-# StarCi Skills 1.7.5
+# StarCi Skills 1.7.6
 
 Cây này chính là runtime. Đọc tiếp `SKILL.md` (bản tiếng Anh là bản được nạp; `SKILL.vi.md` chỉ để người đọc); đó là cửa vào duy nhất,
 đóng băng phạm vi của một nhiệm vụ, chọn đúng một operator sở hữu kết quả, rồi định tuyến giữa các
@@ -68,6 +68,7 @@ thì không được publish.
 
 ## Dòng dõi
 
+1.7.6 (2026-09-04): điểm là một lời khẳng định về chính ứng viên được chấm — quyết định khai rõ ứng viên không mang gì, và tiêu chí đã khai là không thoả thì không được chấm ở đầu đạt, cũng không được bỏ trống.
 1.7.5 (2026-09-04): một lần chạy UAT khởi động vì nhu cầu và lấy thẩm quyền từ khai báo môi trường cho lớp seed và định danh, không phải từ một người được nêu tên trong request; topic đọc theo trạng thái — composition, accessibility, lens taste — bị blocked kèm tên các khoảng thiếu khi ma trận không phủ đủ trạng thái direction khai, và một vòng thu hẹp không được chốt vòng lặp hay tuyên đã cạn ngân sách; bậc serve chạy bộ gate giao hàng do sản phẩm khai, gồm patch coverage đo theo base đã merge.
 1.7.4 (2026-09-03): thẩm quyền đến từ khai báo môi trường — .stacks/<env>/environment.json đánh dấu từng lớp thao tác là declared hay person, ngoài production mặc định declared cho cấp tài khoản và runtime, production mặc định person, và trường approval nhận tham chiếu khai báo kèm hash; nhiều ứng viên đã render được xếp hạng theo rubric proof và ứng viên trội được chọn, chỉ hỏi người khi điểm số chứng minh hoà; tiêu chí phụ thuộc khối lượng dữ liệu đo ở khối lượng seed đại diện của flow, thiếu thì route sang seed, đủ mà vẫn fail thì là data-bound; tiêu chí mà lựa chọn in ra của người đã biết là fail thì là person-accepted và không chặn quality hay uat.
 1.7.3 (2026-09-03): quyết định trao cho người được in thành ứng viên đã render — mỗi lựa chọn một ứng viên, ít nhất ba cho composition hay taste, một ảnh mỗi viewport, câu hỏi một dòng — và validator của direction và audit từ chối route user in ít hơn; family bind theo grammarId của route dưới dạng @knowledge/grammars/<family>; hàng Steps nêu việc và kind, cơ chế nằm ở contract của kind; UPDATE.md mang hai nguyên tắc viết (không cụ thể, không đính chính) và cả cây được quét theo cả hai.

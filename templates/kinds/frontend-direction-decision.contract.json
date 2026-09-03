@@ -87,6 +87,15 @@
       }
     },
     {
+      "heading": "^## Candidate limits$",
+      "table": "| Candidate | Criterion | Candidate says |",
+      "cell": {
+        "Candidate": "^`[a-z0-9][a-z0-9-]*`$",
+        "Criterion": "^`(TASTE-([1-9]|1[0-2])|UX-([1-9]|1[01]))`$",
+        "Candidate says": "\\S"
+      }
+    },
+    {
       "heading": "^## Scores$",
       "table": "| Candidate | Viewport | Criterion | Score | Verdict |",
       "cell": {

@@ -78,7 +78,11 @@ thấy câu trả lời thì không ai cần phải đưa ra. Khi có nhiều h�
 chấm từng phương án đã render ở từng viewport nó đã được in theo các tiêu chí của `@knowledge/ui/proof`
 mà một bản render tĩnh trả lời được — trọn lens thẩm mỹ, chấm theo cách `TASTE-13` Case 1 chấm, và
 mọi tiêu chí trải nghiệm mà luật của nó gọi bức chụp là công cụ đo — rồi ghi từng điểm dưới
-`## Scores`, cạnh các phương án đã in. Một phương án là trội khi điểm trung bình của nó cao nhất và ở
+`## Scores`, cạnh các phương án đã in. Một điểm là một tuyên bố về phương án được chấm, và một tuyên
+bố mâu thuẫn với phương án đó là một lỗi của quyết định, không phải chuyện xét đoán: khi mô tả của
+chính một phương án khai, dưới `## Candidate limits`, rằng nó không thoả một tiêu chí, cặp đó bị từ
+chối ở đầu đạt bất cứ nơi nào `## Scores` mang nó, và một giới hạn đã khai mà không có dòng khớp nào
+trong `## Scores` cũng bị từ chối, vì một giới hạn không ai chấm thì chẳng ràng buộc gì. Một phương án là trội khi điểm trung bình của nó cao nhất và ở
 cùng viewport nó không thấp hơn bất kỳ phương án nào khác trên mọi tiêu chí mà bất kỳ phương án nào đã
 rớt trong lần chấm ấy. Phương án trội được chọn dưới cả hai chính sách chọn. Chỉ khi không phương án
 nào trội — các điểm trung bình dẫn đầu bằng nhau, chính là độ phân giải của thang điểm, hoặc phương án

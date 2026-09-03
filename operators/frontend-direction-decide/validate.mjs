@@ -81,6 +81,31 @@ export function scoreCoverageErrors({ at, scores, rendered, printed }) {
   return errors;
 }
 
+// A score is a claim about the candidate it is scored for. `## Candidate limits` carries the
+// candidate's own declaration, one row per criterion it says it does not satisfy; a claim in
+// `## Scores` that contradicts that declaration — scoring the pairing at the passing end, or
+// scoring it nowhere at all — is refused, because a description and a score that disagree cannot
+// both stand.
+export function candidateLimitRows(rows) {
+  return (rows ?? []).map(([candidate, criterion, says]) => ({ candidate, criterion, says }));
+}
+export function candidateLimitErrors({ at, limits, scores }) {
+  const errors = [];
+  for (const { candidate, criterion, says } of limits) {
+    const matching = scores.filter((r) => r.candidate === candidate && r.criterion === criterion);
+    if (matching.length === 0) {
+      errors.push(`${at}: candidate ${candidate} declares under ## Candidate limits that it does not satisfy ${criterion} (${says}), and ## Scores carries no row for that pairing; a declared limit needs the score row it constrains`);
+      continue;
+    }
+    for (const row of matching) {
+      if (row.verdict !== 'fail') {
+        errors.push(`${at}: candidate ${candidate} declares under ## Candidate limits that it does not satisfy ${criterion} (${says}), and ## Scores scores it ${row.verdict} at ${row.viewport}; a score that contradicts the candidate's own description is refused`);
+      }
+    }
+  }
+  return errors;
+}
+
 // The surface class vocabulary is not copied here: it is read out of the rule that publishes it,
 // COVERAGE-1 Case 7 in knowledge/ui/composition/coverage.md, so widening the rule widens the gate and
 // there is no second place to forget. The Case names the classes in one sentence, each in backticks.
@@ -220,10 +245,12 @@ export async function validateDirectionStep(branchDir, root = ROOT) {
     const rendered = [...artifacts].map((page) => page.replace(/^.*\//, '').replace(/\.html$/, ''));
     const printedMap = printedCandidates(tableUnder(text, '## Printed') ?? []);
     const scores = scoreRows(tableUnder(text, '## Scores'));
+    const limits = candidateLimitRows(tableUnder(text, '## Candidate limits'));
     const ranking = rankCandidates(scores);
     const scored = rendered.length > 1 && scores.length > 0;
     if (response.status === 'done') {
       errors.push(...scoreCoverageErrors({ at, scores, rendered, printed: printedMap }));
+      errors.push(...candidateLimitErrors({ at, limits, scores }));
       if (scored && ranking.dominant && selected !== ranking.dominant) {
         errors.push(`${at}: the scores make ${ranking.dominant} dominant (mean ${ranking.means[0].mean.toFixed(2)}) and the receipt selects ${selected}; a dominant candidate is the one selected`);
       }
@@ -283,6 +310,7 @@ export async function validateDirectionStep(branchDir, root = ROOT) {
       if (scores.length === 0) errors.push(`${at}: the choice is handed to the person with no ## Scores; the stop is lawful only over a tie the scores prove`);
       else {
         errors.push(...scoreCoverageErrors({ at, scores, rendered, printed: printedMap }));
+        errors.push(...candidateLimitErrors({ at, limits, scores }));
         if (ranking.dominant) errors.push(`${at}: the scores make ${ranking.dominant} dominant (mean ${ranking.means[0].mean.toFixed(2)}), so the choice was the operator's; a confirmation whose answer the receipt already shows is never a stop`);
       }
     }
