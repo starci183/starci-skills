@@ -23,7 +23,7 @@ function freshRepo() {
 test('package.json ships exactly the runtime paths the installer copies, plus bin and the READMEs', () => {
   const shipped = pkg.files.map((f) => f.replace(/\/$/, ''));
   for (const p of PAYLOAD) assert.ok(shipped.includes(p), `${p} is copied by init but not in package.json files`);
-  for (const stale of ['sites', 'docs', 'tests', 'onichan.md', '.github']) assert.ok(!shipped.includes(stale), `${stale} must not ship`);
+  for (const stale of ['sites', 'docs', 'tests', '.github']) assert.ok(!shipped.includes(stale), `${stale} must not ship`);
   assert.equal(pkg.bin['starci-skills'], 'bin/starci-skills.mjs');
   assert.equal(pkg.publishConfig.access, 'public');
   assert.match(readFileSync(path.join(root, 'INDEX.md'), 'utf8'), new RegExp(`^# StarCi Skills ${pkg.version.replace(/\./g, '\\.')}$`, 'm'));

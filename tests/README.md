@@ -24,7 +24,7 @@ stand-in is declared, not silent.
 
 ## What the round changed in the tree
 
-Fixed from the records (see `onichan.md` for the owner-facing log): the `validate-response` CLI branch
+Fixed from the records (see `tests/evidence/`): the `validate-response` CLI branch
 detection; `route.schema.json` write roots; `PADDING-9`; the resolve law for a forbidden class;
 `business.decide` `promise` and the claims schema for intent statements; Next-table edges and the
 workflow adjacency and bound-role checks; `runtimeNeed: consume` presets; `response.json.reason`;
@@ -61,7 +61,7 @@ businesses worktree. The shared runtime was down on the machine (registry genera
 
 ## What the round changed in the tree
 
-See `onichan.md` for the owner-facing log. Gates: `unquote` only unquotes a fully quoted cell; `UNKNOWN_STOP`
+See `tests/evidence/` for the evidence notes. Gates: `unquote` only unquotes a fully quoted cell; `UNKNOWN_STOP`
 needs no Stops-table row; `response.next` must be offered by the operator's Next table; `boundProfile` /
 `ranProfile` recorded as a pair; `state.json` has `templates/step/state.schema.json` and `validate-request`
 checks it and the resume linkage; `validate-workflows` requires every no-Default field to be preset or
