@@ -5,8 +5,8 @@ description: Complete one StarCi mission by freezing its scope, selecting the on
 
 # StarCi
 
-One entry, fourteen operators, one closed routing map. This file selects the first operator and
-sequences the rest. It does no work of its own: it never decides a value, writes source, or judges a
+One entry, fourteen operators, eight example workflows, one closed routing map. This file picks the
+workflow or composes one, selects the first operator, and sequences the rest. It does no work of its own: it never decides a value, writes source, or judges a
 result.
 
 ## Setup
@@ -52,25 +52,30 @@ focused question naming the competing boundaries.
 ## The loop
 
 ```text
-build input -> validate-input.mjs -> execute -> validate-output.mjs -> route
+request/request.json -> validate-request.mjs -> agent writes response/ -> validate-response.mjs + the operator's validate.mjs -> route
 ```
 
-Routing reads two fields of a validated output and nothing else:
+Routing reads `response.json` and nothing else:
 
-1. A success outcome advances the mission to the next operator its plan names.
-2. `blocked` reads `failure.owningDomain` and resolves it in `routing.json`:
+1. `done` advances the chain to the next step the workflow names; the next branch's `request.json`
+   points at this branch's outputs by explicit path.
+2. `waiting` runs the nested exchange the response awaits (`<exchange>/request` and `response` inside
+   the same branch), then resumes the same agent; sibling branches keep running.
+3. `blocked` reads `stop`, looks the code up in the merged registry (`operators/errors.json` plus the
+   operator's own `errors.json`) for its `domain`, and resolves that domain in `routing.json`:
    - `operator` invokes the named operator, then returns here;
-   - `resume` invokes the same operator again with the delta its resume token requires;
+   - `resume` re-enters the same operator in a new step, `request.json.resume` naming the blocked one;
    - `user` stops and reports what the person must decide or publish;
    - `external` stops and reports what outside the runtime must change.
-3. `uat.verify` returning `failed` and `release.deploy` returning `rolled-back` are decided results,
-   not blocks. They carry their own owner and route the same way.
+   A code whose disposition is `fallback` never blocks: the agent performs the fallback, records it
+   under `## Fallbacks taken`, and continues, unless the code's `unless` param says otherwise.
 
-An output that fails its validator does not route. Prose in a receipt does not route. A narrated
-outcome does not route. Only a validated field does.
+A response that fails either validator does not route. Prose in `response.md` does not route. Only a
+validated field of `response.json` does.
 
-`routing.json` is closed and checked: every domain an operator can emit has exactly one route, and no
-route names a domain it never emits. A missing route is a build failure, not a judgement call.
+`routing.json` is closed and checked: every domain an operator's stop codes hand to has exactly one
+route, and no route names a domain no code reaches. A missing route is a build failure, not a
+judgement call.
 
 ## Progress
 
@@ -83,16 +88,19 @@ fingerprint, or the same material finding twice, ends the loop and reports the s
 
 ## Authority
 
-This file grants nothing. Every authority boundary is enforced by the operator's own schema, which
-this file cannot widen:
+This file grants nothing. Every authority boundary is enforced by the operator's own `operator.md`
+tables and `validate.mjs`, which this file cannot widen:
 
-- `git.publish` pins `forcePush` and `historyRewrite` to `false`, so no valid input describes a force
-  push, a bypassed hook, a reset, a clean, a stash, or a branch deletion.
-- `release.deploy` requires its declared authorization, scoped to the environment and unexpired.
-- `uat.verify` accepts no free-form string in its account record, so a credential cannot be written
-  into a snapshot.
-- `frontend.presentation.resolve` and `frontend.surface.audit` may name only rule identifiers the bound knowledge
-  publishes.
+- `git.publish` has no requirement that can name a force push, a bypassed hook, a reset, a clean, a
+  stash, or a branch deletion; it merges the session branch, pushes non-force, and a conflict is
+  `NON_FAST_FORWARD` for a person.
+- `release.deploy` and `platform.operate` require an `approval`; `release.deploy` runs only on a
+  `quality-verification` input.
+- `uat.verify` runs only with a `requestedBy`, its account record refuses a password field, and its
+  validator rejects a credential-shaped string anywhere in what it writes.
+- `frontend.presentation.resolve` and `frontend.surface.audit` may name only rule identifiers the bound
+  knowledge publishes; `frontend.source.apply` writes only classes in the resolved inventory.
+- A source-writing operator commits only on `session/<sessionId>`; the person's branch is never touched.
 
 If a mission seems to need more than an operator allows, that is the answer, not an obstacle to route
 around.
@@ -115,9 +123,13 @@ never enter a context manifest, a dependency list, a validator input, or an oper
 ## Orchestration
 
 One invocation of one operator is one agent, created fresh on the profile its `operator.json` names,
-with the grants and the refs it declares and nothing else. `resources/orchestrator.json` fixes the
-rules: at most three agents at once, never two agents sharing a writable location, dispatch by
-`routing.json`, hand-off only through the typed receipt and `changes.md` under `@dynamic`, in a session folder the orchestrator creates first and deletes when the run completes. An agent never starts
-another agent; a critique inside an operator is a step of the same agent. `alias/alias.json` is the one
-place an alias resolves to a location, and `alias/INDEX.md` is its readable map by zone (workspaces, grammar,
-knowledge, worktrees, remote, dynamic); an operator reads only what its Refs table names.
+with the grants and the aliases its Context table declares and nothing else. `resources/orchestrator.json`
+fixes the rules: at most three agents at once, branches of one step never sharing a write alias,
+dispatch by workflow and `routing.json`, hand-off only through `response.json` fields inside the
+session (`state.json`, `step-N/parallel-M/{request,response}`), a session the orchestrator creates
+first and deletes after `git.publish`. An agent never starts another agent; a nested exchange (a
+critique, a review) is a second fresh agent the orchestrator spawns for a branch that paused with
+`waiting`. `alias/alias.json` is the one place an alias resolves to a location, and `alias/INDEX.md` is
+its readable map by zone (workspaces, grammar, knowledge, worktrees, remote, dynamic); an operator
+reads only what its Context table names.
+

@@ -7,8 +7,9 @@ operator dựa trên kết quả có kiểu.
 ## Thứ tự nạp
 
 1. `SKILL.md`: cửa vào, vòng lặp định tuyến, và tuyên bố về thẩm quyền.
-2. `routing.json`: bảng đóng ánh xạ `failure.owningDomain` của mọi operator sang bước kế tiếp. Bảng
-   được kiểm đối chiếu với chính schema của các operator, nên thiếu một route là lỗi build.
+2. `routing.json`: bảng đóng ánh xạ mọi domain mà mã dừng bàn giao tới (xem bảng Mã dừng trong
+   `operators/INDEX.md`) sang bước kế tiếp. Bảng được kiểm đối chiếu với bảng Dừng của các operator,
+   nên thiếu một route là lỗi build. `workflows/` giữ các chuỗi mẫu mà cửa vào dùng lại.
 3. `resources/`: profile thực thi nào chạy từng vai trò của operator, nó được dùng quyền nào lúc
    chạy, và câu trả lời thường trực về tìm mạng, ràng Grammar, sinh hình. Cũng được kiểm.
 4. Đúng một operator mà nhiệm vụ cần: `operator.md` (Việc, Context, Đầu vào, Yêu cầu, Các bước, Đầu ra,

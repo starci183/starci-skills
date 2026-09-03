@@ -7,8 +7,9 @@ typed results.
 ## Load order
 
 1. `SKILL.md` — entry, routing loop, and the authority statement.
-2. `routing.json` — the closed map from every operator's `failure.owningDomain` to its next step. It
-   is validated against the operators' own schemas, so a missing route is a build failure.
+2. `routing.json` — the closed map from every domain a stop code hands to (see the Stop codes table of
+   `operators/INDEX.md`) to its next step. It is validated against the operators' Stops tables, so a
+   missing route is a build failure. `workflows/` holds the example chains the entry reuses.
 3. `resources/` — which execution profile runs each operator role, which runtime grants it may use,
    and its standing answers on web search, Grammar binding, and image generation. Also validated.
 4. The one operator the mission needs: its `operator.md` (Job, Context, Inputs, Requirements, Steps,

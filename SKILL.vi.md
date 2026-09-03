@@ -46,26 +46,30 @@ một câu hỏi tập trung nêu tên các ranh giới đang cạnh tranh.
 ## Vòng lặp
 
 ```text
-dựng input -> validate-input.mjs -> execute -> validate-output.mjs -> định tuyến
+request/request.json -> validate-request.mjs -> agent ghi response/ -> validate-response.mjs + validate.mjs của operator -> định tuyến
 ```
 
-Định tuyến chỉ đọc hai trường của một output đã validate, không đọc gì khác:
+Định tuyến chỉ đọc `response.json`, không đọc gì khác:
 
-1. Một kết quả thành công đưa nhiệm vụ tới operator kế tiếp mà kế hoạch của nó gọi tên.
-2. `blocked` đọc `failure.owningDomain` và tra nó trong `routing.json`:
+1. `done` đưa chuỗi tới bậc kế tiếp mà workflow gọi tên; `request.json` của nhánh sau trỏ tới output
+   của nhánh này bằng đường dẫn tường minh.
+2. `waiting` chạy cuộc trao đổi lồng mà response đang chờ (`<exchange>/request` và `response` trong
+   cùng nhánh), rồi cho chính agent đó chạy tiếp; các nhánh cùng bậc vẫn chạy.
+3. `blocked` đọc `stop`, tra mã trong sổ gộp (`operators/errors.json` cộng `errors.json` của chính
+   operator) lấy `domain`, rồi tra domain đó trong `routing.json`:
    - `operator` gọi operator được nêu tên, rồi quay lại đây;
-   - `resume` gọi lại chính operator đó với phần delta mà token resume đòi hỏi;
+   - `resume` vào lại chính operator đó ở một bậc mới, `request.json.resume` trỏ về nhánh bị chặn;
    - `user` dừng và báo người phải quyết hoặc phải publish gì;
    - `external` dừng và báo thứ gì ngoài runtime phải thay đổi.
-3. `uat.verify` trả `failed` và `release.deploy` trả `rolled-back` là kết quả đã quyết, không phải
-   block. Chúng mang chủ của riêng mình và định tuyến theo cùng một cách.
+   Mã có cách xử lý `fallback` không bao giờ chặn: agent làm đúng fallback, ghi dưới
+   `## Fallbacks taken`, rồi chạy tiếp, trừ khi tham số `unless` của mã nói khác.
 
-Một output trượt validator thì không định tuyến. Văn xuôi trong receipt không định tuyến. Một kết
-quả kể bằng lời không định tuyến. Chỉ một trường đã validate mới định tuyến.
+Response trượt một trong hai validator thì không định tuyến. Văn xuôi trong `response.md` không định
+tuyến. Chỉ một trường đã validate của `response.json` mới định tuyến.
 
-`routing.json` là bảng đóng và được kiểm: mọi domain mà một operator có thể phát ra đều có đúng một
-route, và không route nào gọi tên một domain nó không bao giờ phát. Thiếu một route là lỗi build,
-không phải chỗ để phán đoán.
+`routing.json` là bảng đóng và được kiểm: mọi domain mà mã dừng của một operator bàn giao tới đều có
+đúng một route, và không route nào gọi tên một domain không mã nào chạm tới. Thiếu một route là lỗi
+build, không phải chỗ để phán đoán.
 
 ## Tiến độ
 
@@ -78,20 +82,21 @@ hoặc cùng một finding đáng kể xuất hiện hai lần, kết thúc vòn
 
 ## Thẩm quyền
 
-File này không cấp gì cả. Mọi ranh giới thẩm quyền đều do schema của chính operator thực thi, và file
-này không nới rộng được:
+File này không cấp gì cả. Mọi ranh giới thẩm quyền đều do các bảng trong `operator.md` và
+`validate.mjs` của chính operator thực thi, và file này không nới rộng được:
 
-- `git.publish` ghim `forcePush` và `historyRewrite` bằng `false`, nên không input hợp lệ nào mô tả
-  được một lần force push, một hook bị bỏ qua, một reset, một clean, một stash, hay một lần xoá
-  nhánh.
-- `release.deploy` đòi authorization đã khai của nó, đúng môi trường và còn hạn.
-- `uat.verify` không nhận chuỗi tự do nào trong bản ghi tài khoản, nên một credential không thể được
-  ghi vào snapshot.
-- `frontend.presentation.resolve` và `frontend.surface.audit` chỉ được gọi tên những mã rule mà knowledge được
-  bind có publish.
+- `git.publish` không có yêu cầu nào gọi tên được force push, hook bị bỏ qua, reset, clean, stash hay
+  xoá nhánh; nó merge nhánh phiên, push không force, và xung đột là `NON_FAST_FORWARD` cho người xử.
+- `release.deploy` và `platform.operate` đòi `approval`; `release.deploy` chỉ chạy trên đầu vào
+  `quality-verification`.
+- `uat.verify` chỉ chạy khi có `requestedBy`, bản ghi tài khoản từ chối trường password, và validator
+  của nó bác mọi chuỗi có hình dạng credential trong bất cứ thứ gì nó ghi.
+- `frontend.presentation.resolve` và `frontend.surface.audit` chỉ được gọi tên những mã rule mà
+  knowledge được bind có publish; `frontend.source.apply` chỉ ghi class có trong inventory đã resolve.
+- Operator ghi source chỉ commit trên `session/<sessionId>`; nhánh của người không bao giờ bị đụng.
 
-Nếu một nhiệm vụ có vẻ cần nhiều hơn những gì một operator cho phép, thì đó chính là câu trả lời,
-không phải một trở ngại cần đi vòng.
+Nếu một nhiệm vụ có vẻ cần nhiều hơn mức một operator cho phép, thì đó chính là câu trả lời, không
+phải chướng ngại để lách.
 
 ## Knowledge
 
@@ -112,9 +117,12 @@ operator.
 ## Điều phối
 
 Một lần gọi một operator là một agent, tạo mới trên profile mà `operator.json` của nó gọi tên, với
-đúng những quyền và ref nó khai, không hơn. `resources/orchestrator.json` chốt luật: tối đa ba agent
-cùng lúc, không bao giờ hai agent chung một nơi ghi, điều phối theo `routing.json`, bàn giao chỉ qua
-receipt có kiểu và `changes.md` dưới `@dynamic`, trong thư mục phiên mà orchestrator tạo trước và xoá khi chạy xong. Agent không bao giờ khởi động agent khác; một bước phản biện bên
-trong operator là một bước của chính agent đó. `alias/alias.json` là nơi duy nhất một alias phân giải ra vị
-trí, và `alias/INDEX.md` là bản đồ đọc được của nó theo vùng (workspaces, grammar, knowledge, worktrees, remote,
-dynamic); operator chỉ đọc những gì bảng Ref của nó gọi tên.
+đúng những quyền và alias mà bảng Context của nó khai, không hơn. `resources/orchestrator.json` chốt
+luật: tối đa ba agent cùng lúc, các nhánh cùng bậc không bao giờ chung alias ghi, điều phối theo
+workflow và `routing.json`, bàn giao chỉ qua các trường của `response.json` trong phiên (`state.json`,
+`step-N/parallel-M/{request,response}`), phiên do orchestrator tạo trước và xoá sau `git.publish`. Agent
+không bao giờ khởi động agent khác; một cuộc trao đổi lồng (phản biện, review) là một agent mới do
+orchestrator tạo cho nhánh đang `waiting`. `alias/alias.json` là nơi duy nhất một alias phân giải ra vị
+trí, và `alias/INDEX.md` là bản đồ đọc được của nó theo vùng (workspaces, grammar, knowledge, worktrees,
+remote, dynamic); operator chỉ đọc những gì bảng Context của nó gọi tên.
+
