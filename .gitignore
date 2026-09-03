@@ -5,3 +5,6 @@ dist/
 .venv/
 mcp/
 runtime/
+
+# Claude sessions spawned into this checkout keep their worktrees here
+worktrees/
