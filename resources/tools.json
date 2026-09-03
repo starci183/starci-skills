@@ -277,13 +277,14 @@
       "support": {
         "openai": {
           "supported": true,
-          "via": "a static server started through the shell of the Codex session"
+          "via": "node scripts/host-artifacts.mjs <folder> through the shell of the Codex session (the tree ships the server; nothing is written ad hoc)"
         },
         "claude": {
           "supported": true,
-          "via": "a static server started through the shell or preview tools of the Claude Code session"
+          "via": "node scripts/host-artifacts.mjs <folder> through the shell of the Claude Code session (the tree ships the server; nothing is written ad hoc)"
         }
-      }
+      },
+      "script": "scripts/host-artifacts.mjs"
     }
   }
 }

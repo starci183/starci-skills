@@ -1,6 +1,6 @@
 {
-  "version": "1.5.2",
-  "lineageNote": "1.5.2 (2026-09-03): the direction decision declares the surface class (coverage.surfaceClass and a ## Surface class row read from COVERAGE-1); the audit copies it from the decision instead of declaring one.",
+  "version": "1.5.3",
+  "lineageNote": "1.5.3 (2026-09-03): @tools/host ships its server (scripts/host-artifacts.mjs) so no session writes one for the occasion; .gitattributes pins LF.",
   "entry": {
     "name": "starci",
     "description": "Complete one StarCi mission by freezing its scope, selecting the one operator that owns the outcome, and routing between operators on typed results until the outcome is proved or a person must decide.",

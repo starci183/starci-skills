@@ -154,7 +154,7 @@ approved and a candidate described in prose is not a candidate anybody can judge
 however many there are: that is `@tools/visualize`, needs no grant, and every runtime does it.
 
 The candidate pages are not files a person is asked to find. Step 9 serves the artifacts folder over
-`@tools/host` on the loopback interface, at the first free port from 60000 up to 60100, and records
+`@tools/host` (the shipped `scripts/host-artifacts.mjs`, never a server written for the occasion) on the loopback interface, at the first free port from 60000 up to 60100, and records
 the URL, the port, the folder and the pid in `response/artifacts/host.json`; the server stops when the
 branch ends or is resumed. Each candidate is served once per viewport of the coverage — one page per
 viewport, or one page taking the viewport as a query string — so the person sees the wide and the

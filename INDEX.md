@@ -1,4 +1,4 @@
-# StarCi Skills 1.5.2
+# StarCi Skills 1.5.3
 
 This tree is the runtime. Read [SKILL.md](SKILL.md) next; it is the single entry that freezes a
 mission's scope, selects the one operator that owns the outcome, and routes between operators on
@@ -66,6 +66,8 @@ head or the head is not publishable.
 - Rule IDs are stable public addresses. Append; never renumber, reuse, or silently change meaning.
 
 ## Lineage
+
+1.5.3 (2026-09-03): @tools/host ships its server (scripts/host-artifacts.mjs) so no session writes one for the occasion; .gitattributes pins LF.
 
 1.5.2 (2026-09-03): the direction decision declares the surface class (coverage.surfaceClass and a ## Surface class row read from COVERAGE-1); the audit copies it from the decision instead of declaring one.
 

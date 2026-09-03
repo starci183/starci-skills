@@ -154,7 +154,7 @@ phương án mà lượt chạy hình thành đều được render thành trang
 có bao nhiêu phương án: đó là `@tools/visualize`, không cần cấp quyền, và mọi runtime đều làm được.
 
 Trang phương án không phải file để người ta tự đi tìm. Bậc 9 phục vụ thư mục artifacts qua
-`@tools/host` trên loopback, ở cổng trống đầu tiên từ 60000 lên tới 60100, và ghi URL, cổng, thư mục
+`@tools/host` (script `scripts/host-artifacts.mjs` có sẵn trong cây, không viết server mới cho từng lần) trên loopback, ở cổng trống đầu tiên từ 60000 lên tới 60100, và ghi URL, cổng, thư mục
 cùng pid vào `response/artifacts/host.json`; server dừng khi nhánh kết thúc hoặc được resume. Mỗi
 phương án được phục vụ một lần cho mỗi viewport của coverage — mỗi viewport một trang, hoặc một trang
 nhận viewport qua query string — để người xem thấy bản rộng và bản hẹp trước khi quyết, và đó là chỗ

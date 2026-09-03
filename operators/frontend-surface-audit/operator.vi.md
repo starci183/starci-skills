@@ -97,7 +97,7 @@ mà rule của topic ấy sinh ra cùng đường đi của một lần fail. M�
 chỉ tốt bằng viewport tệ nhất đã chụp; một `fix-first` ở đó vẫn đứng ngay cả khi mọi luật canon đều
 xanh, và các cổng của chính checkout chờ một `ship`.
 
-Bảng chụp được phục vụ chứ không chỉ được lưu. `@tools/host` đặt `response/artifacts/` lên loopback ở
+Bảng chụp được phục vụ chứ không chỉ được lưu (bằng `scripts/host-artifacts.mjs` có sẵn). `@tools/host` đặt `response/artifacts/` lên loopback ở
 cổng trống đầu tiên từ 60000 lên tới 60100 và ghi URL, cổng, thư mục cùng pid vào
 `response/artifacts/host.json`, rồi dừng khi nhánh kết thúc hoặc được resume; một người mở bảng ấy và
 thấy từng mục ma trận cạnh phán quyết của nó. Không gì bind `0.0.0.0`.

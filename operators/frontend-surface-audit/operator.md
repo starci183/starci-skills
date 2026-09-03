@@ -97,7 +97,7 @@ The taste row is scored per matrix entry and rolled up across them, lowest score
 winning, because a surface is only as good as its worst captured viewport; a `fix-first` there stands
 even when every canon rule passed, and the checkout's own gates wait for a `ship`.
 
-The sheet is served, not filed. `@tools/host` puts `response/artifacts/` on the loopback interface at
+The sheet is served, not filed. `@tools/host` (the shipped `scripts/host-artifacts.mjs`) puts `response/artifacts/` on the loopback interface at
 the first free port from 60000 up to 60100 and records the URL, the port, the folder and the pid in
 `response/artifacts/host.json`, stopping when the branch ends or is resumed; a person opens the sheet
 and sees every matrix entry beside its verdicts. Nothing binds `0.0.0.0`.
