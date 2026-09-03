@@ -93,7 +93,9 @@
               "RUNTIME_SERVER_RESET",
               "RUNTIME_SERVER_STOPPED",
               "RUNTIME_LEASE_BUSY",
-              "INTEGRATION_MERGED"
+              "INTEGRATION_MERGED",
+              "INTEGRATION_RESOLVED",
+              "INTEGRATION_GATE_FAILED"
             ]
           },
           "resourceRef": {
@@ -165,7 +167,8 @@
         "checkout-located",
         "integration-merged",
         "server-pid-owned",
-        "lease-honoured"
+        "lease-honoured",
+        "gates-passed"
       ]
     }
   }

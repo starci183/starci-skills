@@ -106,7 +106,8 @@ const PRINTED = [
 const APPLIED = '3'.repeat(40);
 const SERVED = '7'.repeat(40);
 const PROFILE = '.worktrees/sessions/s-test/browser';
-const served = (over = {}) => ({ applied: APPLIED, servedBranch: 'uat', servedHead: SERVED, contains: 'yes', profile: PROFILE, ...over });
+const FAMILY = '0.4.7';
+const served = (over = {}) => ({ applied: APPLIED, servedBranch: 'uat', servedHead: SERVED, contains: 'yes', profile: PROFILE, familyObserved: FAMILY, familyResolved: FAMILY, ...over });
 
 const responseMd = (lens = taste(), printed = PRINTED, surface = served()) => `# frontend-surface-audit — plan-picker
 
@@ -119,6 +120,8 @@ const responseMd = (lens = taste(), printed = PRINTED, surface = served()) => `#
 | Served head | \`${surface.servedHead}\` |
 | Contains applied commit | ${surface.contains} |
 | Browser profile | \`${surface.profile}\` |
+| Family version observed | \`${surface.familyObserved}\` |
+| Family version resolved against | \`${surface.familyResolved}\` |
 
 ## Surface class
 
@@ -328,4 +331,16 @@ await expectError({ ...baseline(), 'response/response.md': responseMd(taste(), P
 await expectError({ ...baseline(), 'response/response.md': responseMd(taste(), PRINTED, served({ profile: '—' })) }, 'names the browser profile this session drove', 'an audit that never says whose browser it drove');
 await expectError({ ...baseline(), 'response/response.md': responseMd(taste(), PRINTED, served({ servedHead: 'HEAD' })) }, 'as a full commit', 'a served head nobody could compare');
 
-process.stdout.write('frontend.surface.audit self-test: 4 valid branches, 40 rejected mutations\n');
+// The family a served head renders can drift from the one the delivery was resolved against even
+// when the source ancestry is clean (main carried a newer dependency forward). The receipt names both
+// versions in ## Served surface always, and when they differ, names both again in the measured
+// evidence of whichever verdict the drift could have flipped.
+await expectError({ ...baseline(), 'response/response.md': responseMd(taste(), PRINTED, served({ familyObserved: 'latest' })) }, 'as a family version', 'a family version nobody could compare');
+const driftedServed = served({ familyObserved: '0.4.8', familyResolved: '0.4.7' });
+await expectError({ ...baseline(), 'response/response.md': responseMd(taste(), PRINTED, driftedServed) }, 'a version drift the receipt does not name', 'a family version drift never named in any verdict\'s own evidence');
+const driftNamedMd = responseMd(taste(), PRINTED, driftedServed)
+  .replace('| `narrow-light-loaded` | app | `body>main` | `GAP-5` | 1rem | fail |', '| `narrow-light-loaded` | app | `body>main` | `GAP-5` | 1rem — family 0.4.8 observed, resolved against 0.4.7 | fail |')
+  .replace('| `narrow-light-loaded` | `body>main` | `GAP-5` | 1rem | resolve |', '| `narrow-light-loaded` | `body>main` | `GAP-5` | 1rem — family 0.4.8 observed, resolved against 0.4.7 | resolve |');
+await expectValid({ ...baseline(), 'response/response.md': driftNamedMd }, 'a family version drift named in Served surface and in the verdict evidence it could have flipped');
+
+process.stdout.write('frontend.surface.audit self-test: 5 valid branches, 42 rejected mutations\n');

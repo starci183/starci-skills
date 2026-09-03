@@ -91,7 +91,7 @@ up it is instead of being either ready or mysteriously not.
 | `stack-up` | Brings up the environment's declared infrastructure with the tooling that environment declares, waits for its readiness probes, and confirms the declared origin rule admits the served origin | `infra-ports-open`, `cors-origin-admitted`, `generation-advanced` |
 | `locate` | Resolves the project's roles to routed checkouts through the workspace routes, never by directory name, and records the head observed in each | `checkout-located`, `head-observed`, `generation-advanced` |
 | `start-role` | Starts a role's server from its integration worktree, backend before frontend, under the dev command its declaration or its package scripts publish | `entry-declared`, `endpoints-served`, `head-observed`, `generation-advanced`, `integration-merged`, `server-pid-owned`, `lease-honoured` |
-| `serve` | Merges one session's work into the integration branch and has the server run the result | the `start-role` set |
+| `serve` | Merges one session's work into the integration branch, resolving any conflict by rule and gating the merged head, and has the server run the result | the `start-role` set plus `gates-passed` |
 | `restart` | Starts the same head again, same branch, same port | the `start-role` set |
 | `reset` | Stops, clears the framework's build cache for that worktree, starts again | the `start-role` set |
 | `stop` | Stops the server: the recorded pid is killed and the lease released | `entry-declared`, `generation-advanced`, `server-pid-owned`, `lease-honoured` |
@@ -99,9 +99,29 @@ up it is instead of being either ready or mysteriously not.
 A rung that cannot be climbed stops with the code that names the owner of the gap and no other: infra
 that will not come up, or a backend whose declared origin rule does not admit the served origin, is
 `PROVISIONING_UNAVAILABLE` naming what is missing and the declaration line to add; a route with no dev
-command to run is `INVALID_INPUT` naming the field it lacks; a merge that conflicts is
-`INTEGRATION_CONFLICT`, which belongs to a person and is reached at integration time rather than at
-publication time, which is the whole reason the merge happens here.
+command to run is `INVALID_INPUT` naming the field it lacks. A merge that conflicts is not one of
+these: it belongs to `serve` itself, resolved at integration time rather than escalated to a person,
+which is the whole reason the merge happens here.
+
+## A conflict is resolved by the integrator, not escalated to a person
+
+`serve` resolves a merge conflict itself, under a closed rule set, rather than stopping and handing it
+to a person: for a hunk only one side touched, that side's version wins; for a hunk both sides
+touched, both behaviours are kept where they are additive — separate imports, sibling declarations,
+separate table rows; for every other hunk both sides touched, the incoming session's version wins in a
+file the session's write set owns, and the branch's version wins everywhere else. Every hunk resolved
+this way is recorded on its merge, in `runtimeLadder.integration.merges[].resolutions`, naming the
+file, the hunk's range and which of the four rules applied — the record is what lets a later reader
+tell a clean merge from one that took a side.
+
+Resolving a conflict is not the same as trusting the result. Before the server restarts on the merged
+head, `serve` runs the product's delivery gates on it — typecheck, lint, architecture lint and unit
+tests, the same list `quality.verify` runs — and only a red gate stops the rung, with
+`INTEGRATION_FAILED` naming the failing gate and the resolutions that were made. The audit and UAT that
+follow on the integration branch are what catch a broken result the gates cannot see; the gate here
+only refuses to serve a head that fails what it can see. `INTEGRATION_FAILED` is resumed by a person or
+the owning session repairing the session branch and asking to serve again — never by rebasing, forcing
+or abandoning the merge that produced the failing head.
 
 ## One branch, one server, one fixed port
 
@@ -117,8 +137,9 @@ and `serve` merges that session's branch into the integration branch — a merge
 rebase — and restarts the one server on the result. The served head then carries the work of both,
 and the entry records `contains`: the commits that head is known to carry. A conflict surfaces here,
 early, where the two changes actually meet, instead of at publication where it would block a finished
-piece of work. The integration branch is also merged from the mainline periodically, so it does not
-drift into a state that nothing else shares.
+piece of work — and it is resolved here too, by rule and under a gate, rather than handed to a person
+mid-merge. The integration branch is also merged from the mainline periodically, so it does not drift
+into a state that nothing else shares.
 
 ## A consumer's own commit inside a shared head
 
@@ -310,7 +331,7 @@ proof.
 | 4 | Resolve the port claims against the projection, and observe who holds each | `portClaims` | @workspaces/ports/&lt;project> for the projected ports, @worktrees/sessions/central-runtime for their observed holders | — | `PORT_CONFLICT` |
 | 5 | Derive the delta between what is observed and what is desired | `desiredState` | @worktrees/sessions/central-runtime for the observed state, `request/request.json` for the desired state | `response/data/delta.json` | — |
 | 6 | Apply the approved delta, one resource at a time, under an exclusive lease | — | @worktrees/sessions/central-runtime, @workspaces/device-state for the handles by name | @worktrees/sessions/central-runtime, `response/data/delta.json`, @tools/container, @tools/shell | `EFFECT_UNAUTHORIZED`, `SERVICE_UNAVAILABLE` |
-| 7 | Climb the named rung for the bound route — bring the environment's infra up, resolve its checkouts, start a role, or merge this session's commit into the integration branch and serve, restart, reset or stop the one detached server through `scripts/serve-runtime.mjs`, queueing behind a lease another session holds — then attest the entry: probe the endpoints, record the served head, what it contains and the evidence, and set the status | `routeKey`, `operation`, `commit`, `env` | @worktrees/sessions/central-runtime for the entry of that route with its server, lease and queue, @workspaces/projects/&lt;project>/&lt;role> for the role's dev command, the integration worktree and the session branch merged into it, the environment's declared infra, the endpoints re-observed once, @tools/git, @tools/http, @tools/container, @tools/shell | @worktrees/sessions/central-runtime, `response/data/delta.json` | `SERVICE_UNAVAILABLE`, `PROVISIONING_UNAVAILABLE`, `INTEGRATION_CONFLICT`, `INVALID_INPUT` |
+| 7 | Climb the named rung for the bound route — bring the environment's infra up, resolve its checkouts, start a role, or merge this session's commit into the integration branch and serve, restart, reset or stop the one detached server through `scripts/serve-runtime.mjs`, queueing behind a lease another session holds — then attest the entry: probe the endpoints, record the served head, what it contains and the evidence, and set the status | `routeKey`, `operation`, `commit`, `env` | @worktrees/sessions/central-runtime for the entry of that route with its server, lease and queue, @workspaces/projects/&lt;project>/&lt;role> for the role's dev command, the integration worktree and the session branch merged into it, the environment's declared infra, the endpoints re-observed once, @tools/git, @tools/http, @tools/container, @tools/shell | @worktrees/sessions/central-runtime, `response/data/delta.json` | `SERVICE_UNAVAILABLE`, `PROVISIONING_UNAVAILABLE`, `INTEGRATION_FAILED`, `INVALID_INPUT` |
 | 8 | Provision the flow's identity against that entry: read the account record or create the account, set its password from the sealed name, write the record, draft what is absent and seed | `routeKey`, `flow`, `env` | @worktrees/uat/&lt;flow> for the account record, the flow document and the seed, @worktrees/_templates for what is absent, @worktrees/sessions/central-runtime for the entry's identity declaration, @workspaces/device-state for the credential by name, @tools/secrets, @tools/http, @tools/browsercontrol, @tools/database | @worktrees/uat/&lt;flow>, `response/data/account.json`, `response/data/delta.json`, @tools/sourcewrite | `INVALID_INPUT`, `PROVISIONING_UNAVAILABLE` |
 | 9 | Prove every required check | — | @worktrees/sessions/central-runtime re-read against the branch's complete proof set, @tools/http | `response/data/checks.json` | `PROOF_FAILED` |
 | 10 | Write the receipt and emit | — | everything above | `response/response.md`, `response/response.json` | — |
@@ -343,7 +364,7 @@ fingerprint cannot yield a different answer.
 | `EFFECT_UNAUTHORIZED` | terminate |
 | `SERVICE_UNAVAILABLE` | terminate |
 | `PROVISIONING_UNAVAILABLE` | terminate |
-| `INTEGRATION_CONFLICT` | terminate |
+| `INTEGRATION_FAILED` | terminate |
 | `PROOF_FAILED` | terminate |
 
 ## Next

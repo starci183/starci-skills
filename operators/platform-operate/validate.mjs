@@ -28,11 +28,14 @@ export const KIND_EFFECTS = {
 // The runtime branch publishes its proof set per rung, not per branch: a rung below the server cannot
 // probe an endpoint nothing is serving yet. KIND_CHECKS.runtime is the union those rungs draw from.
 const SERVER_RUNG_CHECKS = ['entry-declared', 'endpoints-served', 'head-observed', 'generation-advanced', 'integration-merged', 'server-pid-owned', 'lease-honoured'];
+// serve is the one rung that merges a session's work in, so it is the one rung that can meet a
+// conflicting hunk; it resolves that itself and gates the merged head before restarting, and
+// gates-passed is what proves the gate ran and came back green.
 export const RUNG_CHECKS = {
   'stack-up': ['infra-ports-open', 'cors-origin-admitted', 'generation-advanced'],
   locate: ['checkout-located', 'head-observed', 'generation-advanced'],
   'start-role': SERVER_RUNG_CHECKS,
-  serve: SERVER_RUNG_CHECKS,
+  serve: [...SERVER_RUNG_CHECKS, 'gates-passed'],
   restart: SERVER_RUNG_CHECKS,
   reset: SERVER_RUNG_CHECKS,
   stop: ['entry-declared', 'generation-advanced', 'server-pid-owned', 'lease-honoured'],
@@ -103,10 +106,13 @@ const asList = (v) => (Array.isArray(v) ? v : []);
 // port, served from one integration branch: a session gets its commit merged in and the server
 // restarted on the result, or it waits behind the lease. Everything here is a statement the receipt
 // has to make about a process that outlives the branch, because nothing else records it.
-export function runtimeLadderErrors(ladder, { requirements, sessionId, applied, findings }) {
+export function runtimeLadderErrors(ladder, { requirements, sessionId, applied, findings, gateFailed = false }) {
   const errors = [];
   const at = 'response/data/delta.json';
-  const started = RUNGS_THAT_START.has(ladder.rung);
+  // A red delivery gate stops serve before the server restarts: the merge into the integration branch
+  // stands (that is what got gated), but nothing new started, so this rung proves nothing a started
+  // rung proves.
+  const started = RUNGS_THAT_START.has(ladder.rung) && !gateFailed;
   const queued = ladder.queuePosition !== null;
   const say = (m) => errors.push(`${at}: ${m}`);
 
@@ -119,8 +125,8 @@ export function runtimeLadderErrors(ladder, { requirements, sessionId, applied, 
   if (!applied.has('attest-runtime-entry')) say('every rung attests, because a status nobody probed is an assertion');
 
   const rungEffect = RUNG_EFFECTS[ladder.rung];
-  if (ladder.reused || queued) {
-    if (applied.has(rungEffect)) say(`${rungEffect} was applied although the operation ${ladder.reused ? 'reused the running head' : 'only took a queue position'} and started nothing`);
+  if (ladder.reused || queued || gateFailed) {
+    if (applied.has(rungEffect)) say(`${rungEffect} was applied although the operation ${gateFailed ? 'failed its delivery gate' : ladder.reused ? 'reused the running head' : 'only took a queue position'} and started nothing`);
   } else if (!applied.has(rungEffect)) say(`the ${ladder.rung} rung applies ${rungEffect}, which this delta never applied`);
 
   // Idempotent by head: a running server whose head already contains the wanted commit is re-attested
@@ -167,10 +173,17 @@ export function runtimeLadderErrors(ladder, { requirements, sessionId, applied, 
   if (merged && ladder.integration === null) say('a merge was applied and no integration record says what was merged into what');
   if (ladder.integration !== null) {
     if (!merged) say('the integration branch was written without merge-into-integration-branch among the applied effects');
-    if (ladder.integration.conflict) say('a conflicted merge is INTEGRATION_CONFLICT on a blocked branch, never an applied delta');
+    // A conflict no longer blocks the branch: serve resolves it under the closed rule set and records
+    // every resolved hunk on the merge it belongs to, then gates the merged head before restarting.
+    const anyResolutions = ladder.integration.merges.some((m) => m.resolutions.length > 0);
+    if (anyResolutions !== ladder.integration.conflict) say('conflict must be true exactly when a merge here recorded a resolved hunk');
+    if (anyResolutions && !findings.has('INTEGRATION_RESOLVED')) say('a merge that resolved a conflicting hunk records the INTEGRATION_RESOLVED finding, so the receipt names what serve resolved on its own');
+    if (!anyResolutions && findings.has('INTEGRATION_RESOLVED')) say('INTEGRATION_RESOLVED is recorded only when a merge here actually resolved a conflicting hunk');
     for (const m of ladder.integration.merges) {
       if (m.mergeCommit === null) say(`the merge of ${m.ref} records no merge commit`);
-      if (m.kind === 'session' && !ladder.contains.includes(m.commit)) say(`commit ${m.commit} was merged and is absent from contains, so no consumer can prove its work is served`);
+      if (m.kind === 'session' && !gateFailed && !ladder.contains.includes(m.commit)) say(`commit ${m.commit} was merged and is absent from contains, so no consumer can prove its work is served`);
+      if (m.kind === 'session' && gateFailed && ladder.contains.includes(m.commit)) say(`commit ${m.commit} failed its delivery gate and the server never restarted on it, so it cannot appear in the served head's contains`);
+      if (m.kind !== 'session' && m.resolutions.length) say(`the ${m.kind} merge of ${m.ref} records resolutions; only the session merge meets a conflict serve resolves`);
     }
     if (ladder.rung === 'serve' && !ladder.integration.merges.some((m) => m.kind === 'session')) say('a serve merges the asking session branch, and this integration merged none');
   }
@@ -195,7 +208,9 @@ export function runtimeLadderErrors(ladder, { requirements, sessionId, applied, 
   }
   const finding = RUNG_FINDINGS[ladder.rung];
   const expected = ladder.reused ? 'RUNTIME_HEAD_REUSED' : finding;
-  if (!queued && !findings.has(expected)) say(`the receipt records ${expected}, so a reader knows which rung this run climbed`);
+  // A red gate is the one outcome where the rung's usual finding never lands: nothing was served, and
+  // INTEGRATION_GATE_FAILED is what the receipt names instead.
+  if (!queued && !gateFailed && !findings.has(expected)) say(`the receipt records ${expected}, so a reader knows which rung this run climbed`);
   return errors;
 }
 
@@ -239,6 +254,9 @@ export async function validatePlatformStep(branchDir, root = ROOT) {
   if (present.has('delta') && has('response/data/delta.json')) { try { delta = JSON.parse(await read('response/data/delta.json')); } catch { delta = null; } }
   let checks = null;
   if (present.has('checks') && has('response/data/checks.json')) { try { checks = JSON.parse(await read('response/data/checks.json')); } catch { checks = null; } }
+  // A red delivery gate is the one failure serve's own resolution work can produce: the merge into
+  // the integration branch stands, gated, but nothing restarted on it.
+  const gateFailed = Boolean(checks?.checks?.some((c) => c.name === 'gates-passed' && c.status === 'failed'));
 
   let inventoried = new Set();
   if (delta) {
@@ -314,17 +332,28 @@ export async function validatePlatformStep(branchDir, root = ROOT) {
       if (delta && !inventoried.has(c.resourceRef)) errors.push(`response/data/checks.json: check ${c.name} names uninventoried resource ${c.resourceRef}`);
       if (c.status === 'passed') proved.add(c.name);
       else if (response.status === 'done') errors.push(`response/data/checks.json: check ${c.name} failed, so the operation cannot be reported as operated`);
+      // A red delivery gate after serve resolved a conflict is the only stop the resolution itself
+      // produces, and it is INTEGRATION_FAILED and nothing else.
+      if (c.name === 'gates-passed' && c.status === 'failed') {
+        if (response.status === 'done') errors.push('response/data/checks.json: a failed delivery gate cannot end in an operated outcome');
+        else if (response.stop !== 'INTEGRATION_FAILED') errors.push('response/response.json: a failed delivery gate requires the INTEGRATION_FAILED stop');
+      }
     }
     if (response.status === 'done') for (const n of requiredChecks) if (!proved.has(n)) errors.push(`response/data/checks.json: the ${kind} branch cannot be proved without the ${n} check`);
+
+    if (gateFailed && !checks.findings.some((f) => f.code === 'INTEGRATION_GATE_FAILED')) errors.push('response/data/checks.json: a failed delivery gate records the INTEGRATION_GATE_FAILED finding, so the receipt names the gate that failed and the resolutions that were made');
+    if (!gateFailed && checks.findings.some((f) => f.code === 'INTEGRATION_GATE_FAILED')) errors.push('response/data/checks.json: INTEGRATION_GATE_FAILED is recorded only when the gates-passed check actually failed');
 
     findingCount = checks.findings.length;
     for (const f of checks.findings) {
       if (delta && !inventoried.has(f.resourceRef)) errors.push(`response/data/checks.json: finding on ${f.resourceRef} names an uninventoried resource`);
-      if (f.code !== 'PORT_COORDINATION_REQUIRED') continue;
-      if (f.port === null) errors.push('response/data/checks.json: a port coordination finding must name the port');
-      if (f.holderRef === null) errors.push('response/data/checks.json: a port coordination finding must name the process that already holds the port');
-      if (response.status === 'done') errors.push('response/data/checks.json: a port coordination finding cannot end in an operated outcome');
-      else if (response.stop !== 'PORT_CONFLICT') errors.push('response/response.json: a port coordination finding requires the PORT_CONFLICT failure');
+      if (f.code === 'PORT_COORDINATION_REQUIRED') {
+        if (f.port === null) errors.push('response/data/checks.json: a port coordination finding must name the port');
+        if (f.holderRef === null) errors.push('response/data/checks.json: a port coordination finding must name the process that already holds the port');
+        if (response.status === 'done') errors.push('response/data/checks.json: a port coordination finding cannot end in an operated outcome');
+        else if (response.stop !== 'PORT_CONFLICT') errors.push('response/response.json: a port coordination finding requires the PORT_CONFLICT failure');
+      }
+      if (f.code === 'INTEGRATION_GATE_FAILED' && response.status === 'done') errors.push('response/data/checks.json: an integration gate failure finding cannot end in an operated outcome');
     }
     forEachString(checks, (text, at) => { if (credentialLeak(text)) errors.push(`response/data/checks.json: ${at} records a credential, which the receipt refuses`); });
   } else if (response.status === 'done') errors.push('response/data/checks.json: a done branch needs the proved check set');
@@ -385,6 +414,7 @@ export async function validatePlatformStep(branchDir, root = ROOT) {
       sessionId: request?.sessionId ?? null,
       applied: new Set(delta.appliedEffects),
       findings: new Set((checks?.findings ?? []).map((f) => f.code)),
+      gateFailed,
     }));
   }
 

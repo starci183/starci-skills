@@ -219,6 +219,23 @@ export async function validateAuditStep(branchDir, root = ROOT) {
     }
     if (bare(servedRows['Contains applied commit']) !== 'yes') errors.push(`${rel}: the served head must contain the applied commit; a surface that does not is SOURCE_DRIFT with nothing captured`);
     if (empty(bare(servedRows['Browser profile']))) errors.push(`${rel}: Served surface names the browser profile this session drove, so a sign-in state from another session is visible rather than suspected`);
+    // Clean source ancestry proves nothing about the family a served head renders: main can carry a
+    // dependency the session never resolved against forward on its own, and a presentation verdict
+    // that flips over that has nothing to do with the source this session wrote. Both versions are
+    // always named here, and when they differ, named again wherever a verdict's own measured evidence
+    // could have been the one the drift, rather than the source, actually flipped.
+    const FAMILY_VERSION = /^[0-9]+\.[0-9]+\.[0-9]+(?:-[0-9A-Za-z.]+)?$/;
+    for (const field of ['Family version observed', 'Family version resolved against']) {
+      if (!FAMILY_VERSION.test(bare(servedRows[field]))) errors.push(`${rel}: Served surface must name the ${field.toLowerCase()} as a family version, and it names ${servedRows[field] ?? '—'}`);
+    }
+    const familyObserved = bare(servedRows['Family version observed']);
+    const familyResolved = bare(servedRows['Family version resolved against']);
+    if (FAMILY_VERSION.test(familyObserved) && FAMILY_VERSION.test(familyResolved) && familyObserved !== familyResolved) {
+      const namesBoth = (measured) => String(measured ?? '').includes(familyObserved) && String(measured ?? '').includes(familyResolved);
+      const ownerMeasured = (tableUnder(text, '## Verdicts by owner') ?? []).map((row) => row[4]);
+      const regressionMeasured = (tableUnder(text, '## Regressions') ?? []).map((row) => row[3]);
+      if (![...ownerMeasured, ...regressionMeasured].some(namesBoth)) errors.push(`${rel}: the served head renders family ${familyObserved} and this delivery resolved against ${familyResolved}; a version drift the receipt does not name in a verdict's own measured evidence is a presentation flip nobody can trace to its real cause`);
+    }
     const matrixRows = tableUnder(text, '## Matrix') ?? [];
     if (matrixRows.length !== verdicts.entries.length) errors.push(`${rel}: Matrix has ${matrixRows.length} rows, the verdicts carry ${verdicts.entries.length} entries`);
     for (const [id, viewport, scheme, state] of matrixRows) {

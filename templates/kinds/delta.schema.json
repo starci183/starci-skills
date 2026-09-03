@@ -296,7 +296,8 @@
                       "ref",
                       "commit",
                       "mergeCommit",
-                      "kind"
+                      "kind",
+                      "resolutions"
                     ],
                     "properties": {
                       "ref": {
@@ -323,13 +324,47 @@
                           "session",
                           "mainline"
                         ]
+                      },
+                      "resolutions": {
+                        "type": "array",
+                        "maxItems": 64,
+                        "description": "Every hunk this merge resolved under the closed rule set, in the order serve applied them. Empty when the merge produced no conflicting hunk.",
+                        "items": {
+                          "type": "object",
+                          "additionalProperties": false,
+                          "required": [
+                            "file",
+                            "hunkRange",
+                            "rule"
+                          ],
+                          "properties": {
+                            "file": {
+                              "type": "string",
+                              "minLength": 1
+                            },
+                            "hunkRange": {
+                              "type": "string",
+                              "pattern": "^[0-9]+-[0-9]+$",
+                              "description": "The hunk's line range in the merged result."
+                            },
+                            "rule": {
+                              "enum": [
+                                "one-side-touched",
+                                "additive-both-sides",
+                                "incoming-session-owned",
+                                "branch-elsewhere"
+                              ],
+                              "description": "Which of the four closed rules resolved this hunk: only one side touched it and that side wins; both sides touched it additively and both are kept; both sides touched it otherwise and the incoming session's version wins in a file the session's write set owns; or the branch's version wins everywhere else."
+                            }
+                          }
+                        }
                       }
                     }
                   }
                 },
                 "conflict": {
                   "type": "boolean",
-                  "description": "True only on a blocked branch: a conflict is reported and left, never rebased, forced or resolved by discarding a side."
+                  "description": "True when merging this ref required resolving one or more conflicting hunks under the closed rule set; the resolved hunks are this merge's resolutions. A conflict here no longer blocks the branch by itself — the merged head is gated before the server restarts, and only a red gate stops the rung, with INTEGRATION_FAILED."
                 }
               }
             },

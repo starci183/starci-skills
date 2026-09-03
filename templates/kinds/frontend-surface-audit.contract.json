@@ -10,7 +10,9 @@
         "Served branch",
         "Served head",
         "Contains applied commit",
-        "Browser profile"
+        "Browser profile",
+        "Family version observed",
+        "Family version resolved against"
       ],
       "cell": {
         "Value": "\\S"

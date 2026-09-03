@@ -2001,10 +2001,10 @@
           "shared": false
         },
         {
-          "code": "INTEGRATION_CONFLICT",
+          "code": "INTEGRATION_FAILED",
           "disposition": "terminate",
           "domain": "product",
-          "meaning": "Merging the session branch into the integration branch conflicted, so the head a session asked to have served cannot be built from what is already there.",
+          "meaning": "serve resolved the merge conflict itself and gated the merged head, and a required gate came back red: the merged head does not pass the delivery gates. The receipt names the failing gate and the resolutions that were made.",
           "shared": false
         },
         {
@@ -4323,16 +4323,16 @@
       "resume": "Provide a working generator, or turn the image stage off."
     },
     {
-      "code": "INTEGRATION_CONFLICT",
+      "code": "INTEGRATION_FAILED",
       "scope": [
         "platform.operate"
       ],
       "shared": false,
       "domain": "product",
       "disposition": "terminate",
-      "meaning": "Merging the session branch into the integration branch conflicted, so the head a session asked to have served cannot be built from what is already there.",
+      "meaning": "serve resolved the merge conflict itself and gated the merged head, and a required gate came back red: the merged head does not pass the delivery gates. The receipt names the failing gate and the resolutions that were made.",
       "fallback": null,
-      "resume": "A person resolves the conflict in the session branch and asks for the head again; the merge is never rebased, forced or abandoned to make it apply."
+      "resume": "A person or the owning session repairs the session branch and asks to serve again; the merge that produced the failing head is never rebased, forced or abandoned to make it apply."
     },
     {
       "code": "INVALID_INPUT",

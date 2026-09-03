@@ -9,6 +9,8 @@
 | Served head | `9a8b7c6d5e4f30211203f4e5d6c7b8a99a8b7c6d` |
 | Contains applied commit | yes |
 | Browser profile | `.worktrees/sessions/<sessionId>/browser` |
+| Family version observed | `0.4.7` |
+| Family version resolved against | `0.4.7` |
 
 ## Surface class
 

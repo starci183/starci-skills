@@ -171,7 +171,7 @@ const ladder = (over = {}) => ({
   wantedCommit: WANT, servedHead: UAT_NEW, contains: [OTHER_COMMIT, WANT],
   integration: {
     worktreeRef: WORKTREE, branch: 'uat', createdFrom: null,
-    merges: [{ ref: 'session/s-test', commit: WANT, mergeCommit: MERGE_COMMIT, kind: 'session' }],
+    merges: [{ ref: 'session/s-test', commit: WANT, mergeCommit: MERGE_COMMIT, kind: 'session', resolutions: [] }],
     conflict: false,
   },
   infra: null, locations: [],
@@ -357,7 +357,7 @@ const startingRole = (over = {}) => ({
     effects: ['merge-into-integration-branch', 'start-role-runtime', 'attest-runtime-entry'],
     ladderOver: {
       sessionId: null, lease: null,
-      integration: { worktreeRef: WORKTREE, branch: 'uat', createdFrom: 'main', merges: [{ ref: 'main', commit: WANT, mergeCommit: MERGE_COMMIT, kind: 'mainline' }], conflict: false },
+      integration: { worktreeRef: WORKTREE, branch: 'uat', createdFrom: 'main', merges: [{ ref: 'main', commit: WANT, mergeCommit: MERGE_COMMIT, kind: 'mainline', resolutions: [] }], conflict: false },
       contains: [WANT],
       locations: [{ role: 'fe', checkoutRef: '@workspaces/demo-product/fe', head: WANT, devCommand: 'npm run dev' }],
       observed: { head: null, containsWanted: false, pid: null, pidAlive: false, probeAnswered: false, leaseSessionId: null, queue: [] },
@@ -395,7 +395,7 @@ const servingSecond = (over = {}) => ({
     rung: 'serve',
     ladderOver: {
       wantedCommit: OTHER_COMMIT, contains: [WANT, OTHER_COMMIT],
-      integration: { worktreeRef: WORKTREE, branch: 'uat', createdFrom: null, merges: [{ ref: 'main', commit: UAT_OLD, mergeCommit: MERGE_COMMIT, kind: 'mainline' }, { ref: 'session/s-other', commit: OTHER_COMMIT, mergeCommit: UAT_NEW, kind: 'session' }], conflict: false },
+      integration: { worktreeRef: WORKTREE, branch: 'uat', createdFrom: null, merges: [{ ref: 'main', commit: UAT_OLD, mergeCommit: MERGE_COMMIT, kind: 'mainline', resolutions: [] }, { ref: 'session/s-other', commit: OTHER_COMMIT, mergeCommit: UAT_NEW, kind: 'session', resolutions: [] }], conflict: false },
     },
     extra: { commit: OTHER_COMMIT },
   }),
@@ -419,11 +419,43 @@ await expectValid(servingFirst(), 'one session merged into the integration branc
 await expectValid(queuedBehind(), 'a second session queued behind the lease instead of given a second server');
 await expectValid(servingSecond(), 'the second session served after the release: same port, both commits inside the head');
 await expectValid(stopping(), 'a stop that kills the pid the entry recorded and releases the lease');
-await expectValid({
-  'request/request.json': requestJson({ kind: 'runtime', service: ENTRY, effects: ['merge-into-integration-branch'], resourceRefs: [ENTRY], mutableResourceRefs: [ENTRY], extra: { routeKey: ENTRY, operation: 'serve', commit: WANT } }),
-  'response/response.json': responseJson({ status: 'blocked', stop: 'INTEGRATION_CONFLICT', next: [] }),
-  'response/response.md': null, 'response/data/delta.json': null, 'response/data/checks.json': null,
-}, 'a merge that conflicted, reported at integration time and left alone');
+// A conflicting hunk is resolved by rule, recorded on the merge, and the merged head is gated before
+// the server restarts on it.
+const RESOLUTION = { file: 'apps/app/src/page.tsx', hunkRange: '12-18', rule: 'incoming-session-owned' };
+const resolvedMerge = () => ({
+  worktreeRef: WORKTREE, branch: 'uat', createdFrom: null,
+  merges: [{ ref: 'session/s-test', commit: WANT, mergeCommit: MERGE_COMMIT, kind: 'session', resolutions: [RESOLUTION] }],
+  conflict: true,
+});
+const RESOLVED_FINDING = { code: 'INTEGRATION_RESOLVED', resourceRef: ENTRY, port: null, holderRef: null, statement: 'the merge met one conflicting hunk and resolved it by rule before gating the merged head' };
+
+const conflictResolvedGateGreen = (over = {}) => ({
+  ...rungBranch({
+    rung: 'serve',
+    ladderOver: { integration: resolvedMerge() },
+    findings: [RESOLVED_FINDING, { code: 'RUNTIME_HEAD_SERVED', resourceRef: ENTRY, port: null, holderRef: null, statement: 'the session commit was merged into the integration branch and the server restarted on the result' }],
+  }),
+  ...over,
+});
+await expectValid(conflictResolvedGateGreen(), 'a conflicting merge resolved by rule and gated green before the server restarted');
+
+const conflictResolvedGateRed = () => {
+  const applied = ['merge-into-integration-branch', 'attest-runtime-entry'];
+  const lad = ladder({ servedHead: UAT_OLD, contains: [OTHER_COMMIT], server: null, integration: resolvedMerge() });
+  const list = RUNG_CHECKS.serve.map((n) => rtCheck(n, n === 'gates-passed' ? 'failed' : 'passed'));
+  const findings = [RESOLVED_FINDING, { code: 'INTEGRATION_GATE_FAILED', resourceRef: ENTRY, port: null, holderRef: null, statement: 'typecheck failed on the merged head, so the server was not restarted on it' }];
+  return {
+    'request/request.json': requestJson({ kind: 'runtime', service: ENTRY, effects: applied, resourceRefs: [ENTRY], mutableResourceRefs: [ENTRY], extra: { routeKey: ENTRY, operation: 'serve', commit: WANT } }),
+    'response/response.json': { schemaVersion: 9, operatorId: 'platform.operate', step: 1, parallel: 1, status: 'blocked', stop: 'INTEGRATION_FAILED', fallbacks: [], fields: { delta: 'response/data/delta.json', checks: 'response/data/checks.json' }, commits: [], next: [] },
+    'response/response.md': null,
+    'response/data/delta.json': entryDelta('runtime', applied, { runtimeLadder: lad }),
+    'response/data/checks.json': entryChecks('runtime', findings, list, RUNG_CHECKS.serve),
+  };
+};
+await expectValid(conflictResolvedGateRed(), 'the same resolved conflict with a red gate: the server never restarts and INTEGRATION_FAILED names the gate');
+await expectError({ ...conflictResolvedGateRed(), 'response/response.json': { schemaVersion: 9, operatorId: 'platform.operate', step: 1, parallel: 1, status: 'done', fallbacks: [], fields: { delta: 'response/data/delta.json', checks: 'response/data/checks.json' }, commits: [], next: ['frontend.surface.audit'] } }, 'cannot end in an operated outcome', 'a red delivery gate reported as an operated outcome');
+await expectError({ ...conflictResolvedGateGreen(), 'response/data/delta.json': entryDelta('runtime', ['merge-into-integration-branch', 'serve-runtime-head', 'attest-runtime-entry'], { runtimeLadder: ladder({ integration: { ...resolvedMerge(), conflict: false } }) }) }, 'conflict must be true exactly when a merge here recorded a resolved hunk', 'a resolved hunk recorded without the conflict flag set');
+await expectError({ ...conflictResolvedGateGreen(), 'response/data/checks.json': entryChecks('runtime', [{ code: 'RUNTIME_HEAD_SERVED', resourceRef: ENTRY, port: null, holderRef: null, statement: 'x' }], RUNG_CHECKS.serve.map((n) => rtCheck(n)), RUNG_CHECKS.serve), 'response/response.md': entryMd('runtime', ['merge-into-integration-branch', 'serve-runtime-head', 'attest-runtime-entry'], [['RUNTIME_HEAD_SERVED', ENTRY, '—', '—', 'x']], RUNG_CHECKS.serve.map((n) => rtCheck(n))) }, 'records the INTEGRATION_RESOLVED finding', 'a resolved conflict the receipt never names');
 
 await expectError(servingFirst({ 'response/data/delta.json': entryDelta('runtime', ['merge-into-integration-branch', 'serve-runtime-head', 'attest-runtime-entry'], { runtimeLadder: ladder({ sessionId: 'someone-else' }) }) }), 'and this branch belongs to s-test', 'a rung run for another session');
 await expectError(servingFirst({ 'response/data/delta.json': entryDelta('runtime', ['merge-into-integration-branch', 'serve-runtime-head', 'attest-runtime-entry'], { runtimeLadder: ladder({ observed: { head: UAT_OLD, containsWanted: false, pid: 4100, pidAlive: true, probeAnswered: true, leaseSessionId: OTHER, queue: [] } }) }) }), 'may only queue behind it', 'a serve that wrote through another session lease');
@@ -437,4 +469,4 @@ await expectError(stackUp({ 'response/data/delta.json': entryDelta('runtime', ['
 await expectError(baseline({ 'response/data/delta.json': delta({ runtimeLadder: ladder() }) }), 'runtimeLadder belongs to the runtime branch', 'a ladder filed under another branch');
 await expectError({ ...servingFirst(), 'response/data/delta.json': entryDelta('runtime', ['merge-into-integration-branch', 'serve-runtime-head', 'attest-runtime-entry']) }, 'this delta carries no runtimeLadder', 'a runtime branch that never said which rung it climbed');
 
-process.stdout.write('platform.operate self-test: 13 valid branches, 51 rejected mutations\n');
+process.stdout.write('platform.operate self-test: 14 valid branches, 58 rejected mutations\n');

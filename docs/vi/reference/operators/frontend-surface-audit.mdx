@@ -67,6 +67,20 @@ cổng mà entry của nó phục vụ, và trạng thái sẵn sàng đạt đ�
 commit đã áp, hoặc chẳng có gì đang phục vụ, `RUNTIME_UNAVAILABLE` nêu tên commit cần được phục vụ và
 thao tác sẽ phục vụ nó, và chủ runtime mới là bên hành động.
 
+## Một bề mặt đang phục vụ cũng có thể trôi ở family nó render
+
+Quan hệ tổ tiên sạch chứng minh nguồn đúng; nó không chứng minh gì về family mà head đang phục vụ
+render nguồn đó qua. Nhánh tích hợp còn được merge từ mainline, nên một phiên bản Grammar hay
+dependency khác mà phiên này chưa từng resolve theo có thể đã có sẵn trên head đang phục vụ vào lúc
+audit này chạy, và một verdict trình bày bị lật vì thế thì chẳng liên quan gì tới nguồn mà phiên này đã
+ghi. Vì vậy `## Served surface` luôn nêu tên phiên bản family mà head đang phục vụ thật sự render, cạnh
+phiên bản mà lần giao hàng đã resolve theo; khi hai phiên bản khác nhau, sự trôi đó không bị bỏ ngầm
+trong phép thử tổ tiên vốn đã qua. Ở bất cứ đâu mà bằng chứng đo được của một verdict là thứ một sự
+trôi phiên bản có thể đã lật thay vì nguồn, đúng ô đo của node đó nêu tên cả hai phiên bản lại một lần
+nữa, để người đọc không bao giờ phải đoán trong hai nguyên nhân khả dĩ, cái nào đã sinh ra verdict đó.
+Đây là bằng chứng, không phải một gate mới: nó không nêu câu hỏi phạm vi nào, và không dừng ở bất cứ gì
+mà luật chứng minh của chính bề mặt chưa từng dừng ở.
+
 ## Hai phiên trên một sản phẩm
 
 Luật cô lập được công bố đúng một lần, ở operator sở hữu runtime, và lần audit này làm việc bên trong

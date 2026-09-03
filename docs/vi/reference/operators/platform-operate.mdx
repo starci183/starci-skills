@@ -89,7 +89,7 @@ nói rõ nó đang ở đâu thay vì hoặc sẵn sàng hoặc không hiểu v�
 | `stack-up` | Dựng hạ tầng mà môi trường đó khai, bằng đúng công cụ môi trường đó khai, chờ các probe sẵn sàng, và xác nhận luật origin đã khai có nhận origin đang phục vụ | `infra-ports-open`, `cors-origin-admitted`, `generation-advanced` |
 | `locate` | Phân giải các role của project ra checkout đã route qua workspace route, không bao giờ theo tên thư mục, và ghi head quan sát được ở mỗi cái | `checkout-located`, `head-observed`, `generation-advanced` |
 | `start-role` | Khởi động server của một role từ worktree tích hợp, backend trước frontend, bằng lệnh dev mà khai báo route hay package scripts của nó publish | `entry-declared`, `endpoints-served`, `head-observed`, `generation-advanced`, `integration-merged`, `server-pid-owned`, `lease-honoured` |
-| `serve` | Merge phần việc của một phiên vào nhánh tích hợp và cho server chạy kết quả đó | đúng bộ của `start-role` |
+| `serve` | Merge phần việc của một phiên vào nhánh tích hợp, tự giải xung đột (nếu có) theo luật rồi chấm gate trên head đã gộp, và cho server chạy kết quả đó | đúng bộ của `start-role` cộng `gates-passed` |
 | `restart` | Khởi động lại đúng head đó, cùng nhánh, cùng cổng | đúng bộ của `start-role` |
 | `reset` | Dừng, xoá cache build của framework cho worktree đó, khởi động lại | đúng bộ của `start-role` |
 | `stop` | Dừng server: pid đã ghi bị kill và lease được nhả | `entry-declared`, `generation-advanced`, `server-pid-owned`, `lease-honoured` |
@@ -97,9 +97,29 @@ nói rõ nó đang ở đâu thay vì hoặc sẵn sàng hoặc không hiểu v�
 Một bậc không leo được thì dừng bằng đúng mã gọi tên người chủ của khoảng trống đó và không mã nào
 khác: hạ tầng không lên nổi, hay một backend mà luật origin đã khai không nhận origin đang phục vụ, là
 `PROVISIONING_UNAVAILABLE` nêu tên thứ đang thiếu và dòng khai báo cần thêm; một route không publish
-lệnh dev nào là `INVALID_INPUT` nêu tên trường nó thiếu; một lần merge xung đột là
-`INTEGRATION_CONFLICT`, thuộc về con người và xảy ra ngay lúc tích hợp chứ không phải lúc publish, và
-đó chính là lý do lần merge diễn ra ở đây.
+lệnh dev nào là `INVALID_INPUT` nêu tên trường nó thiếu. Một lần merge xung đột không thuộc nhóm này:
+nó thuộc về chính `serve`, được xử lý ngay lúc tích hợp chứ không đẩy lên cho con người, và đó chính là
+lý do lần merge diễn ra ở đây.
+
+## Xung đột do người tích hợp xử lý, không đẩy lên cho con người
+
+`serve` tự giải một xung đột merge theo một tập luật đóng, thay vì dừng lại và đẩy nó cho con người: với
+một hunk chỉ một bên đụng tới, bên đó thắng; với một hunk cả hai bên đụng tới, cả hai hành vi được giữ
+lại nếu chúng cộng dồn được — import riêng, khai báo anh em, dòng bảng riêng; với mọi hunk khác mà cả
+hai bên đụng tới, bản của phiên đang xin được ưu tiên trong file thuộc tập ghi của phiên đó, còn bản của
+nhánh thắng ở mọi nơi khác. Mọi hunk được giải theo cách này đều được ghi lại trên đúng lần merge của
+nó, trong `runtimeLadder.integration.merges[].resolutions`, nêu tên file, khoảng dòng của hunk và luật
+nào trong bốn luật đã áp — bản ghi đó là thứ cho người đọc sau này phân biệt một lần merge sạch với một
+lần đã lấy một bên.
+
+Giải xung đột không đồng nghĩa với tin kết quả. Trước khi server khởi động lại trên head đã gộp,
+`serve` chạy các gate phát hành của sản phẩm trên head đó — typecheck, lint, architecture lint và unit
+test, đúng danh sách mà `quality.verify` chạy — và chỉ một gate đỏ mới dừng bậc này, với
+`INTEGRATION_FAILED` nêu tên gate hỏng và những chỗ đã được giải xung đột. Audit và UAT chạy tiếp trên
+nhánh tích hợp mới là thứ bắt được một kết quả hỏng mà gate không thấy; gate ở đây chỉ từ chối phục vụ
+một head hỏng thứ nó thấy được. `INTEGRATION_FAILED` được nối lại khi một người hoặc chính phiên sở hữu
+sửa trên nhánh phiên rồi xin serve lại — không bao giờ bằng cách rebase, force hay bỏ qua lần merge đã
+sinh ra head hỏng đó.
 
 ## Một nhánh, một server, một cổng cố định
 
@@ -114,7 +134,8 @@ Vậy hai phiên trên cùng một sản phẩm không phải hai server. Mỗi 
 vụ, và `serve` merge nhánh của phiên đó vào nhánh tích hợp — một merge commit, không bao giờ rebase —
 rồi khởi động lại đúng một server trên kết quả. Head đang phục vụ khi đó mang việc của cả hai, và entry
 ghi `contains`: những commit head đó chắc chắn có. Xung đột lộ ra ở đây, sớm, ngay nơi hai thay đổi
-thật sự gặp nhau, thay vì lúc publish nơi nó sẽ chặn một phần việc đã xong. Nhánh tích hợp cũng được
+thật sự gặp nhau, thay vì lúc publish nơi nó sẽ chặn một phần việc đã xong — và cũng được giải ngay ở
+đây, theo luật và dưới một gate, chứ không đẩy cho con người giữa chừng merge. Nhánh tích hợp cũng được
 merge từ mainline theo chu kỳ để không trôi vào một trạng thái không ai khác chia sẻ.
 
 ## Commit của chính người tiêu thụ nằm trong một head dùng chung
@@ -300,7 +321,7 @@ release hay bằng chứng UAT nào.
 | 4 | Phân giải các port claim theo phép chiếu, và quan sát ai đang giữ từng cổng | `portClaims` | @workspaces/ports/&lt;project> cho các cổng được chiếu ra, @worktrees/sessions/central-runtime cho chủ giữ quan sát được của chúng | — | `PORT_CONFLICT` |
 | 5 | Suy ra delta giữa cái quan sát được và cái mong muốn | `desiredState` | @worktrees/sessions/central-runtime cho trạng thái quan sát được, `request/request.json` cho trạng thái mong muốn | `response/data/delta.json` | — |
 | 6 | Áp delta đã duyệt, từng resource một, dưới một lease độc quyền | — | @worktrees/sessions/central-runtime, @workspaces/device-state cho các handle theo tên | @worktrees/sessions/central-runtime, `response/data/delta.json`, @tools/container, @tools/shell | `EFFECT_UNAUTHORIZED`, `SERVICE_UNAVAILABLE` |
-| 7 | Leo đúng bậc đã nêu cho route đã bind — dựng hạ tầng của môi trường, phân giải checkout của nó, khởi động một role, hoặc merge commit của phiên này vào nhánh tích hợp rồi serve, restart, reset hay stop đúng một server detached qua `scripts/serve-runtime.mjs`, xếp hàng sau lease mà phiên khác đang giữ — rồi chứng thực entry: ping các endpoint, ghi head đang phục vụ, những gì nó chứa và bằng chứng, rồi đặt trạng thái | `routeKey`, `operation`, `commit`, `env` | @worktrees/sessions/central-runtime cho entry của route đó cùng server, lease và hàng đợi của nó, @workspaces/projects/&lt;project>/&lt;role> cho lệnh dev của role, worktree tích hợp và nhánh phiên được merge vào đó, hạ tầng đã khai của môi trường, các endpoint được quan sát lại một lần, @tools/git, @tools/http, @tools/container, @tools/shell | @worktrees/sessions/central-runtime, `response/data/delta.json` | `SERVICE_UNAVAILABLE`, `PROVISIONING_UNAVAILABLE`, `INTEGRATION_CONFLICT`, `INVALID_INPUT` |
+| 7 | Leo đúng bậc đã nêu cho route đã bind — dựng hạ tầng của môi trường, phân giải checkout của nó, khởi động một role, hoặc merge commit của phiên này vào nhánh tích hợp rồi serve, restart, reset hay stop đúng một server detached qua `scripts/serve-runtime.mjs`, xếp hàng sau lease mà phiên khác đang giữ — rồi chứng thực entry: ping các endpoint, ghi head đang phục vụ, những gì nó chứa và bằng chứng, rồi đặt trạng thái | `routeKey`, `operation`, `commit`, `env` | @worktrees/sessions/central-runtime cho entry của route đó cùng server, lease và hàng đợi của nó, @workspaces/projects/&lt;project>/&lt;role> cho lệnh dev của role, worktree tích hợp và nhánh phiên được merge vào đó, hạ tầng đã khai của môi trường, các endpoint được quan sát lại một lần, @tools/git, @tools/http, @tools/container, @tools/shell | @worktrees/sessions/central-runtime, `response/data/delta.json` | `SERVICE_UNAVAILABLE`, `PROVISIONING_UNAVAILABLE`, `INTEGRATION_FAILED`, `INVALID_INPUT` |
 | 8 | Cấp danh tính của luồng theo entry đó: đọc hồ sơ tài khoản hoặc tạo tài khoản, đặt mật khẩu từ tên niêm phong, ghi hồ sơ, phác phần còn thiếu và seed | `routeKey`, `flow`, `env` | @worktrees/uat/&lt;flow> cho hồ sơ tài khoản, tài liệu luồng và seed, @worktrees/_templates cho phần còn thiếu, @worktrees/sessions/central-runtime cho khai báo danh tính của entry, @workspaces/device-state cho thông tin đăng nhập theo tên, @tools/secrets, @tools/http, @tools/browsercontrol, @tools/database | @worktrees/uat/&lt;flow>, `response/data/account.json`, `response/data/delta.json`, @tools/sourcewrite | `INVALID_INPUT`, `PROVISIONING_UNAVAILABLE` |
 | 9 | Chứng minh mọi check bắt buộc | — | @worktrees/sessions/central-runtime đọc lại theo bộ chứng minh đầy đủ của nhánh, @tools/http | `response/data/checks.json` | `PROOF_FAILED` |
 | 10 | Viết biên bản và phát | — | mọi thứ ở trên | `response/response.md`, `response/response.json` | — |
@@ -333,7 +354,7 @@ fingerprint không thể cho một câu trả lời khác.
 | `EFFECT_UNAUTHORIZED` | terminate |
 | `SERVICE_UNAVAILABLE` | terminate |
 | `PROVISIONING_UNAVAILABLE` | terminate |
-| `INTEGRATION_CONFLICT` | terminate |
+| `INTEGRATION_FAILED` | terminate |
 | `PROOF_FAILED` | terminate |
 
 ## Kế tiếp

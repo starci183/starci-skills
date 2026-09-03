@@ -161,7 +161,7 @@ Skeleton: [`templates/kinds/frontend-surface-audit.skeleton.md`](https://github.
 
 | Section | Table header | Rows | Cell constraints |
 | --- | --- | --- | --- |
-| `^## Served surface$` | `\| Field \| Value \|` | `Applied commit`, `Served branch`, `Served head`, `Contains applied commit`, `Browser profile` | `Value`: `\S` |
+| `^## Served surface$` | `\| Field \| Value \|` | `Applied commit`, `Served branch`, `Served head`, `Contains applied commit`, `Browser profile`, `Family version observed`, `Family version resolved against` | `Value`: `\S` |
 | `^## Surface class$` | `\| Class \| Declared by \|` | exactRows 1 | `Class`: `^`(console\|form\|landing\|catalog\|reader)`$`<br />`Declared by`: `\S` |
 | `^## Matrix$` | `\| Matrix \| Viewport \| Scheme \| State \| Screenshot \|` | minRows 1 | `Matrix`: `^`[a-z0-9][a-z0-9-]*`$`<br />`Viewport`: `^[0-9]{3,4}x[0-9]{3,4}$`<br />`Scheme`: `^(light\|dark)$`<br />`Screenshot`: `^`response/artifacts/[A-Za-z0-9_.-]+[.]png`$` |
 | `^## Verdicts by owner$` | `\| Matrix \| Owner \| Node \| Rule \| Measured \| Verdict \|` | minRows 1 | `Owner`: `^(app\|grammar)$`<br />`Node`: `^`[^`]+`$`<br />`Rule`: `^`[A-Z][A-Z0-9-]*-[0-9]+`$`<br />`Verdict`: `^(pass\|fail)$`<br />`Matrix`: `^`[a-z0-9][a-z0-9-]*`$` |
@@ -210,7 +210,7 @@ Skeleton: [`templates/kinds/platform-operation-receipt.skeleton.md`](https://git
 | `^## Port holders$` | `\| Port \| Holder \| Evidence \|` | — | `Port`: `^[0-9]{1,5}$` |
 | `^## Mutations$` | `\| Effect \| Resource \| Before \| After \|` | — | `Effect`: `^`(update-config\|restart-service\|upsert-dashboard\|update-remote-write\|create-project\|assign-profile\|assign-gate\|enforce-setting\|create-tunnel\|update-tunnel-route\|upsert-proxied-dns\|register-runtime-entry\|attest-runtime-entry\|bring-up-infra-stack\|locate-routed-checkouts\|start-role-runtime\|merge-into-integration-branch\|serve-runtime-head\|restart-runtime-server\|reset-runtime-server\|stop-runtime-server\|queue-runtime-lease\|provision-identity\|seed-flow-fixtures)`$` |
 | `^## Checks$` | `\| Check \| Resource \| Status \| Evidence \|` | minRows 1 | `Status`: `^(passed\|failed)$`<br />`Evidence`: `\S` |
-| `^## Findings$` | `\| Code \| Resource \| Port \| Holder \| Statement \|` | minRows 1 | `Code`: `^`(SHARED_SERVICE_INVENTORIED\|PORT_COORDINATION_REQUIRED\|ALREADY_CONVERGED\|PARTIAL_MUTATION\|PRODUCT_DEPLOYMENT_DECLINED\|RUNTIME_ENTRY_ATTESTED\|IDENTITY_PROVISIONED\|RUNTIME_RUNG_CLIMBED\|RUNTIME_HEAD_SERVED\|RUNTIME_HEAD_REUSED\|RUNTIME_SERVER_RESTARTED\|RUNTIME_SERVER_RESET\|RUNTIME_SERVER_STOPPED\|RUNTIME_LEASE_BUSY\|INTEGRATION_MERGED)`$`<br />`Statement`: `\S` |
+| `^## Findings$` | `\| Code \| Resource \| Port \| Holder \| Statement \|` | minRows 1 | `Code`: `^`(SHARED_SERVICE_INVENTORIED\|PORT_COORDINATION_REQUIRED\|ALREADY_CONVERGED\|PARTIAL_MUTATION\|PRODUCT_DEPLOYMENT_DECLINED\|RUNTIME_ENTRY_ATTESTED\|IDENTITY_PROVISIONED\|RUNTIME_RUNG_CLIMBED\|RUNTIME_HEAD_SERVED\|RUNTIME_HEAD_REUSED\|RUNTIME_SERVER_RESTARTED\|RUNTIME_SERVER_RESET\|RUNTIME_SERVER_STOPPED\|RUNTIME_LEASE_BUSY\|INTEGRATION_MERGED\|INTEGRATION_RESOLVED\|INTEGRATION_GATE_FAILED)`$`<br />`Statement`: `\S` |
 
 ### `quality-verification`
 

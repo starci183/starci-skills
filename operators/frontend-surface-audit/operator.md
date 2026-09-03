@@ -45,6 +45,20 @@ port its entry serves, and readiness is reached there. When the served head does
 applied commit, or nothing is serving at all, `RUNTIME_UNAVAILABLE` names the commit that must be
 served and the operation that would serve it, and the runtime owner is the one that acts.
 
+## A served surface can also drift in the family it renders
+
+Clean ancestry proves the source is right; it proves nothing about the family the served head renders
+the source through. The integration branch also merges from the mainline, so a Grammar or other
+dependency version the session never resolved against can already be on the served head by the time
+this audit runs, and a presentation verdict that flips over that has nothing to do with the source
+this session wrote. `## Served surface` therefore always names the family version this served head
+actually renders and the version the delivery was resolved against, side by side; when they differ,
+the drift is not left implicit in the ancestry check that already passed. Wherever a verdict's own
+measured evidence is the one a version drift could have flipped rather than the source, that node's
+own measured text names both versions again, so a reader is never left guessing which of the two
+possible causes produced the verdict. This is evidence, not a new gate: it names no scope question and
+stops at nothing the surface's own proof rules did not already stop at.
+
 ## Two sessions on one product
 
 The isolation law is published once, by the operator that owns the runtime, and this audit works

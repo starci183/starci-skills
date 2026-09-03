@@ -86,17 +86,23 @@
         "vi": "Sửa dịch vụ, rồi gọi lại."
       }
     },
-    "INTEGRATION_CONFLICT": {
+    "INTEGRATION_FAILED": {
       "domain": "product",
       "disposition": "terminate",
       "meaning": {
-        "en": "Merging the session branch into the integration branch conflicted, so the head a session asked to have served cannot be built from what is already there.",
-        "vi": "Merge nhánh phiên vào nhánh tích hợp bị xung đột, nên head mà một phiên xin phục vụ không dựng được từ những gì đã có ở đó."
+        "en": "serve resolved the merge conflict itself and gated the merged head, and a required gate came back red: the merged head does not pass the delivery gates. The receipt names the failing gate and the resolutions that were made.",
+        "vi": "serve đã tự giải xung đột merge rồi chấm gate trên head đã gộp, và một gate bắt buộc trả về đỏ: head đã gộp không qua được các gate phát hành. Biên nhận nêu tên gate hỏng và những chỗ đã được giải xung đột."
       },
       "resume": {
-        "en": "A person resolves the conflict in the session branch and asks for the head again; the merge is never rebased, forced or abandoned to make it apply.",
-        "vi": "Người xử lý xung đột trong nhánh phiên rồi xin lại head; lần merge không bao giờ bị rebase, force hay bỏ qua để cho nó áp được."
+        "en": "A person or the owning session repairs the session branch and asks to serve again; the merge that produced the failing head is never rebased, forced or abandoned to make it apply.",
+        "vi": "Một người hoặc chính phiên sở hữu sửa nhánh phiên rồi xin serve lại; lần merge đã sinh ra head hỏng không bao giờ bị rebase, force hay bỏ qua để cho nó áp được."
       }
+    }
+  },
+  "retired": {
+    "INTEGRATION_CONFLICT": {
+      "en": "Retired into INTEGRATION_FAILED. A merge conflict is no longer escalated to a person: serve resolves it itself under the closed rule set recorded in operator.md, records the resolution on the merge, and gates the merged head before restarting the server. INTEGRATION_FAILED is what stops now, and only when that gate comes back red.",
+      "vi": "Đã nghỉ hưu, gộp vào INTEGRATION_FAILED. Một xung đột merge không còn bị đẩy lên cho con người: serve tự giải nó theo tập luật đóng ghi trong operator.md, ghi lại cách giải trên đúng lần merge, rồi chấm gate trên head đã gộp trước khi khởi động lại server. INTEGRATION_FAILED mới là thứ dừng lại bây giờ, và chỉ khi gate đó trả về đỏ."
     }
   }
 }
