@@ -1,0 +1,5 @@
+# One line ending everywhere: the tree is hashed, diffed and fingerprinted as bytes.
+* text=auto eol=lf
+*.png binary
+*.jpg binary
+*.woff2 binary
