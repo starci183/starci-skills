@@ -73,3 +73,7 @@ Mỗi mục: cái gì, ở đâu, bằng chứng, vì sao. Mục nào thầy kh�
 ### Grammar 0.4.2 — `/core` re-export toàn bộ Common (thầy chốt)
 
 - `@starci/grammar/core` giờ `export * from "../common"`: mọi renderer của Common (cùng object) + `CoreGrammarRoot`, token, DNA. Test cũ "Core không re-export component owner" được đảo thành "Core re-export mọi renderer Common". `FE-IMPORTS-7` Case 5 đổi từ "cấm import renderer từ /core" thành "import từ entry family /core hoặc /common; cấm gốc gói và cấm trộn family". Luật cũ đặt ra để một renderer chỉ có một chủ; luật mới giữ một chủ (vẫn là Common) nhưng cho một đường import duy nhất cho family, vì agent (Codex ở nivo) đoán `/core` là hợp lý.
+
+### Gói npm @starci/skills (1.1.0)
+
+- Cây .claude giờ là gói npm `@starci/skills` (repo starci-skills chính là gói; `files` chỉ đóng các đường dẫn runtime + `bin/` + README, không đóng sites/docs/tests/onichan). `bin/starci-skills.mjs` không có dependency, Node 20+: `init` chép cây vào `<repo>/.claude`, viết `CLAUDE.md` (Claude Code) và `AGENTS.md` (Codex) cùng một đoạn bootstrap như backend đang dùng khi chưa có, thêm `.worktrees/sessions/` vào .gitignore, ghi manifest `.claude/.starci-skills.json` (phiên bản + hash từng file); `update` thay các đường dẫn runtime, giữ và liệt kê file thầy sửa tay (`--force` lấy bản gói), không đụng file ngoài runtime; `doctor` chạy đúng chuỗi validator của npm test (trừ docs) trên bản đã cài và báo file lệch so với lúc cài. Spec `scripts/install-cli.spec.mjs` kiểm bốn điều đó và tự skip trong cây đã cài. Docs: trang Install (en/vi) + README gói.

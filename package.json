@@ -1,8 +1,48 @@
 {
-  "name": "starci-skills",
-  "version": "1.0.3",
-  "private": true,
+  "name": "@starci/skills",
+  "version": "1.1.0",
+  "description": "StarCi Skills: one entry, fourteen operators, a closed routing map and a tool registry, installed as the .claude runtime of a repository for Claude Code and Codex.",
+  "license": "MIT",
   "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
+  "bin": {
+    "starci-skills": "bin/starci-skills.mjs"
+  },
+  "files": [
+    "bin/",
+    "INDEX.md",
+    "INDEX.vi.md",
+    "SKILL.md",
+    "SKILL.vi.md",
+    "routing.json",
+    "alias/",
+    "knowledge/",
+    "operators/",
+    "readiness/",
+    "resources/",
+    "scripts/",
+    "templates/",
+    "workflows/",
+    "README.md",
+    "README.vi.md"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/starci183/starci-skills.git"
+  },
+  "homepage": "https://harness.starci.org",
+  "keywords": [
+    "claude-code",
+    "codex",
+    "agent",
+    "skills",
+    "starci"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
   "scripts": {
     "test": "node scripts/validate-routing.mjs && node scripts/validate-resources.mjs && node scripts/validate-knowledge-citations.mjs && node scripts/validate-alias.mjs && node scripts/generate-alias-doc.mjs --check && node scripts/validate-operator.mjs && node scripts/validate-workflows.mjs && node scripts/validate-defaults.mjs && node scripts/generate-operators-index.mjs --check && node scripts/validate-templates.mjs && node scripts/run-operator-self-tests.mjs && node --test scripts/*.spec.mjs && npm run docs:check",
     "docs:check": "node docs/scripts/generate-docs.mjs --check"

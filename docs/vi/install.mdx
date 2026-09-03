@@ -1,0 +1,71 @@
+---
+title: "Cài đặt"
+description: "npx @starci/skills init cài cây làm runtime .claude của một repository cho Claude Code và Codex; update và doctor giữ nó mới và hợp lệ."
+---
+
+# Cài đặt
+
+Cây được phát hành trên npm dưới tên `@starci/skills`. Gói chính là runtime, không phải lớp bọc quanh
+nó: thứ `init` chép vào `.claude/` đúng từng byte là cây mà site này mô tả, và CLI không cần
+dependency nào ngoài Node 20.
+
+```bash
+npx @starci/skills init
+```
+
+Chạy ở gốc repository sẽ sở hữu runtime, tức thư mục mà `INDEX.md` gọi là `<Source>`. Lệnh làm bốn
+việc và báo từng việc:
+
+1. chép các đường dẫn runtime vào `./.claude` — `INDEX.md`, `INDEX.vi.md`, `SKILL.md`, `SKILL.vi.md`,
+   `routing.json`, `alias/`, `knowledge/`, `operators/`, `readiness/`, `resources/`, `scripts/`,
+   `templates/`, `workflows/`;
+2. viết `CLAUDE.md`, file Claude Code đọc, và `AGENTS.md`, file Codex đọc, khi chúng chưa có. Cả hai
+   mang cùng một đoạn bootstrap: đọc trọn `.claude/INDEX.md` và theo thứ tự nạp của nó. File đã có và
+   đã trỏ về đó thì được giữ nguyên; file chưa trỏ thì được báo, không bao giờ bị sửa;
+3. thêm `.worktrees/sessions/` vào `.gitignore`, vì phiên làm việc nằm dưới
+   `<Source>/.worktrees/sessions/` và không bao giờ được commit;
+4. ghi `.claude/.starci-skills.json`, tức manifest: phiên bản đã cài và một hash cho mỗi file.
+
+Hãy commit `.claude/` cùng repository. Nó là source: các operator, knowledge và validator mà một nhiệm
+vụ chạy dựa vào, và người review phải nhìn thấy được phiên bản mà một phiên đã chạy trên đó.
+
+## Claude Code và Codex
+
+Cả hai vào cùng một cửa, qua bootstrap. Khác biệt nằm ở file profile mà processor ràng:
+`resources/agents/profiles/openai.json` cho Codex, `claude.json` cho Claude Code, ghép cặp trong
+`resources/orchestrator.json` dưới `profileEquivalents`. `operator.json` của mỗi operator nêu một
+profile và những tool nó được gọi từ `resources/tools.json`; runtime thiếu một tool (chẳng hạn
+`imagegen` bên Claude) được ghi sẵn ở cột `support` của sổ, không phải phát hiện giữa phiên. Xem
+[Tài nguyên](/vi/concepts/resources).
+
+## Cập nhật
+
+```bash
+npx @starci/skills update
+```
+
+`update` thay các đường dẫn runtime bằng bản của gói. File có hash khác manifest, tức file một người
+đã sửa tay, được giữ lại và liệt kê; `--force` lấy bản của gói cho file đó. File ngoài các đường dẫn
+runtime, như thư mục `tests/` hay ghi chú, không bao giờ bị đụng. Manifest được ghi lại sau đó.
+
+## Doctor
+
+```bash
+npx @starci/skills doctor
+```
+
+`doctor` chạy chính bộ validator của cây trên bản đã cài, theo đúng thứ tự `npm test` chạy trong gói:
+routing, tài nguyên, trích dẫn knowledge, alias, bản đồ alias, operator, workflow, mặc định, chỉ mục
+operator, template, mười bốn self-test của operator, và spec của script. Trước đó nó in số file đã đổi
+từ lúc cài. `--quick` chỉ giữ ba kiểm tra nhanh nhất. Mã thoát khác không nghĩa là cây mà một nhiệm
+vụ sẽ chạy trên đó không phải cây mà validator chấp nhận; hãy sửa file được nêu hoặc chạy
+`update --force` cho nó.
+
+## Tuỳ chọn
+
+| Tuỳ chọn | Lệnh | Ý nghĩa |
+| --- | --- | --- |
+| `--dir <repo>` | tất cả | Gốc repository; mặc định là thư mục hiện tại. |
+| `--force` | `init`, `update` | `init`: thay các đường dẫn runtime bên trong một `.claude` không do gói này cài. `update`: lấy bản của gói cho file đã sửa tay. |
+| `--no-bootstrap` | `init` | Không viết `CLAUDE.md`, `AGENTS.md` hay dòng `.gitignore`. |
+| `--quick` | `doctor` | Chỉ routing, alias và operator. |

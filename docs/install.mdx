@@ -1,0 +1,73 @@
+---
+title: "Install"
+description: "npx @starci/skills init installs the tree as a repository's .claude runtime for Claude Code and Codex; update and doctor keep it current and valid."
+---
+
+# Install
+
+The tree is published on npm as `@starci/skills`. The package is the runtime itself, not a wrapper
+around it: what `init` copies into `.claude/` is byte for byte the tree this site documents, and the
+CLI has no dependencies beyond Node 20.
+
+```bash
+npx @starci/skills init
+```
+
+Run it at the root of the repository that will own the runtime, the one `INDEX.md` calls `<Source>`.
+It does four things and reports each:
+
+1. copies the runtime paths into `./.claude` — `INDEX.md`, `INDEX.vi.md`, `SKILL.md`, `SKILL.vi.md`,
+   `routing.json`, `alias/`, `knowledge/`, `operators/`, `readiness/`, `resources/`, `scripts/`,
+   `templates/`, `workflows/`;
+2. writes `CLAUDE.md`, which Claude Code reads, and `AGENTS.md`, which Codex reads, when they do not
+   exist. Both carry the same bootstrap: read `.claude/INDEX.md` completely and follow its load
+   order. An existing file that already routes there is kept; one that does not is reported, never
+   edited;
+3. adds `.worktrees/sessions/` to `.gitignore`, because sessions live under
+   `<Source>/.worktrees/sessions/` and are never committed;
+4. writes `.claude/.starci-skills.json`, the manifest: the installed version and one hash per file.
+
+Commit `.claude/` with the repository. It is source: the operators, the knowledge and the validators a
+mission runs against, and a reviewer must be able to see the version a session ran on.
+
+## Claude Code and Codex
+
+Both are entered the same way, through the bootstrap. The difference is which profile file the
+processor binds: `resources/agents/profiles/openai.json` for Codex, `claude.json` for Claude Code,
+paired in `resources/orchestrator.json` under `profileEquivalents`. Each operator's `operator.json`
+names one profile and the tools it may call from `resources/tools.json`; a runtime that lacks a tool
+(`imagegen` on Claude, for instance) is recorded in the registry's `support` column, not discovered
+mid-session. See [Resources](/concepts/resources).
+
+## Update
+
+```bash
+npx @starci/skills update
+```
+
+`update` replaces the runtime paths with the package version. A file whose hash differs from the
+manifest — a file a person changed locally — is kept and listed; `--force` takes the package version
+of it. Files outside the runtime paths, such as a `tests/` folder or notes, are never touched. The
+manifest is rewritten afterwards.
+
+## Doctor
+
+```bash
+npx @starci/skills doctor
+```
+
+`doctor` runs the tree's own validators on the installed copy, in the order `npm test` runs them in
+the package: routing, resources, knowledge citations, alias, the alias map, operators, workflows,
+defaults, the operators index, templates, the fourteen operator self-tests, and the script specs. It
+first prints how many files changed since install. `--quick` keeps the three fastest checks. A
+non-zero exit means the tree a mission would run on is not the tree the validators accept; fix the
+listed file or run `update --force` on it.
+
+## Options
+
+| Option | Commands | Meaning |
+| --- | --- | --- |
+| `--dir <repo>` | all | The repository root; default is the current directory. |
+| `--force` | `init`, `update` | `init`: replace the runtime paths inside a `.claude` this package did not install. `update`: take the package version of locally changed files. |
+| `--no-bootstrap` | `init` | Do not write `CLAUDE.md`, `AGENTS.md` or the `.gitignore` line. |
+| `--quick` | `doctor` | Routing, alias and operators only. |

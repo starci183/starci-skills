@@ -1,4 +1,4 @@
-# StarCi Skills 1.0.3
+# StarCi Skills 1.1.0
 
 This tree is the runtime. Read [SKILL.md](SKILL.md) next; it is the single entry that freezes a
 mission's scope, selects the one operator that owns the outcome, and routes between operators on
@@ -61,6 +61,8 @@ head or the head is not publishable.
 - Rule IDs are stable public addresses. Append; never renumber, reuse, or silently change meaning.
 
 ## Lineage
+
+1.1.0 (2026-09-03): the tree ships as the npm package @starci/skills; npx @starci/skills init installs it as a repository's .claude runtime with the CLAUDE.md and AGENTS.md bootstraps, update keeps local edits, doctor runs the validators on the installed copy; @starci/grammar 0.4.2 (the core entry re-exports Common).
 
 1.0.3 (2026-09-03): a tools registry replaces grants and policies (resources/tools.json, @tools/<id> in Steps, per-runtime support, profile equivalents); every operator binds an OpenAI profile for the Codex processor; the first test round (tests/) and its fixes; docs/ and sites/ return.
 

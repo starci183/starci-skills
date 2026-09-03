@@ -1,4 +1,4 @@
-# StarCi Skills 1.0.3
+# StarCi Skills 1.1.0
 
 Cây này chính là runtime. Đọc tiếp `SKILL.vi.md` nếu có, hoặc `SKILL.md`; đó là cửa vào duy nhất,
 đóng băng phạm vi của một nhiệm vụ, chọn đúng một operator sở hữu kết quả, rồi định tuyến giữa các
@@ -62,6 +62,8 @@ thì không được publish.
   đổi nghĩa.
 
 ## Dòng dõi
+
+1.1.0 (2026-09-03): cây phát hành thành gói npm @starci/skills; npx @starci/skills init cài nó làm runtime .claude của một repository kèm bootstrap CLAUDE.md và AGENTS.md, update giữ sửa đổi tay, doctor chạy validator trên bản đã cài; @starci/grammar 0.4.2 (entry core re-export Common).
 
 1.0.3 (2026-09-03): sổ tool thay cho grant và policy (resources/tools.json, @tools/<id> trong Các bước, hỗ trợ theo runtime, profile tương đương); mọi operator ràng profile OpenAI cho processor Codex; vòng test đầu (tests/) và các sửa từ đó; docs/ và sites/ trở lại.
 
