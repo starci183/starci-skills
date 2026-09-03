@@ -29,6 +29,23 @@ bước ràng đã từ chối một cổng chỉ-lắng-nghe thay cho chuỗi n
 lời, mã dừng là `RUNTIME_UNAVAILABLE` trên một endpoint có tên, chứ không phải một phỏng đoán xem
 origin nào mới là origin được nhắc tới.
 
+Endpoint đó phục vụ một nhánh tích hợp mang việc của mọi phiên đã xin, nên head nó đang chạy gần như
+không bao giờ là commit lượt chạy này kiểm. Vì vậy snapshot đóng băng cả hai: commit đã ghim và head
+đang phục vụ, kèm bản ghi phép thử quan hệ tổ tiên giữa chúng. Một head đang phục vụ không chứa commit
+đã ghim là trôi, và trôi là một mã dừng chưa lái gì cả — còn một head đang phục vụ có chứa nó cùng với
+việc của người khác thì đúng là hình hài của một nhánh tích hợp dùng chung, và không phải phát hiện gì
+hết.
+
+## Hai phiên trên một sản phẩm
+
+Luật cô lập được công bố đúng một lần, ở operator sở hữu runtime, và operator này làm việc bên trong
+luật đó chứ không chép lại. Ba điều khoản của nó là những thứ chỉ biên bản này mang được, nên snapshot
+nêu ra và chúng được kiểm: lượt chạy này thuộc về phiên mà request nêu tên và không ghi thư mục của
+phiên nào khác; nó lái profile trình duyệt của riêng mình, vì hai lượt chạy dùng chung một profile là
+dùng chung một phiên đăng nhập, rồi lượt này lại chứng minh cho lượt kia; và nó chỉ seed những định
+danh nằm dưới namespace của chính lượt chạy rồi chỉ rollback đúng những gì mình đã seed, vì một fixture
+với tới hàng dùng chung chính là cách phần dọn dẹp của lượt này thành lỗi của lượt khác.
+
 ## Hồ sơ thiếu thì tạo ra, không phải báo lỗi
 
 Một luồng chưa ai chạy thì chưa có thư mục, chưa có tài liệu luồng, chưa có seed, chưa có tài khoản và

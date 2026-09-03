@@ -5,7 +5,7 @@ import assert from 'node:assert/strict';
 import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
-import { validatePlatformStep, KIND_CHECKS } from './validate.mjs';
+import { validatePlatformStep, KIND_CHECKS, RUNG_CHECKS, QUEUED_CHECKS } from './validate.mjs';
 
 const PLAN = `sha256:${'0'.repeat(64)}`;
 const FP = `sha256:${'1'.repeat(64)}`;
@@ -23,9 +23,10 @@ const checkList = (names = KIND_CHECKS.observability, status = 'passed') => name
 function delta({
   convergence = 'converged', mutations = EFFECTS.map((e) => mutation(e)), appliedEffects, allowedEffects = EFFECTS,
   capabilities = CAPABILITIES, resources = [resource()], portHolders = [], portClaims = [], serviceKind = 'observability',
-  planSha256 = PLAN, approvalRef = APPROVAL, mutableResourceRefs = [SERVICE], serviceRef = SERVICE,
+  planSha256 = PLAN, approvalRef = APPROVAL, mutableResourceRefs = [SERVICE], serviceRef = SERVICE, runtimeLadder,
 } = {}) {
   return {
+    ...(runtimeLadder ? { runtimeLadder } : {}),
     serviceRef, serviceKind, ownerRef: OWNER, approvalRef, planSha256,
     inventoryFingerprint: FP, generation: 7, observedAt: '2026-01-10T00:00:00.000Z',
     inventoriedResources: resources, observedPortHolders: portHolders, portClaims,
@@ -132,8 +133,8 @@ const entryDelta = (serviceKind, effects, over = {}) => delta({
   capabilities: (serviceKind === 'runtime' ? ['runtime:registry-write'] : ['identity:account-admin']).map((c) => ({ capability: c, custodyEvidenceRef: `custody/${serviceKind}.json` })),
   ...over,
 });
-const entryChecks = (serviceKind, findings, list) => checksJson({
-  serviceKind, serviceRef: ENTRY, required: KIND_CHECKS[serviceKind],
+const entryChecks = (serviceKind, findings, list, required) => checksJson({
+  serviceKind, serviceRef: ENTRY, required: required ?? KIND_CHECKS[serviceKind],
   list: list ?? KIND_CHECKS[serviceKind].map((n) => rtCheck(n)),
   findings,
 });
@@ -154,13 +155,59 @@ const accountRecord = ({ accounts, ...over } = {}) => ({
   ...over,
 });
 
+// The runtime ladder. One integration branch on one fixed port: a session's commit is merged in and
+// the one server is restarted on the result, or the session waits behind the lease that is merging.
+const SESSION = 's-test';
+const OTHER = 's-other';
+const UAT_OLD = 'b'.repeat(40);
+const UAT_NEW = 'c'.repeat(40);
+const WANT = 'd'.repeat(40);
+const OTHER_COMMIT = 'e'.repeat(40);
+const MERGE_COMMIT = 'f'.repeat(40);
+const WORKTREE = '.worktrees/demo-product/uat';
+
+const ladder = (over = {}) => ({
+  routeKey: ENTRY, operation: 'serve', rung: 'serve', reused: false, sessionId: SESSION,
+  wantedCommit: WANT, servedHead: UAT_NEW, contains: [OTHER_COMMIT, WANT],
+  integration: {
+    worktreeRef: WORKTREE, branch: 'uat', createdFrom: null,
+    merges: [{ ref: 'session/s-test', commit: WANT, mergeCommit: MERGE_COMMIT, kind: 'session' }],
+    conflict: false,
+  },
+  infra: null, locations: [],
+  observed: { head: UAT_OLD, containsWanted: false, pid: 4100, pidAlive: true, probeAnswered: true, leaseSessionId: null, queue: [] },
+  server: { pid: 4200, previousPid: 4100, port: 3067, command: 'npm run dev', logRef: 'logs/uat.log', pidFileRef: 'logs/uat.pid', startedAt: '2026-01-10T00:02:00.000Z' },
+  queuePosition: null,
+  lease: { sessionId: SESSION, since: '2026-01-10T00:01:00.000Z', operation: 'serve', queue: [] },
+  ...over,
+});
+
+const rungBranch = ({ rung = 'serve', effects, ladderOver = {}, checkNames, findings, extra = {}, status = 'done' } = {}) => {
+  const lad = ladder({ operation: rung, rung, ...ladderOver });
+  const applied = effects ?? ['merge-into-integration-branch', 'serve-runtime-head', 'attest-runtime-entry'];
+  const list = (checkNames ?? RUNG_CHECKS[rung]).map((n) => rtCheck(n));
+  const found = findings ?? [{ code: 'RUNTIME_HEAD_SERVED', resourceRef: ENTRY, port: null, holderRef: null, statement: 'the session commit was merged into the integration branch and the server restarted on the result' }];
+  return {
+    'request/request.json': requestJson({ kind: 'runtime', service: ENTRY, effects: applied, resourceRefs: [ENTRY], mutableResourceRefs: [ENTRY], extra: { routeKey: ENTRY, operation: rung, ...extra } }),
+    'response/response.json': responseJson({ status, next: ['frontend.surface.audit'] }),
+    'response/response.md': entryMd('runtime', applied, found.map((f) => [f.code, f.resourceRef, f.port ?? '—', f.holderRef ?? '—', f.statement]), list),
+    'response/data/delta.json': entryDelta('runtime', applied, { runtimeLadder: lad }),
+    'response/data/checks.json': entryChecks('runtime', found, list, checkNames ?? RUNG_CHECKS[rung]),
+  };
+};
+
 // An already-running service is attested where it stands: probed, recorded, and never restarted.
 const attesting = (over = {}) => ({
-  'request/request.json': requestJson({ kind: 'runtime', service: ENTRY, effects: ['attest-runtime-entry'], resourceRefs: [ENTRY], mutableResourceRefs: [ENTRY], extra: { routeKey: ENTRY } }),
-  'response/response.json': responseJson({ next: ['frontend.surface.audit'] }),
-  'response/response.md': entryMd('runtime', ['attest-runtime-entry'], [['RUNTIME_ENTRY_ATTESTED', ENTRY, '—', '—', 'the declared endpoints answered and the head was recorded']]),
-  'response/data/delta.json': entryDelta('runtime', ['attest-runtime-entry']),
-  'response/data/checks.json': entryChecks('runtime', [{ code: 'RUNTIME_ENTRY_ATTESTED', resourceRef: ENTRY, port: null, holderRef: null, statement: 'the declared endpoints answered and the head was recorded' }]),
+  ...rungBranch({
+    rung: 'serve',
+    effects: ['attest-runtime-entry'],
+    ladderOver: {
+      reused: true, integration: null, servedHead: UAT_OLD, contains: [OTHER_COMMIT, WANT],
+      observed: { head: UAT_OLD, containsWanted: true, pid: 4100, pidAlive: true, probeAnswered: true, leaseSessionId: null, queue: [] },
+      server: { pid: 4100, previousPid: 4100, port: 3067, command: 'npm run dev', logRef: 'logs/uat.log', pidFileRef: 'logs/uat.pid', startedAt: '2026-01-10T00:00:00.000Z' },
+    },
+    findings: [{ code: 'RUNTIME_HEAD_REUSED', resourceRef: ENTRY, port: null, holderRef: null, statement: 'the running head already contained the wanted commit and its endpoint answered, so nothing was restarted' }],
+  }),
   ...over,
 });
 
@@ -274,4 +321,120 @@ await expectError(provisioning({ 'response/data/account.json': { ...accountRecor
 await expectError(provisioning({ 'response/data/checks.json': entryChecks('identity', [{ code: 'SHARED_SERVICE_INVENTORIED', resourceRef: ENTRY, port: null, holderRef: null, statement: 'x' }]), 'response/response.md': entryMd('identity', ['provision-identity', 'seed-flow-fixtures'], [['SHARED_SERVICE_INVENTORIED', ENTRY, '—', '—', 'x']]) }), 'records the IDENTITY_PROVISIONED finding', 'a provisioning the receipt never names');
 await expectError(attesting({ 'request/request.json': requestJson({ kind: 'runtime', service: ENTRY, effects: ['provision-identity'], resourceRefs: [ENTRY], mutableResourceRefs: [ENTRY], extra: { routeKey: ENTRY } }) }), 'does not belong to the runtime service kind', 'an identity effect filed under the runtime branch');
 
-process.stdout.write('platform.operate self-test: 5 valid branches, 41 rejected mutations\n');
+
+// The ladder, rung by rung, and the two sessions that share one product.
+const stackUp = (over = {}) => ({
+  ...rungBranch({
+    rung: 'stack-up',
+    effects: ['bring-up-infra-stack', 'attest-runtime-entry'],
+    ladderOver: {
+      wantedCommit: null, servedHead: null, contains: [], integration: null, server: null, lease: null,
+      infra: { env: 'local', stackRef: '.stacks/local/infra', services: [{ name: 'database', port: 5432, ready: true, evidenceRef: 'probes/database.json' }, { name: 'identity', port: 8089, ready: true, evidenceRef: 'probes/identity.json' }] },
+      observed: { head: null, containsWanted: false, pid: null, pidAlive: false, probeAnswered: false, leaseSessionId: null, queue: [] },
+    },
+    findings: [{ code: 'RUNTIME_RUNG_CLIMBED', resourceRef: ENTRY, port: null, holderRef: null, statement: 'the environment infrastructure came up and its declared origin rule admits the served origin' }],
+  }),
+  ...over,
+});
+
+const locating = (over = {}) => ({
+  ...rungBranch({
+    rung: 'locate',
+    effects: ['locate-routed-checkouts', 'attest-runtime-entry'],
+    ladderOver: {
+      wantedCommit: null, servedHead: null, contains: [], integration: null, server: null, lease: null,
+      locations: [{ role: 'fe', checkoutRef: '@workspaces/demo-product/fe', head: UAT_OLD, devCommand: 'npm run dev' }],
+      observed: { head: null, containsWanted: false, pid: null, pidAlive: false, probeAnswered: false, leaseSessionId: null, queue: [] },
+    },
+    findings: [{ code: 'RUNTIME_RUNG_CLIMBED', resourceRef: ENTRY, port: null, holderRef: null, statement: 'the routed checkout resolved through the workspace route and its head was observed' }],
+  }),
+  ...over,
+});
+
+const startingRole = (over = {}) => ({
+  ...rungBranch({
+    rung: 'start-role',
+    effects: ['merge-into-integration-branch', 'start-role-runtime', 'attest-runtime-entry'],
+    ladderOver: {
+      sessionId: null, lease: null,
+      integration: { worktreeRef: WORKTREE, branch: 'uat', createdFrom: 'main', merges: [{ ref: 'main', commit: WANT, mergeCommit: MERGE_COMMIT, kind: 'mainline' }], conflict: false },
+      contains: [WANT],
+      locations: [{ role: 'fe', checkoutRef: '@workspaces/demo-product/fe', head: WANT, devCommand: 'npm run dev' }],
+      observed: { head: null, containsWanted: false, pid: null, pidAlive: false, probeAnswered: false, leaseSessionId: null, queue: [] },
+      server: { pid: 4200, previousPid: null, port: 3067, command: 'npm run dev', logRef: 'logs/uat.log', pidFileRef: 'logs/uat.pid', startedAt: '2026-01-10T00:02:00.000Z' },
+    },
+  }),
+  ...over,
+});
+
+// Session A merges its commit into the integration branch and the one server restarts on the result.
+const servingFirst = (over = {}) => ({ ...rungBranch({ rung: 'serve', extra: { commit: WANT } }), ...over });
+
+// Session B asks while A holds the lease: it is queued and told where it stands, never given a
+// second server.
+const queuedBehind = (over = {}) => ({
+  ...rungBranch({
+    rung: 'serve',
+    effects: ['queue-runtime-lease', 'attest-runtime-entry'],
+    checkNames: QUEUED_CHECKS,
+    ladderOver: {
+      sessionId: SESSION, wantedCommit: OTHER_COMMIT, servedHead: UAT_OLD, contains: [WANT],
+      integration: null, server: null, queuePosition: 1,
+      observed: { head: UAT_OLD, containsWanted: false, pid: 4100, pidAlive: true, probeAnswered: true, leaseSessionId: OTHER, queue: [] },
+      lease: { sessionId: OTHER, since: '2026-01-10T00:01:00.000Z', operation: 'serve', queue: [SESSION] },
+    },
+    extra: { commit: OTHER_COMMIT },
+    findings: [{ code: 'RUNTIME_LEASE_BUSY', resourceRef: ENTRY, port: null, holderRef: null, statement: 'another session holds the lease while it merges, so this session is queued behind it' }],
+  }),
+  ...over,
+});
+
+// The lease is released and session B is served: same port, same branch, both commits inside the head.
+const servingSecond = (over = {}) => ({
+  ...rungBranch({
+    rung: 'serve',
+    ladderOver: {
+      wantedCommit: OTHER_COMMIT, contains: [WANT, OTHER_COMMIT],
+      integration: { worktreeRef: WORKTREE, branch: 'uat', createdFrom: null, merges: [{ ref: 'main', commit: UAT_OLD, mergeCommit: MERGE_COMMIT, kind: 'mainline' }, { ref: 'session/s-other', commit: OTHER_COMMIT, mergeCommit: UAT_NEW, kind: 'session' }], conflict: false },
+    },
+    extra: { commit: OTHER_COMMIT },
+  }),
+  ...over,
+});
+
+const stopping = (over = {}) => ({
+  ...rungBranch({
+    rung: 'stop',
+    effects: ['stop-runtime-server', 'attest-runtime-entry'],
+    ladderOver: { wantedCommit: null, servedHead: UAT_OLD, contains: [WANT], integration: null, server: null, lease: null, observed: { head: UAT_OLD, containsWanted: false, pid: 4100, pidAlive: true, probeAnswered: true, leaseSessionId: SESSION, queue: [] } },
+    findings: [{ code: 'RUNTIME_SERVER_STOPPED', resourceRef: ENTRY, port: null, holderRef: null, statement: 'the pid the entry recorded was stopped and the lease released' }],
+  }),
+  ...over,
+});
+
+await expectValid(stackUp(), 'the stack-up rung on a machine with nothing running');
+await expectValid(locating(), 'the locate rung resolving the routed checkout through its route');
+await expectValid(startingRole(), 'the start-role rung starting the one server from the integration worktree');
+await expectValid(servingFirst(), 'one session merged into the integration branch and served');
+await expectValid(queuedBehind(), 'a second session queued behind the lease instead of given a second server');
+await expectValid(servingSecond(), 'the second session served after the release: same port, both commits inside the head');
+await expectValid(stopping(), 'a stop that kills the pid the entry recorded and releases the lease');
+await expectValid({
+  'request/request.json': requestJson({ kind: 'runtime', service: ENTRY, effects: ['merge-into-integration-branch'], resourceRefs: [ENTRY], mutableResourceRefs: [ENTRY], extra: { routeKey: ENTRY, operation: 'serve', commit: WANT } }),
+  'response/response.json': responseJson({ status: 'blocked', stop: 'INTEGRATION_CONFLICT', next: [] }),
+  'response/response.md': null, 'response/data/delta.json': null, 'response/data/checks.json': null,
+}, 'a merge that conflicted, reported at integration time and left alone');
+
+await expectError(servingFirst({ 'response/data/delta.json': entryDelta('runtime', ['merge-into-integration-branch', 'serve-runtime-head', 'attest-runtime-entry'], { runtimeLadder: ladder({ sessionId: 'someone-else' }) }) }), 'and this branch belongs to s-test', 'a rung run for another session');
+await expectError(servingFirst({ 'response/data/delta.json': entryDelta('runtime', ['merge-into-integration-branch', 'serve-runtime-head', 'attest-runtime-entry'], { runtimeLadder: ladder({ observed: { head: UAT_OLD, containsWanted: false, pid: 4100, pidAlive: true, probeAnswered: true, leaseSessionId: OTHER, queue: [] } }) }) }), 'may only queue behind it', 'a serve that wrote through another session lease');
+await expectError(servingFirst({ 'response/data/delta.json': entryDelta('runtime', ['merge-into-integration-branch', 'serve-runtime-head', 'attest-runtime-entry'], { runtimeLadder: ladder({ observed: { head: UAT_OLD, containsWanted: true, pid: 4100, pidAlive: true, probeAnswered: true, leaseSessionId: null, queue: [] } }) }) }), 'rather than restarting a healthy server', 'a healthy server restarted although the head already contained the commit');
+await expectError(attesting({ 'response/data/delta.json': entryDelta('runtime', ['attest-runtime-entry'], { runtimeLadder: ladder({ reused: true, integration: null, servedHead: UAT_OLD, observed: { head: UAT_OLD, containsWanted: true, pid: 4100, pidAlive: true, probeAnswered: true, leaseSessionId: null, queue: [] }, server: { pid: 4300, previousPid: 4100, port: 3067, command: 'npm run dev', logRef: 'logs/uat.log', pidFileRef: 'logs/uat.pid', startedAt: '2026-01-10T00:02:00.000Z' } }) }) }), 'no new pid appears', 'a reused head that quietly started a new process');
+await expectError(servingFirst({ 'response/data/delta.json': entryDelta('runtime', ['merge-into-integration-branch', 'serve-runtime-head', 'attest-runtime-entry'], { runtimeLadder: ladder({ server: { pid: 4200, previousPid: 9999, port: 3067, command: 'npm run dev', logRef: 'logs/uat.log', pidFileRef: 'logs/uat.pid', startedAt: '2026-01-10T00:02:00.000Z' } }) }) }), 'never replaces a process it does not own', 'a rung that replaced a pid the entry never recorded');
+await expectError(servingFirst({ 'response/data/delta.json': entryDelta('runtime', ['merge-into-integration-branch', 'serve-runtime-head', 'attest-runtime-entry'], { runtimeLadder: ladder({ contains: [OTHER_COMMIT] }) }) }), 'is absent from contains', 'a merged commit no consumer could prove is served');
+await expectError(servingFirst({ 'response/data/delta.json': entryDelta('runtime', ['serve-runtime-head', 'attest-runtime-entry'], { runtimeLadder: ladder() }) }), 'without merge-into-integration-branch among the applied effects', 'an integration branch written by no merge');
+await expectError(servingFirst({ 'response/data/delta.json': entryDelta('runtime', ['merge-into-integration-branch', 'serve-runtime-head'], { runtimeLadder: ladder() }) }), 'every rung attests', 'a rung that changed the runtime and never probed it');
+await expectError(stackUp({ 'response/data/delta.json': entryDelta('runtime', ['bring-up-infra-stack', 'attest-runtime-entry'], { runtimeLadder: ladder({ operation: 'stack-up', rung: 'stack-up', wantedCommit: null, servedHead: null, contains: [], integration: null, server: null, lease: null, infra: { env: 'local', stackRef: '.stacks/local/infra', services: [{ name: 'database', port: 5432, ready: false, evidenceRef: 'probes/database.json' }] }, observed: { head: null, containsWanted: false, pid: null, pidAlive: false, probeAnswered: false, leaseSessionId: null, queue: [] } }) }) }), 'never reached readiness', 'infra reported up while a service never answered');
+await expectError(baseline({ 'response/data/delta.json': delta({ runtimeLadder: ladder() }) }), 'runtimeLadder belongs to the runtime branch', 'a ladder filed under another branch');
+await expectError({ ...servingFirst(), 'response/data/delta.json': entryDelta('runtime', ['merge-into-integration-branch', 'serve-runtime-head', 'attest-runtime-entry']) }, 'this delta carries no runtimeLadder', 'a runtime branch that never said which rung it climbed');
+
+process.stdout.write('platform.operate self-test: 13 valid branches, 51 rejected mutations\n');

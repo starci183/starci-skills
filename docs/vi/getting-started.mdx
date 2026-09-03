@@ -111,7 +111,34 @@ không mang thêm bằng chứng, ràng buộc, kiểm kê hay phê duyệt mớ
 `SKILL.md` nói rõ điều đó nghĩa là gì: cùng một input đã đâm vào cùng một bức tường, hãy báo bức
 tường thay vì thử lại.
 
-## 10. Khi nào UAT chạy
+## 10. Runtime mà một phiên được audit trên đó
+
+Không thứ nào ở trên cần một sản phẩm đang chạy, cho tới lúc phải nhìn một bề mặt hay đi một hành
+trình. Khi cần, runtime không do operator đang cần nó khởi động: `platform.operate` sở hữu nó, và nó
+leo một cái thang, mỗi lần gọi một bậc, mỗi bậc được chứng thực trước khi thử bậc kế.
+
+| Bậc | Nó làm gì |
+| --- | --- |
+| `stack-up` | Dựng hạ tầng mà môi trường khai và chờ các probe sẵn sàng |
+| `locate` | Phân giải các role của project ra checkout đã route qua workspace route, không bao giờ theo tên thư mục |
+| `start-role` | Khởi động server của một role từ worktree tích hợp, backend trước frontend |
+| `serve` | Merge commit của một phiên vào nhánh tích hợp và cho server chạy kết quả đó |
+| `restart` / `reset` | Khởi động lại đúng head đó, hoặc xoá cache build trước; cả hai đều phải gọi đích danh |
+| `stop` | Kill đúng pid entry đã ghi và nhả lease |
+
+Nhánh nó phục vụ mới là mấu chốt. Một sản phẩm có một nhánh tích hợp và một server trên một cổng cố
+định, và một phiên không được phát server riêng: `serve` merge commit của phiên vào rồi khởi động lại
+đúng server đó, nên head đang phục vụ mang việc của mọi phiên đã xin. Giữ cổng cố định là thứ giữ cho
+redirect URI của identity client, danh sách origin của backend và mọi callback đã đăng ký còn đúng;
+giữ một nhánh là thứ khiến hai thay đổi gặp nhau sớm, ngay lúc tích hợp, nơi một xung đột chỉ tốn năm
+phút của một con người thay vì chặn một lần publish đã xong.
+
+Có hai hệ quả nên biết trước khi đọc một biên bản. Người tiêu thụ không bao giờ hỏi head đang phục vụ
+có bằng commit mình vừa áp không — nó hỏi commit của mình có phải tổ tiên của head đó không, và cả hai
+được in cạnh nhau. Và một phiên hỏi trong lúc phiên khác đang merge thì được xếp hàng sau lease và được
+cho biết vị trí, chứ không được phát một server thứ hai trên một cổng khác.
+
+## 11. Khi nào UAT chạy
 
 `uat.verify` lái một sản phẩm thật như một người thật, và nó là bằng chứng duy nhất không suy ra được
 từ bất cứ thứ gì khác, nên đáng nói thẳng khi nào nó chạy và khi nào sự vắng mặt của nó là thành thật.
@@ -156,7 +183,7 @@ Thư mục luồng có đúng một hình dạng — `flow.md`, `accounts.<env>.
 `templates/uat/README.md` là hợp đồng của nó. Repo chủ theo dõi thư mục ấy, nên bằng chứng của một lượt
 chạy đi cùng sản phẩm; chỉ thư mục phiên bên cạnh mới bị bỏ qua.
 
-## 11. Kết thúc phiên
+## 12. Kết thúc phiên
 
 Thư mục phiên do orchestrator tạo trước khi agent đầu tiên khởi động và bị xoá khi `git.publish` xong
 việc. Thứ sống sót là những gì các bậc đã publish — commit, business head, cặp UAT, các lần chạy từ

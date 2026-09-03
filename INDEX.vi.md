@@ -1,4 +1,4 @@
-# StarCi Skills 1.6.1
+# StarCi Skills 1.7.0
 
 Cây này chính là runtime. Đọc tiếp `SKILL.md` (bản tiếng Anh là bản được nạp; `SKILL.vi.md` chỉ để người đọc); đó là cửa vào duy nhất,
 đóng băng phạm vi của một nhiệm vụ, chọn đúng một operator sở hữu kết quả, rồi định tuyến giữa các
@@ -67,6 +67,8 @@ thì không được publish.
   đổi nghĩa.
 
 ## Dòng dõi
+
+1.7.0 (2026-09-03): runtime là nhánh tích hợp uat của mỗi sản phẩm trên cổng cố định — platform.operate leo đủ thang stack-up → locate → start-role → serve → attest, serve = merge nhánh phiên vào uat rồi khởi động lại idempotent theo head, server chạy ngầm có pid/log (scripts/serve-runtime.mjs), lease theo thứ tự merge, RUNTIME_BUSY và INTEGRATION_CONFLICT; bind theo tổ tiên (head serve chứa commit đã pin); audit có input route và mục Served surface; UAT có isolation trong snapshot; luật hai phiên một sản phẩm ở một chỗ; schema projection cổng với sessionSlots mặc định 0.
 
 1.6.1 (2026-09-03): @tools/print — direction in URL và ảnh mỗi candidate theo viewport trước khi viết quyết định, audit in sheet + ảnh tệ nhất mỗi topic + bảng Verdict, UAT in tóm tắt ảnh từng bước; receipt có bảng ## Printed và validator từ chối quyết định mà người chưa thấy.
 

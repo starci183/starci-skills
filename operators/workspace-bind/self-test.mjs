@@ -17,6 +17,7 @@ const OWNER = 'task-runtime-owner-1';
 const runtimeConsumption = (overrides = {}) => ({
   ownerTaskId: OWNER,
   registryEntryKey: 'starci-academy/be',
+  served: { branch: 'uat', head: 'f'.repeat(40), contains: [head], port: 3001, leaseSessionId: null },
   identity: { provider: 'the declared identity provider', adminEndpoint: 'http://localhost:8089/admin', realm: 'product', tenant: null, credentialName: 'identity-admin' },
   generation: 3,
   status: 'ready',
@@ -55,10 +56,11 @@ function responseMd({ binding = routeBinding(), findings = null, runtimeRows = n
     ...(binding.gitPolicy.worktreeBranches === 'session-only' ? [['WORKTREE_BRANCH_SESSION_ONLY', binding.gitPolicy.mutationBranch, 'the routed policy permits a session worktree branch']] : []),
     ...(binding.provenanceHeadRef ? [['PROVENANCE_HEAD_BOUND', binding.provenanceHeadRef, 'a redacted conversation head was attached']] : []),
     ...(binding.runtime ? [['RUNTIME_CONSUMED_NOT_OWNED', binding.runtime.ownerTaskId, 'the caller consumes the owner endpoints and owns no lifecycle']] : []),
+    ...(binding.runtime ? [['RUNTIME_HEAD_CONTAINS_BOUND_COMMIT', binding.sourceHead, 'the served head contains the head this route bound']] : []),
   ];
   const rows = (findings ?? defaultFindings).map(([code, subject, statement]) => `| \`${code}\` | ${subject} | ${statement} |`).join('\n');
   const runtime = runtimeRows ?? (binding.runtime
-    ? [['Owner task', binding.runtime.ownerTaskId], ['Status', binding.runtime.status], ['Consumer role', binding.runtime.consumerRole], ['Frontend', binding.runtime.endpoints.frontend], ['Api', binding.runtime.endpoints.api], ['Identity', binding.runtime.endpoints.identity]]
+    ? [['Owner task', binding.runtime.ownerTaskId], ['Status', binding.runtime.status], ['Consumer role', binding.runtime.consumerRole], ['Served branch', binding.runtime.served.branch], ['Served head', binding.runtime.served.head], ['Frontend', binding.runtime.endpoints.frontend], ['Api', binding.runtime.endpoints.api], ['Identity', binding.runtime.endpoints.identity]]
     : []);
   const runtimeTable = runtime.map(([k, v]) => `| ${k} | ${v} |`).join('\n');
   const writeRootRows = binding.writeRoots.map((p) => `| ${p} | the only paths later work may write |`).join('\n');
@@ -195,7 +197,7 @@ await expectError(withBinding(routeBinding({ runtime: runtimeConsumption({ endpo
 await expectError(withBinding(routeBinding({ runtime: runtimeConsumption({ endpointBinding: { ...runtimeConsumption().endpointBinding, services: { frontend: 'web', api: 'web', identity: 'keycloak' } } }) }), { runtimeNeed: 'consume' }), 'service keys must be distinct', 'two services under one key');
 await expectError(withBinding(routeBinding({ runtime: runtimeConsumption({ endpointBinding: { ...runtimeConsumption().endpointBinding, project: 'other-project' } }) }), { runtimeNeed: 'consume' }), 'belongs to another project than the bound route', 'an endpoint binding from another project');
 await expectError(withBinding(routeBinding({ runtime: runtimeConsumption({ registryEntryKey: 'starci-academy/fe' }) }), { runtimeNeed: 'consume' }), 'and this route is starci-academy/be', 'a binding that consumed a sibling route entry');
-await expectError({ ...consuming(), 'response/response.md': responseMd({ binding: routeBinding({ runtime: runtimeConsumption() }), findings: [['ROUTE_HYDRATED_FROM_PORTABLE', HYDRATED, 'resolved'], ['IDENTITY_ROSTER_SEALED', 'roster', 'sealed'], ['WORKTREE_BRANCH_FORBIDDEN', 'mtp', 'forbidden']] }) }, 'must record that the caller does not own it', 'a consumed runtime with no ownership finding');
+await expectError({ ...consuming(), 'response/response.md': responseMd({ binding: routeBinding({ runtime: runtimeConsumption() }), findings: [['ROUTE_HYDRATED_FROM_PORTABLE', HYDRATED, 'resolved'], ['IDENTITY_ROSTER_SEALED', 'roster', 'sealed'], ['WORKTREE_BRANCH_FORBIDDEN', 'mtp', 'forbidden'], ['RUNTIME_HEAD_CONTAINS_BOUND_COMMIT', head, 'contained']] }) }, 'must record that the caller does not own it', 'a consumed runtime with no ownership finding');
 await expectError({ ...baseline(), 'response/response.md': responseMd({ findings: [['IDENTITY_ROSTER_SEALED', 'roster', 'sealed'], ['WORKTREE_BRANCH_FORBIDDEN', 'mtp', 'forbidden']] }) }, 'must record the hydrated route it resolved from', 'a bound route with no hydration finding');
 await expectError({ ...baseline(), 'response/response.md': responseMd({ findings: [['ROUTE_HYDRATED_FROM_PORTABLE', HYDRATED, 'resolved'], ['IDENTITY_ROSTER_SEALED', 'roster', 'sealed'], ['WORKTREE_BRANCH_FORBIDDEN', 'mtp', 'forbidden'], ['HINT_REJECTED', 'D:/Repositories/starci-academy', 'a similar directory name']] }) }, 'a hint is INVALID_INPUT at the gate', 'a receipt that weighs a hint');
 await expectError({ ...baseline(), 'response/response.md': responseMd({ findings: [['ROUTE_HYDRATED_FROM_PORTABLE', HYDRATED, 'resolved'], ['WORKTREE_BRANCH_FORBIDDEN', 'mtp', 'forbidden']] }) }, 'the credential roster was sealed and never read', 'no sealed roster finding');
@@ -207,4 +209,8 @@ await expectError({ ...baseline(), 'response/response.md': responseMd().replace(
 await expectError({ ...baseline(), 'response/data/route.json': routeBinding({ sourceHead: 'not-a-head' }) }, 'sourceHead', 'route schema');
 await expectError({ ...baseline(), 'response/response.json': (() => { const o = responseJson(); delete o.fields.route; return o; })() }, 'required output route is not in fields', 'missing required output');
 
-process.stdout.write('workspace.bind self-test: 3 valid branches, 30 rejected mutations\n');
+await expectError(withBinding(routeBinding({ runtime: runtimeConsumption({ served: { branch: 'uat', head: 'f'.repeat(40), contains: ['a'.repeat(40)], port: 3001, leaseSessionId: null } }) }), { runtimeNeed: 'consume' }), "does not contain this route's head", 'a served head that carries other work and not this');
+await expectError(withBinding(routeBinding({ runtime: runtimeConsumption({ served: { branch: 'uat', head: 'f'.repeat(40), contains: [head], port: 3999, leaseSessionId: null } }) }), { runtimeNeed: 'consume' }), 'and the entry serves this route on http://localhost:3999', 'an endpoint that is not the port the entry serves this route on');
+await expectError({ ...consuming(), 'response/response.md': responseMd({ binding: routeBinding({ runtime: runtimeConsumption() }), findings: [['ROUTE_HYDRATED_FROM_PORTABLE', HYDRATED, 'resolved'], ['IDENTITY_ROSTER_SEALED', 'roster', 'sealed'], ['WORKTREE_BRANCH_FORBIDDEN', 'mtp', 'forbidden'], ['RUNTIME_CONSUMED_NOT_OWNED', OWNER, 'consumed']] }) }, 'the served head contains the head this route bound', 'a consumed runtime whose ancestry the receipt never states');
+
+process.stdout.write('workspace.bind self-test: 3 valid branches, 33 rejected mutations\n');

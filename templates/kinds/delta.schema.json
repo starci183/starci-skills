@@ -3,92 +3,743 @@
   "type": "object",
   "additionalProperties": false,
   "required": [
-    "serviceRef", "serviceKind", "ownerRef", "approvalRef", "planSha256",
-    "inventoryFingerprint", "generation", "observedAt",
-    "inventoriedResources", "observedPortHolders", "portClaims",
-    "mutableResourceRefs", "observationOnlyResourceRefs",
-    "allowedEffects", "appliedEffects", "capabilities", "convergence", "mutations"
+    "serviceRef",
+    "serviceKind",
+    "ownerRef",
+    "approvalRef",
+    "planSha256",
+    "inventoryFingerprint",
+    "generation",
+    "observedAt",
+    "inventoriedResources",
+    "observedPortHolders",
+    "portClaims",
+    "mutableResourceRefs",
+    "observationOnlyResourceRefs",
+    "allowedEffects",
+    "appliedEffects",
+    "capabilities",
+    "convergence",
+    "mutations"
   ],
   "properties": {
-    "serviceRef": { "type": "string", "minLength": 1 },
-    "serviceKind": { "$ref": "#/$defs/serviceKind" },
-    "ownerRef": { "type": "string", "minLength": 1 },
-    "approvalRef": { "type": "string", "minLength": 1 },
-    "planSha256": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
-    "inventoryFingerprint": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
-    "generation": { "type": "integer", "minimum": 0 },
-    "observedAt": { "type": "string", "format": "date-time" },
+    "serviceRef": {
+      "type": "string",
+      "minLength": 1
+    },
+    "serviceKind": {
+      "$ref": "#/$defs/serviceKind"
+    },
+    "ownerRef": {
+      "type": "string",
+      "minLength": 1
+    },
+    "approvalRef": {
+      "type": "string",
+      "minLength": 1
+    },
+    "planSha256": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "inventoryFingerprint": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "generation": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "observedAt": {
+      "type": "string",
+      "format": "date-time"
+    },
     "inventoriedResources": {
       "type": "array",
       "minItems": 1,
       "items": {
         "type": "object",
         "additionalProperties": false,
-        "required": ["resourceRef", "kind", "revision", "ownerRef"],
+        "required": [
+          "resourceRef",
+          "kind",
+          "revision",
+          "ownerRef"
+        ],
         "properties": {
-          "resourceRef": { "type": "string", "minLength": 1 },
-          "kind": { "$ref": "#/$defs/serviceKind" },
-          "revision": { "type": "string", "minLength": 1 },
-          "ownerRef": { "type": "string", "minLength": 1 }
+          "resourceRef": {
+            "type": "string",
+            "minLength": 1
+          },
+          "kind": {
+            "$ref": "#/$defs/serviceKind"
+          },
+          "revision": {
+            "type": "string",
+            "minLength": 1
+          },
+          "ownerRef": {
+            "type": "string",
+            "minLength": 1
+          }
         }
       }
     },
-    "observedPortHolders": { "type": "array", "items": { "$ref": "#/$defs/portHolder" } },
+    "observedPortHolders": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/portHolder"
+      }
+    },
     "portClaims": {
       "type": "array",
       "items": {
         "type": "object",
         "additionalProperties": false,
-        "required": ["port", "resourceRef"],
+        "required": [
+          "port",
+          "resourceRef"
+        ],
         "properties": {
-          "port": { "type": "integer", "minimum": 1, "maximum": 65535 },
-          "resourceRef": { "type": "string", "minLength": 1 }
+          "port": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 65535
+          },
+          "resourceRef": {
+            "type": "string",
+            "minLength": 1
+          }
         }
       }
     },
-    "mutableResourceRefs": { "type": "array", "minItems": 1, "items": { "type": "string", "minLength": 1 } },
-    "observationOnlyResourceRefs": { "type": "array", "items": { "type": "string", "minLength": 1 } },
-    "allowedEffects": { "type": "array", "uniqueItems": true, "items": { "$ref": "#/$defs/effect" } },
-    "appliedEffects": { "type": "array", "uniqueItems": true, "items": { "$ref": "#/$defs/effect" } },
+    "mutableResourceRefs": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "observationOnlyResourceRefs": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "allowedEffects": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "$ref": "#/$defs/effect"
+      }
+    },
+    "appliedEffects": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "$ref": "#/$defs/effect"
+      }
+    },
     "capabilities": {
       "type": "array",
       "items": {
         "type": "object",
         "additionalProperties": false,
-        "required": ["capability", "custodyEvidenceRef"],
+        "required": [
+          "capability",
+          "custodyEvidenceRef"
+        ],
         "properties": {
-          "capability": { "enum": ["metrics:remote-write", "sonar:project-admin", "tunnel:write", "dns:write", "runtime:registry-write", "identity:account-admin"] },
-          "custodyEvidenceRef": { "type": "string", "minLength": 1 }
+          "capability": {
+            "enum": [
+              "metrics:remote-write",
+              "sonar:project-admin",
+              "tunnel:write",
+              "dns:write",
+              "runtime:registry-write",
+              "identity:account-admin"
+            ]
+          },
+          "custodyEvidenceRef": {
+            "type": "string",
+            "minLength": 1
+          }
         }
       }
     },
-    "convergence": { "enum": ["converged", "already-converged"] },
+    "runtimeLadder": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "What the runtime branch did on one rung of the ladder for one route. The ladder is climbed from a bare machine in one order, and the rung that serves does it by merging a session's work into the route's integration branch and restarting one server on one fixed port. Absent on every other branch, required on this one.",
+      "required": [
+        "routeKey",
+        "operation",
+        "rung",
+        "reused",
+        "sessionId",
+        "wantedCommit",
+        "servedHead",
+        "contains",
+        "integration",
+        "infra",
+        "locations",
+        "observed",
+        "server",
+        "queuePosition",
+        "lease"
+      ],
+      "properties": {
+        "routeKey": {
+          "type": "string",
+          "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*/[a-z0-9]+(?:-[a-z0-9]+)*$"
+        },
+        "operation": {
+          "$ref": "#/$defs/runtimeOperation"
+        },
+        "rung": {
+          "$ref": "#/$defs/runtimeOperation",
+          "description": "The rung this operation climbed; it is the operation, recorded again where the registry reads it."
+        },
+        "reused": {
+          "type": "boolean",
+          "description": "True when the running server's head already contained the wanted commit and answered its probe, so the operation re-attested it and started nothing. Serve is idempotent by head, and nothing restarts a healthy server unasked."
+        },
+        "sessionId": {
+          "description": "The session asking, or null when the operation is the runtime's own. It is the session that takes the lease, and no operation may act while another session holds it.",
+          "oneOf": [
+            {
+              "type": "string",
+              "minLength": 1
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "wantedCommit": {
+          "description": "The commit the caller needs served, or null on a rung that serves nothing.",
+          "oneOf": [
+            {
+              "type": "string",
+              "pattern": "^[0-9a-f]{40}$"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "servedHead": {
+          "description": "The integration branch head the server runs, after any merge this operation made.",
+          "oneOf": [
+            {
+              "type": "string",
+              "pattern": "^[0-9a-f]{40}$"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "contains": {
+          "type": "array",
+          "maxItems": 64,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{40}$"
+          },
+          "description": "The commits the served head is known to contain, as the entry will record them. A wanted commit that was merged appears here."
+        },
+        "integration": {
+          "description": "What this operation did to the integration branch: the worktree it merged in, the branch it merged into, each ref it merged with the merge commit that resulted, and whether the mainline was merged to keep the branch from falling behind. Null on rungs that merged nothing.",
+          "oneOf": [
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "worktreeRef",
+                "branch",
+                "createdFrom",
+                "merges",
+                "conflict"
+              ],
+              "properties": {
+                "worktreeRef": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "branch": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "createdFrom": {
+                  "description": "The branch the integration worktree was created from when it did not exist yet; null when it was already there.",
+                  "oneOf": [
+                    {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "merges": {
+                  "type": "array",
+                  "maxItems": 32,
+                  "items": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": [
+                      "ref",
+                      "commit",
+                      "mergeCommit",
+                      "kind"
+                    ],
+                    "properties": {
+                      "ref": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "commit": {
+                        "type": "string",
+                        "pattern": "^[0-9a-f]{40}$"
+                      },
+                      "mergeCommit": {
+                        "oneOf": [
+                          {
+                            "type": "string",
+                            "pattern": "^[0-9a-f]{40}$"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      },
+                      "kind": {
+                        "enum": [
+                          "session",
+                          "mainline"
+                        ]
+                      }
+                    }
+                  }
+                },
+                "conflict": {
+                  "type": "boolean",
+                  "description": "True only on a blocked branch: a conflict is reported and left, never rebased, forced or resolved by discarding a side."
+                }
+              }
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "infra": {
+          "description": "The environment's shared infrastructure as the stack-up rung found and left it. Null on every other rung.",
+          "oneOf": [
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "env",
+                "stackRef",
+                "services"
+              ],
+              "properties": {
+                "env": {
+                  "type": "string",
+                  "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$"
+                },
+                "stackRef": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The infra declaration of that environment, and the tooling it names; the rung brings up what it declares and nothing else."
+                },
+                "services": {
+                  "type": "array",
+                  "minItems": 1,
+                  "maxItems": 32,
+                  "items": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": [
+                      "name",
+                      "port",
+                      "ready",
+                      "evidenceRef"
+                    ],
+                    "properties": {
+                      "name": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "port": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 65535
+                      },
+                      "ready": {
+                        "type": "boolean"
+                      },
+                      "evidenceRef": {
+                        "type": "string",
+                        "minLength": 1
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "locations": {
+          "type": "array",
+          "maxItems": 8,
+          "description": "The routed checkouts the locate rung resolved, through the workspace routes and never by directory name, each with the head observed there and the dev command its declaration or package scripts publish. Empty on rungs that resolved nothing.",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "role",
+              "checkoutRef",
+              "head",
+              "devCommand"
+            ],
+            "properties": {
+              "role": {
+                "type": "string",
+                "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$"
+              },
+              "checkoutRef": {
+                "type": "string",
+                "minLength": 1
+              },
+              "head": {
+                "type": "string",
+                "pattern": "^[0-9a-f]{40}$"
+              },
+              "devCommand": {
+                "oneOf": [
+                  {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            }
+          }
+        },
+        "observed": {
+          "type": "object",
+          "additionalProperties": false,
+          "description": "The entry as it stood before the operation. An operation that acts on a server it never observed acts blind.",
+          "required": [
+            "head",
+            "containsWanted",
+            "pid",
+            "pidAlive",
+            "probeAnswered",
+            "leaseSessionId",
+            "queue"
+          ],
+          "properties": {
+            "head": {
+              "oneOf": [
+                {
+                  "type": "string",
+                  "pattern": "^[0-9a-f]{40}$"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "containsWanted": {
+              "type": "boolean",
+              "description": "Whether the running head already contained the wanted commit, which is the whole of what makes a serve idempotent."
+            },
+            "pid": {
+              "oneOf": [
+                {
+                  "type": "integer",
+                  "minimum": 1
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "pidAlive": {
+              "type": "boolean"
+            },
+            "probeAnswered": {
+              "type": "boolean"
+            },
+            "leaseSessionId": {
+              "oneOf": [
+                {
+                  "type": "string",
+                  "minLength": 1
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "queue": {
+              "type": "array",
+              "maxItems": 16,
+              "uniqueItems": true,
+              "items": {
+                "type": "string",
+                "minLength": 1
+              }
+            }
+          }
+        },
+        "server": {
+          "description": "The detached process as the operation left it, in the shape the registry records, plus the pid it replaced. Null when the operation stopped the server or started nothing.",
+          "oneOf": [
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "pid",
+                "previousPid",
+                "port",
+                "command",
+                "logRef",
+                "pidFileRef",
+                "startedAt"
+              ],
+              "properties": {
+                "pid": {
+                  "type": "integer",
+                  "minimum": 1
+                },
+                "previousPid": {
+                  "oneOf": [
+                    {
+                      "type": "integer",
+                      "minimum": 1
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "port": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 65535
+                },
+                "command": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "logRef": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "pidFileRef": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "startedAt": {
+                  "type": "string",
+                  "format": "date-time"
+                }
+              }
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "queuePosition": {
+          "description": "Where the asking session stands behind the lease holder when an integration is already in flight. Null whenever the operation acted.",
+          "oneOf": [
+            {
+              "type": "integer",
+              "minimum": 1
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "lease": {
+          "description": "The lease as the operation left it: held while it merges and restarts, released when it is done. Null means nothing is in flight.",
+          "oneOf": [
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "sessionId",
+                "since",
+                "operation",
+                "queue"
+              ],
+              "properties": {
+                "sessionId": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "since": {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                "operation": {
+                  "enum": [
+                    "serve",
+                    "restart",
+                    "reset",
+                    "stop"
+                  ]
+                },
+                "queue": {
+                  "type": "array",
+                  "maxItems": 16,
+                  "uniqueItems": true,
+                  "items": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                }
+              }
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      }
+    },
+    "convergence": {
+      "enum": [
+        "converged",
+        "already-converged"
+      ]
+    },
     "mutations": {
       "type": "array",
       "items": {
         "type": "object",
         "additionalProperties": false,
-        "required": ["effect", "resourceRef", "beforeRevision", "afterRevision"],
+        "required": [
+          "effect",
+          "resourceRef",
+          "beforeRevision",
+          "afterRevision"
+        ],
         "properties": {
-          "effect": { "$ref": "#/$defs/effect" },
-          "resourceRef": { "type": "string", "minLength": 1 },
-          "beforeRevision": { "oneOf": [{ "type": "string", "minLength": 1 }, { "type": "null" }] },
-          "afterRevision": { "type": "string", "minLength": 1 }
+          "effect": {
+            "$ref": "#/$defs/effect"
+          },
+          "resourceRef": {
+            "type": "string",
+            "minLength": 1
+          },
+          "beforeRevision": {
+            "oneOf": [
+              {
+                "type": "string",
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "afterRevision": {
+            "type": "string",
+            "minLength": 1
+          }
         }
       }
     }
   },
   "$defs": {
-    "serviceKind": { "enum": ["observability", "sonar", "tunnel", "runtime", "identity"] },
-    "effect": { "enum": ["update-config", "restart-service", "upsert-dashboard", "update-remote-write", "create-project", "assign-profile", "assign-gate", "enforce-setting", "create-tunnel", "update-tunnel-route", "upsert-proxied-dns", "register-runtime-entry", "attest-runtime-entry", "provision-identity", "seed-flow-fixtures"] },
+    "serviceKind": {
+      "enum": [
+        "observability",
+        "sonar",
+        "tunnel",
+        "runtime",
+        "identity"
+      ]
+    },
+    "runtimeOperation": {
+      "enum": [
+        "stack-up",
+        "locate",
+        "start-role",
+        "serve",
+        "restart",
+        "reset",
+        "stop"
+      ]
+    },
+    "effect": {
+      "enum": [
+        "update-config",
+        "restart-service",
+        "upsert-dashboard",
+        "update-remote-write",
+        "create-project",
+        "assign-profile",
+        "assign-gate",
+        "enforce-setting",
+        "create-tunnel",
+        "update-tunnel-route",
+        "upsert-proxied-dns",
+        "register-runtime-entry",
+        "attest-runtime-entry",
+        "bring-up-infra-stack",
+        "locate-routed-checkouts",
+        "start-role-runtime",
+        "merge-into-integration-branch",
+        "serve-runtime-head",
+        "restart-runtime-server",
+        "reset-runtime-server",
+        "stop-runtime-server",
+        "queue-runtime-lease",
+        "provision-identity",
+        "seed-flow-fixtures"
+      ]
+    },
     "portHolder": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["port", "holderRef", "evidenceRef"],
+      "required": [
+        "port",
+        "holderRef",
+        "evidenceRef"
+      ],
       "properties": {
-        "port": { "type": "integer", "minimum": 1, "maximum": 65535 },
-        "holderRef": { "type": "string", "minLength": 1 },
-        "evidenceRef": { "type": "string", "minLength": 1 }
+        "port": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 65535
+        },
+        "holderRef": {
+          "type": "string",
+          "minLength": 1
+        },
+        "evidenceRef": {
+          "type": "string",
+          "minLength": 1
+        }
       }
     }
   }

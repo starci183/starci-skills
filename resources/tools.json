@@ -46,7 +46,8 @@
         "never": "no git at all",
         "read": "rev-parse, status, log, diff, show; nothing that writes",
         "commit-session-branch": "create or reuse the session/<sessionId> worktree from the frozen head and commit the declared write set there exactly once; never the person's branch",
-        "merge-and-push": "merge the session branch into the target (fast-forward, or a merge commit with the gates re-run), push without force, remove the session worktree and branch; never rebase, never force, never --no-verify"
+        "merge-and-push": "merge the session branch into the target (fast-forward, or a merge commit with the gates re-run), push without force, remove the session worktree and branch; never rebase, never force, never --no-verify",
+        "merge-into-integration-branch": "create or reuse the product integration worktree from the mainline and merge a session branch or the mainline into it as a merge commit, so two sessions meet at integration time; never push, never rebase, never force, never delete a branch"
       },
       "support": {
         "openai": {

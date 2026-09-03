@@ -41,6 +41,22 @@ at once, so a registry read as a single block answers for whichever route happen
 it, and every other route binds as not ready while the service it needs is listening. The binding
 records the entry key it read, which is what makes that mistake visible instead of merely likely.
 
+## The runtime is bound by ancestry, not by equality
+
+One machine serves one integration branch per product, and that branch carries the work of every
+session that asked for it, so the head a binding pinned is almost never the head that is serving. A
+binding therefore does not compare the two for equality — that would fail on arithmetic the moment a
+second session existed — it establishes that its own head is inside the served one: present among the
+commits the entry records as contained, and an ancestor of the served head. Both are recorded, because
+a reader who cannot see the pinned head beside the served one cannot check the claim.
+
+A served head that does not contain this route's head is not a runtime this binding may consume.
+`RUNTIME_NOT_READY` then names the commit that must be served and the operation that would serve it,
+so the coordination request that follows is a specific request rather than a report that something is
+wrong; and while another session holds the lease and is merging, the answer is `RUNTIME_BUSY` with the
+holder and the queue position, which is a wait rather than a failure. Neither is permission to serve
+it here: this operator still starts nothing.
+
 ## The caller is a consumer, never an owner
 
 The shared local frontend, api, and identity processes belong to exactly one delegated owner task.
@@ -88,7 +104,7 @@ workspace, or provisions an account. It makes no product decision and carries no
 | `@workspaces/local/routes/<project>/<role>` | the hydrated route this machine projects the declaration onto, and the checkout it resolves to | yes |
 | `@workspaces/device-state` | machine identity and the sealed credential roster, bound by name and never read | yes |
 | `@workspaces/ports/<project>` | the port projection, read only when the caller consumes the runtime | no |
-| `@worktrees/sessions/central-runtime` | the runtime owner registry, its generation and health evidence, bound only when the caller consumes | no |
+| `@worktrees/sessions/central-runtime` | the runtime owner registry: the entry of this route, the head it serves, what that head contains, its lease, generation and health evidence, bound only when the caller consumes | no |
 
 ## Inputs
 
@@ -115,7 +131,7 @@ workspace, or provisions an account. It makes no product decision and carries no
 | 2 | Bind bootstrap and identity | — | @workspaces/device-state, the machine identity and the sealed credential roster, @tools/secrets | — | `IDENTITY_UNVERIFIED` |
 | 3 | Resolve the route | `project`, `role` | @workspaces/projects/<project>/<role> for exactly this project and role, @workspaces/local/routes/<project>/<role>, @tools/git | — | `ROUTE_UNDECLARED`, `ROUTE_UNHYDRATED`, `ROUTE_MISMATCH` |
 | 4 | Verify the checkout: branch policy, a clean tree, and the write roots | `gitPolicy`, `declaredWriteRoots` | @workspaces/local/routes/<project>/<role>, the resolved checkout, its branch, its head and its working tree, @tools/git, @tools/shell | — | `BRANCH_POLICY_VIOLATION`, `CHECKOUT_DIRTY` |
-| 5 | Bind the runtime the caller consumes from the registry entry of this project route, only when `runtimeNeed` is not none | `runtimeNeed` | @worktrees/sessions/central-runtime, the entry of this `<project>/<role>` with its generation, health evidence and identity declaration, @workspaces/ports/<project>, @tools/http | — | `ENDPOINT_AUTHORITY_STALE`, `RUNTIME_NOT_READY` |
+| 5 | Bind the runtime the caller consumes from the registry entry of this project route, only when `runtimeNeed` is not none | `runtimeNeed` | @worktrees/sessions/central-runtime, the entry of this `<project>/<role>` with its served head, what that head contains, its lease, its generation, health evidence and identity declaration, @workspaces/ports/<project>, @tools/http | — | `ENDPOINT_AUTHORITY_STALE`, `RUNTIME_NOT_READY`, `RUNTIME_BUSY` |
 | 6 | Bind provenance and freshness, then emit | — | everything above, @workspaces/device-state | `response/response.md`, `response/data/route.json`, `response/response.json` | — |
 
 Step 5 recomputes nothing: the endpoint fingerprint either matches the closed projection or the
@@ -156,6 +172,7 @@ cannot yield a different binding.
 | `CHECKOUT_DIRTY` | terminate |
 | `ENDPOINT_AUTHORITY_STALE` | terminate |
 | `RUNTIME_NOT_READY` | terminate |
+| `RUNTIME_BUSY` | terminate |
 
 ## Next
 

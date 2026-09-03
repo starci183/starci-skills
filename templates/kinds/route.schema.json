@@ -196,6 +196,7 @@
       "required": [
         "ownerTaskId",
         "registryEntryKey",
+        "served",
         "generation",
         "status",
         "consumerRole",
@@ -306,6 +307,51 @@
               "type": "null"
             }
           ]
+        },
+        "served": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "branch",
+            "head",
+            "contains",
+            "port",
+            "leaseSessionId"
+          ],
+          "description": "What the entry is actually serving: the integration branch, the head the server runs, the commits that head is known to contain, the fixed port, and the session holding the lease if one is. A binding does not require the served head to equal the head it pinned — one server carries the work of several sessions — it requires its own head to be inside that served head, and `contains` is where it reads that.",
+          "properties": {
+            "branch": {
+              "type": "string",
+              "minLength": 1
+            },
+            "head": {
+              "$ref": "#/$defs/gitHead"
+            },
+            "contains": {
+              "type": "array",
+              "maxItems": 64,
+              "uniqueItems": true,
+              "items": {
+                "$ref": "#/$defs/gitHead"
+              }
+            },
+            "port": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 65535
+            },
+            "leaseSessionId": {
+              "oneOf": [
+                {
+                  "type": "string",
+                  "minLength": 1
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            }
+          }
         }
       }
     },

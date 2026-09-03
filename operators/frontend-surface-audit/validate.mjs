@@ -209,6 +209,16 @@ export async function validateAuditStep(branchDir, root = ROOT) {
   if (present.has('frontend-surface-audit') && has('response/response.md')) {
     const text = await read('response/response.md');
     const rel = 'response/response.md';
+    // One integration branch carries several sessions' work, so the audit states which head it
+    // measured and how its own commit is inside it. Ancestry a reader cannot see is a claim, and a
+    // browser profile nobody recorded is how one session's sign-in becomes another session's evidence.
+    const servedRows = Object.fromEntries((tableUnder(text, '## Served surface') ?? []).map(([k, v]) => [k, v]));
+    const bare = (v) => String(v ?? '').replace(/^`|`$/g, '').trim();
+    for (const field of ['Applied commit', 'Served head']) {
+      if (!/^[0-9a-f]{40}$/.test(bare(servedRows[field]))) errors.push(`${rel}: Served surface must name the ${field.toLowerCase()} as a full commit, and it names ${servedRows[field] ?? '—'}`);
+    }
+    if (bare(servedRows['Contains applied commit']) !== 'yes') errors.push(`${rel}: the served head must contain the applied commit; a surface that does not is SOURCE_DRIFT with nothing captured`);
+    if (empty(bare(servedRows['Browser profile']))) errors.push(`${rel}: Served surface names the browser profile this session drove, so a sign-in state from another session is visible rather than suspected`);
     const matrixRows = tableUnder(text, '## Matrix') ?? [];
     if (matrixRows.length !== verdicts.entries.length) errors.push(`${rel}: Matrix has ${matrixRows.length} rows, the verdicts carry ${verdicts.entries.length} entries`);
     for (const [id, viewport, scheme, state] of matrixRows) {

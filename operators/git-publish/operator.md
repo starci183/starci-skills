@@ -111,6 +111,13 @@ After the push succeeds, the session worktree and the session branch are removed
 session folder, because the evidence they held has just become a published commit. A blocked session
 keeps both: the evidence of what was attempted lives there until a person has read it.
 
+One thing is released rather than removed. While the session ran, the runtime owner served its work
+from the product integration branch and holds the lease and the pid that go with it; removing a
+worktree under a live server leaves a process serving a tree that is no longer there, and killing that
+process here would be this operator taking a lifecycle it does not own. So the release is a hand-off:
+the runtime owner is asked to stop what it started, by name, and it is the one that kills the pid it
+recorded.
+
 ## Boundary
 
 Context is read-only apart from the merge and the push. The operator writes only `response/` of its
@@ -193,3 +200,4 @@ remote head because the same observation cannot yield a different result.
 | When | Operator |
 | --- | --- |
 | the boundary is published and the head must reach an environment | `release.deploy` |
+| the session is cleaned up and the runtime it was served from must release the lease and the server it started | `platform.operate` |

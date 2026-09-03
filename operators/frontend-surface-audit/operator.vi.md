@@ -30,11 +30,28 @@ Một sổ được tra như một khối duy nhất sẽ trả lời thay cho b
 đó chính là cách một lượt audit đi tới chỗ báo rằng chẳng có gì đang phục vụ trong khi bề mặt nó cần
 đang hiện trên màn hình.
 
-## Bề mặt phải là bề mặt đã commit
+## Bề mặt phải chứa bề mặt đã commit
 
-Biên nhận áp dụng gọi tên commit nó đã ghi, head được ghim bằng đúng commit đó, và preview phục vụ
-worktree phiên ở chính commit ấy. Head khác là `SOURCE_DRIFT` và không chụp gì cả, vì đo một cây khác
-thì không chứng minh được gì về cây này.
+Biên bản áp nêu tên commit nó đã ghi, còn runtime phục vụ một nhánh tích hợp cho mỗi sản phẩm, mang
+việc của mọi phiên đã xin. Nên phép thử không phải phép bằng — làm thế sẽ hỏng ngay khi có phiên thứ
+hai, và hỏng vì số học chứ không vì bằng chứng — mà là quan hệ tổ tiên: commit đã áp phải là tổ tiên
+của head đang phục vụ, và có mặt trong danh sách commit mà route đã bind ghi là đã chứa. Một head đang
+phục vụ không qua phép thử đó là `SOURCE_DRIFT` và không chụp gì cả, vì đo một cây khác chẳng chứng
+minh được gì về cây này. Biên bản nêu cả hai commit dưới `## Served surface`, vì quan hệ tổ tiên mà
+người đọc không thấy được thì chỉ là lời khẳng định.
+
+Endpoint là cái route đã bind mang theo, không bao giờ là cái operator này tự suy ra: route nêu tên
+cổng mà entry của nó phục vụ, và trạng thái sẵn sàng đạt được ở đó. Khi head đang phục vụ không chứa
+commit đã áp, hoặc chẳng có gì đang phục vụ, `RUNTIME_UNAVAILABLE` nêu tên commit cần được phục vụ và
+thao tác sẽ phục vụ nó, và chủ runtime mới là bên hành động.
+
+## Hai phiên trên một sản phẩm
+
+Luật cô lập được công bố đúng một lần, ở operator sở hữu runtime, và lần audit này làm việc bên trong
+luật đó chứ không chép lại: một sản phẩm phục vụ một nhánh tích hợp trên một cổng, và thứ giữ cho hai
+lượt audit chạy song song không đọc trạng thái của nhau là mỗi lượt lái profile trình duyệt của riêng
+mình. Profile đó được ghi dưới `## Served surface`, để một biên bản có trạng thái đăng nhập đến từ
+nơi khác lộ ra chứ không chỉ bị nghi ngờ.
 
 ## Phép đo thắng lời khai, luôn luôn
 
@@ -84,6 +101,7 @@ làm bằng chứng rằng node đã pass.
 | `frontend-source-application` | `frontend.source.apply`, commit đang được quan sát và các lời khai nó đã ghi | có |
 | `frontend-presentation-resolution` | `frontend.presentation.resolve`, chủ sở hữu của từng node | có |
 | `frontend-direction-decision` | `frontend.direction.decide`, route và coverage mà ma trận suy ra từ đó | có |
+| `route` | `workspace.bind`, route đã bind: endpoint mà entry của nó phục vụ và những commit head đang phục vụ chứa | có |
 | `uat-account` | `platform.operate`, tài khoản dùng để đi vào route có cổng canh; vắng ở lượt đầu, và đó chính là thứ `IDENTITY_MISSING` bàn giao | không |
 
 ## Yêu cầu
@@ -100,10 +118,10 @@ làm bằng chứng rằng node đã pass.
 
 | # | Bước | Tham số | Đọc | Ghi | Dừng với |
 | --- | --- | --- | --- | --- | --- |
-| 1 | Kiểm gate, chạy lại, và xác nhận head cùng route đang phục vụ | `resume` | `request/request.json`, đầu vào `frontend-source-application` (commit của nó phải bằng head đã ghim), @workspaces/fe ở head đóng băng, @worktrees/sessions/central-runtime (preview phục vụ worktree phiên ở commit ấy), @tools/git | — | `INVALID_INPUT`, `SOURCE_DRIFT`, `NO_PROGRESS` |
+| 1 | Kiểm cổng vào và resume, và xác nhận commit đã áp nằm trong head mà route đang phục vụ | `resume` | `request/request.json`, đầu vào `frontend-source-application` (commit nó đã ghi), đầu vào `route` (nhánh đang phục vụ, head đang phục vụ và những commit head đó chứa), @workspaces/fe tại head đã đóng băng, @worktrees/sessions/central-runtime, @tools/git | — | `INVALID_INPUT`, `SOURCE_DRIFT`, `NO_PROGRESS` |
 | 2 | Bind thẩm quyền | — | @knowledge/ui/proof (mọi topic kèm fingerprint và kho luật), đầu vào `frontend-source-application` (các lời khai), đầu vào `frontend-presentation-resolution` (chủ sở hữu của từng node), @worktrees/sessions/central-runtime | — | — |
 | 3 | Chọn các mục ma trận và đọc lớp bề mặt đã khai | `matrix` | đầu vào `frontend-direction-decision` (chính `response/data/coverage.json` của nó: state nhân viewport nhân bảng màu, và `surfaceClass` mà quyết định ấy đã khai) | — | `SURFACE_CLASS_MISSING` |
-| 4 | Chờ từng mục tới lúc sẵn sàng, đăng nhập bằng tài khoản của luồng khi route đòi một danh tính | `readinessProbe`, `account`, `env` | @worktrees/sessions/central-runtime để lấy entry của đúng route này, đầu vào `uat-account` cho hồ sơ toàn tên, @tools/http, @tools/secrets, @tools/browsercontrol | — | `RUNTIME_UNAVAILABLE`, `IDENTITY_MISSING` |
+| 4 | Chờ từng mục tới lúc sẵn sàng trên cổng mà route đã bind mang theo, trong profile trình duyệt của riêng phiên này, đăng nhập bằng tài khoản của luồng khi route đòi một danh tính | `readinessProbe`, `account`, `env` | đầu vào `route` để lấy endpoint mà entry của nó phục vụ, @worktrees/sessions/central-runtime để lấy entry của đúng route này, đầu vào `uat-account` cho hồ sơ toàn tên, @tools/http, @tools/secrets, @tools/browsercontrol | — | `RUNTIME_UNAVAILABLE`, `IDENTITY_MISSING` |
 | 5 | Chụp và đo từng mục | — | @worktrees/sessions/central-runtime, @workspaces/fe (các owner được quan sát và identifier từng node mang), @tools/browsercontrol | `response/artifacts/<matrixId>.png`, `response/data/captures/<matrixId>.json` | `EVIDENCE_MISSING` |
 | 6 | Đối chiếu với lời khai và luật proof, phán quyết theo chủ sở hữu, để từng topic tự đóng, rồi phát | — | @knowledge/ui/proof, @knowledge/grammars/starci, các bức chụp, @tools/websearch | `response/data/verdicts.json`, `response/response.md`, `response/response.json`, `response/artifacts/host.json`, @tools/visualize, @tools/host, @tools/print | `UNKNOWN_RULE` |
 

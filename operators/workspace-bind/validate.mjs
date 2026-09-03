@@ -76,6 +76,15 @@ export async function validateWorkspaceStep(branchDir, root = ROOT) {
       // a route is never reported not ready because a sibling route's entry was the one consulted.
       if (runtime.registryEntryKey !== `${route.project}/${route.role}`) errors.push(`response/data/route.json: the binding consumed registry entry ${runtime.registryEntryKey}, and this route is ${route.project}/${route.role}`);
       if (runtime.endpointBinding.project !== route.project) errors.push('response/data/route.json: the endpoint binding belongs to another project than the bound route');
+      // One integration branch carries the work of several sessions, so the served head is almost
+      // never this route's head. What a binding must establish is that its own head is inside it.
+      const served = runtime.served;
+      if (!served.contains.includes(route.sourceHead)) errors.push(`response/data/route.json: the served head ${served.head} does not contain this route's head ${route.sourceHead}, so the running surface carries other work and not this`);
+      const serviceOfRole = { fe: 'frontend', be: 'api' }[route.role];
+      if (serviceOfRole) {
+        const expected = `http://localhost:${served.port}`;
+        if (runtime.endpoints[serviceOfRole] !== expected) errors.push(`response/data/route.json: the ${serviceOfRole} endpoint is ${runtime.endpoints[serviceOfRole]} and the entry serves this route on ${expected}`);
+      }
       const services = Object.values(runtime.endpointBinding.services);
       if (new Set(services).size !== services.length) errors.push('response/data/route.json: endpoint binding service keys must be distinct');
       const ports = [];
@@ -132,6 +141,10 @@ export async function validateWorkspaceStep(branchDir, root = ROOT) {
         if (runtimeRows['Owner task'] !== route.runtime.ownerTaskId) errors.push('response/response.md: Owner task differs from the route binding');
         if (runtimeRows.Status !== route.runtime.status) errors.push('response/response.md: Runtime status differs from the route binding');
         if (runtimeRows['Consumer role'] !== 'consumer') errors.push('response/response.md: the caller consumes the runtime and never owns it');
+        // The two heads are printed side by side, because ancestry a reader cannot see is a claim.
+        if (runtimeRows['Served branch'] !== route.runtime.served.branch) errors.push('response/response.md: Served branch differs from the route binding');
+        if (runtimeRows['Served head'] !== route.runtime.served.head) errors.push('response/response.md: Served head differs from the route binding');
+        if (!findingKeys.has(`RUNTIME_HEAD_CONTAINS_BOUND_COMMIT|${route.sourceHead}`)) errors.push('response/response.md: a consumed runtime must record that the served head contains the head this route bound');
         for (const [label, key] of [['Frontend', 'frontend'], ['Api', 'api'], ['Identity', 'identity']]) {
           if (runtimeRows[label] !== route.runtime.endpoints[key]) errors.push(`response/response.md: the ${key} endpoint differs from the route binding`);
         }

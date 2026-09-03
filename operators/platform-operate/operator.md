@@ -28,8 +28,13 @@ Each branch publishes three closed sets, and each is enforced. Observability app
 `source-revision`, `profile-assigned`, `gate-assigned` and `enforcement-active`, and needs
 `sonar:project-admin`. Tunnel applies `create-tunnel`, `update-tunnel-route` and `upsert-proxied-dns`,
 proves `dns-target`, `tunnel-route`, `tls` and `public-https`, and needs `tunnel:write` and
-`dns:write`. Runtime applies `register-runtime-entry` and `attest-runtime-entry`, proves
-`entry-declared`, `endpoints-served`, `head-observed` and `generation-advanced`, and needs
+`dns:write`. Runtime applies `register-runtime-entry`, `attest-runtime-entry`,
+`bring-up-infra-stack`, `locate-routed-checkouts`, `start-role-runtime`,
+`merge-into-integration-branch`, `serve-runtime-head`, `restart-runtime-server`,
+`reset-runtime-server`, `stop-runtime-server` and `queue-runtime-lease`, proves `entry-declared`,
+`endpoints-served`, `head-observed`, `generation-advanced`, `infra-ports-open`,
+`cors-origin-admitted`, `checkout-located`, `integration-merged`, `server-pid-owned` and
+`lease-honoured`, and needs
 `runtime:registry-write`. Identity applies `provision-identity` and `seed-flow-fixtures`, proves
 `provider-reachable`, `credential-resolvable`, `account-exists`, `account-signs-in` and
 `no-credential-recorded`, and needs `identity:account-admin`. Keeping those two apart is what keeps
@@ -37,7 +42,10 @@ each proof set honest: an attestation cannot be asked to prove an account, and p
 reported by probing a port. An effect or a check filed under the wrong branch is invalid input rather
 than a warning, because a cross-filed effect is how an unapproved change acquires the appearance of
 authority. The required proof set is the whole set the branch publishes: the caller cannot ask for
-less, because a green dashboard alone never proved delivery, ordering, or redaction.
+less, because a green dashboard alone never proved delivery, ordering, or redaction. The runtime
+branch is the one that publishes its set per rung rather than per branch, because a rung below the
+server cannot probe an endpoint nothing is serving yet; each rung's set is stated with the ladder
+below, and a rung may no more ask for less than its own than a branch may.
 
 ## The registry is one entry per project route
 
@@ -47,6 +55,109 @@ endpoint block can attest exactly one route, and every other bind reads it as no
 service it needs is listening — a false negative indistinguishable from an outage. The previous
 single-block shape is still read for one release, as the entry of the route it names, and a registry
 that carries both must agree; the release after this one drops it.
+
+## The runtime ladder, climbed one rung at a time
+
+A machine that has just been switched on has no database, no identity provider, no checkout resolved
+and nothing serving, and every one of those is a different missing thing with a different owner. The
+runtime branch therefore climbs a ladder in one order, each rung a closed operation the caller names
+and each rung attested before the next is attempted, so a registry entry always says exactly how far
+up it is instead of being either ready or mysteriously not.
+
+| Rung | What it does | Proves |
+| --- | --- | --- |
+| `stack-up` | Brings up the environment's declared infrastructure with the tooling that environment declares, waits for its readiness probes, and confirms the declared origin rule admits the served origin | `infra-ports-open`, `cors-origin-admitted`, `generation-advanced` |
+| `locate` | Resolves the project's roles to routed checkouts through the workspace routes, never by directory name, and records the head observed in each | `checkout-located`, `head-observed`, `generation-advanced` |
+| `start-role` | Starts a role's server from its integration worktree, backend before frontend, under the dev command its declaration or its package scripts publish | `entry-declared`, `endpoints-served`, `head-observed`, `generation-advanced`, `integration-merged`, `server-pid-owned`, `lease-honoured` |
+| `serve` | Merges one session's work into the integration branch and has the server run the result | the `start-role` set |
+| `restart` | Starts the same head again, same branch, same port | the `start-role` set |
+| `reset` | Stops, clears the framework's build cache for that worktree, starts again | the `start-role` set |
+| `stop` | Stops the server: the recorded pid is killed and the lease released | `entry-declared`, `generation-advanced`, `server-pid-owned`, `lease-honoured` |
+
+A rung that cannot be climbed stops with the code that names the owner of the gap and no other: infra
+that will not come up, or a backend whose declared origin rule does not admit the served origin, is
+`PROVISIONING_UNAVAILABLE` naming what is missing and the declaration line to add; a route with no dev
+command to run is `INVALID_INPUT` naming the field it lacks; a merge that conflicts is
+`INTEGRATION_CONFLICT`, which belongs to a person and is reached at integration time rather than at
+publication time, which is the whole reason the merge happens here.
+
+## One branch, one server, one fixed port
+
+The runtime serves a per-product integration branch, and the port that branch is served on never
+moves. That is not a convenience: an identity client's redirect URIs, a backend's allowed origins and
+every callback registered at any provider are declared against a port, so a runtime that moved the
+port to make room for a second session would break the sign-in of the first, and would then have to
+mutate a provider's allow-list at runtime to repair what it had just broken. Nothing here registers
+an origin, because nothing here moves a port.
+
+Two sessions on one product are therefore not two servers. Each asks for its own commit to be served,
+and `serve` merges that session's branch into the integration branch — a merge commit, never a
+rebase — and restarts the one server on the result. The served head then carries the work of both,
+and the entry records `contains`: the commits that head is known to carry. A conflict surfaces here,
+early, where the two changes actually meet, instead of at publication where it would block a finished
+piece of work. The integration branch is also merged from the mainline periodically, so it does not
+drift into a state that nothing else shares.
+
+## A consumer's own commit inside a shared head
+
+Because one head carries several sessions' work, a consumer that demanded the served head equal the
+commit it applied would fail every time a second session was present, and it would be failing on
+arithmetic rather than on evidence. The test is ancestry: the applied commit must be an ancestor of
+the served head. A surface that satisfies it carries the work under audit, whatever else it also
+carries. Both commits are recorded — what was applied and what is served — because a reader who
+cannot see the two cannot check the claim. Only a failed ancestry test is drift.
+
+## A server that outlives the branch that started it
+
+The server a rung starts is detached. It has to be: the branch that started it ends, and the audit or
+the journey that needs it runs in another branch, sometimes in another session. A process nobody
+recorded is then a process nobody can find, so the entry carries the whole of it — the exact command,
+the pid, the log file under the session folder and the pid file beside it. The tree ships the helper
+that does this (`scripts/serve-runtime.mjs`), and it is named here so that starting a server is one
+recorded act rather than a shell line somebody improvised. A stop kills the pid the entry recorded
+and no other pid at all.
+
+`serve` is idempotent by head. When the running server's head already contains the wanted commit and
+its endpoint answers, the operation attests it and returns it: nothing is merged, nothing is
+restarted, no new pid appears, and the receipt records that the head was reused. Restarting a healthy
+server to be allowed to describe it destroys the state the next step was going to measure, which is
+the same reason attestation never restarts anything. `restart` and `reset` exist for when a person
+actually wants that, and they are asked for by name.
+
+## The lease is the merge order
+
+One session integrates at a time. The session that serves takes the lease while it merges and
+restarts, and releases it when the server answers again; a session that asks while another holds it
+is recorded in the queue, told its position and the holder, and waits. It is never given a second
+server, because a second server is the contention the lease exists to remove. The wait is short by
+construction: a lease is held for one merge and one restart, not for the length of an audit.
+
+## A port in use is a coordination finding
+
+A port already bound by another process is a fact about a shared machine, not permission to reclaim
+it. The operation records `PORT_COORDINATION_REQUIRED` naming both the port and the process that
+holds it, returns `PORT_CONFLICT`, and stops. It does not stop, kill, restart, or reconfigure the
+holder, and no mutation may target a process observed holding a claimed port. Moving to another port
+is not an answer either: the port is what every provider was configured against. Coordination is the
+required next step and it belongs to the two owners, not to this invocation.
+
+## Two sessions, one product
+
+This is the one place the isolation law is written; the audit and the journey operators cite it and
+do not restate it. Two sessions may work on one product at the same time when all five of these hold,
+and each is a gate rather than an intention.
+
+- One product, one integration branch, one server, one port: heads are merged in turn under the
+  lease, and the backend, the identity realm and the database are shared and scoped rather than
+  duplicated.
+- Each flow's actors are its own account aliases, provisioned for that flow and named in its record.
+- Each session drives its own browser profile, recorded in the run's own snapshot, so one session's
+  cookies are never the other's session.
+- Seeds are scoped by the flow's own prefix and touch no shared row: every seeded identifier carries
+  that prefix, and the rollback lists those identifiers and nothing else.
+- No operator writes another session's lease, account or run folder: the lease, the account's
+  provisioning attribution and the run's snapshot all name the session that asked, and a write whose
+  session differs is refused rather than merged.
 
 ## Attesting a runtime nobody restarted
 
@@ -94,15 +205,6 @@ approved set, one resource at a time, recording the before and after revision of
 application is reported as `PARTIAL_MUTATION` with exact revisions and is never hidden behind a
 generic blocker.
 
-## A port in use is a coordination finding
-
-A port already bound by another process is a fact about a shared machine, not permission to reclaim
-it. The operation records `PORT_COORDINATION_REQUIRED` naming both the port and the process that
-holds it, returns `PORT_CONFLICT`, and stops. It does not stop, kill, restart, or reconfigure the
-holder, and no mutation may target a process observed holding a claimed port. Coordination is the
-required next step and it belongs to the two owners, not to this invocation; `PORT_CONFLICT` is the
-expected outcome on a busy shared machine, not a defect in the plan.
-
 ## Credentials are resolved, never recorded
 
 A capability is a handle and its custody evidence. The credential behind it is resolved for use at
@@ -129,12 +231,17 @@ delta on the inventoried shared service, under an exclusive lease on
 `@worktrees/sessions/central-runtime`, and writes only `response/` of its own branch:
 `data/delta.json`, `data/checks.json`, `response.md` and `response.json`. It also writes the flow folder of the flow it
 provisions for and the runtime entry of the route it attests, and nothing else outside `response/`.
+It is the one owner of a served runtime's lifecycle: it merges into the integration branch and
+starts, restarts, resets and stops the server of a route the registry records, under a named rung,
+and it kills only the pid the entry itself recorded.
 It does not deploy,
-restart, migrate, or otherwise take ownership of a product service; does not restart or reconfigure a
-running process in order to attest it; does not mutate a resource the
+migrate, or otherwise take ownership of a product's deployed service; does not restart or reconfigure a
+running process in order to attest it, and never restarts a healthy server nobody asked it to; does
+not act while another session holds the lease; does not rebase, force or abandon a merge to make it
+apply; does not mutate a resource the
 bound inventory does not list; does not emit an effect or a check the bound service kind does not
-publish; does not free a port by stopping, killing, or reconfiguring the process that already holds
-it; does not record a credential value, capability handle, or secret-shaped token anywhere in the
+publish; does not move a served port, or free one by stopping, killing, or reconfiguring the process that already holds
+it; does not edit a running service's allowed origins in place of the declaration that should carry them; does not record a credential value, capability handle, or secret-shaped token anywhere in the
 output, in the account record, or in the flow folder; does not ask a person to sign in, to create an
 account, or to paste a credential; does not edit knowledge or grant its own approval; and does not claim an operated outcome
 while any required check is absent or failed, nor any product readiness, release approval, or UAT
@@ -165,6 +272,8 @@ proof.
 | `portClaims` | list of `{port, resourceRef}` | [] | Which ports the desired state needs, and for which owned resource |
 | `approval` | id | — | The approval that covers this desired state; changing a shared runtime always needs a person |
 | `routeKey` | id | null | The `<project>/<role>` registry entry this operation attests or provisions against; null when the operation touches no route |
+| `operation` | choice | serve | The rung of the runtime ladder this invocation climbs: `stack-up`, `locate`, `start-role`, `serve`, `restart`, `reset` or `stop` |
+| `commit` | id | null | The commit this session needs served, merged into the integration branch when the served head does not already contain it |
 | `flow` | id | null | The flow whose dedicated identity is provisioned and whose folder receives the account record, the drafted document and the seed |
 | `env` | id | dev | The stack the attested entry and the provisioned accounts belong to; an account of one stack is not an account in another |
 | `resume` | token | null | The blocked branch's token when re-entering after a stop |
@@ -176,10 +285,10 @@ proof.
 | 1 | Validate the gate and resume | `resume` | `request/request.json`, @worktrees/sessions/central-runtime at the frozen generation | — | `INVALID_INPUT`, `SOURCE_DRIFT`, `NO_PROGRESS` |
 | 2 | Bind the authority: the runtime, the device state, the projects and the approval | `service`, `approval` | @worktrees/sessions/central-runtime for the inventory fingerprint and generation, @workspaces/device-state for each capability handle with its custody evidence, @workspaces/projects/<project>/<role>, @tools/secrets | — | `AUTHORITY_DRIFT`, `CAPABILITY_MISSING` |
 | 3 | Recheck the inventory once before anything changes | — | @worktrees/sessions/central-runtime, the declared resources re-observed once, @tools/git | — | `INVENTORY_DRIFT` |
-| 4 | Resolve the port claims | `portClaims` | @workspaces/ports/<project> for the claimed ports, @worktrees/sessions/central-runtime for their observed holders | — | `PORT_CONFLICT` |
+| 4 | Resolve the port claims against the projection, and observe who holds each | `portClaims` | @workspaces/ports/<project> for the projected ports, @worktrees/sessions/central-runtime for their observed holders | — | `PORT_CONFLICT` |
 | 5 | Derive the delta between what is observed and what is desired | `desiredState` | @worktrees/sessions/central-runtime for the observed state, `request/request.json` for the desired state | `response/data/delta.json` | — |
 | 6 | Apply the approved delta, one resource at a time, under an exclusive lease | — | @worktrees/sessions/central-runtime, @workspaces/device-state for the handles by name | @worktrees/sessions/central-runtime, `response/data/delta.json`, @tools/container, @tools/shell | `EFFECT_UNAUTHORIZED`, `SERVICE_UNAVAILABLE` |
-| 7 | Attest the runtime entry of the bound route: probe the endpoints it declares, record the head and the evidence, and set its status | `routeKey`, `env` | @worktrees/sessions/central-runtime for the entry of that route, the endpoints it declares re-observed once, @tools/http | @worktrees/sessions/central-runtime, `response/data/delta.json` | `SERVICE_UNAVAILABLE` |
+| 7 | Climb the named rung for the bound route — bring the environment's infra up, resolve its checkouts, start a role, or merge this session's commit into the integration branch and serve, restart, reset or stop the one detached server through `scripts/serve-runtime.mjs`, queueing behind a lease another session holds — then attest the entry: probe the endpoints, record the served head, what it contains and the evidence, and set the status | `routeKey`, `operation`, `commit`, `env` | @worktrees/sessions/central-runtime for the entry of that route with its server, lease and queue, @workspaces/projects/<project>/<role> for the role's dev command, the integration worktree and the session branch merged into it, the environment's declared infra, the endpoints re-observed once, @tools/git, @tools/http, @tools/container, @tools/shell | @worktrees/sessions/central-runtime, `response/data/delta.json` | `SERVICE_UNAVAILABLE`, `PROVISIONING_UNAVAILABLE`, `INTEGRATION_CONFLICT`, `INVALID_INPUT` |
 | 8 | Provision the flow's identity against that entry: read the account record or create the account, set its password from the sealed name, write the record, draft what is absent and seed | `routeKey`, `flow`, `env` | @worktrees/uat/<flow> for the account record, the flow document and the seed, @worktrees/_templates for what is absent, @worktrees/sessions/central-runtime for the entry's identity declaration, @workspaces/device-state for the credential by name, @tools/secrets, @tools/http, @tools/browsercontrol, @tools/database | @worktrees/uat/<flow>, `response/data/account.json`, `response/data/delta.json`, @tools/sourcewrite | `INVALID_INPUT`, `PROVISIONING_UNAVAILABLE` |
 | 9 | Prove every required check | — | @worktrees/sessions/central-runtime re-read against the branch's complete proof set, @tools/http | `response/data/checks.json` | `PROOF_FAILED` |
 | 10 | Write the receipt and emit | — | everything above | `response/response.md`, `response/response.json` | — |
@@ -212,6 +321,7 @@ fingerprint cannot yield a different answer.
 | `EFFECT_UNAUTHORIZED` | terminate |
 | `SERVICE_UNAVAILABLE` | terminate |
 | `PROVISIONING_UNAVAILABLE` | terminate |
+| `INTEGRATION_CONFLICT` | terminate |
 | `PROOF_FAILED` | terminate |
 
 ## Next

@@ -62,6 +62,22 @@ một sổ được đọc như một khối duy nhất sẽ trả lời thay ch
 route còn lại bind ra chưa sẵn sàng trong khi dịch vụ chúng cần đang lắng nghe. Lần bind ghi lại khoá
 entry nó đã đọc, và đó là thứ khiến sai lầm ấy lộ ra thay vì chỉ đơn giản là dễ xảy ra.
 
+## Runtime được ràng bằng quan hệ tổ tiên, không phải bằng phép bằng
+
+Một máy phục vụ một nhánh tích hợp cho mỗi sản phẩm, và nhánh đó mang việc của mọi phiên đã xin, nên
+head mà một lần bind ghim gần như không bao giờ là head đang phục vụ. Vì vậy lần bind không so hai cái
+đó bằng phép bằng — làm thế sẽ hỏng vì số học ngay khi có phiên thứ hai — nó chứng minh head của chính
+mình nằm bên trong head đang phục vụ: có mặt trong danh sách commit mà entry ghi là đã chứa, và là tổ
+tiên của head đang phục vụ. Cả hai đều được ghi, vì người đọc không thấy head đã ghim nằm cạnh head
+đang phục vụ thì không kiểm được lời khẳng định.
+
+Một head đang phục vụ mà không chứa head của route này thì không phải runtime lần bind này được tiêu
+thụ. Khi đó `RUNTIME_NOT_READY` nêu tên commit cần được phục vụ và thao tác sẽ phục vụ nó, để yêu cầu
+phối hợp tiếp theo là một yêu cầu cụ thể chứ không phải một bản báo rằng có gì đó sai; còn trong lúc
+phiên khác giữ lease và đang merge, câu trả lời là `RUNTIME_BUSY` kèm tên bên đang giữ và vị trí xếp
+hàng, tức là một lần chờ chứ không phải một lần hỏng. Cả hai đều không phải giấy phép để tự phục vụ ở
+đây: operator này vẫn không khởi động gì cả.
+
 ## Người gọi là người tiêu thụ, không bao giờ là chủ
 
 Các tiến trình frontend, api và identity local dùng chung thuộc về đúng một task chủ được uỷ quyền.
@@ -110,7 +126,7 @@ và không mang phán quyết nào.
 | `@workspaces/local/routes/<project>/<role>` | route đã hydrate mà máy này chiếu khai báo xuống, và checkout nó phân giải ra | có |
 | `@workspaces/device-state` | định danh máy và roster credential đã niêm phong, ràng theo tên và không bao giờ đọc | có |
 | `@workspaces/ports/<project>` | phép chiếu port, chỉ đọc khi người gọi tiêu thụ runtime | không |
-| `@worktrees/sessions/central-runtime` | registry chủ runtime, generation và bằng chứng sức khoẻ của nó, chỉ ràng khi người gọi tiêu thụ | không |
+| `@worktrees/sessions/central-runtime` | registry chủ runtime: entry của route này, head nó đang phục vụ, những gì head đó chứa, lease, generation và bằng chứng sức khoẻ của nó, chỉ ràng khi người gọi tiêu thụ | không |
 
 ## Đầu vào
 
@@ -137,7 +153,7 @@ và không mang phán quyết nào.
 | 2 | Ràng bootstrap và identity | — | @workspaces/device-state, định danh máy và roster credential đã niêm phong, @tools/secrets | — | `IDENTITY_UNVERIFIED` |
 | 3 | Phân giải route | `project`, `role` | @workspaces/projects/&lt;project>/&lt;role> đúng project và role này, @workspaces/local/routes/&lt;project>/&lt;role>, @tools/git | — | `ROUTE_UNDECLARED`, `ROUTE_UNHYDRATED`, `ROUTE_MISMATCH` |
 | 4 | Kiểm checkout: chính sách nhánh, cây sạch và các write root | `gitPolicy`, `declaredWriteRoots` | @workspaces/local/routes/&lt;project>/&lt;role>, checkout đã phân giải, nhánh, head và cây làm việc của nó, @tools/git, @tools/shell | — | `<br />ANCH_POLICY_VIOLATION`, `CHECKOUT_DIRTY` |
-| 5 | Ràng runtime mà người gọi tiêu thụ từ entry của đúng project route này, chỉ khi `runtimeNeed` khác none | `runtimeNeed` | @worktrees/sessions/central-runtime, entry của `<project>/<role>` này cùng generation, bằng chứng health và khai báo danh tính của nó, @workspaces/ports/&lt;project>, @tools/http | — | `ENDPOINT_AUTHORITY_STALE`, `RUNTIME_NOT_READY` |
+| 5 | Ràng runtime mà người gọi tiêu thụ từ entry của đúng project route này, chỉ khi `runtimeNeed` khác none | `runtimeNeed` | @worktrees/sessions/central-runtime, entry của `<project>/<role>` này cùng head đang phục vụ, những gì head đó chứa, lease, generation, bằng chứng health và khai báo danh tính của nó, @workspaces/ports/&lt;project>, @tools/http | — | `ENDPOINT_AUTHORITY_STALE`, `RUNTIME_NOT_READY`, `RUNTIME_BUSY` |
 | 6 | Ràng provenance và độ tươi, rồi phát | — | mọi thứ ở trên, @workspaces/device-state | `response/response.md`, `response/data/route.json`, `response/response.json` | — |
 
 Bước 5 không tính lại gì cả: fingerprint endpoint hoặc khớp phép chiếu đóng, hoặc nhánh dừng. Dưới
@@ -176,6 +192,7 @@ buộc khác.
 | `CHECKOUT_DIRTY` | terminate |
 | `ENDPOINT_AUTHORITY_STALE` | terminate |
 | `RUNTIME_NOT_READY` | terminate |
+| `RUNTIME_BUSY` | terminate |
 
 ## Kế tiếp
 

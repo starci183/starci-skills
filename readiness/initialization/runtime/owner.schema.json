@@ -2,13 +2,24 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://starci.dev/v9/readiness/initialization/runtime/owner.schema.json",
   "title": "Shared runtime owner registry",
-  "description": "The registry the runtime owner publishes at the central-runtime alias. It is keyed per project route, because one machine runs the routes of several products at once: a registry with one endpoint block can attest exactly one of them, and every other bind reads it as not ready while the service it needs is listening. `runtimes` is that key space: one entry per `<project>/<role>`, each attesting its own endpoints, head, generation, status, health evidence and identity provider. The single-block form below it is the previous shape and is read for one release as the entry of the route `legacyRouteKey` names; a registry that carries both must agree, and the next major release drops it.",
+  "description": "The registry the runtime owner publishes at the central-runtime alias. It is keyed per project route, because one machine runs the routes of several products at once: a registry with one endpoint block can attest exactly one of them, and every other bind reads it as not ready while the service it needs is listening. `runtimes` is that key space: one entry per `<project>/<role>`, each attesting its own endpoints, head, generation, status, health evidence and identity provider. An entry serves one per-product integration branch on one fixed port: two sessions that pinned different heads of one route are merged into that branch in turn, so neither waits for a port and neither moves one. The single-block form below it is the previous shape and is read for one release as the entry of the route `legacyRouteKey` names; a registry that carries both must agree, and the next major release drops it.",
   "type": "object",
   "additionalProperties": false,
-  "required": ["schemaVersion", "ownerTaskId", "generation", "updatedAt", "runtimes"],
+  "required": [
+    "schemaVersion",
+    "ownerTaskId",
+    "generation",
+    "updatedAt",
+    "runtimes"
+  ],
   "properties": {
-    "$schema": { "type": "string", "minLength": 1 },
-    "schemaVersion": { "const": 9 },
+    "$schema": {
+      "type": "string",
+      "minLength": 1
+    },
+    "schemaVersion": {
+      "const": 9
+    },
     "ownerTaskId": {
       "type": "string",
       "minLength": 1,
@@ -19,61 +30,273 @@
       "minimum": 1,
       "description": "The registry's own generation, raised whenever an entry is added, attested again, or removed."
     },
-    "updatedAt": { "type": "string", "format": "date-time" },
+    "updatedAt": {
+      "type": "string",
+      "format": "date-time"
+    },
     "runtimes": {
       "type": "object",
       "description": "One entry per bound project route. The key is `<project>/<role>` with both segments lower-case and hyphenated; a binder reads the entry for its own project and role and no other, so a route whose entry is absent is not ready even when a sibling route is serving.",
-      "propertyNames": { "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*/[a-z0-9]+(?:-[a-z0-9]+)*$" },
-      "additionalProperties": { "$ref": "#/$defs/entry" }
+      "propertyNames": {
+        "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*/[a-z0-9]+(?:-[a-z0-9]+)*$"
+      },
+      "additionalProperties": {
+        "$ref": "#/$defs/entry"
+      }
     },
     "legacyRouteKey": {
       "description": "Which route the single-block form below attests. Required whenever that form is present, and meaningless without it.",
       "oneOf": [
-        { "type": "string", "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*/[a-z0-9]+(?:-[a-z0-9]+)*$" },
-        { "type": "null" }
+        {
+          "type": "string",
+          "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*/[a-z0-9]+(?:-[a-z0-9]+)*$"
+        },
+        {
+          "type": "null"
+        }
       ]
     },
-    "endpoints": { "$ref": "#/$defs/endpoints", "description": "Compatibility read only: the previous single-owner shape. Read as the endpoints of `legacyRouteKey`." },
-    "status": { "$ref": "#/$defs/status", "description": "Compatibility read only: the previous single-owner shape." },
-    "head": { "$ref": "#/$defs/head", "description": "Compatibility read only: the previous single-owner shape." }
+    "endpoints": {
+      "$ref": "#/$defs/endpoints",
+      "description": "Compatibility read only: the previous single-owner shape. Read as the endpoints of `legacyRouteKey`."
+    },
+    "status": {
+      "$ref": "#/$defs/status",
+      "description": "Compatibility read only: the previous single-owner shape."
+    },
+    "head": {
+      "$ref": "#/$defs/head",
+      "description": "Compatibility read only: the previous single-owner shape."
+    }
   },
   "$defs": {
-    "head": { "type": "string", "pattern": "^[0-9a-f]{40}$" },
-    "status": { "enum": ["starting", "ready", "degraded", "stopped"] },
+    "head": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{40}$"
+    },
+    "status": {
+      "enum": [
+        "starting",
+        "ready",
+        "degraded",
+        "stopped"
+      ]
+    },
     "endpoints": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["frontend", "api", "identity"],
+      "required": [
+        "frontend",
+        "api",
+        "identity"
+      ],
       "properties": {
-        "frontend": { "type": "string", "minLength": 1 },
-        "api": { "type": "string", "minLength": 1 },
-        "identity": { "type": "string", "minLength": 1 }
+        "frontend": {
+          "type": "string",
+          "minLength": 1
+        },
+        "api": {
+          "type": "string",
+          "minLength": 1
+        },
+        "identity": {
+          "type": "string",
+          "minLength": 1
+        }
       }
     },
     "entry": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["endpoints", "head", "generation", "status", "healthEvidenceRefs", "identity"],
+      "required": [
+        "endpoints",
+        "branch",
+        "head",
+        "contains",
+        "generation",
+        "status",
+        "healthEvidenceRefs",
+        "identity",
+        "server",
+        "lease"
+      ],
       "properties": {
-        "endpoints": { "$ref": "#/$defs/endpoints" },
+        "endpoints": {
+          "$ref": "#/$defs/endpoints"
+        },
+        "rung": {
+          "description": "How far up the runtime ladder this entry has been brought, and on what evidence. The ladder is climbed from a bare machine in one order — the environment's infra stack, the routed checkouts, the backend role, then the frontend slot — and each rung is attested before the next is attempted, so an entry that says `locate` is an entry whose checkouts resolved and whose server has not been started yet.",
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "reached",
+            "at",
+            "evidenceRefs"
+          ],
+          "properties": {
+            "reached": {
+              "enum": [
+                "stack-up",
+                "locate",
+                "start-role",
+                "serve",
+                "restart",
+                "reset",
+                "stop"
+              ]
+            },
+            "at": {
+              "type": "string",
+              "format": "date-time"
+            },
+            "evidenceRefs": {
+              "type": "array",
+              "minItems": 1,
+              "maxItems": 32,
+              "items": {
+                "type": "string",
+                "minLength": 1
+              }
+            }
+          }
+        },
         "head": {
           "$ref": "#/$defs/head",
-          "description": "The commit the running process was started from, as the attestation observed it. A binder that pins another head reads this as drift rather than as the head to use."
+          "description": "The commit of the integration branch the running process was started from, as the attestation observed it. It is a merge of the work of every session that asked to be served, so a consumer does not test it for equality with the commit it pinned: it tests that its commit is an ancestor of this one, and `contains` is that answer written down."
         },
-        "generation": { "type": "integer", "minimum": 1 },
-        "status": { "$ref": "#/$defs/status" },
+        "generation": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "status": {
+          "$ref": "#/$defs/status"
+        },
         "healthEvidenceRefs": {
           "type": "array",
           "minItems": 1,
           "maxItems": 32,
-          "items": { "type": "string", "minLength": 1 },
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
           "description": "What was observed to justify the status: the probe records the attestation wrote. A status with no evidence behind it is an assertion, and a binder may not consume one."
         },
         "identity": {
           "description": "Where an account for this route is created, and the name of the sealed credential its password is set from. Null means this route declares no identity provider, which is why a request to provision one against it is refused at the gate rather than guessed at.",
           "oneOf": [
-            { "$ref": "#/$defs/identity" },
-            { "type": "null" }
+            {
+              "$ref": "#/$defs/identity"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "branch": {
+          "type": "string",
+          "minLength": 1,
+          "description": "The per-product integration branch this entry serves. One branch, one running server, one fixed port: sessions do not each get a server of their own, they get their work merged into this branch in turn. Because the port never moves, the identity client's redirect URIs, the backend's allowed origins and every callback registered anywhere stay exactly as they were declared."
+        },
+        "contains": {
+          "type": "array",
+          "maxItems": 64,
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/head"
+          },
+          "description": "The commits the served head is known to contain, each recorded by the serve that merged it. A consumer whose applied commit appears here is looking at a surface that carries its work; one whose commit is absent, and which is not an ancestor of the served head either, is looking at another tree and stops."
+        },
+        "server": {
+          "description": "The detached process serving this entry. It outlives the branch that started it, so the entry is the only record of what it is: the pid to stop, the log to read, and the exact command it was started with. Null when nothing is running.",
+          "oneOf": [
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "pid",
+                "port",
+                "command",
+                "logRef",
+                "pidFileRef",
+                "startedAt"
+              ],
+              "properties": {
+                "pid": {
+                  "type": "integer",
+                  "minimum": 1
+                },
+                "port": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 65535,
+                  "description": "The port the port projection derives for this route. It is fixed: a server that cannot have it is a conflict to coordinate, never a reason to move to another port."
+                },
+                "command": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "logRef": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "pidFileRef": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "startedAt": {
+                  "type": "string",
+                  "format": "date-time"
+                }
+              }
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "lease": {
+          "description": "Who is merging into and restarting this entry right now, and who is waiting. The lease is the merge order: one session integrates at a time, and the others queue rather than start a second server. Null means nothing is in flight.",
+          "oneOf": [
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "sessionId",
+                "since",
+                "operation",
+                "queue"
+              ],
+              "properties": {
+                "sessionId": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "since": {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                "operation": {
+                  "enum": [
+                    "serve",
+                    "restart",
+                    "reset",
+                    "stop"
+                  ]
+                },
+                "queue": {
+                  "type": "array",
+                  "maxItems": 16,
+                  "uniqueItems": true,
+                  "items": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                }
+              }
+            },
+            {
+              "type": "null"
+            }
           ]
         }
       }
@@ -81,7 +304,13 @@
     "identity": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["provider", "adminEndpoint", "realm", "tenant", "credentialName"],
+      "required": [
+        "provider",
+        "adminEndpoint",
+        "realm",
+        "tenant",
+        "credentialName"
+      ],
       "properties": {
         "provider": {
           "type": "string",
@@ -90,14 +319,38 @@
         },
         "adminEndpoint": {
           "description": "The provider's administrative API, when it publishes one. Null means accounts are created only through the product's own sign-up surface, and the provisioning step drives that instead.",
-          "oneOf": [{ "type": "string", "minLength": 1 }, { "type": "null" }]
+          "oneOf": [
+            {
+              "type": "string",
+              "minLength": 1
+            },
+            {
+              "type": "null"
+            }
+          ]
         },
         "realm": {
           "description": "The provider's isolated user directory, under whichever of the two words that provider uses. Exactly one of realm and tenant carries a value.",
-          "oneOf": [{ "type": "string", "minLength": 1 }, { "type": "null" }]
+          "oneOf": [
+            {
+              "type": "string",
+              "minLength": 1
+            },
+            {
+              "type": "null"
+            }
+          ]
         },
         "tenant": {
-          "oneOf": [{ "type": "string", "minLength": 1 }, { "type": "null" }]
+          "oneOf": [
+            {
+              "type": "string",
+              "minLength": 1
+            },
+            {
+              "type": "null"
+            }
+          ]
         },
         "credentialName": {
           "type": "string",
@@ -106,8 +359,32 @@
         }
       },
       "oneOf": [
-        { "required": ["realm"], "properties": { "realm": { "type": "string" }, "tenant": { "type": "null" } } },
-        { "required": ["tenant"], "properties": { "tenant": { "type": "string" }, "realm": { "type": "null" } } }
+        {
+          "required": [
+            "realm"
+          ],
+          "properties": {
+            "realm": {
+              "type": "string"
+            },
+            "tenant": {
+              "type": "null"
+            }
+          }
+        },
+        {
+          "required": [
+            "tenant"
+          ],
+          "properties": {
+            "tenant": {
+              "type": "string"
+            },
+            "realm": {
+              "type": "null"
+            }
+          }
+        }
       ]
     }
   }

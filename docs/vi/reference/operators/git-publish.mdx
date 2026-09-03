@@ -132,6 +132,12 @@ Sau khi push thành công, worktree phiên và nhánh phiên được xóa cùng
 chúng giữ vừa trở thành một commit đã publish. Một phiên bị chặn giữ lại cả hai: bằng chứng về việc
 đã thử làm gì nằm ở đó cho tới khi có người đọc.
 
+
+Có đúng một thứ được nhả chứ không bị xoá. Trong lúc phiên chạy, chủ runtime đã phục vụ phần việc của
+nó từ nhánh tích hợp của sản phẩm và đang giữ lease cùng pid đi kèm; xoá một worktree khi server còn
+sống sẽ để lại một tiến trình phục vụ một cây không còn ở đó, còn tự kill tiến trình đó ở đây là
+operator này giành lấy một vòng đời nó không sở hữu. Nên đây là một lần bàn giao: chủ runtime được yêu
+cầu dừng đúng thứ nó đã khởi động, đích danh, và chính nó kill pid mà nó đã ghi.
 ## Ranh giới ghi
 
 Context chỉ đọc, trừ merge và push. Operator chỉ ghi vào `response/` của nhánh mình, nhánh đích của
@@ -213,6 +219,7 @@ dạng một remote head mới vì cùng một quan sát không thể cho một 
 | Khi | Operator |
 | --- | --- |
 | ranh giới đã publish và head phải tới được một môi trường | `release.deploy` |
+| phiên đã được dọn và runtime từng phục vụ nó phải nhả lease cùng server nó đã khởi động | `platform.operate` |
 
 ---
 

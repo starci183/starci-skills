@@ -113,7 +113,34 @@ that adds no evidence, constraint, inventory or approval delta stops with `NO_PR
 `SKILL.md` is explicit about what that means: "the same input reached the same wall: report the wall
 rather than trying again."
 
-## 10. When UAT runs
+## 10. The runtime a session is audited against
+
+Nothing above needs a running product until a surface has to be looked at or a journey walked. When
+one does, the runtime is not started by the operator that needs it: `platform.operate` owns it, and
+it climbs one ladder, one rung per invocation, each rung attested before the next is attempted.
+
+| Rung | What it does |
+| --- | --- |
+| `stack-up` | Brings up the environment's declared infrastructure and waits for its readiness probes |
+| `locate` | Resolves the project's roles to routed checkouts through the workspace routes, never by directory name |
+| `start-role` | Starts a role's server from the integration worktree, backend before frontend |
+| `serve` | Merges one session's commit into the integration branch and runs the server on the result |
+| `restart` / `reset` | Starts the same head again, or clears the build cache first; both asked for by name |
+| `stop` | Kills the pid the entry recorded and releases the lease |
+
+The branch it serves is the point. One product has one integration branch and one server on one fixed
+port, and a session does not get a server of its own: `serve` merges its commit in and restarts that
+one server, so the served head carries the work of every session that asked. Keeping the port fixed is
+what keeps an identity client's redirect URIs, a backend's allowed origins and every registered
+callback true; keeping it one branch is what makes two changes meet early, at integration, where a
+conflict is a person's five minutes rather than a blocked publication.
+
+Two consequences are worth knowing before you read a receipt. A consumer never asks whether the served
+head equals the commit it applied — it asks whether its commit is an ancestor of that head, and both
+are printed side by side. And a session that asks while another is merging is queued behind the lease
+and told where it stands, rather than given a second server on another port.
+
+## 11. When UAT runs
 
 `uat.verify` drives a real product as a real person, and it is the one proof that cannot be inferred
 from anything else, so it is worth saying plainly when it runs and when its absence is honest.
@@ -158,7 +185,7 @@ The flow folder has one shape — `flow.md`, `accounts.<env>.json`, `seed/`, `sn
 `templates/uat/README.md` is its contract. The host repository tracks it, so a run's evidence travels
 with the product; only the session folder beside it is ignored.
 
-## 11. The end of the session
+## 12. The end of the session
 
 The session folder is created by the orchestrator before the first agent starts and deleted when
 `git.publish` finishes. What survives is what the steps published — commits, business heads, UAT

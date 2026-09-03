@@ -85,6 +85,18 @@
         "en": "Repair the service, then invoke again.",
         "vi": "Sửa dịch vụ, rồi gọi lại."
       }
+    },
+    "INTEGRATION_CONFLICT": {
+      "domain": "product",
+      "disposition": "terminate",
+      "meaning": {
+        "en": "Merging the session branch into the integration branch conflicted, so the head a session asked to have served cannot be built from what is already there.",
+        "vi": "Merge nhánh phiên vào nhánh tích hợp bị xung đột, nên head mà một phiên xin phục vụ không dựng được từ những gì đã có ở đó."
+      },
+      "resume": {
+        "en": "A person resolves the conflict in the session branch and asks for the head again; the merge is never rebased, forced or abandoned to make it apply.",
+        "vi": "Người xử lý xung đột trong nhánh phiên rồi xin lại head; lần merge không bao giờ bị rebase, force hay bỏ qua để cho nó áp được."
+      }
     }
   }
 }

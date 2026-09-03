@@ -49,8 +49,12 @@ nhánh công bố ba tập đóng, và cả ba đều được thi hành. Observ
 `source-revision`, `profile-assigned`, `gate-assigned` và `enforcement-active`, và cần
 `sonar:project-admin`. Tunnel áp `create-tunnel`, `update-tunnel-route` và `upsert-proxied-dns`,
 chứng minh `dns-target`, `tunnel-route`, `tls` và `public-https`, và cần `tunnel:write` cùng
-`dns:write`. Runtime áp `register-runtime-entry` và `attest-runtime-entry`, chứng minh
-`entry-declared`, `endpoints-served`, `head-observed` và `generation-advanced`, và cần
+`dns:write`. Runtime áp `register-runtime-entry`, `attest-runtime-entry`, `bring-up-infra-stack`,
+`locate-routed-checkouts`, `start-role-runtime`, `merge-into-integration-branch`,
+`serve-runtime-head`, `restart-runtime-server`, `reset-runtime-server`, `stop-runtime-server` và
+`queue-runtime-lease`, chứng minh `entry-declared`, `endpoints-served`, `head-observed`,
+`generation-advanced`, `infra-ports-open`, `cors-origin-admitted`, `checkout-located`,
+`integration-merged`, `server-pid-owned` và `lease-honoured`, và cần
 `runtime:registry-write`. Identity áp `provision-identity` và `seed-flow-fixtures`, chứng minh
 `provider-reachable`, `credential-resolvable`, `account-exists`, `account-signs-in` và
 `no-credential-recorded`, và cần `identity:account-admin`. Giữ hai nhánh cuối tách nhau là thứ giữ cho
@@ -58,7 +62,10 @@ mỗi tập chứng minh còn thật: không thể bắt một lần chứng th�
 báo cáo một lần cấp tài khoản bằng cách ping một cổng. Một effect hay một check nộp nhầm nhánh là đầu vào không hợp lệ chứ không phải cảnh báo,
 vì effect nộp chéo chính là cách một thay đổi chưa duyệt khoác lên mình vẻ ngoài của thẩm quyền. Tập
 chứng minh bắt buộc là trọn tập mà nhánh công bố: người gọi không được xin ít hơn, vì một dashboard
-xanh tự nó chưa bao giờ chứng minh được delivery, ordering hay redaction.
+xanh tự nó chưa bao giờ chứng minh được delivery, ordering hay redaction. Nhánh runtime là nhánh công
+bố tập của mình theo từng bậc thay vì theo cả nhánh, vì một bậc nằm dưới server thì không ping nổi một
+endpoint chưa có gì phục vụ; tập của mỗi bậc được nêu cùng cái thang bên dưới, và một bậc cũng không
+được xin ít hơn tập của chính nó, y như một nhánh.
 
 ## Sổ đăng ký có một entry cho mỗi route
 
@@ -68,6 +75,80 @@ chứng thực được đúng một route, và mọi lần bind khác đọc ra
 đang lắng nghe — một âm tính giả không phân biệt được với sự cố. Hình dạng một-khối trước đây vẫn được
 đọc thêm một release, như entry của route mà nó nêu tên, và một sổ mang cả hai thì hai bên phải khớp;
 release kế tiếp bỏ nó.
+
+## Thang runtime, leo từng bậc một
+
+Một cái máy vừa bật lên thì chưa có cơ sở dữ liệu, chưa có nhà cung cấp danh tính, chưa checkout nào
+được phân giải và chưa có gì phục vụ, và mỗi thứ đó là một thứ thiếu khác nhau với một người chủ khác
+nhau. Vì vậy nhánh runtime leo một cái thang theo đúng một thứ tự, mỗi bậc là một thao tác đóng do
+người gọi nêu tên và mỗi bậc được chứng thực trước khi thử bậc kế, để một entry trong sổ đăng ký luôn
+nói rõ nó đang ở đâu thay vì hoặc sẵn sàng hoặc không hiểu vì sao chưa.
+
+| Bậc | Nó làm gì | Chứng minh |
+| --- | --- | --- |
+| `stack-up` | Dựng hạ tầng mà môi trường đó khai, bằng đúng công cụ môi trường đó khai, chờ các probe sẵn sàng, và xác nhận luật origin đã khai có nhận origin đang phục vụ | `infra-ports-open`, `cors-origin-admitted`, `generation-advanced` |
+| `locate` | Phân giải các role của project ra checkout đã route qua workspace route, không bao giờ theo tên thư mục, và ghi head quan sát được ở mỗi cái | `checkout-located`, `head-observed`, `generation-advanced` |
+| `start-role` | Khởi động server của một role từ worktree tích hợp, backend trước frontend, bằng lệnh dev mà khai báo route hay package scripts của nó publish | `entry-declared`, `endpoints-served`, `head-observed`, `generation-advanced`, `integration-merged`, `server-pid-owned`, `lease-honoured` |
+| `serve` | Merge phần việc của một phiên vào nhánh tích hợp và cho server chạy kết quả đó | đúng bộ của `start-role` |
+| `restart` | Khởi động lại đúng head đó, cùng nhánh, cùng cổng | đúng bộ của `start-role` |
+| `reset` | Dừng, xoá cache build của framework cho worktree đó, khởi động lại | đúng bộ của `start-role` |
+| `stop` | Dừng server: pid đã ghi bị kill và lease được nhả | `entry-declared`, `generation-advanced`, `server-pid-owned`, `lease-honoured` |
+
+Một bậc không leo được thì dừng bằng đúng mã gọi tên người chủ của khoảng trống đó và không mã nào
+khác: hạ tầng không lên nổi, hay một backend mà luật origin đã khai không nhận origin đang phục vụ, là
+`PROVISIONING_UNAVAILABLE` nêu tên thứ đang thiếu và dòng khai báo cần thêm; một route không publish
+lệnh dev nào là `INVALID_INPUT` nêu tên trường nó thiếu; một lần merge xung đột là
+`INTEGRATION_CONFLICT`, thuộc về con người và xảy ra ngay lúc tích hợp chứ không phải lúc publish, và
+đó chính là lý do lần merge diễn ra ở đây.
+
+## Một nhánh, một server, một cổng cố định
+
+Runtime phục vụ một nhánh tích hợp của mỗi sản phẩm, và cổng phục vụ nhánh đó không bao giờ dời. Đó
+không phải chuyện tiện tay: redirect URI của identity client, danh sách origin được phép của backend
+và mọi callback đăng ký ở bất kỳ nhà cung cấp nào đều khai theo một cổng, nên một runtime dời cổng để
+lấy chỗ cho phiên thứ hai sẽ làm hỏng đăng nhập của phiên thứ nhất, rồi lại phải sửa allow-list của
+nhà cung cấp ngay lúc chạy để vá đúng thứ nó vừa làm hỏng. Ở đây không có gì đăng ký origin, vì ở đây
+không có gì dời cổng.
+
+Vậy hai phiên trên cùng một sản phẩm không phải hai server. Mỗi phiên xin commit của mình được phục
+vụ, và `serve` merge nhánh của phiên đó vào nhánh tích hợp — một merge commit, không bao giờ rebase —
+rồi khởi động lại đúng một server trên kết quả. Head đang phục vụ khi đó mang việc của cả hai, và entry
+ghi `contains`: những commit head đó chắc chắn có. Xung đột lộ ra ở đây, sớm, ngay nơi hai thay đổi
+thật sự gặp nhau, thay vì lúc publish nơi nó sẽ chặn một phần việc đã xong. Nhánh tích hợp cũng được
+merge từ mainline theo chu kỳ để không trôi vào một trạng thái không ai khác chia sẻ.
+
+## Commit của chính người tiêu thụ nằm trong một head dùng chung
+
+Vì một head mang việc của nhiều phiên, một người tiêu thụ đòi head đang phục vụ phải bằng đúng commit
+mình vừa áp sẽ hỏng mỗi lần có phiên thứ hai, và hỏng vì số học chứ không vì bằng chứng. Phép thử là
+quan hệ tổ tiên: commit đã áp phải là tổ tiên của head đang phục vụ. Một bề mặt thoả điều đó có mang
+phần việc đang được audit, bất kể nó còn mang gì khác. Cả hai commit đều được ghi — cái đã áp và cái
+đang phục vụ — vì người đọc không thấy đủ hai thì không kiểm được lời khẳng định. Chỉ một phép thử tổ
+tiên hỏng mới là trôi.
+
+## Một server sống lâu hơn nhánh đã khởi động nó
+
+Server mà một bậc khởi động là tiến trình detached. Nó phải vậy: nhánh khởi động nó kết thúc, còn lần
+audit hay hành trình cần nó lại chạy ở nhánh khác, đôi khi ở phiên khác. Một tiến trình không ai ghi
+lại là một tiến trình không ai tìm ra, nên entry mang trọn nó — đúng lệnh, pid, tệp log dưới thư mục
+phiên và tệp pid nằm cạnh. Cây này ship sẵn helper làm việc đó (`scripts/serve-runtime.mjs`), và nó
+được gọi tên ở đây để khởi động một server là một hành vi có ghi chép, không phải một dòng shell ai đó
+tự ứng biến. Một lần `stop` kill đúng pid mà entry đã ghi và không kill pid nào khác.
+
+`serve` là idempotent theo head. Khi head của server đang chạy đã chứa commit được xin và endpoint của
+nó trả lời, thao tác chỉ chứng thực rồi trả lại: không merge gì, không khởi động lại gì, không có pid
+mới, và biên bản ghi rằng head đã được dùng lại. Khởi động lại một server đang khoẻ chỉ để được phép
+mô tả nó sẽ phá đúng trạng thái mà bước sau định đo, cũng là lý do việc chứng thực không bao giờ khởi
+động lại thứ gì. `restart` và `reset` tồn tại cho lúc một con người thật sự muốn điều đó, và chúng
+được gọi đích danh.
+
+## Lease chính là thứ tự merge
+
+Mỗi lúc chỉ một phiên tích hợp. Phiên nào serve thì giữ lease trong lúc merge và khởi động lại, rồi
+nhả khi server trả lời trở lại; phiên nào hỏi trong lúc người khác đang giữ thì được ghi vào hàng đợi,
+được cho biết vị trí và ai đang giữ, và chờ. Nó không bao giờ được phát một server thứ hai, vì server
+thứ hai đúng là sự tranh chấp mà lease sinh ra để dẹp. Thời gian chờ ngắn theo thiết kế: lease giữ cho
+một lần merge và một lần khởi động lại, không phải cho cả một lượt audit.
 
 ## Chứng thực một runtime không ai khởi động lại
 
@@ -123,6 +204,24 @@ claim. Phối hợp là bước kế bắt buộc và nó thuộc về hai ngư�
 `PORT_CONFLICT` là kết quả bình thường trên một máy dùng chung bận, không phải khiếm khuyết của kế
 hoạch.
 
+## Hai phiên, một sản phẩm
+
+Đây là chỗ duy nhất luật cô lập được viết ra; operator audit và operator hành trình trích dẫn nó chứ
+không chép lại. Hai phiên có thể làm trên cùng một sản phẩm cùng lúc khi cả năm điều sau đều đúng, và
+mỗi điều là một cổng chứ không phải một ý định.
+
+- Một sản phẩm, một nhánh tích hợp, một server, một cổng: các head được merge lần lượt dưới lease, còn
+  backend, realm danh tính và cơ sở dữ liệu thì dùng chung và được scope chứ không nhân bản.
+- Diễn viên của mỗi luồng là các alias tài khoản của riêng luồng đó, được cấp cho luồng đó và nêu tên
+  trong hồ sơ của nó.
+- Mỗi phiên lái profile trình duyệt của riêng nó, ghi trong snapshot của chính lượt chạy, để cookie
+  của phiên này không bao giờ là phiên đăng nhập của phiên kia.
+- Seed được scope bằng tiền tố của chính luồng và không đụng hàng dùng chung: mọi định danh được seed
+  đều mang tiền tố đó, và phần rollback liệt kê đúng những định danh đó, không gì khác.
+- Không operator nào ghi lease, tài khoản hay thư mục lượt chạy của phiên khác: lease, phần ghi công
+  cấp tài khoản và snapshot của lượt chạy đều nêu tên phiên đã hỏi, và một lần ghi mà phiên khác đi thì
+  bị từ chối chứ không hoà vào.
+
 ## Credential được phân giải, không bao giờ được ghi lại
 
 Một capability là một handle cùng bằng chứng custody của nó. Credential đứng sau nó được phân giải để
@@ -147,6 +246,11 @@ cần cổng nào, và một claim không ai đặt thì không thể đụng ai
 Context chỉ đọc, trừ phần delta đã duyệt. Operator chỉ áp delta effect đã duyệt lên dịch vụ dùng chung
 đã kiểm kê, dưới một lease độc quyền trên `@worktrees/sessions/central-runtime`, và chỉ ghi
 `response/` của nhánh mình: `data/delta.json`, `data/checks.json`, `response.md` và `response.json`.
+Nó là chủ duy nhất của vòng đời một runtime đang phục vụ: nó merge vào nhánh tích hợp rồi khởi động,
+khởi động lại, reset và dừng server của một route mà sổ đăng ký ghi nhận, dưới một bậc có tên, và nó
+chỉ kill đúng pid mà chính entry đã ghi. Nó không hành động trong lúc phiên khác giữ lease; không
+rebase, force hay bỏ dở một lần merge để nó áp được; không dời một cổng đang phục vụ; và không sửa
+danh sách origin của một dịch vụ đang chạy thay cho khai báo lẽ ra phải mang nó.
 Nó không deploy, restart, migrate hay theo cách nào khác nhận quyền sở hữu một dịch vụ sản phẩm; không
 làm đổi một resource mà inventory đã ràng không liệt kê; không phát một effect hay một check mà nhánh
 dịch vụ đã ràng không công bố; không giải phóng một cổng bằng cách dừng, giết hay cấu hình lại tiến
@@ -180,6 +284,8 @@ release hay bằng chứng UAT nào.
 | `portClaims` | list of `{port, resourceRef}` | [] | Trạng thái mong muốn cần những cổng nào, và cho resource sở hữu nào |
 | `approval` | id | — | Phê duyệt phủ lên trạng thái mong muốn này; đổi một runtime dùng chung luôn cần một con người |
 | `routeKey` | id | null | Entry `<project>/<role>` mà lượt vận hành này chứng thực hoặc cấp tài khoản vào; null khi lượt chạy không đụng route nào |
+| `operation` | choice | serve | Bậc thang runtime mà lần gọi này leo: `stack-up`, `locate`, `start-role`, `serve`, `restart`, `reset` hay `stop` |
+| `commit` | id | null | Commit mà phiên này cần được phục vụ, được merge vào nhánh tích hợp khi head đang phục vụ chưa chứa nó |
 | `flow` | id | null | Luồng có danh tính riêng được cấp, và có thư mục nhận hồ sơ tài khoản, tài liệu đã phác cùng seed |
 | `env` | id | dev | Stack mà entry được chứng thực và các tài khoản được cấp thuộc về; tài khoản của stack này không phải tài khoản của stack khác |
 | `resume` | token | null | Token của nhánh bị chặn khi vào lại sau một mã dừng |
@@ -191,10 +297,10 @@ release hay bằng chứng UAT nào.
 | 1 | Kiểm cổng vào và resume | `resume` | `request/request.json`, @worktrees/sessions/central-runtime tại generation đã đóng băng | — | `INVALID_INPUT`, `SOURCE_DRIFT`, `NO_PROGRESS` |
 | 2 | Ràng thẩm quyền: runtime, device-state, projects và phê duyệt | `service`, `approval` | @worktrees/sessions/central-runtime cho fingerprint và generation của inventory, @workspaces/device-state cho từng handle capability kèm bằng chứng custody, @workspaces/projects/&lt;project>/&lt;role>, @tools/secrets | — | `AUTHORITY_DRIFT`, `CAPABILITY_MISSING` |
 | 3 | Kiểm lại inventory một lần trước khi có gì thay đổi | — | @worktrees/sessions/central-runtime, các resource đã khai được quan sát lại một lần, @tools/git | — | `INVENTORY_DRIFT` |
-| 4 | Phân giải các port claim | `portClaims` | @workspaces/ports/&lt;project> cho các cổng được claim, @worktrees/sessions/central-runtime cho chủ giữ quan sát được của chúng | — | `PORT_CONFLICT` |
+| 4 | Phân giải các port claim theo phép chiếu, và quan sát ai đang giữ từng cổng | `portClaims` | @workspaces/ports/&lt;project> cho các cổng được chiếu ra, @worktrees/sessions/central-runtime cho chủ giữ quan sát được của chúng | — | `PORT_CONFLICT` |
 | 5 | Suy ra delta giữa cái quan sát được và cái mong muốn | `desiredState` | @worktrees/sessions/central-runtime cho trạng thái quan sát được, `request/request.json` cho trạng thái mong muốn | `response/data/delta.json` | — |
 | 6 | Áp delta đã duyệt, từng resource một, dưới một lease độc quyền | — | @worktrees/sessions/central-runtime, @workspaces/device-state cho các handle theo tên | @worktrees/sessions/central-runtime, `response/data/delta.json`, @tools/container, @tools/shell | `EFFECT_UNAUTHORIZED`, `SERVICE_UNAVAILABLE` |
-| 7 | Chứng thực entry runtime của route đã bind: ping các endpoint nó khai, ghi head và bằng chứng, rồi đặt trạng thái | `routeKey`, `env` | @worktrees/sessions/central-runtime cho entry của route đó, các endpoint nó khai được quan sát lại một lần, @tools/http | @worktrees/sessions/central-runtime, `response/data/delta.json` | `SERVICE_UNAVAILABLE` |
+| 7 | Leo đúng bậc đã nêu cho route đã bind — dựng hạ tầng của môi trường, phân giải checkout của nó, khởi động một role, hoặc merge commit của phiên này vào nhánh tích hợp rồi serve, restart, reset hay stop đúng một server detached qua `scripts/serve-runtime.mjs`, xếp hàng sau lease mà phiên khác đang giữ — rồi chứng thực entry: ping các endpoint, ghi head đang phục vụ, những gì nó chứa và bằng chứng, rồi đặt trạng thái | `routeKey`, `operation`, `commit`, `env` | @worktrees/sessions/central-runtime cho entry của route đó cùng server, lease và hàng đợi của nó, @workspaces/projects/&lt;project>/&lt;role> cho lệnh dev của role, worktree tích hợp và nhánh phiên được merge vào đó, hạ tầng đã khai của môi trường, các endpoint được quan sát lại một lần, @tools/git, @tools/http, @tools/container, @tools/shell | @worktrees/sessions/central-runtime, `response/data/delta.json` | `SERVICE_UNAVAILABLE`, `PROVISIONING_UNAVAILABLE`, `INTEGRATION_CONFLICT`, `INVALID_INPUT` |
 | 8 | Cấp danh tính của luồng theo entry đó: đọc hồ sơ tài khoản hoặc tạo tài khoản, đặt mật khẩu từ tên niêm phong, ghi hồ sơ, phác phần còn thiếu và seed | `routeKey`, `flow`, `env` | @worktrees/uat/&lt;flow> cho hồ sơ tài khoản, tài liệu luồng và seed, @worktrees/_templates cho phần còn thiếu, @worktrees/sessions/central-runtime cho khai báo danh tính của entry, @workspaces/device-state cho thông tin đăng nhập theo tên, @tools/secrets, @tools/http, @tools/browsercontrol, @tools/database | @worktrees/uat/&lt;flow>, `response/data/account.json`, `response/data/delta.json`, @tools/sourcewrite | `INVALID_INPUT`, `PROVISIONING_UNAVAILABLE` |
 | 9 | Chứng minh mọi check bắt buộc | — | @worktrees/sessions/central-runtime đọc lại theo bộ chứng minh đầy đủ của nhánh, @tools/http | `response/data/checks.json` | `PROOF_FAILED` |
 | 10 | Viết biên bản và phát | — | mọi thứ ở trên | `response/response.md`, `response/response.json` | — |
@@ -227,6 +333,7 @@ fingerprint không thể cho một câu trả lời khác.
 | `EFFECT_UNAUTHORIZED` | terminate |
 | `SERVICE_UNAVAILABLE` | terminate |
 | `PROVISIONING_UNAVAILABLE` | terminate |
+| `INTEGRATION_CONFLICT` | terminate |
 | `PROOF_FAILED` | terminate |
 
 ## Kế tiếp

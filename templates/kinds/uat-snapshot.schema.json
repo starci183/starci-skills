@@ -20,7 +20,8 @@
     "seed",
     "cases",
     "flowSource",
-    "golden"
+    "golden",
+    "isolation"
   ],
   "properties": {
     "runId": {
@@ -328,6 +329,66 @@
               "minLength": 1
             }
           }
+        }
+      }
+    },
+    "isolation": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "What keeps this run apart from another run of the same product on the same machine. The runtime serves one integration branch on one port, so isolation is not a second server: it is this session driving its own browser profile, seeding only rows that carry its own prefix, and rolling back only what it seeded. Every field here is something another run could otherwise have written.",
+      "required": [
+        "sessionId",
+        "browserProfileRef",
+        "servedHead",
+        "servedContainsCommit",
+        "ancestryEvidenceRef",
+        "seededIds",
+        "rollbackIds"
+      ],
+      "properties": {
+        "sessionId": {
+          "type": "string",
+          "minLength": 1,
+          "description": "The session this run belongs to. It is the session the request names, so a run folder written for somebody else is visible rather than merely possible."
+        },
+        "browserProfileRef": {
+          "type": "string",
+          "minLength": 1,
+          "description": "This run's own browser profile. Two runs sharing one profile share a sign-in, and then each proves the other's session."
+        },
+        "servedHead": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{40}$",
+          "description": "The head the runtime was serving. It carries the work of every session that asked for it, so it is almost never equal to the commit this run verifies."
+        },
+        "servedContainsCommit": {
+          "type": "boolean",
+          "description": "Whether the served head contains the commit this run pinned. False is drift, and drift is a stop with nothing driven."
+        },
+        "ancestryEvidenceRef": {
+          "type": "string",
+          "minLength": 1,
+          "description": "The record of the ancestry test, so the claim can be checked without rerunning it."
+        },
+        "seededIds": {
+          "type": "array",
+          "maxItems": 512,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "description": "Every identifier this run seeded. Each carries the run fixture namespace, which is what makes \"touched no shared row\" a fact rather than an intention."
+        },
+        "rollbackIds": {
+          "type": "array",
+          "maxItems": 512,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "description": "What cleanup removes: a subset of what this run seeded, and never one identifier more."
         }
       }
     }

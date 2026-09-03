@@ -51,7 +51,7 @@
       "heading": "^## Mutations$",
       "table": "| Effect | Resource | Before | After |",
       "cell": {
-        "Effect": "^`(update-config|restart-service|upsert-dashboard|update-remote-write|create-project|assign-profile|assign-gate|enforce-setting|create-tunnel|update-tunnel-route|upsert-proxied-dns|register-runtime-entry|attest-runtime-entry|provision-identity|seed-flow-fixtures)`$"
+        "Effect": "^`(update-config|restart-service|upsert-dashboard|update-remote-write|create-project|assign-profile|assign-gate|enforce-setting|create-tunnel|update-tunnel-route|upsert-proxied-dns|register-runtime-entry|attest-runtime-entry|bring-up-infra-stack|locate-routed-checkouts|start-role-runtime|merge-into-integration-branch|serve-runtime-head|restart-runtime-server|reset-runtime-server|stop-runtime-server|queue-runtime-lease|provision-identity|seed-flow-fixtures)`$"
       }
     },
     {
@@ -68,7 +68,7 @@
       "table": "| Code | Resource | Port | Holder | Statement |",
       "minRows": 1,
       "cell": {
-        "Code": "^`(SHARED_SERVICE_INVENTORIED|PORT_COORDINATION_REQUIRED|ALREADY_CONVERGED|PARTIAL_MUTATION|PRODUCT_DEPLOYMENT_DECLINED|RUNTIME_ENTRY_ATTESTED|IDENTITY_PROVISIONED)`$",
+        "Code": "^`(SHARED_SERVICE_INVENTORIED|PORT_COORDINATION_REQUIRED|ALREADY_CONVERGED|PARTIAL_MUTATION|PRODUCT_DEPLOYMENT_DECLINED|RUNTIME_ENTRY_ATTESTED|IDENTITY_PROVISIONED|RUNTIME_RUNG_CLIMBED|RUNTIME_HEAD_SERVED|RUNTIME_HEAD_REUSED|RUNTIME_SERVER_RESTARTED|RUNTIME_SERVER_RESET|RUNTIME_SERVER_STOPPED|RUNTIME_LEASE_BUSY|INTEGRATION_MERGED)`$",
         "Statement": "\\S"
       }
     }

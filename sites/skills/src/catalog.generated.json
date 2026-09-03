@@ -1,6 +1,6 @@
 {
-  "version": "1.6.1",
-  "lineageNote": "1.6.1 (2026-09-03): @tools/print — direction prints every candidate URL and a capture per viewport before the decision is written, the audit prints the sheet, the worst capture per topic and the Verdict table, UAT prints the step-capture summary; receipts carry a ## Printed table and validators refuse a decision the person never saw.",
+  "version": "1.7.0",
+  "lineageNote": "1.7.0 (2026-09-03): the runtime is each product's uat integration branch on the fixed projected port — platform.operate climbs the whole ladder (stack-up → locate → start-role → serve → attest), serve merges the session branch into uat and restarts idempotently by head, servers run detached with pid and log (scripts/serve-runtime.mjs), the lease is the merge order, RUNTIME_BUSY and INTEGRATION_CONFLICT; workspace.bind binds by ancestry (the served head contains the pinned commit); the audit takes a route input and a Served surface section; UAT snapshots carry isolation; the two-sessions-one-product law lives in one place; a ports projection schema with sessionSlots defaulting to 0.",
   "entry": {
     "name": "starci",
     "description": "Complete one StarCi mission by freezing its scope, selecting the one operator that owns the outcome, and routing between operators on typed results until the outcome is proved or a person must decide.",
@@ -1520,6 +1520,10 @@
           "required": true
         },
         {
+          "kind": "route",
+          "required": true
+        },
+        {
           "kind": "uat-account",
           "required": false
         }
@@ -1723,6 +1727,10 @@
         {
           "when": "the boundary is published and the head must reach an environment",
           "operator": "release.deploy"
+        },
+        {
+          "when": "the session is cleaned up and the runtime it was served from must release the lease and the server it started",
+          "operator": "platform.operate"
         }
       ],
       "stops": [
@@ -1834,7 +1842,7 @@
         },
         {
           "id": "git",
-          "mode": "read"
+          "mode": "merge-into-integration-branch"
         },
         {
           "id": "shell",
@@ -1875,7 +1883,7 @@
         "@worktrees/uat/<flow>"
       ],
       "steps": 10,
-      "requirements": 8,
+      "requirements": 10,
       "inputs": [],
       "outputs": [
         {
@@ -1990,6 +1998,13 @@
           "disposition": "terminate",
           "domain": "control-panel",
           "meaning": "The identity provider, the sealed credential or the store a UAT identity needs cannot be reached, so the account can be neither created nor used. A record that is merely absent is created; this code is for a dependency that is not there at all.",
+          "shared": false
+        },
+        {
+          "code": "INTEGRATION_CONFLICT",
+          "disposition": "terminate",
+          "domain": "product",
+          "meaning": "Merging the session branch into the integration branch conflicted, so the head a session asked to have served cannot be built from what is already there.",
           "shared": false
         },
         {
@@ -2843,6 +2858,13 @@
           "domain": "runtime",
           "meaning": "The runtime owner registry is missing, stale, or not ready while the caller must consume it.",
           "shared": false
+        },
+        {
+          "code": "RUNTIME_BUSY",
+          "disposition": "terminate",
+          "domain": "runtime",
+          "meaning": "The integration branch of this route is leased by another session while it merges and restarts, so the head this binding needs is not served yet.",
+          "shared": false
         }
       ],
       "routes": [
@@ -2986,7 +3008,8 @@
       "modes": [
         "read",
         "commit-session-branch",
-        "merge-and-push"
+        "merge-and-push",
+        "merge-into-integration-branch"
       ],
       "support": {
         "openai": true,
@@ -3579,6 +3602,7 @@
         "workspace.bind"
       ],
       "consumedBy": [
+        "frontend.surface.audit",
         "uat.verify"
       ]
     },
@@ -4299,6 +4323,18 @@
       "resume": "Provide a working generator, or turn the image stage off."
     },
     {
+      "code": "INTEGRATION_CONFLICT",
+      "scope": [
+        "platform.operate"
+      ],
+      "shared": false,
+      "domain": "product",
+      "disposition": "terminate",
+      "meaning": "Merging the session branch into the integration branch conflicted, so the head a session asked to have served cannot be built from what is already there.",
+      "fallback": null,
+      "resume": "A person resolves the conflict in the session branch and asks for the head again; the merge is never rebased, forced or abandoned to make it apply."
+    },
+    {
       "code": "INVALID_INPUT",
       "scope": [
         "*"
@@ -4721,6 +4757,18 @@
       "meaning": "No published case matches the observed condition on a node.",
       "fallback": null,
       "resume": "The knowledge owner publishes the case, and the tree is resolved again."
+    },
+    {
+      "code": "RUNTIME_BUSY",
+      "scope": [
+        "workspace.bind"
+      ],
+      "shared": false,
+      "domain": "runtime",
+      "disposition": "terminate",
+      "meaning": "The integration branch of this route is leased by another session while it merges and restarts, so the head this binding needs is not served yet.",
+      "fallback": null,
+      "resume": "Wait for the holder to release the lease, then bind again: the same endpoint serves the merged head next. The reason names the holding session, the operation it is in and the queue position."
     },
     {
       "code": "RUNTIME_NOT_READY",
@@ -5737,7 +5785,7 @@
     "workflows": 9,
     "routes": 70,
     "kinds": 53,
-    "stopCodes": 97,
+    "stopCodes": 99,
     "steps": 123,
     "domains": 11,
     "profiles": 3,

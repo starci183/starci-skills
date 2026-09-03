@@ -1,5 +1,15 @@
 # frontend-surface-audit — target-id
 
+## Served surface
+
+| Field | Value |
+| --- | --- |
+| Applied commit | `0f1e2d3c4b5a69788796a5b4c3d2e1f00f1e2d3c` |
+| Served branch | `uat` |
+| Served head | `9a8b7c6d5e4f30211203f4e5d6c7b8a99a8b7c6d` |
+| Contains applied commit | yes |
+| Browser profile | `.worktrees/sessions/<sessionId>/browser` |
+
 ## Surface class
 
 | Class | Declared by |

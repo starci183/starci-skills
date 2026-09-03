@@ -103,7 +103,22 @@ const PRINTED = [
   `| ${BT}${SHOT(NARROW)}${BT} | the worst-scoring capture of the taste topic |`,
 ];
 
-const responseMd = (lens = taste(), printed = PRINTED) => `# frontend-surface-audit — plan-picker
+const APPLIED = '3'.repeat(40);
+const SERVED = '7'.repeat(40);
+const PROFILE = '.worktrees/sessions/s-test/browser';
+const served = (over = {}) => ({ applied: APPLIED, servedBranch: 'uat', servedHead: SERVED, contains: 'yes', profile: PROFILE, ...over });
+
+const responseMd = (lens = taste(), printed = PRINTED, surface = served()) => `# frontend-surface-audit — plan-picker
+
+## Served surface
+
+| Field | Value |
+| --- | --- |
+| Applied commit | \`${surface.applied}\` |
+| Served branch | \`${surface.servedBranch}\` |
+| Served head | \`${surface.servedHead}\` |
+| Contains applied commit | ${surface.contains} |
+| Browser profile | \`${surface.profile}\` |
 
 ## Surface class
 
@@ -177,6 +192,7 @@ const requestJson = ({ extra = {} } = {}) => ({
     'frontend-source-application': 'step-3/parallel-1/response/response.md',
     'frontend-presentation-resolution': 'step-2/parallel-1/response/response.md',
     'frontend-direction-decision': 'step-1/parallel-1/response/response.md',
+    route: 'step-1/parallel-1/response/data/route.json',
   },
   resume: null,
 });
@@ -211,6 +227,7 @@ function writeBranch(files, { decisionClass = 'console' } = {}) {
   // The class this audit carries is the one the direction decided; the coverage beside that receipt
   // is where it is read from, and a decision written before the class was declared carries none.
   mkdirSync(path.join(session, 'step-1', 'parallel-1', 'response', 'data'), { recursive: true });
+  writeFileSync(path.join(session, 'step-1', 'parallel-1', 'response', 'data', 'route.json'), JSON.stringify({ served: { branch: 'uat', head: SERVED, contains: [APPLIED], port: 3067 } }, null, 2));
   writeFileSync(
     path.join(session, 'step-1', 'parallel-1', 'response', 'data', 'coverage.json'),
     JSON.stringify({ directionId: 'plan-picker', ...(decisionClass ? { surfaceClass: decisionClass } : {}), actions: [], regions: [], states: [], responsive: [] }, null, 2),
@@ -307,4 +324,8 @@ await expectError({ ...baseline(), 'response/response.md': responseMd().replace(
 
 await expectError({ ...baseline(), 'response/response.md': responseMd(taste(), [`| ${BT}${SHOT(NARROW)}${BT} | the worst-scoring capture of the taste topic |`]) }, 'names no served sheet', 'a verdict recorded without the sheet ever reaching the person');
 
-process.stdout.write('frontend.surface.audit self-test: 4 valid branches, 37 rejected mutations\n');
+await expectError({ ...baseline(), 'response/response.md': responseMd(taste(), PRINTED, served({ contains: 'no' })) }, 'the served head must contain the applied commit', 'a surface measured on a head that never carried this work');
+await expectError({ ...baseline(), 'response/response.md': responseMd(taste(), PRINTED, served({ profile: '—' })) }, 'names the browser profile this session drove', 'an audit that never says whose browser it drove');
+await expectError({ ...baseline(), 'response/response.md': responseMd(taste(), PRINTED, served({ servedHead: 'HEAD' })) }, 'as a full commit', 'a served head nobody could compare');
+
+process.stdout.write('frontend.surface.audit self-test: 4 valid branches, 40 rejected mutations\n');

@@ -85,6 +85,18 @@
         "en": "Raise one coordination request to the registered owner and wait for a ready generation.",
         "vi": "Nêu một yêu cầu phối hợp tới chủ đã đăng ký và chờ một generation sẵn sàng."
       }
+    },
+    "RUNTIME_BUSY": {
+      "domain": "runtime",
+      "disposition": "terminate",
+      "meaning": {
+        "en": "The integration branch of this route is leased by another session while it merges and restarts, so the head this binding needs is not served yet.",
+        "vi": "Nhánh tích hợp của route này đang bị một phiên khác giữ lease trong lúc merge và khởi động lại, nên head mà lần bind này cần chưa được phục vụ."
+      },
+      "resume": {
+        "en": "Wait for the holder to release the lease, then bind again: the same endpoint serves the merged head next. The reason names the holding session, the operation it is in and the queue position.",
+        "vi": "Chờ bên đang giữ nhả lease, rồi bind lại: chính endpoint đó sẽ phục vụ head đã merge kế tiếp. Phần reason nêu tên phiên đang giữ, thao tác nó đang chạy và vị trí xếp hàng."
+      }
     }
   }
 }

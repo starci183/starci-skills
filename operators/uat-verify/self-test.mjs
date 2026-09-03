@@ -38,6 +38,21 @@ const account = (alias = 'learner', over = {}) => ({
   custody: 'sealed-shared-master-identity', isUat: true, plaintextRecorded: false, identity: ENTRY, provisionedBy: RUN, ...over,
 });
 
+// One product serves one integration branch on one port, so what keeps two concurrent runs apart is
+// this: each drives its own browser profile, seeds only rows under its own namespace, and rolls back
+// only what it seeded.
+const SERVED_HEAD = '7'.repeat(40);
+const isolation = (over = {}) => ({
+  sessionId: 's-test',
+  browserProfileRef: '.worktrees/sessions/s-test/browser',
+  servedHead: SERVED_HEAD,
+  servedContainsCommit: true,
+  ancestryEvidenceRef: 'response/data/ancestry.json',
+  seededIds: [`${NS}-learner`, `${NS}-enrollment`],
+  rollbackIds: [`${NS}-enrollment`],
+  ...over,
+});
+
 function snapshot(over = {}) {
   return {
     runId: RUN, requestedBy: 'the product owner', feature: FEATURE, flow: FLOW, env: ENV, commit: COMMIT, frozenAt: T(10),
@@ -52,6 +67,7 @@ function snapshot(over = {}) {
     golden: { state: 'candidate', ref: `${DIR}/snapshots/snapshot.json`, approvedBy: null, env: ENV },
     fixtureNamespace: NS,
     seed: { recordsRef: `${DIR}/seed/records.json`, expectedRef: `${DIR}/seed/expected.json`, fingerprint: FP(4), namespace: NS, isUat: true },
+    isolation: isolation(),
     cases: CASES.map((c, i) => frozenCase(c, i)),
     ...over,
   };
@@ -383,4 +399,9 @@ await expectError(baseline(), 'excludes the flow folder', 'a flow folder the hos
 // A verdict nobody was shown is a verdict nobody read.
 await expectError({ ...baseline(), 'response/response.md': responseMd({ printed: [] }) }, 'names no run summary', 'a published verdict the person who asked never saw');
 
-process.stdout.write('uat.verify self-test: 9 valid branches, 53 rejected mutations\n');
+await expectError({ ...baseline(), 'response/data/snapshot.json': snapshot({ isolation: isolation({ sessionId: 's-other' }) }) }, "no run writes another session's folder", 'a run folder written for another session');
+await expectError({ ...baseline(), 'response/data/snapshot.json': snapshot({ isolation: isolation({ servedContainsCommit: false }) }) }, 'does not contain the commit this run pinned', 'a journey driven against a head that never carried this work');
+await expectError({ ...baseline(), 'response/data/snapshot.json': snapshot({ isolation: isolation({ seededIds: [`${NS}-learner`, 'shared-learner-1'] }) }) }, 'lies outside the run namespace', 'a seed that reached a row the run does not own');
+await expectError({ ...baseline(), 'response/data/snapshot.json': snapshot({ isolation: isolation({ rollbackIds: ['someone-elses-row'] }) }) }, 'which this run never seeded', 'a rollback that would delete another run rows');
+
+process.stdout.write('uat.verify self-test: 9 valid branches, 57 rejected mutations\n');

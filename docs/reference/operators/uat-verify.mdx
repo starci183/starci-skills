@@ -51,6 +51,23 @@ browser at a dead port, and the bind step already refused a merely listening por
 behalf. When the bound endpoint does not answer, the stop is `RUNTIME_UNAVAILABLE` against a named
 endpoint rather than a guess about which origin was meant.
 
+That endpoint serves one integration branch carrying the work of every session that asked for it, so
+the head it runs is almost never the commit this run verifies. The snapshot therefore freezes both:
+the commit pinned and the head served, with the record of the ancestry test between them. A served
+head that does not contain the pinned commit is drift, and drift is a stop with nothing driven — but
+a served head that contains it and other work besides is exactly what a shared integration branch
+looks like, and is no finding at all.
+
+## Two sessions on one product
+
+The isolation law is published once, by the operator that owns the runtime, and this operator works
+inside it rather than restating it. Three of its clauses are things only this receipt can carry, so
+the snapshot states them and they are checked: this run belongs to the session the request names and
+writes no other session's folder; it drives its own browser profile, because two runs sharing one
+profile share a sign-in and then each proves the other's; and it seeds only identifiers under its own
+run namespace and rolls back only what it seeded, because a fixture that reaches a shared row is how
+one run's cleanup becomes another run's failure.
+
 ## A missing record is created, not reported
 
 A flow nobody has run yet has no folder, no flow document, no seed, no account and no approved

@@ -12,7 +12,7 @@
     "grammarBound": false,
     "tools": {
       "@tools/fileread": "context-aliases",
-      "@tools/git": "read",
+      "@tools/git": "merge-into-integration-branch",
       "@tools/shell": "declared-commands",
       "@tools/http": "probe",
       "@tools/container": "operate",

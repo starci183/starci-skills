@@ -52,11 +52,28 @@ was bound to. A registry consulted as a single block answers for whichever route
 recorded in it, which is how an audit comes to report that nothing is serving while the surface it
 needs is on screen.
 
-## The surface must be the committed surface
+## The surface must contain the committed surface
 
-The applied receipt names the commit it wrote, the pinned head equals that commit, and the preview
-serves the session worktree at it. A head that differs is `SOURCE_DRIFT` with nothing captured,
-because a measurement of another tree proves nothing about this one.
+The applied receipt names the commit it wrote, and the runtime serves one integration branch per
+product carrying the work of every session that asked for it. So the test is not equality — that
+would fail the moment a second session existed, and fail on arithmetic rather than on evidence — it
+is ancestry: the applied commit must be an ancestor of the served head, and present among the commits
+the bound route records as contained. A served head that fails that test is `SOURCE_DRIFT` with
+nothing captured, because a measurement of another tree proves nothing about this one. The receipt
+states both commits under `## Served surface`, since ancestry a reader cannot see is a claim.
+
+The endpoint is the one the bound route carries, never one this operator derived: the route names the
+port its entry serves, and readiness is reached there. When the served head does not contain the
+applied commit, or nothing is serving at all, `RUNTIME_UNAVAILABLE` names the commit that must be
+served and the operation that would serve it, and the runtime owner is the one that acts.
+
+## Two sessions on one product
+
+The isolation law is published once, by the operator that owns the runtime, and this audit works
+inside it rather than restating it: one product serves one integration branch on one port, and what
+keeps two concurrent audits from reading each other's state is that each drives its own browser
+profile. That profile is recorded under `## Served surface`, so a receipt whose sign-in state came
+from somewhere else is visible instead of merely suspected.
 
 ## Measurement beats claim, always
 
@@ -106,6 +123,7 @@ a node passes.
 | `frontend-source-application` | `frontend.source.apply`, the commit under observation and the claims it wrote | yes |
 | `frontend-presentation-resolution` | `frontend.presentation.resolve`, the owner of every node | yes |
 | `frontend-direction-decision` | `frontend.direction.decide`, the route and the coverage the matrix is derived from | yes |
+| `route` | `workspace.bind`, the bound route: the endpoint its entry serves and the commits the served head contains | yes |
 | `uat-account` | `platform.operate`, the account the guarded route is reached as; absent on the first pass, which is what `IDENTITY_MISSING` hands over | no |
 
 ## Requirements
@@ -122,10 +140,10 @@ a node passes.
 
 | # | Step | Params | Reads | Writes | Stops with |
 | --- | --- | --- | --- | --- | --- |
-| 1 | Validate the gate and resume, and confirm the head and the served route | `resume` | `request/request.json`, input `frontend-source-application` (its commit must equal the pinned head), @workspaces/fe at the frozen head, @worktrees/sessions/central-runtime (the preview serving the session worktree at that commit), @tools/git | — | `INVALID_INPUT`, `SOURCE_DRIFT`, `NO_PROGRESS` |
+| 1 | Validate the gate and resume, and confirm the applied commit is inside the head the route is serving | `resume` | `request/request.json`, input `frontend-source-application` (the commit it wrote), input `route` (the served branch, the served head and the commits it contains), @workspaces/fe at the frozen head, @worktrees/sessions/central-runtime, @tools/git | — | `INVALID_INPUT`, `SOURCE_DRIFT`, `NO_PROGRESS` |
 | 2 | Bind the authority | — | @knowledge/ui/proof (every topic with its fingerprint and inventory), input `frontend-source-application` (the claims), input `frontend-presentation-resolution` (the owner of every node), @worktrees/sessions/central-runtime | — | — |
 | 3 | Select the matrix entries and read the declared surface class | `matrix` | input `frontend-direction-decision` (its `response/data/coverage.json`: state by viewport by colour scheme, and the `surfaceClass` that decision declared) | — | `SURFACE_CLASS_MISSING` |
-| 4 | Reach readiness for each entry, signing in as the flow's account when the route requires an identity | `readinessProbe`, `account`, `env` | @worktrees/sessions/central-runtime for the entry of this project route, input `uat-account` for the account of names, @tools/http, @tools/secrets, @tools/browsercontrol | — | `RUNTIME_UNAVAILABLE`, `IDENTITY_MISSING` |
+| 4 | Reach readiness for each entry on the port the bound route carries, in this session's own browser profile, signing in as the flow's account when the route requires an identity | `readinessProbe`, `account`, `env` | input `route` for the endpoint its entry serves, @worktrees/sessions/central-runtime for the entry of this project route, input `uat-account` for the account of names, @tools/http, @tools/secrets, @tools/browsercontrol | — | `RUNTIME_UNAVAILABLE`, `IDENTITY_MISSING` |
 | 5 | Capture and measure each entry | — | @worktrees/sessions/central-runtime, @workspaces/fe (the observed owners and the identifiers each node carries), @tools/browsercontrol | `response/artifacts/<matrixId>.png`, `response/data/captures/<matrixId>.json` | `EVIDENCE_MISSING` |
 | 6 | Compare against the claims and the proof rules, judge by owner, let each topic close itself, and emit | — | @knowledge/ui/proof, @knowledge/grammars/starci, the captures, @tools/websearch | `response/data/verdicts.json`, `response/response.md`, `response/response.json`, `response/artifacts/host.json`, @tools/visualize, @tools/host, @tools/print | `UNKNOWN_RULE` |
 

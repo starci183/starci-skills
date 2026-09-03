@@ -111,6 +111,17 @@ export async function validateUatStep(branchDir, root = ROOT) {
     if (!empty(requirements.requestedBy) && snapshot.requestedBy !== requirements.requestedBy) errors.push('response/data/snapshot.json: the snapshot names another requester than the person who asked');
     if (snapshot.fixtureNamespace !== `uat-${snapshot.runId}`) errors.push(`response/data/snapshot.json: the fixture namespace must be uat-${snapshot.runId}, so cleanup can name exactly what this run wrote`);
     if (snapshot.seed.namespace !== snapshot.fixtureNamespace) errors.push('response/data/snapshot.json: the seed namespace must equal the run fixture namespace');
+    // Two sessions may run against one product at once, under the isolation law platform.operate
+    // publishes. Each clause of it that this receipt can carry is checked here.
+    const iso = snapshot.isolation;
+    if (iso) {
+      const sessionId = request?.sessionId ?? null;
+      if (sessionId && iso.sessionId !== sessionId) errors.push(`response/data/snapshot.json: the run belongs to session ${iso.sessionId} and this branch to ${sessionId}; no run writes another session's folder`);
+      if (response.status === 'done' && !iso.servedContainsCommit) errors.push('response/data/snapshot.json: the served head does not contain the commit this run pinned, which is drift and not a journey');
+      for (const id of iso.seededIds) if (!id.startsWith(snapshot.fixtureNamespace)) errors.push(`response/data/snapshot.json: seeded id ${id} lies outside the run namespace ${snapshot.fixtureNamespace}, so this run touched a row it does not own`);
+      const seeded = new Set(iso.seededIds);
+      for (const id of iso.rollbackIds) if (!seeded.has(id)) errors.push(`response/data/snapshot.json: rollback names ${id}, which this run never seeded`);
+    }
     if (pinned !== null && snapshot.commit !== pinned) errors.push(`response/data/snapshot.json: the snapshot froze commit ${snapshot.commit} but the request pinned @workspaces/be at ${pinned}`);
     if (!snapshot.snapshotRef.startsWith(`.worktrees/uat/${snapshot.feature}/${snapshot.flow}/`)) errors.push('response/data/snapshot.json: the snapshot path must address this feature and flow');
 

@@ -22,14 +22,29 @@ export const KIND_EFFECTS = {
   observability: ['update-config', 'restart-service', 'upsert-dashboard', 'update-remote-write'],
   sonar: ['create-project', 'assign-profile', 'assign-gate', 'enforce-setting'],
   tunnel: ['create-tunnel', 'update-tunnel-route', 'upsert-proxied-dns'],
-  runtime: ['register-runtime-entry', 'attest-runtime-entry'],
+  runtime: ['register-runtime-entry', 'attest-runtime-entry', 'bring-up-infra-stack', 'locate-routed-checkouts', 'start-role-runtime', 'merge-into-integration-branch', 'serve-runtime-head', 'restart-runtime-server', 'reset-runtime-server', 'stop-runtime-server', 'queue-runtime-lease'],
   identity: ['provision-identity', 'seed-flow-fixtures'],
 };
+// The runtime branch publishes its proof set per rung, not per branch: a rung below the server cannot
+// probe an endpoint nothing is serving yet. KIND_CHECKS.runtime is the union those rungs draw from.
+const SERVER_RUNG_CHECKS = ['entry-declared', 'endpoints-served', 'head-observed', 'generation-advanced', 'integration-merged', 'server-pid-owned', 'lease-honoured'];
+export const RUNG_CHECKS = {
+  'stack-up': ['infra-ports-open', 'cors-origin-admitted', 'generation-advanced'],
+  locate: ['checkout-located', 'head-observed', 'generation-advanced'],
+  'start-role': SERVER_RUNG_CHECKS,
+  serve: SERVER_RUNG_CHECKS,
+  restart: SERVER_RUNG_CHECKS,
+  reset: SERVER_RUNG_CHECKS,
+  stop: ['entry-declared', 'generation-advanced', 'server-pid-owned', 'lease-honoured'],
+};
+// A serve that only took a queue position merged nothing and started nothing, so it proves the lease
+// it honoured and the entry it wrote, and nothing about a server it did not touch.
+export const QUEUED_CHECKS = ['entry-declared', 'generation-advanced', 'lease-honoured'];
 export const KIND_CHECKS = {
   observability: ['service-health', 'target-boundary', 'label-boundary', 'remote-write-delivery', 'sample-ordering', 'retry-backoff', 'sensitive-data-filter'],
   sonar: ['service-available', 'project-exists', 'source-revision', 'profile-assigned', 'gate-assigned', 'enforcement-active'],
   tunnel: ['dns-target', 'tunnel-route', 'tls', 'public-https'],
-  runtime: ['entry-declared', 'endpoints-served', 'head-observed', 'generation-advanced'],
+  runtime: [...new Set([...Object.values(RUNG_CHECKS).flat(), ...QUEUED_CHECKS])],
   identity: ['provider-reachable', 'credential-resolvable', 'account-exists', 'account-signs-in', 'no-credential-recorded'],
 };
 export const KIND_CAPABILITIES = {
@@ -38,6 +53,29 @@ export const KIND_CAPABILITIES = {
   tunnel: ['tunnel:write', 'dns:write'],
   runtime: ['runtime:registry-write'],
   identity: ['identity:account-admin'],
+};
+// One rung, one effect. Every rung attests on top of it, because a status nobody probed is an
+// assertion; a reused or queued serve applies no rung effect at all, having started nothing.
+export const RUNG_EFFECTS = {
+  'stack-up': 'bring-up-infra-stack',
+  locate: 'locate-routed-checkouts',
+  'start-role': 'start-role-runtime',
+  serve: 'serve-runtime-head',
+  restart: 'restart-runtime-server',
+  reset: 'reset-runtime-server',
+  stop: 'stop-runtime-server',
+};
+// The rungs that leave a process running, and therefore a pid the entry owns and a head to attest.
+export const RUNGS_THAT_START = new Set(['start-role', 'serve', 'restart', 'reset']);
+// One finding per outcome, so a receipt says which rung it climbed without being read twice.
+export const RUNG_FINDINGS = {
+  'stack-up': 'RUNTIME_RUNG_CLIMBED',
+  locate: 'RUNTIME_RUNG_CLIMBED',
+  'start-role': 'RUNTIME_HEAD_SERVED',
+  serve: 'RUNTIME_HEAD_SERVED',
+  restart: 'RUNTIME_SERVER_RESTARTED',
+  reset: 'RUNTIME_SERVER_RESET',
+  stop: 'RUNTIME_SERVER_STOPPED',
 };
 
 // The two branches that act for one bound project route. Both address the registry entry of that
@@ -60,6 +98,106 @@ function forEachString(value, visit, at = '$') {
 }
 const empty = (v) => v === undefined || v === null || v === '' || v === '—';
 const asList = (v) => (Array.isArray(v) ? v : []);
+
+// The runtime ladder's own law, over the block the delta publishes. One server per route on one fixed
+// port, served from one integration branch: a session gets its commit merged in and the server
+// restarted on the result, or it waits behind the lease. Everything here is a statement the receipt
+// has to make about a process that outlives the branch, because nothing else records it.
+export function runtimeLadderErrors(ladder, { requirements, sessionId, applied, findings }) {
+  const errors = [];
+  const at = 'response/data/delta.json';
+  const started = RUNGS_THAT_START.has(ladder.rung);
+  const queued = ladder.queuePosition !== null;
+  const say = (m) => errors.push(`${at}: ${m}`);
+
+  if (ladder.operation !== ladder.rung) say(`the operation is ${ladder.operation} and the rung recorded is ${ladder.rung}; a rung is the operation it climbed`);
+  if (!empty(requirements.operation) && ladder.operation !== requirements.operation) say(`the ladder climbed ${ladder.operation}, which the request did not ask for`);
+  if (!empty(requirements.routeKey) && ladder.routeKey !== String(requirements.routeKey)) say(`the ladder acts on ${ladder.routeKey}, not on the requested route ${requirements.routeKey}`);
+  if (!empty(requirements.commit) && ladder.wantedCommit !== String(requirements.commit)) say('the wanted commit is not the one the request named');
+  // Isolation: a session writes its own lease and no other session's.
+  if (ladder.sessionId !== null && sessionId && ladder.sessionId !== sessionId) say(`the ladder acts for session ${ladder.sessionId}, and this branch belongs to ${sessionId}`);
+  if (!applied.has('attest-runtime-entry')) say('every rung attests, because a status nobody probed is an assertion');
+
+  const rungEffect = RUNG_EFFECTS[ladder.rung];
+  if (ladder.reused || queued) {
+    if (applied.has(rungEffect)) say(`${rungEffect} was applied although the operation ${ladder.reused ? 'reused the running head' : 'only took a queue position'} and started nothing`);
+  } else if (!applied.has(rungEffect)) say(`the ${ladder.rung} rung applies ${rungEffect}, which this delta never applied`);
+
+  // Idempotent by head: a running server whose head already contains the wanted commit is re-attested
+  // and returned. Restarting a healthy server unasked destroys what the next step was going to measure.
+  if (ladder.rung === 'serve' && ladder.observed.containsWanted && ladder.observed.pidAlive && ladder.observed.probeAnswered && !ladder.reused && !queued) {
+    say('the running head already contained the wanted commit and answered its probe, so serve reuses it rather than restarting a healthy server');
+  }
+  if (ladder.reused) {
+    if (ladder.rung !== 'serve') say(`only serve is idempotent by head; ${ladder.rung} is asked for by name and always acts`);
+    if (!ladder.observed.containsWanted) say('a reused head must be one the running server already contained');
+    if (ladder.server === null || ladder.server.pid !== ladder.observed.pid) say('a reused head keeps the running process: no new pid appears');
+    if (ladder.integration !== null) say('a reused head merged nothing');
+  }
+
+  // The lease is the merge order. One session integrates at a time, and a session that finds the
+  // lease held is queued rather than given a second server.
+  const foreign = ladder.observed.leaseSessionId !== null && ladder.observed.leaseSessionId !== ladder.sessionId;
+  if (foreign && !queued) say(`the lease is held by session ${ladder.observed.leaseSessionId}, so this operation may only queue behind it`);
+  if (queued) {
+    if (!foreign) say('a queue position is recorded only behind a lease another session holds');
+    if (ladder.rung !== 'serve') say(`${ladder.rung} is not a queueing operation`);
+    if (!applied.has('queue-runtime-lease')) say('a queued serve applies queue-runtime-lease and nothing else');
+    if (ladder.server !== null) say('a queued serve touched no server');
+    if (ladder.integration !== null) say('a queued serve merged nothing');
+    if (!findings.has('RUNTIME_LEASE_BUSY')) say('a queued serve records the RUNTIME_LEASE_BUSY finding, which is what the consumer is told to wait on');
+  } else if (applied.has('queue-runtime-lease')) say('queue-runtime-lease belongs to a serve that took a queue position');
+
+  // The server, and the pid a stop is allowed to kill.
+  if (started && !ladder.reused && !queued) {
+    if (ladder.server === null) say(`the ${ladder.rung} rung leaves a running server, and this delta records none`);
+    else {
+      if (ladder.server.previousPid !== ladder.observed.pid) say('the pid replaced must be the pid the entry recorded; a rung never replaces a process it does not own');
+      if (ladder.server.pid === ladder.observed.pid) say('a rung that started a server records a new pid');
+      if (ladder.servedHead === null) say('a rung that started a server records the head it serves');
+    }
+  }
+  if (ladder.rung === 'stop') {
+    if (ladder.server !== null) say('a stopped entry runs no server');
+    if (ladder.lease !== null) say('a stop releases the lease');
+    if (ladder.servedHead !== ladder.observed.head) say('a stop keeps the head the entry served; it is overwritten only by the next merge');
+  }
+  // The merge that produces the served head, and the ancestry the consumers will read.
+  const merged = applied.has('merge-into-integration-branch');
+  if (merged && ladder.integration === null) say('a merge was applied and no integration record says what was merged into what');
+  if (ladder.integration !== null) {
+    if (!merged) say('the integration branch was written without merge-into-integration-branch among the applied effects');
+    if (ladder.integration.conflict) say('a conflicted merge is INTEGRATION_CONFLICT on a blocked branch, never an applied delta');
+    for (const m of ladder.integration.merges) {
+      if (m.mergeCommit === null) say(`the merge of ${m.ref} records no merge commit`);
+      if (m.kind === 'session' && !ladder.contains.includes(m.commit)) say(`commit ${m.commit} was merged and is absent from contains, so no consumer can prove its work is served`);
+    }
+    if (ladder.rung === 'serve' && !ladder.integration.merges.some((m) => m.kind === 'session')) say('a serve merges the asking session branch, and this integration merged none');
+  }
+  if (ladder.wantedCommit !== null && started && !queued && !ladder.contains.includes(ladder.wantedCommit)) say('the wanted commit is not among the commits the served head contains');
+  if (ladder.servedHead !== null && ladder.contains.length === 0) say('a served head contains at least the commit that was merged into it');
+
+  // The rungs below the server.
+  if (ladder.rung === 'stack-up') {
+    if (ladder.infra === null) say('the stack-up rung records the infrastructure it brought up');
+    else for (const s of ladder.infra.services) if (!s.ready) say(`infra service ${s.name} never reached readiness, which is PROVISIONING_UNAVAILABLE and not an applied rung`);
+    if (ladder.server !== null) say('the stack-up rung starts no product server');
+  } else if (ladder.infra !== null) say(`the ${ladder.rung} rung records no infrastructure; only stack-up does`);
+  if (ladder.rung === 'locate') {
+    if (!ladder.locations.length) say('the locate rung records the routed checkouts it resolved');
+    if (ladder.server !== null) say('the locate rung starts no server');
+  }
+  if (ladder.rung === 'start-role') {
+    const role = String(ladder.routeKey).split('/')[1];
+    const here = ladder.locations.find((l) => l.role === role);
+    if (!here) say(`the start-role rung starts the ${role} role and records no routed checkout for it`);
+    else if (here.devCommand === null) say(`the ${role} route publishes no dev command, which is INVALID_INPUT naming the field it lacks`);
+  }
+  const finding = RUNG_FINDINGS[ladder.rung];
+  const expected = ladder.reused ? 'RUNTIME_HEAD_REUSED' : finding;
+  if (!queued && !findings.has(expected)) say(`the receipt records ${expected}, so a reader knows which rung this run climbed`);
+  return errors;
+}
 
 export async function validatePlatformStep(branchDir, root = ROOT) {
   const base = await validateStep(root, branchDir);
@@ -147,13 +285,24 @@ export async function validatePlatformStep(branchDir, root = ROOT) {
     forEachString(delta, (text, at) => { if (credentialLeak(text)) errors.push(`response/data/delta.json: ${at} records a credential, which the receipt refuses`); });
   } else if (response.status === 'done') errors.push('response/data/delta.json: a done branch needs the derived and applied delta');
 
+  // The runtime branch climbs one rung of the ladder, and the rung decides both what it must apply and
+  // what it must prove: a rung below the server cannot probe an endpoint nothing is serving yet.
+  const ladder = delta?.runtimeLadder ?? null;
+  const queuedServe = Boolean(ladder && ladder.queuePosition !== null);
+  if (kind === 'runtime') {
+    if (delta && !ladder) errors.push('response/data/delta.json: the runtime branch records the rung it climbed, and this delta carries no runtimeLadder');
+  } else if (ladder) errors.push(`response/data/delta.json: runtimeLadder belongs to the runtime branch, not to ${kind || 'this'}`);
+  const requiredChecks = kind === 'runtime'
+    ? (ladder ? (queuedServe ? QUEUED_CHECKS : (RUNG_CHECKS[ladder.rung] ?? [])) : [])
+    : (KIND_CHECKS[kind] ?? []);
+
   let findingCount = 0;
   if (checks) {
     if (!empty(service) && checks.serviceRef !== service) errors.push('response/data/checks.json: the proof set names a service the request did not operate');
     if (kind && checks.serviceKind !== kind) errors.push('response/data/checks.json: the proof set names another service kind');
     // The required proof set is the whole set the branch publishes; the caller cannot ask for less.
     const requested = new Set(checks.requiredCheckNames);
-    for (const n of KIND_CHECKS[kind] ?? []) if (!requested.has(n)) errors.push(`response/data/checks.json: the ${kind} branch must require the ${n} check`);
+    for (const n of requiredChecks) if (!requested.has(n)) errors.push(`response/data/checks.json: the ${kind} branch must require the ${n} check`);
     for (const n of requested) if (KIND_CHECKS[kind] && !KIND_CHECKS[kind].includes(n)) errors.push(`response/data/checks.json: check ${n} does not belong to the ${kind} service kind`);
 
     const seen = new Set();
@@ -166,7 +315,7 @@ export async function validatePlatformStep(branchDir, root = ROOT) {
       if (c.status === 'passed') proved.add(c.name);
       else if (response.status === 'done') errors.push(`response/data/checks.json: check ${c.name} failed, so the operation cannot be reported as operated`);
     }
-    if (response.status === 'done') for (const n of KIND_CHECKS[kind] ?? []) if (!proved.has(n)) errors.push(`response/data/checks.json: the ${kind} branch cannot be proved without the ${n} check`);
+    if (response.status === 'done') for (const n of requiredChecks) if (!proved.has(n)) errors.push(`response/data/checks.json: the ${kind} branch cannot be proved without the ${n} check`);
 
     findingCount = checks.findings.length;
     for (const f of checks.findings) {
@@ -226,8 +375,17 @@ export async function validatePlatformStep(branchDir, root = ROOT) {
   // the evidence is the checks the branch publishes, never the status it would like to write.
   if (kind === 'runtime' && checks && response.status === 'done') {
     for (const name of ['endpoints-served', 'head-observed']) {
+      if (!requiredChecks.includes(name)) continue;
       if (!checks.checks.some((c) => c.name === name && c.status === 'passed')) errors.push(`response/data/checks.json: an attested runtime entry needs ${name} passed; a status nobody probed is an assertion`);
     }
+  }
+  if (ladder && delta) {
+    errors.push(...runtimeLadderErrors(ladder, {
+      requirements,
+      sessionId: request?.sessionId ?? null,
+      applied: new Set(delta.appliedEffects),
+      findings: new Set((checks?.findings ?? []).map((f) => f.code)),
+    }));
   }
 
   if (present.has('platform-operation-receipt') && has('response/response.md')) {
