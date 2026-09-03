@@ -63,6 +63,15 @@ thẩm quyền, không bịa hành vi nghiệp vụ, backend, kiến trúc, xác
 publish Grammar dùng chung, không khởi động hay cấu hình lại dịch vụ runtime, và không tuyên bố rằng
 implementation, cổng chất lượng thị giác hay một lượt UAT đã qua.
 
+## Hình là thứ operator tự xét, không chờ yêu cầu
+
+Một tấm hình là quyết định composition như mọi quyết định khác: khi một ứng viên để lại vùng đọc lên
+thấy trống (hero không có chủ thể, empty state chỉ có một câu, hàng card mà chữ không gánh nổi chiều
+rộng), operator thêm hình làm theo đúng một claim của hướng và ghi lý do vào bảng `## Images`. Nó
+không chờ người nói, và cũng không trang trí: vùng mà chữ và Grammar object đã gánh được thì không
+thêm hình, và hình không bao giờ mã hoá claim mà lời hứa nghiệp vụ không hề nêu. Asset và prompt nằm
+dưới `response/artifacts/images/`; `frontend.source.apply` ghi chúng cùng write set đã khai.
+
 ## Context
 
 | Alias | Bind | Bắt buộc |
@@ -109,7 +118,7 @@ implementation, cổng chất lượng thị giác hay một lượt UAT đã qu
 | 6 | Đi tìm tham chiếu ngoài, có giới hạn | `references`, `changeLevel` | @knowledge/ui/composition (khoảng trống mà nghiên cứu phải lấp) | — | `REFERENCE_EVIDENCE_EXHAUSTED` |
 | 7 | Hình thành các phương án | `candidates` | UI contract vừa biên | — | `NO_VIABLE_DIRECTION` |
 | 8 | Áp bộ lọc Grammar | `ownerCeiling` | @grammar/core (component sở hữu gì và có prop nào), @knowledge/grammars/starci | — | `GRAMMAR_REQUIRED` |
-| 9 | Render bằng chứng quyết định | `candidates`, `preview` | các phương án còn sống | `response/artifacts/<candidateId>.html` | — |
+| 9 | Render bằng chứng quyết định và hình đã tự xét | `candidates`, `preview` | các phương án còn sống, @knowledge/grammars/starci | `response/artifacts/<candidateId>.html`, `response/artifacts/images/<slot>.png` | — |
 | 10 | Phản chứng | — | các phương án, đầu vào `business-promise-authority` và `backend-source-application`, `response/data/coverage.json` | — | `NO_VIABLE_DIRECTION` |
 | 11 | Quyết | `selectionPolicy`, `approval` | bảng phản chứng | — | `DIRECTION_CHOICE_REQUIRED` |
 | 12 | Phát | — | mọi thứ ở trên | `response/response.md`, `response/response.json` | — |
@@ -128,6 +137,7 @@ render ra sao.
 | `frontend-direction-decision` | `response/response.md` | md | có |
 | `ui-coverage` | `response/data/coverage.json` | data | có |
 | `candidates` | `response/artifacts/<candidateId>.html` | artifact | không |
+| `direction-image` | `response/artifacts/images/<slot>.png` | artifact | không |
 
 ## Dừng
 

@@ -56,7 +56,7 @@ A summary of what each `operator.json` declares; the validator rejects a row tha
 | `business.decide` | sol-fresh | bounded | no | never | An unfamiliar business model may need reference research before coverage can be frozen |
 | `architecture.decide` | sol-fresh | bounded | no | never | Alternatives and compatibility need evidence beyond the repo; schema pins the model |
 | `backend.source.apply` | opus | never | no | never | Writes inside a frozen contract following patterns/be |
-| `frontend.direction.decide` | sol-fresh | bounded | yes | authority-only | Research only for an unfamiliar domain; renders a page, not a picture |
+| `frontend.direction.decide` | sol-fresh | bounded | yes | judged | Research only for an unfamiliar domain; renders candidates as pages and judges for itself when a region is too empty to stand without an image |
 | `frontend.presentation.resolve` | sonnet | never | yes | never | A lookup against a closed inventory |
 | `frontend.source.apply` | opus | never | yes | never | Writes only what the resolution already contains, following patterns/fe |
 | `frontend.surface.audit` | sol-reviewer | never | yes | never | Browser only, no source write: the auditor cannot repair what it measures |

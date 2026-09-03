@@ -31,7 +31,7 @@ for (const [runtime, group] of Object.entries(agents.runtimes)) {
 
 const GRANTS = ['webSearch', 'imageGeneration', 'browser', 'sourceWrite'];
 const WEB = new Set(['never', 'bounded']);
-const IMAGE = new Set(['never', 'authority-only', 'required']);
+const IMAGE = new Set(['never', 'judged', 'required']);
 
 // Every profile declares every grant explicitly, so a missing key cannot read as "allowed".
 for (const [id, profile] of Object.entries(profiles)) {
@@ -85,12 +85,12 @@ for (const [id, { resources, pinned }] of operators) {
 
   // Policy answers must agree with the grants actually required.
   if (!WEB.has(policy.webSearch)) errors.push(`${id}: policy.webSearch must be never or bounded`);
-  if (!IMAGE.has(policy.imageGeneration)) errors.push(`${id}: policy.imageGeneration must be never, authority-only, or required`);
+  if (!IMAGE.has(policy.imageGeneration)) errors.push(`${id}: policy.imageGeneration must be never, judged, or required`);
   if (typeof policy.grammarBound !== 'boolean') errors.push(`${id}: policy.grammarBound must be true or false`);
   const req = new Set(requires);
   if (policy.webSearch === 'bounded' && !req.has('webSearch')) errors.push(`${id}: bounded web search must appear in requires`);
   if (policy.webSearch === 'never' && req.has('webSearch')) errors.push(`${id}: requires webSearch but policy says never`);
-  if (policy.imageGeneration === 'required' && !req.has('imageGeneration')) errors.push(`${id}: required image generation must appear in requires`);
+  if ((policy.imageGeneration === 'required' || policy.imageGeneration === 'judged') && !req.has('imageGeneration')) errors.push(`${id}: ${policy.imageGeneration} image generation must appear in requires`);
   if (policy.imageGeneration === 'never' && req.has('imageGeneration')) errors.push(`${id}: requires imageGeneration but policy says never`);
 
   // A model an operator's schema pins as a const must be the model of its one profile.

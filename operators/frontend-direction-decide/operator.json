@@ -11,12 +11,13 @@
     "profile": "sol-fresh",
     "requires": [
       "webSearch",
-      "browser"
+      "browser",
+      "imageGeneration"
     ],
     "policy": {
       "webSearch": "bounded",
       "grammarBound": true,
-      "imageGeneration": "authority-only"
+      "imageGeneration": "judged"
     }
   }
 }

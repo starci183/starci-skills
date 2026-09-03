@@ -58,7 +58,7 @@ Bản tóm tắt những gì mỗi `operator.json` khai; validator từ chối d
 | `business.decide` | sol-fresh | giới hạn | không | không | Mô hình kinh doanh lạ có thể cần tra cứu trước khi đóng băng độ phủ |
 | `architecture.decide` | sol-fresh | giới hạn | không | không | Phương án thay thế và tương thích cần bằng chứng ngoài repo; schema đã ghim model |
 | `backend.source.apply` | opus | không | không | không | Ghi trong hợp đồng đã đóng băng, theo patterns/be |
-| `frontend.direction.decide` | sol-fresh | giới hạn | có | chỉ khi có thẩm quyền | Chỉ tra cứu khi lĩnh vực lạ; render một trang, không phải một bức hình |
+| `frontend.direction.decide` | sol-fresh | giới hạn | có | theo gu | Chỉ tra cứu khi lĩnh vực lạ; render ứng viên thành trang và tự xét khi một vùng quá trống, cần hình |
 | `frontend.presentation.resolve` | sonnet | không | có | không | Tra cứu trên một danh sách đóng |
 | `frontend.source.apply` | opus | không | có | không | Chỉ ghi thứ resolution đã chứa, theo patterns/fe |
 | `frontend.surface.audit` | sol-reviewer | không | có | không | Chỉ trình duyệt, không ghi source: người audit không sửa được thứ mình đo |

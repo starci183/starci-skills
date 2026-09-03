@@ -31,3 +31,5 @@ Cái gì còn mở sau bốn bước ấy thì không giải bằng sở thích:
 `DIRECTION_CHOICE_REQUIRED` và về tay chủ sở hữu. Trong đó có mọi hình dạng vắng mặt ở bảng trên, mọi
 cách ghép chỉ nằm ở bảng "mới thấy một lần" của file idiom, và mọi điểm mà tham chiếu với idiom nói
 ngược nhau.
+
+Chốt của owner ngày 2026-09-03 về hình: hướng nào để lại một vùng đọc lên thấy trống thì tự thêm hình làm theo đúng một claim của lời hứa, tự xét và ghi lý do; không bao giờ chờ được yêu cầu và không bao giờ trang trí vùng mà chữ và Grammar object đã gánh được. `frontend.direction.decide` áp điều này trong bảng `## Images` của nó.

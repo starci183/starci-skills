@@ -43,6 +43,12 @@
 | --- | --- | --- |
 | what the reference showed | https://example.com/pattern | what it does not settle; no rows when the person supplied references or the change level is refine |
 
+## Images
+
+| Slot | Why | Claim | File |
+| --- | --- | --- | --- |
+| hero | the region reads empty without a subject | the one claim of the promise the image encodes | `response/artifacts/images/hero.png` |
+
 ## Falsification
 
 | Attack | Candidate | Verdict | Evidence |

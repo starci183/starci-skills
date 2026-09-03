@@ -78,6 +78,11 @@ function responseMd({
 | --- | --- | --- |
 ${refRows.join('\n')}
 
+## Images
+
+| Slot | Why | Claim | File |
+| --- | --- | --- | --- |
+
 ## Falsification
 
 | Attack | Candidate | Verdict | Evidence |

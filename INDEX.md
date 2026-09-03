@@ -1,4 +1,4 @@
-# StarCi Skills 1.0.0
+# StarCi Skills 1.0.2
 
 This tree is the runtime. Read [SKILL.md](SKILL.md) next; it is the single entry that freezes a
 mission's scope, selects the one operator that owns the outcome, and routes between operators on
@@ -61,6 +61,9 @@ head or the head is not publishable.
 - Rule IDs are stable public addresses. Append; never renumber, reuse, or silently change meaning.
 
 ## Lineage
+
+1.0.2 (2026-09-03): every operator is one authored operator.md with a request/response branch layout, JSON kind contracts, an errors registry with dispositions, example workflows, and the frontend.*/backend.source.apply names; 1.0.1 was the dry-run round that exposed the old shape.
+
 
 This tree replaced the v7.6 runtime on 2026-09-02. The complete v7.6 tree, including its 13 skills,
 113 operators, templates, and runtime contracts, is preserved on the `v7` branch of this repository.

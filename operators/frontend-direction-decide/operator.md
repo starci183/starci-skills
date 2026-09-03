@@ -62,6 +62,16 @@ product or authority source, invent business, backend, architecture, authenticat
 data behaviour, publish shared UI Grammar, start or reconfigure runtime services, or claim that an
 implementation, a visual quality gate or a UAT run has passed.
 
+## Images are judged, not requested
+
+An image is a composition decision like any other: when a candidate leaves a region that reads empty
+(a hero without a subject, an empty state with only a sentence, a card row whose copy cannot carry the
+width), the operator adds an image made to one stated claim of the direction and records why, in the
+`## Images` table. It does not wait for a person to ask, and it does not decorate: a region that the
+copy and the Grammar objects already carry gets no image, and an image never encodes a claim the
+business promise did not make. The asset and its prompt land under `response/artifacts/images/`;
+`frontend.source.apply` writes them with the declared write set.
+
 ## Context
 
 | Alias | Bind | Required |
@@ -108,7 +118,7 @@ implementation, a visual quality gate or a UAT run has passed.
 | 6 | Resolve external references, bounded | `references`, `changeLevel` | @knowledge/ui/composition (the gap the research must close) | — | `REFERENCE_EVIDENCE_EXHAUSTED` |
 | 7 | Form the candidates | `candidates` | the compiled UI contract | — | `NO_VIABLE_DIRECTION` |
 | 8 | Apply the Grammar filter | `ownerCeiling` | @grammar/core (what a component owns and which props exist), @knowledge/grammars/starci | — | `GRAMMAR_REQUIRED` |
-| 9 | Render the decision evidence | `candidates`, `preview` | the surviving candidates | `response/artifacts/<candidateId>.html` | — |
+| 9 | Render the decision evidence and the judged images | `candidates`, `preview` | the surviving candidates, `@knowledge/grammars/starci` | `response/artifacts/<candidateId>.html`, `response/artifacts/images/<slot>.png` | — |
 | 10 | Falsify | — | the candidates, inputs `business-promise-authority` and `backend-source-application`, `response/data/coverage.json` | — | `NO_VIABLE_DIRECTION` |
 | 11 | Decide | `selectionPolicy`, `approval` | the falsification table | — | `DIRECTION_CHOICE_REQUIRED` |
 | 12 | Emit | — | everything above | `response/response.md`, `response/response.json` | — |
@@ -127,6 +137,7 @@ nothing about how the result renders.
 | `frontend-direction-decision` | `response/response.md` | md | yes |
 | `ui-coverage` | `response/data/coverage.json` | data | yes |
 | `candidates` | `response/artifacts/<candidateId>.html` | artifact | no |
+| `direction-image` | `response/artifacts/images/<slot>.png` | artifact | no |
 
 ## Stops
 

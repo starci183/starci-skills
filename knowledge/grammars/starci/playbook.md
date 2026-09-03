@@ -32,3 +32,5 @@ Anything still open after those four steps is not resolved by preference: it sto
 `DIRECTION_CHOICE_REQUIRED` and goes to the owner. That includes any shape absent from the table
 above, any composition that appears only in the idioms file's seen-once table, and any point where
 the reference and an idiom disagree.
+
+Owner ruling 2026-09-03 on images: a direction that leaves a region reading empty adds an image made to one claim of the promise, on its own judgement, and records why; it never waits to be asked and never decorates a region the copy and the Grammar objects already carry. `frontend.direction.decide` applies this in its `## Images` table.

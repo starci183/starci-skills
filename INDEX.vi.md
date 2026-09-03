@@ -1,4 +1,4 @@
-# StarCi Skills 1.0.0
+# StarCi Skills 1.0.2
 
 Cây này chính là runtime. Đọc tiếp `SKILL.vi.md` nếu có, hoặc `SKILL.md`; đó là cửa vào duy nhất,
 đóng băng phạm vi của một nhiệm vụ, chọn đúng một operator sở hữu kết quả, rồi định tuyến giữa các
@@ -62,6 +62,9 @@ thì không được publish.
   đổi nghĩa.
 
 ## Dòng dõi
+
+1.0.2 (2026-09-03): mọi operator là một operator.md viết tay với layout nhánh request/response, hợp đồng kind JSON, sổ mã dừng có cách xử lý, workflow mẫu, và tên frontend.* / backend.source.apply; 1.0.1 là vòng chạy khô đã lộ ra dạng cũ.
+
 
 Cây này thay thế runtime v7.6 vào ngày 2026-09-02. Toàn bộ cây v7.6, gồm 13 skill, 113 operator,
 template và các contract runtime, được giữ nguyên trên nhánh `v7` của cùng repository. Tài liệu v8
