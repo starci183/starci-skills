@@ -22,13 +22,19 @@ phán xét một kết quả.
    trước khi tới `git.publish`, và chuỗi nào giao một luồng có người dùng chạm vào cũng vậy, vì một
    bản giao mà không ai nhìn và không ai đi thử thì không phải một bản giao.
 4. Tạo phiên trước khi bất cứ điều gì khác xảy ra. Không có gì được thiết kế, ghi hay commit bên
-   ngoài một phiên: hành động đầu tiên của một nhiệm vụ là thư mục phiên và một `request.json` đã
-   hợp lệ. Trước khi bất kỳ file nào ngoài thư mục phiên bị đọc để sửa, và trước khi bất kỳ file nào
-   ngoài thư mục phiên bị ghi, `<Source>/.worktrees/sessions/<sessionId>/state.json` và
+   ngoài một phiên: hành động đầu tiên của một nhiệm vụ sẽ ghi bất cứ thứ gì, theo đúng thứ tự, là
+   thư mục phiên, nhánh mà chính sách git của route đặt tên cho việc của phiên, rồi một
+   `request.json` đã hợp lệ — không bao giờ là một câu hỏi đặt ra cho người, hỏi có nên mở phiên hay
+   nên làm cái nào trong số đó, vì cây đã trả lời sẵn cả hai, và không bao giờ là việc làm sau khi đã
+   ghi lần đầu. Trước khi bất kỳ file nào ngoài thư mục phiên bị đọc để sửa, và trước khi bất kỳ file
+   nào ngoài thư mục phiên bị ghi, `<Source>/.worktrees/sessions/<sessionId>/state.json` và
    `step-1/parallel-1/request/request.json` đã có trên đĩa và `scripts/validate-request.mjs` xanh
    trên nhánh đó. Một agent phát hiện mình đang sửa hay công bố nguồn được route mà không có
-   `step-N/parallel-M` nào dưới một phiên thì dừng và báo `SESSION_MISSING`; nó không viết phiên
-   sau đó, vì phiên viết sau khi việc đã xong là ghi chép việc chứ không phải chặn việc. Thiết kế
+   `step-N/parallel-M` nào dưới một phiên thì dừng và báo `SESSION_MISSING`. Cách sửa của nó là cố
+   định, không phải một lựa chọn đem hỏi: mở phiên ngay bây giờ, chuyển thay đổi đã ghi sang nhánh mà
+   chính sách git đặt tên cho việc của phiên, rồi chạy các operator còn nợ biên nhận cho nó — đúng
+   cách khắc phục mà chính `SESSION_MISSING` đã nêu — không bao giờ viết phiên sau đó để làm cho quá
+   khứ trông như đã được chặn, vì như vậy là ghi chép việc chứ không phải chặn việc. Thiết kế
    bằng tay rồi commit lên một nhánh phiên trong khi không có phiên nào trên đĩa cũng là đúng vi
    phạm ấy: các phương án không ai thấy, các ảnh chụp không ai chụp và UAT không ai chạy chính là
    những thứ thư mục thiếu kia lẽ ra phải chứa.

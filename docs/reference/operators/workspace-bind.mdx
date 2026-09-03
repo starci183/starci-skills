@@ -141,7 +141,7 @@ workspace, or provisions an account. It makes no product decision and carries no
 | `project` | id | — | The project to bind |
 | `role` | choice | — | `fe` or `be`: the role of that project to bind |
 | `gitPolicy` | list of `{worktreeBranches, mutationBranch}` | the policy the route declaration carries; a declaration that carries none is `INVALID_INPUT` at step 1, never a guessed policy | The branch law this binding is verified against; `forbidden` keeps every write on the mutation branch |
-| `declaredWriteRoots` | list | empty | The only paths later work may write; anything dirty outside them is `CHECKOUT_DIRTY` |
+| `declaredWriteRoots` | list | empty | The only paths later work may write; anything dirty outside them is `CHECKOUT_DIRTY`, and so is anything dirty at all when the checkout sits on the mutation branch rather than a `session/<sessionId>` branch |
 | `runtimeNeed` | choice | none | `none` binds no runtime and skips step 5; `consume` binds the owner's endpoints as a consumer |
 | `resume` | token | null | The blocked branch's token when re-entering after a stop |
 
@@ -164,9 +164,14 @@ records `WORKTREE_<br />ANCH_SESSION_ONLY`, because a policy that opens a write 
 finding a later reader looks for; a redacted conversation head records `PROVENANCE_HEAD_BOUND`, and
 a cached receipt matching the same identity tuple and fingerprints records `CACHED_ROUTE_REUSED`. `mutationReadiness` is
 `ready` when the observed branch is one the routed policy permits a write on — the mutation branch, or
-a `session/<sessionId>` branch under `session-only` — and the working tree is clean outside the
-declared write roots; it is `read-only` in every other case, including a route bound with no declared
-write roots. It is derived here and never accepted from the request, because a readiness a caller can
+a `session/<sessionId>` branch under `session-only` — and the working tree carries nothing this step
+must refuse; it is `read-only` in every other case, including a route bound with no declared write
+roots. The declared write roots exempt dirt only on a `session/<sessionId>` branch, where it is a
+session's expected work in progress; the mutation branch has no in-progress state of its own to
+exempt, so any dirt observed there — inside a declared write root or outside it — is source that was
+written with no session to account for it, and step 4 stops with `CHECKOUT_DIRTY` rather than
+reporting a readiness that would carry the violation forward unrecorded. It is derived here and never
+accepted from the request, because a readiness a caller can
 assert is a readiness nobody measured. A
 resume begins again at step 1, reuses only unchanged fingerprinted observations, and consumes the
 exact delta; a republished route arrives as a new route fingerprint, because the same fingerprint

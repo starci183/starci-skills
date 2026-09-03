@@ -1,4 +1,4 @@
-# StarCi Skills 1.7.8
+# StarCi Skills 1.7.9
 
 Cây này chính là runtime. Đọc tiếp `SKILL.md` (bản tiếng Anh là bản được nạp; `SKILL.vi.md` chỉ để người đọc); đó là cửa vào duy nhất,
 đóng băng phạm vi của một nhiệm vụ, chọn đúng một operator sở hữu kết quả, rồi định tuyến giữa các
@@ -68,6 +68,7 @@ thì không được publish.
 
 ## Dòng dõi
 
+1.7.9 (2026-09-04): mở phiên là hành động đầu tiên của một nhiệm vụ có viết, không phải câu hỏi đặt cho người và không phải việc làm sau lần viết đầu tiên — nhiệm vụ đã lỡ viết ngoài phiên thì mở phiên rồi chuyển việc lên nhánh của nó; một lần bind thấy source chưa commit trên nhánh mutation thì từ chối, dù write root đã khai có phủ nó hay không.
 1.7.8 (2026-09-04): một giá trị niêm phong chỉ được phân giải tại đúng chỗ tiêu thụ — một lệnh chẩn đoán chứng minh tham chiếu phân giải được thì báo kết quả, tên, độ dài hay digest, không bao giờ báo giá trị, và lệnh nào không viết được như vậy thì không chạy; receipt trước đây chỉ có mục fallback nay có mục finding để ghi sự cố ấy.
 1.7.7 (2026-09-04): một lượt đi bộ chỉ là bằng chứng cho thứ nó đã bấm — mỗi khẳng định được chấm trong một capture UAT phải nêu tên control trên bề mặt mà bước đó tác động, nên một bước làm cho việc gì đó xảy ra không qua bề mặt thì không được chấm.
 1.7.6 (2026-09-04): điểm là một lời khẳng định về chính ứng viên được chấm — quyết định khai rõ ứng viên không mang gì, và tiêu chí đã khai là không thoả thì không được chấm ở đầu đạt, cũng không được bỏ trống.

@@ -141,7 +141,7 @@ và không mang phán quyết nào.
 | `project` | id | — | Project cần ràng |
 | `role` | choice | — | `fe` hay `be`: vai của project ấy cần ràng |
 | `gitPolicy` | list `{worktreeBranches, mutationBranch}` | the policy the route declaration carries; a declaration that carries none is `INVALID_INPUT` at step 1, never a guessed policy | Luật nhánh mà binding này được kiểm theo; `forbidden` giữ mọi lần ghi trên nhánh mutation |
-| `declaredWriteRoots` | list | empty | Những đường dẫn duy nhất mà việc sau được ghi; bẩn ngoài chúng là `CHECKOUT_DIRTY` |
+| `declaredWriteRoots` | list | empty | Những đường dẫn duy nhất mà việc sau được ghi; bẩn ngoài chúng là `CHECKOUT_DIRTY`, và bẩn bất kỳ khi checkout đang ở nhánh mutation thay vì nhánh `session/<sessionId>` cũng vậy |
 | `runtimeNeed` | choice | none | `none` không ràng runtime và bỏ qua bước 5; `consume` ràng endpoint của chủ với vai tiêu thụ |
 | `resume` | token | null | Token của nhánh bị chặn khi vào lại sau một mã dừng |
 
@@ -162,9 +162,13 @@ Bước 5 không tính lại gì cả: fingerprint endpoint hoặc khớp phép 
 một chính sách mở ra đường ghi đúng là phát hiện mà người đọc sau đi tìm; một head hội thoại đã che ghi `PROVENANCE_HEAD_BOUND`, và một biên nhận Đặt là `session-only` thì route ràng trên nhánh mutation hoặc trên nhánh worktree
 `session/<sessionId>`, hình dạng duy nhất mà operator ghi source được commit lên;
 cache khớp cùng bộ định danh và fingerprint ghi `CACHED_ROUTE_REUSED`. `mutationReadiness` là `ready` khi nhánh quan sát được là nhánh mà chính sách được route cho phép ghi
-lên — nhánh mutation, hoặc một nhánh `session/<sessionId>` dưới `session-only` — và cây làm việc sạch
-ngoài các gốc ghi đã khai; mọi trường hợp khác là `read-only`, kể cả một route ràng mà không khai gốc
-ghi nào. Nó được suy ra ở đây và không bao giờ nhận từ request, vì một mức sẵn sàng mà người gọi khẳng
+lên — nhánh mutation, hoặc một nhánh `session/<sessionId>` dưới `session-only` — và cây làm việc không
+mang thứ gì bước này phải từ chối; mọi trường hợp khác là `read-only`, kể cả một route ràng mà không
+khai gốc ghi nào. Các gốc ghi đã khai chỉ miễn trừ vết bẩn trên một nhánh `session/<sessionId>`, nơi
+đó là việc dở dang mà một phiên vốn phải có; nhánh mutation không có trạng thái dở dang nào của riêng
+nó để miễn trừ, nên bất kỳ vết bẩn nào thấy ở đó — trong một gốc ghi đã khai hay ngoài nó — đều là
+source được ghi mà không có phiên nào chịu trách nhiệm, và bước 4 dừng với `CHECKOUT_DIRTY` thay vì
+báo một mức sẵn sàng sẽ mang vi phạm đi tiếp mà không ghi lại. Nó được suy ra ở đây và không bao giờ nhận từ request, vì một mức sẵn sàng mà người gọi khẳng
 định được là một mức sẵn sàng không ai đo. Chạy lại thì bắt đầu lại từ
 bước 1, chỉ dùng lại quan sát có fingerprint không đổi, và tiêu thụ đúng phần delta; một route
 publish lại tới dưới dạng một fingerprint route mới, vì cùng một fingerprint không thể cho một ràng

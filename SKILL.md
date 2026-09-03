@@ -28,16 +28,22 @@ result.
    chain that delivers any user-facing flow does the same, because a delivery nobody looked at and
    nobody walked through is not a delivery.
 4. Create the session before anything else happens. Nothing is designed, written or committed outside
-   a session: the first act of a mission is the session folder and a validated `request.json`. Before
-   any file outside the session folder is read in order to change it, and before any file outside the
-   session folder is written, `<Source>/.worktrees/sessions/<sessionId>/state.json` and
+   a session: the first act of a mission that will write anything is, in order, the session folder,
+   the branch the route's git policy names for session work, and a validated `request.json` — never a
+   question put to a person about whether to open one or which of those to do, because the tree has
+   already answered both, and never something done after the first write. Before any file outside the
+   session folder is read in order to change it, and before any file outside the session folder is
+   written, `<Source>/.worktrees/sessions/<sessionId>/state.json` and
    `step-1/parallel-1/request/request.json` exist on disk and `scripts/validate-request.mjs` is green
    on that branch. An agent that finds itself editing routed source, or publishing it, with no
-   `step-N/parallel-M` under a session stops and reports `SESSION_MISSING`; it does not write the
-   session afterwards, because a session written after the work records the work instead of gating
-   it. Designing by hand and committing on a session branch with no session on disk is the same
-   violation as writing with no request: the candidates nobody saw, the screenshots nobody took and
-   the UAT nobody ran are exactly what the missing folder was supposed to hold.
+   `step-N/parallel-M` under a session stops and reports `SESSION_MISSING`. Its repair is fixed, not a
+   choice to surface: open the session now, move the already-written change onto the branch its git
+   policy names for session work, and run the operators that owe the receipt for it — the same
+   recovery `SESSION_MISSING` itself states — never write the session afterwards to make the past look
+   gated, because that records the work instead of gating it. Designing by hand and committing on a
+   session branch with no session on disk is the same violation as writing with no request: the
+   candidates nobody saw, the screenshots nobody took and the UAT nobody ran are exactly what the
+   missing folder was supposed to hold.
 5. Select the first operator of that chain. Read only that operator's `operator.md` and
    `operator.json`.
 6. Run that operator, end to end, on the one profile its `operator.json` names under `resources`, with

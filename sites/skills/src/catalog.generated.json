@@ -1,6 +1,6 @@
 {
-  "version": "1.7.8",
-  "lineageNote": "1.7.8 (2026-09-04): a sealed value is resolved only where it is consumed — a diagnostic that proves a reference resolves reports the outcome, the name, a length or a digest, never the value, and one that cannot be written that way is not run; a receipt that had only a fallback section now has a finding section to record the lapse in.",
+  "version": "1.7.9",
+  "lineageNote": "1.7.9 (2026-09-04): opening a session is the first act of a mission that writes, never a question put to a person and never something done after the first write — a mission that has already written outside a session opens one and moves the work onto its branch; a bind that finds uncommitted source on the mutation branch refuses, whether or not a declared write root covers it.",
   "entry": {
     "name": "starci",
     "description": "Complete one StarCi mission by freezing its scope, selecting the one operator that owns the outcome, and routing between operators on typed results until the outcome is proved or a person must decide.",
@@ -2858,7 +2858,7 @@
           "code": "CHECKOUT_DIRTY",
           "disposition": "terminate",
           "domain": "source",
-          "meaning": "Something is dirty outside the declared write roots.",
+          "meaning": "Something is dirty outside the declared write roots, or the checkout carries any dirt at all while sitting on the mutation branch rather than a session/<sessionId> branch: the mutation branch has no in-progress state of its own, so dirt found there is source written with no session to account for it, session-only policy or not.",
           "shared": false
         },
         {
@@ -3938,9 +3938,9 @@
       "shared": false,
       "domain": "source",
       "disposition": "terminate",
-      "meaning": "Something is dirty outside the declared write roots.",
+      "meaning": "Something is dirty outside the declared write roots, or the checkout carries any dirt at all while sitting on the mutation branch rather than a session/<sessionId> branch: the mutation branch has no in-progress state of its own, so dirt found there is source written with no session to account for it, session-only policy or not.",
       "fallback": null,
-      "resume": "Clean the boundary, or declare the write roots that cover it; this operator never stashes."
+      "resume": "Clean the boundary, or declare the write roots that cover it when the checkout is already on a session/<sessionId> branch; on the mutation branch the repair is to open the session and move the change onto its branch, not to declare a write root over it — this operator never stashes."
     },
     {
       "code": "CHOICE_REQUIRED",

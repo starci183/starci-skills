@@ -54,12 +54,12 @@
       "domain": "source",
       "disposition": "terminate",
       "meaning": {
-        "en": "Something is dirty outside the declared write roots.",
-        "vi": "Có thứ đang bẩn ngoài các write root đã khai báo."
+        "en": "Something is dirty outside the declared write roots, or the checkout carries any dirt at all while sitting on the mutation branch rather than a session/<sessionId> branch: the mutation branch has no in-progress state of its own, so dirt found there is source written with no session to account for it, session-only policy or not.",
+        "vi": "Có thứ đang bẩn ngoài các write root đã khai báo, hoặc checkout mang bất kỳ vết bẩn nào trong khi đang ở nhánh mutation thay vì nhánh session/<sessionId>: nhánh mutation không có trạng thái dở dang của riêng nó, nên vết bẩn thấy ở đó là source được ghi mà không có phiên nào chịu trách nhiệm, dù chính sách có là session-only hay không."
       },
       "resume": {
-        "en": "Clean the boundary, or declare the write roots that cover it; this operator never stashes.",
-        "vi": "Dọn sạch ranh giới, hoặc khai báo write root bao được nó; operator này không bao giờ stash."
+        "en": "Clean the boundary, or declare the write roots that cover it when the checkout is already on a session/<sessionId> branch; on the mutation branch the repair is to open the session and move the change onto its branch, not to declare a write root over it — this operator never stashes.",
+        "vi": "Dọn sạch ranh giới, hoặc khai báo write root bao được nó khi checkout đã ở nhánh session/<sessionId>; trên nhánh mutation, cách sửa là mở phiên và chuyển thay đổi sang nhánh của phiên đó, không phải khai báo write root đè lên nó — operator này không bao giờ stash."
       }
     },
     "ENDPOINT_AUTHORITY_STALE": {
