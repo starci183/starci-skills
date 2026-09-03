@@ -1,6 +1,6 @@
 # StarCi Core — DNA
 
-`@starci/grammar@0.4.0` · checkout `14e0c20f4746ae08f00a84a4eac18aa78ded987b` · generated 2026-09-02
+`@starci/grammar@0.4.0` · checkout `14e0c20f4746ae08f00a84a4eac18aa78ded987b` · generated 2026-09-03
 
 This file is generated from the live `@starci/grammar` package, never written by hand: identity, tokens, renderers, published props, `data-contract` claims, and emitted classes are read out of `src/`, and the gap list is copied from the `## Gaps` table in [Family and DNA](family.md). Prime a direction agent with this file: it says what exists. [Idioms](idioms.md) says how StarCi composes it, and [Playbook](playbook.md) says which idioms a business shape needs. Regenerate with `node scripts/generate-grammar-dna.mjs`, and verify with `--check`; it needs the routed FE checkout, so it is not part of `npm test`.
 
@@ -15,7 +15,7 @@ This file is generated from the live `@starci/grammar` package, never written by
 | Root component | `CoreGrammarRoot` |
 | Family scope | `data-grammar-family="core"` |
 | Style entrypoint | `@starci/grammar/core/styles.css` |
-| Counts | 41 renderers · 59 tokens · 97 claim entries · 13 gaps |
+| Counts | 41 renderers · 59 tokens · 97 claim entries · 17 gaps |
 
 ## Tokens
 
@@ -144,3 +144,7 @@ This file is generated from the live `@starci/grammar` package, never written by
 | `MediaFrame` | `MediaFrame` publishes no loading or error prop and renders no state | `packages/grammar/src/core/primitive/MediaFrame/index.tsx` |
 | `OtpInput` | `OtpInput` publishes `disabled` and `invalid` (not the `isDisabled`/`isError` names) and no skeleton input, so its unresolved state has no owner | `packages/grammar/src/core/OtpInput.tsx` |
 | `OtpInput` | `OtpInput` publishes no `label`, `hint`, or `errorMessage` slot; only `describedBy` links outside text, so its visible identity has no Common owner | `packages/grammar/src/core/OtpInput.tsx` |
+| `StaticStateRow` | claims `GAP-2 PADDING-2` while its CSS sets `gap: .75rem` (GAP-3) and `padding: 1rem` (PADDING-4); the compact `.5rem` gap exists only under a container query, so the published claim does not match the rendered value | `packages/grammar/src/core/composite/StaticStateRow/index.tsx`; `packages/grammar/src/common/styles.css` (`.starci-core-static-row`) |
+| `SurfaceAccordionCard` | the trigger claims `PADDING-4 PADDING-3` while `.starci-core-accordion-trigger` sets `padding: 1rem` only, so PADDING-3 has no rendered form | `packages/grammar/src/core/branch/SurfaceAccordionCard/index.tsx`; `packages/grammar/src/common/styles.css` (`.starci-core-accordion-trigger`) |
+| `HorizontalScrollRegion`, `VerticalScrollRegion` | both render a bare `ScrollShadow` with no class and no claim; `.starci-core-horizontal-scroll-region` (padding-block, max-content children, overscroll containment) is applied by callers, so the region owns nothing an audit can measure | `packages/grammar/src/core/composite/HorizontalScrollRegion/index.tsx`; `packages/grammar/src/core/composite/VerticalScrollRegion/index.tsx`; `packages/grammar/src/common/styles.css` (`.starci-core-horizontal-scroll-region`) |
+| `SectionHeader` | the root gap (`1.5rem`, GAP-5) and the copy column gap (`0.375rem`, off the scale) carry no claim; only the title carries `MARGIN-0 FLOW-3`, so the header spacing has no published owner | `packages/grammar/src/core/composite/SectionHeader/index.tsx`; `packages/grammar/src/common/styles.css` (`.starci-core-section-header`, `.starci-core-section-header-copy`) |

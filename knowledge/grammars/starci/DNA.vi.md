@@ -1,6 +1,6 @@
 # StarCi Core — DNA
 
-`@starci/grammar@0.4.0` · checkout `14e0c20f4746ae08f00a84a4eac18aa78ded987b` · sinh ngày 2026-09-02
+`@starci/grammar@0.4.0` · checkout `14e0c20f4746ae08f00a84a4eac18aa78ded987b` · sinh ngày 2026-09-03
 
 File này được sinh ra từ package `@starci/grammar` đang chạy, không viết tay: danh tính, token, renderer, prop công bố, claim `data-contract` và class phát ra đều đọc thẳng từ `src/`, còn danh sách gap được chép từ bảng `## Gap` trong [Family và DNA](family.vi.md). Hãy mồi cho agent định hướng bằng đúng file này: nó nói cái gì đang tồn tại. [Idiom](idioms.vi.md) nói StarCi ghép chúng ra sao, còn [Playbook](playbook.vi.md) nói hình dạng nghiệp vụ nào cần chuỗi idiom nào. Sinh lại bằng `node scripts/generate-grammar-dna.mjs`, kiểm bằng `--check`; lệnh này cần checkout FE đã định tuyến nên không nằm trong `npm test`.
 
@@ -15,7 +15,7 @@ File này được sinh ra từ package `@starci/grammar` đang chạy, không v
 | Component gốc | `CoreGrammarRoot` |
 | Phạm vi family | `data-grammar-family="core"` |
 | Điểm vào CSS | `@starci/grammar/core/styles.css` |
-| Số đếm | 41 renderer · 59 token · 97 mục claim · 13 gap |
+| Số đếm | 41 renderer · 59 token · 97 mục claim · 17 gap |
 
 ## Token
 
@@ -144,3 +144,7 @@ File này được sinh ra từ package `@starci/grammar` đang chạy, không v
 | `MediaFrame` | `MediaFrame` không công bố prop loading hay error và không render state nào | `packages/grammar/src/core/primitive/MediaFrame/index.tsx` |
 | `OtpInput` | `OtpInput` công bố `disabled` và `invalid` (không phải tên `isDisabled`/`isError`) và không có đầu vào skeleton, nên state chưa phân giải của nó không có owner | `packages/grammar/src/core/OtpInput.tsx` |
 | `OtpInput` | `OtpInput` không công bố slot `label`, `hint` hay `errorMessage`; chỉ `describedBy` nối tới chữ bên ngoài, nên danh tính nhìn thấy của nó không có owner Common | `packages/grammar/src/core/OtpInput.tsx` |
+| `StaticStateRow` | claim `GAP-2 PADDING-2` trong khi CSS đặt `gap: .75rem` (GAP-3) và `padding: 1rem` (PADDING-4); gap gọn `.5rem` chỉ có dưới một container query, nên claim đã publish không khớp giá trị render | `packages/grammar/src/core/composite/StaticStateRow/index.tsx`; `packages/grammar/src/common/styles.css` (`.starci-core-static-row`) |
+| `SurfaceAccordionCard` | trigger claim `PADDING-4 PADDING-3` trong khi `.starci-core-accordion-trigger` chỉ đặt `padding: 1rem`, nên PADDING-3 không có hình dạng render nào | `packages/grammar/src/core/branch/SurfaceAccordionCard/index.tsx`; `packages/grammar/src/common/styles.css` (`.starci-core-accordion-trigger`) |
+| `HorizontalScrollRegion`, `VerticalScrollRegion` | cả hai chỉ render một `ScrollShadow` trần, không class, không claim; `.starci-core-horizontal-scroll-region` (padding-block, con max-content, chặn overscroll) do nơi gọi áp vào, nên vùng cuộn không sở hữu thứ gì audit đo được | `packages/grammar/src/core/composite/HorizontalScrollRegion/index.tsx`; `packages/grammar/src/core/composite/VerticalScrollRegion/index.tsx`; `packages/grammar/src/common/styles.css` (`.starci-core-horizontal-scroll-region`) |
+| `SectionHeader` | gap gốc (`1.5rem`, GAP-5) và gap cột copy (`0.375rem`, ngoài thang) không mang claim; chỉ tiêu đề mang `MARGIN-0 FLOW-3`, nên khoảng cách của header không có chủ đã publish | `packages/grammar/src/core/composite/SectionHeader/index.tsx`; `packages/grammar/src/common/styles.css` (`.starci-core-section-header`, `.starci-core-section-header-copy`) |
