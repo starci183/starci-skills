@@ -50,6 +50,14 @@ từ gốc phiên tới file mà một nhánh trước đã sinh — và `resume
 
 ## 6. Layout nhánh
 
+Không có gì được thiết kế, ghi hay commit bên ngoài một phiên: hành động đầu tiên của một nhiệm vụ là
+thư mục phiên và một `request.json` đã hợp lệ. Trước khi bất kỳ file nào ngoài thư mục phiên bị đọc để
+sửa, và trước khi bất kỳ file nào ngoài thư mục phiên bị ghi, `state.json` và
+`step-1/parallel-1/request/request.json` đã có và `validate-request` xanh trên chúng. Một agent phát
+hiện mình đang sửa hay công bố nguồn được route mà không có `step-N/parallel-M` nào dưới một phiên thì
+dừng với `SESSION_MISSING` và báo lại — nó không viết phiên sau đó, vì một phiên viết sau khi việc đã
+xong là ghi chép việc chứ không phải chặn việc.
+
 Gốc phiên là `<Source>/.worktrees/sessions/<sessionId>/`, với `state.json` nằm cạnh các bậc. Một
 nhánh là `step-<N>/parallel-<M>/`, và `parallel-1` luôn tồn tại:
 
@@ -103,7 +111,35 @@ không mang thêm bằng chứng, ràng buộc, kiểm kê hay phê duyệt mớ
 `SKILL.md` nói rõ điều đó nghĩa là gì: cùng một input đã đâm vào cùng một bức tường, hãy báo bức
 tường thay vì thử lại.
 
-## 10. Kết thúc phiên
+## 10. Khi nào UAT chạy
+
+`uat.verify` lái một sản phẩm thật như một người thật, và nó là bằng chứng duy nhất không suy ra được
+từ bất cứ thứ gì khác, nên đáng nói thẳng khi nào nó chạy và khi nào sự vắng mặt của nó là thành thật.
+
+Nó chỉ chạy trong một workflow có bước `uat.verify` — sau vòng này là mọi ví dụ có ghi source frontend
+dưới `mode: apply`: `frontend-refine`, `frontend-reconstruct`, `frontend-new-surface`,
+`frontend-with-uat` và `full-feature`. `backend-feature` không ghi bề mặt nào và `when` của nó nói rõ
+điều đó; `release` và `content-unit` cũng không publish bề mặt nào.
+
+Trong một chuỗi như vậy nó vẫn chỉ chạy khi tất cả những thứ sau đã có:
+
+- một người đã yêu cầu, đích danh — `requestedBy`, `feature` và `flow` không có mặc định và workflow
+  khai chúng dưới `asks`, nên nhánh thà từ chối chứ không bịa ra người yêu cầu;
+- thư mục flow: `uat/<flow>/flow.md` với các case và assertion có tên của chúng,
+  `uat/<flow>/account.json` với username, role và *tên* credential, và `uat/<flow>/seed/` với các bản
+  ghi mà lượt chạy đặt namespace;
+- mật khẩu dùng chung đã niêm, tra theo tên trong sổ credential lúc đăng nhập và không đọc ở đâu khác
+  — không field nào của operator này chứa được bí mật, và validator của nó bác mọi chuỗi có hình dạng
+  credential ở bất cứ đâu nó ghi;
+- cả hai giấy thông hành lấy tại commit đã ghim — `frontend-surface-audit` và `quality-verification` —
+  cộng biên nhận `route` mà lượt chạy lái vào endpoint của nó.
+
+Thiếu thứ gì cũng là một lần dừng chứ không phải một sự im lặng: không người yêu cầu hay thiếu giấy
+thông hành là `INVALID_INPUT` ngay ở cổng request, không có credential đã niêm là
+`PROVISIONING_UNAVAILABLE`, và không có gì phục vụ sản phẩm là `RUNTIME_UNAVAILABLE`. Một nhiệm vụ
+không tới được UAT phải nói ra được nó vướng cái nào.
+
+## 11. Kết thúc phiên
 
 Thư mục phiên do orchestrator tạo trước khi agent đầu tiên khởi động và bị xoá khi `git.publish` xong
 việc. Thứ sống sót là những gì các bậc đã publish — commit, business head, cặp UAT, các lần chạy từ

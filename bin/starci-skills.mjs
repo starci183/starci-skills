@@ -24,6 +24,7 @@ const pkg = JSON.parse(readFileSync(path.join(packageRoot, 'package.json'), 'utf
 // What an installed tree is made of. Only these paths are copied, hashed and updated; anything else
 // a person adds beside them (a tests/ folder, notes) is theirs and is never touched.
 export const PAYLOAD = [
+  'UPDATE.md', 'UPDATE.vi.md',
   'INDEX.md', 'INDEX.vi.md', 'SKILL.md', 'SKILL.vi.md', 'routing.json',
   'alias', 'knowledge', 'operators', 'readiness', 'resources', 'scripts', 'templates', 'workflows',
 ];
@@ -38,6 +39,9 @@ Before planning, reading target source, or running a skill, read
 \`<Source>\` is the single host repository that owns this bootstrap and the \`.claude\` runtime. A routed
 repository checkout or Git worktree follows that Source; do not rebind \`<Source>\` to it or expect it to
 contain another \`.claude/INDEX.md\`.
+
+Nothing is designed, written or committed outside a session: the first act of a mission is the session
+folder and a validated request.json.
 
 This file is only a bootstrap. Do not copy context, brainstorm, compiler, gate or skill rules into it:
 the entry routes, and a rule copied here becomes a second home that nobody remembers to update.

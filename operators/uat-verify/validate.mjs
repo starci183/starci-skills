@@ -15,6 +15,24 @@ import { tableUnder } from '../../scripts/validate-response.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 const LANES = ['behavior', 'ux', 'ui'];
+// knowledge/ui/proof/ux.md: UX-1..UX-11 are the scored criteria and UX-12 is the arithmetic over
+// them. `ship` needs no failure on the five criteria that strand a person mid-task, and a mean of at
+// least 4; anything else is `fix-first`. The gate carries the shape, never a second copy of the law.
+export const UX_RULES = Array.from({ length: 11 }, (_, i) => `UX-${i + 1}`);
+const UX_GATES = new Set(['UX-1', 'UX-3', 'UX-4', 'UX-6', 'UX-7']);
+export function uxVerdict(rows) {
+  const mean = rows.reduce((sum, r) => sum + Number(r.score), 0) / rows.length;
+  const gated = rows.some((r) => r.verdict === 'fail' && UX_GATES.has(r.rule));
+  return { mean, verdict: !gated && mean >= 4 ? 'ship' : 'fix-first' };
+}
+const sectionText = (text, heading) => {
+  const lines = text.split(/\r?\n/);
+  const from = lines.findIndex((l) => l.trimEnd() === heading);
+  if (from === -1) return '';
+  const rest = lines.slice(from + 1);
+  const next = rest.findIndex((l) => l.startsWith('## '));
+  return (next === -1 ? rest : rest.slice(0, next)).join('\n');
+};
 const ADMISSIONS = ['frontend-surface-audit', 'quality-verification'];
 // The password placeholder this operator's self-test injects, plus any inline assignment of one. The
 // shared UAT password is resolved by name at login; a run that wrote it anywhere failed its custody.
@@ -166,8 +184,57 @@ export async function validateUatStep(branchDir, root = ROOT) {
         if (!entry) { errors.push(`response/response.md: Lanes names ${lane}, which the verdicts do not`); continue; }
         if (entry.verdict !== verdict) errors.push(`response/response.md: the ${lane} lane reads ${verdict} but the verdicts say ${entry.verdict}`);
       }
+      // The experience lane is scored, not asserted: ## Experience reads what the lens carries, and
+      // ## Verdict carries the one row this operator owns.
+      const lens = verdicts.experience;
+      if (lens) {
+        const rows = tableUnder(text, '## Experience') ?? [];
+        if (rows.length !== lens.entries.length) errors.push(`response/response.md: Experience has ${rows.length} rows, the lens scores ${lens.entries.length} criteria`);
+        for (const [rule, measured, score, rowVerdict] of rows) {
+          const scored = lens.entries.find((e) => `\`${e.rule}\`` === rule || e.rule === rule.replaceAll('\`', ''));
+          if (!scored) { errors.push(`response/response.md: Experience names ${rule}, which the lens does not score`); continue; }
+          if (Number(score) !== scored.score) errors.push(`response/response.md: ${rule} scores ${score} here and ${scored.score} in the verdicts`);
+          if (rowVerdict !== scored.verdict) errors.push(`response/response.md: ${rule} is ${rowVerdict} here and ${scored.verdict} in the verdicts`);
+          if (measured !== scored.measured) errors.push(`response/response.md: ${rule} is scored on "${measured}", which the run did not measure`);
+        }
+        const section = sectionText(text, '## Experience');
+        const mean = /^- Mean: (\d+(?:\.\d+)?)$/m.exec(section);
+        if (!mean) errors.push('response/response.md: Experience closes with no "- Mean: <number>" line');
+        else if (Math.abs(Number(mean[1]) - Number(lens.mean)) > 0.005) errors.push(`response/response.md: Experience records a mean of ${mean[1]}; the verdicts record ${lens.mean}`);
+        const verdictRows = tableUnder(text, '## Verdict') ?? [];
+        const row = verdictRows.find(([topic]) => topic.replaceAll('\`', '') === 'experience');
+        if (!row) errors.push('response/response.md: Verdict carries no experience row; it is the one topic this operator closes');
+        else {
+          if (row[1] !== lens.verdict) errors.push(`response/response.md: Verdict records ${row[1]} for experience; the verdicts record ${lens.verdict}`);
+          if (row[2] !== lens.routeTo) errors.push(`response/response.md: Verdict routes experience to ${row[2]}; the verdicts route it to ${lens.routeTo}`);
+        }
+      }
     }
   } else if (decided) errors.push('response/response.md: a done branch needs the verification receipt');
+
+  // UX-12 computes the experience lane; a receipt may publish it and may not assert it.
+  if (verdicts?.experience) {
+    const lens = verdicts.experience;
+    const at = 'response/data/verdicts.json';
+    const seen = new Map();
+    for (const row of lens.entries) {
+      if (seen.has(row.rule)) errors.push(`${at}: the experience lane scores ${row.rule} twice`);
+      seen.set(row.rule, row);
+      if (!UX_RULES.includes(row.rule)) errors.push(`${at}: the experience lane scores ${row.rule}, which is not one of the eleven scored criteria (UX-12 is the arithmetic and is not itself scored)`);
+      if (row.verdict === 'fail' && row.routeTo === 'none') errors.push(`${at}: the experience lane fails ${row.rule} and routes nowhere`);
+      if (row.verdict === 'pass' && row.routeTo !== 'none') errors.push(`${at}: the experience lane passes ${row.rule} and still routes to ${row.routeTo}`);
+    }
+    for (const rule of UX_RULES) if (!seen.has(rule)) errors.push(`${at}: the experience lane leaves ${rule} unscored; the lane is incomplete until every criterion carries a measurement`);
+    if (UX_RULES.every((r) => seen.has(r)) && seen.size === UX_RULES.length) {
+      const computed = uxVerdict(UX_RULES.map((r) => seen.get(r)));
+      if (Math.abs(Number(lens.mean) - computed.mean) > 0.005) errors.push(`${at}: the experience lane records a mean of ${lens.mean}; the eleven scores average ${computed.mean.toFixed(2)}`);
+      if (lens.verdict !== computed.verdict) errors.push(`${at}: the experience lane records ${lens.verdict}; UX-12 makes it ${computed.verdict}`);
+    }
+    const uxLane = verdicts.lanes?.find((l) => l.lane === 'ux');
+    if (uxLane && uxLane.verdict !== (lens.verdict === 'ship' ? 'pass' : 'fail')) {
+      errors.push(`${at}: the ux lane reads ${uxLane.verdict} while UX-12 made the experience lens ${lens.verdict}`);
+    }
+  }
 
   // Custody is proved on the written bytes, not asserted in prose.
   const scanned = ['response/response.md', 'response/response.json', 'response/data/snapshot.json', 'response/data/verdicts.json', ...asList(response.fields?.['uat-capture'])];

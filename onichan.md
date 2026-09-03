@@ -214,3 +214,181 @@ nên ghi ở đây.
   `folder.md` vẫn nêu tên repo và cả đường dẫn Windows tuyệt đối. Chúng có từ trước phiên này và là
   phần khai xuất xứ của cả nhóm `patterns/fe`, không phải text của rule; sửa là phải làm lại mô hình
   xuất xứ của cả nhóm. Trò để nguyên và báo.
+
+### Session-first (từ phiên Codex nivo overview)
+
+Thầy hỏi vì sao không có gì cho thầy xem phương án đã trực quan hoá, ảnh chụp kèm phê phán, hay luồng
+UAT. Trò đi kiểm và câu trả lời gọn hơn trò tưởng: **chưa từng có phiên nào.**
+`.worktrees/sessions/20260903-nivo-overview-core042/` chỉ có một thư mục `checkout` — mà thư mục ấy
+còn không phải worktree của repo được route: nó chứa `apps/` với `node_modules/`, và
+`git rev-parse --show-toplevel` từ trong đó rơi về chính repo Source. Không `state.json`, không
+`step-N/parallel-M`, không request, không response, không `coverage.json`, không `<candidateId>.html`,
+không `captures/`, không `verdicts.json`, không `<matrixId>.png`, không gì thuộc `uat/`. Nhánh
+`session/20260903-nivo-overview-core042` cũng không còn trong `nivo-fe`, trong khi hai phiên anh em
+cùng ngày vẫn là worktree thật trên nhánh thật.
+
+Rollout (13.148.356 byte) cho thấy agent **không hề thiếu thông tin**: `20260903-nivo-overview-core042`
+300 lần, `response.json` 182, `request.json` 181, `operator.md` 145, `sessionId` 135,
+`frontend.direction.decide` 86, `state.json` 53, `validate-request`/`validate-response` 22/22,
+`candidateId` 8, `@tools/visualize` 4 — rồi `step-1/parallel-1` đúng 5 lần, validator chạy 0 lần,
+trang phương án render 0, và `git commit` 1. Nó tường thuật runtime rồi làm việc bên cạnh runtime.
+
+**Vì sao không cổng nào kêu.** Cả bốn validator đều nhận một thư mục nhánh làm tham số. Không có nhánh
+thì không có gì để chỉ chúng vào; chúng báo được request *sai*, không báo được request *thiếu*. Còn
+luật của `git.publish` cho tới hôm nay chỉ nói về lần publish — boundary, phê duyệt, hook, mode, head,
+tag, dọn dẹp — không một dòng nào hỏi nhánh nó đang merge có từng được cái gì sinh ra. Và câu trong
+`orchestrator.json` (`create: the orchestrator writes state.json …`) là **mô tả việc orchestrator
+làm**, không phải **tiền điều kiện lên việc agent được phép làm**. Bỏ qua câu ấy không phá vỡ thứ gì
+đo được. Zero phát hiện trong khi việc sai hoàn toàn — đúng cái hình dạng thầy vẫn bảo là đáng ngờ.
+
+**Trò đã vá, bằng luật có mã đứng sau, không phải bằng lời khuyên.**
+
+- **Phiên là hành động đầu tiên** (`SKILL.md` Chuẩn bị bước 4, `orchestrator.json`
+  `session.lifecycle.create`): trước khi bất kỳ file nào ngoài thư mục phiên bị đọc để sửa hay bị ghi,
+  `state.json` và `step-1/parallel-1/request/request.json` đã có và `validate-request` xanh. Và trò
+  đưa đúng một câu vào **bootstrap** mà `bin/starci-skills.mjs` ghi ra `CLAUDE.md`/`AGENTS.md` —
+  *Nothing is designed, written or committed outside a session: the first act of a mission is the
+  session folder and a validated request.json* — vì đó là chữ đầu tiên mọi agent đọc, kể cả agent
+  không bao giờ mở tới `orchestrator.json`. `scripts/install-cli.spec.mjs` ghim câu ấy lại.
+- **`SESSION_MISSING`** (`operators/errors.json`): scope `backend.source.apply`,
+  `frontend.source.apply`, `git.publish`; domain `caller`, `terminate`, route về `user`. Có mặt trong
+  bảng Dừng và dòng Bước của cả ba, và trong `operators/INDEX.md` sinh ra.
+- **`git.publish` không merge một nhánh vô thừa nhận** (bước 6 + `validate.mjs` + self-test): phiên
+  phải còn trên đĩa, phải có một nhánh `frontend.source.apply`/`backend.source.apply` `done` mà
+  `commits` chứa head đem publish, và khi `state.json` nói chuỗi có khai bước `frontend.surface.audit`
+  hoặc `uat.verify` thì nhánh ấy phải `done` với artifact `screenshot` còn nguyên. 6 nhánh hợp lệ, 30
+  đột biến bị bác.
+- **Phương án phải nhìn được** (`frontend.direction.decide`): dưới `new` và `reconstruct`, mọi phương
+  án hình thành đều render thành `response/artifacts/<candidateId>.html`, bất kể `preview`; số trang
+  phải bằng số phương án. `refine` giữ nguyên trang tuỳ chọn. Không tốn gì: đó là `@tools/visualize`,
+  không cần cấp quyền, mọi runtime đều làm được.
+- **Mọi ví dụ workflow thành dòng dài**: `apply` → `workspace.bind` (fe, `runtimeNeed: consume`) →
+  `audit` → `quality` → `uat` → `publish`, cho `frontend-refine`, `frontend-reconstruct`,
+  `frontend-new-surface`, `frontend-with-uat`, `full-feature`; `validate-workflows.mjs` từ chối một
+  chuỗi publish bề mặt đã apply mà thiếu một trong hai bằng chứng. `backend-feature` không có chúng và
+  `when` của nó nay nói rõ vì sao (nó không ghi bề mặt; `uat.verify` cần đầu vào
+  `frontend-surface-audit` và một route fe đã bind). `runtimeNeed: consume` dời từ bậc 1 của
+  `frontend-with-uat` xuống lần bind sau apply của cả năm chuỗi — bề mặt cần phục vụ là bề mặt mà lần
+  ghi vừa sinh ra, không phải bề mặt đã bind trước đó.
+- **Nói thẳng khi nào UAT chạy** (`docs/getting-started.mdx` +vi, `tests/README.md`): chỉ trong
+  workflow có bước `uat.verify`, và chỉ khi đã có người yêu cầu đích danh, thư mục
+  `uat/<flow>/{flow.md,account.json,seed/}`, mật khẩu dùng chung đã niêm, và cả hai giấy thông hành
+  lấy tại commit đã ghim. Thiếu cái nào cũng là một lần dừng có mã, để sự vắng mặt đọc ra được.
+
+**Bản ghi**: `tests/runs/20260903-r2-codex-overview-nonconformance.md` (+vi), thêm một dòng vào bảng
+vòng 2 của `tests/README.md`. Ba vi phạm gốc thì trùng đúng ba cái thầy đã ghi ở mục "Gate quét
+presentation" bên trên — nghĩa là `sweep-presentation.mjs` **sẽ** bắt được cả bốn; nó chỉ không bao
+giờ chạy, vì operator chạy nó không bao giờ chạy.
+
+**Còn mở, trò báo chứ không tự quyết**: session-first vẫn là kỷ luật mà bootstrap phát biểu và cổng
+publish bắt được *về sau*. Không gì chặn được khoảnh khắc một agent mở editor lên checkout được route.
+Nếu thầy muốn chặn ngay tại đó thì phải là một hook bên ngoài cây (pre-commit trên checkout được
+route, từ chối commit khi không có phiên nào đang giữ lease) — trò chưa làm, vì nó nằm ngoài
+`.claude` và là quyết định của thầy.
+
+### Lens thẩm mỹ (taste) trong audit
+
+Thầy chốt: một bề mặt đúng ngữ pháp mà nhìn xấu thì vẫn vứt. Trò nối `knowledge/ui/proof/taste.md`
+(TASTE-1..13) vào đúng chỗ nó có răng, chứ không để nó nằm làm một topic ai đọc thì đọc.
+
+- **`frontend.surface.audit` bậc 6 nay phát hai lens trên cùng một bộ chụp.** Lens canon giữ nguyên;
+  lens thẩm mỹ chấm đủ mười hai tiêu chí `TASTE-1..12` cho **mỗi mục ma trận**, mỗi tiêu chí một phép
+  đo, một điểm 1..5, một phán quyết và một `routeTo`. `validate.mjs` bắt: thiếu một tiêu chí là hỏng;
+  trung bình và `ship`/`fix-first` phải là thứ `TASTE-13` **tính ra**, không phải thứ được khai; một
+  tiêu chí hỏng chỉ được đi về `direction`, không bao giờ về `resolve` — đổi một giá trị không vá được
+  một bố cục.
+- **Biên nhận có mục `## Taste`** (`| Rule | Measured | Score | Verdict |`, rồi dòng `- Mean:` và
+  `- Verdict:`), xếp ngay sau `## Verdicts by owner`. Biên nhận publish lens đã **gộp** qua các mục:
+  điểm thấp nhất và phán quyết hỏng thắng, vì một bề mặt chỉ tốt bằng viewport tệ nhất đã chụp.
+- **`fix-first` chặn cổng.** `response.json.next` phải gọi tên `frontend.direction.decide`, và
+  **không được** gọi `quality.verify` — các cổng của chính checkout chỉ chạy sau một `ship`. Đây là
+  chỗ `TASTE-13` Case 3 có hiệu lực thật: canon xanh toàn tập vẫn có thể `fix-first`.
+- **Vòng lặp mới trong cả năm workflow frontend**: `frontend.surface.audit → frontend.direction.decide`,
+  `maxRounds: 2`, when là "taste fix-first". Vòng cũ về `frontend.presentation.resolve` giữ nguyên.
+- **`frontend.direction.decide` nay phải nêu chuẩn tham chiếu theo lớp.** `## References` đổi thành
+  `| Standard | Class | URL | What is borrowed | Limitation |` — trò **giữ** `URL` và `Limitation` chứ
+  không xoá, vì luật nghiên cứu có giới hạn (mỗi tham chiếu ghi URL và đúng giới hạn nó mang) là luật
+  đã publish và không có nhà nào khác. `new`/`reconstruct` phải có ít nhất một dòng; `refine` vẫn
+  không dòng nào. Không có dòng nào dưới `new`/`reconstruct` **không phải** `INVALID_INPUT`: đó là lỗi
+  của chính operator, nên trò đăng ký `REFERENCE_MISSING` (domain `self`, terminate) trong
+  `operators/frontend-direction-decide/errors.json`, có mặt ở bậc 6 và trong bảng Dừng.
+- **Self-test**: audit 3 nhánh hợp lệ / 30 đột biến bị bác (thêm ship, fix-first, thiếu tiêu chí, sai
+  số học, hỏng mà đi về resolve, fix-first mà next là `quality.verify`, biên nhận giấu một cái hỏng);
+  direction 6 nhánh hợp lệ / 30 đột biến (thêm nhánh dừng `REFERENCE_MISSING`, reconstruct không nêu
+  chuẩn, chuẩn không có lớp).
+
+**Trò báo, không tự quyết**: `tests/runs/` không có tài liệu nào thuộc kind `frontend-surface-audit`
+(`validate-templates` chỉ nhận `knowledge/**`, `operators/*/operator.md` và skeleton của từng kind), nên
+không bản ghi nào cần thêm `## Taste` để giữ xanh. Bản ghi audit thật duy nhất ở đó,
+`20260903-r3-starci-dashboard-subscriptions-audit.md`, là văn xuôi tự do có bảng riêng và chạy trước khi
+lens được publish; trò không viết điểm ngược vào nó. Nếu thầy muốn nó mang lens, trò chấm lại từ chính
+ảnh chụp đã lưu trong `tests/evidence/`.
+
+### Pass gom 1.5.0
+
+Thầy chốt: đo bằng **số nhà trên một khái niệm**, không đo bằng số dòng. Trò đếm trước rồi mới sửa,
+và bảng trước/sau đầy đủ nằm ở `tests/evidence/20260903-consolidation.md`. Tổng: 44 nhà xuống còn 19
+trên các khái niệm hôm nay chạm tới, mười một id và một file nghỉ hẳn, không id nào bị đánh số lại.
+
+**Chuẩn cập nhật, viết trung lập.** `UPDATE.md` (+ `UPDATE.vi.md`) ở gốc cây, không nêu StarCi, sản
+phẩm hay lịch sử nào; chỉ dòng phả hệ nói chuẩn được đúc ra từ việc vận hành một cây. Bốn câu hỏi theo
+thứ tự (đã bị cấm chưa → sửa cổng; chưa có nhà → một rule, chỉ hình dạng; rule sai hay hẹp → sửa Case
+và giữ id; hai nhà → gom, bên kia trích dẫn), được thêm gì và không được thêm gì, sửa và cho nghỉ một
+id thế nào, mức bằng chứng ≥2 lần, luật ngôn ngữ, cưỡng chế trước lời khuyên, file nào sinh ra và bằng
+lệnh gì, patch/minor/major nghĩa là gì, và danh mục kiểm trước khi commit có mục "đếm số nhà". Được
+nối vào `INDEX.md` như mục 0 của thứ tự nạp và được `docs/contributing.mdx` trích chứ không chép lại.
+
+**Gom nhà.** Bốn vụ chính:
+- Hình học shell: `FE-IMPORTS-7` Case 9 gộp vào Case 7; comment của `sweep-presentation.mjs` thành
+  câu trích; và cổng nay **đọc danh sách tên đơn vị shell ra từ chính Case 7** thay vì gõ cứng, nên
+  sửa rule là cổng đổi theo.
+- Spec theo cặp: `FE-TEST-7` nghỉ, gộp vào `FE-TEST-1` Case 7. Hai Case "không thay được nhau" của nó
+  vốn chỉ nhắc lại `FE-TEST-2` Case 4 và `FE-TEST-3` Case 3, nay là trích dẫn.
+- Ngưỡng theo lớp bề mặt: mật độ về `TASTE-9`, số accent về `TASTE-5`, độ sâu điều hướng về `UX-5`,
+  ngân sách bước về `UX-2`, kích thước mục tiêu về `A11Y-4`. Đây là chỗ trò tìm ra một **mâu thuẫn
+  thật**: `TASTE-5` nói "đúng một accent" còn `UI-9` cho landing hai cái — đúng cái hình dạng hai nhà
+  rồi trôi khỏi nhau mà thầy vẫn cảnh báo.
+- Số liệu khảo sát (49/49, 215/272, 28/101…) và tên sản phẩm rời khỏi text của Case, sang
+  `tests/evidence/`.
+
+**Bỏ tầng id thứ hai (thầy chốt giữa chừng).** `knowledge/ui/proof/ui.md` với `UI-1..UI-11` đã nghỉ
+hẳn — một file mà toàn bộ nội dung là trỏ sang file khác thì chỉ thêm địa chỉ chứ không thêm quyết
+định. Thay vào đó mỗi topic proof tự đóng lại bằng rule verdict của chính nó: `TASTE-13` và `UX-12` đã
+có sẵn, trò thêm `A11Y-5`, `FOCUS-6`, `COLOR-6`, `MOTION-5`, `TRUTH-5`, cùng một hình dạng (tập chặn
+cửa, ngưỡng, verdict, đường đi). Bộ từ vựng lớp bề mặt rút về năm tên — `console`, `form`, `landing`,
+`catalog`, `reader` — và sống ở `COVERAGE-1` Case 7, **không mang con số nào**. Mỗi `UI-n` cũ nay tra
+về đúng rule đã sống sót thay nó; bảng ánh xạ ở file bằng chứng. Đếm rule ui: 159 → 153 (proof 55 →
+49).
+
+**"ĐẠT CHƯA" thành hợp đồng biên nhận, không thành rule.** Bảng `## Verdict` một hàng mỗi topic
+(`| Topic | Verdict | Route |`) có mặt ở cả ba biên nhận: audit đóng tám topic, uat đóng `experience`,
+còn `quality.verify` chép cả chín và viết đúng một dòng `Verdict: ship | fix-first | blocked` — thiếu
+hàng hay `blocked` thì `blocked`; có `fail`/`fix-first` thì `fix-first` kèm tên hàng và đường đi; còn
+lại là `ship`. Không trung bình qua các hàng, không chấm lại. Validator của cả ba kiểm bản chép có
+trung thực không: audit đối chiếu từng hàng với kết quả của chính topic ấy, uat đối chiếu hàng
+`experience` với lens, quality kiểm dòng cuối tính đúng từ các hàng và một topic `blocked` thì không
+được có chủ để đẩy về.
+
+**Còn lại của phần nối dây.** `uat.verify` mang bộ điểm `UX-1..UX-11` trong biên nhận (mục
+`## Experience` + `- Mean`/`- Verdict`), lane `ux` phải khớp verdict mà `UX-12` tính; audit khai lớp bề
+mặt trong `## Surface class` và dừng `SURFACE_CLASS_MISSING` (domain `direction`, route mới về
+`frontend.direction.decide`) khi coverage không khai; `@worktrees/_templates` nói rõ phần uat nằm ở
+`templates/uat/` mà gói ship sẵn; `knowledge/ui/INDEX.md` ghi `ux.md` còn được `uat.verify` đọc.
+
+**`@tools/host` (thầy thêm, là cổng chứ không phải rule).** Phục vụ một thư mục HTML tĩnh trên
+loopback, mode `loopback`, thử cổng từ **60000** lên tới 60100, ghi URL/port/folder/pid vào
+`response/artifacts/host.json`, dừng khi nhánh kết thúc hoặc resume, không bao giờ bind `0.0.0.0`. Hai
+runtime đều hỗ trợ qua shell (Claude thêm preview). Khai ở `frontend.direction.decide` (bậc 9 phục vụ
+ứng viên **một lần cho mỗi viewport của coverage**, để thầy thấy 1280 và 390 trước khi quyết) và ở
+`frontend.surface.audit` (phục vụ bảng chụp). Không rule mới; tính đáp ứng được kiểm hai lần thì ghi
+đúng một chỗ, ở `RESPONSIVE-4` Case 6.
+
+**Một cổng phải nới.** `validate-knowledge-citations.mjs`: một dòng nói "retired/đã nghỉ" nay được
+phép nêu cả một **tiền tố** không còn file nào publish, không chỉ những con số. Không nới thì không
+ghi nổi việc `UI-` đã nghỉ.
+
+**Trò báo, không tự quyết.** `knowledge/patterns/**` vẫn nêu đường dẫn nguồn tương đối và số đếm: đó
+là chính mô hình xuất xứ của nhóm ấy, cổng trích dẫn dựng trên nó, và `contributing` phát biểu nó.
+Trò chỉ dời số liệu ra khỏi những Case thêm hôm nay. Phần còn lại — tên repo và đường dẫn Windows
+tuyệt đối trong `patterns/fe/INDEX.md` và dòng `Sources:` của `folder.md` — vẫn là việc phải làm lại
+mô hình xuất xứ cho cả nhóm, không phải sửa một Case; trò để nguyên và báo lần nữa.

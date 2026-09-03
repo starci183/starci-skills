@@ -34,6 +34,21 @@ kèm URL và đúng giới hạn nó mang theo; không gì chép lại một tra
 giải phẫu của một component. Khi nghiên cứu có giới hạn không lấp được câu hỏi nghiệp vụ hay tương
 tác mà quyết định dựa vào, lần chạy dừng ở đúng khoảng trống có chủ.
 
+## Tham chiếu được gọi tên theo lớp, không theo tính từ
+
+`## References` là chỗ hướng nói rõ bề mặt này nhắm tới chuẩn nào, và gọi tên nó đúng cách một người
+đọc sẽ phân loại: một lớp như `console-grid` hay `plan-comparison`, không bao giờ là một tính từ như
+hiện đại, sạch sẽ hay cao cấp, vì tính từ không đem so với một bức chụp được. Mỗi dòng còn ghi thứ
+được mượn — một quyết định bố cục, một thứ tự, một mật độ — và chính nó giữ cho việc mượn được lương
+thiện, vì không gì chép lại một thương hiệu, một bảng màu hay giải phẫu của một component. Một hướng
+`new` hay `reconstruct` mang ít nhất một dòng như thế; một lượt `refine` không mang dòng nào, vì cấu
+trúc mà nó dịch chuyển các phần tử bên trong đã được duyệt từ trước. Đây là thứ lần audit về sau đọc:
+lens thẩm mỹ đặt bức chụp cạnh các chuẩn đã nêu, và một hướng không nêu chuẩn nào làm lens ấy chết
+trước khi có một pixel nào được đo. Một lần chạy tới được quyết định mà không có dòng tham chiếu nào
+thì không phải lỗi của người gọi và không bao giờ thành `INVALID_INPUT`: đó là lỗi của chính operator
+này, nên nó dừng bằng `REFERENCE_MISSING`, định tuyến về `self` và được trả lời bằng cách nêu tên các
+chuẩn rồi chạy lại chính hướng ấy.
+
 ## Bộ lọc Grammar từ chối sự bịa đặt, không từ chối quyền sở hữu
 
 Một phương án bịa ra giao diện dùng chung còn thiếu, đi vòng qua trần owner, bắt chước Grammar chưa
@@ -115,16 +130,31 @@ dưới `response/artifacts/images/`; `frontend.source.apply` ghi chúng cùng w
 | 3 | Bind các đầu vào mà change level đòi | `changeLevel` | đầu vào `business-promise-authority`, `backend-source-application` và `architecture-decision` | — | `BUSINESS_REQUIRED`, `BACKEND_REQUIRED`, `ARCHITECTURE_REQUIRED` |
 | 4 | Quan sát context đang có | — | @workspaces/fe (artifact trực tiếp của target, hoặc host được uỷ quyền và họ sản phẩm khi target chưa tồn tại), @worktrees/uat/<flow>/<case> nếu có | — | `EVIDENCE_MISSING` |
 | 5 | Biên một UI contract và coverage của nó | — | @knowledge/ui/composition, đầu vào `business-promise-authority` nếu có, context đã quan sát | `response/data/coverage.json` | `SCOPE_UNFROZEN` |
-| 6 | Đi tìm tham chiếu ngoài, có giới hạn | `references`, `changeLevel` | @knowledge/ui/composition (khoảng trống mà nghiên cứu phải lấp), @tools/websearch | — | `REFERENCE_EVIDENCE_EXHAUSTED` |
+| 6 | Chốt các chuẩn tham chiếu theo lớp, có giới hạn | `references`, `changeLevel` | @knowledge/ui/composition (khoảng trống mà nghiên cứu phải lấp), @tools/websearch | — | `REFERENCE_EVIDENCE_EXHAUSTED`, `REFERENCE_MISSING` |
 | 7 | Hình thành các phương án | `candidates` | UI contract vừa biên | — | `NO_VIABLE_DIRECTION` |
 | 8 | Áp bộ lọc Grammar | `ownerCeiling` | @grammar/core (component sở hữu gì và có prop nào), @knowledge/grammars/starci | — | `GRAMMAR_REQUIRED` |
-| 9 | Render bằng chứng quyết định và hình đã tự xét | `candidates`, `preview` | các phương án còn sống, @knowledge/grammars/starci | `response/artifacts/<candidateId>.html`, `response/artifacts/images/<slot>.png`, @tools/visualize, @tools/imagegen | — |
+| 9 | Render bằng chứng quyết định và hình đã tự xét, rồi phục vụ cho một người xem | `candidates`, `preview` | các phương án còn sống, @knowledge/grammars/starci | `response/artifacts/<candidateId>.html`, `response/artifacts/images/<slot>.png`, `response/artifacts/host.json`, @tools/visualize, @tools/imagegen, @tools/host | — |
 | 10 | Phản chứng | — | các phương án, đầu vào `business-promise-authority` và `backend-source-application`, `response/data/coverage.json` | — | `NO_VIABLE_DIRECTION` |
 | 11 | Quyết | `selectionPolicy`, `approval` | bảng phản chứng | — | `DIRECTION_CHOICE_REQUIRED` |
 | 12 | Phát | — | mọi thứ ở trên | `response/response.md`, `response/response.json` | — |
 
-Bước 9 chỉ render khi có nhiều hơn một phương án được hình thành hoặc `preview` là yes; một phương án
-duy nhất dưới mặc định không sinh trang nào và dựa vào bước 10. Dưới `automatic`,
+Bước 6 để lại trong biên nhận các chuẩn mà bề mặt này nhắm tới, mỗi chuẩn gọi tên theo lớp, kèm thứ
+được mượn và thứ nó không giải quyết. Dưới `new` và `reconstruct` bảng ấy có ít nhất một dòng và bước
+6 dừng bằng `REFERENCE_MISSING` khi không sinh nổi một dòng nào; dưới `refine` nó để trống. Bước 9
+render trước khi bước 11 ghi quyết định, vì một cấu trúc chưa ai nhìn thấy thì không thể duyệt,
+và một phương án chỉ được tả bằng văn xuôi thì không ai phán được. Dưới `new` và `reconstruct`, mọi
+phương án mà lượt chạy hình thành đều được render thành trang riêng, bất kể `preview` nói gì và bất kể
+có bao nhiêu phương án: đó là `@tools/visualize`, không cần cấp quyền, và mọi runtime đều làm được.
+
+Trang phương án không phải file để người ta tự đi tìm. Bậc 9 phục vụ thư mục artifacts qua
+`@tools/host` trên loopback, ở cổng trống đầu tiên từ 60000 lên tới 60100, và ghi URL, cổng, thư mục
+cùng pid vào `response/artifacts/host.json`; server dừng khi nhánh kết thúc hoặc được resume. Mỗi
+phương án được phục vụ một lần cho mỗi viewport của coverage — mỗi viewport một trang, hoặc một trang
+nhận viewport qua query string — để người xem thấy bản rộng và bản hẹp trước khi quyết, và đó là chỗ
+thứ nhất trong hai chỗ tính đáp ứng được nhìn.
+Dưới `refine` trang vẫn là tuỳ chọn — cấu trúc đã được duyệt từ trước lượt chạy này — và chỉ render
+khi có nhiều hơn một phương án được hình thành hoặc `preview` là yes; một phương án refine duy nhất
+dưới mặc định không sinh trang nào và dựa vào bước 10. Dưới `automatic`,
 `DIRECTION_CHOICE_REQUIRED` chọn phương án sống sót qua nhiều đòn tấn công nhất và ghi lại bảng; dưới
 `approval-required` nó dừng và người dùng quay lại với `approval`. Biên nhận uỷ quyền cho domain kế
 tiếp resolve và triển khai bên trong trần owner đã đóng băng, và không chứng minh gì về việc kết quả
@@ -138,6 +168,7 @@ render ra sao.
 | `ui-coverage` | `response/data/coverage.json` | data | có |
 | `candidates` | `response/artifacts/<candidateId>.html` | artifact | không |
 | `direction-image` | `response/artifacts/images/<slot>.png` | artifact | không |
+| `host` | `response/artifacts/host.json` | artifact | không |
 
 ## Dừng
 
@@ -155,6 +186,7 @@ render ra sao.
 | `GRAMMAR_REQUIRED` | terminate |
 | `EVIDENCE_MISSING` | terminate |
 | `REFERENCE_EVIDENCE_EXHAUSTED` | terminate |
+| `REFERENCE_MISSING` | terminate |
 | `NO_VIABLE_DIRECTION` | terminate |
 | `DIRECTION_CHOICE_REQUIRED` | fallback |
 | `NO_PROGRESS` | terminate |

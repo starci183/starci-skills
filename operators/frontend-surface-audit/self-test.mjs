@@ -1,7 +1,8 @@
 // Proves validate.mjs on a synthetic session branch: one conforming audit over two matrix entries
-// (one all-pass entry, one entry whose application-owned node fails and routes back to resolve), one
-// blocked on EVIDENCE_MISSING with nothing captured, and one mutation per law, each of which must
-// fail with a line that names the defect.
+// (one all-pass entry, one entry whose application-owned node fails and routes back to resolve) with
+// a taste lens that ships; the same audit with a taste lens that is fix-first and routes to
+// direction; one blocked on EVIDENCE_MISSING with nothing captured; and one mutation per law, each
+// of which must fail with a line that names the defect.
 import assert from 'node:assert/strict';
 import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -26,10 +27,44 @@ const capture = (id) => ({
   ],
 });
 
-const verdicts = () => ({
+// The taste lens: twelve scored criteria, each with the measurement its own rule names, and the
+// arithmetic of TASTE-13 over them. `taste()` ships at a flat 4; `tasteFixFirst()` fails TASTE-2,
+// one of the five gating criteria, and drops the mean to 3.83.
+const TASTE_MEASURED = {
+  'TASTE-1': 'the plan title outweighs the next candidate by 40%',
+  'TASTE-2': 'the tallest content-free band measures 32px and separates two regions',
+  'TASTE-3': 'every stacked text block resolves to x=32; both gutters measure 24px',
+  'TASTE-4': 'region 48px > section 24px > row 16px at both viewports',
+  'TASTE-5': 'one accent-filled call to action; four hues, all palette roles',
+  'TASTE-6': 'three sizes and two weights per region; the paragraph measures 62 characters',
+  'TASTE-7': 'two radius steps, one family; the deepest nesting is two cards',
+  'TASTE-8': 'one image, carrying the promise subject, lighter than the focal element',
+  'TASTE-9': 'content and action rectangles sum to 63% of the captured area',
+  'TASTE-10': 'skeleton, empty and error hold the same regions at the same ranks',
+  'TASTE-11': 'every target measures at least 44x44; hover moves nothing',
+  'TASTE-12': 'sorted into the class the direction named',
+};
+const TASTE_RULES = Object.keys(TASTE_MEASURED);
+const VOID_BAND = 'a tinted band 180px tall whose only occupant is a decorative artwork';
+const taste = () => ({
+  entries: TASTE_RULES.map((rule) => ({ rule, measured: TASTE_MEASURED[rule], score: 4, verdict: 'pass', routeTo: 'none' })),
+  mean: 4,
+  verdict: 'ship',
+});
+const tasteFixFirst = () => {
+  const lens = taste();
+  lens.entries[1] = { rule: 'TASTE-2', measured: VOID_BAND, score: 2, verdict: 'fail', routeTo: 'direction' };
+  lens.mean = 3.83;
+  lens.verdict = 'fix-first';
+  return lens;
+};
+
+const verdicts = (lens = taste) => ({
   entries: [
     {
       matrixId: WIDE,
+      surfaceClass: 'console',
+      taste: lens(),
       results: [
         { path: MAIN, owner: 'app', rule: 'GAP-5', measured: '1.5rem', verdict: 'pass', routeTo: 'none' },
         { path: SECTION, owner: 'grammar', rule: 'PADDING-4', measured: '1rem', verdict: 'pass', routeTo: 'none' },
@@ -37,6 +72,8 @@ const verdicts = () => ({
     },
     {
       matrixId: NARROW,
+      surfaceClass: 'console',
+      taste: lens(),
       results: [
         { path: MAIN, owner: 'app', rule: 'GAP-5', measured: '1rem', verdict: 'fail', routeTo: 'resolve' },
         { path: SECTION, owner: 'grammar', rule: 'PADDING-4', measured: '1rem', verdict: 'pass', routeTo: 'none' },
@@ -45,7 +82,29 @@ const verdicts = () => ({
   ],
 });
 
-const responseMd = () => `# frontend-surface-audit — plan-picker
+const BT = String.fromCharCode(96);
+const tasteTable = (lens) => lens.entries.map((r) => `| ${BT}${r.rule}${BT} | ${r.measured} | ${r.score} | ${r.verdict} |`).join(String.fromCharCode(10));
+
+// Every rule this audit judges belongs to a topic, and each topic closes itself; the receipt copies
+// those verdicts rather than recomputing them.
+const verdictTable = (lens) => [
+  ['presentation', 'fail', 'resolve'],
+  ['composition', 'blocked', 'none'],
+  ['responsive', 'blocked', 'none'],
+  ['motion', 'blocked', 'none'],
+  ['accessibility', 'blocked', 'none'],
+  ['contrast', 'blocked', 'none'],
+  ['render-truth', 'blocked', 'none'],
+  ['taste', lens.verdict, lens.verdict === 'ship' ? 'none' : 'direction'],
+].map(([topic, verdict, route]) => `| ${BT}${topic}${BT} | ${verdict} | ${route} |`).join(String.fromCharCode(10));
+
+const responseMd = (lens = taste()) => `# frontend-surface-audit — plan-picker
+
+## Surface class
+
+| Class | Declared by |
+| --- | --- |
+| \`console\` | \`frontend-direction-decision\`, whose coverage names the class every banded rule reads |
 
 ## Matrix
 
@@ -62,6 +121,21 @@ const responseMd = () => `# frontend-surface-audit — plan-picker
 | \`${WIDE}\` | grammar | \`${SECTION}\` | \`PADDING-4\` | 1rem | pass |
 | \`${NARROW}\` | app | \`${MAIN}\` | \`GAP-5\` | 1rem | fail |
 | \`${NARROW}\` | grammar | \`${SECTION}\` | \`PADDING-4\` | 1rem | pass |
+
+## Taste
+
+| Rule | Measured | Score | Verdict |
+| --- | --- | --- | --- |
+${tasteTable(lens)}
+
+- Mean: ${lens.mean.toFixed(2)}
+- Verdict: ${lens.verdict}
+
+## Verdict
+
+| Topic | Verdict | Route |
+| --- | --- | --- |
+${verdictTable(lens)}
 
 ## Regressions
 
@@ -156,7 +230,18 @@ async function expectError(files, needle, label) {
 }
 const mutate = (change) => { const v = verdicts(); change(v); return { ...baseline(), 'response/data/verdicts.json': v }; };
 
+// The same audit under a taste lens that fails TASTE-2: the composition is decided again, and the
+// checkout's own gates wait, so next names direction and never quality.verify.
+const fixFirst = (extra = {}) => ({
+  ...baseline(),
+  'response/data/verdicts.json': verdicts(tasteFixFirst),
+  'response/response.md': responseMd(tasteFixFirst()),
+  'response/response.json': responseJson({ next: ['frontend.presentation.resolve', 'frontend.direction.decide'] }),
+  ...extra,
+});
+
 await expectValid(baseline(), 'two entries: one all-pass, one application-owned failure routed back to resolve');
+await expectValid(fixFirst(), 'the canon lane holds where it can and the taste lens is fix-first, routed to direction');
 await expectValid({ 'request/request.json': requestJson(), 'response/response.json': responseJson({ status: 'blocked', stop: 'EVIDENCE_MISSING', next: [], fields: {} }) }, 'blocked on EVIDENCE_MISSING with nothing captured');
 
 await expectError({ ...baseline(), 'request/request.json': requestJson({ extra: { mystery: 1 } }) }, 'requirements.mystery is not a field', 'undeclared requirement');
@@ -182,4 +267,21 @@ await expectError({ ...baseline(), 'response/data/verdicts.json': null, 'respons
 await expectError({ ...baseline(), [CAP(WIDE)]: { ...capture(WIDE), viewport: [10, 10] } }, 'viewport', 'capture schema');
 await expectError({ ...baseline(), 'response/response.json': responseJson({ status: 'blocked', stop: 'MADE_UP_CODE', next: [] }) }, 'not a registered code', 'unknown stop code');
 
-process.stdout.write('frontend.surface.audit self-test: 2 valid branches, 20 rejected mutations\n');
+// The taste lens.
+await expectError(mutate((v) => { delete v.entries[0].taste; }), 'carries no taste block', 'a done audit that publishes only the canon lens');
+await expectError(mutate((v) => { v.entries[0].taste.entries.splice(6, 1); }), 'leaves TASTE-7 unscored', 'a criterion left out of the lens');
+await expectError(mutate((v) => { v.entries[0].taste.mean = 5; }), 'the twelve scores average 4.00', 'a mean nobody computed');
+await expectError(mutate((v) => { v.entries[0].taste.verdict = 'fix-first'; }), 'TASTE-13 makes it ship', 'a verdict TASTE-13 does not produce');
+await expectError(mutate((v) => { v.entries[0].taste.entries[0].verdict = 'fail'; v.entries[0].taste.entries[0].routeTo = 'resolve'; }), 'routeTo', 'a taste failure sent into the resolve loop');
+await expectError(mutate((v) => { v.entries[0].taste.entries[0].verdict = 'fail'; }), 'a taste failure routes to direction, never to resolve', 'a taste failure that routes nowhere');
+await expectError(fixFirst({ 'response/response.json': responseJson({ next: ['frontend.presentation.resolve', 'quality.verify'] }) }), 'quality.verify follows a ship', 'a fix-first surface sent to the gates');
+await expectError(fixFirst({ 'response/response.json': responseJson({ next: ['frontend.presentation.resolve'] }) }), 'the taste lens is fix-first, so next names frontend.direction.decide', 'a fix-first lens that never reaches the direction');
+await expectError(fixFirst({ 'response/response.md': responseMd() }), 'TASTE-2 is pass here and fail in the verdicts', 'receipt hides a taste failure');
+
+// The surface class and the per-topic verdict rows.
+await expectError(mutate((v) => { v.entries[1].surfaceClass = 'landing'; }), 'one surface has one class', 'two classes over one surface');
+await expectError(mutate((v) => { delete v.entries[0].surfaceClass; }), 'surfaceClass', 'an entry with no declared class');
+await expectError({ ...baseline(), 'response/response.md': responseMd().replace(`| ${BT}presentation${BT} | fail | resolve |`, `| ${BT}presentation${BT} | pass | none |`) }, 'Verdict records pass for presentation', 'a Verdict row that hides a failing topic');
+await expectError({ ...baseline(), 'response/response.md': responseMd().replace(`| ${BT}contrast${BT} | blocked | none |`, `| ${BT}contrast${BT} | pass | none |`) }, 'Verdict records pass for contrast', 'a topic passed on evidence nobody took');
+
+process.stdout.write('frontend.surface.audit self-test: 3 valid branches, 34 rejected mutations\n');

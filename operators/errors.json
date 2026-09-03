@@ -158,6 +158,23 @@
         "vi": "Người cấp phê duyệt."
       }
     },
+    "SESSION_MISSING": {
+      "scope": [
+        "backend.source.apply",
+        "frontend.source.apply",
+        "git.publish"
+      ],
+      "domain": "caller",
+      "disposition": "terminate",
+      "meaning": {
+        "en": "Source was designed, written or published outside a session: the branch has no step-N/parallel-M under a session folder with state.json and a validated request.json, or the session branch being published carries no done source-application response whose commits contain its head, or a frontend chain with an audit step has no frontend-surface-audit response with its screenshots.",
+        "vi": "Nguồn được thiết kế, ghi hay công bố bên ngoài một phiên: nhánh không nằm trong step-N/parallel-M dưới thư mục phiên có state.json và request.json đã hợp lệ, hoặc nhánh phiên đem công bố không có response source-application nào ở trạng thái done mà commits chứa head của nó, hoặc một chuỗi frontend có bước audit lại không có response frontend-surface-audit kèm ảnh chụp."
+      },
+      "resume": {
+        "en": "Create the session first — state.json and step-1/parallel-1/request/request.json, green under validate-request — and run the operators that owe the receipt; a session cannot be reconstructed after the fact.",
+        "vi": "Tạo phiên trước — state.json và step-1/parallel-1/request/request.json, xanh dưới validate-request — rồi chạy các operator còn nợ biên nhận; một phiên không thể dựng lại sau khi việc đã xong."
+      }
+    },
     "BRANCH_POLICY_VIOLATION": {
       "scope": [
         "git.publish",

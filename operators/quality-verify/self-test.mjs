@@ -30,7 +30,26 @@ const failing = (gate, over = {}) => gateResult(gate, { status: 'fail', exitCode
 
 const coverage = (over = {}) => ({ statements: 90, lines: 90, functions: 90, branches: 81.4, thresholds: THRESHOLDS, evidenceRef: 'gates/unit-coverage.log', ...over });
 
-function responseMd({ results = PLAN.map((g) => [g.gate, 'pass']), verdict = 'pass', findings = [['PREDECESSOR_CONSUMED', '—', 'the producer receipt was consumed unchanged']], plan = PLAN, sonarScope = 'new-code', head = HEAD, cov = coverage() } = {}) {
+// The scorecard the audit and the UAT run closed; this receipt copies the rows and computes the line.
+const SCORECARD = [
+  ['presentation', 'pass', 'none'],
+  ['composition', 'pass', 'none'],
+  ['responsive', 'pass', 'none'],
+  ['motion', 'pass', 'none'],
+  ['accessibility', 'pass', 'none'],
+  ['contrast', 'pass', 'none'],
+  ['render-truth', 'pass', 'none'],
+  ['taste', 'ship', 'none'],
+  ['experience', 'ship', 'none'],
+];
+const TOPICS = SCORECARD.map(([t]) => t);
+const scorecardLine = (rows) => {
+  const by = new Map(rows.map((r) => [r[0], r]));
+  if (TOPICS.some((t) => !by.has(t) || by.get(t)[1] === 'blocked')) return 'blocked';
+  return rows.some((r) => r[1] === 'fail' || r[1] === 'fix-first') ? 'fix-first' : 'ship';
+};
+
+function responseMd({ results = PLAN.map((g) => [g.gate, 'pass']), verdict = 'pass', scorecard = SCORECARD, findings = [['PREDECESSOR_CONSUMED', '—', 'the producer receipt was consumed unchanged']], plan = PLAN, sonarScope = 'new-code', head = HEAD, cov = coverage() } = {}) {
   return `# quality-verification — ${head}
 
 The delivery was verified at one frozen head against the routed gate plan, and the verdict rests on
@@ -83,11 +102,19 @@ ${results.map(([gate, status]) => `| \`${gate}\` | ${status} | ${status === 'pas
 | --- | --- | --- |
 ${findings.map(([code, gate, statement]) => `| \`${code}\` | ${gate} | ${statement} |`).join('\n')}
 
-## Verdict
+## Gate verdict
 
 | Field | Value |
 | --- | --- |
 | Verdict | \`${verdict}\` |
+
+## Verdict
+
+| Topic | Verdict | Route |
+| --- | --- | --- |
+${scorecard.map(([topic, v, route]) => `| \`${topic}\` | ${v} | ${route} |`).join('\n')}
+
+Verdict: ${scorecardLine(scorecard)}
 `;
 }
 
@@ -254,4 +281,11 @@ await expectValid(baseline({
   }),
 }), 'a frontend delivery whose plan carries the presentation sweep');
 
-process.stdout.write('quality.verify self-test: 4 valid branches, 27 rejected mutations\n');
+// The scorecard is copied, never rescored, and the line is computed from the rows.
+await expectValid(baseline({ 'response/response.md': responseMd({ scorecard: SCORECARD.map((r) => (r[0] === 'experience' ? ['experience', 'blocked', 'none'] : r)) }) }), 'a delivery whose experience topic was never observed');
+await expectError(baseline({ 'response/response.md': responseMd({ scorecard: SCORECARD.slice(0, 8) }) }), 'Verdict carries no experience row', 'a scorecard missing a topic');
+await expectError(baseline({ 'response/response.md': responseMd().replace('Verdict: ship', 'Verdict: fix-first') }), 'the rows make it ship', 'a line the rows do not produce');
+await expectError(baseline({ 'response/response.md': responseMd({ scorecard: SCORECARD.map((r) => (r[0] === 'taste' ? ['taste', 'fix-first', 'direction'] : r)) }).replace('Verdict: fix-first', 'Verdict: ship') }), 'the rows make it fix-first', 'a fix-first row reported as a ship');
+await expectError(baseline({ 'response/response.md': responseMd({ scorecard: SCORECARD.map((r) => (r[0] === 'motion' ? ['motion', 'blocked', 'direction'] : r)) }) }), 'is blocked and still routes to direction', 'a blocked topic given an owner');
+
+process.stdout.write('quality.verify self-test: 5 valid branches, 31 rejected mutations\n');

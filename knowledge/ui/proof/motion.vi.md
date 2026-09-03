@@ -54,6 +54,20 @@ Chi phối những gì khép lại một tuyên bố về chuyển động.
 | Case 4 | Có thứ gì nhấp nháy | Nó ở mức tối đa ba lần mỗi giây. Một dấu hiệu khẩn nhấp bốn lần bác bỏ tính an toàn ngay lập tức |
 | Case 5 | Một family hoặc ứng dụng thêm delta | Quy trách nhiệm từng tầng độc lập, và một video mượt không kèm bằng chứng về tuỳ chọn và về lúc bị cắt ngang không khép được gì |
 
+## MOTION-5 — Phán quyết của chuyển động
+
+Chi phối việc các tiêu chí trên trở thành đúng một hàng của topic này trong bảng `## Verdict` của receipt.
+
+| Case | Dùng khi | Quan sát |
+| --- | --- | --- |
+| Case 1 | Lens chạy | `MOTION-1` đến `MOTION-4` được xét trên cặp ảnh chụp mà coverage đòi: một ảnh khi tuỳ chọn giảm chuyển động chưa bật và một ảnh khi đã bật |
+| Case 2 | Tính verdict | Tập chặn cửa là toàn bộ tập: `pass` đòi mọi tiêu chí đều đạt, vì chuyển động đánh mất nghĩa một lần là đã mất |
+| Case 3 | Thiếu một trong hai ảnh chụp | Verdict là `blocked`; một lens chỉ chạy trên ảnh thường thì chưa hề thử tới tuỳ chọn ấy |
+| Case 4 | Một lần fail được định tuyến | Một thời lượng hay một easing ngoài thang đã publish thì về `resolve` kèm nguyên nhân ngoài thang; sai dàn dựng, mất outcome hay gây dồn lại bố cục thì về `direction` |
+
+Tập được chấm là `MOTION-1` đến `MOTION-4`; rule này là phần số học và bản thân nó không được chấm.
+Kết quả của nó là hàng `motion` trong bảng `## Verdict` của receipt audit.
+
 ## File này không quyết định
 
 Có những state nào và carrier nào giữ từng cái thuộc [State](../composition/state.vi.md), còn action

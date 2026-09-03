@@ -39,9 +39,9 @@
 
 ## References
 
-| Source | URL | Limitation |
-| --- | --- | --- |
-| what the reference showed | https://example.com/pattern | what it does not settle; no rows when the person supplied references or the change level is refine |
+| Standard | Class | URL | What is borrowed | Limitation |
+| --- | --- | --- | --- | --- |
+| the standard this surface is aiming at, named | `console-grid` | https://example.com/pattern | the composition decision taken from it, never a brand, a palette or a component anatomy | what it does not settle; at least one row under new or reconstruct, none under refine |
 
 ## Images
 

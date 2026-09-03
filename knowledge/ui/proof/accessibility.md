@@ -58,6 +58,21 @@ Governs the evidence that closes an accessibility claim.
 Not this rule: which semantic owner should have been chosen is decided in composition, under
 HIERARCHY-1 and STATE-1.
 
+## A11Y-5 — The accessibility verdict
+
+Governs how the criteria above become this topic's one row in the receipt's `## Verdict` table.
+
+| Case | When | Observe |
+| --- | --- | --- |
+| Case 1 | The lens runs | `A11Y-1` to `A11Y-4` are each judged at every state the coverage declares, in every colour scheme, from the computed accessibility tree and the measured render rather than from source |
+| Case 2 | The verdict is computed | The gating set is the whole set: `pass` requires every criterion to pass, because a reader who cannot reach a control is not partially served. There is no mean and no tolerance here, and averaging this topic into another falsifies it |
+| Case 3 | A criterion has no observation behind it | The verdict is `blocked`, never `pass` and never `fail`, because a render nobody measured has earned neither |
+| Case 4 | A failure is routed | A missing value routes to `resolve`; a missing structure or relationship routes to `direction`; a capability the published family does not offer routes to `grammar-gap`, never to a local repair in the application |
+
+The scored set is `A11Y-1` to `A11Y-4`; this rule is the arithmetic and is not itself scored. Its
+result is the `accessibility` row of the audit receipt's `## Verdict` table, copied from there and
+never recomputed downstream.
+
 ## What this file does not decide
 
 Which rank, action, or state the direction chose is [Hierarchy](../composition/hierarchy.md),

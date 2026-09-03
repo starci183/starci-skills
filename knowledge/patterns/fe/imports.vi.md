@@ -6,6 +6,11 @@ thứ tự nào?
 Nguồn: `tsconfig.json` (`paths`), `eslint.config.mjs`, `src/hooks/index.ts`,
 `src/components/**`, `src/hooks/swr/**`.
 
+Một Case đã nghỉ ở đây: `FE-IMPORTS-7` Case 9 gộp vào Case 7, vì "dải được mount ở đâu" và "dải có bị
+vẽ tay không" là một luật về một đối tượng và đang trôi thành hai. Lượt quét presentation đọc tên đơn
+vị shell ra từ chính Case 7 thay vì giữ danh sách riêng, còn những lần xuất hiện đã biện minh cho Case
+này được ghi ở [bằng chứng lượt quét presentation](../../../tests/evidence/20260903-presentation-sweep.md).
+
 ## FE-IMPORTS-1 — Đường dẫn
 
 | Case | Dùng khi | Viết |
@@ -76,9 +81,8 @@ của 417 tệp component, là framework, rồi Grammar, rồi tầng của mìn
 | Case 4 | `namespace` | chỉ `src/modules/api/graphql/clients/options.ts`, theo ngoại lệ ghi trong cấu hình |
 | Case 5 | Trộn family, hay import từ gốc gói | renderer và kiểu props lấy từ entry family `@starci/grammar/core` (từ 0.4.2 re-export toàn bộ renderer của Common) hoặc từ `@starci/grammar/common`; không bao giờ từ gốc gói, không bao giờ hai family trong một app |
 | Case 6 | Stylesheet của family thứ hai dưới cùng một root | một `CoreGrammarRoot` ở root của composition, một `@starci/grammar/core/styles.css`; family được chọn đúng một lần |
-| Case 7 | Bản sao cục bộ của một renderer Common hay một layout vô danh | `TextLink`, `NavLink`, `SeeMoreLink`, `Sidebar` hay hình học shell tự dựng: dùng renderer của Common và truyền prop; một adapter sản phẩm chỉ ánh xạ route và state vào Common và không sở hữu hình học — nó compose `WorkspaceShell` và không có `classNames.ts`, hoặc compose `NavigationFeatureNav` và chỉ viết class bên trong các slot được trao. Một thanh ráp bằng div vẫn là hình học shell dù đặt tên gì: dải, phần lót và đường ngăn của nó thuộc về `NavigationFeatureNav`. Phép thử không phải "thư mục shell có class hay không" mà là "nó có compose một đối tượng shell của Grammar hay không"; một thư mục shell chỉ import `Text` rồi dựng lại `flex … items-center justify-between gap-*` trong `classNames.ts` của chính nó là đã sao chép dải. Quan sát trên hai sản phẩm: một bên compose đối tượng shell ở mọi thư mục shell, bên kia thì không ở một thư mục |
+| Case 7 | Bản sao cục bộ của một renderer Common, một layout vô danh, hay một dải shell do ứng dụng tự vẽ | Dùng renderer của Common và truyền prop. Một đơn vị shell — thư mục có tên kết thúc bằng `Layout`, `Shell`, `TopBar`, `Navbar`, `Nav`, `Sidebar` hay `Rail` — compose một đối tượng shell của Grammar và chỉ viết class bên trong các slot được trao. Phép thử không phải "thư mục shell có class hay không" mà là "nó có compose một đối tượng shell hay không": một thanh ráp bằng div vẫn là hình học shell dù đặt tên gì, và dải, phần lót cùng đường ngăn của nó thuộc về đối tượng được compose. Cùng Case ấy đặt chỗ cho dải. Dải được mount ngang hàng với page trong route layout, không bao giờ nằm trong slot `header` của một đối tượng shell, vì slot ấy đã được chủ của nó bọc trong một banner còn dải vốn đã là một banner, nên lồng vào nhau là công bố hai landmark banner cho một dải; slot ấy là hero ở tầng page và nhận chữ của page |
 | Case 8 | Tên sản phẩm trong export công khai của Grammar, hay logic nghiệp vụ bên trong Common/Core | `Learn`, `Console`, `Dashboard` ở lại code sản phẩm; route, quyền, persistence và effect không bao giờ vào gói |
-| Case 9 | Dải của ứng dụng nằm trong slot `header` của `WorkspaceShell` | `header={<XNav />}`. `WorkspaceShell` bọc thứ nó nhận vào một `<header>` của chính nó, còn `NavigationFeatureNav` vốn đã là một `<header>`, nên lồng vào nhau là công bố hai landmark banner cho một dải. Dải được mount trong route layout, đứng ngang hàng phía trên page hoặc phía trên shell; `WorkspaceShell.header` là hero ở tầng page và nhận chữ của page. Quan sát trên hai sản phẩm: một bên mount dải ở 6 route layout, mỗi tệp render adapter rồi tới page, và adapter shell của chính nó không truyền `header`; bên kia đẩy top bar vào slot ấy và render ra hai banner |
 
 ## Câu hỏi để ngỏ
 

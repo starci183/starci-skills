@@ -98,6 +98,18 @@
         "vi": "Cấp thẩm quyền có chủ hoặc một tham chiếu mới về bản chất."
       }
     },
+    "REFERENCE_MISSING": {
+      "domain": "self",
+      "disposition": "terminate",
+      "meaning": {
+        "en": "A new or reconstruct direction named no reference standard, so the class the surface is aiming at is unstated and the taste lens cannot judge whether it landed there.",
+        "vi": "Một hướng new hay reconstruct không nêu chuẩn tham chiếu nào, nên lớp mà bề mặt nhắm tới bị bỏ trống và lens thẩm mỹ không phán được nó có tới đó không."
+      },
+      "resume": {
+        "en": "Name at least one standard by class, with what is borrowed from it, and run the same direction again.",
+        "vi": "Nêu ít nhất một chuẩn theo lớp, kèm thứ được mượn từ nó, rồi chạy lại chính hướng ấy."
+      }
+    },
     "NO_VIABLE_DIRECTION": {
       "domain": "caller",
       "disposition": "terminate",

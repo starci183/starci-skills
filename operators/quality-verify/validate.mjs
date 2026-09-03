@@ -15,6 +15,19 @@ import { validateStep } from '../../scripts/validate-step.mjs';
 import { sessionRootOf } from '../../scripts/validate-request.mjs';
 import { tableUnder } from '../../scripts/validate-response.mjs';
 
+// The nine topics the scorecard reports. Eight are closed by the surface audit and one by the UAT
+// run; this operator copies each verdict and never recomputes one.
+export const SCORECARD_TOPICS = ['presentation', 'composition', 'responsive', 'motion', 'accessibility', 'contrast', 'render-truth', 'taste', 'experience'];
+// Any row missing or blocked makes the answer blocked; any fail or fix-first makes it fix-first;
+// otherwise ship. Nothing is averaged across rows, because each row already carries its own
+// arithmetic.
+export function scorecardVerdict(rows) {
+  const byTopic = new Map(rows.map((r) => [r.topic, r]));
+  if (SCORECARD_TOPICS.some((t) => !byTopic.has(t) || byTopic.get(t).verdict === 'blocked')) return 'blocked';
+  if (rows.some((r) => r.verdict === 'fail' || r.verdict === 'fix-first')) return 'fix-first';
+  return 'ship';
+}
+
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 const METRICS = ['statements', 'lines', 'functions', 'branches'];
 const DEFAULT_GATES = [
@@ -190,7 +203,7 @@ export async function validateQualityStep(branchDir, root = ROOT) {
   if (present.has('quality-verification') && has('response/response.md')) {
     const text = await read('response/response.md');
     const findingKeys = new Set((tableUnder(text, '## Findings') ?? []).map(([code, gate]) => `${code}|${gate === '—' ? 'null' : gate}`));
-    const verdict = Object.fromEntries((tableUnder(text, '## Verdict') ?? []).map(([k, v]) => [k, v]));
+    const verdict = Object.fromEntries((tableUnder(text, '## Gate verdict') ?? []).map(([k, v]) => [k, v]));
     if (verdict.Verdict !== expected) errors.push(`response/response.md: Verdict says ${verdict.Verdict} but ${unmet.length ? `required gates ${unmet.join(', ')} neither passed nor carry a debt` : 'every required gate passed or is debt-covered'}`);
     const binding = Object.fromEntries((tableUnder(text, '## Binding') ?? []).map(([k, v]) => [k, v]));
     if (pinned && binding.Head !== pinned) errors.push(`response/response.md: Binding names head ${binding.Head} but the request pinned ${pinned}`);
@@ -201,6 +214,22 @@ export async function validateQualityStep(branchDir, root = ROOT) {
     if (below.length && !findingKeys.has('COVERAGE_BELOW_THRESHOLD|unit-coverage')) errors.push('response/response.md: coverage below a threshold must record COVERAGE_BELOW_THRESHOLD');
     for (const [gate, debt] of debtByGate) if (!findingKeys.has(`DEBT_DECLARED|${gate}`)) errors.push(`response/response.md: debt ${debt.debtId} is carried without recording DEBT_DECLARED`);
     for (const key of findingKeys) { const gate = key.split('|')[1]; if (gate !== 'null' && !plannedNames.includes(gate)) errors.push(`response/response.md: a finding names unplanned gate ${gate}`); }
+    // The scorecard: one row per topic, and the line that says whether it passed.
+    const rows = (tableUnder(text, '## Verdict') ?? []).map(([topic, v, route]) => ({ topic: topic.replaceAll('`', ''), verdict: v, routeTo: route }));
+    for (const topic of SCORECARD_TOPICS) if (!rows.some((r) => r.topic === topic)) errors.push(`response/response.md: Verdict carries no ${topic} row; a topic nobody reported is not a topic that passed`);
+    for (const row of rows) {
+      if (!SCORECARD_TOPICS.includes(row.topic)) errors.push(`response/response.md: Verdict names ${row.topic}, which is not one of the nine topics`);
+      if (row.verdict === 'blocked' && row.routeTo !== 'none') errors.push(`response/response.md: ${row.topic} is blocked and still routes to ${row.routeTo}; a topic nobody observed has no owner to send it to`);
+      if ((row.verdict === 'pass' || row.verdict === 'ship') && row.routeTo !== 'none') errors.push(`response/response.md: ${row.topic} ${row.verdict === 'ship' ? 'ships' : 'passes'} and still routes to ${row.routeTo}`);
+      if ((row.verdict === 'fail' || row.verdict === 'fix-first') && row.routeTo === 'none') errors.push(`response/response.md: ${row.topic} is ${row.verdict} and routes nowhere`);
+    }
+    if (rows.length) {
+      const line = /^Verdict: (ship|fix-first|blocked)$/m.exec(text);
+      const computed = scorecardVerdict(rows);
+      if (!line) errors.push('response/response.md: Verdict closes with no "Verdict: ship|fix-first|blocked" line');
+      else if (line[1] !== computed) errors.push(`response/response.md: Verdict reads ${line[1]}; the rows make it ${computed}`);
+    }
+
     const mdResults = tableUnder(text, '## Results') ?? [];
     if (mdResults.length !== byGate.size) errors.push(`response/response.md: Results has ${mdResults.length} rows, the gate files measure ${byGate.size}`);
     for (const row of mdResults) {

@@ -36,7 +36,12 @@ test('init installs the tree, writes both bootstraps and the sessions ignore, an
     assert.equal(manifest.version, pkg.version);
     for (const p of PAYLOAD) assert.ok(existsSync(path.join(repo, '.claude', p)), `${p} not installed`);
     assert.ok(!existsSync(path.join(repo, '.claude', 'package.json')), 'the package manifest is not part of the runtime');
-    for (const name of ['CLAUDE.md', 'AGENTS.md']) assert.match(readFileSync(path.join(repo, name), 'utf8'), /\.claude\/INDEX\.md/);
+    for (const name of ['CLAUDE.md', 'AGENTS.md']) {
+      const text = readFileSync(path.join(repo, name), 'utf8');
+      assert.match(text, /\.claude\/INDEX\.md/);
+      // The session-first law rides on the bootstrap, so an agent meets it before it reads anything.
+      assert.match(text, /Nothing is designed, written or committed outside a session: the first act of a mission is the session\nfolder and a validated request\.json\./);
+    }
     assert.match(readFileSync(path.join(repo, '.gitignore'), 'utf8'), /^\.worktrees\/sessions\/$/m);
     assert.equal(doctor({ dir: repo, quick: true }, quiet), 0);
   } finally { rmSync(repo, { recursive: true, force: true }); }

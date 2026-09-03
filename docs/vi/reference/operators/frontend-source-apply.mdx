@@ -37,6 +37,17 @@ repository, điều bất khả thi khi ba operator mỗi anh ghi một ít. Vì
 chỗ duy nhất một giá trị bịa có thể lọt vào source, nên nó không có đường nào để tạo ra một giá trị
 như vậy.
 
+## Không ghi gì bên ngoài một phiên
+
+Trước khi một byte nguồn được route bị đọc để sửa hay bị ghi, nhánh mà operator này chạy trong đó đã
+tồn tại: một thư mục phiên có `state.json` và `step-N/parallel-M/request/request.json` của chính nhánh
+ấy, xanh dưới `validate-request`. Thứ tự đó chính là lý do phiên tồn tại — request nói được phép chạm
+vào cái gì trước khi có gì bị chạm, và mọi biên nhận sau đều treo vào nó. Một lần gọi phát hiện mình
+sắp sửa nguồn được route mà không có `step-N/parallel-M` nào dưới một phiên thì dừng với
+`SESSION_MISSING` và báo lại; nó không dựng thư mục phiên ngược về sau, vì một phiên viết sau khi việc
+đã xong là bản ghi của việc chứ không phải cổng chặn việc, và không thứ gì trong đó từng được kiểm
+lại với những gì thực sự đã làm.
+
 ## Nhánh phiên
 
 Operator không bao giờ ghi lên nhánh mà người dùng đang checkout. Nó chỉ ghi trên
@@ -125,7 +136,7 @@ không bao giờ biết nó render ra sao.
 
 | # | Bước | Tham số | Đọc | Ghi | Dừng với |
 | --- | --- | --- | --- | --- | --- |
-| 1 | Kiểm gate, chạy lại, và xác nhận head | `resume`, `mode` | `request/request.json`, đầu vào `frontend-presentation-resolution`, @workspaces/fe ở head đóng băng | — | `INVALID_INPUT`, `SOURCE_DRIFT`, `NO_PROGRESS` |
+| 1 | Kiểm gate, chạy lại, xác nhận phiên và xác nhận head | `resume`, `mode` | `request/request.json`, `state.json` của phiên và `step-N/parallel-M` của nhánh này, đầu vào `frontend-presentation-resolution`, @workspaces/fe ở head đóng băng | — | `INVALID_INPUT`, `SESSION_MISSING`, `SOURCE_DRIFT`, `NO_PROGRESS` |
 | 2 | Bind resolution, direction và write set đã khai | — | đầu vào `frontend-presentation-resolution` (fingerprint cây, kho class và kho luật, cây đã resolve) và `frontend-direction-decision` (ý đồ và trần owner), @workspaces/fe (các path đã khai và gốc owner của chúng) | — | `RESOLUTION_STALE`, `OWNER_CONFLICT` |
 | 3 | Chiếu cây đã resolve lên các path đã khai | — | đầu vào `frontend-presentation-resolution` (cây đã resolve), @workspaces/fe (write set đã khai) | — | — |
 | 4 | Đối chiếu mọi giá trị tạo ra với kho, rồi quét write set đã chiếu | `mode` | đầu vào `frontend-presentation-resolution` (kho nằm cạnh biên nhận), @workspaces/fe (write set đã chiếu), @tools/shell | `response/data/writes.json` | `WRITE_REJECTED` |
@@ -156,6 +167,7 @@ và bề mặt nào bây giờ phải được quan sát.
 | Code | Xử lý |
 | --- | --- |
 | `INVALID_INPUT` | terminate |
+| `SESSION_MISSING` | terminate |
 | `SOURCE_DRIFT` | terminate |
 | `OWNER_CONFLICT` | terminate |
 | `RESOLUTION_STALE` | terminate |
@@ -166,6 +178,7 @@ và bề mặt nào bây giờ phải được quan sát.
 
 | Khi | Operator |
 | --- | --- |
+| source đã commit và một bề mặt đang được phục vụ phải được bind ở head mới trước khi quan sát được | `workspace.bind` |
 | source đã commit và bề mặt render ra phải được đo | `frontend.surface.audit` |
 | source đã commit và các cổng của chính checkout phải chạy | `quality.verify` |
 

@@ -55,6 +55,7 @@ Chi phối những cách khác khiến không gian cạn đi.
 | Case 3 | Nội dung vốn hai chiều và không thể chảy lại | Đúng một `HorizontalScrollRegion` có tên sở hữu nó, và trang bao quanh vẫn nằm trong biên inline của mình |
 | Case 4 | Bàn phím ảo, xoay màn hình hoặc safe-area làm hụt không gian dùng được | Geometry thường trực vẫn vừa, vẫn nhìn thấy và không che phần nào của nhiệm vụ; việc một layout query vẫn ở chế độ rộng không được nhận là bằng chứng vừa mắt |
 | Case 5 | Một state làm surface nở ra, như lỗi, panel mở hay overlay | Hình dạng nở ra được chốt trong cùng mục receipt với hình dạng lúc nghỉ |
+| Case 6 | Quyết định được kiểm xem có vừa không | Nó được kiểm hai lần, và không lần nào thay được lần nào. Trước khi có cây, mỗi phương án được render và phục vụ một lần cho mỗi viewport của coverage, để một người so bản rộng với bản hẹp trong lúc hướng còn đổi được. Sau khi cây đã dựng, audit chụp đủ mọi viewport của chính coverage ấy và đo các rule ở trên trên thứ đã render. Một quyết định chỉ được nhìn một lần là mới chỉ được kiểm ở một bề rộng |
 
 Retired: RESPONSIVE-5 đã nghỉ, gộp vào COVERAGE-1, và số này không được dùng lại; địa chỉ đó coi như đã tiêu.
 

@@ -54,6 +54,20 @@ Governs what closes a motion claim.
 | Case 4 | Anything flashes | It stays at or below three flashes per second. A four-flash urgency cue falsifies safety outright |
 | Case 5 | A family or the application adds a delta | Each layer is attributed independently, and a smooth video with no preference or interruption evidence closes nothing |
 
+## MOTION-5 — The motion verdict
+
+Governs how the criteria above become this topic's one row in the receipt's `## Verdict` table.
+
+| Case | When | Observe |
+| --- | --- | --- |
+| Case 1 | The lens runs | `MOTION-1` to `MOTION-4` are judged on the capture pair the coverage requires: one with the reduced-motion preference unset and one with it set to reduce |
+| Case 2 | The verdict is computed | The gating set is the whole set: `pass` requires every criterion to pass, because movement that loses meaning once has lost it |
+| Case 3 | One of the two captures is missing | The verdict is `blocked`; a lens run on the ordinary capture alone has not tested the preference at all |
+| Case 4 | A failure is routed | A duration or an easing outside the published scale routes to `resolve` with an off-scale cause; wrong choreography, a lost outcome or a reflow routes to `direction` |
+
+The scored set is `MOTION-1` to `MOTION-4`; this rule is the arithmetic and is not itself scored. Its
+result is the `motion` row of the audit receipt's `## Verdict` table.
+
 ## What this file does not decide
 
 Which states exist and which carrier holds each is [State](../composition/state.md), and which

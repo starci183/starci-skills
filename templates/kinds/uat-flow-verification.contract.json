@@ -2,10 +2,88 @@
   "kind": "uat-flow-verification",
   "title": "^# uat-flow-verification — [a-z0-9][a-z0-9-]*/[a-z0-9][a-z0-9-]*$",
   "sections": [
-    { "heading": "^## Admission$", "table": "| Kind | Ref | Commit |", "exactRows": 2, "rows": ["frontend-surface-audit", "quality-verification"], "cell": { "Kind": "^`(frontend-surface-audit|quality-verification)`$", "Ref": "\\S", "Commit": "^`[0-9a-f]{40}`$" } },
-    { "heading": "^## Snapshot$", "table": "| Field | Value |", "rows": ["Run", "Requested by", "Feature", "Flow", "Commit", "Snapshot", "Namespace", "Credential", "Run record", "Latest"], "cell": { "Value": "\\S" } },
-    { "heading": "^## Cases$", "table": "| Case | Order | Assertions | Capture | Screenshot | Outcome |", "minRows": 1, "cell": { "Order": "^[1-9][0-9]*$", "Assertions": "\\S", "Capture": "^`response/data/captures/[A-Za-z0-9_.-]+\\.json`$", "Screenshot": "^`response/artifacts/[A-Za-z0-9_.-]+\\.png`$", "Outcome": "^(pass|fail)$" } },
-    { "heading": "^## Lanes$", "table": "| Lane | Verdict | Evidence |", "exactRows": 3, "cell": { "Lane": "^`(behavior|ux|ui)`$", "Verdict": "^(pass|fail)$", "Evidence": "\\S" } },
-    { "heading": "^## Fallbacks taken$", "table": "| Code | Action |" }
+    {
+      "heading": "^## Admission$",
+      "table": "| Kind | Ref | Commit |",
+      "exactRows": 2,
+      "rows": [
+        "frontend-surface-audit",
+        "quality-verification"
+      ],
+      "cell": {
+        "Kind": "^`(frontend-surface-audit|quality-verification)`$",
+        "Ref": "\\S",
+        "Commit": "^`[0-9a-f]{40}`$"
+      }
+    },
+    {
+      "heading": "^## Snapshot$",
+      "table": "| Field | Value |",
+      "rows": [
+        "Run",
+        "Requested by",
+        "Feature",
+        "Flow",
+        "Commit",
+        "Snapshot",
+        "Namespace",
+        "Credential",
+        "Run record",
+        "Latest"
+      ],
+      "cell": {
+        "Value": "\\S"
+      }
+    },
+    {
+      "heading": "^## Cases$",
+      "table": "| Case | Order | Assertions | Capture | Screenshot | Outcome |",
+      "minRows": 1,
+      "cell": {
+        "Order": "^[1-9][0-9]*$",
+        "Assertions": "\\S",
+        "Capture": "^`response/data/captures/[A-Za-z0-9_.-]+\\.json`$",
+        "Screenshot": "^`response/artifacts/[A-Za-z0-9_.-]+\\.png`$",
+        "Outcome": "^(pass|fail)$"
+      }
+    },
+    {
+      "heading": "^## Lanes$",
+      "table": "| Lane | Verdict | Evidence |",
+      "exactRows": 3,
+      "cell": {
+        "Lane": "^`(behavior|ux|ui)`$",
+        "Verdict": "^(pass|fail)$",
+        "Evidence": "\\S"
+      }
+    },
+    {
+      "heading": "^## Experience$",
+      "table": "| Rule | Measured | Score | Verdict |",
+      "exactRows": 11,
+      "cell": {
+        "Rule": "^`UX-([1-9]|1[01])`$",
+        "Measured": "\\S",
+        "Score": "^[1-5]$",
+        "Verdict": "^(pass|fail|evidence-unavailable)$"
+      }
+    },
+    {
+      "heading": "^## Verdict$",
+      "table": "| Topic | Verdict | Route |",
+      "exactRows": 1,
+      "rows": [
+        "experience"
+      ],
+      "cell": {
+        "Topic": "^`experience`$",
+        "Verdict": "^(pass|fail|ship|fix-first|blocked)$",
+        "Route": "^(resolve|direction|flow-owner|grammar-gap|none)$"
+      }
+    },
+    {
+      "heading": "^## Fallbacks taken$",
+      "table": "| Code | Action |"
+    }
   ]
 }

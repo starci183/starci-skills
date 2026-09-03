@@ -67,6 +67,21 @@ Chi phối sự ngang bằng giữa hai phương thức nhập trên mọi owner
 | Case 4 | Một action bắt buộc chỉ lộ ra khi hover | Điều đó bác bỏ nó. Một action bắt buộc không bao giờ chỉ có ở hover |
 | Case 5 | Các đường được chạy qua trạng thái mặc định, selected, expanded, disabled, pending và vắng mặt | Mỗi trạng thái được chạy bằng cả hai đường, và một lượt bấm chuột trên desktop không khép được gì |
 
+## FOCUS-6 — Phán quyết của focus
+
+Chi phối việc các tiêu chí trên trở thành đúng một hàng của topic này trong bảng `## Verdict` của receipt.
+
+| Case | Dùng khi | Quan sát |
+| --- | --- | --- |
+| Case 1 | Lens chạy | `FOCUS-1` đến `FOCUS-5` đều được xét dựa trên phần tử thật sự đang giữ focus, ở mọi state mà coverage khai |
+| Case 2 | Tính verdict | Tập chặn cửa là toàn bộ tập: `pass` đòi mọi tiêu chí đều đạt, vì focus mất một lần là mất hẳn với người điều hướng theo cách ấy |
+| Case 3 | Một tiêu chí không có quan sát nào đứng sau | Verdict là `blocked`, và một lần đạt một phần trên những tiêu chí đã quan sát được sẽ bác bỏ nó |
+| Case 4 | Một lần fail được định tuyến | Một chỉ dấu có mặt nhưng sai thì về `resolve`; thứ tự, phạm vi giam giữ hay đường quay lại sai thì về `direction`; thiếu một năng lực đã publish thì về `grammar-gap` |
+
+Tập được chấm là `FOCUS-1` đến `FOCUS-5`; rule này là phần số học và bản thân nó không được chấm. Kết
+quả của nó nhập vào hàng `accessibility` của bảng `## Verdict`, vì một bề mặt không với tới được và
+một bề mặt không nhìn thấy được là mình đang với tới đều làm hỏng cùng một người đọc.
+
 ## File này không quyết định
 
 Nhiệm vụ đòi thứ tự đọc nào thuộc [Hierarchy](../composition/hierarchy.vi.md), surface nào tương tác

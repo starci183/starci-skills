@@ -2,7 +2,9 @@
   "$id": "kind:verdicts",
   "type": "object",
   "additionalProperties": false,
-  "required": ["entries"],
+  "required": [
+    "entries"
+  ],
   "properties": {
     "entries": {
       "type": "array",
@@ -11,9 +13,93 @@
       "items": {
         "type": "object",
         "additionalProperties": false,
-        "required": ["matrixId", "results"],
+        "required": [
+          "matrixId",
+          "surfaceClass",
+          "results"
+        ],
         "properties": {
-          "matrixId": { "type": "string", "pattern": "^[a-z0-9][a-z0-9-]*$" },
+          "matrixId": {
+            "type": "string",
+            "pattern": "^[a-z0-9][a-z0-9-]*$"
+          },
+          "surfaceClass": {
+            "description": "The class the coverage declared, from the vocabulary COVERAGE-1 Case 7 publishes. Every banded threshold lives in the proof topic that owns the measure; this name only says which surface the topics are looking at.",
+            "enum": [
+              "console",
+              "form",
+              "landing",
+              "catalog",
+              "reader"
+            ]
+          },
+          "taste": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "entries",
+              "mean",
+              "verdict"
+            ],
+            "properties": {
+              "entries": {
+                "type": "array",
+                "minItems": 1,
+                "maxItems": 32,
+                "items": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "rule",
+                    "measured",
+                    "score",
+                    "verdict",
+                    "routeTo"
+                  ],
+                  "properties": {
+                    "rule": {
+                      "type": "string",
+                      "pattern": "^TASTE-[0-9]+$"
+                    },
+                    "measured": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "score": {
+                      "type": "integer",
+                      "minimum": 1,
+                      "maximum": 5
+                    },
+                    "verdict": {
+                      "enum": [
+                        "pass",
+                        "fail"
+                      ]
+                    },
+                    "routeTo": {
+                      "enum": [
+                        "direction",
+                        "none"
+                      ]
+                    }
+                  }
+                }
+              },
+              "mean": {
+                "type": "number",
+                "minimum": 1,
+                "maximum": 5
+              },
+              "verdict": {
+                "description": "TASTE-13 computes ship or fix-first; blocked is what a topic takes when its evidence never arrived, and blocked is never reported as a pass or as a failure.",
+                "enum": [
+                  "ship",
+                  "fix-first",
+                  "blocked"
+                ]
+              }
+            }
+          },
           "results": {
             "type": "array",
             "minItems": 1,
@@ -21,14 +107,95 @@
             "items": {
               "type": "object",
               "additionalProperties": false,
-              "required": ["path", "owner", "rule", "measured", "verdict", "routeTo"],
+              "required": [
+                "path",
+                "owner",
+                "rule",
+                "measured",
+                "verdict",
+                "routeTo"
+              ],
               "properties": {
-                "path": { "type": "string", "minLength": 1 },
-                "owner": { "enum": ["app", "grammar"] },
-                "rule": { "type": "string", "pattern": "^[A-Z][A-Z0-9-]*-[0-9]+$" },
-                "measured": { "type": "string", "minLength": 1 },
-                "verdict": { "enum": ["pass", "fail"] },
-                "routeTo": { "enum": ["resolve", "grammar-gap", "none"] }
+                "path": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "owner": {
+                  "enum": [
+                    "app",
+                    "grammar"
+                  ]
+                },
+                "rule": {
+                  "type": "string",
+                  "pattern": "^[A-Z][A-Z0-9-]*-[0-9]+$"
+                },
+                "measured": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "verdict": {
+                  "enum": [
+                    "pass",
+                    "fail"
+                  ]
+                },
+                "routeTo": {
+                  "enum": [
+                    "resolve",
+                    "direction",
+                    "flow-owner",
+                    "grammar-gap",
+                    "none"
+                  ]
+                }
+              }
+            }
+          },
+          "topics": {
+            "description": "One entry per proof topic this audit judged. The verdict is the one the topic's own closing rule computed; nothing downstream recomputes it.",
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 8,
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "topic",
+                "verdict",
+                "routeTo"
+              ],
+              "properties": {
+                "topic": {
+                  "enum": [
+                    "presentation",
+                    "composition",
+                    "responsive",
+                    "motion",
+                    "accessibility",
+                    "contrast",
+                    "render-truth",
+                    "taste"
+                  ]
+                },
+                "verdict": {
+                  "enum": [
+                    "pass",
+                    "fail",
+                    "ship",
+                    "fix-first",
+                    "blocked"
+                  ]
+                },
+                "routeTo": {
+                  "enum": [
+                    "resolve",
+                    "direction",
+                    "flow-owner",
+                    "grammar-gap",
+                    "none"
+                  ]
+                }
               }
             }
           }

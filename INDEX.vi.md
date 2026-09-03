@@ -1,4 +1,4 @@
-# StarCi Skills 1.3.0
+# StarCi Skills 1.5.0
 
 Cây này chính là runtime. Đọc tiếp `SKILL.md` (bản tiếng Anh là bản được nạp; `SKILL.vi.md` chỉ để người đọc); đó là cửa vào duy nhất,
 đóng băng phạm vi của một nhiệm vụ, chọn đúng một operator sở hữu kết quả, rồi định tuyến giữa các
@@ -6,6 +6,11 @@ operator dựa trên kết quả có kiểu.
 
 ## Thứ tự nạp
 
+0. [`UPDATE.md`](UPDATE.md) (bản soi [`UPDATE.vi.md`](UPDATE.vi.md)): đọc trước khi sửa cây này, không
+   bao giờ để chạy một nhiệm vụ. Đó là chuẩn cập nhật một cây skills hình dạng này: bốn câu hỏi theo
+   thứ tự, được thêm gì và không được thêm gì, sửa một id thế nào và cho một id nghỉ thế nào, mức bằng
+   chứng, luật ngôn ngữ, cưỡng chế trước lời khuyên, file nào được sinh ra, phát hành nghĩa là gì, và
+   danh mục kiểm trước khi commit. Một thay đổi chưa đi qua nó thì chưa commit được.
 1. `SKILL.md`: cửa vào, vòng lặp định tuyến, và tuyên bố về thẩm quyền.
 2. `routing.json`: bảng đóng ánh xạ mọi domain mà mã dừng bàn giao tới (xem bảng Mã dừng trong
    `operators/INDEX.md`) sang bước kế tiếp. Bảng được kiểm đối chiếu với bảng Dừng của các operator,
@@ -62,6 +67,8 @@ thì không được publish.
   đổi nghĩa.
 
 ## Dòng dõi
+
+1.5.0 (2026-09-03): UPDATE.md, chuẩn cập nhật trung lập cho một cây skills, đứng đầu thứ tự nạp và đi theo gói cài; session-first và SESSION_MISSING; git.publish đòi receipt; mọi workflow ví dụ là luồng dài (bind runtime → audit chụp màn → quality → uat → publish); lens taste (TASTE) và experience (UX) tự kết luận trong topic của mình, verdict cuối là bảng trong receipt của quality.verify; @tools/host phục vụ candidate theo viewport; pass gom: 44 chỗ → 19 cho các khái niệm thêm trong ngày, ui.md và FE-TEST-7 nghỉ.
 
 1.3.0 (2026-09-03): gate quét presentation chạy máy (scripts/sweep-presentation.mjs: APP_OVERRIDE, APP_REIMPLEMENTATION, OFF_SCALE, SHELL_GEOMETRY) nối vào frontend.source.apply và quality.verify; phạm vi resolve gồm mọi thư mục leaf/branch app sở hữu; luật twin, spec cặp và hằng số triển khai; luật viết product-agnostic.
 

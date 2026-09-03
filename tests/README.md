@@ -43,7 +43,9 @@ policy for the fe route.
 
 ## Round 2 — 2026-09-03, tree at 1.0.3 → 1.1.0
 
-Five sessions, each run by a processor agent (Claude Opus standing in for every bound profile), every branch
+Five dry sessions plus one real one that never became a session at all (the last row: a Codex
+processor working beside the runtime on a live product). The five were each run by a processor agent
+(Claude Opus standing in for every bound profile), every branch
 through the four validators, source-writing steps in `mode: dry`, nothing written to a checkout or the
 businesses worktree. The shared runtime was down on the machine (registry generation 6 says `ready`, ports
 3000/3001 refuse), which every chain that bound `runtimeNeed: consume` met at step 1.
@@ -55,6 +57,7 @@ businesses worktree. The shared runtime was down on the machine (registry genera
 | `full-feature` | `pro-subscription` | step 1 parallel (be done, fe `RUNTIME_NOT_READY`) → resume → business → architecture waiting → done → step 5 parallel | `5/1` `CONTRACT_UNFROZEN` (the architecture decision carries no operations the backend plan can consume); `5/2` `CHANGE_LEVEL_AMBIGUOUS` (preset `new` on an existing route) | the parallel step and the nested exchange lay out and validate as designed; the architecture → backend handoff does not typecheck | [record](runs/20260903-r2-full-feature-parallel.md) |
 | `frontend-with-uat` | `/[lang]/subscriptions` | step 1: be `CHECKOUT_DIRTY`, fe `RUNTIME_NOT_READY`; `uat.verify` probed out of chain | `INVALID_INPUT` at the request gate (no `requestedBy`, no flow, no admissions); `ADMISSION_MISSING` unreachable | correct stop; the uat validator could not accept its own lawful refusal | [record](runs/20260903-r2-frontend-with-uat-admission.md) |
 | resume | `frontend-reconstruct`, learner dashboard | bind `RUNTIME_NOT_READY` → resume as step 2 with linkage → direction → resolve done | — (probe branches: an unregistered code fails both checks; `UNKNOWN_STOP` itself was unemittable) | resume layout holds; routing sent `runtime` to `external` while the operator's Next said `platform.operate`; `state.json` had no schema | [record](runs/20260903-r2-resume-blocked-branch.md) |
+| none (a Codex processor, not a workflow) | one overview surface, `frontend-reconstruct` in intent | nothing: the session folder holds a `checkout/` that is not even a worktree — no `state.json`, no branch, no request, no response | nothing stopped it; it designed and coded by hand and committed | the run was entirely nonconformant and every validator was silent, because all four take a branch directory that never existed; three blocking canon violations reached the product's `main`. The gate that failed was the processor, not the validators | [record](runs/20260903-r2-codex-overview-nonconformance.md) |
 
 ## What the round changed in the tree
 
@@ -73,6 +76,49 @@ lawful refusal and reads the fe route; workspace.bind states the blocked-branch 
 `PREDECESSOR_STALE` for quality.verify; an unpublished business `model` reaches architecture and backend.
 Outside the tree: `.workspaces/projects/starci-academy/be.json` now declares `session-only`.
 
+The Codex record above changed a second set of things, all of them about work that happens *beside* the
+runtime rather than inside it. The session is now a precondition rather than a description
+(`SKILL.md` Setup, `resources/orchestrator.json` → `session.lifecycle.create`, and the bootstrap
+`bin/starci-skills.mjs` writes into `CLAUDE.md` and `AGENTS.md`, pinned by `install-cli.spec.mjs`);
+`SESSION_MISSING` exists, scoped to the two source-writing operators and `git.publish`, domain
+`caller`, route `user`; `git.publish` binds the session's receipts before it merges and refuses a
+session branch with no `done` source-application response carrying its head, or with a declared
+`frontend.surface.audit` or `uat.verify` step whose branch or screenshots are missing;
+`frontend.direction.decide` renders every candidate it forms under `new` and `reconstruct`; and every
+example workflow that applies frontend source now proves it — `apply` → `workspace.bind` (fe,
+`runtimeNeed: consume`) → `audit` → `quality` → `uat` → `publish` — with
+`scripts/validate-workflows.mjs` refusing a chain that publishes an applied surface with either proof
+missing. `runtimeNeed: consume` moved from step 1 of `frontend-with-uat` to the post-apply bind of all
+five delivery chains, which is also where it belongs: the surface that must be served is the one the
+write just produced.
+
+## When UAT runs
+
+`uat.verify` is the only operator that drives a real product as a real person, and it is the easiest
+one to skip quietly, so the preconditions are written here as well as in
+[Getting started](../docs/getting-started.mdx):
+
+- **A workflow with a `uat.verify` step.** After this round that is `frontend-refine`,
+  `frontend-reconstruct`, `frontend-new-surface`, `frontend-with-uat` and `full-feature` — every
+  example that writes frontend source under `mode: apply`. `backend-feature` has none and its `when`
+  says why; `release` and `content-unit` write no surface.
+- **A person who asked, by name.** `requestedBy`, `feature` and `flow` have no defaults, the workflow
+  declares them under `asks`, and the branch refuses rather than inventing a requester.
+- **A flow directory that already exists**: `uat/<flow>/flow.md` with the cases and their named
+  assertions, `uat/<flow>/account.json` with a username, a role and a credential *name* — never a
+  secret — and `uat/<flow>/seed/` with the records a run namespaces.
+- **A sealed shared password**, resolved by name from the credential roster at login and read nowhere
+  else. No field of this operator can hold one, and its validator rejects a credential-shaped string
+  anywhere in what it writes.
+- **Both admissions at the pinned commit**: the `frontend-surface-audit` and the
+  `quality-verification` taken at the same head, plus the `route` receipt whose endpoint the run
+  drives.
+
+Any of those missing is a stop, not a silence: no requester or no admission is `INVALID_INPUT` at the
+request gate, no sealed credential is `PROVISIONING_UNAVAILABLE`, and nothing serving the product is
+`RUNTIME_UNAVAILABLE`. On this machine round 2 met the first and the last, which is why no record in
+this folder yet contains a UAT verdict — an absence that is now legible instead of invisible.
+
 ## Still open after round 2
 
 - The `.claude` head is not in `request.json.contexts`, so a tree edit under a running session is invisible
@@ -84,6 +130,14 @@ Outside the tree: `.workspaces/projects/starci-academy/be.json` now declares `se
 - The v7-era result/snapshot pair under `.worktrees/_templates/uat` and the seven flow folders still do not
   match the flow layout `uat.verify` reads.
 - The shared runtime registry claims `ready` with nothing listening; `platform.operate` territory.
+- Session-first is a rule an agent obeys and a receipt gate `git.publish` enforces afterwards. Nothing
+  can enforce it at the moment an agent opens an editor on a routed checkout, so a processor that
+  ignores the bootstrap is still only caught at the publish — as the Codex record shows, after the
+  work is done.
+- The presentation violations that Codex run shipped were found by a person reading source, and the
+  sweep that now catches them runs inside `frontend.source.apply` — the operator the run skipped. No
+  `frontend.surface.audit` has ever looked at that surface rendered and no `uat.verify` has walked it,
+  so the tree still knows nothing about how it behaves. Round 3 should do both.
 
 ## Round 3 — planned
 

@@ -3,6 +3,15 @@
   "title": "^# frontend-surface-audit — [a-z0-9][a-z0-9-]*$",
   "sections": [
     {
+      "heading": "^## Surface class$",
+      "table": "| Class | Declared by |",
+      "exactRows": 1,
+      "cell": {
+        "Class": "^`(console|form|landing|catalog|reader)`$",
+        "Declared by": "\\S"
+      }
+    },
+    {
       "heading": "^## Matrix$",
       "table": "| Matrix | Viewport | Scheme | State | Screenshot |",
       "minRows": 1,
@@ -23,6 +32,37 @@
         "Rule": "^`[A-Z][A-Z0-9-]*-[0-9]+`$",
         "Verdict": "^(pass|fail)$",
         "Matrix": "^`[a-z0-9][a-z0-9-]*`$"
+      }
+    },
+    {
+      "heading": "^## Taste$",
+      "table": "| Rule | Measured | Score | Verdict |",
+      "minRows": 12,
+      "cell": {
+        "Rule": "^`TASTE-([1-9]|1[0-2])`$",
+        "Measured": "\\S",
+        "Score": "^[1-5]$",
+        "Verdict": "^(pass|fail)$"
+      }
+    },
+    {
+      "heading": "^## Verdict$",
+      "table": "| Topic | Verdict | Route |",
+      "exactRows": 8,
+      "rows": [
+        "presentation",
+        "composition",
+        "responsive",
+        "motion",
+        "accessibility",
+        "contrast",
+        "render-truth",
+        "taste"
+      ],
+      "cell": {
+        "Topic": "^`(presentation|composition|responsive|motion|accessibility|contrast|render-truth|taste)`$",
+        "Verdict": "^(pass|fail|ship|fix-first|blocked)$",
+        "Route": "^(resolve|direction|flow-owner|grammar-gap|none)$"
       }
     },
     {

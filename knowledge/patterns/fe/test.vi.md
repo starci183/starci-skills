@@ -6,7 +6,12 @@ Tệp này trả lời một câu hỏi: cho một đơn vị frontend, spec c�
 Nguồn: `src/components/pages/CartPage/index.spec.tsx`,
 `pages/CodingDomainPage/component.spec.tsx`, `blocks/commerce/CartBlock/index.spec.tsx`,
 `hooks/index.ts`, `packages/grammar/src/**/*.spec.tsx`, `packages/grammar/src/**/*.test.mjs`,
-script trong `package.json` (`vitest run`).
+script trong `package.json` (`vitest run`), và
+[bằng chứng gom nhà](../../../tests/evidence/20260903-consolidation.md) cho phần kiểm kê đứng sau
+FE-TEST-1 Case 7.
+
+Một rule đã nghỉ ở đây: `FE-TEST-7` gộp vào `FE-TEST-1` Case 7, vì "spec nằm đâu" và "spec đo nửa nào"
+là một luật về một chỗ đặt. Số của nó không được dùng lại.
 
 ## FE-TEST-1 — Vị trí
 
@@ -18,6 +23,7 @@ script trong `package.json` (`vitest run`).
 | Case 4 | Chuỗi class | `classNames.spec.ts` cạnh `classNames.ts` (2 trong block); chứng minh CSS của Grammar trong `styles.spec.ts` (6) |
 | Case 5 | Nơi khác | 0 trên 497 spec nằm trong thư mục `__tests__/` |
 | Case 6 | Bộ chạy | `vitest`, `@testing-library/react`; `describe/it/expect/vi` import từ `"vitest"` |
+| Case 7 | Một unit mới có đủ hai nửa (FE-FUNCTION-4) | Cả hai tệp ở trên, mỗi nửa một tệp. Không bên nào thay được bên kia: spec nối thay trọn nửa thuần (FE-TEST-2 Case 4) còn spec thuần stub các con của nó (FE-TEST-3 Case 3), nên một unit chỉ mang một spec là có một nửa chưa được phủ chứ không phải phủ một phần cả hai. Một leaf không có nửa thuần nên chỉ một spec (FE-FOLDER-2 Case 4) |
 
 ## FE-TEST-2 — Spec nửa nối: giả lập các cánh cửa, khẳng định props được trao xuống
 
@@ -55,7 +61,7 @@ script trong `package.json` (`vitest run`).
 | Case 1 | Snapshot | 0 `toMatchSnapshot` / `toMatchInlineSnapshot` trong `src/` |
 | Case 2 | Mạng | không bao giờ chạm tới; `@/hooks` bị giả lập toàn bộ, đó là lý do barrel tồn tại |
 | Case 3 | Nội dung bản dịch | `useTranslations: () => (key: string) => key` — spec khẳng định khóa, không khẳng định câu chữ |
-| Case 4 | Một chuỗi class nguyên văn trong spec component hoặc index | Không viết gì. Hãy khẳng định vai trò, chữ, hoặc prop được trao xuống: 215 trên 272 spec component không mang `toHaveClass` hay `className` nào. Ghim một chuỗi nguyên văn là nhân đôi thẩm quyền trình bày ra một chỗ thứ hai, nên một class dời về thang đóng sẽ làm spec đỏ vì một thay đổi đúng, còn một class ngoài thang thì bị chính spec ghim nó khoá lại. Chứng minh class đã có hai nhà riêng: `classNames.spec.ts` (2 tệp, 11 khẳng định) và `styles.spec.ts` của Grammar (6 tệp). 57 spec đang ghim là câu hỏi để ngỏ bên dưới, không phải một thực hành thứ hai |
+| Case 4 | Một chuỗi class nguyên văn trong spec component hoặc index | Không viết gì. Hãy khẳng định vai trò, chữ, hoặc prop được trao xuống. Ghim một chuỗi nguyên văn là nhân đôi thẩm quyền trình bày ra một chỗ thứ hai, nên một class dời về thang đóng sẽ làm spec đỏ vì một thay đổi đúng, còn một class ngoài thang thì bị chính spec ghim nó khoá lại. Chứng minh class đã có nhà riêng: `classNames.spec.ts` đặt cạnh chính chuỗi nó chứng minh, và spec style của gói Grammar. Những spec vẫn ghim một chuỗi nguyên văn là câu hỏi để ngỏ bên dưới, không phải một thực hành thứ hai |
 
 ## FE-TEST-6 — Gói Grammar
 
@@ -66,27 +72,11 @@ script trong `package.json` (`vitest run`).
 | Case 3 | Bề mặt gói | `package-boundary.test.mjs`: `assert.deepEqual(Object.keys(packageJson.peerDependencies).sort(), ["@heroui/react", "react"])` |
 | Case 4 | Chứng minh toàn họ | `core/family.spec.tsx`, `core/surface-card-family.spec.tsx`, `core/scrollable-surfaces.spec.tsx` |
 
-## FE-TEST-7 — Phủ sóng tính theo từng nửa, và spec của nửa này không phủ nửa kia
-
-Một unit có hai nửa là có hai đối tượng đo. Spec nối giả lập trọn `./component` (FE-TEST-2 Case 4)
-còn spec thuần thay các con bằng stub (FE-TEST-3 Case 3), nên mỗi bên cố tình mù với bên kia; một
-unit chỉ có một spec là có một nửa chưa được phủ, chứ không phải phủ một phần cả hai.
-
-| Case | Dùng khi | Viết |
-| --- | --- | --- |
-| Case 1 | Một block hay page mới có đủ hai nửa | Cả `index.spec.tsx` lẫn `component.spec.tsx`, đặt cạnh đúng tệp mà mỗi spec đo (28 trên 101 thư mục block và 22 trên 49 thư mục page hiện đã có cả hai) |
-| Case 2 | Xét xem spec nối có thay được spec thuần không | Không: `vi.mock("./component", () => ({ CartBlockBase: (input) => { mocks.input = input; return <output /> } }))` thay trọn nửa thuần, nên không có gì nửa thuần render được đo |
-| Case 3 | Xét xem spec thuần có thay được spec nối không | Không: nó render fixture và stub các con, nên không hook, khoá SWR, tra bản dịch hay đấu nối hành động nào được chạy |
-
-Không phải rule này: một leaf, vốn không có `component.tsx` (FE-FOLDER-2 Case 4) nên chỉ có một spec.
-
 ## Câu hỏi để ngỏ
 
-- 57 trên 272 spec component và index chứa `toHaveClass` hoặc `className`, trong 167 lời gọi. 215
-  spec còn lại chỉ khẳng định vai trò, chữ và props được trao xuống, còn chứng minh class đã có nhà
-  riêng (`classNames.spec.ts`, `styles.spec.ts`). FE-TEST-5 Case 4 ghi đa số ấy thành luật; 57 spec
-  kia là một khoản nợ đứng đối lập với luật chứ không phải một thực hành thứ hai, và file này không
-  nói nên xoá cái nào trước.
-- FE-TEST-7 Case 1 ràng một unit mới. Nó không phải bản kiểm kê cây hiện tại: 73 trên 101 thư mục
-  block và 27 trên 49 thư mục page đang có một spec chứ không phải hai, và ở đây không luật hoá một
-  đợt quét khoản tồn ấy.
+- Một thiểu số spec component và index vẫn ghim chuỗi class nguyên văn. FE-TEST-5 Case 4 ghi đa số
+  thành luật và coi phần còn lại là một khoản nợ đối lập với luật chứ không phải một thực hành thứ
+  hai; file này không nói nên xoá cái nào trước. Số đếm nằm ở
+  [bằng chứng gom nhà](../../../tests/evidence/20260903-consolidation.md).
+- FE-TEST-1 Case 7 ràng một unit mới. Nó không phải bản kiểm kê cây hiện tại: phần lớn unit đang có
+  một spec chứ không phải hai, và ở đây không luật hoá một đợt quét khoản tồn ấy.

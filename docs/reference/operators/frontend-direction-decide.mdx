@@ -56,6 +56,21 @@ recorded with its URL and with the exact limitation it carries; nothing copies a
 palette or a component anatomy. When bounded research cannot close the business or interaction
 question the decision rests on, the run stops with the owning gap.
 
+## A reference is named by class, not by adjective
+
+`## References` is where the direction states which standard the surface is aiming at, and it names
+it the way a reader would sort it: a class such as `console-grid` or `plan-comparison`, never an
+adjective such as modern, clean or premium, because an adjective cannot be compared with a capture.
+Each row also records what is borrowed — a composition decision, an ordering, a density — which is
+what keeps the borrowing honest, since nothing copies a brand, a palette or a component anatomy. A
+`new` or `reconstruct` direction carries at least one such row; a `refine` carries none, because the
+structure it moves elements inside was already approved. This is what the later audit reads: the
+taste lens sorts the capture beside the named standards, and a direction that named none falsifies
+that lens before a single pixel is measured. A run that reaches the decision with no reference row is
+not the caller's defect and never becomes `INVALID_INPUT`: it is this operator's own, so it stops
+with `REFERENCE_MISSING`, which routes to `self` and is answered by naming the standards and running
+the same direction again.
+
 ## The Grammar filter refuses invention, not ownership
 
 A candidate that invents a missing shared interface, bypasses the owner ceiling, imitates unpublished
@@ -137,16 +152,33 @@ business promise did not make. The asset and its prompt land under `response/art
 | 3 | Bind the inputs the change level requires | `changeLevel` | inputs `business-promise-authority`, `backend-source-application` and `architecture-decision` | — | `BUSINESS_REQUIRED`, `BACKEND_REQUIRED`, `ARCHITECTURE_REQUIRED` |
 | 4 | Observe the existing context | — | @workspaces/fe (the target's direct artifacts, or the authorized host and product family when the target is absent), @worktrees/uat/&lt;flow>/&lt;case> when present | — | `EVIDENCE_MISSING` |
 | 5 | Compile one UI contract and its coverage | — | @knowledge/ui/composition, input `business-promise-authority` when present, the observed context | `response/data/coverage.json` | `SCOPE_UNFROZEN` |
-| 6 | Resolve external references, bounded | `references`, `changeLevel` | @knowledge/ui/composition (the gap the research must close), @tools/websearch | — | `REFERENCE_EVIDENCE_EXHAUSTED` |
+| 6 | Resolve the reference standards by class, bounded | `references`, `changeLevel` | @knowledge/ui/composition (the gap the research must close), @tools/websearch | — | `REFERENCE_EVIDENCE_EXHAUSTED`, `REFERENCE_MISSING` |
 | 7 | Form the candidates | `candidates` | the compiled UI contract | — | `NO_VIABLE_DIRECTION` |
 | 8 | Apply the Grammar filter | `ownerCeiling` | @grammar/core (what a component owns and which props exist), @knowledge/grammars/starci | — | `GRAMMAR_REQUIRED` |
-| 9 | Render the decision evidence and the judged images | `candidates`, `preview` | the surviving candidates, `@knowledge/grammars/starci` | `response/artifacts/<candidateId>.html`, `response/artifacts/images/<slot>.png`, @tools/visualize, @tools/imagegen | — |
+| 9 | Render the decision evidence and the judged images, and serve them for a person | `candidates`, `preview` | the surviving candidates, `@knowledge/grammars/starci` | `response/artifacts/<candidateId>.html`, `response/artifacts/images/<slot>.png`, `response/artifacts/host.json`, @tools/visualize, @tools/imagegen, @tools/host | — |
 | 10 | Falsify | — | the candidates, inputs `business-promise-authority` and `backend-source-application`, `response/data/coverage.json` | — | `NO_VIABLE_DIRECTION` |
 | 11 | Decide | `selectionPolicy`, `approval` | the falsification table | — | `DIRECTION_CHOICE_REQUIRED` |
 | 12 | Emit | — | everything above | `response/response.md`, `response/response.json` | — |
 
-Step 9 renders only when more than one candidate was formed or `preview` is yes; a single candidate
-under the defaults produces no page and rests on step 10. Under `automatic`,
+Step 6 leaves the receipt with the standards this surface is aiming at, each named by class, each
+carrying what is borrowed and what it does not settle. Under `new` and `reconstruct` that table has
+at least one row and step 6 stops with `REFERENCE_MISSING` when it cannot produce one; under
+`refine` it stays empty. Step 9 renders before step 11 writes the decision, because a structure nobody has seen cannot be
+approved and a candidate described in prose is not a candidate anybody can judge. Under `new` and
+`reconstruct` every candidate the run forms is rendered as its own page, whatever `preview` says and
+however many there are: that is `@tools/visualize`, needs no grant, and every runtime does it.
+
+The candidate pages are not files a person is asked to find. Step 9 serves the artifacts folder over
+`@tools/host` on the loopback interface, at the first free port from 60000 up to 60100, and records
+the URL, the port, the folder and the pid in `response/artifacts/host.json`; the server stops when the
+branch ends or is resumed. Each candidate is served once per viewport of the coverage — one page per
+viewport, or one page taking the viewport as a query string — so the person sees the wide and the
+narrow render before deciding, which is the first of the two places responsiveness is looked at.
+
+Under
+`refine` the page stays optional — the structure was approved before this run began — and is rendered
+only when more than one candidate was formed or `preview` is yes; a single refine candidate under the
+defaults produces no page and rests on step 10. Under `automatic`,
 `DIRECTION_CHOICE_REQUIRED` selects the candidate that survived the most attacks and records the
 table; under `approval-required` it stops and the person returns with `approval`. The receipt
 authorizes the next domain to resolve and implement inside the frozen owner ceiling and proves
@@ -160,6 +192,7 @@ nothing about how the result renders.
 | `ui-coverage` | `response/data/coverage.json` | data | yes |
 | `candidates` | `response/artifacts/<candidateId>.html` | artifact | no |
 | `direction-image` | `response/artifacts/images/<slot>.png` | artifact | no |
+| `host` | `response/artifacts/host.json` | artifact | no |
 
 ## Stops
 
@@ -177,6 +210,7 @@ nothing about how the result renders.
 | `GRAMMAR_REQUIRED` | terminate |
 | `EVIDENCE_MISSING` | terminate |
 | `REFERENCE_EVIDENCE_EXHAUSTED` | terminate |
+| `REFERENCE_MISSING` | terminate |
 | `NO_VIABLE_DIRECTION` | terminate |
 | `DIRECTION_CHOICE_REQUIRED` | fallback |
 | `NO_PROGRESS` | terminate |

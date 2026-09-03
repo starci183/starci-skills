@@ -51,8 +51,29 @@ to reach any verdict at all is a stop.
 | --- | --- | --- |
 | `PREDECESSOR_CONSUMED` | — | the producer receipt was consumed unchanged at the frozen head |
 
-## Verdict
+## Gate verdict
 
 | Field | Value |
 | --- | --- |
 | Verdict | `pass` |
+
+## Verdict
+
+One row per topic, each copied from the receipt that computed it — the audit for the eight it scores,
+the UAT run for `experience` — and never rescored here. The line below is the whole answer: any row
+missing or `blocked` makes it `blocked`; any `fail` or `fix-first` makes it `fix-first`, naming that
+row and its route; otherwise `ship`. Nothing is averaged across rows.
+
+| Topic | Verdict | Route |
+| --- | --- | --- |
+| `presentation` | pass | none |
+| `composition` | pass | none |
+| `responsive` | pass | none |
+| `motion` | pass | none |
+| `accessibility` | pass | none |
+| `contrast` | pass | none |
+| `render-truth` | pass | none |
+| `taste` | ship | none |
+| `experience` | ship | none |
+
+Verdict: ship

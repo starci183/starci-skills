@@ -76,6 +76,17 @@ must name the same commit as the pinned head; either one absent, or either one t
 commit, is `ADMISSION_MISSING`, because a clean surface and a green gate at some other commit say
 nothing about the product this run drives.
 
+## The experience lane is scored, not asserted
+
+The `ux` lane is not a sentence about how the run felt. `UX-1` to `UX-11` are each carried in the run
+receipt with the run step or the capture that measured them, a score from 1 to 5 and a verdict, and
+`UX-12` computes the lane from them; the arithmetic lives in that rule and is not repeated here. The
+result is the one row this operator publishes under `## Verdict`, as `experience`, and nothing
+downstream rescores it — `quality.verify` copies the row and combines it with the audit's topics. A
+criterion whose only evidence is a screenshot, for a rule that this file assigns to a run, is
+`EVIDENCE_UNAVAILABLE` rather than a pass or a fail, and the lane is incomplete until the attempt
+exists.
+
 ## Three lanes, judged apart
 
 Behaviour, UX and UI are judged on their own evidence and never borrow each other's conclusions.
@@ -116,10 +127,11 @@ anything outside its own fixture namespace.
 | Alias | Bind | Required |
 | --- | --- | --- |
 | `@worktrees/uat/<flow>/<case>` | the flow directory: `flow.md`, `account.json`, `seed/`, the append-only `runs/<runId>/` history and the `latest` pointer, bound by fingerprint per file and written only under the exclusive lease | yes |
-| `@worktrees/_templates` | the UAT flow template a new flow directory is created from, which is exactly the three things step 4 reads: `uat/flow.md` with the cases and their named assertions, `uat/account.json` with a username, a role, a credential name and the sealed file's path and no field that could hold a secret, and `uat/seed/` with the records a run namespaces; consumed, never modified | yes |
+| `@worktrees/_templates` | the UAT flow template a new flow directory is created from, which the tree ships at `templates/uat/`, which is exactly the three things step 4 reads: `uat/flow.md` with the cases and their named assertions, `uat/account.json` with a username, a role, a credential name and the sealed file's path and no field that could hold a secret, and `uat/seed/` with the records a run namespaces; consumed, never modified | yes |
 | `@worktrees/sessions/central-runtime` | the runtime owner's generation behind the bound endpoint; readiness is proved by the `route` Input, never re-derived from this registry | yes |
 | `@workspaces/device-state` | the sealed credential roster; the shared UAT password is resolved by name here at login and read nowhere else | yes |
 | `@workspaces/be` | the routed backend checkout at the pinned commit, whose behaviour the flow verifies and whose store holds the namespaced records | yes |
+| `@knowledge/ui/proof` | the UX topic: the criteria the experience lane scores and the rule that turns them into its verdict | yes |
 
 ## Inputs
 
@@ -152,7 +164,7 @@ anything outside its own fixture namespace.
 | 5 | Seed the frozen records into the run namespace | `runId` | `response/data/snapshot.json`, @workspaces/be | @tools/database | `FIXTURE_VIOLATION` |
 | 6 | Execute the frozen cases in order against the endpoint the bound route carries, at the pinned commit | — | `response/data/snapshot.json`, input `route` for the endpoint this run drives, @worktrees/sessions/central-runtime for the generation behind that endpoint, @workspaces/device-state for the credential at login only, @tools/browsercontrol, @tools/websearch | — | `LEASE_INVALID`, `RUNTIME_UNAVAILABLE` |
 | 7 | Capture at each named assertion with the login field masked, and stitch the sheet | — | `response/data/snapshot.json`, @worktrees/sessions/central-runtime for the most direct runtime evidence | `response/data/captures/<case>.json`, `response/artifacts/<case>.png`, `response/artifacts/sheet.png`, @tools/visualize | `EVIDENCE_UNAVAILABLE` |
-| 8 | Judge the three lanes apart | — | `response/data/captures/<case>.json` | `response/data/verdicts.json` | — |
+| 8 | Judge the three lanes apart, and score the experience lane criterion by criterion | — | @knowledge/ui/proof (the UX topic and its closing rule), `response/data/captures/<case>.json` | `response/data/verdicts.json` | — |
 | 9 | Verify read-only, then delete the run namespace and nothing else | `runId` | @workspaces/be for the records carrying `is_uat=true` and this namespace, `response/data/verdicts.json` | @tools/database | — |
 | 10 | Append `runs/<runId>/`, move `latest`, and emit | `runId` | everything above | @worktrees/uat/&lt;flow>/&lt;case> (runs/&lt;runId>/ and latest), `response/response.md`, `response/response.json`, @tools/sourcewrite | — |
 
@@ -193,6 +205,7 @@ lease, evidence or case change is `NO_PROGRESS`. A second attempt after a publis
 | When | Operator |
 | --- | --- |
 | all three lanes pass | `git.publish` |
+| all three lanes pass and the promise must be reconciled against the journey that was actually walked | `business.decide` |
 | the UI lane fails on an application-owned node | `frontend.presentation.resolve` |
 | the behaviour lane fails | `backend.source.apply` |
 | the UX lane fails: a person decides what the experience should be, and the flow is verified again only after that decision | `user` |

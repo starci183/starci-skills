@@ -1,4 +1,4 @@
-# StarCi Skills 1.3.0
+# StarCi Skills 1.5.0
 
 This tree is the runtime. Read [SKILL.md](SKILL.md) next; it is the single entry that freezes a
 mission's scope, selects the one operator that owns the outcome, and routes between operators on
@@ -6,6 +6,11 @@ typed results.
 
 ## Load order
 
+0. [`UPDATE.md`](UPDATE.md) — read before editing this tree, never to run a mission. It is the standard
+   for updating a skills tree of this shape: the four questions asked in order, what may be added and
+   what may not, how an id is modified and how one is retired, the evidence bar, the language rule,
+   enforcement before advice, which files are generated, what a release means, and the pre-commit
+   checklist. A change that has not been through it is not ready to commit.
 1. `SKILL.md` — entry, routing loop, and the authority statement.
 2. `routing.json` — the closed map from every domain a stop code hands to (see the Stop codes table of
    `operators/INDEX.md`) to its next step. It is validated against the operators' Stops tables, so a
@@ -61,6 +66,8 @@ head or the head is not publishable.
 - Rule IDs are stable public addresses. Append; never renumber, reuse, or silently change meaning.
 
 ## Lineage
+
+1.5.0 (2026-09-03): UPDATE.md, the neutral standard for changing a skills tree, first in the load order and shipped with the installer; session-first and SESSION_MISSING; git.publish demands receipts; every example workflow is a long flow (bind runtime → screenshot audit → quality → uat → publish); the taste (TASTE) and experience (UX) lenses conclude inside their own topics and the final verdict is a table in quality.verify's receipt; @tools/host serves candidates per viewport; the consolidation pass took the day's concepts from 44 places to 19 and retired ui.md and FE-TEST-7.
 
 1.3.0 (2026-09-03): a mechanical presentation sweep (scripts/sweep-presentation.mjs: APP_OVERRIDE, APP_REIMPLEMENTATION, OFF_SCALE, SHELL_GEOMETRY) wired into frontend.source.apply and quality.verify; resolve scope covers every app-owned leaf/branch folder; twin, paired-spec and deployment-constant rules; rules are written product-agnostic.
 

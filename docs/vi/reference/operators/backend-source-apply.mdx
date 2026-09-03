@@ -45,6 +45,17 @@ phải sự nhụt chí: chủ contract mở lại và đóng băng lại, rồi
 fingerprint mới. Với tay ra ngoài danh sách không phải là thay đổi nhỏ hơn việc mở lại contract; nó là
 cùng một thay đổi nhưng không có dấu vết.
 
+## Không ghi gì bên ngoài một phiên
+
+Trước khi một byte nguồn được route bị đọc để sửa hay bị ghi, nhánh mà operator này chạy trong đó đã
+tồn tại: một thư mục phiên có `state.json` và `step-N/parallel-M/request/request.json` của chính nhánh
+ấy, xanh dưới `validate-request`. Thứ tự đó chính là lý do phiên tồn tại — request nói được phép chạm
+vào cái gì trước khi có gì bị chạm, và mọi biên nhận sau đều treo vào nó. Một lần gọi phát hiện mình
+sắp sửa nguồn được route mà không có `step-N/parallel-M` nào dưới một phiên thì dừng với
+`SESSION_MISSING` và báo lại; nó không dựng thư mục phiên ngược về sau, vì một phiên viết sau khi việc
+đã xong là bản ghi của việc chứ không phải cổng chặn việc, và không thứ gì trong đó từng được kiểm
+lại với những gì thực sự đã làm.
+
 ## Không bao giờ ghi lên nhánh của người
 
 Operator này không bao giờ ghi lên nhánh mà một người đang checkout. Orchestrator chuẩn bị một git
@@ -159,7 +170,7 @@ publish bị giữ lại. Khi nó vắng, head đã publish là thẩm quyền.
 
 | # | Bước | Tham số | Đọc | Ghi | Dừng với |
 | --- | --- | --- | --- | --- | --- |
-| 1 | Kiểm gate và chạy lại | `resume`, `mode` | `request/request.json`, đầu vào `backend-source-application` nếu có, @workspaces/be ở head đóng băng | — | `INVALID_INPUT`, `SOURCE_DRIFT`, `NO_PROGRESS` |
+| 1 | Kiểm gate, chạy lại và xác nhận phiên | `resume`, `mode` | `request/request.json`, `state.json` của phiên và `step-N/parallel-M` của nhánh này, đầu vào `backend-source-application` nếu có, @workspaces/be ở head đóng băng | — | `INVALID_INPUT`, `SESSION_MISSING`, `SOURCE_DRIFT`, `NO_PROGRESS` |
 | 2 | Ràng thẩm quyền, contract và pattern | `featureId` | đầu vào `model` khi có, nếu không thì @worktrees/businesses/&lt;featureId> ở head đã publish, đầu vào `architecture-decision` làm contract đóng băng và làm nguồn `operations` của nó, @knowledge/patterns/be mỗi khía cạnh một pattern | — | `CONTRACT_UNFROZEN`, `BUSINESS_AUTHORITY_MISSING`, `PATTERN_UNBOUND` |
 | 3 | Điền từng operation của contract, trên nhánh phiên | `mutableFileRefs` | @knowledge/patterns/be cho từng khía cạnh, @workspaces/be trong trần được sửa | @workspaces/be/branch/session trong trần được sửa, dưới một lease độc quyền, @tools/sourcewrite | `CONTRACT_WIDENED`, `OWNER_CONFLICT` |
 | 4 | Đối chiếu mọi mutation với contract đóng băng và ghi nó kèm hash trước và sau | `mode` | @workspaces/be, các file bị chạm và contract đóng băng | `response/data/mutations.json` | — |
@@ -198,6 +209,7 @@ không thể cho một câu trả lời khác.
 | Code | Xử lý |
 | --- | --- |
 | `INVALID_INPUT` | terminate |
+| `SESSION_MISSING` | terminate |
 | `SOURCE_DRIFT` | terminate |
 | `NO_PROGRESS` | terminate |
 | `CONTRACT_UNFROZEN` | terminate |

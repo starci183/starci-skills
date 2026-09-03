@@ -55,6 +55,7 @@ Governs the other ways space runs out.
 | Case 3 | Content is essentially two-dimensional and cannot reflow | Exactly one named `HorizontalScrollRegion` owns it, and the surrounding page stays inside its inline bound |
 | Case 4 | A virtual keyboard, an orientation change, or a safe-area inset reduces usable space | Persistent geometry still fits, stays visible, and occludes no part of the task; a layout query staying in wide mode is not accepted as proof of fit |
 | Case 5 | A state expands the surface, as an error, an expanded panel, or an overlay does | The expanded form is decided in the same receipt entry as the resting one |
+| Case 6 | The decision is checked for fit | It is checked twice, and neither pass replaces the other. Before the tree exists, every candidate is rendered and served once per viewport of the coverage, so a person compares the wide and the narrow render while the direction can still change. After the tree is built, the audit captures every viewport of that same coverage and measures the rules above on what rendered. A decision looked at once has been checked at one width only |
 
 Retired: RESPONSIVE-5 is retired into COVERAGE-1 and is not reused; the address stays spent.
 

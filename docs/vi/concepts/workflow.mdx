@@ -11,14 +11,16 @@ description: "Các bậc gồm nhánh song song, vòng lặp và preset; cửa v
 > **nhánh** chạy song song (tối đa ba), kèm **vòng lặp** quay về một bậc trước và **preset** cho Yêu
 > cầu của từng nhánh.
 
-Tám file trong `workflows/` là ví dụ, không phải những chuỗi duy nhất được phép.
+Tám file trong `workflows/` là tham chiếu, không phải toàn bộ số chuỗi có thể có: chúng là những hình
+dạng lặp lại đủ nhiều để đáng ghi xuống.
 
 ## Cửa vào dùng chúng ra sao
 
-Cửa vào đọc `when` của mọi ví dụ. Khớp thì chạy đúng như đã ghi; preset điền vào `request.json`, và
-người chỉ bị hỏi những field không có mặc định. Không khớp cái nào thì tự ghép chuỗi từ bảng
-`## Next` của các operator và `routing.json`, theo đúng luật mà `scripts/validate-workflows.mjs` ép
-lên các file này:
+Cửa vào đọc `when` của mọi ví dụ. Khớp trọn thì chạy đúng như đã ghi; preset điền vào `request.json`,
+và người chỉ bị hỏi những field không có mặc định. Khi chỉ khớp một phần, hoặc bài toán nghiệp vụ khó
+hơn mọi `when` mô tả, cửa vào tự ghép chuỗi của mình từ bảng `## Next` của các operator và
+`routing.json` thay vì bẻ một ví dụ gần đúng cho vừa, theo đúng luật mà
+`scripts/validate-workflows.mjs` ép lên các file này:
 
 - mỗi nhánh gọi tên một operator có thật và chỉ preset field mà operator đó khai;
 - mọi field Requirements không có Default thì được preset hoặc nằm trong `asks` của nhánh, để chuỗi nói
@@ -28,20 +30,44 @@ lên các file này:
   checkout hay cùng một gốc cùng lúc, còn `frontend.surface.audit` được fan-out theo ma trận vì nó
   không ghi gì;
 - một vòng lặp quay về bậc trước và mang `maxRounds`;
+- chuỗi nào ghi source frontend dưới `mode: apply` thì chạy `frontend.surface.audit` và `uat.verify`
+  giữa lần ghi đó và `git.publish` của nó;
 - chuỗi kết thúc ở `git.publish`, `release.deploy` hoặc `user`.
 
 Chuỗi tự ghép mà còn dùng lại được thì thành một file mới ở đây, kèm `when` của nó.
 
+## Mọi chuỗi giao hàng đều là một dòng dài
+
+Chuỗi ghi một bề mặt không kết thúc khi source biên dịch được. Giữa lần ghi và lần publish có hai
+bằng chứng không thứ gì khác trong cây cấp được: `frontend.surface.audit` render bề mặt và giữ lại
+ảnh chụp, còn `uat.verify` đi hành trình của một người thật xuyên qua nó. `quality.verify` nằm giữa
+và trả lời câu hỏi khác — build, lint, type, coverage — và cổng xanh không nhận ra một trang đọc lên
+thấy sai. Nên mọi ví dụ có apply source frontend đều kết thúc như nhau:
+
+```text
+frontend.source.apply → workspace.bind (role fe, runtimeNeed consume) → frontend.surface.audit → quality.verify → uat.verify → git.publish
+```
+
+`workspace.bind` lần hai có ở đó vì head đã dịch: bề mặt được phục vụ, audit và đi thử là bề mặt mà
+lần ghi vừa sinh ra. `uat.verify` cần `requestedBy`, `feature` và `flow`, nên mọi chuỗi mang nó đều
+khai chúng dưới `asks`. `backend-feature` là chuỗi giao hàng duy nhất không có hai bằng chứng ấy, và
+`when` của nó nói rõ vì sao: nó không ghi bề mặt nào, còn `uat.verify` cần đầu vào
+`frontend-surface-audit` và một route fe đã bind.
+
 ## Hình dạng file
 
 `schemaVersion` là 9. `id` bằng tên file. `when` có `en` và `vi`. `chain` là mảng các bậc, mỗi bậc là
-mảng `{ operator, requirements?, fanout?: "matrix", maxParallel?: 1..3 }`. `loops` là mảng
-`{ from, to, when, maxRounds }`. `ends` là `user` hoặc một operator của bậc cuối.
+mảng `{ operator, requirements?, asks?: [field], fanout?: "matrix", maxParallel?: 1..3 }`. `loops` là
+mảng `{ from, to, when, maxRounds }`. `ends` là `user` hoặc một operator của bậc cuối.
 
 ## Nhánh và phiên
 
-Mọi nhánh có ghi source đều commit trên `session/<sessionId>`; `git.publish` merge nhánh đó vào. Một
-nhánh bị chặn vào lại như một bậc mới, và một vòng lặp tính vào `maxRounds` của chính operator đó.
+Không có gì được thiết kế, ghi hay commit bên ngoài một phiên: `state.json` và
+`step-1/parallel-1/request/request.json` đã có, và `validate-request` xanh trên chúng, trước khi bất
+kỳ file nào ngoài thư mục phiên bị đọc để sửa hay bị ghi. Mọi nhánh có ghi source đều commit trên
+`session/<sessionId>`; `git.publish` merge nhánh đó vào, và từ chối một nhánh phiên mà phiên của nó
+không có biên nhận source-application lẫn ảnh chụp audit (`SESSION_MISSING`). Một nhánh bị chặn vào
+lại như một bậc mới, và một vòng lặp tính vào `maxRounds` của chính operator đó.
 
 Tám ví dụ, với chuỗi được dựng ra theo từng bậc, nằm ở
 [Tham chiếu → Workflow](/vi/reference/workflows).

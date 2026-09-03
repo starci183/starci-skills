@@ -54,6 +54,16 @@ phải nêu đúng commit đã ghim; thiếu một trong hai, hoặc một trong
 `ADMISSION_MISSING`, vì một bề mặt sạch và một cổng xanh ở commit khác chẳng nói gì về sản phẩm mà
 lượt chạy này đang lái.
 
+## Làn trải nghiệm được chấm, không phải được khẳng định
+
+Làn `ux` không phải một câu tả cảm giác về lượt chạy. `UX-1` đến `UX-11` đều được mang vào biên nhận
+lượt chạy kèm bước chạy hay ảnh chụp đã đo chúng, một điểm từ 1 tới 5 và một phán quyết, rồi `UX-12`
+tính ra làn từ chúng; phần số học sống trong rule ấy và không nhắc lại ở đây. Kết quả là đúng một
+hàng mà operator này publish dưới `## Verdict`, tên là `experience`, và không gì phía sau chấm lại nó
+— `quality.verify` chép hàng ấy rồi ghép với các topic của audit. Một tiêu chí mà bằng chứng duy nhất
+là một ảnh chụp, trong khi chính file ấy giao nó cho một lượt chạy, là `EVIDENCE_UNAVAILABLE` chứ
+không phải đạt cũng không phải hỏng, và làn còn dở cho tới khi có lần thử thật.
+
 ## Ba làn, xét riêng
 
 Hành vi, UX và UI được xét trên bằng chứng của riêng chúng và không bao giờ mượn kết luận của nhau.
@@ -93,10 +103,11 @@ lượt chạy, và không xoá bất cứ thứ gì ngoài namespace fixture c�
 | Alias | Bind | Bắt buộc |
 | --- | --- | --- |
 | `@worktrees/uat/<flow>/<case>` | thư mục luồng: `flow.md`, `account.json`, `seed/`, lịch sử chỉ-thêm `runs/<runId>/` và con trỏ `latest`, bind theo fingerprint từng file và chỉ ghi khi giữ lease độc quyền | có |
-| `@worktrees/_templates` | khuôn luồng UAT dùng để tạo thư mục luồng mới, đúng ba thứ mà bước 4 đọc: `uat/flow.md` với các case và những khẳng định có tên của chúng, `uat/account.json` với username, vai, tên thông tin đăng nhập và đường dẫn file niêm phong, không trường nào có thể chứa bí mật, và `uat/seed/` với các bản ghi mà một lượt chạy đặt namespace lên; tiêu thụ, không sửa | có |
+| `@worktrees/_templates` | khuôn luồng UAT dùng để tạo thư mục luồng mới, mà cây ship sẵn ở `templates/uat/`, đúng ba thứ mà bước 4 đọc: `uat/flow.md` với các case và những khẳng định có tên của chúng, `uat/account.json` với username, vai, tên thông tin đăng nhập và đường dẫn file niêm phong, không trường nào có thể chứa bí mật, và `uat/seed/` với các bản ghi mà một lượt chạy đặt namespace lên; tiêu thụ, không sửa | có |
 | `@worktrees/sessions/central-runtime` | generation của chủ runtime đứng sau endpoint đã ràng; sự sẵn sàng do đầu vào `route` chứng minh, không bao giờ suy lại từ sổ đăng ký này | có |
 | `@workspaces/device-state` | sổ thông tin đăng nhập niêm phong; mật khẩu UAT dùng chung được giải theo tên ở đây lúc đăng nhập và không đọc ở đâu khác | có |
 | `@workspaces/be` | checkout backend được route tại commit đã ghim, nơi luồng kiểm hành vi và nơi store giữ các bản ghi có namespace | có |
+| `@knowledge/ui/proof` | topic UX: các tiêu chí làn trải nghiệm chấm và rule biến chúng thành phán quyết của làn | có |
 
 ## Đầu vào
 
@@ -129,7 +140,7 @@ lượt chạy, và không xoá bất cứ thứ gì ngoài namespace fixture c�
 | 5 | Gieo các bản ghi đã đóng băng vào namespace lượt chạy | `runId` | `response/data/snapshot.json`, @workspaces/be | @tools/database | `FIXTURE_VIOLATION` |
 | 6 | Chạy các case đã đóng băng theo thứ tự trên endpoint mà route đã ràng mang, tại commit đã ghim | — | `response/data/snapshot.json`, đầu vào `route` để lấy endpoint lượt chạy này lái theo, @worktrees/sessions/central-runtime để lấy generation đứng sau endpoint đó, @workspaces/device-state để lấy thông tin đăng nhập chỉ lúc đăng nhập, @tools/browsercontrol, @tools/websearch | — | `LEASE_INVALID`, `RUNTIME_UNAVAILABLE` |
 | 7 | Capture tại từng khẳng định có tên với ô mật khẩu đã che, rồi ghép tấm sheet | — | `response/data/snapshot.json`, @worktrees/sessions/central-runtime để lấy bằng chứng runtime trực tiếp nhất | `response/data/captures/<case>.json`, `response/artifacts/<case>.png`, `response/artifacts/sheet.png`, @tools/visualize | `EVIDENCE_UNAVAILABLE` |
-| 8 | Xét ba làn tách rời nhau | — | `response/data/captures/<case>.json` | `response/data/verdicts.json` | — |
+| 8 | Xét ba làn tách rời nhau, và chấm làn trải nghiệm theo từng tiêu chí | — | @knowledge/ui/proof (topic UX và rule đóng của nó), `response/data/captures/<case>.json` | `response/data/verdicts.json` | — |
 | 9 | Kiểm chỉ-đọc, rồi xoá namespace lượt chạy và không gì khác | `runId` | @workspaces/be để lấy các bản ghi mang `is_uat=true` và namespace này, `response/data/verdicts.json` | @tools/database | — |
 | 10 | Thêm `runs/<runId>/`, dời `latest`, rồi phát | `runId` | mọi thứ ở trên | @worktrees/uat/<flow>/<case> (runs/<runId>/ và latest), `response/response.md`, `response/response.json`, @tools/sourcewrite | — |
 
@@ -170,6 +181,7 @@ mới, không bao giờ là một lần sửa lượt cũ.
 | Khi | Operator |
 | --- | --- |
 | cả ba làn đều pass | `git.publish` |
+| cả ba làn đều pass và lời hứa phải được đối chiếu với hành trình thực sự đã đi | `business.decide` |
 | làn UI fail trên một node do ứng dụng sở hữu | `frontend.presentation.resolve` |
 | làn hành vi fail | `backend.source.apply` |
 | làn UX fail: người quyết định trải nghiệm phải thế nào, và luồng chỉ được kiểm lại sau quyết định ấy | `user` |

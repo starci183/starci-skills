@@ -25,7 +25,8 @@
         "ci": true,
         "objectstorage": true,
         "secrets": true,
-        "database": true
+        "database": true,
+        "host": true
       },
       "permits": {
         "fileread": true,
@@ -42,7 +43,8 @@
         "ci": true,
         "objectstorage": true,
         "secrets": true,
-        "database": true
+        "database": true,
+        "host": true
       }
     },
     "sol-reviewer": {
@@ -66,7 +68,8 @@
         "ci": true,
         "objectstorage": true,
         "secrets": true,
-        "database": true
+        "database": true,
+        "host": true
       },
       "permits": {
         "fileread": true,
@@ -83,7 +86,8 @@
         "ci": true,
         "objectstorage": false,
         "secrets": true,
-        "database": true
+        "database": true,
+        "host": true
       }
     },
     "luna": {
@@ -107,7 +111,8 @@
         "ci": true,
         "objectstorage": true,
         "secrets": true,
-        "database": true
+        "database": true,
+        "host": true
       },
       "permits": {
         "fileread": true,
@@ -124,7 +129,8 @@
         "ci": true,
         "objectstorage": true,
         "secrets": true,
-        "database": true
+        "database": true,
+        "host": true
       }
     }
   }

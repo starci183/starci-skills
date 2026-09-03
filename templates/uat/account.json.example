@@ -1,0 +1,9 @@
+{
+  "_comment": "The UAT account record. It carries a username, a role, a credential NAME and the sealed file's path, and nothing that could hold a secret. There is no password field and none may be added: uat.verify resolves the shared UAT password by name through @workspaces/device-state at the moment of login and at no other moment. A password in this file, in a fixture, in a command, in a log or in a screenshot has already left custody.",
+  "username": "uat.enrollment.paid-enrollment",
+  "role": "learner",
+  "credentialName": "uat-shared-password",
+  "sealedFile": ".stacks/local/secrets/uat.enc",
+  "identity": "the shared master identity that seals the file above",
+  "notes": "One dedicated username per flow. The password is shared across every UAT account and is never written here."
+}

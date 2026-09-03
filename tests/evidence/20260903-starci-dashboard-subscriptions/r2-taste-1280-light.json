@@ -1,0 +1,221 @@
+{
+  "railType": [
+    [
+      "16px/600",
+      1
+    ],
+    [
+      "12px/500",
+      1
+    ],
+    [
+      "36px/600",
+      1
+    ],
+    [
+      "14px/400",
+      2
+    ],
+    [
+      "14px/500",
+      1
+    ],
+    [
+      "12px/400",
+      1
+    ]
+  ],
+  "benefitsType": [
+    [
+      "14px/400",
+      1
+    ],
+    [
+      "14px/600",
+      4
+    ],
+    [
+      "12px/400",
+      4
+    ]
+  ],
+  "accordionType": [
+    [
+      "14px/600",
+      2
+    ],
+    [
+      "14px/400",
+      2
+    ]
+  ],
+  "density": [
+    {
+      "cls": "starci-core-navigation-feature-nav",
+      "tag": "HEADER",
+      "x": 0,
+      "y": 0,
+      "w": 1280,
+      "h": 79,
+      "area": 101120
+    },
+    {
+      "cls": "starci-core-navigation-feature-nav-navigation",
+      "tag": "NAV",
+      "x": 68.94,
+      "y": 21,
+      "w": 794.77,
+      "h": 36,
+      "area": 28611.56
+    },
+    {
+      "cls": "starci-core-section-header",
+      "tag": "HEADER",
+      "x": 32,
+      "y": 143,
+      "w": 768,
+      "h": 59.7,
+      "area": 45852
+    },
+    {
+      "cls": "starci-core-primary-region",
+      "tag": "DIV",
+      "x": 32,
+      "y": 226.7,
+      "w": 808,
+      "h": 845.63,
+      "area": 683265
+    },
+    {
+      "cls": "starci-core-rail-region",
+      "tag": "DIV",
+      "x": 864,
+      "y": 226.7,
+      "w": 384,
+      "h": 261,
+      "area": 100224
+    }
+  ],
+  "pageArea": 1413120,
+  "vw": 1280,
+  "vh": 1104,
+  "railBox": {
+    "x": 864,
+    "y": 226.7,
+    "w": 384,
+    "h": 261
+  },
+  "railVoid": {
+    "w": 384,
+    "h": 616.3
+  },
+  "primaryBox": {
+    "x": 32,
+    "y": 226.7,
+    "w": 808,
+    "h": 845.63
+  },
+  "focal": {
+    "h1": {
+      "w": 768,
+      "h": 30.7,
+      "area": 23580
+    },
+    "image": {
+      "w": 808,
+      "h": 454.63,
+      "area": 367337
+    },
+    "cta": {
+      "w": 352,
+      "h": 44,
+      "area": 15488
+    }
+  },
+  "shapes": [
+    {
+      "cls": "group starci-core-text-action",
+      "radius": "0px",
+      "w": 44.94,
+      "h": 62
+    },
+    {
+      "cls": "group starci-core-text-action",
+      "radius": "999px",
+      "w": 91.31,
+      "h": 36
+    },
+    {
+      "cls": "group starci-core-text-action",
+      "radius": "999px",
+      "w": 88.81,
+      "h": 36
+    },
+    {
+      "cls": "group starci-core-text-action",
+      "radius": "999px",
+      "w": 72.89,
+      "h": 36
+    },
+    {
+      "cls": "starci-core-pressable-field",
+      "radius": "12px",
+      "w": 164.3,
+      "h": 44
+    },
+    {
+      "cls": "dropdown__trigger button button--icon-on",
+      "radius": "3.35544e+07px",
+      "w": 44,
+      "h": 44
+    },
+    {
+      "cls": "button button--icon-only button--md butt",
+      "radius": "999px",
+      "w": 44,
+      "h": 44
+    },
+    {
+      "cls": "dropdown__trigger button button--icon-on",
+      "radius": "3.35544e+07px",
+      "w": 44,
+      "h": 44
+    },
+    {
+      "cls": "card card--transparent starci-core-surfa",
+      "radius": "24px",
+      "w": 808,
+      "h": 645.63
+    },
+    {
+      "cls": "starci-core-surface-accordion-card",
+      "radius": "0px",
+      "w": 808,
+      "h": 104
+    },
+    {
+      "cls": "accordion__trigger starci-core-accordion",
+      "radius": "0px",
+      "w": 808,
+      "h": 52
+    },
+    {
+      "cls": "accordion__trigger starci-core-accordion",
+      "radius": "0px",
+      "w": 808,
+      "h": 52
+    },
+    {
+      "cls": "card card--transparent starci-core-surfa",
+      "radius": "24px",
+      "w": 384,
+      "h": 261
+    },
+    {
+      "cls": "button button--full-width button--md but",
+      "radius": "24px",
+      "w": 352,
+      "h": 44
+    }
+  ]
+}

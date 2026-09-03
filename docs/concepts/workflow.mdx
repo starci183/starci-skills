@@ -11,14 +11,16 @@ description: "Steps of parallel branches, loops and presets; how the entry match
 > **branches** that run in parallel (at most three), with optional **loops** back to an earlier step
 > and **presets** for a branch's Requirements.
 
-The eight files in `workflows/` are examples, not the only chains allowed.
+The eight files in `workflows/` are references, not the only chains there are: they are the shapes
+that came up often enough to be worth writing down.
 
 ## How the entry uses them
 
-The entry reads the `when` of every example. A match is run as written; its presets fill
-`request.json`, and the person is asked only for fields with no default. If none matches, the entry
-composes a chain from the operators' `## Next` tables and `routing.json`, under the same rules
-`scripts/validate-workflows.mjs` enforces on these files:
+The entry reads the `when` of every example. A full match is run as written; its presets fill
+`request.json`, and the person is asked only for fields with no default. When the match is partial,
+or the business is harder than any `when` describes, the entry composes its own chain from the
+operators' `## Next` tables and `routing.json` rather than bending a near-miss example into shape,
+under the same rules `scripts/validate-workflows.mjs` enforces on these files:
 
 - every branch names a real operator and presets only fields that operator declares;
 - every Requirements field with no Default is preset or listed under the branch's `asks`, so the chain
@@ -27,20 +29,46 @@ composes a chain from the operators' `## Next` tables and `routing.json`, under 
 - branches of one step share no write alias — two operators may not write the same checkout or root
   at once, and `frontend.surface.audit` fans out by matrix entry because it writes nothing;
 - a loop goes back to an earlier step and carries `maxRounds`;
+- a chain that writes frontend source under `mode: apply` runs `frontend.surface.audit` and
+  `uat.verify` between that write and its `git.publish`;
 - the chain ends at `git.publish`, `release.deploy`, or `user`.
 
 A composed chain that would be useful again becomes a new file, with its `when`.
 
+## Every delivery chain is a long flow
+
+A chain that writes a surface is not finished when the source compiles. Between the write and the
+publish stand two proofs nothing else in the tree supplies: `frontend.surface.audit`, which renders
+the surface and keeps the screenshots, and `uat.verify`, which walks a real person's journey through
+it. `quality.verify` sits between them and answers a different question — build, lint, types,
+coverage — and green gates do not notice that a page reads wrong. Every example that applies frontend
+source therefore ends the same way:
+
+```text
+frontend.source.apply → workspace.bind (role fe, runtimeNeed consume) → frontend.surface.audit → quality.verify → uat.verify → git.publish
+```
+
+The second `workspace.bind` is there because the head moved: the surface served, audited and walked
+is the one the write just produced. `uat.verify` needs `requestedBy`, `feature` and `flow`, so every
+chain carrying it declares them under `asks`. `backend-feature` is the one delivery chain with
+neither proof, and its `when` says why: it writes no surface, and `uat.verify` requires a
+`frontend-surface-audit` input and a bound fe route.
+
 ## The file shape
 
 `schemaVersion` is 9. `id` equals the file name. `when` has `en` and `vi`. `chain` is an array of
-steps, each an array of `{ operator, requirements?, fanout?: "matrix", maxParallel?: 1..3 }`. `loops`
+steps, each an array of
+`{ operator, requirements?, asks?: [field], fanout?: "matrix", maxParallel?: 1..3 }`. `loops`
 is an array of `{ from, to, when, maxRounds }`. `ends` is `user` or an operator of the last step.
 
 ## Branches and the session
 
-Every source-writing branch commits on `session/<sessionId>`; `git.publish` merges it. A blocked
-branch re-enters as a new step, and a loop counts toward the operator's own `maxRounds`.
+Nothing is designed, written or committed outside a session: `state.json` and
+`step-1/parallel-1/request/request.json` exist, and `validate-request` is green on them, before any
+file outside the session folder is read in order to change it or written. Every source-writing branch
+commits on `session/<sessionId>`; `git.publish` merges it, and refuses a session branch whose session
+carries no source-application receipt and no audit screenshots (`SESSION_MISSING`). A blocked branch
+re-enters as a new step, and a loop counts toward the operator's own `maxRounds`.
 
 The eight examples, with their chains rendered step by step, are under
 [Reference → Workflows](/reference/workflows).

@@ -54,6 +54,20 @@ Governs what closes a render-truth claim.
 | Case 4 | A family or the application adds a delta | The isolated published output, the family delta, the application delta, and the current pixels are compared separately |
 | Case 5 | Copy review or source props are offered as the evidence | They are not sufficient. A rendered claim is proved by the rendered output and its traced authority |
 
+## TRUTH-5 — The render-truth verdict
+
+Governs how the criteria above become this topic's one row in the receipt's `## Verdict` table.
+
+| Case | When | Observe |
+| --- | --- | --- |
+| Case 1 | The lens runs | `TRUTH-1` to `TRUTH-4` are judged on every capture that renders a fact, an availability, a progress signal or an outcome, each traced to the authority behind it |
+| Case 2 | The verdict is computed | The gating set is the whole set: `pass` requires every criterion to pass, because one claim the page cannot back is one claim a reader will act on |
+| Case 3 | There is no store or authority the claims can be checked against | The verdict is `blocked`. Approving claims because they look plausible falsifies it |
+| Case 4 | A failure is routed | A claim that was designed wrong routes to `direction`; a claim whose authority is missing routes to the flow owner, because no value and no composition can supply a fact the product does not hold |
+
+The scored set is `TRUTH-1` to `TRUTH-4`; this rule is the arithmetic and is not itself scored. Its
+result is the `render-truth` row of the audit receipt's `## Verdict` table.
+
 ## What this file does not decide
 
 Which rank a fact receives is [Hierarchy](../composition/hierarchy.md), which conditions exist and

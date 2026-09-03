@@ -2,8 +2,9 @@
 
 This tree holds the universal UI law shared by every published Grammar family, split into three
 groups by the operator that reads each one.
-It owns 115 stable live X-n laws (36 in composition, 60 in presentation, 19 in proof), plus five
-composition ids that are retired into COVERAGE-1 and never reused, together with observable
+It owns 153 stable live X-n laws (36 in composition, 68 in presentation, 49 in proof), plus five
+composition ids that are retired into COVERAGE-1 and the eleven retired `UI-` ids that now resolve to
+the proof topic rules that survived them, none of which are ever reused, together with observable
 selection conditions, ownership decisions, deterministic verdicts, and audit vectors. It is not an implementation or consumer cookbook. It does not own business facts, page copy,
 routes, permissions, artwork identity, product effects, or family material choices.
 
@@ -47,7 +48,7 @@ A topic lives with the operator that reads it. A topic no operator reads has no 
 | --- | --- | --- |
 | [`composition/`](composition/INDEX.md) | Constraints a direction must satisfy, after taste is decided in grammars | `frontend.direction.decide` |
 | [`presentation/`](presentation/INDEX.md) | Which CSS value an app-owned boundary takes | `frontend.presentation.resolve` |
-| [`proof/`](proof/INDEX.md) | What only becomes true once rendered | `frontend.surface.audit` |
+| [`proof/`](proof/INDEX.md) | What only becomes true once rendered | `frontend.surface.audit`; [`proof/ux.md`](proof/ux.md) is read by `uat.verify` too, because a task run is the only instrument that answers it |
 
 The test that places a topic is whether reading source answers it. A spacing value is readable from a
 class, so it is presentation. The number of dominant actions is settled before any tree exists, so it

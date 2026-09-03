@@ -50,6 +50,14 @@ explicit path from the session root to a file an earlier branch produced — and
 
 ## 6. The branch layout
 
+Nothing is designed, written or committed outside a session: the first act of a mission is the
+session folder and a validated `request.json`. Before any file outside the session folder is read in
+order to change it, and before any file outside the session folder is written, `state.json` and
+`step-1/parallel-1/request/request.json` exist and `validate-request` is green on them. An agent that
+finds itself editing routed source, or publishing it, with no `step-N/parallel-M` under a session
+stops with `SESSION_MISSING` and reports it — it does not write the session afterwards, because a
+session written after the work records the work instead of gating it.
+
 The session root is `<Source>/.worktrees/sessions/<sessionId>/`, with `state.json` beside the steps.
 One branch is `step-<N>/parallel-<M>/`, and `parallel-1` always exists:
 
@@ -105,7 +113,35 @@ that adds no evidence, constraint, inventory or approval delta stops with `NO_PR
 `SKILL.md` is explicit about what that means: "the same input reached the same wall: report the wall
 rather than trying again."
 
-## 10. The end of the session
+## 10. When UAT runs
+
+`uat.verify` drives a real product as a real person, and it is the one proof that cannot be inferred
+from anything else, so it is worth saying plainly when it runs and when its absence is honest.
+
+It runs only in a workflow that carries a `uat.verify` step — after this round, every example that
+writes frontend source under `mode: apply`: `frontend-refine`, `frontend-reconstruct`,
+`frontend-new-surface`, `frontend-with-uat` and `full-feature`. `backend-feature` writes no surface
+and its `when` says so; `release` and `content-unit` publish no surface either.
+
+Inside such a chain it still runs only once all of this exists:
+
+- a person who asked, by name — `requestedBy`, `feature` and `flow` have no defaults and the workflow
+  declares them under `asks`, so the branch refuses rather than inventing a requester;
+- the flow directory: `uat/<flow>/flow.md` with the cases and their named assertions,
+  `uat/<flow>/account.json` with a username, a role and a credential *name*, and `uat/<flow>/seed/`
+  with the records the run namespaces;
+- the sealed shared password, resolved by name from the credential roster at login and read nowhere
+  else — no field of this operator can hold a secret, and its validator rejects a credential-shaped
+  string anywhere in what it writes;
+- both admissions taken at the pinned commit — the `frontend-surface-audit` and the
+  `quality-verification` — plus the `route` receipt whose endpoint the run drives.
+
+Anything missing is a stop rather than a silence: no requester or no admission is `INVALID_INPUT` at
+the request gate, no sealed credential is `PROVISIONING_UNAVAILABLE`, and nothing serving the product
+is `RUNTIME_UNAVAILABLE`. A mission that never reaches UAT should be able to say which of those it
+met.
+
+## 11. The end of the session
 
 The session folder is created by the orchestrator before the first agent starts and deleted when
 `git.publish` finishes. What survives is what the steps published — commits, business heads, UAT

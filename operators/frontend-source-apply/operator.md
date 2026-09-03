@@ -15,6 +15,17 @@ that entered the repository, which is impossible when three operators each write
 is the only writer, it is also the only place a fabricated value could enter source, and it has no way
 to produce one.
 
+## Nothing is written outside a session
+
+Before a single byte of routed source is read for change or written, the branch this operator runs in
+exists: a session folder with `state.json` and this branch's own `step-N/parallel-M/request/request.json`,
+green under `validate-request`. That order is the whole point of the session — the request states what
+may be touched before anything is touched, and every later receipt hangs off it. An invocation that
+finds itself about to edit routed source with no `step-N/parallel-M` under a session stops with
+`SESSION_MISSING` and reports it; it does not create the folder retroactively, because a session
+written after the work is a record of the work, not a gate on it, and nothing it contains was ever
+validated against what was actually done.
+
 ## The session branch
 
 The operator never writes on the person's checked-out branch. It writes only on `session/<sessionId>`
@@ -104,7 +115,7 @@ knows what it wrote, never how it renders.
 
 | # | Step | Params | Reads | Writes | Stops with |
 | --- | --- | --- | --- | --- | --- |
-| 1 | Validate the gate and resume, and confirm the head | `resume`, `mode` | `request/request.json`, input `frontend-presentation-resolution`, @workspaces/fe at the frozen head | — | `INVALID_INPUT`, `SOURCE_DRIFT`, `NO_PROGRESS` |
+| 1 | Validate the gate and resume, confirm the session, and confirm the head | `resume`, `mode` | `request/request.json`, the session's `state.json` and this branch's `step-N/parallel-M`, input `frontend-presentation-resolution`, @workspaces/fe at the frozen head | — | `INVALID_INPUT`, `SESSION_MISSING`, `SOURCE_DRIFT`, `NO_PROGRESS` |
 | 2 | Bind the resolution, the direction and the declared write set | — | inputs `frontend-presentation-resolution` (tree fingerprint, class and rule inventory, resolved tree) and `frontend-direction-decision` (intent and owner ceiling), @workspaces/fe (the declared paths and their owner roots) | — | `RESOLUTION_STALE`, `OWNER_CONFLICT` |
 | 3 | Project the resolved tree onto the declared paths | — | input `frontend-presentation-resolution` (the resolved tree), @workspaces/fe (the declared write set) | — | — |
 | 4 | Check every produced value against the inventory, then sweep the projected write set | `mode` | input `frontend-presentation-resolution` (the inventory beside the receipt), @workspaces/fe (the projected write set), @tools/shell | `response/data/writes.json` | `WRITE_REJECTED` |
@@ -135,6 +146,7 @@ checkout pins for them, and which surfaces must now be observed.
 | Code | Disposition |
 | --- | --- |
 | `INVALID_INPUT` | terminate |
+| `SESSION_MISSING` | terminate |
 | `SOURCE_DRIFT` | terminate |
 | `OWNER_CONFLICT` | terminate |
 | `RESOLUTION_STALE` | terminate |
@@ -145,5 +157,6 @@ checkout pins for them, and which surfaces must now be observed.
 
 | When | Operator |
 | --- | --- |
+| the source is committed and a served surface must be bound at the new head before it can be observed | `workspace.bind` |
 | the source is committed and the rendered surface must be measured | `frontend.surface.audit` |
 | the source is committed and the checkout's own gates must run | `quality.verify` |

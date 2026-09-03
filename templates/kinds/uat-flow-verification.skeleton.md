@@ -41,6 +41,31 @@ the login field is masked in every screenshot.
 | `ux` | pass | `response/data/captures/pay-and-enrol.json` |
 | `ui` | pass | `response/artifacts/sheet.png` |
 
+## Experience
+
+| Rule | Measured | Score | Verdict |
+| --- | --- | --- | --- |
+| `UX-1` | the run reached the terminal assertion and the store holds the record it names | 5 | pass |
+| `UX-2` | four committed steps against the flow's declared budget of five | 4 | pass |
+| `UX-3` | the wrong value was corrected at its own field and the flow finished two steps later | 4 | pass |
+| `UX-4` | the pressed treatment rendered in 60ms; the pending indicator held the initiator | 4 | pass |
+| `UX-5` | the destination sat one navigation level from entry, and the three place signals agreed | 5 | pass |
+| `UX-6` | every state the run reached offered a next action or a way back | 4 | pass |
+| `UX-7` | back, reload and a fresh session each returned the same step with its values | 4 | pass |
+| `UX-8` | every field kept a visible label; tab order equalled reading order | 4 | pass |
+| `UX-9` | the primary action sat in the lower half at the narrowest declared viewport | 4 | pass |
+| `UX-10` | one verb per action across both surfaces of the run | 4 | pass |
+| `UX-11` | labels named the things, controls named the effects, no stub copy survived | 4 | pass |
+
+- Mean: 4.18
+- Verdict: ship
+
+## Verdict
+
+| Topic | Verdict | Route |
+| --- | --- | --- |
+| `experience` | ship | none |
+
 ## Fallbacks taken
 
 | Code | Action |

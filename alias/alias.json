@@ -197,11 +197,11 @@
       "_templates": {
         "params": [],
         "kind": "dir",
-        "resolvesTo": "<Source>/.worktrees/_templates/  (businesses/, debts/, sessions/, uat/)",
+        "resolvesTo": "<Source>/.worktrees/_templates/  (businesses/, debts/, sessions/); uat/ resolves to <Source>/.claude/templates/uat/",
         "scheme": "template://<kind>",
         "bind": "fingerprint per file",
         "writers": [],
-        "purpose": "Authority templates for new heads, debts, sessions, and UAT pairs. Consumed, never modified."
+        "purpose": "Authority templates for new heads, debts, sessions, and UAT flows. The UAT flow template ships with the tree at templates/uat/ (flow.md, account.json.example, run.md, seed/), so a fresh install has one without provisioning a worktree. Consumed, never modified."
       }
     },
     "@grammar": {

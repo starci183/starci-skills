@@ -81,10 +81,31 @@ làm bằng chứng rằng node đã pass.
 | --- | --- | --- | --- | --- | --- |
 | 1 | Kiểm gate, chạy lại, và xác nhận head cùng route đang phục vụ | `resume` | `request/request.json`, đầu vào `frontend-source-application` (commit của nó phải bằng head đã ghim), @workspaces/fe ở head đóng băng, @worktrees/sessions/central-runtime (preview phục vụ worktree phiên ở commit ấy), @tools/git | — | `INVALID_INPUT`, `SOURCE_DRIFT`, `NO_PROGRESS` |
 | 2 | Bind thẩm quyền | — | @knowledge/ui/proof (mọi topic kèm fingerprint và kho luật), đầu vào `frontend-source-application` (các lời khai), đầu vào `frontend-presentation-resolution` (chủ sở hữu của từng node), @worktrees/sessions/central-runtime | — | — |
-| 3 | Chọn các mục ma trận | `matrix` | đầu vào `frontend-direction-decision` (coverage: state nhân viewport nhân bảng màu) | — | — |
+| 3 | Chọn các mục ma trận và mang theo lớp bề mặt đã khai | `matrix` | đầu vào `frontend-direction-decision` (coverage: state nhân viewport nhân bảng màu, và `coverage.surfaceClass`) | — | `SURFACE_CLASS_MISSING` |
 | 4 | Chờ từng mục tới lúc sẵn sàng | `readinessProbe` | @worktrees/sessions/central-runtime, @tools/http | — | `RUNTIME_UNAVAILABLE` |
 | 5 | Chụp và đo từng mục | — | @worktrees/sessions/central-runtime, @workspaces/fe (các owner được quan sát và identifier từng node mang), @tools/browsercontrol | `response/artifacts/<matrixId>.png`, `response/data/captures/<matrixId>.json` | `EVIDENCE_MISSING` |
-| 6 | Đối chiếu với lời khai và luật proof, phán quyết theo chủ sở hữu, rồi phát | — | @knowledge/ui/proof, @knowledge/grammars/starci, các bức chụp, @tools/websearch | `response/data/verdicts.json`, `response/response.md`, `response/response.json`, @tools/visualize | `UNKNOWN_RULE` |
+| 6 | Đối chiếu với lời khai và luật proof, phán quyết theo chủ sở hữu, để từng topic tự đóng, rồi phát | — | @knowledge/ui/proof, @knowledge/grammars/starci, các bức chụp, @tools/websearch | `response/data/verdicts.json`, `response/response.md`, `response/response.json`, `response/artifacts/host.json`, @tools/visualize, @tools/host | `UNKNOWN_RULE` |
+
+Bậc 6 phán mọi lời khai rồi để từng topic proof tự đóng lại. Phần phán canon là cái ở trên: mọi lời
+khai đều được đo, phán theo luật đã publish, định tuyến theo chủ sở hữu của node nó đứng lên. Trên nền
+ấy, mỗi topic được ràng tự tính verdict của mình bằng chính rule đóng của nó — phần số học sống ở đó
+và không nhắc lại ở đây — và biên nhận publish mỗi topic một hàng dưới `## Verdict`: presentation,
+composition, responsive, motion, accessibility, contrast, render-truth và taste, mỗi hàng mang verdict
+mà rule của topic ấy sinh ra cùng đường đi của một lần fail. Một topic không có bằng chứng tới nơi là
+`blocked`, và `blocked` không bao giờ được báo thành đạt cũng không bao giờ thành hỏng. Hàng taste
+được chấm theo từng mục ma trận rồi gộp lại, điểm thấp nhất và phán quyết hỏng thắng, vì một bề mặt
+chỉ tốt bằng viewport tệ nhất đã chụp; một `fix-first` ở đó vẫn đứng ngay cả khi mọi luật canon đều
+xanh, và các cổng của chính checkout chờ một `ship`.
+
+Bảng chụp được phục vụ chứ không chỉ được lưu. `@tools/host` đặt `response/artifacts/` lên loopback ở
+cổng trống đầu tiên từ 60000 lên tới 60100 và ghi URL, cổng, thư mục cùng pid vào
+`response/artifacts/host.json`, rồi dừng khi nhánh kết thúc hoặc được resume; một người mở bảng ấy và
+thấy từng mục ma trận cạnh phán quyết của nó. Không gì bind `0.0.0.0`.
+
+Lớp bề mặt không phải thứ operator này được chọn. Coverage của hướng đã khai nó từ bộ từ vựng mà
+`COVERAGE-1` Case 7 publish, mọi rule proof có dải đọc ngưỡng của mình từ cái tên ấy, còn audit mang
+nó vào `## Surface class` và vào verdicts. Một quyết định không khai lớp nào, hay khai một tên ngoài
+bộ từ vựng, là `SURFACE_CLASS_MISSING`: không dải, không ngưỡng, không có gì để phán.
 
 Ma trận là coverage của hướng, không phải một quyết định mới: `matrix` chỉ được thu hẹp nó, và
 orchestrator có thể chia các mục ra tối đa ba nhánh song song của cùng một bậc. Mỗi mục cho đúng một
@@ -100,6 +121,7 @@ chỗ khuyết lặng lẽ. Mọi node mang lời khai đều được đo; khô
 | `capture` | `response/data/captures/<matrixId>.json` | data | có |
 | `screenshot` | `response/artifacts/<matrixId>.png` | artifact | có |
 | `verdicts` | `response/data/verdicts.json` | data | có |
+| `host` | `response/artifacts/host.json` | artifact | không |
 
 ## Dừng
 
@@ -110,6 +132,7 @@ chỗ khuyết lặng lẽ. Mọi node mang lời khai đều được đo; khô
 | `RUNTIME_UNAVAILABLE` | terminate |
 | `EVIDENCE_MISSING` | terminate |
 | `UNKNOWN_RULE` | terminate |
+| `SURFACE_CLASS_MISSING` | terminate |
 | `NO_PROGRESS` | terminate |
 
 ## Kế tiếp
@@ -117,5 +140,6 @@ chỗ khuyết lặng lẽ. Mọi node mang lời khai đều được đo; khô
 | Khi | Operator |
 | --- | --- |
 | một lời khai hỏng trên node do ứng dụng sở hữu, nên phải publish lại một giá trị | `frontend.presentation.resolve` |
-| mọi lời khai đều đứng vững và các cổng của chính checkout phải chạy | `quality.verify` |
+| một verdict topic là fix-first, hoặc hướng không khai lớp bề mặt nào, nên bố cục được quyết lại trước khi có giá trị nào được quyết | `frontend.direction.decide` |
+| mọi topic đều ship hoặc đạt, và các cổng của chính checkout phải chạy | `quality.verify` |
 | một lời khai hỏng trên phần render của chính component Grammar, nên một người ghi gap của họ rồi publish | `frontend.surface.audit` |

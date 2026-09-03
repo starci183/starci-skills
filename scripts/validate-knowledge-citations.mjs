@@ -58,19 +58,19 @@ for (const file of files) {
   const lines = text.split(/\r?\n/);
   lines.forEach((line, i) => {
     if (HEADING.test(line)) return; // the heading is the publication, not a citation
-    // A file may name the numbers it retired, so a reader knows they are not free. Such a line
-    // says "retired" (or its mirror "đã nghỉ") and may cite unpublished numbers of a published
-    // prefix; it still may not cite a prefix nobody owns.
+    // A file may name the numbers, or the whole prefix, it retired, so a reader who meets an old
+    // citation can still resolve it. Such a line says "retired" (or its mirror "đã nghỉ") and may
+    // cite unpublished numbers of a published prefix, or a prefix no file publishes any more.
     const retiredLine = /retired|đã nghỉ/i.test(line);
     for (const m of line.matchAll(CITATION)) {
       const [, prefix, a, b] = m;
       if (IGNORE_PREFIXES.has(prefix)) continue;
+      if (retiredLine) continue;
       const set = published.get(prefix);
       if (!set) {
         errors.push(`${rel}:${i + 1}: prefix ${prefix} is published by no knowledge file (${m[0]})`);
         continue;
       }
-      if (retiredLine) continue;
       const from = Number(a);
       const to = b === undefined ? from : Number(b);
       if (to < from) errors.push(`${rel}:${i + 1}: inverted range ${m[0]}`);

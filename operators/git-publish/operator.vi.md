@@ -59,6 +59,20 @@ merge không sinh xung đột, và những cổng mà bản kiểm định đã 
 đều pass. Xung đột là `NON_FAST_FORWARD`, nó terminate, và một con người giải quyết; operator không
 bao giờ rebase, không bao giờ force, và không bao giờ chạy với hook bị tắt.
 
+## Nhánh phiên không có biên nhận thì không publish được
+
+Một nhánh phiên chỉ là phần đuôi của một phiên, nên phiên sinh ra nó phải còn trên đĩa lúc operator
+này merge: thư mục phiên tồn tại, và trong đó một nhánh `frontend.source.apply` hay
+`backend.source.apply` ở trạng thái `done` với head của nhánh nằm trong `commits` của nó. Biên nhận
+đó là thứ duy nhất nói được path nào đã khai, giá trị nào được cho phép, và cổng nào đã cho chúng
+qua; một nhánh phiên không có biên nhận ấy mang những commit không ai viết request cho, và merge nó
+là publish thứ chưa từng đi vào runtime. Khi chuỗi mà phiên chạy có bước `frontend.surface.audit`
+hay `uat.verify`, response của nhánh đó cùng các artifact `screenshot` cũng phải tồn tại, vì một bề
+mặt không ai nhìn và một hành trình không ai đi chính là những thay đổi mà cổng này sinh ra để chặn.
+Thiếu bất kỳ cái nào cũng là `SESSION_MISSING`, nó
+kết thúc, và cách xử lý là chạy các operator còn nợ biên nhận — không bao giờ là viết biên nhận bây
+giờ, sau khi việc đã xong, từ những gì diff tình cờ chứa.
+
 ## Hook chặn là một kết quả
 
 Hook luôn được thi hành, và `pre-push` là cổng cuối trước remote. Một hook hỏng sinh ra `HOOK_BLOCKED`
@@ -140,7 +154,7 @@ giới đã duyệt; và không publish khi chưa có route đã kiểm và mộ
 | 3 | Ràng phê duyệt vào đúng ranh giới này | `boundary`, `approval` | phần requirements của `request/request.json`, Đầu vào `changes` là tập file, Đầu vào `quality-verification` là commit đã đo | — | `APPROVAL_MISSING` |
 | 4 | Kiểm cây: bẩn ngoài ranh giới, chính sách nhánh | — | @workspaces/local/routes/<project>/<role>, các path bẩn, mọi nhánh, chính sách đã route | — | `DIRTY_OUTSIDE_BOUNDARY`, `BRANCH_POLICY_VIOLATION` |
 | 5 | Chạy hook | — | @workspaces/<project>/<role>/husky: các hook đã cài, trong đó có `pre-push` | @tools/shell | `HOOK_BLOCKED` |
-| 6 | Merge nhánh phiên vào nhánh đích | — | @workspaces/local/routes/<project>/<role> cho head đích, base phiên và head phiên | @workspaces/local/routes/<project>/<role>, nhánh đích của checkout đó, @tools/git | `NON_FAST_FORWARD` |
+| 6 | Ràng biên nhận của phiên, rồi merge nhánh phiên vào nhánh đích | — | thư mục phiên: `state.json`, nhánh `frontend.source.apply` hay `backend.source.apply` có `commits` mang head phiên, và các nhánh `frontend.surface.audit` cùng `uat.verify` với artifact `screenshot` của chúng khi chuỗi có các bước đó; @workspaces/local/routes/<project>/<role> cho head đích, base phiên và head phiên | @workspaces/local/routes/<project>/<role>, nhánh đích của checkout đó, @tools/git | `SESSION_MISSING`, `NON_FAST_FORWARD` |
 | 7 | Push non-force, chỉ fast-forward | — | @workspaces/local/routes/<project>/<role> cho head đã duyệt, @remote/git/<project>/<role> tại remote head quan sát được, @tools/ci | @remote/git/<project>/<role>, @tools/git | `NON_FAST_FORWARD` |
 | 8 | Push tag tiếp nối | `tag` | @workspaces/local/routes/<project>/<role> cho head mà lần publish này đã đẩy | @remote/git/<project>/<role>, @tools/git | — |
 | 9 | Xóa worktree và nhánh phiên, viết biên bản và phát | — | mọi thứ ở trên | @workspaces/local/routes/<project>/<role>, `response/response.md`, `response/response.json`, @tools/git | — |
@@ -165,6 +179,7 @@ dạng một remote head mới vì cùng một quan sát không thể cho một 
 | `SOURCE_DRIFT` | terminate |
 | `NO_PROGRESS` | terminate |
 | `ROUTE_UNVERIFIED` | terminate |
+| `SESSION_MISSING` | terminate |
 | `APPROVAL_MISSING` | terminate |
 | `BRANCH_POLICY_VIOLATION` | terminate |
 | `DIRTY_OUTSIDE_BOUNDARY` | terminate |

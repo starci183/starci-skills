@@ -59,12 +59,44 @@ const capture = (caseId, over = {}) => ({
 });
 
 const lane = (name, verdict = 'pass') => ({ lane: name, verdict, evidenceRefs: [`response/data/captures/${CASES[0]}.json`], statement: `the ${name} lane was judged on its own evidence` });
+
+// knowledge/ui/proof/ux.md: UX-1..UX-11 are the scored criteria and UX-12 is the arithmetic over
+// them. `experience()` ships at a flat 4; `experienceFixFirst()` fails UX-3, one of the five gating
+// criteria, and drops the mean below the bar.
+const UX_MEASURED = {
+  'UX-1': 'the run reached the terminal assertion and the store holds the record it names',
+  'UX-2': 'four committed steps against a declared budget of five',
+  'UX-3': 'the wrong value was corrected at its own field and the flow finished two steps later',
+  'UX-4': 'the pressed treatment rendered in 60ms and the pending indicator held the initiator',
+  'UX-5': 'the destination sat one navigation level from entry and the three place signals agreed',
+  'UX-6': 'every state the run reached offered a next action or a way back',
+  'UX-7': 'back, reload and a fresh session each returned the same step with its values',
+  'UX-8': 'every field kept a visible label and tab order equalled reading order',
+  'UX-9': 'the primary action sat in the lower half at the narrowest declared viewport',
+  'UX-10': 'one verb per action across both surfaces of the run',
+  'UX-11': 'labels named the things, controls named the effects, no stub copy survived',
+};
+const UX_RULES = Object.keys(UX_MEASURED);
+const experience = () => ({
+  entries: UX_RULES.map((rule) => ({ rule, measured: UX_MEASURED[rule], score: 4, verdict: 'pass', routeTo: 'none' })),
+  mean: 4,
+  verdict: 'ship',
+  routeTo: 'none',
+});
+const experienceFixFirst = () => {
+  const lens = experience();
+  lens.entries[2] = { rule: 'UX-3', measured: 'the flow restarted to correct one field', score: 2, verdict: 'fail', routeTo: 'direction' };
+  lens.mean = 3.82;
+  lens.verdict = 'fix-first';
+  lens.routeTo = 'direction';
+  return lens;
+};
 const lanes = (over = {}) => ['behavior', 'ux', 'ui'].map((l) => lane(l, over[l] ?? 'pass'));
 
 function verdicts(over = {}) {
   return {
     runId: RUN, commit: COMMIT, resultRef: `${DIR}/runs/${RUN}/result.json`, latestRef: `${DIR}/latest`,
-    lanes: lanes(), cleanup: { performed: true, isUat: true, namespace: NS, runRecordsDeleted: false },
+    lanes: lanes(), experience: experience(), cleanup: { performed: true, isUat: true, namespace: NS, runRecordsDeleted: false },
     ...over,
   };
 }
@@ -107,6 +139,21 @@ ${snap.cases.map((c) => `| \`${c.caseId}\` | ${c.order} | ${c.assertions.join(',
 | Lane | Verdict | Evidence |
 | --- | --- | --- |
 ${verd.lanes.map((l) => `| \`${l.lane}\` | ${l.verdict} | \`${l.evidenceRefs[0]}\` |`).join('\n')}
+
+## Experience
+
+| Rule | Measured | Score | Verdict |
+| --- | --- | --- | --- |
+${verd.experience.entries.map((r) => `| \`${r.rule}\` | ${r.measured} | ${r.score} | ${r.verdict} |`).join('\n')}
+
+- Mean: ${verd.experience.mean.toFixed(2)}
+- Verdict: ${verd.experience.verdict}
+
+## Verdict
+
+| Topic | Verdict | Route |
+| --- | --- | --- |
+| \`experience\` | ${verd.experience.verdict} | ${verd.experience.routeTo} |
 
 ## Fallbacks taken
 
@@ -186,7 +233,8 @@ const baseline = () => ({
 });
 
 function withVerdicts(over, { next, outcomes } = {}) {
-  const verd = verdicts({ lanes: lanes(over) });
+  // The ux lane is the experience lens’ own verdict, so a failing lane carries a failing lens.
+  const verd = verdicts({ lanes: lanes(over), experience: over.ux === 'fail' ? experienceFixFirst() : experience() });
   return {
     ...baseline(),
     'response/data/verdicts.json': verd,
@@ -268,4 +316,12 @@ await expectError({ ...baseline(), 'response/response.md': responseMd().replace(
 await expectError({ ...baseline(), 'response/response.md': responseMd().replace('## Cases', '## Case list') }, 'missing section ^## Cases$', 'a receipt section renamed');
 await expectError({ ...baseline(), 'response/response.json': responseJson({ drop: 'uat-verdicts' }) }, 'required output uat-verdicts is not in fields', 'a decided run that published no verdicts');
 
-process.stdout.write('uat.verify self-test: 4 valid branches, 36 rejected mutations\n');
+// The experience lane is scored, not asserted: UX-12 computes it, and the receipt copies it.
+await expectValid(withVerdicts({ ux: 'fail' }, { next: ['user'], outcomes: { 'pay-and-enrol': 'fail', 'abandon-checkout': 'pass' } }), 'a run whose experience lane is fix-first on a gating criterion');
+await expectError({ ...baseline(), 'response/data/verdicts.json': verdicts({ experience: { ...experience(), mean: 5 } }) }, 'the eleven scores average 4.00', 'an experience mean nobody computed');
+await expectError({ ...baseline(), 'response/data/verdicts.json': verdicts({ experience: { ...experience(), verdict: 'fix-first' } }) }, 'UX-12 makes it ship', 'an experience verdict UX-12 does not produce');
+await expectError({ ...baseline(), 'response/data/verdicts.json': verdicts({ experience: { ...experience(), entries: experience().entries.slice(0, 10) } }) }, 'array is too short', 'a criterion left out of the experience lane');
+await expectError({ ...baseline(), 'response/data/verdicts.json': verdicts({ experience: (() => { const l = experience(); l.entries[0] = { ...l.entries[0], verdict: 'fail', routeTo: 'none' }; l.mean = 4; l.verdict = 'fix-first'; l.routeTo = 'direction'; return l; })() }) }, 'fails UX-1 and routes nowhere', 'an experience failure that routes nowhere');
+await expectError({ ...baseline(), 'response/response.md': responseMd().replace('| `experience` | ship | none |', '| `experience` | fix-first | direction |') }, 'Verdict records fix-first', 'a receipt whose experience row differs from the lane');
+
+process.stdout.write('uat.verify self-test: 6 valid branches, 40 rejected mutations\n');

@@ -105,6 +105,22 @@ failure, the kind the delivery owner can fix; a `boundary-drift` failure belongs
 boundary and cannot be owed away here. `declaredDebts` defaults to the empty list, so carrying a red
 gate is always something a person did on purpose.
 
+## The scorecard is copied, never rescored
+
+The gates say whether the delivery is well formed. They say nothing about whether the surface is good,
+reachable, truthful or usable, and those questions were already answered by the operators that
+observed the running product: `frontend.surface.audit` closed eight proof topics on its captures, and
+`uat.verify` closed the experience topic on its run. This operator reads both receipts and writes one
+`## Verdict` table: one row per topic, each verdict and route copied from the receipt that computed
+it. It may not rescore a topic, may not average across rows, and may not substitute its own judgement
+for a measurement it did not take.
+
+The line under that table is the whole answer. Any row missing, or `blocked`, makes it `blocked`,
+because a topic nobody observed has earned neither a pass nor a failure. Any row `fail` or
+`fix-first` makes it `fix-first`, and the receipt names that row and the route it carries. Only when
+every row ships or passes is it `ship`. Two failing rows are both reported with their own routes;
+collapsing them into one composite, or reporting only the first, hides the second owner.
+
 ## The verdict
 
 `pass` requires every required gate to have passed, or to have failed `in-boundary` under a declared
@@ -139,6 +155,8 @@ approval expired.
 | `backend-source-application` | `backend.source.apply`, the backend delivery to verify | no |
 | `frontend-source-application` | `frontend.source.apply`, the frontend delivery to verify | no |
 | `changes` | `backend.source.apply` or `frontend.source.apply`, the paths that moved and the gates and surfaces they name | no |
+| `frontend-surface-audit` | `frontend.surface.audit`, the eight proof topics it closed at the same head | no |
+| `uat-flow-verification` | `uat.verify`, the experience topic it closed at the same head | no |
 
 ## Requirements
 
@@ -161,7 +179,8 @@ approval expired.
 | 4 | Apply the coverage policy | `thresholds` | `response/data/gates/<gate>.json` of the unit gate | `response/data/coverage.json` | — |
 | 5 | Classify each failure from its diagnostics | — | `response/data/gates/<gate>.json` of every red gate | — | — |
 | 6 | Apply approved debt | `declaredDebts` | @worktrees/debts, `response/data/gates/<gate>.json` | — | `DEBT_UNAPPROVED` |
-| 7 | Compute the verdict, write the receipt and emit | — | everything above | `response/response.md`, `response/response.json` | — |
+| 7 | Copy each topic verdict from the receipt that computed it | — | inputs `frontend-surface-audit` and `uat-flow-verification` at the same pinned head | — | `PREDECESSOR_MIXED` |
+| 8 | Compute the gate verdict and the scorecard, write the receipt and emit | — | everything above | `response/response.md`, `response/response.json` | — |
 
 A gate that could not be executed at all in this environment is `GATE_UNAVAILABLE` when it was
 required; a non-required gate the environment blocked is recorded as `external-blocker` and the

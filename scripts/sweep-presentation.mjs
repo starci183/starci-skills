@@ -15,18 +15,11 @@
 //                          owners are read from DNA.md too: a renderer whose published claims name a
 //                          GAP-, PADDING-, MARGIN-, MEASURE- or OVERFLOW- rule already owns the
 //                          distance the class would redraw.
-//   SHELL_GEOMETRY         a product shell that draws its own band instead of composing one. Owner
-//                          ruling 2026-09-03, on top of `patterns/fe/imports.md` FE-IMPORTS-7 Case 7:
-//                          "a local `Sidebar` or shell geometry: use the Common renderer and pass
-//                          props". A unit under `product-shells/**`, or whose folder name ends in
-//                          Layout, Shell, TopBar, Navbar, Nav, Sidebar or Rail, may compose a Grammar
-//                          shell object and pass props or slots. Carrying layout, spacing or border
-//                          utilities while composing no shell object at all means the band, its
-//                          inset and its separator were rebuilt out of divs. The same code covers
-//                          the band mounted in the wrong place: `WorkspaceShell` wraps its `header`
-//                          slot in a `<header>` and `NavigationFeatureNav` is already one, so the
-//                          application band belongs beside the page in the route layout, never in
-//                          that slot.
+//   SHELL_GEOMETRY         a shell unit that draws its own band instead of composing one, or mounts a
+//                          band inside a shell object's hero slot. The law is FE-IMPORTS-7 Case 7 in
+//                          `patterns/fe/imports.md` and is not restated here; the folder names that
+//                          make a unit a shell unit are parsed out of that Case, so the rule and this
+//                          gate cannot disagree.
 //   OFF_SCALE              a class outside the closed scale its topic publishes. The scales are
 //                          parsed out of gap.md, padding.md, margin.md, measure.md and radius.md;
 //                          this file adds nothing to them. `rounded-small|medium|large` and any
@@ -112,12 +105,24 @@ export function loadGrammarObjects(root = ROOT) {
   return { objects, geometryOwners, shellObjects };
 }
 
-// A unit whose job is the shell of a product surface, by the owner's two tests.
 // Grammar containers whose className is a published extension point and whose claims stop at measure
 // and centring; the application arranges its own regions inside them (GAP-5 Case 2).
 const OPEN_CONTAINERS = new Set(['PageContainer']);
+
+// FE-IMPORTS-7 Case 7 publishes which folder names make a unit a shell unit, and this gate reads them
+// out of the rule file rather than keeping a copy: changing the Case changes the gate.
+export function loadShellUnitNames(root = ROOT) {
+  const text = readFileSync(path.join(root, 'knowledge', 'patterns', 'fe', 'imports.md'), 'utf8');
+  const row = text.split('\n').find((l) => l.startsWith('| Case 7 |') && l.includes('ends in'));
+  if (!row) throw new Error('FE-IMPORTS-7 Case 7 publishes no shell-unit names');
+  const phrase = row.slice(row.indexOf('ends in') + 7).split('—')[0];
+  const names = [...phrase.matchAll(/`([A-Za-z][A-Za-z0-9]*)`/g)].map((m) => m[1]);
+  if (!names.length) throw new Error('FE-IMPORTS-7 Case 7 publishes no shell-unit names');
+  return names;
+}
+const SHELL_NAMES = loadShellUnitNames();
 const SHELL_FOLDER = /(?:^|\/)product-shells\//;
-const SHELL_NAME = /(Layout|Shell|TopBar|Navbar|Nav|Sidebar|Rail)$/;
+const SHELL_NAME = new RegExp(`(${SHELL_NAMES.join('|')})$`);
 export const isShellUnit = (relPath) => SHELL_FOLDER.test(relPath) || SHELL_NAME.test(path.basename(path.dirname(relPath)));
 
 const SHELL_TOKEN = /^(flex|flex-col|flex-row|grid|grid-cols-.+|items-.+|justify-.+|self-.+|place-.+|gap(-[xy])?-.+|p[trblxyse]?-.+|w-.+|h-.+|sticky|border(-.+)?)$/;
@@ -279,10 +284,9 @@ function attrOf(tag, name) {
 }
 const classNameOf = (tag) => attrOf(tag, 'className');
 
-// The application band is a sibling of the page, not the page's hero. `WorkspaceShell` wraps whatever
-// it is handed in its own `<header>`, and `NavigationFeatureNav` is already a `<header>`, so nesting
-// one in the other publishes two banner landmarks for one band.
-const BAND_NAME = /^(NavigationFeatureNav|.*(?:Nav|TopBar))$/;
+// FE-IMPORTS-7 Case 7 also places the band: beside the page, never inside a shell object's hero slot.
+// A band is a shell unit by the same published vocabulary, so this test carries no list of its own.
+const BAND_NAME = new RegExp(`^.*(?:${SHELL_NAMES.join('|')})$`);
 export function bandInHeaderSlot(tag) {
   const header = attrOf(tag, 'header');
   if (header === null) return null;

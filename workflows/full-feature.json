@@ -83,6 +83,15 @@
     ],
     [
       {
+        "operator": "workspace.bind",
+        "requirements": {
+          "role": "fe",
+          "runtimeNeed": "consume"
+        }
+      }
+    ],
+    [
+      {
         "operator": "frontend.surface.audit",
         "fanout": "matrix",
         "maxParallel": 3
@@ -91,6 +100,16 @@
     [
       {
         "operator": "quality.verify"
+      }
+    ],
+    [
+      {
+        "operator": "uat.verify",
+        "asks": [
+          "requestedBy",
+          "feature",
+          "flow"
+        ]
       }
     ],
     [
@@ -121,6 +140,12 @@
       "from": "frontend.surface.audit",
       "to": "frontend.presentation.resolve",
       "when": "an application-owned node fails a claim or a proof rule",
+      "maxRounds": 2
+    },
+    {
+      "from": "frontend.surface.audit",
+      "to": "frontend.direction.decide",
+      "when": "the taste lens is fix-first, so the composition is decided again rather than revalued",
       "maxRounds": 2
     }
   ]

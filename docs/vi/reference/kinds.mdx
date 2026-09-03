@@ -121,7 +121,7 @@ Khung: [`templates/kinds/frontend-direction-decision.skeleton.md`](https://githu
 | `^## Observed$` | `\| Item \| Evidence \|` | minRows 1 | `Evidence`: `^`[^`]+@[0-9a-f]{7,40}`$` |
 | `^## UI contract$` | `\| Element \| Kind \| Responsibility \|` | minRows 1 | `Kind`: `^(region\|action\|state\|responsive\|content\|accessibility)$`<br />`Responsibility`: `\S` |
 | `^## Coverage$` | `\| Concern \| Enumerated \|` | `Actions`, `Regions`, `States`, `Responsive` | `Enumerated`: `\S` |
-| `^## References$` | `\| Source \| URL \| Limitation \|` | — | `URL`: `^https?://\S+$`<br />`Limitation`: `\S` |
+| `^## References$` | `\| Standard \| Class \| URL \| What is borrowed \| Limitation \|` | — | `Standard`: `\S`<br />`Class`: `^`[a-z0-9][a-z0-9-]*`$`<br />`URL`: `^(https?://\S+\|—)$`<br />`What is borrowed`: `\S`<br />`Limitation`: `\S` |
 | `^## Images$` | `\| Slot \| Why \| Claim \| File \|` | — | `File`: `^(`response/artifacts/images/[A-Za-z0-9_.-]+`\|—)$` |
 | `^## Falsification$` | `\| Attack \| Candidate \| Verdict \| Evidence \|` | minRows 1 | `Candidate`: `^`[a-z0-9][a-z0-9-]*`$`<br />`Verdict`: `^(holds\|fails)$`<br />`Evidence`: `\S` |
 | `^## Why not the others$` | `\| Candidate \| Rejected because \|` | — | `Candidate`: `^`[a-z0-9][a-z0-9-]*`$`<br />`Rejected because`: `\S` |
@@ -159,8 +159,11 @@ Khung: [`templates/kinds/frontend-surface-audit.skeleton.md`](https://github.com
 
 | Mục | Dòng đầu của bảng | Số dòng | Ràng buộc ô |
 | --- | --- | --- | --- |
+| `^## Surface class$` | `\| Class \| Declared by \|` | exactRows 1 | `Class`: `^`(console\|form\|landing\|catalog\|reader)`$`<br />`Declared by`: `\S` |
 | `^## Matrix$` | `\| Matrix \| Viewport \| Scheme \| State \| Screenshot \|` | minRows 1 | `Matrix`: `^`[a-z0-9][a-z0-9-]*`$`<br />`Viewport`: `^[0-9]{3,4}x[0-9]{3,4}$`<br />`Scheme`: `^(light\|dark)$`<br />`Screenshot`: `^`response/artifacts/[A-Za-z0-9_.-]+[.]png`$` |
 | `^## Verdicts by owner$` | `\| Matrix \| Owner \| Node \| Rule \| Measured \| Verdict \|` | minRows 1 | `Owner`: `^(app\|grammar)$`<br />`Node`: `^`[^`]+`$`<br />`Rule`: `^`[A-Z][A-Z0-9-]*-[0-9]+`$`<br />`Verdict`: `^(pass\|fail)$`<br />`Matrix`: `^`[a-z0-9][a-z0-9-]*`$` |
+| `^## Taste$` | `\| Rule \| Measured \| Score \| Verdict \|` | minRows 12 | `Rule`: `^`TASTE-([1-9]\|1[0-2])`$`<br />`Measured`: `\S`<br />`Score`: `^[1-5]$`<br />`Verdict`: `^(pass\|fail)$` |
+| `^## Verdict$` | `\| Topic \| Verdict \| Route \|` | exactRows 8 | `Topic`: `^`(presentation\|composition\|responsive\|motion\|accessibility\|contrast\|render-truth\|taste)`$`<br />`Verdict`: `^(pass\|fail\|ship\|fix-first\|blocked)$`<br />`Route`: `^(resolve\|direction\|flow-owner\|grammar-gap\|none)$` |
 | `^## Regressions$` | `\| Matrix \| Node \| Rule \| Measured \| Routes to \|` | — | `Node`: `^`[^`]+`$`<br />`Routes to`: `^(resolve\|grammar-gap)$`<br />`Matrix`: `^`[a-z0-9][a-z0-9-]*`$` |
 | `^## Grammar gaps$` | `\| Component \| Rule \| What the family lacks \|` | — | `What the family lacks`: `\S` |
 | `^## Fallbacks taken$` | `\| Code \| Action \|` | — | `Code`: `^`[A-Z][A-Z0-9_]+`$` |
@@ -219,7 +222,8 @@ Khung: [`templates/kinds/quality-verification.skeleton.md`](https://github.com/s
 | `^## Sonar$` | `\| Field \| Value \|` | `Scope`, `Finding` | `Value`: `\S` |
 | `^## Debts$` | `\| Debt \| Gate \| Approval \| Owner \| Expires \| Statement \|` | — | `Gate`: `^`(format\|lint\|typecheck\|build\|unit-coverage\|integration\|e2e\|sonar\|presentation-sweep)`$` |
 | `^## Findings$` | `\| Code \| Gate \| Statement \|` | minRows 1 | `Code`: `^`(PREDECESSOR_CONSUMED\|SONAR_NEW_CODE_ONLY\|E2E_NOT_REQUESTED\|COVERAGE_BELOW_THRESHOLD\|FLAKY_CONFIRMED\|DEBT_DECLARED)`$`<br />`Statement`: `\S` |
-| `^## Verdict$` | `\| Field \| Value \|` | exactRows 1 | `Value`: `^`(pass\|fail)`$` |
+| `^## Gate verdict$` | `\| Field \| Value \|` | exactRows 1 | `Value`: `^`(pass\|fail)`$` |
+| `^## Verdict$` | `\| Topic \| Verdict \| Route \|` | exactRows 9 | `Topic`: `^`(presentation\|composition\|responsive\|motion\|accessibility\|contrast\|render-truth\|taste\|experience)`$`<br />`Verdict`: `^(pass\|fail\|ship\|fix-first\|blocked)$`<br />`Route`: `^(resolve\|direction\|flow-owner\|grammar-gap\|none)$` |
 
 ### `release-deployment`
 
@@ -247,6 +251,8 @@ Khung: [`templates/kinds/uat-flow-verification.skeleton.md`](https://github.com/
 | `^## Snapshot$` | `\| Field \| Value \|` | `Run`, `Requested by`, `Feature`, `Flow`, `Commit`, `Snapshot`, `Namespace`, `Credential`, `Run record`, `Latest` | `Value`: `\S` |
 | `^## Cases$` | `\| Case \| Order \| Assertions \| Capture \| Screenshot \| Outcome \|` | minRows 1 | `Order`: `^[1-9][0-9]*$`<br />`Assertions`: `\S`<br />`Capture`: `^`response/data/captures/[A-Za-z0-9_.-]+\.json`$`<br />`Screenshot`: `^`response/artifacts/[A-Za-z0-9_.-]+\.png`$`<br />`Outcome`: `^(pass\|fail)$` |
 | `^## Lanes$` | `\| Lane \| Verdict \| Evidence \|` | exactRows 3 | `Lane`: `^`(behavior\|ux\|ui)`$`<br />`Verdict`: `^(pass\|fail)$`<br />`Evidence`: `\S` |
+| `^## Experience$` | `\| Rule \| Measured \| Score \| Verdict \|` | exactRows 11 | `Rule`: `^`UX-([1-9]\|1[01])`$`<br />`Measured`: `\S`<br />`Score`: `^[1-5]$`<br />`Verdict`: `^(pass\|fail\|evidence-unavailable)$` |
+| `^## Verdict$` | `\| Topic \| Verdict \| Route \|` | exactRows 1 | `Topic`: `^`experience`$`<br />`Verdict`: `^(pass\|fail\|ship\|fix-first\|blocked)$`<br />`Route`: `^(resolve\|direction\|flow-owner\|grammar-gap\|none)$` |
 | `^## Fallbacks taken$` | `\| Code \| Action \|` | — | — |
 
 ### `workspace-route-binding`
@@ -286,7 +292,7 @@ Khung: [`templates/kinds/workspace-route-binding.skeleton.md`](https://github.co
 | `stack-model` | [`templates/kinds/stack-model.schema.json`](https://github.com/starci183/starci-skills/blob/main/templates/kinds/stack-model.schema.json) | `decisionId`, `selectedAlternativeId`, `alternatives`, `boundaries`, `stores`, `components`, `operations` |
 | `uat-capture` | [`templates/kinds/uat-capture.schema.json`](https://github.com/starci183/starci-skills/blob/main/templates/kinds/uat-capture.schema.json) | `caseId`, `runId`, `order`, `executedAt`, `screenshotRef`, `loginFieldMasked`, `outcome`, `assertions` |
 | `uat-snapshot` | [`templates/kinds/uat-snapshot.schema.json`](https://github.com/starci183/starci-skills/blob/main/templates/kinds/uat-snapshot.schema.json) | `runId`, `requestedBy`, `feature`, `flow`, `commit`, `frozenAt`, `flowRoot`, `snapshotRef`, `snapshotFingerprint`, `lease`, `admission`, `account`, `fixtureNamespace`, `seed`, `cases` |
-| `uat-verdicts` | [`templates/kinds/uat-verdicts.schema.json`](https://github.com/starci183/starci-skills/blob/main/templates/kinds/uat-verdicts.schema.json) | `runId`, `commit`, `resultRef`, `latestRef`, `lanes`, `cleanup` |
+| `uat-verdicts` | [`templates/kinds/uat-verdicts.schema.json`](https://github.com/starci183/starci-skills/blob/main/templates/kinds/uat-verdicts.schema.json) | `runId`, `commit`, `resultRef`, `latestRef`, `lanes`, `experience`, `cleanup` |
 | `ui-coverage` | [`templates/kinds/ui-coverage.schema.json`](https://github.com/starci183/starci-skills/blob/main/templates/kinds/ui-coverage.schema.json) | `directionId`, `actions`, `regions`, `states`, `responsive` |
 | `verdicts` | [`templates/kinds/verdicts.schema.json`](https://github.com/starci183/starci-skills/blob/main/templates/kinds/verdicts.schema.json) | `entries` |
 | `writes` | [`templates/kinds/writes.schema.json`](https://github.com/starci183/starci-skills/blob/main/templates/kinds/writes.schema.json) | `mode`, `base`, `branch`, `commit`, `files`, `sweep` |

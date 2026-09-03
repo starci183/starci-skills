@@ -103,10 +103,31 @@ a node passes.
 | --- | --- | --- | --- | --- | --- |
 | 1 | Validate the gate and resume, and confirm the head and the served route | `resume` | `request/request.json`, input `frontend-source-application` (its commit must equal the pinned head), @workspaces/fe at the frozen head, @worktrees/sessions/central-runtime (the preview serving the session worktree at that commit), @tools/git | — | `INVALID_INPUT`, `SOURCE_DRIFT`, `NO_PROGRESS` |
 | 2 | Bind the authority | — | @knowledge/ui/proof (every topic with its fingerprint and inventory), input `frontend-source-application` (the claims), input `frontend-presentation-resolution` (the owner of every node), @worktrees/sessions/central-runtime | — | — |
-| 3 | Select the matrix entries | `matrix` | input `frontend-direction-decision` (the coverage: state by viewport by colour scheme) | — | — |
+| 3 | Select the matrix entries and carry the declared surface class | `matrix` | input `frontend-direction-decision` (the coverage: state by viewport by colour scheme, and `coverage.surfaceClass`) | — | `SURFACE_CLASS_MISSING` |
 | 4 | Reach readiness for each entry | `readinessProbe` | @worktrees/sessions/central-runtime, @tools/http | — | `RUNTIME_UNAVAILABLE` |
 | 5 | Capture and measure each entry | — | @worktrees/sessions/central-runtime, @workspaces/fe (the observed owners and the identifiers each node carries), @tools/browsercontrol | `response/artifacts/<matrixId>.png`, `response/data/captures/<matrixId>.json` | `EVIDENCE_MISSING` |
-| 6 | Compare against the claims and the proof rules, judge by owner, and emit | — | @knowledge/ui/proof, @knowledge/grammars/starci, the captures, @tools/websearch | `response/data/verdicts.json`, `response/response.md`, `response/response.json`, @tools/visualize | `UNKNOWN_RULE` |
+| 6 | Compare against the claims and the proof rules, judge by owner, let each topic close itself, and emit | — | @knowledge/ui/proof, @knowledge/grammars/starci, the captures, @tools/websearch | `response/data/verdicts.json`, `response/response.md`, `response/response.json`, `response/artifacts/host.json`, @tools/visualize, @tools/host | `UNKNOWN_RULE` |
+
+Step 6 judges every claim and then lets each proof topic close itself. The canon judgement is the one
+above: every claim measured, judged against the published rule, routed by the owner of the node it
+stands on. On top of it, each bound topic computes its own verdict by its own closing rule — the
+arithmetic lives there and is not repeated here — and the receipt publishes one row per topic under
+`## Verdict`: presentation, composition, responsive, motion, accessibility, contrast, render-truth
+and taste, each with the verdict that topic's rule produced and the route a failure carries. A topic
+whose evidence never arrived is `blocked`, which is never reported as a pass and never as a failure.
+The taste row is scored per matrix entry and rolled up across them, lowest score and failing verdict
+winning, because a surface is only as good as its worst captured viewport; a `fix-first` there stands
+even when every canon rule passed, and the checkout's own gates wait for a `ship`.
+
+The sheet is served, not filed. `@tools/host` puts `response/artifacts/` on the loopback interface at
+the first free port from 60000 up to 60100 and records the URL, the port, the folder and the pid in
+`response/artifacts/host.json`, stopping when the branch ends or is resumed; a person opens the sheet
+and sees every matrix entry beside its verdicts. Nothing binds `0.0.0.0`.
+
+The surface class is not this operator's to choose. The direction's coverage declared it from the
+vocabulary `COVERAGE-1` Case 7 publishes, every banded proof rule reads its threshold from that name,
+and the audit carries it into `## Surface class` and into the verdicts. A decision that declares none,
+or a name outside the vocabulary, is `SURFACE_CLASS_MISSING`: no band, no threshold, nothing to judge.
 
 The matrix is the direction's coverage, not a new decision: `matrix` may only narrow it, and the
 orchestrator may split the entries across up to three parallel branches of the same step. Every entry
@@ -122,6 +143,7 @@ for a node that was not.
 | `capture` | `response/data/captures/<matrixId>.json` | data | yes |
 | `screenshot` | `response/artifacts/<matrixId>.png` | artifact | yes |
 | `verdicts` | `response/data/verdicts.json` | data | yes |
+| `host` | `response/artifacts/host.json` | artifact | no |
 
 ## Stops
 
@@ -132,6 +154,7 @@ for a node that was not.
 | `RUNTIME_UNAVAILABLE` | terminate |
 | `EVIDENCE_MISSING` | terminate |
 | `UNKNOWN_RULE` | terminate |
+| `SURFACE_CLASS_MISSING` | terminate |
 | `NO_PROGRESS` | terminate |
 
 ## Next
@@ -139,7 +162,8 @@ for a node that was not.
 | When | Operator |
 | --- | --- |
 | a claim fails on an application-owned node, so a value must be published again | `frontend.presentation.resolve` |
-| every claim holds and the checkout's own gates must run | `quality.verify` |
+| a topic verdict is fix-first, or the direction declared no surface class, so the composition is decided again before any value is | `frontend.direction.decide` |
+| every topic ships or passes and the checkout's own gates must run | `quality.verify` |
 | a claim fails on a Grammar component's own render, so a person records the family gap and publishes | `frontend.surface.audit` |
 
 ---

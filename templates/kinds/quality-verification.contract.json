@@ -73,7 +73,7 @@
       }
     },
     {
-      "heading": "^## Verdict$",
+      "heading": "^## Gate verdict$",
       "table": "| Field | Value |",
       "exactRows": 1,
       "rows": [
@@ -81,6 +81,27 @@
       ],
       "cell": {
         "Value": "^`(pass|fail)`$"
+      }
+    },
+    {
+      "heading": "^## Verdict$",
+      "table": "| Topic | Verdict | Route |",
+      "exactRows": 9,
+      "rows": [
+        "presentation",
+        "composition",
+        "responsive",
+        "motion",
+        "accessibility",
+        "contrast",
+        "render-truth",
+        "taste",
+        "experience"
+      ],
+      "cell": {
+        "Topic": "^`(presentation|composition|responsive|motion|accessibility|contrast|render-truth|taste|experience)`$",
+        "Verdict": "^(pass|fail|ship|fix-first|blocked)$",
+        "Route": "^(resolve|direction|flow-owner|grammar-gap|none)$"
       }
     }
   ]

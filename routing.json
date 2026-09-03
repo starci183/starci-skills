@@ -153,6 +153,10 @@
       },
       "frontend": {
         "kind": "resume"
+      },
+      "direction": {
+        "kind": "operator",
+        "target": "frontend.direction.decide"
       }
     },
     "git.publish": {

@@ -54,6 +54,20 @@ Chi phối những gì khép lại một tuyên bố về render truth.
 | Case 4 | Một family hoặc ứng dụng thêm delta | So sánh riêng đầu ra công khai cô lập, delta của family, delta của ứng dụng và pixel hiện tại |
 | Case 5 | Có người đưa ra bản duyệt copy hoặc prop trong source làm bằng chứng | Chúng không đủ. Một tuyên bố đã render được chứng minh bằng đầu ra đã render và bằng authority đã truy ngược |
 
+## TRUTH-5 — Phán quyết của tính thật của bản render
+
+Chi phối việc các tiêu chí trên trở thành đúng một hàng của topic này trong bảng `## Verdict` của receipt.
+
+| Case | Dùng khi | Quan sát |
+| --- | --- | --- |
+| Case 1 | Lens chạy | `TRUTH-1` đến `TRUTH-4` được xét trên mọi ảnh chụp có render một dữ kiện, một mức khả dụng, một tín hiệu tiến trình hay một outcome, mỗi thứ đều truy về thẩm quyền đứng sau nó |
+| Case 2 | Tính verdict | Tập chặn cửa là toàn bộ tập: `pass` đòi mọi tiêu chí đều đạt, vì một tuyên bố trang không chống lưng nổi là một tuyên bố người đọc sẽ hành động theo |
+| Case 3 | Không có kho hay thẩm quyền nào để đối chiếu các tuyên bố | Verdict là `blocked`. Duyệt các tuyên bố vì chúng trông hợp lý sẽ bác bỏ nó |
+| Case 4 | Một lần fail được định tuyến | Một tuyên bố bị thiết kế sai thì về `direction`; một tuyên bố thiếu thẩm quyền thì về chủ của flow, vì không giá trị nào và không bố cục nào cấp được một dữ kiện mà sản phẩm không giữ |
+
+Tập được chấm là `TRUTH-1` đến `TRUTH-4`; rule này là phần số học và bản thân nó không được chấm. Kết
+quả của nó là hàng `render-truth` trong bảng `## Verdict` của receipt audit.
+
 ## File này không quyết định
 
 Một dữ kiện nhận cấp độ nào thuộc [Hierarchy](../composition/hierarchy.vi.md), có những điều kiện

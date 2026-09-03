@@ -6,6 +6,12 @@ and in which order?
 Sources: `tsconfig.json` (`paths`), `eslint.config.mjs`, `src/hooks/index.ts`,
 `src/components/**`, `src/hooks/swr/**`.
 
+One Case is retired here: `FE-IMPORTS-7` Case 9 folded into Case 7, because where a band is mounted
+and whether a band was drawn by hand are one law about one object and were drifting as two. The
+presentation sweep reads the shell-unit names out of Case 7 rather than keeping a list of its own, and
+the occurrences that justified the case are recorded in
+[the presentation sweep evidence](../../../tests/evidence/20260903-presentation-sweep.md).
+
 ## FE-IMPORTS-1 — Paths
 
 | Case | When | Write |
@@ -76,9 +82,8 @@ imports alphabetically by binding instead; the order above is dominant, not univ
 | Case 4 | `namespace` | only `src/modules/api/graphql/clients/options.ts`, by config exception |
 | Case 5 | Mixing families, or importing the package root | renderers and prop types come from the family entry `@starci/grammar/core` (which re-exports every Common renderer since 0.4.2) or from `@starci/grammar/common`; never from the package root, never from two families in one app |
 | Case 6 | A second family stylesheet under one root | one `CoreGrammarRoot` at the composition root, one `@starci/grammar/core/styles.css`; the family is selected once |
-| Case 7 | An app-local clone of a Common renderer or an anonymous layout | `TextLink`, `NavLink`, `SeeMoreLink`, a local `Sidebar` or shell geometry: use the Common renderer and pass props. A product adapter maps routes and state into Common and owns no geometry — it composes `WorkspaceShell` and owns no `classNames.ts`, or it composes `NavigationFeatureNav` and writes classes only inside the slots it is handed. A bar assembled from divs is shell geometry whatever it is named: the band, its inset and its separator belong to `NavigationFeatureNav`. The test is not whether a shell folder holds classes, it is whether it composes a Grammar shell object at all; a shell folder importing only `Text` and rebuilding `flex … items-center justify-between gap-*` in its own `classNames.ts` has cloned the band. Observed in two products: one composes a shell object in every shell folder, the other does not in one of them |
+| Case 7 | An app-local clone of a Common renderer, an anonymous layout, or a shell band the application draws itself | Use the Common renderer and pass props. A shell unit — a folder whose name ends in `Layout`, `Shell`, `TopBar`, `Navbar`, `Nav`, `Sidebar` or `Rail` — composes a Grammar shell object and writes classes only inside the slots it is handed. The test is not whether a shell folder holds classes, it is whether it composes a shell object at all: a bar assembled from divs is shell geometry whatever it is named, and the band, its inset and its separator belong to the composed object. The same case places the band. It is mounted beside the page in the route layout, never inside a shell object's `header` slot, because that slot is wrapped in a banner by its owner while a band already is one, so the nesting publishes two banner landmarks for one band; the slot is the page-level hero and takes page copy |
 | Case 8 | A product name in a Grammar public export, or business logic inside Common/Core | `Learn`, `Console`, `Dashboard` stay in product code; routes, permissions, persistence and effects never enter the package |
-| Case 9 | The application band inside `WorkspaceShell`'s `header` slot | `header={<XNav />}`. `WorkspaceShell` wraps whatever it is handed in its own `<header>`, and `NavigationFeatureNav` is already a `<header>`, so the nesting publishes two banner landmarks for one band. The band is mounted in the route layout as a sibling above the page or above the shell; `WorkspaceShell.header` is the page-level hero and takes page copy. Observed in two products: one mounts the band in 6 route layouts, each rendering the adapter then the page, and its own shell adapter passes no `header`; the other passes its top bar into that slot and rendered two banners |
 
 ## Open questions
 

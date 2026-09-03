@@ -47,6 +47,20 @@ Không phải rule này: khác biệt có tồn tại khi không có màu hay kh
 được chọn đúng cho phần chữ không được quyết ở presentation, dưới TONE-1 tới TONE-3. Chữ có được
 đọc lên hay không thuộc A11Y-1 tới A11Y-3.
 
+## COLOR-6 — Phán quyết của tương phản
+
+Chi phối việc các tiêu chí trên trở thành đúng một hàng của topic này trong bảng `## Verdict` của receipt.
+
+| Case | Dùng khi | Quan sát |
+| --- | --- | --- |
+| Case 1 | Lens chạy | `COLOR-3` và `COLOR-5` được xét dựa trên màu đã đo trong mọi theme và mọi state mà coverage khai, không bao giờ dựa vào tên token |
+| Case 2 | Tính verdict | Tập chặn cửa là toàn bộ tập: `pass` đòi cả hai đều đạt ở mọi theme, vì một khác biệt sống ở theme này mà chết ở theme kia thì không phải khác biệt |
+| Case 3 | Một theme hay một state chưa từng được đo | Verdict của topic là `blocked`, không phải một lần đạt trên những theme đã đo |
+| Case 4 | Một lần fail được định tuyến | Một giá trị đo dưới ngưỡng của nó thì về `resolve`; một khác biệt dựa vào màu không ai publish thì về `direction` |
+
+Tập được chấm là `COLOR-3` và `COLOR-5`; rule này là phần số học và bản thân nó không được chấm. Kết
+quả của nó là hàng `contrast` trong bảng `## Verdict` của receipt audit.
+
 ## File này không quyết định
 
 Một đoạn chữ lấy tone nào và surface nào nằm sau nó thuộc [Tone](../presentation/tone.vi.md) và

@@ -2,8 +2,9 @@
 
 Cây này chứa universal UI law dùng chung cho mọi Grammar family đã publish, chia thành ba nhóm theo
 operator đọc từng law.
-Nó sở hữu 115 law X-n ổn định đang sống (36 ở composition, 60 ở presentation, 19 ở proof), cộng
-năm id composition đã nghỉ vào COVERAGE-1 và không bao giờ dùng lại, cùng với selection condition
+Nó sở hữu 153 law X-n ổn định đang sống (36 ở composition, 68 ở presentation, 49 ở proof), cộng
+năm id composition đã nghỉ vào COVERAGE-1 và mười một id `UI-` đã nghỉ, nay tra về chính các rule
+topic proof đã sống sót thay chúng, không id nào được dùng lại, cùng với selection condition
 quan sát được, ownership decision, deterministic verdict và audit vector. Đây không phải implementation hay consumer cookbook. Nó không sở hữu business fact, copy riêng của page, route, permission,
 identity artwork, effect sản phẩm hay lựa chọn material của family.
 
@@ -48,7 +49,7 @@ Một topic sống cùng operator đọc nó. Topic nào không operator nào đ
 | --- | --- | --- |
 | [`composition/`](composition/INDEX.vi.md) | Ràng buộc mà một direction phải thoả, sau khi gu thẩm mỹ đã quyết ở grammars | `frontend.direction.decide` |
 | [`presentation/`](presentation/INDEX.vi.md) | Ranh giới do app sở hữu lấy giá trị CSS nào | `frontend.presentation.resolve` |
-| [`proof/`](proof/INDEX.vi.md) | Thứ chỉ đúng sau khi đã render | `frontend.surface.audit` |
+| [`proof/`](proof/INDEX.vi.md) | Thứ chỉ đúng sau khi đã render | `frontend.surface.audit`; riêng [`proof/ux.md`](proof/ux.vi.md) còn được `uat.verify` đọc, vì một lượt chạy tác vụ là dụng cụ duy nhất trả lời được nó |
 
 Phép thử để xếp một topic là: đọc source có trả lời được không. Giá trị khoảng cách đọc được từ class
 nên thuộc presentation. Số hành động trội đã chốt trước khi có cây nên thuộc composition. Thứ tự bàn

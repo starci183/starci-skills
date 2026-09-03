@@ -1,7 +1,8 @@
 // Proves validate.mjs on a synthetic session branch: one conforming branch under the defaults
 // (modify, reconstruct, one candidate, automatic), one three-candidate branch that takes the
-// DIRECTION_CHOICE_REQUIRED fallback, one blocked on the same code under approval-required, and one
-// mutation per law, each of which must fail with a line that names the defect.
+// DIRECTION_CHOICE_REQUIRED fallback, one blocked on the same code under approval-required, one
+// blocked on REFERENCE_MISSING because no standard could be named by class, and one mutation per
+// law, each of which must fail with a line that names the defect.
 import assert from 'node:assert/strict';
 import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -25,12 +26,13 @@ const coverage = ({ regions = 2, actions = 1 } = {}) => ({
 function responseMd({
   intent = 'modify', changeLevel = 'reconstruct', ownerCeiling = 'surface-and-nested-layouts',
   classification = 'dominant', policy = 'automatic', selected = 'one-column', candidates = 1,
-  selectedFails = false, rejectAll = true, references = 0, fallbacks = [],
+  refClass = 'plan-comparison', selectedFails = false, rejectAll = true, references = changeLevel === 'refine' ? 0 : 1, fallbacks = [],
 } = {}) {
   const formed = NAMES.slice(0, candidates);
   const attacks = formed.map((id) => `| content stress | \`${id}\` | ${selectedFails && id === selected ? 'fails' : 'holds'} | the widest plan name still fits at 360px |`);
   const others = rejectAll ? formed.filter((id) => id !== selected).map((id) => `| \`${id}\` | it loses the offer above the fold on the narrow branch |`) : [];
-  const refRows = references ? ['| a public plan picker | https://example.com/plans | it settles nothing about entitlement |'] : [];
+  const BT = String.fromCharCode(96);
+  const refRows = references ? [`| a public plan picker | ${BT}${refClass}${BT} | https://example.com/plans | the two-column offer-then-decision ordering | it settles nothing about entitlement |`] : [];
   return `# frontend-direction-decision — plan-picker
 
 ## Decision
@@ -74,8 +76,8 @@ function responseMd({
 
 ## References
 
-| Source | URL | Limitation |
-| --- | --- | --- |
+| Standard | Class | URL | What is borrowed | Limitation |
+| --- | --- | --- | --- | --- |
 ${refRows.join('\n')}
 
 ## Images
@@ -154,11 +156,23 @@ function writeBranch(files) {
   return { branch, session };
 }
 
+// A reconstruct renders every candidate it forms, so the baseline carries its one page. A refine
+// under the defaults renders nothing, and is built from the baseline by `refine()` below.
 const baseline = () => ({
   'request/request.json': requestJson(),
-  'response/response.json': responseJson(),
+  'response/response.json': responseJson({ fields: { 'frontend-direction-decision': 'response/response.md', 'ui-coverage': 'response/data/coverage.json', candidates: ['response/artifacts/one-column.html'] } }),
   'response/response.md': responseMd(),
   'response/data/coverage.json': coverage(),
+  'response/artifacts/one-column.html': '<!doctype html><title>one-column</title>',
+});
+
+const refine = (over = {}) => ({
+  ...baseline(),
+  'request/request.json': requestJson({ extra: { changeLevel: 'refine' } }),
+  'response/response.json': responseJson(),
+  'response/response.md': responseMd({ changeLevel: 'refine', classification: 'locked-refine' }),
+  'response/artifacts/one-column.html': null,
+  ...over,
 });
 
 const threeCandidates = ({ policy = 'automatic', approval = null, extraResponse = {}, md = {} } = {}) => ({
@@ -187,7 +201,8 @@ async function expectError(files, needle, label) {
 }
 const withCoverage = (change) => { const c = coverage(); change(c); return { ...baseline(), 'response/data/coverage.json': c }; };
 
-await expectValid(baseline(), 'defaults (modify, reconstruct, one candidate, automatic)');
+await expectValid(baseline(), 'defaults (modify, reconstruct, one candidate, automatic, its page rendered)');
+await expectValid(refine(), 'a refine under the defaults renders no page');
 await expectValid(threeCandidates(), 'three candidates, the choice taken as a fallback');
 await expectValid(threeCandidates({ policy: 'approval-required', approval: 'one-column' }), 'three candidates approved by the person');
 await expectValid({
@@ -195,19 +210,27 @@ await expectValid({
   'response/response.json': responseJson({ status: 'blocked', stop: 'DIRECTION_CHOICE_REQUIRED', next: [], fields: { candidates: NAMES.map((n) => `response/artifacts/${n}.html`) } }),
   ...Object.fromEntries(NAMES.map((n) => [`response/artifacts/${n}.html`, `<!doctype html><title>${n}</title>`])),
 }, 'DIRECTION_CHOICE_REQUIRED terminates under approval-required');
+await expectValid({
+  'request/request.json': requestJson(),
+  'response/response.json': responseJson({ status: 'blocked', stop: 'REFERENCE_MISSING', next: [], fields: {} }),
+}, 'a reconstruct that could name no standard by class stops with REFERENCE_MISSING');
 
 await expectError({ ...baseline(), 'request/request.json': requestJson({ extra: { intent: 'create' } }) }, 'intent create requires changeLevel new', 'create without new');
 await expectError({ ...baseline(), 'request/request.json': requestJson({ extra: { candidates: 4 } }) }, 'candidates must be 1, 2 or 3', 'four candidates');
 await expectError({ ...baseline(), 'request/request.json': requestJson({ extra: { approval: 'one-column' } }) }, 'approval is bound under automatic policy', 'approval under automatic');
 await expectError({ ...baseline(), 'request/request.json': requestJson({ extra: { mystery: 1 } }) }, 'requirements.mystery is not a field', 'undeclared requirement');
 await expectError({ ...baseline(), 'request/request.json': requestJson({ extra: { changeLevel: '' } }) }, 'required field changeLevel has no value', 'missing change level');
-await expectError({ ...baseline(), 'request/request.json': requestJson({ extra: { candidates: 2 } }) }, 'more than one candidate was formed but none was rendered', 'comparison without pages');
-await expectError({ ...baseline(), 'request/request.json': requestJson({ extra: { preview: 'yes' } }) }, 'preview was asked for but no candidate page was rendered', 'preview without a page');
-await expectError({ ...baseline(), 'response/response.json': responseJson({ fields: { 'frontend-direction-decision': 'response/response.md', 'ui-coverage': 'response/data/coverage.json', candidates: 'response/artifacts/one-column.html' } }), 'response/artifacts/one-column.html': '<!doctype html>' }, 'one candidate under no preview renders no page', 'unasked preview page');
+await expectError({ ...baseline(), 'request/request.json': requestJson({ extra: { candidates: 2 } }), 'response/response.json': responseJson() }, 'more than one candidate was formed but none was rendered', 'comparison without pages');
+await expectError({ ...refine(), 'request/request.json': requestJson({ extra: { changeLevel: 'refine', preview: 'yes' } }) }, 'preview was asked for but no candidate page was rendered', 'preview without a page');
+await expectError(refine({ 'response/response.json': responseJson({ fields: { 'frontend-direction-decision': 'response/response.md', 'ui-coverage': 'response/data/coverage.json', candidates: 'response/artifacts/one-column.html' } }), 'response/artifacts/one-column.html': '<!doctype html>' }), 'one candidate under no preview renders no page', 'unasked preview page on a refine');
+await expectError({ ...baseline(), 'response/response.json': responseJson() }, 'a reconstruct direction renders every candidate it forms', 'a reconstruct whose candidate nobody can see');
+await expectError({ ...threeCandidates(), 'response/response.json': responseJson({ fallbacks: ['DIRECTION_CHOICE_REQUIRED'], fields: { 'frontend-direction-decision': 'response/response.md', 'ui-coverage': 'response/data/coverage.json', candidates: ['response/artifacts/one-column.html'] } }) }, '3 formed and 1 rendered', 'a reconstruct that rendered only the candidate it liked');
 await expectError({ ...baseline(), 'response/response.md': responseMd({ changeLevel: 'refine' }) }, 'Change level refine differs from the request', 'receipt and request disagree on the change level');
-await expectError({ ...baseline(), 'request/request.json': requestJson({ extra: { changeLevel: 'refine' } }), 'response/response.md': responseMd({ changeLevel: 'refine' }) }, 'a refine is classified locked-refine', 'refine classified dominant');
-await expectError({ ...baseline(), 'request/request.json': requestJson({ extra: { changeLevel: 'refine' } }), 'response/response.md': responseMd({ changeLevel: 'refine', classification: 'locked-refine', references: 1 }) }, 'a refine works from the family idioms alone', 'refine that researched');
-await expectError({ ...baseline(), 'request/request.json': requestJson({ extra: { references: ['https://example.com/plans'] } }) }, 'the person supplied references and none of them is recorded', 'supplied reference dropped');
+await expectError(refine({ 'response/response.md': responseMd({ changeLevel: 'refine' }) }), 'a refine is classified locked-refine', 'refine classified dominant');
+await expectError(refine({ 'response/response.md': responseMd({ changeLevel: 'refine', classification: 'locked-refine', references: 1 }) }), 'a refine works from the family idioms alone', 'refine that researched');
+await expectError({ ...baseline(), 'request/request.json': requestJson({ extra: { references: ['https://example.com/plans'] } }), 'response/response.md': responseMd({ references: 0 }) }, 'the person supplied references and none of them is recorded', 'supplied reference dropped');
+await expectError({ ...baseline(), 'response/response.md': responseMd({ references: 0 }) }, 'names at least one reference standard by class', 'a reconstruct that named no standard');
+await expectError({ ...baseline(), 'response/response.md': responseMd({ refClass: '' }) }, 'Class', 'a standard with no class');
 await expectError({ ...baseline(), 'response/response.md': responseMd({ selectedFails: true }) }, 'fails an attack, so the direction is not decided', 'selected candidate fails an attack');
 await expectError({ ...threeCandidates(), 'response/response.md': responseMd({ candidates: 3, rejectAll: false, fallbacks: ['DIRECTION_CHOICE_REQUIRED'] }) }, 'is not rejected by name', 'unselected candidate not rejected');
 await expectError({ ...baseline(), 'response/response.md': responseMd({ candidates: 2 }).replace('| `split-view` | it loses', '| `absent` | it loses') }, 'Falsification covers 2 candidates, the request asked for 1', 'more candidates than asked');
@@ -223,4 +246,4 @@ await expectError({ ...baseline(), 'response/response.md': responseMd().replace(
 await expectError({ ...baseline(), 'response/response.json': responseJson({ status: 'blocked', stop: 'DIRECTION_CHOICE_REQUIRED', next: [] }) }, 'has disposition fallback under these requirements', 'terminating on the choice under automatic');
 await expectError({ ...baseline(), 'response/response.json': responseJson({ status: 'blocked', stop: 'MADE_UP_CODE', next: [] }) }, 'not a registered code', 'unknown stop code');
 
-process.stdout.write('frontend.direction.decide self-test: 4 valid branches, 24 rejected mutations\n');
+process.stdout.write('frontend.direction.decide self-test: 6 valid branches, 30 rejected mutations\n');

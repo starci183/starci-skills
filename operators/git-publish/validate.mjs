@@ -3,15 +3,75 @@
 // quality-verification input measured; the mode is fast-forward only and nothing was forced; the
 // session branch was merged, never rebased, and a merge commit exists only when the target moved;
 // every hook ran and passed, `pre-push` among them; the head actually advanced; a continuation tag
-// exists exactly when the request asked for one and points at the head this run pushed; and the
-// worktree and the session branch were cleaned up on a done branch.
+// exists exactly when the request asked for one and points at the head this run pushed; the session
+// that produced the merged branch is on disk with the receipt that authorized it; and the worktree
+// and the session branch were cleaned up on a done branch.
 import { existsSync } from 'node:fs';
-import { readFile } from 'node:fs/promises';
+import { readdir, readFile } from 'node:fs/promises';
 import path from 'node:path';
 import process from 'node:process';
 import { fileURLToPath } from 'node:url';
 import { validateStep } from '../../scripts/validate-step.mjs';
+import { sessionRootOf } from '../../scripts/validate-request.mjs';
 import { tableUnder } from '../../scripts/validate-response.mjs';
+
+const PRODUCERS = new Set(['frontend.source.apply', 'backend.source.apply']);
+
+// Every step branch of the session this publish belongs to, read once as { dir, response }.
+async function sessionBranches(sessionRoot) {
+  const out = [];
+  let steps = [];
+  try { steps = (await readdir(sessionRoot, { withFileTypes: true })).filter((e) => e.isDirectory() && /^step-\d+$/.test(e.name)); } catch { return out; }
+  for (const step of steps) {
+    let parallels = [];
+    try { parallels = (await readdir(path.join(sessionRoot, step.name), { withFileTypes: true })).filter((e) => e.isDirectory() && /^parallel-\d+$/.test(e.name)); } catch { continue; }
+    for (const parallel of parallels) {
+      const dir = path.join(sessionRoot, step.name, parallel.name);
+      const file = path.join(dir, 'response', 'response.json');
+      if (!existsSync(file)) continue;
+      try { out.push({ dir, rel: `${step.name}/${parallel.name}`, response: JSON.parse(await readFile(file, 'utf8')) }); } catch { /* a malformed response is the response gate's finding, not this one's */ }
+    }
+  }
+  return out;
+}
+
+// SESSION_MISSING: a session branch is only ever the tail of a session, so the receipt that
+// authorized its commits, and the screenshots of any audit the chain declared, are on disk here.
+export async function sessionReceiptErrors(branchDir, { pushedHeads, sessionBranch }) {
+  const errors = [];
+  const sessionRoot = sessionRootOf(branchDir);
+  if (!sessionRoot || !existsSync(path.join(sessionRoot, 'state.json'))) {
+    errors.push(`SESSION_MISSING: ${sessionBranch || 'the session branch'} is published from no session; state.json is not on disk beside this branch`);
+    return errors;
+  }
+  const branches = await sessionBranches(sessionRoot);
+  const producers = branches.filter((b) => PRODUCERS.has(b.response.operatorId));
+  const receipted = producers.filter((b) => b.response.status === 'done' && [...pushedHeads].every((h) => (b.response.commits ?? []).includes(h)));
+  if (receipted.length === 0) {
+    errors.push(`SESSION_MISSING: no done frontend.source.apply or backend.source.apply branch in the session registers ${[...pushedHeads].join(', ') || 'the published head'} under commits; a session branch with no source-application receipt carries commits nobody wrote a request for`);
+  }
+
+  // When the chain declared an audit or a UAT run, that branch is done and the pictures proving it
+  // are still on disk. Both operators publish their proof as `screenshot` artifacts.
+  let state = {};
+  try { state = JSON.parse(await readFile(path.join(sessionRoot, 'state.json'), 'utf8')); } catch { state = {}; }
+  const declared = new Set(Object.values(state.steps ?? {}));
+  for (const [operatorId, why] of [
+    ['frontend.surface.audit', 'a frontend surface nobody looked at is exactly what this gate refuses to publish'],
+    ['uat.verify', 'a journey nobody walked is exactly what this gate refuses to publish'],
+  ]) {
+    if (!declared.has(operatorId)) continue;
+    const done = branches.filter((b) => b.response.operatorId === operatorId && b.response.status === 'done');
+    if (done.length === 0) { errors.push(`SESSION_MISSING: the session chain declares a ${operatorId} step and no done ${operatorId} branch is on disk; ${why}`); continue; }
+    for (const branch of done) {
+      const shots = branch.response.fields?.screenshot;
+      const files = Array.isArray(shots) ? shots : shots ? [shots] : [];
+      if (files.length === 0) { errors.push(`SESSION_MISSING: ${branch.rel} is a done ${operatorId} with no screenshot artifact; the proof is the picture`); continue; }
+      for (const f of files) if (!existsSync(path.join(branch.dir, f))) errors.push(`SESSION_MISSING: ${branch.rel} names the screenshot ${f}, which is not on disk`);
+    }
+  }
+  return errors;
+}
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 const SHA = /^[0-9a-f]{40}$/;
@@ -84,6 +144,11 @@ export async function validateGitPublishStep(branchDir, root = ROOT, { verifiedC
       if (!findings.has('CONTINUATION_TAG_PUBLISHED')) errors.push('response/response.md: a published tag must record CONTINUATION_TAG_PUBLISHED');
     }
   } else if (tag.Tag !== '—') errors.push('response/response.md: a continuation tag was published without the request asking for one');
+
+  // The session that produced the merged branch is on disk, with the receipt that authorized it.
+  if (response.status === 'done') {
+    errors.push(...await sessionReceiptErrors(branchDir, { pushedHeads, sessionBranch: publication['Session branch'] ?? '' }));
+  }
 
   // Cleanup is part of the publish, and only on a done branch.
   if (response.status === 'done' && !/removed/i.test(publication.Cleanup ?? '')) errors.push('response/response.md: a published branch removes the worktree and the session branch');

@@ -15,7 +15,8 @@
       "@tools/git": "read",
       "@tools/websearch": "bounded",
       "@tools/imagegen": "judged",
-      "@tools/visualize": "html"
+      "@tools/visualize": "html",
+      "@tools/host": "loopback"
     }
   }
 }

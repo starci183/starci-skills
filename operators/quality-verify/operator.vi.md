@@ -99,6 +99,22 @@ không phải là nợ, và một khoản nợ đặt lên cổng đã pass là 
 `boundary-drift` thuộc về người sở hữu ranh giới và không thể khất ở đây. `declaredDebts` mặc định là
 danh sách rỗng, nên mang một cổng đỏ luôn là việc có người cố ý làm.
 
+## Scorecard là thứ được chép, không phải thứ được chấm lại
+
+Các cổng nói delivery có đúng hình dạng không. Chúng không nói bề mặt có đẹp, có với tới được, có thật
+và có dùng được hay không, và những câu ấy đã được trả lời bởi chính các operator quan sát sản phẩm
+đang chạy: `frontend.surface.audit` đóng lại tám topic proof trên bộ chụp của nó, còn `uat.verify`
+đóng topic trải nghiệm trên lượt chạy của nó. Operator này đọc cả hai biên nhận và viết một bảng
+`## Verdict`: mỗi topic một hàng, mỗi verdict và mỗi đường đi đều chép từ biên nhận đã tính ra nó. Nó
+không được chấm lại một topic, không được lấy trung bình qua các hàng, và không được thay một phép đo
+nó chưa từng thực hiện bằng phán đoán của chính mình.
+
+Dòng dưới bảng ấy là toàn bộ câu trả lời. Một hàng thiếu, hay `blocked`, làm cả bảng thành `blocked`,
+vì một topic không ai quan sát thì chưa xứng với cả đạt lẫn hỏng. Một hàng `fail` hay `fix-first` làm
+cả bảng thành `fix-first`, và biên nhận gọi tên hàng ấy cùng đường đi nó mang. Chỉ khi mọi hàng đều
+ship hay đạt thì mới là `ship`. Hai hàng hỏng thì cả hai đều được báo kèm đường đi riêng; gộp chúng
+thành một phán quyết hợp nhất, hay chỉ báo cái đầu tiên, là giấu mất người chủ thứ hai.
+
 ## Phán quyết
 
 `pass` đòi mọi cổng bắt buộc đã pass, hoặc đã fail `in-boundary` dưới một khoản nợ đã khai. Mọi hình
@@ -131,6 +147,8 @@ khoản nợ không ai duyệt hoặc đã hết hạn.
 | `backend-source-application` | `backend.source.apply`, delivery backend cần kiểm định | không |
 | `frontend-source-application` | `frontend.source.apply`, delivery frontend cần kiểm định | không |
 | `changes` | `backend.source.apply` hoặc `frontend.source.apply`, những path đã dịch chuyển cùng cổng và bề mặt chúng nêu | không |
+| `frontend-surface-audit` | `frontend.surface.audit`, tám topic proof nó đã đóng ở cùng head | không |
+| `uat-flow-verification` | `uat.verify`, topic trải nghiệm nó đã đóng ở cùng head | không |
 
 ## Yêu cầu
 
@@ -153,7 +171,8 @@ khoản nợ không ai duyệt hoặc đã hết hạn.
 | 4 | Áp chính sách coverage | `thresholds` | `response/data/gates/<gate>.json` của cổng unit | `response/data/coverage.json` | — |
 | 5 | Phân loại từng lỗi từ chẩn đoán của nó | — | `response/data/gates/<gate>.json` của mọi cổng đỏ | — | — |
 | 6 | Áp nợ đã được duyệt | `declaredDebts` | @worktrees/debts, `response/data/gates/<gate>.json` | — | `DEBT_UNAPPROVED` |
-| 7 | Tính phán quyết, viết biên bản và phát | — | mọi thứ ở trên | `response/response.md`, `response/response.json` | — |
+| 7 | Chép verdict của từng topic từ biên nhận đã tính ra nó | — | đầu vào `frontend-surface-audit` và `uat-flow-verification` ở cùng head đã ghim | — | `PREDECESSOR_MIXED` |
+| 8 | Tính phán quyết cổng và scorecard, viết biên bản và phát | — | mọi thứ ở trên | `response/response.md`, `response/response.json` | — |
 
 Một cổng hoàn toàn không chạy được ở môi trường này là `GATE_UNAVAILABLE` khi nó bắt buộc; một cổng
 không bắt buộc bị môi trường chặn được ghi là `external-blocker` và phán quyết hấp thụ nó. Không có mã

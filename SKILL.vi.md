@@ -11,13 +11,30 @@ phán xét một kết quả.
    trong số đó là một câu hỏi tập trung, không phải một phỏng đoán.
 2. Chạy `workspace.bind` cho mọi nhiệm vụ có đọc hoặc ghi source đã route. Không thứ gì khác được
    phép tự tìm checkout, và một thư mục trùng tên không bao giờ là thẩm quyền route.
-3. Tìm workflow trước: đọc `when` của mọi ví dụ trong `workflows/`. Khớp thì chạy đúng như đã ghi,
-   preset điền vào `request.json`. Không khớp thì tự ghép chuỗi từ bảng `## Kế tiếp` của các operator
-   theo luật trong `workflows/README.md` (input bắt buộc phải được sinh trước, không chung alias ghi
-   trong một bậc, vòng lặp có trần, có điểm kết thúc); chuỗi tự ghép đáng giữ thì thành ví dụ mới.
-4. Chọn operator đầu tiên của chuỗi đó. Chỉ đọc `operator.md` và `operator.json` của đúng
+3. Tìm workflow trước: đọc `when` của mọi ví dụ trong `workflows/`. Khớp trọn thì chạy đúng như đã
+   ghi, preset điền vào `request.json`. Các ví dụ là tham chiếu chứ không phải toàn bộ số chuỗi có
+   thể có: khi chỉ khớp một phần, hoặc bài toán nghiệp vụ khó hơn mọi `when` mô tả, cửa vào tự nghĩ
+   ra chuỗi của mình từ bảng `## Kế tiếp` của các operator theo luật trong `workflows/README.md`
+   (input bắt buộc phải được sinh trước, không chung alias ghi trong một bậc, vòng lặp có trần, có
+   điểm kết thúc), thay vì bẻ một ví dụ gần đúng cho vừa; chuỗi tự ghép đáng giữ thì thành ví dụ mới.
+   Mọi chuỗi, có sẵn hay tự ghép, đều theo cùng một luật dòng dài: chuỗi nào ghi source frontend dưới
+   `mode: apply` thì phải chứng minh bề mặt bằng `frontend.surface.audit` và đi qua `uat.verify`
+   trước khi tới `git.publish`, và chuỗi nào giao một luồng có người dùng chạm vào cũng vậy, vì một
+   bản giao mà không ai nhìn và không ai đi thử thì không phải một bản giao.
+4. Tạo phiên trước khi bất cứ điều gì khác xảy ra. Không có gì được thiết kế, ghi hay commit bên
+   ngoài một phiên: hành động đầu tiên của một nhiệm vụ là thư mục phiên và một `request.json` đã
+   hợp lệ. Trước khi bất kỳ file nào ngoài thư mục phiên bị đọc để sửa, và trước khi bất kỳ file nào
+   ngoài thư mục phiên bị ghi, `<Source>/.worktrees/sessions/<sessionId>/state.json` và
+   `step-1/parallel-1/request/request.json` đã có trên đĩa và `scripts/validate-request.mjs` xanh
+   trên nhánh đó. Một agent phát hiện mình đang sửa hay công bố nguồn được route mà không có
+   `step-N/parallel-M` nào dưới một phiên thì dừng và báo `SESSION_MISSING`; nó không viết phiên
+   sau đó, vì phiên viết sau khi việc đã xong là ghi chép việc chứ không phải chặn việc. Thiết kế
+   bằng tay rồi commit lên một nhánh phiên trong khi không có phiên nào trên đĩa cũng là đúng vi
+   phạm ấy: các phương án không ai thấy, các ảnh chụp không ai chụp và UAT không ai chạy chính là
+   những thứ thư mục thiếu kia lẽ ra phải chứa.
+5. Chọn operator đầu tiên của chuỗi đó. Chỉ đọc `operator.md` và `operator.json` của đúng
    operator đó.
-5. Chạy operator đó, từ đầu tới cuối, trên đúng một profile mà `operator.json` của nó gọi tên dưới
+6. Chạy operator đó, từ đầu tới cuối, trên đúng một profile mà `operator.json` của nó gọi tên dưới
    `resources`, với đúng những quyền nó liệt kê. Một operator không có model khác, không thừa hưởng lượt nào,
    và không có quyền nào mà assignment bỏ sót.
 

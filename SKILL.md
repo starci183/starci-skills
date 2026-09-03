@@ -16,14 +16,31 @@ result.
    question, not a guess.
 2. Run `workspace.bind` for any mission that reads or writes routed source. Nothing else may resolve a
    checkout, and a similar directory name is never route authority.
-3. Look for a workflow first: read the `when` of every example in `workflows/`. A match is run as
-   written, its presets filling `request.json`. No match means composing a chain from the operators'
-   `## Next` tables under the rules `workflows/README.md` states (required inputs produced earlier,
-   no shared write alias inside a step, loops capped, a declared end); a composed chain worth keeping
-   becomes a new example.
-4. Select the first operator of that chain. Read only that operator's `operator.md` and
+3. Look for a workflow first: read the `when` of every example in `workflows/`. A full match is run as
+   written, its presets filling `request.json`. The examples are references, not the only chains
+   there are: when the match is partial, or the business is harder than any `when` describes, the
+   entry brainstorms its own chain from the operators' `## Next` tables under the rules
+   `workflows/README.md` states (required inputs produced earlier, no shared write alias inside a
+   step, loops capped, a declared end) rather than bending a near-miss example into shape; a composed
+   chain worth keeping becomes a new example. Every chain, written or composed, obeys the same
+   long-flow law: a chain that writes frontend source under `mode: apply` proves the surface with
+   `frontend.surface.audit` and walks it with `uat.verify` before it reaches `git.publish`, and a
+   chain that delivers any user-facing flow does the same, because a delivery nobody looked at and
+   nobody walked through is not a delivery.
+4. Create the session before anything else happens. Nothing is designed, written or committed outside
+   a session: the first act of a mission is the session folder and a validated `request.json`. Before
+   any file outside the session folder is read in order to change it, and before any file outside the
+   session folder is written, `<Source>/.worktrees/sessions/<sessionId>/state.json` and
+   `step-1/parallel-1/request/request.json` exist on disk and `scripts/validate-request.mjs` is green
+   on that branch. An agent that finds itself editing routed source, or publishing it, with no
+   `step-N/parallel-M` under a session stops and reports `SESSION_MISSING`; it does not write the
+   session afterwards, because a session written after the work records the work instead of gating
+   it. Designing by hand and committing on a session branch with no session on disk is the same
+   violation as writing with no request: the candidates nobody saw, the screenshots nobody took and
+   the UAT nobody ran are exactly what the missing folder was supposed to hold.
+5. Select the first operator of that chain. Read only that operator's `operator.md` and
    `operator.json`.
-5. Run that operator, end to end, on the one profile its `operator.json` names under `resources`, with
+6. Run that operator, end to end, on the one profile its `operator.json` names under `resources`, with
    only the grants it lists. An operator has no other model, no inherited turns, and no grant the
    assignment omits.
 

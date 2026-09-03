@@ -51,9 +51,12 @@
     },
     {
       "heading": "^## References$",
-      "table": "| Source | URL | Limitation |",
+      "table": "| Standard | Class | URL | What is borrowed | Limitation |",
       "cell": {
-        "URL": "^https?://\\S+$",
+        "Standard": "\\S",
+        "Class": "^`[a-z0-9][a-z0-9-]*`$",
+        "URL": "^(https?://\\S+|—)$",
+        "What is borrowed": "\\S",
         "Limitation": "\\S"
       }
     },

@@ -59,6 +59,20 @@ conditions together: the merge produced no conflict, and the gates the verificat
 on the merge result and passed. A conflict is `NON_FAST_FORWARD`, it terminates, and a person
 resolves it; the operator never rebases, never forces, and never runs with hooks disabled.
 
+## An unreceipted session branch is not publishable
+
+A session branch is only ever the tail of a session, so the session that produced it is on disk when
+this operator merges it: the session folder exists, and inside it a `frontend.source.apply` or
+`backend.source.apply` branch is `done` with the branch head among its `commits`. That receipt is the
+only thing that says which paths were declared, which values were authorized, and which gate passed
+them; a session branch with no such receipt carries commits nobody wrote a request for, and merging
+it publishes work that never entered the runtime at all. When the chain the session ran includes a
+`frontend.surface.audit` or a `uat.verify` step, that branch's response and its `screenshot`
+artifacts must exist too, because a surface nobody looked at and a journey nobody walked are exactly
+the changes this gate is here to catch. Any of those absences is `SESSION_MISSING`, it terminates,
+and the answer is to run the operators that owe
+the receipt — never to write the receipt now, after the fact, from what the diff happens to contain.
+
 ## A blocked hook is a result
 
 Hooks are enforced, always, and `pre-push` is the last gate before the remote. A failing hook
@@ -142,7 +156,7 @@ publish without a verified route and an approval bound to this exact boundary.
 | 3 | Bind the approval to this exact boundary | `boundary`, `approval` | `request/request.json` requirements, input `changes` as the file set, input `quality-verification` as the measured commit | — | `APPROVAL_MISSING` |
 | 4 | Verify the tree: dirty outside the boundary, branch policy | — | @workspaces/local/routes/<project>/<role>, the dirty paths, every branch, the routed policy | — | `DIRTY_OUTSIDE_BOUNDARY`, `BRANCH_POLICY_VIOLATION` |
 | 5 | Run the hooks | — | @workspaces/<project>/<role>/husky: the installed hooks, `pre-push` among them | @tools/shell | `HOOK_BLOCKED` |
-| 6 | Merge the session branch into the target branch | — | @workspaces/local/routes/<project>/<role> for the target head, the session base and the session head | @workspaces/local/routes/<project>/<role>, the target branch of that checkout, @tools/git | `NON_FAST_FORWARD` |
+| 6 | Bind the session's receipts, then merge the session branch into the target branch | — | the session folder: `state.json`, the `frontend.source.apply` or `backend.source.apply` branch whose `commits` carry the session head, and the `frontend.surface.audit` and `uat.verify` branches with their `screenshot` artifacts when the chain has them; @workspaces/local/routes/<project>/<role> for the target head, the session base and the session head | @workspaces/local/routes/<project>/<role>, the target branch of that checkout, @tools/git | `SESSION_MISSING`, `NON_FAST_FORWARD` |
 | 7 | Push non-force, fast-forward only | — | @workspaces/local/routes/<project>/<role> for the approved head, @remote/git/<project>/<role> at the observed remote head, @tools/ci | @remote/git/<project>/<role>, @tools/git | `NON_FAST_FORWARD` |
 | 8 | Push the continuation tag | `tag` | @workspaces/local/routes/<project>/<role> for the head this publication pushed | @remote/git/<project>/<role>, @tools/git | — |
 | 9 | Remove the worktree and the session branch, write the receipt and emit | — | everything above | @workspaces/local/routes/<project>/<role>, `response/response.md`, `response/response.json`, @tools/git | — |
@@ -167,6 +181,7 @@ remote head because the same observation cannot yield a different result.
 | `SOURCE_DRIFT` | terminate |
 | `NO_PROGRESS` | terminate |
 | `ROUTE_UNVERIFIED` | terminate |
+| `SESSION_MISSING` | terminate |
 | `APPROVAL_MISSING` | terminate |
 | `BRANCH_POLICY_VIOLATION` | terminate |
 | `DIRTY_OUTSIDE_BOUNDARY` | terminate |

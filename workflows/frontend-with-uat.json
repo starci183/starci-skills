@@ -16,8 +16,7 @@
       {
         "operator": "workspace.bind",
         "requirements": {
-          "role": "fe",
-          "runtimeNeed": "consume"
+          "role": "fe"
         }
       }
     ],
@@ -43,6 +42,15 @@
         "operator": "frontend.source.apply",
         "requirements": {
           "mode": "apply"
+        }
+      }
+    ],
+    [
+      {
+        "operator": "workspace.bind",
+        "requirements": {
+          "role": "fe",
+          "runtimeNeed": "consume"
         }
       }
     ],
@@ -84,6 +92,12 @@
       "from": "frontend.surface.audit",
       "to": "frontend.presentation.resolve",
       "when": "an application-owned node fails a claim or a proof rule",
+      "maxRounds": 2
+    },
+    {
+      "from": "frontend.surface.audit",
+      "to": "frontend.direction.decide",
+      "when": "the taste lens is fix-first, so the composition is decided again rather than revalued",
       "maxRounds": 2
     }
   ]

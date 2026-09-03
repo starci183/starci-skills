@@ -1,0 +1,2036 @@
+{
+  "sub-1280-light": {
+    "navAll": [
+      {
+        "tag": "BUTTON",
+        "cls": "group starci-core-text-action",
+        "label": "Trang chủ",
+        "w": 91.31,
+        "h": 36,
+        "minH": "auto",
+        "height": "36px",
+        "padding": "8px 12px",
+        "radius": "999px",
+        "fontSize": "14px",
+        "fontWeight": "400"
+      },
+      {
+        "tag": "BUTTON",
+        "cls": "group starci-core-text-action",
+        "label": "Khóa học",
+        "w": 88.81,
+        "h": 36,
+        "minH": "auto",
+        "height": "36px",
+        "padding": "8px 12px",
+        "radius": "999px",
+        "fontSize": "14px",
+        "fontWeight": "400"
+      },
+      {
+        "tag": "BUTTON",
+        "cls": "group starci-core-text-action",
+        "label": "Liên hệ",
+        "w": 72.89,
+        "h": 36,
+        "minH": "auto",
+        "height": "36px",
+        "padding": "8px 12px",
+        "radius": "999px",
+        "fontSize": "14px",
+        "fontWeight": "400"
+      },
+      {
+        "tag": "LABEL",
+        "cls": "switch__content",
+        "label": "",
+        "w": 64,
+        "h": 36,
+        "minH": "auto",
+        "height": "36px",
+        "padding": "0px",
+        "radius": "0px",
+        "fontSize": "14px",
+        "fontWeight": "500"
+      },
+      {
+        "tag": "INPUT",
+        "cls": "",
+        "label": "Chuyển sang tối",
+        "w": 13,
+        "h": 13,
+        "minH": "0px",
+        "height": "13px",
+        "padding": "0px",
+        "radius": "0px",
+        "fontSize": "14px",
+        "fontWeight": "500"
+      },
+      {
+        "tag": "SPAN",
+        "cls": "switch__control",
+        "label": "",
+        "w": 64,
+        "h": 36,
+        "minH": "auto",
+        "height": "36px",
+        "padding": "0px",
+        "radius": "9999px",
+        "fontSize": "14px",
+        "fontWeight": "500"
+      },
+      {
+        "tag": "SPAN",
+        "cls": "switch__thumb",
+        "label": "",
+        "w": 28,
+        "h": 28,
+        "minH": "auto",
+        "height": "28px",
+        "padding": "0px",
+        "radius": "9999px",
+        "fontSize": "14px",
+        "fontWeight": "500"
+      },
+      {
+        "tag": "SPAN",
+        "cls": "switch__icon",
+        "label": "",
+        "w": 28,
+        "h": 28,
+        "minH": "auto",
+        "height": "28px",
+        "padding": "0px",
+        "radius": "0px",
+        "fontSize": "14px",
+        "fontWeight": "500"
+      }
+    ],
+    "themeSwitchChain": [
+      {
+        "tag": "INPUT",
+        "cls": "",
+        "label": "Chuyển sang tối",
+        "w": 13,
+        "h": 13,
+        "minH": "0px",
+        "height": "13px",
+        "padding": "0px",
+        "radius": "0px",
+        "fontSize": "14px",
+        "fontWeight": "500"
+      },
+      {
+        "tag": "SPAN",
+        "cls": "",
+        "label": "",
+        "w": 1,
+        "h": 1,
+        "minH": "0px",
+        "height": "1px",
+        "padding": "0px",
+        "radius": "0px",
+        "fontSize": "14px",
+        "fontWeight": "500"
+      },
+      {
+        "tag": "LABEL",
+        "cls": "switch__content",
+        "label": "",
+        "w": 64,
+        "h": 36,
+        "minH": "auto",
+        "height": "36px",
+        "padding": "0px",
+        "radius": "0px",
+        "fontSize": "14px",
+        "fontWeight": "500"
+      },
+      {
+        "tag": "DIV",
+        "cls": "switch switch--md",
+        "label": "",
+        "w": 64,
+        "h": 36,
+        "minH": "auto",
+        "height": "36px",
+        "padding": "0px",
+        "radius": "0px",
+        "fontSize": "16px",
+        "fontWeight": "400"
+      }
+    ],
+    "page": {
+      "vw": 1280,
+      "vh": 1104
+    },
+    "big": [
+      {
+        "tag": "SECTION",
+        "cls": "flex min-w-0 flex-col gap-3",
+        "label": "Bạn nhận được gì",
+        "w": 808,
+        "h": 681.63,
+        "minH": "auto",
+        "height": "681.625px",
+        "padding": "0px",
+        "radius": "0px",
+        "fontSize": "16px",
+        "fontWeight": "400",
+        "area": 550753,
+        "x": 32,
+        "y": 226.7
+      },
+      {
+        "tag": "SECTION",
+        "cls": "card card--transparent starci-core-surface-card",
+        "label": "Một quyền truy cập xuyên suốt ",
+        "w": 808,
+        "h": 645.63,
+        "minH": "auto",
+        "height": "645.625px",
+        "padding": "0px",
+        "radius": "24px",
+        "fontSize": "16px",
+        "fontWeight": "400",
+        "area": 521665,
+        "x": 32,
+        "y": 262.7
+      },
+      {
+        "tag": "IMG",
+        "cls": "block h-auto w-full",
+        "label": "",
+        "w": 808,
+        "h": 454.63,
+        "minH": "0px",
+        "height": "454.625px",
+        "padding": "0px",
+        "radius": "0px",
+        "fontSize": "16px",
+        "fontWeight": "400",
+        "area": 367337,
+        "x": 32,
+        "y": 307.7
+      },
+      {
+        "tag": "SECTION",
+        "cls": "flex min-w-0 flex-col gap-3",
+        "label": "Thông tin cần biết",
+        "w": 808,
+        "h": 140,
+        "minH": "auto",
+        "height": "140px",
+        "padding": "0px",
+        "radius": "0px",
+        "fontSize": "16px",
+        "fontWeight": "400",
+        "area": 113120,
+        "x": 32,
+        "y": 932.33
+      },
+      {
+        "tag": "SECTION",
+        "cls": "card card--transparent starci-core-surface-card",
+        "label": "StarCi ProFull access229.000 ₫",
+        "w": 384,
+        "h": 261,
+        "minH": "0px",
+        "height": "261px",
+        "padding": "0px",
+        "radius": "24px",
+        "fontSize": "16px",
+        "fontWeight": "400",
+        "area": 100224,
+        "x": 864,
+        "y": 226.7
+      },
+      {
+        "tag": "SECTION",
+        "cls": "starci-core-surface-accordion-card",
+        "label": "AI được tính như thế nào?Các t",
+        "w": 808,
+        "h": 104,
+        "minH": "0px",
+        "height": "104px",
+        "padding": "0px",
+        "radius": "0px",
+        "fontSize": "16px",
+        "fontWeight": "400",
+        "area": 84032,
+        "x": 32,
+        "y": 968.33
+      },
+      {
+        "tag": "H3",
+        "cls": "accordion__heading starci-core-accordion-heading",
+        "label": "AI được tính như thế nào?",
+        "w": 808,
+        "h": 52,
+        "minH": "0px",
+        "height": "52px",
+        "padding": "0px",
+        "radius": "0px",
+        "fontSize": "16px",
+        "fontWeight": "400",
+        "area": 42016,
+        "x": 32,
+        "y": 968.33
+      },
+      {
+        "tag": "BUTTON",
+        "cls": "accordion__trigger starci-core-accordion-trigger",
+        "label": "AI được tính như thế nào?",
+        "w": 808,
+        "h": 52,
+        "minH": "44px",
+        "height": "52px",
+        "padding": "16px",
+        "radius": "0px",
+        "fontSize": "14px",
+        "fontWeight": "500",
+        "area": 42016,
+        "x": 32,
+        "y": 968.33
+      },
+      {
+        "tag": "H3",
+        "cls": "accordion__heading starci-core-accordion-heading",
+        "label": "Thanh toán và kích hoạt",
+        "w": 808,
+        "h": 52,
+        "minH": "0px",
+        "height": "52px",
+        "padding": "0px",
+        "radius": "0px",
+        "fontSize": "16px",
+        "fontWeight": "400",
+        "area": 42016,
+        "x": 32,
+        "y": 1020.33
+      },
+      {
+        "tag": "BUTTON",
+        "cls": "accordion__trigger starci-core-accordion-trigger",
+        "label": "Thanh toán và kích hoạt",
+        "w": 808,
+        "h": 52,
+        "minH": "44px",
+        "height": "52px",
+        "padding": "16px",
+        "radius": "0px",
+        "fontSize": "14px",
+        "fontWeight": "500",
+        "area": 42016,
+        "x": 32,
+        "y": 1020.33
+      },
+      {
+        "tag": "H1",
+        "cls": "starci-core-section-title",
+        "label": "Mở toàn bộ hành trình học với ",
+        "w": 768,
+        "h": 30.7,
+        "minH": "auto",
+        "height": "30.7031px",
+        "padding": "0px",
+        "radius": "0px",
+        "fontSize": "25.6px",
+        "fontWeight": "700",
+        "area": 23580,
+        "x": 32,
+        "y": 143
+      },
+      {
+        "tag": "H2",
+        "cls": "typography typography--align-start typography--color-default typography--h2 text",
+        "label": "Bạn nhận được gì",
+        "w": 808,
+        "h": 24,
+        "minH": "auto",
+        "height": "24px",
+        "padding": "0px",
+        "radius": "0px",
+        "fontSize": "16px",
+        "fontWeight": "600",
+        "area": 19392,
+        "x": 32,
+        "y": 226.7
+      },
+      {
+        "tag": "H2",
+        "cls": "typography typography--align-start typography--color-default typography--h2 text",
+        "label": "Thông tin cần biết",
+        "w": 808,
+        "h": 24,
+        "minH": "auto",
+        "height": "24px",
+        "padding": "0px",
+        "radius": "0px",
+        "fontSize": "16px",
+        "fontWeight": "600",
+        "area": 19392,
+        "x": 32,
+        "y": 932.33
+      },
+      {
+        "tag": "BUTTON",
+        "cls": "button button--full-width button--md button--primary starci-core-button",
+        "label": "Đăng nhập để mua StarCi Pro",
+        "w": 352,
+        "h": 44,
+        "minH": "44px",
+        "height": "44px",
+        "padding": "0px 16px",
+        "radius": "24px",
+        "fontSize": "14px",
+        "fontWeight": "500",
+        "area": 15488,
+        "x": 880,
+        "y": 403.7
+      },
+      {
+        "tag": "SPAN",
+        "cls": "text-4xl font-semibold tracking-tight text-foreground",
+        "label": "229.000 ₫",
+        "w": 181.23,
+        "h": 40,
+        "minH": "auto",
+        "height": "40px",
+        "padding": "0px",
+        "radius": "0px",
+        "fontSize": "36px",
+        "fontWeight": "600",
+        "area": 7249.38,
+        "x": 880,
+        "y": 282.7
+      },
+      {
+        "tag": "BUTTON",
+        "cls": "starci-core-pressable-field",
+        "label": "Tìm kiếm",
+        "w": 164.3,
+        "h": 44,
+        "minH": "44px",
+        "height": "44px",
+        "padding": "0px 12px",
+        "radius": "12px",
+        "fontSize": "16px",
+        "fontWeight": "400",
+        "area": 7229.06,
+        "x": 875.7,
+        "y": 17
+      },
+      {
+        "tag": "SPAN",
+        "cls": "",
+        "label": "Đăng nhập để mua StarCi Pro",
+        "w": 203.52,
+        "h": 20,
+        "minH": "auto",
+        "height": "20px",
+        "padding": "0px",
+        "radius": "0px",
+        "fontSize": "14px",
+        "fontWeight": "500",
+        "area": 4070.31,
+        "x": 954.23,
+        "y": 415.7
+      },
+      {
+        "tag": "BUTTON",
+        "cls": "group starci-core-text-action",
+        "label": "Trang chủ",
+        "w": 91.31,
+        "h": 36,
+        "minH": "auto",
+        "height": "36px",
+        "padding": "8px 12px",
+        "radius": "999px",
+        "fontSize": "14px",
+        "fontWeight": "400",
+        "area": 3287.25,
+        "x": 331.81,
+        "y": 21
+      },
+      {
+        "tag": "BUTTON",
+        "cls": "group starci-core-text-action",
+        "label": "Khóa học",
+        "w": 88.81,
+        "h": 36,
+        "minH": "auto",
+        "height": "36px",
+        "padding": "8px 12px",
+        "radius": "999px",
+        "fontSize": "14px",
+        "fontWeight": "400",
+        "area": 3197.25,
+        "x": 431.13,
+        "y": 21
+      },
+      {
+        "tag": "BUTTON",
+        "cls": "group starci-core-text-action",
+        "label": "StarCiAcademy",
+        "w": 44.94,
+        "h": 62,
+        "minH": "0px",
+        "height": "62px",
+        "padding": "0px",
+        "radius": "0px",
+        "fontSize": "14px",
+        "fontWeight": "400",
+        "area": 2786.13,
+        "x": 12,
+        "y": 8
+      },
+      {
+        "tag": "SPAN",
+        "cls": "",
+        "label": "StarCiAcademy",
+        "w": 44.94,
+        "h": 62,
+        "minH": "auto",
+        "height": "62px",
+        "padding": "0px",
+        "radius": "0px",
+        "fontSize": "14px",
+        "fontWeight": "400",
+        "area": 2786.13,
+        "x": 12,
+        "y": 8
+      },
+      {
+        "tag": "BUTTON",
+        "cls": "group starci-core-text-action",
+        "label": "Liên hệ",
+        "w": 72.89,
+        "h": 36,
+        "minH": "auto",
+        "height": "36px",
+        "padding": "8px 12px",
+        "radius": "999px",
+        "fontSize": "14px",
+        "fontWeight": "400",
+        "area": 2624.06,
+        "x": 527.94,
+        "y": 21
+      },
+      {
+        "tag": "SPAN",
+        "cls": "switch__control",
+        "label": "",
+        "w": 64,
+        "h": 36,
+        "minH": "auto",
+        "height": "36px",
+        "padding": "0px",
+        "radius": "9999px",
+        "fontSize": "14px",
+        "fontWeight": "500",
+        "area": 2304,
+        "x": 1100,
+        "y": 21
+      },
+      {
+        "tag": "BUTTON",
+        "cls": "dropdown__trigger button button--icon-only button--md button--tertiary rounded-f",
+        "label": "Đổi ngôn ngữ",
+        "w": 44,
+        "h": 44,
+        "minH": "44px",
+        "height": "44px",
+        "padding": "0px",
+        "radius": "3.35544e+07px",
+        "fontSize": "14px",
+        "fontWeight": "500",
+        "area": 1936,
+        "x": 1048,
+        "y": 17
+      },
+      {
+        "tag": "BUTTON",
+        "cls": "button button--icon-only button--md button--tertiary starci-core-icon-button",
+        "label": "Giỏ hàng",
+        "w": 44,
+        "h": 44,
+        "minH": "44px",
+        "height": "44px",
+        "padding": "0px",
+        "radius": "999px",
+        "fontSize": "14px",
+        "fontWeight": "500",
+        "area": 1936,
+        "x": 1172,
+        "y": 17
+      }
+    ],
+    "accents": [
+      {
+        "label": "Tìm kiếm",
+        "bg": "lab(99.9896 0.269651 -0.0285387)",
+        "color": "lab(8.37524 0.504933 -0.0534832)",
+        "w": 164.3,
+        "h": 44
+      },
+      {
+        "label": "Đổi ngôn ngữ",
+        "bg": "lab(93.0204 0.505507 -0.053525)",
+        "color": "lab(8.37524 0.504933 -0.0534832)",
+        "w": 44,
+        "h": 44
+      },
+      {
+        "label": "Giỏ hàng",
+        "bg": "lab(93.0204 0.505507 -0.053525)",
+        "color": "lab(8.37524 0.504933 -0.0534832)",
+        "w": 44,
+        "h": 44
+      },
+      {
+        "label": "Tài khoản",
+        "bg": "lab(93.0204 0.505507 -0.053525)",
+        "color": "lab(8.37524 0.504933 -0.0534832)",
+        "w": 44,
+        "h": 44
+      },
+      {
+        "label": "Đăng nhập để mua StarCi Pro",
+        "bg": "rgb(117, 71, 255)",
+        "color": "lab(100 0 0)",
+        "w": 352,
+        "h": 44
+      }
+    ],
+    "fontSizes": [
+      [
+        "14px/400",
+        10
+      ],
+      [
+        "14px/600",
+        7
+      ],
+      [
+        "12px/400",
+        6
+      ],
+      [
+        "14px/500",
+        3
+      ],
+      [
+        "16px/600",
+        3
+      ],
+      [
+        "8px/400",
+        1
+      ],
+      [
+        "25.6px/700",
+        1
+      ],
+      [
+        "12px/500",
+        1
+      ],
+      [
+        "36px/600",
+        1
+      ]
+    ],
+    "radii": [
+      [
+        "16px",
+        6
+      ],
+      [
+        "999px",
+        4
+      ],
+      [
+        "12px",
+        3
+      ],
+      [
+        "24px",
+        3
+      ],
+      [
+        "3.35544e+07px",
+        2
+      ],
+      [
+        "9999px",
+        2
+      ],
+      [
+        "4px",
+        1
+      ]
+    ],
+    "backgrounds": [
+      [
+        "lab(99.9896 0.269651 -0.0285387)",
+        4
+      ],
+      [
+        "lab(93.0204 0.505507 -0.053525)",
+        4
+      ],
+      [
+        "lab(94.4628 0.404418 -0.04282)",
+        3
+      ],
+      [
+        "lab(96.5236 0.505537 -0.053525)",
+        2
+      ],
+      [
+        "rgb(255, 255, 255)",
+        1
+      ],
+      [
+        "oklab(0.564963 0.0724149 -0.242857 / 0.15)",
+        1
+      ],
+      [
+        "rgb(117, 71, 255)",
+        1
+      ]
+    ],
+    "primaryStack": [
+      {
+        "cls": "flex min-w-0 flex-col gap-3",
+        "top": 226.7,
+        "bottom": 908.33
+      },
+      {
+        "cls": "flex min-w-0 flex-col gap-3",
+        "top": 932.33,
+        "bottom": 1072.33
+      }
+    ],
+    "cardEdges": [
+      {
+        "cls": "card__content starci-core-surface",
+        "x": 32,
+        "w": 808,
+        "text": "Một quyền truy cập xuyên"
+      },
+      {
+        "cls": "starci-core-surface-content",
+        "x": 32,
+        "w": 808,
+        "text": "Một quyền truy cập xuyên"
+      },
+      {
+        "cls": "bg-surface-secondary px-4 py-3 text-foregrou",
+        "x": 32,
+        "w": 808,
+        "text": "Một quyền truy cập xuyên"
+      },
+      {
+        "cls": "starci-core-text",
+        "x": 48,
+        "w": 776,
+        "text": "Một quyền truy cập xuyên"
+      },
+      {
+        "cls": "min-w-0 border-t border-separator bg-surface",
+        "x": 32,
+        "w": 808,
+        "text": ""
+      },
+      {
+        "cls": "block h-auto w-full",
+        "x": 32,
+        "w": 808,
+        "text": ""
+      },
+      {
+        "cls": "flex min-w-0 flex-col gap-1",
+        "x": 80,
+        "w": 315.56,
+        "text": "Học tậpToàn bộ khóa học,"
+      },
+      {
+        "cls": "starci-core-text",
+        "x": 80,
+        "w": 315.56,
+        "text": "Học tập"
+      },
+      {
+        "cls": "starci-core-text",
+        "x": 80,
+        "w": 315.56,
+        "text": "Toàn bộ khóa học, bài họ"
+      },
+      {
+        "cls": "flex min-w-0 flex-col gap-1",
+        "x": 484,
+        "w": 281.28,
+        "text": "Luyện tậpCoding, Playgro"
+      },
+      {
+        "cls": "starci-core-text",
+        "x": 484,
+        "w": 281.28,
+        "text": "Luyện tập"
+      },
+      {
+        "cls": "starci-core-text",
+        "x": 484,
+        "w": 281.28,
+        "text": "Coding, Playground, thử "
+      },
+      {
+        "cls": "flex min-w-0 flex-col gap-1",
+        "x": 80,
+        "w": 296.56,
+        "text": "Cộng đồngThảo luận khóa "
+      },
+      {
+        "cls": "starci-core-text",
+        "x": 80,
+        "w": 296.56,
+        "text": "Cộng đồng"
+      },
+      {
+        "cls": "starci-core-text",
+        "x": 80,
+        "w": 296.56,
+        "text": "Thảo luận khóa học, cộng"
+      },
+      {
+        "cls": "flex min-w-0 flex-col gap-1",
+        "x": 484,
+        "w": 316.66,
+        "text": "Nghề nghiệpDự án cá nhân"
+      },
+      {
+        "cls": "starci-core-text",
+        "x": 484,
+        "w": 316.66,
+        "text": "Nghề nghiệp"
+      },
+      {
+        "cls": "starci-core-text",
+        "x": 484,
+        "w": 316.66,
+        "text": "Dự án cá nhân, chấm bài "
+      }
+    ],
+    "paragraphs": [],
+    "images": [
+      {
+        "tag": "IMG",
+        "alt": "",
+        "w": 40,
+        "h": 40
+      },
+      {
+        "tag": "IMG",
+        "alt": "Hành trình StarCi Pro từ học tập, luyện tập và cộng đồng đến mục tiêu nghề nghiệp",
+        "w": 808,
+        "h": 454.63
+      }
+    ]
+  },
+  "sub-390-light": {
+    "navAll": [],
+    "themeSwitchChain": [
+      {
+        "tag": "INPUT",
+        "cls": "",
+        "label": "Chuyển sang tối",
+        "w": 0,
+        "h": 0,
+        "minH": "0px",
+        "height": "auto",
+        "padding": "0px",
+        "radius": "0px",
+        "fontSize": "14px",
+        "fontWeight": "500"
+      },
+      {
+        "tag": "SPAN",
+        "cls": "",
+        "label": "",
+        "w": 0,
+        "h": 0,
+        "minH": "0px",
+        "height": "1px",
+        "padding": "0px",
+        "radius": "0px",
+        "fontSize": "14px",
+        "fontWeight": "500"
+      },
+      {
+        "tag": "LABEL",
+        "cls": "switch__content",
+        "label": "",
+        "w": 0,
+        "h": 0,
+        "minH": "0px",
+        "height": "auto",
+        "padding": "0px",
+        "radius": "0px",
+        "fontSize": "14px",
+        "fontWeight": "500"
+      },
+      {
+        "tag": "DIV",
+        "cls": "switch switch--md",
+        "label": "",
+        "w": 0,
+        "h": 0,
+        "minH": "0px",
+        "height": "auto",
+        "padding": "0px",
+        "radius": "0px",
+        "fontSize": "16px",
+        "fontWeight": "400"
+      }
+    ],
+    "page": {
+      "vw": 390,
+      "vh": 1393
+    },
+    "big": [
+      {
+        "tag": "SECTION",
+        "cls": "flex min-w-0 flex-col gap-3",
+        "label": "Bạn nhận được gì",
+        "w": 358,
+        "h": 642.38,
+        "minH": "auto",
+        "height": "642.375px",
+        "padding": "0px",
+        "radius": "0px",
+        "fontSize": "16px",
+        "fontWeight": "400",
+        "area": 229970.25,
+        "x": 16,
+        "y": 563
+      },
+      {
+        "tag": "SECTION",
+        "cls": "card card--transparent starci-core-surface-card",
+        "label": "Một quyền truy cập xuyên suốt ",
+        "w": 358,
+        "h": 606.38,
+        "minH": "auto",
+        "height": "606.375px",
+        "padding": "0px",
+        "radius": "24px",
+        "fontSize": "16px",
+        "fontWeight": "400",
+        "area": 217082.25,
+        "x": 16,
+        "y": 599
+      },
+      {
+        "tag": "SECTION",
+        "cls": "card card--transparent starci-core-surface-card",
+        "label": "StarCi ProFull access229.000 ₫",
+        "w": 358,
+        "h": 261,
+        "minH": "0px",
+        "height": "261px",
+        "padding": "0px",
+        "radius": "24px",
+        "fontSize": "16px",
+        "fontWeight": "400",
+        "area": 93438,
+        "x": 16,
+        "y": 278
+      },
+      {
+        "tag": "IMG",
+        "cls": "block h-auto w-full",
+        "label": "",
+        "w": 358,
+        "h": 201.38,
+        "minH": "0px",
+        "height": "201.375px",
+        "padding": "0px",
+        "radius": "0px",
+        "fontSize": "16px",
+        "fontWeight": "400",
+        "area": 72092.25,
+        "x": 16,
+        "y": 664
+      },
+      {
+        "tag": "SECTION",
+        "cls": "flex min-w-0 flex-col gap-3",
+        "label": "Thông tin cần biết",
+        "w": 358,
+        "h": 140,
+        "minH": "auto",
+        "height": "140px",
+        "padding": "0px",
+        "radius": "0px",
+        "fontSize": "16px",
+        "fontWeight": "400",
+        "area": 50120,
+        "x": 16,
+        "y": 1229.38
+      },
+      {
+        "tag": "SECTION",
+        "cls": "starci-core-surface-accordion-card",
+        "label": "AI được tính như thế nào?Các t",
+        "w": 358,
+        "h": 104,
+        "minH": "0px",
+        "height": "104px",
+        "padding": "0px",
+        "radius": "0px",
+        "fontSize": "16px",
+        "fontWeight": "400",
+        "area": 37232,
+        "x": 16,
+        "y": 1265.38
+      },
+      {
+        "tag": "H3",
+        "cls": "accordion__heading starci-core-accordion-heading",
+        "label": "AI được tính như thế nào?",
+        "w": 358,
+        "h": 52,
+        "minH": "0px",
+        "height": "52px",
+        "padding": "0px",
+        "radius": "0px",
+        "fontSize": "16px",
+        "fontWeight": "400",
+        "area": 18616,
+        "x": 16,
+        "y": 1265.38
+      },
+      {
+        "tag": "BUTTON",
+        "cls": "accordion__trigger starci-core-accordion-trigger",
+        "label": "AI được tính như thế nào?",
+        "w": 358,
+        "h": 52,
+        "minH": "44px",
+        "height": "52px",
+        "padding": "16px",
+        "radius": "0px",
+        "fontSize": "14px",
+        "fontWeight": "500",
+        "area": 18616,
+        "x": 16,
+        "y": 1265.38
+      },
+      {
+        "tag": "H3",
+        "cls": "accordion__heading starci-core-accordion-heading",
+        "label": "Thanh toán và kích hoạt",
+        "w": 358,
+        "h": 52,
+        "minH": "0px",
+        "height": "52px",
+        "padding": "0px",
+        "radius": "0px",
+        "fontSize": "16px",
+        "fontWeight": "400",
+        "area": 18616,
+        "x": 16,
+        "y": 1317.38
+      },
+      {
+        "tag": "BUTTON",
+        "cls": "accordion__trigger starci-core-accordion-trigger",
+        "label": "Thanh toán và kích hoạt",
+        "w": 358,
+        "h": 52,
+        "minH": "44px",
+        "height": "52px",
+        "padding": "16px",
+        "radius": "0px",
+        "fontSize": "14px",
+        "fontWeight": "500",
+        "area": 18616,
+        "x": 16,
+        "y": 1317.38
+      },
+      {
+        "tag": "H1",
+        "cls": "starci-core-section-title",
+        "label": "Mở toàn bộ hành trình học với ",
+        "w": 358,
+        "h": 48,
+        "minH": "auto",
+        "height": "48px",
+        "padding": "0px",
+        "radius": "0px",
+        "fontSize": "20px",
+        "fontWeight": "700",
+        "area": 17184,
+        "x": 16,
+        "y": 135
+      },
+      {
+        "tag": "BUTTON",
+        "cls": "button button--full-width button--md button--primary starci-core-button",
+        "label": "Đăng nhập để mua StarCi Pro",
+        "w": 326,
+        "h": 44,
+        "minH": "44px",
+        "height": "44px",
+        "padding": "0px 16px",
+        "radius": "24px",
+        "fontSize": "14px",
+        "fontWeight": "500",
+        "area": 14344,
+        "x": 32,
+        "y": 455
+      },
+      {
+        "tag": "H2",
+        "cls": "typography typography--align-start typography--color-default typography--h2 text",
+        "label": "Bạn nhận được gì",
+        "w": 358,
+        "h": 24,
+        "minH": "auto",
+        "height": "24px",
+        "padding": "0px",
+        "radius": "0px",
+        "fontSize": "16px",
+        "fontWeight": "600",
+        "area": 8592,
+        "x": 16,
+        "y": 563
+      },
+      {
+        "tag": "H2",
+        "cls": "typography typography--align-start typography--color-default typography--h2 text",
+        "label": "Thông tin cần biết",
+        "w": 358,
+        "h": 24,
+        "minH": "auto",
+        "height": "24px",
+        "padding": "0px",
+        "radius": "0px",
+        "fontSize": "16px",
+        "fontWeight": "600",
+        "area": 8592,
+        "x": 16,
+        "y": 1229.38
+      },
+      {
+        "tag": "SPAN",
+        "cls": "text-4xl font-semibold tracking-tight text-foreground",
+        "label": "229.000 ₫",
+        "w": 181.23,
+        "h": 40,
+        "minH": "auto",
+        "height": "40px",
+        "padding": "0px",
+        "radius": "0px",
+        "fontSize": "36px",
+        "fontWeight": "600",
+        "area": 7249.38,
+        "x": 32,
+        "y": 334
+      },
+      {
+        "tag": "SPAN",
+        "cls": "",
+        "label": "Đăng nhập để mua StarCi Pro",
+        "w": 203.52,
+        "h": 20,
+        "minH": "auto",
+        "height": "20px",
+        "padding": "0px",
+        "radius": "0px",
+        "fontSize": "14px",
+        "fontWeight": "500",
+        "area": 4070.31,
+        "x": 93.23,
+        "y": 467
+      },
+      {
+        "tag": "BUTTON",
+        "cls": "group starci-core-text-action",
+        "label": "StarCiAcademy",
+        "w": 44.94,
+        "h": 62,
+        "minH": "0px",
+        "height": "62px",
+        "padding": "0px",
+        "radius": "0px",
+        "fontSize": "14px",
+        "fontWeight": "400",
+        "area": 2786.13,
+        "x": 12,
+        "y": 8
+      },
+      {
+        "tag": "SPAN",
+        "cls": "",
+        "label": "StarCiAcademy",
+        "w": 44.94,
+        "h": 62,
+        "minH": "auto",
+        "height": "62px",
+        "padding": "0px",
+        "radius": "0px",
+        "fontSize": "14px",
+        "fontWeight": "400",
+        "area": 2786.13,
+        "x": 12,
+        "y": 8
+      },
+      {
+        "tag": "BUTTON",
+        "cls": "button button--icon-only button--md button--tertiary starci-core-icon-button",
+        "label": "Điều hướng và tiện ích",
+        "w": 44,
+        "h": 44,
+        "minH": "44px",
+        "height": "44px",
+        "padding": "0px",
+        "radius": "999px",
+        "fontSize": "14px",
+        "fontWeight": "500",
+        "area": 1936,
+        "x": 226,
+        "y": 17
+      },
+      {
+        "tag": "BUTTON",
+        "cls": "button button--icon-only button--md button--tertiary starci-core-icon-button",
+        "label": "Giỏ hàng",
+        "w": 44,
+        "h": 44,
+        "minH": "44px",
+        "height": "44px",
+        "padding": "0px",
+        "radius": "999px",
+        "fontSize": "14px",
+        "fontWeight": "500",
+        "area": 1936,
+        "x": 282,
+        "y": 17
+      },
+      {
+        "tag": "BUTTON",
+        "cls": "dropdown__trigger button button--icon-only button--md button--tertiary rounded-f",
+        "label": "Tài khoản",
+        "w": 44,
+        "h": 44,
+        "minH": "44px",
+        "height": "44px",
+        "padding": "0px",
+        "radius": "3.35544e+07px",
+        "fontSize": "14px",
+        "fontWeight": "500",
+        "area": 1936,
+        "x": 334,
+        "y": 17
+      },
+      {
+        "tag": "H2",
+        "cls": "typography typography--align-start typography--color-default typography--h2 text",
+        "label": "StarCi Pro",
+        "w": 78.34,
+        "h": 24,
+        "minH": "auto",
+        "height": "24px",
+        "padding": "0px",
+        "radius": "0px",
+        "fontSize": "16px",
+        "fontWeight": "600",
+        "area": 1880.25,
+        "x": 32,
+        "y": 294
+      },
+      {
+        "tag": "IMG",
+        "cls": "h-10 w-auto shrink-0",
+        "label": "",
+        "w": 40,
+        "h": 40,
+        "minH": "0px",
+        "height": "40px",
+        "padding": "0px",
+        "radius": "0px",
+        "fontSize": "14px",
+        "fontWeight": "400",
+        "area": 1600,
+        "x": 12,
+        "y": 8
+      },
+      {
+        "tag": "SPAN",
+        "cls": "link breadcrumbs__link",
+        "label": "StarCi Pro",
+        "w": 74.94,
+        "h": 20,
+        "minH": "auto",
+        "height": "20px",
+        "padding": "0px 2px",
+        "radius": "12px",
+        "fontSize": "14px",
+        "fontWeight": "500",
+        "area": 1498.75,
+        "x": 108.27,
+        "y": 103
+      },
+      {
+        "tag": "SPAN",
+        "cls": "chip chip--accent chip--sm chip--soft",
+        "label": "Full access",
+        "w": 73.91,
+        "h": 20,
+        "minH": "auto",
+        "height": "20px",
+        "padding": "0px 4px",
+        "radius": "16px",
+        "fontSize": "12px",
+        "fontWeight": "500",
+        "area": 1478.13,
+        "x": 284.09,
+        "y": 296
+      }
+    ],
+    "accents": [
+      {
+        "label": "Điều hướng và tiện ích",
+        "bg": "lab(93.0204 0.505507 -0.053525)",
+        "color": "lab(8.37524 0.504933 -0.0534832)",
+        "w": 44,
+        "h": 44
+      },
+      {
+        "label": "Giỏ hàng",
+        "bg": "lab(93.0204 0.505507 -0.053525)",
+        "color": "lab(8.37524 0.504933 -0.0534832)",
+        "w": 44,
+        "h": 44
+      },
+      {
+        "label": "Tài khoản",
+        "bg": "lab(93.0204 0.505507 -0.053525)",
+        "color": "lab(8.37524 0.504933 -0.0534832)",
+        "w": 44,
+        "h": 44
+      },
+      {
+        "label": "Đăng nhập để mua StarCi Pro",
+        "bg": "rgb(117, 71, 255)",
+        "color": "lab(100 0 0)",
+        "w": 326,
+        "h": 44
+      }
+    ],
+    "fontSizes": [
+      [
+        "14px/600",
+        7
+      ],
+      [
+        "14px/400",
+        6
+      ],
+      [
+        "12px/400",
+        5
+      ],
+      [
+        "14px/500",
+        3
+      ],
+      [
+        "16px/600",
+        3
+      ],
+      [
+        "8px/400",
+        1
+      ],
+      [
+        "20px/700",
+        1
+      ],
+      [
+        "12px/500",
+        1
+      ],
+      [
+        "36px/600",
+        1
+      ]
+    ],
+    "radii": [
+      [
+        "16px",
+        6
+      ],
+      [
+        "24px",
+        3
+      ],
+      [
+        "999px",
+        2
+      ],
+      [
+        "12px",
+        2
+      ],
+      [
+        "3.35544e+07px",
+        1
+      ]
+    ],
+    "backgrounds": [
+      [
+        "lab(93.0204 0.505507 -0.053525)",
+        3
+      ],
+      [
+        "lab(99.9896 0.269651 -0.0285387)",
+        3
+      ],
+      [
+        "lab(96.5236 0.505537 -0.053525)",
+        2
+      ],
+      [
+        "lab(94.4628 0.404418 -0.04282)",
+        2
+      ],
+      [
+        "oklab(0.564963 0.0724149 -0.242857 / 0.15)",
+        1
+      ],
+      [
+        "rgb(117, 71, 255)",
+        1
+      ]
+    ],
+    "primaryStack": [
+      {
+        "cls": "flex min-w-0 flex-col gap-3",
+        "top": 563,
+        "bottom": 1205.38
+      },
+      {
+        "cls": "flex min-w-0 flex-col gap-3",
+        "top": 1229.38,
+        "bottom": 1369.38
+      }
+    ],
+    "cardEdges": [
+      {
+        "cls": "card__content starci-core-surface",
+        "x": 16,
+        "w": 358,
+        "text": "Một quyền truy cập xuyên"
+      },
+      {
+        "cls": "starci-core-surface-content",
+        "x": 16,
+        "w": 358,
+        "text": "Một quyền truy cập xuyên"
+      },
+      {
+        "cls": "bg-surface-secondary px-4 py-3 text-foregrou",
+        "x": 16,
+        "w": 358,
+        "text": "Một quyền truy cập xuyên"
+      },
+      {
+        "cls": "starci-core-text",
+        "x": 32,
+        "w": 326,
+        "text": "Một quyền truy cập xuyên"
+      },
+      {
+        "cls": "min-w-0 border-t border-separator bg-surface",
+        "x": 16,
+        "w": 358,
+        "text": ""
+      },
+      {
+        "cls": "block h-auto w-full",
+        "x": 16,
+        "w": 358,
+        "text": ""
+      },
+      {
+        "cls": "flex min-w-0 flex-col gap-1",
+        "x": 64,
+        "w": 294,
+        "text": "Học tậpToàn bộ khóa học,"
+      },
+      {
+        "cls": "starci-core-text",
+        "x": 64,
+        "w": 294,
+        "text": "Học tập"
+      },
+      {
+        "cls": "starci-core-text",
+        "x": 64,
+        "w": 294,
+        "text": "Toàn bộ khóa học, bài họ"
+      },
+      {
+        "cls": "flex min-w-0 flex-col gap-1",
+        "x": 64,
+        "w": 281.28,
+        "text": "Luyện tậpCoding, Playgro"
+      },
+      {
+        "cls": "starci-core-text",
+        "x": 64,
+        "w": 281.28,
+        "text": "Luyện tập"
+      },
+      {
+        "cls": "starci-core-text",
+        "x": 64,
+        "w": 281.28,
+        "text": "Coding, Playground, thử "
+      },
+      {
+        "cls": "flex min-w-0 flex-col gap-1",
+        "x": 64,
+        "w": 294,
+        "text": "Cộng đồngThảo luận khóa "
+      },
+      {
+        "cls": "starci-core-text",
+        "x": 64,
+        "w": 294,
+        "text": "Cộng đồng"
+      },
+      {
+        "cls": "starci-core-text",
+        "x": 64,
+        "w": 294,
+        "text": "Thảo luận khóa học, cộng"
+      },
+      {
+        "cls": "flex min-w-0 flex-col gap-1",
+        "x": 64,
+        "w": 294,
+        "text": "Nghề nghiệpDự án cá nhân"
+      },
+      {
+        "cls": "starci-core-text",
+        "x": 64,
+        "w": 294,
+        "text": "Nghề nghiệp"
+      },
+      {
+        "cls": "starci-core-text",
+        "x": 64,
+        "w": 294,
+        "text": "Dự án cá nhân, chấm bài "
+      }
+    ],
+    "paragraphs": [],
+    "images": [
+      {
+        "tag": "IMG",
+        "alt": "",
+        "w": 40,
+        "h": 40
+      },
+      {
+        "tag": "IMG",
+        "alt": "Hành trình StarCi Pro từ học tập, luyện tập và cộng đồng đến mục tiêu nghề nghiệp",
+        "w": 358,
+        "h": 201.38
+      }
+    ]
+  },
+  "auth-390-light": {
+    "navAll": [],
+    "themeSwitchChain": [
+      {
+        "tag": "INPUT",
+        "cls": "",
+        "label": "Ghi nhớ đăng nhập",
+        "w": 13,
+        "h": 13,
+        "minH": "0px",
+        "height": "13px",
+        "padding": "0px",
+        "radius": "0px",
+        "fontSize": "14px",
+        "fontWeight": "500"
+      },
+      {
+        "tag": "SPAN",
+        "cls": "",
+        "label": "",
+        "w": 1,
+        "h": 1,
+        "minH": "0px",
+        "height": "1px",
+        "padding": "0px",
+        "radius": "0px",
+        "fontSize": "14px",
+        "fontWeight": "500"
+      },
+      {
+        "tag": "LABEL",
+        "cls": "checkbox__content",
+        "label": "Ghi nhớ đăng nhập",
+        "w": 157.09,
+        "h": 20,
+        "minH": "auto",
+        "height": "20px",
+        "padding": "0px",
+        "radius": "0px",
+        "fontSize": "14px",
+        "fontWeight": "500"
+      },
+      {
+        "tag": "DIV",
+        "cls": "checkbox checkbox--secondary flex flex-row items-center gap-2 text-sm",
+        "label": "Ghi nhớ đăng nhập",
+        "w": 157.09,
+        "h": 20,
+        "minH": "auto",
+        "height": "20px",
+        "padding": "0px",
+        "radius": "0px",
+        "fontSize": "14px",
+        "fontWeight": "400"
+      }
+    ],
+    "page": {
+      "vw": 390,
+      "vh": 844
+    },
+    "big": [
+      {
+        "tag": "SECTION",
+        "cls": "card card--transparent starci-core-surface-card starci-core-form-surface starci-",
+        "label": "Đăng nhậpĐăng nhập để tiếp tục",
+        "w": 358,
+        "h": 548,
+        "minH": "auto",
+        "height": "548px",
+        "padding": "0px",
+        "radius": "24px",
+        "fontSize": "16px",
+        "fontWeight": "400",
+        "area": 196184,
+        "x": 16,
+        "y": 148
+      },
+      {
+        "tag": "BUTTON",
+        "cls": "button button--md button--outline starci-core-button",
+        "label": "Đăng nhập với Google",
+        "w": 326,
+        "h": 40,
+        "minH": "auto",
+        "height": "40px",
+        "padding": "0px 16px",
+        "radius": "24px",
+        "fontSize": "14px",
+        "fontWeight": "500",
+        "area": 13040,
+        "x": 32,
+        "y": 244
+      },
+      {
+        "tag": "BUTTON",
+        "cls": "button button--md button--outline starci-core-button",
+        "label": "Đăng nhập với GitHub",
+        "w": 326,
+        "h": 40,
+        "minH": "auto",
+        "height": "40px",
+        "padding": "0px 16px",
+        "radius": "24px",
+        "fontSize": "14px",
+        "fontWeight": "500",
+        "area": 13040,
+        "x": 32,
+        "y": 296
+      },
+      {
+        "tag": "BUTTON",
+        "cls": "button button--md button--primary starci-core-button",
+        "label": "Đăng nhập",
+        "w": 326,
+        "h": 40,
+        "minH": "auto",
+        "height": "40px",
+        "padding": "0px 16px",
+        "radius": "24px",
+        "fontSize": "14px",
+        "fontWeight": "500",
+        "area": 13040,
+        "x": 32,
+        "y": 596
+      },
+      {
+        "tag": "SPAN",
+        "cls": "",
+        "label": "Đăng nhập với Google",
+        "w": 153.2,
+        "h": 20,
+        "minH": "auto",
+        "height": "20px",
+        "padding": "0px",
+        "radius": "0px",
+        "fontSize": "14px",
+        "fontWeight": "500",
+        "area": 3064.06,
+        "x": 118.39,
+        "y": 254
+      },
+      {
+        "tag": "SPAN",
+        "cls": "",
+        "label": "Đăng nhập với GitHub",
+        "w": 151.13,
+        "h": 20,
+        "minH": "auto",
+        "height": "20px",
+        "padding": "0px",
+        "radius": "0px",
+        "fontSize": "14px",
+        "fontWeight": "500",
+        "area": 3022.5,
+        "x": 119.44,
+        "y": 306
+      },
+      {
+        "tag": "BUTTON",
+        "cls": "group starci-core-text-action",
+        "label": "Quên mật khẩu?",
+        "w": 112.11,
+        "h": 20,
+        "minH": "auto",
+        "height": "20px",
+        "padding": "0px",
+        "radius": "0px",
+        "fontSize": "14px",
+        "fontWeight": "500",
+        "area": 2242.19,
+        "x": 245.89,
+        "y": 560
+      },
+      {
+        "tag": "SPAN",
+        "cls": "",
+        "label": "Quên mật khẩu?",
+        "w": 112.11,
+        "h": 20,
+        "minH": "auto",
+        "height": "20px",
+        "padding": "0px",
+        "radius": "0px",
+        "fontSize": "14px",
+        "fontWeight": "500",
+        "area": 2242.19,
+        "x": 245.89,
+        "y": 560
+      },
+      {
+        "tag": "SPAN",
+        "cls": "",
+        "label": "Đăng nhập",
+        "w": 83.25,
+        "h": 24,
+        "minH": "auto",
+        "height": "24px",
+        "padding": "0px",
+        "radius": "0px",
+        "fontSize": "16px",
+        "fontWeight": "400",
+        "area": 1998,
+        "x": 153.38,
+        "y": 164
+      },
+      {
+        "tag": "H2",
+        "cls": "typography typography--align-start typography--color-default typography--h2 text",
+        "label": "Đăng nhập",
+        "w": 83.25,
+        "h": 24,
+        "minH": "0px",
+        "height": "24px",
+        "padding": "0px",
+        "radius": "0px",
+        "fontSize": "16px",
+        "fontWeight": "600",
+        "area": 1998,
+        "x": 153.38,
+        "y": 164
+      },
+      {
+        "tag": "SPAN",
+        "cls": "",
+        "label": "Đăng nhập",
+        "w": 75.39,
+        "h": 20,
+        "minH": "auto",
+        "height": "20px",
+        "padding": "0px",
+        "radius": "0px",
+        "fontSize": "14px",
+        "fontWeight": "500",
+        "area": 1507.81,
+        "x": 157.3,
+        "y": 606
+      },
+      {
+        "tag": "BUTTON",
+        "cls": "group starci-core-text-action",
+        "label": "Đăng ký",
+        "w": 56.81,
+        "h": 20,
+        "minH": "auto",
+        "height": "20px",
+        "padding": "0px",
+        "radius": "0px",
+        "fontSize": "14px",
+        "fontWeight": "500",
+        "area": 1136.25,
+        "x": 236.64,
+        "y": 660
+      },
+      {
+        "tag": "SPAN",
+        "cls": "",
+        "label": "Đăng ký",
+        "w": 56.81,
+        "h": 20,
+        "minH": "auto",
+        "height": "20px",
+        "padding": "0px",
+        "radius": "0px",
+        "fontSize": "14px",
+        "fontWeight": "500",
+        "area": 1136.25,
+        "x": 236.64,
+        "y": 660
+      }
+    ],
+    "accents": [
+      {
+        "label": "Đăng nhập",
+        "bg": "rgb(117, 71, 255)",
+        "color": "lab(100 0 0)",
+        "w": 326,
+        "h": 40
+      }
+    ],
+    "fontSizes": [
+      [
+        "14px/500",
+        7
+      ],
+      [
+        "14px/400",
+        3
+      ],
+      [
+        "16px/600",
+        1
+      ]
+    ],
+    "radii": [
+      [
+        "24px",
+        4
+      ],
+      [
+        "12px",
+        2
+      ],
+      [
+        "16px",
+        1
+      ],
+      [
+        "6px",
+        1
+      ]
+    ],
+    "backgrounds": [
+      [
+        "lab(93.0204 0.505507 -0.053525)",
+        3
+      ],
+      [
+        "lab(96.5236 0.505537 -0.053525)",
+        1
+      ],
+      [
+        "lab(99.9896 0.269651 -0.0285387)",
+        1
+      ],
+      [
+        "rgb(117, 71, 255)",
+        1
+      ]
+    ],
+    "cardEdges": [
+      {
+        "cls": "card__content starci-core-surface",
+        "x": 16,
+        "w": 358,
+        "text": "Đăng nhậpĐăng nhập để ti"
+      },
+      {
+        "cls": "scroll-shadow scroll-shadow--hide-scrollbar ",
+        "x": 16,
+        "w": 358,
+        "text": "Đăng nhậpĐăng nhập để ti"
+      },
+      {
+        "cls": "mx-auto flex w-full max-w-md flex-col gap-6",
+        "x": 32,
+        "w": 326,
+        "text": "Đăng nhậpĐăng nhập để ti"
+      },
+      {
+        "cls": "",
+        "x": 153.38,
+        "w": 83.25,
+        "text": "Đăng nhập"
+      },
+      {
+        "cls": "typography typography--align-start typograph",
+        "x": 153.38,
+        "w": 83.25,
+        "text": "Đăng nhập"
+      },
+      {
+        "cls": "starci-core-text",
+        "x": 118.73,
+        "w": 152.53,
+        "text": "Đăng nhập để tiếp tục"
+      },
+      {
+        "cls": "flex flex-col gap-3 [&>*]:w-full",
+        "x": 32,
+        "w": 326,
+        "text": "Đăng nhập với GoogleĐăng"
+      },
+      {
+        "cls": "",
+        "x": 118.39,
+        "w": 153.2,
+        "text": "Đăng nhập với Google"
+      },
+      {
+        "cls": "",
+        "x": 119.44,
+        "w": 151.13,
+        "text": "Đăng nhập với GitHub"
+      },
+      {
+        "cls": "starci-core-divider",
+        "x": 32,
+        "w": 326,
+        "text": "HOẶC"
+      },
+      {
+        "cls": "starci-core-divider-rule",
+        "x": 32,
+        "w": 129.67,
+        "text": ""
+      },
+      {
+        "cls": "starci-core-text",
+        "x": 173.67,
+        "w": 42.66,
+        "text": "HOẶC"
+      },
+      {
+        "cls": "starci-core-divider-rule",
+        "x": 228.33,
+        "w": 129.67,
+        "text": ""
+      },
+      {
+        "cls": "textfield textfield--full-width starci-core-",
+        "x": 32,
+        "w": 326,
+        "text": "Email"
+      },
+      {
+        "cls": "starci-core-input-control",
+        "x": 32,
+        "w": 326,
+        "text": ""
+      },
+      {
+        "cls": "textfield textfield--full-width starci-core-",
+        "x": 32,
+        "w": 326,
+        "text": "Mật khẩu"
+      },
+      {
+        "cls": "starci-core-input-control",
+        "x": 32,
+        "w": 326,
+        "text": ""
+      },
+      {
+        "cls": "flex flex-row flex-wrap items-center justify",
+        "x": 32,
+        "w": 326,
+        "text": "Ghi nhớ đăng nhậpQuên mậ"
+      },
+      {
+        "cls": "checkbox checkbox--secondary flex flex-row i",
+        "x": 32,
+        "w": 157.09,
+        "text": "Ghi nhớ đăng nhập"
+      },
+      {
+        "cls": "",
+        "x": 245.89,
+        "w": 112.11,
+        "text": "Quên mật khẩu?"
+      },
+      {
+        "cls": "",
+        "x": 157.3,
+        "w": 75.39,
+        "text": "Đăng nhập"
+      },
+      {
+        "cls": "flex flex-row flex-wrap items-center justify",
+        "x": 32,
+        "w": 326,
+        "text": "Chưa có tài khoản?Đăng k"
+      },
+      {
+        "cls": "starci-core-text",
+        "x": 96.55,
+        "w": 132.09,
+        "text": "Chưa có tài khoản?"
+      },
+      {
+        "cls": "",
+        "x": 236.64,
+        "w": 56.81,
+        "text": "Đăng ký"
+      }
+    ],
+    "paragraphs": [],
+    "images": []
+  }
+}

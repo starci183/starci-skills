@@ -1,6 +1,6 @@
 {
-  "version": "1.3.0",
-  "lineageNote": "1.3.0 (2026-09-03): a mechanical presentation sweep (scripts/sweep-presentation.mjs: APP_OVERRIDE, APP_REIMPLEMENTATION, OFF_SCALE, SHELL_GEOMETRY) wired into frontend.source.apply and quality.verify; resolve scope covers every app-owned leaf/branch folder; twin, paired-spec and deployment-constant rules; rules are written product-agnostic.",
+  "version": "1.5.0",
+  "lineageNote": "1.5.0 (2026-09-03): UPDATE.md, the neutral standard for changing a skills tree, first in the load order and shipped with the installer; session-first and SESSION_MISSING; git.publish demands receipts; every example workflow is a long flow (bind runtime → screenshot audit → quality → uat → publish); the taste (TASTE) and experience (UX) lenses conclude inside their own topics and the final verdict is a table in quality.verify's receipt; @tools/host serves candidates per viewport; the consolidation pass took the day's concepts from 44 places to 19 and retired ui.md and FE-TEST-7.",
   "entry": {
     "name": "starci",
     "description": "Complete one StarCi mission by freezing its scope, selecting the one operator that owns the outcome, and routing between operators on typed results until the outcome is proved or a person must decide.",
@@ -69,7 +69,7 @@
       {
         "id": "operator",
         "meaning": "Invoke the named operator next.",
-        "count": 29
+        "count": 30
       },
       {
         "id": "resume",
@@ -399,6 +399,13 @@
           "domain": "caller",
           "meaning": "request.json fails the gate or the operator's Requirements.",
           "shared": true
+        },
+        {
+          "code": "SESSION_MISSING",
+          "disposition": "terminate",
+          "domain": "caller",
+          "meaning": "Source was designed, written or published outside a session: the branch has no step-N/parallel-M under a session folder with state.json and a validated request.json, or the session branch being published carries no done source-application response whose commits contain its head, or a frontend chain with an audit step has no frontend-surface-audit response with its screenshots.",
+          "shared": false
         },
         {
           "code": "SOURCE_DRIFT",
@@ -910,6 +917,10 @@
         {
           "id": "visualize",
           "mode": "html"
+        },
+        {
+          "id": "host",
+          "mode": "loopback"
         }
       ],
       "hasVietnamese": true,
@@ -962,6 +973,12 @@
         {
           "kind": "direction-image",
           "file": "response/artifacts/images/<slot>.png",
+          "type": "artifact",
+          "required": false
+        },
+        {
+          "kind": "host",
+          "file": "response/artifacts/host.json",
           "type": "artifact",
           "required": false
         }
@@ -1059,6 +1076,13 @@
           "disposition": "terminate",
           "domain": "caller",
           "meaning": "Bounded research cannot close the business or interaction question the decision rests on.",
+          "shared": false
+        },
+        {
+          "code": "REFERENCE_MISSING",
+          "disposition": "terminate",
+          "domain": "self",
+          "meaning": "A new or reconstruct direction named no reference standard, so the class the surface is aiming at is unstated and the taste lens cannot judge whether it landed there.",
           "shared": false
         },
         {
@@ -1343,6 +1367,10 @@
       ],
       "next": [
         {
+          "when": "the source is committed and a served surface must be bound at the new head before it can be observed",
+          "operator": "workspace.bind"
+        },
+        {
           "when": "the source is committed and the rendered surface must be measured",
           "operator": "frontend.surface.audit"
         },
@@ -1358,6 +1386,13 @@
           "domain": "caller",
           "meaning": "request.json fails the gate or the operator's Requirements.",
           "shared": true
+        },
+        {
+          "code": "SESSION_MISSING",
+          "disposition": "terminate",
+          "domain": "caller",
+          "meaning": "Source was designed, written or published outside a session: the branch has no step-N/parallel-M under a session folder with state.json and a validated request.json, or the session branch being published carries no done source-application response whose commits contain its head, or a frontend chain with an audit step has no frontend-surface-audit response with its screenshots.",
+          "shared": false
         },
         {
           "code": "SOURCE_DRIFT",
@@ -1444,6 +1479,10 @@
         {
           "id": "http",
           "mode": "probe"
+        },
+        {
+          "id": "host",
+          "mode": "loopback"
         }
       ],
       "hasVietnamese": true,
@@ -1493,6 +1532,12 @@
           "file": "response/data/verdicts.json",
           "type": "data",
           "required": true
+        },
+        {
+          "kind": "host",
+          "file": "response/artifacts/host.json",
+          "type": "artifact",
+          "required": false
         }
       ],
       "next": [
@@ -1501,7 +1546,11 @@
           "operator": "frontend.presentation.resolve"
         },
         {
-          "when": "every claim holds and the checkout's own gates must run",
+          "when": "a topic verdict is fix-first, or the direction declared no surface class, so the composition is decided again before any value is",
+          "operator": "frontend.direction.decide"
+        },
+        {
+          "when": "every topic ships or passes and the checkout's own gates must run",
           "operator": "quality.verify"
         },
         {
@@ -1546,6 +1595,13 @@
           "shared": false
         },
         {
+          "code": "SURFACE_CLASS_MISSING",
+          "disposition": "terminate",
+          "domain": "direction",
+          "meaning": "The direction decision declares no surface class, or one outside the vocabulary COVERAGE-1 Case 7 publishes, so every banded proof rule is left without a threshold and no topic can be judged.",
+          "shared": false
+        },
+        {
           "code": "NO_PROGRESS",
           "disposition": "terminate",
           "domain": "caller",
@@ -1573,6 +1629,11 @@
           "domain": "frontend",
           "kind": "resume",
           "target": null
+        },
+        {
+          "domain": "direction",
+          "kind": "operator",
+          "target": "frontend.direction.decide"
         }
       ]
     },
@@ -1664,6 +1725,13 @@
           "disposition": "terminate",
           "domain": "workspace",
           "meaning": "The project or the routed frontend checkout identity is not verified.",
+          "shared": false
+        },
+        {
+          "code": "SESSION_MISSING",
+          "disposition": "terminate",
+          "domain": "caller",
+          "meaning": "Source was designed, written or published outside a session: the branch has no step-N/parallel-M under a session folder with state.json and a validated request.json, or the session branch being published carries no done source-application response whose commits contain its head, or a frontend chain with an audit step has no frontend-surface-audit response with its screenshots.",
           "shared": false
         },
         {
@@ -1934,7 +2002,7 @@
         "@workspaces/fe",
         "@worktrees/debts"
       ],
-      "steps": 7,
+      "steps": 8,
       "requirements": 6,
       "inputs": [
         {
@@ -1947,6 +2015,14 @@
         },
         {
           "kind": "changes",
+          "required": false
+        },
+        {
+          "kind": "frontend-surface-audit",
+          "required": false
+        },
+        {
+          "kind": "uat-flow-verification",
           "required": false
         }
       ],
@@ -2323,6 +2399,7 @@
       ],
       "hasVietnamese": true,
       "context": [
+        "@knowledge/ui/proof",
         "@workspaces/be",
         "@workspaces/device-state",
         "@worktrees/_templates",
@@ -2387,6 +2464,10 @@
         {
           "when": "all three lanes pass",
           "operator": "git.publish"
+        },
+        {
+          "when": "all three lanes pass and the promise must be reconciled against the journey that was actually walked",
+          "operator": "business.decide"
         },
         {
           "when": "the UI lane fails on an application-owned node",
@@ -3040,6 +3121,21 @@
       "declaredBy": [
         "uat.verify"
       ]
+    },
+    {
+      "id": "host",
+      "purpose": "Serve a folder of static HTML on the loopback interface so a person can open it in a browser. The port is tried from 60000 upward to 60100 and the first free one wins; the receipt records the URL, the port, the folder and the pid under response/artifacts/host.json, and the server is stopped when the branch ends or is resumed. It never binds 0.0.0.0, so nothing it serves leaves the machine.",
+      "modes": [
+        "loopback"
+      ],
+      "support": {
+        "openai": true,
+        "claude": true
+      },
+      "declaredBy": [
+        "frontend.direction.decide",
+        "frontend.surface.audit"
+      ]
     }
   ],
   "runtimes": [
@@ -3254,6 +3350,7 @@
       ],
       "consumedBy": [
         "frontend.presentation.resolve",
+        "quality.verify",
         "uat.verify"
       ]
     },
@@ -3268,6 +3365,14 @@
       "kind": "git-publication",
       "producedBy": [
         "git.publish"
+      ],
+      "consumedBy": []
+    },
+    {
+      "kind": "host",
+      "producedBy": [
+        "frontend.direction.decide",
+        "frontend.surface.audit"
       ],
       "consumedBy": []
     },
@@ -3412,7 +3517,9 @@
       "producedBy": [
         "uat.verify"
       ],
-      "consumedBy": []
+      "consumedBy": [
+        "quality.verify"
+      ]
     },
     {
       "kind": "uat-snapshot",
@@ -4353,6 +4460,18 @@
       "resume": "Supply the owning authority or a materially new reference."
     },
     {
+      "code": "REFERENCE_MISSING",
+      "scope": [
+        "frontend.direction.decide"
+      ],
+      "shared": false,
+      "domain": "self",
+      "disposition": "terminate",
+      "meaning": "A new or reconstruct direction named no reference standard, so the class the surface is aiming at is unstated and the taste lens cannot judge whether it landed there.",
+      "fallback": null,
+      "resume": "Name at least one standard by class, with what is borrowed from it, and run the same direction again."
+    },
+    {
       "code": "RESOLUTION_STALE",
       "scope": [
         "frontend.source.apply"
@@ -4523,6 +4642,20 @@
       "resume": "Restore the provider."
     },
     {
+      "code": "SESSION_MISSING",
+      "scope": [
+        "backend.source.apply",
+        "frontend.source.apply",
+        "git.publish"
+      ],
+      "shared": false,
+      "domain": "caller",
+      "disposition": "terminate",
+      "meaning": "Source was designed, written or published outside a session: the branch has no step-N/parallel-M under a session folder with state.json and a validated request.json, or the session branch being published carries no done source-application response whose commits contain its head, or a frontend chain with an audit step has no frontend-surface-audit response with its screenshots.",
+      "fallback": null,
+      "resume": "Create the session first — state.json and step-1/parallel-1/request/request.json, green under validate-request — and run the operators that owe the receipt; a session cannot be reconstructed after the fact."
+    },
+    {
       "code": "SOURCE_DRIFT",
       "scope": [
         "*"
@@ -4545,6 +4678,18 @@
       "meaning": "The steady window never closed before the bounded deadline, and an assumed rollout is not a deployment.",
       "fallback": null,
       "resume": "Observe a fresh series after the target recovers."
+    },
+    {
+      "code": "SURFACE_CLASS_MISSING",
+      "scope": [
+        "frontend.surface.audit"
+      ],
+      "shared": false,
+      "domain": "direction",
+      "disposition": "terminate",
+      "meaning": "The direction decision declares no surface class, or one outside the vocabulary COVERAGE-1 Case 7 publishes, so every banded proof rule is left without a threshold and no topic can be judged.",
+      "fallback": null,
+      "resume": "Decide the direction again with a declared surface class, then audit at the same commit."
     },
     {
       "code": "UNKNOWN_RULE",
@@ -4588,8 +4733,8 @@
     {
       "id": "backend-feature",
       "when": {
-        "en": "Server behaviour, an API contract, persistence or a job changes for one business feature; the architecture is decided first and the promise is reconciled after the code lands.",
-        "vi": "Hành vi server, contract API, persistence hay job đổi cho một feature nghiệp vụ; kiến trúc quyết trước, lời hứa được đối chiếu sau khi code đã vào."
+        "en": "Server behaviour, an API contract, persistence or a job changes for one business feature; the architecture is decided first and the promise is reconciled after the code lands. This chain writes no surface, so it carries no frontend.surface.audit and no uat.verify: uat.verify requires a frontend-surface-audit input and a bound fe route, and neither exists here. A feature whose promise reaches a person through a screen is not this workflow — it is full-feature, which walks the journey before it publishes.",
+        "vi": "Hành vi server, contract API, persistence hay job đổi cho một feature nghiệp vụ; kiến trúc quyết trước, lời hứa được đối chiếu sau khi code đã vào. Chuỗi này không ghi bề mặt nào nên không mang frontend.surface.audit và không mang uat.verify: uat.verify cần đầu vào frontend-surface-audit và một route fe đã bind, ở đây không có cái nào. Một feature mà lời hứa chạm tới người qua màn hình thì không thuộc workflow này — nó là full-feature, nơi hành trình được đi trước khi publish."
       },
       "ends": "git.publish",
       "steps": [
@@ -4755,6 +4900,17 @@
         ],
         [
           {
+            "operator": "workspace.bind",
+            "fanout": null,
+            "maxParallel": null,
+            "requirements": {
+              "role": "fe",
+              "runtimeNeed": "consume"
+            }
+          }
+        ],
+        [
+          {
             "operator": "frontend.surface.audit",
             "fanout": "matrix",
             "maxParallel": 3,
@@ -4771,6 +4927,14 @@
         ],
         [
           {
+            "operator": "uat.verify",
+            "fanout": null,
+            "maxParallel": null,
+            "requirements": null
+          }
+        ],
+        [
+          {
             "operator": "git.publish",
             "fanout": null,
             "maxParallel": null,
@@ -4778,14 +4942,20 @@
           }
         ]
       ],
-      "stepCount": 8,
-      "branchCount": 9,
+      "stepCount": 10,
+      "branchCount": 11,
       "widestStep": 2,
       "loops": [
         {
           "from": "frontend.surface.audit",
           "to": "frontend.presentation.resolve",
           "when": "an application-owned node fails a claim or a proof rule",
+          "maxRounds": 2
+        },
+        {
+          "from": "frontend.surface.audit",
+          "to": "frontend.direction.decide",
+          "when": "the taste lens is fix-first, so the composition is decided again rather than revalued",
           "maxRounds": 2
         }
       ]
@@ -4799,6 +4969,14 @@
       "ends": "git.publish",
       "steps": [
         [
+          {
+            "operator": "workspace.bind",
+            "fanout": null,
+            "maxParallel": null,
+            "requirements": {
+              "role": "be"
+            }
+          },
           {
             "operator": "workspace.bind",
             "fanout": null,
@@ -4839,6 +5017,17 @@
         ],
         [
           {
+            "operator": "workspace.bind",
+            "fanout": null,
+            "maxParallel": null,
+            "requirements": {
+              "role": "fe",
+              "runtimeNeed": "consume"
+            }
+          }
+        ],
+        [
+          {
             "operator": "frontend.surface.audit",
             "fanout": "matrix",
             "maxParallel": 3,
@@ -4855,6 +5044,14 @@
         ],
         [
           {
+            "operator": "uat.verify",
+            "fanout": null,
+            "maxParallel": null,
+            "requirements": null
+          }
+        ],
+        [
+          {
             "operator": "git.publish",
             "fanout": null,
             "maxParallel": null,
@@ -4862,14 +5059,20 @@
           }
         ]
       ],
-      "stepCount": 7,
-      "branchCount": 7,
-      "widestStep": 1,
+      "stepCount": 9,
+      "branchCount": 10,
+      "widestStep": 2,
       "loops": [
         {
           "from": "frontend.surface.audit",
           "to": "frontend.presentation.resolve",
           "when": "an application-owned node fails a claim or a proof rule",
+          "maxRounds": 2
+        },
+        {
+          "from": "frontend.surface.audit",
+          "to": "frontend.direction.decide",
+          "when": "the taste lens is fix-first, so the composition is decided again rather than revalued",
           "maxRounds": 2
         }
       ]
@@ -4883,6 +5086,14 @@
       "ends": "git.publish",
       "steps": [
         [
+          {
+            "operator": "workspace.bind",
+            "fanout": null,
+            "maxParallel": null,
+            "requirements": {
+              "role": "be"
+            }
+          },
           {
             "operator": "workspace.bind",
             "fanout": null,
@@ -4923,94 +5134,12 @@
         ],
         [
           {
-            "operator": "frontend.surface.audit",
-            "fanout": "matrix",
-            "maxParallel": 3,
-            "requirements": null
-          }
-        ],
-        [
-          {
-            "operator": "quality.verify",
-            "fanout": null,
-            "maxParallel": null,
-            "requirements": null
-          }
-        ],
-        [
-          {
-            "operator": "git.publish",
-            "fanout": null,
-            "maxParallel": null,
-            "requirements": null
-          }
-        ]
-      ],
-      "stepCount": 7,
-      "branchCount": 7,
-      "widestStep": 1,
-      "loops": [
-        {
-          "from": "frontend.surface.audit",
-          "to": "frontend.presentation.resolve",
-          "when": "an application-owned node fails a claim or a proof rule",
-          "maxRounds": 2
-        }
-      ]
-    },
-    {
-      "id": "frontend-with-uat",
-      "when": {
-        "en": "A frontend change must also be walked by a real person's journey before it is published; a person asked for the UAT run by name.",
-        "vi": "Một thay đổi frontend còn phải đi qua hành trình của người thật trước khi publish; có người yêu cầu đích danh lần chạy UAT."
-      },
-      "ends": "git.publish",
-      "steps": [
-        [
-          {
-            "operator": "workspace.bind",
-            "fanout": null,
-            "maxParallel": null,
-            "requirements": {
-              "role": "be"
-            }
-          },
-          {
             "operator": "workspace.bind",
             "fanout": null,
             "maxParallel": null,
             "requirements": {
               "role": "fe",
               "runtimeNeed": "consume"
-            }
-          }
-        ],
-        [
-          {
-            "operator": "frontend.direction.decide",
-            "fanout": null,
-            "maxParallel": null,
-            "requirements": {
-              "intent": "modify",
-              "changeLevel": "reconstruct"
-            }
-          }
-        ],
-        [
-          {
-            "operator": "frontend.presentation.resolve",
-            "fanout": null,
-            "maxParallel": null,
-            "requirements": null
-          }
-        ],
-        [
-          {
-            "operator": "frontend.source.apply",
-            "fanout": null,
-            "maxParallel": null,
-            "requirements": {
-              "mode": "apply"
             }
           }
         ],
@@ -5047,14 +5176,137 @@
           }
         ]
       ],
-      "stepCount": 8,
-      "branchCount": 9,
+      "stepCount": 9,
+      "branchCount": 10,
       "widestStep": 2,
       "loops": [
         {
           "from": "frontend.surface.audit",
           "to": "frontend.presentation.resolve",
           "when": "an application-owned node fails a claim or a proof rule",
+          "maxRounds": 2
+        },
+        {
+          "from": "frontend.surface.audit",
+          "to": "frontend.direction.decide",
+          "when": "the taste lens is fix-first, so the composition is decided again rather than revalued",
+          "maxRounds": 2
+        }
+      ]
+    },
+    {
+      "id": "frontend-with-uat",
+      "when": {
+        "en": "A frontend change must also be walked by a real person's journey before it is published; a person asked for the UAT run by name.",
+        "vi": "Một thay đổi frontend còn phải đi qua hành trình của người thật trước khi publish; có người yêu cầu đích danh lần chạy UAT."
+      },
+      "ends": "git.publish",
+      "steps": [
+        [
+          {
+            "operator": "workspace.bind",
+            "fanout": null,
+            "maxParallel": null,
+            "requirements": {
+              "role": "be"
+            }
+          },
+          {
+            "operator": "workspace.bind",
+            "fanout": null,
+            "maxParallel": null,
+            "requirements": {
+              "role": "fe"
+            }
+          }
+        ],
+        [
+          {
+            "operator": "frontend.direction.decide",
+            "fanout": null,
+            "maxParallel": null,
+            "requirements": {
+              "intent": "modify",
+              "changeLevel": "reconstruct"
+            }
+          }
+        ],
+        [
+          {
+            "operator": "frontend.presentation.resolve",
+            "fanout": null,
+            "maxParallel": null,
+            "requirements": null
+          }
+        ],
+        [
+          {
+            "operator": "frontend.source.apply",
+            "fanout": null,
+            "maxParallel": null,
+            "requirements": {
+              "mode": "apply"
+            }
+          }
+        ],
+        [
+          {
+            "operator": "workspace.bind",
+            "fanout": null,
+            "maxParallel": null,
+            "requirements": {
+              "role": "fe",
+              "runtimeNeed": "consume"
+            }
+          }
+        ],
+        [
+          {
+            "operator": "frontend.surface.audit",
+            "fanout": "matrix",
+            "maxParallel": 3,
+            "requirements": null
+          }
+        ],
+        [
+          {
+            "operator": "quality.verify",
+            "fanout": null,
+            "maxParallel": null,
+            "requirements": null
+          }
+        ],
+        [
+          {
+            "operator": "uat.verify",
+            "fanout": null,
+            "maxParallel": null,
+            "requirements": null
+          }
+        ],
+        [
+          {
+            "operator": "git.publish",
+            "fanout": null,
+            "maxParallel": null,
+            "requirements": null
+          }
+        ]
+      ],
+      "stepCount": 9,
+      "branchCount": 10,
+      "widestStep": 2,
+      "loops": [
+        {
+          "from": "frontend.surface.audit",
+          "to": "frontend.presentation.resolve",
+          "when": "an application-owned node fails a claim or a proof rule",
+          "maxRounds": 2
+        },
+        {
+          "from": "frontend.surface.audit",
+          "to": "frontend.direction.decide",
+          "when": "the taste lens is fix-first, so the composition is decided again rather than revalued",
           "maxRounds": 2
         }
       ]
@@ -5149,6 +5401,17 @@
         ],
         [
           {
+            "operator": "workspace.bind",
+            "fanout": null,
+            "maxParallel": null,
+            "requirements": {
+              "role": "fe",
+              "runtimeNeed": "consume"
+            }
+          }
+        ],
+        [
+          {
             "operator": "frontend.surface.audit",
             "fanout": "matrix",
             "maxParallel": 3,
@@ -5158,6 +5421,14 @@
         [
           {
             "operator": "quality.verify",
+            "fanout": null,
+            "maxParallel": null,
+            "requirements": null
+          }
+        ],
+        [
+          {
+            "operator": "uat.verify",
             "fanout": null,
             "maxParallel": null,
             "requirements": null
@@ -5182,14 +5453,20 @@
           }
         ]
       ],
-      "stepCount": 10,
-      "branchCount": 13,
+      "stepCount": 12,
+      "branchCount": 15,
       "widestStep": 2,
       "loops": [
         {
           "from": "frontend.surface.audit",
           "to": "frontend.presentation.resolve",
           "when": "an application-owned node fails a claim or a proof rule",
+          "maxRounds": 2
+        },
+        {
+          "from": "frontend.surface.audit",
+          "to": "frontend.direction.decide",
+          "when": "the taste lens is fix-first, so the composition is decided again rather than revalued",
           "maxRounds": 2
         }
       ]
@@ -5238,13 +5515,13 @@
   "counts": {
     "operators": 14,
     "workflows": 8,
-    "routes": 68,
-    "kinds": 51,
-    "stopCodes": 93,
-    "steps": 120,
+    "routes": 69,
+    "kinds": 52,
+    "stopCodes": 96,
+    "steps": 121,
     "domains": 11,
     "profiles": 3,
-    "tools": 15,
+    "tools": 16,
     "fallbackCodes": 6
   }
 }

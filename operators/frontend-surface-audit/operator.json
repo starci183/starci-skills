@@ -16,7 +16,8 @@
       "@tools/websearch": "bounded",
       "@tools/visualize": "html",
       "@tools/browsercontrol": "required",
-      "@tools/http": "probe"
+      "@tools/http": "probe",
+      "@tools/host": "loopback"
     }
   }
 }

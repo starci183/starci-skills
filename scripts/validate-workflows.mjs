@@ -3,7 +3,8 @@
 // matches their `when`; otherwise the entry composes its own chain under the same rules this script
 // enforces: every operator exists; every requirement preset names a declared field; every required
 // Input of a branch is produced by an earlier step; branches of one step share no write alias; a loop
-// goes back to an earlier step and carries a round cap; the chain ends where it says it ends.
+// goes back to an earlier step and carries a round cap; a chain that writes frontend source under
+// mode apply audits and walks it before it publishes; the chain ends where it says it ends.
 import { readdir, readFile } from 'node:fs/promises';
 import path from 'node:path';
 import process from 'node:process';
@@ -96,6 +97,20 @@ export async function validateWorkflows(root) {
       if (!(Number.isInteger(loop.maxRounds) && loop.maxRounds >= 1)) errors.push(`${rel}: loop ${loop.from} → ${loop.to} needs maxRounds ≥ 1`);
       if (!loop.when) errors.push(`${rel}: loop ${loop.from} → ${loop.to} needs a when`);
     }
+    // The long-flow law: a chain that writes frontend source for real proves it before it publishes.
+    // Between the write and the publish stand the audit that looked at the surface and the UAT that
+    // walked it; a delivery nobody saw and nobody used is not a delivery, and mode dry writes nothing
+    // so it owes nothing. A chain that publishes nothing is out of scope: there is no delivery yet.
+    const applyStep = wf.chain.findIndex((s) => Array.isArray(s) && s.some((b) => b.operator === 'frontend.source.apply' && (b.requirements?.mode ?? 'apply') === 'apply'));
+    const publishStep = positions.get('git.publish');
+    if (applyStep !== -1 && publishStep !== undefined) {
+      for (const owed of ['frontend.surface.audit', 'uat.verify']) {
+        const at = positions.get(owed);
+        if (at === undefined) errors.push(`${rel}: step ${applyStep + 1} writes frontend source under mode apply and step ${publishStep + 1} publishes it with no ${owed} anywhere in the chain; a surface nobody proved is not publishable`);
+        else if (!(at > applyStep && at < publishStep)) errors.push(`${rel}: ${owed} runs at step ${at + 1}, outside the write at step ${applyStep + 1} and the publish at step ${publishStep + 1}; it proves nothing about what is being published`);
+      }
+    }
+
     const last = wf.chain[wf.chain.length - 1];
     const lastOps = Array.isArray(last) ? last.map((b) => b.operator) : [];
     if (wf.ends !== 'user' && !lastOps.includes(wf.ends)) errors.push(`${rel}: ends must be "user" or an operator of the last step (${lastOps.join(', ')})`);

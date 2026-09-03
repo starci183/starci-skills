@@ -75,11 +75,19 @@ export async function validateDirectionStep(branchDir, root = ROOT) {
   if (!(candidates >= 1 && candidates <= 3)) errors.push(`request.json: candidates must be 1, 2 or 3, not ${requirements.candidates}`);
   if (policy === 'automatic' && approval !== null) errors.push('request.json: approval is bound under automatic policy; supplying both hides which one decided');
 
+  // A structural change is looked at before it is decided: `new` and `reconstruct` render every
+  // candidate they form, whatever the preview flag says, because the person cannot approve a
+  // structure nobody has seen. `refine` moves elements inside a structure that was already approved,
+  // so its page stays optional and is rendered only when a comparison or a preview asks for one.
+  const structural = changeLevel === 'new' || changeLevel === 'reconstruct';
   const artifacts = new Set(list(response.fields?.candidates));
   if (response.status === 'done') {
+    if (structural && candidates >= 1 && artifacts.size !== candidates) {
+      errors.push(`response/response.json: a ${changeLevel} direction renders every candidate it forms; ${candidates} formed and ${artifacts.size} rendered, so the person is asked to approve a structure they cannot see`);
+    }
     if (candidates > 1 && artifacts.size === 0) errors.push('response/response.json: more than one candidate was formed but none was rendered');
     if (preview === 'yes' && artifacts.size === 0) errors.push('response/response.json: preview was asked for but no candidate page was rendered');
-    if (candidates === 1 && preview === 'no' && artifacts.size > 0) errors.push('response/response.json: one candidate under no preview renders no page');
+    if (!structural && candidates === 1 && preview === 'no' && artifacts.size > 0) errors.push('response/response.json: one candidate under no preview renders no page');
   }
 
   let coverage = null;
@@ -123,10 +131,19 @@ export async function validateDirectionStep(branchDir, root = ROOT) {
       else if (approval !== selected) errors.push(`${at}: the receipt selects ${selected} but approval names ${approval}`);
     }
 
-    // A refine moves elements inside the approved structure and consults no external reference.
+    // A refine moves elements inside the approved structure and consults no external reference. A
+    // structural change names the standard it is aiming at, by class, so the later taste lens can
+    // sort the capture beside it (TASTE-12); a decision that names none is this operator's own
+    // defect and stops with REFERENCE_MISSING rather than blaming the caller.
     const refs = tableUnder(text, '## References') ?? [];
     if (changeLevel === 'refine' && refs.length) errors.push(`${at}: a refine works from the family idioms alone, so References carries no row`);
     if (references.length && refs.length === 0) errors.push(`${at}: the person supplied references and none of them is recorded`);
+    if (structural && response.status === 'done' && refs.length === 0) {
+      errors.push(`${at}: a ${changeLevel} direction names at least one reference standard by class under ## References; with none the run stops with REFERENCE_MISSING`);
+    }
+    for (const [standard, klass] of refs) {
+      if (empty(klass)) errors.push(`${at}: the reference ${standard} names no class; a standard is named by the class a reader would sort it into, never by an adjective`);
+    }
     const contract = (tableUnder(text, '## UI contract') ?? []).map(([element, kind]) => ({ element, kind }));
     if (coverage) {
       errors.push(...coverageErrors(coverage, contract, 'response/data/coverage.json'));

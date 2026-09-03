@@ -15,6 +15,42 @@ const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '.
 const empty = (v) => v === undefined || v === null || v === '' || v === '—';
 const list = (v) => (Array.isArray(v) ? v : empty(v) ? [] : [v]);
 
+// knowledge/ui/proof/taste.md: TASTE-1..TASTE-12 are the scored criteria and TASTE-13 is the
+// arithmetic over them. `ship` needs no failure on the five criteria a reader registers before
+// reading a word, and a mean of at least 4; anything else is `fix-first`.
+export const TASTE_RULES = Array.from({ length: 12 }, (_, i) => `TASTE-${i + 1}`);
+// Each proof topic closes itself. A rule identifier belongs to exactly one topic, and the topic's own
+// closing rule turns its results into one verdict; nothing here recomputes a threshold.
+export const TOPIC_OF_PREFIX = {
+  GAP: 'presentation', PADDING: 'presentation', MARGIN: 'presentation', MEASURE: 'presentation',
+  RADIUS: 'presentation', SURFACE: 'presentation', TONE: 'presentation', FONT: 'presentation',
+  BOUNDARY: 'presentation', OVERFLOW: 'presentation', FLOW: 'presentation',
+  HIERARCHY: 'composition', CTA: 'composition', ACCENT: 'composition', ACTION: 'composition',
+  LAYOUT: 'composition', STATE: 'composition', FEEDBACK: 'composition', COVERAGE: 'composition',
+  RESPONSIVE: 'responsive',
+  MOTION: 'motion',
+  A11Y: 'accessibility', FOCUS: 'accessibility',
+  COLOR: 'contrast',
+  TRUTH: 'render-truth',
+  TASTE: 'taste',
+};
+export const AUDIT_TOPICS = ['presentation', 'composition', 'responsive', 'motion', 'accessibility', 'contrast', 'render-truth', 'taste'];
+const topicOf = (rule) => TOPIC_OF_PREFIX[String(rule).replace(/-\d+$/, '')] ?? null;
+const TASTE_GATES = new Set(['TASTE-1', 'TASTE-2', 'TASTE-5', 'TASTE-8', 'TASTE-12']);
+export function tasteVerdict(rows) {
+  const mean = rows.reduce((sum, r) => sum + Number(r.score), 0) / rows.length;
+  const gated = rows.some((r) => r.verdict === 'fail' && TASTE_GATES.has(r.rule));
+  return { mean, verdict: !gated && mean >= 4 ? 'ship' : 'fix-first' };
+}
+const sectionText = (text, heading) => {
+  const lines = text.split(/\r?\n/);
+  const from = lines.findIndex((l) => l.trimEnd() === heading);
+  if (from === -1) return '';
+  const rest = lines.slice(from + 1);
+  const next = rest.findIndex((l) => l.startsWith('## '));
+  return (next === -1 ? rest : rest.slice(0, next)).join('\n');
+};
+
 export async function validateAuditStep(branchDir, root = ROOT) {
   const base = await validateStep(root, branchDir);
   const errors = [...base.errors];
@@ -81,6 +117,68 @@ export async function validateAuditStep(branchDir, root = ROOT) {
   }
   for (const [matrixId] of captures) if (!ids.has(matrixId)) errors.push(`${at}: ${matrixId} was captured and never judged`);
 
+  // The taste lens. A done audit publishes it for every entry it judged: all twelve scored criteria,
+  // each failure routed to direction because no value swap repairs a composition (TASTE-13 Case 4),
+  // and the entry's own mean and verdict computed by TASTE-13 Case 2 rather than asserted.
+  const rolled = new Map(); // rule -> { score, verdict, measured[] }
+  for (const entry of verdicts.entries) {
+    const lens = entry.taste;
+    if (!lens) {
+      if (response.status === 'done') errors.push(`${at}: ${entry.matrixId} carries no taste block; a done audit publishes both lenses, canon and taste`);
+      continue;
+    }
+    const seen = new Map();
+    for (const row of lens.entries) {
+      if (seen.has(row.rule)) errors.push(`${at}: ${entry.matrixId} scores ${row.rule} twice`);
+      seen.set(row.rule, row);
+      if (!TASTE_RULES.includes(row.rule)) errors.push(`${at}: ${entry.matrixId} scores ${row.rule}, which is not one of the twelve scored criteria (TASTE-13 is the arithmetic and is not itself scored)`);
+      if (row.verdict === 'fail' && row.routeTo !== 'direction') errors.push(`${at}: ${entry.matrixId} fails ${row.rule} and routes to ${row.routeTo}; a taste failure routes to direction, never to resolve`);
+      if (row.verdict === 'pass' && row.routeTo !== 'none') errors.push(`${at}: ${entry.matrixId} passes ${row.rule} and still routes to ${row.routeTo}`);
+    }
+    for (const rule of TASTE_RULES) if (!seen.has(rule)) errors.push(`${at}: ${entry.matrixId} leaves ${rule} unscored; the lens is incomplete until every criterion carries a measurement`);
+    const complete = TASTE_RULES.every((r) => seen.has(r)) && seen.size === TASTE_RULES.length;
+    if (complete) {
+      const rows = TASTE_RULES.map((r) => seen.get(r));
+      const computed = tasteVerdict(rows);
+      if (Math.abs(Number(lens.mean) - computed.mean) > 0.005) errors.push(`${at}: ${entry.matrixId} records a mean of ${lens.mean}; the twelve scores average ${computed.mean.toFixed(2)}`);
+      if (lens.verdict !== computed.verdict) errors.push(`${at}: ${entry.matrixId} records ${lens.verdict}; TASTE-13 makes it ${computed.verdict}`);
+      for (const row of rows) {
+        const prior = rolled.get(row.rule);
+        if (!prior) rolled.set(row.rule, { score: row.score, verdict: row.verdict, measured: [row.measured] });
+        else rolled.set(row.rule, { score: Math.min(prior.score, row.score), verdict: prior.verdict === 'fail' || row.verdict === 'fail' ? 'fail' : 'pass', measured: [...prior.measured, row.measured] });
+      }
+    }
+  }
+  // The surface is only as good as its worst captured viewport, so the receipt publishes the lens
+  // rolled up across the entries: the lowest score and the failing verdict win.
+  const lensRows = TASTE_RULES.filter((r) => rolled.has(r)).map((r) => ({ rule: r, ...rolled.get(r) }));
+  const surface = lensRows.length === TASTE_RULES.length ? tasteVerdict(lensRows) : null;
+  if (surface) {
+    const next = response.next ?? [];
+    if (surface.verdict === 'fix-first') {
+      if (!next.includes('frontend.direction.decide')) errors.push('response/response.json: the taste lens is fix-first, so next names frontend.direction.decide');
+      if (next.includes('quality.verify')) errors.push('response/response.json: the taste lens is fix-first, so the checkout\'s own gates do not run yet; quality.verify follows a ship');
+    }
+  }
+
+  // One surface, one class: every entry carries the class the coverage declared, and they agree.
+  const classes = new Set(verdicts.entries.map((e) => e.surfaceClass));
+  if (classes.size > 1) errors.push(`${at}: the entries declare ${[...classes].join(' and ')}; one surface has one class, and every banded rule reads its threshold from it`);
+
+  // Each topic's row is the verdict its own closing rule produced over the results of that topic.
+  const topicRows = new Map();
+  for (const entry of verdicts.entries) {
+    for (const result of entry.results) {
+      const topic = topicOf(result.rule);
+      if (!topic) { errors.push(`${at}: ${result.rule} belongs to no published proof topic`); continue; }
+      const prior = topicRows.get(topic) ?? { verdict: 'pass', routeTo: 'none' };
+      if (result.verdict === 'fail') topicRows.set(topic, { verdict: 'fail', routeTo: prior.verdict === 'fail' ? prior.routeTo : result.routeTo });
+      else if (!topicRows.has(topic)) topicRows.set(topic, prior);
+    }
+  }
+  if (surface) topicRows.set('taste', { verdict: surface.verdict, routeTo: surface.verdict === 'ship' ? 'none' : 'direction' });
+  const topicVerdict = (topic) => topicRows.get(topic) ?? { verdict: 'blocked', routeTo: 'none' };
+
   const failing = verdicts.entries.flatMap((e) => e.results.filter((r) => r.verdict === 'fail'));
   if (failing.some((r) => r.routeTo === 'resolve') && !(response.next ?? []).includes('frontend.presentation.resolve')) {
     errors.push('response/response.json: a claim fails on an application-owned node, so next names frontend.presentation.resolve');
@@ -107,6 +205,42 @@ export async function validateAuditStep(branchDir, root = ROOT) {
       if (result.owner !== owner) errors.push(`${rel}: ${node} is ${owner} here and ${result.owner} in the verdicts`);
       if (result.verdict !== verdict) errors.push(`${rel}: ${rule} on ${node} is ${verdict} here and ${result.verdict} in the verdicts`);
     }
+    // ## Taste reads what the taste blocks carry, rolled up across the entries, and closes with the
+    // mean and the verdict TASTE-13 computes from those very rows.
+    if (surface) {
+      const tasteRows = tableUnder(text, '## Taste') ?? [];
+      if (tasteRows.length !== TASTE_RULES.length) errors.push(`${rel}: Taste has ${tasteRows.length} rows, the lens scores ${TASTE_RULES.length} criteria`);
+      for (const [rule, measured, score, verdict] of tasteRows) {
+        const row = rolled.get(rule);
+        if (!row) { errors.push(`${rel}: Taste names ${rule}, which the verdicts do not score`); continue; }
+        if (Number(score) !== row.score) errors.push(`${rel}: ${rule} scores ${score} here and ${row.score} in the verdicts`);
+        if (verdict !== row.verdict) errors.push(`${rel}: ${rule} is ${verdict} here and ${row.verdict} in the verdicts`);
+        if (!row.measured.includes(measured)) errors.push(`${rel}: ${rule} is scored on "${measured}", which no capture measured`);
+      }
+      const section = sectionText(text, '## Taste');
+      const mean = /^- Mean: (\d+(?:\.\d+)?)$/m.exec(section);
+      const verdictLine = /^- Verdict: (ship|fix-first)$/m.exec(section);
+      if (!mean) errors.push(`${rel}: Taste closes with no "- Mean: <number>" line`);
+      else if (Math.abs(Number(mean[1]) - surface.mean) > 0.005) errors.push(`${rel}: Taste records a mean of ${mean[1]}; the twelve rows average ${surface.mean.toFixed(2)}`);
+      if (!verdictLine) errors.push(`${rel}: Taste closes with no "- Verdict: ship|fix-first" line`);
+      else if (verdictLine[1] !== surface.verdict) errors.push(`${rel}: Taste records ${verdictLine[1]}; TASTE-13 makes the surface ${surface.verdict}`);
+    }
+
+    // ## Surface class carries the one the coverage declared, and ## Verdict carries one row per
+    // topic, each copied from the topic that computed it rather than recomputed here.
+    const classRows = tableUnder(text, '## Surface class') ?? [];
+    const declared = classRows[0]?.[0]?.replaceAll('`', '');
+    if (declared && classes.size === 1 && declared !== [...classes][0]) errors.push(`${rel}: Surface class reads ${declared} and the verdicts carry ${[...classes][0]}`);
+    const verdictRows = tableUnder(text, '## Verdict') ?? [];
+    if (verdictRows.length !== AUDIT_TOPICS.length) errors.push(`${rel}: Verdict has ${verdictRows.length} rows, this operator closes ${AUDIT_TOPICS.length} topics`);
+    for (const [topicCell, verdict, route] of verdictRows) {
+      const topic = topicCell.replaceAll('`', '');
+      if (!AUDIT_TOPICS.includes(topic)) { errors.push(`${rel}: Verdict names ${topic}, which is not a topic this operator closes`); continue; }
+      const computed = topicVerdict(topic);
+      if (verdict !== computed.verdict) errors.push(`${rel}: Verdict records ${verdict} for ${topic}; its own rule made it ${computed.verdict}`);
+      if (route !== computed.routeTo) errors.push(`${rel}: Verdict routes ${topic} to ${route}; its own rule routes it to ${computed.routeTo}`);
+    }
+
     const regressions = tableUnder(text, '## Regressions') ?? [];
     if (regressions.length !== failing.length) errors.push(`${rel}: Regressions has ${regressions.length} rows, the verdicts carry ${failing.length} failures`);
     for (const [matrixId, node, rule, , routeTo] of regressions) {
