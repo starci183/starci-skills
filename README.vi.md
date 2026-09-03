@@ -14,7 +14,12 @@ npx @starci/skills init
 Chạy ở gốc repository sẽ sở hữu runtime. Lệnh chép cây vào `./.claude`, viết `CLAUDE.md` (Claude Code
 đọc) và `AGENTS.md` (Codex đọc) khi chưa có, và thêm `.worktrees/sessions/` vào `.gitignore` vì phiên
 làm việc nằm ở đó. Hãy commit `.claude/` cùng repository: nó là source, không phải cache. Cần Node 20
-trở lên; CLI không có dependency.
+trở lên; CLI không có dependency. Cùng CLI đó chạy thẳng từ một tag git khi registry chưa liệt kê phiên
+bản:
+
+```bash
+npx --package=github:starci183/starci-skills#v1.1.0 starci-skills init
+```
 
 | Lệnh | Việc nó làm |
 | --- | --- |

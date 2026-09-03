@@ -27,6 +27,13 @@ It does four things and reports each:
    `<Source>/.worktrees/sessions/` and are never committed;
 4. writes `.claude/.starci-skills.json`, the manifest: the installed version and one hash per file.
 
+The package is also runnable straight from a git tag, which is the same tree at the same commit;
+use it when the registry has not yet listed a version:
+
+```bash
+npx --package=github:starci183/starci-skills#v1.1.0 starci-skills init
+```
+
 Commit `.claude/` with the repository. It is source: the operators, the knowledge and the validators a
 mission runs against, and a reviewer must be able to see the version a session ran on.
 

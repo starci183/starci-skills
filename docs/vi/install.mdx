@@ -26,6 +26,13 @@ việc và báo từng việc:
    `<Source>/.worktrees/sessions/` và không bao giờ được commit;
 4. ghi `.claude/.starci-skills.json`, tức manifest: phiên bản đã cài và một hash cho mỗi file.
 
+Gói cũng chạy thẳng được từ một tag git, vẫn là cây đó ở đúng commit đó; dùng cách này khi registry
+chưa liệt kê phiên bản:
+
+```bash
+npx --package=github:starci183/starci-skills#v1.1.0 starci-skills init
+```
+
 Hãy commit `.claude/` cùng repository. Nó là source: các operator, knowledge và validator mà một nhiệm
 vụ chạy dựa vào, và người review phải nhìn thấy được phiên bản mà một phiên đã chạy trên đó.
 
