@@ -543,7 +543,7 @@
           }
         },
         "server": {
-          "description": "The detached process as the operation left it, in the shape the registry records, plus the pid it replaced. Null when the operation stopped the server or started nothing.",
+          "description": "The detached process as the operation left it, in the shape the registry records, plus the pid it replaced and the build-cache decision made before it started. Null when the operation stopped the server or started nothing.",
           "oneOf": [
             {
               "type": "object",
@@ -555,7 +555,8 @@
                 "command",
                 "logRef",
                 "pidFileRef",
-                "startedAt"
+                "startedAt",
+                "cache"
               ],
               "properties": {
                 "pid": {
@@ -563,6 +564,18 @@
                   "minimum": 1
                 },
                 "previousPid": {
+                  "oneOf": [
+                    {
+                      "type": "integer",
+                      "minimum": 1
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "listenerPid": {
+                  "description": "The pid that actually answers on the port when it is not the recorded wrapper pid; null when they are the same or the listener has not been read yet.",
                   "oneOf": [
                     {
                       "type": "integer",
@@ -593,6 +606,51 @@
                 "startedAt": {
                   "type": "string",
                   "format": "date-time"
+                },
+                "cache": {
+                  "description": "Whether the framework's build cache was cleared before this process started, and why: asked by name, no previous record to compare against, the declared manifests or lockfiles moved since the previous record, or unchanged and therefore kept. A restart on a head whose dependencies moved keeps serving what the old dependencies compiled unless the cache goes first.",
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "cleared",
+                    "reason",
+                    "directories",
+                    "previousHead"
+                  ],
+                  "properties": {
+                    "cleared": {
+                      "type": "boolean"
+                    },
+                    "reason": {
+                      "enum": [
+                        "asked",
+                        "previous-unknown",
+                        "manifests-changed",
+                        "unchanged"
+                      ]
+                    },
+                    "directories": {
+                      "type": "array",
+                      "uniqueItems": true,
+                      "items": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "description": "The build directories that were removed, relative to the worktree; empty when the cache was kept."
+                    },
+                    "previousHead": {
+                      "description": "The head the previous record served, which the decision was made against; null when no previous record was known.",
+                      "oneOf": [
+                        {
+                          "type": "string",
+                          "pattern": "^[0-9a-f]{40}$"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    }
+                  }
                 }
               }
             },

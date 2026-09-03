@@ -225,6 +225,18 @@
                   "type": "integer",
                   "minimum": 1
                 },
+                "listenerPid": {
+                  "description": "The pid that actually answers on the port when it is a child of the recorded pid rather than the recorded pid itself; null when they are the same or it has not been read. A stop takes the recorded pid's whole tree and proves the port free before it clears the record.",
+                  "oneOf": [
+                    {
+                      "type": "integer",
+                      "minimum": 1
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
                 "port": {
                   "type": "integer",
                   "minimum": 1,
@@ -246,6 +258,49 @@
                 "startedAt": {
                   "type": "string",
                   "format": "date-time"
+                },
+                "cache": {
+                  "description": "The build-cache decision the start made, copied from the server record: whether the framework's build cache was cleared first and why. Optional for entries written before the decision was recorded; every new start carries it.",
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "cleared",
+                    "reason",
+                    "directories",
+                    "previousHead"
+                  ],
+                  "properties": {
+                    "cleared": {
+                      "type": "boolean"
+                    },
+                    "reason": {
+                      "enum": [
+                        "asked",
+                        "previous-unknown",
+                        "manifests-changed",
+                        "unchanged"
+                      ]
+                    },
+                    "directories": {
+                      "type": "array",
+                      "uniqueItems": true,
+                      "items": {
+                        "type": "string",
+                        "minLength": 1
+                      }
+                    },
+                    "previousHead": {
+                      "oneOf": [
+                        {
+                          "type": "string",
+                          "pattern": "^[0-9a-f]{40}$"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    }
+                  }
                 }
               }
             },

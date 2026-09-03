@@ -161,6 +161,16 @@ export function runtimeLadderErrors(ladder, { requirements, sessionId, applied, 
       if (ladder.server.previousPid !== ladder.observed.pid) say('the pid replaced must be the pid the entry recorded; a rung never replaces a process it does not own');
       if (ladder.server.pid === ladder.observed.pid) say('a rung that started a server records a new pid');
       if (ladder.servedHead === null) say('a rung that started a server records the head it serves');
+      // A restart is not a rebuild. The build cache is cleared before the start whenever the declared
+      // manifests moved since the previous record, or no previous record is known, or reset asked;
+      // the record says which, and a kept cache over an unknown previous head is the defect itself.
+      const cache = ladder.server.cache ?? null; // the schema refuses a record without one
+      if (cache) {
+        if (cache.cleared !== (cache.reason !== 'unchanged')) say(`the build-cache record says cleared ${cache.cleared} for reason ${cache.reason}; the cache is cleared exactly when a reason to clear it was recorded`);
+        if (ladder.rung === 'reset' && !cache.cleared) say('the reset rung clears the build cache by definition, and this record says it was kept');
+        if (cache.previousHead !== ladder.observed.head) say('the build-cache decision was made against a previous head other than the one the entry recorded');
+        if (ladder.observed.head === null && cache.reason === 'unchanged') say('the previously served head is unknown, so nothing proves the manifests unchanged; the build cache is cleared');
+      }
     }
   }
   if (ladder.rung === 'stop') {

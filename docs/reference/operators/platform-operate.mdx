@@ -91,10 +91,10 @@ up it is instead of being either ready or mysteriously not.
 | `stack-up` | Brings up the environment's declared infrastructure with the tooling that environment declares, waits for its readiness probes, and confirms the declared origin rule admits the served origin | `infra-ports-open`, `cors-origin-admitted`, `generation-advanced` |
 | `locate` | Resolves the project's roles to routed checkouts through the workspace routes, never by directory name, and records the head observed in each | `checkout-located`, `head-observed`, `generation-advanced` |
 | `start-role` | Starts a role's server from its integration worktree, backend before frontend, under the dev command its declaration or its package scripts publish | `entry-declared`, `endpoints-served`, `head-observed`, `generation-advanced`, `integration-merged`, `server-pid-owned`, `lease-honoured` |
-| `serve` | Merges one session's work into the integration branch, resolving any conflict by rule and gating the merged head, and has the server run the result | the `start-role` set plus `gates-passed` |
-| `restart` | Starts the same head again, same branch, same port | the `start-role` set |
-| `reset` | Stops, clears the framework's build cache for that worktree, starts again | the `start-role` set |
-| `stop` | Stops the server: the recorded pid is killed and the lease released | `entry-declared`, `generation-advanced`, `server-pid-owned`, `lease-honoured` |
+| `serve` | Merges one session's work into the integration branch, resolving any conflict by rule and gating the merged head, and has the server run the result, under the build-cache rule | the `start-role` set plus `gates-passed` |
+| `restart` | Starts the same head again, same branch, same port, under the build-cache rule | the `start-role` set |
+| `reset` | Stops, clears the build cache by name, starts again | the `start-role` set |
+| `stop` | Stops the server: the recorded pid's process tree is stopped, the port is proved free, and the lease released | `entry-declared`, `generation-advanced`, `server-pid-owned`, `lease-honoured` |
 
 A rung that cannot be climbed stops with the code that names the owner of the gap and no other: infra
 that will not come up, or a backend whose declared origin rule does not admit the served origin, is
@@ -157,8 +157,28 @@ the journey that needs it runs in another branch, sometimes in another session. 
 recorded is then a process nobody can find, so the entry carries the whole of it — the exact command,
 the pid, the log file under the session folder and the pid file beside it. The tree ships the helper
 that does this (`scripts/serve-runtime.mjs`), and it is named here so that starting a server is one
-recorded act rather than a shell line somebody improvised. A stop kills the pid the entry recorded
-and no other pid at all.
+recorded act rather than a shell line somebody improvised. The recorded pid is usually a wrapper
+and the process answering on the port is its child, so the record names both when they differ, and a
+stop stops the whole process tree of the recorded pid and no other tree, then proves by connecting
+that the port no longer answers before the record is cleared; when something still answers, the
+record stays and the result names the surviving listener by the pid the socket table gives, because
+a cleared record over a held port is the fixed-port conflict the next start would refuse on.
+
+A restart is not a rebuild. A framework's dev server compiles into a build cache under the worktree
+and serves from it, and that cache is only as fresh as the install it was compiled against: when the
+served head moves to one whose dependency manifests or lockfiles — the manifests the route declares,
+and the lockfiles beside them — differ from those of the previously served record, a restart alone
+keeps serving what the old dependencies compiled while the installed packages are already the new
+ones, and what the audit then measures is a stylesheet or a chunk nobody ships any more. So every
+rung that starts a server decides about the cache before it starts, and the helper makes that
+decision rather than the operator remembering to: it digests the declared manifests and lockfiles,
+compares the digest with the one the previous record carries, and clears the conventional build
+directories of the worktree's packages when the digest differs, when no previous record is known,
+or when `--clean` — which `reset` always passes — asks by name. The server record carries the
+decision: whether the cache was cleared, for which of those reasons, which directories went and
+which previous head it was compared against. A record that says the cache was kept while the
+previous head is unknown, or that `reset` kept it, is refused, because a cache nobody can prove was
+cleared is the same defect with a politer log line.
 
 `serve` is idempotent by head. When the running server's head already contains the wanted commit and
 its endpoint answers, the operation attests it and returns it: nothing is merged, nothing is
@@ -276,7 +296,7 @@ delta on the inventoried shared service, under an exclusive lease on
 provisions for and the runtime entry of the route it attests, and nothing else outside `response/`.
 It is the one owner of a served runtime's lifecycle: it merges into the integration branch and
 starts, restarts, resets and stops the server of a route the registry records, under a named rung,
-and it kills only the pid the entry itself recorded.
+and it stops only the process tree of the pid the entry itself recorded.
 It does not deploy,
 migrate, or otherwise take ownership of a product's deployed service; does not restart or reconfigure a
 running process in order to attest it, and never restarts a healthy server nobody asked it to; does

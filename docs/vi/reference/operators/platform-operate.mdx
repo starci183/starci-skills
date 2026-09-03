@@ -89,10 +89,10 @@ nói rõ nó đang ở đâu thay vì hoặc sẵn sàng hoặc không hiểu v�
 | `stack-up` | Dựng hạ tầng mà môi trường đó khai, bằng đúng công cụ môi trường đó khai, chờ các probe sẵn sàng, và xác nhận luật origin đã khai có nhận origin đang phục vụ | `infra-ports-open`, `cors-origin-admitted`, `generation-advanced` |
 | `locate` | Phân giải các role của project ra checkout đã route qua workspace route, không bao giờ theo tên thư mục, và ghi head quan sát được ở mỗi cái | `checkout-located`, `head-observed`, `generation-advanced` |
 | `start-role` | Khởi động server của một role từ worktree tích hợp, backend trước frontend, bằng lệnh dev mà khai báo route hay package scripts của nó publish | `entry-declared`, `endpoints-served`, `head-observed`, `generation-advanced`, `integration-merged`, `server-pid-owned`, `lease-honoured` |
-| `serve` | Merge phần việc của một phiên vào nhánh tích hợp, tự giải xung đột (nếu có) theo luật rồi chấm gate trên head đã gộp, và cho server chạy kết quả đó | đúng bộ của `start-role` cộng `gates-passed` |
-| `restart` | Khởi động lại đúng head đó, cùng nhánh, cùng cổng | đúng bộ của `start-role` |
-| `reset` | Dừng, xoá cache build của framework cho worktree đó, khởi động lại | đúng bộ của `start-role` |
-| `stop` | Dừng server: pid đã ghi bị kill và lease được nhả | `entry-declared`, `generation-advanced`, `server-pid-owned`, `lease-honoured` |
+| `serve` | Merge phần việc của một phiên vào nhánh tích hợp, tự giải xung đột (nếu có) theo luật rồi chấm gate trên head đã gộp, và cho server chạy kết quả đó, theo luật cache build | đúng bộ của `start-role` cộng `gates-passed` |
+| `restart` | Khởi động lại đúng head đó, cùng nhánh, cùng cổng, theo luật cache build | đúng bộ của `start-role` |
+| `reset` | Dừng, xoá cache build theo yêu cầu đích danh, khởi động lại | đúng bộ của `start-role` |
+| `stop` | Dừng server: cả cây tiến trình của pid đã ghi bị dừng, cổng được chứng minh là trống, và lease được nhả | `entry-declared`, `generation-advanced`, `server-pid-owned`, `lease-honoured` |
 
 Một bậc không leo được thì dừng bằng đúng mã gọi tên người chủ của khoảng trống đó và không mã nào
 khác: hạ tầng không lên nổi, hay một backend mà luật origin đã khai không nhận origin đang phục vụ, là
@@ -154,7 +154,27 @@ audit hay hành trình cần nó lại chạy ở nhánh khác, đôi khi ở ph
 lại là một tiến trình không ai tìm ra, nên entry mang trọn nó — đúng lệnh, pid, tệp log dưới thư mục
 phiên và tệp pid nằm cạnh. Cây này ship sẵn helper làm việc đó (`scripts/serve-runtime.mjs`), và nó
 được gọi tên ở đây để khởi động một server là một hành vi có ghi chép, không phải một dòng shell ai đó
-tự ứng biến. Một lần `stop` kill đúng pid mà entry đã ghi và không kill pid nào khác.
+tự ứng biến. Pid đã ghi thường là một tiến trình bọc ngoài còn tiến trình thật sự trả lời trên cổng
+là con của nó, nên bản ghi nêu cả hai khi chúng khác nhau, và một lần `stop` dừng trọn cây tiến trình
+của pid đã ghi chứ không cây nào khác, rồi kết nối thử để chứng minh cổng không còn trả lời trước khi
+xoá bản ghi; khi vẫn có thứ trả lời, bản ghi được giữ nguyên và kết quả nêu đích danh listener còn
+sống bằng pid mà bảng socket đưa ra, vì một bản ghi đã xoá trên một cổng còn bị giữ chính là xung đột
+cổng cố định mà lần khởi động kế tiếp sẽ từ chối.
+
+Khởi động lại không phải là build lại. Dev server của một framework biên dịch vào một cache build
+dưới worktree rồi phục vụ từ đó, và cache ấy chỉ mới bằng lần cài đặt mà nó được biên dịch dựa trên:
+khi head đang phục vụ chuyển sang một head mà manifest phụ thuộc hay lockfile — những manifest mà
+route khai, và các lockfile nằm cạnh chúng — khác với của bản ghi đã phục vụ trước đó, một lần khởi
+động lại đơn thuần vẫn phục vụ thứ mà các phụ thuộc cũ đã biên dịch trong khi gói đã cài đã là bản
+mới, và thứ mà lần audit sau đó đo là một stylesheet hay một chunk không ai còn ship nữa. Vì vậy mọi
+bậc khởi động server đều quyết định về cache trước khi khởi động, và helper là bên ra quyết định đó
+chứ không phải người vận hành phải nhớ: nó băm các manifest và lockfile đã khai, so digest với digest
+mà bản ghi trước mang, và xoá các thư mục build quy ước của các package trong worktree khi digest
+khác, khi không biết bản ghi trước nào, hoặc khi `--clean` — thứ `reset` luôn truyền — yêu cầu đích
+danh. Bản ghi server mang quyết định ấy: cache có bị xoá không, vì lý do nào trong số đó, những thư
+mục nào đã đi và nó được so với head trước nào. Một bản ghi nói cache được giữ trong khi head trước
+không rõ, hay nói `reset` đã giữ nó, bị từ chối, vì một cache không ai chứng minh được là đã xoá cũng
+chính là lỗi đó với một dòng log lịch sự hơn.
 
 `serve` là idempotent theo head. Khi head của server đang chạy đã chứa commit được xin và endpoint của
 nó trả lời, thao tác chỉ chứng thực rồi trả lại: không merge gì, không khởi động lại gì, không có pid
@@ -269,7 +289,7 @@ Context chỉ đọc, trừ phần delta đã duyệt. Operator chỉ áp delta 
 `response/` của nhánh mình: `data/delta.json`, `data/checks.json`, `response.md` và `response.json`.
 Nó là chủ duy nhất của vòng đời một runtime đang phục vụ: nó merge vào nhánh tích hợp rồi khởi động,
 khởi động lại, reset và dừng server của một route mà sổ đăng ký ghi nhận, dưới một bậc có tên, và nó
-chỉ kill đúng pid mà chính entry đã ghi. Nó không hành động trong lúc phiên khác giữ lease; không
+chỉ dừng đúng cây tiến trình của pid mà chính entry đã ghi. Nó không hành động trong lúc phiên khác giữ lease; không
 rebase, force hay bỏ dở một lần merge để nó áp được; không dời một cổng đang phục vụ; và không sửa
 danh sách origin của một dịch vụ đang chạy thay cho khai báo lẽ ra phải mang nó.
 Nó không deploy, restart, migrate hay theo cách nào khác nhận quyền sở hữu một dịch vụ sản phẩm; không

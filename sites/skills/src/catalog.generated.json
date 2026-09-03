@@ -1,6 +1,6 @@
 {
-  "version": "1.7.0",
-  "lineageNote": "1.7.0 (2026-09-03): the runtime is each product's uat integration branch on the fixed projected port — platform.operate climbs the whole ladder (stack-up → locate → start-role → serve → attest), serve merges the session branch into uat and restarts idempotently by head, servers run detached with pid and log (scripts/serve-runtime.mjs), the lease is the merge order, RUNTIME_BUSY and INTEGRATION_CONFLICT; workspace.bind binds by ancestry (the served head contains the pinned commit); the audit takes a route input and a Served surface section; UAT snapshots carry isolation; the two-sessions-one-product law lives in one place; a ports projection schema with sessionSlots defaulting to 0.",
+  "version": "1.7.2",
+  "lineageNote": "1.7.2 (2026-09-03): a restart is not a rebuild — scripts/serve-runtime.mjs records the served head and a digest of the route's manifests and lockfiles, clears the framework build cache when they moved, the previous head is unknown or --clean is asked, and stops the whole process tree of a server, verifying by connecting that the port is free; the platform-operation receipt requires a cache row and the validator refuses a kept cache over an unknown previous head.",
   "entry": {
     "name": "starci",
     "description": "Complete one StarCi mission by freezing its scope, selecting the one operator that owns the outcome, and routing between operators on typed results until the outcome is proved or a person must decide.",

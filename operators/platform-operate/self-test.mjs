@@ -165,6 +165,11 @@ const WANT = 'd'.repeat(40);
 const OTHER_COMMIT = 'e'.repeat(40);
 const MERGE_COMMIT = 'f'.repeat(40);
 const WORKTREE = '.worktrees/demo-product/uat';
+// The build-cache decision a start records: kept because the manifests did not move, or cleared
+// with the reason that made it go.
+const CACHE_KEPT = { cleared: false, reason: 'unchanged', directories: [], previousHead: UAT_OLD };
+const CACHE_CLEARED = (reason, previousHead = UAT_OLD) => ({ cleared: true, reason, directories: ['apps/app/.next'], previousHead });
+const server = (over = {}) => ({ pid: 4200, previousPid: 4100, port: 3067, command: 'npm run dev', logRef: 'logs/uat.log', pidFileRef: 'logs/uat.pid', startedAt: '2026-01-10T00:02:00.000Z', cache: CACHE_KEPT, ...over });
 
 const ladder = (over = {}) => ({
   routeKey: ENTRY, operation: 'serve', rung: 'serve', reused: false, sessionId: SESSION,
@@ -176,7 +181,7 @@ const ladder = (over = {}) => ({
   },
   infra: null, locations: [],
   observed: { head: UAT_OLD, containsWanted: false, pid: 4100, pidAlive: true, probeAnswered: true, leaseSessionId: null, queue: [] },
-  server: { pid: 4200, previousPid: 4100, port: 3067, command: 'npm run dev', logRef: 'logs/uat.log', pidFileRef: 'logs/uat.pid', startedAt: '2026-01-10T00:02:00.000Z' },
+  server: server(),
   queuePosition: null,
   lease: { sessionId: SESSION, since: '2026-01-10T00:01:00.000Z', operation: 'serve', queue: [] },
   ...over,
@@ -204,7 +209,7 @@ const attesting = (over = {}) => ({
     ladderOver: {
       reused: true, integration: null, servedHead: UAT_OLD, contains: [OTHER_COMMIT, WANT],
       observed: { head: UAT_OLD, containsWanted: true, pid: 4100, pidAlive: true, probeAnswered: true, leaseSessionId: null, queue: [] },
-      server: { pid: 4100, previousPid: 4100, port: 3067, command: 'npm run dev', logRef: 'logs/uat.log', pidFileRef: 'logs/uat.pid', startedAt: '2026-01-10T00:00:00.000Z' },
+      server: server({ pid: 4100, startedAt: '2026-01-10T00:00:00.000Z' }),
     },
     findings: [{ code: 'RUNTIME_HEAD_REUSED', resourceRef: ENTRY, port: null, holderRef: null, statement: 'the running head already contained the wanted commit and its endpoint answered, so nothing was restarted' }],
   }),
@@ -361,7 +366,7 @@ const startingRole = (over = {}) => ({
       contains: [WANT],
       locations: [{ role: 'fe', checkoutRef: '@workspaces/demo-product/fe', head: WANT, devCommand: 'npm run dev' }],
       observed: { head: null, containsWanted: false, pid: null, pidAlive: false, probeAnswered: false, leaseSessionId: null, queue: [] },
-      server: { pid: 4200, previousPid: null, port: 3067, command: 'npm run dev', logRef: 'logs/uat.log', pidFileRef: 'logs/uat.pid', startedAt: '2026-01-10T00:02:00.000Z' },
+      server: server({ previousPid: null, cache: CACHE_CLEARED('previous-unknown', null) }),
     },
   }),
   ...over,
@@ -419,6 +424,34 @@ await expectValid(servingFirst(), 'one session merged into the integration branc
 await expectValid(queuedBehind(), 'a second session queued behind the lease instead of given a second server');
 await expectValid(servingSecond(), 'the second session served after the release: same port, both commits inside the head');
 await expectValid(stopping(), 'a stop that kills the pid the entry recorded and releases the lease');
+
+// A restart is not a rebuild: the same head started again clears the build cache first when the
+// declared manifests or lockfiles moved since the previous record, and reset clears it by name.
+const restarting = (over = {}) => ({
+  ...rungBranch({
+    rung: 'restart',
+    effects: ['restart-runtime-server', 'attest-runtime-entry'],
+    ladderOver: { wantedCommit: null, servedHead: UAT_OLD, contains: [WANT], integration: null, server: server({ cache: CACHE_CLEARED('manifests-changed') }) },
+    findings: [{ code: 'RUNTIME_SERVER_RESTARTED', resourceRef: ENTRY, port: null, holderRef: null, statement: 'the same head was started again; a lockfile moved since the previous record, so the build cache was cleared first' }],
+  }),
+  ...over,
+});
+const resetting = (over = {}) => ({
+  ...rungBranch({
+    rung: 'reset',
+    effects: ['reset-runtime-server', 'attest-runtime-entry'],
+    ladderOver: { wantedCommit: null, servedHead: UAT_OLD, contains: [WANT], integration: null, server: server({ cache: CACHE_CLEARED('asked') }) },
+    findings: [{ code: 'RUNTIME_SERVER_RESET', resourceRef: ENTRY, port: null, holderRef: null, statement: 'the server was stopped, the build cache cleared by name, and the same head started again' }],
+  }),
+  ...over,
+});
+await expectValid(restarting(), 'a restart that cleared the build cache because the manifests moved');
+await expectValid(resetting(), 'a reset that cleared the build cache by name');
+await expectError(resetting({ 'response/data/delta.json': entryDelta('runtime', ['reset-runtime-server', 'attest-runtime-entry'], { runtimeLadder: ladder({ operation: 'reset', rung: 'reset', wantedCommit: null, servedHead: UAT_OLD, contains: [WANT], integration: null, server: server() }) }) }), 'clears the build cache by definition', 'a reset that kept the build cache');
+await expectError(restarting({ 'response/data/delta.json': entryDelta('runtime', ['restart-runtime-server', 'attest-runtime-entry'], { runtimeLadder: ladder({ operation: 'restart', rung: 'restart', wantedCommit: null, servedHead: UAT_OLD, contains: [WANT], integration: null, server: server({ cache: { ...CACHE_KEPT, reason: 'manifests-changed' } }) }) }) }), 'exactly when a reason to clear it was recorded', 'a restart that saw the manifests move and kept the cache anyway');
+await expectError(startingRole({ 'response/data/delta.json': entryDelta('runtime', ['merge-into-integration-branch', 'start-role-runtime', 'attest-runtime-entry'], { runtimeLadder: ladder({ operation: 'start-role', rung: 'start-role', sessionId: null, lease: null, integration: { worktreeRef: WORKTREE, branch: 'uat', createdFrom: 'main', merges: [{ ref: 'main', commit: WANT, mergeCommit: MERGE_COMMIT, kind: 'mainline', resolutions: [] }], conflict: false }, contains: [WANT], locations: [{ role: 'fe', checkoutRef: '@workspaces/demo-product/fe', head: WANT, devCommand: 'npm run dev' }], observed: { head: null, containsWanted: false, pid: null, pidAlive: false, probeAnswered: false, leaseSessionId: null, queue: [] }, server: server({ previousPid: null, cache: { ...CACHE_KEPT, previousHead: null } }) }) }) }), 'nothing proves the manifests unchanged', 'a first start that trusted a cache nothing had recorded');
+await expectError(servingFirst({ 'response/data/delta.json': entryDelta('runtime', ['merge-into-integration-branch', 'serve-runtime-head', 'attest-runtime-entry'], { runtimeLadder: ladder({ server: server({ cache: { ...CACHE_KEPT, previousHead: UAT_NEW } }) }) }) }), 'other than the one the entry recorded', 'a cache decision made against a head the entry never served');
+await expectError(servingFirst({ 'response/data/delta.json': entryDelta('runtime', ['merge-into-integration-branch', 'serve-runtime-head', 'attest-runtime-entry'], { runtimeLadder: ladder({ server: (() => { const s = server(); delete s.cache; return s; })() }) }) }), 'runtimeLadder.server', 'a started server that never said what became of the build cache');
 // A conflicting hunk is resolved by rule, recorded on the merge, and the merged head is gated before
 // the server restarts on it.
 const RESOLUTION = { file: 'apps/app/src/page.tsx', hunkRange: '12-18', rule: 'incoming-session-owned' };
@@ -460,8 +493,8 @@ await expectError({ ...conflictResolvedGateGreen(), 'response/data/checks.json':
 await expectError(servingFirst({ 'response/data/delta.json': entryDelta('runtime', ['merge-into-integration-branch', 'serve-runtime-head', 'attest-runtime-entry'], { runtimeLadder: ladder({ sessionId: 'someone-else' }) }) }), 'and this branch belongs to s-test', 'a rung run for another session');
 await expectError(servingFirst({ 'response/data/delta.json': entryDelta('runtime', ['merge-into-integration-branch', 'serve-runtime-head', 'attest-runtime-entry'], { runtimeLadder: ladder({ observed: { head: UAT_OLD, containsWanted: false, pid: 4100, pidAlive: true, probeAnswered: true, leaseSessionId: OTHER, queue: [] } }) }) }), 'may only queue behind it', 'a serve that wrote through another session lease');
 await expectError(servingFirst({ 'response/data/delta.json': entryDelta('runtime', ['merge-into-integration-branch', 'serve-runtime-head', 'attest-runtime-entry'], { runtimeLadder: ladder({ observed: { head: UAT_OLD, containsWanted: true, pid: 4100, pidAlive: true, probeAnswered: true, leaseSessionId: null, queue: [] } }) }) }), 'rather than restarting a healthy server', 'a healthy server restarted although the head already contained the commit');
-await expectError(attesting({ 'response/data/delta.json': entryDelta('runtime', ['attest-runtime-entry'], { runtimeLadder: ladder({ reused: true, integration: null, servedHead: UAT_OLD, observed: { head: UAT_OLD, containsWanted: true, pid: 4100, pidAlive: true, probeAnswered: true, leaseSessionId: null, queue: [] }, server: { pid: 4300, previousPid: 4100, port: 3067, command: 'npm run dev', logRef: 'logs/uat.log', pidFileRef: 'logs/uat.pid', startedAt: '2026-01-10T00:02:00.000Z' } }) }) }), 'no new pid appears', 'a reused head that quietly started a new process');
-await expectError(servingFirst({ 'response/data/delta.json': entryDelta('runtime', ['merge-into-integration-branch', 'serve-runtime-head', 'attest-runtime-entry'], { runtimeLadder: ladder({ server: { pid: 4200, previousPid: 9999, port: 3067, command: 'npm run dev', logRef: 'logs/uat.log', pidFileRef: 'logs/uat.pid', startedAt: '2026-01-10T00:02:00.000Z' } }) }) }), 'never replaces a process it does not own', 'a rung that replaced a pid the entry never recorded');
+await expectError(attesting({ 'response/data/delta.json': entryDelta('runtime', ['attest-runtime-entry'], { runtimeLadder: ladder({ reused: true, integration: null, servedHead: UAT_OLD, observed: { head: UAT_OLD, containsWanted: true, pid: 4100, pidAlive: true, probeAnswered: true, leaseSessionId: null, queue: [] }, server: server({ pid: 4300 }) }) }) }), 'no new pid appears', 'a reused head that quietly started a new process');
+await expectError(servingFirst({ 'response/data/delta.json': entryDelta('runtime', ['merge-into-integration-branch', 'serve-runtime-head', 'attest-runtime-entry'], { runtimeLadder: ladder({ server: server({ previousPid: 9999 }) }) }) }), 'never replaces a process it does not own', 'a rung that replaced a pid the entry never recorded');
 await expectError(servingFirst({ 'response/data/delta.json': entryDelta('runtime', ['merge-into-integration-branch', 'serve-runtime-head', 'attest-runtime-entry'], { runtimeLadder: ladder({ contains: [OTHER_COMMIT] }) }) }), 'is absent from contains', 'a merged commit no consumer could prove is served');
 await expectError(servingFirst({ 'response/data/delta.json': entryDelta('runtime', ['serve-runtime-head', 'attest-runtime-entry'], { runtimeLadder: ladder() }) }), 'without merge-into-integration-branch among the applied effects', 'an integration branch written by no merge');
 await expectError(servingFirst({ 'response/data/delta.json': entryDelta('runtime', ['merge-into-integration-branch', 'serve-runtime-head'], { runtimeLadder: ladder() }) }), 'every rung attests', 'a rung that changed the runtime and never probed it');
@@ -469,4 +502,4 @@ await expectError(stackUp({ 'response/data/delta.json': entryDelta('runtime', ['
 await expectError(baseline({ 'response/data/delta.json': delta({ runtimeLadder: ladder() }) }), 'runtimeLadder belongs to the runtime branch', 'a ladder filed under another branch');
 await expectError({ ...servingFirst(), 'response/data/delta.json': entryDelta('runtime', ['merge-into-integration-branch', 'serve-runtime-head', 'attest-runtime-entry']) }, 'this delta carries no runtimeLadder', 'a runtime branch that never said which rung it climbed');
 
-process.stdout.write('platform.operate self-test: 14 valid branches, 58 rejected mutations\n');
+process.stdout.write('platform.operate self-test: 16 valid branches, 63 rejected mutations\n');
