@@ -223,6 +223,15 @@ khiển. Nó không bao giờ vào một file, một fixture, một lệnh đư�
 Vì thế hồ sơ tài khoản operator này công bố mang username, vai trò, tên thông tin đăng nhập, đường dẫn
 file niêm phong và entry nó thuộc về, và không có chỗ nào để đặt một bí mật kể cả do sơ ý.
 
+Một lệnh chẩn đoán không phải là chỗ thứ ba. Một lệnh chạy chỉ để chứng minh rằng một giá trị niêm
+phong giải được báo cáo kết quả của việc giải — rằng nó đã giải được, tên nó giải theo, và độ dài hay
+digest khi cần thêm gì đó để phân biệt lần giải này với lần khác — chứ không bao giờ báo cáo giá trị.
+Giá trị vẫn chỉ đi từ kho của nó tới đúng form hay body tiêu thụ nó, không có gì ở giữa hiển thị nó ra:
+không một biến trung gian nào mà lệnh in, trả về hay echo cho một người hay một transcript đọc được.
+Một lệnh chẩn đoán không thể viết theo cách đó, vì cách chứng minh duy nhất nó biết là in ra chính giá
+trị, thì không được chạy; operator báo cáo điều mình không kiểm được thay vì kiểm nó theo cách mất an
+toàn.
+
 ## Kiểm kê trước khi đổi
 
 Một dịch vụ dùng chung được kiểm kê trước khi bị đổi. Inventory được ràng bằng fingerprint, nên biên

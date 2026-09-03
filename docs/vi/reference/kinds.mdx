@@ -213,7 +213,7 @@ Khung: [`templates/kinds/platform-operation-receipt.skeleton.md`](https://github
 | `^## Port holders$` | `\| Port \| Holder \| Evidence \|` | — | `Port`: `^[0-9]{1,5}$` |
 | `^## Mutations$` | `\| Effect \| Resource \| Before \| After \|` | — | `Effect`: `^`(update-config\|restart-service\|upsert-dashboard\|update-remote-write\|create-project\|assign-profile\|assign-gate\|enforce-setting\|create-tunnel\|update-tunnel-route\|upsert-proxied-dns\|register-runtime-entry\|attest-runtime-entry\|bring-up-infra-stack\|locate-routed-checkouts\|start-role-runtime\|merge-into-integration-branch\|serve-runtime-head\|restart-runtime-server\|reset-runtime-server\|stop-runtime-server\|queue-runtime-lease\|provision-identity\|seed-flow-fixtures)`$` |
 | `^## Checks$` | `\| Check \| Resource \| Status \| Evidence \|` | minRows 1 | `Status`: `^(passed\|failed)$`<br />`Evidence`: `\S` |
-| `^## Findings$` | `\| Code \| Resource \| Port \| Holder \| Statement \|` | minRows 1 | `Code`: `^`(SHARED_SERVICE_INVENTORIED\|PORT_COORDINATION_REQUIRED\|ALREADY_CONVERGED\|PARTIAL_MUTATION\|PRODUCT_DEPLOYMENT_DECLINED\|RUNTIME_ENTRY_ATTESTED\|IDENTITY_PROVISIONED\|RUNTIME_RUNG_CLIMBED\|RUNTIME_HEAD_SERVED\|RUNTIME_HEAD_REUSED\|RUNTIME_SERVER_RESTARTED\|RUNTIME_SERVER_RESET\|RUNTIME_SERVER_STOPPED\|RUNTIME_LEASE_BUSY\|INTEGRATION_MERGED\|INTEGRATION_RESOLVED\|INTEGRATION_GATE_FAILED)`$`<br />`Statement`: `\S` |
+| `^## Findings$` | `\| Code \| Resource \| Port \| Holder \| Statement \|` | minRows 1 | `Code`: `^`(SHARED_SERVICE_INVENTORIED\|PORT_COORDINATION_REQUIRED\|ALREADY_CONVERGED\|PARTIAL_MUTATION\|PRODUCT_DEPLOYMENT_DECLINED\|RUNTIME_ENTRY_ATTESTED\|IDENTITY_PROVISIONED\|RUNTIME_RUNG_CLIMBED\|RUNTIME_HEAD_SERVED\|RUNTIME_HEAD_REUSED\|RUNTIME_SERVER_RESTARTED\|RUNTIME_SERVER_RESET\|RUNTIME_SERVER_STOPPED\|RUNTIME_LEASE_BUSY\|INTEGRATION_MERGED\|INTEGRATION_RESOLVED\|INTEGRATION_GATE_FAILED\|CREDENTIAL_VALUE_IN_OUTPUT)`$`<br />`Statement`: `\S` |
 
 ### `quality-verification`
 
@@ -244,7 +244,7 @@ Khung: [`templates/kinds/release-deployment.skeleton.md`](https://github.com/sta
 | `^## Steps$` | `\| Step \| State \| Revision before \| Revision after \| Statement \|` | minRows 1 | `Step`: `^`(authorize\|manifest-validate\|plan\|execution-root-init\|credential-resolve\|host-prepare\|artifact-build\|artifact-publish\|migrate\|domain-reconcile\|rollout\|monitor\|recover\|rollback\|proof)`$`<br />`State`: `^(applied\|no-op\|skipped\|failed)$`<br />`Statement`: `\S` |
 | `^## Monitoring$` | `\| Field \| Value \|` | `Deadline`, `Elapsed`, `Backoff`, `Final condition` | `Value`: `\S` |
 | `^## Steady state$` | `\| Metric \| Value \|` | — | `Value`: `\S` |
-| `^## Findings$` | `\| Code \| Step \| Statement \|` | — | `Code`: `^`(IDEMPOTENT_NO_OP\|PROBE_TRANSIENT\|TARGET_UNAVAILABLE\|SUPERSEDED_TARGET_ACTIVE\|FOREIGN_RELEASE_OBSERVED\|APPROVED_ACTION_REPEATED)`$`<br />`Statement`: `\S` |
+| `^## Findings$` | `\| Code \| Step \| Statement \|` | — | `Code`: `^`(IDEMPOTENT_NO_OP\|PROBE_TRANSIENT\|TARGET_UNAVAILABLE\|SUPERSEDED_TARGET_ACTIVE\|FOREIGN_RELEASE_OBSERVED\|APPROVED_ACTION_REPEATED\|CREDENTIAL_VALUE_IN_OUTPUT)`$`<br />`Statement`: `\S` |
 | `^## Fallbacks taken$` | `\| Code \| Action \|` | — | `Code`: `^`[A-Z][A-Z0-9_]+`$` |
 
 ### `uat-flow-verification`
@@ -261,6 +261,7 @@ Khung: [`templates/kinds/uat-flow-verification.skeleton.md`](https://github.com/
 | `^## Experience$` | `\| Rule \| Measured \| Score \| Verdict \|` | exactRows 11 | `Rule`: `^`UX-([1-9]\|1[01])`$`<br />`Measured`: `\S`<br />`Score`: `^[1-5]$`<br />`Verdict`: `^(pass\|fail\|evidence-unavailable)$` |
 | `^## Verdict$` | `\| Topic \| Verdict \| Route \|` | exactRows 1 | `Topic`: `^`experience`$`<br />`Verdict`: `^(pass\|fail\|ship\|fix-first\|blocked)$`<br />`Route`: `^(resolve\|direction\|flow-owner\|grammar-gap\|none)$` |
 | `^## Printed$` | `\| Artifact \| Why \|` | — | `Artifact`: `^(`[^`]+`\|https?://\S+)$`<br />`Why`: `\S` |
+| `^## Findings$` | `\| Code \| Statement \|` | — | `Code`: `^`(CREDENTIAL_VALUE_IN_OUTPUT)`$`<br />`Statement`: `\S` |
 | `^## Fallbacks taken$` | `\| Code \| Action \|` | — | — |
 
 ### `workspace-route-binding`

@@ -1,6 +1,6 @@
 {
-  "version": "1.7.7",
-  "lineageNote": "1.7.7 (2026-09-04): a walk is evidence only for what it pressed — every scored assertion of a UAT capture names the surface control the step acted on, so a step that makes something happen other than through the surface cannot be scored.",
+  "version": "1.7.8",
+  "lineageNote": "1.7.8 (2026-09-04): a sealed value is resolved only where it is consumed — a diagnostic that proves a reference resolves reports the outcome, the name, a length or a digest, never the value, and one that cannot be written that way is not run; a receipt that had only a fallback section now has a finding section to record the lapse in.",
   "entry": {
     "name": "starci",
     "description": "Complete one StarCi mission by freezing its scope, selecting the one operator that owns the outcome, and routing between operators on typed results until the outcome is proved or a person must decide.",

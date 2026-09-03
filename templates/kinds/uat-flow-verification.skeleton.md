@@ -76,6 +76,11 @@ in a log: the credential is named, and the login field is masked in every screen
 | --- | --- |
 | `response/artifacts/sheet.png` | the run's step captures, printed before the verdict was published |
 
+## Findings
+
+| Code | Statement |
+| --- | --- |
+
 ## Fallbacks taken
 
 | Code | Action |

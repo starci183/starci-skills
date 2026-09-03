@@ -57,7 +57,9 @@ Handles are resolved through existing custody at the moment they are needed. A r
 enters the plan, the manifest, the receipt, a log line, a command argument, or a message. The receipt
 records which handles were resolved and nothing more, and no field in the contract can hold a value
 even if someone tried: a token written where a `secret-ref://` handle belongs is rejected as
-malformed rather than quietly carried into an argument list.
+malformed rather than quietly carried into an argument list. Step 3's resolution check is a diagnostic
+under the same law `platform.operate` states for its own identity branch: proving `CREDENTIAL_UNAVAILABLE`
+does not apply reports that a handle failed to resolve, never what it resolved to.
 
 ## Every effect is a compare-and-set
 

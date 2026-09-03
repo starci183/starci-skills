@@ -195,6 +195,11 @@ ${verd.experience.entries.map((r) => `| \`${r.rule}\` | ${r.measured} | ${r.scor
 | --- | --- |
 ${printed.join('\n')}
 
+## Findings
+
+| Code | Statement |
+| --- | --- |
+
 ## Fallbacks taken
 
 | Code | Action |

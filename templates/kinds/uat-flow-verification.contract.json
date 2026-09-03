@@ -94,6 +94,14 @@
       }
     },
     {
+      "heading": "^## Findings$",
+      "table": "| Code | Statement |",
+      "cell": {
+        "Code": "^`(CREDENTIAL_VALUE_IN_OUTPUT)`$",
+        "Statement": "\\S"
+      }
+    },
+    {
       "heading": "^## Fallbacks taken$",
       "table": "| Code | Action |"
     }

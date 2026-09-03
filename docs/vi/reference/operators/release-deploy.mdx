@@ -57,7 +57,10 @@ Handle được phân giải qua custody đang có, đúng lúc cần. Một gi�
 vào plan, manifest, biên bản, một dòng log, một tham số lệnh hay một tin nhắn. Biên bản ghi lại
 những handle nào đã được phân giải và không gì hơn, và không trường nào trong hợp đồng chứa nổi một
 giá trị dù có ai cố: một token viết vào chỗ đáng lẽ là handle `secret-ref://` bị từ chối như đầu vào
-sai dạng, thay vì lặng lẽ trôi vào một danh sách tham số.
+sai dạng, thay vì lặng lẽ trôi vào một danh sách tham số. Việc kiểm tra phân giải ở bước 3 là một lệnh
+chẩn đoán theo đúng luật mà `platform.operate` đã nêu cho nhánh identity của chính nó: việc chứng minh
+`CREDENTIAL_UNAVAILABLE` không xảy ra chỉ báo cáo rằng một handle không giải được, không bao giờ báo
+cáo nó đã giải ra gì.
 
 ## Mọi tác động đều là compare-and-set
 

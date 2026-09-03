@@ -255,6 +255,15 @@ The account record this operator publishes therefore carries a username, a role,
 the sealed file's path and the registry entry it belongs to, and has nowhere to put a secret even by
 accident.
 
+A diagnostic is not a third place. A command run only to prove that a sealed value resolves reports
+the outcome of resolution — that it resolved, the name it resolved by, and a length or a digest when
+something more is needed to tell one resolution from another — and never the value. The value still
+moves only from its store to the form or the body that consumes it, with nothing in between that
+would render it: no intermediate the command echoes, prints or returns for a person or a transcript to
+read. A diagnostic that cannot be written that way, because the only proof it knows how to give is the
+value itself, is not run; the operator reports what it could not check rather than checking it
+unsafely.
+
 ## Inventory before change
 
 A shared service is inventoried before it is changed. The inventory is bound by fingerprint, so the

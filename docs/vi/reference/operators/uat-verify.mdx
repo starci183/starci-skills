@@ -118,7 +118,10 @@ hành. Mật khẩu không bao giờ nằm ở dạng rõ tại bất kỳ nơi 
 trong mọi ảnh chụp, kể cả ảnh chụp trước khi gửi và ảnh chụp sau một lần đăng nhập hỏng, vì một ảnh
 chụp là bằng chứng đã phát hành và mật khẩu đã lọt vào ảnh thì đã rời khỏi vòng giữ. Vì thế hồ sơ tài
 khoản chỉ mang username, vai trò, tên thông tin đăng nhập và đường dẫn file niêm phong, không mang
-thứ gì có thể chứa một bí mật.
+thứ gì có thể chứa một bí mật. Bước kiểm tra sơ bộ rằng thông tin đăng nhập giải được (bước 3) là một
+lệnh chẩn đoán theo đúng luật mà `platform.operate` đã nêu cho nhánh identity của chính nó: nó báo cáo
+rằng kho đã trả lời, không bao giờ báo cáo nó trả lời bằng gì, để việc chứng minh sẵn sàng không trở
+thành đường thứ hai khiến giá trị rời khỏi vòng giữ.
 
 ## Đóng băng đi trước thực thi
 
