@@ -6,6 +6,7 @@
 // or the person's mistake, never the agent's.
 import { existsSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
+import { createHash } from 'node:crypto';
 import path from 'node:path';
 import process from 'node:process';
 import { fileURLToPath } from 'node:url';
@@ -24,15 +25,52 @@ export function sessionRootOf(dir) {
   return null;
 }
 
+// The host repository that owns this tree: the stacks live beside the tree, never inside it.
+export const hostRootOf = (root) => path.resolve(root, '..');
+
 // An `env` requirement names one stack of the installation. The names are read from the folder, never
 // listed here: a tree installed beside another set of stacks must accept that set, and a hard-coded
 // vocabulary would be a second home for something the filesystem already publishes. A machine with no
 // stacks at all checks nothing, because there is nothing to check against.
-export function missingStack(root, env) {
+export function missingStack(root, env, hostRoot = hostRootOf(root)) {
   if (isEmpty(env)) return null;
-  const stacks = path.resolve(root, '..', '.stacks');
+  const stacks = path.join(hostRoot, '.stacks');
   if (!existsSync(stacks)) return null;
   return existsSync(path.join(stacks, String(env))) ? null : `.stacks/${env}`;
+}
+
+// What an environment declares about itself lives in its folder, in the shape the environment schema
+// gives; the classes an operation can fall under, the defaults an omitted class takes and the shape of
+// a reference to the declaration are all read from that schema, so a gate carries no copy of them.
+const ENVIRONMENT_SCHEMA = path.join('readiness', 'initialization', 'stacks', 'environment.schema.json');
+export async function loadEnvironmentSchema(root) {
+  return JSON.parse(await readFile(path.join(root, ENVIRONMENT_SCHEMA), 'utf8'));
+}
+// An approval that names a declaration does so by path and content hash; anything else is an id.
+export function parseDeclarationReference(schema, value) {
+  if (typeof value !== 'string') return null;
+  const m = new RegExp(schema.$defs.reference.pattern).exec(value);
+  return m ? { env: m[1], hash: m[2] } : null;
+}
+export const declarationPath = (env) => `.stacks/${env}/environment.json`;
+// Reads one environment's declaration as it stands on disk: its bytes hashed, its shape checked
+// against the schema, and its authorization completed with the defaults its production flag selects.
+export async function stackDeclaration(root, env, hostRoot = hostRootOf(root), schema = null) {
+  schema ??= await loadEnvironmentSchema(root);
+  const rel = declarationPath(env);
+  const file = path.join(hostRoot, rel);
+  const out = { rel, file, exists: existsSync(file), hash: null, reference: null, declaration: null, authorization: null, errors: [] };
+  if (!out.exists) return out;
+  const bytes = await readFile(file);
+  out.hash = `sha256:${createHash('sha256').update(bytes).digest('hex')}`;
+  out.reference = `${rel}#${out.hash}`;
+  try { out.declaration = JSON.parse(bytes.toString('utf8')); } catch (e) { out.errors.push(`${rel}: ${e.message}`); return out; }
+  out.errors.push(...validateAgainst(schema, out.declaration, rel));
+  if (out.declaration?.env !== undefined && out.declaration.env !== env) out.errors.push(`${rel}: declares env ${out.declaration.env} inside the ${env} folder`);
+  if (out.errors.length) return out;
+  const defaults = schema.$defs.defaults[out.declaration.production ? 'production' : 'non-production'];
+  out.authorization = { ...defaults, ...(out.declaration.authorization ?? {}) };
+  return out;
 }
 
 export async function validateRequest(root, dir, packages) {

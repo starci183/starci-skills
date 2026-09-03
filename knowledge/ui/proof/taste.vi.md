@@ -14,7 +14,10 @@ chứng kết quả còn composition đã kiểm chứng ý định.
 
 Sources: phán quyết của chủ sở hữu rằng một bề mặt đúng grammar mà xấu thì vẫn vứt, và ví dụ thực tế
 về một trang tổng quan dạng console đã qua sạch canon mà chỉ đạt khoảng ba trên năm, ghi tại
-[bản ghi bằng chứng taste rubric](../../../tests/evidence/20260903-taste-rubric.md).
+[bản ghi bằng chứng taste rubric](../../../tests/evidence/20260903-taste-rubric.md); và phán quyết rằng
+một lựa chọn mà thang điểm đã cho sẵn câu trả lời thì không bao giờ là một lần dừng, cùng tiêu chí mật
+độ đo trên dữ liệu đã seed và lựa chọn của chính người, ghi trong
+[bản ghi bằng chứng phương án trội](../../../tests/evidence/20260903-dominant-candidate.md).
 
 ## TASTE-1 — Một điểm nhìn trong ba giây
 
@@ -126,6 +129,8 @@ Chi phối việc bao nhiêu phần bề mặt đang thật sự làm việc.
 | Case 2 | Dải của lớp là trần chứ không phải sàn, như với `landing` và với nửa trên của `form` và `reader` | Phần thở giữ mật độ ở dưới trần ấy là liên tục chứ không phải những túi trống rải rác. Vùng trống bị cắt thành những khoảng rời rạc sẽ bác bỏ nó |
 | Case 3 | Phép ước lượng được thực hiện | Các hình chữ nhật được đếm đều được gọi tên trong receipt, để người đọc thứ hai lặp lại được và ra kết quả lệch chừng mười phần trăm |
 | Case 4 | Một lớp bề mặt dày được chụp ở viewport hẹp | Mật độ đạt được bằng sắp thứ tự và gom nhóm, không phải bằng cách thu nhỏ mục tiêu xuống dưới ngưỡng của chúng |
+| Case 5 | Mật độ phụ thuộc vào số bản ghi mà dữ liệu cung cấp | Nó được đo ở khối lượng seed đại diện của luồng: số bản ghi mà seed của luồng đặt cho thực thể mà bề mặt liệt kê. Một workspace đang phục vụ dưới khối lượng ấy thì không được phán: ô Measured ghi `below-volume` kèm khối lượng đang phục vụ và khối lượng seed đặt, và hàng ấy định tuyến về `seed` — operator sở hữu dữ liệu đưa workspace lên đủ khối lượng rồi mục ấy được chụp lại — không bao giờ về `direction` và không bao giờ tới một người |
+| Case 6 | Mật độ vẫn hỏng ở khối lượng đại diện | Ô Measured ghi `data-bound` kèm khối lượng đã đo; hàng ấy giữ điểm và kết luận hỏng của nó, và `TASTE-13` Case 6 để nó ngoài verdict, nên nó không chặn quality cũng không chặn UAT |
 
 Không phải rule này: ở mật độ đó mục tiêu còn thao tác được không thuộc
 [A11Y-4](accessibility.vi.md).
@@ -177,6 +182,8 @@ Chi phối việc các tiêu chí trên gộp thành một quyết định như 
 | Case 3 | Mọi rule của canon đều đạt mà verdict taste là `fix-first` | Bề mặt vẫn là `fix-first`. Một receipt cho ship vì canon xanh sẽ bác bỏ cả ống kính |
 | Case 4 | Một tiêu chí taste hỏng | Nó định tuyến về `direction`, không bao giờ về `resolve`, vì đổi một giá trị không sửa được một bố cục |
 | Case 5 | Một điểm được ghi mà không có phép đo | Mục đó vô hiệu, và ống kính chưa hoàn tất cho tới khi phép đo được chụp |
+| Case 6 | Một hàng là `below-volume` hay `data-bound` (`TASTE-9` Case 5 và 6) | Hàng `below-volume` làm verdict thành `blocked`, định tuyến về `seed`, cho tới khi mục ấy được chụp ở đủ khối lượng; hàng `data-bound` được để ngoài điểm trung bình và ngoài tập chặn cửa, nên verdict được tính trên các tiêu chí mà dữ liệu trả lời được |
+| Case 7 | Người đã chọn phương án của bề mặt từ một bảng đã in mà bảng điểm cho thấy tiêu chí này rớt ở chính phương án ấy vào lúc chọn | Ô Measured ghi `person-accepted` và gọi tên nhánh của quyết định người đã duyệt, cạnh phép đo; hàng ấy giữ điểm và kết luận hỏng của nó và được để ngoài điểm trung bình lẫn tập chặn cửa, vì thang điểm không bao giờ lật một quyết định người đã lấy trên chính bằng chứng của mình trong cùng phiên. Một hàng `person-accepted` không gọi tên nhánh nào, gọi tên một quyết định operator tự lấy, hay phủ lên một tiêu chí mà phương án được chọn không được cho thấy là rớt, thì vô hiệu |
 
 Tập được chấm là `TASTE-1` tới `TASTE-12`; rule này là phần số học và bản thân nó không được chấm.
 Năm tiêu chí chặn cửa `ship` đúng là năm thứ người đọc nhận ra trước khi đọc chữ nào: điểm nhìn,

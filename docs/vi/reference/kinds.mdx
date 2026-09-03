@@ -125,6 +125,7 @@ Khung: [`templates/kinds/frontend-direction-decision.skeleton.md`](https://githu
 | `^## References$` | `\| Standard \| Class \| URL \| What is borrowed \| Limitation \|` | — | `Standard`: `\S`<br />`Class`: `^`[a-z0-9][a-z0-9-]*`$`<br />`URL`: `^(https?://\S+\|—)$`<br />`What is borrowed`: `\S`<br />`Limitation`: `\S` |
 | `^## Images$` | `\| Slot \| Why \| Claim \| File \|` | — | `File`: `^(`response/artifacts/images/[A-Za-z0-9_.-]+`\|—)$` |
 | `^## Falsification$` | `\| Attack \| Candidate \| Verdict \| Evidence \|` | minRows 1 | `Candidate`: `^`[a-z0-9][a-z0-9-]*`$`<br />`Verdict`: `^(holds\|fails)$`<br />`Evidence`: `\S` |
+| `^## Scores$` | `\| Candidate \| Viewport \| Criterion \| Score \| Verdict \|` | — | `Candidate`: `^`[a-z0-9][a-z0-9-]*`$`<br />`Viewport`: `^[a-z0-9][a-z0-9-]*$`<br />`Criterion`: `^`(TASTE-([1-9]\|1[0-2])\|UX-([1-9]\|1[01]))`$`<br />`Score`: `^[1-5]$`<br />`Verdict`: `^(pass\|fail)$` |
 | `^## Why not the others$` | `\| Candidate \| Rejected because \|` | — | `Candidate`: `^`[a-z0-9][a-z0-9-]*`$`<br />`Rejected because`: `\S` |
 | `^## Printed$` | `\| Artifact \| Why \|` | — | `Artifact`: `^(`[^`]+`\|https?://\S+)$`<br />`Why`: `\S` |
 | `^## Fallbacks taken$` | `\| Code \| Action \|` | — | `Code`: `^`[A-Z][A-Z0-9_]+`$` |
@@ -166,7 +167,7 @@ Khung: [`templates/kinds/frontend-surface-audit.skeleton.md`](https://github.com
 | `^## Matrix$` | `\| Matrix \| Viewport \| Scheme \| State \| Screenshot \|` | minRows 1 | `Matrix`: `^`[a-z0-9][a-z0-9-]*`$`<br />`Viewport`: `^[0-9]{3,4}x[0-9]{3,4}$`<br />`Scheme`: `^(light\|dark)$`<br />`Screenshot`: `^`response/artifacts/[A-Za-z0-9_.-]+[.]png`$` |
 | `^## Verdicts by owner$` | `\| Matrix \| Owner \| Node \| Rule \| Measured \| Verdict \|` | minRows 1 | `Owner`: `^(app\|grammar)$`<br />`Node`: `^`[^`]+`$`<br />`Rule`: `^`[A-Z][A-Z0-9-]*-[0-9]+`$`<br />`Verdict`: `^(pass\|fail)$`<br />`Matrix`: `^`[a-z0-9][a-z0-9-]*`$` |
 | `^## Taste$` | `\| Rule \| Measured \| Score \| Verdict \|` | minRows 12 | `Rule`: `^`TASTE-([1-9]\|1[0-2])`$`<br />`Measured`: `\S`<br />`Score`: `^[1-5]$`<br />`Verdict`: `^(pass\|fail)$` |
-| `^## Verdict$` | `\| Topic \| Verdict \| Route \|` | exactRows 8 | `Topic`: `^`(presentation\|composition\|responsive\|motion\|accessibility\|contrast\|render-truth\|taste)`$`<br />`Verdict`: `^(pass\|fail\|ship\|fix-first\|blocked)$`<br />`Route`: `^(resolve\|direction\|flow-owner\|grammar-gap\|none)$` |
+| `^## Verdict$` | `\| Topic \| Verdict \| Route \|` | exactRows 8 | `Topic`: `^`(presentation\|composition\|responsive\|motion\|accessibility\|contrast\|render-truth\|taste)`$`<br />`Verdict`: `^(pass\|fail\|ship\|fix-first\|blocked)$`<br />`Route`: `^(resolve\|direction\|seed\|flow-owner\|grammar-gap\|none)$` |
 | `^## Regressions$` | `\| Matrix \| Node \| Rule \| Measured \| Routes to \|` | — | `Node`: `^`[^`]+`$`<br />`Routes to`: `^(resolve\|grammar-gap)$`<br />`Matrix`: `^`[a-z0-9][a-z0-9-]*`$` |
 | `^## Grammar gaps$` | `\| Component \| Rule \| What the family lacks \|` | — | `What the family lacks`: `\S` |
 | `^## Printed$` | `\| Artifact \| Why \|` | — | `Artifact`: `^(`[^`]+`\|https?://\S+)$`<br />`Why`: `\S` |

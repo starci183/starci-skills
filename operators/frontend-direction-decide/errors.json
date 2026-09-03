@@ -126,12 +126,12 @@
       "domain": "caller",
       "disposition": "fallback",
       "meaning": {
-        "en": "Several candidates survive falsification and none dominates.",
-        "vi": "Nhiều phương án cùng sống sót qua phản chứng và không cái nào trội."
+        "en": "Several candidates survive falsification and the scores under ## Scores prove none dominant: the top means are equal, or the top scorer loses a failed criterion to another.",
+        "vi": "Nhiều phương án cùng sống sót qua phản chứng và bảng điểm dưới ## Scores chứng minh không cái nào trội: các điểm trung bình dẫn đầu bằng nhau, hoặc phương án dẫn đầu thua một phương án khác trên một tiêu chí đã rớt."
       },
       "fallback": {
-        "en": "Select the candidate that survived the most falsification attacks; on a tie, the one that introduces the fewest new nodes; record the table under ## Decision.",
-        "vi": "Chọn phương án sống sót qua nhiều đòn phản chứng nhất; hòa thì chọn phương án thêm ít node mới nhất; ghi bảng vào mục ## Decision."
+        "en": "Among the tied top scorers, select the candidate that introduces the fewest new nodes; the scores stay under ## Scores and the pick under ## Decision.",
+        "vi": "Trong các phương án hoà điểm dẫn đầu, chọn phương án thêm ít node mới nhất; bảng điểm giữ dưới ## Scores và lựa chọn ghi dưới ## Decision."
       },
       "unless": {
         "param": "selectionPolicy",

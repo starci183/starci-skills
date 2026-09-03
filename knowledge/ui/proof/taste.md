@@ -15,7 +15,10 @@ it, because taste tests the outcome and composition tested the intent.
 Sources: the owner ruling that a surface which is correct by grammar and ugly by eye is still thrown
 away, and the worked example of a console overview that passed every canon rule and still scored
 about three out of five, recorded in
-[the taste rubric evidence](../../../tests/evidence/20260903-taste-rubric.md).
+[the taste rubric evidence](../../../tests/evidence/20260903-taste-rubric.md); and the ruling that a
+choice whose answer the rubric already gives is never a stop, with the density criterion measured
+against seeded data and the person's own choice, recorded in
+[the dominant-candidate evidence](../../../tests/evidence/20260903-dominant-candidate.md).
 
 ## TASTE-1 — One focal point in three seconds
 
@@ -126,6 +129,8 @@ Governs how much of the surface is doing work.
 | Case 2 | The class's band is a ceiling rather than a floor, as it is for `landing` and for the upper half of `form` and `reader` | The breathing room that keeps density under it is continuous rather than scattered pockets. Empty area broken into unrelated gaps falsifies it |
 | Case 3 | The estimate is taken | The rectangles counted are named in the receipt, so a second reader can repeat the estimate and land within about ten percent |
 | Case 4 | A dense class is captured at a narrow viewport | Density is achieved by ordering and grouping, not by shrinking targets below their minimum |
+| Case 5 | The density depends on how many records the data supplies | It is measured at the flow's representative seeded volume: the count of records the flow's seed places for the entity the surface lists. A served workspace below that volume is not judged: the Measured cell reads `below-volume` with the volume served and the volume the seed places, and the row routes to `seed` — the operator that owns the data brings the workspace to volume and the entry is captured again — never to `direction` and never to a person |
+| Case 6 | The density still fails at representative volume | The Measured cell reads `data-bound` with the volume it was measured at; the row keeps its score and its fail, and `TASTE-13` Case 6 leaves it out of the verdict, so it blocks neither quality nor UAT |
 
 Not this rule: whether a target is still operable at that density is
 [A11Y-4](accessibility.md).
@@ -177,6 +182,8 @@ Governs how the criteria above become one decision.
 | Case 3 | Every canon rule passed and the taste verdict is `fix-first` | The surface is still `fix-first`. A receipt shipping a surface because canon was green falsifies the lens |
 | Case 4 | A taste criterion fails | It routes to `direction`, never to `resolve`, because a value swap cannot repair a composition |
 | Case 5 | A score is recorded with no measurement | The entry is void, and the lens is incomplete until the measurement is captured |
+| Case 6 | A row is `below-volume` or `data-bound` (`TASTE-9` Case 5 and 6) | A `below-volume` row makes the verdict `blocked`, routed to `seed`, until the entry is captured at volume; a `data-bound` row is left out of the mean and out of the gating set, so the verdict is computed over the criteria the data could answer |
+| Case 7 | The person chose the surface's candidate from a printed sheet whose scores showed this criterion failing for that candidate at choice time | The Measured cell reads `person-accepted` and names the branch of the decision the person approved, beside the measurement; the row keeps its score and its fail and is left out of the mean and the gating set, because the rubric never overturns a decision the person took on its own evidence in the same session. A `person-accepted` row that names no branch, names a decision the operator took by itself, or covers a criterion the chosen candidate was not shown failing, is void |
 
 The scored set is `TASTE-1` to `TASTE-12`; this rule is the arithmetic and is not itself scored. The
 five criteria that gate `ship` are the ones a reader notices before reading a word: the focal point,

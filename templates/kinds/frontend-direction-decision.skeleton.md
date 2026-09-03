@@ -61,11 +61,18 @@
 | --- | --- | --- | --- |
 | content stress | `candidate-id` | holds | the widest plan name still fits the decision bar |
 
+## Scores
+
+| Candidate | Viewport | Criterion | Score | Verdict |
+| --- | --- | --- | --- | --- |
+| `candidate-id` | wide | `TASTE-1` | 4 | pass |
+| `other-candidate-id` | wide | `TASTE-1` | 3 | pass |
+
 ## Why not the others
 
 | Candidate | Rejected because |
 | --- | --- |
-| `other-candidate-id` | which attack it failed; no rows when one candidate was formed |
+| `other-candidate-id` | which attack it failed, or the scores it lost on; no rows when one candidate was formed |
 
 ## Printed
 

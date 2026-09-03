@@ -1,8 +1,10 @@
 // Proves validate.mjs on a synthetic session branch: one conforming audit over two matrix entries
 // (one all-pass entry, one entry whose application-owned node fails and routes back to resolve) with
 // a taste lens that ships; the same audit with a taste lens that is fix-first and routes to
-// direction; one blocked on EVIDENCE_MISSING with nothing captured; and one mutation per law, each
-// of which must fail with a line that names the defect.
+// direction; the density criterion below the representative seeded volume (blocked, routed to seed),
+// data-bound at that volume, and a criterion the person accepted from the printed sheet; one blocked
+// on EVIDENCE_MISSING with nothing captured; and one mutation per law, each of which must fail with
+// a line that names the defect.
 import assert from 'node:assert/strict';
 import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -51,6 +53,13 @@ const taste = () => ({
   mean: 4,
   verdict: 'ship',
 });
+// TASTE-9 Case 5 and 6 and TASTE-13 Case 6 and 7: the density criterion measured below the flow's
+// representative seeded volume (blocked, routed to seed), data-bound at that volume (kept out of the
+// verdict), and a criterion the person accepted from the printed sheet (closed by that choice).
+const withDensity = (measured, routeTo) => { const lens = taste(); lens.entries[8] = { rule: 'TASTE-9', measured, score: 2, verdict: 'fail', routeTo }; lens.mean = 4; return lens; };
+const tasteBelowVolume = () => ({ ...withDensity('below-volume: 3 records served where the seed places 24', 'seed'), verdict: 'blocked' });
+const tasteDataBound = () => ({ ...withDensity('data-bound at representative volume: 24 records fill 41% of a console band', 'none'), verdict: 'ship' });
+const tastePersonAccepted = (branch = 'step-1/parallel-1') => { const lens = taste(); lens.entries[1] = { rule: 'TASTE-2', measured: `person-accepted by ${branch}: ${VOID_BAND}`, score: 2, verdict: 'fail', routeTo: 'none' }; lens.mean = 4; lens.verdict = 'ship'; return lens; };
 const tasteFixFirst = () => {
   const lens = taste();
   lens.entries[1] = { rule: 'TASTE-2', measured: VOID_BAND, score: 2, verdict: 'fail', routeTo: 'direction' };
@@ -95,7 +104,7 @@ const verdictTable = (lens) => [
   ['accessibility', 'blocked', 'none'],
   ['contrast', 'blocked', 'none'],
   ['render-truth', 'blocked', 'none'],
-  ['taste', lens.verdict, lens.verdict === 'ship' ? 'none' : 'direction'],
+  ['taste', lens.verdict, lens.verdict === 'ship' ? 'none' : lens.verdict === 'blocked' ? 'seed' : 'direction'],
 ].map(([topic, verdict, route]) => `| ${BT}${topic}${BT} | ${verdict} | ${route} |`).join(String.fromCharCode(10));
 
 const PRINTED = [
@@ -219,14 +228,35 @@ const responseJson = ({ status = 'done', stop, fields, next = ['frontend.present
   next,
 });
 
-function writeBranch(files, { decisionClass = 'console' } = {}) {
+// The direction decision this audit reads: its selection policy and the scores the printed sheet
+// showed the person, with `failing` naming the criteria the selected candidate was shown failing.
+const decisionMd = ({ policy = 'approval-required', selected = 'one-column', failing = [] } = {}) => [
+  '# frontend-direction-decision — plan-picker',
+  '',
+  '## Decision',
+  '',
+  '| Field | Value |',
+  '| --- | --- |',
+  `| Direction id | ${BT}plan-picker${BT} |`,
+  `| Selection policy | ${BT}${policy}${BT} |`,
+  `| Selected candidate | ${BT}${selected}${BT} |`,
+  '',
+  '## Scores',
+  '',
+  '| Candidate | Viewport | Criterion | Score | Verdict |',
+  '| --- | --- | --- | --- | --- |',
+  ...TASTE_RULES.map((rule) => `| ${BT}${selected}${BT} | wide | ${BT}${rule}${BT} | ${failing.includes(rule) ? 2 : 4} | ${failing.includes(rule) ? 'fail' : 'pass'} |`),
+  '',
+].join(String.fromCharCode(10));
+
+function writeBranch(files, { decisionClass = 'console', decision = {} } = {}) {
   const session = mkdtempSync(path.join(tmpdir(), 'fe-audit-session-'));
   const branch = path.join(session, 'step-4', 'parallel-1');
-  for (const d of ['request', 'response/data/captures', 'response/artifacts/candidates']) mkdirSync(path.join(branch, d), { recursive: true });
+  for (const d of ['request', 'response/data/captures', 'response/artifacts']) mkdirSync(path.join(branch, d), { recursive: true });
   for (const [step, name] of [[1, 'frontend-direction-decision'], [2, 'frontend-presentation-resolution'], [3, 'frontend-source-application']]) {
     const dir = path.join(session, `step-${step}`, 'parallel-1', 'response');
     mkdirSync(dir, { recursive: true });
-    writeFileSync(path.join(dir, 'response.md'), `# ${name} — plan-picker\n`);
+    writeFileSync(path.join(dir, 'response.md'), name === 'frontend-direction-decision' ? decisionMd(decision) : `# ${name} — plan-picker\n`);
   }
   // The class this audit carries is the one the direction decided; the coverage beside that receipt
   // is where it is read from, and a decision written before the class was declared carries none.
@@ -344,36 +374,32 @@ const driftNamedMd = responseMd(taste(), PRINTED, driftedServed)
   .replace('| `narrow-light-loaded` | `body>main` | `GAP-5` | 1rem | resolve |', '| `narrow-light-loaded` | `body>main` | `GAP-5` | 1rem — family 0.4.8 observed, resolved against 0.4.7 | resolve |');
 await expectValid({ ...baseline(), 'response/response.md': driftNamedMd }, 'a family version drift named in Served surface and in the verdict evidence it could have flipped');
 
-// The hand-off to the person. The taste lens is fix-first and the same wall was reached again, so
-// the audit reports it to the person — and the report is the direction's rendered candidates, each
-// printed at every viewport of the matrix, at least three of them, with one question. Two prose
-// options are refused, and so is a choice printed short.
-const CANDIDATE_PAGE = (id) => `response/artifacts/candidates/${id}.html`;
-const CHOICE_NAMES = ['one-column', 'split-view', 'stepper'];
-const candidateRows = (ids) => ids.flatMap((id) => [WIDE, NARROW].map((m) => `| http://127.0.0.1:60000/candidates/${id}.html?viewport=${m} | the candidate at the ${m} entry of the matrix, printed for the person to pick by eye |`));
-const CHOICE_REASON = 'http://127.0.0.1:60000/ — which of the three compositions do you take?';
-const printedChoice = ({ ids = CHOICE_NAMES, reason = CHOICE_REASON, receipt = true } = {}) => ({
+// A composition or taste verdict is never closed by asking: an open one routes to direction, which
+// scores the candidates and decides or proves the tie, so a user route over it is refused outright.
+const wallToPerson = {
   ...baseline(),
   'response/data/verdicts.json': verdicts(tasteFixFirst),
-  'response/response.md': receipt ? responseMd(tasteFixFirst(), [...PRINTED, ...candidateRows(ids)]) : null,
-  'response/response.json': responseJson({
-    status: 'blocked',
-    stop: 'NO_PROGRESS',
-    next: [],
-    reason,
-    fields: {
-      ...(receipt ? { 'frontend-surface-audit': 'response/response.md' } : {}),
-      verdicts: 'response/data/verdicts.json',
-      capture: [CAP(WIDE), CAP(NARROW)],
-      screenshot: [SHOT(WIDE), SHOT(NARROW)],
-      ...(ids.length ? { candidates: ids.map(CANDIDATE_PAGE) } : {}),
-    },
-  }),
-  ...Object.fromEntries(ids.map((id) => [CANDIDATE_PAGE(id), `<!doctype html><title>${id}</title>`])),
-});
-await expectValid(printedChoice(), 'a taste verdict handed to the person as three rendered candidates at both viewports, with one question');
-await expectError(printedChoice({ ids: [], reason: 'Accept the composition and record the density band as seeded-data-limited, or handle the density band and three family gaps first?' }), 'lists no rendered candidate', 'a taste verdict handed over as two prose options');
-await expectError(printedChoice({ ids: CHOICE_NAMES.slice(0, 2) }), 'shows 2 rendered candidate(s) for a choice of 3', 'a composition choice printed with fewer candidates than the choice needs');
-await expectError(printedChoice({ receipt: false }), 'with no receipt', 'a verdict handed to the person with no receipt and so nothing printed');
+  'response/response.md': responseMd(tasteFixFirst()),
+  'response/response.json': responseJson({ status: 'blocked', stop: 'NO_PROGRESS', next: [], reason: 'the same head was measured again with no delta', fields: { 'frontend-surface-audit': 'response/response.md', verdicts: 'response/data/verdicts.json', capture: [CAP(WIDE), CAP(NARROW)], screenshot: [SHOT(WIDE), SHOT(NARROW)] } }),
+};
+await expectError(wallToPerson, 'this audit asks nobody', 'a fix-first taste verdict handed to a person');
 
-process.stdout.write('frontend.surface.audit self-test: 6 valid branches, 45 rejected mutations\n');
+// The density criterion and data volume (TASTE-9 Case 5 and 6, TASTE-13 Case 6), and a criterion
+// the person accepted from the printed sheet (TASTE-13 Case 7).
+const lensBranch = (lens, next) => ({ ...baseline(), 'response/data/verdicts.json': verdicts(lens), 'response/response.md': responseMd(lens()), 'response/response.json': responseJson({ next }) });
+const SEEDED = ['frontend.presentation.resolve', 'platform.operate'];
+const SHIPPED = ['frontend.presentation.resolve', 'quality.verify'];
+await expectValid(lensBranch(tasteBelowVolume, SEEDED), 'density measured below the representative seeded volume: the lens is blocked and hands to the operator that seeds');
+await expectValid(lensBranch(tasteDataBound, SHIPPED), 'density data-bound at representative volume: left out of the verdict, the lens ships');
+await expectValid(lensBranch(tastePersonAccepted, SHIPPED), 'a criterion the person accepted from the printed sheet: closed by that choice, the lens ships and quality follows', { decision: { failing: ['TASTE-2'] } });
+await expectError(lensBranch(tasteBelowVolume, ['frontend.presentation.resolve', 'frontend.direction.decide']), 'does not name frontend.direction.decide', 'a density below volume sent to direction');
+await expectError(lensBranch(tasteBelowVolume, ['frontend.presentation.resolve']), 'next names platform.operate', 'a density below volume that never asks for the seed');
+await expectError(lensBranch(() => { const l = tasteBelowVolume(); l.entries[8].routeTo = 'direction'; return l; }, SEEDED), 'never to direction and never to a person', 'a below-volume row routed to direction');
+await expectError(lensBranch(() => { const l = taste(); l.entries[0] = { rule: 'TASTE-1', measured: 'below-volume: the title', score: 2, verdict: 'fail', routeTo: 'seed' }; l.verdict = 'blocked'; return l; }, SEEDED), 'only the density criterion', 'a volume marker on a criterion that does not depend on data');
+await expectError(lensBranch(() => ({ ...tasteDataBound(), verdict: 'fix-first' }), ['frontend.presentation.resolve', 'frontend.direction.decide']), 'TASTE-13 makes it ship', 'a data-bound density recorded as fix-first');
+await expectError(lensBranch(() => tastePersonAccepted('nowhere'), SHIPPED), 'names no decision branch', 'a person-accepted row that names no decision', { decision: { failing: ['TASTE-2'] } });
+await expectError(lensBranch(() => tastePersonAccepted('step-9/parallel-9'), SHIPPED), 'not the decision this audit reads', 'a person-accepted row naming another decision', { decision: { failing: ['TASTE-2'] } });
+await expectError(lensBranch(tastePersonAccepted, SHIPPED), 'was not shown failing', 'a person-accepted criterion the chosen candidate was never shown failing', { decision: { failing: [] } });
+await expectError(lensBranch(tastePersonAccepted, SHIPPED), 'took by itself', 'a person-accepted row over a decision the operator took automatically', { decision: { policy: 'automatic', failing: ['TASTE-2'] } });
+
+process.stdout.write('frontend.surface.audit self-test: 8 valid branches, 54 rejected mutations\n');

@@ -3,6 +3,7 @@
 // must fail with a line that names the defect.
 import assert from 'node:assert/strict';
 import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs';
+import { createHash } from 'node:crypto';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { validatePlatformStep, KIND_CHECKS, RUNG_CHECKS, QUEUED_CHECKS } from './validate.mjs';
@@ -255,15 +256,15 @@ const alreadyConverged = () => baseline({
   'response/response.md': responseMd({ convergence: 'already-converged', mutations: [], findings: [['ALREADY_CONVERGED', SERVICE, '—', '—', 'the service already matched the approved plan']] }),
 });
 
-async function expectValid(files, label) {
+async function expectValid(files, label, options = {}) {
   const { branch, session } = writeBranch(files);
-  const { errors } = await validatePlatformStep(branch);
+  const { errors } = await validatePlatformStep(branch, undefined, options);
   rmSync(session, { recursive: true, force: true });
   assert.deepEqual(errors, [], `${label} should be valid`);
 }
-async function expectError(files, needle, label) {
+async function expectError(files, needle, label, options = {}) {
   const { branch, session } = writeBranch(files);
-  const { errors } = await validatePlatformStep(branch);
+  const { errors } = await validatePlatformStep(branch, undefined, options);
   rmSync(session, { recursive: true, force: true });
   assert.ok(errors.some((e) => e.includes(needle)), `${label}: expected an error containing "${needle}", got:\n${errors.join('\n') || '(none)'}`);
 }
@@ -325,6 +326,54 @@ await expectError(provisioning({ 'response/data/account.json': accountRecord({ a
 await expectError(provisioning({ 'response/data/account.json': { ...accountRecord(), password: 'x' } }), 'unexpected property', 'an account record with a place to hold a secret');
 await expectError(provisioning({ 'response/data/checks.json': entryChecks('identity', [{ code: 'SHARED_SERVICE_INVENTORIED', resourceRef: ENTRY, port: null, holderRef: null, statement: 'x' }]), 'response/response.md': entryMd('identity', ['provision-identity', 'seed-flow-fixtures'], [['SHARED_SERVICE_INVENTORIED', ENTRY, '—', '—', 'x']]) }), 'records the IDENTITY_PROVISIONED finding', 'a provisioning the receipt never names');
 await expectError(attesting({ 'request/request.json': requestJson({ kind: 'runtime', service: ENTRY, effects: ['provision-identity'], resourceRefs: [ENTRY], mutableResourceRefs: [ENTRY], extra: { routeKey: ENTRY } }) }), 'does not belong to the runtime service kind', 'an identity effect filed under the runtime branch');
+
+// Authority from the environment's own declaration. A synthetic host holds one declaration per case;
+// the reference a request carries is the declaration's path and the hash of its bytes.
+const HOST = mkdtempSync(path.join(tmpdir(), 'platform-host-'));
+const declare = (env, body) => {
+  mkdirSync(path.join(HOST, '.stacks', env), { recursive: true });
+  const bytes = Buffer.from(JSON.stringify(body, null, 2));
+  writeFileSync(path.join(HOST, '.stacks', env, 'environment.json'), bytes);
+  return `.stacks/${env}/environment.json#sha256:${createHash('sha256').update(bytes).digest('hex')}`;
+};
+const DEV_REF = declare('dev', { schemaVersion: 9, env: 'dev', production: false });
+const TIGHT_REF = declare('tight', { schemaVersion: 9, env: 'tight', production: false, authorization: { 'identity-provisioning': 'person' } });
+const PROD_REF = declare('production', { schemaVersion: 9, env: 'production', production: true });
+const LOOSE_REF = declare('loose', { schemaVersion: 9, env: 'loose', production: true, authorization: { release: 'declared', 'identity-provisioning': 'declared' } });
+const MOVED_REF = DEV_REF.replace(/[0-9a-f]{64}$/, '9'.repeat(64));
+const onHost = { hostRoot: HOST };
+
+const IDENTITY_EFFECTS = ['provision-identity', 'seed-flow-fixtures'];
+const IDENTITY_FINDING = { code: 'IDENTITY_PROVISIONED', resourceRef: ENTRY, port: null, holderRef: null, statement: 'the flow had no account, so one was created and its password set from the sealed name' };
+// Provisioning under the environment's declaration: the request, the delta and the receipt all carry
+// the same reference, and the account record lives in that environment.
+const provisioningDeclared = ({ approval = DEV_REF, env = 'dev', effects = IDENTITY_EFFECTS } = {}) => ({
+  'request/request.json': requestJson({ kind: 'identity', service: ENTRY, effects, resourceRefs: [ENTRY], mutableResourceRefs: [ENTRY], approval, extra: { routeKey: ENTRY, flow: FLOW, env } }),
+  'response/response.json': responseJson({ next: ['uat.verify'], account: true }),
+  'response/response.md': responseMd({ kind: 'identity', service: ENTRY, approval, resources: [resource(ENTRY, 'identity', 'g-6')], mutations: effects.map((e) => mutation(e, { resourceRef: ENTRY, beforeRevision: 'g-5', afterRevision: 'g-6' })), list: KIND_CHECKS.identity.map((n) => rtCheck(n)), findings: [[IDENTITY_FINDING.code, ENTRY, '—', '—', IDENTITY_FINDING.statement]] }),
+  'response/data/delta.json': entryDelta('identity', effects, { approvalRef: approval }),
+  'response/data/checks.json': entryChecks('identity', [IDENTITY_FINDING]),
+  'response/data/account.json': accountRecord({ env, accounts: { learner: { username: `uat-${FLOW}-learner`, role: 'learner', credentialName: 'uat-shared', sealed: `.stacks/${env}/secrets/uat.enc`, provisionedBy: '20260110-000000-1111111', createdAt: '2026-01-10T00:05:00.000Z' } } }),
+});
+// A serve rung under the same declaration: the runtime class is declared in a non-production environment.
+const servingDeclared = () => {
+  const files = rungBranch({ rung: 'serve', extra: { commit: WANT, env: 'dev' } });
+  const req = files['request/request.json']; req.requirements.approval = DEV_REF;
+  const d = files['response/data/delta.json']; d.approvalRef = DEV_REF;
+  return { ...files, 'response/response.md': files['response/response.md'].replace(`| Approval | ${APPROVAL} |`, `| Approval | ${DEV_REF} |`) };
+};
+
+await expectValid(provisioningDeclared(), 'dev provisioning approved by the environment declaration itself, no person asked', onHost);
+await expectValid(servingDeclared(), 'a serve on the dev runtime approved by the environment declaration', onHost);
+await expectError(provisioningDeclared({ approval: PROD_REF, env: 'production' }), 'marks identity-provisioning as person', 'a declaration reference for production provisioning, which the production defaults keep with a person', onHost);
+await expectError(provisioningDeclared({ approval: LOOSE_REF, env: 'loose' }), 'the environment schema refuses', 'a production declaration that loosened release to declared', onHost);
+await expectError(provisioningDeclared({ approval: TIGHT_REF, env: 'tight' }), 'marks identity-provisioning as person', 'a declaration reference for a class the declaration tightened to person', onHost);
+await expectError(provisioningDeclared({ approval: MOVED_REF }), 'the declaration moved since it was read', 'a declaration reference whose hash no longer matches the file', onHost);
+await expectError(provisioningDeclared({ approval: DEV_REF, env: 'tight' }), 'authorises its own environment only', 'a dev declaration offered as approval for another environment', onHost);
+await expectError(provisioningDeclared({ approval: DEV_REF.replace('/dev/', '/nowhere/'), env: 'nowhere' }), 'which this installation does not have', 'a declaration reference to an environment with no declaration', onHost);
+await expectError(baseline({ 'request/request.json': requestJson({ approval: DEV_REF }), 'response/data/delta.json': delta({ approvalRef: DEV_REF }), 'response/response.md': responseMd({ approval: DEV_REF }) }), 'no operation class an environment declaration authorises', 'a shared observability service offered a declaration where only an approval id counts', onHost);
+await expectError(provisioningDeclared({ approval: DEV_REF, effects: ['provision-identity', 'update-config'] }), 'update-config belongs to no operation class', 'an unclassified effect smuggled under a declared class', onHost);
+rmSync(HOST, { recursive: true, force: true });
 
 
 // The ladder, rung by rung, and the two sessions that share one product.
@@ -502,4 +551,4 @@ await expectError(stackUp({ 'response/data/delta.json': entryDelta('runtime', ['
 await expectError(baseline({ 'response/data/delta.json': delta({ runtimeLadder: ladder() }) }), 'runtimeLadder belongs to the runtime branch', 'a ladder filed under another branch');
 await expectError({ ...servingFirst(), 'response/data/delta.json': entryDelta('runtime', ['merge-into-integration-branch', 'serve-runtime-head', 'attest-runtime-entry']) }, 'this delta carries no runtimeLadder', 'a runtime branch that never said which rung it climbed');
 
-process.stdout.write('platform.operate self-test: 16 valid branches, 63 rejected mutations\n');
+process.stdout.write('platform.operate self-test: 18 valid branches, 71 rejected mutations\n');

@@ -273,14 +273,29 @@ response đều bị từ chối như dữ liệu sai dạng.
 
 ## Trạng thái mong muốn là một khai báo đã duyệt
 
-`desiredState` là toàn bộ những gì người ta xin: hash của kế hoạch đã duyệt, kiểu dịch vụ mà kế hoạch
+`desiredState` là toàn bộ những gì bên gọi xin: hash của kế hoạch đã duyệt, kiểu dịch vụ mà kế hoạch
 được viết cho, các resource cần đưa về đúng trạng thái, các effect cần áp, và hai tập phạm vi nói
 resource nào được đổi và resource nào chỉ được quan sát. Giữ nó thành một khai báo duy nhất chính là
 thứ làm cho phê duyệt có nghĩa: `approval` phủ lên đúng khai báo đó, kèm cả hash, nên một field sửa
-sau đó không còn khớp cái hash mà phê duyệt đã gọi tên. `approval` không có mặc định vì đây là một
-runtime mà phiên khác và người khác dùng chung, và đổi việc một dịch vụ dùng chung đang làm không bao
-giờ là chuyện một agent tự quyết. `portClaims` mặc định là danh sách rỗng, vì phần lớn thao tác không
-cần cổng nào, và một claim không ai đặt thì không thể đụng ai.
+sau đó không còn khớp cái hash mà phê duyệt đã gọi tên.
+
+Thẩm quyền đứng sau `approval` đến từ đâu là chuyện của môi trường. Mỗi môi trường của bản cài đặt
+khai báo, theo từng lớp thao tác nền tảng — cấp danh tính, seed, các bậc của runtime dùng chung, dựng
+stack, release — rằng chính bản khai báo của nó là phê duyệt (`declared`) hay cần một id phê duyệt của
+con người (`person`). Hình dạng của bản khai báo, chỗ của nó trong thư mục môi trường, các mặc định
+mà một lớp bị bỏ trống nhận lấy tuỳ theo môi trường có phải production hay không, và lần nới duy nhất
+mà một bản khai báo production bị từ chối, tất cả đều thuộc về schema môi trường
+(`readiness/initialization/stacks/environment.schema.json`), được nói ở đó một lần và được cổng kiểm
+đọc từ đó. Vì thế `approval` nhận hoặc một id phê duyệt, hoặc tham chiếu tới bản khai báo
+— đường dẫn của nó cùng hash nội dung — và dòng Approval của biên nhận ghi lại đúng cái đã được ràng.
+Validator suy ra lớp của thao tác từ nhánh và các effect của nó, đọc bản khai báo mà tham chiếu gọi
+tên, và từ chối tham chiếu khi bản khai báo vắng mặt, có hash khác, thuộc môi trường khác, bị chính
+schema của nó từ chối, hay đánh dấu lớp đó là `person`; một hash đã đổi giữa lúc viết request và lúc
+chạy là `AUTHORITY_DRIFT`. `approval` vẫn không có mặc định: một runtime mà phiên khác và người khác
+dùng chung không bao giờ bị đổi trên sự im lặng, và điều bản khai báo thay đổi là câu trả lời thường
+trực của môi trường được tính là phê duyệt, chứ không phải câu hỏi thôi được đặt ra. `portClaims` mặc
+định là danh sách rỗng, vì phần lớn thao tác không cần cổng nào, và một claim không ai đặt thì không
+thể đụng ai.
 
 ## Ranh giới ghi
 
@@ -296,7 +311,7 @@ Nó không deploy, restart, migrate hay theo cách nào khác nhận quyền s�
 làm đổi một resource mà inventory đã ràng không liệt kê; không phát một effect hay một check mà nhánh
 dịch vụ đã ràng không công bố; không giải phóng một cổng bằng cách dừng, giết hay cấu hình lại tiến
 trình đang giữ nó; không ghi giá trị credential, handle capability hay token dạng bí mật ở bất kỳ đâu
-trong đầu ra; không sửa knowledge hay tự cấp phê duyệt cho mình; và không tuyên bố một kết quả đã vận
+trong đầu ra; không sửa knowledge, không viết bản khai báo của một môi trường, hay bằng cách nào khác tự cấp phê duyệt cho mình; và không tuyên bố một kết quả đã vận
 hành khi còn một check bắt buộc vắng mặt hay hỏng, cũng không tuyên bố readiness sản phẩm, phê duyệt
 release hay bằng chứng UAT nào.
 
@@ -323,7 +338,7 @@ release hay bằng chứng UAT nào.
 | `service` | id | — | Đúng một dịch vụ dùng chung đang được vận hành |
 | `desiredState` | `{planSha256, serviceKind, resourceRefs, effects, mutableResourceRefs, observationOnlyResourceRefs}` | — | Khai báo đã duyệt: kế hoạch nào, nhánh nào, resource nào, effect nào, và cái gì được đổi so với cái gì chỉ được quan sát |
 | `portClaims` | list of `{port, resourceRef}` | [] | Trạng thái mong muốn cần những cổng nào, và cho resource sở hữu nào |
-| `approval` | id | — | Phê duyệt phủ lên trạng thái mong muốn này; đổi một runtime dùng chung luôn cần một con người |
+| `approval` | id | — | Thẩm quyền phủ lên trạng thái mong muốn này: một id phê duyệt, hoặc tham chiếu tới bản khai báo môi trường — đường dẫn cùng hash nội dung — khi bản khai báo đó đánh dấu lớp của thao tác này là `declared` cho `env`; không có mặc định, vì im lặng không phải đồng thuận |
 | `routeKey` | id | null | Entry `<project>/<role>` mà lượt vận hành này chứng thực hoặc cấp tài khoản vào; null khi lượt chạy không đụng route nào |
 | `operation` | choice | serve | Bậc thang runtime mà lần gọi này leo: `stack-up`, `locate`, `start-role`, `serve`, `restart`, `reset` hay `stop` |
 | `commit` | id | null | Commit mà phiên này cần được phục vụ, được merge vào nhánh tích hợp khi head đang phục vụ chưa chứa nó |
@@ -336,7 +351,7 @@ release hay bằng chứng UAT nào.
 | # | Bước | Tham số | Đọc | Ghi | Dừng với |
 | --- | --- | --- | --- | --- | --- |
 | 1 | Kiểm cổng vào và resume | `resume` | `request/request.json`, @worktrees/sessions/central-runtime tại generation đã đóng băng | — | `INVALID_INPUT`, `SOURCE_DRIFT`, `NO_PROGRESS` |
-| 2 | Ràng thẩm quyền: runtime, device-state, projects và phê duyệt | `service`, `approval` | @worktrees/sessions/central-runtime cho fingerprint và generation của inventory, @workspaces/device-state cho từng handle capability kèm bằng chứng custody, @workspaces/projects/&lt;project>/&lt;role>, @tools/secrets | — | `AUTHORITY_DRIFT`, `CAPABILITY_MISSING` |
+| 2 | Ràng thẩm quyền: runtime, device-state, projects và phê duyệt — một id, hoặc bản khai báo của môi trường được đọc lại và băm lại | `service`, `approval`, `env` | @worktrees/sessions/central-runtime cho fingerprint và generation của inventory, @workspaces/device-state cho từng handle capability kèm bằng chứng custody, @workspaces/projects/&lt;project>/&lt;role>, bản khai báo của môi trường khi `approval` tham chiếu tới nó, @tools/secrets | — | `AUTHORITY_DRIFT`, `CAPABILITY_MISSING` |
 | 3 | Kiểm lại inventory một lần trước khi có gì thay đổi | — | @worktrees/sessions/central-runtime, các resource đã khai được quan sát lại một lần, @tools/git | — | `INVENTORY_DRIFT` |
 | 4 | Phân giải các port claim theo phép chiếu, và quan sát ai đang giữ từng cổng | `portClaims` | @workspaces/ports/&lt;project> cho các cổng được chiếu ra, @worktrees/sessions/central-runtime cho chủ giữ quan sát được của chúng | — | `PORT_CONFLICT` |
 | 5 | Suy ra delta giữa cái quan sát được và cái mong muốn | `desiredState` | @worktrees/sessions/central-runtime cho trạng thái quan sát được, `request/request.json` cho trạng thái mong muốn | `response/data/delta.json` | — |

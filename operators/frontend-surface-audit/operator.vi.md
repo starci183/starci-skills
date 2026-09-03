@@ -137,7 +137,7 @@ làm bằng chứng rằng node đã pass.
 | 3 | Chọn các mục ma trận và đọc lớp bề mặt đã khai | `matrix` | đầu vào `frontend-direction-decision` (chính `response/data/coverage.json` của nó: state nhân viewport nhân bảng màu, và `surfaceClass` mà quyết định ấy đã khai) | — | `SURFACE_CLASS_MISSING` |
 | 4 | Chờ từng mục tới lúc sẵn sàng trên cổng mà route đã bind mang theo, trong profile trình duyệt của riêng phiên này, đăng nhập bằng tài khoản của luồng khi route đòi một danh tính | `readinessProbe`, `account`, `env` | đầu vào `route` để lấy endpoint mà entry của nó phục vụ, @worktrees/sessions/central-runtime để lấy entry của đúng route này, đầu vào `uat-account` cho hồ sơ toàn tên, @tools/http, @tools/secrets, @tools/browsercontrol | — | `RUNTIME_UNAVAILABLE`, `IDENTITY_MISSING` |
 | 5 | Chụp và đo từng mục | — | @worktrees/sessions/central-runtime, @workspaces/fe (các owner được quan sát và identifier từng node mang), @tools/browsercontrol | `response/artifacts/<matrixId>.png`, `response/data/captures/<matrixId>.json` | `EVIDENCE_MISSING` |
-| 6 | Đối chiếu với lời khai và luật proof, phán quyết theo chủ sở hữu, để từng topic tự đóng, rồi phát; khi phán quyết về tay người, in các phương án của direction | — | @knowledge/ui/proof, @knowledge/grammars/<family>, các bức chụp, input `frontend-direction-decision` (các phương án đã render của nó, khi một phán quyết bố cục hay thẩm mỹ là việc người phải quyết) | `verdicts`, `frontend-surface-audit`, `response/response.json`, `host`, `candidates` | `UNKNOWN_RULE`, `NO_PROGRESS` |
+| 6 | Đối chiếu với lời khai và luật proof, phán quyết theo chủ sở hữu, để từng topic tự đóng, rồi phát | — | @knowledge/ui/proof, @knowledge/grammars/<family>, các bức chụp | `verdicts`, `frontend-surface-audit`, `response/response.json`, `host` | `UNKNOWN_RULE`, `NO_PROGRESS` |
 
 Bậc 6 phán mọi lời khai rồi để từng topic proof tự đóng lại. Phần phán canon là cái ở trên: mọi lời
 khai đều được đo, phán theo luật đã publish, định tuyến theo chủ sở hữu của node nó đứng lên; tra cứu
@@ -161,17 +161,33 @@ Phục vụ chưa phải là nói. Bậc 6 in qua `@tools/print`, thẳng vào c
 liệt kê từng artifact đã in dưới `## Printed` kèm lý do. Một phán quyết không ai thấy thì không đưa ai
 đi đâu, và một lượt soi lưu bảng chụp rồi im lặng chỉ soi chính nó.
 
-Khi phán quyết là việc người phải quyết — một topic bố cục hay thẩm mỹ đóng ở fail hay fix-first mà
-chuỗi không còn route đi đâu được nữa, vì các lượt direction nó cho phép đã cạn và cùng một bức tường
-lại chạm phải lần nữa — audit báo bức tường ấy bằng `NO_PROGRESS` và vẫn không khuyên. Lời báo chính là
-lựa chọn, đã in: nó chép bộ phương án đã render của direction vào `response/artifacts/candidates/`,
-phục vụ cạnh bảng chụp, in từng phương án ở từng viewport của ma trận, ít nhất ba phương án, và
-`reason` của nó nêu URL của bảng rồi hỏi đúng một câu, không hơn. Audit không tự dựng gì, nên một bộ
-có ít hơn ba không phải việc nó bù: khi ấy phần bàn giao đi sang `frontend.direction.decide` dưới
-`approval-required`, mà lần dừng của chính operator ấy in ra ba. Hai lựa chọn viết bằng văn xuôi là lời
-khuyên, không phải lựa chọn, và validator từ chối một route `user` trên một phán quyết bố cục hay thẩm
-mỹ còn mở mà `## Printed` có ít phương án đã render hơn số lựa chọn, hoặc không có phương án nào. Một
-route `user` cho một phê duyệt vận hành có/không thì không mang phương án nào và nói rõ điều ấy.
+Một phán quyết bố cục hay thẩm mỹ không bao giờ được đóng bằng cách hỏi. Khi một topic như thế đóng ở
+fail hay fix-first, hàng của nó định tuyến về `direction` và chuỗi bàn giao sang
+`frontend.direction.decide`, nơi chấm các phương án đã render theo đúng các tiêu chí mà audit này đã
+đánh rớt rồi chọn phương án trội, hoặc, trên một thế hoà mà chính bảng điểm của nó chứng minh, hỏi
+người từ lần dừng của chính nó. Audit này không dựng gì, không xếp hạng gì và không mời chọn gì:
+validator từ chối một route `user` mà còn để một topic bố cục hay thẩm mỹ mở, vì câu trả lời tính được
+từ thang điểm của direction, và một câu hỏi mà câu trả lời tính được thì không đem ra hỏi. Các mã dừng
+về phía caller và `NO_PROGRESS` ở đây là việc vận hành — cùng một head đo lại mà không có delta — nên
+`reason` của chúng nói rõ điều ấy và không mang phương án nào.
+
+Một tiêu chí phụ thuộc vào khối lượng dữ liệu được đo ở khối lượng seed đại diện của luồng, khối
+lượng mà `TASTE-9` Case 5 định nghĩa, không bao giờ ở bất kỳ thứ gì workspace đang phục vụ tình cờ
+đang có. Khi workspace đang phục vụ ở dưới mức ấy, topic thẩm mỹ là `blocked` và định tuyến về
+`seed`: operator sở hữu dữ liệu đưa workspace lên đủ khối lượng rồi mục ấy được chụp lại — không phải
+một lượt direction, cũng không phải một câu có/không cho người, vì cây đã trả lời sẵn bằng cách tạo ra
+dữ liệu. Đo lại ở đủ khối lượng mà vẫn hỏng, tiêu chí ấy được ghi `data-bound` trong ô Measured và
+`TASTE-13` Case 6 để nó ngoài verdict, nên nó không chặn quality cũng không chặn UAT.
+
+Một lựa chọn người đã lấy từ một bảng đã in đóng lại những tiêu chí mà lựa chọn ấy đã biết là rớt. Khi
+quyết định direction mà audit này đọc đã được người duyệt và `## Scores` của nó cho thấy một tiêu chí
+rớt ở phương án được chọn vào lúc chọn, audit này ghi tiêu chí ấy là `person-accepted` trong ô
+Measured, gọi tên nhánh của quyết định đó, thay vì đánh rớt nó ngược về direction; `TASTE-13` Case 7
+để nó ngoài verdict và topic đóng trên các tiêu chí còn lại. Thang điểm không bao giờ lật một quyết
+định người đã lấy trên chính bằng chứng của mình trong cùng phiên, nên một lens thẩm mỹ mà mọi tiêu
+chí rớt đều là `data-bound` hay `person-accepted` thì ship, và `next` gọi tên `quality.verify`.
+Validator từ chối một hàng `person-accepted` không gọi tên nhánh quyết định nào, gọi tên một quyết định
+operator tự lấy, hay phủ lên một tiêu chí mà phương án được chọn không được cho thấy là rớt.
 
 Lớp bề mặt không phải thứ operator này được chọn, cũng không phải thứ nó khai. Nó được đọc từ coverage
 của `frontend-direction-decision` mà audit này nhận vào, nơi hướng đã khai nó từ bộ từ vựng mà
@@ -196,7 +212,6 @@ chỗ khuyết lặng lẽ. Mọi node mang lời khai đều được đo; khô
 | `screenshot` | `response/artifacts/<matrixId>.png` | artifact | có |
 | `verdicts` | `response/data/verdicts.json` | data | có |
 | `host` | `response/artifacts/host.json` | artifact | không |
-| `candidates` | `response/artifacts/candidates/<candidateId>.html` | artifact | không |
 
 ## Dừng
 
@@ -219,4 +234,5 @@ chỗ khuyết lặng lẽ. Mọi node mang lời khai đều được đo; khô
 | một verdict topic là fix-first, hoặc hướng không khai lớp bề mặt nào, nên bố cục được quyết lại trước khi có giá trị nào được quyết | `frontend.direction.decide` |
 | mọi topic đều ship hoặc đạt, và các cổng của chính checkout phải chạy | `quality.verify` |
 | một lời khai hỏng trên phần render của chính component Grammar, nên một người ghi gap của họ rồi publish | `frontend.surface.audit` |
+| một tiêu chí mật độ được đo dưới khối lượng seed đại diện của luồng, nên dữ liệu được seed trước khi bề mặt được phán lại | `platform.operate` |
 | route đòi một danh tính mà luồng này chưa có tài khoản, nên tài khoản được cấp trước khi bề mặt được quan sát | `platform.operate` |

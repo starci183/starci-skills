@@ -78,7 +78,7 @@
       "cell": {
         "Topic": "^`(presentation|composition|responsive|motion|accessibility|contrast|render-truth|taste)`$",
         "Verdict": "^(pass|fail|ship|fix-first|blocked)$",
-        "Route": "^(resolve|direction|flow-owner|grammar-gap|none)$"
+        "Route": "^(resolve|direction|seed|flow-owner|grammar-gap|none)$"
       }
     },
     {

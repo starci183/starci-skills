@@ -137,7 +137,7 @@ a node passes.
 | 3 | Select the matrix entries and read the declared surface class | `matrix` | input `frontend-direction-decision` (its `response/data/coverage.json`: state by viewport by colour scheme, and the `surfaceClass` that decision declared) | — | `SURFACE_CLASS_MISSING` |
 | 4 | Reach readiness for each entry on the port the bound route carries, in this session's own browser profile, signing in as the flow's account when the route requires an identity | `readinessProbe`, `account`, `env` | input `route` for the endpoint its entry serves, @worktrees/sessions/central-runtime for the entry of this project route, input `uat-account` for the account of names, @tools/http, @tools/secrets, @tools/browsercontrol | — | `RUNTIME_UNAVAILABLE`, `IDENTITY_MISSING` |
 | 5 | Capture and measure each entry | — | @worktrees/sessions/central-runtime, @workspaces/fe (the observed owners and the identifiers each node carries), @tools/browsercontrol | `response/artifacts/<matrixId>.png`, `response/data/captures/<matrixId>.json` | `EVIDENCE_MISSING` |
-| 6 | Compare against the claims and the proof rules, judge by owner, let each topic close itself, and emit; when the verdict goes to a person, print the direction's candidates | — | @knowledge/ui/proof, @knowledge/grammars/<family>, the captures, input `frontend-direction-decision` (its rendered candidates, when a composition or taste verdict is the person's to take) | `verdicts`, `frontend-surface-audit`, `response/response.json`, `host`, `candidates` | `UNKNOWN_RULE`, `NO_PROGRESS` |
+| 6 | Compare against the claims and the proof rules, judge by owner, let each topic close itself, and emit | — | @knowledge/ui/proof, @knowledge/grammars/<family>, the captures | `verdicts`, `frontend-surface-audit`, `response/response.json`, `host` | `UNKNOWN_RULE`, `NO_PROGRESS` |
 
 Step 6 judges every claim and then lets each proof topic close itself. The canon judgement is the one
 above: every claim measured, judged against the published rule, routed by the owner of the node it
@@ -162,18 +162,33 @@ receipt lists each printed artifact under `## Printed` with why it was printed. 
 never saw sends nobody anywhere, and an audit that files its sheet and says nothing has audited only
 itself.
 
-When the verdict is the person's to take — a composition or taste topic closed as fail or fix-first
-that the chain can no longer route on, because the direction laps it allows are spent and the same
-wall was reached again — the audit reports the wall as `NO_PROGRESS` and still does not advise. The
-report is the choice, printed: it copies the direction's rendered candidate set under
-`response/artifacts/candidates/`, serves it beside the sheet, prints every candidate at every
-viewport of the matrix, at least three of them, and its `reason` names the sheet URL and asks one
-question and nothing more. The audit composes nothing of its own, so a set with fewer than three is
-not its to complete: the hand-off then goes to `frontend.direction.decide` under `approval-required`,
-whose own stop prints three. Two options written out in prose are advice, not a choice, and the
-validator refuses a `user` route over an open composition or taste verdict whose `## Printed` holds
-fewer rendered candidates than the choice has options, or none. A `user` route for a yes/no
-operational approval carries no candidate and says so.
+A composition or taste verdict is never closed by asking. When such a topic closes as fail or
+fix-first, its row routes to `direction` and the chain hands to `frontend.direction.decide`, which
+scores the rendered candidates against the criteria this audit failed and selects the dominant one,
+or, over a tie its own scores prove, asks the person from its own stop. This audit composes nothing,
+ranks nothing and offers nothing: the validator refuses a `user` route that leaves a composition or
+taste topic open, because the answer is computable from the direction's rubric and a question whose
+answer is computable is not asked. The caller stops and `NO_PROGRESS` are operational here — the same
+head measured again with no delta — so their `reason` says so and carries no candidate.
+
+A criterion that depends on data volume is measured at the flow's representative seeded volume, the
+volume `TASTE-9` Case 5 defines, never at whatever the served workspace happened to hold. When the
+served workspace is below it, the taste topic is `blocked` and routes to `seed`: the operator that
+owns the data brings the workspace to volume and the entry is captured again — not a direction lap,
+and not a yes/no for a person, because the tree already answers it by creating the data. Re-measured
+at volume and still failing, the criterion is recorded `data-bound` in its Measured cell and
+`TASTE-13` Case 6 keeps it out of the verdict, so it blocks neither quality nor UAT.
+
+A choice the person took from a printed sheet closes the criteria that choice was known to fail. When
+the direction decision this audit reads was approved by the person and its `## Scores` showed a
+criterion failing for the selected candidate at choice time, this audit records that criterion
+`person-accepted` in its Measured cell, naming the branch of that decision, instead of failing it back
+to direction; `TASTE-13` Case 7 keeps it out of the verdict and the topic closes on the remaining
+criteria. The rubric never overturns a decision the person took on its own evidence in the same
+session, so a taste lens whose every failing criterion is `data-bound` or `person-accepted` ships, and
+`next` names `quality.verify`. The validator refuses a `person-accepted` row that names no decision
+branch, names a decision the operator took by itself, or covers a criterion the chosen candidate was
+not shown failing.
 
 The surface class is not this operator's to choose or to declare. It is read from the coverage of the
 `frontend-direction-decision` this audit was given, where the direction declared it from the
@@ -198,7 +213,6 @@ for a node that was not.
 | `screenshot` | `response/artifacts/<matrixId>.png` | artifact | yes |
 | `verdicts` | `response/data/verdicts.json` | data | yes |
 | `host` | `response/artifacts/host.json` | artifact | no |
-| `candidates` | `response/artifacts/candidates/<candidateId>.html` | artifact | no |
 
 ## Stops
 
@@ -221,4 +235,5 @@ for a node that was not.
 | a topic verdict is fix-first, or the direction declared no surface class, so the composition is decided again before any value is | `frontend.direction.decide` |
 | every topic ships or passes and the checkout's own gates must run | `quality.verify` |
 | a claim fails on a Grammar component's own render, so a person records the family gap and publishes | `frontend.surface.audit` |
+| a density criterion was measured below the flow's representative seeded volume, so the data is seeded before the surface is judged again | `platform.operate` |
 | the route requires an identity and this flow has no account yet, so one is provisioned before the surface is observed | `platform.operate` |

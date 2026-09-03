@@ -2,7 +2,8 @@
 // change level agree; the selection policy and the approval agree; the receipt names exactly one
 // selected candidate, falsifies every candidate it formed, and rejects the others by name; a refine
 // forms no structural candidate and consults no external reference; more than one candidate is
-// rendered; and COVERAGE-1 holds, meaning the coverage declares one surface class from the published
+// rendered, scored, and the dominant one selected, a choice reaching the person only over a tie the
+// scores prove; and COVERAGE-1 holds, meaning the coverage declares one surface class from the published
 // vocabulary and enumerates every action, region, state and responsive branch the UI contract
 // declares, with the receipt naming the same class the coverage carries.
 import { existsSync } from 'node:fs';
@@ -11,12 +12,74 @@ import path from 'node:path';
 import process from 'node:process';
 import { fileURLToPath } from 'node:url';
 import { validateStep } from '../../scripts/validate-step.mjs';
-import { tableUnder, userRouted, choiceHandoffErrors } from '../../scripts/validate-response.mjs';
+import { tableUnder, userRouted, choiceHandoffErrors, printedCandidates } from '../../scripts/validate-response.mjs';
 import { loadErrorsRegistry } from '../../scripts/errors-registry.mjs';
+import { TASTE_RULES } from '../frontend-surface-audit/validate.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 const empty = (v) => v === undefined || v === null || v === '' || v === '—';
 const list = (v) => (Array.isArray(v) ? v : empty(v) ? [] : [v]);
+
+// Several survivors are ranked, not offered. `## Scores` carries one row per rendered candidate,
+// printed viewport and criterion; a candidate is dominant when its mean is the highest and, at the
+// same viewport, it scores no lower than every other candidate on every criterion any candidate
+// failed. Equal top means are the rubric's own resolution (TASTE-13 Case 1 scores in whole steps),
+// so they are a tie, and so is a top scorer that loses a failed criterion to another.
+export function scoreRows(rows) {
+  return (rows ?? []).map(([candidate, viewport, criterion, score, verdict]) => ({ candidate, viewport, criterion, score: Number(score), verdict }));
+}
+export function rankCandidates(scores) {
+  const by = new Map();
+  for (const r of scores) {
+    if (!by.has(r.candidate)) by.set(r.candidate, { sum: 0, n: 0, cells: new Map() });
+    const c = by.get(r.candidate);
+    c.sum += r.score; c.n += 1; c.cells.set(`${r.viewport}|${r.criterion}`, r.score);
+  }
+  const means = [...by].map(([id, c]) => ({ id, mean: c.n ? c.sum / c.n : 0, sum: c.sum, n: c.n })).sort((a, b) => b.mean - a.mean);
+  if (means.length === 0) return { dominant: null, means, tie: null };
+  if (means.length === 1) return { dominant: means[0].id, means, tie: null };
+  const top = means[0];
+  const level = means.filter((m) => m.n === top.n ? m.sum === top.sum : m.mean === top.mean);
+  if (level.length > 1) return { dominant: null, means, tie: `the top means of ${level.map((m) => m.id).join(' and ')} are equal` };
+  const failed = new Set(scores.filter((r) => r.verdict === 'fail').map((r) => `${r.viewport}|${r.criterion}`));
+  for (const key of failed) {
+    const mine = by.get(top.id).cells.get(key);
+    for (const [id, c] of by) {
+      if (id === top.id) continue;
+      const theirs = c.cells.get(key);
+      if (mine !== undefined && theirs !== undefined && theirs > mine) {
+        const [viewport, criterion] = key.split('|');
+        return { dominant: null, means, tie: `${top.id} has the highest mean and loses the failed criterion ${criterion} at ${viewport} to ${id}` };
+      }
+    }
+  }
+  return { dominant: top.id, means, tie: null };
+}
+// The scores a decision over several rendered candidates must carry: every rendered candidate at
+// every viewport it was printed at, the taste lens whole for each, and one criterion set for all,
+// or the means cannot be compared.
+export function scoreCoverageErrors({ at, scores, rendered, printed }) {
+  const errors = [];
+  if (rendered.length < 2) return errors;
+  if (scores.length === 0) {
+    errors.push(`${at}: ${rendered.length} candidates were rendered and ## Scores carries no row; a decision over several rendered candidates carries the scores that ranked them, or the tie they prove`);
+    return errors;
+  }
+  const keysOf = (id) => new Set(scores.filter((r) => r.candidate === id).map((r) => `${r.viewport}|${r.criterion}`));
+  const first = keysOf(rendered[0]);
+  for (const id of rendered) {
+    const keys = keysOf(id);
+    if (keys.size === 0) { errors.push(`${at}: candidate ${id} was rendered and never scored under ## Scores`); continue; }
+    for (const viewport of printed.get(id) ?? []) {
+      const missing = TASTE_RULES.filter((rule) => !keys.has(`${viewport}|${rule}`));
+      if (missing.length) errors.push(`${at}: candidate ${id} at ${viewport} is scored without ${missing.join(', ')}; the taste lens is scored whole (TASTE-13 Case 1)`);
+    }
+    if (id !== rendered[0] && (keys.size !== first.size || [...keys].some((k) => !first.has(k)))) {
+      errors.push(`${at}: candidate ${id} is scored on a different criterion set than ${rendered[0]}; means over different criteria cannot be compared`);
+    }
+  }
+  return errors;
+}
 
 // The surface class vocabulary is not copied here: it is read out of the rule that publishes it,
 // COVERAGE-1 Case 7 in knowledge/ui/composition/coverage.md, so widening the rule widens the gate and
@@ -151,9 +214,26 @@ export async function validateDirectionStep(branchDir, root = ROOT) {
         if (candidate === selected && verdict === 'fails') errors.push(`${at}: the selected candidate ${selected} fails an attack, so the direction is not decided`);
       }
     }
+    // Several rendered candidates are ranked before one is selected. The scores decide a dominant
+    // candidate under either policy; only a tie they prove is a choice, taken by the fallback under
+    // automatic and by the person under approval-required.
+    const rendered = [...artifacts].map((page) => page.replace(/^.*\//, '').replace(/\.html$/, ''));
+    const printedMap = printedCandidates(tableUnder(text, '## Printed') ?? []);
+    const scores = scoreRows(tableUnder(text, '## Scores'));
+    const ranking = rankCandidates(scores);
+    const scored = rendered.length > 1 && scores.length > 0;
+    if (response.status === 'done') {
+      errors.push(...scoreCoverageErrors({ at, scores, rendered, printed: printedMap }));
+      if (scored && ranking.dominant && selected !== ranking.dominant) {
+        errors.push(`${at}: the scores make ${ranking.dominant} dominant (mean ${ranking.means[0].mean.toFixed(2)}) and the receipt selects ${selected}; a dominant candidate is the one selected`);
+      }
+      const tookFallback = list(response.fallbacks).includes('DIRECTION_CHOICE_REQUIRED');
+      if (scored && ranking.dominant && tookFallback) errors.push(`${at}: the scores make ${ranking.dominant} dominant, so no choice was required and DIRECTION_CHOICE_REQUIRED was not a fallback to take`);
+      if (scored && !ranking.dominant && policy === 'automatic' && !tookFallback) errors.push(`${at}: no candidate dominates (${ranking.tie}) and no DIRECTION_CHOICE_REQUIRED fallback is recorded; a tie under automatic is broken by the fallback and recorded`);
+    }
     if (policy === 'approval-required' && response.status === 'done') {
-      if (approval === null) errors.push('response/response.json: approval-required with no approval cannot end done; DIRECTION_CHOICE_REQUIRED terminates here');
-      else if (approval !== selected) errors.push(`${at}: the receipt selects ${selected} but approval names ${approval}`);
+      if (approval === null && !(scored && ranking.dominant)) errors.push('response/response.json: approval-required with no approval cannot end done unless the scores make one candidate dominant; over a tie DIRECTION_CHOICE_REQUIRED terminates here');
+      else if (approval !== null && approval !== selected) errors.push(`${at}: the receipt selects ${selected} but approval names ${approval}`);
     }
 
     // A refine moves elements inside the approved structure and consults no external reference. A
@@ -197,8 +277,14 @@ export async function validateDirectionStep(branchDir, root = ROOT) {
     // and a reason that names the sheet and asks one question. Two options written out in prose
     // are advice, and advice is what the print law exists to refuse.
     if (response.status === 'blocked' && response.stop === 'DIRECTION_CHOICE_REQUIRED' && await userRouted(root, await loadErrorsRegistry(root), 'frontend.direction.decide', response)) {
-      const options = [...artifacts].map((page) => page.replace(/^.*\//, '').replace(/\.html$/, ''));
-      errors.push(...choiceHandoffErrors({ at, printedRows, options, reason: response.reason }));
+      errors.push(...choiceHandoffErrors({ at, printedRows, options: rendered, reason: response.reason }));
+      // The stop is lawful only over a tie the scores prove: a sheet whose scores name a winner is a
+      // confirmation whose answer is already known, and that is never a stop.
+      if (scores.length === 0) errors.push(`${at}: the choice is handed to the person with no ## Scores; the stop is lawful only over a tie the scores prove`);
+      else {
+        errors.push(...scoreCoverageErrors({ at, scores, rendered, printed: printedMap }));
+        if (ranking.dominant) errors.push(`${at}: the scores make ${ranking.dominant} dominant (mean ${ranking.means[0].mean.toFixed(2)}), so the choice was the operator's; a confirmation whose answer the receipt already shows is never a stop`);
+      }
     }
 
     const contract = (tableUnder(text, '## UI contract') ?? []).map(([element, kind]) => ({ element, kind }));

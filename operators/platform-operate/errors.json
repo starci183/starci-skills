@@ -6,12 +6,12 @@
       "domain": "caller",
       "disposition": "terminate",
       "meaning": {
-        "en": "The approval, the plan hash, or the allowed effect set no longer matches the requested delta.",
-        "vi": "Phê duyệt, hash kế hoạch hay tập effect được phép không còn khớp phần delta được yêu cầu."
+        "en": "The approval — an approval id, or the environment declaration it references, whose content hash has moved — the plan hash, or the allowed effect set no longer matches the requested delta.",
+        "vi": "Phê duyệt — một id phê duyệt, hay bản khai báo môi trường mà nó tham chiếu với hash nội dung đã đổi — hash kế hoạch hay tập effect được phép không còn khớp phần delta được yêu cầu."
       },
       "resume": {
-        "en": "Bring a fresh approval for this exact plan.",
-        "vi": "Mang một phê duyệt mới cho đúng kế hoạch này."
+        "en": "Bring a fresh approval for this exact plan: a new id, or the declaration's current reference.",
+        "vi": "Mang một phê duyệt mới cho đúng kế hoạch này: một id mới, hoặc tham chiếu hiện hành của bản khai báo."
       }
     },
     "CAPABILITY_MISSING": {

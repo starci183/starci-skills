@@ -1,4 +1,4 @@
-# StarCi Skills 1.7.3
+# StarCi Skills 1.7.4
 
 This tree is the runtime. Read [SKILL.md](SKILL.md) next; it is the single entry that freezes a
 mission's scope, selects the one operator that owns the outcome, and routes between operators on
@@ -67,6 +67,7 @@ head or the head is not publishable.
 
 ## Lineage
 
+1.7.4 (2026-09-03): authority comes from the environment declaration — .stacks/<env>/environment.json marks each operation class declared or person, non-production defaults to declared for provisioning and runtime, production to person, and the approval field accepts the declaration reference with its hash; several rendered candidates are ranked by the proof rubric and the dominant one is taken, a person is asked only over a scored tie; a data-volume criterion is measured at the flow's representative seeded volume, routes to seed below it and is data-bound at it; a criterion the person's printed choice was known to fail is person-accepted and does not block quality or uat.
 1.7.3 (2026-09-03): a decision handed to a person is printed as rendered candidates — one per option, at least three for composition or taste, a capture per viewport, a one-line question — and the direction and audit validators refuse a user route that prints fewer; the family binds by the route's grammarId as @knowledge/grammars/<family>; Steps rows state the job and the kind, mechanisms live in the kind contracts; UPDATE.md carries the two writing principles (nothing specific, no errata) and the tree is swept for both.
 1.7.2 (2026-09-03): a restart is not a rebuild — scripts/serve-runtime.mjs records the served head and a digest of the route's manifests and lockfiles, clears the framework build cache when they moved, the previous head is unknown or --clean is asked, and stops the whole process tree of a server, verifying by connecting that the port is free; the platform-operation receipt requires a cache row and the validator refuses a kept cache over an unknown previous head.
 1.7.1 (2026-09-03): INTEGRATION_CONFLICT retired into INTEGRATION_FAILED — serve resolves a merge conflict under a closed four-rule set, records each resolution on the merge, runs the delivery gates on the merged head before restarting, and stops only on a red gate; the audit's Served surface names the family version observed and the version the delivery was resolved against, and states the drift in the evidence of any verdict it could flip.

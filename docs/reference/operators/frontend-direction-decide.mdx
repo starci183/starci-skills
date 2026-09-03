@@ -88,8 +88,26 @@ A direction is invalid while an applicable business contradiction, owner leak, G
 responsive failure, accessibility failure, unresolved adverse state or materially stronger reversible
 alternative remains. Under `refine` the candidates are element-level moves inside the approved
 structure, never a new structure. When the only candidate fails an attack the run stops with
-`NO_VIABLE_DIRECTION`, and when several survive, `DIRECTION_CHOICE_REQUIRED` selects the one that
-survived the most attacks unless the person kept the choice.
+`NO_VIABLE_DIRECTION`; when several survive they are scored and ranked, and `DIRECTION_CHOICE_REQUIRED`
+is raised only over a tie the scores prove.
+
+## Several survivors are ranked, not offered
+
+A choice goes to a person only when the candidates are genuinely level; when one is dominant the
+operator decides, prints the candidates as evidence and continues, because a confirmation whose answer
+the receipt already shows is not a decision anybody needs to take. When more than one candidate is
+rendered, step 11 scores every rendered candidate at every viewport it was printed at against the
+criteria of `@knowledge/ui/proof` that a still render answers — the taste lens whole, scored the way
+`TASTE-13` Case 1 scores it, and any experience criterion whose rule names the capture as its
+instrument — and records every score under `## Scores`, beside the printed candidates. A candidate is
+dominant when its mean is the highest and it scores no lower than every other candidate, at the same
+viewport, on every criterion any candidate failed in that scoring. A dominant candidate is selected
+under either selection policy. Only when no candidate dominates — the top means are equal, which is
+the rubric's own resolution, or the top scorer loses a failed criterion to another — is the choice
+open: under `automatic` the fallback breaks the tie and records it; under `approval-required` the run
+stops with `DIRECTION_CHOICE_REQUIRED`, and the scores in the receipt are what prove the tie was one.
+The validator refuses that stop when its scores show a dominant candidate, and refuses a decision over
+more than one rendered candidate that carries no scores.
 
 ## Boundary
 
@@ -117,6 +135,7 @@ business promise did not make. The asset and its prompt land under `response/art
 | `@knowledge/ui/composition` | the assertions the emitted receipt has to satisfy, `COVERAGE-1` being the assertion about the receipt as a whole | yes |
 | `@workspaces/fe` | the routed frontend checkout read at the frozen head; the current implementation as evidence, never as the requested direction | yes |
 | `@knowledge/grammars/<family>` | how the family the bound route names (`context.grammarId`) is meant to realize Common; law about the Grammar, never the Grammar itself | no |
+| `@knowledge/ui/proof` | the criteria every rendered candidate is scored against before one is picked; the same rubric the later audit measures, read only when more than one candidate is rendered | no |
 | `@worktrees/uat/<flow>/<case>` | prior behaviour, UX and UI observations with their captures; evidence and counterevidence, and a prior pass is not current authority | no |
 
 ## Inputs
@@ -139,8 +158,8 @@ business promise did not make. The asset and its prompt land under `response/art
 | `candidates` | number 1–3 | 1 | How many directions to form; more than one only when a comparison is wanted |
 | `preview` | choice | no | yes renders the single candidate as an inspectable page |
 | `references` | list | [] | External references the person supplies; bounded research runs only when this is empty |
-| `selectionPolicy` | choice | automatic | `automatic`: the operator selects and records why; `approval-required`: the person selects |
-| `approval` | id | null | The approved candidate id; required only under `approval-required`, supplied on resume after `DIRECTION_CHOICE_REQUIRED` |
+| `selectionPolicy` | choice | automatic | `automatic`: the operator selects, a tie included, and records why; `approval-required`: the operator still selects a dominant candidate and a tie is the person's |
+| `approval` | id | null | The approved candidate id; required only under `approval-required` when the scores proved a tie, supplied on resume after `DIRECTION_CHOICE_REQUIRED` |
 | `resume` | token | null | The blocked branch's token when re-entering after a stop |
 
 ## Steps
@@ -157,7 +176,7 @@ business promise did not make. The asset and its prompt land under `response/art
 | 8 | Apply the Grammar filter | `ownerCeiling` | @grammar/core (what a component owns and which props exist), @knowledge/grammars/&lt;family> | — | `GRAMMAR_REQUIRED` |
 | 9 | Render the decision evidence and the judged images, serve them for a person and print them | `candidates`, `preview` | the surviving candidates, @knowledge/grammars/&lt;family> | `candidates`, `direction-image`, `host` | — |
 | 10 | Falsify | — | the candidates, inputs `business-promise-authority` and `backend-source-application`, `response/data/coverage.json` | — | `NO_VIABLE_DIRECTION` |
-| 11 | Decide | `selectionPolicy`, `approval` | the falsification table | — | `DIRECTION_CHOICE_REQUIRED` |
+| 11 | Score the rendered candidates and decide | `selectionPolicy`, `approval` | the falsification table, @knowledge/ui/proof (the criteria a still render answers, per printed viewport) | — | `DIRECTION_CHOICE_REQUIRED` |
 | 12 | Emit | — | everything above | `response/response.md`, `response/response.json` | — |
 
 Step 5 also settles which kind of surface this is. `COVERAGE-1` Case 7 publishes the vocabulary, the
@@ -188,22 +207,26 @@ receipt lists each printed artifact under `## Printed` with why it was printed. 
 a port nobody was told about is a candidate nobody saw, and a decision taken over one is taken alone.
 
 The same table is the whole hand-off when the choice is the person's. `DIRECTION_CHOICE_REQUIRED`
-under `approval-required` stops with the receipt, and its `## Printed` table is the choice: one served
-candidate per option, each with a capture per viewport, and at least three of them, because a
-composition is chosen by eye — when fewer survived, the run renders the third from its own rejected
-or element-level alternatives so the person compares renders rather than sentences. The stop's
-`reason` names the sheet URL and asks one question and nothing more: two options written out in
-prose are not a choice, they are advice, and the validator refuses a `user` route whose table holds
-fewer rendered candidates than the choice has options, or none. `GRAMMAR_REQUIRED` and the caller
-stops are operational — a person publishes, corrects or supplies something — so their `reason` says
-so and carries no candidate.
+under `approval-required` stops, over a tie its `## Scores` proves, with the receipt, and its
+`## Printed` table is the choice: one served candidate per option, each with a capture per viewport,
+and at least three of them, because a composition is chosen by eye — when fewer survived, the run
+renders the third from its own rejected or element-level alternatives so the person compares renders
+rather than sentences. The stop's `reason` names the sheet URL and asks one question and nothing
+more: two options written out in prose are not a choice, they are advice, and the validator refuses a
+`user` route whose table holds fewer rendered candidates than the choice has options, or none, and one
+whose scores name a winner the operator should have taken. A choice the person takes from that sheet
+closes what the sheet showed: a criterion `## Scores` showed failing for the candidate the person
+approved is settled for this session, and the later audit records it as person-accepted, naming this
+branch, instead of routing it back (`TASTE-13` Case 7) — the rubric never overturns a decision the
+person took on its own evidence. `GRAMMAR_REQUIRED` and the caller stops are operational — a person
+publishes, corrects or supplies something — so their `reason` says so and carries no candidate.
 
 Under
 `refine` the page stays optional — the structure was approved before this run began — and is rendered
 only when more than one candidate was formed or `preview` is yes; a single refine candidate under the
-defaults produces no page and rests on step 10. Under `automatic`,
-`DIRECTION_CHOICE_REQUIRED` selects the candidate that survived the most attacks and records the
-table; under `approval-required` it stops and the person returns with `approval`. The receipt
+defaults produces no page and rests on step 10. A dominant candidate is decided under either policy;
+over a tie, `automatic` takes the fallback and records it, and `approval-required` stops with
+`DIRECTION_CHOICE_REQUIRED` until the person returns with `approval`. The receipt
 authorizes the next domain to resolve and implement inside the frozen owner ceiling and proves
 nothing about how the result renders.
 

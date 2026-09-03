@@ -10,7 +10,7 @@ import path from 'node:path';
 import process from 'node:process';
 import { fileURLToPath } from 'node:url';
 import { validateStep } from '../../scripts/validate-step.mjs';
-import { tableUnder, userRouted, choiceHandoffErrors } from '../../scripts/validate-response.mjs';
+import { tableUnder, userRouted } from '../../scripts/validate-response.mjs';
 import { loadErrorsRegistry } from '../../scripts/errors-registry.mjs';
 import { sessionRootOf, missingStack } from '../../scripts/validate-request.mjs';
 
@@ -40,10 +40,31 @@ export const TOPIC_OF_PREFIX = {
 export const AUDIT_TOPICS = ['presentation', 'composition', 'responsive', 'motion', 'accessibility', 'contrast', 'render-truth', 'taste'];
 const topicOf = (rule) => TOPIC_OF_PREFIX[String(rule).replace(/-\d+$/, '')] ?? null;
 const TASTE_GATES = new Set(['TASTE-1', 'TASTE-2', 'TASTE-5', 'TASTE-8', 'TASTE-12']);
+// TASTE-9 Case 5 and 6: the density criterion depends on data volume and is measured at the flow's
+// representative seeded volume. Measured below it, its row reads `below-volume`, the lens is blocked
+// and routes to seed — the operator that owns the data — never to direction and never to a person.
+// Re-measured at volume and still failing, it reads `data-bound` and TASTE-13 Case 6 keeps it out of
+// the arithmetic, so it blocks neither quality nor UAT. Only the density criterion carries a marker.
+const VOLUME_RULE = 'TASTE-9';
+const BELOW_VOLUME = 'below-volume';
+const DATA_BOUND = 'data-bound';
+// TASTE-13 Case 7: a criterion the person accepted from the printed sheet — the approved decision's
+// scores showed it failing for the candidate they chose — reads `person-accepted` with the branch
+// of that decision, and is kept out of the arithmetic: the rubric never overturns a decision the
+// person took on its own evidence in the same session.
+const PERSON_ACCEPTED = 'person-accepted';
+const BRANCH = /step-\d+\/parallel-\d+/;
+const measuredText = (row) => (Array.isArray(row.measured) ? row.measured : [row.measured]).map(String).join(' ');
+export const isBelowVolume = (row) => measuredText(row).includes(BELOW_VOLUME);
+export const isDataBound = (row) => measuredText(row).includes(DATA_BOUND);
+export const isPersonAccepted = (row) => measuredText(row).includes(PERSON_ACCEPTED);
 export function tasteVerdict(rows) {
-  const mean = rows.reduce((sum, r) => sum + Number(r.score), 0) / rows.length;
-  const gated = rows.some((r) => r.verdict === 'fail' && TASTE_GATES.has(r.rule));
-  return { mean, verdict: !gated && mean >= 4 ? 'ship' : 'fix-first' };
+  const scored = rows.filter((r) => !isDataBound(r) && !isBelowVolume(r) && !isPersonAccepted(r));
+  const mean = scored.length ? scored.reduce((sum, r) => sum + Number(r.score), 0) / scored.length : 0;
+  if (rows.some(isBelowVolume)) return { mean, verdict: 'blocked', routeTo: 'seed' };
+  const gated = scored.some((r) => r.verdict === 'fail' && TASTE_GATES.has(r.rule));
+  const verdict = !gated && mean >= 4 ? 'ship' : 'fix-first';
+  return { mean, verdict, routeTo: verdict === 'ship' ? 'none' : 'direction' };
 }
 const sectionText = (text, heading) => {
   const lines = text.split(/\r?\n/);
@@ -128,6 +149,7 @@ export async function validateAuditStep(branchDir, root = ROOT) {
   // each failure routed to direction because no value swap repairs a composition (TASTE-13 Case 4),
   // and the entry's own mean and verdict computed by TASTE-13 Case 2 rather than asserted.
   const rolled = new Map(); // rule -> { score, verdict, measured[] }
+  const personAccepted = []; // { matrixId, rule, branch }, checked against the decision below
   for (const entry of verdicts.entries) {
     const lens = entry.taste;
     if (!lens) {
@@ -139,8 +161,18 @@ export async function validateAuditStep(branchDir, root = ROOT) {
       if (seen.has(row.rule)) errors.push(`${at}: ${entry.matrixId} scores ${row.rule} twice`);
       seen.set(row.rule, row);
       if (!TASTE_RULES.includes(row.rule)) errors.push(`${at}: ${entry.matrixId} scores ${row.rule}, which is not one of the twelve scored criteria (TASTE-13 is the arithmetic and is not itself scored)`);
-      if (row.verdict === 'fail' && row.routeTo !== 'direction') errors.push(`${at}: ${entry.matrixId} fails ${row.rule} and routes to ${row.routeTo}; a taste failure routes to direction, never to resolve`);
-      if (row.verdict === 'pass' && row.routeTo !== 'none') errors.push(`${at}: ${entry.matrixId} passes ${row.rule} and still routes to ${row.routeTo}`);
+      const marker = isBelowVolume(row) ? BELOW_VOLUME : isDataBound(row) ? DATA_BOUND : isPersonAccepted(row) ? PERSON_ACCEPTED : null;
+      if ((marker === BELOW_VOLUME || marker === DATA_BOUND) && row.rule !== VOLUME_RULE) errors.push(`${at}: ${entry.matrixId} marks ${row.rule} ${marker}; only the density criterion ${VOLUME_RULE} depends on data volume (TASTE-9 Case 5)`);
+      if (marker === PERSON_ACCEPTED) {
+        if (row.routeTo !== 'none' || row.verdict !== 'fail') errors.push(`${at}: ${entry.matrixId} records ${row.rule} person-accepted; the row keeps its fail and routes nowhere, the choice closed it (TASTE-13 Case 7)`);
+        const branch = BRANCH.exec(measuredText(row))?.[0] ?? null;
+        if (!branch) errors.push(`${at}: ${entry.matrixId} records ${row.rule} person-accepted and names no decision branch; the acceptance is the person's approval of one decision, named as step-N/parallel-M (TASTE-13 Case 7)`);
+        else personAccepted.push({ matrixId: entry.matrixId, rule: row.rule, branch });
+      }
+      if (marker === BELOW_VOLUME && row.routeTo !== 'seed') errors.push(`${at}: ${entry.matrixId} measures ${row.rule} below the representative seeded volume and routes to ${row.routeTo}; it routes to seed, the operator that owns the data, never to direction and never to a person (TASTE-9 Case 5)`);
+      if (marker === DATA_BOUND && row.routeTo !== 'none') errors.push(`${at}: ${entry.matrixId} records ${row.rule} data-bound at representative volume and routes to ${row.routeTo}; a data-bound criterion is left out of the verdict and routes nowhere (TASTE-13 Case 6)`);
+      if (!marker && row.verdict === 'fail' && row.routeTo !== 'direction') errors.push(`${at}: ${entry.matrixId} fails ${row.rule} and routes to ${row.routeTo}; a taste failure routes to direction, never to resolve`);
+      if (!marker && row.verdict === 'pass' && row.routeTo !== 'none') errors.push(`${at}: ${entry.matrixId} passes ${row.rule} and still routes to ${row.routeTo}`);
     }
     for (const rule of TASTE_RULES) if (!seen.has(rule)) errors.push(`${at}: ${entry.matrixId} leaves ${rule} unscored; the lens is incomplete until every criterion carries a measurement`);
     const complete = TASTE_RULES.every((r) => seen.has(r)) && seen.size === TASTE_RULES.length;
@@ -167,6 +199,11 @@ export async function validateAuditStep(branchDir, root = ROOT) {
       if (!next.includes('frontend.direction.decide')) errors.push('response/response.json: the taste lens is fix-first, so next names frontend.direction.decide');
       if (next.includes('quality.verify')) errors.push('response/response.json: the taste lens is fix-first, so the checkout\'s own gates do not run yet; quality.verify follows a ship');
     }
+    if (surface.verdict === 'blocked') {
+      if (!next.includes('platform.operate')) errors.push('response/response.json: the density criterion was measured below the flow\'s representative seeded volume, so next names platform.operate, the operator that seeds; the entry is captured again at volume (TASTE-9 Case 5)');
+      if (next.includes('frontend.direction.decide')) errors.push('response/response.json: a density measured below representative volume is a data gap, not a composition finding; next does not name frontend.direction.decide');
+      if (next.includes('quality.verify')) errors.push('response/response.json: the taste lens is blocked until the entry is captured at representative volume; quality.verify follows a ship');
+    }
   }
 
   // One surface, one class: every entry carries the class the coverage declared, and they agree.
@@ -188,6 +225,22 @@ export async function validateAuditStep(branchDir, root = ROOT) {
     if (empty(declared)) errors.push(`${at}: the frontend-direction-decision this audit reads declares no surface class, so every banded rule is left without a threshold (SURFACE_CLASS_MISSING)`);
     else for (const cls of classes) if (cls !== declared) errors.push(`${at}: the entries carry ${cls} and the direction's coverage declares ${declared}; the class is read from the decision, never chosen here`);
   }
+  // A person-accepted criterion is checked against the decision it names: that decision is the one
+  // this audit reads, the person approved it, and its scores showed the criterion failing for the
+  // candidate they chose. Anything else is a fail dressed as an acceptance.
+  if (personAccepted.length && decisionRef && sessionRoot) {
+    const decisionBranch = BRANCH.exec(String(decisionRef))?.[0] ?? null;
+    const decisionFile = path.join(sessionRoot, String(decisionRef));
+    let decisionText = '';
+    if (existsSync(decisionFile)) decisionText = await readFile(decisionFile, 'utf8');
+    const decision = Object.fromEntries((tableUnder(decisionText, '## Decision') ?? []).map(([k, v]) => [k, v]));
+    const shownFailing = new Set((tableUnder(decisionText, '## Scores') ?? []).filter(([candidate, , , , verdict]) => candidate === decision['Selected candidate'] && verdict === 'fail').map(([, , criterion]) => criterion));
+    for (const { matrixId, rule, branch } of personAccepted) {
+      if (branch !== decisionBranch) { errors.push(`${at}: ${matrixId} records ${rule} person-accepted by ${branch}, which is not the decision this audit reads (${decisionBranch})`); continue; }
+      if (decision['Selection policy'] !== 'approval-required') errors.push(`${at}: ${matrixId} records ${rule} person-accepted by ${branch}, a decision the operator took by itself; only a choice the person took closes a criterion (TASTE-13 Case 7)`);
+      if (!shownFailing.has(rule)) errors.push(`${at}: ${matrixId} records ${rule} person-accepted, but the chosen candidate was not shown failing ${rule} in the scores of ${branch}; a choice closes only what the sheet showed (TASTE-13 Case 7)`);
+    }
+  }
 
   // Each topic's row is the verdict its own closing rule produced over the results of that topic.
   const topicRows = new Map();
@@ -200,7 +253,7 @@ export async function validateAuditStep(branchDir, root = ROOT) {
       else if (!topicRows.has(topic)) topicRows.set(topic, prior);
     }
   }
-  if (surface) topicRows.set('taste', { verdict: surface.verdict, routeTo: surface.verdict === 'ship' ? 'none' : 'direction' });
+  if (surface) topicRows.set('taste', { verdict: surface.verdict, routeTo: surface.routeTo });
   const topicVerdict = (topic) => topicRows.get(topic) ?? { verdict: 'blocked', routeTo: 'none' };
 
   const failing = verdicts.entries.flatMap((e) => e.results.filter((r) => r.verdict === 'fail'));
@@ -208,20 +261,13 @@ export async function validateAuditStep(branchDir, root = ROOT) {
     errors.push('response/response.json: a claim fails on an application-owned node, so next names frontend.presentation.resolve');
   }
 
-  // When the verdict goes to a person while a composition or taste topic is still open — the same
-  // wall reached again, so the audit reports it rather than advising — the hand-off is the
-  // direction's rendered candidates, printed at every viewport of the matrix, never two sentences
-  // the person is asked to choose between (@tools/print, decision-points).
-  const openForPerson = ['composition', 'taste'].filter((topic) => ['fail', 'fix-first'].includes(topicVerdict(topic).verdict));
-  const toPerson = openForPerson.length > 0 && await userRouted(root, await loadErrorsRegistry(root), 'frontend.surface.audit', response);
-  if (toPerson) {
-    if (!(present.has('frontend-surface-audit') && has('response/response.md'))) {
-      errors.push(`response/response.md: the ${openForPerson.join(' and ')} verdict is handed to the person with no receipt, so nothing was printed; a design decision reaches a person as rendered candidates under ## Printed`);
-    } else {
-      const printedRows = tableUnder(await read('response/response.md'), '## Printed') ?? [];
-      const viewports = new Set([...captures.values()].map(({ doc }) => doc.viewport.join('x')));
-      errors.push(...choiceHandoffErrors({ at: 'response/response.md', printedRows, viewports: Math.max(1, viewports.size), reason: response.reason }));
-    }
+  // A composition or taste verdict is never closed by asking. An open one routes to direction,
+  // which scores the rendered candidates and decides or proves the tie; a density measured below
+  // representative volume routes to seed. Either way the answer is computable from the tree, and a
+  // question whose answer is computable is not put to a person.
+  const open = ['composition', 'taste'].filter((topic) => ['fail', 'fix-first'].includes(topicVerdict(topic).verdict) || topicVerdict(topic).routeTo === 'seed');
+  if (open.length > 0 && await userRouted(root, await loadErrorsRegistry(root), 'frontend.surface.audit', response)) {
+    errors.push(`response/response.json: the ${open.join(' and ')} verdict is open and the branch hands to a person; a composition or taste finding routes to direction, which scores the rendered candidates and decides or proves the tie, and a density below representative volume routes to seed; this audit asks nobody`);
   }
 
   if (present.has('frontend-surface-audit') && has('response/response.md')) {
@@ -286,10 +332,10 @@ export async function validateAuditStep(branchDir, root = ROOT) {
       }
       const section = sectionText(text, '## Taste');
       const mean = /^- Mean: (\d+(?:\.\d+)?)$/m.exec(section);
-      const verdictLine = /^- Verdict: (ship|fix-first)$/m.exec(section);
+      const verdictLine = /^- Verdict: (ship|fix-first|blocked)$/m.exec(section);
       if (!mean) errors.push(`${rel}: Taste closes with no "- Mean: <number>" line`);
-      else if (Math.abs(Number(mean[1]) - surface.mean) > 0.005) errors.push(`${rel}: Taste records a mean of ${mean[1]}; the twelve rows average ${surface.mean.toFixed(2)}`);
-      if (!verdictLine) errors.push(`${rel}: Taste closes with no "- Verdict: ship|fix-first" line`);
+      else if (Math.abs(Number(mean[1]) - surface.mean) > 0.005) errors.push(`${rel}: Taste records a mean of ${mean[1]}; the scored rows average ${surface.mean.toFixed(2)}`);
+      if (!verdictLine) errors.push(`${rel}: Taste closes with no "- Verdict: ship|fix-first|blocked" line`);
       else if (verdictLine[1] !== surface.verdict) errors.push(`${rel}: Taste records ${verdictLine[1]}; TASTE-13 makes the surface ${surface.verdict}`);
     }
 

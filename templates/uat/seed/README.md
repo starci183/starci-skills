@@ -10,6 +10,10 @@ produce turns a broken purchase into a passing run, which is the one failure a U
 catch. Seed the preconditions — the catalogue row, the account's starting balance, the course that
 must already exist — and let the flow create the rest.
 
+The count of records a seed places for an entity is the flow's representative volume: the proof
+criteria that depend on data volume (`TASTE-9` Case 5) are measured at it, so a seed places as many
+records as the surface is meant to carry, not the one row that lets the flow pass.
+
 Every record a seed places carries `is_uat=true` and the `uat-<runId>` namespace. Step 9 deletes
 exactly that namespace: not another run's namespace, not a record that merely carries the UAT flag,
 and never a run record.

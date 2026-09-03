@@ -1,5 +1,7 @@
 // platform.operate's own law over one branch, on top of the shared step check: the branch's closed
-// effect, proof and capability sets; the approved plan hash and the approval that covers it; every
+// effect, proof and capability sets; the approved plan hash and the approval that covers it — an
+// approval id, or the environment's declaration by path and hash where it marks the operation's class
+// declared; every
 // desired resource inventoried under the same kind and inside the mutable ceiling; port claims owned
 // by this operation and never freed by mutating their holder; every mutation inventoried first and
 // inside the approved set; convergence agreeing with the mutation count; the complete proof set
@@ -11,7 +13,7 @@ import process from 'node:process';
 import { fileURLToPath } from 'node:url';
 import { validateStep } from '../../scripts/validate-step.mjs';
 import { tableUnder } from '../../scripts/validate-response.mjs';
-import { missingStack } from '../../scripts/validate-request.mjs';
+import { hostRootOf, missingStack, loadEnvironmentSchema, parseDeclarationReference, stackDeclaration } from '../../scripts/validate-request.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 
@@ -25,6 +27,22 @@ export const KIND_EFFECTS = {
   runtime: ['register-runtime-entry', 'attest-runtime-entry', 'bring-up-infra-stack', 'locate-routed-checkouts', 'start-role-runtime', 'merge-into-integration-branch', 'serve-runtime-head', 'restart-runtime-server', 'reset-runtime-server', 'stop-runtime-server', 'queue-runtime-lease'],
   identity: ['provision-identity', 'seed-flow-fixtures'],
 };
+// The join from an effect to the class of authorisation an environment declares for it. The classes,
+// their defaults and the reference shape are the environment schema's; an effect with no class here is
+// one no declaration authorises, so its approval is always an id.
+export const EFFECT_CLASSES = {
+  'provision-identity': 'identity-provisioning',
+  'seed-flow-fixtures': 'seed',
+  'bring-up-infra-stack': 'stack-up',
+  ...Object.fromEntries(KIND_EFFECTS.runtime.filter((e) => e !== 'bring-up-infra-stack').map((e) => [e, 'runtime'])),
+};
+export function operationClasses(kind, effects) {
+  const set = effects.length ? effects : (KIND_EFFECTS[kind] ?? []);
+  return {
+    classes: [...new Set(set.map((e) => EFFECT_CLASSES[e]).filter(Boolean))],
+    unclassified: set.filter((e) => !EFFECT_CLASSES[e]),
+  };
+}
 // The runtime branch publishes its proof set per rung, not per branch: a rung below the server cannot
 // probe an endpoint nothing is serving yet. KIND_CHECKS.runtime is the union those rungs draw from.
 const SERVER_RUNG_CHECKS = ['entry-declared', 'endpoints-served', 'head-observed', 'generation-advanced', 'integration-merged', 'server-pid-owned', 'lease-honoured'];
@@ -224,7 +242,7 @@ export function runtimeLadderErrors(ladder, { requirements, sessionId, applied, 
   return errors;
 }
 
-export async function validatePlatformStep(branchDir, root = ROOT) {
+export async function validatePlatformStep(branchDir, root = ROOT, { hostRoot = hostRootOf(root) } = {}) {
   const base = await validateStep(root, branchDir);
   const errors = [...base.errors];
   const { response, request, requirements = {}, present = new Set() } = base;
@@ -233,7 +251,7 @@ export async function validatePlatformStep(branchDir, root = ROOT) {
   const read = (f) => readFile(path.join(branchDir, f), 'utf8');
 
   // An env names a stack of this installation; the vocabulary is the folder, not a list kept here.
-  const missing = missingStack(root, requirements.env);
+  const missing = missingStack(root, requirements.env, hostRoot);
   if (missing) errors.push(`request.json: env ${requirements.env} names ${missing}, which this installation does not have`);
 
   const desired = requirements.desiredState ?? {};
@@ -245,7 +263,27 @@ export async function validatePlatformStep(branchDir, root = ROOT) {
   const portClaims = asList(requirements.portClaims);
   const service = requirements.service;
 
-  if (empty(requirements.approval)) errors.push('request.json: approval has no default; changing a shared runtime is never something an agent decides alone');
+  // Authority for the desired state: an approval id, or the environment's own declaration when it marks
+  // this operation's class declared. The declaration is read as it stands, hashed, and checked against
+  // the environment schema; a reference is refused for a declaration that is absent, moved, belongs to
+  // another environment, is refused by its schema, or marks the class person.
+  if (empty(requirements.approval)) errors.push('request.json: approval has no default; a shared runtime is never changed on silence, and an environment that authorises the change says so in a declaration the request references');
+  else {
+    const envSchema = await loadEnvironmentSchema(root);
+    const ref = parseDeclarationReference(envSchema, requirements.approval);
+    if (ref) {
+      if (!empty(requirements.env) && ref.env !== String(requirements.env)) errors.push(`request.json: approval references the ${ref.env} declaration while the operation runs in ${requirements.env}; a declaration authorises its own environment only`);
+      const decl = await stackDeclaration(root, ref.env, hostRoot, envSchema);
+      if (!decl.exists) errors.push(`request.json: approval references ${decl.rel}, which this installation does not have`);
+      else {
+        for (const e of decl.errors) errors.push(`request.json: approval references a declaration the environment schema refuses: ${e}`);
+        if (decl.hash !== ref.hash) errors.push(`request.json: approval references ${decl.rel} at ${ref.hash} and the file hashes to ${decl.hash}; the declaration moved since it was read, which is AUTHORITY_DRIFT and not an approval`);
+        const { classes, unclassified } = operationClasses(kind, desiredEffects);
+        if (unclassified.length) errors.push(`request.json: ${unclassified.join(', ')} ${unclassified.length === 1 ? 'belongs' : 'belong'} to no operation class an environment declaration authorises, so approval must be an approval id`);
+        if (decl.authorization) for (const c of classes) if (decl.authorization[c] !== 'declared') errors.push(`request.json: ${decl.rel} marks ${c} as ${decl.authorization[c]}, so a declaration reference is not an approval for it; an approval id is required`);
+      }
+    }
+  }
   if (kind && !KIND_EFFECTS[kind]) errors.push(`request.json: ${kind} is not a service kind this operator operates`);
   if (KIND_EFFECTS[kind]) {
     if (new Set(desiredEffects).size !== desiredEffects.length) errors.push('request.json: desiredState.effects must not repeat an effect');
@@ -452,6 +490,6 @@ export async function validatePlatformStep(branchDir, root = ROOT) {
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   const target = process.argv[2];
   if (!target) { process.stderr.write('usage: node validate.mjs <session>/step-N/parallel-M\n'); process.exit(2); }
-  const { errors } = await validatePlatformStep(path.resolve(target));
+  const { errors } = await validatePlatformStep(path.resolve(target), ROOT);
   if (errors.length) { process.stderr.write(`${errors.join('\n')}\n`); process.exitCode = 1; } else process.stdout.write('valid platform.operate branch\n');
 }

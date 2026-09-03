@@ -79,6 +79,7 @@
                     "routeTo": {
                       "enum": [
                         "direction",
+                        "seed",
                         "none"
                       ]
                     }
@@ -144,6 +145,7 @@
                   "enum": [
                     "resolve",
                     "direction",
+                    "seed",
                     "flow-owner",
                     "grammar-gap",
                     "none"

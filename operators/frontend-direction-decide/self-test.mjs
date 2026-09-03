@@ -1,8 +1,9 @@
 // Proves validate.mjs on a synthetic session branch: one conforming branch under the defaults
-// (modify, reconstruct, one candidate, automatic), one three-candidate branch that takes the
-// DIRECTION_CHOICE_REQUIRED fallback, one blocked on the same code under approval-required, one
-// blocked on REFERENCE_MISSING because no standard could be named by class, and one mutation per
-// law, each of which must fail with a line that names the defect.
+// (modify, reconstruct, one candidate, automatic), three-candidate branches whose scores make one
+// dominant (decided under either policy) or prove a tie (the fallback under automatic, the person
+// under approval-required), the DIRECTION_CHOICE_REQUIRED stop over a proven tie, one blocked on
+// REFERENCE_MISSING because no standard could be named by class, and one mutation per law, each of
+// which must fail with a line that names the defect.
 import assert from 'node:assert/strict';
 import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -11,6 +12,31 @@ import { validateDirectionStep } from './validate.mjs';
 
 const HEAD = '0f1e2d3c4b5a69788796a5b4c3d2e1f009182736';
 const NAMES = ['one-column', 'split-view', 'stepper'];
+const VIEWPORTS = ['wide', 'narrow'];
+const TASTE = Array.from({ length: 12 }, (_, i) => `TASTE-${i + 1}`);
+
+// The scores over several rendered candidates. `dominant` (the default) gives the selected
+// candidate a flat 4 and the others a flat 3; `tie` levels every candidate at 4; `loser` keeps the
+// selected candidate's mean highest and fails it on TASTE-2 at the wide viewport, where another
+// candidate scores higher, which is the second shape of a tie; `short` drops TASTE-12 from one
+// candidate so the taste lens is not whole; `uneven` scores one candidate on an extra UX criterion.
+function scoreTable(formed, selected, shape = 'dominant') {
+  if (formed.length < 2) return [];
+  const rows = [];
+  for (const id of formed) {
+    for (const viewport of VIEWPORTS) {
+      for (const rule of TASTE) {
+        if (shape === 'short' && id === formed[1] && rule === 'TASTE-12') continue;
+        let score = shape === 'tie' ? 4 : id === selected ? 4 : 3;
+        let verdict = 'pass';
+        if (shape === 'loser' && rule === 'TASTE-2' && viewport === 'wide') { score = id === selected ? 2 : 3; verdict = 'fail'; }
+        rows.push(`| \`${id}\` | ${viewport} | \`${rule}\` | ${score} | ${verdict} |`);
+      }
+    }
+    if (shape === 'uneven' && id === formed[1]) rows.push(`| \`${id}\` | wide | \`UX-9\` | 4 | pass |`);
+  }
+  return rows;
+}
 
 const coverage = ({ regions = 2, actions = 1 } = {}) => ({
   directionId: 'plan-picker',
@@ -29,10 +55,11 @@ function responseMd({
   classification = 'dominant', policy = 'automatic', selected = 'one-column', candidates = 1,
   surfaceClass = 'catalog',
   refClass = 'plan-comparison', selectedFails = false, rejectAll = true, references = changeLevel === 'refine' ? 0 : 1, fallbacks = [],
-  printed = null,
+  printed = null, scores = 'dominant', winner = null,
 } = {}) {
   const formed = NAMES.slice(0, candidates);
   const shown = printed ?? formed;
+  const scoreRows = scores === 'none' ? [] : scoreTable(formed, winner ?? (selected === '—' ? formed[0] : selected), scores);
   const printedRows = shown.flatMap((id) => ['wide', 'narrow'].map((viewport) => `| http://127.0.0.1:60000/${id}.html?viewport=${viewport} | the ${viewport} render of the candidate, shown before the decision was written |`));
   const attacks = formed.map((id) => `| content stress | \`${id}\` | ${selectedFails && id === selected ? 'fails' : 'holds'} | the widest plan name still fits at 360px |`);
   const others = rejectAll ? formed.filter((id) => id !== selected).map((id) => `| \`${id}\` | it loses the offer above the fold on the narrow branch |`) : [];
@@ -102,6 +129,12 @@ ${refRows.join('\n')}
 | --- | --- | --- | --- |
 ${attacks.join('\n')}
 
+## Scores
+
+| Candidate | Viewport | Criterion | Score | Verdict |
+| --- | --- | --- | --- | --- |
+${scoreRows.join('\n')}
+
 ## Why not the others
 
 | Candidate | Rejected because |
@@ -118,7 +151,7 @@ ${printedRows.join('\n')}
 
 | Code | Action |
 | --- | --- |
-${fallbacks.map((c) => `| \`${c}\` | the candidate that survived the most attacks was selected |`).join('\n')}
+${fallbacks.map((c) => `| \`${c}\` | among the tied top scorers, the candidate introducing the fewest new nodes was selected |`).join('\n')}
 `;
 }
 
@@ -193,14 +226,17 @@ const refine = (over = {}) => ({
   ...over,
 });
 
-const threeCandidates = ({ policy = 'automatic', approval = null, extraResponse = {}, md = {} } = {}) => ({
+// Three rendered candidates, scored. Under the default the scores make one-column dominant and the
+// operator decides under either policy; `tie` levels them, so automatic takes the fallback and
+// approval-required needs the person's approval.
+const threeCandidates = ({ policy = 'automatic', approval = null, tie = false, extraResponse = {}, md = {} } = {}) => ({
   'request/request.json': requestJson({ extra: { candidates: 3, selectionPolicy: policy, approval } }),
   'response/response.json': responseJson({
-    fallbacks: policy === 'automatic' ? ['DIRECTION_CHOICE_REQUIRED'] : [],
+    fallbacks: tie && policy === 'automatic' ? ['DIRECTION_CHOICE_REQUIRED'] : [],
     fields: { 'frontend-direction-decision': 'response/response.md', 'ui-coverage': 'response/data/coverage.json', candidates: NAMES.map((n) => `response/artifacts/${n}.html`) },
     ...extraResponse,
   }),
-  'response/response.md': responseMd({ policy, candidates: 3, fallbacks: policy === 'automatic' ? ['DIRECTION_CHOICE_REQUIRED'] : [], ...md }),
+  'response/response.md': responseMd({ policy, candidates: 3, scores: tie ? 'tie' : 'dominant', fallbacks: tie && policy === 'automatic' ? ['DIRECTION_CHOICE_REQUIRED'] : [], ...md }),
   'response/data/coverage.json': coverage(),
   ...Object.fromEntries(NAMES.map((n) => [`response/artifacts/${n}.html`, `<!doctype html><title>${n}</title>`])),
 });
@@ -226,14 +262,17 @@ await expectValid({
   'response/response.md': responseMd({ surfaceClass: 'console' }),
   'response/data/coverage.json': { ...coverage(), surfaceClass: 'console' },
 }, 'another class of the published vocabulary, declared in the receipt and carried by the coverage');
-await expectValid(threeCandidates(), 'three candidates, the choice taken as a fallback');
-await expectValid(threeCandidates({ policy: 'approval-required', approval: 'one-column' }), 'three candidates approved by the person');
-// The choice is the person's: DIRECTION_CHOICE_REQUIRED under approval-required stops with the receipt,
-// and its ## Printed table is the choice — every candidate served at every viewport, at least three
-// of them, and a reason that names the sheet and asks one question. `printedChoice()` is that stop;
-// its mutations are options narrated in prose, or printed short.
+await expectValid(threeCandidates(), 'three candidates, the scores make one dominant and the operator decides');
+await expectValid(threeCandidates({ tie: true }), 'three candidates level on the scores, the tie broken by the fallback');
+await expectValid(threeCandidates({ policy: 'approval-required' }), 'three candidates under approval-required, one dominant, decided without asking');
+await expectValid(threeCandidates({ policy: 'approval-required', approval: 'one-column', tie: true }), 'three candidates level on the scores, the tie approved by the person');
+// The choice is the person's only over a tie the scores prove: DIRECTION_CHOICE_REQUIRED under
+// approval-required stops with the receipt, its ## Scores shows the tie, and its ## Printed table is
+// the choice — every candidate served at every viewport, at least three of them, and a reason that
+// names the sheet and asks one question. `printedChoice()` is that stop; its mutations are options
+// narrated in prose, printed short, scored with a winner, or not scored at all.
 const CHOICE_REASON = 'http://127.0.0.1:60000/ — which of the three compositions do you take?';
-const printedChoice = ({ candidates = 3, printed = NAMES.slice(0, candidates), reason = CHOICE_REASON, receipt = true } = {}) => ({
+const printedChoice = ({ candidates = 3, printed = NAMES.slice(0, candidates), reason = CHOICE_REASON, receipt = true, scores = 'tie' } = {}) => ({
   'request/request.json': requestJson({ extra: { candidates, selectionPolicy: 'approval-required' } }),
   'response/response.json': responseJson({
     status: 'blocked',
@@ -242,10 +281,11 @@ const printedChoice = ({ candidates = 3, printed = NAMES.slice(0, candidates), r
     reason,
     fields: { ...(receipt ? { 'frontend-direction-decision': 'response/response.md', 'ui-coverage': 'response/data/coverage.json' } : {}), candidates: NAMES.slice(0, candidates).map((n) => `response/artifacts/${n}.html`) },
   }),
-  ...(receipt ? { 'response/response.md': responseMd({ policy: 'approval-required', candidates, selected: '—', rejectAll: false, printed }), 'response/data/coverage.json': coverage() } : {}),
+  ...(receipt ? { 'response/response.md': responseMd({ policy: 'approval-required', candidates, selected: '—', rejectAll: false, printed, scores }), 'response/data/coverage.json': coverage() } : {}),
   ...Object.fromEntries(NAMES.slice(0, candidates).map((n) => [`response/artifacts/${n}.html`, `<!doctype html><title>${n}</title>`])),
 });
-await expectValid(printedChoice(), 'DIRECTION_CHOICE_REQUIRED under approval-required: three candidates printed at both viewports, one question for the person');
+await expectValid(printedChoice(), 'DIRECTION_CHOICE_REQUIRED under approval-required over a proven tie: three candidates printed at both viewports, one question for the person');
+await expectValid(printedChoice({ scores: 'loser' }), 'DIRECTION_CHOICE_REQUIRED over the other tie: the top mean loses a failed criterion to another candidate');
 await expectValid({
   'request/request.json': requestJson(),
   'response/response.json': responseJson({ status: 'blocked', stop: 'REFERENCE_MISSING', next: [], fields: {} }),
@@ -260,7 +300,7 @@ await expectError({ ...baseline(), 'request/request.json': requestJson({ extra: 
 await expectError({ ...refine(), 'request/request.json': requestJson({ extra: { changeLevel: 'refine', preview: 'yes' } }) }, 'preview was asked for but no candidate page was rendered', 'preview without a page');
 await expectError(refine({ 'response/response.json': responseJson({ fields: { 'frontend-direction-decision': 'response/response.md', 'ui-coverage': 'response/data/coverage.json', candidates: 'response/artifacts/one-column.html' } }), 'response/artifacts/one-column.html': '<!doctype html>' }), 'one candidate under no preview renders no page', 'unasked preview page on a refine');
 await expectError({ ...baseline(), 'response/response.json': responseJson() }, 'a reconstruct direction renders every candidate it forms', 'a reconstruct whose candidate nobody can see');
-await expectError({ ...threeCandidates(), 'response/response.json': responseJson({ fallbacks: ['DIRECTION_CHOICE_REQUIRED'], fields: { 'frontend-direction-decision': 'response/response.md', 'ui-coverage': 'response/data/coverage.json', candidates: ['response/artifacts/one-column.html'] } }) }, '3 formed and 1 rendered', 'a reconstruct that rendered only the candidate it liked');
+await expectError({ ...threeCandidates(), 'response/response.json': responseJson({ fields: { 'frontend-direction-decision': 'response/response.md', 'ui-coverage': 'response/data/coverage.json', candidates: ['response/artifacts/one-column.html'] } }) }, '3 formed and 1 rendered', 'a reconstruct that rendered only the candidate it liked');
 await expectError({ ...baseline(), 'response/response.md': responseMd({ changeLevel: 'refine' }) }, 'Change level refine differs from the request', 'receipt and request disagree on the change level');
 await expectError(refine({ 'response/response.md': responseMd({ changeLevel: 'refine' }) }), 'a refine is classified locked-refine', 'refine classified dominant');
 await expectError(refine({ 'response/response.md': responseMd({ changeLevel: 'refine', classification: 'locked-refine', references: 1 }) }), 'a refine works from the family idioms alone', 'refine that researched');
@@ -268,17 +308,26 @@ await expectError({ ...baseline(), 'request/request.json': requestJson({ extra: 
 await expectError({ ...baseline(), 'response/response.md': responseMd({ references: 0 }) }, 'names at least one reference standard by class', 'a reconstruct that named no standard');
 await expectError({ ...baseline(), 'response/response.md': responseMd({ refClass: '' }) }, 'Class', 'a standard with no class');
 await expectError({ ...baseline(), 'response/response.md': responseMd({ selectedFails: true }) }, 'fails an attack, so the direction is not decided', 'selected candidate fails an attack');
-await expectError({ ...threeCandidates(), 'response/response.md': responseMd({ candidates: 3, rejectAll: false, fallbacks: ['DIRECTION_CHOICE_REQUIRED'] }) }, 'is not rejected by name', 'unselected candidate not rejected');
+await expectError({ ...threeCandidates(), 'response/response.md': responseMd({ candidates: 3, rejectAll: false }) }, 'is not rejected by name', 'unselected candidate not rejected');
 await expectError({ ...baseline(), 'response/response.md': responseMd({ candidates: 2 }).replace('| `split-view` | it loses', '| `absent` | it loses') }, 'Falsification covers 2 candidates, the request asked for 1', 'more candidates than asked');
-await expectError({ ...threeCandidates({ policy: 'approval-required', approval: 'split-view' }) }, 'but approval names split-view', 'approval names another candidate');
-await expectError({ ...threeCandidates({ policy: 'approval-required' }) }, 'approval-required with no approval cannot end done', 'approval-required decided without an approval');
+await expectError({ ...threeCandidates({ policy: 'approval-required', approval: 'split-view', tie: true }) }, 'but approval names split-view', 'approval names another candidate');
+await expectError({ ...threeCandidates({ policy: 'approval-required', tie: true }) }, 'approval-required with no approval cannot end done', 'approval-required decided a tie without an approval');
+// Several rendered candidates are ranked, not offered: the scores are present for every one, whole
+// and comparable; the dominant candidate is the one selected; a tie is recorded as the fallback it
+// was, and a fallback over a dominant candidate is a choice that never existed.
+await expectError({ ...threeCandidates(), 'response/response.md': responseMd({ candidates: 3, scores: 'none' }) }, '## Scores carries no row', 'three rendered candidates decided with no scores');
+await expectError({ ...threeCandidates(), 'response/response.md': responseMd({ candidates: 3, selected: 'split-view', winner: 'one-column' }) }, 'the scores make one-column dominant', 'the receipt selects a candidate the scores rank below another');
+await expectError({ ...threeCandidates({ tie: true }), 'response/response.md': responseMd({ candidates: 3, scores: 'dominant', fallbacks: ['DIRECTION_CHOICE_REQUIRED'] }) }, 'no choice was required', 'a fallback recorded over a dominant candidate');
+await expectError({ ...threeCandidates(), 'response/response.md': responseMd({ candidates: 3, scores: 'tie' }) }, 'no candidate dominates', 'a tie decided under automatic with no fallback recorded');
+await expectError({ ...threeCandidates(), 'response/response.md': responseMd({ candidates: 3, scores: 'short' }) }, 'the taste lens is scored whole', 'a candidate scored without the whole taste lens');
+await expectError({ ...threeCandidates(), 'response/response.md': responseMd({ candidates: 3, scores: 'uneven' }) }, 'different criterion set', 'candidates scored on different criterion sets');
 await expectError(withCoverage((c) => { c.regions = c.regions.slice(0, 1); }), 'COVERAGE-1: region is not covered: decision', 'region uncovered');
 await expectError(withCoverage((c) => { c.actions = []; }), 'COVERAGE-1: actions must enumerate every declared action', 'actions uncovered');
 await expectError(withCoverage((c) => { c.states[1].carrier = 'the offer region'; }), 'COVERAGE-1: two meanings share one carrier', 'two meanings on one carrier');
 await expectError(withCoverage((c) => { c.actions[0].pendingPaths[0].settlement = ''; }), 'pending path without a settlement', 'unsettled pending path');
 await expectError(withCoverage((c) => { c.directionId = 'other-picker'; }), 'differs from the receipt', 'coverage names another direction');
 await expectError({ ...baseline(), 'response/response.md': responseMd({ printed: [] }) }, 'was rendered and never printed', 'a candidate rendered and never put in front of the person');
-await expectError({ ...threeCandidates(), 'response/response.md': responseMd({ candidates: 3, printed: ['one-column'], fallbacks: ['DIRECTION_CHOICE_REQUIRED'] }) }, 'candidate split-view was rendered and never printed', 'only the favourite candidate printed');
+await expectError({ ...threeCandidates(), 'response/response.md': responseMd({ candidates: 3, printed: ['one-column'] }) }, 'candidate split-view was rendered and never printed', 'only the favourite candidate printed');
 await expectError({ ...baseline(), 'response/response.md': responseMd({ surfaceClass: '' }) }, 'Surface class', 'a decided direction that declares no surface class');
 await expectError({ ...baseline(), 'response/response.md': responseMd({ surfaceClass: 'dashboard' }), 'response/data/coverage.json': { ...coverage(), surfaceClass: 'dashboard' } }, 'outside the vocabulary COVERAGE-1 Case 7 publishes', 'a class name nobody publishes');
 await expectError(withCoverage((c) => { delete c.surfaceClass; }), 'surfaceClass', 'coverage with no declared class');
@@ -294,5 +343,7 @@ await expectError(printedChoice({ candidates: 2, printed: ['one-column'] }), 'op
 await expectError(printedChoice({ candidates: 2 }), 'shows 2 rendered candidate(s) for a choice of 3', 'a composition choice with fewer than three candidates in front of the person');
 await expectError(printedChoice({ receipt: false }), 'with no receipt', 'a choice stop that carries no receipt and so printed nothing');
 await expectError(printedChoice({ reason: 'http://127.0.0.1:60000/ — one-column keeps the offer above the fold and split-view reads denser; which do you prefer, or should I refine first?' }), 'is not one question', 'a message that narrates the options instead of asking one question');
+await expectError(printedChoice({ scores: 'dominant' }), 'so the choice was the operator\'s', 'a choice handed to the person while the scores name a winner');
+await expectError(printedChoice({ scores: 'none' }), 'with no ## Scores', 'a choice handed to the person with nothing scored');
 
-process.stdout.write('frontend.direction.decide self-test: 7 valid branches, 41 rejected mutations\n');
+process.stdout.write('frontend.direction.decide self-test: 11 valid branches, 49 rejected mutations\n');

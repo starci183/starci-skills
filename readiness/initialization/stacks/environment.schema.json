@@ -1,0 +1,90 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://starci.dev/v9/readiness/initialization/stacks/environment.schema.json",
+  "title": "Environment declaration",
+  "description": "`<Source>/.stacks/<env>/environment.json`: what one environment of the installation declares about itself. The folder's presence is what names the environment — an `env` requirement is checked against the folder, never against a list — and this file is what that folder says, which today is one thing: who authorises each class of platform operation there. Authority for a platform operation comes from the environment's declaration, not from a per-run approval, whenever the declaration marks that operation's class `declared`; a class marked `person` needs an approval id. A request's `approval` therefore accepts either an approval id or a reference to this file — its path and the hash of its bytes, in the shape `$defs.reference` gives — and the reference is an approval only for a class this declaration marks `declared`, in this environment. A class the declaration omits takes the default `$defs.defaults` gives for its `production` value: a non-production environment authorises identity provisioning, seeding, the shared runtime's rungs and the stack's bring-up by declaration and keeps release with a person; a production environment keeps every class with a person. Any declaration may tighten a class to `person`; a production declaration may not loosen `release`, and this schema refuses one that tries. Silence remains silence: a request with no `approval` is not one whose environment answered.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "env", "production"],
+  "properties": {
+    "$schema": { "type": "string", "minLength": 1 },
+    "schemaVersion": { "const": 9 },
+    "env": {
+      "type": "string",
+      "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+      "description": "The environment this file declares; it is the folder the file lives in, and the two must agree."
+    },
+    "production": {
+      "type": "boolean",
+      "description": "Whether people are served from this environment. It selects which column of `$defs.defaults` an omitted class takes, and it is what forbids loosening `release`."
+    },
+    "authorization": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Per operation class, who authorises it in this environment. A class absent here takes its default; a class present here may tighten the default to `person`, and a non-production declaration may loosen one to `declared`.",
+      "properties": {
+        "identity-provisioning": {
+          "$ref": "#/$defs/authority",
+          "description": "Creating a flow's account at the environment's identity provider and writing its record of names."
+        },
+        "seed": {
+          "$ref": "#/$defs/authority",
+          "description": "Applying a flow's scoped fixtures to the environment's data."
+        },
+        "runtime": {
+          "$ref": "#/$defs/authority",
+          "description": "The shared runtime's server rungs and its registry: locating, starting, serving, restarting, resetting and stopping the one server of a route, and attesting its entry."
+        },
+        "stack-up": {
+          "$ref": "#/$defs/authority",
+          "description": "Bringing up the environment's declared infrastructure."
+        },
+        "release": {
+          "$ref": "#/$defs/authority",
+          "description": "Deploying a release to this environment. Never `declared` where `production` is true."
+        }
+      }
+    }
+  },
+  "if": {
+    "required": ["production"],
+    "properties": { "production": { "const": true } }
+  },
+  "then": {
+    "properties": {
+      "authorization": {
+        "properties": {
+          "release": { "const": "person" }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "authority": {
+      "enum": ["declared", "person"],
+      "description": "`declared`: this declaration is the approval, and a request names it by `$defs.reference`. `person`: an approval id is required, and a declaration reference is refused for the class."
+    },
+    "defaults": {
+      "description": "What a class the declaration omits is read as, by `production`. These two rows are the only place the defaults live; a validator reads them from here.",
+      "production": {
+        "identity-provisioning": "person",
+        "seed": "person",
+        "runtime": "person",
+        "stack-up": "person",
+        "release": "person"
+      },
+      "non-production": {
+        "identity-provisioning": "declared",
+        "seed": "declared",
+        "runtime": "declared",
+        "stack-up": "declared",
+        "release": "person"
+      }
+    },
+    "reference": {
+      "type": "string",
+      "pattern": "^\\.stacks/([a-z0-9]+(?:-[a-z0-9]+)*)/environment\\.json#(sha256:[0-9a-f]{64})$",
+      "description": "How a request's `approval` names this declaration: the file's path from the host repository root, `#`, and the sha256 of its bytes. The hash is what binds the approval to one exact declaration; a declaration edited after the request was written no longer matches it, which is authority drift and not a quieter approval."
+    }
+  }
+}

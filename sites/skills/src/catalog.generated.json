@@ -1,6 +1,6 @@
 {
-  "version": "1.7.3",
-  "lineageNote": "1.7.3 (2026-09-03): a decision handed to a person is printed as rendered candidates — one per option, at least three for composition or taste, a capture per viewport, a one-line question — and the direction and audit validators refuse a user route that prints fewer; the family binds by the route's grammarId as @knowledge/grammars/<family>; Steps rows state the job and the kind, mechanisms live in the kind contracts; UPDATE.md carries the two writing principles (nothing specific, no errata) and the tree is swept for both.",
+  "version": "1.7.4",
+  "lineageNote": "1.7.4 (2026-09-03): authority comes from the environment declaration — .stacks/<env>/environment.json marks each operation class declared or person, non-production defaults to declared for provisioning and runtime, production to person, and the approval field accepts the declaration reference with its hash; several rendered candidates are ranked by the proof rubric and the dominant one is taken, a person is asked only over a scored tie; a data-volume criterion is measured at the flow's representative seeded volume, routes to seed below it and is data-bound at it; a criterion the person's printed choice was known to fail is person-accepted and does not block quality or uat.",
   "entry": {
     "name": "starci",
     "description": "Complete one StarCi mission by freezing its scope, selecting the one operator that owns the outcome, and routing between operators on typed results until the outcome is proved or a person must decide.",
@@ -932,6 +932,7 @@
         "@grammar/core",
         "@knowledge/grammars/<family>",
         "@knowledge/ui/composition",
+        "@knowledge/ui/proof",
         "@workspaces/fe",
         "@worktrees/uat/<flow>/<case>"
       ],
@@ -1100,7 +1101,7 @@
           "code": "DIRECTION_CHOICE_REQUIRED",
           "disposition": "fallback",
           "domain": "caller",
-          "meaning": "Several candidates survive falsification and none dominates.",
+          "meaning": "Several candidates survive falsification and the scores under ## Scores prove none dominant: the top means are equal, or the top scorer loses a failed criterion to another.",
           "shared": false
         },
         {
@@ -1558,12 +1559,6 @@
           "file": "response/artifacts/host.json",
           "type": "artifact",
           "required": false
-        },
-        {
-          "kind": "candidates",
-          "file": "response/artifacts/candidates/<candidateId>.html",
-          "type": "artifact",
-          "required": false
         }
       ],
       "next": [
@@ -1582,6 +1577,10 @@
         {
           "when": "a claim fails on a Grammar component's own render, so a person records the family gap and publishes",
           "operator": "frontend.surface.audit"
+        },
+        {
+          "when": "a density criterion was measured below the flow's representative seeded volume, so the data is seeded before the surface is judged again",
+          "operator": "platform.operate"
         },
         {
           "when": "the route requires an identity and this flow has no account yet, so one is provisioned before the surface is observed",
@@ -1961,7 +1960,7 @@
           "code": "AUTHORITY_DRIFT",
           "disposition": "terminate",
           "domain": "caller",
-          "meaning": "The approval, the plan hash, or the allowed effect set no longer matches the requested delta.",
+          "meaning": "The approval — an approval id, or the environment declaration it references, whose content hash has moved — the plan hash, or the allowed effect set no longer matches the requested delta.",
           "shared": false
         },
         {
@@ -3338,8 +3337,7 @@
     {
       "kind": "candidates",
       "producedBy": [
-        "frontend.direction.decide",
-        "frontend.surface.audit"
+        "frontend.direction.decide"
       ],
       "consumedBy": []
     },
@@ -3795,9 +3793,9 @@
       "shared": false,
       "domain": "caller",
       "disposition": "terminate",
-      "meaning": "The approval, the plan hash, or the allowed effect set no longer matches the requested delta.",
+      "meaning": "The approval — an approval id, or the environment declaration it references, whose content hash has moved — the plan hash, or the allowed effect set no longer matches the requested delta.",
       "fallback": null,
-      "resume": "Bring a fresh approval for this exact plan."
+      "resume": "Bring a fresh approval for this exact plan: a new id, or the declaration's current reference."
     },
     {
       "code": "AUTHORIZATION_MISSING",
@@ -4132,8 +4130,8 @@
       "shared": false,
       "domain": "caller",
       "disposition": "fallback",
-      "meaning": "Several candidates survive falsification and none dominates.",
-      "fallback": "Select the candidate that survived the most falsification attacks; on a tie, the one that introduces the fewest new nodes; record the table under ## Decision.",
+      "meaning": "Several candidates survive falsification and the scores under ## Scores prove none dominant: the top means are equal, or the top scorer loses a failed criterion to another.",
+      "fallback": "Among the tied top scorers, select the candidate that introduces the fewest new nodes; the scores stay under ## Scores and the pick under ## Decision.",
       "resume": "The person supplies approval naming one candidate."
     },
     {

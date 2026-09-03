@@ -89,8 +89,26 @@ biên nhận kèm phán quyết của nó. Một hướng còn vô hiệu chừn
 lợi chưa giải quyết hay một phương án đảo ngược mạnh hơn về bản chất. Dưới `refine`, các phương án là
 những nước đi ở cấp phần tử bên trong cấu trúc đã duyệt, không bao giờ là một cấu trúc mới. Khi
 phương án duy nhất chết dưới một đòn tấn công, lần chạy dừng với `NO_VIABLE_DIRECTION`; khi nhiều
-phương án cùng sống, `DIRECTION_CHOICE_REQUIRED` chọn cái sống sót qua nhiều đòn nhất, trừ khi người
-dùng giữ quyền chọn.
+phương án cùng sống, chúng được chấm điểm và xếp hạng, và `DIRECTION_CHOICE_REQUIRED` chỉ được nêu
+lên trên một thế hoà mà bảng điểm chứng minh được.
+
+## Nhiều phương án sống sót thì được xếp hạng, không đem ra mời chọn
+
+Một lựa chọn chỉ về tay người khi các phương án thật sự ngang nhau; khi một phương án trội, operator
+tự quyết, in các phương án ra làm bằng chứng rồi đi tiếp, vì một lời xác nhận mà biên nhận đã cho
+thấy câu trả lời thì không ai cần phải đưa ra. Khi có nhiều hơn một phương án được render, bước 11
+chấm từng phương án đã render ở từng viewport nó đã được in theo các tiêu chí của `@knowledge/ui/proof`
+mà một bản render tĩnh trả lời được — trọn lens thẩm mỹ, chấm theo cách `TASTE-13` Case 1 chấm, và
+mọi tiêu chí trải nghiệm mà luật của nó gọi bức chụp là công cụ đo — rồi ghi từng điểm dưới
+`## Scores`, cạnh các phương án đã in. Một phương án là trội khi điểm trung bình của nó cao nhất và ở
+cùng viewport nó không thấp hơn bất kỳ phương án nào khác trên mọi tiêu chí mà bất kỳ phương án nào đã
+rớt trong lần chấm ấy. Phương án trội được chọn dưới cả hai chính sách chọn. Chỉ khi không phương án
+nào trội — các điểm trung bình dẫn đầu bằng nhau, chính là độ phân giải của thang điểm, hoặc phương án
+dẫn đầu thua một phương án khác trên một tiêu chí đã rớt — lựa chọn mới mở: dưới `automatic`, fallback
+phá thế hoà và ghi lại; dưới `approval-required`, lần chạy dừng với `DIRECTION_CHOICE_REQUIRED`, và
+bảng điểm trong biên nhận chính là thứ chứng minh đó đúng là một thế hoà. Validator từ chối lần dừng
+ấy khi bảng điểm cho thấy một phương án trội, và từ chối một quyết định trên nhiều hơn một phương án đã
+render mà không mang điểm.
 
 ## Ranh giới
 
@@ -117,6 +135,7 @@ dưới `response/artifacts/images/`; `frontend.source.apply` ghi chúng cùng w
 | `@knowledge/ui/composition` | các khẳng định mà biên nhận phát ra phải thoả, `COVERAGE-1` là khẳng định về toàn bộ biên nhận | có |
 | `@workspaces/fe` | checkout frontend được route, đọc ở head đóng băng; hiện trạng là bằng chứng, không bao giờ là hướng được yêu cầu | có |
 | `@knowledge/grammars/<family>` | họ mà route đã bind gọi tên (`context.grammarId`) được kỳ vọng hiện thực hoá Common ra sao; luật về Grammar, không phải chính Grammar | không |
+| `@knowledge/ui/proof` | các tiêu chí mà mọi phương án đã render được chấm theo trước khi chọn một; cùng thang điểm mà audit sau này đo, chỉ đọc khi có nhiều hơn một phương án được render | không |
 | `@worktrees/uat/<flow>/<case>` | quan sát hành vi, UX và UI của lần trước kèm ảnh chụp; bằng chứng và phản chứng, một lần pass cũ không phải thẩm quyền hiện tại | không |
 
 ## Đầu vào
@@ -139,8 +158,8 @@ dưới `response/artifacts/images/`; `frontend.source.apply` ghi chúng cùng w
 | `candidates` | number 1–3 | 1 | Hình thành bao nhiêu hướng; nhiều hơn một chỉ khi muốn so sánh |
 | `preview` | choice | no | yes thì render phương án duy nhất thành một trang xem được |
 | `references` | list | [] | Tham chiếu ngoài do người dùng cấp; nghiên cứu có giới hạn chỉ chạy khi ô này rỗng |
-| `selectionPolicy` | choice | automatic | `automatic`: operator chọn và ghi lý do; `approval-required`: người chọn |
-| `approval` | id | null | Id phương án được duyệt; chỉ bắt buộc dưới `approval-required`, nhập khi chạy lại sau `DIRECTION_CHOICE_REQUIRED` |
+| `selectionPolicy` | choice | automatic | `automatic`: operator chọn, kể cả khi hoà, và ghi lý do; `approval-required`: operator vẫn chọn phương án trội, còn thế hoà là của người |
+| `approval` | id | null | Id phương án được duyệt; chỉ bắt buộc dưới `approval-required` khi bảng điểm đã chứng minh thế hoà, nhập khi chạy lại sau `DIRECTION_CHOICE_REQUIRED` |
 | `resume` | token | null | Token của nhánh bị chặn khi vào lại sau một mã dừng |
 
 ## Các bước
@@ -157,7 +176,7 @@ dưới `response/artifacts/images/`; `frontend.source.apply` ghi chúng cùng w
 | 8 | Áp bộ lọc Grammar | `ownerCeiling` | @grammar/core (component sở hữu gì và có prop nào), @knowledge/grammars/&lt;family> | — | `GRAMMAR_REQUIRED` |
 | 9 | Render bằng chứng quyết định và hình đã tự xét, phục vụ cho một người xem rồi in ra | `candidates`, `preview` | các phương án còn sống, @knowledge/grammars/&lt;family> | `candidates`, `direction-image`, `host` | — |
 | 10 | Phản chứng | — | các phương án, đầu vào `business-promise-authority` và `backend-source-application`, `response/data/coverage.json` | — | `NO_VIABLE_DIRECTION` |
-| 11 | Quyết | `selectionPolicy`, `approval` | bảng phản chứng | — | `DIRECTION_CHOICE_REQUIRED` |
+| 11 | Chấm các phương án đã render rồi quyết | `selectionPolicy`, `approval` | bảng phản chứng, @knowledge/ui/proof (các tiêu chí một bản render tĩnh trả lời được, theo từng viewport đã in) | — | `DIRECTION_CHOICE_REQUIRED` |
 | 12 | Phát | — | mọi thứ ở trên | `response/response.md`, `response/response.json` | — |
 
 Bước 5 còn chốt luôn đây là loại bề mặt nào. `COVERAGE-1` Case 7 publish bộ từ vựng, coverage mang
@@ -188,21 +207,26 @@ liệt kê từng artifact đã in dưới `## Printed` kèm lý do. Một phư�
 báo là phương án không ai thấy, và quyết định lấy trên đó là quyết định lấy một mình.
 
 Cũng chính bảng ấy là toàn bộ phần bàn giao khi lựa chọn thuộc về người. `DIRECTION_CHOICE_REQUIRED`
-dưới `approval-required` dừng kèm biên nhận, và bảng `## Printed` của nó chính là lựa chọn: mỗi phương
+dưới `approval-required` dừng, trên một thế hoà mà `## Scores` của nó chứng minh, kèm biên nhận, và bảng `## Printed` của nó chính là lựa chọn: mỗi phương
 án một trang đã phục vụ, mỗi trang một ảnh chụp cho mỗi viewport, và ít nhất ba phương án, vì bố cục
 được chọn bằng mắt — khi sống sót ít hơn, lượt chạy render phương án thứ ba từ các phương án đã loại
 hay các biến thể ở mức phần tử của chính nó, để người so sánh bản render chứ không so sánh câu chữ.
 `reason` của lần dừng nêu URL của bảng và hỏi đúng một câu, không hơn: hai lựa chọn viết bằng văn xuôi
 không phải là lựa chọn, đó là lời khuyên, và validator từ chối một route `user` mà bảng có ít phương án
-đã render hơn số lựa chọn, hoặc không có phương án nào. `GRAMMAR_REQUIRED` và các mã dừng về phía
+đã render hơn số lựa chọn, hoặc không có phương án nào, và cả một route mà bảng điểm đã gọi tên người
+thắng lẽ ra operator phải tự lấy. Một lựa chọn người lấy từ bảng ấy đóng lại những gì bảng đã cho
+thấy: một tiêu chí mà `## Scores` cho thấy rớt ở phương án người đã duyệt được coi là đã định cho phiên
+này, và audit sau đó ghi nó là person-accepted, gọi tên nhánh này, thay vì định tuyến ngược lại
+(`TASTE-13` Case 7) — thang điểm không bao giờ lật một quyết định người đã lấy trên chính bằng chứng
+của mình. `GRAMMAR_REQUIRED` và các mã dừng về phía
 caller là việc vận hành — một người publish, sửa hay cấp một thứ gì đó — nên `reason` của chúng nói rõ
 điều ấy và không mang phương án nào.
 
 Dưới `refine` trang vẫn là tuỳ chọn — cấu trúc đã được duyệt từ trước lượt chạy này — và chỉ render
 khi có nhiều hơn một phương án được hình thành hoặc `preview` là yes; một phương án refine duy nhất
-dưới mặc định không sinh trang nào và dựa vào bước 10. Dưới `automatic`,
-`DIRECTION_CHOICE_REQUIRED` chọn phương án sống sót qua nhiều đòn tấn công nhất và ghi lại bảng; dưới
-`approval-required` nó dừng và người dùng quay lại với `approval`. Biên nhận uỷ quyền cho domain kế
+dưới mặc định không sinh trang nào và dựa vào bước 10. Phương án trội được quyết dưới cả hai chính
+sách; khi hoà, `automatic` lấy fallback và ghi lại, còn `approval-required` dừng với
+`DIRECTION_CHOICE_REQUIRED` cho tới khi người quay lại với `approval`. Biên nhận uỷ quyền cho domain kế
 tiếp resolve và triển khai bên trong trần owner đã đóng băng, và không chứng minh gì về việc kết quả
 render ra sao.
 

@@ -256,14 +256,29 @@ the response is refused as malformed.
 
 ## The desired state is one approved declaration
 
-`desiredState` is the whole of what the person asks for: the approved plan hash, the service kind the
+`desiredState` is the whole of what the caller asks for: the approved plan hash, the service kind the
 plan was written against, the resources to converge, the effects to apply, and the two scope sets that
 say which resources may change and which may only be observed. Keeping it as one declaration is what
 makes the approval mean something: `approval` covers that declaration, hash and all, so a field
-edited afterwards no longer matches the hash the approval named. `approval` has no default because
-this is a runtime other sessions and other people share, and changing what a shared service does is
-never something an agent decides alone. `portClaims` defaults to the empty list, because most
-operations need no port at all and a claim nobody made cannot collide with anybody.
+edited afterwards no longer matches the hash the approval named.
+
+Where the authority behind `approval` comes from is the environment's to say. Every environment of
+the installation declares, per class of platform operation — identity provisioning, seeding, the
+shared runtime's rungs, the stack's bring-up, release — whether its own declaration is the approval
+(`declared`) or a person's approval id is required (`person`). The declaration's shape, its place in
+the environment's folder, the defaults an omitted class takes by whether the environment is
+production, and the one loosening a production declaration is refused are all the environment
+schema's (`readiness/initialization/stacks/environment.schema.json`), stated there once and read from
+there by the gate. `approval` therefore accepts either an approval id or
+the declaration's reference — its path and the hash of its content — and the receipt's Approval row
+records whichever was bound. The validator derives the operation's class from its branch and effects,
+reads the declaration the reference names, and refuses the reference when the declaration is absent,
+hashes differently, belongs to another environment, is refused by its schema, or marks that class
+`person`; a hash that moved between the request and the run is `AUTHORITY_DRIFT`. `approval` still
+has no default: a runtime other sessions and other people share is never changed on silence, and what
+the declaration changes is that the environment's standing answer counts as the approval, not that the
+question stops being asked. `portClaims` defaults to the empty list, because most operations need no
+port at all and a claim nobody made cannot collide with anybody.
 
 ## Boundary
 
@@ -284,7 +299,7 @@ bound inventory does not list; does not emit an effect or a check the bound serv
 publish; does not move a served port, or free one by stopping, killing, or reconfiguring the process that already holds
 it; does not edit a running service's allowed origins in place of the declaration that should carry them; does not record a credential value, capability handle, or secret-shaped token anywhere in the
 output, in the account record, or in the flow folder; does not ask a person to sign in, to create an
-account, or to paste a credential; does not edit knowledge or grant its own approval; and does not claim an operated outcome
+account, or to paste a credential; does not edit knowledge, write an environment's declaration, or otherwise grant its own approval; and does not claim an operated outcome
 while any required check is absent or failed, nor any product readiness, release approval, or UAT
 proof.
 
@@ -311,7 +326,7 @@ proof.
 | `service` | id | — | The one shared service being operated |
 | `desiredState` | `{planSha256, serviceKind, resourceRefs, effects, mutableResourceRefs, observationOnlyResourceRefs}` | — | The approved declaration: which plan, which branch, which resources, which effects, and what may change against what may only be observed |
 | `portClaims` | list of `{port, resourceRef}` | [] | Which ports the desired state needs, and for which owned resource |
-| `approval` | id | — | The approval that covers this desired state; changing a shared runtime always needs a person |
+| `approval` | id | — | The authority that covers this desired state: an approval id, or the environment declaration's reference — its path and content hash — when that declaration marks this operation's class `declared` for `env`; no default, because silence is not consent |
 | `routeKey` | id | null | The `<project>/<role>` registry entry this operation attests or provisions against; null when the operation touches no route |
 | `operation` | choice | serve | The rung of the runtime ladder this invocation climbs: `stack-up`, `locate`, `start-role`, `serve`, `restart`, `reset` or `stop` |
 | `commit` | id | null | The commit this session needs served, merged into the integration branch when the served head does not already contain it |
@@ -324,7 +339,7 @@ proof.
 | # | Step | Params | Reads | Writes | Stops with |
 | --- | --- | --- | --- | --- | --- |
 | 1 | Validate the gate and resume | `resume` | `request/request.json`, @worktrees/sessions/central-runtime at the frozen generation | — | `INVALID_INPUT`, `SOURCE_DRIFT`, `NO_PROGRESS` |
-| 2 | Bind the authority: the runtime, the device state, the projects and the approval | `service`, `approval` | @worktrees/sessions/central-runtime for the inventory fingerprint and generation, @workspaces/device-state for each capability handle with its custody evidence, @workspaces/projects/<project>/<role>, @tools/secrets | — | `AUTHORITY_DRIFT`, `CAPABILITY_MISSING` |
+| 2 | Bind the authority: the runtime, the device state, the projects and the approval — an id, or the environment's declaration re-read and re-hashed | `service`, `approval`, `env` | @worktrees/sessions/central-runtime for the inventory fingerprint and generation, @workspaces/device-state for each capability handle with its custody evidence, @workspaces/projects/<project>/<role>, the environment's declaration when `approval` references it, @tools/secrets | — | `AUTHORITY_DRIFT`, `CAPABILITY_MISSING` |
 | 3 | Recheck the inventory once before anything changes | — | @worktrees/sessions/central-runtime, the declared resources re-observed once, @tools/git | — | `INVENTORY_DRIFT` |
 | 4 | Resolve the port claims against the projection, and observe who holds each | `portClaims` | @workspaces/ports/<project> for the projected ports, @worktrees/sessions/central-runtime for their observed holders | — | `PORT_CONFLICT` |
 | 5 | Derive the delta between what is observed and what is desired | `desiredState` | @worktrees/sessions/central-runtime for the observed state, `request/request.json` for the desired state | `response/data/delta.json` | — |

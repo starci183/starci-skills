@@ -68,8 +68,8 @@
     },
     "encryptedAuthority": {
       "commit": true,
-      "paths": [".stacks/**/*.enc", ".stacks/**/KEYS.md", ".stacks/*/infra/compose/**"],
-      "rule": "Ciphertext, recipient metadata and value-free topology are portable. The master identity and decrypted twins are never committed."
+      "paths": [".stacks/**/*.enc", ".stacks/**/KEYS.md", ".stacks/*/infra/compose/**", ".stacks/*/environment.json"],
+      "rule": "Ciphertext, recipient metadata, value-free topology and the environment's declaration (readiness/initialization/stacks/environment.schema.json) are portable. The master identity and decrypted twins are never committed."
     },
     "masterIdentity": {
       "commit": false,

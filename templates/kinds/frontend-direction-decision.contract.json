@@ -87,6 +87,17 @@
       }
     },
     {
+      "heading": "^## Scores$",
+      "table": "| Candidate | Viewport | Criterion | Score | Verdict |",
+      "cell": {
+        "Candidate": "^`[a-z0-9][a-z0-9-]*`$",
+        "Viewport": "^[a-z0-9][a-z0-9-]*$",
+        "Criterion": "^`(TASTE-([1-9]|1[0-2])|UX-([1-9]|1[01]))`$",
+        "Score": "^[1-5]$",
+        "Verdict": "^(pass|fail)$"
+      }
+    },
+    {
       "heading": "^## Why not the others$",
       "table": "| Candidate | Rejected because |",
       "cell": {
