@@ -16,7 +16,8 @@
       "@tools/websearch": "bounded",
       "@tools/imagegen": "judged",
       "@tools/visualize": "html",
-      "@tools/host": "loopback"
+      "@tools/host": "loopback",
+      "@tools/print": "decision-points"
     }
   }
 }

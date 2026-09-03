@@ -105,7 +105,7 @@ a node passes.
 | 3 | Select the matrix entries and read the declared surface class | `matrix` | input `frontend-direction-decision` (its `response/data/coverage.json`: state by viewport by colour scheme, and the `surfaceClass` that decision declared) | — | `SURFACE_CLASS_MISSING` |
 | 4 | Reach readiness for each entry, signing in as the flow's account when the route requires an identity | `readinessProbe`, `account`, `env` | @worktrees/sessions/central-runtime for the entry of this project route, input `uat-account` for the account of names, @tools/http, @tools/secrets, @tools/browsercontrol | — | `RUNTIME_UNAVAILABLE`, `IDENTITY_MISSING` |
 | 5 | Capture and measure each entry | — | @worktrees/sessions/central-runtime, @workspaces/fe (the observed owners and the identifiers each node carries), @tools/browsercontrol | `response/artifacts/<matrixId>.png`, `response/data/captures/<matrixId>.json` | `EVIDENCE_MISSING` |
-| 6 | Compare against the claims and the proof rules, judge by owner, let each topic close itself, and emit | — | @knowledge/ui/proof, @knowledge/grammars/starci, the captures, @tools/websearch | `response/data/verdicts.json`, `response/response.md`, `response/response.json`, `response/artifacts/host.json`, @tools/visualize, @tools/host | `UNKNOWN_RULE` |
+| 6 | Compare against the claims and the proof rules, judge by owner, let each topic close itself, and emit | — | @knowledge/ui/proof, @knowledge/grammars/starci, the captures, @tools/websearch | `response/data/verdicts.json`, `response/response.md`, `response/response.json`, `response/artifacts/host.json`, @tools/visualize, @tools/host, @tools/print | `UNKNOWN_RULE` |
 
 Step 6 judges every claim and then lets each proof topic close itself. The canon judgement is the one
 above: every claim measured, judged against the published rule, routed by the owner of the node it
@@ -122,6 +122,12 @@ The sheet is served, not filed. `@tools/host` (the shipped `scripts/host-artifac
 the first free port from 60000 up to 60100 and records the URL, the port, the folder and the pid in
 `response/artifacts/host.json`, stopping when the branch ends or is resumed; a person opens the sheet
 and sees every matrix entry beside its verdicts. Nothing binds `0.0.0.0`.
+
+Serving is not telling. Step 6 prints over `@tools/print`, into the conversation the person is
+reading, the sheet's URL, the worst-scoring capture of each topic and the `## Verdict` table, and the
+receipt lists each printed artifact under `## Printed` with why it was printed. A verdict a person
+never saw sends nobody anywhere, and an audit that files its sheet and says nothing has audited only
+itself.
 
 The surface class is not this operator's to choose or to declare. It is read from the coverage of the
 `frontend-direction-decision` this audit was given, where the direction declared it from the

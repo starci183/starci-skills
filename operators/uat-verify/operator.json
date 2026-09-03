@@ -19,7 +19,8 @@
       "@tools/browsercontrol": "required",
       "@tools/http": "probe",
       "@tools/secrets": "resolve-by-name",
-      "@tools/database": "namespaced-write"
+      "@tools/database": "namespaced-write",
+      "@tools/print": "decision-points"
     }
   }
 }

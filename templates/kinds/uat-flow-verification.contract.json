@@ -86,6 +86,14 @@
       }
     },
     {
+      "heading": "^## Printed$",
+      "table": "| Artifact | Why |",
+      "cell": {
+        "Artifact": "^(`[^`]+`|https?://\\S+)$",
+        "Why": "\\S"
+      }
+    },
+    {
       "heading": "^## Fallbacks taken$",
       "table": "| Code | Action |"
     }

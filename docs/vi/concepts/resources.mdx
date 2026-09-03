@@ -46,7 +46,9 @@ chính là toàn bộ phần quyền: `@tools/git: read` không commit được,
 commit đúng một lần vào `session/<sessionId>` và không bao giờ vào nhánh của người, `@tools/git:
 merge-and-push` là mode duy nhất chạm tới remote mà vẫn không được rebase, không được force, không
 được bỏ hook. `@tools/database: namespaced-write` chỉ được insert và delete những dòng mang namespace
-của lần chạy và `is_uat=true`. `never` không phải một lời khai: công cụ operator không dùng thì để
+của lần chạy và `is_uat=true`. `@tools/print: decision-points` đưa tận tay người dùng artifact mà một
+quyết định hay một phán quyết dựa lên, ngay lúc nó được ghi, và ghi chính artifact đó vào biên nhận.
+`never` không phải một lời khai: công cụ operator không dùng thì để
 hẳn ra ngoài bản đồ.
 
 Năng lực và quyền vẫn là hai sự thật khác nhau. Năng lực thuộc về runtime; quyền là chính sách áp lên

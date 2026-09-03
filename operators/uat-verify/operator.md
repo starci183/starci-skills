@@ -170,10 +170,15 @@ anything outside its own fixture namespace.
 | 4 | Draft from the template whatever the flow folder lacks, then freeze the snapshot from `flow.md`, `accounts.<env>.json` and `seed/` | `feature`, `flow`, `env`, `cases` | @worktrees/uat/<flow>/<case>, @worktrees/_templates for the flow template | @worktrees/uat/<flow>/<case> (snapshot), `response/data/snapshot.json`, @tools/sourcewrite | `CANONICAL_WRITE_DENIED` |
 | 5 | Seed the frozen records into the run namespace | `runId` | `response/data/snapshot.json`, @workspaces/be | @tools/database | `FIXTURE_VIOLATION` |
 | 6 | Execute the frozen cases in order against the endpoint the bound route carries, at the pinned commit | — | `response/data/snapshot.json`, input `route` for the endpoint this run drives, @worktrees/sessions/central-runtime for the generation behind that endpoint, @workspaces/device-state for the credential at login only, @tools/browsercontrol, @tools/websearch | — | `LEASE_INVALID`, `RUNTIME_UNAVAILABLE` |
-| 7 | Capture at each named assertion with the login field masked, and stitch the sheet | — | `response/data/snapshot.json`, @worktrees/sessions/central-runtime for the most direct runtime evidence | `response/data/captures/<case>.json`, `response/artifacts/<case>.png`, `response/artifacts/sheet.png`, @tools/visualize | `EVIDENCE_UNAVAILABLE` |
+| 7 | Capture at each named assertion with the login field masked, and stitch the sheet | — | `response/data/snapshot.json`, @worktrees/sessions/central-runtime for the most direct runtime evidence | `response/data/captures/<case>.json`, `response/artifacts/<case>.png`, `response/artifacts/sheet.png`, @tools/visualize, @tools/print | `EVIDENCE_UNAVAILABLE` |
 | 8 | Judge the three lanes apart, and score the experience lane criterion by criterion | — | @knowledge/ui/proof (the UX topic and its closing rule), `response/data/captures/<case>.json` | `response/data/verdicts.json` | — |
 | 9 | Verify read-only, then delete the run namespace and nothing else | `runId` | @workspaces/be for the records carrying `is_uat=true` and this namespace, `response/data/verdicts.json` | @tools/database | — |
-| 10 | Append `runs/<runId>/`, point `latest.json` at it, add the history line, and emit | `runId` | everything above | @worktrees/uat/<flow>/<case> (runs/<runId>/, latest.json and history.md), `response/response.md`, `response/response.json`, @tools/sourcewrite | — |
+| 10 | Append `runs/<runId>/`, point `latest.json` at it, add the history line, and emit | `runId` | everything above | @worktrees/uat/<flow>/<case> (runs/<runId>/, latest.json and history.md), `response/response.md`, `response/response.json`, @tools/sourcewrite, @tools/print | — |
+
+A verdict nobody was shown is a verdict nobody read. Step 7 prints the run's step-capture summary and
+step 10 prints the `## Verdict` table over `@tools/print`, into the conversation the person who asked
+for this run is reading, and the receipt lists both under `## Printed` with why each was printed; the
+login field stays masked in every frame that is printed, exactly as in every frame that is written.
 
 A blocked run publishes no run record at all, because a half-written record is the artifact a later
 reader would mistake for a decision. A resume begins again at validation, reuses only observations

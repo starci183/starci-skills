@@ -107,7 +107,9 @@ function verdicts(over = {}) {
   };
 }
 
-function responseMd({ snap = snapshot(), verd = verdicts(), outcomes = { 'pay-and-enrol': 'pass', 'abandon-checkout': 'pass' }, note = 'The shared credential is named, never printed, and every login field is masked.' } = {}) {
+const PRINTED = [`| ${BT}response/artifacts/sheet.png${BT} | the run's step captures, handed to the person who asked before the verdict was published |`];
+
+function responseMd({ snap = snapshot(), verd = verdicts(), outcomes = { 'pay-and-enrol': 'pass', 'abandon-checkout': 'pass' }, printed = PRINTED, note = 'The shared credential is named, never printed, and every login field is masked.' } = {}) {
   return `# uat-flow-verification — ${snap.feature}/${snap.flow}
 
 The product owner asked for this run; it was admitted at one commit, executed case by case in the
@@ -164,6 +166,12 @@ ${verd.experience.entries.map((r) => `| \`${r.rule}\` | ${r.measured} | ${r.scor
 | Topic | Verdict | Route |
 | --- | --- | --- |
 | \`experience\` | ${verd.experience.verdict} | ${verd.experience.routeTo} |
+
+## Printed
+
+| Artifact | Why |
+| --- | --- |
+${printed.join('\n')}
 
 ## Fallbacks taken
 
@@ -372,4 +380,7 @@ await expectError({ ...baseline(), 'response/response.md': responseMd().replace(
 await expectError(baseline(), 'appends one line to the flow history', 'a run that left no history line', 'no-history');
 await expectError(baseline(), 'excludes the flow folder', 'a flow folder the host repository would never track', 'ignored');
 
-process.stdout.write('uat.verify self-test: 9 valid branches, 52 rejected mutations\n');
+// A verdict nobody was shown is a verdict nobody read.
+await expectError({ ...baseline(), 'response/response.md': responseMd({ printed: [] }) }, 'names no run summary', 'a published verdict the person who asked never saw');
+
+process.stdout.write('uat.verify self-test: 9 valid branches, 53 rejected mutations\n');

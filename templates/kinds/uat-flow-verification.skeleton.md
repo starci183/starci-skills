@@ -70,6 +70,12 @@ the login field is masked in every screenshot.
 | --- | --- | --- |
 | `experience` | ship | none |
 
+## Printed
+
+| Artifact | Why |
+| --- | --- |
+| `response/artifacts/sheet.png` | the run's step captures, handed to the person who asked before the verdict was published |
+
 ## Fallbacks taken
 
 | Code | Action |

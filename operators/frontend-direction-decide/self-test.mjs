@@ -29,8 +29,11 @@ function responseMd({
   classification = 'dominant', policy = 'automatic', selected = 'one-column', candidates = 1,
   surfaceClass = 'catalog',
   refClass = 'plan-comparison', selectedFails = false, rejectAll = true, references = changeLevel === 'refine' ? 0 : 1, fallbacks = [],
+  printed = null,
 } = {}) {
   const formed = NAMES.slice(0, candidates);
+  const shown = printed ?? formed;
+  const printedRows = shown.flatMap((id) => ['wide', 'narrow'].map((viewport) => `| http://127.0.0.1:60000/${id}.html?viewport=${viewport} | the ${viewport} render of the candidate, shown before the decision was written |`));
   const attacks = formed.map((id) => `| content stress | \`${id}\` | ${selectedFails && id === selected ? 'fails' : 'holds'} | the widest plan name still fits at 360px |`);
   const others = rejectAll ? formed.filter((id) => id !== selected).map((id) => `| \`${id}\` | it loses the offer above the fold on the narrow branch |`) : [];
   const BT = String.fromCharCode(96);
@@ -104,6 +107,12 @@ ${attacks.join('\n')}
 | Candidate | Rejected because |
 | --- | --- |
 ${others.join('\n')}
+
+## Printed
+
+| Artifact | Why |
+| --- | --- |
+${printedRows.join('\n')}
 
 ## Fallbacks taken
 
@@ -254,6 +263,8 @@ await expectError(withCoverage((c) => { c.actions = []; }), 'COVERAGE-1: actions
 await expectError(withCoverage((c) => { c.states[1].carrier = 'the offer region'; }), 'COVERAGE-1: two meanings share one carrier', 'two meanings on one carrier');
 await expectError(withCoverage((c) => { c.actions[0].pendingPaths[0].settlement = ''; }), 'pending path without a settlement', 'unsettled pending path');
 await expectError(withCoverage((c) => { c.directionId = 'other-picker'; }), 'differs from the receipt', 'coverage names another direction');
+await expectError({ ...baseline(), 'response/response.md': responseMd({ printed: [] }) }, 'was rendered and never printed', 'a candidate rendered and never put in front of the person');
+await expectError({ ...threeCandidates(), 'response/response.md': responseMd({ candidates: 3, printed: ['one-column'], fallbacks: ['DIRECTION_CHOICE_REQUIRED'] }) }, 'candidate split-view was rendered and never printed', 'only the favourite candidate printed');
 await expectError({ ...baseline(), 'response/response.md': responseMd({ surfaceClass: '' }) }, 'Surface class', 'a decided direction that declares no surface class');
 await expectError({ ...baseline(), 'response/response.md': responseMd({ surfaceClass: 'dashboard' }), 'response/data/coverage.json': { ...coverage(), surfaceClass: 'dashboard' } }, 'outside the vocabulary COVERAGE-1 Case 7 publishes', 'a class name nobody publishes');
 await expectError(withCoverage((c) => { delete c.surfaceClass; }), 'surfaceClass', 'coverage with no declared class');
@@ -263,4 +274,4 @@ await expectError({ ...baseline(), 'response/response.md': responseMd().replace(
 await expectError({ ...baseline(), 'response/response.json': responseJson({ status: 'blocked', stop: 'DIRECTION_CHOICE_REQUIRED', next: [] }) }, 'has disposition fallback under these requirements', 'terminating on the choice under automatic');
 await expectError({ ...baseline(), 'response/response.json': responseJson({ status: 'blocked', stop: 'MADE_UP_CODE', next: [] }) }, 'not a registered code', 'unknown stop code');
 
-process.stdout.write('frontend.direction.decide self-test: 7 valid branches, 34 rejected mutations\n');
+process.stdout.write('frontend.direction.decide self-test: 7 valid branches, 36 rejected mutations\n');

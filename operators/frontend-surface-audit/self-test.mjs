@@ -98,7 +98,12 @@ const verdictTable = (lens) => [
   ['taste', lens.verdict, lens.verdict === 'ship' ? 'none' : 'direction'],
 ].map(([topic, verdict, route]) => `| ${BT}${topic}${BT} | ${verdict} | ${route} |`).join(String.fromCharCode(10));
 
-const responseMd = (lens = taste()) => `# frontend-surface-audit — plan-picker
+const PRINTED = [
+  `| http://127.0.0.1:60000/ | the served sheet, handed over when the verdict was recorded |`,
+  `| ${BT}${SHOT(NARROW)}${BT} | the worst-scoring capture of the taste topic |`,
+];
+
+const responseMd = (lens = taste(), printed = PRINTED) => `# frontend-surface-audit — plan-picker
 
 ## Surface class
 
@@ -147,6 +152,12 @@ ${verdictTable(lens)}
 
 | Component | Rule | What the family lacks |
 | --- | --- | --- |
+
+## Printed
+
+| Artifact | Why |
+| --- | --- |
+${printed.join(String.fromCharCode(10))}
 
 ## Fallbacks taken
 
@@ -294,4 +305,6 @@ await expectError(baseline(), "the entries carry console and the direction's cov
 await expectError({ ...baseline(), 'response/response.md': responseMd().replace(`| ${BT}presentation${BT} | fail | resolve |`, `| ${BT}presentation${BT} | pass | none |`) }, 'Verdict records pass for presentation', 'a Verdict row that hides a failing topic');
 await expectError({ ...baseline(), 'response/response.md': responseMd().replace(`| ${BT}contrast${BT} | blocked | none |`, `| ${BT}contrast${BT} | pass | none |`) }, 'Verdict records pass for contrast', 'a topic passed on evidence nobody took');
 
-process.stdout.write('frontend.surface.audit self-test: 4 valid branches, 36 rejected mutations\n');
+await expectError({ ...baseline(), 'response/response.md': responseMd(taste(), [`| ${BT}${SHOT(NARROW)}${BT} | the worst-scoring capture of the taste topic |`]) }, 'names no served sheet', 'a verdict recorded without the sheet ever reaching the person');
+
+process.stdout.write('frontend.surface.audit self-test: 4 valid branches, 37 rejected mutations\n');

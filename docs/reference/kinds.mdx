@@ -126,6 +126,7 @@ Skeleton: [`templates/kinds/frontend-direction-decision.skeleton.md`](https://gi
 | `^## Images$` | `\| Slot \| Why \| Claim \| File \|` | — | `File`: `^(`response/artifacts/images/[A-Za-z0-9_.-]+`\|—)$` |
 | `^## Falsification$` | `\| Attack \| Candidate \| Verdict \| Evidence \|` | minRows 1 | `Candidate`: `^`[a-z0-9][a-z0-9-]*`$`<br />`Verdict`: `^(holds\|fails)$`<br />`Evidence`: `\S` |
 | `^## Why not the others$` | `\| Candidate \| Rejected because \|` | — | `Candidate`: `^`[a-z0-9][a-z0-9-]*`$`<br />`Rejected because`: `\S` |
+| `^## Printed$` | `\| Artifact \| Why \|` | — | `Artifact`: `^(`[^`]+`\|https?://\S+)$`<br />`Why`: `\S` |
 | `^## Fallbacks taken$` | `\| Code \| Action \|` | — | `Code`: `^`[A-Z][A-Z0-9_]+`$` |
 
 ### `frontend-presentation-resolution`
@@ -167,6 +168,7 @@ Skeleton: [`templates/kinds/frontend-surface-audit.skeleton.md`](https://github.
 | `^## Verdict$` | `\| Topic \| Verdict \| Route \|` | exactRows 8 | `Topic`: `^`(presentation\|composition\|responsive\|motion\|accessibility\|contrast\|render-truth\|taste)`$`<br />`Verdict`: `^(pass\|fail\|ship\|fix-first\|blocked)$`<br />`Route`: `^(resolve\|direction\|flow-owner\|grammar-gap\|none)$` |
 | `^## Regressions$` | `\| Matrix \| Node \| Rule \| Measured \| Routes to \|` | — | `Node`: `^`[^`]+`$`<br />`Routes to`: `^(resolve\|grammar-gap)$`<br />`Matrix`: `^`[a-z0-9][a-z0-9-]*`$` |
 | `^## Grammar gaps$` | `\| Component \| Rule \| What the family lacks \|` | — | `What the family lacks`: `\S` |
+| `^## Printed$` | `\| Artifact \| Why \|` | — | `Artifact`: `^(`[^`]+`\|https?://\S+)$`<br />`Why`: `\S` |
 | `^## Fallbacks taken$` | `\| Code \| Action \|` | — | `Code`: `^`[A-Z][A-Z0-9_]+`$` |
 
 ### `git-publication`
@@ -254,6 +256,7 @@ Skeleton: [`templates/kinds/uat-flow-verification.skeleton.md`](https://github.c
 | `^## Lanes$` | `\| Lane \| Verdict \| Evidence \|` | exactRows 3 | `Lane`: `^`(behavior\|ux\|ui)`$`<br />`Verdict`: `^(pass\|fail)$`<br />`Evidence`: `\S` |
 | `^## Experience$` | `\| Rule \| Measured \| Score \| Verdict \|` | exactRows 11 | `Rule`: `^`UX-([1-9]\|1[01])`$`<br />`Measured`: `\S`<br />`Score`: `^[1-5]$`<br />`Verdict`: `^(pass\|fail\|evidence-unavailable)$` |
 | `^## Verdict$` | `\| Topic \| Verdict \| Route \|` | exactRows 1 | `Topic`: `^`experience`$`<br />`Verdict`: `^(pass\|fail\|ship\|fix-first\|blocked)$`<br />`Route`: `^(resolve\|direction\|flow-owner\|grammar-gap\|none)$` |
+| `^## Printed$` | `\| Artifact \| Why \|` | — | `Artifact`: `^(`[^`]+`\|https?://\S+)$`<br />`Why`: `\S` |
 | `^## Fallbacks taken$` | `\| Code \| Action \|` | — | — |
 
 ### `workspace-route-binding`

@@ -26,7 +26,8 @@
         "objectstorage": true,
         "secrets": true,
         "database": true,
-        "host": true
+        "host": true,
+        "print": true
       },
       "permits": {
         "fileread": true,
@@ -44,7 +45,8 @@
         "objectstorage": true,
         "secrets": true,
         "database": true,
-        "host": true
+        "host": true,
+        "print": true
       }
     },
     "sonnet": {
@@ -69,7 +71,8 @@
         "objectstorage": true,
         "secrets": true,
         "database": true,
-        "host": true
+        "host": true,
+        "print": true
       },
       "permits": {
         "fileread": true,
@@ -87,7 +90,8 @@
         "objectstorage": true,
         "secrets": true,
         "database": true,
-        "host": true
+        "host": true,
+        "print": true
       }
     },
     "fable": {
@@ -112,7 +116,8 @@
         "objectstorage": true,
         "secrets": true,
         "database": true,
-        "host": true
+        "host": true,
+        "print": true
       },
       "permits": {
         "fileread": true,
@@ -130,7 +135,8 @@
         "objectstorage": false,
         "secrets": true,
         "database": true,
-        "host": true
+        "host": true,
+        "print": true
       }
     }
   }

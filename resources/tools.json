@@ -285,6 +285,23 @@
         }
       },
       "script": "scripts/host-artifacts.mjs"
+    },
+    "print": {
+      "purpose": "Hand an artifact to the person in the conversation, rendered when the client can (image, HTML) and as a path or URL otherwise, at the moment a decision or a verdict needs their eyes. A run that produced the artifact and said nothing served nobody: the artifact reaches the person where they are reading, not where the branch happened to write it.",
+      "modes": {
+        "never": "the operator hands the person nothing",
+        "decision-points": "before a decision or a verdict is recorded, the operator hands the person every artifact that decision or verdict rests on, and lists the same artifact in the receipt under `## Printed` with why it was printed; a receipt whose table is empty where the operator printed something is a defect its own validator refuses"
+      },
+      "support": {
+        "openai": {
+          "supported": true,
+          "via": "the absolute path or the URL printed into the conversation, with the image inline where the client renders one"
+        },
+        "claude": {
+          "supported": true,
+          "via": "the session's file and render hand-off, which displays an image or an HTML page in the conversation and falls back to the path or the URL"
+        }
+      }
     }
   }
 }

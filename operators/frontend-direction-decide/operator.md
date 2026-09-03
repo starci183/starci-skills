@@ -133,7 +133,7 @@ business promise did not make. The asset and its prompt land under `response/art
 | 6 | Resolve the reference standards by class, bounded | `references`, `changeLevel` | @knowledge/ui/composition (the gap the research must close), @tools/websearch | — | `REFERENCE_EVIDENCE_EXHAUSTED`, `REFERENCE_MISSING` |
 | 7 | Form the candidates | `candidates` | the compiled UI contract | — | `NO_VIABLE_DIRECTION` |
 | 8 | Apply the Grammar filter | `ownerCeiling` | @grammar/core (what a component owns and which props exist), @knowledge/grammars/starci | — | `GRAMMAR_REQUIRED` |
-| 9 | Render the decision evidence and the judged images, and serve them for a person | `candidates`, `preview` | the surviving candidates, `@knowledge/grammars/starci` | `response/artifacts/<candidateId>.html`, `response/artifacts/images/<slot>.png`, `response/artifacts/host.json`, @tools/visualize, @tools/imagegen, @tools/host | — |
+| 9 | Render the decision evidence and the judged images, and serve them for a person | `candidates`, `preview` | the surviving candidates, `@knowledge/grammars/starci` | `response/artifacts/<candidateId>.html`, `response/artifacts/images/<slot>.png`, `response/artifacts/host.json`, @tools/visualize, @tools/imagegen, @tools/host, @tools/print | — |
 | 10 | Falsify | — | the candidates, inputs `business-promise-authority` and `backend-source-application`, `response/data/coverage.json` | — | `NO_VIABLE_DIRECTION` |
 | 11 | Decide | `selectionPolicy`, `approval` | the falsification table | — | `DIRECTION_CHOICE_REQUIRED` |
 | 12 | Emit | — | everything above | `response/response.md`, `response/response.json` | — |
@@ -159,6 +159,11 @@ the URL, the port, the folder and the pid in `response/artifacts/host.json`; the
 branch ends or is resumed. Each candidate is served once per viewport of the coverage — one page per
 viewport, or one page taking the viewport as a query string — so the person sees the wide and the
 narrow render before deciding, which is the first of the two places responsiveness is looked at.
+
+Serving is not telling. Before step 11 writes the decision, step 9 prints over `@tools/print` every
+candidate's URL and one capture per viewport into the conversation the person is reading, and the
+receipt lists each printed artifact under `## Printed` with why it was printed. A candidate served at
+a port nobody was told about is a candidate nobody saw, and a decision taken over one is taken alone.
 
 Under
 `refine` the page stays optional — the structure was approved before this run began — and is rendered

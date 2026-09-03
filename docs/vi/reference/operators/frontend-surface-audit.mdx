@@ -127,7 +127,7 @@ làm bằng chứng rằng node đã pass.
 | 3 | Chọn các mục ma trận và đọc lớp bề mặt đã khai | `matrix` | đầu vào `frontend-direction-decision` (chính `response/data/coverage.json` của nó: state nhân viewport nhân bảng màu, và `surfaceClass` mà quyết định ấy đã khai) | — | `SURFACE_CLASS_MISSING` |
 | 4 | Chờ từng mục tới lúc sẵn sàng, đăng nhập bằng tài khoản của luồng khi route đòi một danh tính | `readinessProbe`, `account`, `env` | @worktrees/sessions/central-runtime để lấy entry của đúng route này, đầu vào `uat-account` cho hồ sơ toàn tên, @tools/http, @tools/secrets, @tools/browsercontrol | — | `RUNTIME_UNAVAILABLE`, `IDENTITY_MISSING` |
 | 5 | Chụp và đo từng mục | — | @worktrees/sessions/central-runtime, @workspaces/fe (các owner được quan sát và identifier từng node mang), @tools/browsercontrol | `response/artifacts/<matrixId>.png`, `response/data/captures/<matrixId>.json` | `EVIDENCE_MISSING` |
-| 6 | Đối chiếu với lời khai và luật proof, phán quyết theo chủ sở hữu, để từng topic tự đóng, rồi phát | — | @knowledge/ui/proof, @knowledge/grammars/starci, các bức chụp, @tools/websearch | `response/data/verdicts.json`, `response/response.md`, `response/response.json`, `response/artifacts/host.json`, @tools/visualize, @tools/host | `UNKNOWN_RULE` |
+| 6 | Đối chiếu với lời khai và luật proof, phán quyết theo chủ sở hữu, để từng topic tự đóng, rồi phát | — | @knowledge/ui/proof, @knowledge/grammars/starci, các bức chụp, @tools/websearch | `response/data/verdicts.json`, `response/response.md`, `response/response.json`, `response/artifacts/host.json`, @tools/visualize, @tools/host, @tools/print | `UNKNOWN_RULE` |
 
 Bậc 6 phán mọi lời khai rồi để từng topic proof tự đóng lại. Phần phán canon là cái ở trên: mọi lời
 khai đều được đo, phán theo luật đã publish, định tuyến theo chủ sở hữu của node nó đứng lên. Trên nền
@@ -144,6 +144,11 @@ Bảng chụp được phục vụ chứ không chỉ được lưu (bằng `scr
 cổng trống đầu tiên từ 60000 lên tới 60100 và ghi URL, cổng, thư mục cùng pid vào
 `response/artifacts/host.json`, rồi dừng khi nhánh kết thúc hoặc được resume; một người mở bảng ấy và
 thấy từng mục ma trận cạnh phán quyết của nó. Không gì bind `0.0.0.0`.
+
+Phục vụ chưa phải là nói. Bậc 6 in qua `@tools/print`, thẳng vào cuộc trò chuyện người ta đang
+đọc, URL của bảng chụp, ảnh chụp điểm thấp nhất của từng topic và bảng `## Verdict`, còn biên nhận
+liệt kê từng artifact đã in dưới `## Printed` kèm lý do. Một phán quyết không ai thấy thì không đưa ai
+đi đâu, và một lượt soi lưu bảng chụp rồi im lặng chỉ soi chính nó.
 
 Lớp bề mặt không phải thứ operator này được chọn, cũng không phải thứ nó khai. Nó được đọc từ coverage
 của `frontend-direction-decision` mà audit này nhận vào, nơi hướng đã khai nó từ bộ từ vựng mà

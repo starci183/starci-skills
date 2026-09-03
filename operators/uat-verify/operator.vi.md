@@ -165,10 +165,15 @@ lượt chạy, và không xoá bất cứ thứ gì ngoài namespace fixture c�
 | 4 | Phác từ khuôn những gì thư mục luồng còn thiếu, rồi đóng băng snapshot từ `flow.md`, `accounts.<env>.json` và `seed/` | `feature`, `flow`, `env`, `cases` | @worktrees/uat/<flow>/<case>, @worktrees/_templates để lấy khuôn luồng | @worktrees/uat/<flow>/<case> (snapshot), `response/data/snapshot.json`, @tools/sourcewrite | `CANONICAL_WRITE_DENIED` |
 | 5 | Gieo các bản ghi đã đóng băng vào namespace lượt chạy | `runId` | `response/data/snapshot.json`, @workspaces/be | @tools/database | `FIXTURE_VIOLATION` |
 | 6 | Chạy các case đã đóng băng theo thứ tự trên endpoint mà route đã ràng mang, tại commit đã ghim | — | `response/data/snapshot.json`, đầu vào `route` để lấy endpoint lượt chạy này lái theo, @worktrees/sessions/central-runtime để lấy generation đứng sau endpoint đó, @workspaces/device-state để lấy thông tin đăng nhập chỉ lúc đăng nhập, @tools/browsercontrol, @tools/websearch | — | `LEASE_INVALID`, `RUNTIME_UNAVAILABLE` |
-| 7 | Capture tại từng khẳng định có tên với ô mật khẩu đã che, rồi ghép tấm sheet | — | `response/data/snapshot.json`, @worktrees/sessions/central-runtime để lấy bằng chứng runtime trực tiếp nhất | `response/data/captures/<case>.json`, `response/artifacts/<case>.png`, `response/artifacts/sheet.png`, @tools/visualize | `EVIDENCE_UNAVAILABLE` |
+| 7 | Capture tại từng khẳng định có tên với ô mật khẩu đã che, rồi ghép tấm sheet | — | `response/data/snapshot.json`, @worktrees/sessions/central-runtime để lấy bằng chứng runtime trực tiếp nhất | `response/data/captures/<case>.json`, `response/artifacts/<case>.png`, `response/artifacts/sheet.png`, @tools/visualize, @tools/print | `EVIDENCE_UNAVAILABLE` |
 | 8 | Xét ba làn tách rời nhau, và chấm làn trải nghiệm theo từng tiêu chí | — | @knowledge/ui/proof (topic UX và rule đóng của nó), `response/data/captures/<case>.json` | `response/data/verdicts.json` | — |
 | 9 | Kiểm chỉ-đọc, rồi xoá namespace lượt chạy và không gì khác | `runId` | @workspaces/be để lấy các bản ghi mang `is_uat=true` và namespace này, `response/data/verdicts.json` | @tools/database | — |
-| 10 | Thêm `runs/<runId>/`, trỏ `latest.json` vào nó, thêm dòng lịch sử, rồi phát | `runId` | mọi thứ ở trên | @worktrees/uat/<flow>/<case> (runs/<runId>/, latest.json và history.md), `response/response.md`, `response/response.json`, @tools/sourcewrite | — |
+| 10 | Thêm `runs/<runId>/`, trỏ `latest.json` vào nó, thêm dòng lịch sử, rồi phát | `runId` | mọi thứ ở trên | @worktrees/uat/<flow>/<case> (runs/<runId>/, latest.json và history.md), `response/response.md`, `response/response.json`, @tools/sourcewrite, @tools/print | — |
+
+Một phán quyết không ai được cho xem là một phán quyết không ai đọc. Bậc 7 in bản tóm tắt các ảnh
+chụp theo bước và bậc 10 in bảng `## Verdict` qua `@tools/print`, thẳng vào cuộc trò chuyện mà người
+yêu cầu lượt chạy này đang đọc, còn biên nhận liệt kê cả hai dưới `## Printed` kèm lý do in; ô đăng
+nhập vẫn được che trong mọi khung được in, đúng như trong mọi khung được ghi.
 
 Một lượt bị chặn không phát hồ sơ lượt chạy nào cả, vì một hồ sơ viết nửa vời chính là thứ người đọc
 sau này sẽ nhầm thành một quyết định. Lần chạy lại bắt đầu lại từ khâu kiểm, chỉ tái dùng những quan

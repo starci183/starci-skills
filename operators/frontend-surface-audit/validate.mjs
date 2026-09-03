@@ -263,6 +263,14 @@ export async function validateAuditStep(branchDir, root = ROOT) {
       if (route !== computed.routeTo) errors.push(`${rel}: Verdict routes ${topic} to ${route}; its own rule routes it to ${computed.routeTo}`);
     }
 
+    // Serving is not telling: the sheet reaches the person at the moment the verdict is recorded, and
+    // ## Printed is where the receipt says what was handed over. An audit that filed its sheet and
+    // said nothing leaves a verdict nobody read.
+    const printed = (tableUnder(text, '## Printed') ?? []).map(([artifact]) => artifact);
+    if (response.status === 'done' && !printed.some((p) => /host\.json$/.test(p) || /^https?:\/\//.test(p))) {
+      errors.push(`${rel}: ## Printed names no served sheet; the audit hands the person the sheet's URL when the verdict is recorded and records here what it handed over`);
+    }
+
     const regressions = tableUnder(text, '## Regressions') ?? [];
     if (regressions.length !== failing.length) errors.push(`${rel}: Regressions has ${regressions.length} rows, the verdicts carry ${failing.length} failures`);
     for (const [matrixId, node, rule, , routeTo] of regressions) {

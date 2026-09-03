@@ -178,6 +178,19 @@ export async function validateDirectionStep(branchDir, root = ROOT) {
       else if (classes.length && !classes.includes(declaredClass)) errors.push(`${at}: surface class ${declaredClass} is outside the vocabulary COVERAGE-1 Case 7 publishes: ${classes.join(', ')}`);
     }
 
+    // Rendering is not showing. A candidate served at a port nobody was told about is a candidate
+    // nobody saw, so `## Printed` records what was actually put in front of the person, and a
+    // structural direction that decided without printing every candidate it rendered decided alone.
+    const printed = (tableUnder(text, '## Printed') ?? []).map(([artifact]) => artifact);
+    if (response.status === 'done' && structural) {
+      for (const page of artifacts) {
+        const candidate = page.replace(/^.*\//, '').replace(/\.html$/, '');
+        if (!printed.some((p) => p.includes(candidate))) {
+          errors.push(`${at}: candidate ${candidate} was rendered and never printed; ## Printed lists what the person was shown before the decision was written`);
+        }
+      }
+    }
+
     const contract = (tableUnder(text, '## UI contract') ?? []).map(([element, kind]) => ({ element, kind }));
     if (coverage) {
       errors.push(...coverageErrors(coverage, contract, 'response/data/coverage.json', classes));

@@ -192,6 +192,12 @@ export async function validateUatStep(branchDir, root = ROOT) {
 
   if (present.has('uat-flow-verification') && has('response/response.md')) {
     const text = await read('response/response.md');
+    // A verdict nobody was shown is a verdict nobody read: the run summary reaches the person who
+    // asked for the run, and ## Printed records what was handed over.
+    const printed = (tableUnder(text, '## Printed') ?? []).map(([artifact]) => artifact);
+    if (decided && !printed.some((p) => p.includes('sheet.png'))) {
+      errors.push("response/response.md: ## Printed names no run summary; the stitched sheet is handed to the person who asked before the verdict is published");
+    }
     const snap = Object.fromEntries((tableUnder(text, '## Snapshot') ?? []).map(([k, v]) => [k, v]));
     if (snapshot) {
       if (snap.Run !== snapshot.runId) errors.push(`response/response.md: Snapshot names run ${snap.Run}, the frozen snapshot names ${snapshot.runId}`);

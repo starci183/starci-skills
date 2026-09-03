@@ -155,7 +155,7 @@ dưới `response/artifacts/images/`; `frontend.source.apply` ghi chúng cùng w
 | 6 | Chốt các chuẩn tham chiếu theo lớp, có giới hạn | `references`, `changeLevel` | @knowledge/ui/composition (khoảng trống mà nghiên cứu phải lấp), @tools/websearch | — | `REFERENCE_EVIDENCE_EXHAUSTED`, `REFERENCE_MISSING` |
 | 7 | Hình thành các phương án | `candidates` | UI contract vừa biên | — | `NO_VIABLE_DIRECTION` |
 | 8 | Áp bộ lọc Grammar | `ownerCeiling` | @grammar/core (component sở hữu gì và có prop nào), @knowledge/grammars/starci | — | `GRAMMAR_REQUIRED` |
-| 9 | Render bằng chứng quyết định và hình đã tự xét, rồi phục vụ cho một người xem | `candidates`, `preview` | các phương án còn sống, @knowledge/grammars/starci | `response/artifacts/<candidateId>.html`, `response/artifacts/images/<slot>.png`, `response/artifacts/host.json`, @tools/visualize, @tools/imagegen, @tools/host | — |
+| 9 | Render bằng chứng quyết định và hình đã tự xét, rồi phục vụ cho một người xem | `candidates`, `preview` | các phương án còn sống, @knowledge/grammars/starci | `response/artifacts/<candidateId>.html`, `response/artifacts/images/<slot>.png`, `response/artifacts/host.json`, @tools/visualize, @tools/imagegen, @tools/host, @tools/print | — |
 | 10 | Phản chứng | — | các phương án, đầu vào `business-promise-authority` và `backend-source-application`, `response/data/coverage.json` | — | `NO_VIABLE_DIRECTION` |
 | 11 | Quyết | `selectionPolicy`, `approval` | bảng phản chứng | — | `DIRECTION_CHOICE_REQUIRED` |
 | 12 | Phát | — | mọi thứ ở trên | `response/response.md`, `response/response.json` | — |
@@ -181,6 +181,12 @@ cùng pid vào `response/artifacts/host.json`; server dừng khi nhánh kết th
 phương án được phục vụ một lần cho mỗi viewport của coverage — mỗi viewport một trang, hoặc một trang
 nhận viewport qua query string — để người xem thấy bản rộng và bản hẹp trước khi quyết, và đó là chỗ
 thứ nhất trong hai chỗ tính đáp ứng được nhìn.
+
+Phục vụ chưa phải là nói. Trước khi bước 11 ghi quyết định, bậc 9 in qua `@tools/print` URL của từng
+phương án cùng một ảnh chụp cho mỗi viewport thẳng vào cuộc trò chuyện người ta đang đọc, và biên nhận
+liệt kê từng artifact đã in dưới `## Printed` kèm lý do. Một phương án phục vụ ở cổng không ai được
+báo là phương án không ai thấy, và quyết định lấy trên đó là quyết định lấy một mình.
+
 Dưới `refine` trang vẫn là tuỳ chọn — cấu trúc đã được duyệt từ trước lượt chạy này — và chỉ render
 khi có nhiều hơn một phương án được hình thành hoặc `preview` là yes; một phương án refine duy nhất
 dưới mặc định không sinh trang nào và dựa vào bước 10. Dưới `automatic`,

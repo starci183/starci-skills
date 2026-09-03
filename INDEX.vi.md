@@ -1,4 +1,4 @@
-# StarCi Skills 1.6.0
+# StarCi Skills 1.6.1
 
 Cây này chính là runtime. Đọc tiếp `SKILL.md` (bản tiếng Anh là bản được nạp; `SKILL.vi.md` chỉ để người đọc); đó là cửa vào duy nhất,
 đóng băng phạm vi của một nhiệm vụ, chọn đúng một operator sở hữu kết quả, rồi định tuyến giữa các
@@ -67,6 +67,8 @@ thì không được publish.
   đổi nghĩa.
 
 ## Dòng dõi
+
+1.6.1 (2026-09-03): @tools/print — direction in URL và ảnh mỗi candidate theo viewport trước khi viết quyết định, audit in sheet + ảnh tệ nhất mỗi topic + bảng Verdict, UAT in tóm tắt ảnh từng bước; receipt có bảng ## Printed và validator từ chối quyết định mà người chưa thấy.
 
 1.6.0 (2026-09-03): hồ sơ UAT thiếu thì được tạo, không báo lỗi — platform.operate cấp tài khoản tại identity provider của registry với mật khẩu chung niêm phong và seed dữ liệu; registry runtime theo <project>/<role> (owner.schema.json) có identity; audit đăng nhập bằng tài khoản của flow, IDENTITY_MISSING chuyển sang provisioning; kiến trúc thư mục UAT (flow.md, accounts.<env>.json, seed, snapshots golden, runs append-only, latest.json, history.md) là contract; tham số env ở uat/audit/platform; workflow ví dụ staging-uat.
 

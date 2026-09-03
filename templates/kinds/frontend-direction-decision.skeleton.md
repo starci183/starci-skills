@@ -67,6 +67,13 @@
 | --- | --- |
 | `other-candidate-id` | which attack it failed; no rows when one candidate was formed |
 
+## Printed
+
+| Artifact | Why |
+| --- | --- |
+| http://127.0.0.1:60000/candidate-id.html?viewport=wide | the candidate at the wide viewport, put in front of the person before the decision was written |
+| http://127.0.0.1:60000/candidate-id.html?viewport=narrow | the same candidate at the narrow viewport; every candidate is printed at every viewport the coverage names |
+
 ## Fallbacks taken
 
 | Code | Action |

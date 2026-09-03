@@ -46,6 +46,8 @@ the whole permission: `@tools/git: read` cannot commit, `@tools/git: commit-sess
 once to `session/<sessionId>` and never to a person's branch, `@tools/git: merge-and-push` is the
 only mode that reaches a remote and still may not rebase, force, or skip a hook. `@tools/database:
 namespaced-write` may insert and delete only rows carrying the run namespace and `is_uat=true`.
+`@tools/print: decision-points` hands the person the artifact a decision or a verdict rests on, at the
+moment it is recorded, and records the same artifact in the receipt.
 `never` is not a declaration: a tool the operator does not use is left out of the map entirely.
 
 Capability and permission stay different facts. Capability belongs to the runtime; permission is a

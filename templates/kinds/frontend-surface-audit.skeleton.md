@@ -64,6 +64,13 @@
 | --- | --- | --- |
 | `SurfaceCard` | `PADDING-4` | the component renders its own inset one step low; no rows when the family holds |
 
+## Printed
+
+| Artifact | Why |
+| --- | --- |
+| http://127.0.0.1:60000/ | the served sheet: every matrix entry beside its verdicts, handed over at the moment the verdict was recorded |
+| `response/artifacts/narrow-light-loaded.png` | the worst-scoring capture of the taste topic, so the person sees what the score was taken from |
+
 ## Fallbacks taken
 
 | Code | Action |
