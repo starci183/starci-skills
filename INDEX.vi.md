@@ -1,4 +1,4 @@
-# StarCi Skills 1.5.0
+# StarCi Skills 1.5.1
 
 Cây này chính là runtime. Đọc tiếp `SKILL.md` (bản tiếng Anh là bản được nạp; `SKILL.vi.md` chỉ để người đọc); đó là cửa vào duy nhất,
 đóng băng phạm vi của một nhiệm vụ, chọn đúng một operator sở hữu kết quả, rồi định tuyến giữa các
@@ -67,6 +67,8 @@ thì không được publish.
   đổi nghĩa.
 
 ## Dòng dõi
+
+1.5.1 (2026-09-03): rule kết luận của topic contrast lấy tiền tố của chính topic (CONTRAST-1); COLOR-6 nghỉ, trỏ sang nó.
 
 1.5.0 (2026-09-03): UPDATE.md, chuẩn cập nhật trung lập cho một cây skills, đứng đầu thứ tự nạp và đi theo gói cài; session-first và SESSION_MISSING; git.publish đòi receipt; mọi workflow ví dụ là luồng dài (bind runtime → audit chụp màn → quality → uat → publish); lens taste (TASTE) và experience (UX) tự kết luận trong topic của mình, verdict cuối là bảng trong receipt của quality.verify; @tools/host phục vụ candidate theo viewport; pass gom: 44 chỗ → 19 cho các khái niệm thêm trong ngày, ui.md và FE-TEST-7 nghỉ.
 

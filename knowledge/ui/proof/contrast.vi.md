@@ -47,7 +47,7 @@ Không phải rule này: khác biệt có tồn tại khi không có màu hay kh
 được chọn đúng cho phần chữ không được quyết ở presentation, dưới TONE-1 tới TONE-3. Chữ có được
 đọc lên hay không thuộc A11Y-1 tới A11Y-3.
 
-## COLOR-6 — Phán quyết của tương phản
+## CONTRAST-1 — Phán quyết của tương phản
 
 Chi phối việc các tiêu chí trên trở thành đúng một hàng của topic này trong bảng `## Verdict` của receipt.
 

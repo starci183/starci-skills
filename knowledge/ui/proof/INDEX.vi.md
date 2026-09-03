@@ -25,7 +25,7 @@ luôn gọi tên được thứ đã thật sự được nhìn.
 | Knowledge | Quyết định điều gì | Rule |
 | --- | --- | --- |
 | [Accessibility](accessibility.vi.md) | Tên, quan hệ, kích thước mục tiêu và tương phản có tới được mọi người đọc không | A11Y-1 đến A11Y-5 |
-| [Contrast](contrast.vi.md) | Khác biệt và chữ có sống sót qua phép đo ở mọi theme và mọi state không | COLOR-3, COLOR-5, COLOR-6 |
+| [Contrast](contrast.vi.md) | Khác biệt và chữ có sống sót qua phép đo ở mọi theme và mọi state không | COLOR-3, COLOR-5, CONTRAST-1 |
 | [Focus](focus.vi.md) | Focus nhìn thấy ở đâu, đi xa tới đâu, và quay về đâu | FOCUS-1 đến FOCUS-6 |
 | [Motion](motion.vi.md) | Ý nghĩa có sống sót khi chuyển động dừng, bị giảm hoặc bị cắt ngang không | MOTION-1 đến MOTION-5 |
 | [Render truth](render-truth.vi.md) | Mọi tuyên bố đã render có truy về được authority thật không | TRUTH-1 đến TRUTH-5 |
@@ -48,7 +48,7 @@ giờ được dùng lại. Bảng ánh xạ nằm ở
 
 `A11Y-1`, `FOCUS-5` và các tên `PREFIX-n` khác là địa chỉ thứ tự ổn định trong chủ đề của chúng. Con
 số không phải mức độ nghiêm trọng, cũng không phải một mức tuân thủ. Một chủ đề có thể công bố một
-dãy không liền số: `contrast.vi.md` chỉ công bố `COLOR-3`, `COLOR-5` và `COLOR-6`, vì các số còn lại của tiền tố đó đã
+dãy không liền số: `contrast.vi.md` chỉ công bố `COLOR-3`, `COLOR-5` và `CONTRAST-1`, vì các số còn lại của tiền tố đó đã
 nghỉ cùng chủ đề sinh ra chúng và không bao giờ được dùng lại, còn cả tiền tố `UI-` thì đã nghỉ.
 
 Mỗi rule gồm heading, một dòng gọi tên thứ mà rule chi phối, và đúng một bảng:

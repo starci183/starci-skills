@@ -1,4 +1,4 @@
-# StarCi Skills 1.5.0
+# StarCi Skills 1.5.1
 
 This tree is the runtime. Read [SKILL.md](SKILL.md) next; it is the single entry that freezes a
 mission's scope, selects the one operator that owns the outcome, and routes between operators on
@@ -66,6 +66,8 @@ head or the head is not publishable.
 - Rule IDs are stable public addresses. Append; never renumber, reuse, or silently change meaning.
 
 ## Lineage
+
+1.5.1 (2026-09-03): the contrast topic's verdict rule takes the topic's own prefix (CONTRAST-1); COLOR-6 is retired and points at it.
 
 1.5.0 (2026-09-03): UPDATE.md, the neutral standard for changing a skills tree, first in the load order and shipped with the installer; session-first and SESSION_MISSING; git.publish demands receipts; every example workflow is a long flow (bind runtime → screenshot audit → quality → uat → publish); the taste (TASTE) and experience (UX) lenses conclude inside their own topics and the final verdict is a table in quality.verify's receipt; @tools/host serves candidates per viewport; the consolidation pass took the day's concepts from 44 places to 19 and retired ui.md and FE-TEST-7.
 

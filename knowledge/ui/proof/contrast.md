@@ -9,7 +9,8 @@ transparency, overlays, and state opacity. Each rule below names the observation
 it.
 
 `COLOR-3` and `COLOR-5` are the two surviving addresses of the retired `ui/color.md` topic. The
-numbers `COLOR-1`, `COLOR-2`, and `COLOR-4` were retired with it and are not reused.
+numbers `COLOR-1`, `COLOR-2`, and `COLOR-4` were retired with it and are not reused. New rules in this topic
+take its own prefix, `CONTRAST-`; `COLOR-6` (retired) → `CONTRAST-1`.
 
 ## COLOR-3 — Action, destination, selection, and focus stay distinguishable
 
@@ -48,7 +49,7 @@ Not this rule: whether the distinction exists at all without colour is COLOR-3. 
 tone token was chosen for the copy is decided in presentation, under TONE-1 to TONE-3. Whether the
 text is announced at all is A11Y-1 to A11Y-3.
 
-## COLOR-6 — The contrast verdict
+## CONTRAST-1 — The contrast verdict
 
 Governs how the criteria above become this topic's one row in the receipt's `## Verdict` table.
 

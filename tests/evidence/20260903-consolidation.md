@@ -57,7 +57,7 @@ decision it used to point at:
 same rule, which keeps its id.
 
 New closing rules, each of the same shape — gating set, threshold, verdict, route: `A11Y-5`,
-`FOCUS-6`, `COLOR-6`, `MOTION-5`, `TRUTH-5`. `TASTE-13` and `UX-12` already had one.
+`FOCUS-6`, `CONTRAST-1` (first written as COLOR-6 under the retired prefix; renamed the same day, COLOR-6 retired → CONTRAST-1), `MOTION-5`, `TRUTH-5`. `TASTE-13` and `UX-12` already had one.
 
 ## The censuses that were moved out of the rules
 

@@ -354,7 +354,7 @@ nối vào `INDEX.md` như mục 0 của thứ tự nạp và được `docs/con
 **Bỏ tầng id thứ hai (thầy chốt giữa chừng).** `knowledge/ui/proof/ui.md` với `UI-1..UI-11` đã nghỉ
 hẳn — một file mà toàn bộ nội dung là trỏ sang file khác thì chỉ thêm địa chỉ chứ không thêm quyết
 định. Thay vào đó mỗi topic proof tự đóng lại bằng rule verdict của chính nó: `TASTE-13` và `UX-12` đã
-có sẵn, trò thêm `A11Y-5`, `FOCUS-6`, `COLOR-6`, `MOTION-5`, `TRUTH-5`, cùng một hình dạng (tập chặn
+có sẵn, trò thêm `A11Y-5`, `FOCUS-6`, `CONTRAST-1` (ban đầu lỡ đặt là COLOR-6 theo tiền tố đã nghỉ; đã sửa), `MOTION-5`, `TRUTH-5`, cùng một hình dạng (tập chặn
 cửa, ngưỡng, verdict, đường đi). Bộ từ vựng lớp bề mặt rút về năm tên — `console`, `form`, `landing`,
 `catalog`, `reader` — và sống ở `COVERAGE-1` Case 7, **không mang con số nào**. Mỗi `UI-n` cũ nay tra
 về đúng rule đã sống sót thay nó; bảng ánh xạ ở file bằng chứng. Đếm rule ui: 159 → 153 (proof 55 →

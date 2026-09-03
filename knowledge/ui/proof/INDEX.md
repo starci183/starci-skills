@@ -25,7 +25,7 @@ something that was looked at.
 | Knowledge | What it decides | Rules |
 | --- | --- | --- |
 | [Accessibility](accessibility.md) | Whether names, relationships, targets and contrast reach every reader | A11Y-1 to A11Y-5 |
-| [Contrast](contrast.md) | Whether distinctions and text survive measurement in every theme and state | COLOR-3, COLOR-5, COLOR-6 |
+| [Contrast](contrast.md) | Whether distinctions and text survive measurement in every theme and state | COLOR-3, COLOR-5, CONTRAST-1 |
 | [Focus](focus.md) | Where focus is visible, how far it travels, and where it returns | FOCUS-1 to FOCUS-6 |
 | [Motion](motion.md) | Whether meaning survives with the movement stopped, reduced or interrupted | MOTION-1 to MOTION-5 |
 | [Render truth](render-truth.md) | Whether every rendered claim traces back to real authority | TRUTH-1 to TRUTH-5 |
@@ -48,7 +48,7 @@ those numbers are never reused. The mapping is recorded in
 
 `A11Y-1`, `FOCUS-5`, and the other `PREFIX-n` names are stable ordinal addresses within their topic.
 The number is not a severity or a conformance level. A topic may publish a non-contiguous series:
-`contrast.md` publishes only `COLOR-3`, `COLOR-5` and `COLOR-6`, because the other numbers of that
+`contrast.md` publishes only `COLOR-3`, `COLOR-5` and `CONTRAST-1`, because the other numbers of that
 prefix were retired with the topic they came from and are never reused, and the whole `UI-` prefix is
 retired.
 
