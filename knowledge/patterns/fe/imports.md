@@ -17,7 +17,7 @@ the occurrences that justified the case are recorded in
 | Case | When | Write |
 | --- | --- | --- |
 | Case 1 | Anything under `src/` from another folder | `@/…` — the only alias (`"@/*": ["./src/*"]`); 459 files use it |
-| Case 2 | A Grammar object | `import { SurfaceCard, Text, Heading, Badge, Button } from "@starci/grammar/common"` (553 imports, all through `/common`) |
+| Case 2 | A Grammar object | `import { SurfaceCard, Text, Heading, Badge, Button } from "@grammar/common"` (553 imports, all through `/common`) |
 | Case 3 | HeroUI | `import { cn } from "@heroui/react"` in `classNames.ts` (136 of 151); vendor components in leaves (48) and blocks (74); page `component.tsx` never (0/49) |
 | Case 4 | Files inside the same unit | `./component`, `./classNames`, `./index` |
 | Case 5 | Type only | `import type { AuthMode } from "@/hooks/auth/useAuthPanel"`, `import { type CourseDetail } from "…"` (274 files) |
@@ -30,11 +30,11 @@ import of 417 component files, is framework, then Grammar, then own tiers, then 
 | Case | When | Write |
 | --- | --- | --- |
 | Case 1 | Framework first | `react` (108 files), `next-intl` (45), `next` / `next/navigation` (16), `swr` |
-| Case 2 | Then Grammar | `@starci/grammar/common` (95 files start here when no framework import exists) |
+| Case 2 | Then Grammar | `@grammar/common` (95 files start here when no framework import exists) |
 | Case 3 | Then own tiers | `@/components/branches/…`, `@/components/leaves/…`, `@/hooks`, `@/modules/…` (88 files start with `@/components`) |
 | Case 4 | Own unit last | `import { aiChatClassNames, getAiChatBubbleClassName } from "./classNames"`, `import { AuthenticationPageBase } from "./component"` |
 
-`blocks/ai/StarCiAiChat/component.tsx` interleaves `@starci/grammar/common` and `@/components/…`
+`blocks/ai/StarCiAiChat/component.tsx` interleaves `@grammar/common` and `@/components/…`
 imports alphabetically by binding instead; the order above is dominant, not universal.
 
 ## FE-IMPORTS-3 — Data enters a block through the hooks barrel
@@ -52,7 +52,7 @@ imports alphabetically by binding instead; the order above is dominant, not univ
 | --- | --- | --- |
 | Case 1 | Page → block | `import { AuthenticationPanel } from "@/components/blocks/auth/AuthenticationPanel"` (48 of 50 pages import blocks; 11 import leaves; 8 import hooks; 1 imports modules) |
 | Case 2 | Block → leaf, branch, Grammar, hooks, modules | `import { CodeBlock } from "@/components/leaves/CodeBlock"`, `import { Article } from "@/components/branches/Article"` (82 blocks import hooks, 67 import modules) |
-| Case 3 | Leaf → Grammar and vendor only | `import type { ButtonVariant } from "@starci/grammar/common"`, `import { buttonVariants } from "@heroui/styles"` (1 leaf imports hooks, 1 imports a block: outliers) |
+| Case 3 | Leaf → Grammar and vendor only | `import type { ButtonVariant } from "@grammar/common"`, `import { buttonVariants } from "@heroui/styles"` (1 leaf imports hooks, 1 imports a block: outliers) |
 | Case 4 | Upward import | block → page observed once; leaf → block observed once; neither is a pattern |
 | Case 5 | Pure half → data layer | never at runtime; 18 `component.tsx` files use `import type` from `@/modules/api/graphql/queries/…` only |
 
@@ -80,8 +80,8 @@ imports alphabetically by binding instead; the order above is dominant, not univ
 | Case 2 | Default export from `src/components` | 0 exist |
 | Case 3 | Inline lint config | `eslint-disable` appears in 0 files; `src/components/blocks/**/{index,component}.tsx` run with `noInlineConfig: true` |
 | Case 4 | `namespace` | only `src/modules/api/graphql/clients/options.ts`, by config exception |
-| Case 5 | Mixing families, or importing the package root | renderers and prop types come from the family entry `@starci/grammar/core` (which re-exports every Common renderer since 0.4.2) or from `@starci/grammar/common`; never from the package root, never from two families in one app |
-| Case 6 | A second family stylesheet under one root | one `CoreGrammarRoot` at the composition root, one `@starci/grammar/core/styles.css`; the family is selected once |
+| Case 5 | Mixing families, or importing the package root | renderers and prop types come from the family entry `@grammar/core` (which re-exports every Common renderer since 0.4.2) or from `@grammar/common`; never from the package root, never from two families in one app |
+| Case 6 | A second family stylesheet under one root | one `CoreGrammarRoot` at the composition root, one `@grammar/core/styles.css`; the family is selected once |
 | Case 7 | An app-local clone of a Common renderer, an anonymous layout, or a shell band the application draws itself | Use the Common renderer and pass props. A shell unit — a folder whose name ends in `Layout`, `Shell`, `TopBar`, `Navbar`, `Nav`, `Sidebar` or `Rail` — composes a Grammar shell object and writes classes only inside the slots it is handed. The test is not whether a shell folder holds classes, it is whether it composes a shell object at all: a bar assembled from divs is shell geometry whatever it is named, and the band, its inset and its separator belong to the composed object. The same case places the band. It is mounted beside the page in the route layout, never inside a shell object's `header` slot, because that slot is wrapped in a banner by its owner while a band already is one, so the nesting publishes two banner landmarks for one band; the slot is the page-level hero and takes page copy |
 | Case 8 | A product name in a Grammar public export, or business logic inside Common/Core | `Learn`, `Console`, `Dashboard` stay in product code; routes, permissions, persistence and effects never enter the package |
 

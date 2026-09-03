@@ -68,8 +68,17 @@ export async function validateOperators(root) {
       if (type === 'data') { if (!existsSync(path.join(root, 'templates', 'kinds', `${kind}.schema.json`))) errors.push(`${at}:${r._line}: output ${kind} is data but templates/kinds/${kind}.schema.json is missing`); if (!/\/data\/.+\.json$/.test(file)) errors.push(`${at}:${r._line}: data output ${kind} must live under response/data/ as .json`); }
       if (type === 'artifact' && !/\/artifacts\//.test(file)) errors.push(`${at}:${r._line}: artifact output ${kind} must live under response/artifacts/`);
     }
+    // A Steps row states the job; the Outputs table is where a file's path lives. A row may therefore
+    // name what it writes by output kind (`candidates`, `verdicts`) and the path resolves through the
+    // Outputs table, or spell the path itself; both count as writing the file. response/response.json
+    // is the routing gate, not an output, and is always named as itself.
+    const writesOf = (step) => {
+      const files = new Set(cellFiles(step.writes));
+      for (const m of step.writes.matchAll(/`([a-z][a-z0-9-]*)`/g)) { const o = outputs.get(m[1]); if (o) files.add(o.file); }
+      return files;
+    };
     const written = new Set();
-    for (const s of op.tables.steps.rows) for (const f of cellFiles(s.writes)) written.add(f);
+    for (const s of op.tables.steps.rows) for (const f of writesOf(s)) written.add(f);
     const outputFiles = new Set([...outputs.values()].map((o) => o.file));
     for (const f of written) if (f !== 'response/response.json' && !outputFiles.has(f) && !exchangeOf(f)) errors.push(`${at}: a step writes ${f}, which Outputs does not declare`);
     for (const f of outputFiles) if (!written.has(f) && !exchangeOf(f)) errors.push(`${at}: output ${f} is written by no step`);
@@ -107,7 +116,7 @@ export async function validateOperators(root) {
         if (key === 'steps') {
           if (cellCodes(ra.stops).join() !== cellCodes(rb.stops).join()) errors.push(`operators/${pkg.name}/operator.vi.md:${rb._line}: step ${ra.n} stop codes differ from English`);
           if (cellParams(ra.params).join() !== cellParams(rb.params).join()) errors.push(`operators/${pkg.name}/operator.vi.md:${rb._line}: step ${ra.n} params differ from English`);
-          if (cellFiles(ra.writes).join() !== cellFiles(rb.writes).join()) errors.push(`operators/${pkg.name}/operator.vi.md:${rb._line}: step ${ra.n} writes differ from English`);
+          if ([...writesOf(ra)].join() !== [...writesOf(rb)].join()) errors.push(`operators/${pkg.name}/operator.vi.md:${rb._line}: step ${ra.n} writes differ from English`);
         }
         if (key === 'stops' && ra.disposition.trim() !== rb.disposition.trim()) errors.push(`operators/${pkg.name}/operator.vi.md:${rb._line}: ${unquote(ra.code)} disposition differs from English`);
         if (key === 'outputs' && (ra.type.trim() !== rb.type.trim() || unquote(ra.file) !== unquote(rb.file))) errors.push(`operators/${pkg.name}/operator.vi.md:${rb._line}: output ${unquote(ra.kind)} file or type differs from English`);

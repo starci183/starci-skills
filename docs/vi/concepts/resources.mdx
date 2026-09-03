@@ -47,7 +47,10 @@ commit đúng một lần vào `session/<sessionId>` và không bao giờ vào n
 merge-and-push` là mode duy nhất chạm tới remote mà vẫn không được rebase, không được force, không
 được bỏ hook. `@tools/database: namespaced-write` chỉ được insert và delete những dòng mang namespace
 của lần chạy và `is_uat=true`. `@tools/print: decision-points` đưa tận tay người dùng artifact mà một
-quyết định hay một phán quyết dựa lên, ngay lúc nó được ghi, và ghi chính artifact đó vào biên nhận.
+quyết định hay một phán quyết dựa lên, ngay lúc nó được ghi, và ghi chính artifact đó vào biên nhận;
+khi quyết định là của người, những artifact ấy chính là các lựa chọn — phương án đã render, mỗi lựa
+chọn một phương án và ít nhất ba khi chọn bố cục hay thẩm mỹ, kèm một câu hỏi duy nhất — không bao
+giờ là các phương án kể bằng văn xuôi.
 `never` không phải một lời khai: công cụ operator không dùng thì để
 hẳn ra ngoài bản đồ.
 

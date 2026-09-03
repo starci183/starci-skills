@@ -10,9 +10,9 @@ terminal outcome of its own and never reads as delivery of the release it reject
 | --- | --- |
 | Operator | `release.deploy` |
 | Step | `step-1/parallel-1` |
-| Project | `starci-academy` |
+| Project | `project` |
 | Release | `release:2026.01.10-1` |
-| Artifact | `@remote/ghcr/starci/academy-api` |
+| Artifact | `@remote/ghcr/project/api` |
 | Digest | `sha256:1111111111111111111111111111111111111111111111111111111111111111` |
 | Target | `production/api` |
 | Environment | production |

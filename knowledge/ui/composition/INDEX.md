@@ -49,12 +49,12 @@ Every rule carries its heading, one line naming what the rule governs, and one t
 The `Assert` cell states a predicate the receipt or the composed tree either satisfies or fails, not
 advice and not a class name. It may name a published component or prop where that is what must be
 carried, but it never resolves a CSS value; that belongs to presentation. Taste and layout are
-decided in `knowledge/grammars/starci`; these rules only say what a direction must satisfy.
+decided in `@knowledge/grammars/<family>`; these rules only say what a direction must satisfy.
 
 A case that belongs to a neighbouring rule is not a table row. It goes on one line after the table,
 as `Not this rule: <condition> is PREFIX-n`. Each file closes with a
 `## What this file does not decide` section linking its siblings and the proof knowledge that
 observes the result.
 
-Component and prop names in these files resolve to `@starci/grammar/common`. An API that does not
+Component and prop names in these files resolve to `@grammar/common`. An API that does not
 exist there is not written into a rule; a required capability that is missing is recorded as a gap.

@@ -6,9 +6,8 @@
 // the only input here: the script parses `packages/grammar/src/core/**/*.ts|tsx`, resolves each
 // `data-contract` value (a static string, a template, a ternary, a local constant, a lookup map, or
 // a helper function), and prints one row per component, element-or-condition, and rule id. It never
-// prints a value the source does not state: the old tables carried internal values such as
-// `.75rem`, which no claim carries, so the generated table carries the rule id alone and the CSS
-// stays the authority on what that rule resolves to.
+// prints a value the source does not state: the generated table carries the rule id alone, and the
+// CSS stays the authority on what that rule resolves to.
 //
 // "Element or condition" is read from the source too, in this order: an element carrying
 // `data-component="<Component>"`, or the component's own returned root, is `root`; otherwise the

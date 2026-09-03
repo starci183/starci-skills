@@ -33,6 +33,67 @@ export function tableUnder(text, heading) {
   }
   return rows;
 }
+// Whether a response hands the mission to a person: a blocked response routes by the domain of its
+// stop through routing.json, a done one may name `user` in next. Both are read from the files that
+// publish them, so the map keeps one home.
+export async function userRouted(root, registry, operatorId, response) {
+  if ((response?.next ?? []).includes('user')) return true;
+  if (response?.status !== 'blocked') return false;
+  const entry = registry?.codes?.[response.stop];
+  if (!entry || entry.domain === 'self') return false;
+  const routing = JSON.parse(await readFile(path.join(root, 'routing.json'), 'utf8'));
+  return routing.routes?.[operatorId]?.[entry.domain]?.kind === 'user';
+}
+
+// The candidates a ## Printed table put in front of the person, keyed by candidate id with the
+// viewports each was printed at. A candidate row is a served page `<candidateId>.html?viewport=<name>`
+// or a capture `<candidateId>.<name>.png`, wherever it lives; a row of any other shape (the sheet, a
+// worst capture per topic, a run summary) is not a candidate and is not counted.
+export function printedCandidates(rows) {
+  const out = new Map();
+  for (const [artifact] of rows ?? []) {
+    const cell = String(artifact ?? '').replace(/^`|`$/g, '');
+    const [file, query = ''] = cell.split('?');
+    const base = file.replace(/^.*\//, '');
+    let id = null;
+    let viewport = null;
+    const q = /(?:^|&)viewport=([A-Za-z0-9-]+)/.exec(query);
+    if (q && /\.html$/.test(base)) { id = base.replace(/\.html$/, ''); viewport = q[1]; }
+    else { const m = /^([a-z0-9][a-z0-9-]*)\.([a-z0-9][a-z0-9-]*)\.png$/.exec(base); if (m) { id = m[1]; viewport = m[2]; } }
+    if (!id) continue;
+    if (!out.has(id)) out.set(id, new Set());
+    out.get(id).add(viewport);
+  }
+  return out;
+}
+
+// @tools/print, decision-points: a design decision handed to a person reaches them as rendered
+// candidates they pick by eye, never as prose alternatives. `options` are the ids the person is
+// asked to choose between (every one must be printed), `minimum` is the floor for a composition or
+// taste choice, `viewports` is how many captures each candidate carries, and `reason` is the stop's
+// message, which names the sheet and asks one question and nothing more.
+export function choiceHandoffErrors({ at, printedRows, options = [], minimum = 3, viewports = 2, reason }) {
+  const errors = [];
+  const candidates = printedCandidates(printedRows);
+  const needed = Math.max(minimum, options.length);
+  if (candidates.size === 0) errors.push(`${at}: the choice is handed to the person as prose; ## Printed lists no rendered candidate, and a design decision reaches a person as rendered candidates they pick by eye`);
+  for (const option of options) if (!candidates.has(option)) errors.push(`${at}: option ${option} is offered and never printed; every option the person is asked to choose between is a rendered candidate under ## Printed`);
+  if (candidates.size && candidates.size < needed) errors.push(`${at}: ## Printed shows ${candidates.size} rendered candidate(s) for a choice of ${needed}; a composition or taste choice puts at least ${minimum} in front of the person and never fewer than the options`);
+  for (const [id, seen] of candidates) if (seen.size < viewports) errors.push(`${at}: candidate ${id} is printed at ${seen.size} viewport(s) of ${viewports}; every candidate carries a capture per viewport`);
+  const text = String(reason ?? '');
+  if (!text.trim()) errors.push('response/response.json: a choice handed to a person carries a reason: the sheet URL and one question');
+  else {
+    if (/[\r\n]/.test(text)) errors.push('response/response.json: reason spans more than one line; the message to the person is the sheet URL and one question');
+    if (!/https?:\/\/\S+/.test(text)) errors.push('response/response.json: reason names no served URL; the person is told where the candidates are, not what they look like');
+    // One sentence, and that sentence a question: a clause that describes the options before asking
+    // is the narration the print law refuses.
+    const prose = text.replace(/https?:\/\/\S+/g, '').trim();
+    const sentences = prose.split(/[.;!?]\s+|[.;!?]$/).filter((s) => s.trim()).length;
+    if (sentences !== 1 || !/\?$/.test(prose)) errors.push('response/response.json: reason is not one question ending in "?"; the options are printed, not narrated');
+  }
+  return errors;
+}
+
 function patternOf(fileCell) {
   const esc = unquote(fileCell).replace(/[.+^${}()|[\]\\]/g, '\\$&').replace(/<[^>]+>/g, '[A-Za-z0-9_.-]+');
   return new RegExp(`^${esc}$`);

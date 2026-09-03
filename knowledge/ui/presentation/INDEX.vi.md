@@ -63,7 +63,7 @@ Mỗi rule chỉ có heading và đúng một bảng:
 
 | Case | When | Common render |
 | --- | --- | --- |
-| Case 1 | Điều kiện cụ thể chọn rule. | TSX inline qua API public hiện có của `@starci/grammar/common`, kèm prop, class hoặc giá trị đã resolve khi source chứng minh được. |
+| Case 1 | Điều kiện cụ thể chọn rule. | TSX inline qua API public hiện có của `@grammar/common`, kèm prop, class hoặc giá trị đã resolve khi source chứng minh được. |
 
 Chỉ thêm `Case 2`, `Case 3` và các row tiếp theo khi chúng là những đầu vào khác nhau nhưng cùng một
 quyết định. Code nằm trong bảng. Không thêm `Why`, `When not to use`, code block rời, audit verdict,

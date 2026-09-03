@@ -12,7 +12,7 @@ operator, not to this file.
 
 | Owner | Meaning |
 | --- | --- |
-| A composition name | `@starci/grammar/common` already owns that region's tracks and geometry |
+| A composition name | `@grammar/common` already owns that region's tracks and geometry |
 | `App` | The direction supplies content, state, and labels into a published slot |
 | `—` | No published composition covers this region; the direction records the gap |
 

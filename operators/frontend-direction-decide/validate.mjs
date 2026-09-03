@@ -11,7 +11,8 @@ import path from 'node:path';
 import process from 'node:process';
 import { fileURLToPath } from 'node:url';
 import { validateStep } from '../../scripts/validate-step.mjs';
-import { tableUnder } from '../../scripts/validate-response.mjs';
+import { tableUnder, userRouted, choiceHandoffErrors } from '../../scripts/validate-response.mjs';
+import { loadErrorsRegistry } from '../../scripts/errors-registry.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 const empty = (v) => v === undefined || v === null || v === '' || v === '—';
@@ -181,7 +182,8 @@ export async function validateDirectionStep(branchDir, root = ROOT) {
     // Rendering is not showing. A candidate served at a port nobody was told about is a candidate
     // nobody saw, so `## Printed` records what was actually put in front of the person, and a
     // structural direction that decided without printing every candidate it rendered decided alone.
-    const printed = (tableUnder(text, '## Printed') ?? []).map(([artifact]) => artifact);
+    const printedRows = tableUnder(text, '## Printed') ?? [];
+    const printed = printedRows.map(([artifact]) => artifact);
     if (response.status === 'done' && structural) {
       for (const page of artifacts) {
         const candidate = page.replace(/^.*\//, '').replace(/\.html$/, '');
@@ -189,6 +191,14 @@ export async function validateDirectionStep(branchDir, root = ROOT) {
           errors.push(`${at}: candidate ${candidate} was rendered and never printed; ## Printed lists what the person was shown before the decision was written`);
         }
       }
+    }
+    // When the choice is the person's, the same table is the whole hand-off: one rendered candidate
+    // per option, at least three because a composition is chosen by eye, a capture per viewport,
+    // and a reason that names the sheet and asks one question. Two options written out in prose
+    // are advice, and advice is what the print law exists to refuse.
+    if (response.status === 'blocked' && response.stop === 'DIRECTION_CHOICE_REQUIRED' && await userRouted(root, await loadErrorsRegistry(root), 'frontend.direction.decide', response)) {
+      const options = [...artifacts].map((page) => page.replace(/^.*\//, '').replace(/\.html$/, ''));
+      errors.push(...choiceHandoffErrors({ at, printedRows, options, reason: response.reason }));
     }
 
     const contract = (tableUnder(text, '## UI contract') ?? []).map(([element, kind]) => ({ element, kind }));
@@ -201,6 +211,8 @@ export async function validateDirectionStep(branchDir, root = ROOT) {
         errors.push(`response/data/coverage.json: surfaceClass ${coverage.surfaceClass} differs from the receipt's ${declaredClass}`);
       }
     }
+  } else if (response.status === 'blocked' && response.stop === 'DIRECTION_CHOICE_REQUIRED' && await userRouted(root, await loadErrorsRegistry(root), 'frontend.direction.decide', response)) {
+    errors.push('response/response.md: the choice is handed to the person with no receipt, so nothing was printed; DIRECTION_CHOICE_REQUIRED carries the receipt whose ## Printed table is the choice');
   }
   return { errors };
 }

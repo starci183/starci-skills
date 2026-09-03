@@ -8,7 +8,7 @@ Vùng làm việc: các checkout đã route của project đang bind, và khai b
 
 | Alias | Tham số | Trỏ tới | Bind | Ai ghi | Operator ràng | Mục đích |
 | --- | --- | --- | --- | --- | --- | --- |
-| `@workspaces` | `<project>`, `<role>` | `<checkout:project/role>  (any routed checkout named explicitly, for cross-project reads: @workspaces/nivo/fe)` | fingerprint + sourceHead (git rev-parse HEAD of the checkout) | — | — | A checkout of another project. The bound project's own are @workspaces/fe and @workspaces/be. |
+| `@workspaces` | `<project>`, `<role>` | `<checkout:project/role>  (any routed checkout named explicitly, for cross-project reads: @workspaces/other-project/fe)` | fingerprint + sourceHead (git rev-parse HEAD of the checkout) | — | — | A checkout of another project. The bound project's own are @workspaces/fe and @workspaces/be. |
 | `@workspaces/be` | — | `<checkout:input.project.id/be>  (diskPath from <Source>/.workspaces/local/routes/<project>/be/config.json); friendly segments: /husky, /package, /gates (see segments)` | fingerprint + sourceHead (git rev-parse HEAD of the checkout) | `backend.source.apply` | — | The routed backend checkout of the bound project. |
 | `@workspaces/device-state` | — | `<Source>/.workspaces/device-state.json  (sealed keys live in <Source>/.workspaces/local/credentials/*.key.enc and are bound by name, never read)` | fingerprint | — | — | Machine identity and the encrypted credential roster reference. |
 | `@workspaces/fe` | — | `<checkout:input.project.id/fe>  (diskPath from <Source>/.workspaces/local/routes/<project>/fe/config.json); friendly segments: /husky, /package, /gates, /grammar (see segments)` | fingerprint + sourceHead (git rev-parse HEAD of the checkout) | `frontend.source.apply` | — | The routed frontend checkout of the bound project. |
@@ -18,11 +18,11 @@ Vùng làm việc: các checkout đã route của project đang bind, và khai b
 
 ## Grammar — gói
 
-Gói @starci/grammar như app đang resolve: sự thật duy nhất về việc component sở hữu gì.
+Gói Grammar như app đang resolve: sự thật duy nhất về việc component sở hữu gì.
 
 | Alias | Tham số | Trỏ tới | Bind | Ai ghi | Operator ràng | Mục đích |
 | --- | --- | --- | --- | --- | --- | --- |
-| `@grammar` | `<family>` | `the @starci/grammar package as the bound app resolves it (file:packages/grammar inside @workspaces/fe today, source 0.4.2; @remote/npm publishes 0.3.0), narrowed to one family <family>: @grammar/core, @grammar/heritage, @grammar/offset-pop; @grammar/common is the shared layer every family imports` | package.json version + the resolved location's fingerprint (checkout head for file:, tarball integrity for npm) | — | — | The Grammar as it runs: Common renderers, props, owned relationships, data-contract claims, and the family's own CSS. The only fact about what a component owns. |
+| `@grammar` | `<family>` | `the Grammar package as the bound app resolves it (file:packages/grammar inside @workspaces/fe when vendored locally, or @remote/npm when published), narrowed to one family <family>: @grammar/core, @grammar/heritage, @grammar/offset-pop; @grammar/common is the shared layer every family imports` | package.json version + the resolved location's fingerprint (checkout head for file:, tarball integrity for npm) | — | — | The Grammar as it runs: Common renderers, props, owned relationships, data-contract claims, and the family's own CSS. The only fact about what a component owns. |
 
 ## Knowledge — luật
 
@@ -57,7 +57,7 @@ Internet. Registry, git remote, kho image, run CI, object storage. Đọc qua m�
 | `@remote/git` | `<project>`, `<role>` | `the origin URL in @workspaces/local/routes/<project>/<role> (repository.gitRepository)` | observed remote head (git ls-remote) at invocation time | `git.publish` | — | The publication target; fast-forwardness is decided against this observation. |
 | `@remote/github-actions` | `<runId>` | `GitHub Actions run <runId> of the routed repository` | run id + conclusion | — | — | CI evidence of a build or rollout, read only. |
 | `@remote/minio` | `<contentId>`, `<locale>` | `MinIO object contents/<contentId>/<locale>.json through the routed runtime` | fingerprint of the fetched object | `content.generate` | — | Authored lesson content as served, not as drafted. |
-| `@remote/npm` | `<package>` | `the npm registry entry for <package>, e.g. @remote/npm/@starci/grammar@0.3.0` | version + tarball integrity | — | — | Published packages. A version is the binding; latest never is. |
+| `@remote/npm` | `<package>` | `the npm registry entry for <package>, e.g. @remote/npm/@scope/package@1.0.0` | version + tarball integrity | — | — | Published packages. A version is the binding; latest never is. |
 
 ## Dynamic — sinh trong phiên
 
@@ -100,7 +100,7 @@ Human-friendly segments inside any checkout alias (@workspaces/fe, @workspaces/b
 | `husky` | `.husky/  (pre-commit, pre-push)` |
 | `package` | `package.json  (scripts, dependencies, the package version)` |
 | `gates` | `package.json#scripts plus the configs it names (eslint.config.*, tsconfig*.json, jest.config.*/vitest.config.*, sonar-project.properties)` |
-| `grammar` | `packages/grammar  (the @starci/grammar source inside @workspaces/fe)` |
+| `grammar` | `packages/grammar  (the Grammar package source inside @workspaces/fe)` |
 | `/branch/session` | `the session branch session/<sessionId> of that checkout, in its own git worktree prepared from the frozen head; the only branch a source-writing operator may commit to` |
 | `/commit/<sha>` | `that checkout at one commit; how a later step names exactly what an earlier step wrote (response.json.commits[])` |
 

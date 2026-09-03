@@ -4,10 +4,10 @@
 NestJS code behind it is written: which root a file lives under, what a GraphQL unit's files are
 called, how a handler is shaped, which alias an import uses, where a docblock sits relative to a
 decorator, how an exception is declared and where it is mapped to HTTP and GraphQL, and where the
-spec goes. Every rule below was extracted from `starci-academy-backend/src/` by opening files and
-counting; each table cites its sources. Where the code is split, the file records the dominant
-variant with its count instead of legislating. Lint rule names from `@starci/eslint-canon-be` are
-quoted only where the code already follows them.
+spec goes. Every rule below was extracted from the bound project's backend checkout (`@workspaces/be/src/`)
+by opening files and counting; each table cites its sources. Where the code is split, the file
+records the dominant variant with its count instead of legislating. Lint rule names from the bound
+project's own ESLint config are quoted only where the code already follows them.
 
 ## Catalog
 
@@ -24,6 +24,5 @@ quoted only where the code already follows them.
 
 ## Sources
 
-`D:\Repositories\starci-academy-backend\src\` (4463 non-spec TypeScript files, 875 unit specs,
-7 integration specs), `apps/core/src/app.module.ts` for filter registration, `tsconfig.json`,
-`jest.config.ts`, `eslint.config.mjs`.
+The bound project's backend checkout (`@workspaces/be/src/`), `apps/core/src/app.module.ts` for
+filter registration, `tsconfig.json`, `jest.config.ts`, `eslint.config.mjs`.

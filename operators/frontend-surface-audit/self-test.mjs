@@ -200,13 +200,14 @@ const requestJson = ({ extra = {} } = {}) => ({
   resume: null,
 });
 
-const responseJson = ({ status = 'done', stop, fields, next = ['frontend.presentation.resolve'] } = {}) => ({
+const responseJson = ({ status = 'done', stop, fields, next = ['frontend.presentation.resolve'], reason } = {}) => ({
   schemaVersion: 9,
   operatorId: 'frontend.surface.audit',
   step: 4,
   parallel: 1,
   status,
   ...(stop ? { stop } : {}),
+  ...(reason ? { reason } : {}),
   fallbacks: [],
   fields: fields ?? {
     'frontend-surface-audit': 'response/response.md',
@@ -221,7 +222,7 @@ const responseJson = ({ status = 'done', stop, fields, next = ['frontend.present
 function writeBranch(files, { decisionClass = 'console' } = {}) {
   const session = mkdtempSync(path.join(tmpdir(), 'fe-audit-session-'));
   const branch = path.join(session, 'step-4', 'parallel-1');
-  for (const d of ['request', 'response/data/captures', 'response/artifacts']) mkdirSync(path.join(branch, d), { recursive: true });
+  for (const d of ['request', 'response/data/captures', 'response/artifacts/candidates']) mkdirSync(path.join(branch, d), { recursive: true });
   for (const [step, name] of [[1, 'frontend-direction-decision'], [2, 'frontend-presentation-resolution'], [3, 'frontend-source-application']]) {
     const dir = path.join(session, `step-${step}`, 'parallel-1', 'response');
     mkdirSync(dir, { recursive: true });
@@ -343,4 +344,36 @@ const driftNamedMd = responseMd(taste(), PRINTED, driftedServed)
   .replace('| `narrow-light-loaded` | `body>main` | `GAP-5` | 1rem | resolve |', '| `narrow-light-loaded` | `body>main` | `GAP-5` | 1rem — family 0.4.8 observed, resolved against 0.4.7 | resolve |');
 await expectValid({ ...baseline(), 'response/response.md': driftNamedMd }, 'a family version drift named in Served surface and in the verdict evidence it could have flipped');
 
-process.stdout.write('frontend.surface.audit self-test: 5 valid branches, 42 rejected mutations\n');
+// The hand-off to the person. The taste lens is fix-first and the same wall was reached again, so
+// the audit reports it to the person — and the report is the direction's rendered candidates, each
+// printed at every viewport of the matrix, at least three of them, with one question. Two prose
+// options are refused, and so is a choice printed short.
+const CANDIDATE_PAGE = (id) => `response/artifacts/candidates/${id}.html`;
+const CHOICE_NAMES = ['one-column', 'split-view', 'stepper'];
+const candidateRows = (ids) => ids.flatMap((id) => [WIDE, NARROW].map((m) => `| http://127.0.0.1:60000/candidates/${id}.html?viewport=${m} | the candidate at the ${m} entry of the matrix, printed for the person to pick by eye |`));
+const CHOICE_REASON = 'http://127.0.0.1:60000/ — which of the three compositions do you take?';
+const printedChoice = ({ ids = CHOICE_NAMES, reason = CHOICE_REASON, receipt = true } = {}) => ({
+  ...baseline(),
+  'response/data/verdicts.json': verdicts(tasteFixFirst),
+  'response/response.md': receipt ? responseMd(tasteFixFirst(), [...PRINTED, ...candidateRows(ids)]) : null,
+  'response/response.json': responseJson({
+    status: 'blocked',
+    stop: 'NO_PROGRESS',
+    next: [],
+    reason,
+    fields: {
+      ...(receipt ? { 'frontend-surface-audit': 'response/response.md' } : {}),
+      verdicts: 'response/data/verdicts.json',
+      capture: [CAP(WIDE), CAP(NARROW)],
+      screenshot: [SHOT(WIDE), SHOT(NARROW)],
+      ...(ids.length ? { candidates: ids.map(CANDIDATE_PAGE) } : {}),
+    },
+  }),
+  ...Object.fromEntries(ids.map((id) => [CANDIDATE_PAGE(id), `<!doctype html><title>${id}</title>`])),
+});
+await expectValid(printedChoice(), 'a taste verdict handed to the person as three rendered candidates at both viewports, with one question');
+await expectError(printedChoice({ ids: [], reason: 'Accept the composition and record the density band as seeded-data-limited, or handle the density band and three family gaps first?' }), 'lists no rendered candidate', 'a taste verdict handed over as two prose options');
+await expectError(printedChoice({ ids: CHOICE_NAMES.slice(0, 2) }), 'shows 2 rendered candidate(s) for a choice of 3', 'a composition choice printed with fewer candidates than the choice needs');
+await expectError(printedChoice({ receipt: false }), 'with no receipt', 'a verdict handed to the person with no receipt and so nothing printed');
+
+process.stdout.write('frontend.surface.audit self-test: 6 valid branches, 45 rejected mutations\n');

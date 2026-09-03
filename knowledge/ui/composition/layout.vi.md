@@ -12,7 +12,7 @@ audit, không thuộc file này.
 
 | Owner | Nghĩa |
 | --- | --- |
-| Tên một composition | `@starci/grammar/common` đã sở hữu track và geometry của vùng đó |
+| Tên một composition | `@grammar/common` đã sở hữu track và geometry của vùng đó |
 | `App` | Direction cấp nội dung, state và label vào một slot công khai |
 | `—` | Chưa có composition công khai nào phủ được vùng này; direction ghi nhận gap |
 

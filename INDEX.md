@@ -1,4 +1,4 @@
-# StarCi Skills 1.7.2
+# StarCi Skills 1.7.3
 
 This tree is the runtime. Read [SKILL.md](SKILL.md) next; it is the single entry that freezes a
 mission's scope, selects the one operator that owns the outcome, and routes between operators on
@@ -67,6 +67,7 @@ head or the head is not publishable.
 
 ## Lineage
 
+1.7.3 (2026-09-03): a decision handed to a person is printed as rendered candidates — one per option, at least three for composition or taste, a capture per viewport, a one-line question — and the direction and audit validators refuse a user route that prints fewer; the family binds by the route's grammarId as @knowledge/grammars/<family>; Steps rows state the job and the kind, mechanisms live in the kind contracts; UPDATE.md carries the two writing principles (nothing specific, no errata) and the tree is swept for both.
 1.7.2 (2026-09-03): a restart is not a rebuild — scripts/serve-runtime.mjs records the served head and a digest of the route's manifests and lockfiles, clears the framework build cache when they moved, the previous head is unknown or --clean is asked, and stops the whole process tree of a server, verifying by connecting that the port is free; the platform-operation receipt requires a cache row and the validator refuses a kept cache over an unknown previous head.
 1.7.1 (2026-09-03): INTEGRATION_CONFLICT retired into INTEGRATION_FAILED — serve resolves a merge conflict under a closed four-rule set, records each resolution on the merge, runs the delivery gates on the merged head before restarting, and stops only on a red gate; the audit's Served surface names the family version observed and the version the delivery was resolved against, and states the drift in the evidence of any verdict it could flip.
 1.7.0 (2026-09-03): the runtime is each product's uat integration branch on the fixed projected port — platform.operate climbs the whole ladder (stack-up → locate → start-role → serve → attest), serve merges the session branch into uat and restarts idempotently by head, servers run detached with pid and log (scripts/serve-runtime.mjs), the lease is the merge order, RUNTIME_BUSY and INTEGRATION_CONFLICT; workspace.bind binds by ancestry (the served head contains the pinned commit); the audit takes a route input and a Served surface section; UAT snapshots carry isolation; the two-sessions-one-product law lives in one place; a ports projection schema with sessionSlots defaulting to 0.

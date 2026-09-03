@@ -7,8 +7,8 @@
       "vi": "Internet. Registry, git remote, kho image, run CI, object storage. Đọc qua mạng; bind bằng version, digest hay head quan sát được."
     },
     "grammar": {
-      "en": "The @starci/grammar package as the bound app resolves it: the only fact about what a component owns.",
-      "vi": "Gói @starci/grammar như app đang resolve: sự thật duy nhất về việc component sở hữu gì."
+      "en": "The Grammar package as the bound app resolves it: the only fact about what a component owns.",
+      "vi": "Gói Grammar như app đang resolve: sự thật duy nhất về việc component sở hữu gì."
     },
     "knowledge": {
       "en": "Canonical law in this tree: universal UI law (ui), the family's taste (grammars), code conventions (patterns). Read only; edited by the owner.",
@@ -32,7 +32,7 @@
     "husky": ".husky/  (pre-commit, pre-push)",
     "package": "package.json  (scripts, dependencies, the package version)",
     "gates": "package.json#scripts plus the configs it names (eslint.config.*, tsconfig*.json, jest.config.*/vitest.config.*, sonar-project.properties)",
-    "grammar": "packages/grammar  (the @starci/grammar source inside @workspaces/fe)",
+    "grammar": "packages/grammar  (the Grammar package source inside @workspaces/fe)",
     "/branch/session": "the session branch session/<sessionId> of that checkout, in its own git worktree prepared from the frozen head; the only branch a source-writing operator may commit to",
     "/commit/<sha>": "that checkout at one commit; how a later step names exactly what an earlier step wrote (response.json.commits[])"
   },
@@ -43,7 +43,7 @@
         "role"
       ],
       "kind": "checkout",
-      "resolvesTo": "<checkout:project/role>  (any routed checkout named explicitly, for cross-project reads: @workspaces/nivo/fe)",
+      "resolvesTo": "<checkout:project/role>  (any routed checkout named explicitly, for cross-project reads: @workspaces/other-project/fe)",
       "scheme": "source://<repository>",
       "bind": "fingerprint + sourceHead (git rev-parse HEAD of the checkout)",
       "writers": [],
@@ -210,7 +210,7 @@
         "family"
       ],
       "kind": "checkout",
-      "resolvesTo": "the @starci/grammar package as the bound app resolves it (`file:packages/grammar` inside @workspaces/fe today, source 0.4.2; @remote/npm publishes 0.3.0), narrowed to one family <family>: @grammar/core, @grammar/heritage, @grammar/offset-pop; @grammar/common is the shared layer every family imports",
+      "resolvesTo": "the Grammar package as the bound app resolves it (`file:packages/grammar` inside @workspaces/fe when vendored locally, or @remote/npm when published), narrowed to one family <family>: @grammar/core, @grammar/heritage, @grammar/offset-pop; @grammar/common is the shared layer every family imports",
       "scheme": "grammar://<family>@<version>",
       "bind": "package.json version + the resolved location's fingerprint (checkout head for file:, tarball integrity for npm)",
       "writers": [],
@@ -222,7 +222,7 @@
           "package"
         ],
         "kind": "service",
-        "resolvesTo": "the npm registry entry for <package>, e.g. @remote/npm/@starci/grammar@0.3.0",
+        "resolvesTo": "the npm registry entry for <package>, e.g. @remote/npm/@scope/package@1.0.0",
         "scheme": "npm://<package>@<version>",
         "bind": "version + tarball integrity",
         "writers": [],

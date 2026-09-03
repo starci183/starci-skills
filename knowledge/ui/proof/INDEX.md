@@ -67,6 +67,6 @@ as `Not this rule: <condition> is PREFIX-n`. Each file closes with a
 `## What this file does not decide` section linking its siblings and the composition knowledge that
 made the decision being tested.
 
-Component and prop names in these files resolve to `@starci/grammar/common`. Where the published
+Component and prop names in these files resolve to `@grammar/common`. Where the published
 contract offers no owner for a required behaviour, the audit records a capability gap rather than
 approving a local substitute.

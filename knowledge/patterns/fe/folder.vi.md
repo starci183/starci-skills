@@ -39,7 +39,7 @@ Grammar thường không có tệp này; 9 page có tệp này đều chỉ đ�
 ```ts
 // pages/AuthenticationPage/classNames.ts
 import { cn } from "@heroui/react"
-import { formPageClassName } from "@starci/grammar/common"
+import { formPageClassName } from "@grammar/common"
 
 /** Grammar-owned page frame; this app alias adds no visual override. */
 export const authenticationPageClassName = cn(formPageClassName)

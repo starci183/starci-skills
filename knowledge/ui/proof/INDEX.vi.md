@@ -66,6 +66,6 @@ dạng `Không phải rule này: <điều kiện> thuộc PREFIX-n`. Mỗi file 
 `## File này không quyết định`, dẫn sang các file anh em và sang nhóm composition, nơi quyết định
 đang bị kiểm chứng đã được đưa ra.
 
-Tên component và tên prop trong các file này đều phải phân giải được về `@starci/grammar/common`. Ở
+Tên component và tên prop trong các file này đều phải phân giải được về `@grammar/common`. Ở
 đâu hợp đồng công khai chưa có owner cho một hành vi cần thiết, phần audit ghi nhận capability gap
 thay vì chấp nhận một giải pháp cục bộ.

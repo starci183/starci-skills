@@ -10,7 +10,7 @@ service reached the approved state; it proves nothing about any product.
 | --- | --- |
 | Operator | `platform.operate` |
 | Step | `step-1/parallel-1` |
-| Project | `starci-academy` |
+| Project | `project` |
 | Service | `prometheus/shared` |
 | Service kind | observability |
 | Owner | `platform-team` |

@@ -52,11 +52,20 @@ May not be added:
 - **A code example from a product.** A rule states a shape: a relationship, a constraint, a
   condition. Concrete component names, file paths, line numbers, commit shas and counts belong to
   evidence, not to law.
-- **A product name.** The tree is installed by teams that do not share the history that produced it.
-  A rule naming a repository, an application, a company or a page cannot be read by them.
+- **Anything specific.** The tree is installed by teams that do not share the history that produced
+  it, and a rule speaks in roles — the bound project, the route's family, the projected port, the
+  kind — never in the one instance this install happens to have. A rule naming a repository, an
+  application, a company, a page, a machine path, a port, a tool or the number from one run cannot be
+  read by another install; where the concept needs a name, it names the alias or the role, not the
+  fact.
 - **A restated threshold.** A number lives in exactly one rule. Every other rule that needs it cites
   that rule's id. Two copies of a number drift, and the drift is discovered as a contradiction
   between two green gates.
+- **Errata.** A rule states what is true now, never what changed or why it changed: not "used to",
+  not "as of", not an incident it was written against. The change record is the commit and the
+  evidence file, not the rule. A retired id keeps only the one clause naming it and the survivor it
+  folded into — nothing more, because that address must still resolve for a reader who finds an old
+  citation.
 
 ## How to modify
 

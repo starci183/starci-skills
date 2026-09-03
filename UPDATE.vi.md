@@ -49,11 +49,20 @@ Không được thêm:
 - **Ví dụ code lấy từ một sản phẩm.** Rule phát biểu hình dạng: một quan hệ, một ràng buộc, một điều
   kiện. Tên component cụ thể, đường dẫn file, số dòng, sha commit và số đếm thuộc về bằng chứng, không
   thuộc về luật.
-- **Tên sản phẩm.** Cây được cài bởi những đội không chia sẻ lịch sử đã sinh ra nó. Một rule nêu tên
-  một repo, một ứng dụng, một công ty hay một trang thì họ không đọc được.
+- **Bất kỳ điều gì cụ thể.** Cây được cài bởi những đội không chia sẻ lịch sử đã sinh ra nó, và một
+  rule nói bằng vai trò — project đang bind, family của route, port đã projected, kind — chứ không
+  bao giờ nói bằng đúng cái instance mà bản cài này tình cờ có. Một rule nêu tên một repo, một ứng
+  dụng, một công ty, một trang, một đường dẫn máy, một port, một tool hay con số của đúng một lần
+  chạy thì đội khác không đọc được; chỗ nào khái niệm cần một cái tên, nó gọi tên alias hay vai trò,
+  không gọi tên sự việc cụ thể.
 - **Một ngưỡng được nhắc lại.** Một con số sống ở đúng một rule. Mọi rule khác cần nó thì trích id của
   rule ấy. Hai bản sao của một con số sẽ trôi khỏi nhau, và người ta phát hiện ra sự trôi ấy dưới dạng
   mâu thuẫn giữa hai cổng cùng xanh.
+- **Lịch sử sửa đổi.** Một rule phát biểu điều đúng ngay bây giờ, không bao giờ nói nó đã đổi thế nào
+  hay vì sao đổi: không "từng", không "kể từ", không một sự cố nó được viết ra để chống lại. Bản ghi
+  thay đổi là commit và file bằng chứng, không phải rule. Một id đã nghỉ chỉ giữ lại đúng một mệnh đề
+  nêu tên nó và rule sống sót mà nó gộp vào — không hơn, vì địa chỉ đó vẫn phải tra được cho người đọc
+  nào tìm thấy một trích dẫn cũ.
 
 ## Sửa thế nào
 

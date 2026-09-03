@@ -1,6 +1,6 @@
 {
-  "version": "1.7.2",
-  "lineageNote": "1.7.2 (2026-09-03): a restart is not a rebuild — scripts/serve-runtime.mjs records the served head and a digest of the route's manifests and lockfiles, clears the framework build cache when they moved, the previous head is unknown or --clean is asked, and stops the whole process tree of a server, verifying by connecting that the port is free; the platform-operation receipt requires a cache row and the validator refuses a kept cache over an unknown previous head.",
+  "version": "1.7.3",
+  "lineageNote": "1.7.3 (2026-09-03): a decision handed to a person is printed as rendered candidates — one per option, at least three for composition or taste, a capture per viewport, a one-line question — and the direction and audit validators refuse a user route that prints fewer; the family binds by the route's grammarId as @knowledge/grammars/<family>; Steps rows state the job and the kind, mechanisms live in the kind contracts; UPDATE.md carries the two writing principles (nothing specific, no errata) and the tree is swept for both.",
   "entry": {
     "name": "starci",
     "description": "Complete one StarCi mission by freezing its scope, selecting the one operator that owns the outcome, and routing between operators on typed results until the outcome is proved or a person must decide.",
@@ -930,7 +930,7 @@
       "hasVietnamese": true,
       "context": [
         "@grammar/core",
-        "@knowledge/grammars/starci",
+        "@knowledge/grammars/<family>",
         "@knowledge/ui/composition",
         "@workspaces/fe",
         "@worktrees/uat/<flow>/<case>"
@@ -1499,7 +1499,7 @@
       ],
       "hasVietnamese": true,
       "context": [
-        "@knowledge/grammars/starci",
+        "@knowledge/grammars/<family>",
         "@knowledge/ui/proof",
         "@workspaces/fe",
         "@worktrees/sessions/central-runtime"
@@ -1556,6 +1556,12 @@
         {
           "kind": "host",
           "file": "response/artifacts/host.json",
+          "type": "artifact",
+          "required": false
+        },
+        {
+          "kind": "candidates",
+          "file": "response/artifacts/candidates/<candidateId>.html",
           "type": "artifact",
           "required": false
         }
@@ -3332,7 +3338,8 @@
     {
       "kind": "candidates",
       "producedBy": [
-        "frontend.direction.decide"
+        "frontend.direction.decide",
+        "frontend.surface.audit"
       ],
       "consumedBy": []
     },

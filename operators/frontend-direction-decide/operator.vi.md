@@ -82,7 +82,7 @@ implementation, cổng chất lượng thị giác hay một lượt UAT đã qu
 
 Một tấm hình là quyết định composition như mọi quyết định khác: khi một ứng viên để lại vùng đọc lên
 thấy trống (hero không có chủ thể, empty state chỉ có một câu, hàng card mà chữ không gánh nổi chiều
-rộng), operator thêm hình làm theo đúng một claim của hướng và ghi lý do vào bảng `## Images`. Nó
+rộng), operator thêm hình làm theo đúng một claim của hướng (`@tools/imagegen`) và ghi lý do vào bảng `## Images`. Nó
 không chờ người nói, và cũng không trang trí: vùng mà chữ và Grammar object đã gánh được thì không
 thêm hình, và hình không bao giờ mã hoá claim mà lời hứa nghiệp vụ không hề nêu. Asset và prompt nằm
 dưới `response/artifacts/images/`; `frontend.source.apply` ghi chúng cùng write set đã khai.
@@ -94,7 +94,7 @@ dưới `response/artifacts/images/`; `frontend.source.apply` ghi chúng cùng w
 | `@grammar/core` | Grammar đã publish như app đang bind resolve ra; các composition mà một hướng được phép ràng | có |
 | `@knowledge/ui/composition` | các khẳng định mà biên nhận phát ra phải thoả, `COVERAGE-1` là khẳng định về toàn bộ biên nhận | có |
 | `@workspaces/fe` | checkout frontend được route, đọc ở head đóng băng; hiện trạng là bằng chứng, không bao giờ là hướng được yêu cầu | có |
-| `@knowledge/grammars/starci` | họ Core được kỳ vọng hiện thực hoá Common ra sao; luật về Grammar, không phải chính Grammar | không |
+| `@knowledge/grammars/<family>` | họ mà route đã bind gọi tên (`context.grammarId`) được kỳ vọng hiện thực hoá Common ra sao; luật về Grammar, không phải chính Grammar | không |
 | `@worktrees/uat/<flow>/<case>` | quan sát hành vi, UX và UI của lần trước kèm ảnh chụp; bằng chứng và phản chứng, một lần pass cũ không phải thẩm quyền hiện tại | không |
 
 ## Đầu vào
@@ -132,8 +132,8 @@ dưới `response/artifacts/images/`; `frontend.source.apply` ghi chúng cùng w
 | 5 | Biên một UI contract và coverage của nó, và khai lớp bề mặt | — | @knowledge/ui/composition (`COVERAGE-1` Case 7 publish bộ từ vựng lớp), đầu vào `business-promise-authority` nếu có, context đã quan sát | `response/data/coverage.json` | `SCOPE_UNFROZEN` |
 | 6 | Chốt các chuẩn tham chiếu theo lớp, có giới hạn | `references`, `changeLevel` | @knowledge/ui/composition (khoảng trống mà nghiên cứu phải lấp), @tools/websearch | — | `REFERENCE_EVIDENCE_EXHAUSTED`, `REFERENCE_MISSING` |
 | 7 | Hình thành các phương án | `candidates` | UI contract vừa biên | — | `NO_VIABLE_DIRECTION` |
-| 8 | Áp bộ lọc Grammar | `ownerCeiling` | @grammar/core (component sở hữu gì và có prop nào), @knowledge/grammars/starci | — | `GRAMMAR_REQUIRED` |
-| 9 | Render bằng chứng quyết định và hình đã tự xét, rồi phục vụ cho một người xem | `candidates`, `preview` | các phương án còn sống, @knowledge/grammars/starci | `response/artifacts/<candidateId>.html`, `response/artifacts/images/<slot>.png`, `response/artifacts/host.json`, @tools/visualize, @tools/imagegen, @tools/host, @tools/print | — |
+| 8 | Áp bộ lọc Grammar | `ownerCeiling` | @grammar/core (component sở hữu gì và có prop nào), @knowledge/grammars/<family> | — | `GRAMMAR_REQUIRED` |
+| 9 | Render bằng chứng quyết định và hình đã tự xét, phục vụ cho một người xem rồi in ra | `candidates`, `preview` | các phương án còn sống, @knowledge/grammars/<family> | `candidates`, `direction-image`, `host` | — |
 | 10 | Phản chứng | — | các phương án, đầu vào `business-promise-authority` và `backend-source-application`, `response/data/coverage.json` | — | `NO_VIABLE_DIRECTION` |
 | 11 | Quyết | `selectionPolicy`, `approval` | bảng phản chứng | — | `DIRECTION_CHOICE_REQUIRED` |
 | 12 | Phát | — | mọi thứ ở trên | `response/response.md`, `response/response.json` | — |
@@ -154,7 +154,7 @@ phương án mà lượt chạy hình thành đều được render thành trang
 có bao nhiêu phương án: đó là `@tools/visualize`, không cần cấp quyền, và mọi runtime đều làm được.
 
 Trang phương án không phải file để người ta tự đi tìm. Bậc 9 phục vụ thư mục artifacts qua
-`@tools/host` (script `scripts/host-artifacts.mjs` có sẵn trong cây, không viết server mới cho từng lần) trên loopback, ở cổng trống đầu tiên từ 60000 lên tới 60100, và ghi URL, cổng, thư mục
+`@tools/host` (tool có sẵn trong sổ đăng ký, không viết server mới cho từng lần) trên loopback, ở cổng trống đầu tiên trong dải của sổ đăng ký, và ghi URL, cổng, thư mục
 cùng pid vào `response/artifacts/host.json`; server dừng khi nhánh kết thúc hoặc được resume. Mỗi
 phương án được phục vụ một lần cho mỗi viewport của coverage — mỗi viewport một trang, hoặc một trang
 nhận viewport qua query string — để người xem thấy bản rộng và bản hẹp trước khi quyết, và đó là chỗ
@@ -164,6 +164,17 @@ Phục vụ chưa phải là nói. Trước khi bước 11 ghi quyết định, 
 phương án cùng một ảnh chụp cho mỗi viewport thẳng vào cuộc trò chuyện người ta đang đọc, và biên nhận
 liệt kê từng artifact đã in dưới `## Printed` kèm lý do. Một phương án phục vụ ở cổng không ai được
 báo là phương án không ai thấy, và quyết định lấy trên đó là quyết định lấy một mình.
+
+Cũng chính bảng ấy là toàn bộ phần bàn giao khi lựa chọn thuộc về người. `DIRECTION_CHOICE_REQUIRED`
+dưới `approval-required` dừng kèm biên nhận, và bảng `## Printed` của nó chính là lựa chọn: mỗi phương
+án một trang đã phục vụ, mỗi trang một ảnh chụp cho mỗi viewport, và ít nhất ba phương án, vì bố cục
+được chọn bằng mắt — khi sống sót ít hơn, lượt chạy render phương án thứ ba từ các phương án đã loại
+hay các biến thể ở mức phần tử của chính nó, để người so sánh bản render chứ không so sánh câu chữ.
+`reason` của lần dừng nêu URL của bảng và hỏi đúng một câu, không hơn: hai lựa chọn viết bằng văn xuôi
+không phải là lựa chọn, đó là lời khuyên, và validator từ chối một route `user` mà bảng có ít phương án
+đã render hơn số lựa chọn, hoặc không có phương án nào. `GRAMMAR_REQUIRED` và các mã dừng về phía
+caller là việc vận hành — một người publish, sửa hay cấp một thứ gì đó — nên `reason` của chúng nói rõ
+điều ấy và không mang phương án nào.
 
 Dưới `refine` trang vẫn là tuỳ chọn — cấu trúc đã được duyệt từ trước lượt chạy này — và chỉ render
 khi có nhiều hơn một phương án được hình thành hoặc `preview` là yes; một phương án refine duy nhất

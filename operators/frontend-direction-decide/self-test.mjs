@@ -146,13 +146,14 @@ const requestJson = ({ extra = {} } = {}) => ({
   resume: null,
 });
 
-const responseJson = ({ status = 'done', stop, fields, fallbacks = [], next = ['frontend.presentation.resolve'] } = {}) => ({
+const responseJson = ({ status = 'done', stop, fields, fallbacks = [], next = ['frontend.presentation.resolve'], reason } = {}) => ({
   schemaVersion: 9,
   operatorId: 'frontend.direction.decide',
   step: 2,
   parallel: 1,
   status,
   ...(stop ? { stop } : {}),
+  ...(reason ? { reason } : {}),
   fallbacks,
   fields: fields ?? { 'frontend-direction-decision': 'response/response.md', 'ui-coverage': 'response/data/coverage.json' },
   commits: [],
@@ -227,11 +228,24 @@ await expectValid({
 }, 'another class of the published vocabulary, declared in the receipt and carried by the coverage');
 await expectValid(threeCandidates(), 'three candidates, the choice taken as a fallback');
 await expectValid(threeCandidates({ policy: 'approval-required', approval: 'one-column' }), 'three candidates approved by the person');
-await expectValid({
-  'request/request.json': requestJson({ extra: { candidates: 3, selectionPolicy: 'approval-required' } }),
-  'response/response.json': responseJson({ status: 'blocked', stop: 'DIRECTION_CHOICE_REQUIRED', next: [], fields: { candidates: NAMES.map((n) => `response/artifacts/${n}.html`) } }),
-  ...Object.fromEntries(NAMES.map((n) => [`response/artifacts/${n}.html`, `<!doctype html><title>${n}</title>`])),
-}, 'DIRECTION_CHOICE_REQUIRED terminates under approval-required');
+// The choice is the person's: DIRECTION_CHOICE_REQUIRED under approval-required stops with the receipt,
+// and its ## Printed table is the choice — every candidate served at every viewport, at least three
+// of them, and a reason that names the sheet and asks one question. `printedChoice()` is that stop;
+// its mutations are options narrated in prose, or printed short.
+const CHOICE_REASON = 'http://127.0.0.1:60000/ — which of the three compositions do you take?';
+const printedChoice = ({ candidates = 3, printed = NAMES.slice(0, candidates), reason = CHOICE_REASON, receipt = true } = {}) => ({
+  'request/request.json': requestJson({ extra: { candidates, selectionPolicy: 'approval-required' } }),
+  'response/response.json': responseJson({
+    status: 'blocked',
+    stop: 'DIRECTION_CHOICE_REQUIRED',
+    next: [],
+    reason,
+    fields: { ...(receipt ? { 'frontend-direction-decision': 'response/response.md', 'ui-coverage': 'response/data/coverage.json' } : {}), candidates: NAMES.slice(0, candidates).map((n) => `response/artifacts/${n}.html`) },
+  }),
+  ...(receipt ? { 'response/response.md': responseMd({ policy: 'approval-required', candidates, selected: '—', rejectAll: false, printed }), 'response/data/coverage.json': coverage() } : {}),
+  ...Object.fromEntries(NAMES.slice(0, candidates).map((n) => [`response/artifacts/${n}.html`, `<!doctype html><title>${n}</title>`])),
+});
+await expectValid(printedChoice(), 'DIRECTION_CHOICE_REQUIRED under approval-required: three candidates printed at both viewports, one question for the person');
 await expectValid({
   'request/request.json': requestJson(),
   'response/response.json': responseJson({ status: 'blocked', stop: 'REFERENCE_MISSING', next: [], fields: {} }),
@@ -274,4 +288,11 @@ await expectError({ ...baseline(), 'response/response.md': responseMd().replace(
 await expectError({ ...baseline(), 'response/response.json': responseJson({ status: 'blocked', stop: 'DIRECTION_CHOICE_REQUIRED', next: [] }) }, 'has disposition fallback under these requirements', 'terminating on the choice under automatic');
 await expectError({ ...baseline(), 'response/response.json': responseJson({ status: 'blocked', stop: 'MADE_UP_CODE', next: [] }) }, 'not a registered code', 'unknown stop code');
 
-process.stdout.write('frontend.direction.decide self-test: 7 valid branches, 36 rejected mutations\n');
+// The hand-off to the person.
+await expectError(printedChoice({ printed: [], reason: 'Accept the composition and record the density band as seeded-data-limited, or handle the density band and three family gaps first?' }), 'lists no rendered candidate', 'a choice handed over as two prose options');
+await expectError(printedChoice({ candidates: 2, printed: ['one-column'] }), 'option split-view is offered and never printed', 'a two-option choice printed with one candidate');
+await expectError(printedChoice({ candidates: 2 }), 'shows 2 rendered candidate(s) for a choice of 3', 'a composition choice with fewer than three candidates in front of the person');
+await expectError(printedChoice({ receipt: false }), 'with no receipt', 'a choice stop that carries no receipt and so printed nothing');
+await expectError(printedChoice({ reason: 'http://127.0.0.1:60000/ — one-column keeps the offer above the fold and split-view reads denser; which do you prefer, or should I refine first?' }), 'is not one question', 'a message that narrates the options instead of asking one question');
+
+process.stdout.write('frontend.direction.decide self-test: 7 valid branches, 41 rejected mutations\n');

@@ -2,7 +2,7 @@
 
 One or two paragraphs: which universal constraint this topic places on a direction receipt, before
 any tree exists, and which operator checks it (`frontend.direction.decide`). Layout and taste are decided
-in `knowledge/grammars/starci`; a composition topic only says what the resulting direction must
+in `@knowledge/grammars/<family>`; a composition topic only says what the resulting direction must
 satisfy.
 
 ## PREFIX-1 — <what the rule governs>

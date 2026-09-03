@@ -50,7 +50,7 @@ Mỗi rule gồm heading, một dòng gọi tên thứ mà rule chi phối, và 
 Ô `Khẳng định` nêu một mệnh đề mà receipt hoặc cây đã dựng hoặc thoả hoặc trượt, không phải lời
 khuyên và không phải tên class. Nó có thể gọi tên một component hay prop công khai khi đó chính là
 thứ phải được mang, nhưng nó không bao giờ chốt một giá trị CSS; phần đó thuộc về presentation. Bố
-cục và gu thẩm mỹ được quyết trong `knowledge/grammars/starci`; các rule ở đây chỉ nói một direction
+cục và gu thẩm mỹ được quyết trong `@knowledge/grammars/<family>`; các rule ở đây chỉ nói một direction
 phải thoả điều gì.
 
 Một case thuộc về rule hàng xóm thì không nằm trong bảng. Nó đứng thành một dòng ngay sau bảng, theo
@@ -58,6 +58,6 @@ dạng `Không phải rule này: <điều kiện> thuộc PREFIX-n`. Mỗi file 
 `## File này không quyết định`, dẫn sang các file anh em và sang nhóm proof, nơi kết quả được quan
 sát.
 
-Tên component và tên prop trong các file này đều phải phân giải được về `@starci/grammar/common`.
+Tên component và tên prop trong các file này đều phải phân giải được về `@grammar/common`.
 Một API không tồn tại ở đó thì không được viết vào rule; một năng lực cần mà chưa có thì ghi nhận
 thành capability gap.

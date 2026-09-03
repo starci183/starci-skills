@@ -4,10 +4,10 @@
 đứng sau giao diện ấy được viết ra sao: một tệp nằm dưới gốc nào, các tệp của một đơn vị GraphQL
 tên gì, một handler có hình dạng nào, một import dùng alias nào, docblock đứng ở đâu so với
 decorator, một exception được khai báo thế nào và được ánh xạ sang HTTP và GraphQL ở đâu, và spec
-nằm chỗ nào. Mọi luật dưới đây được rút ra từ `starci-academy-backend/src/` bằng cách mở tệp và
-đếm; mỗi bảng dẫn nguồn của nó. Nơi nào mã nguồn chia hai ngả, tệp ghi lại biến thể chiếm ưu thế
-cùng con số thay vì áp đặt. Tên luật lint từ `@starci/eslint-canon-be` chỉ được dẫn ở nơi mã đã
-tuân theo.
+nằm chỗ nào. Mọi luật dưới đây được rút ra từ checkout backend của project đang bind
+(`@workspaces/be/src/`) bằng cách mở tệp và đếm; mỗi bảng dẫn nguồn của nó. Nơi nào mã nguồn chia
+hai ngả, tệp ghi lại biến thể chiếm ưu thế cùng con số thay vì áp đặt. Tên luật lint từ chính
+ESLint config của project đang bind chỉ được dẫn ở nơi mã đã tuân theo.
 
 ## Danh mục
 
@@ -24,6 +24,5 @@ tuân theo.
 
 ## Nguồn
 
-`D:\Repositories\starci-academy-backend\src\` (4463 tệp TypeScript không phải spec, 875 spec đơn
-vị, 7 spec tích hợp), `apps/core/src/app.module.ts` cho việc đăng ký bộ lọc, `tsconfig.json`,
-`jest.config.ts`, `eslint.config.mjs`.
+Checkout backend của project đang bind (`@workspaces/be/src/`), `apps/core/src/app.module.ts` cho
+việc đăng ký bộ lọc, `tsconfig.json`, `jest.config.ts`, `eslint.config.mjs`.

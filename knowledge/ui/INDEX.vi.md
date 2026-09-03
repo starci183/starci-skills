@@ -22,10 +22,10 @@ identity artwork, effect sản phẩm hay lựa chọn material của family.
 
 ## Grammar binding
 
-`@starci/grammar/common` là authority công khai cho props, semantics, renderer anatomy, state,
+`@grammar/common` là authority công khai cho props, semantics, renderer anatomy, state,
 accessibility, composition và universal implementation. Một application đã chọn family chỉ import
 đúng stylesheet của family đó; stylesheet đó import Common. Import trực tiếp
-`@starci/grammar/common/styles.css` chỉ dành cho trường hợp dùng Common không family có chủ đích và
+`@grammar/common/styles.css` chỉ dành cho trường hợp dùng Common không family có chủ đích và
 cho test harness cô lập. Một application không được import cả hai đường cho cùng một cây đã render.
 
 Một visual family là scoped overlay tương thích props, khai báo qua `defineGrammarFamily`. Nó có thể

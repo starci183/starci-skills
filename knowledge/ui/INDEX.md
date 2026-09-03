@@ -22,10 +22,10 @@ routes, permissions, artwork identity, product effects, or family material choic
 
 ## Grammar binding
 
-`@starci/grammar/common` is the public authority for props, semantics, renderer anatomy, state,
+`@grammar/common` is the public authority for props, semantics, renderer anatomy, state,
 accessibility, composition, and universal implementation. A family-selected application imports
 exactly the selected family stylesheet; that stylesheet imports Common. Direct
-`@starci/grammar/common/styles.css` consumption is reserved for intentional familyless Common usage
+`@grammar/common/styles.css` consumption is reserved for intentional familyless Common usage
 and isolated test harnesses. An application must not import both paths for the same rendered tree.
 
 A visual family is a props-compatible scoped overlay declared through `defineGrammarFamily`. It may

@@ -128,7 +128,7 @@ a node passes.
 | `@knowledge/ui/proof` | what only becomes true once rendered; the audit's whole rule inventory | yes |
 | `@workspaces/fe` | the routed checkout at the commit the application wrote; the owners and identifiers observed there | yes |
 | `@worktrees/sessions/central-runtime` | the shared runtime owner: the preview serving the session worktree at that commit | yes |
-| `@knowledge/grammars/starci` | how the Core family is meant to realize Common, and where its gaps are recorded | no |
+| `@knowledge/grammars/<family>` | how the family the bound route names (`context.grammarId`) is meant to realize Common, and where its gaps are recorded | no |
 
 ## Inputs
 
@@ -159,11 +159,12 @@ a node passes.
 | 3 | Select the matrix entries and read the declared surface class | `matrix` | input `frontend-direction-decision` (its `response/data/coverage.json`: state by viewport by colour scheme, and the `surfaceClass` that decision declared) | — | `SURFACE_CLASS_MISSING` |
 | 4 | Reach readiness for each entry on the port the bound route carries, in this session's own browser profile, signing in as the flow's account when the route requires an identity | `readinessProbe`, `account`, `env` | input `route` for the endpoint its entry serves, @worktrees/sessions/central-runtime for the entry of this project route, input `uat-account` for the account of names, @tools/http, @tools/secrets, @tools/browsercontrol | — | `RUNTIME_UNAVAILABLE`, `IDENTITY_MISSING` |
 | 5 | Capture and measure each entry | — | @worktrees/sessions/central-runtime, @workspaces/fe (the observed owners and the identifiers each node carries), @tools/browsercontrol | `response/artifacts/<matrixId>.png`, `response/data/captures/<matrixId>.json` | `EVIDENCE_MISSING` |
-| 6 | Compare against the claims and the proof rules, judge by owner, let each topic close itself, and emit | — | @knowledge/ui/proof, @knowledge/grammars/starci, the captures, @tools/websearch | `response/data/verdicts.json`, `response/response.md`, `response/response.json`, `response/artifacts/host.json`, @tools/visualize, @tools/host, @tools/print | `UNKNOWN_RULE` |
+| 6 | Compare against the claims and the proof rules, judge by owner, let each topic close itself, and emit; when the verdict goes to a person, print the direction's candidates | — | @knowledge/ui/proof, @knowledge/grammars/&lt;family>, the captures, input `frontend-direction-decision` (its rendered candidates, when a composition or taste verdict is the person's to take) | `verdicts`, `frontend-surface-audit`, `response/response.json`, `host`, `candidates` | `UNKNOWN_RULE`, `NO_PROGRESS` |
 
 Step 6 judges every claim and then lets each proof topic close itself. The canon judgement is the one
 above: every claim measured, judged against the published rule, routed by the owner of the node it
-stands on. On top of it, each bound topic computes its own verdict by its own closing rule — the
+stands on; bounded search (`@tools/websearch`) resolves a referent a rule names and settles nothing
+else. On top of it, each bound topic computes its own verdict by its own closing rule — the
 arithmetic lives there and is not repeated here — and the receipt publishes one row per topic under
 `## Verdict`: presentation, composition, responsive, motion, accessibility, contrast, render-truth
 and taste, each with the verdict that topic's rule produced and the route a failure carries. A topic
@@ -172,8 +173,8 @@ The taste row is scored per matrix entry and rolled up across them, lowest score
 winning, because a surface is only as good as its worst captured viewport; a `fix-first` there stands
 even when every canon rule passed, and the checkout's own gates wait for a `ship`.
 
-The sheet is served, not filed. `@tools/host` (the shipped `scripts/host-artifacts.mjs`) puts `response/artifacts/` on the loopback interface at
-the first free port from 60000 up to 60100 and records the URL, the port, the folder and the pid in
+The sheet is composed with `@tools/visualize` and served, not filed. `@tools/host` (the tool the registry ships) puts `response/artifacts/` on the loopback interface at
+the first free port of the registry's range and records the URL, the port, the folder and the pid in
 `response/artifacts/host.json`, stopping when the branch ends or is resumed; a person opens the sheet
 and sees every matrix entry beside its verdicts. Nothing binds `0.0.0.0`.
 
@@ -182,6 +183,19 @@ reading, the sheet's URL, the worst-scoring capture of each topic and the `## Ve
 receipt lists each printed artifact under `## Printed` with why it was printed. A verdict a person
 never saw sends nobody anywhere, and an audit that files its sheet and says nothing has audited only
 itself.
+
+When the verdict is the person's to take — a composition or taste topic closed as fail or fix-first
+that the chain can no longer route on, because the direction laps it allows are spent and the same
+wall was reached again — the audit reports the wall as `NO_PROGRESS` and still does not advise. The
+report is the choice, printed: it copies the direction's rendered candidate set under
+`response/artifacts/candidates/`, serves it beside the sheet, prints every candidate at every
+viewport of the matrix, at least three of them, and its `reason` names the sheet URL and asks one
+question and nothing more. The audit composes nothing of its own, so a set with fewer than three is
+not its to complete: the hand-off then goes to `frontend.direction.decide` under `approval-required`,
+whose own stop prints three. Two options written out in prose are advice, not a choice, and the
+validator refuses a `user` route over an open composition or taste verdict whose `## Printed` holds
+fewer rendered candidates than the choice has options, or none. A `user` route for a yes/no
+operational approval carries no candidate and says so.
 
 The surface class is not this operator's to choose or to declare. It is read from the coverage of the
 `frontend-direction-decision` this audit was given, where the direction declared it from the
@@ -206,6 +220,7 @@ for a node that was not.
 | `screenshot` | `response/artifacts/<matrixId>.png` | artifact | yes |
 | `verdicts` | `response/data/verdicts.json` | data | yes |
 | `host` | `response/artifacts/host.json` | artifact | no |
+| `candidates` | `response/artifacts/candidates/<candidateId>.html` | artifact | no |
 
 ## Stops
 

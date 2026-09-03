@@ -10,12 +10,12 @@ exactly this ref; it carries no verdict about the change itself.
 | --- | --- |
 | Operator | `git.publish` |
 | Step | `step-1/parallel-1` |
-| Project | `starci-academy` |
+| Project | `project` |
 | Boundary | `api.core` |
 | Approval | `@worktrees/businesses/features/api-core/model.json#approval` |
 | Route receipt | `step-1/parallel-1/response/response.md` |
 | Worktree branches | forbidden |
-| Mutation branch | `mtp` |
+| Mutation branch | `branch` |
 | Frozen head | `1111111111111111111111111111111111111111` |
 
 ## Publication
@@ -23,11 +23,11 @@ exactly this ref; it carries no verdict about the change itself.
 | Field | Value |
 | --- | --- |
 | Remote | origin |
-| Ref | `refs/heads/mtp` |
+| Ref | `refs/heads/branch` |
 | Mode | fast-forward-only |
 | Forced | no |
 | Session branch | `session/s-2026-01-10` |
-| Target branch | `mtp` |
+| Target branch | `branch` |
 | Merge | fast-forward |
 | Verified commit | `1111111111111111111111111111111111111111` |
 | Cleanup | worktree and session branch removed |
@@ -36,7 +36,7 @@ exactly this ref; it carries no verdict about the change itself.
 
 | Checkout | Branch | Head | Previous remote head | Commits |
 | --- | --- | --- | --- | --- |
-| `@workspaces/be` | `mtp` | `1111111111111111111111111111111111111111` | `2222222222222222222222222222222222222222` | 4 |
+| `@workspaces/be` | `branch` | `1111111111111111111111111111111111111111` | `2222222222222222222222222222222222222222` | 4 |
 
 ## Hooks
 

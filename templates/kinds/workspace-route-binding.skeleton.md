@@ -48,9 +48,9 @@ later work to open exactly this checkout at exactly this head and proves nothing
 | Owner task | the delegated owner of the shared runtime; no rows at all when no runtime was consumed |
 | Status | ready |
 | Consumer role | consumer |
-| Frontend | `http://localhost:3000` |
-| Api | `http://localhost:3001` |
-| Identity | `http://localhost:8089` |
+| Frontend | `http://localhost:<canonical-port>` |
+| Api | `http://localhost:<canonical-port>` |
+| Identity | `http://localhost:<canonical-port>` |
 
 ## Findings
 

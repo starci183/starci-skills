@@ -10,7 +10,8 @@ import path from 'node:path';
 import process from 'node:process';
 import { fileURLToPath } from 'node:url';
 import { validateStep } from '../../scripts/validate-step.mjs';
-import { tableUnder } from '../../scripts/validate-response.mjs';
+import { tableUnder, userRouted, choiceHandoffErrors } from '../../scripts/validate-response.mjs';
+import { loadErrorsRegistry } from '../../scripts/errors-registry.mjs';
 import { sessionRootOf, missingStack } from '../../scripts/validate-request.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
@@ -159,7 +160,8 @@ export async function validateAuditStep(branchDir, root = ROOT) {
   // rolled up across the entries: the lowest score and the failing verdict win.
   const lensRows = TASTE_RULES.filter((r) => rolled.has(r)).map((r) => ({ rule: r, ...rolled.get(r) }));
   const surface = lensRows.length === TASTE_RULES.length ? tasteVerdict(lensRows) : null;
-  if (surface) {
+  // A blocked branch routes by its stop, not by next; the hand-offs below are read on a done one.
+  if (surface && response.status === 'done') {
     const next = response.next ?? [];
     if (surface.verdict === 'fix-first') {
       if (!next.includes('frontend.direction.decide')) errors.push('response/response.json: the taste lens is fix-first, so next names frontend.direction.decide');
@@ -202,8 +204,24 @@ export async function validateAuditStep(branchDir, root = ROOT) {
   const topicVerdict = (topic) => topicRows.get(topic) ?? { verdict: 'blocked', routeTo: 'none' };
 
   const failing = verdicts.entries.flatMap((e) => e.results.filter((r) => r.verdict === 'fail'));
-  if (failing.some((r) => r.routeTo === 'resolve') && !(response.next ?? []).includes('frontend.presentation.resolve')) {
+  if (response.status === 'done' && failing.some((r) => r.routeTo === 'resolve') && !(response.next ?? []).includes('frontend.presentation.resolve')) {
     errors.push('response/response.json: a claim fails on an application-owned node, so next names frontend.presentation.resolve');
+  }
+
+  // When the verdict goes to a person while a composition or taste topic is still open — the same
+  // wall reached again, so the audit reports it rather than advising — the hand-off is the
+  // direction's rendered candidates, printed at every viewport of the matrix, never two sentences
+  // the person is asked to choose between (@tools/print, decision-points).
+  const openForPerson = ['composition', 'taste'].filter((topic) => ['fail', 'fix-first'].includes(topicVerdict(topic).verdict));
+  const toPerson = openForPerson.length > 0 && await userRouted(root, await loadErrorsRegistry(root), 'frontend.surface.audit', response);
+  if (toPerson) {
+    if (!(present.has('frontend-surface-audit') && has('response/response.md'))) {
+      errors.push(`response/response.md: the ${openForPerson.join(' and ')} verdict is handed to the person with no receipt, so nothing was printed; a design decision reaches a person as rendered candidates under ## Printed`);
+    } else {
+      const printedRows = tableUnder(await read('response/response.md'), '## Printed') ?? [];
+      const viewports = new Set([...captures.values()].map(({ doc }) => doc.viewport.join('x')));
+      errors.push(...choiceHandoffErrors({ at: 'response/response.md', printedRows, viewports: Math.max(1, viewports.size), reason: response.reason }));
+    }
   }
 
   if (present.has('frontend-surface-audit') && has('response/response.md')) {

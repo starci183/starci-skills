@@ -81,8 +81,8 @@ implementation, a visual quality gate or a UAT run has passed.
 
 An image is a composition decision like any other: when a candidate leaves a region that reads empty
 (a hero without a subject, an empty state with only a sentence, a card row whose copy cannot carry the
-width), the operator adds an image made to one stated claim of the direction and records why, in the
-`## Images` table. It does not wait for a person to ask, and it does not decorate: a region that the
+width), the operator adds an image made to one stated claim of the direction (`@tools/imagegen`) and
+records why, in the `## Images` table. It does not wait for a person to ask, and it does not decorate: a region that the
 copy and the Grammar objects already carry gets no image, and an image never encodes a claim the
 business promise did not make. The asset and its prompt land under `response/artifacts/images/`;
 `frontend.source.apply` writes them with the declared write set.
@@ -94,7 +94,7 @@ business promise did not make. The asset and its prompt land under `response/art
 | `@grammar/core` | the published Grammar as the bound app resolves it; the compositions a direction may bind | yes |
 | `@knowledge/ui/composition` | the assertions the emitted receipt has to satisfy, `COVERAGE-1` being the assertion about the receipt as a whole | yes |
 | `@workspaces/fe` | the routed frontend checkout read at the frozen head; the current implementation as evidence, never as the requested direction | yes |
-| `@knowledge/grammars/starci` | how the Core family is meant to realize Common; law about the Grammar, never the Grammar itself | no |
+| `@knowledge/grammars/<family>` | how the family the bound route names (`context.grammarId`) is meant to realize Common; law about the Grammar, never the Grammar itself | no |
 | `@worktrees/uat/<flow>/<case>` | prior behaviour, UX and UI observations with their captures; evidence and counterevidence, and a prior pass is not current authority | no |
 
 ## Inputs
@@ -132,8 +132,8 @@ business promise did not make. The asset and its prompt land under `response/art
 | 5 | Compile one UI contract and its coverage, and declare the surface class | — | @knowledge/ui/composition (`COVERAGE-1` Case 7 publishes the class vocabulary), input `business-promise-authority` when present, the observed context | `response/data/coverage.json` | `SCOPE_UNFROZEN` |
 | 6 | Resolve the reference standards by class, bounded | `references`, `changeLevel` | @knowledge/ui/composition (the gap the research must close), @tools/websearch | — | `REFERENCE_EVIDENCE_EXHAUSTED`, `REFERENCE_MISSING` |
 | 7 | Form the candidates | `candidates` | the compiled UI contract | — | `NO_VIABLE_DIRECTION` |
-| 8 | Apply the Grammar filter | `ownerCeiling` | @grammar/core (what a component owns and which props exist), @knowledge/grammars/starci | — | `GRAMMAR_REQUIRED` |
-| 9 | Render the decision evidence and the judged images, and serve them for a person | `candidates`, `preview` | the surviving candidates, `@knowledge/grammars/starci` | `response/artifacts/<candidateId>.html`, `response/artifacts/images/<slot>.png`, `response/artifacts/host.json`, @tools/visualize, @tools/imagegen, @tools/host, @tools/print | — |
+| 8 | Apply the Grammar filter | `ownerCeiling` | @grammar/core (what a component owns and which props exist), @knowledge/grammars/<family> | — | `GRAMMAR_REQUIRED` |
+| 9 | Render the decision evidence and the judged images, serve them for a person and print them | `candidates`, `preview` | the surviving candidates, @knowledge/grammars/<family> | `candidates`, `direction-image`, `host` | — |
 | 10 | Falsify | — | the candidates, inputs `business-promise-authority` and `backend-source-application`, `response/data/coverage.json` | — | `NO_VIABLE_DIRECTION` |
 | 11 | Decide | `selectionPolicy`, `approval` | the falsification table | — | `DIRECTION_CHOICE_REQUIRED` |
 | 12 | Emit | — | everything above | `response/response.md`, `response/response.json` | — |
@@ -154,7 +154,7 @@ approved and a candidate described in prose is not a candidate anybody can judge
 however many there are: that is `@tools/visualize`, needs no grant, and every runtime does it.
 
 The candidate pages are not files a person is asked to find. Step 9 serves the artifacts folder over
-`@tools/host` (the shipped `scripts/host-artifacts.mjs`, never a server written for the occasion) on the loopback interface, at the first free port from 60000 up to 60100, and records
+`@tools/host` (the tool the registry ships, never a server written for the occasion) on the loopback interface, at the first free port of the registry's range, and records
 the URL, the port, the folder and the pid in `response/artifacts/host.json`; the server stops when the
 branch ends or is resumed. Each candidate is served once per viewport of the coverage — one page per
 viewport, or one page taking the viewport as a query string — so the person sees the wide and the
@@ -164,6 +164,17 @@ Serving is not telling. Before step 11 writes the decision, step 9 prints over `
 candidate's URL and one capture per viewport into the conversation the person is reading, and the
 receipt lists each printed artifact under `## Printed` with why it was printed. A candidate served at
 a port nobody was told about is a candidate nobody saw, and a decision taken over one is taken alone.
+
+The same table is the whole hand-off when the choice is the person's. `DIRECTION_CHOICE_REQUIRED`
+under `approval-required` stops with the receipt, and its `## Printed` table is the choice: one served
+candidate per option, each with a capture per viewport, and at least three of them, because a
+composition is chosen by eye — when fewer survived, the run renders the third from its own rejected
+or element-level alternatives so the person compares renders rather than sentences. The stop's
+`reason` names the sheet URL and asks one question and nothing more: two options written out in
+prose are not a choice, they are advice, and the validator refuses a `user` route whose table holds
+fewer rendered candidates than the choice has options, or none. `GRAMMAR_REQUIRED` and the caller
+stops are operational — a person publishes, corrects or supplies something — so their `reason` says
+so and carries no candidate.
 
 Under
 `refine` the page stays optional — the structure was approved before this run began — and is rendered

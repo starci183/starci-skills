@@ -41,7 +41,7 @@ into a Grammar frame usually has none; the 9 pages that have one alias a Grammar
 ```ts
 // pages/AuthenticationPage/classNames.ts
 import { cn } from "@heroui/react"
-import { formPageClassName } from "@starci/grammar/common"
+import { formPageClassName } from "@grammar/common"
 
 /** Grammar-owned page frame; this app alias adds no visual override. */
 export const authenticationPageClassName = cn(formPageClassName)

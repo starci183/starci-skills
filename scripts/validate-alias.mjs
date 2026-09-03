@@ -90,15 +90,23 @@ async function checkOperatorMd(dir, id) {
   const declaredTools = new Set(Object.keys(manifest.resources?.tools ?? {}));
   for (const [file, lang] of [['operator.md', 'en'], ['operator.vi.md', 'vi']]) {
     if (!existsSync(path.join(dir, file))) continue;
-    const op = lang === 'en' ? en : parseOperatorMd(await readFile(path.join(dir, file), 'utf8'), 'vi');
+    const text = await readFile(path.join(dir, file), 'utf8');
+    const op = lang === 'en' ? en : parseOperatorMd(text, 'vi');
     const used = new Set();
     const toolsUsed = new Set();
+    // A tool is used where the operator's law names it: a Steps cell or the prose that states the job
+    // the tool serves. Either way it must exist in the registry and be declared in operator.json.
+    for (const m of text.matchAll(/@tools\/[a-z][a-z0-9-]*/g)) {
+      toolsUsed.add(m[0]);
+      if (!aliases[m[0]]) errors.push(`${id}: ${file} names ${m[0]}, which resources/tools.json does not define`);
+      else if (!declaredTools.has(m[0])) errors.push(`${id}: ${file} names ${m[0]}, which operator.json resources.tools does not declare`);
+    }
     for (const step of op.tables.steps?.rows ?? []) for (const a of [...cellAliases(step.reads), ...cellAliases(step.writes)]) {
       if (a.startsWith('@dynamic')) { errors.push(`${id}: ${file} step ${step.n} names ${a}; an operator.md package passes dynamic files as kinds, not aliases`); continue; }
       if (a.startsWith('@tools/')) { toolsUsed.add(a); if (!aliases[a]) errors.push(`${id}: ${file} step ${step.n} names ${a}, which resources/tools.json does not define`); else if (!declaredTools.has(a)) errors.push(`${id}: ${file} step ${step.n} calls ${a}, which operator.json resources.tools does not declare`); continue; }
       used.add(baseOf(a) ?? a);
     }
-    if (lang === 'en') for (const t of declaredTools) if (!toolsUsed.has(t) && t !== '@tools/fileread') errors.push(`${id}: operator.json declares ${t} but no step names it`);
+    if (lang === 'en') for (const t of declaredTools) if (!toolsUsed.has(t) && t !== '@tools/fileread') errors.push(`${id}: operator.json declares ${t} but the operator's law names it nowhere`);
     for (const u of used) if (!declaredBases.has(u)) errors.push(`${id}: ${file} Steps read or write ${u}, which the Context table does not declare`);
     for (const r of requiredBases) if (!used.has(r)) errors.push(`${id}: ${file} Steps never read or write required ${r}`);
     if (used.size === 0) errors.push(`${id}: ${file} Steps name no alias at all`);

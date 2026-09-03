@@ -32,7 +32,7 @@
   },
   "session": {
     "root": "<Source>/.worktrees/sessions/<sessionId>/",
-    "id": "<yyyymmdd-HHMMss>-<project>-<first operator>, e.g. 20260903-142200-starci-academy-frontend.direction.decide",
+    "id": "<yyyymmdd-HHMMss>-<project>-<first operator>, e.g. 20260903-142200-project-frontend.direction.decide",
     "manifest": "state.json, validated against templates/step/state.schema.json by validate-request: id, project, workflow, startedAt, status (running | blocked | done | stopped), chain [[\"1/1\"], [\"2/1\", \"2/2\"], ...], steps { \"N/M\": operatorId }, current, leases { \"N/M\": { agent, holds } }, requestHashes { \"N/M\": sha256 of request/request.json }, resumes { \"N/M\": { resumes: \"K/L\", stop } } for every re-entry, stoppedAt { branch, operator, stop | null, domain, route, why } when the session ended, substitutions { \"N/M\": code } for codes read as UNKNOWN_STOP, transitions [] as the audit trail",
     "branch": "step-<N>/parallel-<M>/ — N is the position in the chain, M the parallel branch; parallel-1 always exists",
     "branchLayout": [
