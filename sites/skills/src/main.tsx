@@ -19,8 +19,7 @@ import {
   Warning,
 } from '@phosphor-icons/react'
 import type { Icon } from '@phosphor-icons/react'
-import { Rail, StaticStateRow, SurfaceCard, SurfaceListCard } from '@starci/grammar/common'
-import { CoreGrammarRoot } from '@starci/grammar/core'
+import { CoreGrammarRoot, Rail, StaticStateRow, SurfaceCard, SurfaceListCard } from '@starci/grammar/core'
 import '@starci/grammar/common.css'
 import '@starci/grammar/core.css'
 import './styles.css'
