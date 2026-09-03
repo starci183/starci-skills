@@ -18,6 +18,15 @@ conditional, and `validate.mjs` refuses a `reconcile` branch whose request does 
 modes end at the same place: one head under `@worktrees/businesses/<featureId>` and one
 `response/data/model.json` that says exactly what that head now holds.
 
+## A first run starts from the person's promise
+
+A feature that no source implements yet has no fact claim by construction. On a first run under mode
+model, the promise the person stated in `promise` is recorded as the one intent claim, bound to
+`request/request.json#requirements.promise` instead of a source line, and the model is built from it;
+`EVIDENCE_MISSING` applies to a fact claim without a file behind it, never to the intent of a promise
+that is being decided for the first time. Every enforcing row of the coverage matrix still rests on a
+fact claim, so a greenfield head publishes with its enforcing rows open, which is what `pending` means.
+
 ## Separate the claim before modelling it
 
 Modelling begins by separating every observation into fact, intent, example, unknown, or
@@ -103,6 +112,7 @@ implementation, a quality gate, or a UAT run has passed.
 | --- | --- | --- | --- |
 | `featureId` | id | — | The one feature the promise belongs to |
 | `mode` | choice | model | `model` decides and publishes the promise; `reconcile` compares the published head against delivered source |
+| `promise` | prompt | the promise the previous head states | The promise in the person's words; required on a first run, when no head exists yet, and recorded as the intent claim bound to `request/request.json#requirements.promise` |
 | `targetState` | choice | — | `pending`, `in-progress`, `implemented` or `rejected` for the published head |
 | `dimensions` | list | the dimensions of the previous head | The coverage surface this promise is accountable for; required on a first run, because no previous head declares it |
 | `approval` | id | null | The owner approval the transition needs, supplied on resume after `APPROVAL_REQUIRED` |
@@ -115,7 +125,7 @@ implementation, a quality gate, or a UAT run has passed.
 | 1 | Validate the gate and resume | `resume`, `mode` | `request/request.json`, @workspaces/be at the frozen head | — | `INVALID_INPUT`, `SOURCE_DRIFT`, `NO_PROGRESS` |
 | 2 | Normalize the evidence into claims | — | @workspaces/be, every observation with its role, path, line range and head, input `architecture-decision` when present as evidence only | `response/data/claims.json` | `EVIDENCE_MISSING`, `CONTRADICTION_UNRESOLVED` |
 | 3 | Check the published head and the transition authority | `featureId`, `targetState`, `approval` | @worktrees/businesses/<featureId>: the current head, its state and its frozen evidence | — | `LIFECYCLE_TRANSITION_INVALID`, `AUTHORITY_CONFLICT`, `APPROVAL_REQUIRED` |
-| 4 | Model the promise, its actor and its eligibility from fact claims only, under mode model | — | `response/data/claims.json`, @workspaces/be at the frozen head | — | `EVIDENCE_MISSING` |
+| 4 | Model the promise, its actor and its eligibility, under mode model: fact claims carry every enforcing row, the intent claim carries the promise itself | `promise` | `response/data/claims.json`, @workspaces/be at the frozen head | — | `EVIDENCE_MISSING` |
 | 5 | Freeze the coverage matrix, under mode model | `dimensions` | `response/data/claims.json`, @workspaces/be and the surface it discovers | `response/data/coverage-matrix.json` | `COVERAGE_INCOMPLETE`, `CONSUMER_UNPROVEN` |
 | 6 | Dispose legacy coexistence, under mode model | — | `response/data/coverage-matrix.json`: the legacy create, read and settle rows and their proof | — | `CONTRADICTION_UNRESOLVED` |
 | 7 | Reconcile against delivered source, under mode reconcile | — | input `backend-source-application`, @workspaces/be at the frozen head, the coverage matrix frozen at the published head | — | `RECONCILIATION_DISCREPANCY` |
@@ -163,3 +173,4 @@ cannot yield a different answer.
 | the promise is published and a frontend surface must carry it | `frontend.direction.decide` |
 | the promise is published and a backend contract must carry it | `backend.source.apply` |
 | the promise needs boundaries and data ownership decided before it can be enforced | `architecture.decide` |
+| the head is reconciled against the delivered source and the delivery may be published | `git.publish` |

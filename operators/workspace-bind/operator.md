@@ -140,6 +140,9 @@ cannot yield a different binding.
 | When | Operator |
 | --- | --- |
 | the route is bound and the checkout carries a publication to push | `git.publish` |
+| the route is bound and a promise must be decided against its source | `business.decide` |
 | the route is bound and a backend contract must be filled inside it | `backend.source.apply` |
 | the route is bound and a frontend surface must be written inside it | `frontend.source.apply` |
 | the runtime owner is missing or not ready and one coordination request must be raised | `platform.operate` |
+| the route is bound and a frontend surface must be decided inside it | `frontend.direction.decide` |
+| the route is bound and a published head must be verified before it ships | `quality.verify` |

@@ -23,12 +23,12 @@ lại thành bậc mới; vòng lặp tính vào `maxRounds` của chính operat
 
 | Workflow | Khi | Các bậc | Song song | Kết thúc |
 | --- | --- | --- | --- | --- |
-| `frontend-new-surface` | bề mặt chưa tồn tại (`new`) | bind → business → direction → resolve → apply → audit → quality → publish | audit theo matrix | `git.publish` |
+| `frontend-new-surface` | bề mặt chưa tồn tại (`new`) | bind ×2 → business → direction → resolve → apply → audit → quality → publish | audit theo matrix | `git.publish` |
 | `frontend-reconstruct` | dựng lại bề mặt đã có, giữ fact nghiệp vụ | bind → direction → resolve → apply → audit → quality → publish | audit theo matrix | `git.publish` |
 | `frontend-refine` | sửa bên trong cấu trúc đã duyệt | bind → direction → resolve → apply → audit → quality → publish | audit theo matrix | `git.publish` |
 | `backend-feature` | một contract backend cho một feature | bind → business (model) → architecture → backend apply → quality → business (reconcile) → publish | — | `git.publish` |
 | `full-feature` | backend và bề mặt frontend mới cùng lúc | bind ×2 → business → architecture → [backend apply ∥ direction] → [quality ∥ resolve] → apply → audit → quality → business (reconcile) → publish | hai bậc hai nhánh, audit theo matrix | `git.publish` |
-| `frontend-with-uat` | thay đổi frontend mà người yêu cầu đi thử | … audit → quality → uat → publish | audit theo matrix | `git.publish` |
+| `frontend-with-uat` | thay đổi frontend mà người yêu cầu đi thử | bind ×2 → … audit → quality → uat → publish | audit theo matrix | `git.publish` |
 | `release` | head đã publish phải lên production | bind → quality → release | — | `release.deploy` |
 | `content-unit` | một đơn vị giáo trình từ đầu tới cuối | content.generate (có exchange review bên trong) | — | `user` |
 

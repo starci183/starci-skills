@@ -10,6 +10,12 @@
       {
         "operator": "workspace.bind",
         "requirements": {
+          "role": "be"
+        }
+      },
+      {
+        "operator": "workspace.bind",
+        "requirements": {
           "role": "fe"
         }
       }

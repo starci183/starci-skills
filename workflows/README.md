@@ -23,12 +23,12 @@ re-enters as a new step; a loop counts toward the operator's own `maxRounds`.
 
 | Workflow | When | Steps | Parallel | Ends |
 | --- | --- | --- | --- | --- |
-| `frontend-new-surface` | a surface that does not exist yet (`new`) | bind → business → direction → resolve → apply → audit → quality → publish | audit by matrix | `git.publish` |
+| `frontend-new-surface` | a surface that does not exist yet (`new`) | bind ×2 → business → direction → resolve → apply → audit → quality → publish | audit by matrix | `git.publish` |
 | `frontend-reconstruct` | rebuild an existing surface, business facts kept | bind → direction → resolve → apply → audit → quality → publish | audit by matrix | `git.publish` |
 | `frontend-refine` | repair inside an approved structure | bind → direction → resolve → apply → audit → quality → publish | audit by matrix | `git.publish` |
 | `backend-feature` | a backend contract for one feature | bind → business (model) → architecture → backend apply → quality → business (reconcile) → publish | — | `git.publish` |
 | `full-feature` | backend and a new frontend surface together | bind ×2 → business → architecture → [backend apply ∥ direction] → [quality ∥ resolve] → apply → audit → quality → business (reconcile) → publish | two steps of two, audit by matrix | `git.publish` |
-| `frontend-with-uat` | a frontend change a person asked to walk through | … audit → quality → uat → publish | audit by matrix | `git.publish` |
+| `frontend-with-uat` | a frontend change a person asked to walk through | bind ×2 → … audit → quality → uat → publish | audit by matrix | `git.publish` |
 | `release` | a published head must reach production | bind → quality → release | — | `release.deploy` |
 | `content-unit` | one curriculum unit end to end | content.generate (review exchange inside) | — | `user` |
 

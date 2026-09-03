@@ -17,6 +17,15 @@ buộc phụ thuộc chế độ, và `validate.mjs` từ chối một nhánh `r
 chế độ kết thúc ở cùng một chỗ: một head dưới `@worktrees/businesses/<featureId>` và một
 `response/data/model.json` nói đúng những gì head ấy đang giữ.
 
+## Lần chạy đầu bắt đầu từ lời hứa của người
+
+Một feature chưa có source hiện thực thì theo định nghĩa không có claim fact. Ở lần chạy đầu dưới chế
+độ model, lời hứa người dùng nêu trong `promise` được ghi thành claim intent duy nhất, ràng vào
+`request/request.json#requirements.promise` thay vì một dòng source, và mô hình dựng từ đó;
+`EVIDENCE_MISSING` áp cho claim fact không có file đứng sau, không bao giờ áp cho intent của một lời
+hứa đang được quyết lần đầu. Mọi hàng enforcing của coverage matrix vẫn phải tựa trên claim fact, nên
+head greenfield publish với các hàng enforcing còn mở, đó chính là nghĩa của `pending`.
+
 ## Tách loại claim trước khi mô hình hoá
 
 Mô hình hoá bắt đầu bằng việc tách mọi quan sát thành fact, intent, example, unknown hay
@@ -101,6 +110,7 @@ cài đặt, một cổng chất lượng hay một lượt UAT đã qua.
 | --- | --- | --- | --- |
 | `featureId` | id | — | Một feature duy nhất mà lời hứa thuộc về |
 | `mode` | choice | model | `model` quyết và publish lời hứa; `reconcile` đối chiếu head đã publish với source đã giao |
+| `promise` | prompt | the promise the previous head states | Lời hứa bằng lời của người dùng; bắt buộc ở lần chạy đầu khi chưa có head, và được ghi thành claim intent ràng vào `request/request.json#requirements.promise` |
 | `targetState` | choice | — | `pending`, `in-progress`, `implemented` hay `rejected` cho head được publish |
 | `dimensions` | list | the dimensions of the previous head | Bề mặt phủ mà lời hứa này chịu trách nhiệm; bắt buộc ở lần chạy đầu, vì chưa head nào khai nó |
 | `approval` | id | null | Phê duyệt của chủ mà chuyển trạng thái cần, nhập khi chạy lại sau `APPROVAL_REQUIRED` |
@@ -113,7 +123,7 @@ cài đặt, một cổng chất lượng hay một lượt UAT đã qua.
 | 1 | Kiểm gate và chạy lại | `resume`, `mode` | `request/request.json`, @workspaces/be ở head đóng băng | — | `INVALID_INPUT`, `SOURCE_DRIFT`, `NO_PROGRESS` |
 | 2 | Chuẩn hoá bằng chứng thành claim | — | @workspaces/be, mọi quan sát kèm vai, path, khoảng dòng và head, đầu vào `architecture-decision` nếu có và chỉ như bằng chứng | `response/data/claims.json` | `EVIDENCE_MISSING`, `CONTRADICTION_UNRESOLVED` |
 | 3 | Kiểm head đã publish và thẩm quyền chuyển trạng thái | `featureId`, `targetState`, `approval` | @worktrees/businesses/<featureId>: head hiện tại, trạng thái và bằng chứng đóng băng của nó | — | `LIFECYCLE_TRANSITION_INVALID`, `AUTHORITY_CONFLICT`, `APPROVAL_REQUIRED` |
-| 4 | Mô hình lời hứa, actor và eligibility chỉ từ claim fact, dưới chế độ model | — | `response/data/claims.json`, @workspaces/be ở head đóng băng | — | `EVIDENCE_MISSING` |
+| 4 | Mô hình lời hứa, actor và eligibility dưới chế độ model: claim fact gánh mọi hàng enforcing, claim intent gánh chính lời hứa | `promise` | `response/data/claims.json`, @workspaces/be ở head đóng băng | — | `EVIDENCE_MISSING` |
 | 5 | Đóng băng ma trận phủ, dưới chế độ model | `dimensions` | `response/data/claims.json`, @workspaces/be và bề mặt nó phát hiện | `response/data/coverage-matrix.json` | `COVERAGE_INCOMPLETE`, `CONSUMER_UNPROVEN` |
 | 6 | Xử lý phần chung sống với legacy, dưới chế độ model | — | `response/data/coverage-matrix.json`: các hàng legacy create, read, settle và bằng chứng của chúng | — | `CONTRADICTION_UNRESOLVED` |
 | 7 | Đối chiếu với source đã giao, dưới chế độ reconcile | — | đầu vào `backend-source-application`, @workspaces/be ở head đóng băng, ma trận phủ đã đóng băng ở head đã publish | — | `RECONCILIATION_DISCREPANCY` |
@@ -161,3 +171,4 @@ một câu trả lời khác.
 | lời hứa đã publish và một bề mặt frontend phải mang nó | `frontend.direction.decide` |
 | lời hứa đã publish và một contract backend phải mang nó | `backend.source.apply` |
 | lời hứa cần quyết ranh giới và quyền sở hữu dữ liệu trước khi thực thi được | `architecture.decide` |
+| head đã được đối chiếu với source đã giao và bản giao có thể được publish | `git.publish` |

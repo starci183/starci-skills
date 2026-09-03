@@ -102,8 +102,8 @@ khoản nợ không ai duyệt hoặc đã hết hạn.
 | Alias | Bind | Bắt buộc |
 | --- | --- | --- |
 | `@workspaces/<project>/<role>/gates` | lệnh cổng đã ghim, cấu hình và ngưỡng chúng mang; là nghĩa của "cùng một cổng" qua các lần chạy | có |
-| `@workspaces/be` | checkout backend đã route tại commit đã ghim, chủ thể mọi cổng đo khi delivery là backend | có |
-| `@workspaces/fe` | checkout frontend đã route tại commit đã ghim, chủ thể mọi cổng đo khi delivery là frontend | có |
+| `@workspaces/be` | checkout backend đã route tại commit đã ghim, chủ thể mọi cổng đo khi delivery là backend | không |
+| `@workspaces/fe` | checkout frontend đã route tại commit đã ghim, chủ thể mọi cổng đo khi delivery là frontend | không |
 | `@worktrees/debts` | bản ghi nợ được chủ duyệt và hạn của chúng; một cổng đỏ chỉ được mang từ đây | không |
 
 ## Đầu vào
@@ -173,3 +173,5 @@ cùng một fingerprint không thể cho một câu trả lời khác.
 | một cổng frontend hỏng trong ranh giới và chủ frontend phải áp bản sửa | `frontend.source.apply` |
 | phán quyết xanh và delivery sẵn sàng để publish | `git.publish` |
 | phán quyết xanh và head đã publish phải tới được một môi trường | `release.deploy` |
+| các gate xanh và lời hứa phải được đối chiếu với source đã giao | `business.decide` |
+| các gate xanh và có người yêu cầu đi thử hành trình | `uat.verify` |

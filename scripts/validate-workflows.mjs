@@ -21,10 +21,15 @@ export async function validateWorkflows(root) {
     const op = p.en;
     const writes = new Set();
     for (const s of op.tables.steps?.rows ?? []) for (const a of cellAliases(s.writes)) writes.add(baseOf(aliases, a) ?? a);
+    // The checkout roles the operator's required Context binds (@workspaces/fe, @workspaces/be, ...).
+    const roles = new Set();
+    for (const r of op.tables.context?.rows ?? []) { const a = cellAliases(r.alias)[0]; const m = a && /^@workspaces\/(fe|be)\b/.exec(a); if (m && isYes(r.required)) roles.add(m[1]); }
     return [p.manifest.id, {
       fields: new Set((op.tables.requirements?.rows ?? []).map((r) => unquote(r.field))),
       required: (op.tables.inputs?.rows ?? []).filter((r) => isYes(r.required)).map((r) => kindOf(r.kind)),
       outputs: new Set((op.tables.outputs?.rows ?? []).map((r) => kindOf(r.kind))),
+      next: new Set((op.tables.next?.rows ?? []).map((r) => unquote(r.operator))),
+      roles,
       writes,
     }];
   }));
@@ -41,7 +46,17 @@ export async function validateWorkflows(root) {
     if (!Array.isArray(wf.chain) || wf.chain.length === 0) { errors.push(`${rel}: chain must be a non-empty array of steps`); continue; }
     const produced = new Set();
     const positions = new Map(); // operator -> first step index
+    const boundRoles = new Set(); // workspace.bind roles bound by earlier steps
+    let previousOps = null;
     wf.chain.forEach((step, n) => {
+      // Adjacency: every operator of this step must be a Next of some operator of the previous step,
+      // or the same operator re-entered (a resume or a second mode of the same job).
+      if (Array.isArray(step) && previousOps) {
+        for (const b of step) {
+          const allowed = previousOps.some((prev) => prev === b.operator || (ops.get(prev)?.next ?? new Set()).has(b.operator));
+          if (!allowed) errors.push(`${rel}: step ${n + 1} runs ${b.operator}, which no Next table of step ${n} (${previousOps.join(', ')}) permits`);
+        }
+      }
       if (!Array.isArray(step) || step.length === 0) { errors.push(`${rel}: step ${n + 1} must be a non-empty array of branches`); return; }
       if (step.length > 3) errors.push(`${rel}: step ${n + 1} has ${step.length} branches; at most 3 run in parallel`);
       const stepProduces = new Set();
@@ -53,6 +68,8 @@ export async function validateWorkflows(root) {
         if (!positions.has(b.operator)) positions.set(b.operator, n);
         for (const key of Object.keys(b.requirements ?? {})) if (!op.fields.has(key)) errors.push(`${at}: requirement ${key} is not a field of ${b.operator}`);
         for (const kind of op.required) if (!produced.has(kind)) errors.push(`${at}: ${b.operator} requires input ${kind}, which no earlier step produces`);
+        // A required @workspaces/<role> context needs a workspace.bind of that role in an earlier step.
+        if (b.operator !== 'workspace.bind') for (const role of op.roles) if (!boundRoles.has(role)) errors.push(`${at}: ${b.operator} requires @workspaces/${role}, which no earlier workspace.bind (role ${role}) bound`);
         if (b.fanout !== undefined && b.fanout !== 'matrix') errors.push(`${at}: fanout must be "matrix"`);
         if (b.maxParallel !== undefined && !(Number.isInteger(b.maxParallel) && b.maxParallel >= 1 && b.maxParallel <= 3)) errors.push(`${at}: maxParallel must be 1..3`);
         for (const w of op.writes) {
@@ -62,6 +79,8 @@ export async function validateWorkflows(root) {
         for (const k of op.outputs) stepProduces.add(k);
       });
       for (const k of stepProduces) produced.add(k);
+      for (const b of step) if (b.operator === 'workspace.bind' && b.requirements?.role) boundRoles.add(b.requirements.role);
+      previousOps = step.map((b) => b.operator);
     });
     for (const loop of wf.loops ?? []) {
       const from = positions.get(loop.from); const to = positions.get(loop.to);

@@ -110,8 +110,8 @@ approval expired.
 | Alias | Bind | Required |
 | --- | --- | --- |
 | `@workspaces/<project>/<role>/gates` | the pinned gate commands, their configuration and the thresholds they carry; what "the same gate" means across runs | yes |
-| `@workspaces/be` | the routed backend checkout at the pinned commit, the subject every gate measures when the delivery is a backend | yes |
-| `@workspaces/fe` | the routed frontend checkout at the pinned commit, the subject every gate measures when the delivery is a frontend | yes |
+| `@workspaces/be` | the routed backend checkout at the pinned commit, the subject every gate measures when the delivery is a backend | no |
+| `@workspaces/fe` | the routed frontend checkout at the pinned commit, the subject every gate measures when the delivery is a frontend | no |
 | `@worktrees/debts` | owner-approved debt records and their expiry; a red gate is carried only from here | no |
 
 ## Inputs
@@ -181,3 +181,5 @@ debt or source change is `NO_PROGRESS`, because the same fingerprint cannot yiel
 | a frontend gate failed in boundary and the frontend owner must apply the fix | `frontend.source.apply` |
 | the verdict is green and the delivery is ready to publish | `git.publish` |
 | the verdict is green and the published head must reach an environment | `release.deploy` |
+| the gates are green and the promise must be reconciled against the delivered source | `business.decide` |
+| the gates are green and a person asked for the journey to be walked | `uat.verify` |

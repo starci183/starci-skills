@@ -140,6 +140,9 @@ buộc khác.
 | Khi | Operator |
 | --- | --- |
 | route đã ràng và checkout mang một bản publish cần đẩy | `git.publish` |
+| route đã ràng và một lời hứa phải được quyết dựa trên source của nó | `business.decide` |
 | route đã ràng và một contract backend phải được điền bên trong nó | `backend.source.apply` |
 | route đã ràng và một bề mặt frontend phải được viết bên trong nó | `frontend.source.apply` |
 | chủ runtime thiếu hoặc chưa sẵn sàng và cần nêu một yêu cầu phối hợp | `platform.operate` |
+| route đã ràng và một bề mặt frontend phải được quyết bên trong nó | `frontend.direction.decide` |
+| route đã ràng và một head đã publish phải được kiểm trước khi lên | `quality.verify` |
