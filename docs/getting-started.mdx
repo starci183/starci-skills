@@ -123,23 +123,40 @@ writes frontend source under `mode: apply`: `frontend-refine`, `frontend-reconst
 `frontend-new-surface`, `frontend-with-uat` and `full-feature`. `backend-feature` writes no surface
 and its `when` says so; `release` and `content-unit` publish no surface either.
 
-Inside such a chain it still runs only once all of this exists:
+Inside such a chain, exactly two things must come from outside it:
 
 - a person who asked, by name — `requestedBy`, `feature` and `flow` have no defaults and the workflow
   declares them under `asks`, so the branch refuses rather than inventing a requester;
-- the flow directory: `uat/<flow>/flow.md` with the cases and their named assertions,
-  `uat/<flow>/account.json` with a username, a role and a credential *name*, and `uat/<flow>/seed/`
-  with the records the run namespaces;
-- the sealed shared password, resolved by name from the credential roster at login and read nowhere
-  else — no field of this operator can hold a secret, and its validator rejects a credential-shaped
-  string anywhere in what it writes;
 - both admissions taken at the pinned commit — the `frontend-surface-audit` and the
   `quality-verification` — plus the `route` receipt whose endpoint the run drives.
 
-Anything missing is a stop rather than a silence: no requester or no admission is `INVALID_INPUT` at
-the request gate, no sealed credential is `PROVISIONING_UNAVAILABLE`, and nothing serving the product
-is `RUNTIME_UNAVAILABLE`. A mission that never reaches UAT should be able to say which of those it
-met.
+Everything else the run needs, it makes. **A missing record is created, not reported.** A flow nobody
+has run yet has no folder, no flow document, no seed, no account and no approved reference, and none
+of that stops anything:
+
+- the flow document and the seed are drafted from the shipped template and named in the receipt as
+  drafts, because a drafted flow is honest and an absent flow would have been a stop;
+- the account is provisioned by `platform.operate` against the identity the runtime registry declares
+  for the bound route, its password set from the sealed shared credential resolved by name. A flow
+  names its actors by alias and every alias gets its own dedicated account, per environment, in
+  `accounts.<env>.json`. `IDENTITY_MISSING` is the hand-off that asks for this, not a verdict;
+- the first run leaves a candidate reference under `snapshots/`, which only a person promotes.
+
+The credential is a name everywhere it is written down. Its value reaches the request body of the
+provider's administrative call, or the field of a sign-up or sign-in form in a driven browser, and
+nothing else — no file, no fixture, no recorded command, no capture, no receipt. Capture begins only
+after the sign-in redirect lands, and the validators scan the whole flow folder rather than trusting
+the promise.
+
+Two stops on this path are honest, and they are the only two: a provider, sealed file or store that
+cannot be reached at all is `PROVISIONING_UNAVAILABLE`, and a registry entry that declares no identity
+is `INVALID_INPUT` naming the field it lacks. A route that answers with a sign-in screen is not
+`RUNTIME_UNAVAILABLE`: it is serving, and what was missing was an identity.
+
+The flow folder has one shape — `flow.md`, `accounts.<env>.json`, `seed/`, `snapshots/`,
+`runs/<runId>/` with `runId` as `<yyyymmdd-HHMMss>-<commit7>`, `latest.json` and `history.md` — and
+`templates/uat/README.md` is its contract. The host repository tracks it, so a run's evidence travels
+with the product; only the session folder beside it is ignored.
 
 ## 11. The end of the session
 

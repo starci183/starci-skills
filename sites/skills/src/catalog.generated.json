@@ -1,6 +1,6 @@
 {
-  "version": "1.5.4",
-  "lineageNote": "1.5.4 (2026-09-03): the host probes a port by connecting before binding (Windows lets two servers bind one loopback port); 1.5.3 shipped with that spec red.",
+  "version": "1.6.0",
+  "lineageNote": "1.6.0 (2026-09-03): a missing UAT record is created, not reported — platform.operate provisions the account at the registry's identity provider with the sealed shared password and seeds the data; the runtime registry is keyed <project>/<role> (owner.schema.json) and carries identity; the audit signs in as the flow's account and IDENTITY_MISSING hands to provisioning; the UAT flow folder (flow.md, accounts.<env>.json, seed, golden snapshots, append-only runs, latest.json, history.md) is a contract; env on uat, audit and platform; the staging-uat example workflow.",
   "entry": {
     "name": "starci",
     "description": "Complete one StarCi mission by freezing its scope, selecting the one operator that owns the outcome, and routing between operators on typed results until the outcome is proved or a person must decide.",
@@ -84,7 +84,7 @@
       {
         "id": "external",
         "meaning": "Stop. The blocker is outside the runtime and no operator can clear it.",
-        "count": 6
+        "count": 7
       }
     ]
   },
@@ -1483,6 +1483,10 @@
         {
           "id": "host",
           "mode": "loopback"
+        },
+        {
+          "id": "secrets",
+          "mode": "resolve-by-name"
         }
       ],
       "hasVietnamese": true,
@@ -1493,7 +1497,7 @@
         "@worktrees/sessions/central-runtime"
       ],
       "steps": 6,
-      "requirements": 3,
+      "requirements": 5,
       "inputs": [
         {
           "kind": "frontend-source-application",
@@ -1506,6 +1510,10 @@
         {
           "kind": "frontend-direction-decision",
           "required": true
+        },
+        {
+          "kind": "uat-account",
+          "required": false
         }
       ],
       "outputs": [
@@ -1556,6 +1564,10 @@
         {
           "when": "a claim fails on a Grammar component's own render, so a person records the family gap and publishes",
           "operator": "frontend.surface.audit"
+        },
+        {
+          "when": "the route requires an identity and this flow has no account yet, so one is provisioned before the surface is observed",
+          "operator": "platform.operate"
         }
       ],
       "stops": [
@@ -1578,6 +1590,13 @@
           "disposition": "terminate",
           "domain": "platform",
           "meaning": "The endpoint does not serve the bound route, or the surface never reaches readiness.",
+          "shared": false
+        },
+        {
+          "code": "IDENTITY_MISSING",
+          "disposition": "terminate",
+          "domain": "platform",
+          "meaning": "The route requires an identity to reach the surface and no account record exists for this flow yet. It is a hand-off and not a verdict: the operator that owns identity provisions the account, and this branch is re-entered with it.",
           "shared": false
         },
         {
@@ -1797,7 +1816,7 @@
       "id": "platform.operate",
       "dir": "platform-operate",
       "domain": "platform",
-      "job": "Operate one bounded shared observability, Sonar, or tunnel service from exact evidence: inventory it, converge only the approved delta, prove every check the bound knowledge requires, and stop at the smallest owning gap instead of taking product deployment ownership.",
+      "job": "Operate one bounded shared service from exact evidence — observability, Sonar, tunnel, the runtime registry, or the identity a bound route authenticates against: inventory it, converge only the approved delta, prove every check the bound knowledge requires, and stop at the smallest owning gap instead of taking product deployment ownership.",
       "profile": "luna",
       "grammarBound": false,
       "tools": [
@@ -1824,6 +1843,18 @@
         {
           "id": "secrets",
           "mode": "resolve-by-name"
+        },
+        {
+          "id": "sourcewrite",
+          "mode": "declared-write-set"
+        },
+        {
+          "id": "browsercontrol",
+          "mode": "required"
+        },
+        {
+          "id": "database",
+          "mode": "namespaced-write"
         }
       ],
       "hasVietnamese": true,
@@ -1831,10 +1862,12 @@
         "@workspaces/device-state",
         "@workspaces/ports/<project>",
         "@workspaces/projects/<project>/<role>",
-        "@worktrees/sessions/central-runtime"
+        "@worktrees/_templates",
+        "@worktrees/sessions/central-runtime",
+        "@worktrees/uat/<flow>"
       ],
-      "steps": 8,
-      "requirements": 5,
+      "steps": 10,
+      "requirements": 8,
       "inputs": [],
       "outputs": [
         {
@@ -1854,6 +1887,12 @@
           "file": "response/data/checks.json",
           "type": "data",
           "required": true
+        },
+        {
+          "kind": "uat-account",
+          "file": "response/data/account.json",
+          "type": "data",
+          "required": false
         }
       ],
       "next": [
@@ -1868,6 +1907,10 @@
         {
           "when": "the shared service is operated and the release that waited on it may continue",
           "operator": "release.deploy"
+        },
+        {
+          "when": "the flow's identity is provisioned and the run that waited on it may verify the flow",
+          "operator": "uat.verify"
         }
       ],
       "stops": [
@@ -1935,6 +1978,13 @@
           "shared": false
         },
         {
+          "code": "PROVISIONING_UNAVAILABLE",
+          "disposition": "terminate",
+          "domain": "control-panel",
+          "meaning": "The identity provider, the sealed credential or the store a UAT identity needs cannot be reached, so the account can be neither created nor used. A record that is merely absent is created; this code is for a dependency that is not there at all.",
+          "shared": false
+        },
+        {
           "code": "PROOF_FAILED",
           "disposition": "terminate",
           "domain": "platform",
@@ -1966,6 +2016,11 @@
         {
           "domain": "caller",
           "kind": "user",
+          "target": null
+        },
+        {
+          "domain": "control-panel",
+          "kind": "external",
           "target": null
         }
       ]
@@ -2407,7 +2462,7 @@
         "@worktrees/uat/<flow>/<case>"
       ],
       "steps": 10,
-      "requirements": 7,
+      "requirements": 8,
       "inputs": [
         {
           "kind": "frontend-surface-audit",
@@ -2420,6 +2475,10 @@
         {
           "kind": "route",
           "required": true
+        },
+        {
+          "kind": "uat-account",
+          "required": false
         }
       ],
       "outputs": [
@@ -2478,7 +2537,15 @@
           "operator": "backend.source.apply"
         },
         {
+          "when": "the flow has no dedicated account yet, so the identity is provisioned before the run continues",
+          "operator": "platform.operate"
+        },
+        {
           "when": "the UX lane fails: a person decides what the experience should be, and the flow is verified again only after that decision",
+          "operator": "user"
+        },
+        {
+          "when": "the run produced the first baseline of this flow, so a person promotes the candidate before it is a reference",
           "operator": "user"
         }
       ],
@@ -2515,7 +2582,14 @@
           "code": "PROVISIONING_UNAVAILABLE",
           "disposition": "terminate",
           "domain": "control-panel",
-          "meaning": "The sealed UAT credential cannot be resolved by name, or the flow's dedicated account does not exist; asking a person to sign in is forbidden in every branch.",
+          "meaning": "The identity provider, the sealed credential or the store a UAT identity needs cannot be reached, so the account can be neither created nor used. A record that is merely absent is created; this code is for a dependency that is not there at all.",
+          "shared": false
+        },
+        {
+          "code": "IDENTITY_MISSING",
+          "disposition": "terminate",
+          "domain": "platform",
+          "meaning": "The route requires an identity to reach the surface and no account record exists for this flow yet. It is a hand-off and not a verdict: the operator that owns identity provisions the account, and this branch is re-entered with it.",
           "shared": false
         },
         {
@@ -2890,6 +2964,7 @@
         "backend.source.apply",
         "business.decide",
         "frontend.source.apply",
+        "platform.operate",
         "uat.verify"
       ]
     },
@@ -3007,6 +3082,7 @@
       },
       "declaredBy": [
         "frontend.surface.audit",
+        "platform.operate",
         "uat.verify"
       ]
     },
@@ -3092,7 +3168,7 @@
     },
     {
       "id": "secrets",
-      "purpose": "Resolve a sealed credential by name at the moment it is used; never read, print or store its value.",
+      "purpose": "Resolve a sealed credential by name at the moment it is used; never read, print or store its value. The value may enter the request body of the call that consumes it or the field of a form in a driven browser, and nowhere else: not a file, not a fixture, not a recorded command, not a screenshot, not a log and not a receipt.",
       "modes": [
         "resolve-by-name"
       ],
@@ -3101,6 +3177,7 @@
         "claude": true
       },
       "declaredBy": [
+        "frontend.surface.audit",
         "platform.operate",
         "release.deploy",
         "uat.verify",
@@ -3119,6 +3196,7 @@
         "claude": true
       },
       "declaredBy": [
+        "platform.operate",
         "uat.verify"
       ]
     },
@@ -3504,6 +3582,16 @@
         "content.generate"
       ],
       "consumedBy": []
+    },
+    {
+      "kind": "uat-account",
+      "producedBy": [
+        "platform.operate"
+      ],
+      "consumedBy": [
+        "frontend.surface.audit",
+        "uat.verify"
+      ]
     },
     {
       "kind": "uat-capture",
@@ -4146,6 +4234,19 @@
       "resume": "Provide a reachable, prepared host."
     },
     {
+      "code": "IDENTITY_MISSING",
+      "scope": [
+        "frontend.surface.audit",
+        "uat.verify"
+      ],
+      "shared": false,
+      "domain": "platform",
+      "disposition": "terminate",
+      "meaning": "The route requires an identity to reach the surface and no account record exists for this flow yet. It is a hand-off and not a verdict: the operator that owns identity provisions the account, and this branch is re-entered with it.",
+      "fallback": null,
+      "resume": "The identity operator provisions the flow's account against the registry entry, and this branch runs again with it."
+    },
+    {
       "code": "IDENTITY_UNVERIFIED",
       "scope": [
         "workspace.bind"
@@ -4414,14 +4515,15 @@
     {
       "code": "PROVISIONING_UNAVAILABLE",
       "scope": [
+        "platform.operate",
         "uat.verify"
       ],
       "shared": false,
       "domain": "control-panel",
       "disposition": "terminate",
-      "meaning": "The sealed UAT credential cannot be resolved by name, or the flow's dedicated account does not exist; asking a person to sign in is forbidden in every branch.",
+      "meaning": "The identity provider, the sealed credential or the store a UAT identity needs cannot be reached, so the account can be neither created nor used. A record that is merely absent is created; this code is for a dependency that is not there at all.",
       "fallback": null,
-      "resume": "Restore the sealed credential or the account; never a person's sign-in."
+      "resume": "Restore the provider, the sealed file or the store; never ask a person to sign in or to paste a credential."
     },
     {
       "code": "RECONCILIATION_DISCREPANCY",
@@ -5510,15 +5612,105 @@
       "branchCount": 3,
       "widestStep": 1,
       "loops": []
+    },
+    {
+      "id": "staging-uat",
+      "when": {
+        "en": "A delivery that is already published must be verified on another stack before it is released: the same head is observed and walked there, and the chain ends with the two receipts in a person's hands rather than with a deployment.",
+        "vi": "Một bản giao đã publish phải được kiểm trên một stack khác trước khi release: cùng một head được quan sát và đi qua ở đó, và chuỗi kết thúc bằng hai biên nhận trong tay một con người chứ không bằng một lần deploy."
+      },
+      "ends": "user",
+      "steps": [
+        [
+          {
+            "operator": "workspace.bind",
+            "fanout": null,
+            "maxParallel": null,
+            "requirements": {
+              "role": "be"
+            }
+          },
+          {
+            "operator": "workspace.bind",
+            "fanout": null,
+            "maxParallel": null,
+            "requirements": {
+              "role": "fe",
+              "runtimeNeed": "consume"
+            }
+          }
+        ],
+        [
+          {
+            "operator": "frontend.direction.decide",
+            "fanout": null,
+            "maxParallel": null,
+            "requirements": {
+              "intent": "modify",
+              "changeLevel": "refine"
+            }
+          }
+        ],
+        [
+          {
+            "operator": "frontend.presentation.resolve",
+            "fanout": null,
+            "maxParallel": null,
+            "requirements": null
+          }
+        ],
+        [
+          {
+            "operator": "frontend.source.apply",
+            "fanout": null,
+            "maxParallel": null,
+            "requirements": {
+              "mode": "dry"
+            }
+          }
+        ],
+        [
+          {
+            "operator": "frontend.surface.audit",
+            "fanout": "matrix",
+            "maxParallel": 3,
+            "requirements": {
+              "env": "staging"
+            }
+          }
+        ],
+        [
+          {
+            "operator": "quality.verify",
+            "fanout": null,
+            "maxParallel": null,
+            "requirements": null
+          }
+        ],
+        [
+          {
+            "operator": "uat.verify",
+            "fanout": null,
+            "maxParallel": null,
+            "requirements": {
+              "env": "staging"
+            }
+          }
+        ]
+      ],
+      "stepCount": 7,
+      "branchCount": 8,
+      "widestStep": 2,
+      "loops": []
     }
   ],
   "counts": {
     "operators": 14,
-    "workflows": 8,
-    "routes": 69,
-    "kinds": 52,
-    "stopCodes": 96,
-    "steps": 121,
+    "workflows": 9,
+    "routes": 70,
+    "kinds": 53,
+    "stopCodes": 97,
+    "steps": 123,
     "domains": 11,
     "profiles": 3,
     "tools": 16,

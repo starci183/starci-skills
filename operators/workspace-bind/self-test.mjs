@@ -16,6 +16,8 @@ const OWNER = 'task-runtime-owner-1';
 
 const runtimeConsumption = (overrides = {}) => ({
   ownerTaskId: OWNER,
+  registryEntryKey: 'starci-academy/be',
+  identity: { provider: 'the declared identity provider', adminEndpoint: 'http://localhost:8089/admin', realm: 'product', tenant: null, credentialName: 'identity-admin' },
   generation: 3,
   status: 'ready',
   consumerRole: 'consumer',
@@ -192,6 +194,7 @@ await expectError(withBinding(routeBinding({ runtime: runtimeConsumption({ endpo
 await expectError(withBinding(routeBinding({ runtime: runtimeConsumption({ endpoints: { frontend: 'http://localhost:3000', api: 'http://localhost:3000', identity: 'http://localhost:8089' } }) }), { runtimeNeed: 'consume' }), 'must resolve to distinct ports', 'two services on one port');
 await expectError(withBinding(routeBinding({ runtime: runtimeConsumption({ endpointBinding: { ...runtimeConsumption().endpointBinding, services: { frontend: 'web', api: 'web', identity: 'keycloak' } } }) }), { runtimeNeed: 'consume' }), 'service keys must be distinct', 'two services under one key');
 await expectError(withBinding(routeBinding({ runtime: runtimeConsumption({ endpointBinding: { ...runtimeConsumption().endpointBinding, project: 'other-project' } }) }), { runtimeNeed: 'consume' }), 'belongs to another project than the bound route', 'an endpoint binding from another project');
+await expectError(withBinding(routeBinding({ runtime: runtimeConsumption({ registryEntryKey: 'starci-academy/fe' }) }), { runtimeNeed: 'consume' }), 'and this route is starci-academy/be', 'a binding that consumed a sibling route entry');
 await expectError({ ...consuming(), 'response/response.md': responseMd({ binding: routeBinding({ runtime: runtimeConsumption() }), findings: [['ROUTE_HYDRATED_FROM_PORTABLE', HYDRATED, 'resolved'], ['IDENTITY_ROSTER_SEALED', 'roster', 'sealed'], ['WORKTREE_BRANCH_FORBIDDEN', 'mtp', 'forbidden']] }) }, 'must record that the caller does not own it', 'a consumed runtime with no ownership finding');
 await expectError({ ...baseline(), 'response/response.md': responseMd({ findings: [['IDENTITY_ROSTER_SEALED', 'roster', 'sealed'], ['WORKTREE_BRANCH_FORBIDDEN', 'mtp', 'forbidden']] }) }, 'must record the hydrated route it resolved from', 'a bound route with no hydration finding');
 await expectError({ ...baseline(), 'response/response.md': responseMd({ findings: [['ROUTE_HYDRATED_FROM_PORTABLE', HYDRATED, 'resolved'], ['IDENTITY_ROSTER_SEALED', 'roster', 'sealed'], ['WORKTREE_BRANCH_FORBIDDEN', 'mtp', 'forbidden'], ['HINT_REJECTED', 'D:/Repositories/starci-academy', 'a similar directory name']] }) }, 'a hint is INVALID_INPUT at the gate', 'a receipt that weighs a hint');
@@ -204,4 +207,4 @@ await expectError({ ...baseline(), 'response/response.md': responseMd().replace(
 await expectError({ ...baseline(), 'response/data/route.json': routeBinding({ sourceHead: 'not-a-head' }) }, 'sourceHead', 'route schema');
 await expectError({ ...baseline(), 'response/response.json': (() => { const o = responseJson(); delete o.fields.route; return o; })() }, 'required output route is not in fields', 'missing required output');
 
-process.stdout.write('workspace.bind self-test: 3 valid branches, 29 rejected mutations\n');
+process.stdout.write('workspace.bind self-test: 3 valid branches, 30 rejected mutations\n');

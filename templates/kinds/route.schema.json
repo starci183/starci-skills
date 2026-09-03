@@ -195,16 +195,23 @@
       "additionalProperties": false,
       "required": [
         "ownerTaskId",
+        "registryEntryKey",
         "generation",
         "status",
         "consumerRole",
         "endpointBinding",
-        "endpoints"
+        "endpoints",
+        "identity"
       ],
       "properties": {
         "ownerTaskId": {
           "type": "string",
           "minLength": 1
+        },
+        "registryEntryKey": {
+          "type": "string",
+          "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*/[a-z0-9]+(?:-[a-z0-9]+)*$",
+          "description": "The registry entry this binding read, as `<project>/<role>`. The registry holds one entry per route, so a binding names the entry it consumed and a route can never be judged not ready because a sibling route's entry was the one that was read."
         },
         "generation": {
           "type": "integer",
@@ -288,6 +295,71 @@
               "minLength": 1
             }
           }
+        },
+        "identity": {
+          "description": "The identity declaration the registry entry carries, copied unchanged. It says where an account for this route is created and the name of the sealed credential its password is set from. Null means the entry declares no provider, which is why a request to provision an account against this route is refused at the gate instead of guessed at.",
+          "oneOf": [
+            {
+              "$ref": "#/$defs/identityDeclaration"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      }
+    },
+    "identityDeclaration": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "provider",
+        "adminEndpoint",
+        "realm",
+        "tenant",
+        "credentialName"
+      ],
+      "properties": {
+        "provider": {
+          "type": "string",
+          "minLength": 1
+        },
+        "adminEndpoint": {
+          "oneOf": [
+            {
+              "type": "string",
+              "minLength": 1
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "realm": {
+          "oneOf": [
+            {
+              "type": "string",
+              "minLength": 1
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "tenant": {
+          "oneOf": [
+            {
+              "type": "string",
+              "minLength": 1
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "credentialName": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9-]*$"
         }
       }
     }

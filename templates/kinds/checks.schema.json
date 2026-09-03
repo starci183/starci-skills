@@ -5,7 +5,7 @@
   "required": ["serviceRef", "serviceKind", "requiredCheckNames", "checks", "findings"],
   "properties": {
     "serviceRef": { "type": "string", "minLength": 1 },
-    "serviceKind": { "enum": ["observability", "sonar", "tunnel"] },
+    "serviceKind": { "enum": ["observability", "sonar", "tunnel", "runtime", "identity"] },
     "requiredCheckNames": { "type": "array", "minItems": 1, "uniqueItems": true, "items": { "$ref": "#/$defs/checkName" } },
     "checks": {
       "type": "array",
@@ -29,7 +29,7 @@
         "additionalProperties": false,
         "required": ["code", "resourceRef", "port", "holderRef", "statement"],
         "properties": {
-          "code": { "enum": ["SHARED_SERVICE_INVENTORIED", "PORT_COORDINATION_REQUIRED", "ALREADY_CONVERGED", "PARTIAL_MUTATION", "PRODUCT_DEPLOYMENT_DECLINED"] },
+          "code": { "enum": ["SHARED_SERVICE_INVENTORIED", "PORT_COORDINATION_REQUIRED", "ALREADY_CONVERGED", "PARTIAL_MUTATION", "PRODUCT_DEPLOYMENT_DECLINED", "RUNTIME_ENTRY_ATTESTED", "IDENTITY_PROVISIONED"] },
           "resourceRef": { "type": "string", "minLength": 1 },
           "port": { "oneOf": [{ "type": "integer", "minimum": 1, "maximum": 65535 }, { "type": "null" }] },
           "holderRef": { "oneOf": [{ "type": "string", "minLength": 1 }, { "type": "null" }] },
@@ -39,6 +39,6 @@
     }
   },
   "$defs": {
-    "checkName": { "enum": ["service-health", "target-boundary", "label-boundary", "remote-write-delivery", "sample-ordering", "retry-backoff", "sensitive-data-filter", "service-available", "project-exists", "source-revision", "profile-assigned", "gate-assigned", "enforcement-active", "dns-target", "tunnel-route", "tls", "public-https"] }
+    "checkName": { "enum": ["service-health", "target-boundary", "label-boundary", "remote-write-delivery", "sample-ordering", "retry-backoff", "sensitive-data-filter", "service-available", "project-exists", "source-revision", "profile-assigned", "gate-assigned", "enforcement-active", "dns-target", "tunnel-route", "tls", "public-https", "entry-declared", "endpoints-served", "head-observed", "generation-advanced", "provider-reachable", "credential-resolvable", "account-exists", "account-signs-in", "no-credential-recorded"] }
   }
 }

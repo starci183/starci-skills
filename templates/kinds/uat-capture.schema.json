@@ -2,7 +2,7 @@
   "$id": "kind:uat-capture",
   "type": "object",
   "additionalProperties": false,
-  "required": ["caseId", "runId", "order", "executedAt", "screenshotRef", "loginFieldMasked", "outcome", "assertions"],
+  "required": ["caseId", "runId", "order", "executedAt", "screenshotRef", "loginFieldMasked", "captureStartedAfterRedirect", "outcome", "assertions"],
   "properties": {
     "caseId": { "type": "string", "pattern": "^[a-z0-9][a-z0-9-]*$" },
     "runId": { "type": "string", "pattern": "^[A-Za-z0-9._-]+$" },
@@ -11,6 +11,10 @@
     "screenshotRef": { "type": "string", "pattern": "^response/artifacts/[A-Za-z0-9_.-]+\\.png$" },
     "loginFieldMasked": {
       "description": "The login field is masked in every screenshot this capture points at. A capture that cannot say so is EVIDENCE_UNAVAILABLE, never an unmasked picture.",
+      "const": true
+    },
+    "captureStartedAfterRedirect": {
+      "description": "Capture began after the sign-in redirect landed. Everything before that moment can hold a credential on screen, so a capture that cannot say this is evidence that may never be published.",
       "const": true
     },
     "outcome": { "enum": ["pass", "fail"] },

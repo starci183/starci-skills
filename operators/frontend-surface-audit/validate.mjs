@@ -11,7 +11,7 @@ import process from 'node:process';
 import { fileURLToPath } from 'node:url';
 import { validateStep } from '../../scripts/validate-step.mjs';
 import { tableUnder } from '../../scripts/validate-response.mjs';
-import { sessionRootOf } from '../../scripts/validate-request.mjs';
+import { sessionRootOf, missingStack } from '../../scripts/validate-request.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 const empty = (v) => v === undefined || v === null || v === '' || v === '—';
@@ -60,6 +60,10 @@ export async function validateAuditStep(branchDir, root = ROOT) {
   if (!response || response.operatorId !== 'frontend.surface.audit') return { errors };
   const has = (f) => existsSync(path.join(branchDir, f));
   const read = (f) => readFile(path.join(branchDir, f), 'utf8');
+
+  // An env names a stack of this installation; the vocabulary is the folder, not a list kept here.
+  const missing = missingStack(root, requirements.env);
+  if (missing) errors.push(`request.json: env ${requirements.env} names ${missing}, which this installation does not have`);
 
   let verdicts = null;
   if (present.has('verdicts') && has('response/data/verdicts.json')) {

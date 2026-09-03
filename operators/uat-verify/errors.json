@@ -1,6 +1,6 @@
 {
   "schemaVersion": 9,
-  "note": "Stop codes only uat.verify emits. Same entry shape as operators/errors.json, scope implicit. Shared codes (INVALID_INPUT, SOURCE_DRIFT, NO_PROGRESS) come from operators/errors.json. RUNTIME_UNAVAILABLE is emitted here too but is defined in operators/frontend-surface-audit/errors.json; it belongs in operators/errors.json with both operators in scope, and until that move validate-operator reports it as out of scope here. No code asks a person for a credential: the shared UAT password is resolved by name at login, and unavailable provisioning blocks instead of prompting.",
+  "note": "Stop codes only uat.verify emits. Same entry shape as operators/errors.json, scope implicit. Shared codes (INVALID_INPUT, SOURCE_DRIFT, NO_PROGRESS, RUNTIME_UNAVAILABLE, PROVISIONING_UNAVAILABLE, IDENTITY_MISSING) come from operators/errors.json. No code asks a person for a credential, and no code reports a record as merely missing: a flow document, a seed or an account that does not exist yet is created, IDENTITY_MISSING hands the account to the operator that owns provisioning, and only a dependency that cannot be reached at all blocks.",
   "codes": {
     "ADMISSION_MISSING": {
       "domain": "quality",
@@ -12,18 +12,6 @@
       "resume": {
         "en": "Re-run the missing admission at the pinned commit.",
         "vi": "Chạy lại admission còn thiếu tại đúng commit đã ghim."
-      }
-    },
-    "PROVISIONING_UNAVAILABLE": {
-      "domain": "control-panel",
-      "disposition": "terminate",
-      "meaning": {
-        "en": "The sealed UAT credential cannot be resolved by name, or the flow's dedicated account does not exist; asking a person to sign in is forbidden in every branch.",
-        "vi": "Không giải được thông tin đăng nhập UAT niêm phong theo tên, hoặc tài khoản riêng của luồng không tồn tại; nhờ người đăng nhập bị cấm ở mọi nhánh."
-      },
-      "resume": {
-        "en": "Restore the sealed credential or the account; never a person's sign-in.",
-        "vi": "Khôi phục thông tin đăng nhập niêm phong hoặc tài khoản; không bao giờ nhờ người đăng nhập."
       }
     },
     "LEASE_INVALID": {

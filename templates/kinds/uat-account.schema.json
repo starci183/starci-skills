@@ -1,0 +1,88 @@
+{
+  "$id": "kind:uat-account",
+  "description": "The accounts one flow signs in as, in one environment, as the flow folder holds them at accounts.<env>.json and as the provisioning operator publishes them. A flow names its actors by alias and each alias has its own dedicated account, because a flow that is only true when two roles meet cannot be verified by one. Every field is a name or a reference: there is no password field and none may be added, since the shared password is sealed under the master identity, resolved by name at the moment it is used, and enters only a request body or a browser form.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "env",
+    "flow",
+    "identity",
+    "accounts",
+    "plaintextRecorded"
+  ],
+  "properties": {
+    "env": {
+      "type": "string",
+      "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+      "description": "The environment these accounts exist in. Accounts are per environment: one environment's account is not an account anywhere else, which is why the file name carries the environment too."
+    },
+    "flow": {
+      "type": "string",
+      "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$"
+    },
+    "identity": {
+      "type": "string",
+      "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*/[a-z0-9]+(?:-[a-z0-9]+)*$",
+      "description": "The runtime registry entry these accounts were created at, as `<project>/<role>`."
+    },
+    "accounts": {
+      "type": "object",
+      "description": "One entry per alias the flow's steps name in their `as` column. Provisioning creates every alias the flow names, and a step whose alias has no entry has nobody to act as.",
+      "propertyNames": {
+        "pattern": "^[a-z][a-z0-9-]*$"
+      },
+      "additionalProperties": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "username",
+          "role",
+          "credentialName",
+          "sealed",
+          "provisionedBy",
+          "createdAt"
+        ],
+        "properties": {
+          "username": {
+            "type": "string",
+            "pattern": "^uat-[A-Za-z0-9._-]+$"
+          },
+          "role": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The product role this alias holds. A flow that is only true when two roles meet needs both, which is why the document is a map and not a single account."
+          },
+          "credentialName": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9-]*$",
+            "description": "The name the shared password is resolved by. A name, never a value: this document is committed."
+          },
+          "sealed": {
+            "type": "string",
+            "pattern": "^\\.stacks/[a-z0-9][a-z0-9-]*/secrets/[a-z0-9][a-z0-9-]*\\.enc$"
+          },
+          "provisionedBy": {
+            "description": "The run that created this account, or null when it already existed.",
+            "oneOf": [
+              {
+                "type": "string",
+                "pattern": "^[A-Za-z0-9._-]+$"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      }
+    },
+    "plaintextRecorded": {
+      "const": false,
+      "description": "The standing assertion this document exists to make. It is a constant so that a file claiming otherwise fails its schema instead of being believed."
+    }
+  }
+}

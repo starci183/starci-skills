@@ -111,11 +111,68 @@ const requestJson = ({ kind = 'observability', effects = EFFECTS, resourceRefs =
   inputs: {}, resume: null,
 });
 
-const responseJson = ({ status = 'done', stop, next = ['release.deploy'] } = {}) => ({
+const responseJson = ({ status = 'done', stop, next = ['release.deploy'], account = false } = {}) => ({
   schemaVersion: 9, operatorId: 'platform.operate', step: 1, parallel: 1, status, ...(stop ? { stop } : {}),
   fallbacks: [],
-  fields: status === 'blocked' ? {} : { 'platform-operation-receipt': 'response/response.md', delta: 'response/data/delta.json', checks: 'response/data/checks.json' },
+  fields: status === 'blocked' ? {} : {
+    'platform-operation-receipt': 'response/response.md', delta: 'response/data/delta.json', checks: 'response/data/checks.json',
+    ...(account ? { 'uat-account': 'response/data/account.json' } : {}),
+  },
   commits: [], next,
+});
+
+// The two branches that act for one bound project route. The registry holds one entry per
+// <project>/<role>, and that entry is the resource both branches operate.
+const ENTRY = 'demo-product/fe';
+const FLOW = 'paid-enrolment';
+const rtCheck = (name, status = 'passed') => ({ name, resourceRef: ENTRY, status, evidenceRef: `probes/${name}.json` });
+const entryDelta = (serviceKind, effects, over = {}) => delta({
+  serviceKind, serviceRef: ENTRY, mutableResourceRefs: [ENTRY], resources: [resource(ENTRY, serviceKind, 'g-6')],
+  allowedEffects: effects, mutations: effects.map((e) => mutation(e, { resourceRef: ENTRY, beforeRevision: 'g-5', afterRevision: 'g-6' })),
+  capabilities: (serviceKind === 'runtime' ? ['runtime:registry-write'] : ['identity:account-admin']).map((c) => ({ capability: c, custodyEvidenceRef: `custody/${serviceKind}.json` })),
+  ...over,
+});
+const entryChecks = (serviceKind, findings, list) => checksJson({
+  serviceKind, serviceRef: ENTRY, required: KIND_CHECKS[serviceKind],
+  list: list ?? KIND_CHECKS[serviceKind].map((n) => rtCheck(n)),
+  findings,
+});
+const entryMd = (serviceKind, effects, findings, list) => responseMd({
+  kind: serviceKind, service: ENTRY, resources: [resource(ENTRY, serviceKind, 'g-6')],
+  mutations: effects.map((e) => mutation(e, { resourceRef: ENTRY, beforeRevision: 'g-5', afterRevision: 'g-6' })),
+  list: list ?? KIND_CHECKS[serviceKind].map((n) => rtCheck(n)), findings,
+});
+const ENV = 'local';
+const accountRecord = ({ accounts, ...over } = {}) => ({
+  env: ENV, flow: FLOW, identity: ENTRY, plaintextRecorded: false,
+  accounts: accounts ?? {
+    learner: {
+      username: `uat-${FLOW}-learner`, role: 'learner', credentialName: 'uat-shared', sealed: `.stacks/${ENV}/secrets/uat.enc`,
+      provisionedBy: '20260110-000000-1111111', createdAt: '2026-01-10T00:05:00.000Z',
+    },
+  },
+  ...over,
+});
+
+// An already-running service is attested where it stands: probed, recorded, and never restarted.
+const attesting = (over = {}) => ({
+  'request/request.json': requestJson({ kind: 'runtime', service: ENTRY, effects: ['attest-runtime-entry'], resourceRefs: [ENTRY], mutableResourceRefs: [ENTRY], extra: { routeKey: ENTRY } }),
+  'response/response.json': responseJson({ next: ['frontend.surface.audit'] }),
+  'response/response.md': entryMd('runtime', ['attest-runtime-entry'], [['RUNTIME_ENTRY_ATTESTED', ENTRY, '—', '—', 'the declared endpoints answered and the head was recorded']]),
+  'response/data/delta.json': entryDelta('runtime', ['attest-runtime-entry']),
+  'response/data/checks.json': entryChecks('runtime', [{ code: 'RUNTIME_ENTRY_ATTESTED', resourceRef: ENTRY, port: null, holderRef: null, statement: 'the declared endpoints answered and the head was recorded' }]),
+  ...over,
+});
+
+// A flow with no account is a flow nobody has run yet: the account is created and published as names.
+const provisioning = (over = {}) => ({
+  'request/request.json': requestJson({ kind: 'identity', service: ENTRY, effects: ['provision-identity', 'seed-flow-fixtures'], resourceRefs: [ENTRY], mutableResourceRefs: [ENTRY], extra: { routeKey: ENTRY, flow: FLOW } }),
+  'response/response.json': responseJson({ next: ['uat.verify'], account: true }),
+  'response/response.md': entryMd('identity', ['provision-identity', 'seed-flow-fixtures'], [['IDENTITY_PROVISIONED', ENTRY, '—', '—', 'the flow had no account, so one was created and its password set from the sealed name']]),
+  'response/data/delta.json': entryDelta('identity', ['provision-identity', 'seed-flow-fixtures']),
+  'response/data/checks.json': entryChecks('identity', [{ code: 'IDENTITY_PROVISIONED', resourceRef: ENTRY, port: null, holderRef: null, statement: 'the flow had no account, so one was created and its password set from the sealed name' }]),
+  'response/data/account.json': accountRecord(),
+  ...over,
 });
 
 function writeBranch(files) {
@@ -199,4 +256,22 @@ await expectError(baseline({ 'response/response.md': responseMd().replace('## Ch
 await expectError(baseline({ 'response/data/delta.json': { ...delta(), inventoryFingerprint: 'nope' } }), 'inventoryFingerprint', 'delta schema');
 await expectError(baseline({ 'response/response.json': (() => { const o = responseJson(); delete o.fields.checks; return o; })() }), 'required output checks is not in fields', 'missing required output');
 
-process.stdout.write('platform.operate self-test: 3 valid branches, 28 rejected mutations\n');
+// The runtime and identity branches.
+await expectValid(attesting(), 'a running runtime attested where it stands, with no restart');
+await expectValid(provisioning(), 'a flow that had no account: one created, seeded, and published as names');
+
+await expectError(attesting({ 'request/request.json': requestJson({ kind: 'runtime', service: ENTRY, effects: ['attest-runtime-entry'], resourceRefs: [ENTRY], mutableResourceRefs: [ENTRY] }) }), 'routeKey names none', 'an attestation with no registry entry to attest');
+await expectError(attesting({ 'request/request.json': requestJson({ kind: 'runtime', service: ENTRY, effects: ['attest-runtime-entry'], resourceRefs: [ENTRY], mutableResourceRefs: [ENTRY], extra: { routeKey: 'demo-product' } }) }), 'is not a <project>/<role> registry entry', 'a route key that names no route');
+await expectError(attesting({ 'response/data/delta.json': entryDelta('runtime', ['attest-runtime-entry'], { mutations: [mutation('attest-runtime-entry', { resourceRef: 'demo-product/be', beforeRevision: 'g-5', afterRevision: 'g-6' })], resources: [resource(ENTRY, 'runtime', 'g-6'), resource('demo-product/be', 'runtime', 'g-6')], mutableResourceRefs: [ENTRY, 'demo-product/be'] }) }), 'which is not the registry entry', 'an attestation that wrote a sibling route entry');
+await expectError(attesting({ 'response/data/checks.json': entryChecks('runtime', [{ code: 'RUNTIME_ENTRY_ATTESTED', resourceRef: ENTRY, port: null, holderRef: null, statement: 'x' }], KIND_CHECKS.runtime.map((n) => rtCheck(n, n === 'endpoints-served' ? 'failed' : 'passed'))) }), 'a status nobody probed is an assertion', 'an entry reported ready over a failed probe');
+await expectError(baseline({ 'request/request.json': requestJson({ extra: { routeKey: ENTRY } }) }), 'operates no project route', 'a shared-service branch carrying a route key');
+await expectError(provisioning({ 'request/request.json': requestJson({ kind: 'identity', service: ENTRY, effects: ['provision-identity', 'seed-flow-fixtures'], resourceRefs: [ENTRY], mutableResourceRefs: [ENTRY], extra: { routeKey: ENTRY } }) }), 'flow names none', 'provisioning for no flow at all');
+await expectError(provisioning({ 'response/response.json': responseJson({ next: ['uat.verify'] }), 'response/data/account.json': null }), 'the account record it wrote is published with it', 'an account created and never published');
+await expectError(provisioning({ 'response/data/account.json': accountRecord({ identity: 'demo-product/be' }) }), 'belongs to registry entry', 'an account filed under another registry entry');
+await expectError(provisioning({ 'response/data/account.json': accountRecord({ accounts: { learner: { username: `uat-${FLOW}-learner`, role: 'learner', credentialName: 'uat-shared', sealed: `.stacks/${ENV}/secrets/uat.enc`, provisionedBy: null, createdAt: '2026-01-10T00:05:00.000Z' } } }) }), 'names the run that provisioned it', 'an account this run created and left unattributed');
+await expectError(provisioning({ 'response/data/account.json': accountRecord({ accounts: { learner: { username: `uat-${FLOW}-learner`, role: 'password: hunter2-hunter2', credentialName: 'uat-shared', sealed: `.stacks/${ENV}/secrets/uat.enc`, provisionedBy: '20260110-000000-1111111', createdAt: '2026-01-10T00:05:00.000Z' } } }) }), 'carries a credential', 'a secret filed in the account record');
+await expectError(provisioning({ 'response/data/account.json': { ...accountRecord(), password: 'x' } }), 'unexpected property', 'an account record with a place to hold a secret');
+await expectError(provisioning({ 'response/data/checks.json': entryChecks('identity', [{ code: 'SHARED_SERVICE_INVENTORIED', resourceRef: ENTRY, port: null, holderRef: null, statement: 'x' }]), 'response/response.md': entryMd('identity', ['provision-identity', 'seed-flow-fixtures'], [['SHARED_SERVICE_INVENTORIED', ENTRY, '—', '—', 'x']]) }), 'records the IDENTITY_PROVISIONED finding', 'a provisioning the receipt never names');
+await expectError(attesting({ 'request/request.json': requestJson({ kind: 'runtime', service: ENTRY, effects: ['provision-identity'], resourceRefs: [ENTRY], mutableResourceRefs: [ENTRY], extra: { routeKey: ENTRY } }) }), 'does not belong to the runtime service kind', 'an identity effect filed under the runtime branch');
+
+process.stdout.write('platform.operate self-test: 5 valid branches, 41 rejected mutations\n');

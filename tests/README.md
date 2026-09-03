@@ -105,7 +105,7 @@ one to skip quietly, so the preconditions are written here as well as in
 - **A person who asked, by name.** `requestedBy`, `feature` and `flow` have no defaults, the workflow
   declares them under `asks`, and the branch refuses rather than inventing a requester.
 - **A flow directory that already exists**: `uat/<flow>/flow.md` with the cases and their named
-  assertions, `uat/<flow>/account.json` with a username, a role and a credential *name* — never a
+  assertions, `uat/<flow>/accounts.<env>.json` with a username, a role and a credential *name* per alias — never a
   secret — and `uat/<flow>/seed/` with the records a run namespaces.
 - **A sealed shared password**, resolved by name from the credential roster at login and read nowhere
   else. No field of this operator can hold one, and its validator rejects a credential-shaped string

@@ -7,5 +7,6 @@ export default {
   "frontend-refine": "frontend-refine",
   "frontend-with-uat": "frontend-with-uat",
   "full-feature": "full-feature",
-  "release": "release"
+  "release": "release",
+  "staging-uat": "staging-uat"
 }

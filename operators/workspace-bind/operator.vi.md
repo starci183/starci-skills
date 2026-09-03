@@ -31,6 +31,15 @@ lập gì cả. Bước 5 chỉ chạy khi `runtimeNeed` khác `none`: người 
 ràng endpoint, và một route mang endpoint không ai xin là một route đã tiêu thụ tài nguyên chung theo
 ý riêng.
 
+## Một entry cho mỗi route
+
+Sổ đăng ký runtime giữ một entry cho mỗi `<project>/<role>`, và một lần bind tiêu thụ đúng entry của
+route mình: endpoint, head, generation, trạng thái, bằng chứng đứng sau trạng thái ấy, cùng nhà cung
+cấp danh tính mà một tài khoản cho nó sẽ được tạo tại đó. Một máy phục vụ nhiều sản phẩm cùng lúc, nên
+một sổ được đọc như một khối duy nhất sẽ trả lời thay cho bất kỳ route nào tình cờ nằm trong đó, và mọi
+route còn lại bind ra chưa sẵn sàng trong khi dịch vụ chúng cần đang lắng nghe. Lần bind ghi lại khoá
+entry nó đã đọc, và đó là thứ khiến sai lầm ấy lộ ra thay vì chỉ đơn giản là dễ xảy ra.
+
 ## Người gọi là người tiêu thụ, không bao giờ là chủ
 
 Các tiến trình frontend, api và identity local dùng chung thuộc về đúng một task chủ được uỷ quyền.
@@ -106,7 +115,7 @@ và không mang phán quyết nào.
 | 2 | Ràng bootstrap và identity | — | @workspaces/device-state, định danh máy và roster credential đã niêm phong, @tools/secrets | — | `IDENTITY_UNVERIFIED` |
 | 3 | Phân giải route | `project`, `role` | @workspaces/projects/<project>/<role> đúng project và role này, @workspaces/local/routes/<project>/<role>, @tools/git | — | `ROUTE_UNDECLARED`, `ROUTE_UNHYDRATED`, `ROUTE_MISMATCH` |
 | 4 | Kiểm checkout: chính sách nhánh, cây sạch và các write root | `gitPolicy`, `declaredWriteRoots` | @workspaces/local/routes/<project>/<role>, checkout đã phân giải, nhánh, head và cây làm việc của nó, @tools/git, @tools/shell | — | `BRANCH_POLICY_VIOLATION`, `CHECKOUT_DIRTY` |
-| 5 | Ràng runtime mà người gọi tiêu thụ, chỉ khi `runtimeNeed` khác none | `runtimeNeed` | @worktrees/sessions/central-runtime, registry chủ, generation và bằng chứng sức khoẻ của nó, @workspaces/ports/<project>, @tools/http | — | `ENDPOINT_AUTHORITY_STALE`, `RUNTIME_NOT_READY` |
+| 5 | Ràng runtime mà người gọi tiêu thụ từ entry của đúng project route này, chỉ khi `runtimeNeed` khác none | `runtimeNeed` | @worktrees/sessions/central-runtime, entry của `<project>/<role>` này cùng generation, bằng chứng health và khai báo danh tính của nó, @workspaces/ports/<project>, @tools/http | — | `ENDPOINT_AUTHORITY_STALE`, `RUNTIME_NOT_READY` |
 | 6 | Ràng provenance và độ tươi, rồi phát | — | mọi thứ ở trên, @workspaces/device-state | `response/response.md`, `response/data/route.json`, `response/response.json` | — |
 
 Bước 5 không tính lại gì cả: fingerprint endpoint hoặc khớp phép chiếu đóng, hoặc nhánh dừng. Dưới

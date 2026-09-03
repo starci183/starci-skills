@@ -51,6 +51,30 @@ bước ràng đã từ chối một cổng chỉ-lắng-nghe thay cho chuỗi n
 lời, mã dừng là `RUNTIME_UNAVAILABLE` trên một endpoint có tên, chứ không phải một phỏng đoán xem
 origin nào mới là origin được nhắc tới.
 
+## Hồ sơ thiếu thì tạo ra, không phải báo lỗi
+
+Một luồng chưa ai chạy thì chưa có thư mục, chưa có tài liệu luồng, chưa có seed, chưa có tài khoản và
+chưa có bản tham chiếu đã duyệt, và không thứ nào trong đó là một mã dừng. Tài liệu luồng và seed được
+phác từ khuôn đi kèm cây rồi nêu trong biên bản là bản nháp; tài khoản do operator sở hữu danh tính cấp
+và nhánh này được vào lại cùng nó; còn lượt chạy đầu tiên trở thành bản ứng viên mà chỉ một con người
+mới nâng lên chuẩn. `IDENTITY_MISSING` là lần bàn giao ấy chứ không phải một phán quyết — nó nêu tên
+luồng chưa có tài khoản, và operator danh tính trả lời. Hai mã dừng thật lòng trên lối này là hai phụ
+thuộc không ai ở đây bịa ra được: một provider, file niêm phong hay kho dữ liệu hoàn toàn không tới
+được là `PROVISIONING_UNAVAILABLE`, và một yêu cầu không nêu luồng nào để chạy là `INVALID_INPUT`.
+Dừng ở "phải có người tạo tài khoản" không phải cái nào trong hai.
+
+## Thư mục luồng có đúng một hình dạng
+
+`flow.md` nêu mục tiêu, vai, tiền đề, ngân sách theo số bước và số giây, và các bước cùng kết quả mong
+đợi, bằng chứng và tiêu chí được chấm, mỗi bước nêu alias nó đóng vai. `accounts.<env>.json` chỉ mang
+những cái tên, mỗi alias một tài khoản, theo từng môi trường. `seed/` giữ thứ phải có
+trước lượt chạy, nói một lần và đặt lại được. `snapshots/` là bản tham chiếu chuẩn và chỉ đổi khi một
+con người duyệt. `runs/<runId>/` là lịch sử chỉ-thêm, `runId` gồm dấu thời gian của lượt chạy và commit
+rút gọn nó kiểm, nên hai lượt chạy cùng luồng tại cùng commit vẫn phân biệt được và không lượt nào đè
+lượt nào. `latest.json` nêu lượt mới nhất — một file chứa một run id, không bao giờ là symlink — và
+`history.md` thêm một dòng cho mỗi lượt. Hình dạng này được thi hành chứ không chỉ được mô tả, vì một
+hồ sơ lượt chạy mà không ai đoán được thư mục là một hồ sơ không ai đọc.
+
 ## Mật khẩu là một cái tên, không bao giờ là một giá trị
 
 Mọi tài khoản UAT dùng chung một mật khẩu, niêm phong tại `.stacks/<env>/secrets/uat.enc` bằng master
@@ -124,8 +148,8 @@ lượt chạy, và không xoá bất cứ thứ gì ngoài namespace fixture c�
 
 | Alias | Bind | Bắt buộc |
 | --- | --- | --- |
-| `@worktrees/uat/<flow>/<case>` | thư mục luồng: `flow.md`, `account.json`, `seed/`, lịch sử chỉ-thêm `runs/<runId>/` và con trỏ `latest`, bind theo fingerprint từng file và chỉ ghi khi giữ lease độc quyền | có |
-| `@worktrees/_templates` | khuôn luồng UAT dùng để tạo thư mục luồng mới, mà cây ship sẵn ở `templates/uat/`, đúng ba thứ mà bước 4 đọc: `uat/flow.md` với các case và những khẳng định có tên của chúng, `uat/account.json` với username, vai, tên thông tin đăng nhập và đường dẫn file niêm phong, không trường nào có thể chứa bí mật, và `uat/seed/` với các bản ghi mà một lượt chạy đặt namespace lên; tiêu thụ, không sửa | có |
+| `@worktrees/uat/<flow>/<case>` | thư mục luồng ở đúng một hình dạng: `flow.md`, `accounts.<env>.json`, `seed/`, `snapshots/` đã duyệt, lịch sử chỉ-thêm `runs/<runId>/`, con trỏ `latest.json` và `history.md`, bind theo fingerprint từng file và chỉ ghi khi giữ lease độc quyền | có |
+| `@worktrees/_templates` | khuôn luồng UAT dùng để phác một thư mục luồng còn thiếu, mà cây ship sẵn ở `templates/uat/` với `README.md` là hợp đồng cho cả thư mục: `flow.md` với các case, alias chúng đóng vai và những khẳng định có tên, `accounts.json.example` chỉ toàn tên và không trường nào chứa được bí mật, và `seed/` với các bản ghi mà một lượt chạy đặt namespace lên; tiêu thụ, không sửa | có |
 | `@worktrees/sessions/central-runtime` | generation của chủ runtime đứng sau endpoint đã ràng; sự sẵn sàng do đầu vào `route` chứng minh, không bao giờ suy lại từ sổ đăng ký này | có |
 | `@workspaces/device-state` | sổ thông tin đăng nhập niêm phong; mật khẩu UAT dùng chung được giải theo tên ở đây lúc đăng nhập và không đọc ở đâu khác | có |
 | `@workspaces/be` | checkout backend được route tại commit đã ghim, nơi luồng kiểm hành vi và nơi store giữ các bản ghi có namespace | có |
@@ -138,6 +162,7 @@ lượt chạy, và không xoá bất cứ thứ gì ngoài namespace fixture c�
 | `frontend-surface-audit` | lượt soi bề mặt kết luận frontend sạch, lấy tại commit đã ghim | có |
 | `quality-verification` | cổng chất lượng đã xanh, lấy tại đúng commit đã ghim ấy | có |
 | `route` | `workspace.bind` ở vai fe; route đã ràng mà lượt chạy này lái theo endpoint của nó | có |
+| `uat-account` | `platform.operate`, tài khoản riêng nó đã cấp cho luồng này; vắng ở lượt đầu, và đó chính là thứ `IDENTITY_MISSING` bàn giao | không |
 
 ## Yêu cầu
 
@@ -146,6 +171,7 @@ lượt chạy, và không xoá bất cứ thứ gì ngoài namespace fixture c�
 | `requestedBy` | id | — | Ai yêu cầu lượt UAT này; UAT không bao giờ khởi động khi không có người đứng sau |
 | `feature` | id | — | Khoá feature dùng để địa chỉ hoá thư mục luồng |
 | `flow` | id | — | Luồng sản phẩm duy nhất mà lần gọi này kiểm chứng |
+| `env` | id | dev | Stack mà lượt chạy này lái: nó chọn file tài khoản, bí mật niêm phong, entry trong sổ đăng ký runtime, đích của seed và bản tham chiếu đã duyệt |
 | `cases` | list `caseId` | every case of the flow | Chạy những case đã đóng băng nào; mặc định là mọi case `flow.md` khai, theo đúng thứ tự của nó |
 | `runId` | id | — | Không hỏi người: orchestrator điền nó, và nó namespace mọi bản ghi lượt chạy này ghi ra |
 | `lease` | token | — | Không hỏi người: orchestrator điền nó, cấp lease độc quyền trên thư mục luồng trước khi nhánh bắt đầu |
@@ -157,14 +183,14 @@ lượt chạy, và không xoá bất cứ thứ gì ngoài namespace fixture c�
 | --- | --- | --- | --- | --- | --- |
 | 1 | Kiểm gate, lần chạy lại, lease độc quyền và người đã yêu cầu | `requestedBy`, `lease`, `resume` | `request/request.json`, @worktrees/uat/&lt;flow>/&lt;case> để lấy `latest` và hồ sơ lượt chạy trước, @workspaces/be tại commit đã ghim, @tools/git | — | `INVALID_INPUT`, `SOURCE_DRIFT`, `NO_PROGRESS` |
 | 2 | Xác nhận admission: bề mặt sạch và cổng chất lượng xanh tại cùng một commit đã ghim | — | đầu vào `frontend-surface-audit`, đầu vào `quality-verification` | — | `ADMISSION_MISSING` |
-| 3 | Preflight runtime: thông tin đăng nhập niêm phong giải được theo tên, tài khoản tồn tại, store trả lời | — | @workspaces/device-state để lấy thông tin đăng nhập mà `account.json` nêu tên, @worktrees/sessions/central-runtime để lấy generation và các origin, @tools/secrets, @tools/http | — | `PROVISIONING_UNAVAILABLE` |
-| 4 | Đóng băng snapshot từ `flow.md`, `account.json` và `seed/` | `feature`, `flow`, `cases` | @worktrees/uat/&lt;flow>/&lt;case>, @worktrees/_templates để lấy khuôn luồng | @worktrees/uat/&lt;flow>/&lt;case> (snapshot), `response/data/snapshot.json`, @tools/sourcewrite | `CANONICAL_WRITE_DENIED` |
+| 3 | Preflight runtime và danh tính của luồng: thông tin đăng nhập niêm phong giải được theo tên, store trả lời, và luồng chưa có tài khoản thì bàn giao chứ không dừng | `env` | @workspaces/device-state để lấy thông tin đăng nhập mà `accounts.<env>.json` nêu tên, @worktrees/sessions/central-runtime để lấy entry của route đã bind, generation và các origin, đầu vào `uat-account` khi danh tính đã được cấp, @tools/secrets, @tools/http | — | `PROVISIONING_UNAVAILABLE`, `IDENTITY_MISSING` |
+| 4 | Phác từ khuôn những gì thư mục luồng còn thiếu, rồi đóng băng snapshot từ `flow.md`, `accounts.<env>.json` và `seed/` | `feature`, `flow`, `env`, `cases` | @worktrees/uat/&lt;flow>/&lt;case>, @worktrees/_templates để lấy khuôn luồng | @worktrees/uat/&lt;flow>/&lt;case> (snapshot), `response/data/snapshot.json`, @tools/sourcewrite | `CANONICAL_WRITE_DENIED` |
 | 5 | Gieo các bản ghi đã đóng băng vào namespace lượt chạy | `runId` | `response/data/snapshot.json`, @workspaces/be | @tools/database | `FIXTURE_VIOLATION` |
 | 6 | Chạy các case đã đóng băng theo thứ tự trên endpoint mà route đã ràng mang, tại commit đã ghim | — | `response/data/snapshot.json`, đầu vào `route` để lấy endpoint lượt chạy này lái theo, @worktrees/sessions/central-runtime để lấy generation đứng sau endpoint đó, @workspaces/device-state để lấy thông tin đăng nhập chỉ lúc đăng nhập, @tools/browsercontrol, @tools/websearch | — | `LEASE_INVALID`, `RUNTIME_UNAVAILABLE` |
 | 7 | Capture tại từng khẳng định có tên với ô mật khẩu đã che, rồi ghép tấm sheet | — | `response/data/snapshot.json`, @worktrees/sessions/central-runtime để lấy bằng chứng runtime trực tiếp nhất | `response/data/captures/<case>.json`, `response/artifacts/<case>.png`, `response/artifacts/sheet.png`, @tools/visualize | `EVIDENCE_UNAVAILABLE` |
 | 8 | Xét ba làn tách rời nhau, và chấm làn trải nghiệm theo từng tiêu chí | — | @knowledge/ui/proof (topic UX và rule đóng của nó), `response/data/captures/<case>.json` | `response/data/verdicts.json` | — |
 | 9 | Kiểm chỉ-đọc, rồi xoá namespace lượt chạy và không gì khác | `runId` | @workspaces/be để lấy các bản ghi mang `is_uat=true` và namespace này, `response/data/verdicts.json` | @tools/database | — |
-| 10 | Thêm `runs/<runId>/`, dời `latest`, rồi phát | `runId` | mọi thứ ở trên | @worktrees/uat/&lt;flow>/&lt;case> (runs/&lt;runId>/ và latest), `response/response.md`, `response/response.json`, @tools/sourcewrite | — |
+| 10 | Thêm `runs/<runId>/`, trỏ `latest.json` vào nó, thêm dòng lịch sử, rồi phát | `runId` | mọi thứ ở trên | @worktrees/uat/&lt;flow>/&lt;case> (runs/&lt;runId>/, latest.json và history.md), `response/response.md`, `response/response.json`, @tools/sourcewrite | — |
 
 Một lượt bị chặn không phát hồ sơ lượt chạy nào cả, vì một hồ sơ viết nửa vời chính là thứ người đọc
 sau này sẽ nhầm thành một quyết định. Lần chạy lại bắt đầu lại từ khâu kiểm, chỉ tái dùng những quan
@@ -192,6 +218,7 @@ mới, không bao giờ là một lần sửa lượt cũ.
 | `NO_PROGRESS` | terminate |
 | `ADMISSION_MISSING` | terminate |
 | `PROVISIONING_UNAVAILABLE` | terminate |
+| `IDENTITY_MISSING` | terminate |
 | `LEASE_INVALID` | terminate |
 | `RUNTIME_UNAVAILABLE` | terminate |
 | `EVIDENCE_UNAVAILABLE` | terminate |
@@ -206,7 +233,9 @@ mới, không bao giờ là một lần sửa lượt cũ.
 | cả ba làn đều pass và lời hứa phải được đối chiếu với hành trình thực sự đã đi | `business.decide` |
 | làn UI fail trên một node do ứng dụng sở hữu | `frontend.presentation.resolve` |
 | làn hành vi fail | `backend.source.apply` |
+| luồng chưa có tài khoản riêng, nên danh tính được cấp trước khi lượt chạy đi tiếp | `platform.operate` |
 | làn UX fail: người quyết định trải nghiệm phải thế nào, và luồng chỉ được kiểm lại sau quyết định ấy | `user` |
+| lượt chạy sinh ra bản tham chiếu đầu tiên của luồng, nên một con người nâng bản ứng viên trước khi nó thành chuẩn | `user` |
 
 ---
 

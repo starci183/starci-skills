@@ -46,6 +46,12 @@ and walked is the one the write just produced, not the one that was bound before
 needs three things a person owns — `requestedBy`, `feature` and `flow` — so every chain that carries
 it declares them under `asks`, and the run refuses rather than inventing a requester.
 
+`staging-uat` is the one example that proves a delivery somewhere other than where it was written.
+It writes nothing — `frontend.source.apply` runs under `mode: dry`, so the long-flow law does not
+reach it — and it carries `env` on the audit and the run, which is what selects the stack's runtime
+registry entry, its accounts file and its approved reference. It ends at `user`, because two receipts
+in a person's hands are the outcome; reaching an environment is `release`'s job and stays there.
+
 `backend-feature` is the one delivery chain with neither proof, and its `when` says why: it writes no
 surface, `uat.verify` requires a `frontend-surface-audit` input and a bound fe route, and neither
 exists there. A backend feature whose promise reaches a person through a screen belongs in
@@ -65,6 +71,7 @@ session branch whose session carries no source-application receipt and no audit 
 | `backend-feature` | a backend contract for one feature, no surface | bind → business (model) → architecture → backend apply → quality → business (reconcile) → publish | — | `git.publish` |
 | `full-feature` | backend and a new frontend surface together | bind ×2 → business → architecture → [backend apply ∥ direction] → [quality ∥ resolve] → apply → bind (consume) → audit → quality → uat → business (reconcile) → publish | two steps of two, audit by matrix | `git.publish` |
 | `frontend-with-uat` | a frontend change a person asked to walk through by name | bind ×2 → direction → resolve → apply → bind (consume) → audit → quality → uat → publish | audit by matrix | `git.publish` |
+| `staging-uat` | a published delivery must be walked on another stack before release | bind ×2 (consume) → direction → resolve → apply (dry) → audit (env staging) → quality → uat (env staging) | audit by matrix | `user` |
 | `release` | a published head must reach production | bind → quality → release | — | `release.deploy` |
 | `content-unit` | one curriculum unit end to end | content.generate (review exchange inside) | — | `user` |
 

@@ -79,7 +79,7 @@
         "websearch": true,
         "imagegen": false,
         "visualize": true,
-        "browsercontrol": false,
+        "browsercontrol": true,
         "http": true,
         "registry": true,
         "container": true,

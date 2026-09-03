@@ -23,7 +23,11 @@ the login field is masked in every screenshot.
 | Commit | `1111111111111111111111111111111111111111` |
 | Snapshot | `.worktrees/uat/enrollment/paid-enrollment/snapshot.json` |
 | Namespace | `uat-run-2026-01-10-1` |
+| Accounts | `learner` |
+| Environment | local |
 | Credential | `.stacks/local/secrets/uat.enc`, resolved by name at login only |
+| Flow source | drafted-from-template |
+| Golden | candidate, awaiting a person's approval |
 | Run record | `.worktrees/uat/enrollment/paid-enrollment/runs/run-2026-01-10-1/result.json` |
 | Latest | `run-2026-01-10-1` |
 

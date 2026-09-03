@@ -250,6 +250,7 @@ const fixFirst = (extra = {}) => ({
 await expectValid(baseline(), 'two entries: one all-pass, one application-owned failure routed back to resolve');
 await expectValid(fixFirst(), 'the canon lane holds where it can and the taste lens is fix-first, routed to direction');
 await expectValid({ 'request/request.json': requestJson(), 'response/response.json': responseJson({ status: 'blocked', stop: 'EVIDENCE_MISSING', next: [], fields: {} }) }, 'blocked on EVIDENCE_MISSING with nothing captured');
+await expectValid({ 'request/request.json': requestJson(), 'response/response.json': responseJson({ status: 'blocked', stop: 'IDENTITY_MISSING', next: ['platform.operate'], fields: {} }) }, 'a guarded route with no account yet: handed to provisioning, not reported as an unavailable runtime');
 
 await expectError({ ...baseline(), 'request/request.json': requestJson({ extra: { mystery: 1 } }) }, 'requirements.mystery is not a field', 'undeclared requirement');
 await expectError({ ...baseline(), 'request/request.json': requestJson({ extra: { matrix: [{ matrixId: WIDE }] } }) }, 'the request narrowed the matrix without it', 'entry judged outside the narrowed matrix');
@@ -293,4 +294,4 @@ await expectError(baseline(), "the entries carry console and the direction's cov
 await expectError({ ...baseline(), 'response/response.md': responseMd().replace(`| ${BT}presentation${BT} | fail | resolve |`, `| ${BT}presentation${BT} | pass | none |`) }, 'Verdict records pass for presentation', 'a Verdict row that hides a failing topic');
 await expectError({ ...baseline(), 'response/response.md': responseMd().replace(`| ${BT}contrast${BT} | blocked | none |`, `| ${BT}contrast${BT} | pass | none |`) }, 'Verdict records pass for contrast', 'a topic passed on evidence nobody took');
 
-process.stdout.write('frontend.surface.audit self-test: 3 valid branches, 36 rejected mutations\n');
+process.stdout.write('frontend.surface.audit self-test: 4 valid branches, 36 rejected mutations\n');

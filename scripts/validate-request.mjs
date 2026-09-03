@@ -24,6 +24,17 @@ export function sessionRootOf(dir) {
   return null;
 }
 
+// An `env` requirement names one stack of the installation. The names are read from the folder, never
+// listed here: a tree installed beside another set of stacks must accept that set, and a hard-coded
+// vocabulary would be a second home for something the filesystem already publishes. A machine with no
+// stacks at all checks nothing, because there is nothing to check against.
+export function missingStack(root, env) {
+  if (isEmpty(env)) return null;
+  const stacks = path.resolve(root, '..', '.stacks');
+  if (!existsSync(stacks)) return null;
+  return existsSync(path.join(stacks, String(env))) ? null : `.stacks/${env}`;
+}
+
 export async function validateRequest(root, dir, packages) {
   const errors = [];
   const rel = (f) => path.relative(sessionRootOf(dir) ?? dir, path.join(dir, f)).split(path.sep).join('/');

@@ -72,6 +72,9 @@ export async function validateWorkspaceStep(branchDir, root = ROOT) {
       // owner, or a degraded one is evidence to report, not a runtime to use.
       if ((requirements.runtimeNeed ?? 'none') === 'none') errors.push('response/data/route.json: runtimeNeed is none, so step 5 never ran and no runtime may be bound');
       if (runtime.status !== 'ready') errors.push(`response/data/route.json: a route cannot bind a ${runtime.status} runtime owner for consumption`);
+      // The registry holds one entry per project route. A binding reads the entry of its own route, so
+      // a route is never reported not ready because a sibling route's entry was the one consulted.
+      if (runtime.registryEntryKey !== `${route.project}/${route.role}`) errors.push(`response/data/route.json: the binding consumed registry entry ${runtime.registryEntryKey}, and this route is ${route.project}/${route.role}`);
       if (runtime.endpointBinding.project !== route.project) errors.push('response/data/route.json: the endpoint binding belongs to another project than the bound route');
       const services = Object.values(runtime.endpointBinding.services);
       if (new Set(services).size !== services.length) errors.push('response/data/route.json: endpoint binding service keys must be distinct');

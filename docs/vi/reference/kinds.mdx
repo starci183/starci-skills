@@ -196,18 +196,18 @@ Khung: [`templates/kinds/independent-critique.skeleton.md`](https://github.com/s
 
 ### `platform-operation-receipt`
 
-Tiêu đề: `^# platform-operation-receipt — (observability|sonar|tunnel) [A-Za-z0-9._/-]+$`  
+Tiêu đề: `^# platform-operation-receipt — (observability|sonar|tunnel|runtime|identity) [A-Za-z0-9._/-]+$`  
 Khung: [`templates/kinds/platform-operation-receipt.skeleton.md`](https://github.com/starci183/starci-skills/blob/main/templates/kinds/platform-operation-receipt.skeleton.md)
 
 | Mục | Dòng đầu của bảng | Số dòng | Ràng buộc ô |
 | --- | --- | --- | --- |
 | `^## Binding$` | `\| Field \| Value \|` | `Operator`, `Step`, `Project`, `Service`, `Service kind`, `Owner`, `Approval`, `Desired state`, `Inventory fingerprint` | `Value`: `\S` |
 | `^## Convergence$` | `\| Field \| Value \|` | exactRows 1 | `Value`: `^(converged\|already-converged)$` |
-| `^## Inventoried resources$` | `\| Resource \| Kind \| Revision \| Owner \|` | minRows 1 | `Kind`: `^(observability\|sonar\|tunnel)$`<br />`Revision`: `\S` |
+| `^## Inventoried resources$` | `\| Resource \| Kind \| Revision \| Owner \|` | minRows 1 | `Kind`: `^(observability\|sonar\|tunnel\|runtime\|identity)$`<br />`Revision`: `\S` |
 | `^## Port holders$` | `\| Port \| Holder \| Evidence \|` | — | `Port`: `^[0-9]{1,5}$` |
-| `^## Mutations$` | `\| Effect \| Resource \| Before \| After \|` | — | `Effect`: `^`(update-config\|restart-service\|upsert-dashboard\|update-remote-write\|create-project\|assign-profile\|assign-gate\|enforce-setting\|create-tunnel\|update-tunnel-route\|upsert-proxied-dns)`$` |
+| `^## Mutations$` | `\| Effect \| Resource \| Before \| After \|` | — | `Effect`: `^`(update-config\|restart-service\|upsert-dashboard\|update-remote-write\|create-project\|assign-profile\|assign-gate\|enforce-setting\|create-tunnel\|update-tunnel-route\|upsert-proxied-dns\|register-runtime-entry\|attest-runtime-entry\|provision-identity\|seed-flow-fixtures)`$` |
 | `^## Checks$` | `\| Check \| Resource \| Status \| Evidence \|` | minRows 1 | `Status`: `^(passed\|failed)$`<br />`Evidence`: `\S` |
-| `^## Findings$` | `\| Code \| Resource \| Port \| Holder \| Statement \|` | minRows 1 | `Code`: `^`(SHARED_SERVICE_INVENTORIED\|PORT_COORDINATION_REQUIRED\|ALREADY_CONVERGED\|PARTIAL_MUTATION\|PRODUCT_DEPLOYMENT_DECLINED)`$`<br />`Statement`: `\S` |
+| `^## Findings$` | `\| Code \| Resource \| Port \| Holder \| Statement \|` | minRows 1 | `Code`: `^`(SHARED_SERVICE_INVENTORIED\|PORT_COORDINATION_REQUIRED\|ALREADY_CONVERGED\|PARTIAL_MUTATION\|PRODUCT_DEPLOYMENT_DECLINED\|RUNTIME_ENTRY_ATTESTED\|IDENTITY_PROVISIONED)`$`<br />`Statement`: `\S` |
 
 ### `quality-verification`
 
@@ -249,7 +249,7 @@ Khung: [`templates/kinds/uat-flow-verification.skeleton.md`](https://github.com/
 | Mục | Dòng đầu của bảng | Số dòng | Ràng buộc ô |
 | --- | --- | --- | --- |
 | `^## Admission$` | `\| Kind \| Ref \| Commit \|` | exactRows 2 | `Kind`: `^`(frontend-surface-audit\|quality-verification)`$`<br />`Ref`: `\S`<br />`Commit`: `^`[0-9a-f]&#123;40}`$` |
-| `^## Snapshot$` | `\| Field \| Value \|` | `Run`, `Requested by`, `Feature`, `Flow`, `Commit`, `Snapshot`, `Namespace`, `Credential`, `Run record`, `Latest` | `Value`: `\S` |
+| `^## Snapshot$` | `\| Field \| Value \|` | `Run`, `Requested by`, `Feature`, `Flow`, `Environment`, `Commit`, `Snapshot`, `Namespace`, `Accounts`, `Credential`, `Flow source`, `Golden`, `Run record`, `Latest` | `Value`: `\S` |
 | `^## Cases$` | `\| Case \| Order \| Assertions \| Capture \| Screenshot \| Outcome \|` | minRows 1 | `Order`: `^[1-9][0-9]*$`<br />`Assertions`: `\S`<br />`Capture`: `^`response/data/captures/[A-Za-z0-9_.-]+\.json`$`<br />`Screenshot`: `^`response/artifacts/[A-Za-z0-9_.-]+\.png`$`<br />`Outcome`: `^(pass\|fail)$` |
 | `^## Lanes$` | `\| Lane \| Verdict \| Evidence \|` | exactRows 3 | `Lane`: `^`(behavior\|ux\|ui)`$`<br />`Verdict`: `^(pass\|fail)$`<br />`Evidence`: `\S` |
 | `^## Experience$` | `\| Rule \| Measured \| Score \| Verdict \|` | exactRows 11 | `Rule`: `^`UX-([1-9]\|1[01])`$`<br />`Measured`: `\S`<br />`Score`: `^[1-5]$`<br />`Verdict`: `^(pass\|fail\|evidence-unavailable)$` |
@@ -291,9 +291,10 @@ Khung: [`templates/kinds/workspace-route-binding.skeleton.md`](https://github.co
 | `proof` | [`templates/kinds/proof.schema.json`](https://github.com/starci183/starci-skills/blob/main/templates/kinds/proof.schema.json) | `operationId`, `proofKind`, `commandRef`, `exitCode`, `result`, `output`, `statement`, `contractFingerprint` |
 | `route` | [`templates/kinds/route.schema.json`](https://github.com/starci183/starci-skills/blob/main/templates/kinds/route.schema.json) | `project`, `role`, `portableRouteRef`, `hydratedRouteRef`, `routeFingerprint`, `identityFingerprint`, `sourceHead`, `checkout`, `gitPolicy`, `mutationReadiness`, `writeRoots`, `authorityRoots`, `runtime`, `provenanceHeadRef` |
 | `stack-model` | [`templates/kinds/stack-model.schema.json`](https://github.com/starci183/starci-skills/blob/main/templates/kinds/stack-model.schema.json) | `decisionId`, `selectedAlternativeId`, `alternatives`, `boundaries`, `stores`, `components`, `operations` |
-| `uat-capture` | [`templates/kinds/uat-capture.schema.json`](https://github.com/starci183/starci-skills/blob/main/templates/kinds/uat-capture.schema.json) | `caseId`, `runId`, `order`, `executedAt`, `screenshotRef`, `loginFieldMasked`, `outcome`, `assertions` |
-| `uat-snapshot` | [`templates/kinds/uat-snapshot.schema.json`](https://github.com/starci183/starci-skills/blob/main/templates/kinds/uat-snapshot.schema.json) | `runId`, `requestedBy`, `feature`, `flow`, `commit`, `frozenAt`, `flowRoot`, `snapshotRef`, `snapshotFingerprint`, `lease`, `admission`, `account`, `fixtureNamespace`, `seed`, `cases` |
-| `uat-verdicts` | [`templates/kinds/uat-verdicts.schema.json`](https://github.com/starci183/starci-skills/blob/main/templates/kinds/uat-verdicts.schema.json) | `runId`, `commit`, `resultRef`, `latestRef`, `lanes`, `experience`, `cleanup` |
+| `uat-account` | [`templates/kinds/uat-account.schema.json`](https://github.com/starci183/starci-skills/blob/main/templates/kinds/uat-account.schema.json) | `env`, `flow`, `identity`, `accounts`, `plaintextRecorded` |
+| `uat-capture` | [`templates/kinds/uat-capture.schema.json`](https://github.com/starci183/starci-skills/blob/main/templates/kinds/uat-capture.schema.json) | `caseId`, `runId`, `order`, `executedAt`, `screenshotRef`, `loginFieldMasked`, `captureStartedAfterRedirect`, `outcome`, `assertions` |
+| `uat-snapshot` | [`templates/kinds/uat-snapshot.schema.json`](https://github.com/starci183/starci-skills/blob/main/templates/kinds/uat-snapshot.schema.json) | `runId`, `requestedBy`, `feature`, `flow`, `env`, `commit`, `frozenAt`, `flowRoot`, `snapshotRef`, `snapshotFingerprint`, `lease`, `admission`, `accounts`, `fixtureNamespace`, `seed`, `cases`, `flowSource`, `golden` |
+| `uat-verdicts` | [`templates/kinds/uat-verdicts.schema.json`](https://github.com/starci183/starci-skills/blob/main/templates/kinds/uat-verdicts.schema.json) | `runId`, `commit`, `resultRef`, `latestRef`, `historyRef`, `lanes`, `experience`, `cleanup` |
 | `ui-coverage` | [`templates/kinds/ui-coverage.schema.json`](https://github.com/starci183/starci-skills/blob/main/templates/kinds/ui-coverage.schema.json) | `directionId`, `surfaceClass`, `actions`, `regions`, `states`, `responsive` |
 | `verdicts` | [`templates/kinds/verdicts.schema.json`](https://github.com/starci183/starci-skills/blob/main/templates/kinds/verdicts.schema.json) | `entries` |
 | `writes` | [`templates/kinds/writes.schema.json`](https://github.com/starci183/starci-skills/blob/main/templates/kinds/writes.schema.json) | `mode`, `base`, `branch`, `commit`, `files`, `sweep` |

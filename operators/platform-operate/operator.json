@@ -2,7 +2,7 @@
   "schemaVersion": 9,
   "id": "platform.operate",
   "domain": "platform",
-  "job": "Operate one bounded shared observability, Sonar, or tunnel service from exact evidence: inventory it, converge only the approved delta, prove every check the bound knowledge requires, and stop at the smallest owning gap instead of taking product deployment ownership.",
+  "job": "Operate one bounded shared service from exact evidence - observability, Sonar, tunnel, the runtime registry, or the identity a bound route authenticates against: inventory it, converge only the approved delta, prove every check the bound knowledge requires, and stop at the smallest owning gap instead of taking product deployment ownership.",
   "package": "operator.md",
   "errors": "errors.json",
   "validator": "validate.mjs",
@@ -16,7 +16,10 @@
       "@tools/shell": "declared-commands",
       "@tools/http": "probe",
       "@tools/container": "operate",
-      "@tools/secrets": "resolve-by-name"
+      "@tools/secrets": "resolve-by-name",
+      "@tools/sourcewrite": "declared-write-set",
+      "@tools/browsercontrol": "required",
+      "@tools/database": "namespaced-write"
     }
   }
 }

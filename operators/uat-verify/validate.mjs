@@ -5,13 +5,14 @@
 // namespace and never a run record; the run history is append-only; and no capture, snapshot, verdict
 // or published sentence contains the password. Masking is proved, not promised: the chosen placeholder
 // for the shared UAT password may appear nowhere this operator writes.
-import { existsSync } from 'node:fs';
+import { existsSync, readdirSync, statSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
 import path from 'node:path';
 import process from 'node:process';
 import { fileURLToPath } from 'node:url';
 import { validateStep } from '../../scripts/validate-step.mjs';
 import { tableUnder } from '../../scripts/validate-response.mjs';
+import { missingStack } from '../../scripts/validate-request.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 const LANES = ['behavior', 'ux', 'ui'];
@@ -34,6 +35,32 @@ const sectionText = (text, heading) => {
   return (next === -1 ? rest : rest.slice(0, next)).join('\n');
 };
 const ADMISSIONS = ['frontend-surface-audit', 'quality-verification'];
+// A run identifier is the moment it ran and the head it verified. Two runs of one flow at one commit
+// stay distinguishable, and a record can be placed against its commit without opening it.
+export const RUN_ID = /^(\d{8})-(\d{6})-([0-9a-f]{7})$/;
+// Every file the flow folder holds, so custody is proved over the whole record and not over the four
+// files the branch happens to publish.
+function filesUnder(dir, out = []) {
+  let entries; try { entries = readdirSync(dir); } catch { return out; }
+  for (const name of entries) {
+    const full = path.join(dir, name);
+    let st; try { st = statSync(full); } catch { continue; }
+    if (st.isDirectory()) filesUnder(full, out);
+    else out.push(full);
+  }
+  return out;
+}
+// The history has to survive the machine that made it, so the host repository tracks the flow folder.
+// An ignore line that excludes it turns every run record into a local file nobody else will ever see.
+export function ignoredLine(text) {
+  for (const raw of String(text).split(/\r?\n/)) {
+    const line = raw.trim();
+    if (!line || line.startsWith('#') || line.startsWith('!')) continue;
+    const bare = line.replace(/^\//, '').replace(/\/$/, '');
+    if (bare === '.worktrees' || bare === '.worktrees/**' || bare === '.worktrees/uat' || bare.startsWith('.worktrees/uat')) return line;
+  }
+  return null;
+}
 // The password placeholder this operator's self-test injects, plus any inline assignment of one. The
 // shared UAT password is resolved by name at login; a run that wrote it anywhere failed its custody.
 export const PASSWORD_LEAK = /uat-shared-password|password\s*[:=]\s*\S/i;
@@ -54,6 +81,10 @@ export async function validateUatStep(branchDir, root = ROOT) {
   if (decided && empty(requirements.requestedBy)) errors.push('request.json: UAT runs only when a person asked; requestedBy has no value');
   if (decided && empty(requirements.runId)) errors.push('request.json: the orchestrator supplies runId; a decided run cannot namespace its records without one');
   if (decided && empty(requirements.lease)) errors.push('request.json: the orchestrator supplies the exclusive lease; a decided run cannot write the flow directory without one');
+
+  // An env names a stack of this installation; the vocabulary is the folder, not a list kept here.
+  const missing = missingStack(root, requirements.env);
+  if (missing) errors.push(`request.json: env ${requirements.env} names ${missing}, which this installation does not have`);
 
   const pinned = (request?.contexts ?? []).find((c) => c.alias === '@workspaces/be')?.head ?? null;
 
@@ -144,7 +175,8 @@ export async function validateUatStep(branchDir, root = ROOT) {
       if (verdicts.runId !== snapshot.runId) errors.push('response/data/verdicts.json: the result belongs to another run than the snapshot');
       if (verdicts.commit !== snapshot.commit) errors.push(`response/data/verdicts.json: the result carries commit ${verdicts.commit} but the run was pinned at ${snapshot.commit}`);
       if (verdicts.resultRef !== `${snapshot.snapshotRef.replace(/snapshot\.json$/, '')}runs/${snapshot.runId}/result.json`) errors.push('response/data/verdicts.json: the result must be appended under runs/<runId>/ of this flow directory');
-      if (verdicts.latestRef !== `${snapshot.snapshotRef.replace(/snapshot\.json$/, '')}latest`) errors.push('response/data/verdicts.json: latest must be the pointer of this flow directory');
+      if (verdicts.latestRef !== `${snapshot.snapshotRef.replace(/snapshot\.json$/, '')}latest.json`) errors.push('response/data/verdicts.json: latest.json must be the pointer of this flow directory');
+      if (verdicts.historyRef !== `${snapshot.snapshotRef.replace(/snapshot\.json$/, '')}history.md`) errors.push('response/data/verdicts.json: history.md must be the history of this flow directory');
       if (verdicts.cleanup.namespace !== snapshot.fixtureNamespace) errors.push('response/data/verdicts.json: cleanup must name the exact run fixture namespace and nothing wider');
     }
     if (pinned !== null && verdicts.commit !== pinned) errors.push(`response/data/verdicts.json: the result commit ${verdicts.commit} is not the pinned head ${pinned}`);
@@ -168,6 +200,10 @@ export async function validateUatStep(branchDir, root = ROOT) {
       if (snap.Commit !== snapshot.commit) errors.push('response/response.md: Snapshot names another commit than the frozen one');
       if (snap.Namespace !== snapshot.fixtureNamespace) errors.push('response/response.md: Snapshot names another fixture namespace');
       if (snap['Requested by'] !== snapshot.requestedBy) errors.push('response/response.md: Snapshot names another requester');
+      if (snap.Environment !== snapshot.env) errors.push('response/response.md: Snapshot names another environment than the run drove');
+      if (snap['Flow source'] !== snapshot.flowSource) errors.push(`response/response.md: Snapshot reads ${snap['Flow source']} but the flow was ${snapshot.flowSource}; a drafted flow is honest and an undeclared draft is not`);
+      if (!String(snap.Golden ?? '').startsWith(snapshot.golden.state)) errors.push(`response/response.md: Snapshot reads Golden "${snap.Golden}" but the reference is ${snapshot.golden.state}`);
+      if (String(snap.Accounts ?? '').replaceAll('`', '') !== snapshot.accounts.map((a) => a.alias).join(', ')) errors.push('response/response.md: Snapshot names another set of accounts than the run froze');
       const admission = tableUnder(text, '## Admission') ?? [];
       for (const [kind, ref, commit] of admission) {
         const entry = snapshot.admission.find((a) => a.kind === kind);
@@ -236,6 +272,29 @@ export async function validateUatStep(branchDir, root = ROOT) {
     }
   }
 
+  // A missing record is created, not reported: a drafted flow is honest and says so, and the first run
+  // of a flow is the candidate baseline a person promotes rather than a failure against a reference
+  // that never existed. Both facts are carried, so neither can be quietly reported as the other.
+  if (snapshot) {
+    const at = 'response/data/snapshot.json';
+    const m = RUN_ID.exec(String(snapshot.runId));
+    if (!m) errors.push(`${at}: runId ${snapshot.runId} is not <yyyymmdd-HHMMss>-<commit7>; a run is identified by when it ran and what it verified`);
+    else if (m[3] !== String(snapshot.commit).slice(0, 7)) errors.push(`${at}: runId names commit ${m[3]} and the run was pinned at ${String(snapshot.commit).slice(0, 7)}`);
+    if (!empty(requirements.env) && snapshot.env !== requirements.env) errors.push(`${at}: the snapshot froze environment ${snapshot.env} and the request named ${requirements.env}`);
+    if (snapshot.golden.env !== snapshot.env) errors.push(`${at}: the approved reference was taken in ${snapshot.golden.env} and this run drove ${snapshot.env}; a golden from one environment is not authority for another`);
+    if (snapshot.flowSource === 'drafted-from-template' && snapshot.golden.state !== 'candidate') errors.push(`${at}: the flow was drafted this run, so it can have no approved reference yet; the first run is the candidate a person promotes`);
+    const aliases = new Set();
+    for (const account of snapshot.accounts) {
+      if (aliases.has(account.alias)) errors.push(`${at}: the alias ${account.alias} is frozen twice; one alias is one account`);
+      aliases.add(account.alias);
+      if (!account.credentialRef.startsWith(`.stacks/${snapshot.env}/`)) errors.push(`${at}: the account ${account.alias} resolves its credential in another environment than ${snapshot.env}`);
+    }
+    for (const c of snapshot.cases) if (!aliases.has(c.as)) errors.push(`${at}: case ${c.caseId} runs as ${c.as}, which no frozen account carries; provisioning creates every alias the flow names`);
+  }
+  if (snapshot && decided && snapshot.golden.state === 'candidate' && !(response.next ?? []).includes('user')) {
+    errors.push('response/response.json: this run produced the first baseline of the flow, so a person promotes the candidate; no run approves its own reference');
+  }
+
   // Custody is proved on the written bytes, not asserted in prose.
   const scanned = ['response/response.md', 'response/response.json', 'response/data/snapshot.json', 'response/data/verdicts.json', ...asList(response.fields?.['uat-capture'])];
   for (const f of scanned) {
@@ -257,10 +316,39 @@ export async function validateUatStep(branchDir, root = ROOT) {
         if (!same) errors.push(`runs/${snapshot.runId}: a run record already exists with a different result; runs are append-only, so a second attempt is a new runId`);
       }
     } else if (decided) errors.push(`runs/${snapshot.runId}: a decided run appends its record under runs/<runId>/ before it emits`);
-    const latestFile = path.join(snapshot.flowRoot, 'latest');
+    const latestFile = path.join(snapshot.flowRoot, 'latest.json');
     if (decided && existsSync(latestFile)) {
-      const latest = (await readFile(latestFile, 'utf8')).trim();
-      if (latest !== snapshot.runId) errors.push(`latest: points at ${latest}, but this run published ${snapshot.runId}`);
+      let latest = null;
+      try { latest = JSON.parse(await readFile(latestFile, 'utf8')).runId ?? null; } catch { latest = null; }
+      if (latest === null) errors.push('latest.json: the pointer must be a file naming one runId; it is never a symlink');
+      else if (latest !== snapshot.runId) errors.push(`latest.json: points at ${latest}, but this run published ${snapshot.runId}`);
+    }
+    const historyFile = path.join(snapshot.flowRoot, 'history.md');
+    if (decided) {
+      if (!existsSync(historyFile)) errors.push('history.md: a decided run appends one line to the flow history before it emits');
+      else if (!(await readFile(historyFile, 'utf8')).includes(snapshot.runId)) errors.push(`history.md: no line names ${snapshot.runId}; the history gains one line per run and loses none`);
+    }
+    // Custody over the whole record, not over the four files the branch publishes.
+    for (const file of filesUnder(path.join(snapshot.flowRoot, 'runs'))) {
+      if (!/\.(json|md|txt|log)$/.test(file)) continue;
+      if (PASSWORD_LEAK.test(await readFile(file, 'utf8'))) errors.push(`${path.relative(snapshot.flowRoot, file).split(path.sep).join('/')}: the shared UAT password appears under the flow folder; the credential reaches a form or a request body and nothing else`);
+    }
+  }
+
+  // The flow folder is tracked by the host repository: an ignore line that excludes it is the request
+  // gate's problem, because the run would leave no history anyone else could read.
+  if (snapshot) {
+    let dir = snapshot.flowRoot;
+    for (let i = 0; i < 6 && dir; i += 1) {
+      const file = path.join(dir, '.gitignore');
+      if (existsSync(file)) {
+        const line = ignoredLine(await readFile(file, 'utf8'));
+        if (line) errors.push(`.gitignore: the line "${line}" excludes the flow folder, so this run would leave no history the next machine can read (INVALID_INPUT)`);
+        break;
+      }
+      const parent = path.dirname(dir);
+      if (parent === dir) break;
+      dir = parent;
     }
   }
 

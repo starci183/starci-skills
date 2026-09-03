@@ -29,7 +29,11 @@ are the working detail the contract does not model and they stay in the run reco
 | Commit | `<40 hex>` |
 | Snapshot | `<.worktrees/uat/<feature>/<flow>/snapshot.json>` |
 | Namespace | `uat-<runId>` |
+| Accounts | `<alias>`, `<alias>` |
+| Environment | `<env>` |
 | Credential | `<sealed file path>`, resolved by name at login only |
+| Flow source | `<committed \| drafted-from-template>` |
+| Golden | `<approved \| candidate>` |
 | Run record | `<.worktrees/uat/<feature>/<flow>/runs/<runId>/result.json>` |
 | Latest | `<runId>` |
 

@@ -11,7 +11,7 @@ description: "Steps of parallel branches, loops and presets; how the entry match
 > **branches** that run in parallel (at most three), with optional **loops** back to an earlier step
 > and **presets** for a branch's Requirements.
 
-The eight files in `workflows/` are references, not the only chains there are: they are the shapes
+The nine files in `workflows/` are references, not the only chains there are: they are the shapes
 that came up often enough to be worth writing down.
 
 ## How the entry uses them
@@ -54,6 +54,14 @@ chain carrying it declares them under `asks`. `backend-feature` is the one deliv
 neither proof, and its `when` says why: it writes no surface, and `uat.verify` requires a
 `frontend-surface-audit` input and a bound fe route.
 
+A chain may also prove a delivery somewhere other than where it was written. `staging-uat` writes
+nothing — its `frontend.source.apply` runs under `mode: dry`, so the long-flow law does not reach it —
+and it presets `env` on the audit and the run. That field selects one stack of the installation: its
+runtime registry entry, its accounts file, its seed target and its approved reference. An environment
+that names no stack under `.stacks/` is refused at the gate rather than defaulted, and the chain ends
+at `user`, because two receipts in a person's hands are the outcome; reaching an environment stays
+`release`'s job.
+
 ## The file shape
 
 `schemaVersion` is 9. `id` equals the file name. `when` has `en` and `vi`. `chain` is an array of
@@ -70,5 +78,5 @@ commits on `session/<sessionId>`; `git.publish` merges it, and refuses a session
 carries no source-application receipt and no audit screenshots (`SESSION_MISSING`). A blocked branch
 re-enters as a new step, and a loop counts toward the operator's own `maxRounds`.
 
-The eight examples, with their chains rendered step by step, are under
+The nine examples, with their chains rendered step by step, are under
 [Reference → Workflows](/reference/workflows).

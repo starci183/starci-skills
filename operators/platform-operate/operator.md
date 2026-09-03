@@ -2,9 +2,10 @@
 
 ## Job
 
-Operate one bounded shared observability, Sonar, or tunnel service from exact evidence: inventory it,
-converge only the approved delta, prove every check the bound knowledge requires, and stop at the
-smallest owning gap instead of taking product deployment ownership.
+Operate one bounded shared service from exact evidence — observability, Sonar, tunnel, the runtime
+registry, or the identity a bound route authenticates against: inventory it, converge only the
+approved delta, prove every check the bound knowledge requires, and stop at the smallest owning gap
+instead of taking product deployment ownership.
 
 ## Shared infrastructure, not product
 
@@ -15,10 +16,10 @@ plan that reaches for one is invalid input rather than a judgement call at execu
 request to restart a product service to make room for a shared one leaves through a
 `PRODUCT_DEPLOYMENT_DECLINED` finding rather than through a mutation.
 
-## One job, three branches
+## One job, five branches
 
-The service kind the inventory records selects the branch, and the three are branches of one job
-rather than three operators.
+The service kind the inventory records selects the branch, and the five are branches of one job
+rather than five operators.
 Each branch publishes three closed sets, and each is enforced. Observability applies `update-config`,
 `restart-service`, `upsert-dashboard` and `update-remote-write`, proves `service-health`,
 `target-boundary`, `label-boundary`, `remote-write-delivery`, `sample-ordering`, `retry-backoff` and
@@ -27,10 +28,57 @@ Each branch publishes three closed sets, and each is enforced. Observability app
 `source-revision`, `profile-assigned`, `gate-assigned` and `enforcement-active`, and needs
 `sonar:project-admin`. Tunnel applies `create-tunnel`, `update-tunnel-route` and `upsert-proxied-dns`,
 proves `dns-target`, `tunnel-route`, `tls` and `public-https`, and needs `tunnel:write` and
-`dns:write`. An effect or a check filed under the wrong branch is invalid input rather than a
-warning, because a cross-filed effect is how an unapproved change acquires the appearance of
+`dns:write`. Runtime applies `register-runtime-entry` and `attest-runtime-entry`, proves
+`entry-declared`, `endpoints-served`, `head-observed` and `generation-advanced`, and needs
+`runtime:registry-write`. Identity applies `provision-identity` and `seed-flow-fixtures`, proves
+`provider-reachable`, `credential-resolvable`, `account-exists`, `account-signs-in` and
+`no-credential-recorded`, and needs `identity:account-admin`. Keeping those two apart is what keeps
+each proof set honest: an attestation cannot be asked to prove an account, and provisioning cannot be
+reported by probing a port. An effect or a check filed under the wrong branch is invalid input rather
+than a warning, because a cross-filed effect is how an unapproved change acquires the appearance of
 authority. The required proof set is the whole set the branch publishes: the caller cannot ask for
 less, because a green dashboard alone never proved delivery, ordering, or redaction.
+
+## The registry is one entry per project route
+
+One machine runs the routes of several products at once, so the runtime registry holds one entry per
+`<project>/<role>` and every reader takes the entry of its own route. A registry with a single
+endpoint block can attest exactly one route, and every other bind reads it as not ready while the
+service it needs is listening — a false negative indistinguishable from an outage. The previous
+single-block shape is still read for one release, as the entry of the route it names, and a registry
+that carries both must agree; the release after this one drops it.
+
+## Attesting a runtime nobody restarted
+
+A process that is already serving is evidence, not a problem. The runtime branch probes the endpoints
+the entry declares, records the head it observes and the probe records behind it, and sets the entry's
+status from what answered. Nothing is started, stopped or restarted to make that possible: a person's
+own running service is registered exactly as it stands, because the alternative — restarting a
+runtime in order to be allowed to describe it — destroys the state the next step was going to verify.
+An entry whose endpoints do not answer is `SERVICE_UNAVAILABLE` against the endpoint that failed,
+never a status this operator asserts on its own.
+
+## A missing record is created, not reported
+
+Provisioning is the default branch, not the exception. A flow with no folder, no flow document, no
+seed and no account is a flow nobody has run yet, and the runtime creates all four: the flow document
+and the seed are drafted from the shipped template and marked as drafts in the receipt, the account is
+created at the provider the registry entry declares, its password is set from the sealed shared
+credential resolved by name, and the seed is applied. Reporting any of that as an error is wrong, and
+stopping at "a person must create an account" is the same error with a politer sentence. Two things
+are genuinely not this operator's to invent, and they are the only stops on this path: a registry
+entry that declares no identity at all is `INVALID_INPUT` naming the field it lacks, and a provider,
+sealed file or store that cannot be reached is `PROVISIONING_UNAVAILABLE`.
+
+## A credential is a name, and it reaches a form or a body
+
+One password is sealed per environment and every flow's account is set from it, while each flow owns
+its own username. It is resolved by name at the moment of the call, and the only two places its value
+may arrive are the request body of the provider's administrative call and the field of a sign-up form
+in a driven browser. It never enters a file, a fixture, a recorded command, a capture or a receipt.
+The account record this operator publishes therefore carries a username, a role, a credential name,
+the sealed file's path and the registry entry it belongs to, and has nowhere to put a secret even by
+accident.
 
 ## Inventory before change
 
@@ -79,12 +127,16 @@ operations need no port at all and a claim nobody made cannot collide with anybo
 Context is read-only apart from the approved delta. The operator applies only the approved effect
 delta on the inventoried shared service, under an exclusive lease on
 `@worktrees/sessions/central-runtime`, and writes only `response/` of its own branch:
-`data/delta.json`, `data/checks.json`, `response.md` and `response.json`. It does not deploy,
-restart, migrate, or otherwise take ownership of a product service; does not mutate a resource the
+`data/delta.json`, `data/checks.json`, `response.md` and `response.json`. It also writes the flow folder of the flow it
+provisions for and the runtime entry of the route it attests, and nothing else outside `response/`.
+It does not deploy,
+restart, migrate, or otherwise take ownership of a product service; does not restart or reconfigure a
+running process in order to attest it; does not mutate a resource the
 bound inventory does not list; does not emit an effect or a check the bound service kind does not
 publish; does not free a port by stopping, killing, or reconfiguring the process that already holds
 it; does not record a credential value, capability handle, or secret-shaped token anywhere in the
-output; does not edit knowledge or grant its own approval; and does not claim an operated outcome
+output, in the account record, or in the flow folder; does not ask a person to sign in, to create an
+account, or to paste a credential; does not edit knowledge or grant its own approval; and does not claim an operated outcome
 while any required check is absent or failed, nor any product readiness, release approval, or UAT
 proof.
 
@@ -96,6 +148,8 @@ proof.
 | `@workspaces/ports/<project>` | the port projection the runtime binds to | yes |
 | `@workspaces/device-state` | capability handles by name and their custody; values never appear | yes |
 | `@workspaces/projects/<project>/<role>` | which projects the shared services serve | no |
+| `@worktrees/uat/<flow>` | the flow folder the identity branch writes: the account record, the drafted flow document and the seed | no |
+| `@worktrees/_templates` | the flow template a missing flow folder is drafted from, consumed and never modified | no |
 
 ## Inputs
 
@@ -110,6 +164,9 @@ proof.
 | `desiredState` | `{planSha256, serviceKind, resourceRefs, effects, mutableResourceRefs, observationOnlyResourceRefs}` | — | The approved declaration: which plan, which branch, which resources, which effects, and what may change against what may only be observed |
 | `portClaims` | list of `{port, resourceRef}` | [] | Which ports the desired state needs, and for which owned resource |
 | `approval` | id | — | The approval that covers this desired state; changing a shared runtime always needs a person |
+| `routeKey` | id | null | The `<project>/<role>` registry entry this operation attests or provisions against; null when the operation touches no route |
+| `flow` | id | null | The flow whose dedicated identity is provisioned and whose folder receives the account record, the drafted document and the seed |
+| `env` | id | dev | The stack the attested entry and the provisioned accounts belong to; an account of one stack is not an account in another |
 | `resume` | token | null | The blocked branch's token when re-entering after a stop |
 
 ## Steps
@@ -122,8 +179,10 @@ proof.
 | 4 | Resolve the port claims | `portClaims` | @workspaces/ports/<project> for the claimed ports, @worktrees/sessions/central-runtime for their observed holders | — | `PORT_CONFLICT` |
 | 5 | Derive the delta between what is observed and what is desired | `desiredState` | @worktrees/sessions/central-runtime for the observed state, `request/request.json` for the desired state | `response/data/delta.json` | — |
 | 6 | Apply the approved delta, one resource at a time, under an exclusive lease | — | @worktrees/sessions/central-runtime, @workspaces/device-state for the handles by name | @worktrees/sessions/central-runtime, `response/data/delta.json`, @tools/container, @tools/shell | `EFFECT_UNAUTHORIZED`, `SERVICE_UNAVAILABLE` |
-| 7 | Prove every required check | — | @worktrees/sessions/central-runtime re-read against the branch's complete proof set, @tools/http | `response/data/checks.json` | `PROOF_FAILED` |
-| 8 | Write the receipt and emit | — | everything above | `response/response.md`, `response/response.json` | — |
+| 7 | Attest the runtime entry of the bound route: probe the endpoints it declares, record the head and the evidence, and set its status | `routeKey`, `env` | @worktrees/sessions/central-runtime for the entry of that route, the endpoints it declares re-observed once, @tools/http | @worktrees/sessions/central-runtime, `response/data/delta.json` | `SERVICE_UNAVAILABLE` |
+| 8 | Provision the flow's identity against that entry: read the account record or create the account, set its password from the sealed name, write the record, draft what is absent and seed | `routeKey`, `flow`, `env` | @worktrees/uat/<flow> for the account record, the flow document and the seed, @worktrees/_templates for what is absent, @worktrees/sessions/central-runtime for the entry's identity declaration, @workspaces/device-state for the credential by name, @tools/secrets, @tools/http, @tools/browsercontrol, @tools/database | @worktrees/uat/<flow>, `response/data/account.json`, `response/data/delta.json`, @tools/sourcewrite | `INVALID_INPUT`, `PROVISIONING_UNAVAILABLE` |
+| 9 | Prove every required check | — | @worktrees/sessions/central-runtime re-read against the branch's complete proof set, @tools/http | `response/data/checks.json` | `PROOF_FAILED` |
+| 10 | Write the receipt and emit | — | everything above | `response/response.md`, `response/response.json` | — |
 
 A resume begins again at validation, reuses only unchanged fingerprinted observations, and consumes
 the exact delta; a resume that adds no authority, inventory, desired-state or scope change is
@@ -137,6 +196,7 @@ fingerprint cannot yield a different answer.
 | `platform-operation-receipt` | `response/response.md` | md | yes |
 | `delta` | `response/data/delta.json` | data | yes |
 | `checks` | `response/data/checks.json` | data | yes |
+| `uat-account` | `response/data/account.json` | data | no |
 
 ## Stops
 
@@ -151,6 +211,7 @@ fingerprint cannot yield a different answer.
 | `PORT_CONFLICT` | terminate |
 | `EFFECT_UNAUTHORIZED` | terminate |
 | `SERVICE_UNAVAILABLE` | terminate |
+| `PROVISIONING_UNAVAILABLE` | terminate |
 | `PROOF_FAILED` | terminate |
 
 ## Next
@@ -160,3 +221,4 @@ fingerprint cannot yield a different answer.
 | the routed checkout or its head no longer matches the frozen binding | `workspace.bind` |
 | the runtime a frontend surface must be audited against is now serving | `frontend.surface.audit` |
 | the shared service is operated and the release that waited on it may continue | `release.deploy` |
+| the flow's identity is provisioned and the run that waited on it may verify the flow | `uat.verify` |

@@ -14,9 +14,22 @@ Every record a seed places carries `is_uat=true` and the `uat-<runId>` namespace
 exactly that namespace: not another run's namespace, not a record that merely carries the UAT flag,
 and never a run record.
 
-No secret belongs in this directory. The shared UAT password is resolved by name at login and is
+## Where the data state comes from
+
+`db/before.json` and `db/after.json` under a run hold the scoped state this document defines: which
+entities, which fields, in which order. How that state is taken is also this document's to say — a
+query against the store, an export over the product's own API, or files the fixtures point at. Nothing
+requires a database, and a flow whose truth lives in an API says so here.
+
+## Idempotency and rollback
+
+A seed is applied more than once over the life of a flow, so it states what it places, how placing it
+again changes nothing, and what undoes it. A seed that only works on an empty store is a seed that
+works once.
+
+No secret belongs in this directory. The shared password is resolved by name at the moment it is used and is
 never written into a fixture, a command or a file. A seed that needs an authenticated identity names
-the account record instead of carrying a credential.
+the alias in `accounts.<env>.json` instead of carrying a credential.
 
 ## Layout
 

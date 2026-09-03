@@ -2,9 +2,10 @@
 
 ## Việc
 
-Vận hành một dịch vụ dùng chung có ranh giới, thuộc observability, Sonar hay tunnel, từ bằng chứng
-chính xác: kiểm kê nó, hội tụ đúng phần delta đã duyệt, chứng minh mọi phép kiểm mà tri thức đã ràng
-đòi hỏi, và dừng ở khoảng trống sở hữu nhỏ nhất thay vì nhận lấy quyền deploy sản phẩm.
+Vận hành một dịch vụ dùng chung có ranh giới từ bằng chứng chính xác — observability, Sonar, tunnel,
+sổ đăng ký runtime, hay danh tính mà một route đã bind xác thực vào: kiểm kê nó, hội tụ đúng phần
+delta đã duyệt, chứng minh mọi phép kiểm mà tri thức đã ràng đòi hỏi, và dừng ở khoảng trống sở hữu
+nhỏ nhất thay vì nhận lấy quyền deploy sản phẩm.
 
 ## Hạ tầng dùng chung, không phải sản phẩm
 
@@ -15,9 +16,9 @@ tunnel. Một kế hoạch với tay sang đó là đầu vào không hợp lệ
 và yêu cầu restart một dịch vụ sản phẩm để dọn chỗ cho một dịch vụ dùng chung sẽ đi ra bằng phát hiện
 `PRODUCT_DEPLOYMENT_DECLINED` chứ không bằng một lần mutate.
 
-## Một việc, ba nhánh
+## Một việc, năm nhánh
 
-Kiểu dịch vụ mà inventory ghi lại chọn nhánh, và ba nhánh là ba nhánh của cùng một việc chứ không phải ba operator. Mỗi
+Kiểu dịch vụ mà inventory ghi lại chọn nhánh, và năm nhánh là năm nhánh của cùng một việc chứ không phải năm operator. Mỗi
 nhánh công bố ba tập đóng, và cả ba đều được thi hành. Observability áp `update-config`,
 `restart-service`, `upsert-dashboard` và `update-remote-write`, chứng minh `service-health`,
 `target-boundary`, `label-boundary`, `remote-write-delivery`, `sample-ordering`, `retry-backoff` và
@@ -26,10 +27,56 @@ nhánh công bố ba tập đóng, và cả ba đều được thi hành. Observ
 `source-revision`, `profile-assigned`, `gate-assigned` và `enforcement-active`, và cần
 `sonar:project-admin`. Tunnel áp `create-tunnel`, `update-tunnel-route` và `upsert-proxied-dns`,
 chứng minh `dns-target`, `tunnel-route`, `tls` và `public-https`, và cần `tunnel:write` cùng
-`dns:write`. Một effect hay một check nộp nhầm nhánh là đầu vào không hợp lệ chứ không phải cảnh báo,
+`dns:write`. Runtime áp `register-runtime-entry` và `attest-runtime-entry`, chứng minh
+`entry-declared`, `endpoints-served`, `head-observed` và `generation-advanced`, và cần
+`runtime:registry-write`. Identity áp `provision-identity` và `seed-flow-fixtures`, chứng minh
+`provider-reachable`, `credential-resolvable`, `account-exists`, `account-signs-in` và
+`no-credential-recorded`, và cần `identity:account-admin`. Giữ hai nhánh cuối tách nhau là thứ giữ cho
+mỗi tập chứng minh còn thật: không thể bắt một lần chứng thực chứng minh một tài khoản, và không thể
+báo cáo một lần cấp tài khoản bằng cách ping một cổng. Một effect hay một check nộp nhầm nhánh là đầu vào không hợp lệ chứ không phải cảnh báo,
 vì effect nộp chéo chính là cách một thay đổi chưa duyệt khoác lên mình vẻ ngoài của thẩm quyền. Tập
 chứng minh bắt buộc là trọn tập mà nhánh công bố: người gọi không được xin ít hơn, vì một dashboard
 xanh tự nó chưa bao giờ chứng minh được delivery, ordering hay redaction.
+
+## Sổ đăng ký có một entry cho mỗi route
+
+Một máy chạy route của nhiều sản phẩm cùng lúc, nên sổ đăng ký runtime giữ một entry cho mỗi
+`<project>/<role>` và mỗi người đọc lấy đúng entry của route mình. Một sổ chỉ có một khối endpoint thì
+chứng thực được đúng một route, và mọi lần bind khác đọc ra chưa sẵn sàng trong khi dịch vụ chúng cần
+đang lắng nghe — một âm tính giả không phân biệt được với sự cố. Hình dạng một-khối trước đây vẫn được
+đọc thêm một release, như entry của route mà nó nêu tên, và một sổ mang cả hai thì hai bên phải khớp;
+release kế tiếp bỏ nó.
+
+## Chứng thực một runtime không ai khởi động lại
+
+Một tiến trình đang phục vụ là bằng chứng, không phải vấn đề. Nhánh runtime ping các endpoint mà entry
+khai, ghi lại head quan sát được cùng các bản ghi ping đứng sau, rồi đặt trạng thái của entry theo cái
+đã trả lời. Không có gì bị khởi động, dừng hay khởi động lại để làm được điều đó: dịch vụ đang chạy của
+một người được đăng ký đúng như nó đang là, vì lựa chọn còn lại — khởi động lại một runtime để được
+phép mô tả nó — phá huỷ chính trạng thái mà bước sau định kiểm. Một entry có endpoint không trả lời là
+`SERVICE_UNAVAILABLE` nêu đích danh endpoint hỏng, không bao giờ là một trạng thái operator này tự
+khẳng định.
+
+## Hồ sơ thiếu thì tạo ra, không phải báo lỗi
+
+Cấp phát là nhánh mặc định, không phải ngoại lệ. Một luồng chưa có thư mục, chưa có tài liệu luồng,
+chưa có seed và chưa có tài khoản là một luồng chưa ai chạy, và runtime tạo cả bốn: tài liệu luồng và
+seed được phác từ khuôn đi kèm cây và được đánh dấu là bản nháp trong biên bản, tài khoản được tạo tại
+provider mà entry khai, mật khẩu của nó đặt từ thông tin đăng nhập niêm phong dùng chung giải theo tên,
+rồi seed được áp. Báo bất kỳ điều nào ở trên như một lỗi là sai, và dừng ở "phải có người tạo tài
+khoản" cũng là đúng cái sai đó với một câu lịch sự hơn. Chỉ hai thứ thực sự không phải để operator này
+bịa ra, và chúng là hai mã dừng duy nhất trên lối này: một entry không khai danh tính nào cả là
+`INVALID_INPUT` nêu tên trường còn thiếu, và một provider, file niêm phong hay kho dữ liệu không tới
+được là `PROVISIONING_UNAVAILABLE`.
+
+## Thông tin đăng nhập là một cái tên, và nó đi vào một form hay một body
+
+Mỗi môi trường niêm phong đúng một mật khẩu và tài khoản của mọi luồng được đặt từ nó, còn mỗi luồng sở
+hữu username riêng. Nó được giải theo tên đúng lúc gọi, và giá trị của nó chỉ được phép tới đúng hai
+chỗ: body của lời gọi quản trị tới provider, và ô của một form đăng ký trong trình duyệt đang được điều
+khiển. Nó không bao giờ vào một file, một fixture, một lệnh được ghi lại, một ảnh chụp hay một biên bản.
+Vì thế hồ sơ tài khoản operator này công bố mang username, vai trò, tên thông tin đăng nhập, đường dẫn
+file niêm phong và entry nó thuộc về, và không có chỗ nào để đặt một bí mật kể cả do sơ ý.
 
 ## Kiểm kê trước khi đổi
 
@@ -94,6 +141,8 @@ release hay bằng chứng UAT nào.
 | `@workspaces/ports/<project>` | phép chiếu cổng mà runtime ràng vào | có |
 | `@workspaces/device-state` | handle capability theo tên và custody của chúng; giá trị không bao giờ xuất hiện | có |
 | `@workspaces/projects/<project>/<role>` | những project mà các dịch vụ dùng chung phục vụ | không |
+| `@worktrees/uat/<flow>` | thư mục luồng mà nhánh identity ghi: hồ sơ tài khoản, tài liệu luồng đã phác và seed | không |
+| `@worktrees/_templates` | khuôn luồng dùng để phác một thư mục luồng còn thiếu, chỉ tiêu thụ chứ không sửa | không |
 
 ## Đầu vào
 
@@ -108,6 +157,9 @@ release hay bằng chứng UAT nào.
 | `desiredState` | `{planSha256, serviceKind, resourceRefs, effects, mutableResourceRefs, observationOnlyResourceRefs}` | — | Khai báo đã duyệt: kế hoạch nào, nhánh nào, resource nào, effect nào, và cái gì được đổi so với cái gì chỉ được quan sát |
 | `portClaims` | list of `{port, resourceRef}` | [] | Trạng thái mong muốn cần những cổng nào, và cho resource sở hữu nào |
 | `approval` | id | — | Phê duyệt phủ lên trạng thái mong muốn này; đổi một runtime dùng chung luôn cần một con người |
+| `routeKey` | id | null | Entry `<project>/<role>` mà lượt vận hành này chứng thực hoặc cấp tài khoản vào; null khi lượt chạy không đụng route nào |
+| `flow` | id | null | Luồng có danh tính riêng được cấp, và có thư mục nhận hồ sơ tài khoản, tài liệu đã phác cùng seed |
+| `env` | id | dev | Stack mà entry được chứng thực và các tài khoản được cấp thuộc về; tài khoản của stack này không phải tài khoản của stack khác |
 | `resume` | token | null | Token của nhánh bị chặn khi vào lại sau một mã dừng |
 
 ## Các bước
@@ -120,8 +172,10 @@ release hay bằng chứng UAT nào.
 | 4 | Phân giải các port claim | `portClaims` | @workspaces/ports/<project> cho các cổng được claim, @worktrees/sessions/central-runtime cho chủ giữ quan sát được của chúng | — | `PORT_CONFLICT` |
 | 5 | Suy ra delta giữa cái quan sát được và cái mong muốn | `desiredState` | @worktrees/sessions/central-runtime cho trạng thái quan sát được, `request/request.json` cho trạng thái mong muốn | `response/data/delta.json` | — |
 | 6 | Áp delta đã duyệt, từng resource một, dưới một lease độc quyền | — | @worktrees/sessions/central-runtime, @workspaces/device-state cho các handle theo tên | @worktrees/sessions/central-runtime, `response/data/delta.json`, @tools/container, @tools/shell | `EFFECT_UNAUTHORIZED`, `SERVICE_UNAVAILABLE` |
-| 7 | Chứng minh mọi check bắt buộc | — | @worktrees/sessions/central-runtime đọc lại theo bộ chứng minh đầy đủ của nhánh, @tools/http | `response/data/checks.json` | `PROOF_FAILED` |
-| 8 | Viết biên bản và phát | — | mọi thứ ở trên | `response/response.md`, `response/response.json` | — |
+| 7 | Chứng thực entry runtime của route đã bind: ping các endpoint nó khai, ghi head và bằng chứng, rồi đặt trạng thái | `routeKey`, `env` | @worktrees/sessions/central-runtime cho entry của route đó, các endpoint nó khai được quan sát lại một lần, @tools/http | @worktrees/sessions/central-runtime, `response/data/delta.json` | `SERVICE_UNAVAILABLE` |
+| 8 | Cấp danh tính của luồng theo entry đó: đọc hồ sơ tài khoản hoặc tạo tài khoản, đặt mật khẩu từ tên niêm phong, ghi hồ sơ, phác phần còn thiếu và seed | `routeKey`, `flow`, `env` | @worktrees/uat/<flow> cho hồ sơ tài khoản, tài liệu luồng và seed, @worktrees/_templates cho phần còn thiếu, @worktrees/sessions/central-runtime cho khai báo danh tính của entry, @workspaces/device-state cho thông tin đăng nhập theo tên, @tools/secrets, @tools/http, @tools/browsercontrol, @tools/database | @worktrees/uat/<flow>, `response/data/account.json`, `response/data/delta.json`, @tools/sourcewrite | `INVALID_INPUT`, `PROVISIONING_UNAVAILABLE` |
+| 9 | Chứng minh mọi check bắt buộc | — | @worktrees/sessions/central-runtime đọc lại theo bộ chứng minh đầy đủ của nhánh, @tools/http | `response/data/checks.json` | `PROOF_FAILED` |
+| 10 | Viết biên bản và phát | — | mọi thứ ở trên | `response/response.md`, `response/response.json` | — |
 
 Một lần resume bắt đầu lại từ cổng vào, chỉ dùng lại quan sát có fingerprint không đổi, và tiêu thụ
 đúng phần delta; một lần resume không thêm thẩm quyền, inventory, trạng thái mong muốn hay phạm vi nào
@@ -135,6 +189,7 @@ fingerprint không thể cho một câu trả lời khác.
 | `platform-operation-receipt` | `response/response.md` | md | có |
 | `delta` | `response/data/delta.json` | data | có |
 | `checks` | `response/data/checks.json` | data | có |
+| `uat-account` | `response/data/account.json` | data | không |
 
 ## Dừng
 
@@ -149,6 +204,7 @@ fingerprint không thể cho một câu trả lời khác.
 | `PORT_CONFLICT` | terminate |
 | `EFFECT_UNAUTHORIZED` | terminate |
 | `SERVICE_UNAVAILABLE` | terminate |
+| `PROVISIONING_UNAVAILABLE` | terminate |
 | `PROOF_FAILED` | terminate |
 
 ## Kế tiếp
@@ -158,3 +214,4 @@ fingerprint không thể cho một câu trả lời khác.
 | checkout đã route hay head của nó không còn khớp ràng buộc đã đóng băng | `workspace.bind` |
 | runtime mà một bề mặt frontend phải được audit trên đó nay đã phục vụ | `frontend.surface.audit` |
 | dịch vụ dùng chung đã vận hành xong và release đang chờ nó có thể chạy tiếp | `release.deploy` |
+| danh tính của luồng đã được cấp và lượt chạy đang chờ nó có thể kiểm luồng | `uat.verify` |

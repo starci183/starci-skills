@@ -17,7 +17,8 @@
       "@tools/visualize": "html",
       "@tools/browsercontrol": "required",
       "@tools/http": "probe",
-      "@tools/host": "loopback"
+      "@tools/host": "loopback",
+      "@tools/secrets": "resolve-by-name"
     }
   }
 }

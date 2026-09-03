@@ -1,0 +1,25 @@
+{
+  "_comment": "Copy to accounts.<env>.json. One dedicated account per alias the flow's steps act as, in one environment. There is no password field and none may be added: the shared password is sealed once per environment under the master identity, resolved by name at the moment it is used, and reaches only a request body or a form field. A password in this file, in a fixture, in a recorded command, in a log or in a capture has already left custody. A file that does not exist yet is created by the provisioning operator; it is never a reason to stop.",
+  "env": "local",
+  "flow": "the-flow-this-belongs-to",
+  "identity": "the-project/the-role",
+  "accounts": {
+    "learner": {
+      "username": "uat-the-flow-learner",
+      "role": "learner",
+      "credentialName": "uat-shared",
+      "sealed": ".stacks/local/secrets/uat.enc",
+      "provisionedBy": null,
+      "createdAt": "2026-01-01T00:00:00.000Z"
+    },
+    "reviewer": {
+      "username": "uat-the-flow-reviewer",
+      "role": "reviewer",
+      "credentialName": "uat-shared",
+      "sealed": ".stacks/local/secrets/uat.enc",
+      "provisionedBy": null,
+      "createdAt": "2026-01-01T00:00:00.000Z"
+    }
+  },
+  "plaintextRecorded": false
+}

@@ -3,28 +3,84 @@
   "type": "object",
   "additionalProperties": false,
   "required": [
-    "runId", "requestedBy", "feature", "flow", "commit", "frozenAt", "flowRoot", "snapshotRef",
-    "snapshotFingerprint", "lease", "admission", "account", "fixtureNamespace", "seed", "cases"
+    "runId",
+    "requestedBy",
+    "feature",
+    "flow",
+    "env",
+    "commit",
+    "frozenAt",
+    "flowRoot",
+    "snapshotRef",
+    "snapshotFingerprint",
+    "lease",
+    "admission",
+    "accounts",
+    "fixtureNamespace",
+    "seed",
+    "cases",
+    "flowSource",
+    "golden"
   ],
   "properties": {
-    "runId": { "$ref": "#/$defs/runId" },
-    "requestedBy": { "type": "string", "minLength": 1 },
-    "feature": { "$ref": "#/$defs/slug" },
-    "flow": { "$ref": "#/$defs/slug" },
-    "commit": { "type": "string", "pattern": "^[0-9a-f]{40}$" },
-    "frozenAt": { "type": "string", "format": "date-time" },
-    "flowRoot": { "type": "string", "minLength": 1 },
-    "snapshotRef": { "type": "string", "pattern": "^\\.worktrees/uat/[a-z0-9][a-z0-9-]*/[a-z0-9][a-z0-9-]*/snapshot\\.json$" },
-    "snapshotFingerprint": { "$ref": "#/$defs/fingerprint" },
+    "runId": {
+      "$ref": "#/$defs/runId"
+    },
+    "requestedBy": {
+      "type": "string",
+      "minLength": 1
+    },
+    "feature": {
+      "$ref": "#/$defs/slug"
+    },
+    "flow": {
+      "$ref": "#/$defs/slug"
+    },
+    "env": {
+      "type": "string",
+      "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+      "description": "The environment this run drove. Accounts and the approved reference are both per environment, so a run that does not say which one it was in can be compared with the wrong baseline."
+    },
+    "commit": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{40}$"
+    },
+    "frozenAt": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "flowRoot": {
+      "type": "string",
+      "minLength": 1
+    },
+    "snapshotRef": {
+      "type": "string",
+      "pattern": "^\\.worktrees/uat/[a-z0-9][a-z0-9-]*/[a-z0-9][a-z0-9-]*/snapshot\\.json$"
+    },
+    "snapshotFingerprint": {
+      "$ref": "#/$defs/fingerprint"
+    },
     "lease": {
       "description": "The exclusive lease on the flow directory. One run writes it at a time; the lease is granted by the orchestrator and is never asked of a person.",
       "type": "object",
       "additionalProperties": false,
-      "required": ["leaseRef", "exclusive", "expiresAt"],
+      "required": [
+        "leaseRef",
+        "exclusive",
+        "expiresAt"
+      ],
       "properties": {
-        "leaseRef": { "type": "string", "pattern": "^uat-lease://[A-Za-z0-9._~/-]+$" },
-        "exclusive": { "const": true },
-        "expiresAt": { "type": "string", "format": "date-time" }
+        "leaseRef": {
+          "type": "string",
+          "pattern": "^uat-lease://[A-Za-z0-9._~/-]+$"
+        },
+        "exclusive": {
+          "const": true
+        },
+        "expiresAt": {
+          "type": "string",
+          "format": "date-time"
+        }
       }
     },
     "admission": {
@@ -35,41 +91,206 @@
       "items": {
         "type": "object",
         "additionalProperties": false,
-        "required": ["kind", "ref", "commit"],
+        "required": [
+          "kind",
+          "ref",
+          "commit"
+        ],
         "properties": {
-          "kind": { "enum": ["frontend-surface-audit", "quality-verification"] },
-          "ref": { "type": "string", "minLength": 1 },
-          "commit": { "type": "string", "pattern": "^[0-9a-f]{40}$" }
+          "kind": {
+            "enum": [
+              "frontend-surface-audit",
+              "quality-verification"
+            ]
+          },
+          "ref": {
+            "type": "string",
+            "minLength": 1
+          },
+          "commit": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{40}$"
+          }
         }
       }
     },
-    "account": {
-      "description": "A dedicated UAT username per flow and one shared password, sealed under the master identity. Every field is a name or a reference, so a password has nowhere to live even by accident.",
-      "type": "object",
-      "additionalProperties": false,
-      "required": ["username", "role", "credentialName", "credentialRef", "custody", "isUat", "plaintextRecorded"],
-      "properties": {
-        "username": { "type": "string", "pattern": "^uat-[A-Za-z0-9._-]+$" },
-        "role": { "type": "string", "minLength": 1 },
-        "credentialName": { "type": "string", "pattern": "^[a-z][a-z0-9-]*$" },
-        "credentialRef": { "type": "string", "pattern": "^\\.stacks/[a-z0-9][a-z0-9-]*/secrets/uat\\.enc$" },
-        "custody": { "const": "sealed-shared-master-identity" },
-        "isUat": { "const": true },
-        "plaintextRecorded": { "const": false }
+    "accounts": {
+      "description": "One frozen account per alias the flow names, each a dedicated username with the shared password resolved by name. Every field is a name or a reference, so a password has nowhere to live even by accident.",
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 16,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "alias",
+          "username",
+          "role",
+          "credentialName",
+          "credentialRef",
+          "custody",
+          "isUat",
+          "plaintextRecorded",
+          "identity",
+          "provisionedBy"
+        ],
+        "properties": {
+          "alias": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9-]*$"
+          },
+          "username": {
+            "type": "string",
+            "pattern": "^uat-[A-Za-z0-9._-]+$"
+          },
+          "role": {
+            "type": "string",
+            "minLength": 1
+          },
+          "credentialName": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9-]*$"
+          },
+          "credentialRef": {
+            "type": "string",
+            "pattern": "^\\.stacks/[a-z0-9][a-z0-9-]*/secrets/uat\\.enc$"
+          },
+          "custody": {
+            "const": "sealed-shared-master-identity"
+          },
+          "isUat": {
+            "const": true
+          },
+          "plaintextRecorded": {
+            "const": false
+          },
+          "identity": {
+            "type": "string",
+            "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*/[a-z0-9]+(?:-[a-z0-9]+)*$",
+            "description": "The runtime registry entry this account exists in. An account that names none names no provider it could have been created at."
+          },
+          "provisionedBy": {
+            "description": "The run that created the account, or null when it already existed. A flow whose account was absent is not a stop: the identity is provisioned and the run continues.",
+            "oneOf": [
+              {
+                "type": "string",
+                "pattern": "^[A-Za-z0-9._-]+$"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        }
       }
     },
-    "fixtureNamespace": { "$ref": "#/$defs/namespace" },
+    "fixtureNamespace": {
+      "$ref": "#/$defs/namespace"
+    },
     "seed": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["recordsRef", "expectedRef", "fingerprint", "namespace", "isUat"],
+      "required": [
+        "recordsRef",
+        "expectedRef",
+        "fingerprint",
+        "namespace",
+        "isUat"
+      ],
       "properties": {
-        "recordsRef": { "type": "string", "pattern": "^\\.worktrees/uat/[a-z0-9][a-z0-9-]*/[a-z0-9][a-z0-9-]*/seed/records\\.json$" },
-        "expectedRef": { "type": "string", "pattern": "^\\.worktrees/uat/[a-z0-9][a-z0-9-]*/[a-z0-9][a-z0-9-]*/seed/expected\\.json$" },
-        "fingerprint": { "$ref": "#/$defs/fingerprint" },
-        "namespace": { "$ref": "#/$defs/namespace" },
-        "isUat": { "const": true }
+        "recordsRef": {
+          "type": "string",
+          "pattern": "^\\.worktrees/uat/[a-z0-9][a-z0-9-]*/[a-z0-9][a-z0-9-]*/seed/records\\.json$"
+        },
+        "expectedRef": {
+          "type": "string",
+          "pattern": "^\\.worktrees/uat/[a-z0-9][a-z0-9-]*/[a-z0-9][a-z0-9-]*/seed/expected\\.json$"
+        },
+        "fingerprint": {
+          "$ref": "#/$defs/fingerprint"
+        },
+        "namespace": {
+          "$ref": "#/$defs/namespace"
+        },
+        "isUat": {
+          "const": true
+        }
       }
+    },
+    "flowSource": {
+      "enum": [
+        "committed",
+        "drafted-from-template"
+      ],
+      "description": "Where the flow document and its seed came from. A flow folder that did not exist is created from the shipped template and the receipt says so: a drafted flow is honest, an absent flow would have been a stop, and a draft reported as committed is the one outcome neither is."
+    },
+    "golden": {
+      "description": "The approved reference this run is compared against. A flow with no approved reference yet does not fail: this run becomes the candidate, and only a person's approval promotes it, so no run ever approves its own baseline.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "state",
+        "ref",
+        "approvedBy",
+        "env"
+      ],
+      "properties": {
+        "state": {
+          "enum": [
+            "approved",
+            "candidate"
+          ]
+        },
+        "ref": {
+          "type": "string",
+          "minLength": 1
+        },
+        "approvedBy": {
+          "oneOf": [
+            {
+              "type": "string",
+              "minLength": 1
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "env": {
+          "type": "string",
+          "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+          "description": "The environment the approved reference was taken in. A golden from one environment is not authority for another."
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "state": {
+                "const": "candidate"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "approvedBy": {
+                "type": "null"
+              }
+            }
+          },
+          "else": {
+            "properties": {
+              "approvedBy": {
+                "type": "string",
+                "minLength": 1
+              }
+            }
+          }
+        }
+      ]
     },
     "cases": {
       "type": "array",
@@ -78,19 +299,55 @@
       "items": {
         "type": "object",
         "additionalProperties": false,
-        "required": ["caseId", "order", "assertions"],
+        "required": [
+          "caseId",
+          "order",
+          "as",
+          "assertions"
+        ],
         "properties": {
-          "caseId": { "$ref": "#/$defs/slug" },
-          "order": { "type": "integer", "minimum": 1 },
-          "assertions": { "type": "array", "minItems": 1, "maxItems": 32, "uniqueItems": true, "items": { "type": "string", "minLength": 1 } }
+          "caseId": {
+            "$ref": "#/$defs/slug"
+          },
+          "order": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "as": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9-]*$",
+            "description": "The alias this case acts as. It names one of the frozen accounts, so a case can never be run as an identity the flow never declared."
+          },
+          "assertions": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 32,
+            "uniqueItems": true,
+            "items": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
         }
       }
     }
   },
   "$defs": {
-    "fingerprint": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
-    "slug": { "type": "string", "pattern": "^[a-z0-9][a-z0-9-]*$" },
-    "runId": { "type": "string", "pattern": "^[A-Za-z0-9._-]+$" },
-    "namespace": { "type": "string", "pattern": "^uat-[A-Za-z0-9._-]+$" }
+    "fingerprint": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "slug": {
+      "type": "string",
+      "pattern": "^[a-z0-9][a-z0-9-]*$"
+    },
+    "runId": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9._-]+$"
+    },
+    "namespace": {
+      "type": "string",
+      "pattern": "^uat-[A-Za-z0-9._-]+$"
+    }
   }
 }

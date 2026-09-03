@@ -32,6 +32,15 @@ listening establishes nothing. Step 5 runs only when `runtimeNeed` is not `none`
 no runtime binds no endpoints either, and a route that carries endpoints nobody asked for has
 consumed a shared resource on its own initiative.
 
+## One registry entry per project route
+
+The runtime registry holds one entry for each `<project>/<role>`, and a binding consumes the entry of
+its own route: its endpoints, its head, its generation, its status, the evidence behind that status
+and the identity provider an account for it would be created at. One machine serves several products
+at once, so a registry read as a single block answers for whichever route happens to be recorded in
+it, and every other route binds as not ready while the service it needs is listening. The binding
+records the entry key it read, which is what makes that mistake visible instead of merely likely.
+
 ## The caller is a consumer, never an owner
 
 The shared local frontend, api, and identity processes belong to exactly one delegated owner task.
@@ -106,7 +115,7 @@ workspace, or provisions an account. It makes no product decision and carries no
 | 2 | Bind bootstrap and identity | — | @workspaces/device-state, the machine identity and the sealed credential roster, @tools/secrets | — | `IDENTITY_UNVERIFIED` |
 | 3 | Resolve the route | `project`, `role` | @workspaces/projects/<project>/<role> for exactly this project and role, @workspaces/local/routes/<project>/<role>, @tools/git | — | `ROUTE_UNDECLARED`, `ROUTE_UNHYDRATED`, `ROUTE_MISMATCH` |
 | 4 | Verify the checkout: branch policy, a clean tree, and the write roots | `gitPolicy`, `declaredWriteRoots` | @workspaces/local/routes/<project>/<role>, the resolved checkout, its branch, its head and its working tree, @tools/git, @tools/shell | — | `BRANCH_POLICY_VIOLATION`, `CHECKOUT_DIRTY` |
-| 5 | Bind the runtime the caller consumes, only when `runtimeNeed` is not none | `runtimeNeed` | @worktrees/sessions/central-runtime, the owner registry, its generation and health evidence, @workspaces/ports/<project>, @tools/http | — | `ENDPOINT_AUTHORITY_STALE`, `RUNTIME_NOT_READY` |
+| 5 | Bind the runtime the caller consumes from the registry entry of this project route, only when `runtimeNeed` is not none | `runtimeNeed` | @worktrees/sessions/central-runtime, the entry of this `<project>/<role>` with its generation, health evidence and identity declaration, @workspaces/ports/<project>, @tools/http | — | `ENDPOINT_AUTHORITY_STALE`, `RUNTIME_NOT_READY` |
 | 6 | Bind provenance and freshness, then emit | — | everything above, @workspaces/device-state | `response/response.md`, `response/data/route.json`, `response/response.json` | — |
 
 Step 5 recomputes nothing: the endpoint fingerprint either matches the closed projection or the

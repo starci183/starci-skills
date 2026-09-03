@@ -1,10 +1,11 @@
 dist/
 
 
-# v7 local artifacts that must stay out of the v8 tree
-.venv/
-mcp/
-runtime/
+# v7 local artifacts that must stay out of the v8 tree. Anchored to the root: an unanchored
+# `runtime/` also excluded readiness/initialization/runtime, which is tracked law.
+/.venv/
+/mcp/
+/runtime/
 
 # Claude sessions spawned into this checkout keep their worktrees here
 worktrees/

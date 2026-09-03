@@ -392,3 +392,67 @@ là chính mô hình xuất xứ của nhóm ấy, cổng trích dẫn dựng tr
 Trò chỉ dời số liệu ra khỏi những Case thêm hôm nay. Phần còn lại — tên repo và đường dẫn Windows
 tuyệt đối trong `patterns/fe/INDEX.md` và dòng `Sources:` của `folder.md` — vẫn là việc phải làm lại
 mô hình xuất xứ cho cả nhóm, không phải sửa một Case; trò để nguyên và báo lần nữa.
+
+### UAT tự cấp tài khoản (từ phiên mù AgentOS)
+
+**Chỗ hỏng.** Một phiên dừng `RUNTIME_UNAVAILABLE` vì route console nằm sau một guard phía client, với
+lý do "không operator nào tạo được danh tính hay nhập được thông tin đăng nhập", và `platform.operate`
+"cũng không đúc được danh tính". Cả hai câu đều là khoảng trống thi hành chứ không phải sự thật: một
+route trả về màn hình đăng nhập là đang phục vụ, và thứ còn thiếu là một danh tính — thứ runtime có.
+
+**Luật thầy đặt, trò đã đóng đinh vào cây.** Trong UAT, hồ sơ thiếu thì **tạo ra**, không báo lỗi. Mỗi
+luồng có tài khoản riêng; mật khẩu UAT dùng chung niêm phong một lần cho mỗi môi trường tại
+`.stacks/<env>/secrets/*.enc` dưới master identity; giá trị chỉ đi vào body của một lời gọi quản trị
+hoặc ô của một form trong trình duyệt, không bao giờ vào file, ảnh chụp, log hay biên nhận.
+
+**Ai sở hữu gì.** `platform.operate` nhận thêm hai nhánh — `runtime` (`register-runtime-entry`,
+`attest-runtime-entry`) và `identity` (`provision-identity`, `seed-flow-fixtures`) — mỗi nhánh có tập
+effect, tập check và capability đóng của riêng nó, nên một lần chứng thực không bị bắt chứng minh một
+tài khoản, và một lần cấp tài khoản không được báo cáo bằng cách ping một cổng. Nhánh `runtime` chứng
+thực một tiến trình **đang chạy** đúng như nó đang là: không khởi động lại, vì khởi động lại để được
+phép mô tả sẽ phá đúng trạng thái mà bước sau định kiểm.
+
+**Sổ đăng ký giờ theo từng route.** `runtimes: { "<project>/<role>": { endpoints, head, generation,
+status, healthEvidenceRefs, identity } }`. Hình dạng một-khối cũ còn đọc thêm một release, như entry
+của route mà nó nêu tên. `workspace.bind` đọc entry của chính route mình và ghi lại khoá entry ấy —
+đó là thứ khiến "một máy nhiều sản phẩm, sổ chỉ trả lời cho một" lộ ra thay vì chỉ dễ xảy ra.
+
+**Mã mới.** `IDENTITY_MISSING` (domain `platform`, phạm vi `frontend.surface.audit` + `uat.verify`) là
+một lần **bàn giao** chứ không phải phán quyết: luồng chưa có tài khoản thì `platform.operate` cấp,
+rồi nhánh chạy lại. `PROVISIONING_UNAVAILABLE` dời sang sổ chung với hai chủ, và chỉ dành cho phụ
+thuộc **không tới được**. Route có cổng canh không còn là `RUNTIME_UNAVAILABLE` nữa.
+
+**Thư mục luồng có một hình dạng, và nó được thi hành.** `flow.md` (mục tiêu, vai, tiền đề, ngân sách,
+bảng bước có cột `as`), `accounts.<env>.json` (một tài khoản cho mỗi alias, theo môi trường),
+`seed/`, `snapshots/` (bản chuẩn, chỉ người nâng), `runs/<runId>/` chỉ-thêm với
+`runId = <yyyymmdd-HHMMss>-<commit7>`, `latest.json` (một file, không phải symlink) và `history.md`.
+Validator kiểm: dạng runId khớp commit, alias mỗi case có tài khoản, môi trường của golden khớp môi
+trường của lượt chạy, luồng phác thì golden phải là ứng viên, con trỏ và lịch sử đúng chỗ, và quét mật
+khẩu trên **toàn bộ** thư mục luồng chứ không chỉ bốn file nhánh publish.
+
+**Repo chủ theo dõi `.worktrees/uat/`.** Không phải một repo riêng. Trò phát hiện `.gitignore` của
+`.claude` có dòng `runtime/` không neo, và nó đã nuốt luôn `readiness/initialization/runtime/` — đúng
+cái bẫy thầy nói: một dòng ignore biến hồ sơ thành file cục bộ không ai đọc. Đã neo về gốc, và
+validator của `uat.verify` nay từ chối một thư mục luồng bị ignore, nêu đích danh dòng ấy.
+
+**Một nới quyền, trò báo chứ không tự quyết.** `platform.operate` chạy profile `luna`, mà `luna` và
+`sonnet` đều `permits.browsercontrol: false`. Cấp tài khoản qua form đăng ký của sản phẩm cần một
+trình duyệt, nên trò bật `permits` cho hai profile ấy (`capabilities` vốn đã true). Grant vẫn theo
+`operator.json`, nên không operator nào khác rộng thêm — nhưng đây là chính sách profile, thầy xem lại
+giúp trò.
+
+**Môi trường là một trường, và bộ từ vựng là thư mục.** `uat.verify`, `frontend.surface.audit` và
+`platform.operate` nhận `env` (mặc định `dev`). Nó chọn `accounts.<env>.json`, bí mật niêm phong
+`.stacks/<env>/secrets/*.enc`, entry runtime của môi trường ấy, đích của seed và `snapshots/` đã duyệt.
+Tên hợp lệ đọc từ `.stacks/`, không liệt kê cứng ở đâu cả — một bản cài đặt cạnh bộ stack khác phải
+chấp nhận bộ ấy — và một `env` không ứng với thư mục nào bị từ chối ngay ở cổng, nêu đích danh
+`.stacks/<env>` còn thiếu. Luật này có đúng một nhà: `missingStack()` trong `validate-request.mjs`,
+ba validator gọi nó.
+
+**Ví dụ mới `staging-uat`.** bind ×2 (fe consume) → direction → resolve → apply (`mode: dry`, nên luật
+dòng dài không với tới) → audit (`env: staging`) → quality → uat (`env: staging`, hỏi `requestedBy`,
+`feature`, `flow`), kết thúc ở `user`: hai biên nhận trong tay thầy mới là kết quả, còn đưa lên một môi
+trường vẫn là việc của `release`. Trò không preset `env` lên `workspace.bind` vì operator ấy không khai
+trường đó — route chọn theo project/role, không theo môi trường — và cổng workflow sẽ bác một preset
+cho trường không tồn tại; nếu thầy muốn bind cũng theo môi trường thì đó là một thay đổi riêng, thầy
+gật là trò làm.

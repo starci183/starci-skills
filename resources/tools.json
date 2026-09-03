@@ -234,10 +234,10 @@
       }
     },
     "secrets": {
-      "purpose": "Resolve a sealed credential by name at the moment it is used; never read, print or store its value.",
+      "purpose": "Resolve a sealed credential by name at the moment it is used; never read, print or store its value. The value may enter the request body of the call that consumes it or the field of a form in a driven browser, and nowhere else: not a file, not a fixture, not a recorded command, not a screenshot, not a log and not a receipt.",
       "modes": {
         "never": "no credential is resolved",
-        "resolve-by-name": "the name comes from device-state or a route; decryption happens in the tool that consumes it; a value never enters response/"
+        "resolve-by-name": "the name comes from device-state or a route; decryption happens in the tool that consumes it; the value reaches only a request body or a browser form, and never enters response/, a captured image, or any file the operator writes"
       },
       "support": {
         "openai": {

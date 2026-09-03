@@ -1,0 +1,80 @@
+{
+  "schemaVersion": 9,
+  "id": "staging-uat",
+  "when": {
+    "en": "A delivery that is already published must be verified on another stack before it is released: the same head is observed and walked there, and the chain ends with the two receipts in a person's hands rather than with a deployment.",
+    "vi": "Một bản giao đã publish phải được kiểm trên một stack khác trước khi release: cùng một head được quan sát và đi qua ở đó, và chuỗi kết thúc bằng hai biên nhận trong tay một con người chứ không bằng một lần deploy."
+  },
+  "chain": [
+    [
+      {
+        "operator": "workspace.bind",
+        "requirements": {
+          "role": "be"
+        }
+      },
+      {
+        "operator": "workspace.bind",
+        "requirements": {
+          "role": "fe",
+          "runtimeNeed": "consume"
+        }
+      }
+    ],
+    [
+      {
+        "operator": "frontend.direction.decide",
+        "requirements": {
+          "intent": "modify",
+          "changeLevel": "refine"
+        },
+        "asks": [
+          "target"
+        ]
+      }
+    ],
+    [
+      {
+        "operator": "frontend.presentation.resolve"
+      }
+    ],
+    [
+      {
+        "operator": "frontend.source.apply",
+        "requirements": {
+          "mode": "dry"
+        }
+      }
+    ],
+    [
+      {
+        "operator": "frontend.surface.audit",
+        "requirements": {
+          "env": "staging"
+        },
+        "fanout": "matrix",
+        "maxParallel": 3
+      }
+    ],
+    [
+      {
+        "operator": "quality.verify"
+      }
+    ],
+    [
+      {
+        "operator": "uat.verify",
+        "requirements": {
+          "env": "staging"
+        },
+        "asks": [
+          "requestedBy",
+          "feature",
+          "flow"
+        ]
+      }
+    ]
+  ],
+  "ends": "user",
+  "loops": []
+}

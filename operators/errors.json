@@ -190,6 +190,38 @@
         "en": "Move to a permitted branch or change the routed policy.",
         "vi": "Chuyển sang nhánh được phép hoặc đổi chính sách của route."
       }
+    },
+    "PROVISIONING_UNAVAILABLE": {
+      "scope": [
+        "platform.operate",
+        "uat.verify"
+      ],
+      "domain": "control-panel",
+      "disposition": "terminate",
+      "meaning": {
+        "en": "The identity provider, the sealed credential or the store a UAT identity needs cannot be reached, so the account can be neither created nor used. A record that is merely absent is created; this code is for a dependency that is not there at all.",
+        "vi": "Không tới được nhà cung cấp danh tính, bí mật niêm phong hay kho dữ liệu mà một danh tính UAT cần, nên tài khoản không tạo được mà cũng không dùng được. Hồ sơ chỉ đơn giản là chưa có thì được tạo ra; mã này dành cho một phụ thuộc hoàn toàn không tồn tại."
+      },
+      "resume": {
+        "en": "Restore the provider, the sealed file or the store; never ask a person to sign in or to paste a credential.",
+        "vi": "Khôi phục provider, file niêm phong hay kho dữ liệu; không bao giờ nhờ người đăng nhập hay dán thông tin đăng nhập."
+      }
+    },
+    "IDENTITY_MISSING": {
+      "scope": [
+        "frontend.surface.audit",
+        "uat.verify"
+      ],
+      "domain": "platform",
+      "disposition": "terminate",
+      "meaning": {
+        "en": "The route requires an identity to reach the surface and no account record exists for this flow yet. It is a hand-off and not a verdict: the operator that owns identity provisions the account, and this branch is re-entered with it.",
+        "vi": "Route đòi một danh tính mới tới được bề mặt, mà luồng này chưa có hồ sơ tài khoản nào. Đây là một lần bàn giao, không phải một phán quyết: operator sở hữu danh tính sẽ cấp tài khoản, rồi nhánh này được vào lại cùng nó."
+      },
+      "resume": {
+        "en": "The identity operator provisions the flow's account against the registry entry, and this branch runs again with it.",
+        "vi": "Operator danh tính cấp tài khoản của luồng theo entry trong registry, rồi nhánh này chạy lại cùng tài khoản đó."
+      }
     }
   }
 }

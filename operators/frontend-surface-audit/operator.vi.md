@@ -12,6 +12,24 @@ Tách chúng ra đã sinh ra một kiểu hỏng quen thuộc: một bức chụ
 phán quyết bởi một bước không còn cách nào biết điều đó, dựa trên bằng chứng mà chính nó không thu.
 Một operator vừa chờ, vừa đo, vừa phán quyết dưới một biên nhận thì không đánh mất mối nối ấy.
 
+## Route có cổng canh thì đi vào, không phải tuyên bố runtime chết
+
+Một route trả về màn hình đăng nhập là đang phục vụ rất tốt; thứ còn thiếu là một danh tính, và danh
+tính là thứ runtime có. Vì thế sự sẵn sàng bao gồm cả việc đăng nhập bằng tài khoản riêng của luồng khi
+route đòi hỏi: thông tin đăng nhập được giải theo tên, được gõ vào form chứ không vào đâu khác, và việc
+chụp chỉ bắt đầu khi cú chuyển hướng đã tới nơi, nên không khung hình nào operator này công bố có thể
+chứa nó. Báo một route có cổng canh thành một runtime không sẵn sàng là một âm tính giả đẩy người ta đi
+khởi động lại một dịch vụ chưa bao giờ chết. Mã dừng thật lòng duy nhất ở đây là luồng này chưa có tài
+khoản nào, tức `IDENTITY_MISSING`: một lần bàn giao cho operator cấp tài khoản, không bao giờ là một
+phán quyết về bề mặt, và không bao giờ là lời nhờ một người đi tạo tài khoản.
+
+## Sự sẵn sàng đọc entry của đúng route này
+
+Sổ đăng ký runtime giữ một entry cho mỗi route, và lượt audit này đọc entry của route nó được bind vào.
+Một sổ được tra như một khối duy nhất sẽ trả lời thay cho bất kỳ route nào tình cờ được ghi trong đó, và
+đó chính là cách một lượt audit đi tới chỗ báo rằng chẳng có gì đang phục vụ trong khi bề mặt nó cần
+đang hiện trên màn hình.
+
 ## Bề mặt phải là bề mặt đã commit
 
 Biên nhận áp dụng gọi tên commit nó đã ghi, head được ghim bằng đúng commit đó, và preview phục vụ
@@ -66,6 +84,7 @@ làm bằng chứng rằng node đã pass.
 | `frontend-source-application` | `frontend.source.apply`, commit đang được quan sát và các lời khai nó đã ghi | có |
 | `frontend-presentation-resolution` | `frontend.presentation.resolve`, chủ sở hữu của từng node | có |
 | `frontend-direction-decision` | `frontend.direction.decide`, route và coverage mà ma trận suy ra từ đó | có |
+| `uat-account` | `platform.operate`, tài khoản dùng để đi vào route có cổng canh; vắng ở lượt đầu, và đó chính là thứ `IDENTITY_MISSING` bàn giao | không |
 
 ## Yêu cầu
 
@@ -73,6 +92,8 @@ làm bằng chứng rằng node đã pass.
 | --- | --- | --- | --- |
 | `matrix` | list | every coverage entry | Các mục ma trận cần chụp; người dùng chỉ được thu hẹp thứ coverage đã suy ra |
 | `readinessProbe` | choice | route-served | Mức sàn của sẵn sàng; một state cần dữ liệu tự nâng lên `route-and-data-served` |
+| `account` | id | null | Hồ sơ tài khoản dùng để đăng nhập khi route đòi một danh tính; giá trị là tham chiếu tới một hồ sơ toàn tên, không bao giờ là thông tin đăng nhập |
+| `env` | id | dev | Stack mà lượt soi này đọc entry và tài khoản của nó; một bề mặt quan sát ở stack này không nói gì về stack khác |
 | `resume` | token | null | Token của nhánh bị chặn khi vào lại sau một mã dừng |
 
 ## Các bước
@@ -82,7 +103,7 @@ làm bằng chứng rằng node đã pass.
 | 1 | Kiểm gate, chạy lại, và xác nhận head cùng route đang phục vụ | `resume` | `request/request.json`, đầu vào `frontend-source-application` (commit của nó phải bằng head đã ghim), @workspaces/fe ở head đóng băng, @worktrees/sessions/central-runtime (preview phục vụ worktree phiên ở commit ấy), @tools/git | — | `INVALID_INPUT`, `SOURCE_DRIFT`, `NO_PROGRESS` |
 | 2 | Bind thẩm quyền | — | @knowledge/ui/proof (mọi topic kèm fingerprint và kho luật), đầu vào `frontend-source-application` (các lời khai), đầu vào `frontend-presentation-resolution` (chủ sở hữu của từng node), @worktrees/sessions/central-runtime | — | — |
 | 3 | Chọn các mục ma trận và đọc lớp bề mặt đã khai | `matrix` | đầu vào `frontend-direction-decision` (chính `response/data/coverage.json` của nó: state nhân viewport nhân bảng màu, và `surfaceClass` mà quyết định ấy đã khai) | — | `SURFACE_CLASS_MISSING` |
-| 4 | Chờ từng mục tới lúc sẵn sàng | `readinessProbe` | @worktrees/sessions/central-runtime, @tools/http | — | `RUNTIME_UNAVAILABLE` |
+| 4 | Chờ từng mục tới lúc sẵn sàng, đăng nhập bằng tài khoản của luồng khi route đòi một danh tính | `readinessProbe`, `account`, `env` | @worktrees/sessions/central-runtime để lấy entry của đúng route này, đầu vào `uat-account` cho hồ sơ toàn tên, @tools/http, @tools/secrets, @tools/browsercontrol | — | `RUNTIME_UNAVAILABLE`, `IDENTITY_MISSING` |
 | 5 | Chụp và đo từng mục | — | @worktrees/sessions/central-runtime, @workspaces/fe (các owner được quan sát và identifier từng node mang), @tools/browsercontrol | `response/artifacts/<matrixId>.png`, `response/data/captures/<matrixId>.json` | `EVIDENCE_MISSING` |
 | 6 | Đối chiếu với lời khai và luật proof, phán quyết theo chủ sở hữu, để từng topic tự đóng, rồi phát | — | @knowledge/ui/proof, @knowledge/grammars/starci, các bức chụp, @tools/websearch | `response/data/verdicts.json`, `response/response.md`, `response/response.json`, `response/artifacts/host.json`, @tools/visualize, @tools/host | `UNKNOWN_RULE` |
 
@@ -133,6 +154,7 @@ chỗ khuyết lặng lẽ. Mọi node mang lời khai đều được đo; khô
 | `INVALID_INPUT` | terminate |
 | `SOURCE_DRIFT` | terminate |
 | `RUNTIME_UNAVAILABLE` | terminate |
+| `IDENTITY_MISSING` | terminate |
 | `EVIDENCE_MISSING` | terminate |
 | `UNKNOWN_RULE` | terminate |
 | `SURFACE_CLASS_MISSING` | terminate |
@@ -146,3 +168,4 @@ chỗ khuyết lặng lẽ. Mọi node mang lời khai đều được đo; khô
 | một verdict topic là fix-first, hoặc hướng không khai lớp bề mặt nào, nên bố cục được quyết lại trước khi có giá trị nào được quyết | `frontend.direction.decide` |
 | mọi topic đều ship hoặc đạt, và các cổng của chính checkout phải chạy | `quality.verify` |
 | một lời khai hỏng trên phần render của chính component Grammar, nên một người ghi gap của họ rồi publish | `frontend.surface.audit` |
+| route đòi một danh tính mà luồng này chưa có tài khoản, nên tài khoản được cấp trước khi bề mặt được quan sát | `platform.operate` |

@@ -7,6 +7,7 @@
     "commit",
     "resultRef",
     "latestRef",
+    "historyRef",
     "lanes",
     "experience",
     "cleanup"
@@ -25,8 +26,14 @@
       "pattern": "^\\.worktrees/uat/[a-z0-9][a-z0-9-]*/[a-z0-9][a-z0-9-]*/runs/[A-Za-z0-9._-]+/result\\.json$"
     },
     "latestRef": {
+      "description": "The pointer file that names the newest run. It is a file holding a run id, never a symlink: a symlink does not survive every checkout the tree is cloned into.",
       "type": "string",
-      "pattern": "^\\.worktrees/uat/[a-z0-9][a-z0-9-]*/[a-z0-9][a-z0-9-]*/latest$"
+      "pattern": "^\\.worktrees/uat/[a-z0-9][a-z0-9-]*/[a-z0-9][a-z0-9-]*/latest\\.json$"
+    },
+    "historyRef": {
+      "description": "The one-line-per-run history of this flow, appended to and never rewritten.",
+      "type": "string",
+      "pattern": "^\\.worktrees/uat/[a-z0-9][a-z0-9-]*/[a-z0-9][a-z0-9-]*/history\\.md$"
     },
     "lanes": {
       "description": "Three independent lanes, judged apart on their own evidence. There is no fourth lane and no lane may be omitted.",

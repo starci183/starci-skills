@@ -1,0 +1,114 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://starci.dev/v9/readiness/initialization/runtime/owner.schema.json",
+  "title": "Shared runtime owner registry",
+  "description": "The registry the runtime owner publishes at the central-runtime alias. It is keyed per project route, because one machine runs the routes of several products at once: a registry with one endpoint block can attest exactly one of them, and every other bind reads it as not ready while the service it needs is listening. `runtimes` is that key space: one entry per `<project>/<role>`, each attesting its own endpoints, head, generation, status, health evidence and identity provider. The single-block form below it is the previous shape and is read for one release as the entry of the route `legacyRouteKey` names; a registry that carries both must agree, and the next major release drops it.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "ownerTaskId", "generation", "updatedAt", "runtimes"],
+  "properties": {
+    "$schema": { "type": "string", "minLength": 1 },
+    "schemaVersion": { "const": 9 },
+    "ownerTaskId": {
+      "type": "string",
+      "minLength": 1,
+      "description": "The one delegated owner task that holds the lifecycle of every entry here. A consumer binds an entry; it never starts, stops or replaces what the entry describes."
+    },
+    "generation": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "The registry's own generation, raised whenever an entry is added, attested again, or removed."
+    },
+    "updatedAt": { "type": "string", "format": "date-time" },
+    "runtimes": {
+      "type": "object",
+      "description": "One entry per bound project route. The key is `<project>/<role>` with both segments lower-case and hyphenated; a binder reads the entry for its own project and role and no other, so a route whose entry is absent is not ready even when a sibling route is serving.",
+      "propertyNames": { "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*/[a-z0-9]+(?:-[a-z0-9]+)*$" },
+      "additionalProperties": { "$ref": "#/$defs/entry" }
+    },
+    "legacyRouteKey": {
+      "description": "Which route the single-block form below attests. Required whenever that form is present, and meaningless without it.",
+      "oneOf": [
+        { "type": "string", "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*/[a-z0-9]+(?:-[a-z0-9]+)*$" },
+        { "type": "null" }
+      ]
+    },
+    "endpoints": { "$ref": "#/$defs/endpoints", "description": "Compatibility read only: the previous single-owner shape. Read as the endpoints of `legacyRouteKey`." },
+    "status": { "$ref": "#/$defs/status", "description": "Compatibility read only: the previous single-owner shape." },
+    "head": { "$ref": "#/$defs/head", "description": "Compatibility read only: the previous single-owner shape." }
+  },
+  "$defs": {
+    "head": { "type": "string", "pattern": "^[0-9a-f]{40}$" },
+    "status": { "enum": ["starting", "ready", "degraded", "stopped"] },
+    "endpoints": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["frontend", "api", "identity"],
+      "properties": {
+        "frontend": { "type": "string", "minLength": 1 },
+        "api": { "type": "string", "minLength": 1 },
+        "identity": { "type": "string", "minLength": 1 }
+      }
+    },
+    "entry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["endpoints", "head", "generation", "status", "healthEvidenceRefs", "identity"],
+      "properties": {
+        "endpoints": { "$ref": "#/$defs/endpoints" },
+        "head": {
+          "$ref": "#/$defs/head",
+          "description": "The commit the running process was started from, as the attestation observed it. A binder that pins another head reads this as drift rather than as the head to use."
+        },
+        "generation": { "type": "integer", "minimum": 1 },
+        "status": { "$ref": "#/$defs/status" },
+        "healthEvidenceRefs": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 32,
+          "items": { "type": "string", "minLength": 1 },
+          "description": "What was observed to justify the status: the probe records the attestation wrote. A status with no evidence behind it is an assertion, and a binder may not consume one."
+        },
+        "identity": {
+          "description": "Where an account for this route is created, and the name of the sealed credential its password is set from. Null means this route declares no identity provider, which is why a request to provision one against it is refused at the gate rather than guessed at.",
+          "oneOf": [
+            { "$ref": "#/$defs/identity" },
+            { "type": "null" }
+          ]
+        }
+      }
+    },
+    "identity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["provider", "adminEndpoint", "realm", "tenant", "credentialName"],
+      "properties": {
+        "provider": {
+          "type": "string",
+          "minLength": 1,
+          "description": "The identity provider this route authenticates against, named the way the product names it. The registry says which one; nothing here knows what any particular provider is."
+        },
+        "adminEndpoint": {
+          "description": "The provider's administrative API, when it publishes one. Null means accounts are created only through the product's own sign-up surface, and the provisioning step drives that instead.",
+          "oneOf": [{ "type": "string", "minLength": 1 }, { "type": "null" }]
+        },
+        "realm": {
+          "description": "The provider's isolated user directory, under whichever of the two words that provider uses. Exactly one of realm and tenant carries a value.",
+          "oneOf": [{ "type": "string", "minLength": 1 }, { "type": "null" }]
+        },
+        "tenant": {
+          "oneOf": [{ "type": "string", "minLength": 1 }, { "type": "null" }]
+        },
+        "credentialName": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9-]*$",
+          "description": "The name of the sealed administrative credential, resolved at the moment of the call. A name, never a value: this file is committed."
+        }
+      },
+      "oneOf": [
+        { "required": ["realm"], "properties": { "realm": { "type": "string" }, "tenant": { "type": "null" } } },
+        { "required": ["tenant"], "properties": { "tenant": { "type": "string" }, "realm": { "type": "null" } } }
+      ]
+    }
+  }
+}

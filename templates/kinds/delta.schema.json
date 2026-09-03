@@ -57,7 +57,7 @@
         "additionalProperties": false,
         "required": ["capability", "custodyEvidenceRef"],
         "properties": {
-          "capability": { "enum": ["metrics:remote-write", "sonar:project-admin", "tunnel:write", "dns:write"] },
+          "capability": { "enum": ["metrics:remote-write", "sonar:project-admin", "tunnel:write", "dns:write", "runtime:registry-write", "identity:account-admin"] },
           "custodyEvidenceRef": { "type": "string", "minLength": 1 }
         }
       }
@@ -79,8 +79,8 @@
     }
   },
   "$defs": {
-    "serviceKind": { "enum": ["observability", "sonar", "tunnel"] },
-    "effect": { "enum": ["update-config", "restart-service", "upsert-dashboard", "update-remote-write", "create-project", "assign-profile", "assign-gate", "enforce-setting", "create-tunnel", "update-tunnel-route", "upsert-proxied-dns"] },
+    "serviceKind": { "enum": ["observability", "sonar", "tunnel", "runtime", "identity"] },
+    "effect": { "enum": ["update-config", "restart-service", "upsert-dashboard", "update-remote-write", "create-project", "assign-profile", "assign-gate", "enforce-setting", "create-tunnel", "update-tunnel-route", "upsert-proxied-dns", "register-runtime-entry", "attest-runtime-entry", "provision-identity", "seed-flow-fixtures"] },
     "portHolder": {
       "type": "object",
       "additionalProperties": false,

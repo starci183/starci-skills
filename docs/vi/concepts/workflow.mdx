@@ -11,7 +11,7 @@ description: "Các bậc gồm nhánh song song, vòng lặp và preset; cửa v
 > **nhánh** chạy song song (tối đa ba), kèm **vòng lặp** quay về một bậc trước và **preset** cho Yêu
 > cầu của từng nhánh.
 
-Tám file trong `workflows/` là tham chiếu, không phải toàn bộ số chuỗi có thể có: chúng là những hình
+Chín file trong `workflows/` là tham chiếu, không phải toàn bộ số chuỗi có thể có: chúng là những hình
 dạng lặp lại đủ nhiều để đáng ghi xuống.
 
 ## Cửa vào dùng chúng ra sao
@@ -54,6 +54,13 @@ khai chúng dưới `asks`. `backend-feature` là chuỗi giao hàng duy nhất 
 `when` của nó nói rõ vì sao: nó không ghi bề mặt nào, còn `uat.verify` cần đầu vào
 `frontend-surface-audit` và một route fe đã bind.
 
+Một chuỗi cũng có thể chứng minh một bản giao ở nơi khác nơi nó được viết. `staging-uat` không ghi gì —
+`frontend.source.apply` của nó chạy dưới `mode: dry`, nên luật dòng dài không với tới — và nó preset `env`
+cho lượt audit cùng lượt chạy. Trường ấy chọn ra một stack của bản cài: entry trong sổ đăng ký runtime,
+file tài khoản, đích của seed và bản tham chiếu đã duyệt. Một môi trường không ứng với stack nào dưới
+`.stacks/` bị từ chối ngay ở cổng chứ không được mặc định hoá, và chuỗi kết thúc ở `user`, vì hai biên
+nhận trong tay một con người mới là kết quả; đưa lên một môi trường vẫn là việc của `release`.
+
 ## Hình dạng file
 
 `schemaVersion` là 9. `id` bằng tên file. `when` có `en` và `vi`. `chain` là mảng các bậc, mỗi bậc là
@@ -69,5 +76,5 @@ kỳ file nào ngoài thư mục phiên bị đọc để sửa hay bị ghi. M�
 không có biên nhận source-application lẫn ảnh chụp audit (`SESSION_MISSING`). Một nhánh bị chặn vào
 lại như một bậc mới, và một vòng lặp tính vào `maxRounds` của chính operator đó.
 
-Tám ví dụ, với chuỗi được dựng ra theo từng bậc, nằm ở
+Chín ví dụ, với chuỗi được dựng ra theo từng bậc, nằm ở
 [Tham chiếu → Workflow](/vi/reference/workflows).

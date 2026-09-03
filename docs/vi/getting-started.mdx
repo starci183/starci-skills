@@ -121,23 +121,40 @@ dưới `mode: apply`: `frontend-refine`, `frontend-reconstruct`, `frontend-new-
 `frontend-with-uat` và `full-feature`. `backend-feature` không ghi bề mặt nào và `when` của nó nói rõ
 điều đó; `release` và `content-unit` cũng không publish bề mặt nào.
 
-Trong một chuỗi như vậy nó vẫn chỉ chạy khi tất cả những thứ sau đã có:
+Trong một chuỗi như vậy, đúng hai thứ phải tới từ bên ngoài:
 
 - một người đã yêu cầu, đích danh — `requestedBy`, `feature` và `flow` không có mặc định và workflow
   khai chúng dưới `asks`, nên nhánh thà từ chối chứ không bịa ra người yêu cầu;
-- thư mục flow: `uat/<flow>/flow.md` với các case và assertion có tên của chúng,
-  `uat/<flow>/account.json` với username, role và *tên* credential, và `uat/<flow>/seed/` với các bản
-  ghi mà lượt chạy đặt namespace;
-- mật khẩu dùng chung đã niêm, tra theo tên trong sổ credential lúc đăng nhập và không đọc ở đâu khác
-  — không field nào của operator này chứa được bí mật, và validator của nó bác mọi chuỗi có hình dạng
-  credential ở bất cứ đâu nó ghi;
 - cả hai giấy thông hành lấy tại commit đã ghim — `frontend-surface-audit` và `quality-verification` —
   cộng biên nhận `route` mà lượt chạy lái vào endpoint của nó.
 
-Thiếu thứ gì cũng là một lần dừng chứ không phải một sự im lặng: không người yêu cầu hay thiếu giấy
-thông hành là `INVALID_INPUT` ngay ở cổng request, không có credential đã niêm là
-`PROVISIONING_UNAVAILABLE`, và không có gì phục vụ sản phẩm là `RUNTIME_UNAVAILABLE`. Một nhiệm vụ
-không tới được UAT phải nói ra được nó vướng cái nào.
+Mọi thứ còn lại lượt chạy tự làm ra. **Hồ sơ thiếu thì tạo ra, không phải báo lỗi.** Một luồng chưa ai
+chạy thì chưa có thư mục, chưa có tài liệu luồng, chưa có seed, chưa có tài khoản và chưa có bản tham
+chiếu đã duyệt, và không thứ nào trong đó chặn được cái gì:
+
+- tài liệu luồng và seed được phác từ khuôn đi kèm cây rồi nêu trong biên nhận là bản nháp, vì một
+  luồng đã phác là thành thật còn một luồng vắng mặt mới là một lần dừng;
+- tài khoản do `platform.operate` cấp theo danh tính mà sổ đăng ký runtime khai cho route đã bind, mật
+  khẩu đặt từ thông tin đăng nhập niêm phong dùng chung giải theo tên. Một luồng gọi các vai của nó
+  bằng alias và mỗi alias có tài khoản riêng, theo từng môi trường, trong `accounts.<env>.json`.
+  `IDENTITY_MISSING` là lần bàn giao xin điều đó, không phải một phán quyết;
+- lượt chạy đầu tiên để lại một bản ứng viên dưới `snapshots/`, và chỉ một con người mới nâng nó lên.
+
+Thông tin đăng nhập là một cái tên ở mọi nơi nó được ghi xuống. Giá trị của nó tới được body của lời
+gọi quản trị tới provider, hoặc ô của một form đăng ký hay đăng nhập trong trình duyệt đang được điều
+khiển, và không đâu khác — không file, không fixture, không lệnh được ghi lại, không ảnh chụp, không
+biên nhận. Việc chụp chỉ bắt đầu sau khi cú chuyển hướng đăng nhập đã tới nơi, và các validator quét cả
+thư mục luồng chứ không tin vào lời hứa.
+
+Hai mã dừng trên lối này là thành thật, và chỉ có hai: một provider, file niêm phong hay kho dữ liệu
+hoàn toàn không tới được là `PROVISIONING_UNAVAILABLE`, và một entry không khai danh tính nào là
+`INVALID_INPUT` nêu tên trường còn thiếu. Một route trả về màn hình đăng nhập không phải
+`RUNTIME_UNAVAILABLE`: nó đang phục vụ, thứ còn thiếu là một danh tính.
+
+Thư mục luồng có đúng một hình dạng — `flow.md`, `accounts.<env>.json`, `seed/`, `snapshots/`,
+`runs/<runId>/` với `runId` là `<yyyymmdd-HHMMss>-<commit7>`, `latest.json` và `history.md` — và
+`templates/uat/README.md` là hợp đồng của nó. Repo chủ theo dõi thư mục ấy, nên bằng chứng của một lượt
+chạy đi cùng sản phẩm; chỉ thư mục phiên bên cạnh mới bị bỏ qua.
 
 ## 11. Kết thúc phiên
 

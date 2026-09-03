@@ -34,6 +34,24 @@ Splitting them produced a familiar failure: a capture taken before the surface w
 step that could no longer tell, against evidence it had not itself collected. One operator that
 waits, measures and judges under one receipt cannot lose that connection.
 
+## A guarded route is reached, not declared unavailable
+
+A route that answers with a sign-in screen is serving perfectly well; what is missing is an identity,
+and an identity is something the runtime has. Readiness therefore includes signing in as the flow's
+own account when the route requires one: the credential is resolved by name, it is typed into the form
+and nowhere else, and capture begins only once the redirect has landed, so no frame this operator
+publishes can hold it. Reporting a guarded route as an unavailable runtime is a false negative that
+sends a person to restart a service that was never down. The one honest stop here is that no account
+exists for this flow yet, which is `IDENTITY_MISSING`: a hand-off to the operator that provisions one,
+never a verdict about the surface, and never a request that a person go and make an account.
+
+## Readiness reads the entry of this route
+
+The runtime registry holds one entry per project route, and this audit reads the entry of the route it
+was bound to. A registry consulted as a single block answers for whichever route happens to be
+recorded in it, which is how an audit comes to report that nothing is serving while the surface it
+needs is on screen.
+
 ## The surface must be the committed surface
 
 The applied receipt names the commit it wrote, the pinned head equals that commit, and the preview
@@ -88,6 +106,7 @@ a node passes.
 | `frontend-source-application` | `frontend.source.apply`, the commit under observation and the claims it wrote | yes |
 | `frontend-presentation-resolution` | `frontend.presentation.resolve`, the owner of every node | yes |
 | `frontend-direction-decision` | `frontend.direction.decide`, the route and the coverage the matrix is derived from | yes |
+| `uat-account` | `platform.operate`, the account the guarded route is reached as; absent on the first pass, which is what `IDENTITY_MISSING` hands over | no |
 
 ## Requirements
 
@@ -95,6 +114,8 @@ a node passes.
 | --- | --- | --- | --- |
 | `matrix` | list | every coverage entry | The matrix entries to capture; the person may only narrow what the coverage implies |
 | `readinessProbe` | choice | route-served | The floor for readiness; a state that needs data rises to `route-and-data-served` on its own |
+| `account` | id | null | The account record the route is signed in as when it requires an identity; the value is a reference to a record of names, never a credential |
+| `env` | id | dev | The stack whose registry entry and accounts this audit reads; a surface observed in one stack says nothing about another |
 | `resume` | token | null | The blocked branch's token when re-entering after a stop |
 
 ## Steps
@@ -104,7 +125,7 @@ a node passes.
 | 1 | Validate the gate and resume, and confirm the head and the served route | `resume` | `request/request.json`, input `frontend-source-application` (its commit must equal the pinned head), @workspaces/fe at the frozen head, @worktrees/sessions/central-runtime (the preview serving the session worktree at that commit), @tools/git | — | `INVALID_INPUT`, `SOURCE_DRIFT`, `NO_PROGRESS` |
 | 2 | Bind the authority | — | @knowledge/ui/proof (every topic with its fingerprint and inventory), input `frontend-source-application` (the claims), input `frontend-presentation-resolution` (the owner of every node), @worktrees/sessions/central-runtime | — | — |
 | 3 | Select the matrix entries and read the declared surface class | `matrix` | input `frontend-direction-decision` (its `response/data/coverage.json`: state by viewport by colour scheme, and the `surfaceClass` that decision declared) | — | `SURFACE_CLASS_MISSING` |
-| 4 | Reach readiness for each entry | `readinessProbe` | @worktrees/sessions/central-runtime, @tools/http | — | `RUNTIME_UNAVAILABLE` |
+| 4 | Reach readiness for each entry, signing in as the flow's account when the route requires an identity | `readinessProbe`, `account`, `env` | @worktrees/sessions/central-runtime for the entry of this project route, input `uat-account` for the account of names, @tools/http, @tools/secrets, @tools/browsercontrol | — | `RUNTIME_UNAVAILABLE`, `IDENTITY_MISSING` |
 | 5 | Capture and measure each entry | — | @worktrees/sessions/central-runtime, @workspaces/fe (the observed owners and the identifiers each node carries), @tools/browsercontrol | `response/artifacts/<matrixId>.png`, `response/data/captures/<matrixId>.json` | `EVIDENCE_MISSING` |
 | 6 | Compare against the claims and the proof rules, judge by owner, let each topic close itself, and emit | — | @knowledge/ui/proof, @knowledge/grammars/starci, the captures, @tools/websearch | `response/data/verdicts.json`, `response/response.md`, `response/response.json`, `response/artifacts/host.json`, @tools/visualize, @tools/host | `UNKNOWN_RULE` |
 
@@ -155,6 +176,7 @@ for a node that was not.
 | `INVALID_INPUT` | terminate |
 | `SOURCE_DRIFT` | terminate |
 | `RUNTIME_UNAVAILABLE` | terminate |
+| `IDENTITY_MISSING` | terminate |
 | `EVIDENCE_MISSING` | terminate |
 | `UNKNOWN_RULE` | terminate |
 | `SURFACE_CLASS_MISSING` | terminate |
@@ -168,6 +190,7 @@ for a node that was not.
 | a topic verdict is fix-first, or the direction declared no surface class, so the composition is decided again before any value is | `frontend.direction.decide` |
 | every topic ships or passes and the checkout's own gates must run | `quality.verify` |
 | a claim fails on a Grammar component's own render, so a person records the family gap and publishes | `frontend.surface.audit` |
+| the route requires an identity and this flow has no account yet, so one is provisioned before the surface is observed | `platform.operate` |
 
 ---
 

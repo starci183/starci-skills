@@ -1,4 +1,4 @@
-# StarCi Skills 1.5.4
+# StarCi Skills 1.6.0
 
 This tree is the runtime. Read [SKILL.md](SKILL.md) next; it is the single entry that freezes a
 mission's scope, selects the one operator that owns the outcome, and routes between operators on
@@ -66,6 +66,8 @@ head or the head is not publishable.
 - Rule IDs are stable public addresses. Append; never renumber, reuse, or silently change meaning.
 
 ## Lineage
+
+1.6.0 (2026-09-03): a missing UAT record is created, not reported — platform.operate provisions the account at the registry's identity provider with the sealed shared password and seeds the data; the runtime registry is keyed <project>/<role> (owner.schema.json) and carries identity; the audit signs in as the flow's account and IDENTITY_MISSING hands to provisioning; the UAT flow folder (flow.md, accounts.<env>.json, seed, golden snapshots, append-only runs, latest.json, history.md) is a contract; env on uat, audit and platform; the staging-uat example workflow.
 
 1.5.4 (2026-09-03): the host probes a port by connecting before binding (Windows lets two servers bind one loopback port); 1.5.3 shipped with that spec red.
 

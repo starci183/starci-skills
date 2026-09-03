@@ -1,6 +1,6 @@
 {
   "kind": "platform-operation-receipt",
-  "title": "^# platform-operation-receipt — (observability|sonar|tunnel) [A-Za-z0-9._/-]+$",
+  "title": "^# platform-operation-receipt — (observability|sonar|tunnel|runtime|identity) [A-Za-z0-9._/-]+$",
   "sections": [
     {
       "heading": "^## Binding$",
@@ -36,7 +36,7 @@
       "table": "| Resource | Kind | Revision | Owner |",
       "minRows": 1,
       "cell": {
-        "Kind": "^(observability|sonar|tunnel)$",
+        "Kind": "^(observability|sonar|tunnel|runtime|identity)$",
         "Revision": "\\S"
       }
     },
@@ -51,7 +51,7 @@
       "heading": "^## Mutations$",
       "table": "| Effect | Resource | Before | After |",
       "cell": {
-        "Effect": "^`(update-config|restart-service|upsert-dashboard|update-remote-write|create-project|assign-profile|assign-gate|enforce-setting|create-tunnel|update-tunnel-route|upsert-proxied-dns)`$"
+        "Effect": "^`(update-config|restart-service|upsert-dashboard|update-remote-write|create-project|assign-profile|assign-gate|enforce-setting|create-tunnel|update-tunnel-route|upsert-proxied-dns|register-runtime-entry|attest-runtime-entry|provision-identity|seed-flow-fixtures)`$"
       }
     },
     {
@@ -68,7 +68,7 @@
       "table": "| Code | Resource | Port | Holder | Statement |",
       "minRows": 1,
       "cell": {
-        "Code": "^`(SHARED_SERVICE_INVENTORIED|PORT_COORDINATION_REQUIRED|ALREADY_CONVERGED|PARTIAL_MUTATION|PRODUCT_DEPLOYMENT_DECLINED)`$",
+        "Code": "^`(SHARED_SERVICE_INVENTORIED|PORT_COORDINATION_REQUIRED|ALREADY_CONVERGED|PARTIAL_MUTATION|PRODUCT_DEPLOYMENT_DECLINED|RUNTIME_ENTRY_ATTESTED|IDENTITY_PROVISIONED)`$",
         "Statement": "\\S"
       }
     }

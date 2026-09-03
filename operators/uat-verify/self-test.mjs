@@ -13,8 +13,11 @@ import { validateUatStep } from './validate.mjs';
 
 const FEATURE = 'enrollment';
 const FLOW = 'paid-enrollment';
-const RUN = 'run-2026-01-10-1';
+const RUN = '20260110-000000-1111111';
 const NS = `uat-${RUN}`;
+const ENV = 'dev';
+const BT = String.fromCharCode(96);
+const ENTRY = 'demo-product/fe';
 const COMMIT = '1'.repeat(40);
 const OTHER_COMMIT = '2'.repeat(40);
 const FP = (c) => `sha256:${String(c).repeat(64)}`;
@@ -29,21 +32,24 @@ const ROUTE_IN = 'step-1/parallel-2/response/data/route.json';
 // The placeholder this operator's law forbids anywhere it writes.
 const LEAK = 'UAT-SHARED-PASSWORD';
 
-const frozenCase = (caseId, i, over = {}) => ({ caseId, order: i + 1, assertions: [...ASSERTIONS[caseId]], ...over });
+const frozenCase = (caseId, i, over = {}) => ({ caseId, order: i + 1, as: 'learner', assertions: [...ASSERTIONS[caseId]], ...over });
+const account = (alias = 'learner', over = {}) => ({
+  alias, username: `uat-${FLOW}-${alias}`, role: alias, credentialName: 'uat-shared', credentialRef: `.stacks/${ENV}/secrets/uat.enc`,
+  custody: 'sealed-shared-master-identity', isUat: true, plaintextRecorded: false, identity: ENTRY, provisionedBy: RUN, ...over,
+});
 
 function snapshot(over = {}) {
   return {
-    runId: RUN, requestedBy: 'the product owner', feature: FEATURE, flow: FLOW, commit: COMMIT, frozenAt: T(10),
+    runId: RUN, requestedBy: 'the product owner', feature: FEATURE, flow: FLOW, env: ENV, commit: COMMIT, frozenAt: T(10),
     flowRoot: 'PATCHED-BY-WRITE-BRANCH', snapshotRef: SNAPSHOT_REF, snapshotFingerprint: FP(3),
     lease: { leaseRef: `uat-lease://s-test/${FLOW}`, exclusive: true, expiresAt: T(180) },
     admission: [
       { kind: 'frontend-surface-audit', ref: AUDIT_IN, commit: COMMIT },
       { kind: 'quality-verification', ref: QUALITY_IN, commit: COMMIT },
     ],
-    account: {
-      username: `uat-${FLOW}`, role: 'learner', credentialName: 'uat-shared', credentialRef: '.stacks/local/secrets/uat.enc',
-      custody: 'sealed-shared-master-identity', isUat: true, plaintextRecorded: false,
-    },
+    accounts: [account()],
+    flowSource: 'drafted-from-template',
+    golden: { state: 'candidate', ref: `${DIR}/snapshots/snapshot.json`, approvedBy: null, env: ENV },
     fixtureNamespace: NS,
     seed: { recordsRef: `${DIR}/seed/records.json`, expectedRef: `${DIR}/seed/expected.json`, fingerprint: FP(4), namespace: NS, isUat: true },
     cases: CASES.map((c, i) => frozenCase(c, i)),
@@ -53,7 +59,7 @@ function snapshot(over = {}) {
 
 const capture = (caseId, over = {}) => ({
   caseId, runId: RUN, order: CASES.indexOf(caseId) + 1, executedAt: T(20 + CASES.indexOf(caseId)),
-  screenshotRef: `response/artifacts/${caseId}.png`, loginFieldMasked: true, outcome: 'pass',
+  screenshotRef: `response/artifacts/${caseId}.png`, loginFieldMasked: true, captureStartedAfterRedirect: true, outcome: 'pass',
   assertions: ASSERTIONS[caseId].map((a) => ({ assertionId: a, lane: a === 'entry' ? 'ui' : 'behavior', observed: `the ${a} state was reached`, evidenceRef: `response/artifacts/${caseId}.png`, outcome: 'pass' })),
   ...over,
 });
@@ -95,7 +101,7 @@ const lanes = (over = {}) => ['behavior', 'ux', 'ui'].map((l) => lane(l, over[l]
 
 function verdicts(over = {}) {
   return {
-    runId: RUN, commit: COMMIT, resultRef: `${DIR}/runs/${RUN}/result.json`, latestRef: `${DIR}/latest`,
+    runId: RUN, commit: COMMIT, resultRef: `${DIR}/runs/${RUN}/result.json`, latestRef: `${DIR}/latest.json`, historyRef: `${DIR}/history.md`,
     lanes: lanes(), experience: experience(), cleanup: { performed: true, isUat: true, namespace: NS, runRecordsDeleted: false },
     ...over,
   };
@@ -124,7 +130,11 @@ ${snap.admission.map((a) => `| \`${a.kind}\` | \`${a.ref}\` | \`${a.commit}\` |`
 | Commit | \`${snap.commit}\` |
 | Snapshot | \`${snap.snapshotRef}\` |
 | Namespace | \`${snap.fixtureNamespace}\` |
-| Credential | \`${snap.account.credentialRef}\`, resolved by name at login only |
+| Accounts | ${snap.accounts.map((a) => BT + a.alias + BT).join(', ')} |
+| Environment | ${snap.env} |
+| Credential | \`${snap.accounts[0].credentialRef}\`, resolved by name at login only |
+| Flow source | ${snap.flowSource} |
+| Golden | ${snap.golden.state}, awaiting a person's approval |
 | Run record | \`${verd.resultRef}\` |
 | Latest | \`${snap.runId}\` |
 
@@ -165,12 +175,12 @@ ${verd.experience.entries.map((r) => `| \`${r.rule}\` | ${r.measured} | ${r.scor
 const requestJson = ({ extra = {}, inputs, cases = [...CASES] } = {}) => ({
   schemaVersion: 9, operatorId: 'uat.verify', step: 3, parallel: 1, sessionId: 's-test',
   contexts: [{ alias: '@workspaces/be', head: COMMIT }, { alias: '@worktrees/uat/enrollment/paid-enrollment', head: null }],
-  requirements: { requestedBy: 'the product owner', feature: FEATURE, flow: FLOW, cases, runId: RUN, lease: `uat-lease://s-test/${FLOW}`, resume: null, ...extra },
+  requirements: { requestedBy: 'the product owner', feature: FEATURE, flow: FLOW, env: ENV, cases, runId: RUN, lease: `uat-lease://s-test/${FLOW}`, resume: null, ...extra },
   inputs: inputs ?? { 'frontend-surface-audit': AUDIT_IN, 'quality-verification': QUALITY_IN, route: ROUTE_IN },
   resume: null,
 });
 
-function responseJson({ status = 'done', stop, next = ['git.publish'], captures = CASES.map((c) => `response/data/captures/${c}.json`), shots = CASES.map((c) => `response/artifacts/${c}.png`), drop } = {}) {
+function responseJson({ status = 'done', stop, next = ['git.publish', 'user'], captures = CASES.map((c) => `response/data/captures/${c}.json`), shots = CASES.map((c) => `response/artifacts/${c}.png`), drop } = {}) {
   const fields = {
     'uat-flow-verification': 'response/response.md',
     'uat-snapshot': 'response/data/snapshot.json',
@@ -218,7 +228,9 @@ function writeBranch(files, history = 'match') {
         : { runId: verd.runId, commit: verd.commit, lanes: verd.lanes };
       writeFileSync(path.join(runDir, 'result.json'), JSON.stringify(recorded, null, 2));
     }
-    writeFileSync(path.join(flowRoot, 'latest'), history === 'stale-latest' ? 'run-2026-01-09-1' : RUN);
+    writeFileSync(path.join(flowRoot, 'latest.json'), JSON.stringify({ runId: history === 'stale-latest' ? '20260109-000000-1111111' : RUN }, null, 2));
+    if (history === 'ignored') writeFileSync(path.join(flowRoot, '.gitignore'), '# local only\n.worktrees/uat/\n');
+    if (history !== 'no-history') writeFileSync(path.join(flowRoot, 'history.md'), `# history\n\n- ${RUN} - ${COMMIT} - pass - the product owner\n`);
   }
   return { branch, session };
 }
@@ -262,9 +274,10 @@ async function expectError(files, needle, label, history) {
 }
 
 await expectValid(baseline(), 'a run a person asked for, admitted at the pinned commit, three lanes passing');
-await expectValid(withVerdicts({ behavior: 'fail' }, { next: ['backend.source.apply'], outcomes: { 'pay-and-enrol': 'fail', 'abandon-checkout': 'pass' } }), 'a behaviour failure routed to the backend');
+await expectValid(withVerdicts({ behavior: 'fail' }, { next: ['backend.source.apply', 'user'], outcomes: { 'pay-and-enrol': 'fail', 'abandon-checkout': 'pass' } }), 'a behaviour failure routed to the backend');
 await expectValid(withVerdicts({ ux: 'fail' }, { next: ['user'], outcomes: { 'pay-and-enrol': 'fail', 'abandon-checkout': 'pass' } }), 'a UX failure routed to a person');
 await expectValid(blocked(), 'blocked on a missing admission, publishing nothing', 'none');
+await expectValid({ 'request/request.json': requestJson(), 'response/response.json': { schemaVersion: 9, operatorId: 'uat.verify', step: 3, parallel: 1, status: 'blocked', stop: 'IDENTITY_MISSING', fallbacks: [], fields: {}, commits: [], next: ['platform.operate'] } }, 'a flow with no account yet: handed to provisioning, which creates it', 'none');
 
 // The gate and the person behind the run.
 await expectError({ ...baseline(), 'response/response.json': { ...responseJson(), stop: 'LEASE_INVALID' } }, 'only a blocked response carries a stop', 'a done branch carrying a stop');
@@ -301,8 +314,8 @@ await expectError({ ...baseline(), 'request/request.json': requestJson({ cases: 
 // Custody: the password may appear in nothing this operator writes.
 await expectError({ ...baseline(), 'response/response.md': responseMd({ note: `The tester signed in with ${LEAK} and continued.` }) }, 'the shared UAT password appears in a file this operator writes', 'the password published in the receipt');
 await expectError({ ...baseline(), [`response/data/captures/${CASES[0]}.json`]: capture(CASES[0], { assertions: [{ assertionId: 'entry', lane: 'ui', observed: `the login form held ${LEAK}`, evidenceRef: 'x', outcome: 'pass' }, { assertionId: 'commitment', lane: 'behavior', observed: 'ok', evidenceRef: 'x', outcome: 'pass' }, { assertionId: 'terminal', lane: 'behavior', observed: 'ok', evidenceRef: 'x', outcome: 'pass' }] }) }, 'the shared UAT password appears in a file this operator writes', 'the password recorded in a capture');
-await expectError({ ...baseline(), 'response/data/snapshot.json': snapshot({ account: { ...snapshot().account, password: 'x' } }) }, 'unexpected property', 'an account record with a place to hold a secret');
-await expectError({ ...baseline(), 'response/data/snapshot.json': snapshot({ account: { ...snapshot().account, credentialRef: '.stacks/local/secrets/uat.txt' } }) }, 'string does not match', 'a credential outside the sealed file');
+await expectError({ ...baseline(), 'response/data/snapshot.json': snapshot({ accounts: [{ ...account(), password: 'x' }] }) }, 'unexpected property', 'an account record with a place to hold a secret');
+await expectError({ ...baseline(), 'response/data/snapshot.json': snapshot({ accounts: [account('learner', { credentialRef: '.stacks/local/secrets/uat.txt' })] }) }, 'string does not match', 'a credential outside the sealed file');
 
 // Namespace and append-only history.
 await expectError({ ...baseline(), 'response/data/verdicts.json': verdicts({ cleanup: { performed: true, isUat: true, namespace: 'uat-anything', runRecordsDeleted: false } }) }, 'cleanup must name the exact run fixture namespace', 'a cleanup wider than the run');
@@ -324,4 +337,39 @@ await expectError({ ...baseline(), 'response/data/verdicts.json': verdicts({ exp
 await expectError({ ...baseline(), 'response/data/verdicts.json': verdicts({ experience: (() => { const l = experience(); l.entries[0] = { ...l.entries[0], verdict: 'fail', routeTo: 'none' }; l.mean = 4; l.verdict = 'fix-first'; l.routeTo = 'direction'; return l; })() }) }, 'fails UX-1 and routes nowhere', 'an experience failure that routes nowhere');
 await expectError({ ...baseline(), 'response/response.md': responseMd().replace('| `experience` | ship | none |', '| `experience` | fix-first | direction |') }, 'Verdict records fix-first', 'a receipt whose experience row differs from the lane');
 
-process.stdout.write('uat.verify self-test: 6 valid branches, 40 rejected mutations\n');
+// A missing record is created, not reported. The baseline above is exactly that branch: a flow with
+// no folder yields a done run that drafted the flow document and its seed, ran as an account this run
+// provisioned, and left the first baseline as a candidate for a person to promote.
+const drafted = snapshot();
+assert.equal(drafted.flowSource, 'drafted-from-template');
+assert.equal(drafted.accounts[0].provisionedBy, RUN);
+assert.equal(drafted.golden.state, 'candidate');
+
+// A flow whose folder already stood, verified against an approved reference.
+const settled = () => {
+  const snap = snapshot({
+    flowSource: 'committed',
+    golden: { state: 'approved', ref: `${DIR}/snapshots/snapshot.json`, approvedBy: 'the product owner', env: ENV },
+    accounts: [account('learner', { provisionedBy: null })],
+  });
+  return { ...baseline(), 'response/data/snapshot.json': snap, 'response/response.md': responseMd({ snap }), 'response/response.json': responseJson({ next: ['git.publish'] }) };
+};
+await expectValid(settled(), 'a flow that already existed, verified against an approved reference');
+
+// The run identifier, the environment and the accounts.
+await expectError({ ...baseline(), 'response/data/snapshot.json': snapshot({ runId: 'run-1' }), 'response/data/verdicts.json': verdicts({ runId: 'run-1' }) }, 'is not <yyyymmdd-HHMMss>-<commit7>', 'a run identifier that names neither a moment nor a commit');
+await expectError({ ...baseline(), 'response/data/snapshot.json': snapshot({ runId: '20260110-000000-2222222' }), 'response/data/verdicts.json': verdicts({ runId: '20260110-000000-2222222' }) }, 'and the run was pinned at', 'a run identifier naming another commit than the run verified');
+await expectError({ ...baseline(), 'response/data/snapshot.json': snapshot({ golden: { state: 'candidate', ref: `${DIR}/snapshots/snapshot.json`, approvedBy: null, env: 'staging' } }) }, 'is not authority for another', 'a reference taken in another environment');
+await expectError({ ...baseline(), 'response/data/snapshot.json': snapshot({ flowSource: 'drafted-from-template', golden: { state: 'approved', ref: `${DIR}/snapshots/snapshot.json`, approvedBy: 'the product owner', env: ENV } }) }, 'the first run is the candidate a person promotes', 'a flow drafted this run that claims an approved reference');
+await expectError({ ...baseline(), 'response/data/snapshot.json': snapshot({ cases: [{ ...frozenCase(CASES[0], 0), as: 'reviewer' }, frozenCase(CASES[1], 1)] }) }, 'which no frozen account carries', 'a case acting as an alias nobody provisioned');
+await expectError({ ...baseline(), 'request/request.json': requestJson({ extra: { env: 'nowhere' } }) }, 'which this installation does not have', 'a run pointed at a stack nobody installed');
+await expectError({ ...baseline(), 'response/data/snapshot.json': snapshot({ accounts: [account('learner'), account('learner')] }) }, 'is frozen twice', 'one alias with two accounts');
+await expectError({ ...baseline(), 'response/data/snapshot.json': snapshot({ accounts: [account('learner', { credentialRef: '.stacks/staging/secrets/uat.enc' })] }) }, 'resolves its credential in another environment', 'an account sealed in another environment than the run drove');
+await expectError({ ...baseline(), 'response/response.json': responseJson({ next: ['git.publish'] }) }, 'no run approves its own reference', 'a first baseline promoted by the run that made it');
+await expectError({ ...baseline(), 'response/response.md': responseMd().replace('| Flow source | drafted-from-template |', '| Flow source | committed |') }, 'a drafted flow is honest and an undeclared draft is not', 'a drafted flow reported as a committed one');
+
+// The record has to survive the machine that made it.
+await expectError(baseline(), 'appends one line to the flow history', 'a run that left no history line', 'no-history');
+await expectError(baseline(), 'excludes the flow folder', 'a flow folder the host repository would never track', 'ignored');
+
+process.stdout.write('uat.verify self-test: 9 valid branches, 52 rejected mutations\n');

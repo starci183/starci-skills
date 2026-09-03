@@ -11,6 +11,7 @@ import process from 'node:process';
 import { fileURLToPath } from 'node:url';
 import { validateStep } from '../../scripts/validate-step.mjs';
 import { tableUnder } from '../../scripts/validate-response.mjs';
+import { missingStack } from '../../scripts/validate-request.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 
@@ -21,17 +22,28 @@ export const KIND_EFFECTS = {
   observability: ['update-config', 'restart-service', 'upsert-dashboard', 'update-remote-write'],
   sonar: ['create-project', 'assign-profile', 'assign-gate', 'enforce-setting'],
   tunnel: ['create-tunnel', 'update-tunnel-route', 'upsert-proxied-dns'],
+  runtime: ['register-runtime-entry', 'attest-runtime-entry'],
+  identity: ['provision-identity', 'seed-flow-fixtures'],
 };
 export const KIND_CHECKS = {
   observability: ['service-health', 'target-boundary', 'label-boundary', 'remote-write-delivery', 'sample-ordering', 'retry-backoff', 'sensitive-data-filter'],
   sonar: ['service-available', 'project-exists', 'source-revision', 'profile-assigned', 'gate-assigned', 'enforcement-active'],
   tunnel: ['dns-target', 'tunnel-route', 'tls', 'public-https'],
+  runtime: ['entry-declared', 'endpoints-served', 'head-observed', 'generation-advanced'],
+  identity: ['provider-reachable', 'credential-resolvable', 'account-exists', 'account-signs-in', 'no-credential-recorded'],
 };
 export const KIND_CAPABILITIES = {
   observability: ['metrics:remote-write'],
   sonar: ['sonar:project-admin'],
   tunnel: ['tunnel:write', 'dns:write'],
+  runtime: ['runtime:registry-write'],
+  identity: ['identity:account-admin'],
 };
+
+// The two branches that act for one bound project route. Both address the registry entry of that
+// route, so the route key is the resource they operate and nothing else may stand in for it.
+export const ROUTE_KINDS = new Set(['runtime', 'identity']);
+export const ROUTE_KEY = /^[a-z0-9]+(?:-[a-z0-9]+)*\/[a-z0-9]+(?:-[a-z0-9]+)*$/;
 
 // A credential is resolved for use, never written down. Fingerprints and commit heads are legitimate
 // long hex, so they are scrubbed before the unbroken-run heuristic runs.
@@ -56,6 +68,10 @@ export async function validatePlatformStep(branchDir, root = ROOT) {
   if (!response || response.operatorId !== 'platform.operate') return { errors };
   const has = (f) => existsSync(path.join(branchDir, f));
   const read = (f) => readFile(path.join(branchDir, f), 'utf8');
+
+  // An env names a stack of this installation; the vocabulary is the folder, not a list kept here.
+  const missing = missingStack(root, requirements.env);
+  if (missing) errors.push(`request.json: env ${requirements.env} names ${missing}, which this installation does not have`);
 
   const desired = requirements.desiredState ?? {};
   const kind = String(desired.serviceKind ?? '');
@@ -163,6 +179,56 @@ export async function validatePlatformStep(branchDir, root = ROOT) {
     }
     forEachString(checks, (text, at) => { if (credentialLeak(text)) errors.push(`response/data/checks.json: ${at} records a credential, which the receipt refuses`); });
   } else if (response.status === 'done') errors.push('response/data/checks.json: a done branch needs the proved check set');
+
+  // The two route branches. A runtime attestation and an identity provisioning both act on the
+  // registry entry of one project route, so the route key is not decoration: it is the resource, and
+  // a branch that names none has nothing to attest or provision against.
+  const routeKey = requirements.routeKey;
+  if (ROUTE_KINDS.has(kind)) {
+    if (empty(routeKey)) errors.push(`request.json: the ${kind} branch acts on one project route and routeKey names none`);
+    else if (!ROUTE_KEY.test(String(routeKey))) errors.push(`request.json: routeKey ${routeKey} is not a <project>/<role> registry entry`);
+    else {
+      if (desiredResources.length && !desiredResources.includes(String(routeKey))) errors.push(`request.json: routeKey ${routeKey} is outside desiredState.resourceRefs, so the operation would act on an entry it never declared`);
+      if (delta) for (const m of delta.mutations) if (m.resourceRef !== String(routeKey)) errors.push(`response/data/delta.json: the ${kind} branch mutated ${m.resourceRef}, which is not the registry entry ${routeKey} it operates`);
+    }
+  } else if (!empty(routeKey)) errors.push(`request.json: routeKey belongs to the runtime and identity branches; the ${kind || 'declared'} branch operates no project route`);
+
+  // Identity: a missing record is created, not reported. A provisioning that ran publishes the
+  // account record it wrote, and one that did not may not publish one; either way the record is a
+  // set of names, which is what makes a password impossible to file here even by accident.
+  const provisioned = Boolean(delta?.appliedEffects?.includes('provision-identity'));
+  const accountFile = 'response/data/account.json';
+  if (kind === 'identity') {
+    if (empty(requirements.flow)) errors.push('request.json: the identity branch provisions for one flow and flow names none');
+    if (provisioned && !present.has('uat-account')) errors.push(`${accountFile}: provision-identity was applied, so the account record it wrote is published with it`);
+    if (checks && provisioned && !checks.findings.some((f) => f.code === 'IDENTITY_PROVISIONED')) errors.push('response/data/checks.json: an identity that was provisioned records the IDENTITY_PROVISIONED finding, so the receipt names what this run created');
+  }
+  if (present.has('uat-account')) {
+    if (kind !== 'identity') errors.push(`${accountFile}: an account record belongs to the identity branch, not to ${kind}`);
+    if (!provisioned && delta) errors.push(`${accountFile}: an account record is published only by the run that provisioned it`);
+    if (has(accountFile)) {
+      let account = null; try { account = JSON.parse(await read(accountFile)); } catch { account = null; }
+      if (account) {
+        if (!empty(routeKey) && account.identity !== String(routeKey)) errors.push(`${accountFile}: the account belongs to registry entry ${account.identity}, not to ${routeKey}`);
+        if (!empty(requirements.flow) && account.flow !== requirements.flow) errors.push(`${accountFile}: the record belongs to flow ${account.flow}, not to ${requirements.flow}`);
+        const aliases = Object.entries(account.accounts ?? {});
+        if (!aliases.length) errors.push(`${accountFile}: a flow names its actors by alias and this record carries none`);
+        for (const [alias, entry] of aliases) {
+          if (provisioned && entry.provisionedBy === null) errors.push(`${accountFile}: this run created ${alias}, so the record names the run that provisioned it`);
+          if (account.env && !String(entry.sealed).startsWith(`.stacks/${account.env}/`)) errors.push(`${accountFile}: ${alias} is sealed in another environment than ${account.env}; an account of one environment is not an account in another`);
+        }
+        forEachString(account, (text, at) => { if (credentialLeak(text)) errors.push(`${accountFile}: ${at} carries a credential; the account record holds names and references only`); });
+      }
+    }
+  }
+
+  // Attestation reports what answered. A runtime entry may only be reported ready over evidence, and
+  // the evidence is the checks the branch publishes, never the status it would like to write.
+  if (kind === 'runtime' && checks && response.status === 'done') {
+    for (const name of ['endpoints-served', 'head-observed']) {
+      if (!checks.checks.some((c) => c.name === name && c.status === 'passed')) errors.push(`response/data/checks.json: an attested runtime entry needs ${name} passed; a status nobody probed is an assertion`);
+    }
+  }
 
   if (present.has('platform-operation-receipt') && has('response/response.md')) {
     const text = await read('response/response.md');

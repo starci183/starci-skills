@@ -43,6 +43,12 @@ mà lần ghi vừa sinh ra, không phải bề mặt đã bind trước đó. `
 người — `requestedBy`, `feature` và `flow` — nên mọi chuỗi mang nó đều khai chúng dưới `asks`, và lần
 chạy thà từ chối chứ không bịa ra người yêu cầu.
 
+`staging-uat` là ví dụ duy nhất chứng minh một bản giao ở nơi khác nơi nó được viết. Nó không ghi gì —
+`frontend.source.apply` chạy dưới `mode: dry`, nên luật chuỗi dài không với tới — và nó mang `env` trên
+lượt audit và lượt chạy, thứ chọn ra entry trong sổ đăng ký runtime, file tài khoản và bản tham chiếu đã
+duyệt của stack ấy. Nó kết thúc ở `user`, vì hai biên nhận trong tay một con người mới là kết quả; đưa
+lên một môi trường là việc của `release` và ở lại đó.
+
 `backend-feature` là chuỗi giao hàng duy nhất không có hai bằng chứng ấy, và `when` của nó nói rõ vì
 sao: nó không ghi bề mặt nào, `uat.verify` cần đầu vào `frontend-surface-audit` và một route fe đã
 bind, ở đó không có cái nào. Một feature backend mà lời hứa chạm tới người qua màn hình thì thuộc về
@@ -62,6 +68,7 @@ operator.
 | `backend-feature` | một contract backend cho một feature, không có bề mặt | bind → business (model) → architecture → backend apply → quality → business (reconcile) → publish | — | `git.publish` |
 | `full-feature` | backend và bề mặt frontend mới cùng lúc | bind ×2 → business → architecture → [backend apply ∥ direction] → [quality ∥ resolve] → apply → bind (consume) → audit → quality → uat → business (reconcile) → publish | hai bậc hai nhánh, audit theo matrix | `git.publish` |
 | `frontend-with-uat` | thay đổi frontend mà người yêu cầu đích danh đi thử | bind ×2 → direction → resolve → apply → bind (consume) → audit → quality → uat → publish | audit theo matrix | `git.publish` |
+| `staging-uat` | một bản giao đã publish phải được đi thử trên stack khác trước khi release | bind ×2 (consume) → direction → resolve → apply (dry) → audit (env staging) → quality → uat (env staging) | audit theo matrix | `user` |
 | `release` | head đã publish phải lên production | bind → quality → release | — | `release.deploy` |
 | `content-unit` | một đơn vị giáo trình từ đầu tới cuối | content.generate (có exchange review bên trong) | — | `user` |
 
