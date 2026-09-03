@@ -65,6 +65,7 @@ Generated from `@grammar/core` claims by `scripts/generate-presentation-owned.mj
 
 | Component | Element or condition | Rule |
 | --- | --- | --- |
+| `HorizontalScrollRegion` | root | MEASURE-3 |
 | `NavigationFeatureNav` | root | MEASURE-2 |
 | `PageContainer` | root | MEASURE-1 |
 | `Progress` | root | MEASURE-2 |
@@ -72,6 +73,7 @@ Generated from `@grammar/core` claims by `scripts/generate-presentation-owned.mj
 | `Sidebar` | root, presentation!="drawer" | MEASURE-6 |
 | `Sidebar` | root, presentation="drawer" | MEASURE-2 |
 | `TextAction` | root | MEASURE-3 |
+| `VerticalScrollRegion` | root, isScrollable | MEASURE-7 |
 | `WorkspaceShell` | layout | MEASURE-1 |
 
 ## MEASURE-1 — Page measure

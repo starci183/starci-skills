@@ -21,7 +21,7 @@ không thể lặng lẽ lệch nhau.
 Operator ràng đúng một profile và chạy trọn trên đó, không theo từng lần gọi và không chia cho
 nhiều profile: một bước phản biện, review hay phán xét bên trong operator là một bước của chính lần
 thực thi đó, và đưa model thứ hai vào là thành workflow. Profile quyết model và cách cô lập;
-`execute.md` của operator quyết công việc; `resources.requires` quyết công việc đó được chạm tới quyền nào.
+bảng Các bước trong `operator.md` của operator quyết công việc; `resources.requires` quyết công việc đó được chạm tới quyền nào.
 Một quyền không nằm trong `requires` thì operator không dùng được dù profile có cho phép. Năng lực là sự thật về model; quyền là chính sách về operator:
 `gpt-5.6-sol` tìm được, vẽ được, lái được trình duyệt và ghi được source, nên `sol-fresh` được dùng cả
 bốn, còn `sol-reviewer` trên cùng model đó chỉ được trình duyệt, vì một reviewer mà tự tạo ra thì
@@ -54,20 +54,20 @@ Bản tóm tắt những gì mỗi `operator.json` khai; validator từ chối d
 
 | Operator | Profile | Mạng | Grammar | Hình | Vì sao hình dạng này |
 | --- | --- | --- | --- | --- | --- |
-| `workspace.bind` | sonnet | không | không | không | Đọc file chuẩn và sổ đăng ký; không phán đoán |
+| `workspace.bind` | luna | giới hạn | không | không | Đọc file chuẩn và sổ đăng ký; không phán đoán |
 | `business.decide` | sol-fresh | giới hạn | không | không | Mô hình kinh doanh lạ có thể cần tra cứu trước khi đóng băng độ phủ |
 | `architecture.decide` | sol-fresh | giới hạn | không | không | Phương án thay thế và tương thích cần bằng chứng ngoài repo; schema đã ghim model |
-| `backend.source.apply` | opus | không | không | không | Ghi trong hợp đồng đã đóng băng, theo patterns/be |
+| `backend.source.apply` | luna | giới hạn | không | không | Ghi trong hợp đồng đã đóng băng, theo patterns/be |
 | `frontend.direction.decide` | sol-fresh | giới hạn | có | theo gu | Chỉ tra cứu khi lĩnh vực lạ; render ứng viên thành trang và tự xét khi một vùng quá trống, cần hình |
-| `frontend.presentation.resolve` | sonnet | không | có | không | Tra cứu trên một danh sách đóng |
-| `frontend.source.apply` | opus | không | có | không | Chỉ ghi thứ resolution đã chứa, theo patterns/fe |
-| `frontend.surface.audit` | sol-reviewer | không | có | không | Chỉ trình duyệt, không ghi source: người audit không sửa được thứ mình đo |
-| `quality.verify` | sonnet | không | không | không | Chạy cổng, không sửa |
-| `uat.verify` | sol-reviewer | không | không | không | Lái hành trình thật trong trình duyệt và không được ghi gì; phán quyết mới cho từng lane |
-| `release.deploy` | opus | không | không | không | Phát hành bất biến dưới authorization đã khai |
-| `platform.operate` | opus | không | không | không | Dịch vụ dùng chung từ bằng chứng chính xác |
+| `frontend.presentation.resolve` | luna | giới hạn | có | theo gu | Tra cứu trên một danh sách đóng |
+| `frontend.source.apply` | luna | giới hạn | có | theo gu | Chỉ ghi thứ resolution đã chứa, theo patterns/fe |
+| `frontend.surface.audit` | sol-reviewer | giới hạn | có | không | Chỉ trình duyệt, không ghi source: người audit không sửa được thứ mình đo |
+| `quality.verify` | luna | giới hạn | không | không | Chạy cổng, không sửa |
+| `uat.verify` | sol-reviewer | giới hạn | không | không | Lái hành trình thật trong trình duyệt và không được ghi gì; phán quyết mới cho từng lane |
+| `release.deploy` | luna | giới hạn | không | không | Phát hành bất biến dưới authorization đã khai |
+| `platform.operate` | luna | giới hạn | không | không | Dịch vụ dùng chung từ bằng chứng chính xác |
 | `content.generate` | luna | giới hạn | không | bắt buộc | Tra cứu brief trong giới hạn, rồi viết, code và vẽ theo tuyên bố; schema ghim model này |
-| `git.publish` | sonnet | không | không | không | Publish không force; thao tác phá hoại không biểu diễn được |
+| `git.publish` | luna | giới hạn | không | không | Publish không force; thao tác phá hoại không biểu diễn được |
 
 ## Profile
 

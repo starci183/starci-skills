@@ -11,8 +11,8 @@
     "profile": "sol-fresh",
     "requires": [
       "webSearch",
-      "browser",
-      "imageGeneration"
+      "imageGeneration",
+      "browser"
     ],
     "policy": {
       "webSearch": "bounded",

@@ -58,6 +58,7 @@ Generated from `@grammar/core` claims by `scripts/generate-presentation-owned.mj
 | `ChatWorkspace` | rail trigger boundary, hasRail, isCompactRail | PADDING-4 |
 | `ChatWorkspace` | rail trigger, hasRail, isCompactRail | PADDING-3 |
 | `EmptyNotice` | root | PADDING-4 |
+| `HorizontalScrollRegion` | root | PADDING-1 |
 | `NavigationFeatureNav` | primary | PADDING-3 |
 | `OtpInput` | root | PADDING-1 |
 | `Rail` | body, inset="content" | PADDING-3 |
@@ -73,11 +74,10 @@ Generated from `@grammar/core` claims by `scripts/generate-presentation-owned.mj
 | `Sidebar` | list box item, not collapsed | PADDING-3 |
 | `Sidebar` | list box, collapsed | PADDING-2 |
 | `Sidebar` | list box, not collapsed | PADDING-3 |
-| `StaticStateRow` | root | PADDING-2 |
+| `StaticStateRow` | root | PADDING-4 |
 | `Subnav` | root | PADDING-3 |
 | `SurfaceAccordionCard` | accordion body | PADDING-8 |
 | `SurfaceAccordionCard` | accordion body wrapper | PADDING-0 |
-| `SurfaceAccordionCard` | accordion trigger | PADDING-3 |
 | `SurfaceAccordionCard` | accordion trigger | PADDING-4 |
 | `SurfaceCard` | card content, composition!="joined" | PADDING-4 |
 | `SurfaceCard` | card content, composition="joined" | PADDING-0 |

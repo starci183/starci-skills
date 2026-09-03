@@ -65,6 +65,7 @@ Sinh từ claim của `@grammar/core` bằng `scripts/generate-presentation-owne
 
 | Component | Phần tử hoặc điều kiện | Rule |
 | --- | --- | --- |
+| `HorizontalScrollRegion` | root | MEASURE-3 |
 | `NavigationFeatureNav` | root | MEASURE-2 |
 | `PageContainer` | root | MEASURE-1 |
 | `Progress` | root | MEASURE-2 |
@@ -72,6 +73,7 @@ Sinh từ claim của `@grammar/core` bằng `scripts/generate-presentation-owne
 | `Sidebar` | root, presentation!="drawer" | MEASURE-6 |
 | `Sidebar` | root, presentation="drawer" | MEASURE-2 |
 | `TextAction` | root | MEASURE-3 |
+| `VerticalScrollRegion` | root, isScrollable | MEASURE-7 |
 | `WorkspaceShell` | layout | MEASURE-1 |
 
 ## MEASURE-1 — Khổ trang

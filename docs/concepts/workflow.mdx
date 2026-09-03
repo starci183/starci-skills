@@ -1,0 +1,44 @@
+---
+title: "Workflow"
+description: "Steps of parallel branches, loops and presets; how the entry matches one and how it composes a new one."
+---
+
+# Workflow
+
+`workflows/README.md` defines it in one sentence:
+
+> A workflow is a pre-composed chain of operators: an ordered list of **steps**, each step a list of
+> **branches** that run in parallel (at most three), with optional **loops** back to an earlier step
+> and **presets** for a branch's Requirements.
+
+The eight files in `workflows/` are examples, not the only chains allowed.
+
+## How the entry uses them
+
+The entry reads the `when` of every example. A match is run as written; its presets fill
+`request.json`, and the person is asked only for fields with no default. If none matches, the entry
+composes a chain from the operators' `## Next` tables and `routing.json`, under the same rules
+`scripts/validate-workflows.mjs` enforces on these files:
+
+- every branch names a real operator and presets only fields that operator declares;
+- every required Input of a branch is produced by an earlier step;
+- branches of one step share no write alias — two operators may not write the same checkout or root
+  at once, and `frontend.surface.audit` fans out by matrix entry because it writes nothing;
+- a loop goes back to an earlier step and carries `maxRounds`;
+- the chain ends at `git.publish`, `release.deploy`, or `user`.
+
+A composed chain that would be useful again becomes a new file, with its `when`.
+
+## The file shape
+
+`schemaVersion` is 9. `id` equals the file name. `when` has `en` and `vi`. `chain` is an array of
+steps, each an array of `{ operator, requirements?, fanout?: "matrix", maxParallel?: 1..3 }`. `loops`
+is an array of `{ from, to, when, maxRounds }`. `ends` is `user` or an operator of the last step.
+
+## Branches and the session
+
+Every source-writing branch commits on `session/<sessionId>`; `git.publish` merges it. A blocked
+branch re-enters as a new step, and a loop counts toward the operator's own `maxRounds`.
+
+The eight examples, with their chains rendered step by step, are under
+[Reference → Workflows](/reference/workflows).

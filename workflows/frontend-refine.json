@@ -10,7 +10,8 @@
       {
         "operator": "workspace.bind",
         "requirements": {
-          "role": "fe"
+          "role": "fe",
+          "runtimeNeed": "consume"
         }
       }
     ],

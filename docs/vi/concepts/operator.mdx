@@ -1,0 +1,62 @@
+---
+title: "Operator"
+description: "Một việc trong một lượt tuyến tính: hình dạng của một gói operator và tám bảng của operator.md."
+---
+
+# Operator
+
+Operator là thứ duy nhất trong cây thật sự làm việc. Luật định hình mọi thứ còn lại về nó được ghi
+đúng một lần, trong `INDEX.md`:
+
+> Một operator làm đúng một việc trong một lượt tuyến tính. Nó không gọi operator khác, không điều
+> phối workflow, không tự dừng giữa chừng, không trả chỉ dẫn điều khiển dạng văn xuôi. Chỉ cha mới
+> ánh xạ một output đã validate sang bước chuyển kế tiếp.
+
+## Gói operator
+
+`operators/<id>/` gồm năm file:
+
+| File | Là gì |
+| --- | --- |
+| `operator.md` | File viết tay duy nhất: Việc, các mục luật riêng, rồi tám bảng |
+| `operator.vi.md` | Bản đối chiếu cho người; không bao giờ là authority lúc chạy |
+| `operator.json` | `id`, `domain`, `job`, và `resources` (profile, quyền, ba câu trả lời chính sách) |
+| `errors.json` | Các mã dừng operator này sở hữu, kèm cách xử lý, domain và fallback |
+| `validate.mjs` | Thứ mà chỉ operator này kiểm được trên response của chính nó |
+| `self-test.mjs` | Chứng minh validator; `npm test` chạy hết |
+
+`templates/operator.template.md` là contract mà `scripts/validate-operator.mjs` ép: tiêu đề phải là
+`# <operator.id>`, và tài liệu phải mang Việc, các mục luật tự do, Context, Đầu vào, Yêu cầu, Các
+bước, Đầu ra, Dừng và Kế tiếp, mỗi mục kèm bảng của nó. Validator sau đó đối chiếu các bảng đó với
+nhau, với `errors/`, và với `templates/kinds`.
+
+## Tám bảng
+
+| Bảng | Cột | Cố định điều gì |
+| --- | --- | --- |
+| Context | Alias, Bind, Bắt buộc | Mọi vị trí operator được đọc, theo alias, và cách ràng buộc từng cái |
+| Đầu vào | Kind, Từ đâu, Bắt buộc | Các kind mà một nhánh trước phải đã sinh ra |
+| Yêu cầu | Trường, Kiểu, Mặc định, Hỏi | Nội dung `request.json`; trường có Mặc định là `—` thì phải hỏi người |
+| Các bước | #, Bước, Tham số, Đọc, Ghi, Dừng với | Lượt tuyến tính, và mỗi bước được dừng với mã nào |
+| Đầu ra | Kind, File, Kiểu, Bắt buộc | Mọi file nhánh sinh ra và kind định kiểu cho nó |
+| Dừng | Mã, Cách xử lý | Mọi mã operator có thể phát ra |
+| Kế tiếp | Khi nào, Operator | Một response `done` được bàn giao đi đâu |
+
+Các mục luật nằm giữa Việc và Context là văn xuôi riêng của operator — `architecture.decide` mang
+"Quan sát trước khi đề xuất", "Đang có sẵn không phải là thẩm quyền", "Chứng minh, đừng giả định",
+"Phản biện là một trao đổi lồng" và "Ranh giới". Chúng được đọc như một phần của gói, và các trang
+tham chiếu chép lại nguyên văn.
+
+## Thẩm quyền nằm trong schema, không nằm trong văn xuôi
+
+`INDEX.md` viết: "Thẩm quyền nằm trong schema của operator, không nằm ở file này hay ở `SKILL.md`.
+`git.publish` không diễn đạt được force push; `release.deploy` không chạy nổi khi thiếu authorization
+đã khai; `uat.verify` không có trường nào chứa nổi credential." Một operator có vẻ cần nhiều hơn mức
+nó cho phép thì đó chính là câu trả lời, không phải một chướng ngại phải đi vòng.
+
+## Đọc một operator
+
+Đừng nạp trước cả cây. Một operator ràng buộc tập chủ đề nhỏ nhất mà quyết định của nó cần, mỗi chủ
+đề kèm fingerprint và kho luật đầy đủ, và không được phát ra định danh nào ngoài kho đó. Các trang
+trong [Tham chiếu → Operator](/vi/reference/operators) chính là các file `operator.vi.md` như chúng
+đang có.

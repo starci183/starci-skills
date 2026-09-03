@@ -1,0 +1,85 @@
+---
+title: "Introduction"
+description: "What StarCi Skills is: one entry, fourteen operators, example workflows, and a session made of typed requests and responses."
+---
+
+# StarCi Skills
+
+StarCi Skills is the runtime that completes one StarCi mission. It is a tree of files, not a
+framework: `SKILL.md` is the entry, `operators/` holds the fourteen units of work, `workflows/` holds
+the example chains, and `routing.json` is the closed map that decides what happens after each one.
+`INDEX.md` states the load order and says plainly what the tree is for — it "is the runtime", and
+`SKILL.md` is "the single entry that freezes a mission's scope, selects the one operator that owns the
+outcome, and routes between operators on typed results."
+
+This site explains that tree and links into it. It never restates a rule: where a rule exists in the
+tree, the page quotes the file or links to it, and every page under [Reference](/reference) is
+generated from the same files the runtime reads.
+
+## One entry
+
+There is exactly one way in. `SKILL.md` freezes the mission scope, runs `workspace.bind` for anything
+that touches routed source, looks for a workflow, selects the first operator, and then sequences the
+rest. It does no work of its own: "it never decides a value, writes source, or judges a result."
+
+Its Entry table maps a request to its first operator — which project applies goes to
+`workspace.bind`, what the product promises goes to `business.decide`, whether a rendered surface
+holds up goes to `frontend.surface.audit`, and so on. A request that names no owner, or two owners
+whose scopes differ materially, stops there with one focused question.
+
+## Fourteen operators
+
+An operator is one job in one linear pass. It never calls another operator, never routes a workflow,
+never pauses internally, and never returns free-form control instructions. The parent alone maps a
+validated output to the next transition. Each operator is one authored `operator.md` — Job, its own
+law sections, then the Context, Inputs, Requirements, Steps, Outputs, Stops and Next tables — beside
+an `operator.json`, an `errors.json`, a `validate.mjs` and a `self-test.mjs`.
+
+See [Operator](/concepts/operator) for the shape, and [the operator reference](/reference/operators)
+for all fourteen packages.
+
+## Workflows
+
+A workflow is a pre-composed chain: ordered steps, each step a list of branches that run in parallel,
+with optional loops back to an earlier step and presets for a branch's Requirements. The eight files
+in `workflows/` are examples, not the only chains allowed; when none matches, the entry composes one
+under the rules `scripts/validate-workflows.mjs` enforces on those same files.
+
+See [Workflow](/concepts/workflow) and [the workflow reference](/reference/workflows).
+
+## The request/response session
+
+Everything an operator receives and everything it produces lives on disk, inside one session folder,
+in a fixed branch layout. The loop `SKILL.md` states is short:
+
+```text
+request/request.json -> validate-request.mjs -> agent writes response/ -> validate-response.mjs + the operator's validate.mjs -> route
+```
+
+Routing reads `response.json` and nothing else. A response that fails either validator does not
+route; prose in `response.md` does not route. See [Session](/concepts/session) and
+[Kinds and contracts](/concepts/kinds-and-contracts).
+
+## Why knowledge is split three ways
+
+`knowledge/` is decision authority, not workflow, and it is split by the operator that reads it.
+`knowledge/ui/` is the universal UI law shared by every published Grammar family, itself grouped into
+composition (what a tree must contain, before it exists), presentation (which CSS value an app-owned
+boundary takes) and proof (what is only true once rendered). `knowledge/grammars/<family>/` is one
+visual family's realization of Common — the owner's taste and what the package actually exposes.
+`knowledge/patterns/fe` and `knowledge/patterns/be` are the code conventions extracted from the two
+live sources, where every rule cites the files it was read from.
+
+The test that places a topic, in `knowledge/ui/INDEX.md`, is whether reading source answers it: a
+spacing value is readable from a class, so it is presentation; the number of dominant actions is
+settled before any tree exists, so it is composition; whether keyboard order matches visual order
+needs a running page, so it is proof.
+
+See [Knowledge](/concepts/knowledge) and [the knowledge reference](/reference/knowledge).
+
+## Language
+
+English `.md` files are the only runtime authority. Same-stem `.vi.md` files are human mirrors and
+never enter a context manifest, a dependency list, a validator input, or an operator binding. This
+site keeps the same split: the English pages are the ones that match the runtime, and
+[the Vietnamese pages](/vi) mirror them for a human reader.

@@ -1,0 +1,57 @@
+---
+title: "Stop codes"
+description: "How a blocked branch is typed, how a code resolves through routing.json, and what a fallback disposition means."
+---
+
+# Stop codes
+
+An operator does not narrate a failure. It stops with a code, and the code alone decides what happens
+next.
+
+## Where a code lives
+
+The registry is merged from two places: `operators/errors.json` holds the codes several operators
+share, each with a scope list, and each `operators/<id>/errors.json` holds the codes that operator
+owns. A code carries a `domain`, a `disposition`, a meaning, and — when it falls back — the exact
+action to take and what a person could do instead.
+
+## Two dispositions
+
+> A code has exactly one disposition: **terminate** ends the branch blocked; **fallback** performs the
+> named action, records it under `## Fallbacks taken` in `response.md`, and continues. `unless` names
+> the one Requirements param whose value flips the disposition.
+
+`CHOICE_REQUIRED` on `architecture.decide` is the clearest example of both halves: it falls back by
+selecting the highest-scoring alternative and recording the score table, *unless* `selectionPolicy`
+is `approval-required`, in which case it terminates and a person selects.
+
+## How a terminating code routes
+
+The runtime reads the code's `domain` and resolves that domain in `routing.json`, which offers four
+kinds:
+
+| Kind | What the runtime does |
+| --- | --- |
+| `operator` | Invokes the named operator next |
+| `resume` | Invokes the same operator again with the delta its resume token requires |
+| `user` | Stops. A person owns this and must decide or publish |
+| `external` | Stops. The blocker is outside the runtime and no operator can clear it |
+
+`self` in a code's domain column means the emitting operator's own domain — a resume.
+
+## The map is closed
+
+`routing.json` is validated against the operators' Stops tables: every domain a stop code hands to
+has exactly one route, and no route names a domain no code reaches. A missing route is a build
+failure, not a judgement call. A runtime that meets a code the merged registry does not list
+terminates with `UNKNOWN_STOP`.
+
+## Codes every operator shares
+
+`EVIDENCE_MISSING`, `INVALID_INPUT`, `NO_PROGRESS`, `SOURCE_DRIFT` and `UNKNOWN_STOP` are scoped `*`.
+`NO_PROGRESS` is the one that ends a loop: a resume that adds no evidence, constraint, inventory or
+approval delta reached the same wall, and `SKILL.md` asks for the wall to be reported rather than
+retried.
+
+The complete table — every code, its scope, domain, disposition, meaning, fallback and resume — is
+generated at [Reference → Stop codes](/reference/stop-codes).

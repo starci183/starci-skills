@@ -1,0 +1,17 @@
+---
+title: "Reference"
+description: "Generated from the tree at build time."
+---
+
+# Reference
+
+Every page under Reference is produced by `docs/scripts/generate-docs.mjs` from the files the runtime itself reads. `npm run check` in `sites/docs` regenerates them and fails when the committed output differs, so a page here cannot describe a tree that no longer exists.
+
+| Page | Generated from |
+| --- | --- |
+| [Operators](/reference/operators) | `operators/<id>/operator.md`, `operator.json` |
+| [Workflows](/reference/workflows) | `workflows/*.json` |
+| [Kinds](/reference/kinds) | `templates/kinds/*` |
+| [Alias](/reference/alias) | `alias/INDEX.md` |
+| [Stop codes](/reference/stop-codes) | `operators/INDEX.md` § Stop codes |
+| [Knowledge](/reference/knowledge) | `knowledge/**/INDEX.md` |

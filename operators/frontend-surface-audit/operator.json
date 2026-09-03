@@ -10,10 +10,11 @@
   "resources": {
     "profile": "sol-reviewer",
     "requires": [
+      "webSearch",
       "browser"
     ],
     "policy": {
-      "webSearch": "never",
+      "webSearch": "bounded",
       "grammarBound": true,
       "imageGeneration": "never"
     }

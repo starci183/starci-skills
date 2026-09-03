@@ -1,6 +1,6 @@
 # StarCi Core — DNA
 
-`@starci/grammar@0.4.0` · checkout `14e0c20f4746ae08f00a84a4eac18aa78ded987b` · generated 2026-09-03
+`@starci/grammar@0.4.1` · checkout `f7167fa78d4c5edb847b16354403aec1c9d5476b` · generated 2026-09-03
 
 This file is generated from the live `@starci/grammar` package, never written by hand: identity, tokens, renderers, published props, `data-contract` claims, and emitted classes are read out of `src/`, and the gap list is copied from the `## Gaps` table in [Family and DNA](family.md). Prime a direction agent with this file: it says what exists. [Idioms](idioms.md) says how StarCi composes it, and [Playbook](playbook.md) says which idioms a business shape needs. Regenerate with `node scripts/generate-grammar-dna.mjs`, and verify with `--check`; it needs the routed FE checkout, so it is not part of `npm test`.
 
@@ -9,13 +9,13 @@ This file is generated from the live `@starci/grammar` package, never written by
 | Fact | Value |
 | --- | --- |
 | Package | `@starci/grammar` |
-| Version | `0.4.0` |
-| Checkout head | `14e0c20f4746ae08f00a84a4eac18aa78ded987b` |
+| Version | `0.4.1` |
+| Checkout head | `f7167fa78d4c5edb847b16354403aec1c9d5476b` |
 | Family id | `core` |
 | Root component | `CoreGrammarRoot` |
 | Family scope | `data-grammar-family="core"` |
 | Style entrypoint | `@starci/grammar/core/styles.css` |
-| Counts | 41 renderers · 59 tokens · 97 claim entries · 17 gaps |
+| Counts | 41 renderers · 59 tokens · 104 claim entries · 13 gaps |
 
 ## Tokens
 
@@ -99,7 +99,7 @@ This file is generated from the live `@starci/grammar` package, never written by
 | `Progress` `ProgressProps` | primitive | — | MEASURE-2 | — |
 | `Text` `TextProps` | primitive | as: `div` \| `p` \| `span`; size: `xs` \| `sm` \| `md` \| `metric-lead`; tone: `default` \| `muted` \| `accent`; weight: `normal` \| `medium` \| `semibold`; live: `off` \| `polite` \| `assertive` | computed: FONT-1 FONT-2 FONT-3 FONT-5 GAP-2 TONE-1 TONE-2 TONE-3 | — |
 | `TextAction` `TextActionProps` | primitive | appearance: ActionAppearance; size: ActionTextSize; target: `_blank` \| `_self` | computed: FONT-1 FONT-2 FONT-3 GAP-2 MEASURE-3 PADDING-1 PADDING-2 PADDING-3 SURFACE-4 TONE-1 TONE-2 TONE-3 | — |
-| `SectionHeader` `SectionHeaderProps` | primitive | level: `1` \| `2` \| `3` \| `4`; composition: `section-header` \| `context-intro` | FLOW-3 MARGIN-0 | `starci-core-section-action` `starci-core-section-description` `starci-core-section-eyebrow` `starci-core-section-header` `starci-core-section-header-copy` `starci-core-section-title` |
+| `SectionHeader` `SectionHeaderProps` | primitive | level: `1` \| `2` \| `3` \| `4`; composition: `section-header` \| `context-intro` | FLOW-3 GAP-2 GAP-5 MARGIN-0 | `starci-core-section-action` `starci-core-section-description` `starci-core-section-eyebrow` `starci-core-section-header` `starci-core-section-header-copy` `starci-core-section-title` |
 | `MediaFrame` `MediaFrameProps` | primitive | aspect: `landscape` \| `portrait` \| `square` \| `auto`; fit: `cover` \| `contain`; treatment: `framed` \| `plain` | FLOW-3 GAP-2 MARGIN-0 computed: BOUNDARY-5 OVERFLOW-2 SURFACE-1 SURFACE-3 | `starci-core-media-caption` `starci-core-media-frame` `starci-core-media-viewport` |
 | `IncludedMark` `IncludedMarkProps` | primitive | — | — | `starci-core-included-mark` |
 | `RankArtwork` `RankArtworkProps` | primitive | kind: `first` \| `second` \| `third` \| `cup` | — | `starci-core-rank-artwork` |
@@ -112,16 +112,16 @@ This file is generated from the live `@starci/grammar` package, never written by
 | `StateMark` `StateMarkProps` | core | state: PresentationState | — | — |
 | `LeadingNumber` `LeadingNumberProps` | core | — | — | — |
 | `OtpInput` `OtpInputProps` | core | — | OVERFLOW-3 OVERFLOW-5 PADDING-1 | — |
-| `StaticStateRow` `StaticStateRowProps` | composite | state: PresentationState | BOUNDARY-3 GAP-1 GAP-2 PADDING-2 | — |
+| `StaticStateRow` `StaticStateRowProps` | composite | state: PresentationState | BOUNDARY-3 GAP-1 GAP-3 PADDING-4 | — |
 | `EmptyNotice` `EmptyNoticeProps` | composite | iconSource: IconSource; actionVariant: ButtonVariant | GAP-3 PADDING-4 | — |
-| `HorizontalScrollRegion` `HorizontalScrollRegionProps` | composite | — | — | — |
-| `VerticalScrollRegion` `VerticalScrollRegionProps` | composite | — | — | — |
+| `HorizontalScrollRegion` `HorizontalScrollRegionProps` | composite | — | MEASURE-3 OVERFLOW-3 OVERFLOW-5 PADDING-1 | `starci-core-horizontal-scroll-region` |
+| `VerticalScrollRegion` `VerticalScrollRegionProps` | composite | — | MEASURE-7 OVERFLOW-3 | — |
 | `SurfaceCard` `SurfaceCardProps` | branch | depth: `top` \| `nested`; state: PresentationState; frame: `bounded` \| `frameless`; scroll: `page` \| `contained`; composition: `single` \| `joined`; measure: `content` \| `form` \| `formCompact`; height: `auto` \| `fill` | GAP-2 computed: BOUNDARY-5 BOUNDARY-6 GAP-0 OVERFLOW-1 OVERFLOW-2 PADDING-0 PADDING-4 SURFACE-1 SURFACE-2 SURFACE-4 | `starci-core-frameless-surface` `starci-core-surface` `starci-core-surface-card` `starci-core-surface-card--fill` `starci-core-surface-content` `starci-core-surface-highlight` `starci-core-surface-highlight-sweep` `starci-core-surface-label` |
 | `SurfaceListCard` `SurfaceListCardProps` | branch | depth: `top` \| `nested` | GAP-2 OVERFLOW-2 PADDING-0 SURFACE-2 computed: FONT-1 FONT-2 TONE-2 | `starci-core-list-shell` `starci-core-owned-collection` `starci-core-surface` `starci-core-surface-footer` `starci-core-surface-label` `starci-core-surface-list` |
 | `FencedCodeBlock` `FencedCodeBlockProps` | branch | measure: `reading` \| `compact` | OVERFLOW-4 | — |
 | `MarkdownArticle` `MarkdownArticleProps` | branch | measure: `reading` \| `compact` | OVERFLOW-4 | — |
 | `MarkdownTableFrame` `MarkdownTableFrameProps` | branch | measure: `reading` \| `compact` | OVERFLOW-4 | — |
-| `SurfaceAccordionCard` `SurfaceAccordionCardProps` | branch | depth: `top` \| `nested` | BOUNDARY-3 GAP-2 MARGIN-0 PADDING-0 PADDING-3 PADDING-4 PADDING-8 TONE-1 computed: BOUNDARY-5 BOUNDARY-6 OVERFLOW-1 OVERFLOW-2 SURFACE-1 SURFACE-2 | `starci-core-accordion-body` `starci-core-accordion-heading` `starci-core-accordion-panel` `starci-core-accordion-row` `starci-core-accordion-scroll-region` `starci-core-accordion-shell` `starci-core-accordion-trigger` `starci-core-surface-accordion-card` |
+| `SurfaceAccordionCard` `SurfaceAccordionCardProps` | branch | depth: `top` \| `nested` | BOUNDARY-3 GAP-2 MARGIN-0 PADDING-0 PADDING-4 PADDING-8 TONE-1 computed: BOUNDARY-5 BOUNDARY-6 OVERFLOW-1 OVERFLOW-2 SURFACE-1 SURFACE-2 | `starci-core-accordion-body` `starci-core-accordion-heading` `starci-core-accordion-panel` `starci-core-accordion-row` `starci-core-accordion-scroll-region` `starci-core-accordion-shell` `starci-core-accordion-trigger` `starci-core-surface-accordion-card` |
 | `Rail` `RailProps` | branch | height: `content` \| `fill`; mode: `flow` \| `sticky`; width: `compact` \| `standard` \| `wide`; state: PresentationState; collapse: `expanded` \| `collapsed`; motion: `static` \| `animated` \| `reduced`; inset: `none` \| `content` | GAP-4 computed: MEASURE-6 OVERFLOW-3 PADDING-3 PADDING-5 | `starci-core-rail` `starci-core-rail-body` `starci-core-rail-footer` `starci-core-rail-frame` `starci-core-visually-hidden` |
 | `Subnav` `SubnavProps` | branch | position: `static` \| `sticky`; visibility: `always` \| `compact` | BOUNDARY-1 FLOW-4 GAP-2 GAP-3 PADDING-3 | `starci-core-subnav` `starci-core-subnav-identity` `starci-core-subnav-leading` `starci-core-subnav-title` `starci-core-subnav-toggle` |
 | `Tabs` `TabsProps` | branch | labelVisibility: `responsive` \| `always`; inset: `page` \| `none` | FLOW-2 GAP-2 OVERFLOW-4 PADDING-3 computed: PADDING-5 | `starci-core-tab-content` `starci-core-tab-label` `starci-core-tabs` `starci-core-tabs-frame` `starci-core-tabs-scroll` |
@@ -144,7 +144,3 @@ This file is generated from the live `@starci/grammar` package, never written by
 | `MediaFrame` | `MediaFrame` publishes no loading or error prop and renders no state | `packages/grammar/src/core/primitive/MediaFrame/index.tsx` |
 | `OtpInput` | `OtpInput` publishes `disabled` and `invalid` (not the `isDisabled`/`isError` names) and no skeleton input, so its unresolved state has no owner | `packages/grammar/src/core/OtpInput.tsx` |
 | `OtpInput` | `OtpInput` publishes no `label`, `hint`, or `errorMessage` slot; only `describedBy` links outside text, so its visible identity has no Common owner | `packages/grammar/src/core/OtpInput.tsx` |
-| `StaticStateRow` | claims `GAP-2 PADDING-2` while its CSS sets `gap: .75rem` (GAP-3) and `padding: 1rem` (PADDING-4); the compact `.5rem` gap exists only under a container query, so the published claim does not match the rendered value | `packages/grammar/src/core/composite/StaticStateRow/index.tsx`; `packages/grammar/src/common/styles.css` (`.starci-core-static-row`) |
-| `SurfaceAccordionCard` | the trigger claims `PADDING-4 PADDING-3` while `.starci-core-accordion-trigger` sets `padding: 1rem` only, so PADDING-3 has no rendered form | `packages/grammar/src/core/branch/SurfaceAccordionCard/index.tsx`; `packages/grammar/src/common/styles.css` (`.starci-core-accordion-trigger`) |
-| `HorizontalScrollRegion`, `VerticalScrollRegion` | both render a bare `ScrollShadow` with no class and no claim; `.starci-core-horizontal-scroll-region` (padding-block, max-content children, overscroll containment) is applied by callers, so the region owns nothing an audit can measure | `packages/grammar/src/core/composite/HorizontalScrollRegion/index.tsx`; `packages/grammar/src/core/composite/VerticalScrollRegion/index.tsx`; `packages/grammar/src/common/styles.css` (`.starci-core-horizontal-scroll-region`) |
-| `SectionHeader` | the root gap (`1.5rem`, GAP-5) and the copy column gap (`0.375rem`, off the scale) carry no claim; only the title carries `MARGIN-0 FLOW-3`, so the header spacing has no published owner | `packages/grammar/src/core/composite/SectionHeader/index.tsx`; `packages/grammar/src/common/styles.css` (`.starci-core-section-header`, `.starci-core-section-header-copy`) |

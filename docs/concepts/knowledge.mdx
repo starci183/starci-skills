@@ -1,0 +1,77 @@
+---
+title: "Knowledge"
+description: "ui, grammars and patterns: what each branch owns, who reads it, and why the English file is the only authority."
+---
+
+# Knowledge
+
+`knowledge/INDEX.md` opens with the boundary: "This tree contains decision authority, not workflow."
+Nothing in it describes how a mission proceeds; it describes what is true, so an operator can decide.
+
+## Three branches, placed by their reader
+
+| Branch | Decides | Read by |
+| --- | --- | --- |
+| `ui/composition/` | Constraints a direction must satisfy, after taste is decided in grammars | `frontend.direction.decide` |
+| `ui/presentation/` | Which CSS value an app-owned boundary takes | `frontend.presentation.resolve` |
+| `ui/proof/` | What only becomes true once rendered | `frontend.surface.audit` |
+| `grammars/<family>/` | One visual family's realization of Common | every operator that composes that family |
+| `patterns/fe`, `patterns/be` | How the code that produces all of it is written | `frontend.source.apply`, `backend.source.apply` |
+
+"A topic lives with the operator that reads it. A topic no operator reads has no reason to exist."
+
+### The test that places a topic
+
+`knowledge/ui/INDEX.md` states it as one question — whether reading source answers it. A spacing
+value is readable from a class, so it is presentation. The number of dominant actions is settled
+before any tree exists, so it is composition. Whether keyboard order matches visual order needs a
+running page, so it is proof.
+
+## ui: universal law
+
+`ui/` holds the law shared by every published Grammar family: 114 stable live `X-n` laws today, with
+observable selection conditions, ownership decisions, deterministic verdicts and audit vectors. It is
+explicitly not a cookbook, and it does not own business facts, page copy, routes, permissions,
+artwork identity, product effects, or family material choices.
+
+## grammars: one family's realization
+
+`knowledge/grammars/starci/` documents one visual family and the taste that directs how it is
+composed. It maps the universal `X-n` rules onto the live Core family; it never re-narrates renderer
+anatomy, because `DNA.md` — generated from the package — already says what exists. Its authority
+chain is a single line:
+
+```text
+knowledge/ui X-n → @starci/grammar/common props/anatomy/state → @starci/grammar/core DNA and scoped CSS → product adapter
+```
+
+Where a taste row disagrees with the package, the package is the fact and the row is the finding.
+
+## patterns: how the code is written
+
+`knowledge/patterns/fe/` and `be/` decide where a unit lives, what its files are called, how a
+component function is shaped, where a class string sits, how a failure is represented, and where the
+spec goes. The division of labour is stated as a pair: "A pattern rule never chooses a visual; a
+`ui/` rule never chooses a file name." Every rule was extracted by opening files and counting in the
+two live sources, and each table cites the files it was read from; where the code is split, the file
+records the dominant variant with its count instead of legislating.
+
+## Binding and identifiers
+
+An operator binds the smallest set of topics its decision needs, each with its fingerprint and
+complete rule inventory, and may emit no identifier outside that inventory. Reaching for an
+identifier outside the bound inventory is `UNKNOWN_RULE`; a condition no published case matches is
+`RULE_MISSING`, which is the knowledge owner's job, not a research task.
+
+Rule IDs are stable public addresses: append the next sequential `PREFIX-n`, and never renumber,
+reuse, or silently change the meaning of an existing one.
+
+## EN is authority, VI is a mirror
+
+> English `.md` files are the only runtime authority. Same-stem `.vi.md` files are human mirrors and
+> never enter a context manifest, a dependency list, a validator input, or an operator binding.
+
+The mirrors are complete, and `scripts/validate-templates.mjs` requires one for every `.md` a
+template claims — but a mirror is for a person reading, never for an agent deciding.
+
+The three reading indexes are reproduced at [Reference → Knowledge](/reference/knowledge).

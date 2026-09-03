@@ -8,14 +8,16 @@
   "validator": "validate.mjs",
   "selfTest": "self-test.mjs",
   "resources": {
-    "profile": "opus",
+    "profile": "luna",
     "requires": [
+      "webSearch",
+      "imageGeneration",
       "sourceWrite"
     ],
     "policy": {
-      "webSearch": "never",
+      "webSearch": "bounded",
       "grammarBound": true,
-      "imageGeneration": "never"
+      "imageGeneration": "judged"
     }
   }
 }

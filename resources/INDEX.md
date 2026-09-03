@@ -7,7 +7,7 @@ Who runs each operator, with what, and under which standing policies. Two closed
   (`capabilities`), and what an operator on that profile is allowed to use (`permits`).
 - `operators/<id>/operator.json` → `resources` — inside each operator: the one profile that runs it
   end to end, which grants it actually requires, and its answers to the three standing questions.
-  Each operator's `context.md` states the same binding in prose. There is no central assignment file.
+  Each operator's `operator.md` names the same aliases in its Context table. There is no central assignment file.
 
 `scripts/validate-resources.mjs` runs inside `npm test`. It rejects an operator whose `operator.json` declares no
 `resources`, an operator bound to an unknown profile, a required grant no assigned profile permits, a profile that permits
@@ -21,7 +21,7 @@ and this summary therefore cannot drift apart silently.
 An operator binds exactly one profile and runs on it end to end, never per invocation and never
 split across profiles: a critique, review, or judgement inside an operator is a step of that one
 execution, and a second model for it would be a workflow. The profile decides the model and the
-isolation; the operator's `execute.md` decides the work; `resources.requires` decides which grants that
+isolation; the operator's `operator.md` Steps decide the work; `resources.requires` decides which grants that
 work may touch. A grant absent from `requires` is unavailable to the operator even if the profile
 would permit it. Capability is a fact about the model; permission is a policy about the
 operator: `gpt-5.6-sol` can search, draw, drive a browser, and write source, so `sol-fresh` may use all
@@ -52,20 +52,20 @@ A summary of what each `operator.json` declares; the validator rejects a row tha
 
 | Operator | Profile | Web | Grammar | Images | Why this shape |
 | --- | --- | --- | --- | --- | --- |
-| `workspace.bind` | sonnet | never | no | never | Reads canonical files and a registry; no judgement |
+| `workspace.bind` | luna | bounded | no | never | Reads canonical files and a registry; no judgement |
 | `business.decide` | sol-fresh | bounded | no | never | An unfamiliar business model may need reference research before coverage can be frozen |
 | `architecture.decide` | sol-fresh | bounded | no | never | Alternatives and compatibility need evidence beyond the repo; schema pins the model |
-| `backend.source.apply` | opus | never | no | never | Writes inside a frozen contract following patterns/be |
+| `backend.source.apply` | luna | bounded | no | never | Writes inside a frozen contract following patterns/be |
 | `frontend.direction.decide` | sol-fresh | bounded | yes | judged | Research only for an unfamiliar domain; renders candidates as pages and judges for itself when a region is too empty to stand without an image |
-| `frontend.presentation.resolve` | sonnet | never | yes | never | A lookup against a closed inventory |
-| `frontend.source.apply` | opus | never | yes | never | Writes only what the resolution already contains, following patterns/fe |
-| `frontend.surface.audit` | sol-reviewer | never | yes | never | Browser only, no source write: the auditor cannot repair what it measures |
-| `quality.verify` | sonnet | never | no | never | Runs gates, repairs nothing |
-| `uat.verify` | sol-reviewer | never | no | never | Drives the real journey in a browser and may write nothing; fresh verdict per lane |
-| `release.deploy` | opus | never | no | never | Immutable release under declared authorization |
-| `platform.operate` | opus | never | no | never | Shared services from exact evidence |
+| `frontend.presentation.resolve` | luna | bounded | yes | judged | A lookup against a closed inventory |
+| `frontend.source.apply` | luna | bounded | yes | judged | Writes only what the resolution already contains, following patterns/fe |
+| `frontend.surface.audit` | sol-reviewer | bounded | yes | never | Browser only, no source write: the auditor cannot repair what it measures |
+| `quality.verify` | luna | bounded | no | never | Runs gates, repairs nothing |
+| `uat.verify` | sol-reviewer | bounded | no | never | Drives the real journey in a browser and may write nothing; fresh verdict per lane |
+| `release.deploy` | luna | bounded | no | never | Immutable release under declared authorization |
+| `platform.operate` | luna | bounded | no | never | Shared services from exact evidence |
 | `content.generate` | luna | bounded | no | required | Researches the brief within bounds, then writes, codes, and draws to a claim; the schema pins this model |
-| `git.publish` | sonnet | never | no | never | Non-force publication; destructive operations are unrepresentable |
+| `git.publish` | luna | bounded | no | never | Non-force publication; destructive operations are unrepresentable |
 
 ## Profiles
 
@@ -92,5 +92,5 @@ it today.
 
 A profile's model or grants, an operator's profile, and any policy answer are owner decisions.
 Changing one is an edit in the profile file or the operator's `operator.json`, the matching line in
-its `context.md`, and a green `npm test`. Adding a grant kind means adding
+its `operator.md`, and a green `npm test`. Adding a grant kind means adding
 it to every profile explicitly, because the validator refuses a profile that leaves a grant unstated.

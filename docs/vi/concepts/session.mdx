@@ -1,0 +1,83 @@
+---
+title: "Phiên"
+description: "Thư mục phiên, layout nhánh, hai cổng kiểm, và vòng đời từ lúc tạo tới lúc xoá."
+---
+
+# Phiên
+
+Phiên là nơi duy nhất công việc của một nhiệm vụ tồn tại trong lúc nó chạy.
+`resources/orchestrator.json` sở hữu luật của nó; các operator không đọc thẳng thư mục phiên, chúng
+đọc alias `@dynamic` trỏ đúng vào nhánh của chính mình.
+
+## Thư mục
+
+```text
+<Source>/.worktrees/sessions/<sessionId>/
+  state.json
+  step-1/parallel-1/
+  step-2/parallel-1/  step-2/parallel-2/
+  ...
+```
+
+Id có dạng `<yyyymmdd-HHMMss>-<project>-<operator đầu tiên>`. `state.json` là bản kê: id, project,
+`startedAt`, trạng thái (`running | blocked | done`), chuỗi dưới dạng danh sách khoá nhánh, `steps`
+ánh xạ từng khoá tới operator của nó, `current`, các `leases` mỗi agent đang giữ, và sha256 của
+`request/request.json` từng nhánh.
+
+## Một nhánh
+
+`step-<N>/parallel-<M>/` — N là vị trí trong chuỗi, M là nhánh song song, và `parallel-1` luôn tồn
+tại. Agent chỉ ghi `response/` của chính nhánh mình; agent của một trao đổi lồng chỉ ghi
+`<exchange>/response/` của nhánh đó. Một operator có ghi source thì ghi thêm nhánh phiên của
+checkout, dưới một lease độc quyền.
+
+```text
+request/request.json
+response/response.json
+response/response.md
+response/<other>.md            khi operator có thêm một cái
+response/data/
+response/artifacts/
+<exchange>/request/request.json và <exchange>/response/
+```
+
+## Hai cổng kiểm
+
+`templates/step/request.schema.json` và `templates/step/response.schema.json` là hai cổng dùng chung
+cho mọi operator và mọi trao đổi lồng. `scripts/validate-request.mjs` chạy trước agent;
+`scripts/validate-response.mjs` chạy sau, rồi tới `validate.mjs` của chính operator.
+
+`response.json` mang `status` (`done | blocked | waiting`), `stop` khi bị chặn, `awaiting` khi đang
+chờ, `fields` — sổ đăng ký những gì nhánh đã sinh, mỗi mục là đường dẫn tính từ nhánh — cùng
+`fallbacks`, `commits` và `next`.
+
+## Bàn giao
+
+Một kind được truyền bằng đường dẫn tường minh. Nhánh sinh ra nó ghi vào `response.json.fields`;
+orchestrator ghi `request.json.inputs` của nhánh kế tiếp trỏ tới `step-N/parallel-M/<path>` tính từ
+gốc phiên. Người sinh gần nhất trước đó là chỉ dẫn cho orchestrator, không bao giờ cho agent.
+
+## Vòng đời
+
+| Giai đoạn | Chuyện gì xảy ra |
+| --- | --- |
+| tạo | Orchestrator ghi `state.json` và lấy các lease trước khi agent đầu tiên khởi động |
+| nhánh | Mỗi agent nhận một nhánh mới với `request/request.json` đã ghi sẵn và đã băm vào `state.json` |
+| tiến | `done` cùng hai validator xanh; orchestrator ghi request của các nhánh kế tiếp |
+| chờ | `waiting` chạy trao đổi lồng, rồi khôi phục chính agent đó |
+| chặn | `blocked` giữ phiên trên đĩa; operator vào lại ở `step-(N+1)/parallel-1` với `resume` đã đặt |
+| xong | Định tuyến tới `user` hay `external`, hoặc `git.publish` phát `done`: nhả lease, xoá thư mục |
+
+Thứ sống sót sau khi phiên bị xoá là những gì các bậc đã publish — commit, business head, cặp UAT,
+các lần chạy từ xa — cùng bản ghi audit mà chủ sở hữu đã chép ra trước.
+
+## Ghi source
+
+Operator có ghi source chỉ ghi trên `session/<sessionId>` của checkout đã route, trong một git
+worktree mà orchestrator đã chuẩn bị từ head đã đóng băng. Nó commit đúng một lần tập file đã khai và
+ghi sha vào `response.json.commits`; nhánh mà người đang checkout không bao giờ bị đụng tới.
+`changes.md` gọi tên mọi đường dẫn kèm hash trước/sau và commit, nên các request kế tiếp ghim được
+checkout đúng vào thứ đã ghi. Sau đó `git.publish` merge nhánh phiên: fast-forward khi nhánh đích
+chưa nhúc nhích, và chỉ tạo merge commit khi không có xung đột và các gate đã chạy lại trên kết quả
+merge. Xung đột là `NON_FAST_FORWARD` và một người sẽ giải — không bao giờ rebase, không bao giờ
+force.

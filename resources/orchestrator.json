@@ -54,5 +54,19 @@
     "publish": "git.publish merges the session branch into the target branch: fast-forward when the target has not moved; a merge commit only when there is no conflict and the gates are re-run on the merge result; a conflict is NON_FAST_FORWARD and a person resolves it; never rebase, never force",
     "cleanup": "after a successful publish the worktree and the session branch are removed together with the session folder; a blocked session keeps both",
     "policy": "the routed checkout must declare gitPolicy.worktreeBranches = session-only (readiness/initialization/workspaces); a route declaring forbidden binds read-only and no source-writing operator may run against it"
+  },
+  "profileEquivalents": {
+    "rule": "an operator binds one profile; when the processor runs on a runtime that lacks that profile, it runs the equivalent profile of its own runtime with exactly the grants the operator requires, and response.json records both (boundProfile, ranProfile) so an audit can tell a stand-in from the binding",
+    "pairs": {
+      "opus": "sol-fresh",
+      "sonnet": "luna",
+      "fable": "sol-reviewer",
+      "sol-fresh": "opus",
+      "luna": "sonnet",
+      "sol-reviewer": "fable"
+    },
+    "grants": "the equivalent runs with the grants the operator requires that its own profile permits; a grant it cannot permit (Claude profiles cannot generate images) is unavailable for that run, so a judged image step records that no image could be made and the branch continues",
+    "imageVersusVisualize": "imageGeneration means artwork: a digital image produced by an image model (OpenAI profiles only). Rendering HTML (direction candidates, audit sheets, previews) is visualization, needs no grant, and every runtime does it.",
+    "policies": "every operator: webSearch bounded; imageGeneration judged for the frontend operators that compose or write a surface (direction, resolve, apply), required for content.generate, never elsewhere (audit captures, it does not draw; backend needs no artwork)"
   }
 }

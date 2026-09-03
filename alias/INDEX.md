@@ -1,6 +1,6 @@
 # Alias
 
-Every location an operator may read, by alias, grouped by zone. Generated from `alias/alias.json` (the machine registry) and every `operator.json` by `scripts/generate-alias-doc.mjs`; `--check` runs inside `npm test`. An operator reads only the aliases its own `context.md` Refs table names; this page is the whole vocabulary those tables draw from. Resolution takes the longest registered prefix, a sub-path narrows an alias, and a segment in angle brackets is supplied by the invocation.
+Every location an operator may read, by alias, grouped by zone. Generated from `alias/alias.json` (the machine registry) and every `operator.json` by `scripts/generate-alias-doc.mjs`; `--check` runs inside `npm test`. An operator reads only the aliases its own `operator.md` Context table names; this page is the whole vocabulary those tables draw from. Resolution takes the longest registered prefix, a sub-path narrows an alias, and a segment in angle brackets is supplied by the invocation.
 
 ## Workspaces — the working area
 

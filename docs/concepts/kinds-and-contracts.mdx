@@ -1,0 +1,52 @@
+---
+title: "Kinds and contracts"
+description: "How every file that crosses between steps is typed: markdown contracts, data schemas, and the templates that enforce them."
+---
+
+# Kinds and contracts
+
+A **kind** types a file. `templates/kinds/` "types every file that crosses between steps", and there
+are two flavours:
+
+- a markdown kind carries `<kind>.contract.json` plus a copyable `<kind>.skeleton.md`;
+- a data kind carries `<kind>.schema.json`, the JSON Schema of one machine kind.
+
+`scripts/validate-response.mjs` loads contracts by kind after every branch, so a document that does
+not satisfy its contract never routes.
+
+## What a markdown contract fixes
+
+A contract is pure JSON, itself checked against `kinds/contract.schema.json`. It states the `title`
+regex the first line must match, and the ordered `##` sections the document must carry. A section may
+carry `table`, the exact header row that must open it, and then:
+
+| Key | Meaning |
+| --- | --- |
+| `minRows` / `exactRows` | How many data rows the table must have |
+| `rows` | First-column values that must appear, backticks ignored |
+| `cell` | A regex per column that every data row's cell under that column must match |
+
+The templates README is precise about why the shape is this narrow: "The contract is the authority;
+the skeleton is how a person reads it."
+
+## Templates outside the session
+
+`templates/` also holds one template per authored document kind — the knowledge families
+(`ui-composition`, `ui-presentation`, `ui-proof`, `grammars`, `patterns`) and `operator.template.md`.
+Each carries a fenced `json template-contract` block that `scripts/validate-templates.mjs` enforces on
+every file the template applies to, and on that file's `.vi.md` mirror.
+
+Two rules from that README are worth carrying:
+
+- `INDEX.md` files are never claimed by a template: "they are reading indexes, not documents of a
+  kind."
+- "Every `.md` a template claims must have a same-stem `.vi.md`, checked against the `vi` form of the
+  same contract. The mirror is a human reading copy, never runtime authority."
+
+## Changing one
+
+Change the contract, run `node scripts/validate-templates.mjs`, and bring every document it names
+into conformance in the same commit. A template that the tree does not satisfy is not published.
+
+Every contract and every schema, with its sections and required properties, is listed under
+[Reference → Kinds](/reference/kinds).

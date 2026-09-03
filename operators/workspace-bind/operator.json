@@ -8,10 +8,12 @@
   "validator": "validate.mjs",
   "selfTest": "self-test.mjs",
   "resources": {
-    "profile": "sonnet",
-    "requires": [],
+    "profile": "luna",
+    "requires": [
+      "webSearch"
+    ],
     "policy": {
-      "webSearch": "never",
+      "webSearch": "bounded",
       "grammarBound": false,
       "imageGeneration": "never"
     }

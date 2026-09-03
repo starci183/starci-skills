@@ -8,12 +8,15 @@
   "validator": "validate.mjs",
   "selfTest": "self-test.mjs",
   "resources": {
-    "profile": "sonnet",
-    "requires": [],
+    "profile": "luna",
+    "requires": [
+      "webSearch",
+      "imageGeneration"
+    ],
     "policy": {
-      "webSearch": "never",
+      "webSearch": "bounded",
       "grammarBound": true,
-      "imageGeneration": "never"
+      "imageGeneration": "judged"
     }
   }
 }

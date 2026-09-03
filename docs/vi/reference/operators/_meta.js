@@ -1,0 +1,17 @@
+export default {
+  "index": "Các operator",
+  "architecture-decide": "architecture.decide",
+  "backend-source-apply": "backend.source.apply",
+  "business-decide": "business.decide",
+  "content-generate": "content.generate",
+  "frontend-direction-decide": "frontend.direction.decide",
+  "frontend-presentation-resolve": "frontend.presentation.resolve",
+  "frontend-source-apply": "frontend.source.apply",
+  "frontend-surface-audit": "frontend.surface.audit",
+  "git-publish": "git.publish",
+  "platform-operate": "platform.operate",
+  "quality-verify": "quality.verify",
+  "release-deploy": "release.deploy",
+  "uat-verify": "uat.verify",
+  "workspace-bind": "workspace.bind"
+}

@@ -1,6 +1,6 @@
 # Alias
 
-Mọi nơi một operator được đọc, theo alias, gom theo vùng. Sinh từ `alias/alias.json` (sổ cho máy) và mọi `operator.json` bởi `scripts/generate-alias-doc.mjs`; `--check` chạy trong `npm test`. Operator chỉ đọc những alias mà bảng Ref trong `context.md` của nó gọi tên; trang này là toàn bộ từ vựng mà các bảng đó lấy ra. Phân giải theo tiền tố đăng ký dài nhất, đuôi đường dẫn thu hẹp alias, đoạn trong ngoặc nhọn do lần gọi cung cấp.
+Mọi nơi một operator được đọc, theo alias, gom theo vùng. Sinh từ `alias/alias.json` (sổ cho máy) và mọi `operator.json` bởi `scripts/generate-alias-doc.mjs`; `--check` chạy trong `npm test`. Operator chỉ đọc những alias mà bảng Context trong `operator.md` của nó gọi tên; trang này là toàn bộ từ vựng mà các bảng đó lấy ra. Phân giải theo tiền tố đăng ký dài nhất, đuôi đường dẫn thu hẹp alias, đoạn trong ngoặc nhọn do lần gọi cung cấp.
 
 ## Workspaces — vùng làm việc
 

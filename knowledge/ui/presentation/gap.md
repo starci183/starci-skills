@@ -54,10 +54,12 @@ Generated from `@grammar/core` claims by `scripts/generate-presentation-owned.mj
 | `NavigationFeatureNav` | primary | GAP-3 |
 | `PrimaryRailLayout` | root | GAP-5 |
 | `Rail` | frame | GAP-4 |
+| `SectionHeader` | copy | GAP-2 |
+| `SectionHeader` | root | GAP-5 |
 | `Sidebar` | list box | GAP-1 |
 | `Sidebar` | list box item, not collapsed | GAP-3 |
 | `Sidebar` | list box section | GAP-1 |
-| `StaticStateRow` | root | GAP-2 |
+| `StaticStateRow` | root | GAP-3 |
 | `StaticStateRow` | row copy | GAP-1 |
 | `Subnav` | identity | GAP-2 |
 | `Subnav` | root | GAP-3 |

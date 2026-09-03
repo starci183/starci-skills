@@ -1,0 +1,69 @@
+---
+title: "Resources"
+description: "Profiles, grants, the three standing policy answers, and the orchestration rule of one agent per operator."
+---
+
+# Resources
+
+Who runs each operator, with what, and under which standing policies. Two closed places carry it, and
+`scripts/validate-resources.mjs` keeps them from drifting apart:
+
+- `resources/agents/profiles/<runtime>.json` — one file per runtime, `openai.json` and `claude.json`.
+  A profile carries a model, an isolation, its `capabilities` (what the model can do here) and its
+  `permits` (what an operator on that profile is allowed to use).
+- `operators/<id>/operator.json → resources` — the one profile that runs the operator end to end,
+  the grants it actually requires, and its answers to the three standing questions. There is no
+  central assignment file.
+
+## The binding rule
+
+> An operator binds exactly one profile and runs on it end to end, never per invocation and never
+> split across profiles: a critique, review, or judgement inside an operator is a step of that one
+> execution, and a second model for it would be a workflow.
+
+Capability and permission are different facts. Capability belongs to the model; permission is a
+policy about the operator. `sol-fresh` and `sol-reviewer` run the same model, but the reviewer is
+permitted only the browser, "because a reviewer that produces is no longer a reviewer." A grant
+absent from `requires` is unavailable even when the profile would permit it.
+
+## The three standing questions
+
+**Does it search the web when the tree holds no reference?** Only where `policy.webSearch` is
+`bounded` — the decision operators and the content brief. Research is bounded by the exact gap it must
+close, records what it used, and never copies a page, brand, palette, or component anatomy. A
+presentation value the knowledge does not publish is `RULE_MISSING`, never a research task.
+
+**Is it bound to published Grammar?** Where `policy.grammarBound` is true — the four frontend
+operators. A missing reusable capability is `GRAMMAR_REQUIRED` or `COMMON_CAPABILITY_MISSING`, never
+a local imitation.
+
+**Does it generate images?** Three values, and only three:
+
+| Value | Where | What it means |
+| --- | --- | --- |
+| `never` | Everywhere else | The operator does not generate images at all |
+| `judged` | `frontend.direction.decide` | The direction renders an inspectable page and judges for itself when a region is too empty to stand without an image; product artwork is generated only when product authority names it |
+| `required` | `content.generate` | An image is made to a stated claim and inspected for fidelity to it |
+
+## One agent per operator, at most three at once
+
+`resources/orchestrator.json` fixes the orchestration:
+
+> One invocation of one operator is one agent, created fresh on the operator's own profile with the
+> aliases its Context table declares and nothing else.
+
+The orchestrator owns dispatch: it writes the branch's `request.json`, validates it, starts the agent,
+validates the response, and follows `routing.json`. It never merges two operators into one agent and
+never lets an agent start another — a step that pauses with `waiting` is served by a *second* fresh
+agent, with its own `request/` and `response/` inside the branch.
+
+At most three agents run at once, and branches of one step run concurrently only when their writes
+touch no common alias. Two agents may read one checkout; only one may hold it for writing.
+`business.decide` is exclusive per businesses root, `platform.operate` per runtime owner.
+
+## Changing any of it
+
+A profile's model or grants, an operator's profile, and any policy answer are owner decisions.
+Changing one is an edit in the profile file and in the operator's `operator.json`, plus a green
+`npm test`. Adding a new grant kind means adding it to every profile explicitly, because the
+validator refuses a profile that leaves a grant unstated.

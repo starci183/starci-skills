@@ -41,3 +41,24 @@ Mỗi mục: cái gì, ở đâu, bằng chứng, vì sao. Mục nào thầy kh�
 - **`workflows/frontend-new-surface` ràng cả `be` lẫn `fe`** vì `business.decide` đọc `@workspaces/be` bắt buộc; `validate-workflows` giờ kiểm hai điều: mỗi cặp bậc liền kề phải có trong bảng Next của bậc trước, và `@workspaces/<role>` bắt buộc của một operator phải có `workspace.bind` role đó ở bậc trước.
 - **`response.json` có `reason` tuỳ chọn** để nhánh chặn sớm (chưa viết được `response.md`) vẫn ghi được vì sao chặn, thay vì lý do chỉ nằm trong transcript của agent.
 - **Bảng Next được bổ sung cạnh mà workflow đã dùng nhưng bảng chưa cho:** `workspace.bind` → `frontend.direction.decide`, `quality.verify`; `quality.verify` → `business.decide` (reconcile), `uat.verify`; `business.decide` → `git.publish`. `quality.verify` đổi `@workspaces/fe` và `@workspaces/be` từ "cả hai bắt buộc" thành "một trong hai" (luật của nó vốn đã nói một delivery, một head). `frontend-with-uat` ràng cả `be`.
+
+### Grammar (đã publish `@starci/grammar@0.4.1`, FE `main` f7167fa)
+
+- `StaticStateRow` claim `GAP-3 PADDING-4` (trước là `GAP-2 PADDING-2`, lệch CSS); trigger của `SurfaceAccordionCard` chỉ còn `PADDING-4`; `HorizontalScrollRegion` tự mang class `starci-core-horizontal-scroll-region` và claim `PADDING-1 MEASURE-3 OVERFLOW-3 OVERFLOW-5`; `VerticalScrollRegion` claim `MEASURE-7 OVERFLOW-3` ở nhánh cuộn; `SectionHeader` claim `GAP-5` ở gốc và `GAP-2` ở cột copy. **Thay đổi hình nhìn thấy được duy nhất:** gap cột copy của `SectionHeader` từ 0.375rem lên 0.5rem (2px) để về thang đóng. Bốn hàng Gaps tương ứng rút khỏi `family.md`; DNA và bảng "Common already owns" sinh lại. Test gói 33 file / 123 case xanh trước khi publish.
+
+### Resources
+
+- `orchestrator.json#profileEquivalents`: `opus ↔ sol-fresh`, `sonnet ↔ luna`, `fable ↔ sol-reviewer`; processor thiếu runtime của profile ràng thì chạy profile tương đương cùng grants và ghi cả hai vào response. `validate-resources` kiểm đối xứng và khác runtime. Vì thầy chạy Codex mà 7 operator đang ràng profile Claude.
+
+### Workflows / docs / cây
+
+- Năm workflow frontend ràng `workspace.bind fe` với `runtimeNeed: consume` để audit có endpoint (hai phiên thử đều chặn `RUNTIME_UNAVAILABLE` vì preset mặc định `none`).
+- `.gitignore` bỏ dòng `sites/` (tàn dư v7) để `sites/docs` và `sites/skills` vào được repo; `docs:check` vào `npm test`; sửa chữ cũ (`context.md`, `execute.md`, "Refs table") trong `resources/INDEX`, `alias/INDEX`.
+- `templates/README`: ghi rõ kind `artifact` cố ý không có hợp đồng.
+
+### Luật resources thầy chốt (áp lên cả 14 gói)
+
+- `webSearch: bounded` cho mọi operator; mọi profile được phép tìm mạng có giới hạn (Claude cũng vậy).
+- `imageGeneration`: `judged` cho `frontend.direction.decide`, `frontend.presentation.resolve`, `frontend.source.apply`; `required` cho `content.generate`; `never` cho phần còn lại. **Trò để `frontend.surface.audit` là `never`** dù là FE, vì audit chụp màn hình chứ không vẽ; thầy muốn `judged` luôn cho đồng bộ thì nói.
+- Phân biệt: `imageGeneration` = **artwork** (digital art do image model của OpenAI sinh); **visualize** bằng HTML (ứng viên, sheet, preview) không phải grant, runtime nào cũng render được. Ghi ở `orchestrator.json#profileEquivalents.imageVersusVisualize`.
+- Ràng lại profile về OpenAI vì processor là Codex: `sol-fresh` cho ba operator quyết (business, architecture, direction), `sol-reviewer` cho hai operator quan sát (audit, uat), `luna` cho chín operator thực thi/ghi. Profile Claude giữ làm tương đương (`opus ↔ sol-fresh`, `sonnet ↔ luna`, `fable ↔ sol-reviewer`); chạy bên Claude thì bước hình `judged` ghi "không sinh được" và đi tiếp vì Claude không vẽ.

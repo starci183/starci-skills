@@ -125,6 +125,15 @@ if (!Number.isInteger(orchestrator.maxConcurrentAgents) || orchestrator.maxConcu
   errors.push('orchestrator.json: maxConcurrentAgents must be an integer from 1 to 3');
 }
 if (orchestrator.dispatch !== 'routing.json') errors.push('orchestrator.json: dispatch must be routing.json');
+// A processor on one runtime must be able to stand in for every profile of the other runtime.
+const pairs = orchestrator.profileEquivalents?.pairs ?? {};
+for (const [id, profile] of Object.entries(profiles)) {
+  const eq = pairs[id];
+  if (!eq) { errors.push(`orchestrator.json: profileEquivalents lacks ${id}`); continue; }
+  if (!profiles[eq]) errors.push(`orchestrator.json: profileEquivalents maps ${id} to unknown profile ${eq}`);
+  else if (profiles[eq].runtime === profile.runtime) errors.push(`orchestrator.json: profileEquivalents maps ${id} to ${eq} on the same runtime`);
+  else if (pairs[eq] !== id) errors.push(`orchestrator.json: profileEquivalents is not symmetric for ${id} and ${eq}`);
+}
 
 if (errors.length > 0) {
   process.stderr.write(`${errors.join('\n')}\n`);

@@ -1,0 +1,19 @@
+---
+title: "Workflow"
+description: "Các chuỗi ví dụ mà entry dùng lại khi yêu cầu khớp với when của chúng."
+---
+
+# Workflow
+
+Một workflow là một chuỗi operator đã soạn sẵn. Entry đọc `when` của mọi ví dụ trước; khớp thì chạy đúng như đã viết, không khớp thì tự soạn một chuỗi theo đúng luật mà `scripts/validate-workflows.mjs` áp lên các tệp này.
+
+| Workflow | Số bước | Kết thúc ở | Khi nào |
+| --- | --- | --- | --- |
+| [`backend-feature`](/reference/workflows/backend-feature) | 7 | `git.publish` | Hành vi server, contract API, persistence hay job đổi cho một feature nghiệp vụ; kiến trúc quyết trước, lời hứa được đối chiếu sau khi code đã vào. |
+| [`content-unit`](/reference/workflows/content-unit) | 1 | `user` | Một đơn vị giáo trình cần brief, các ấn bản ngôn ngữ, track code và một lượt review độc lập; đưa lên MinIO vẫn là việc của người. |
+| [`frontend-new-surface`](/reference/workflows/frontend-new-surface) | 8 | `git.publish` | Một trang, luồng hay bề mặt chưa tồn tại cần được tạo; người dùng nêu route đích, lời hứa nghiệp vụ đã có hoặc sẽ được quyết trước. |
+| [`frontend-reconstruct`](/reference/workflows/frontend-reconstruct) | 7 | `git.publish` | Dựng lại một bề mặt đã có: đổi composition, thứ tự vùng, hierarchy hay cấu trúc responsive trong khi fact nghiệp vụ, hành vi và API giữ nguyên. |
+| [`frontend-refine`](/reference/workflows/frontend-refine) | 7 | `git.publish` | Cấu trúc đã duyệt của bề mặt giữ nguyên; chỉ sửa typography, spacing, label, control, state, token hay conformance Grammar bên trong. |
+| [`frontend-with-uat`](/reference/workflows/frontend-with-uat) | 8 | `git.publish` | Một thay đổi frontend còn phải đi qua hành trình của người thật trước khi publish; có người yêu cầu đích danh lần chạy UAT. |
+| [`full-feature`](/reference/workflows/full-feature) | 10 | `git.publish` | Một feature cần cả contract backend lẫn bề mặt frontend mới; hiện thực backend và hướng frontend chạy song song sau khi kiến trúc đã quyết. |
+| [`release`](/reference/workflows/release) | 3 | `release.deploy` | Một head đã publish phải lên production: kiểm, deploy và chứng minh trạng thái ổn định; phục hồi và rollback nằm trong release.deploy. |

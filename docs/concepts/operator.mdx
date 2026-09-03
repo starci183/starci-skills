@@ -1,0 +1,62 @@
+---
+title: "Operator"
+description: "One job in one linear pass: the shape of an operator package and the eight tables of operator.md."
+---
+
+# Operator
+
+An operator is the only thing in the tree that does work. The rule that shapes everything else about
+it is stated once, in `INDEX.md`:
+
+> An operator performs one job in one linear pass. It never calls another operator, routes a
+> workflow, pauses internally, or returns free-form control instructions. The parent alone maps a
+> validated output to the next transition.
+
+## The package
+
+`operators/<id>/` holds five files:
+
+| File | What it is |
+| --- | --- |
+| `operator.md` | The one authored file: Job, free law sections, then eight tables |
+| `operator.vi.md` | The human mirror; never runtime authority |
+| `operator.json` | `id`, `domain`, `job`, and `resources` (profile, grants, the three policy answers) |
+| `errors.json` | The stop codes this operator owns, with disposition, domain and fallback |
+| `validate.mjs` | What only this operator can check about its own response |
+| `self-test.mjs` | Proves the validator; `npm test` runs every one |
+
+`templates/operator.template.md` is the contract `scripts/validate-operator.mjs` enforces: the title
+must be `# <operator.id>`, and the document must carry Job, free law sections, Context, Inputs,
+Requirements, Steps, Outputs, Stops and Next, each with its table. The validator then checks those
+tables against each other, against `errors/`, and against `templates/kinds`.
+
+## The eight tables
+
+| Table | Columns | What it fixes |
+| --- | --- | --- |
+| Context | Alias, Bind, Required | Every location the operator may read, by alias, and how each one is bound |
+| Inputs | Kind, From, Required | The kinds an earlier branch must have produced |
+| Requirements | Field, Type, Default, Ask | What `request.json` carries; a field whose Default is `—` is asked of a person |
+| Steps | #, Step, Params, Reads, Writes, Stops with | The linear pass, and which code each step may stop with |
+| Outputs | Kind, File, Type, Required | Every file the branch produces and the kind that types it |
+| Stops | Code, Disposition | Every code the operator may emit |
+| Next | When, Operator | Where a done response may hand to |
+
+The law sections between Job and Context are the operator's own prose — `architecture.decide` carries
+"Observe before proposing", "Incumbency is not authority", "Prove, do not assume", "The critique is a
+nested exchange" and "Boundary". They are read as part of the package, and the reference pages
+reproduce them verbatim.
+
+## Authority lives in the schema, not in prose
+
+`INDEX.md` puts it this way: "Authority lives in operator schemas, not in this file or in `SKILL.md`.
+`git.publish` cannot express a force push; `release.deploy` cannot run without its declared
+authorization; `uat.verify` has no field that can hold a credential." An operator that seems to need
+more than it allows has given the answer, not hit an obstacle.
+
+## Reading one
+
+Do not preload the tree. An operator binds the smallest set of topics its decision needs, each with
+its fingerprint and complete rule inventory, and may emit no identifier outside that inventory. The
+generated pages under [Reference → Operators](/reference/operators) are those `operator.md` files as
+they stand.

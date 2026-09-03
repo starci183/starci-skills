@@ -1,0 +1,111 @@
+---
+title: "Bắt đầu"
+description: "Một nhiệm vụ chạy như thế nào: workspace.bind, khớp workflow hay tự ghép chuỗi, request.json, layout nhánh, hai validator, mã dừng và chạy lại."
+---
+
+# Một nhiệm vụ chạy như thế nào
+
+Một nhiệm vụ là một lượt đi qua cây, từ yêu cầu của một người tới một ranh giới đã publish, hoặc tới
+một câu hỏi mà chỉ người mới trả lời được. Không bước nào dưới đây là lời khuyên tuỳ nghi: mỗi bước
+là một luật đã ghi trong `SKILL.md`, `workflows/README.md` hoặc `resources/orchestrator.json`.
+
+## 1. Đóng băng phạm vi
+
+`SKILL.md` mở đầu bằng việc đóng băng một phạm vi nhiệm vụ: "đơn vị, đích, phần bao gồm và phần loại
+trừ, các gốc được ghi, hiệu ứng ra bên ngoài, và thứ sẽ được tính là bằng chứng. Hai cách đọc làm đổi
+bất kỳ điểm nào trong số đó là một câu hỏi tập trung, không phải một phỏng đoán."
+
+## 2. Bind workspace
+
+`workspace.bind` chạy cho mọi nhiệm vụ có đọc hoặc ghi source đã route. Không thứ gì khác được phép
+tự tìm checkout, và một thư mục trùng tên không bao giờ là thẩm quyền route. Nó trả về một receipt
+route có kiểu: danh tính checkout đã xác minh, head nguồn chính xác, và binding runtime đóng mà nhiệm
+vụ được phép tiêu thụ. Xem [`workspace.bind`](/vi/reference/operators/workspace-bind).
+
+## 3. Khớp một workflow, hoặc tự ghép
+
+Cửa vào đọc `when` của mọi ví dụ trong `workflows/`. Khớp thì chạy đúng như đã ghi, preset điền vào
+`request.json`, và người chỉ bị hỏi những field không có mặc định. Không khớp thì tự ghép một chuỗi
+từ bảng `## Kế tiếp` của các operator, theo đúng luật mà `scripts/validate-workflows.mjs` ép lên các
+ví dụ: mọi Input bắt buộc của một nhánh phải do một bậc trước sinh ra, các nhánh trong cùng một bậc
+không dùng chung alias ghi, mỗi vòng lặp quay về bậc trước và mang `maxRounds`, và chuỗi kết thúc ở
+`git.publish`, `release.deploy` hoặc `user`. Chuỗi tự ghép đáng giữ thì thành một ví dụ mới.
+
+## 4. Một agent, một operator
+
+Một lần gọi một operator là một agent, được tạo mới trên đúng profile mà `operator.json` của nó gọi
+tên, chỉ với những quyền và những alias mà bảng Context của nó khai. Tối đa ba agent chạy cùng lúc.
+Một agent không bao giờ khởi động agent khác; một trao đổi lồng — một lượt phản biện, một lượt
+review — là một agent mới toanh do orchestrator sinh ra cho nhánh đang tạm dừng. Xem
+[Tài nguyên](/vi/concepts/resources).
+
+## 5. `request.json`
+
+Orchestrator ghi `request/request.json` của nhánh và kiểm nó bằng `scripts/validate-request.mjs`
+trước khi agent khởi động. Cổng vào là
+[`templates/step/request.schema.json`](https://github.com/starci183/starci-skills/blob/main/templates/step/request.schema.json),
+mang `operatorId`, `step`, `parallel`, `sessionId`, danh sách `contexts` mỗi mục kèm `head` đã đóng
+băng, `requirements` theo bảng Yêu cầu của operator, `inputs` — mỗi input là một đường dẫn tường minh
+từ gốc phiên tới file mà một nhánh trước đã sinh — và `resume`.
+
+## 6. Layout nhánh
+
+Gốc phiên là `<Source>/.worktrees/sessions/<sessionId>/`, với `state.json` nằm cạnh các bậc. Một
+nhánh là `step-<N>/parallel-<M>/`, và `parallel-1` luôn tồn tại:
+
+```text
+step-<N>/parallel-<M>/
+  request/request.json                cổng vào; orchestrator ghi
+  response/response.json              cổng ra; thứ duy nhất định tuyến đọc
+  response/response.md                kind tài liệu của operator
+  response/<other>.md                 khi operator có thêm một cái
+  response/data/<name>.json           các kind máy đọc
+  response/artifacts/<file>           phần còn lại
+  <exchange>/request/ và response/    một trao đổi lồng
+```
+
+Đường dẫn được viết khác nhau tuỳ chỗ: trong `inputs` của `request.json` thì tính từ gốc phiên
+(`step-1/parallel-1/response/response.md`); trong `fields` của `response.json` và trong bảng Đầu ra
+của operator thì tính từ chính nhánh đó (`response/response.md`).
+
+## 7. Hai validator, rồi mới định tuyến
+
+```text
+request/request.json -> validate-request.mjs -> agent ghi response/ -> validate-response.mjs + validate.mjs của operator -> định tuyến
+```
+
+`validate-response.mjs` kiểm cổng chung và nạp contract của từng kind; `validate.mjs` của operator
+kiểm những gì chỉ operator đó kiểm được. Sau đó định tuyến mới nhìn `response.json`:
+
+- `done` đẩy chuỗi sang bậc kế tiếp mà workflow gọi tên;
+- `waiting` chạy trao đổi lồng mà response đang chờ, rồi khôi phục chính agent đó, trong khi các nhánh
+  anh em vẫn chạy;
+- `blocked` đọc `stop`.
+
+"Response trượt một trong hai validator thì không định tuyến. Văn xuôi trong `response.md` không định
+tuyến. Chỉ một trường đã validate của `response.json` mới định tuyến."
+
+## 8. Mã dừng
+
+Nhánh bị chặn mang theo một mã. Mã được tra trong sổ gộp — `operators/errors.json` cho các mã nhiều
+operator dùng chung, cộng `errors.json` riêng của operator — để lấy `domain`, và domain đó được giải
+trong `routing.json` thành một trong bốn loại: `operator` gọi operator được nêu tên, `resume` vào lại
+chính operator đó ở một bậc mới, `user` dừng và báo người phải quyết gì, `external` dừng và báo thứ
+gì bên ngoài runtime phải đổi. Mã có cách xử lý `fallback` thì không chặn: agent làm đúng hành động
+đã ghi, ghi lại dưới `## Fallbacks taken`, rồi chạy tiếp. Xem [Mã dừng](/vi/concepts/stop-codes) và
+[sổ mã đầy đủ](/vi/reference/stop-codes).
+
+## 9. Chạy lại
+
+Nhánh bị chặn nằm lại trên đĩa làm bằng chứng. Nó vào lại chính operator đó như một agent mới ở
+`step-(N+1)/parallel-1`, với `request.json.resume` gọi tên bậc và nhánh đã bị chặn. Một lần chạy lại
+không mang thêm bằng chứng, ràng buộc, kiểm kê hay phê duyệt mới thì dừng với `NO_PROGRESS`, và
+`SKILL.md` nói rõ điều đó nghĩa là gì: cùng một input đã đâm vào cùng một bức tường, hãy báo bức
+tường thay vì thử lại.
+
+## 10. Kết thúc phiên
+
+Thư mục phiên do orchestrator tạo trước khi agent đầu tiên khởi động và bị xoá khi `git.publish` xong
+việc. Thứ sống sót là những gì các bậc đã publish — commit, business head, cặp UAT, các lần chạy từ
+xa — cùng bất kỳ bản ghi audit nào chủ sở hữu đã chép ra trước. Một phiên bị chặn giữ lại thư mục và
+nhánh phiên của nó để chạy lại.
