@@ -18,7 +18,7 @@ const errors = [];
 
 if (registry.schemaVersion !== 8) errors.push('alias.json: schemaVersion must be 8');
 const aliases = registry.aliases ?? {};
-const KINDS = new Set(['file', 'dir', 'checkout', 'service', 'caller-supplied']);
+const KINDS = new Set(['file', 'dir', 'checkout', 'service', 'caller-supplied', 'tool']);
 for (const [alias, def] of Object.entries(aliases)) {
   if (!/^@[a-z][a-z-]*(?:\/[a-z_][a-z0-9_-]*)*$/.test(alias)) errors.push(`alias.json: alias ${alias} must look like @name or @name/sub/path`);
   for (const key of ['params', 'kind', 'resolvesTo', 'scheme', 'bind', 'writers', 'purpose']) {
@@ -85,11 +85,20 @@ async function checkOperatorMd(dir, id) {
     if (base) { declaredBases.add(base); if (isYes(row.required)) requiredBases.add(base); }
     count += 1;
   }
+  // @tools/<id> in a Steps cell is a call, not a read: it must be declared in operator.json → resources.tools.
+  const manifest = JSON.parse(await readFile(path.join(dir, 'operator.json'), 'utf8'));
+  const declaredTools = new Set(Object.keys(manifest.resources?.tools ?? {}));
   for (const [file, lang] of [['operator.md', 'en'], ['operator.vi.md', 'vi']]) {
     if (!existsSync(path.join(dir, file))) continue;
     const op = lang === 'en' ? en : parseOperatorMd(await readFile(path.join(dir, file), 'utf8'), 'vi');
     const used = new Set();
-    for (const step of op.tables.steps?.rows ?? []) for (const a of [...cellAliases(step.reads), ...cellAliases(step.writes)]) { if (a.startsWith('@dynamic')) { errors.push(`${id}: ${file} step ${step.n} names ${a}; an operator.md package passes dynamic files as kinds, not aliases`); continue; } used.add(baseOf(a) ?? a); }
+    const toolsUsed = new Set();
+    for (const step of op.tables.steps?.rows ?? []) for (const a of [...cellAliases(step.reads), ...cellAliases(step.writes)]) {
+      if (a.startsWith('@dynamic')) { errors.push(`${id}: ${file} step ${step.n} names ${a}; an operator.md package passes dynamic files as kinds, not aliases`); continue; }
+      if (a.startsWith('@tools/')) { toolsUsed.add(a); if (!aliases[a]) errors.push(`${id}: ${file} step ${step.n} names ${a}, which resources/tools.json does not define`); else if (!declaredTools.has(a)) errors.push(`${id}: ${file} step ${step.n} calls ${a}, which operator.json resources.tools does not declare`); continue; }
+      used.add(baseOf(a) ?? a);
+    }
+    if (lang === 'en') for (const t of declaredTools) if (!toolsUsed.has(t) && t !== '@tools/fileread') errors.push(`${id}: operator.json declares ${t} but no step names it`);
     for (const u of used) if (!declaredBases.has(u)) errors.push(`${id}: ${file} Steps read or write ${u}, which the Context table does not declare`);
     for (const r of requiredBases) if (!used.has(r)) errors.push(`${id}: ${file} Steps never read or write required ${r}`);
     if (used.size === 0) errors.push(`${id}: ${file} Steps name no alias at all`);

@@ -1,7 +1,8 @@
 // Proves validate.mjs on a synthetic session branch: one conforming implementation of a frozen
 // contract committed once on the session branch, with its change record, one conformance file per
-// facet and one proof file per proof kind, one branch blocked on a terminate code, and one mutation
-// per law, each of which must fail with a line that names the defect.
+// facet and one proof file per proof kind, one dry run that plans the same write set and commits,
+// measures and writes nothing, one branch blocked on a terminate code, and one mutation per law,
+// each of which must fail with a line that names the defect.
 import assert from 'node:assert/strict';
 import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -29,15 +30,16 @@ const CHANGES = [
   { path: WRITER, change: 'added', operationId: OP, beforeHash: null, afterHash: hash('1') },
   { path: SPEC, change: 'added', operationId: OP, beforeHash: null, afterHash: hash('2') },
 ];
-const mutationsJson = ({ operations = [operation()], changes = CHANGES, commit = COMMIT, base = BASE, branch = BRANCH } = {}) => ({
-  contractFingerprint: CONTRACT_FP, base, branch, commit, operations, changes,
+const DRY_CHANGES = CHANGES.map((c) => ({ ...c, afterHash: null }));
+const mutationsJson = ({ operations = [operation()], changes = CHANGES, commit = COMMIT, base = BASE, branch = BRANCH, mode = 'apply' } = {}) => ({
+  mode, contractFingerprint: CONTRACT_FP, base, branch, commit, operations, changes,
 });
 const conformanceRecord = (facet, overrides = {}) => ({ operationId: OP, facet, verdict: 'conforms', evidenceRef: `${SPEC}:40`, statement: `the ${facet} of the operation matches the contract`, contractFingerprint: CONTRACT_FP, ...overrides });
 const proofRecord = (proofKind, overrides = {}) => ({ operationId: OP, proofKind, commandRef: `npm run test:${proofKind}`, exitCode: 0, result: 'passed', output: `${proofKind} suite: 12 passed`, statement: `the ${proofKind} proof ran and passed`, contractFingerprint: CONTRACT_FP, ...overrides });
 const conformancePath = (operationId, facet) => `response/data/conformance/${operationId}.${facet}.json`;
 const proofPath = (operationId, proofKind) => `response/data/proofs/${operationId}.${proofKind}.json`;
 
-function responseMd({ operations = null, changes = null, findings = null, contractFingerprint = CONTRACT_FP, commit = COMMIT, base = BASE, branch = BRANCH } = {}) {
+function responseMd({ operations = null, changes = null, findings = null, contractFingerprint = CONTRACT_FP, commit = COMMIT, base = BASE, branch = BRANCH, mode = 'apply' } = {}) {
   const operationRows = (operations ?? [[OP, 'graphql-mutation', WRITER, 'single-transaction', 'request-token', 'BA-1']]).map((r) => `| \`${r[0]}\` | ${r[1]} | \`${r[2]}\` | ${r[3]} | ${r[4]} | ${r[5]} |`).join('\n');
   const changeRows = (changes ?? [[WRITER, 'added', OP, '—', hash('1')], [SPEC, 'added', OP, '—', hash('2')]]).map((r) => `| \`${r[0]}\` | ${r[1]} | \`${r[2]}\` | ${r[3]} | ${r[4]} |`).join('\n');
   const findingRows = (findings ?? [['PATTERN_BOUND', OP, WRITER, 'the mutation handler mirrors the published command family']]).map(([code, op, file, statement]) => `| \`${code}\` | ${op === null ? '—' : `\`${op}\``} | ${file === null ? '—' : `\`${file}\``} | ${statement} |`).join('\n');
@@ -51,6 +53,7 @@ The enrolment mutation, filled inside the frozen contract and measured on every 
 | --- | --- |
 | Outcome | one enrolment mutation behind the paid access promise |
 | Feature | paid-access |
+| Mode | ${mode} |
 | Contract fingerprint | ${contractFingerprint} |
 | Base | ${base} |
 | Branch | ${branch} |
@@ -77,7 +80,7 @@ ${findingRows}
 }
 
 const changesMd = ({ files = null, checkout = `\`@workspaces/be\` at \`${BASE}\` → \`${COMMIT}\` on \`${BRANCH}\`` } = {}) => {
-  const rows = (files ?? [[WRITER, 'created'], [SPEC, 'created']]).map(([p, kind]) => `| \`${p}\` | ${kind} | the decision this file carries | BE-1 |`).join('\n');
+  const rows = (files ?? [[WRITER, 'created'], [SPEC, 'created']]).map(([p, kind, why]) => `| \`${p}\` | ${kind} | ${why ?? 'the decision this file carries'} | BE-1 |`).join('\n');
   return `# changes — backend.source.apply step-1/parallel-1
 
 The enrolment mutation and its unit spec were written into the session branch of the routed backend
@@ -167,6 +170,20 @@ async function expectError(files, needle, label) {
   rmSync(session, { recursive: true, force: true });
   assert.ok(errors.some((e) => e.includes(needle)), `${label}: expected an error containing "${needle}", got:\n${errors.join('\n') || '(none)'}`);
 }
+// A dry run: the same plan, with nothing committed, nothing measured and nothing moved in the tree.
+const dryFiles = () => ({
+  'request/request.json': requestJson({ extra: { mode: 'dry' } }),
+  'response/response.json': responseJson({
+    commits: [],
+    fields: { 'backend-source-application': 'response/response.md', changes: 'response/changes.md', mutations: 'response/data/mutations.json' },
+  }),
+  'response/response.md': responseMd({ mode: 'dry', commit: '—', changes: [[WRITER, 'added', OP, '—', '—'], [SPEC, 'added', OP, '—', '—']] }),
+  'response/changes.md': changesMd({
+    files: [[WRITER, 'unchanged', 'the mutation handler this run would add'], [SPEC, 'unchanged', 'the unit spec this run would add']],
+    checkout: `\`@workspaces/be\` at \`${BASE}\` on \`${BRANCH}\`, nothing written`,
+  }),
+  'response/data/mutations.json': mutationsJson({ mode: 'dry', commit: null, changes: DRY_CHANGES }),
+});
 const blockedFiles = () => ({
   'request/request.json': requestJson(),
   'response/response.json': responseJson({ status: 'blocked', stop: 'CONTRACT_WIDENED', fields: {}, commits: [], next: [] }),
@@ -189,6 +206,7 @@ const withOperation = (patch) => {
 };
 
 await expectValid(baseline(), 'one operation filled inside the frozen contract and committed once');
+await expectValid(dryFiles(), 'a dry run that plans the write set and commits, measures and writes nothing');
 await expectValid(blockedFiles(), 'blocked on a contract the outcome would widen');
 
 await expectError({ ...baseline(), 'response/response.json': { ...responseJson(), stop: 'CONTRACT_WIDENED' } }, 'only a blocked response carries a stop', 'done with a stop');
@@ -228,5 +246,12 @@ await expectError({ ...baseline(), 'response/response.md': responseMd({ contract
 await expectError({ ...baseline(), 'response/changes.md': changesMd({ files: [[WRITER, 'created']] }) }, 'which the change record omits', 'a changed file missing from the change record');
 await expectError({ ...baseline(), 'response/response.md': responseMd().replace('## Changes', '## Change set') }, 'missing section ^## Changes$', 'response section renamed');
 await expectError({ ...baseline(), 'response/response.json': (() => { const o = responseJson(); delete o.fields.mutations; return o; })() }, 'required output mutations is not in fields', 'missing required output');
+await expectError({ ...baseline(), 'response/response.json': (() => { const o = responseJson(); delete o.fields.conformance; return o; })() }, 'required output conformance is not in fields', 'an applied branch that measured no facet');
+await expectError({ ...dryFiles(), 'response/data/mutations.json': mutationsJson({ mode: 'dry', commit: COMMIT, changes: DRY_CHANGES }) }, 'a dry run commits nothing, so commit must be null', 'a dry plan carrying a commit');
+await expectError({ ...dryFiles(), 'response/response.json': responseJson({ commits: [COMMIT], fields: { 'backend-source-application': 'response/response.md', changes: 'response/changes.md', mutations: 'response/data/mutations.json' } }) }, 'a dry run records no commit', 'a dry run that committed');
+await expectError({ ...dryFiles(), 'response/data/mutations.json': mutationsJson({ mode: 'dry', commit: null }) }, 'reports an after hash under a dry run', 'a dry plan carrying an after hash');
+await expectError({ ...dryFiles(), ...records(), 'response/response.json': responseJson({ commits: [], fields: { ...responseJson().fields } }) }, 'a dry run measures nothing', 'a dry run carrying conformance and proof records');
+await expectError({ ...dryFiles(), 'response/changes.md': changesMd({ files: [[WRITER, 'created'], [SPEC, 'created']], checkout: `\`@workspaces/be\` at \`${BASE}\` on \`${BRANCH}\`, nothing written` }) }, 'under a dry run, which leaves every path unchanged', 'a dry change record reporting a move');
+await expectError({ ...dryFiles(), 'response/data/mutations.json': mutationsJson({ commit: null, changes: DRY_CHANGES }) }, "mode apply differs from the request's dry", 'a plan that re-decides the mode');
 
-process.stdout.write('backend.source.apply self-test: 2 valid branches, 36 rejected mutations\n');
+process.stdout.write('backend.source.apply self-test: 3 valid branches, 43 rejected mutations\n');

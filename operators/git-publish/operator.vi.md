@@ -139,11 +139,11 @@ giới đã duyệt; và không publish khi chưa có route đã kiểm và mộ
 | 2 | Ràng route | — | Đầu vào `workspace-route-binding`: checkout đã kiểm, head và chính sách đã route của nó, cùng @workspaces/local/routes/<project>/<role> | — | `ROUTE_UNVERIFIED` |
 | 3 | Ràng phê duyệt vào đúng ranh giới này | `boundary`, `approval` | phần requirements của `request/request.json`, Đầu vào `changes` là tập file, Đầu vào `quality-verification` là commit đã đo | — | `APPROVAL_MISSING` |
 | 4 | Kiểm cây: bẩn ngoài ranh giới, chính sách nhánh | — | @workspaces/local/routes/<project>/<role>, các path bẩn, mọi nhánh, chính sách đã route | — | `DIRTY_OUTSIDE_BOUNDARY`, `BRANCH_POLICY_VIOLATION` |
-| 5 | Chạy hook | — | @workspaces/<project>/<role>/husky: các hook đã cài, trong đó có `pre-push` | — | `HOOK_BLOCKED` |
-| 6 | Merge nhánh phiên vào nhánh đích | — | @workspaces/local/routes/<project>/<role> cho head đích, base phiên và head phiên | @workspaces/local/routes/<project>/<role>, nhánh đích của checkout đó | `NON_FAST_FORWARD` |
-| 7 | Push non-force, chỉ fast-forward | — | @workspaces/local/routes/<project>/<role> cho head đã duyệt, @remote/git/<project>/<role> tại remote head quan sát được | @remote/git/<project>/<role> | `NON_FAST_FORWARD` |
-| 8 | Push tag tiếp nối | `tag` | @workspaces/local/routes/<project>/<role> cho head mà lần publish này đã đẩy | @remote/git/<project>/<role> | — |
-| 9 | Xóa worktree và nhánh phiên, viết biên bản và phát | — | mọi thứ ở trên | @workspaces/local/routes/<project>/<role>, `response/response.md`, `response/response.json` | — |
+| 5 | Chạy hook | — | @workspaces/<project>/<role>/husky: các hook đã cài, trong đó có `pre-push` | @tools/shell | `HOOK_BLOCKED` |
+| 6 | Merge nhánh phiên vào nhánh đích | — | @workspaces/local/routes/<project>/<role> cho head đích, base phiên và head phiên | @workspaces/local/routes/<project>/<role>, nhánh đích của checkout đó, @tools/git | `NON_FAST_FORWARD` |
+| 7 | Push non-force, chỉ fast-forward | — | @workspaces/local/routes/<project>/<role> cho head đã duyệt, @remote/git/<project>/<role> tại remote head quan sát được, @tools/ci | @remote/git/<project>/<role>, @tools/git | `NON_FAST_FORWARD` |
+| 8 | Push tag tiếp nối | `tag` | @workspaces/local/routes/<project>/<role> cho head mà lần publish này đã đẩy | @remote/git/<project>/<role>, @tools/git | — |
+| 9 | Xóa worktree và nhánh phiên, viết biên bản và phát | — | mọi thứ ở trên | @workspaces/local/routes/<project>/<role>, `response/response.md`, `response/response.json`, @tools/git | — |
 
 Tạo một remote ref và fast-forward một remote ref là hai hành động khác nhau với hai người duyệt khác
 nhau, nên head đã publish ghi lại nó đã làm cái nào. Một lần resume bắt đầu lại từ cổng vào, chỉ dùng

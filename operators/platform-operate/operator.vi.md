@@ -115,12 +115,12 @@ release hay bằng chứng UAT nào.
 | # | Bước | Tham số | Đọc | Ghi | Dừng với |
 | --- | --- | --- | --- | --- | --- |
 | 1 | Kiểm cổng vào và resume | `resume` | `request/request.json`, @worktrees/sessions/central-runtime tại generation đã đóng băng | — | `INVALID_INPUT`, `SOURCE_DRIFT`, `NO_PROGRESS` |
-| 2 | Ràng thẩm quyền: runtime, device-state, projects và phê duyệt | `service`, `approval` | @worktrees/sessions/central-runtime cho fingerprint và generation của inventory, @workspaces/device-state cho từng handle capability kèm bằng chứng custody, @workspaces/projects/<project>/<role> | — | `AUTHORITY_DRIFT`, `CAPABILITY_MISSING` |
-| 3 | Kiểm lại inventory một lần trước khi có gì thay đổi | — | @worktrees/sessions/central-runtime, các resource đã khai được quan sát lại một lần | — | `INVENTORY_DRIFT` |
+| 2 | Ràng thẩm quyền: runtime, device-state, projects và phê duyệt | `service`, `approval` | @worktrees/sessions/central-runtime cho fingerprint và generation của inventory, @workspaces/device-state cho từng handle capability kèm bằng chứng custody, @workspaces/projects/<project>/<role>, @tools/secrets | — | `AUTHORITY_DRIFT`, `CAPABILITY_MISSING` |
+| 3 | Kiểm lại inventory một lần trước khi có gì thay đổi | — | @worktrees/sessions/central-runtime, các resource đã khai được quan sát lại một lần, @tools/git | — | `INVENTORY_DRIFT` |
 | 4 | Phân giải các port claim | `portClaims` | @workspaces/ports/<project> cho các cổng được claim, @worktrees/sessions/central-runtime cho chủ giữ quan sát được của chúng | — | `PORT_CONFLICT` |
 | 5 | Suy ra delta giữa cái quan sát được và cái mong muốn | `desiredState` | @worktrees/sessions/central-runtime cho trạng thái quan sát được, `request/request.json` cho trạng thái mong muốn | `response/data/delta.json` | — |
-| 6 | Áp delta đã duyệt, từng resource một, dưới một lease độc quyền | — | @worktrees/sessions/central-runtime, @workspaces/device-state cho các handle theo tên | @worktrees/sessions/central-runtime, `response/data/delta.json` | `EFFECT_UNAUTHORIZED`, `SERVICE_UNAVAILABLE` |
-| 7 | Chứng minh mọi check bắt buộc | — | @worktrees/sessions/central-runtime đọc lại theo bộ chứng minh đầy đủ của nhánh | `response/data/checks.json` | `PROOF_FAILED` |
+| 6 | Áp delta đã duyệt, từng resource một, dưới một lease độc quyền | — | @worktrees/sessions/central-runtime, @workspaces/device-state cho các handle theo tên | @worktrees/sessions/central-runtime, `response/data/delta.json`, @tools/container, @tools/shell | `EFFECT_UNAUTHORIZED`, `SERVICE_UNAVAILABLE` |
+| 7 | Chứng minh mọi check bắt buộc | — | @worktrees/sessions/central-runtime đọc lại theo bộ chứng minh đầy đủ của nhánh, @tools/http | `response/data/checks.json` | `PROOF_FAILED` |
 | 8 | Viết biên bản và phát | — | mọi thứ ở trên | `response/response.md`, `response/response.json` | — |
 
 Một lần resume bắt đầu lại từ cổng vào, chỉ dùng lại quan sát có fingerprint không đổi, và tiêu thụ

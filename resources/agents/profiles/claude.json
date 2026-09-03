@@ -11,16 +11,38 @@
       "count": 1,
       "role": "Heavy authoring and high-stakes mutation inside a frozen boundary: source apply, backend implementation, release and platform operations.",
       "capabilities": {
-        "webSearch": true,
-        "imageGeneration": false,
-        "browser": true,
-        "sourceWrite": true
+        "fileread": true,
+        "sourcewrite": true,
+        "git": true,
+        "shell": true,
+        "websearch": true,
+        "imagegen": false,
+        "visualize": true,
+        "browsercontrol": true,
+        "http": true,
+        "registry": true,
+        "container": true,
+        "ci": true,
+        "objectstorage": true,
+        "secrets": true,
+        "database": true
       },
       "permits": {
-        "webSearch": true,
-        "imageGeneration": false,
-        "browser": true,
-        "sourceWrite": true
+        "fileread": true,
+        "sourcewrite": true,
+        "git": true,
+        "shell": true,
+        "websearch": true,
+        "imagegen": false,
+        "visualize": true,
+        "browsercontrol": true,
+        "http": true,
+        "registry": true,
+        "container": true,
+        "ci": true,
+        "objectstorage": true,
+        "secrets": true,
+        "database": true
       }
     },
     "sonnet": {
@@ -30,16 +52,38 @@
       "count": 1,
       "role": "Deterministic and mechanical work: lookups against a closed inventory, gate execution, route verification, non-force publication.",
       "capabilities": {
-        "webSearch": true,
-        "imageGeneration": false,
-        "browser": true,
-        "sourceWrite": true
+        "fileread": true,
+        "sourcewrite": true,
+        "git": true,
+        "shell": true,
+        "websearch": true,
+        "imagegen": false,
+        "visualize": true,
+        "browsercontrol": true,
+        "http": true,
+        "registry": true,
+        "container": true,
+        "ci": true,
+        "objectstorage": true,
+        "secrets": true,
+        "database": true
       },
       "permits": {
-        "webSearch": true,
-        "imageGeneration": false,
-        "browser": false,
-        "sourceWrite": true
+        "fileread": true,
+        "sourcewrite": true,
+        "git": true,
+        "shell": true,
+        "websearch": true,
+        "imagegen": false,
+        "visualize": true,
+        "browsercontrol": false,
+        "http": true,
+        "registry": true,
+        "container": true,
+        "ci": true,
+        "objectstorage": true,
+        "secrets": true,
+        "database": true
       }
     },
     "fable": {
@@ -49,16 +93,38 @@
       "count": 1,
       "role": "Long-form extraction and documentation grounded in source, such as pattern catalogs and audits that must count rather than assert.",
       "capabilities": {
-        "webSearch": true,
-        "imageGeneration": false,
-        "browser": true,
-        "sourceWrite": true
+        "fileread": true,
+        "sourcewrite": true,
+        "git": true,
+        "shell": true,
+        "websearch": true,
+        "imagegen": false,
+        "visualize": true,
+        "browsercontrol": true,
+        "http": true,
+        "registry": true,
+        "container": true,
+        "ci": true,
+        "objectstorage": true,
+        "secrets": true,
+        "database": true
       },
       "permits": {
-        "webSearch": true,
-        "imageGeneration": false,
-        "browser": false,
-        "sourceWrite": true
+        "fileread": true,
+        "sourcewrite": false,
+        "git": true,
+        "shell": true,
+        "websearch": true,
+        "imagegen": false,
+        "visualize": true,
+        "browsercontrol": true,
+        "http": true,
+        "registry": true,
+        "container": false,
+        "ci": true,
+        "objectstorage": false,
+        "secrets": true,
+        "database": true
       }
     }
   }

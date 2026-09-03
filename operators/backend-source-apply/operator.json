@@ -9,14 +9,12 @@
   "selfTest": "self-test.mjs",
   "resources": {
     "profile": "luna",
-    "requires": [
-      "webSearch",
-      "sourceWrite"
-    ],
-    "policy": {
-      "webSearch": "bounded",
-      "grammarBound": false,
-      "imageGeneration": "never"
+    "grammarBound": false,
+    "tools": {
+      "@tools/fileread": "context-aliases",
+      "@tools/sourcewrite": "declared-write-set",
+      "@tools/git": "commit-session-branch",
+      "@tools/shell": "declared-commands"
     }
   }
 }

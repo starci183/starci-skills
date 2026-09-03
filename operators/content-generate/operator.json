@@ -9,15 +9,13 @@
   "selfTest": "self-test.mjs",
   "resources": {
     "profile": "luna",
-    "requires": [
-      "webSearch",
-      "imageGeneration",
-      "sourceWrite"
-    ],
-    "policy": {
-      "webSearch": "bounded",
-      "grammarBound": false,
-      "imageGeneration": "required"
+    "grammarBound": false,
+    "tools": {
+      "@tools/fileread": "context-aliases",
+      "@tools/shell": "declared-commands",
+      "@tools/websearch": "bounded",
+      "@tools/imagegen": "required",
+      "@tools/objectstorage": "read"
     }
   }
 }

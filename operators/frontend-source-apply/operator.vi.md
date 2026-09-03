@@ -89,7 +89,7 @@ không bao giờ biết nó render ra sao.
 | 2 | Bind resolution, direction và write set đã khai | — | đầu vào `frontend-presentation-resolution` (fingerprint cây, kho class và kho luật, cây đã resolve) và `frontend-direction-decision` (ý đồ và trần owner), @workspaces/fe (các path đã khai và gốc owner của chúng) | — | `RESOLUTION_STALE`, `OWNER_CONFLICT` |
 | 3 | Chiếu cây đã resolve lên các path đã khai | — | đầu vào `frontend-presentation-resolution` (cây đã resolve), @workspaces/fe (write set đã khai) | — | — |
 | 4 | Đối chiếu mọi giá trị tạo ra với kho | `mode` | đầu vào `frontend-presentation-resolution` (kho nằm cạnh biên nhận) | `response/data/writes.json` | `WRITE_REJECTED` |
-| 5 | Ghi nguyên khối trên nhánh phiên và commit một lần | — | @workspaces/fe (nội dung hiện tại của từng path đã khai, dưới một lease độc quyền) | @workspaces/fe/branch/session, `response/data/writes.json` | — |
+| 5 | Ghi nguyên khối trên nhánh phiên và commit một lần | — | @workspaces/fe (nội dung hiện tại của từng path đã khai, dưới một lease độc quyền) | @workspaces/fe/branch/session, `response/data/writes.json`, @tools/sourcewrite, @tools/git, asset ảnh mà direction phán là cần, @tools/imagegen | — |
 | 6 | Đọc lại cây ở commit | — | @workspaces/fe ở commit | — | `WRITE_REJECTED` |
 | 7 | Phát | — | mọi thứ ở trên | `response/response.md`, `response/changes.md`, `response/response.json` | — |
 

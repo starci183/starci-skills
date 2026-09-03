@@ -2,7 +2,9 @@
 // as exactly one commit on the session branch, and the mutation record, response.json.commits and the
 // change record name that same sha; every operation the frozen contract carries is restated once and
 // applied; every change lies inside the mutable ceiling, names a declared operation, appears once, and
-// carries the hash pair its kind demands; every declared facet has its own conformance file, named for
+// carries the hash pair its kind demands; a dry run commits nothing, writes no after hash, measures no
+// facet and runs no proof, and reports every planned path as unchanged in the change record; every
+// declared facet of an applied run has its own conformance file, named for
 // the operation and facet it measures, with evidence, and every verdict in a done branch conforms;
 // every declared proof ran exactly once in its own file, with a command, an exit code that agrees with
 // its result, and a pass; the change record and the receipt describe the same files; no finding names
@@ -33,6 +35,8 @@ export async function validateBackendStep(branchDir, root = ROOT) {
   const read = (f) => readFile(path.join(branchDir, f), 'utf8');
   const readJson = async (f) => { try { return JSON.parse(await read(f)); } catch { return null; } };
   const mutable = new Set(Array.isArray(requirements.mutableFileRefs) ? requirements.mutableFileRefs : []);
+  // `mode` decides whether this branch touched the checkout at all; everything below reads differently under dry.
+  const mode = requirements.mode ?? 'apply';
 
   // A blocked branch has no implementation at all, and nothing it may have written is committed.
   if (response.status === 'blocked' && (present.has('backend-source-application') || present.has('mutations') || present.has('conformance') || present.has('proof'))) {
@@ -46,14 +50,26 @@ export async function validateBackendStep(branchDir, root = ROOT) {
   const declared = mutations ? mutations.operations : [];
   const declaredById = new Map(declared.map((o) => [o.operationId, o]));
 
+  // The plan cannot re-decide the mode the request asked for.
+  if (mutations && mutations.mode !== mode) errors.push(`response/data/mutations.json: mode ${mutations.mode} differs from the request's ${mode}`);
+
+  // A dry run answers with the plan alone: nothing committed, nothing measured, nothing hashed after.
+  if (mode === 'dry') {
+    if (mutations && mutations.commit !== null) errors.push('response/data/mutations.json: a dry run commits nothing, so commit must be null');
+    if ((response.commits ?? []).length) errors.push('response/response.json: a dry run records no commit');
+    if (present.has('conformance') || present.has('proof')) errors.push('response/response.json: a dry run measures nothing, so it carries no conformance or proof record');
+  }
+
   // One commit on the session branch, named the same way in three places.
-  if (response.status === 'done') {
+  if (response.status === 'done' && mode === 'apply') {
     const commits = response.commits ?? [];
     if (commits.length !== 1) errors.push(`response/response.json: a done branch commits its whole write set once, found ${commits.length} commits`);
     if (mutations && commits.length === 1 && mutations.commit !== commits[0]) errors.push(`response/data/mutations.json: commit ${mutations.commit} differs from response.json commits[0] ${commits[0]}`);
+    // Required of an applied branch only: a dry run has no source to measure, and the Outputs table can only say yes or no.
+    for (const kind of ['conformance', 'proof']) if (!present.has(kind)) errors.push(`response/response.json: required output ${kind} is not in fields`);
   }
   if (mutations) {
-    if (mutations.commit === mutations.base) errors.push('response/data/mutations.json: the commit equals the base, so nothing was written on the session branch');
+    if (mode === 'apply' && mutations.commit === mutations.base) errors.push('response/data/mutations.json: the commit equals the base, so nothing was written on the session branch');
     for (const operation of declared) {
       const at = `response/data/mutations.json: operation ${operation.operationId}`;
       if (mutable.size && !mutable.has(operation.writerRef)) errors.push(`${at} names writer ${operation.writerRef} outside the mutable ceiling`);
@@ -80,8 +96,13 @@ export async function validateBackendStep(branchDir, root = ROOT) {
       if (mutable.size && !mutable.has(change.path)) errors.push(`response/data/mutations.json: change on ${change.path} lies outside the mutable ceiling`);
       const shape = HASH_SHAPE[change.change];
       if ((shape.before === 'set') !== (change.beforeHash !== null)) errors.push(`response/data/mutations.json: change on ${change.path} is ${change.change} with the wrong before hash`);
-      if ((shape.after === 'set') !== (change.afterHash !== null)) errors.push(`response/data/mutations.json: change on ${change.path} is ${change.change} with the wrong after hash`);
-      if (change.change === 'modified' && change.beforeHash === change.afterHash) errors.push(`response/data/mutations.json: change on ${change.path} records a modification whose hashes are identical`);
+      if (mode === 'dry') {
+        // A planned path has no new content yet, so an after hash could only have been invented.
+        if (change.afterHash !== null) errors.push(`response/data/mutations.json: change on ${change.path} reports an after hash under a dry run, which writes nothing`);
+      } else {
+        if ((shape.after === 'set') !== (change.afterHash !== null)) errors.push(`response/data/mutations.json: change on ${change.path} is ${change.change} with the wrong after hash`);
+        if (change.change === 'modified' && change.beforeHash === change.afterHash) errors.push(`response/data/mutations.json: change on ${change.path} records a modification whose hashes are identical`);
+      }
     }
   }
 
@@ -122,7 +143,7 @@ export async function validateBackendStep(branchDir, root = ROOT) {
     if (response.status === 'done' && record.result !== 'passed') errors.push(`${file}: operation ${record.operationId} reports a failed ${record.proofKind} proof in a done branch`);
   }
 
-  if (response.status === 'done') {
+  if (response.status === 'done' && mode === 'apply') {
     for (const operation of declared) {
       // Silence about a facet reads exactly like a pass.
       for (const facet of operation.facets) if (!conformanceKeys.has(`${operation.operationId}|${facet}`)) errors.push(`response/data/conformance/${operation.operationId}.${facet}.json: the operation declares the ${facet} facet and no record proves it`);
@@ -136,11 +157,12 @@ export async function validateBackendStep(branchDir, root = ROOT) {
     const binding = fields(tableUnder(text, '## Binding'));
     if (!empty(requirements.outcome) && binding.Outcome !== requirements.outcome) errors.push('response/response.md: Outcome differs from the request');
     if (!empty(requirements.featureId) && binding.Feature !== requirements.featureId) errors.push('response/response.md: Feature differs from the request');
+    if (binding.Mode !== undefined && binding.Mode !== mode) errors.push(`response/response.md: Mode ${binding.Mode} differs from the request's ${mode}`);
     if (mutations) {
       if (binding['Contract fingerprint'] !== mutations.contractFingerprint) errors.push('response/response.md: Contract fingerprint differs from the fingerprint the mutations were measured against');
       if (binding.Base !== mutations.base) errors.push('response/response.md: Base differs from the base the session branch was cut from');
       if (binding.Branch !== mutations.branch) errors.push('response/response.md: Branch differs from the session branch the write set lives on');
-      if (binding.Commit !== mutations.commit) errors.push('response/response.md: Commit differs from the one commit the write set arrived as');
+      if (binding.Commit !== (mutations.commit ?? '—')) errors.push('response/response.md: Commit differs from the one commit the write set arrived as');
     }
 
     const applied = new Set();
@@ -188,9 +210,18 @@ export async function validateBackendStep(branchDir, root = ROOT) {
     const text = await read('response/changes.md');
     if (mutations) {
       const checkout = fields(tableUnder(text, '## Binding')).Checkout ?? '';
-      const expected = `@workspaces/be at ${mutations.base} → ${mutations.commit} on ${mutations.branch}`;
+      // A dry run wrote nothing, so the next request can only pin the base it read.
+      const expected = mode === 'dry'
+        ? `@workspaces/be at ${mutations.base} on ${mutations.branch}, nothing written`
+        : `@workspaces/be at ${mutations.base} → ${mutations.commit} on ${mutations.branch}`;
       const seen = checkout.replaceAll('`', '').replace(/\s+/g, ' ').trim();
       if (seen !== expected) errors.push(`response/changes.md: Checkout must read ${expected}, so the next request can pin exactly what was written; it reads ${seen}`);
+    }
+    if (mode === 'dry') {
+      // The Change column reports the working tree, and a dry run left every path in it alone.
+      for (const [file, kind] of tableUnder(text, '## Files') ?? []) {
+        if (kind !== 'unchanged') errors.push(`response/changes.md: ${file} is reported ${kind} under a dry run, which leaves every path unchanged in the working tree`);
+      }
     }
     if (receiptFiles) {
       const changed = new Set((tableUnder(text, '## Files') ?? []).map(([p]) => p));

@@ -131,14 +131,14 @@ quan sát probe duy nhất hay từ một rollout được giả định.
 | # | Bước | Tham số | Đọc | Ghi | Dừng với |
 | --- | --- | --- | --- | --- | --- |
 | 1 | Kiểm cổng vào, thẩm quyền mà Đầu vào mang, và resume | `resume` | `request/request.json`, Đầu vào `quality-verification` là thẩm quyền lượt chạy này đứng lên | — | `INVALID_INPUT`, `AUTHORIZATION_MISSING`, `NO_PROGRESS` |
-| 2 | Ràng release và biên dịch kế hoạch | `release`, `target`, `approval` | @remote/ghcr/<image> tại digest đã đóng băng, @remote/github-actions/<runId> cho trạng thái quan sát được | — | `MANIFEST_INVALID`, `APPROVAL_REQUIRED` |
-| 3 | Khởi tạo execution root và phân giải credential theo tên | — | @workspaces/device-state cho các handle đã khai và custody của chúng | — | `CREDENTIAL_UNAVAILABLE` |
-| 4 | Chuẩn bị host, publish artifact theo digest, migrate và đối chiếu domain | — | @remote/ghcr/<image> cho artifact theo digest, @remote/github-actions/<runId> cho revision trước và sau của từng boundary | — | `HOST_UNAVAILABLE`, `ARTIFACT_MISSING`, `MIGRATION_BLOCKED`, `DOMAIN_UNRECONCILED` |
-| 5 | Roll out | — | @remote/ghcr/<image> cho revision của target trước và sau | — | `ROLLOUT_FAILED` |
-| 6 | Theo dõi trong deadline, có backoff | `steadyDeadline`, `probes` | @remote/github-actions/<runId> cho các quan sát probe suốt cửa sổ | `response/data/probes.json` | — |
+| 2 | Ràng release và biên dịch kế hoạch | `release`, `target`, `approval` | @remote/ghcr/<image> tại digest đã đóng băng, @remote/github-actions/<runId> cho trạng thái quan sát được, @tools/git, @tools/ci | — | `MANIFEST_INVALID`, `APPROVAL_REQUIRED` |
+| 3 | Khởi tạo execution root và phân giải credential theo tên | — | @workspaces/device-state cho các handle đã khai và custody của chúng, @tools/secrets | — | `CREDENTIAL_UNAVAILABLE` |
+| 4 | Chuẩn bị host, publish artifact theo digest, migrate và đối chiếu domain | — | @remote/ghcr/<image> cho artifact theo digest, @remote/github-actions/<runId> cho revision trước và sau của từng boundary | @tools/shell | `HOST_UNAVAILABLE`, `ARTIFACT_MISSING`, `MIGRATION_BLOCKED`, `DOMAIN_UNRECONCILED` |
+| 5 | Roll out | — | @remote/ghcr/<image> cho revision của target trước và sau | @tools/container | `ROLLOUT_FAILED` |
+| 6 | Theo dõi trong deadline, có backoff | `steadyDeadline`, `probes` | @remote/github-actions/<runId> cho các quan sát probe suốt cửa sổ, @tools/http | `response/data/probes.json` | — |
 | 7 | Phát hiện drift đồng thời trước khi hành động | — | `response/data/probes.json`, @remote/ghcr/<image> cho release đang active theo digest | — | `CONCURRENT_DRIFT` |
-| 8 | Đi nhánh phục hồi khi lỗi còn dai dẳng | — | `response/data/probes.json`, @remote/ghcr/<image> tại cùng danh tính release | — | `RECOVERY_EXHAUSTED` |
-| 9 | Đi nhánh rollback khi phục hồi không giữ được | `rollbackIdentity` | @remote/ghcr/<image> tại đúng digest an toàn | — | `ROLLBACK_IDENTITY_MISSING` |
+| 8 | Đi nhánh phục hồi khi lỗi còn dai dẳng | — | `response/data/probes.json`, @remote/ghcr/<image> tại cùng danh tính release | @tools/container | `RECOVERY_EXHAUSTED` |
+| 9 | Đi nhánh rollback khi phục hồi không giữ được | `rollbackIdentity` | @remote/ghcr/<image> tại đúng digest an toàn | @tools/container | `ROLLBACK_IDENTITY_MISSING` |
 | 10 | Chứng minh trạng thái ổn định, viết biên bản và phát | — | mọi thứ ở trên | `response/response.md`, `response/response.json` | `STEADY_STATE_UNPROVEN` |
 
 Bước 8 và 9 là hai fallback theo thứ tự, không phải một chuỗi mà lượt chạy nào cũng đi qua: một lượt

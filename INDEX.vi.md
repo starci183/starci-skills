@@ -1,4 +1,4 @@
-# StarCi Skills 1.0.2
+# StarCi Skills 1.0.3
 
 Cây này chính là runtime. Đọc tiếp `SKILL.vi.md` nếu có, hoặc `SKILL.md`; đó là cửa vào duy nhất,
 đóng băng phạm vi của một nhiệm vụ, chọn đúng một operator sở hữu kết quả, rồi định tuyến giữa các
@@ -25,7 +25,7 @@ fingerprint và danh sách rule đầy đủ, và không được phát ra mã n
 SKILL.md                 một cửa vào, mười bốn operator, một bảng định tuyến
 routing.json             14 operator, 68 route, bốn loại: operator | resume | user | external
 alias/                   alias.json (sổ cho máy: vị trí, scheme, bind, ai ghi, vùng) + INDEX.md (bản đồ sinh theo vùng); operator chỉ đọc qua alias
-resources/               agents/profiles/{openai,claude}.json (6 profile) + orchestrator.json (mỗi operator một agent, tối đa 3); có kiểm
+resources/               tools.json (sổ tool đóng: mode và hỗ trợ theo runtime, gọi bằng @tools/<id>) + agents/profiles/{openai,claude}.json (6 profile, quyền theo tool) + orchestrator.json (mỗi operator một agent, tối đa 3, profile tương đương); có kiểm
 workflows/               chuỗi mẫu (các bậc gồm nhánh song song, vòng lặp, preset) mà cửa vào dùng lại khi request khớp when; không khớp thì tự ghép theo cùng luật; có kiểm
 operators/INDEX.md       sinh tự động: mỗi operator đọc gì, tiêu thụ và sinh kind nào, số bước, và mọi mã dừng kèm cách xử lý; operators/errors.json giữ mã dùng chung
 operators/<id>/          operator.md (+vi) một file viết tay cho mỗi operator, operator.json (id, domain, resources), errors.json (mã riêng), validate.mjs, self-test.mjs
@@ -62,6 +62,8 @@ thì không được publish.
   đổi nghĩa.
 
 ## Dòng dõi
+
+1.0.3 (2026-09-03): sổ tool thay cho grant và policy (resources/tools.json, @tools/<id> trong Các bước, hỗ trợ theo runtime, profile tương đương); mọi operator ràng profile OpenAI cho processor Codex; vòng test đầu (tests/) và các sửa từ đó; docs/ và sites/ trở lại.
 
 1.0.2 (2026-09-03): mọi operator là một operator.md viết tay với layout nhánh request/response, hợp đồng kind JSON, sổ mã dừng có cách xử lý, workflow mẫu, và tên frontend.* / backend.source.apply; 1.0.1 là vòng chạy khô đã lộ ra dạng cũ.
 

@@ -1,0 +1,85 @@
+{
+  "schemaVersion": 9,
+  "note": "The closed registry of tools an operator may call, addressed as @tools/<id> in a Steps table. A tool is what an operator is allowed to do beyond reading aliases; an alias is what it may read. Each tool lists the modes an operator may declare in operator.json → resources.tools, and how each runtime provides it, so the same operator.md runs on Codex and on Claude without a second home for the rule. A runtime that does not support a tool cannot run an operator that declares it in a mode other than never; the processor then runs the profile equivalent on a runtime that does, or reports the gap. A tool absent from this file does not exist for an operator.",
+  "runtimes": {
+    "openai": "Codex (desktop app or CLI) running an OpenAI profile from resources/agents/profiles/openai.json",
+    "claude": "Claude Code (desktop app or CLI) running a Claude profile from resources/agents/profiles/claude.json"
+  },
+  "tools": {
+    "fileread": {
+      "purpose": "Read files and directories at the aliases the Context table names, at the frozen head.",
+      "modes": { "never": "the operator reads nothing on disk", "context-aliases": "only locations the Context table resolves to" },
+      "support": { "openai": { "supported": true, "via": "Codex file reads" }, "claude": { "supported": true, "via": "Claude Code Read, Glob and Grep" } }
+    },
+    "sourcewrite": {
+      "purpose": "Write files inside a routed checkout or an authority root.",
+      "modes": { "never": "the operator writes no file outside its own response/", "declared-write-set": "only the paths the request declared, only on the session branch or the authority root the alias names, only values the bound receipts already contain" },
+      "support": { "openai": { "supported": true, "via": "Codex file edits" }, "claude": { "supported": true, "via": "Claude Code Write and Edit" } }
+    },
+    "git": {
+      "purpose": "Read and change repository state: heads, branches, worktrees, commits, merges, pushes.",
+      "modes": { "never": "no git at all", "read": "rev-parse, status, log, diff, show; nothing that writes", "commit-session-branch": "create or reuse the session/<sessionId> worktree from the frozen head and commit the declared write set there exactly once; never the person's branch", "merge-and-push": "merge the session branch into the target (fast-forward, or a merge commit with the gates re-run), push without force, remove the session worktree and branch; never rebase, never force, never --no-verify" },
+      "support": { "openai": { "supported": true, "via": "git through the Codex shell" }, "claude": { "supported": true, "via": "git through the Claude Code Bash tool" } }
+    },
+    "shell": {
+      "purpose": "Run declared commands: gates, builds, proofs, hooks, deployment plans.",
+      "modes": { "never": "the operator runs no command", "declared-commands": "only the commands the route, the contract, or the manifest pins, with their output captured as evidence" },
+      "support": { "openai": { "supported": true, "via": "the Codex shell" }, "claude": { "supported": true, "via": "the Claude Code Bash tool" } }
+    },
+    "websearch": {
+      "purpose": "Read public web pages to close one named gap in the evidence; results are references with URLs, never authority.",
+      "modes": { "never": "the operator does not search", "bounded": "the operator searches only for the gap the step names and records every source it used with its URL" },
+      "support": { "openai": { "supported": true, "via": "Codex web search" }, "claude": { "supported": true, "via": "Claude Code WebSearch and WebFetch" } }
+    },
+    "imagegen": {
+      "purpose": "Produce artwork: a digital image from an image model, made to one stated claim. Rendering HTML is the visualize tool, not this one.",
+      "modes": { "never": "the operator produces no artwork", "judged": "the operator decides on its own, from the direction, whether a region reads empty enough to need artwork, records why, and never decorates", "required": "artwork is a step of the job" },
+      "support": { "openai": { "supported": true, "via": "the OpenAI image model available to the Codex session" }, "claude": { "supported": false, "via": "none; a judged step records that no artwork could be made and the branch continues; a required step blocks with the operator's own code" } }
+    },
+    "visualize": {
+      "purpose": "Render HTML for a person to look at: direction candidates, audit sheets, alternative comparisons, previews. No model grant is involved.",
+      "modes": { "never": "the operator renders nothing", "html": "the operator writes HTML under response/artifacts/ and links it from response.md" },
+      "support": { "openai": { "supported": true, "via": "files written by the Codex session" }, "claude": { "supported": true, "via": "files written by the Claude Code session" } }
+    },
+    "browsercontrol": {
+      "purpose": "Drive a real browser against a served route: navigate, act, capture screenshots and DOM measurements.",
+      "modes": { "never": "the operator opens no browser", "required": "the operator's evidence comes from a driven browser" },
+      "support": { "openai": { "supported": true, "via": "Codex computer use, which opens the person's own Chrome; every UAT or audit run must use a dedicated browser profile (the shared UAT identity), never the person's logged-in profile" }, "claude": { "supported": true, "via": "the in-app Browser pane, or Claude in Chrome when the task needs the person's sessions" } }
+    },
+    "http": {
+      "purpose": "Probe an endpoint: readiness, health, a served route, a GraphQL typename, a status page.",
+      "modes": { "never": "no probes", "probe": "GET or HEAD against the endpoints the runtime registry or the manifest names, with the observed status recorded" },
+      "support": { "openai": { "supported": true, "via": "curl through the Codex shell" }, "claude": { "supported": true, "via": "curl through Bash, or WebFetch for a public URL" } }
+    },
+    "registry": {
+      "purpose": "Read a package registry: the published Grammar, its version, its files.",
+      "modes": { "never": "no registry reads", "read": "npm view and the installed package in node_modules; publishing stays with a person" },
+      "support": { "openai": { "supported": true, "via": "npm through the Codex shell" }, "claude": { "supported": true, "via": "npm through Bash" } }
+    },
+    "container": {
+      "purpose": "Inspect or operate containers and images: compose services, GHCR images by digest.",
+      "modes": { "never": "no container operations", "read": "inspect, logs, digests", "operate": "start, stop, roll out, roll back the services the approved plan names" },
+      "support": { "openai": { "supported": true, "via": "docker and the GHCR API through the Codex shell" }, "claude": { "supported": true, "via": "docker and the GHCR API through Bash" } }
+    },
+    "ci": {
+      "purpose": "Observe or dispatch continuous-integration runs.",
+      "modes": { "never": "no CI access", "read": "list and read runs and their logs", "dispatch": "trigger the workflow the release manifest names" },
+      "support": { "openai": { "supported": true, "via": "gh through the Codex shell" }, "claude": { "supported": true, "via": "gh through Bash" } }
+    },
+    "objectstorage": {
+      "purpose": "Read or write objects in the content store (MinIO): curriculum, style references, published units.",
+      "modes": { "never": "no object store access", "read": "read the objects the unit names", "write": "publish the objects the unit produced, under a person's approval" },
+      "support": { "openai": { "supported": true, "via": "the MinIO client or its HTTP API through the Codex shell" }, "claude": { "supported": true, "via": "the MinIO client or its HTTP API through Bash" } }
+    },
+    "secrets": {
+      "purpose": "Resolve a sealed credential by name at the moment it is used; never read, print or store its value.",
+      "modes": { "never": "no credential is resolved", "resolve-by-name": "the name comes from device-state or a route; decryption happens in the tool that consumes it; a value never enters response/" },
+      "support": { "openai": { "supported": true, "via": "SOPS and age through the Codex shell" }, "claude": { "supported": true, "via": "SOPS and age through Bash" } }
+    },
+    "database": {
+      "purpose": "Read or write the product database for verification: seeds, fixtures, is_uat records.",
+      "modes": { "never": "no database access", "read": "select only", "namespaced-write": "insert and delete only rows carrying the run namespace and is_uat=true" },
+      "support": { "openai": { "supported": true, "via": "psql or the service's API through the Codex shell" }, "claude": { "supported": true, "via": "psql or the service's API through Bash" } }
+    }
+  }
+}

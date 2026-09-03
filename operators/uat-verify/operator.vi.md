@@ -108,16 +108,16 @@ lượt chạy, và không xoá bất cứ thứ gì ngoài namespace fixture c�
 
 | # | Bước | Tham số | Đọc | Ghi | Dừng với |
 | --- | --- | --- | --- | --- | --- |
-| 1 | Kiểm gate, lần chạy lại, lease độc quyền và người đã yêu cầu | `requestedBy`, `lease`, `resume` | `request/request.json`, @worktrees/uat/<flow>/<case> để lấy `latest` và hồ sơ lượt chạy trước, @workspaces/be tại commit đã ghim | — | `INVALID_INPUT`, `SOURCE_DRIFT`, `NO_PROGRESS` |
+| 1 | Kiểm gate, lần chạy lại, lease độc quyền và người đã yêu cầu | `requestedBy`, `lease`, `resume` | `request/request.json`, @worktrees/uat/<flow>/<case> để lấy `latest` và hồ sơ lượt chạy trước, @workspaces/be tại commit đã ghim, @tools/git | — | `INVALID_INPUT`, `SOURCE_DRIFT`, `NO_PROGRESS` |
 | 2 | Xác nhận admission: bề mặt sạch và cổng chất lượng xanh tại cùng một commit đã ghim | — | đầu vào `frontend-surface-audit`, đầu vào `quality-verification` | — | `ADMISSION_MISSING` |
-| 3 | Preflight runtime: thông tin đăng nhập niêm phong giải được theo tên, tài khoản tồn tại, store trả lời | — | @workspaces/device-state để lấy thông tin đăng nhập mà `account.json` nêu tên, @worktrees/sessions/central-runtime để lấy generation và các origin | — | `PROVISIONING_UNAVAILABLE` |
-| 4 | Đóng băng snapshot từ `flow.md`, `account.json` và `seed/` | `feature`, `flow`, `cases` | @worktrees/uat/<flow>/<case>, @worktrees/_templates để lấy khuôn luồng | @worktrees/uat/<flow>/<case> (snapshot), `response/data/snapshot.json` | `CANONICAL_WRITE_DENIED` |
-| 5 | Gieo các bản ghi đã đóng băng vào namespace lượt chạy | `runId` | `response/data/snapshot.json`, @workspaces/be | — | `FIXTURE_VIOLATION` |
-| 6 | Chạy các case đã đóng băng theo thứ tự trên worktree phiên tại commit đã ghim | — | `response/data/snapshot.json`, @worktrees/sessions/central-runtime để lấy origin và generation, @workspaces/device-state để lấy thông tin đăng nhập chỉ lúc đăng nhập | — | `LEASE_INVALID`, `RUNTIME_UNAVAILABLE` |
-| 7 | Capture tại từng khẳng định có tên với ô mật khẩu đã che, rồi ghép tấm sheet | — | `response/data/snapshot.json`, @worktrees/sessions/central-runtime để lấy bằng chứng runtime trực tiếp nhất | `response/data/captures/<case>.json`, `response/artifacts/<case>.png`, `response/artifacts/sheet.png` | `EVIDENCE_UNAVAILABLE` |
+| 3 | Preflight runtime: thông tin đăng nhập niêm phong giải được theo tên, tài khoản tồn tại, store trả lời | — | @workspaces/device-state để lấy thông tin đăng nhập mà `account.json` nêu tên, @worktrees/sessions/central-runtime để lấy generation và các origin, @tools/secrets, @tools/http | — | `PROVISIONING_UNAVAILABLE` |
+| 4 | Đóng băng snapshot từ `flow.md`, `account.json` và `seed/` | `feature`, `flow`, `cases` | @worktrees/uat/<flow>/<case>, @worktrees/_templates để lấy khuôn luồng | @worktrees/uat/<flow>/<case> (snapshot), `response/data/snapshot.json`, @tools/sourcewrite | `CANONICAL_WRITE_DENIED` |
+| 5 | Gieo các bản ghi đã đóng băng vào namespace lượt chạy | `runId` | `response/data/snapshot.json`, @workspaces/be | @tools/database | `FIXTURE_VIOLATION` |
+| 6 | Chạy các case đã đóng băng theo thứ tự trên worktree phiên tại commit đã ghim | — | `response/data/snapshot.json`, @worktrees/sessions/central-runtime để lấy origin và generation, @workspaces/device-state để lấy thông tin đăng nhập chỉ lúc đăng nhập, @tools/browsercontrol, @tools/websearch | — | `LEASE_INVALID`, `RUNTIME_UNAVAILABLE` |
+| 7 | Capture tại từng khẳng định có tên với ô mật khẩu đã che, rồi ghép tấm sheet | — | `response/data/snapshot.json`, @worktrees/sessions/central-runtime để lấy bằng chứng runtime trực tiếp nhất | `response/data/captures/<case>.json`, `response/artifacts/<case>.png`, `response/artifacts/sheet.png`, @tools/visualize | `EVIDENCE_UNAVAILABLE` |
 | 8 | Xét ba làn tách rời nhau | — | `response/data/captures/<case>.json` | `response/data/verdicts.json` | — |
-| 9 | Kiểm chỉ-đọc, rồi xoá namespace lượt chạy và không gì khác | `runId` | @workspaces/be để lấy các bản ghi mang `is_uat=true` và namespace này, `response/data/verdicts.json` | — | — |
-| 10 | Thêm `runs/<runId>/`, dời `latest`, rồi phát | `runId` | mọi thứ ở trên | @worktrees/uat/<flow>/<case> (runs/<runId>/ và latest), `response/response.md`, `response/response.json` | — |
+| 9 | Kiểm chỉ-đọc, rồi xoá namespace lượt chạy và không gì khác | `runId` | @workspaces/be để lấy các bản ghi mang `is_uat=true` và namespace này, `response/data/verdicts.json` | @tools/database | — |
+| 10 | Thêm `runs/<runId>/`, dời `latest`, rồi phát | `runId` | mọi thứ ở trên | @worktrees/uat/<flow>/<case> (runs/<runId>/ và latest), `response/response.md`, `response/response.json`, @tools/sourcewrite | — |
 
 Một lượt bị chặn không phát hồ sơ lượt chạy nào cả, vì một hồ sơ viết nửa vời chính là thứ người đọc
 sau này sẽ nhầm thành một quyết định. Lần chạy lại bắt đầu lại từ khâu kiểm, chỉ tái dùng những quan

@@ -18,7 +18,14 @@ export async function loadAliasRegistry(root) {
     }
   };
   for (const [rootKey, node] of Object.entries(raw.tree ?? {})) walk(node, rootKey, rootKey.slice(1));
-  return { schemaVersion: raw.schemaVersion, note: raw.note, zones: raw.zones ?? {}, segments: raw.segments ?? {}, aliases, tree: raw.tree ?? {} };
+  // @tools/<id> is what an operator may call, not read; it comes from resources/tools.json so a Steps cell can
+  // name a tool next to the aliases it reads and the same resolver answers both.
+  const toolsDoc = JSON.parse(await readFile(path.join(root, 'resources', 'tools.json'), 'utf8'));
+  const tools = {};
+  for (const [id, tool] of Object.entries(toolsDoc.tools ?? {})) {
+    tools[`@tools/${id}`] = { params: [], kind: 'tool', resolvesTo: `resources/tools.json#tools.${id}`, scheme: `tool://${id}`, bind: `mode declared in operator.json → resources.tools; modes: ${Object.keys(tool.modes).join(' | ')}`, writers: [], purpose: tool.purpose, zone: 'tools', support: tool.support };
+  }
+  return { schemaVersion: raw.schemaVersion, note: raw.note, zones: raw.zones ?? {}, segments: raw.segments ?? {}, aliases: { ...aliases, ...tools }, tree: raw.tree ?? {}, tools };
 }
 
 export const baseOf = (aliases, alias) => Object.keys(aliases).filter((k) => alias === k || alias.startsWith(`${k}/`)).sort((a, b) => b.length - a.length)[0] ?? null;

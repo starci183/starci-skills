@@ -48,6 +48,41 @@ test('every operator carries the contract fields the page renders', () => {
   }
 })
 
+test('every tool an operator declares is in the closed registry, in a mode the registry defines', () => {
+  const toolsDoc = JSON.parse(readRepo('resources', 'tools.json'))
+  const runtimeIds = Object.keys(toolsDoc.runtimes)
+  assert.equal(catalog.tools.length, Object.keys(toolsDoc.tools).length)
+  assert.equal(catalog.counts.tools, catalog.tools.length)
+  assert.deepEqual(catalog.runtimes.map((runtime) => runtime.id), runtimeIds)
+
+  for (const tool of catalog.tools) {
+    const source = toolsDoc.tools[tool.id]
+    assert.ok(source, `${tool.id}: not in resources/tools.json`)
+    assert.equal(tool.purpose, source.purpose, `${tool.id}: purpose paraphrased instead of quoted`)
+    // "never" is the absence of the tool, so the page lists only the modes an operator may declare.
+    assert.deepEqual(tool.modes, Object.keys(source.modes).filter((mode) => mode !== 'never'))
+    for (const runtime of runtimeIds) assert.equal(tool.support[runtime], source.support[runtime].supported === true, `${tool.id}: ${runtime} support restated`)
+  }
+
+  for (const operator of catalog.operators) {
+    const manifest = JSON.parse(readRepo('operators', operator.dir, 'operator.json'))
+    assert.ok(!manifest.resources.policy && !manifest.resources.requires, `${operator.id}: resources.policy and resources.requires are retired`)
+    assert.deepEqual(
+      operator.tools.map((tool) => `@tools/${tool.id}`),
+      Object.keys(manifest.resources.tools),
+      `${operator.id}: the catalog tool list drifted from operator.json`,
+    )
+    for (const tool of operator.tools) {
+      const source = toolsDoc.tools[tool.id]
+      assert.ok(source?.modes[tool.mode], `${operator.id}: ${tool.id} mode ${tool.mode} is not in the registry`)
+      assert.notEqual(tool.mode, 'never', `${operator.id}: ${tool.id} declared as never`)
+      assert.ok(catalog.tools.find((entry) => entry.id === tool.id).declaredBy.includes(operator.id))
+    }
+    assert.ok(operator.tools.some((tool) => tool.id === 'fileread'), `${operator.id}: every operator reads its Context aliases`)
+    assert.equal(typeof operator.grammarBound, 'boolean')
+  }
+})
+
 test('the routing map is closed: every stop domain an operator reaches has one route', () => {
   for (const operator of catalog.operators) {
     const routed = new Set(operator.routes.map((route) => route.domain))
@@ -84,6 +119,11 @@ test('the page copy counts the tree instead of hard-coding it', () => {
   // The entry table and the loop are rendered from SKILL.md, never retyped.
   assert.match(main, /catalog\.entry\.rows\.map/)
   assert.match(main, /catalog\.loop\.diagram\.split\('->'\)/)
+  // Tools replaced the standing policy answers: the page reads the declaration, not a retired field.
+  assert.match(main, /operator\.tools\.map/)
+  assert.match(main, /catalog\.tools\.map/)
+  assert.doesNotMatch(main, /operator\.policy/)
+  assert.doesNotMatch(main, /operator\.requires/)
   // v7 vocabulary and v7 counts must not survive anywhere in the copy.
   for (const stale of [/13 skills/i, /113 operators/i, /specialized skills/i, /atomic operators/i, /capability graph/i, /Release 7.0/i, /v7.0/i]) {
     assert.doesNotMatch(main, stale)

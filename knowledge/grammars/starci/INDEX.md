@@ -7,7 +7,7 @@ This branch documents one visual family: StarCi Core, and the taste that directs
 `knowledge/ui X-n → @starci/grammar/common props/anatomy/state → @starci/grammar/core DNA and scoped CSS → product adapter`
 
 - Common owns public renderers, props, semantic DOM, accessibility, presentation states, universal spacing, `COMMON_GRAMMAR_COMPONENTS`, and `defineGrammarFamily`.
-- Core is a sibling family with id `core`; `CoreGrammarRoot` installs `data-grammar-family="core"`.
+- Core is a sibling family with id `core`; `CoreGrammarRoot` installs `data-grammar-family="core"`, and the `@starci/grammar/core` entry re-exports every Common renderer, so a Core consumer imports from one entry.
 - Feature code owns domain facts, routes, copy, permissions, persistence, and effects.
 - Product names such as Learn, Console, Dashboard, Navbar, or Course never become Grammar identities.
 

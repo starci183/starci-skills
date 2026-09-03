@@ -37,6 +37,21 @@ a step whose work arrives as several commits cannot be pinned by the next step's
 uncommitted write cannot be pinned at all. Nothing is pushed and nothing is merged here: `git.publish`
 merges the session branch into the target branch, and it is the only operator that talks to a remote.
 
+## Dry mode writes the plan, not the tree
+
+`mode` decides whether this run touches the checkout at all. Under `apply` the operator fills the
+contract, commits once, and everything below holds as written. Under `dry` it does the same reading,
+the same binding and the same projection, then stops after the plan: `response/data/mutations.json`
+carries the operations it would fill and the files it would touch with `commit` null and no after
+hash, `response.json` records no commit, and not one byte reaches `@workspaces/be`. The branch still
+ends `done`, because a plan honestly produced is a finished answer to a question about a plan; its
+`changes.md` lists every planned path as `unchanged`, which is what the working tree actually shows,
+and names the change it would have made in `Why`. A dry run measures nothing, so it carries no
+conformance record and no proof record: a facet cannot be measured on code that was never written,
+and a plan that shipped verdicts would be indistinguishable from an implementation. That is also why
+a dry run can never be the run that satisfies the contract — it is a way to read the write set before
+paying for it, not a cheaper way to apply it.
+
 ## The backend never invents business behaviour
 
 Every operation cites the approved decisions it implements. When the code reaches a point where the
@@ -108,23 +123,27 @@ other jobs with their own gates.
 | `featureId` | id | — | The feature whose published business head decides this behaviour |
 | `outcome` | prompt | — | The one thing being implemented, in the person's words |
 | `mutableFileRefs` | list | — | The only files product source may be written into |
+| `mode` | choice | apply | `apply` fills the contract and commits, `dry` emits the plan and writes nothing |
 | `resume` | token | null | The blocked branch's token when re-entering after a stop |
 
 ## Steps
 
 | # | Step | Params | Reads | Writes | Stops with |
 | --- | --- | --- | --- | --- | --- |
-| 1 | Validate the gate and resume | `resume` | `request/request.json`, input `backend-source-application` when present, @workspaces/be at the frozen head | — | `INVALID_INPUT`, `SOURCE_DRIFT`, `NO_PROGRESS` |
+| 1 | Validate the gate and resume | `resume`, `mode` | `request/request.json`, input `backend-source-application` when present, @workspaces/be at the frozen head | — | `INVALID_INPUT`, `SOURCE_DRIFT`, `NO_PROGRESS` |
 | 2 | Bind authority, contract and patterns | `featureId` | @worktrees/businesses/<featureId> at its published head, input `architecture-decision` as the frozen contract, @knowledge/patterns/be one pattern per aspect | — | `CONTRACT_UNFROZEN`, `BUSINESS_AUTHORITY_MISSING`, `PATTERN_UNBOUND` |
-| 3 | Fill one contract operation at a time, on the session branch | `mutableFileRefs` | @knowledge/patterns/be for each aspect, @workspaces/be inside the mutable ceiling | @workspaces/be/branch/session inside the mutable ceiling, under an exclusive lease | `CONTRACT_WIDENED`, `OWNER_CONFLICT` |
-| 4 | Record every mutation with its before and after hash | — | @workspaces/be, the touched files and the frozen contract | `response/data/mutations.json` | — |
+| 3 | Fill one contract operation at a time, on the session branch | `mutableFileRefs` | @knowledge/patterns/be for each aspect, @workspaces/be inside the mutable ceiling | @workspaces/be/branch/session inside the mutable ceiling, under an exclusive lease, @tools/sourcewrite | `CONTRACT_WIDENED`, `OWNER_CONFLICT` |
+| 4 | Check every mutation against the frozen contract and record it with its before and after hash | `mode` | @workspaces/be, the touched files and the frozen contract | `response/data/mutations.json` | — |
 | 5 | Revalidate persisted snapshots on read | — | @workspaces/be, the persisted snapshot, @knowledge/patterns/be for the rules that drift after it | — | — |
 | 6 | Prove each declared facet | — | @workspaces/be, the measurement behind each facet | `response/data/conformance/<operationId>.<facet>.json` | — |
-| 7 | Run each declared proof | — | @workspaces/be, the pinned command of each declared proof kind | `response/data/proofs/<operationId>.<proofKind>.json` | `PROOF_UNAVAILABLE` |
-| 8 | Commit the write set once, write the receipt and emit | `outcome` | everything above | @workspaces/be/branch/session as one commit, `response/changes.md`, `response/response.md`, `response/response.json` | — |
+| 7 | Run each declared proof | — | @workspaces/be, the pinned command of each declared proof kind | `response/data/proofs/<operationId>.<proofKind>.json`, @tools/shell | `PROOF_UNAVAILABLE` |
+| 8 | Commit the write set once, write the receipt and emit | `outcome` | everything above | @workspaces/be/branch/session as one commit, `response/changes.md`, `response/response.md`, `response/response.json`, @tools/git | — |
 
-The routed head is reverified immediately before the first product write, so drift found there stops
-the branch before anything is written. Filling an operation writes the transport, the validation, the
+Under `mode = dry` step 3 projects the fill onto the declared paths without writing one of them, step
+4 records that projection as the plan with a null commit and no after hash, steps 5 to 7 have nothing
+to measure and produce nothing, and step 8 emits the receipt and the change record without a commit.
+Under `apply` every step runs as written. The routed head is reverified immediately before the first
+product write, so drift found there stops the branch before anything is written. Filling an operation writes the transport, the validation, the
 authorization check, the data access, and the failure paths into the declared writer and the files the
 change genuinely requires; it refuses loudly and early rather than dropping a case silently, raising
 the exception the exception-identity pattern publishes before any row or external checkout is created.
@@ -142,8 +161,8 @@ fingerprint cannot yield a different answer.
 | `backend-source-application` | `response/response.md` | md | yes |
 | `changes` | `response/changes.md` | md | yes |
 | `mutations` | `response/data/mutations.json` | data | yes |
-| `conformance` | `response/data/conformance/<operationId>.<facet>.json` | data | yes |
-| `proof` | `response/data/proofs/<operationId>.<proofKind>.json` | data | yes |
+| `conformance` | `response/data/conformance/<operationId>.<facet>.json` | data | no |
+| `proof` | `response/data/proofs/<operationId>.<proofKind>.json` | data | no |
 
 ## Stops
 

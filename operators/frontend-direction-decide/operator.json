@@ -9,15 +9,13 @@
   "selfTest": "self-test.mjs",
   "resources": {
     "profile": "sol-fresh",
-    "requires": [
-      "webSearch",
-      "imageGeneration",
-      "browser"
-    ],
-    "policy": {
-      "webSearch": "bounded",
-      "grammarBound": true,
-      "imageGeneration": "judged"
+    "grammarBound": true,
+    "tools": {
+      "@tools/fileread": "context-aliases",
+      "@tools/git": "read",
+      "@tools/websearch": "bounded",
+      "@tools/imagegen": "judged",
+      "@tools/visualize": "html"
     }
   }
 }

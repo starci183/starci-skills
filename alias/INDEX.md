@@ -22,7 +22,7 @@ The @starci/grammar package as the bound app resolves it: the only fact about wh
 
 | Alias | Params | Resolves to | Bind | Writers | Bound by | Purpose |
 | --- | --- | --- | --- | --- | --- | --- |
-| `@grammar` | `<family>` | `the @starci/grammar package as the bound app resolves it (file:packages/grammar inside @workspaces/fe today, source 0.4.1; @remote/npm publishes 0.3.0), narrowed to one family <family>: @grammar/core, @grammar/heritage, @grammar/offset-pop; @grammar/common is the shared layer every family imports` | package.json version + the resolved location's fingerprint (checkout head for file:, tarball integrity for npm) | — | — | The Grammar as it runs: Common renderers, props, owned relationships, data-contract claims, and the family's own CSS. The only fact about what a component owns. |
+| `@grammar` | `<family>` | `the @starci/grammar package as the bound app resolves it (file:packages/grammar inside @workspaces/fe today, source 0.4.2; @remote/npm publishes 0.3.0), narrowed to one family <family>: @grammar/core, @grammar/heritage, @grammar/offset-pop; @grammar/common is the shared layer every family imports` | package.json version + the resolved location's fingerprint (checkout head for file:, tarball integrity for npm) | — | — | The Grammar as it runs: Common renderers, props, owned relationships, data-contract claims, and the family's own CSS. The only fact about what a component owns. |
 
 ## Knowledge — the law
 
@@ -66,6 +66,28 @@ Produced inside the current session by an earlier step and deleted with the sess
 | Alias | Params | Resolves to | Bind | Writers | Bound by | Purpose |
 | --- | --- | --- | --- | --- | --- | --- |
 | `@dynamic` | `<kind>` | `<Source>/.worktrees/sessions/<sessionId>/step-<N>/parallel-<M>/ — one branch of one step. request/request.json is the gate in (orchestrator writes it); response/ is the agent's: response.json (gate out), response.md and other markdown kinds, data/<name>.json, artifacts/<file>; a nested exchange adds <exchange>/request/ and <exchange>/response/. A kind is passed by explicit path in request.json inputs, from the session root. Dynamic files are passed as kinds (templates/kinds/<kind>), never as aliases. The session folder is created by the orchestrator and deleted when git.publish finishes; a blocked run keeps it for resume` | kind contract or schema under templates/kinds; response.json fields is the registry of what a branch produced | `*` | — | Everything produced inside the session and nothing that existed before it. Always dynamic; typed by kind. |
+
+## undefined
+
+
+
+| Alias | Params | Resolves to | Bind | Writers | Bound by | Purpose |
+| --- | --- | --- | --- | --- | --- | --- |
+| `@tools/browsercontrol` | — | `resources/tools.json#tools.browsercontrol` | mode declared in operator.json → resources.tools; modes: never \| required | — | — | Drive a real browser against a served route: navigate, act, capture screenshots and DOM measurements. |
+| `@tools/ci` | — | `resources/tools.json#tools.ci` | mode declared in operator.json → resources.tools; modes: never \| read \| dispatch | — | — | Observe or dispatch continuous-integration runs. |
+| `@tools/container` | — | `resources/tools.json#tools.container` | mode declared in operator.json → resources.tools; modes: never \| read \| operate | — | — | Inspect or operate containers and images: compose services, GHCR images by digest. |
+| `@tools/database` | — | `resources/tools.json#tools.database` | mode declared in operator.json → resources.tools; modes: never \| read \| namespaced-write | — | — | Read or write the product database for verification: seeds, fixtures, is_uat records. |
+| `@tools/fileread` | — | `resources/tools.json#tools.fileread` | mode declared in operator.json → resources.tools; modes: never \| context-aliases | — | — | Read files and directories at the aliases the Context table names, at the frozen head. |
+| `@tools/git` | — | `resources/tools.json#tools.git` | mode declared in operator.json → resources.tools; modes: never \| read \| commit-session-branch \| merge-and-push | — | — | Read and change repository state: heads, branches, worktrees, commits, merges, pushes. |
+| `@tools/http` | — | `resources/tools.json#tools.http` | mode declared in operator.json → resources.tools; modes: never \| probe | — | — | Probe an endpoint: readiness, health, a served route, a GraphQL typename, a status page. |
+| `@tools/imagegen` | — | `resources/tools.json#tools.imagegen` | mode declared in operator.json → resources.tools; modes: never \| judged \| required | — | — | Produce artwork: a digital image from an image model, made to one stated claim. Rendering HTML is the visualize tool, not this one. |
+| `@tools/objectstorage` | — | `resources/tools.json#tools.objectstorage` | mode declared in operator.json → resources.tools; modes: never \| read \| write | — | — | Read or write objects in the content store (MinIO): curriculum, style references, published units. |
+| `@tools/registry` | — | `resources/tools.json#tools.registry` | mode declared in operator.json → resources.tools; modes: never \| read | — | — | Read a package registry: the published Grammar, its version, its files. |
+| `@tools/secrets` | — | `resources/tools.json#tools.secrets` | mode declared in operator.json → resources.tools; modes: never \| resolve-by-name | — | — | Resolve a sealed credential by name at the moment it is used; never read, print or store its value. |
+| `@tools/shell` | — | `resources/tools.json#tools.shell` | mode declared in operator.json → resources.tools; modes: never \| declared-commands | — | — | Run declared commands: gates, builds, proofs, hooks, deployment plans. |
+| `@tools/sourcewrite` | — | `resources/tools.json#tools.sourcewrite` | mode declared in operator.json → resources.tools; modes: never \| declared-write-set | — | — | Write files inside a routed checkout or an authority root. |
+| `@tools/visualize` | — | `resources/tools.json#tools.visualize` | mode declared in operator.json → resources.tools; modes: never \| html | — | — | Render HTML for a person to look at: direction candidates, audit sheets, alternative comparisons, previews. No model grant is involved. |
+| `@tools/websearch` | — | `resources/tools.json#tools.websearch` | mode declared in operator.json → resources.tools; modes: never \| bounded | — | — | Read public web pages to close one named gap in the evidence; results are references with URLs, never authority. |
 
 ## Friendly segments inside a checkout
 

@@ -1,4 +1,4 @@
-# StarCi Skills 1.0.2
+# StarCi Skills 1.0.3
 
 This tree is the runtime. Read [SKILL.md](SKILL.md) next; it is the single entry that freezes a
 mission's scope, selects the one operator that owns the outcome, and routes between operators on
@@ -26,7 +26,7 @@ its fingerprint and complete rule inventory, and may emit no identifier outside 
 SKILL.md                 one entry, fourteen operators, one routing map
 routing.json             14 operators, 68 routes, four kinds: operator | resume | user | external
 alias/                   alias.json (machine registry: location, scheme, binding, writers, zone) + INDEX.md (generated map by zone); every operator reads by alias only
-resources/               agents/profiles/{openai,claude}.json (6 profiles) + orchestrator.json (one agent per operator, max 3); validated
+resources/               tools.json (the closed tool registry: modes and per-runtime support, addressed as @tools/<id>) + agents/profiles/{openai,claude}.json (6 profiles, permits per tool) + orchestrator.json (one agent per operator, max 3, profile equivalents); validated
 workflows/               example chains (steps of parallel branches, loops, presets) the entry reuses when a request matches their when; otherwise it composes its own under the same rules; validated
 operators/INDEX.md       generated: what each operator reads, which kinds it consumes and produces, its steps, and every stop code with its disposition; operators/errors.json holds the codes several operators share
 operators/<id>/          operator.md (+vi) one authored file per operator, operator.json (id, domain, resources), errors.json (its own codes), validate.mjs, self-test.mjs
@@ -61,6 +61,8 @@ head or the head is not publishable.
 - Rule IDs are stable public addresses. Append; never renumber, reuse, or silently change meaning.
 
 ## Lineage
+
+1.0.3 (2026-09-03): a tools registry replaces grants and policies (resources/tools.json, @tools/<id> in Steps, per-runtime support, profile equivalents); every operator binds an OpenAI profile for the Codex processor; the first test round (tests/) and its fixes; docs/ and sites/ return.
 
 1.0.2 (2026-09-03): every operator is one authored operator.md with a request/response branch layout, JSON kind contracts, an errors registry with dispositions, example workflows, and the frontend.*/backend.source.apply names; 1.0.1 was the dry-run round that exposed the old shape.
 

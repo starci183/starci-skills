@@ -109,16 +109,16 @@ anything outside its own fixture namespace.
 
 | # | Step | Params | Reads | Writes | Stops with |
 | --- | --- | --- | --- | --- | --- |
-| 1 | Validate the gate, the resume, the exclusive lease and the person who asked | `requestedBy`, `lease`, `resume` | `request/request.json`, @worktrees/uat/<flow>/<case> for `latest` and the prior run record, @workspaces/be at the pinned commit | — | `INVALID_INPUT`, `SOURCE_DRIFT`, `NO_PROGRESS` |
+| 1 | Validate the gate, the resume, the exclusive lease and the person who asked | `requestedBy`, `lease`, `resume` | `request/request.json`, @worktrees/uat/<flow>/<case> for `latest` and the prior run record, @workspaces/be at the pinned commit, @tools/git | — | `INVALID_INPUT`, `SOURCE_DRIFT`, `NO_PROGRESS` |
 | 2 | Confirm admission: the surface audit is clean and the quality gate is green at the same pinned commit | — | input `frontend-surface-audit`, input `quality-verification` | — | `ADMISSION_MISSING` |
-| 3 | Preflight the runtime: the sealed credential resolves by name, the account exists, the store answers | — | @workspaces/device-state for the credential named by `account.json`, @worktrees/sessions/central-runtime for the generation and origins | — | `PROVISIONING_UNAVAILABLE` |
-| 4 | Freeze the snapshot from `flow.md`, `account.json` and `seed/` | `feature`, `flow`, `cases` | @worktrees/uat/<flow>/<case>, @worktrees/_templates for the flow template | @worktrees/uat/<flow>/<case> (snapshot), `response/data/snapshot.json` | `CANONICAL_WRITE_DENIED` |
-| 5 | Seed the frozen records into the run namespace | `runId` | `response/data/snapshot.json`, @workspaces/be | — | `FIXTURE_VIOLATION` |
-| 6 | Execute the frozen cases in order on the session worktree at the pinned commit | — | `response/data/snapshot.json`, @worktrees/sessions/central-runtime for the origin and generation, @workspaces/device-state for the credential at login only | — | `LEASE_INVALID`, `RUNTIME_UNAVAILABLE` |
-| 7 | Capture at each named assertion with the login field masked, and stitch the sheet | — | `response/data/snapshot.json`, @worktrees/sessions/central-runtime for the most direct runtime evidence | `response/data/captures/<case>.json`, `response/artifacts/<case>.png`, `response/artifacts/sheet.png` | `EVIDENCE_UNAVAILABLE` |
+| 3 | Preflight the runtime: the sealed credential resolves by name, the account exists, the store answers | — | @workspaces/device-state for the credential named by `account.json`, @worktrees/sessions/central-runtime for the generation and origins, @tools/secrets, @tools/http | — | `PROVISIONING_UNAVAILABLE` |
+| 4 | Freeze the snapshot from `flow.md`, `account.json` and `seed/` | `feature`, `flow`, `cases` | @worktrees/uat/<flow>/<case>, @worktrees/_templates for the flow template | @worktrees/uat/<flow>/<case> (snapshot), `response/data/snapshot.json`, @tools/sourcewrite | `CANONICAL_WRITE_DENIED` |
+| 5 | Seed the frozen records into the run namespace | `runId` | `response/data/snapshot.json`, @workspaces/be | @tools/database | `FIXTURE_VIOLATION` |
+| 6 | Execute the frozen cases in order on the session worktree at the pinned commit | — | `response/data/snapshot.json`, @worktrees/sessions/central-runtime for the origin and generation, @workspaces/device-state for the credential at login only, @tools/browsercontrol, @tools/websearch | — | `LEASE_INVALID`, `RUNTIME_UNAVAILABLE` |
+| 7 | Capture at each named assertion with the login field masked, and stitch the sheet | — | `response/data/snapshot.json`, @worktrees/sessions/central-runtime for the most direct runtime evidence | `response/data/captures/<case>.json`, `response/artifacts/<case>.png`, `response/artifacts/sheet.png`, @tools/visualize | `EVIDENCE_UNAVAILABLE` |
 | 8 | Judge the three lanes apart | — | `response/data/captures/<case>.json` | `response/data/verdicts.json` | — |
-| 9 | Verify read-only, then delete the run namespace and nothing else | `runId` | @workspaces/be for the records carrying `is_uat=true` and this namespace, `response/data/verdicts.json` | — | — |
-| 10 | Append `runs/<runId>/`, move `latest`, and emit | `runId` | everything above | @worktrees/uat/<flow>/<case> (runs/<runId>/ and latest), `response/response.md`, `response/response.json` | — |
+| 9 | Verify read-only, then delete the run namespace and nothing else | `runId` | @workspaces/be for the records carrying `is_uat=true` and this namespace, `response/data/verdicts.json` | @tools/database | — |
+| 10 | Append `runs/<runId>/`, move `latest`, and emit | `runId` | everything above | @worktrees/uat/<flow>/<case> (runs/<runId>/ and latest), `response/response.md`, `response/response.json`, @tools/sourcewrite | — |
 
 A blocked run publishes no run record at all, because a half-written record is the artifact a later
 reader would mistake for a decision. A resume begins again at validation, reuses only observations

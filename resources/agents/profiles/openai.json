@@ -11,16 +11,38 @@
       "count": 1,
       "role": "One fresh execution that completes a material brainstorm or decision end to end with no inherited turns.",
       "capabilities": {
-        "webSearch": true,
-        "imageGeneration": true,
-        "browser": true,
-        "sourceWrite": true
+        "fileread": true,
+        "sourcewrite": true,
+        "git": true,
+        "shell": true,
+        "websearch": true,
+        "imagegen": true,
+        "visualize": true,
+        "browsercontrol": true,
+        "http": true,
+        "registry": true,
+        "container": true,
+        "ci": true,
+        "objectstorage": true,
+        "secrets": true,
+        "database": true
       },
       "permits": {
-        "webSearch": true,
-        "imageGeneration": true,
-        "browser": true,
-        "sourceWrite": true
+        "fileread": true,
+        "sourcewrite": true,
+        "git": true,
+        "shell": true,
+        "websearch": true,
+        "imagegen": true,
+        "visualize": true,
+        "browsercontrol": true,
+        "http": true,
+        "registry": true,
+        "container": true,
+        "ci": true,
+        "objectstorage": true,
+        "secrets": true,
+        "database": true
       }
     },
     "sol-reviewer": {
@@ -30,16 +52,38 @@
       "count": 1,
       "role": "One fresh reviewer that receives artifacts and claims only, never the producer's rationale, and returns findings without repairing anything. The model can write and draw; this role is forbidden to, by policy.",
       "capabilities": {
-        "webSearch": true,
-        "imageGeneration": true,
-        "browser": true,
-        "sourceWrite": true
+        "fileread": true,
+        "sourcewrite": true,
+        "git": true,
+        "shell": true,
+        "websearch": true,
+        "imagegen": true,
+        "visualize": true,
+        "browsercontrol": true,
+        "http": true,
+        "registry": true,
+        "container": true,
+        "ci": true,
+        "objectstorage": true,
+        "secrets": true,
+        "database": true
       },
       "permits": {
-        "webSearch": true,
-        "imageGeneration": false,
-        "browser": true,
-        "sourceWrite": false
+        "fileread": true,
+        "sourcewrite": false,
+        "git": true,
+        "shell": true,
+        "websearch": true,
+        "imagegen": false,
+        "visualize": true,
+        "browsercontrol": true,
+        "http": true,
+        "registry": true,
+        "container": false,
+        "ci": true,
+        "objectstorage": false,
+        "secrets": true,
+        "database": true
       }
     },
     "luna": {
@@ -49,16 +93,38 @@
       "count": 1,
       "role": "Authored content end to end: bounded brief research, writing, per-language code tracks, image generation to a stated claim, and the bounded run-read-repair loop.",
       "capabilities": {
-        "webSearch": true,
-        "imageGeneration": true,
-        "browser": false,
-        "sourceWrite": true
+        "fileread": true,
+        "sourcewrite": true,
+        "git": true,
+        "shell": true,
+        "websearch": true,
+        "imagegen": true,
+        "visualize": true,
+        "browsercontrol": true,
+        "http": true,
+        "registry": true,
+        "container": true,
+        "ci": true,
+        "objectstorage": true,
+        "secrets": true,
+        "database": true
       },
       "permits": {
-        "webSearch": true,
-        "imageGeneration": true,
-        "browser": false,
-        "sourceWrite": true
+        "fileread": true,
+        "sourcewrite": true,
+        "git": true,
+        "shell": true,
+        "websearch": true,
+        "imagegen": true,
+        "visualize": true,
+        "browsercontrol": false,
+        "http": true,
+        "registry": true,
+        "container": true,
+        "ci": true,
+        "objectstorage": true,
+        "secrets": true,
+        "database": true
       }
     }
   }

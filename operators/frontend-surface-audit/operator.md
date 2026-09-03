@@ -79,12 +79,12 @@ a node passes.
 
 | # | Step | Params | Reads | Writes | Stops with |
 | --- | --- | --- | --- | --- | --- |
-| 1 | Validate the gate and resume, and confirm the head and the served route | `resume` | `request/request.json`, input `frontend-source-application` (its commit must equal the pinned head), @workspaces/fe at the frozen head, @worktrees/sessions/central-runtime (the preview serving the session worktree at that commit) | — | `INVALID_INPUT`, `SOURCE_DRIFT`, `NO_PROGRESS` |
+| 1 | Validate the gate and resume, and confirm the head and the served route | `resume` | `request/request.json`, input `frontend-source-application` (its commit must equal the pinned head), @workspaces/fe at the frozen head, @worktrees/sessions/central-runtime (the preview serving the session worktree at that commit), @tools/git | — | `INVALID_INPUT`, `SOURCE_DRIFT`, `NO_PROGRESS` |
 | 2 | Bind the authority | — | @knowledge/ui/proof (every topic with its fingerprint and inventory), input `frontend-source-application` (the claims), input `frontend-presentation-resolution` (the owner of every node), @worktrees/sessions/central-runtime | — | — |
 | 3 | Select the matrix entries | `matrix` | input `frontend-direction-decision` (the coverage: state by viewport by colour scheme) | — | — |
-| 4 | Reach readiness for each entry | `readinessProbe` | @worktrees/sessions/central-runtime | — | `RUNTIME_UNAVAILABLE` |
-| 5 | Capture and measure each entry | — | @worktrees/sessions/central-runtime, @workspaces/fe (the observed owners and the identifiers each node carries) | `response/artifacts/<matrixId>.png`, `response/data/captures/<matrixId>.json` | `EVIDENCE_MISSING` |
-| 6 | Compare against the claims and the proof rules, judge by owner, and emit | — | @knowledge/ui/proof, @knowledge/grammars/starci, the captures | `response/data/verdicts.json`, `response/response.md`, `response/response.json` | `UNKNOWN_RULE` |
+| 4 | Reach readiness for each entry | `readinessProbe` | @worktrees/sessions/central-runtime, @tools/http | — | `RUNTIME_UNAVAILABLE` |
+| 5 | Capture and measure each entry | — | @worktrees/sessions/central-runtime, @workspaces/fe (the observed owners and the identifiers each node carries), @tools/browsercontrol | `response/artifacts/<matrixId>.png`, `response/data/captures/<matrixId>.json` | `EVIDENCE_MISSING` |
+| 6 | Compare against the claims and the proof rules, judge by owner, and emit | — | @knowledge/ui/proof, @knowledge/grammars/starci, the captures, @tools/websearch | `response/data/verdicts.json`, `response/response.md`, `response/response.json`, @tools/visualize | `UNKNOWN_RULE` |
 
 The matrix is the direction's coverage, not a new decision: `matrix` may only narrow it, and the
 orchestrator may split the entries across up to three parallel branches of the same step. Every entry

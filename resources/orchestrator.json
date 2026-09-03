@@ -6,7 +6,7 @@
   "dispatch": "routing.json",
   "agent": {
     "profile": "operator.json → resources.profile",
-    "grants": "operator.json → resources.requires, and nothing the profile would otherwise permit",
+    "grants": "operator.json → resources.tools: each @tools/<id> with one mode from resources/tools.json, and nothing the profile would otherwise permit",
     "refs": "operator.md → Context table, resolved through alias/alias.json; an unlisted location is unreadable",
     "requirements": "operator.md → Requirements table; the orchestrator fills defaults into request.json and asks a person only for fields whose Default is — or whose value a stop code names",
     "prompt": "rendered at dispatch from operator.md plus request.json; never stored",
@@ -65,8 +65,7 @@
       "luna": "sonnet",
       "sol-reviewer": "fable"
     },
-    "grants": "the equivalent runs with the grants the operator requires that its own profile permits; a grant it cannot permit (Claude profiles cannot generate images) is unavailable for that run, so a judged image step records that no image could be made and the branch continues",
-    "imageVersusVisualize": "imageGeneration means artwork: a digital image produced by an image model (OpenAI profiles only). Rendering HTML (direction candidates, audit sheets, previews) is visualization, needs no grant, and every runtime does it.",
-    "policies": "every operator: webSearch bounded; imageGeneration judged for the frontend operators that compose or write a surface (direction, resolve, apply), required for content.generate, never elsewhere (audit captures, it does not draw; backend needs no artwork)"
+    "grants": "the equivalent runs with the tools the operator declares that its own profile permits and its runtime supports (resources/tools.json); a tool the runtime does not support is unavailable for that run: a judged imagegen step records that no artwork could be made and continues, any other unsupported tool blocks the branch with the operator's own code",
+    "imageVersusVisualize": "imageGeneration means artwork: a digital image produced by an image model (OpenAI profiles only). Rendering HTML (direction candidates, audit sheets, previews) is visualization, needs no grant, and every runtime does it."
   }
 }

@@ -141,11 +141,11 @@ publish without a verified route and an approval bound to this exact boundary.
 | 2 | Bind the route | — | input `workspace-route-binding`: the verified checkout, its head and its routed policy, and @workspaces/local/routes/<project>/<role> | — | `ROUTE_UNVERIFIED` |
 | 3 | Bind the approval to this exact boundary | `boundary`, `approval` | `request/request.json` requirements, input `changes` as the file set, input `quality-verification` as the measured commit | — | `APPROVAL_MISSING` |
 | 4 | Verify the tree: dirty outside the boundary, branch policy | — | @workspaces/local/routes/<project>/<role>, the dirty paths, every branch, the routed policy | — | `DIRTY_OUTSIDE_BOUNDARY`, `BRANCH_POLICY_VIOLATION` |
-| 5 | Run the hooks | — | @workspaces/<project>/<role>/husky: the installed hooks, `pre-push` among them | — | `HOOK_BLOCKED` |
-| 6 | Merge the session branch into the target branch | — | @workspaces/local/routes/<project>/<role> for the target head, the session base and the session head | @workspaces/local/routes/<project>/<role>, the target branch of that checkout | `NON_FAST_FORWARD` |
-| 7 | Push non-force, fast-forward only | — | @workspaces/local/routes/<project>/<role> for the approved head, @remote/git/<project>/<role> at the observed remote head | @remote/git/<project>/<role> | `NON_FAST_FORWARD` |
-| 8 | Push the continuation tag | `tag` | @workspaces/local/routes/<project>/<role> for the head this publication pushed | @remote/git/<project>/<role> | — |
-| 9 | Remove the worktree and the session branch, write the receipt and emit | — | everything above | @workspaces/local/routes/<project>/<role>, `response/response.md`, `response/response.json` | — |
+| 5 | Run the hooks | — | @workspaces/<project>/<role>/husky: the installed hooks, `pre-push` among them | @tools/shell | `HOOK_BLOCKED` |
+| 6 | Merge the session branch into the target branch | — | @workspaces/local/routes/<project>/<role> for the target head, the session base and the session head | @workspaces/local/routes/<project>/<role>, the target branch of that checkout, @tools/git | `NON_FAST_FORWARD` |
+| 7 | Push non-force, fast-forward only | — | @workspaces/local/routes/<project>/<role> for the approved head, @remote/git/<project>/<role> at the observed remote head, @tools/ci | @remote/git/<project>/<role>, @tools/git | `NON_FAST_FORWARD` |
+| 8 | Push the continuation tag | `tag` | @workspaces/local/routes/<project>/<role> for the head this publication pushed | @remote/git/<project>/<role>, @tools/git | — |
+| 9 | Remove the worktree and the session branch, write the receipt and emit | — | everything above | @workspaces/local/routes/<project>/<role>, `response/response.md`, `response/response.json`, @tools/git | — |
 
 Creating a remote ref and fast-forwarding one are different acts with different reviewers, so the
 published head records which of the two it performed. A resume begins again at validation, reuses

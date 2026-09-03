@@ -10,7 +10,7 @@ import { loadAliasRegistry } from './alias-registry.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const reg = await loadAliasRegistry(root);
-const ZONE_ORDER = ['workspaces', 'grammar', 'knowledge', 'worktrees', 'remote', 'dynamic'];
+const ZONE_ORDER = ['workspaces', 'grammar', 'knowledge', 'worktrees', 'remote', 'dynamic', 'tools'];
 
 // Who binds each alias, from every operator.json.
 const users = new Map();

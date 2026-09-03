@@ -117,7 +117,7 @@ operator.
 ## Điều phối
 
 Một lần gọi một operator là một agent, tạo mới trên profile mà `operator.json` của nó gọi tên, với
-đúng những quyền và alias mà bảng Context của nó khai, không hơn. `resources/orchestrator.json` chốt
+đúng những alias mà bảng Context của nó khai và những tool mà `operator.json` của nó khai (`@tools/<id>` từ `resources/tools.json`, mỗi tool một mode), không hơn. `resources/orchestrator.json` chốt
 luật: tối đa ba agent cùng lúc, các nhánh cùng bậc không bao giờ chung alias ghi, điều phối theo
 workflow và `routing.json`, bàn giao chỉ qua các trường của `response.json` trong phiên (`state.json`,
 `step-N/parallel-M/{request,response}`), phiên do orchestrator tạo trước và xoá sau `git.publish`. Agent

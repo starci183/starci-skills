@@ -90,7 +90,7 @@ knows what it wrote, never how it renders.
 | 2 | Bind the resolution, the direction and the declared write set | — | inputs `frontend-presentation-resolution` (tree fingerprint, class and rule inventory, resolved tree) and `frontend-direction-decision` (intent and owner ceiling), @workspaces/fe (the declared paths and their owner roots) | — | `RESOLUTION_STALE`, `OWNER_CONFLICT` |
 | 3 | Project the resolved tree onto the declared paths | — | input `frontend-presentation-resolution` (the resolved tree), @workspaces/fe (the declared write set) | — | — |
 | 4 | Check every produced value against the inventory | `mode` | input `frontend-presentation-resolution` (the inventory beside the receipt) | `response/data/writes.json` | `WRITE_REJECTED` |
-| 5 | Write atomically on the session branch and commit once | — | @workspaces/fe (the current content of each declared path, under an exclusive lease) | @workspaces/fe/branch/session, `response/data/writes.json` | — |
+| 5 | Write atomically on the session branch and commit once | — | @workspaces/fe (the current content of each declared path, under an exclusive lease) | @workspaces/fe/branch/session, `response/data/writes.json`, @tools/sourcewrite, @tools/git, image assets the direction judged, @tools/imagegen | — |
 | 6 | Read the tree back at the commit | — | @workspaces/fe at the commit | — | `WRITE_REJECTED` |
 | 7 | Emit | — | everything above | `response/response.md`, `response/changes.md`, `response/response.json` | — |
 

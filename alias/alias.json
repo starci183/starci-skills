@@ -209,7 +209,7 @@
         "family"
       ],
       "kind": "checkout",
-      "resolvesTo": "the @starci/grammar package as the bound app resolves it (`file:packages/grammar` inside @workspaces/fe today, source 0.4.1; @remote/npm publishes 0.3.0), narrowed to one family <family>: @grammar/core, @grammar/heritage, @grammar/offset-pop; @grammar/common is the shared layer every family imports",
+      "resolvesTo": "the @starci/grammar package as the bound app resolves it (`file:packages/grammar` inside @workspaces/fe today, source 0.4.2; @remote/npm publishes 0.3.0), narrowed to one family <family>: @grammar/core, @grammar/heritage, @grammar/offset-pop; @grammar/common is the shared layer every family imports",
       "scheme": "grammar://<family>@<version>",
       "bind": "package.json version + the resolved location's fingerprint (checkout head for file:, tarball integrity for npm)",
       "writers": [],

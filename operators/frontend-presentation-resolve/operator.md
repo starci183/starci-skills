@@ -99,7 +99,7 @@ write product source, or record a verdict, score or pass claim on any node.
 | # | Step | Params | Reads | Writes | Stops with |
 | --- | --- | --- | --- | --- | --- |
 | 1 | Validate the gate and resume, and count the audit rounds | `resume`, `maxRounds` | `request/request.json`, input `frontend-surface-audit` when this is a loop, @workspaces/fe at the frozen head | — | `INVALID_INPUT`, `SOURCE_DRIFT`, `NO_PROGRESS` |
-| 2 | Bind the authority | — | @knowledge/ui/presentation (every topic with its fingerprint and rule inventory), @grammar/core (the published package's owned relationships), @workspaces/fe (the routed head and the frozen tree), input `frontend-direction-decision` | — | `KNOWLEDGE_UNBOUND`, `GRAMMAR_UNPUBLISHED` |
+| 2 | Bind the authority | — | @knowledge/ui/presentation (every topic with its fingerprint and rule inventory), @grammar/core (the published package's owned relationships), @workspaces/fe (the routed head and the frozen tree), input `frontend-direction-decision`, @tools/git, @tools/registry | — | `KNOWLEDGE_UNBOUND`, `GRAMMAR_UNPUBLISHED` |
 | 3 | Walk the tree once under the owner ceiling the direction carries | — | @workspaces/fe (the frozen tree, in document order), input `frontend-direction-decision` | — | `OWNER_CONFLICT` |
 | 4 | Determine the owner of every present property | — | @grammar/core (the owned relationships), @workspaces/fe (the properties the node presently carries) | `response/data/inventory.json` | — |
 | 5 | Select one presentation rule per remaining application-owned property | — | @knowledge/ui/presentation (the cases the bound topic publishes) | — | `RULE_MISSING` |

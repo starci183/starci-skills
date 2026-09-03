@@ -8,15 +8,18 @@
   "validator": "validate.mjs",
   "selfTest": "self-test.mjs",
   "resources": {
-    "profile": "sol-reviewer",
-    "requires": [
-      "webSearch",
-      "browser"
-    ],
-    "policy": {
-      "webSearch": "bounded",
-      "grammarBound": false,
-      "imageGeneration": "never"
+    "profile": "sol-fresh",
+    "grammarBound": false,
+    "tools": {
+      "@tools/fileread": "context-aliases",
+      "@tools/sourcewrite": "declared-write-set",
+      "@tools/git": "read",
+      "@tools/websearch": "bounded",
+      "@tools/visualize": "html",
+      "@tools/browsercontrol": "required",
+      "@tools/http": "probe",
+      "@tools/secrets": "resolve-by-name",
+      "@tools/database": "namespaced-write"
     }
   }
 }

@@ -1,14 +1,15 @@
 {
   "$id": "kind:mutations",
-  "title": "Every mutation one source-writing step made, the contract it filled, and the single commit that carries them on the session branch.",
+  "title": "Every mutation one source-writing step made or planned, the contract it filled, and the single commit that carries them on the session branch; under mode dry the commit is null and the record is a plan.",
   "type": "object",
   "additionalProperties": false,
-  "required": ["contractFingerprint", "base", "branch", "commit", "operations", "changes"],
+  "required": ["mode", "contractFingerprint", "base", "branch", "commit", "operations", "changes"],
   "properties": {
+    "mode": { "enum": ["apply", "dry"] },
     "contractFingerprint": { "$ref": "#/$defs/hash" },
     "base": { "$ref": "#/$defs/gitHead" },
     "branch": { "type": "string", "pattern": "^session/[A-Za-z0-9._-]+$" },
-    "commit": { "$ref": "#/$defs/gitHead" },
+    "commit": { "$ref": "#/$defs/nullableGitHead" },
     "operations": {
       "type": "array",
       "minItems": 1,
@@ -26,6 +27,7 @@
     "hash": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
     "nullableHash": { "oneOf": [{ "$ref": "#/$defs/hash" }, { "type": "null" }] },
     "gitHead": { "type": "string", "pattern": "^[0-9a-f]{40}$" },
+    "nullableGitHead": { "oneOf": [{ "$ref": "#/$defs/gitHead" }, { "type": "null" }] },
     "identifier": { "type": "string", "pattern": "^[a-z0-9][a-z0-9-]*$" },
     "facet": { "enum": ["transport", "writer", "store", "transaction", "idempotency", "migration", "exception-identity", "authorization", "concurrency"] },
     "proofKind": { "enum": ["unit", "integration", "migration-replay", "conformance-read", "runtime-probe"] },

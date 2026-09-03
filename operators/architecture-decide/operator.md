@@ -82,10 +82,10 @@ implementation, a quality gate, or a UAT run has passed.
 | # | Step | Params | Reads | Writes | Stops with |
 | --- | --- | --- | --- | --- | --- |
 | 1 | Validate the gate and resume | `resume`, `approval` | `request/request.json`, input `architecture-decision` when present, @workspaces/be at the frozen head | — | `INVALID_INPUT`, `SOURCE_DRIFT`, `NO_PROGRESS` |
-| 2 | Observe the current state | — | @workspaces/be at the frozen head: manifests, configuration, deployment files | `response/data/current-state.json` | `CURRENT_STATE_UNOBSERVED` |
+| 2 | Observe the current state | — | @workspaces/be at the frozen head: manifests, configuration, deployment files, @tools/git | `response/data/current-state.json` | `CURRENT_STATE_UNOBSERVED` |
 | 3 | Bind the inventory to the business promise | — | `response/data/current-state.json`, @worktrees/businesses/<featureId> at its published head | — | `BUSINESS_AUTHORITY_REQUIRED`, `EVIDENCE_MISSING` |
 | 4 | Frame the decision | `objective`, `decisionId`, `constraints`, `tradeoffAxes` | `request/request.json` requirements | — | `CONSTRAINT_CONTRADICTION` |
-| 5 | Generate the alternatives | `alternatives` | `response/data/current-state.json`, @knowledge/patterns | `response/artifacts/<decisionId>-alternatives.html` only when more than one alternative was asked for | `NO_VIABLE_ALTERNATIVE` |
+| 5 | Generate the alternatives | `alternatives` | `response/data/current-state.json`, @knowledge/patterns, @tools/websearch | `response/artifacts/<decisionId>-alternatives.html` only when more than one alternative was asked for, @tools/visualize | `NO_VIABLE_ALTERNATIVE` |
 | 6 | Select | `selectionPolicy`, `tradeoffAxes`, `approval` | `response/artifacts/<decisionId>-alternatives.html` when present | — | `CHOICE_REQUIRED` |
 | 7 | Deepen the selected alternative | `constraints` | `response/data/current-state.json` | `response/data/stack-model.json` | `DATA_OWNERSHIP_UNASSIGNED`, `COMPATIBILITY_UNVERIFIED` |
 | 8 | Await the critique: pause, a fresh agent attacks the selection, resume when it answers | — | `critique/response/critique.md` once the exchange is done | `response/response.json` (waiting, awaiting critique) | `CRITIQUE_UNRESOLVED` |

@@ -50,22 +50,22 @@ names it. Everywhere else, `never`.
 
 A summary of what each `operator.json` declares; the validator rejects a row that disagrees.
 
-| Operator | Profile | Web | Grammar | Images | Why this shape |
-| --- | --- | --- | --- | --- | --- |
-| `workspace.bind` | luna | bounded | no | never | Reads canonical files and a registry; no judgement |
-| `business.decide` | sol-fresh | bounded | no | never | An unfamiliar business model may need reference research before coverage can be frozen |
-| `architecture.decide` | sol-fresh | bounded | no | never | Alternatives and compatibility need evidence beyond the repo; schema pins the model |
-| `backend.source.apply` | luna | bounded | no | never | Writes inside a frozen contract following patterns/be |
-| `frontend.direction.decide` | sol-fresh | bounded | yes | judged | Research only for an unfamiliar domain; renders candidates as pages and judges for itself when a region is too empty to stand without an image |
-| `frontend.presentation.resolve` | luna | bounded | yes | judged | A lookup against a closed inventory |
-| `frontend.source.apply` | luna | bounded | yes | judged | Writes only what the resolution already contains, following patterns/fe |
-| `frontend.surface.audit` | sol-reviewer | bounded | yes | never | Browser only, no source write: the auditor cannot repair what it measures |
-| `quality.verify` | luna | bounded | no | never | Runs gates, repairs nothing |
-| `uat.verify` | sol-reviewer | bounded | no | never | Drives the real journey in a browser and may write nothing; fresh verdict per lane |
-| `release.deploy` | luna | bounded | no | never | Immutable release under declared authorization |
-| `platform.operate` | luna | bounded | no | never | Shared services from exact evidence |
-| `content.generate` | luna | bounded | no | required | Researches the brief within bounds, then writes, codes, and draws to a claim; the schema pins this model |
-| `git.publish` | luna | bounded | no | never | Non-force publication; destructive operations are unrepresentable |
+| Operator | Profile | Grammar | Tools | Why |
+| --- | --- | --- | --- | --- |
+| `workspace.bind` | luna | no | `fileread:context-aliases`, `git:read`, `shell:declared-commands`, `http:probe`, `secrets:resolve-by-name` | Reads canonical files and a registry; no judgement |
+| `business.decide` | sol-fresh | no | `fileread:context-aliases`, `sourcewrite:declared-write-set`, `git:read`, `websearch:bounded` | An unfamiliar business model may need reference research before coverage can be frozen |
+| `architecture.decide` | sol-fresh | no | `fileread:context-aliases`, `git:read`, `websearch:bounded`, `visualize:html` | Alternatives and compatibility need evidence beyond the repo; schema pins the model |
+| `backend.source.apply` | luna | no | `fileread:context-aliases`, `sourcewrite:declared-write-set`, `git:commit-session-branch`, `shell:declared-commands` | Writes inside a frozen contract following patterns/be |
+| `frontend.direction.decide` | sol-fresh | yes | `fileread:context-aliases`, `git:read`, `websearch:bounded`, `imagegen:judged`, `visualize:html` | Research only for an unfamiliar domain; renders candidates as pages and judges for itself when a region is too empty to stand without an image |
+| `frontend.presentation.resolve` | luna | yes | `fileread:context-aliases`, `git:read`, `registry:read` | A lookup against a closed inventory |
+| `frontend.source.apply` | luna | yes | `fileread:context-aliases`, `sourcewrite:declared-write-set`, `git:commit-session-branch`, `imagegen:judged` | Writes only what the resolution already contains, following patterns/fe |
+| `frontend.surface.audit` | sol-reviewer | yes | `fileread:context-aliases`, `git:read`, `websearch:bounded`, `visualize:html`, `browsercontrol:required`, `http:probe` | Browser only, no source write: the auditor cannot repair what it measures |
+| `quality.verify` | luna | no | `fileread:context-aliases`, `git:read`, `shell:declared-commands`, `http:probe` | Runs gates, repairs nothing |
+| `uat.verify` | sol-fresh | no | `fileread:context-aliases`, `sourcewrite:declared-write-set`, `git:read`, `websearch:bounded`, `visualize:html`, `browsercontrol:required`, `http:probe`, `secrets:resolve-by-name`, `database:namespaced-write` | Drives the real journey in a browser and may write nothing; fresh verdict per lane |
+| `release.deploy` | luna | no | `fileread:context-aliases`, `git:read`, `shell:declared-commands`, `http:probe`, `container:operate`, `ci:read`, `secrets:resolve-by-name` | Immutable release under declared authorization |
+| `platform.operate` | luna | no | `fileread:context-aliases`, `git:read`, `shell:declared-commands`, `http:probe`, `container:operate`, `secrets:resolve-by-name` | Shared services from exact evidence |
+| `content.generate` | luna | no | `fileread:context-aliases`, `shell:declared-commands`, `websearch:bounded`, `imagegen:required`, `objectstorage:read` | Researches the brief within bounds, then writes, codes, and draws to a claim; the schema pins this model |
+| `git.publish` | luna | no | `fileread:context-aliases`, `git:merge-and-push`, `shell:declared-commands`, `ci:read` | Non-force publication; destructive operations are unrepresentable |
 
 ## Profiles
 

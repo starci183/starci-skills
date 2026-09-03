@@ -79,12 +79,12 @@ làm bằng chứng rằng node đã pass.
 
 | # | Bước | Tham số | Đọc | Ghi | Dừng với |
 | --- | --- | --- | --- | --- | --- |
-| 1 | Kiểm gate, chạy lại, và xác nhận head cùng route đang phục vụ | `resume` | `request/request.json`, đầu vào `frontend-source-application` (commit của nó phải bằng head đã ghim), @workspaces/fe ở head đóng băng, @worktrees/sessions/central-runtime (preview phục vụ worktree phiên ở commit ấy) | — | `INVALID_INPUT`, `SOURCE_DRIFT`, `NO_PROGRESS` |
+| 1 | Kiểm gate, chạy lại, và xác nhận head cùng route đang phục vụ | `resume` | `request/request.json`, đầu vào `frontend-source-application` (commit của nó phải bằng head đã ghim), @workspaces/fe ở head đóng băng, @worktrees/sessions/central-runtime (preview phục vụ worktree phiên ở commit ấy), @tools/git | — | `INVALID_INPUT`, `SOURCE_DRIFT`, `NO_PROGRESS` |
 | 2 | Bind thẩm quyền | — | @knowledge/ui/proof (mọi topic kèm fingerprint và kho luật), đầu vào `frontend-source-application` (các lời khai), đầu vào `frontend-presentation-resolution` (chủ sở hữu của từng node), @worktrees/sessions/central-runtime | — | — |
 | 3 | Chọn các mục ma trận | `matrix` | đầu vào `frontend-direction-decision` (coverage: state nhân viewport nhân bảng màu) | — | — |
-| 4 | Chờ từng mục tới lúc sẵn sàng | `readinessProbe` | @worktrees/sessions/central-runtime | — | `RUNTIME_UNAVAILABLE` |
-| 5 | Chụp và đo từng mục | — | @worktrees/sessions/central-runtime, @workspaces/fe (các owner được quan sát và identifier từng node mang) | `response/artifacts/<matrixId>.png`, `response/data/captures/<matrixId>.json` | `EVIDENCE_MISSING` |
-| 6 | Đối chiếu với lời khai và luật proof, phán quyết theo chủ sở hữu, rồi phát | — | @knowledge/ui/proof, @knowledge/grammars/starci, các bức chụp | `response/data/verdicts.json`, `response/response.md`, `response/response.json` | `UNKNOWN_RULE` |
+| 4 | Chờ từng mục tới lúc sẵn sàng | `readinessProbe` | @worktrees/sessions/central-runtime, @tools/http | — | `RUNTIME_UNAVAILABLE` |
+| 5 | Chụp và đo từng mục | — | @worktrees/sessions/central-runtime, @workspaces/fe (các owner được quan sát và identifier từng node mang), @tools/browsercontrol | `response/artifacts/<matrixId>.png`, `response/data/captures/<matrixId>.json` | `EVIDENCE_MISSING` |
+| 6 | Đối chiếu với lời khai và luật proof, phán quyết theo chủ sở hữu, rồi phát | — | @knowledge/ui/proof, @knowledge/grammars/starci, các bức chụp, @tools/websearch | `response/data/verdicts.json`, `response/response.md`, `response/response.json`, @tools/visualize | `UNKNOWN_RULE` |
 
 Ma trận là coverage của hướng, không phải một quyết định mới: `matrix` chỉ được thu hẹp nó, và
 orchestrator có thể chia các mục ra tối đa ba nhánh song song của cùng một bậc. Mỗi mục cho đúng một

@@ -9,14 +9,14 @@
   "selfTest": "self-test.mjs",
   "resources": {
     "profile": "sol-reviewer",
-    "requires": [
-      "webSearch",
-      "browser"
-    ],
-    "policy": {
-      "webSearch": "bounded",
-      "grammarBound": true,
-      "imageGeneration": "never"
+    "grammarBound": true,
+    "tools": {
+      "@tools/fileread": "context-aliases",
+      "@tools/git": "read",
+      "@tools/websearch": "bounded",
+      "@tools/visualize": "html",
+      "@tools/browsercontrol": "required",
+      "@tools/http": "probe"
     }
   }
 }

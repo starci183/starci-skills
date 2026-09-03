@@ -117,12 +117,12 @@ proof.
 | # | Step | Params | Reads | Writes | Stops with |
 | --- | --- | --- | --- | --- | --- |
 | 1 | Validate the gate and resume | `resume` | `request/request.json`, @worktrees/sessions/central-runtime at the frozen generation | — | `INVALID_INPUT`, `SOURCE_DRIFT`, `NO_PROGRESS` |
-| 2 | Bind the authority: the runtime, the device state, the projects and the approval | `service`, `approval` | @worktrees/sessions/central-runtime for the inventory fingerprint and generation, @workspaces/device-state for each capability handle with its custody evidence, @workspaces/projects/<project>/<role> | — | `AUTHORITY_DRIFT`, `CAPABILITY_MISSING` |
-| 3 | Recheck the inventory once before anything changes | — | @worktrees/sessions/central-runtime, the declared resources re-observed once | — | `INVENTORY_DRIFT` |
+| 2 | Bind the authority: the runtime, the device state, the projects and the approval | `service`, `approval` | @worktrees/sessions/central-runtime for the inventory fingerprint and generation, @workspaces/device-state for each capability handle with its custody evidence, @workspaces/projects/<project>/<role>, @tools/secrets | — | `AUTHORITY_DRIFT`, `CAPABILITY_MISSING` |
+| 3 | Recheck the inventory once before anything changes | — | @worktrees/sessions/central-runtime, the declared resources re-observed once, @tools/git | — | `INVENTORY_DRIFT` |
 | 4 | Resolve the port claims | `portClaims` | @workspaces/ports/<project> for the claimed ports, @worktrees/sessions/central-runtime for their observed holders | — | `PORT_CONFLICT` |
 | 5 | Derive the delta between what is observed and what is desired | `desiredState` | @worktrees/sessions/central-runtime for the observed state, `request/request.json` for the desired state | `response/data/delta.json` | — |
-| 6 | Apply the approved delta, one resource at a time, under an exclusive lease | — | @worktrees/sessions/central-runtime, @workspaces/device-state for the handles by name | @worktrees/sessions/central-runtime, `response/data/delta.json` | `EFFECT_UNAUTHORIZED`, `SERVICE_UNAVAILABLE` |
-| 7 | Prove every required check | — | @worktrees/sessions/central-runtime re-read against the branch's complete proof set | `response/data/checks.json` | `PROOF_FAILED` |
+| 6 | Apply the approved delta, one resource at a time, under an exclusive lease | — | @worktrees/sessions/central-runtime, @workspaces/device-state for the handles by name | @worktrees/sessions/central-runtime, `response/data/delta.json`, @tools/container, @tools/shell | `EFFECT_UNAUTHORIZED`, `SERVICE_UNAVAILABLE` |
+| 7 | Prove every required check | — | @worktrees/sessions/central-runtime re-read against the branch's complete proof set, @tools/http | `response/data/checks.json` | `PROOF_FAILED` |
 | 8 | Write the receipt and emit | — | everything above | `response/response.md`, `response/response.json` | — |
 
 A resume begins again at validation, reuses only unchanged fingerprinted observations, and consumes

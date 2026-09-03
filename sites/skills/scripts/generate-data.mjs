@@ -72,8 +72,8 @@ const operators = packages.map((pkg) => {
     domain: pkg.manifest.domain,
     job: op.job || pkg.manifest.job,
     profile: pkg.manifest.resources?.profile ?? null,
-    policy: pkg.manifest.resources?.policy ?? null,
-    requires: pkg.manifest.resources?.requires ?? [],
+    grammarBound: pkg.manifest.resources?.grammarBound === true,
+    tools: Object.entries(pkg.manifest.resources?.tools ?? {}).map(([ref, mode]) => ({ id: ref.split('/')[1], mode })),
     hasVietnamese: Boolean(pkg.vi),
     context,
     steps: tables.steps?.rows.length ?? 0,
@@ -97,6 +97,28 @@ const domains = [...new Set(operators.map((operator) => operator.domain))]
 const profiles = [...new Set(operators.map((operator) => operator.profile).filter(Boolean))]
   .map((id) => ({ id, operatorCount: operators.filter((operator) => operator.profile === id).length }))
   .sort((left, right) => right.operatorCount - left.operatorCount || left.id.localeCompare(right.id))
+
+// --- Tools: the closed registry an operator may call, and who declares each one --------------------
+const toolsDoc = await readJson('resources', 'tools.json')
+const runtimeIds = Object.keys(toolsDoc.runtimes ?? {})
+if (runtimeIds.length === 0) throw new Error('resources/tools.json: no runtimes to read the support table from')
+const tools = Object.entries(toolsDoc.tools ?? {}).map(([id, tool]) => ({
+  id,
+  purpose: tool.purpose,
+  modes: Object.keys(tool.modes ?? {}).filter((mode) => mode !== 'never'),
+  // The support table is quoted, never summarized: a runtime that cannot provide a tool cannot run
+  // an operator that declares it, and the page must say which runtime that is.
+  support: Object.fromEntries(runtimeIds.map((runtime) => [runtime, tool.support?.[runtime]?.supported === true])),
+  declaredBy: operators.filter((operator) => operator.tools.some((entry) => entry.id === id)).map((operator) => operator.id),
+}))
+const runtimes = runtimeIds.map((id) => ({
+  id,
+  meaning: toolsDoc.runtimes[id],
+  unsupported: tools.filter((tool) => !tool.support[id]).map((tool) => tool.id),
+}))
+const unknownTools = [...new Set(operators.flatMap((operator) => operator.tools.map((entry) => entry.id)))]
+  .filter((id) => !tools.some((tool) => tool.id === id))
+if (unknownTools.length) throw new Error(`operators declare tools resources/tools.json does not define: ${unknownTools.join(', ')}`)
 
 // --- Kinds: who writes each file that crosses a branch boundary, and who reads it ------------------
 const kindNames = [...new Set(operators.flatMap((operator) => [...operator.inputs, ...operator.outputs].map((entry) => entry.kind)))].sort()
@@ -158,6 +180,8 @@ const catalog = {
   operators,
   domains,
   profiles,
+  tools,
+  runtimes,
   kinds,
   stopCodes,
   workflows,
@@ -170,6 +194,7 @@ const catalog = {
     steps: operators.reduce((total, operator) => total + operator.steps, 0),
     domains: domains.length,
     profiles: profiles.length,
+    tools: tools.length,
     fallbackCodes: stopCodes.filter((code) => code.disposition === 'fallback').length,
   },
 }
@@ -178,5 +203,6 @@ await writeFile(path.join(siteRoot, 'src', 'catalog.generated.json'), `${JSON.st
 
 console.log(
   `generated site data: v${version}, ${catalog.counts.operators} operators, ${catalog.counts.workflows} workflows, `
-  + `${catalog.counts.routes} routes, ${catalog.counts.kinds} kinds, ${catalog.counts.stopCodes} stop codes`,
+  + `${catalog.counts.routes} routes, ${catalog.counts.kinds} kinds, ${catalog.counts.tools} tools, `
+  + `${catalog.counts.stopCodes} stop codes`,
 )

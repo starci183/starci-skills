@@ -52,22 +52,22 @@ tên nó. Mọi nơi khác, `never`.
 
 Bản tóm tắt những gì mỗi `operator.json` khai; validator từ chối dòng nào lệch.
 
-| Operator | Profile | Mạng | Grammar | Hình | Vì sao hình dạng này |
-| --- | --- | --- | --- | --- | --- |
-| `workspace.bind` | luna | giới hạn | không | không | Đọc file chuẩn và sổ đăng ký; không phán đoán |
-| `business.decide` | sol-fresh | giới hạn | không | không | Mô hình kinh doanh lạ có thể cần tra cứu trước khi đóng băng độ phủ |
-| `architecture.decide` | sol-fresh | giới hạn | không | không | Phương án thay thế và tương thích cần bằng chứng ngoài repo; schema đã ghim model |
-| `backend.source.apply` | luna | giới hạn | không | không | Ghi trong hợp đồng đã đóng băng, theo patterns/be |
-| `frontend.direction.decide` | sol-fresh | giới hạn | có | theo gu | Chỉ tra cứu khi lĩnh vực lạ; render ứng viên thành trang và tự xét khi một vùng quá trống, cần hình |
-| `frontend.presentation.resolve` | luna | giới hạn | có | theo gu | Tra cứu trên một danh sách đóng |
-| `frontend.source.apply` | luna | giới hạn | có | theo gu | Chỉ ghi thứ resolution đã chứa, theo patterns/fe |
-| `frontend.surface.audit` | sol-reviewer | giới hạn | có | không | Chỉ trình duyệt, không ghi source: người audit không sửa được thứ mình đo |
-| `quality.verify` | luna | giới hạn | không | không | Chạy cổng, không sửa |
-| `uat.verify` | sol-reviewer | giới hạn | không | không | Lái hành trình thật trong trình duyệt và không được ghi gì; phán quyết mới cho từng lane |
-| `release.deploy` | luna | giới hạn | không | không | Phát hành bất biến dưới authorization đã khai |
-| `platform.operate` | luna | giới hạn | không | không | Dịch vụ dùng chung từ bằng chứng chính xác |
-| `content.generate` | luna | giới hạn | không | bắt buộc | Tra cứu brief trong giới hạn, rồi viết, code và vẽ theo tuyên bố; schema ghim model này |
-| `git.publish` | luna | giới hạn | không | không | Publish không force; thao tác phá hoại không biểu diễn được |
+| Operator | Profile | Grammar | Tool | Vì sao |
+| --- | --- | --- | --- | --- |
+| `workspace.bind` | luna | không | `fileread:context-aliases`, `git:read`, `shell:declared-commands`, `http:probe`, `secrets:resolve-by-name` | Đọc file chuẩn và sổ đăng ký; không phán đoán |
+| `business.decide` | sol-fresh | không | `fileread:context-aliases`, `sourcewrite:declared-write-set`, `git:read`, `websearch:bounded` | Mô hình kinh doanh lạ có thể cần tra cứu trước khi đóng băng độ phủ |
+| `architecture.decide` | sol-fresh | không | `fileread:context-aliases`, `git:read`, `websearch:bounded`, `visualize:html` | Phương án thay thế và tương thích cần bằng chứng ngoài repo; schema đã ghim model |
+| `backend.source.apply` | luna | không | `fileread:context-aliases`, `sourcewrite:declared-write-set`, `git:commit-session-branch`, `shell:declared-commands` | Ghi trong hợp đồng đã đóng băng, theo patterns/be |
+| `frontend.direction.decide` | sol-fresh | có | `fileread:context-aliases`, `git:read`, `websearch:bounded`, `imagegen:judged`, `visualize:html` | Chỉ tra cứu khi lĩnh vực lạ; render ứng viên thành trang và tự xét khi một vùng quá trống, cần hình |
+| `frontend.presentation.resolve` | luna | có | `fileread:context-aliases`, `git:read`, `registry:read` | Tra cứu trên một danh sách đóng |
+| `frontend.source.apply` | luna | có | `fileread:context-aliases`, `sourcewrite:declared-write-set`, `git:commit-session-branch`, `imagegen:judged` | Chỉ ghi thứ resolution đã chứa, theo patterns/fe |
+| `frontend.surface.audit` | sol-reviewer | có | `fileread:context-aliases`, `git:read`, `websearch:bounded`, `visualize:html`, `browsercontrol:required`, `http:probe` | Chỉ trình duyệt, không ghi source: người audit không sửa được thứ mình đo |
+| `quality.verify` | luna | không | `fileread:context-aliases`, `git:read`, `shell:declared-commands`, `http:probe` | Chạy cổng, không sửa |
+| `uat.verify` | sol-fresh | không | `fileread:context-aliases`, `sourcewrite:declared-write-set`, `git:read`, `websearch:bounded`, `visualize:html`, `browsercontrol:required`, `http:probe`, `secrets:resolve-by-name`, `database:namespaced-write` | Lái hành trình thật trong trình duyệt và không được ghi gì; phán quyết mới cho từng lane |
+| `release.deploy` | luna | không | `fileread:context-aliases`, `git:read`, `shell:declared-commands`, `http:probe`, `container:operate`, `ci:read`, `secrets:resolve-by-name` | Phát hành bất biến dưới authorization đã khai |
+| `platform.operate` | luna | không | `fileread:context-aliases`, `git:read`, `shell:declared-commands`, `http:probe`, `container:operate`, `secrets:resolve-by-name` | Dịch vụ dùng chung từ bằng chứng chính xác |
+| `content.generate` | luna | không | `fileread:context-aliases`, `shell:declared-commands`, `websearch:bounded`, `imagegen:required`, `objectstorage:read` | Tra cứu brief trong giới hạn, rồi viết, code và vẽ theo tuyên bố; schema ghim model này |
+| `git.publish` | luna | không | `fileread:context-aliases`, `git:merge-and-push`, `shell:declared-commands`, `ci:read` | Publish không force; thao tác phá hoại không biểu diễn được |
 
 ## Profile
 

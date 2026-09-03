@@ -123,13 +123,13 @@ implementation, a quality gate, or a UAT run has passed.
 | # | Step | Params | Reads | Writes | Stops with |
 | --- | --- | --- | --- | --- | --- |
 | 1 | Validate the gate and resume | `resume`, `mode` | `request/request.json`, @workspaces/be at the frozen head | — | `INVALID_INPUT`, `SOURCE_DRIFT`, `NO_PROGRESS` |
-| 2 | Normalize the evidence into claims | — | @workspaces/be, every observation with its role, path, line range and head, input `architecture-decision` when present as evidence only | `response/data/claims.json` | `EVIDENCE_MISSING`, `CONTRADICTION_UNRESOLVED` |
+| 2 | Normalize the evidence into claims | — | @workspaces/be, every observation with its role, path, line range and head, input `architecture-decision` when present as evidence only, @tools/git | `response/data/claims.json` | `EVIDENCE_MISSING`, `CONTRADICTION_UNRESOLVED` |
 | 3 | Check the published head and the transition authority | `featureId`, `targetState`, `approval` | @worktrees/businesses/<featureId>: the current head, its state and its frozen evidence | — | `LIFECYCLE_TRANSITION_INVALID`, `AUTHORITY_CONFLICT`, `APPROVAL_REQUIRED` |
-| 4 | Model the promise, its actor and its eligibility, under mode model: fact claims carry every enforcing row, the intent claim carries the promise itself | `promise` | `response/data/claims.json`, @workspaces/be at the frozen head | — | `EVIDENCE_MISSING` |
+| 4 | Model the promise, its actor and its eligibility, under mode model: fact claims carry every enforcing row, the intent claim carries the promise itself | `promise` | `response/data/claims.json`, @workspaces/be at the frozen head, @tools/websearch | — | `EVIDENCE_MISSING` |
 | 5 | Freeze the coverage matrix, under mode model | `dimensions` | `response/data/claims.json`, @workspaces/be and the surface it discovers | `response/data/coverage-matrix.json` | `COVERAGE_INCOMPLETE`, `CONSUMER_UNPROVEN` |
 | 6 | Dispose legacy coexistence, under mode model | — | `response/data/coverage-matrix.json`: the legacy create, read and settle rows and their proof | — | `CONTRADICTION_UNRESOLVED` |
 | 7 | Reconcile against delivered source, under mode reconcile | — | input `backend-source-application`, @workspaces/be at the frozen head, the coverage matrix frozen at the published head | — | `RECONCILIATION_DISCREPANCY` |
-| 8 | Publish one head under an exclusive lease | — | `response/data/claims.json`, @worktrees/businesses/<featureId> at the previous head | @worktrees/businesses/<featureId> as the new model.json head, `response/data/model.json` | `SOURCE_DRIFT` |
+| 8 | Publish one head under an exclusive lease | — | `response/data/claims.json`, @worktrees/businesses/<featureId> at the previous head | @worktrees/businesses/<featureId> as the new model.json head, `response/data/model.json`, @tools/sourcewrite | `SOURCE_DRIFT` |
 | 9 | Emit | — | everything above | `response/response.md`, `response/response.json` | — |
 
 Legacy create, read, and settle each take their own row when they are declared: a new sale path may

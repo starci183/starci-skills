@@ -1,6 +1,6 @@
 {
-  "version": "1.0.2",
-  "lineageNote": "1.0.2 (2026-09-03): every operator is one authored operator.md with a request/response branch layout, JSON kind contracts, an errors registry with dispositions, example workflows, and the frontend.*/backend.source.apply names; 1.0.1 was the dry-run round that exposed the old shape.",
+  "version": "1.0.3",
+  "lineageNote": "1.0.3 (2026-09-03): a tools registry replaces grants and policies (resources/tools.json, @tools/<id> in Steps, per-runtime support, profile equivalents); every operator binds an OpenAI profile for the Codex processor; the first test round (tests/) and its fixes; docs/ and sites/ return.",
   "entry": {
     "name": "starci",
     "description": "Complete one StarCi mission by freezing its scope, selecting the one operator that owns the outcome, and routing between operators on typed results until the outcome is proved or a person must decide.",
@@ -95,13 +95,24 @@
       "domain": "architecture",
       "job": "Decide one architecture with its tech stack, system boundaries, and data ownership, and prove it against the observed current state, the rejected alternatives, verified compatibility, and an independent critique.",
       "profile": "sol-fresh",
-      "policy": {
-        "webSearch": "bounded",
-        "grammarBound": false,
-        "imageGeneration": "never"
-      },
-      "requires": [
-        "webSearch"
+      "grammarBound": false,
+      "tools": [
+        {
+          "id": "fileread",
+          "mode": "context-aliases"
+        },
+        {
+          "id": "git",
+          "mode": "read"
+        },
+        {
+          "id": "websearch",
+          "mode": "bounded"
+        },
+        {
+          "id": "visualize",
+          "mode": "html"
+        }
       ],
       "hasVietnamese": true,
       "context": [
@@ -278,14 +289,24 @@
       "domain": "backend",
       "job": "Implement one backend outcome inside a frozen mutation contract, following the observed sibling family, and return the measured conformance and proof receipt that shows the boundary was not widened.",
       "profile": "luna",
-      "policy": {
-        "webSearch": "bounded",
-        "grammarBound": false,
-        "imageGeneration": "never"
-      },
-      "requires": [
-        "webSearch",
-        "sourceWrite"
+      "grammarBound": false,
+      "tools": [
+        {
+          "id": "fileread",
+          "mode": "context-aliases"
+        },
+        {
+          "id": "sourcewrite",
+          "mode": "declared-write-set"
+        },
+        {
+          "id": "git",
+          "mode": "commit-session-branch"
+        },
+        {
+          "id": "shell",
+          "mode": "declared-commands"
+        }
       ],
       "hasVietnamese": true,
       "context": [
@@ -294,7 +315,7 @@
         "@worktrees/businesses/<featureId>"
       ],
       "steps": 8,
-      "requirements": 4,
+      "requirements": 5,
       "inputs": [
         {
           "kind": "architecture-decision",
@@ -328,13 +349,13 @@
           "kind": "conformance",
           "file": "response/data/conformance/<operationId>.<facet>.json",
           "type": "data",
-          "required": true
+          "required": false
         },
         {
           "kind": "proof",
           "file": "response/data/proofs/<operationId>.<proofKind>.json",
           "type": "data",
-          "required": true
+          "required": false
         }
       ],
       "next": [
@@ -463,13 +484,24 @@
       "domain": "business",
       "job": "Decide and publish one evidence-backed business promise as durable backend-owned authority, frozen behind a complete promise-to-enforcement coverage matrix, or reconcile that published head against the source that was actually delivered.",
       "profile": "sol-fresh",
-      "policy": {
-        "webSearch": "bounded",
-        "grammarBound": false,
-        "imageGeneration": "never"
-      },
-      "requires": [
-        "webSearch"
+      "grammarBound": false,
+      "tools": [
+        {
+          "id": "fileread",
+          "mode": "context-aliases"
+        },
+        {
+          "id": "sourcewrite",
+          "mode": "declared-write-set"
+        },
+        {
+          "id": "git",
+          "mode": "read"
+        },
+        {
+          "id": "websearch",
+          "mode": "bounded"
+        }
       ],
       "hasVietnamese": true,
       "context": [
@@ -640,15 +672,28 @@
       "domain": "content",
       "job": "Generate or refactor one educational content unit in one linear pass: a teacher brief that constrains everything after it, one written edition per declared language, images made to a stated claim, code and executable checks that actually run, and an independent review that receives the artifacts without the producer's rationale.",
       "profile": "luna",
-      "policy": {
-        "webSearch": "bounded",
-        "grammarBound": false,
-        "imageGeneration": "required"
-      },
-      "requires": [
-        "webSearch",
-        "imageGeneration",
-        "sourceWrite"
+      "grammarBound": false,
+      "tools": [
+        {
+          "id": "fileread",
+          "mode": "context-aliases"
+        },
+        {
+          "id": "shell",
+          "mode": "declared-commands"
+        },
+        {
+          "id": "websearch",
+          "mode": "bounded"
+        },
+        {
+          "id": "imagegen",
+          "mode": "required"
+        },
+        {
+          "id": "objectstorage",
+          "mode": "read"
+        }
       ],
       "hasVietnamese": true,
       "context": [
@@ -832,15 +877,28 @@
       "domain": "frontend",
       "job": "Decide one evidence-backed, implementation-ready frontend direction for one authorized target, and prove it against the business promise, the published Grammar, the observed implementation and a falsification pass that no candidate survives by taste.",
       "profile": "sol-fresh",
-      "policy": {
-        "webSearch": "bounded",
-        "grammarBound": true,
-        "imageGeneration": "judged"
-      },
-      "requires": [
-        "webSearch",
-        "imageGeneration",
-        "browser"
+      "grammarBound": true,
+      "tools": [
+        {
+          "id": "fileread",
+          "mode": "context-aliases"
+        },
+        {
+          "id": "git",
+          "mode": "read"
+        },
+        {
+          "id": "websearch",
+          "mode": "bounded"
+        },
+        {
+          "id": "imagegen",
+          "mode": "judged"
+        },
+        {
+          "id": "visualize",
+          "mode": "html"
+        }
       ],
       "hasVietnamese": true,
       "context": [
@@ -1057,14 +1115,20 @@
       "domain": "frontend",
       "job": "Resolve every application-owned presentation property on one already-composed tree to exactly one published rule, emit its class and its verifiable contract claim, and stop at the smallest owning gap instead of inventing a value.",
       "profile": "luna",
-      "policy": {
-        "webSearch": "bounded",
-        "grammarBound": true,
-        "imageGeneration": "judged"
-      },
-      "requires": [
-        "webSearch",
-        "imageGeneration"
+      "grammarBound": true,
+      "tools": [
+        {
+          "id": "fileread",
+          "mode": "context-aliases"
+        },
+        {
+          "id": "git",
+          "mode": "read"
+        },
+        {
+          "id": "registry",
+          "mode": "read"
+        }
       ],
       "hasVietnamese": true,
       "context": [
@@ -1206,15 +1270,24 @@
       "domain": "frontend",
       "job": "Write one already-resolved tree into product source on the session branch, inside a frozen owner ceiling and a declared file set, emitting only values the bound resolution already contains, and account for every byte that entered the repository in one commit.",
       "profile": "luna",
-      "policy": {
-        "webSearch": "bounded",
-        "grammarBound": true,
-        "imageGeneration": "judged"
-      },
-      "requires": [
-        "webSearch",
-        "imageGeneration",
-        "sourceWrite"
+      "grammarBound": true,
+      "tools": [
+        {
+          "id": "fileread",
+          "mode": "context-aliases"
+        },
+        {
+          "id": "sourcewrite",
+          "mode": "declared-write-set"
+        },
+        {
+          "id": "git",
+          "mode": "commit-session-branch"
+        },
+        {
+          "id": "imagegen",
+          "mode": "judged"
+        }
       ],
       "hasVietnamese": true,
       "context": [
@@ -1330,14 +1403,32 @@
       "domain": "frontend",
       "job": "Observe the committed surface at the served route across the matrix the direction's coverage implies, measure every node that carries a claim, and judge each measurement against the published proof rules by the owner of the node it stands on.",
       "profile": "sol-reviewer",
-      "policy": {
-        "webSearch": "bounded",
-        "grammarBound": true,
-        "imageGeneration": "never"
-      },
-      "requires": [
-        "webSearch",
-        "browser"
+      "grammarBound": true,
+      "tools": [
+        {
+          "id": "fileread",
+          "mode": "context-aliases"
+        },
+        {
+          "id": "git",
+          "mode": "read"
+        },
+        {
+          "id": "websearch",
+          "mode": "bounded"
+        },
+        {
+          "id": "visualize",
+          "mode": "html"
+        },
+        {
+          "id": "browsercontrol",
+          "mode": "required"
+        },
+        {
+          "id": "http",
+          "mode": "probe"
+        }
       ],
       "hasVietnamese": true,
       "context": [
@@ -1475,14 +1566,24 @@
       "domain": "git",
       "job": "Publish one approved Git boundary from the exact commit quality verified, with non-force, fast-forward-only semantics, and stop with a typed failure rather than reaching for a bypass.",
       "profile": "luna",
-      "policy": {
-        "webSearch": "bounded",
-        "grammarBound": false,
-        "imageGeneration": "never"
-      },
-      "requires": [
-        "webSearch",
-        "sourceWrite"
+      "grammarBound": false,
+      "tools": [
+        {
+          "id": "fileread",
+          "mode": "context-aliases"
+        },
+        {
+          "id": "git",
+          "mode": "merge-and-push"
+        },
+        {
+          "id": "shell",
+          "mode": "declared-commands"
+        },
+        {
+          "id": "ci",
+          "mode": "read"
+        }
       ],
       "hasVietnamese": true,
       "context": [
@@ -1614,14 +1715,32 @@
       "domain": "platform",
       "job": "Operate one bounded shared observability, Sonar, or tunnel service from exact evidence: inventory it, converge only the approved delta, prove every check the bound knowledge requires, and stop at the smallest owning gap instead of taking product deployment ownership.",
       "profile": "luna",
-      "policy": {
-        "webSearch": "bounded",
-        "grammarBound": false,
-        "imageGeneration": "never"
-      },
-      "requires": [
-        "webSearch",
-        "sourceWrite"
+      "grammarBound": false,
+      "tools": [
+        {
+          "id": "fileread",
+          "mode": "context-aliases"
+        },
+        {
+          "id": "git",
+          "mode": "read"
+        },
+        {
+          "id": "shell",
+          "mode": "declared-commands"
+        },
+        {
+          "id": "http",
+          "mode": "probe"
+        },
+        {
+          "id": "container",
+          "mode": "operate"
+        },
+        {
+          "id": "secrets",
+          "mode": "resolve-by-name"
+        }
       ],
       "hasVietnamese": true,
       "context": [
@@ -1773,13 +1892,24 @@
       "domain": "quality",
       "job": "Verify one bounded delivery by running its declared gates against an unchanged predecessor receipt at one frozen head, and return the exact measured verdict, repairing nothing.",
       "profile": "luna",
-      "policy": {
-        "webSearch": "bounded",
-        "grammarBound": false,
-        "imageGeneration": "never"
-      },
-      "requires": [
-        "webSearch"
+      "grammarBound": false,
+      "tools": [
+        {
+          "id": "fileread",
+          "mode": "context-aliases"
+        },
+        {
+          "id": "git",
+          "mode": "read"
+        },
+        {
+          "id": "shell",
+          "mode": "declared-commands"
+        },
+        {
+          "id": "http",
+          "mode": "probe"
+        }
       ],
       "hasVietnamese": true,
       "context": [
@@ -1925,14 +2055,36 @@
       "domain": "deployment",
       "job": "Deploy one immutable release to one declared target under its declared authorization and prove the steady state it reached, taking the recovery or rollback branch inside the same pass rather than assuming the rollout succeeded.",
       "profile": "luna",
-      "policy": {
-        "webSearch": "bounded",
-        "grammarBound": false,
-        "imageGeneration": "never"
-      },
-      "requires": [
-        "webSearch",
-        "sourceWrite"
+      "grammarBound": false,
+      "tools": [
+        {
+          "id": "fileread",
+          "mode": "context-aliases"
+        },
+        {
+          "id": "git",
+          "mode": "read"
+        },
+        {
+          "id": "shell",
+          "mode": "declared-commands"
+        },
+        {
+          "id": "http",
+          "mode": "probe"
+        },
+        {
+          "id": "container",
+          "mode": "operate"
+        },
+        {
+          "id": "ci",
+          "mode": "read"
+        },
+        {
+          "id": "secrets",
+          "mode": "resolve-by-name"
+        }
       ],
       "hasVietnamese": true,
       "context": [
@@ -2113,15 +2265,45 @@
       "dir": "uat-verify",
       "domain": "test",
       "job": "Verify one product flow end to end on the running product at the pinned commit, and publish one append-only run record with three independently judged lanes, or stop at the exact unavailability instead of manufacturing a verdict.",
-      "profile": "sol-reviewer",
-      "policy": {
-        "webSearch": "bounded",
-        "grammarBound": false,
-        "imageGeneration": "never"
-      },
-      "requires": [
-        "webSearch",
-        "browser"
+      "profile": "sol-fresh",
+      "grammarBound": false,
+      "tools": [
+        {
+          "id": "fileread",
+          "mode": "context-aliases"
+        },
+        {
+          "id": "sourcewrite",
+          "mode": "declared-write-set"
+        },
+        {
+          "id": "git",
+          "mode": "read"
+        },
+        {
+          "id": "websearch",
+          "mode": "bounded"
+        },
+        {
+          "id": "visualize",
+          "mode": "html"
+        },
+        {
+          "id": "browsercontrol",
+          "mode": "required"
+        },
+        {
+          "id": "http",
+          "mode": "probe"
+        },
+        {
+          "id": "secrets",
+          "mode": "resolve-by-name"
+        },
+        {
+          "id": "database",
+          "mode": "namespaced-write"
+        }
       ],
       "hasVietnamese": true,
       "context": [
@@ -2315,13 +2497,28 @@
       "domain": "workspace",
       "job": "Resolve one project and role into a verified checkout identity, its exact source head, and the closed runtime binding it may consume, and return that as one typed route receipt.",
       "profile": "luna",
-      "policy": {
-        "webSearch": "bounded",
-        "grammarBound": false,
-        "imageGeneration": "never"
-      },
-      "requires": [
-        "webSearch"
+      "grammarBound": false,
+      "tools": [
+        {
+          "id": "fileread",
+          "mode": "context-aliases"
+        },
+        {
+          "id": "git",
+          "mode": "read"
+        },
+        {
+          "id": "shell",
+          "mode": "declared-commands"
+        },
+        {
+          "id": "http",
+          "mode": "probe"
+        },
+        {
+          "id": "secrets",
+          "mode": "resolve-by-name"
+        }
       ],
       "hasVietnamese": true,
       "context": [
@@ -2539,11 +2736,299 @@
     },
     {
       "id": "sol-fresh",
-      "operatorCount": 3
+      "operatorCount": 4
     },
     {
       "id": "sol-reviewer",
-      "operatorCount": 2
+      "operatorCount": 1
+    }
+  ],
+  "tools": [
+    {
+      "id": "fileread",
+      "purpose": "Read files and directories at the aliases the Context table names, at the frozen head.",
+      "modes": [
+        "context-aliases"
+      ],
+      "support": {
+        "openai": true,
+        "claude": true
+      },
+      "declaredBy": [
+        "architecture.decide",
+        "backend.source.apply",
+        "business.decide",
+        "content.generate",
+        "frontend.direction.decide",
+        "frontend.presentation.resolve",
+        "frontend.source.apply",
+        "frontend.surface.audit",
+        "git.publish",
+        "platform.operate",
+        "quality.verify",
+        "release.deploy",
+        "uat.verify",
+        "workspace.bind"
+      ]
+    },
+    {
+      "id": "sourcewrite",
+      "purpose": "Write files inside a routed checkout or an authority root.",
+      "modes": [
+        "declared-write-set"
+      ],
+      "support": {
+        "openai": true,
+        "claude": true
+      },
+      "declaredBy": [
+        "backend.source.apply",
+        "business.decide",
+        "frontend.source.apply",
+        "uat.verify"
+      ]
+    },
+    {
+      "id": "git",
+      "purpose": "Read and change repository state: heads, branches, worktrees, commits, merges, pushes.",
+      "modes": [
+        "read",
+        "commit-session-branch",
+        "merge-and-push"
+      ],
+      "support": {
+        "openai": true,
+        "claude": true
+      },
+      "declaredBy": [
+        "architecture.decide",
+        "backend.source.apply",
+        "business.decide",
+        "frontend.direction.decide",
+        "frontend.presentation.resolve",
+        "frontend.source.apply",
+        "frontend.surface.audit",
+        "git.publish",
+        "platform.operate",
+        "quality.verify",
+        "release.deploy",
+        "uat.verify",
+        "workspace.bind"
+      ]
+    },
+    {
+      "id": "shell",
+      "purpose": "Run declared commands: gates, builds, proofs, hooks, deployment plans.",
+      "modes": [
+        "declared-commands"
+      ],
+      "support": {
+        "openai": true,
+        "claude": true
+      },
+      "declaredBy": [
+        "backend.source.apply",
+        "content.generate",
+        "git.publish",
+        "platform.operate",
+        "quality.verify",
+        "release.deploy",
+        "workspace.bind"
+      ]
+    },
+    {
+      "id": "websearch",
+      "purpose": "Read public web pages to close one named gap in the evidence; results are references with URLs, never authority.",
+      "modes": [
+        "bounded"
+      ],
+      "support": {
+        "openai": true,
+        "claude": true
+      },
+      "declaredBy": [
+        "architecture.decide",
+        "business.decide",
+        "content.generate",
+        "frontend.direction.decide",
+        "frontend.surface.audit",
+        "uat.verify"
+      ]
+    },
+    {
+      "id": "imagegen",
+      "purpose": "Produce artwork: a digital image from an image model, made to one stated claim. Rendering HTML is the visualize tool, not this one.",
+      "modes": [
+        "judged",
+        "required"
+      ],
+      "support": {
+        "openai": true,
+        "claude": false
+      },
+      "declaredBy": [
+        "content.generate",
+        "frontend.direction.decide",
+        "frontend.source.apply"
+      ]
+    },
+    {
+      "id": "visualize",
+      "purpose": "Render HTML for a person to look at: direction candidates, audit sheets, alternative comparisons, previews. No model grant is involved.",
+      "modes": [
+        "html"
+      ],
+      "support": {
+        "openai": true,
+        "claude": true
+      },
+      "declaredBy": [
+        "architecture.decide",
+        "frontend.direction.decide",
+        "frontend.surface.audit",
+        "uat.verify"
+      ]
+    },
+    {
+      "id": "browsercontrol",
+      "purpose": "Drive a real browser against a served route: navigate, act, capture screenshots and DOM measurements.",
+      "modes": [
+        "required"
+      ],
+      "support": {
+        "openai": true,
+        "claude": true
+      },
+      "declaredBy": [
+        "frontend.surface.audit",
+        "uat.verify"
+      ]
+    },
+    {
+      "id": "http",
+      "purpose": "Probe an endpoint: readiness, health, a served route, a GraphQL typename, a status page.",
+      "modes": [
+        "probe"
+      ],
+      "support": {
+        "openai": true,
+        "claude": true
+      },
+      "declaredBy": [
+        "frontend.surface.audit",
+        "platform.operate",
+        "quality.verify",
+        "release.deploy",
+        "uat.verify",
+        "workspace.bind"
+      ]
+    },
+    {
+      "id": "registry",
+      "purpose": "Read a package registry: the published Grammar, its version, its files.",
+      "modes": [
+        "read"
+      ],
+      "support": {
+        "openai": true,
+        "claude": true
+      },
+      "declaredBy": [
+        "frontend.presentation.resolve"
+      ]
+    },
+    {
+      "id": "container",
+      "purpose": "Inspect or operate containers and images: compose services, GHCR images by digest.",
+      "modes": [
+        "read",
+        "operate"
+      ],
+      "support": {
+        "openai": true,
+        "claude": true
+      },
+      "declaredBy": [
+        "platform.operate",
+        "release.deploy"
+      ]
+    },
+    {
+      "id": "ci",
+      "purpose": "Observe or dispatch continuous-integration runs.",
+      "modes": [
+        "read",
+        "dispatch"
+      ],
+      "support": {
+        "openai": true,
+        "claude": true
+      },
+      "declaredBy": [
+        "git.publish",
+        "release.deploy"
+      ]
+    },
+    {
+      "id": "objectstorage",
+      "purpose": "Read or write objects in the content store (MinIO): curriculum, style references, published units.",
+      "modes": [
+        "read",
+        "write"
+      ],
+      "support": {
+        "openai": true,
+        "claude": true
+      },
+      "declaredBy": [
+        "content.generate"
+      ]
+    },
+    {
+      "id": "secrets",
+      "purpose": "Resolve a sealed credential by name at the moment it is used; never read, print or store its value.",
+      "modes": [
+        "resolve-by-name"
+      ],
+      "support": {
+        "openai": true,
+        "claude": true
+      },
+      "declaredBy": [
+        "platform.operate",
+        "release.deploy",
+        "uat.verify",
+        "workspace.bind"
+      ]
+    },
+    {
+      "id": "database",
+      "purpose": "Read or write the product database for verification: seeds, fixtures, is_uat records.",
+      "modes": [
+        "read",
+        "namespaced-write"
+      ],
+      "support": {
+        "openai": true,
+        "claude": true
+      },
+      "declaredBy": [
+        "uat.verify"
+      ]
+    }
+  ],
+  "runtimes": [
+    {
+      "id": "openai",
+      "meaning": "Codex (desktop app or CLI) running an OpenAI profile from resources/agents/profiles/openai.json",
+      "unsupported": []
+    },
+    {
+      "id": "claude",
+      "meaning": "Claude Code (desktop app or CLI) running a Claude profile from resources/agents/profiles/claude.json",
+      "unsupported": [
+        "imagegen"
+      ]
     }
   ],
   "kinds": [
@@ -4733,6 +5218,7 @@
     "steps": 120,
     "domains": 11,
     "profiles": 3,
+    "tools": 15,
     "fallbackCodes": 6
   }
 }

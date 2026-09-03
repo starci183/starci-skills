@@ -1,49 +1,120 @@
 ---
 title: "Tài nguyên"
-description: "Profile, quyền, ba câu trả lời chính sách thường trực, và luật một agent cho một operator."
+description: "Profile, sổ đăng ký công cụ đóng, các mode, mức hỗ trợ theo runtime, và luật một agent cho một operator."
 ---
 
 # Tài nguyên
 
-Ai chạy mỗi operator, bằng gì, dưới chính sách nào. Hai nơi đóng giữ chuyện đó, và
+Ai chạy mỗi operator, và operator đó được làm gì ngoài việc đọc. Ba nơi đóng giữ chuyện đó, và
 `scripts/validate-resources.mjs` giữ cho chúng không trôi khỏi nhau:
 
+- `resources/tools.json` — sổ đăng ký đóng của các công cụ. Một công cụ không có trong file này thì
+  với operator là không tồn tại.
 - `resources/agents/profiles/<runtime>.json` — một file cho mỗi runtime, `openai.json` và
-  `claude.json`. Một profile mang model, cách cô lập, `capabilities` (model làm được gì ở đây) và
-  `permits` (operator chạy trên profile đó được phép dùng gì).
-- `operators/<id>/operator.json → resources` — đúng một profile chạy operator từ đầu tới cuối, những
-  quyền nó thật sự cần, và câu trả lời cho ba câu hỏi thường trực. Không có file phân công tập trung.
+  `claude.json`. Một profile mang model, cách cô lập, `capabilities` (runtime làm được gì ở đây) và
+  `permits` (operator chạy trên profile đó được phép dùng gì), khai tường minh cho mọi công cụ trong
+  sổ đăng ký.
+- `operators/<id>/operator.json → resources` — đúng một profile chạy operator từ đầu tới cuối, cờ
+  `grammarBound`, và `tools`: bản đồ từ `@tools/<id>` sang đúng một mode nó chạy. Không có file phân
+  công tập trung.
 
-## Luật ràng buộc
+## Công cụ không phải alias
 
-> Operator ràng đúng một profile và chạy trọn trên đó, không theo từng lần gọi và không chia cho
-> nhiều profile: một bước phản biện, review hay phán xét bên trong operator là một bước của chính lần
-> thực thi đó, và đưa model thứ hai vào là thành workflow.
+Alias là thứ operator được **đọc**: `alias/alias.json` phân giải nó về một vị trí chính xác, và bảng
+Context trong `operator.md` khai mọi alias operator được mở. Công cụ là thứ operator được **làm**
+ngoài việc đọc — ghi file, chạy lệnh, lái trình duyệt, thăm dò một endpoint, phân giải một credential
+đã niêm phong.
 
-Năng lực và quyền là hai sự thật khác nhau. Năng lực thuộc về model; quyền là chính sách áp lên
-operator. `sol-fresh` và `sol-reviewer` chạy cùng một model, nhưng reviewer chỉ được phép dùng
-browser, "vì một reviewer có sản xuất thì không còn là reviewer nữa." Một quyền không có trong
-`requires` là không dùng được, kể cả khi profile vốn cho phép.
+Cả hai được viết trong cùng những ô của bảng Các bước, nên một bảng nói được cả bằng chứng đến từ đâu
+lẫn thứ gì đã tạo ra nó: công cụ nằm ở ô **Đọc** của bước gọi nó để lấy bằng chứng, và ở ô **Ghi** của
+bước dùng nó để thay đổi thứ gì đó. `@tools/fileread` là ngoại lệ không cần bước nào gọi tên, vì đọc
+các alias trong Context vốn là việc mọi bước đều làm.
 
-## Ba câu hỏi thường trực
+Hai luật khép vòng, đều do `scripts/validate-alias.mjs` giữ:
 
-**Có tìm trên mạng khi trong cây không có tham chiếu không?** Chỉ ở nơi `policy.webSearch` là
-`bounded` — các operator ra quyết định và bước brief của nội dung. Nghiên cứu bị giới hạn bởi đúng
-khoảng trống phải lấp, ghi lại đã dùng gì, và không bao giờ chép một trang, một thương hiệu, một
-bảng màu hay giải phẫu của một component. Một giá trị presentation mà tri thức chưa publish là
-`RULE_MISSING`, không bao giờ là một nhiệm vụ nghiên cứu.
+- một ô trong bảng Các bước chỉ được gọi tên công cụ mà gói đã khai ở `operator.json → resources.tools`;
+- mọi công cụ đã khai, trừ `@tools/fileread`, phải được ít nhất một bước gọi tên, ở cả bản tiếng Anh
+  lẫn bản gương tiếng Việt, trong cùng những dòng.
 
-**Có bị ràng vào Grammar đã publish không?** Ở nơi `policy.grammarBound` là true — bốn operator
-frontend. Thiếu một năng lực tái dùng là `GRAMMAR_REQUIRED` hoặc `COMMON_CAPABILITY_MISSING`, không
-bao giờ là một bản nhái cục bộ.
+Nhờ vậy một quyền không ai dùng không sống nổi trong manifest, và một bước không với tới được năng lực
+mà manifest chưa từng xin.
 
-**Có sinh ảnh không?** Ba giá trị, và chỉ ba:
+## Các mode
 
-| Giá trị | Ở đâu | Nghĩa là gì |
+Công cụ không bao giờ được khai trần. Mỗi công cụ publish sẵn những mode operator được khai, và mode
+chính là toàn bộ phần quyền: `@tools/git: read` không commit được, `@tools/git: commit-session-branch`
+commit đúng một lần vào `session/<sessionId>` và không bao giờ vào nhánh của người, `@tools/git:
+merge-and-push` là mode duy nhất chạm tới remote mà vẫn không được rebase, không được force, không
+được bỏ hook. `@tools/database: namespaced-write` chỉ được insert và delete những dòng mang namespace
+của lần chạy và `is_uat=true`. `never` không phải một lời khai: công cụ operator không dùng thì để
+hẳn ra ngoài bản đồ.
+
+Năng lực và quyền vẫn là hai sự thật khác nhau. Năng lực thuộc về runtime; quyền là chính sách áp lên
+operator. `sol-fresh` và `sol-reviewer` chạy cùng một model, nhưng reviewer chỉ được phép những gì một
+người review cần, "vì một reviewer có sản xuất thì không còn là reviewer nữa." Một công cụ không có
+trong `resources.tools` là không dùng được, kể cả khi profile vốn cho phép.
+
+## Mỗi runtime cung cấp được gì
+
+`resources/tools.json` nói rõ, theo từng công cụ, runtime nào hỗ trợ và hỗ trợ bằng đường nào. Một
+runtime không hỗ trợ một công cụ thì không chạy được operator khai công cụ đó: bộ xử lý chạy profile
+tương đương trên runtime có hỗ trợ, hoặc báo lại khoảng thiếu.
+
+| Công cụ | Mode | Codex (`openai`) | Claude Code (`claude`) |
+| --- | --- | --- | --- |
+| `fileread` | `context-aliases` | có | có |
+| `sourcewrite` | `declared-write-set` | có | có |
+| `git` | `read`, `commit-session-branch`, `merge-and-push` | có | có |
+| `shell` | `declared-commands` | có | có |
+| `websearch` | `bounded` | có | có |
+| `imagegen` | `judged`, `required` | có | không |
+| `visualize` | `html` | có | có |
+| `browsercontrol` | `required` | có | có |
+| `http` | `probe` | có | có |
+| `registry` | `read` | có | có |
+| `container` | `read`, `operate` | có | có |
+| `ci` | `read`, `dispatch` | có | có |
+| `objectstorage` | `read`, `write` | có | có |
+| `secrets` | `resolve-by-name` | có | có |
+| `database` | `read`, `namespaced-write` | có | có |
+
+`imagegen` là khoảng thiếu duy nhất hiện nay: không profile Claude nào vẽ được artwork.
+
+## Artwork khác với render
+
+`imagegen` và `visualize` là hai hành vi khác nhau và sổ đăng ký giữ chúng tách bạch:
+
+- **`imagegen`** sinh *artwork* — một hình ảnh số do image model tạo ra, làm theo đúng một claim đã nêu.
+- **`visualize`** render *HTML cho người xem* — ứng viên hướng thiết kế, sheet audit, bảng so sánh
+  phương án, preview — ghi dưới `response/artifacts/` và liên kết từ `response.md`. Nó không cần quyền
+  model nào, và runtime nào cũng làm được.
+
+Một operator vẽ trang so sánh là đang visualize, không phải sinh ảnh. Chỉ có ba mode ảnh:
+
+| Mode | Ở đâu | Nghĩa là gì |
 | --- | --- | --- |
-| `never` | Mọi nơi còn lại | Operator không sinh ảnh |
-| `judged` | `frontend.direction.decide` | Hướng tự render một trang xem được và tự phán xét khi một vùng trống tới mức không đứng nổi nếu thiếu ảnh; artwork sản phẩm chỉ được sinh khi thẩm quyền sản phẩm gọi tên |
-| `required` | `content.generate` | Ảnh được làm theo một claim đã nêu và được soi lại xem có trung thành với claim đó không |
+| không khai | Mọi operator không nằm dưới đây | Operator không sinh artwork |
+| `judged` | `frontend.direction.decide`, `frontend.source.apply` | Operator tự phán xét, dựa trên hướng thiết kế, xem một vùng có trống tới mức cần artwork không, ghi lại lý do, và không bao giờ trang trí |
+| `required` | `content.generate` | Artwork là một bước của việc: làm theo một claim đã nêu và soi lại xem có trung thành với claim đó không |
+
+Ở runtime không vẽ được, một bước `judged` ghi rằng không artwork nào được tạo và nhánh chạy tiếp; một
+bước `required` chặn lại bằng chính mã dừng của operator.
+
+## Nghiên cứu, và chỗ nào thì chính đáng
+
+`@tools/websearch: bounded` chỉ được khai bởi những operator có một bước mà lấp khoảng trống từ ngoài
+cây là việc lương thiện: các operator ra quyết định, bước brief của nội dung, bước audit đối chiếu với
+một luật đã publish, và lần chạy UAT đụng vào dịch vụ bên thứ ba. Nghiên cứu bị giới hạn bởi đúng
+khoảng trống mà bước đó gọi tên, ghi lại mọi nguồn kèm URL, và không bao giờ chép một trang, một
+thương hiệu, một bảng màu hay giải phẫu của một component. Một giá trị presentation mà tri thức chưa
+publish là `RULE_MISSING`, không bao giờ là một nhiệm vụ nghiên cứu. Operator nào không có bước như
+vậy — mọi operator ghi source, publish, kiểm định và vận hành hệ thống đang chạy — thì không khai công
+cụ này.
+
+## Ràng buộc Grammar
+
+`resources.grammarBound` là true ở bốn operator frontend. Thiếu một năng lực tái dùng là
+`GRAMMAR_REQUIRED` hoặc `COMMON_CAPABILITY_MISSING`, không bao giờ là một bản nhái cục bộ.
 
 ## Một agent cho một operator, tối đa ba cùng lúc
 
@@ -59,9 +130,25 @@ Tối đa ba agent chạy cùng lúc, và các nhánh trong một bậc chỉ ch
 không chạm chung alias nào. Hai agent được đọc chung một checkout; chỉ một được giữ nó để ghi.
 `business.decide` độc quyền theo gốc businesses, `platform.operate` độc quyền theo chủ sở hữu runtime.
 
+## Profile tương đương
+
+Operator ràng đúng một profile. Khi bộ xử lý chạy trên runtime không có profile đó, nó chạy profile
+tương đương của runtime mình và `response.json` ghi cả `boundProfile` lẫn `ranProfile`, để một lần
+audit phân biệt được bản thay thế với bản ràng buộc. Các cặp đối xứng và luôn bắc qua hai runtime:
+
+| Profile đã ràng | Tương đương |
+| --- | --- |
+| `sol-fresh` | `opus` |
+| `luna` | `sonnet` |
+| `sol-reviewer` | `fable` |
+
+Bản tương đương chạy với những công cụ operator khai mà profile của chính nó cho phép và runtime của
+nó hỗ trợ. Công cụ nào runtime không hỗ trợ thì lần chạy đó không có.
+
 ## Đổi bất kỳ điều gì ở đây
 
-Model hay quyền của một profile, profile của một operator, và mọi câu trả lời chính sách đều là quyết
-định của chủ sở hữu. Đổi một thứ nghĩa là sửa trong file profile và trong `operator.json` của
-operator, cộng một `npm test` xanh. Thêm một loại quyền mới nghĩa là thêm nó vào mọi profile một cách
-tường minh, vì validator từ chối profile nào bỏ trống một loại quyền.
+Model hay permits của một profile, profile của một operator, và mọi công cụ hay mode đã khai đều là
+quyết định của chủ sở hữu. Đổi một thứ nghĩa là sửa trong file profile và trong `operator.json` của
+operator, sửa đúng những dòng Các bước ở cả hai ngôn ngữ, sửa dòng trong `resources/INDEX.md`, cộng
+một `npm test` xanh. Thêm một công cụ vào sổ đăng ký nghĩa là khai nó trong mọi profile một cách tường
+minh, vì validator từ chối profile nào bỏ trống một công cụ.

@@ -137,9 +137,9 @@ approval expired.
 
 | # | Step | Params | Reads | Writes | Stops with |
 | --- | --- | --- | --- | --- | --- |
-| 1 | Validate the gate, confirm the frozen head and the resume | `resume` | `request/request.json`, @workspaces/be or @workspaces/fe at the commit the request pinned | — | `INVALID_INPUT`, `SOURCE_DRIFT`, `NO_PROGRESS` |
+| 1 | Validate the gate, confirm the frozen head and the resume | `resume` | `request/request.json`, @workspaces/be or @workspaces/fe at the commit the request pinned, @tools/git | — | `INVALID_INPUT`, `SOURCE_DRIFT`, `NO_PROGRESS` |
 | 2 | Consume the predecessors unchanged | — | inputs `backend-source-application`, `frontend-source-application` and `changes` at their fingerprints, and the commit each one recorded | — | `PREDECESSOR_MIXED`, `PREDECESSOR_STALE` |
-| 3 | Run the gates in declared order | `gates`, `explicitE2eRequest`, `sonarScope` | @workspaces/<project>/<role>/gates, @workspaces/be or @workspaces/fe as the subject each gate measures | `response/data/gates/<gate>.json` | `GATE_UNAVAILABLE` |
+| 3 | Run the gates in declared order | `gates`, `explicitE2eRequest`, `sonarScope` | @workspaces/<project>/<role>/gates, @workspaces/be or @workspaces/fe as the subject each gate measures, @tools/http | `response/data/gates/<gate>.json`, @tools/shell | `GATE_UNAVAILABLE` |
 | 4 | Apply the coverage policy | `thresholds` | `response/data/gates/<gate>.json` of the unit gate | `response/data/coverage.json` | — |
 | 5 | Classify each failure from its diagnostics | — | `response/data/gates/<gate>.json` of every red gate | — | — |
 | 6 | Apply approved debt | `declaredDebts` | @worktrees/debts, `response/data/gates/<gate>.json` | — | `DEBT_UNAPPROVED` |

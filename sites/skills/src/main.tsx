@@ -101,11 +101,10 @@ function OperatorRow({ operator, open, onToggle }: { operator: Operator; open: b
               <dd>{requirementNote(operator)} · {operator.requirements} requirement fields · {operator.outputs.length} output kinds</dd>
             </div>
             <div>
-              <dt>Standing answers</dt>
+              <dt>Tools it may call</dt>
               <dd>
-                web search <code>{operator.policy?.webSearch}</code> · grammar bound{' '}
-                <code>{operator.policy?.grammarBound ? 'yes' : 'no'}</code> · images{' '}
-                <code>{operator.policy?.imageGeneration}</code>
+                {operator.tools.map((tool) => <code key={tool.id}>{tool.id}:{tool.mode}</code>)}
+                {' · '}grammar bound <code>{operator.grammarBound ? 'yes' : 'no'}</code>
               </dd>
             </div>
             <div>
@@ -378,6 +377,15 @@ function App() {
                 <p>Profiles that run them</p>
                 {catalog.profiles.map((profile) => (
                   <span key={profile.id}><code>{profile.id}</code><strong>{profile.operatorCount}</strong></span>
+                ))}
+              </div>
+              <div className="profile-legend">
+                <p>Tools they may call</p>
+                {catalog.tools.map((tool) => (
+                  <span key={tool.id}><code>{tool.id}</code><strong>{tool.declaredBy.length}</strong></span>
+                ))}
+                {catalog.runtimes.filter((runtime) => runtime.unsupported.length > 0).map((runtime) => (
+                  <span key={runtime.id}><code>{runtime.id}</code><strong>no {runtime.unsupported.join(', ')}</strong></span>
                 ))}
               </div>
             </Rail>

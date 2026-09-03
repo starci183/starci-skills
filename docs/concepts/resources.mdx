@@ -1,49 +1,119 @@
 ---
 title: "Resources"
-description: "Profiles, grants, the three standing policy answers, and the orchestration rule of one agent per operator."
+description: "Profiles, the closed tools registry, modes, per-runtime support, and the orchestration rule of one agent per operator."
 ---
 
 # Resources
 
-Who runs each operator, with what, and under which standing policies. Two closed places carry it, and
-`scripts/validate-resources.mjs` keeps them from drifting apart:
+Who runs each operator, and what it is allowed to do beyond reading. Three closed places carry it,
+and `scripts/validate-resources.mjs` keeps them from drifting apart:
 
+- `resources/tools.json` — the closed registry of tools. A tool absent from this file does not exist
+  for an operator.
 - `resources/agents/profiles/<runtime>.json` — one file per runtime, `openai.json` and `claude.json`.
-  A profile carries a model, an isolation, its `capabilities` (what the model can do here) and its
-  `permits` (what an operator on that profile is allowed to use).
+  A profile carries a model, an isolation, its `capabilities` (what the runtime can do here) and its
+  `permits` (what an operator on that profile is allowed to use), stated for every tool in the
+  registry.
 - `operators/<id>/operator.json → resources` — the one profile that runs the operator end to end,
-  the grants it actually requires, and its answers to the three standing questions. There is no
-  central assignment file.
+  whether it is `grammarBound`, and `tools`: the map of `@tools/<id>` to the one mode it runs in.
+  There is no central assignment file.
 
-## The binding rule
+## A tool is not an alias
 
-> An operator binds exactly one profile and runs on it end to end, never per invocation and never
-> split across profiles: a critique, review, or judgement inside an operator is a step of that one
-> execution, and a second model for it would be a workflow.
+An alias is what an operator may **read**: `alias/alias.json` resolves it to an exact location, and
+`operator.md`'s Context table declares every one the operator is allowed to open. A tool is what the
+operator may **do** beyond reading — write a file, run a command, drive a browser, probe an endpoint,
+resolve a sealed credential.
 
-Capability and permission are different facts. Capability belongs to the model; permission is a
+Both are written in the same Steps cells, so one table says where the evidence came from and what
+made it: a tool goes into the **Reads** cell of the step that calls it to obtain evidence, and into
+the **Writes** cell of the step that changes something with it. `@tools/fileread` is the exception
+that needs no step, because reading the Context aliases is what every step already does.
+
+Two rules close the loop, both enforced by `scripts/validate-alias.mjs`:
+
+- a Steps cell may only name a tool the package declares in `operator.json → resources.tools`;
+- every declared tool other than `@tools/fileread` must be named by at least one step, in both the
+  English file and its Vietnamese mirror, in the same rows.
+
+So a grant nobody uses cannot survive in a manifest, and a step cannot reach for a capability the
+manifest never asked for.
+
+## Modes
+
+A tool is never declared bare. Each one publishes the modes an operator may declare, and the mode is
+the whole permission: `@tools/git: read` cannot commit, `@tools/git: commit-session-branch` commits
+once to `session/<sessionId>` and never to a person's branch, `@tools/git: merge-and-push` is the
+only mode that reaches a remote and still may not rebase, force, or skip a hook. `@tools/database:
+namespaced-write` may insert and delete only rows carrying the run namespace and `is_uat=true`.
+`never` is not a declaration: a tool the operator does not use is left out of the map entirely.
+
+Capability and permission stay different facts. Capability belongs to the runtime; permission is a
 policy about the operator. `sol-fresh` and `sol-reviewer` run the same model, but the reviewer is
-permitted only the browser, "because a reviewer that produces is no longer a reviewer." A grant
-absent from `requires` is unavailable even when the profile would permit it.
+permitted only what a reviewer needs, "because a reviewer that produces is no longer a reviewer." A
+tool absent from `resources.tools` is unavailable even where the profile would permit it.
 
-## The three standing questions
+## What each runtime provides
 
-**Does it search the web when the tree holds no reference?** Only where `policy.webSearch` is
-`bounded` — the decision operators and the content brief. Research is bounded by the exact gap it must
-close, records what it used, and never copies a page, brand, palette, or component anatomy. A
-presentation value the knowledge does not publish is `RULE_MISSING`, never a research task.
+`resources/tools.json` states, per tool, whether each runtime supports it and by what means. A
+runtime that does not support a tool cannot run an operator that declares it: the processor runs the
+profile equivalent on a runtime that does, or reports the gap.
 
-**Is it bound to published Grammar?** Where `policy.grammarBound` is true — the four frontend
-operators. A missing reusable capability is `GRAMMAR_REQUIRED` or `COMMON_CAPABILITY_MISSING`, never
-a local imitation.
+| Tool | Modes | Codex (`openai`) | Claude Code (`claude`) |
+| --- | --- | --- | --- |
+| `fileread` | `context-aliases` | yes | yes |
+| `sourcewrite` | `declared-write-set` | yes | yes |
+| `git` | `read`, `commit-session-branch`, `merge-and-push` | yes | yes |
+| `shell` | `declared-commands` | yes | yes |
+| `websearch` | `bounded` | yes | yes |
+| `imagegen` | `judged`, `required` | yes | no |
+| `visualize` | `html` | yes | yes |
+| `browsercontrol` | `required` | yes | yes |
+| `http` | `probe` | yes | yes |
+| `registry` | `read` | yes | yes |
+| `container` | `read`, `operate` | yes | yes |
+| `ci` | `read`, `dispatch` | yes | yes |
+| `objectstorage` | `read`, `write` | yes | yes |
+| `secrets` | `resolve-by-name` | yes | yes |
+| `database` | `read`, `namespaced-write` | yes | yes |
 
-**Does it generate images?** Three values, and only three:
+`imagegen` is the one gap today: no Claude profile can make artwork.
 
-| Value | Where | What it means |
+## Artwork versus rendering
+
+`imagegen` and `visualize` are different acts and the registry keeps them apart:
+
+- **`imagegen`** produces *artwork* — a digital image from an image model, made to one stated claim.
+- **`visualize`** renders *HTML for a person to look at* — direction candidates, audit sheets,
+  alternative comparisons, previews — written under `response/artifacts/` and linked from
+  `response.md`. It needs no model grant, and every runtime does it.
+
+An operator that draws a comparison page is visualizing, not generating an image. Only three image
+modes exist:
+
+| Mode | Where | What it means |
 | --- | --- | --- |
-| `never` | Everywhere else | The operator does not generate images at all |
-| `judged` | `frontend.direction.decide` | The direction renders an inspectable page and judges for itself when a region is too empty to stand without an image; product artwork is generated only when product authority names it |
-| `required` | `content.generate` | An image is made to a stated claim and inspected for fidelity to it |
+| absent | Every operator not listed below | The operator produces no artwork at all |
+| `judged` | `frontend.direction.decide`, `frontend.source.apply` | The operator decides for itself, from the direction, whether a region reads empty enough to need artwork, records why, and never decorates |
+| `required` | `content.generate` | Artwork is a step of the job: made to a stated claim and inspected for fidelity to it |
+
+Where the runtime cannot make artwork, a `judged` step records that none could be made and the branch
+continues; a `required` step blocks with the operator's own code.
+
+## Research, and where it is legitimate
+
+`@tools/websearch: bounded` is declared only by the operators that have a step where closing a gap
+from outside the tree is honest work: the decision operators, the content brief, the surface audit's
+comparison against a published rule, and the UAT run against a third-party service. Research is
+bounded by the exact gap the step names, records every source with its URL, and never copies a page,
+brand, palette, or component anatomy. A presentation value the knowledge does not publish is
+`RULE_MISSING`, never a research task. An operator with no such step — every applier, publisher,
+verifier and operator of running systems — does not declare the tool at all.
+
+## Grammar binding
+
+`resources.grammarBound` is true for the four frontend operators. A missing reusable capability is
+`GRAMMAR_REQUIRED` or `COMMON_CAPABILITY_MISSING`, never a local imitation.
 
 ## One agent per operator, at most three at once
 
@@ -61,9 +131,26 @@ At most three agents run at once, and branches of one step run concurrently only
 touch no common alias. Two agents may read one checkout; only one may hold it for writing.
 `business.decide` is exclusive per businesses root, `platform.operate` per runtime owner.
 
+## Profile equivalents
+
+An operator binds one profile. When the processor runs on a runtime that lacks that profile, it runs
+the equivalent profile of its own runtime and `response.json` records both `boundProfile` and
+`ranProfile`, so an audit can tell a stand-in from the binding. The pairs are symmetric and always
+cross runtimes:
+
+| Bound profile | Equivalent |
+| --- | --- |
+| `sol-fresh` | `opus` |
+| `luna` | `sonnet` |
+| `sol-reviewer` | `fable` |
+
+The equivalent runs with the tools the operator declares that its own profile permits and its runtime
+supports. A tool the runtime does not support is unavailable for that run.
+
 ## Changing any of it
 
-A profile's model or grants, an operator's profile, and any policy answer are owner decisions.
-Changing one is an edit in the profile file and in the operator's `operator.json`, plus a green
-`npm test`. Adding a new grant kind means adding it to every profile explicitly, because the
-validator refuses a profile that leaves a grant unstated.
+A profile's model or permits, an operator's profile, and any declared tool or mode are owner
+decisions. Changing one is an edit in the profile file and in the operator's `operator.json`, the
+matching Steps rows in both languages, the row in `resources/INDEX.md`, plus a green `npm test`.
+Adding a tool to the registry means stating it in every profile explicitly, because the validator
+refuses a profile that leaves a tool unstated.

@@ -97,10 +97,10 @@ và không mang phán quyết nào.
 | # | Bước | Tham số | Đọc | Ghi | Dừng với |
 | --- | --- | --- | --- | --- | --- |
 | 1 | Kiểm gate và chạy lại, và từ chối mọi hint nó mang | `resume` | `request/request.json`, phần requirements và head đóng băng của nó | — | `INVALID_INPUT`, `SOURCE_DRIFT`, `NO_PROGRESS` |
-| 2 | Ràng bootstrap và identity | — | @workspaces/device-state, định danh máy và roster credential đã niêm phong | — | `IDENTITY_UNVERIFIED` |
-| 3 | Phân giải route | `project`, `role` | @workspaces/projects/<project>/<role> đúng project và role này, @workspaces/local/routes/<project>/<role> | — | `ROUTE_UNDECLARED`, `ROUTE_UNHYDRATED`, `ROUTE_MISMATCH` |
-| 4 | Kiểm checkout: chính sách nhánh, cây sạch và các write root | `gitPolicy`, `declaredWriteRoots` | @workspaces/local/routes/<project>/<role>, checkout đã phân giải, nhánh, head và cây làm việc của nó | — | `BRANCH_POLICY_VIOLATION`, `CHECKOUT_DIRTY` |
-| 5 | Ràng runtime mà người gọi tiêu thụ, chỉ khi `runtimeNeed` khác none | `runtimeNeed` | @worktrees/sessions/central-runtime, registry chủ, generation và bằng chứng sức khoẻ của nó, @workspaces/ports/<project> | — | `ENDPOINT_AUTHORITY_STALE`, `RUNTIME_NOT_READY` |
+| 2 | Ràng bootstrap và identity | — | @workspaces/device-state, định danh máy và roster credential đã niêm phong, @tools/secrets | — | `IDENTITY_UNVERIFIED` |
+| 3 | Phân giải route | `project`, `role` | @workspaces/projects/<project>/<role> đúng project và role này, @workspaces/local/routes/<project>/<role>, @tools/git | — | `ROUTE_UNDECLARED`, `ROUTE_UNHYDRATED`, `ROUTE_MISMATCH` |
+| 4 | Kiểm checkout: chính sách nhánh, cây sạch và các write root | `gitPolicy`, `declaredWriteRoots` | @workspaces/local/routes/<project>/<role>, checkout đã phân giải, nhánh, head và cây làm việc của nó, @tools/git, @tools/shell | — | `BRANCH_POLICY_VIOLATION`, `CHECKOUT_DIRTY` |
+| 5 | Ràng runtime mà người gọi tiêu thụ, chỉ khi `runtimeNeed` khác none | `runtimeNeed` | @worktrees/sessions/central-runtime, registry chủ, generation và bằng chứng sức khoẻ của nó, @workspaces/ports/<project>, @tools/http | — | `ENDPOINT_AUTHORITY_STALE`, `RUNTIME_NOT_READY` |
 | 6 | Ràng provenance và độ tươi, rồi phát | — | mọi thứ ở trên, @workspaces/device-state | `response/response.md`, `response/data/route.json`, `response/response.json` | — |
 
 Bước 5 không tính lại gì cả: fingerprint endpoint hoặc khớp phép chiếu đóng, hoặc nhánh dừng. Dưới

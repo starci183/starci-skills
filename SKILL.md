@@ -5,7 +5,7 @@ description: Complete one StarCi mission by freezing its scope, selecting the on
 
 # StarCi
 
-One entry, fourteen operators, eight example workflows, one closed routing map. This file picks the
+One entry, fourteen operators, eight example workflows, one closed routing map, one tool registry. This file picks the
 workflow or composes one, selects the first operator, and sequences the rest. It does no work of its own: it never decides a value, writes source, or judges a
 result.
 
@@ -123,7 +123,7 @@ never enter a context manifest, a dependency list, a validator input, or an oper
 ## Orchestration
 
 One invocation of one operator is one agent, created fresh on the profile its `operator.json` names,
-with the grants and the aliases its Context table declares and nothing else. `resources/orchestrator.json`
+with the aliases its Context table declares and the tools its `operator.json` declares (`@tools/<id>` from `resources/tools.json`, one mode each) and nothing else. `resources/orchestrator.json`
 fixes the rules: at most three agents at once, branches of one step never sharing a write alias,
 dispatch by workflow and `routing.json`, hand-off only through `response.json` fields inside the
 session (`state.json`, `step-N/parallel-M/{request,response}`), a session the orchestrator creates
