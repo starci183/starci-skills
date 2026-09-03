@@ -33,6 +33,14 @@ chứ không chỉ là điều bị khuyên can. Một class ứng dụng hiện
 phẫu Grammar hay nằm ngoài thang đóng sẽ bị bỏ kèm một dòng ghi của chính nó, theo từng node và không
 bao giờ im lặng.
 
+## Class bị cấm thì gỡ, không phải thiếu rule
+
+Khi case duy nhất gọi tên một class của ứng dụng nêu điều kiện mà node không thoả (foreground accent
+mà `SURFACE-4` chỉ cho phép trong một dải raised, lại viết lên một hàng không raised), thuộc tính đó
+không thiếu rule: rule đã trả lời, và câu trả lời là không. Class bị gỡ ở bước gỡ bỏ, thuộc tính rơi
+về giá trị node kế thừa, và việc gỡ được ghi kèm case đã từ chối nó. `RULE_MISSING` chỉ dành cho thuộc
+tính không case nào đã publish nhắc tới.
+
 ## Thiếu đường công khai là một khoảng trống, không phải một lần dừng
 
 Khi Common không mở đường công khai nào cho một quan hệ mà ứng dụng cần một cách chính đáng, node giữ

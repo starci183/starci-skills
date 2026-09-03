@@ -248,6 +248,26 @@ rather than as subordinate content.
 Common's disclosure currently applies `1rem` on both inline sides, so the indented form has no
 published path. Repairing it belongs to the disclosure component, not to an application override.
 
+## PADDING-9 — Block inset of a routed block at the wider breakpoint
+
+A routed block gives its own `main` a vertical inset that steps up once the width allows it, while
+the inline inset stays with `PageContainer` (`--grammar-page-inset`). The two values are adjacent
+rules on the scale, never a jump of two steps, and only the block axis is written here.
+
+Composed from: block sides of the routed block `1.5rem` → `2rem` (PADDING-5 → PADDING-6); inline sides
+none, because `PageContainer` owns them (MEASURE-1).
+
+| Case | When | Owner | Render |
+| --- | --- | --- | --- |
+| Case 1 | The `main` of a routed block that sits directly under the page shell | `App` | `<main className="py-6 sm:py-8">` |
+
+Evidence, four blocks writing the same pair: `blocks/commerce/ProSubscriptionBlock/classNames.ts`
+(`proPageClassName`), `blocks/learn/CoursePlaygroundCatalog/classNames.ts`,
+`blocks/learn/PlaygroundSession/classNames.ts`, `blocks/learn/PlaygroundSetup/classNames.ts`.
+
+Not this rule: an inline inset on the same element, which duplicates the page inset the container
+already draws. Use MEASURE-1 and leave the inline sides alone.
+
 ## Axis variants
 
 `px-*` and `py-*` are not separate rules. They apply an existing rule to one axis when the two axes

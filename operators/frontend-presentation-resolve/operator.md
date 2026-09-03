@@ -33,6 +33,15 @@ rather than merely discouraged. An application class that reimplements an owned 
 overrides Grammar anatomy or sits off the closed scale is removed with its own row, per node and
 never silently.
 
+## A forbidden class is removed, not ruled
+
+When the only case that names an application class states a condition the node does not meet (an
+accent foreground that `SURFACE-4` allows solely inside a raised band, written on an unraised row),
+the property is not missing a rule: the rule has answered, and the answer is no. The class is removed
+in the removal step, the property falls back to what the node inherits, and the removal is recorded
+with the case that refused it. `RULE_MISSING` is reserved for a property no published case addresses
+at all.
+
 ## A missing public path is a gap, not a stop
 
 When Common exposes no public path for a relationship the application legitimately needs, the node

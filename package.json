@@ -4,6 +4,6 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "test": "node scripts/validate-routing.mjs && node scripts/validate-resources.mjs && node scripts/validate-knowledge-citations.mjs && node scripts/validate-alias.mjs && node scripts/generate-alias-doc.mjs --check && node scripts/validate-operator.mjs && node scripts/validate-workflows.mjs && node scripts/generate-operators-index.mjs --check && node scripts/validate-templates.mjs && node scripts/run-operator-self-tests.mjs && node --test scripts/*.spec.mjs"
+    "test": "node scripts/validate-routing.mjs && node scripts/validate-resources.mjs && node scripts/validate-knowledge-citations.mjs && node scripts/validate-alias.mjs && node scripts/generate-alias-doc.mjs --check && node scripts/validate-operator.mjs && node scripts/validate-workflows.mjs && node scripts/validate-defaults.mjs && node scripts/generate-operators-index.mjs --check && node scripts/validate-templates.mjs && node scripts/run-operator-self-tests.mjs && node --test scripts/*.spec.mjs"
   }
 }

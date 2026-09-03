@@ -37,7 +37,7 @@ is context, not a presentation recommendation.
 | Knowledge | Properties it decides | Rules |
 | --- | --- | --- |
 | [Gap](gap.md) | `gap`, `row-gap`, `column-gap` between Grammar objects | GAP-0 to GAP-6 |
-| [Padding](padding.md) | Inset of app-owned pages, sections, and containers | PADDING-0 to PADDING-8 |
+| [Padding](padding.md) | Inset of app-owned pages, sections, and containers | PADDING-0 to PADDING-9 |
 | [Margin](margin.md) | External offset and auto placement, as a named exception; gap comes first | MARGIN-0 to MARGIN-6, MARGIN-AUTO |
 | [Font](font.md) | `font-size`, `font-weight`, `line-height`, `letter-spacing` by title, body, and meta rank | FONT-1 to FONT-6, plus weight |
 | [Tone](tone.md) | Default, muted, and accent by information rank; never a raw colour | TONE-1 to TONE-3 |

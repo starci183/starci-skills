@@ -247,6 +247,26 @@ inset riêng chứ không phải nội dung con.
 Disclosure của Common hiện áp `1rem` cho cả hai cạnh ngang, nên dạng thụt vào chưa có đường công
 khai. Việc sửa thuộc về chính component disclosure, không phải một override ở tầng ứng dụng.
 
+## PADDING-9 — Inset trục dọc của một block được route ở breakpoint rộng
+
+Một block được route tự cho `main` của nó một inset dọc, nhích lên khi chiều rộng cho phép, còn
+inset trục ngang vẫn thuộc `PageContainer` (`--grammar-page-inset`). Hai giá trị là hai rule kề nhau
+trên thang, không bao giờ nhảy hai bậc, và ở đây chỉ viết trục dọc.
+
+Ghép từ: hai cạnh trục dọc của block được route `1.5rem` → `2rem` (PADDING-5 → PADDING-6); trục ngang
+không có, vì `PageContainer` sở hữu (MEASURE-1).
+
+| Case | Dùng khi | Owner | Render |
+| --- | --- | --- | --- |
+| Case 1 | `main` của một block được route nằm ngay dưới shell của trang | `App` | `<main className="py-6 sm:py-8">` |
+
+Bằng chứng, bốn block viết cùng một cặp: `blocks/commerce/ProSubscriptionBlock/classNames.ts`
+(`proPageClassName`), `blocks/learn/CoursePlaygroundCatalog/classNames.ts`,
+`blocks/learn/PlaygroundSession/classNames.ts`, `blocks/learn/PlaygroundSetup/classNames.ts`.
+
+Không phải rule này: inset trục ngang trên cùng phần tử, vì nó lặp lại inset trang mà container đã
+vẽ. Dùng MEASURE-1 và để yên trục ngang.
+
 ## Biến thể theo trục
 
 `px-*` và `py-*` không phải rule riêng. Chúng áp một rule đã có lên một trục, khi hai trục mang hai

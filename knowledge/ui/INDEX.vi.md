@@ -2,7 +2,7 @@
 
 Cây này chứa universal UI law dùng chung cho mọi Grammar family đã publish, chia thành ba nhóm theo
 operator đọc từng law.
-Nó sở hữu 114 law X-n ổn định đang sống (36 ở composition, 59 ở presentation, 19 ở proof), cộng
+Nó sở hữu 115 law X-n ổn định đang sống (36 ở composition, 60 ở presentation, 19 ở proof), cộng
 năm id composition đã nghỉ vào COVERAGE-1 và không bao giờ dùng lại, cùng với selection condition
 quan sát được, ownership decision, deterministic verdict và audit vector. Đây không phải implementation hay consumer cookbook. Nó không sở hữu business fact, copy riêng của page, route, permission,
 identity artwork, effect sản phẩm hay lựa chọn material của family.
