@@ -1,0 +1,4738 @@
+{
+  "version": "1.0.2",
+  "lineageNote": "1.0.2 (2026-09-03): every operator is one authored operator.md with a request/response branch layout, JSON kind contracts, an errors registry with dispositions, example workflows, and the frontend.*/backend.source.apply names; 1.0.1 was the dry-run round that exposed the old shape.",
+  "entry": {
+    "name": "starci",
+    "description": "Complete one StarCi mission by freezing its scope, selecting the one operator that owns the outcome, and routing between operators on typed results until the outcome is proved or a person must decide.",
+    "rows": [
+      {
+        "about": "Which project, checkout, or runtime binding applies",
+        "operator": "workspace.bind"
+      },
+      {
+        "about": "What the product promises, who may have it, what happens when it fails",
+        "operator": "business.decide"
+      },
+      {
+        "about": "System boundaries, data ownership, or the tech stack",
+        "operator": "architecture.decide"
+      },
+      {
+        "about": "Server behaviour, an API contract, persistence, or a job",
+        "operator": "backend.source.apply"
+      },
+      {
+        "about": "Creating, restructuring, or redesigning a page or surface",
+        "operator": "frontend.direction.decide"
+      },
+      {
+        "about": "Which CSS value an already-composed tree takes",
+        "operator": "frontend.presentation.resolve"
+      },
+      {
+        "about": "Writing an already-resolved tree into product source",
+        "operator": "frontend.source.apply"
+      },
+      {
+        "about": "Whether a rendered surface actually holds up",
+        "operator": "frontend.surface.audit"
+      },
+      {
+        "about": "Build, lint, typecheck, coverage, or Sonar",
+        "operator": "quality.verify"
+      },
+      {
+        "about": "Whether a real person can complete a real journey",
+        "operator": "uat.verify"
+      },
+      {
+        "about": "Shipping a release, or recovering one",
+        "operator": "release.deploy"
+      },
+      {
+        "about": "Observability, Sonar service, or a tunnel",
+        "operator": "platform.operate"
+      },
+      {
+        "about": "An educational content unit",
+        "operator": "content.generate"
+      },
+      {
+        "about": "Publishing an approved Git boundary",
+        "operator": "git.publish"
+      }
+    ]
+  },
+  "loop": {
+    "diagram": "request/request.json -> validate-request.mjs -> agent writes response/ -> validate-response.mjs + the operator's validate.mjs -> route",
+    "kinds": [
+      {
+        "id": "operator",
+        "meaning": "Invoke the named operator next.",
+        "count": 28
+      },
+      {
+        "id": "resume",
+        "meaning": "Invoke the same operator again with the required delta from its resume token.",
+        "count": 11
+      },
+      {
+        "id": "user",
+        "meaning": "Stop. A person owns this and must decide or publish before the mission continues.",
+        "count": 22
+      },
+      {
+        "id": "external",
+        "meaning": "Stop. The blocker is outside the runtime and no operator can clear it.",
+        "count": 7
+      }
+    ]
+  },
+  "operators": [
+    {
+      "id": "architecture.decide",
+      "dir": "architecture-decide",
+      "domain": "architecture",
+      "job": "Decide one architecture with its tech stack, system boundaries, and data ownership, and prove it against the observed current state, the rejected alternatives, verified compatibility, and an independent critique.",
+      "profile": "sol-fresh",
+      "policy": {
+        "webSearch": "bounded",
+        "grammarBound": false,
+        "imageGeneration": "never"
+      },
+      "requires": [
+        "webSearch"
+      ],
+      "hasVietnamese": true,
+      "context": [
+        "@knowledge/patterns",
+        "@workspaces/be",
+        "@worktrees/businesses/<featureId>"
+      ],
+      "steps": 10,
+      "requirements": 8,
+      "inputs": [
+        {
+          "kind": "architecture-decision",
+          "required": false
+        }
+      ],
+      "outputs": [
+        {
+          "kind": "architecture-decision",
+          "file": "response/response.md",
+          "type": "md",
+          "required": true
+        },
+        {
+          "kind": "current-state",
+          "file": "response/data/current-state.json",
+          "type": "data",
+          "required": true
+        },
+        {
+          "kind": "stack-model",
+          "file": "response/data/stack-model.json",
+          "type": "data",
+          "required": true
+        },
+        {
+          "kind": "alternatives",
+          "file": "response/artifacts/<decisionId>-alternatives.html",
+          "type": "artifact",
+          "required": false
+        },
+        {
+          "kind": "independent-critique",
+          "file": "critique/response/critique.md",
+          "type": "md",
+          "required": true
+        }
+      ],
+      "next": [
+        {
+          "when": "the business promise must be modelled again against the decided boundaries",
+          "operator": "business.decide"
+        },
+        {
+          "when": "the decision is confirmed and a backend contract changes",
+          "operator": "backend.source.apply"
+        },
+        {
+          "when": "the decision is confirmed and a frontend surface changes",
+          "operator": "frontend.direction.decide"
+        }
+      ],
+      "stops": [
+        {
+          "code": "INVALID_INPUT",
+          "disposition": "terminate",
+          "domain": "caller",
+          "meaning": "request.json fails the gate or the operator's Requirements.",
+          "shared": true
+        },
+        {
+          "code": "SOURCE_DRIFT",
+          "disposition": "terminate",
+          "domain": "workspace",
+          "meaning": "The observed checkout head differs from the head request.json froze.",
+          "shared": true
+        },
+        {
+          "code": "NO_PROGRESS",
+          "disposition": "terminate",
+          "domain": "caller",
+          "meaning": "A resume adds no evidence, constraint, inventory, or approval delta.",
+          "shared": true
+        },
+        {
+          "code": "EVIDENCE_MISSING",
+          "disposition": "terminate",
+          "domain": "self",
+          "meaning": "A claim about the system has no file, line, or head behind it.",
+          "shared": true
+        },
+        {
+          "code": "CURRENT_STATE_UNOBSERVED",
+          "disposition": "terminate",
+          "domain": "workspace",
+          "meaning": "The system today could not be read at the frozen head.",
+          "shared": false
+        },
+        {
+          "code": "BUSINESS_AUTHORITY_REQUIRED",
+          "disposition": "terminate",
+          "domain": "business",
+          "meaning": "The published business head the architecture must keep is missing or stale.",
+          "shared": false
+        },
+        {
+          "code": "CONSTRAINT_CONTRADICTION",
+          "disposition": "terminate",
+          "domain": "caller",
+          "meaning": "Two fixed-intent constraints cannot both hold.",
+          "shared": false
+        },
+        {
+          "code": "NO_VIABLE_ALTERNATIVE",
+          "disposition": "terminate",
+          "domain": "caller",
+          "meaning": "No alternative survives the frozen constraints, or the only alternative fails an attack.",
+          "shared": false
+        },
+        {
+          "code": "CHOICE_REQUIRED",
+          "disposition": "fallback",
+          "domain": "caller",
+          "meaning": "Several alternatives remain material after assessment.",
+          "shared": false
+        },
+        {
+          "code": "COMPATIBILITY_UNVERIFIED",
+          "disposition": "fallback",
+          "domain": "self",
+          "meaning": "A retained stack component has no compatibility evidence on at least one axis.",
+          "shared": false
+        },
+        {
+          "code": "DATA_OWNERSHIP_UNASSIGNED",
+          "disposition": "terminate",
+          "domain": "self",
+          "meaning": "A physical store has no owning boundary.",
+          "shared": false
+        },
+        {
+          "code": "CRITIQUE_UNRESOLVED",
+          "disposition": "terminate",
+          "domain": "self",
+          "meaning": "An attack on the selected alternative has no resolution.",
+          "shared": false
+        }
+      ],
+      "routes": [
+        {
+          "domain": "architecture",
+          "kind": "resume",
+          "target": null
+        },
+        {
+          "domain": "business",
+          "kind": "operator",
+          "target": "business.decide"
+        },
+        {
+          "domain": "workspace",
+          "kind": "operator",
+          "target": "workspace.bind"
+        },
+        {
+          "domain": "caller",
+          "kind": "user",
+          "target": null
+        }
+      ]
+    },
+    {
+      "id": "backend.source.apply",
+      "dir": "backend-source-apply",
+      "domain": "backend",
+      "job": "Implement one backend outcome inside a frozen mutation contract, following the observed sibling family, and return the measured conformance and proof receipt that shows the boundary was not widened.",
+      "profile": "luna",
+      "policy": {
+        "webSearch": "bounded",
+        "grammarBound": false,
+        "imageGeneration": "never"
+      },
+      "requires": [
+        "webSearch",
+        "sourceWrite"
+      ],
+      "hasVietnamese": true,
+      "context": [
+        "@knowledge/patterns/be",
+        "@workspaces/be",
+        "@worktrees/businesses/<featureId>"
+      ],
+      "steps": 8,
+      "requirements": 4,
+      "inputs": [
+        {
+          "kind": "architecture-decision",
+          "required": true
+        },
+        {
+          "kind": "backend-source-application",
+          "required": false
+        }
+      ],
+      "outputs": [
+        {
+          "kind": "backend-source-application",
+          "file": "response/response.md",
+          "type": "md",
+          "required": true
+        },
+        {
+          "kind": "changes",
+          "file": "response/changes.md",
+          "type": "md",
+          "required": true
+        },
+        {
+          "kind": "mutations",
+          "file": "response/data/mutations.json",
+          "type": "data",
+          "required": true
+        },
+        {
+          "kind": "conformance",
+          "file": "response/data/conformance/<operationId>.<facet>.json",
+          "type": "data",
+          "required": true
+        },
+        {
+          "kind": "proof",
+          "file": "response/data/proofs/<operationId>.<proofKind>.json",
+          "type": "data",
+          "required": true
+        }
+      ],
+      "next": [
+        {
+          "when": "the contract is filled and the gates the change record names must run",
+          "operator": "quality.verify"
+        },
+        {
+          "when": "the promise must be reconciled against the source that was delivered",
+          "operator": "business.decide"
+        },
+        {
+          "when": "the contract is filled and a frontend surface must consume it",
+          "operator": "frontend.direction.decide"
+        },
+        {
+          "when": "a file needing mutation lies outside the routed write ceiling",
+          "operator": "workspace.bind"
+        },
+        {
+          "when": "a declared proof cannot be executed in this environment",
+          "operator": "platform.operate"
+        }
+      ],
+      "stops": [
+        {
+          "code": "INVALID_INPUT",
+          "disposition": "terminate",
+          "domain": "caller",
+          "meaning": "request.json fails the gate or the operator's Requirements.",
+          "shared": true
+        },
+        {
+          "code": "SOURCE_DRIFT",
+          "disposition": "terminate",
+          "domain": "workspace",
+          "meaning": "The observed checkout head differs from the head request.json froze.",
+          "shared": true
+        },
+        {
+          "code": "NO_PROGRESS",
+          "disposition": "terminate",
+          "domain": "caller",
+          "meaning": "A resume adds no evidence, constraint, inventory, or approval delta.",
+          "shared": true
+        },
+        {
+          "code": "CONTRACT_UNFROZEN",
+          "disposition": "terminate",
+          "domain": "contract",
+          "meaning": "The mutation contract is not frozen, or its fingerprint is stale.",
+          "shared": false
+        },
+        {
+          "code": "CONTRACT_WIDENED",
+          "disposition": "terminate",
+          "domain": "contract",
+          "meaning": "The outcome cannot be reached without a boundary the contract does not carry.",
+          "shared": false
+        },
+        {
+          "code": "BUSINESS_AUTHORITY_MISSING",
+          "disposition": "terminate",
+          "domain": "business",
+          "meaning": "A business question is open and no approved decision settles it.",
+          "shared": false
+        },
+        {
+          "code": "OWNER_CONFLICT",
+          "disposition": "terminate",
+          "domain": "caller",
+          "meaning": "A node that must be mutated lies outside the mutable owner ceiling, or the owner sets overlap.",
+          "shared": false
+        },
+        {
+          "code": "PATTERN_UNBOUND",
+          "disposition": "terminate",
+          "domain": "backend",
+          "meaning": "A touched aspect has no sibling family bound for it.",
+          "shared": false
+        },
+        {
+          "code": "PROOF_UNAVAILABLE",
+          "disposition": "terminate",
+          "domain": "platform",
+          "meaning": "A declared proof could not be executed in this environment.",
+          "shared": false
+        }
+      ],
+      "routes": [
+        {
+          "domain": "backend",
+          "kind": "resume",
+          "target": null
+        },
+        {
+          "domain": "business",
+          "kind": "operator",
+          "target": "business.decide"
+        },
+        {
+          "domain": "contract",
+          "kind": "user",
+          "target": null
+        },
+        {
+          "domain": "platform",
+          "kind": "operator",
+          "target": "platform.operate"
+        },
+        {
+          "domain": "workspace",
+          "kind": "operator",
+          "target": "workspace.bind"
+        },
+        {
+          "domain": "caller",
+          "kind": "user",
+          "target": null
+        }
+      ]
+    },
+    {
+      "id": "business.decide",
+      "dir": "business-decide",
+      "domain": "business",
+      "job": "Decide and publish one evidence-backed business promise as durable backend-owned authority, frozen behind a complete promise-to-enforcement coverage matrix, or reconcile that published head against the source that was actually delivered.",
+      "profile": "sol-fresh",
+      "policy": {
+        "webSearch": "bounded",
+        "grammarBound": false,
+        "imageGeneration": "never"
+      },
+      "requires": [
+        "webSearch"
+      ],
+      "hasVietnamese": true,
+      "context": [
+        "@workspaces/be",
+        "@worktrees/businesses/<featureId>"
+      ],
+      "steps": 9,
+      "requirements": 7,
+      "inputs": [
+        {
+          "kind": "architecture-decision",
+          "required": false
+        },
+        {
+          "kind": "backend-source-application",
+          "required": false
+        }
+      ],
+      "outputs": [
+        {
+          "kind": "business-promise-authority",
+          "file": "response/response.md",
+          "type": "md",
+          "required": true
+        },
+        {
+          "kind": "claims",
+          "file": "response/data/claims.json",
+          "type": "data",
+          "required": true
+        },
+        {
+          "kind": "coverage-matrix",
+          "file": "response/data/coverage-matrix.json",
+          "type": "data",
+          "required": false
+        },
+        {
+          "kind": "model",
+          "file": "response/data/model.json",
+          "type": "data",
+          "required": true
+        }
+      ],
+      "next": [
+        {
+          "when": "the promise is published and a frontend surface must carry it",
+          "operator": "frontend.direction.decide"
+        },
+        {
+          "when": "the promise is published and a backend contract must carry it",
+          "operator": "backend.source.apply"
+        },
+        {
+          "when": "the promise needs boundaries and data ownership decided before it can be enforced",
+          "operator": "architecture.decide"
+        },
+        {
+          "when": "the head is reconciled against the delivered source and the delivery may be published",
+          "operator": "git.publish"
+        }
+      ],
+      "stops": [
+        {
+          "code": "INVALID_INPUT",
+          "disposition": "terminate",
+          "domain": "caller",
+          "meaning": "request.json fails the gate or the operator's Requirements.",
+          "shared": true
+        },
+        {
+          "code": "SOURCE_DRIFT",
+          "disposition": "terminate",
+          "domain": "workspace",
+          "meaning": "The observed checkout head differs from the head request.json froze.",
+          "shared": true
+        },
+        {
+          "code": "NO_PROGRESS",
+          "disposition": "terminate",
+          "domain": "caller",
+          "meaning": "A resume adds no evidence, constraint, inventory, or approval delta.",
+          "shared": true
+        },
+        {
+          "code": "EVIDENCE_MISSING",
+          "disposition": "terminate",
+          "domain": "self",
+          "meaning": "A claim about the system has no file, line, or head behind it.",
+          "shared": true
+        },
+        {
+          "code": "CONTRADICTION_UNRESOLVED",
+          "disposition": "terminate",
+          "domain": "caller",
+          "meaning": "Two claims about the same behaviour disagree and nothing resolves them.",
+          "shared": false
+        },
+        {
+          "code": "LIFECYCLE_TRANSITION_INVALID",
+          "disposition": "terminate",
+          "domain": "caller",
+          "meaning": "The requested target state is unreachable from the observed head.",
+          "shared": false
+        },
+        {
+          "code": "AUTHORITY_CONFLICT",
+          "disposition": "terminate",
+          "domain": "workspace",
+          "meaning": "The head or the businesses root contradicts published authority.",
+          "shared": false
+        },
+        {
+          "code": "APPROVAL_REQUIRED",
+          "disposition": "terminate",
+          "domain": "caller",
+          "meaning": "The transition or the release needs an approval that no request bound.",
+          "shared": false
+        },
+        {
+          "code": "COVERAGE_INCOMPLETE",
+          "disposition": "terminate",
+          "domain": "business",
+          "meaning": "A declared coverage dimension carries no disposition.",
+          "shared": false
+        },
+        {
+          "code": "CONSUMER_UNPROVEN",
+          "disposition": "terminate",
+          "domain": "business",
+          "meaning": "A discovered enforcement consumer has no disposition or no proof.",
+          "shared": false
+        },
+        {
+          "code": "RECONCILIATION_DISCREPANCY",
+          "disposition": "terminate",
+          "domain": "backend",
+          "meaning": "Delivered source differs from the frozen coverage matrix.",
+          "shared": false
+        }
+      ],
+      "routes": [
+        {
+          "domain": "business",
+          "kind": "resume",
+          "target": null
+        },
+        {
+          "domain": "backend",
+          "kind": "operator",
+          "target": "backend.source.apply"
+        },
+        {
+          "domain": "workspace",
+          "kind": "operator",
+          "target": "workspace.bind"
+        },
+        {
+          "domain": "caller",
+          "kind": "user",
+          "target": null
+        }
+      ]
+    },
+    {
+      "id": "content.generate",
+      "dir": "content-generate",
+      "domain": "content",
+      "job": "Generate or refactor one educational content unit in one linear pass: a teacher brief that constrains everything after it, one written edition per declared language, images made to a stated claim, code and executable checks that actually run, and an independent review that receives the artifacts without the producer's rationale.",
+      "profile": "luna",
+      "policy": {
+        "webSearch": "bounded",
+        "grammarBound": false,
+        "imageGeneration": "required"
+      },
+      "requires": [
+        "webSearch",
+        "imageGeneration",
+        "sourceWrite"
+      ],
+      "hasVietnamese": true,
+      "context": [
+        "@remote/minio/<contentId>/<locale>",
+        "@worktrees/sessions/central-runtime"
+      ],
+      "steps": 9,
+      "requirements": 8,
+      "inputs": [
+        {
+          "kind": "content-generation-receipt",
+          "required": false
+        }
+      ],
+      "outputs": [
+        {
+          "kind": "content-generation-receipt",
+          "file": "response/response.md",
+          "type": "md",
+          "required": true
+        },
+        {
+          "kind": "content-brief",
+          "file": "response/brief.md",
+          "type": "md",
+          "required": true
+        },
+        {
+          "kind": "e2e",
+          "file": "response/data/e2e.json",
+          "type": "data",
+          "required": false
+        },
+        {
+          "kind": "content-review",
+          "file": "review/response/review.md",
+          "type": "md",
+          "required": true
+        },
+        {
+          "kind": "article",
+          "file": "response/artifacts/article.<language>.md",
+          "type": "artifact",
+          "required": true
+        },
+        {
+          "kind": "image",
+          "file": "response/artifacts/image.<name>",
+          "type": "artifact",
+          "required": false
+        },
+        {
+          "kind": "image-prompt",
+          "file": "response/artifacts/prompt.<name>.txt",
+          "type": "artifact",
+          "required": false
+        },
+        {
+          "kind": "track",
+          "file": "response/artifacts/track.<language>.<extension>",
+          "type": "artifact",
+          "required": false
+        }
+      ],
+      "next": [
+        {
+          "when": "the routed content object or the shared runtime does not answer at the frozen binding",
+          "operator": "workspace.bind"
+        }
+      ],
+      "stops": [
+        {
+          "code": "INVALID_INPUT",
+          "disposition": "terminate",
+          "domain": "caller",
+          "meaning": "request.json fails the gate or the operator's Requirements.",
+          "shared": true
+        },
+        {
+          "code": "SOURCE_DRIFT",
+          "disposition": "terminate",
+          "domain": "workspace",
+          "meaning": "The observed checkout head differs from the head request.json froze.",
+          "shared": true
+        },
+        {
+          "code": "NO_PROGRESS",
+          "disposition": "terminate",
+          "domain": "caller",
+          "meaning": "A resume adds no evidence, constraint, inventory, or approval delta.",
+          "shared": true
+        },
+        {
+          "code": "BRIEF_UNBOUND",
+          "disposition": "terminate",
+          "domain": "curriculum",
+          "meaning": "The teacher brief cannot be frozen from the bound curriculum and source evidence.",
+          "shared": false
+        },
+        {
+          "code": "OUTCOME_UNCOVERED",
+          "disposition": "terminate",
+          "domain": "content",
+          "meaning": "A declared language edition leaves a published learning outcome uncovered.",
+          "shared": false
+        },
+        {
+          "code": "IMAGE_UNAVAILABLE",
+          "disposition": "terminate",
+          "domain": "engineering",
+          "meaning": "A required image cannot be generated to the brief's claims.",
+          "shared": false
+        },
+        {
+          "code": "CODE_BUILD_FAILED",
+          "disposition": "terminate",
+          "domain": "content",
+          "meaning": "A declared implementation track does not build.",
+          "shared": false
+        },
+        {
+          "code": "E2E_FAILED",
+          "disposition": "terminate",
+          "domain": "content",
+          "meaning": "A declared executable check still fails when maxE2eIterations is spent.",
+          "shared": false
+        },
+        {
+          "code": "CONTRACT_WEAKENED",
+          "disposition": "terminate",
+          "domain": "content",
+          "meaning": "The executable contract moved during the repair loop, so the proof measures nothing.",
+          "shared": false
+        },
+        {
+          "code": "REVIEW_REVISION_REQUIRED",
+          "disposition": "fallback",
+          "domain": "content",
+          "meaning": "The independent review returned a revision.",
+          "shared": false
+        },
+        {
+          "code": "REVIEW_ROUNDS_EXHAUSTED",
+          "disposition": "terminate",
+          "domain": "caller",
+          "meaning": "maxReviewRounds is spent and the review still returns a revision.",
+          "shared": false
+        }
+      ],
+      "routes": [
+        {
+          "domain": "content",
+          "kind": "resume",
+          "target": null
+        },
+        {
+          "domain": "curriculum",
+          "kind": "user",
+          "target": null
+        },
+        {
+          "domain": "engineering",
+          "kind": "user",
+          "target": null
+        },
+        {
+          "domain": "workspace",
+          "kind": "operator",
+          "target": "workspace.bind"
+        },
+        {
+          "domain": "caller",
+          "kind": "user",
+          "target": null
+        }
+      ]
+    },
+    {
+      "id": "frontend.direction.decide",
+      "dir": "frontend-direction-decide",
+      "domain": "frontend",
+      "job": "Decide one evidence-backed, implementation-ready frontend direction for one authorized target, and prove it against the business promise, the published Grammar, the observed implementation and a falsification pass that no candidate survives by taste.",
+      "profile": "sol-fresh",
+      "policy": {
+        "webSearch": "bounded",
+        "grammarBound": true,
+        "imageGeneration": "judged"
+      },
+      "requires": [
+        "webSearch",
+        "imageGeneration",
+        "browser"
+      ],
+      "hasVietnamese": true,
+      "context": [
+        "@grammar/core",
+        "@knowledge/grammars/starci",
+        "@knowledge/ui/composition",
+        "@workspaces/fe",
+        "@worktrees/uat/<flow>/<case>"
+      ],
+      "steps": 12,
+      "requirements": 10,
+      "inputs": [
+        {
+          "kind": "business-promise-authority",
+          "required": false
+        },
+        {
+          "kind": "backend-source-application",
+          "required": false
+        },
+        {
+          "kind": "architecture-decision",
+          "required": false
+        },
+        {
+          "kind": "frontend-direction-decision",
+          "required": false
+        }
+      ],
+      "outputs": [
+        {
+          "kind": "frontend-direction-decision",
+          "file": "response/response.md",
+          "type": "md",
+          "required": true
+        },
+        {
+          "kind": "ui-coverage",
+          "file": "response/data/coverage.json",
+          "type": "data",
+          "required": true
+        },
+        {
+          "kind": "candidates",
+          "file": "response/artifacts/<candidateId>.html",
+          "type": "artifact",
+          "required": false
+        },
+        {
+          "kind": "direction-image",
+          "file": "response/artifacts/images/<slot>.png",
+          "type": "artifact",
+          "required": false
+        }
+      ],
+      "next": [
+        {
+          "when": "the direction is decided; every direction resolves its presentation values before any source is written",
+          "operator": "frontend.presentation.resolve"
+        },
+        {
+          "when": "a family component the direction needs is unpublished, so a person publishes it and the same direction runs again",
+          "operator": "frontend.direction.decide"
+        }
+      ],
+      "stops": [
+        {
+          "code": "INVALID_INPUT",
+          "disposition": "terminate",
+          "domain": "caller",
+          "meaning": "request.json fails the gate or the operator's Requirements.",
+          "shared": true
+        },
+        {
+          "code": "ROUTE_UNVERIFIED",
+          "disposition": "terminate",
+          "domain": "workspace",
+          "meaning": "The project or the routed frontend checkout identity is not verified.",
+          "shared": false
+        },
+        {
+          "code": "SOURCE_DRIFT",
+          "disposition": "terminate",
+          "domain": "workspace",
+          "meaning": "The observed checkout head differs from the head request.json froze.",
+          "shared": true
+        },
+        {
+          "code": "SCOPE_UNFROZEN",
+          "disposition": "terminate",
+          "domain": "caller",
+          "meaning": "The target or the boundary of the surface is incomplete, so the UI contract cannot be closed.",
+          "shared": false
+        },
+        {
+          "code": "CHANGE_LEVEL_AMBIGUOUS",
+          "disposition": "terminate",
+          "domain": "caller",
+          "meaning": "The authority for new, reconstruct or refine is unresolved or contradicts the intent.",
+          "shared": false
+        },
+        {
+          "code": "OWNER_CEILING_INVALID",
+          "disposition": "terminate",
+          "domain": "caller",
+          "meaning": "The direction needs an owner the declared ceiling does not authorize.",
+          "shared": false
+        },
+        {
+          "code": "BUSINESS_REQUIRED",
+          "disposition": "terminate",
+          "domain": "business",
+          "meaning": "An actor, promise, permission, adverse outcome or recovery truth the change level requires is unresolved.",
+          "shared": false
+        },
+        {
+          "code": "BACKEND_REQUIRED",
+          "disposition": "terminate",
+          "domain": "backend",
+          "meaning": "The direction changes a data contract nobody delivered.",
+          "shared": false
+        },
+        {
+          "code": "ARCHITECTURE_REQUIRED",
+          "disposition": "terminate",
+          "domain": "architecture",
+          "meaning": "The direction changes a system or data boundary nobody decided.",
+          "shared": false
+        },
+        {
+          "code": "GRAMMAR_REQUIRED",
+          "disposition": "terminate",
+          "domain": "grammar",
+          "meaning": "A family component the direction needs is unpublished; a composite is never assembled in its place.",
+          "shared": false
+        },
+        {
+          "code": "EVIDENCE_MISSING",
+          "disposition": "terminate",
+          "domain": "self",
+          "meaning": "A claim about the system has no file, line, or head behind it.",
+          "shared": true
+        },
+        {
+          "code": "REFERENCE_EVIDENCE_EXHAUSTED",
+          "disposition": "terminate",
+          "domain": "caller",
+          "meaning": "Bounded research cannot close the business or interaction question the decision rests on.",
+          "shared": false
+        },
+        {
+          "code": "NO_VIABLE_DIRECTION",
+          "disposition": "terminate",
+          "domain": "caller",
+          "meaning": "Every candidate contradicts authority or fails a mandatory attack.",
+          "shared": false
+        },
+        {
+          "code": "DIRECTION_CHOICE_REQUIRED",
+          "disposition": "fallback",
+          "domain": "caller",
+          "meaning": "Several candidates survive falsification and none dominates.",
+          "shared": false
+        },
+        {
+          "code": "NO_PROGRESS",
+          "disposition": "terminate",
+          "domain": "caller",
+          "meaning": "A resume adds no evidence, constraint, inventory, or approval delta.",
+          "shared": true
+        }
+      ],
+      "routes": [
+        {
+          "domain": "business",
+          "kind": "operator",
+          "target": "business.decide"
+        },
+        {
+          "domain": "backend",
+          "kind": "operator",
+          "target": "backend.source.apply"
+        },
+        {
+          "domain": "architecture",
+          "kind": "operator",
+          "target": "architecture.decide"
+        },
+        {
+          "domain": "grammar",
+          "kind": "user",
+          "target": null
+        },
+        {
+          "domain": "workspace",
+          "kind": "operator",
+          "target": "workspace.bind"
+        },
+        {
+          "domain": "caller",
+          "kind": "user",
+          "target": null
+        },
+        {
+          "domain": "frontend",
+          "kind": "resume",
+          "target": null
+        }
+      ]
+    },
+    {
+      "id": "frontend.presentation.resolve",
+      "dir": "frontend-presentation-resolve",
+      "domain": "frontend",
+      "job": "Resolve every application-owned presentation property on one already-composed tree to exactly one published rule, emit its class and its verifiable contract claim, and stop at the smallest owning gap instead of inventing a value.",
+      "profile": "luna",
+      "policy": {
+        "webSearch": "bounded",
+        "grammarBound": true,
+        "imageGeneration": "judged"
+      },
+      "requires": [
+        "webSearch",
+        "imageGeneration"
+      ],
+      "hasVietnamese": true,
+      "context": [
+        "@grammar/core",
+        "@knowledge/ui/presentation",
+        "@workspaces/fe"
+      ],
+      "steps": 9,
+      "requirements": 3,
+      "inputs": [
+        {
+          "kind": "frontend-direction-decision",
+          "required": true
+        },
+        {
+          "kind": "frontend-surface-audit",
+          "required": false
+        }
+      ],
+      "outputs": [
+        {
+          "kind": "frontend-presentation-resolution",
+          "file": "response/response.md",
+          "type": "md",
+          "required": true
+        },
+        {
+          "kind": "inventory",
+          "file": "response/data/inventory.json",
+          "type": "data",
+          "required": true
+        },
+        {
+          "kind": "resolved-tree",
+          "file": "response/artifacts/<target>.resolved.tsx",
+          "type": "artifact",
+          "required": true
+        }
+      ],
+      "next": [
+        {
+          "when": "the tree is resolved and its values must be written into product source",
+          "operator": "frontend.source.apply"
+        },
+        {
+          "when": "a gap needs a family component before the next round, so a person publishes it and the same tree is resolved again",
+          "operator": "frontend.presentation.resolve"
+        }
+      ],
+      "stops": [
+        {
+          "code": "INVALID_INPUT",
+          "disposition": "terminate",
+          "domain": "caller",
+          "meaning": "request.json fails the gate or the operator's Requirements.",
+          "shared": true
+        },
+        {
+          "code": "SOURCE_DRIFT",
+          "disposition": "terminate",
+          "domain": "workspace",
+          "meaning": "The observed checkout head differs from the head request.json froze.",
+          "shared": true
+        },
+        {
+          "code": "OWNER_CONFLICT",
+          "disposition": "terminate",
+          "domain": "caller",
+          "meaning": "A node that must be mutated lies outside the mutable owner ceiling, or the owner sets overlap.",
+          "shared": false
+        },
+        {
+          "code": "KNOWLEDGE_UNBOUND",
+          "disposition": "terminate",
+          "domain": "knowledge",
+          "meaning": "A presentation property is present in the tree and no knowledge topic is bound for it.",
+          "shared": false
+        },
+        {
+          "code": "UNKNOWN_RULE",
+          "disposition": "terminate",
+          "domain": "self",
+          "meaning": "An identifier outside the bound rule inventory was reached for.",
+          "shared": false
+        },
+        {
+          "code": "RULE_MISSING",
+          "disposition": "terminate",
+          "domain": "knowledge",
+          "meaning": "No published case matches the observed condition on a node.",
+          "shared": false
+        },
+        {
+          "code": "GRAMMAR_UNPUBLISHED",
+          "disposition": "terminate",
+          "domain": "grammar",
+          "meaning": "The Grammar package is unpublished or the bound fingerprint is stale.",
+          "shared": false
+        },
+        {
+          "code": "NO_PROGRESS",
+          "disposition": "terminate",
+          "domain": "caller",
+          "meaning": "A resume adds no evidence, constraint, inventory, or approval delta.",
+          "shared": true
+        }
+      ],
+      "routes": [
+        {
+          "domain": "grammar",
+          "kind": "user",
+          "target": null
+        },
+        {
+          "domain": "knowledge",
+          "kind": "user",
+          "target": null
+        },
+        {
+          "domain": "workspace",
+          "kind": "operator",
+          "target": "workspace.bind"
+        },
+        {
+          "domain": "caller",
+          "kind": "user",
+          "target": null
+        },
+        {
+          "domain": "frontend",
+          "kind": "resume",
+          "target": null
+        }
+      ]
+    },
+    {
+      "id": "frontend.source.apply",
+      "dir": "frontend-source-apply",
+      "domain": "frontend",
+      "job": "Write one already-resolved tree into product source on the session branch, inside a frozen owner ceiling and a declared file set, emitting only values the bound resolution already contains, and account for every byte that entered the repository in one commit.",
+      "profile": "luna",
+      "policy": {
+        "webSearch": "bounded",
+        "grammarBound": true,
+        "imageGeneration": "judged"
+      },
+      "requires": [
+        "webSearch",
+        "imageGeneration",
+        "sourceWrite"
+      ],
+      "hasVietnamese": true,
+      "context": [
+        "@workspaces/fe"
+      ],
+      "steps": 7,
+      "requirements": 2,
+      "inputs": [
+        {
+          "kind": "frontend-presentation-resolution",
+          "required": true
+        },
+        {
+          "kind": "frontend-direction-decision",
+          "required": true
+        }
+      ],
+      "outputs": [
+        {
+          "kind": "frontend-source-application",
+          "file": "response/response.md",
+          "type": "md",
+          "required": true
+        },
+        {
+          "kind": "changes",
+          "file": "response/changes.md",
+          "type": "md",
+          "required": true
+        },
+        {
+          "kind": "writes",
+          "file": "response/data/writes.json",
+          "type": "data",
+          "required": true
+        }
+      ],
+      "next": [
+        {
+          "when": "the source is committed and the rendered surface must be measured",
+          "operator": "frontend.surface.audit"
+        },
+        {
+          "when": "the source is committed and the checkout's own gates must run",
+          "operator": "quality.verify"
+        }
+      ],
+      "stops": [
+        {
+          "code": "INVALID_INPUT",
+          "disposition": "terminate",
+          "domain": "caller",
+          "meaning": "request.json fails the gate or the operator's Requirements.",
+          "shared": true
+        },
+        {
+          "code": "SOURCE_DRIFT",
+          "disposition": "terminate",
+          "domain": "workspace",
+          "meaning": "The observed checkout head differs from the head request.json froze.",
+          "shared": true
+        },
+        {
+          "code": "OWNER_CONFLICT",
+          "disposition": "terminate",
+          "domain": "caller",
+          "meaning": "A node that must be mutated lies outside the mutable owner ceiling, or the owner sets overlap.",
+          "shared": false
+        },
+        {
+          "code": "RESOLUTION_STALE",
+          "disposition": "terminate",
+          "domain": "resolution",
+          "meaning": "The resolution actually read differs from the resolution the request bound.",
+          "shared": false
+        },
+        {
+          "code": "WRITE_REJECTED",
+          "disposition": "terminate",
+          "domain": "caller",
+          "meaning": "A file or a value the write would produce lies outside what was authorized, or the committed tree is not the resolved tree.",
+          "shared": false
+        },
+        {
+          "code": "NO_PROGRESS",
+          "disposition": "terminate",
+          "domain": "caller",
+          "meaning": "A resume adds no evidence, constraint, inventory, or approval delta.",
+          "shared": true
+        }
+      ],
+      "routes": [
+        {
+          "domain": "resolution",
+          "kind": "operator",
+          "target": "frontend.presentation.resolve"
+        },
+        {
+          "domain": "workspace",
+          "kind": "operator",
+          "target": "workspace.bind"
+        },
+        {
+          "domain": "caller",
+          "kind": "user",
+          "target": null
+        }
+      ]
+    },
+    {
+      "id": "frontend.surface.audit",
+      "dir": "frontend-surface-audit",
+      "domain": "frontend",
+      "job": "Observe the committed surface at the served route across the matrix the direction's coverage implies, measure every node that carries a claim, and judge each measurement against the published proof rules by the owner of the node it stands on.",
+      "profile": "sol-reviewer",
+      "policy": {
+        "webSearch": "bounded",
+        "grammarBound": true,
+        "imageGeneration": "never"
+      },
+      "requires": [
+        "webSearch",
+        "browser"
+      ],
+      "hasVietnamese": true,
+      "context": [
+        "@knowledge/grammars/starci",
+        "@knowledge/ui/proof",
+        "@workspaces/fe",
+        "@worktrees/sessions/central-runtime"
+      ],
+      "steps": 6,
+      "requirements": 3,
+      "inputs": [
+        {
+          "kind": "frontend-source-application",
+          "required": true
+        },
+        {
+          "kind": "frontend-presentation-resolution",
+          "required": true
+        },
+        {
+          "kind": "frontend-direction-decision",
+          "required": true
+        }
+      ],
+      "outputs": [
+        {
+          "kind": "frontend-surface-audit",
+          "file": "response/response.md",
+          "type": "md",
+          "required": true
+        },
+        {
+          "kind": "capture",
+          "file": "response/data/captures/<matrixId>.json",
+          "type": "data",
+          "required": true
+        },
+        {
+          "kind": "screenshot",
+          "file": "response/artifacts/<matrixId>.png",
+          "type": "artifact",
+          "required": true
+        },
+        {
+          "kind": "verdicts",
+          "file": "response/data/verdicts.json",
+          "type": "data",
+          "required": true
+        }
+      ],
+      "next": [
+        {
+          "when": "a claim fails on an application-owned node, so a value must be published again",
+          "operator": "frontend.presentation.resolve"
+        },
+        {
+          "when": "every claim holds and the checkout's own gates must run",
+          "operator": "quality.verify"
+        },
+        {
+          "when": "a claim fails on a Grammar component's own render, so a person records the family gap and publishes",
+          "operator": "frontend.surface.audit"
+        }
+      ],
+      "stops": [
+        {
+          "code": "INVALID_INPUT",
+          "disposition": "terminate",
+          "domain": "caller",
+          "meaning": "request.json fails the gate or the operator's Requirements.",
+          "shared": true
+        },
+        {
+          "code": "SOURCE_DRIFT",
+          "disposition": "terminate",
+          "domain": "workspace",
+          "meaning": "The observed checkout head differs from the head request.json froze.",
+          "shared": true
+        },
+        {
+          "code": "RUNTIME_UNAVAILABLE",
+          "disposition": "terminate",
+          "domain": "platform",
+          "meaning": "The endpoint does not serve the bound route, or the surface never reaches readiness.",
+          "shared": false
+        },
+        {
+          "code": "EVIDENCE_MISSING",
+          "disposition": "terminate",
+          "domain": "self",
+          "meaning": "A claim about the system has no file, line, or head behind it.",
+          "shared": true
+        },
+        {
+          "code": "UNKNOWN_RULE",
+          "disposition": "terminate",
+          "domain": "self",
+          "meaning": "An identifier outside the bound rule inventory was reached for.",
+          "shared": false
+        },
+        {
+          "code": "NO_PROGRESS",
+          "disposition": "terminate",
+          "domain": "caller",
+          "meaning": "A resume adds no evidence, constraint, inventory, or approval delta.",
+          "shared": true
+        }
+      ],
+      "routes": [
+        {
+          "domain": "workspace",
+          "kind": "operator",
+          "target": "workspace.bind"
+        },
+        {
+          "domain": "caller",
+          "kind": "user",
+          "target": null
+        },
+        {
+          "domain": "platform",
+          "kind": "operator",
+          "target": "platform.operate"
+        },
+        {
+          "domain": "frontend",
+          "kind": "resume",
+          "target": null
+        }
+      ]
+    },
+    {
+      "id": "git.publish",
+      "dir": "git-publish",
+      "domain": "git",
+      "job": "Publish one approved Git boundary from the exact commit quality verified, with non-force, fast-forward-only semantics, and stop with a typed failure rather than reaching for a bypass.",
+      "profile": "luna",
+      "policy": {
+        "webSearch": "bounded",
+        "grammarBound": false,
+        "imageGeneration": "never"
+      },
+      "requires": [
+        "webSearch",
+        "sourceWrite"
+      ],
+      "hasVietnamese": true,
+      "context": [
+        "@remote/git/<project>/<role>",
+        "@workspaces/<project>/<role>/husky",
+        "@workspaces/local/routes/<project>/<role>"
+      ],
+      "steps": 9,
+      "requirements": 4,
+      "inputs": [
+        {
+          "kind": "workspace-route-binding",
+          "required": true
+        },
+        {
+          "kind": "changes",
+          "required": true
+        },
+        {
+          "kind": "quality-verification",
+          "required": true
+        }
+      ],
+      "outputs": [
+        {
+          "kind": "git-publication",
+          "file": "response/response.md",
+          "type": "md",
+          "required": true
+        }
+      ],
+      "next": [
+        {
+          "when": "the boundary is published and the head must reach an environment",
+          "operator": "release.deploy"
+        }
+      ],
+      "stops": [
+        {
+          "code": "INVALID_INPUT",
+          "disposition": "terminate",
+          "domain": "caller",
+          "meaning": "request.json fails the gate or the operator's Requirements.",
+          "shared": true
+        },
+        {
+          "code": "SOURCE_DRIFT",
+          "disposition": "terminate",
+          "domain": "workspace",
+          "meaning": "The observed checkout head differs from the head request.json froze.",
+          "shared": true
+        },
+        {
+          "code": "NO_PROGRESS",
+          "disposition": "terminate",
+          "domain": "caller",
+          "meaning": "A resume adds no evidence, constraint, inventory, or approval delta.",
+          "shared": true
+        },
+        {
+          "code": "ROUTE_UNVERIFIED",
+          "disposition": "terminate",
+          "domain": "workspace",
+          "meaning": "The project or the routed frontend checkout identity is not verified.",
+          "shared": false
+        },
+        {
+          "code": "APPROVAL_MISSING",
+          "disposition": "terminate",
+          "domain": "caller",
+          "meaning": "No approval covers this exact boundary unit; completion proof is not approval.",
+          "shared": false
+        },
+        {
+          "code": "BRANCH_POLICY_VIOLATION",
+          "disposition": "terminate",
+          "domain": "workspace",
+          "meaning": "The checkout is on a branch the routed Git policy forbids for this operation.",
+          "shared": false
+        },
+        {
+          "code": "DIRTY_OUTSIDE_BOUNDARY",
+          "disposition": "terminate",
+          "domain": "source",
+          "meaning": "Something dirty lies outside the declared write roots, so the publish would carry work this boundary does not own.",
+          "shared": false
+        },
+        {
+          "code": "HOOK_BLOCKED",
+          "disposition": "terminate",
+          "domain": "source",
+          "meaning": "A Git hook rejected the publication, and no bypass is representable.",
+          "shared": false
+        },
+        {
+          "code": "NON_FAST_FORWARD",
+          "disposition": "terminate",
+          "domain": "remote",
+          "meaning": "The remote carries commits the local ref does not, so the push is not fast-forward.",
+          "shared": false
+        }
+      ],
+      "routes": [
+        {
+          "domain": "workspace",
+          "kind": "operator",
+          "target": "workspace.bind"
+        },
+        {
+          "domain": "source",
+          "kind": "operator",
+          "target": "workspace.bind"
+        },
+        {
+          "domain": "remote",
+          "kind": "external",
+          "target": null
+        },
+        {
+          "domain": "caller",
+          "kind": "user",
+          "target": null
+        }
+      ]
+    },
+    {
+      "id": "platform.operate",
+      "dir": "platform-operate",
+      "domain": "platform",
+      "job": "Operate one bounded shared observability, Sonar, or tunnel service from exact evidence: inventory it, converge only the approved delta, prove every check the bound knowledge requires, and stop at the smallest owning gap instead of taking product deployment ownership.",
+      "profile": "luna",
+      "policy": {
+        "webSearch": "bounded",
+        "grammarBound": false,
+        "imageGeneration": "never"
+      },
+      "requires": [
+        "webSearch",
+        "sourceWrite"
+      ],
+      "hasVietnamese": true,
+      "context": [
+        "@workspaces/device-state",
+        "@workspaces/ports/<project>",
+        "@workspaces/projects/<project>/<role>",
+        "@worktrees/sessions/central-runtime"
+      ],
+      "steps": 8,
+      "requirements": 5,
+      "inputs": [],
+      "outputs": [
+        {
+          "kind": "platform-operation-receipt",
+          "file": "response/response.md",
+          "type": "md",
+          "required": true
+        },
+        {
+          "kind": "delta",
+          "file": "response/data/delta.json",
+          "type": "data",
+          "required": true
+        },
+        {
+          "kind": "checks",
+          "file": "response/data/checks.json",
+          "type": "data",
+          "required": true
+        }
+      ],
+      "next": [
+        {
+          "when": "the routed checkout or its head no longer matches the frozen binding",
+          "operator": "workspace.bind"
+        },
+        {
+          "when": "the runtime a frontend surface must be audited against is now serving",
+          "operator": "frontend.surface.audit"
+        },
+        {
+          "when": "the shared service is operated and the release that waited on it may continue",
+          "operator": "release.deploy"
+        }
+      ],
+      "stops": [
+        {
+          "code": "INVALID_INPUT",
+          "disposition": "terminate",
+          "domain": "caller",
+          "meaning": "request.json fails the gate or the operator's Requirements.",
+          "shared": true
+        },
+        {
+          "code": "SOURCE_DRIFT",
+          "disposition": "terminate",
+          "domain": "workspace",
+          "meaning": "The observed checkout head differs from the head request.json froze.",
+          "shared": true
+        },
+        {
+          "code": "NO_PROGRESS",
+          "disposition": "terminate",
+          "domain": "caller",
+          "meaning": "A resume adds no evidence, constraint, inventory, or approval delta.",
+          "shared": true
+        },
+        {
+          "code": "AUTHORITY_DRIFT",
+          "disposition": "terminate",
+          "domain": "caller",
+          "meaning": "The approval, the plan hash, or the allowed effect set no longer matches the requested delta.",
+          "shared": false
+        },
+        {
+          "code": "CAPABILITY_MISSING",
+          "disposition": "terminate",
+          "domain": "caller",
+          "meaning": "The capability the service kind requires is absent or names no custody evidence.",
+          "shared": false
+        },
+        {
+          "code": "INVENTORY_DRIFT",
+          "disposition": "terminate",
+          "domain": "platform",
+          "meaning": "A declared resource moved since the inventory was bound, so the plan describes a service that no longer exists.",
+          "shared": false
+        },
+        {
+          "code": "PORT_CONFLICT",
+          "disposition": "terminate",
+          "domain": "product",
+          "meaning": "A claimed port is already held by another declared process, and holding it is not permission to reclaim it.",
+          "shared": false
+        },
+        {
+          "code": "EFFECT_UNAUTHORIZED",
+          "disposition": "terminate",
+          "domain": "caller",
+          "meaning": "A required effect lies outside the approved effect set or outside the branch.",
+          "shared": false
+        },
+        {
+          "code": "SERVICE_UNAVAILABLE",
+          "disposition": "terminate",
+          "domain": "provider",
+          "meaning": "The shared service or its provider cannot be reached.",
+          "shared": false
+        },
+        {
+          "code": "PROOF_FAILED",
+          "disposition": "terminate",
+          "domain": "platform",
+          "meaning": "A required check is missing, unreadable, or failed after apply, and an unproved operation is not an operated one.",
+          "shared": false
+        }
+      ],
+      "routes": [
+        {
+          "domain": "platform",
+          "kind": "resume",
+          "target": null
+        },
+        {
+          "domain": "provider",
+          "kind": "external",
+          "target": null
+        },
+        {
+          "domain": "product",
+          "kind": "user",
+          "target": null
+        },
+        {
+          "domain": "workspace",
+          "kind": "operator",
+          "target": "workspace.bind"
+        },
+        {
+          "domain": "caller",
+          "kind": "user",
+          "target": null
+        }
+      ]
+    },
+    {
+      "id": "quality.verify",
+      "dir": "quality-verify",
+      "domain": "quality",
+      "job": "Verify one bounded delivery by running its declared gates against an unchanged predecessor receipt at one frozen head, and return the exact measured verdict, repairing nothing.",
+      "profile": "luna",
+      "policy": {
+        "webSearch": "bounded",
+        "grammarBound": false,
+        "imageGeneration": "never"
+      },
+      "requires": [
+        "webSearch"
+      ],
+      "hasVietnamese": true,
+      "context": [
+        "@workspaces/<project>/<role>/gates",
+        "@workspaces/be",
+        "@workspaces/fe",
+        "@worktrees/debts"
+      ],
+      "steps": 7,
+      "requirements": 6,
+      "inputs": [
+        {
+          "kind": "backend-source-application",
+          "required": false
+        },
+        {
+          "kind": "frontend-source-application",
+          "required": false
+        },
+        {
+          "kind": "changes",
+          "required": false
+        }
+      ],
+      "outputs": [
+        {
+          "kind": "quality-verification",
+          "file": "response/response.md",
+          "type": "md",
+          "required": true
+        },
+        {
+          "kind": "gate-result",
+          "file": "response/data/gates/<gate>.json",
+          "type": "data",
+          "required": true
+        },
+        {
+          "kind": "coverage",
+          "file": "response/data/coverage.json",
+          "type": "data",
+          "required": false
+        }
+      ],
+      "next": [
+        {
+          "when": "a backend gate failed in boundary and the backend owner must fix it",
+          "operator": "backend.source.apply"
+        },
+        {
+          "when": "a frontend gate failed in boundary and the frontend owner must apply the fix",
+          "operator": "frontend.source.apply"
+        },
+        {
+          "when": "the verdict is green and the delivery is ready to publish",
+          "operator": "git.publish"
+        },
+        {
+          "when": "the verdict is green and the published head must reach an environment",
+          "operator": "release.deploy"
+        },
+        {
+          "when": "the gates are green and the promise must be reconciled against the delivered source",
+          "operator": "business.decide"
+        },
+        {
+          "when": "the gates are green and a person asked for the journey to be walked",
+          "operator": "uat.verify"
+        }
+      ],
+      "stops": [
+        {
+          "code": "INVALID_INPUT",
+          "disposition": "terminate",
+          "domain": "caller",
+          "meaning": "request.json fails the gate or the operator's Requirements.",
+          "shared": true
+        },
+        {
+          "code": "SOURCE_DRIFT",
+          "disposition": "terminate",
+          "domain": "workspace",
+          "meaning": "The observed checkout head differs from the head request.json froze.",
+          "shared": true
+        },
+        {
+          "code": "NO_PROGRESS",
+          "disposition": "terminate",
+          "domain": "caller",
+          "meaning": "A resume adds no evidence, constraint, inventory, or approval delta.",
+          "shared": true
+        },
+        {
+          "code": "PREDECESSOR_MIXED",
+          "disposition": "terminate",
+          "domain": "caller",
+          "meaning": "Two predecessor receipts describe different source heads, so their union is a delivery nobody built.",
+          "shared": false
+        },
+        {
+          "code": "PREDECESSOR_STALE",
+          "disposition": "terminate",
+          "domain": "caller",
+          "meaning": "A predecessor fingerprint no longer matches the frozen source.",
+          "shared": false
+        },
+        {
+          "code": "GATE_UNAVAILABLE",
+          "disposition": "terminate",
+          "domain": "platform",
+          "meaning": "A required gate cannot be executed at all in this environment, and an unmeasurable gate is not a passed one.",
+          "shared": false
+        },
+        {
+          "code": "DEBT_UNAPPROVED",
+          "disposition": "terminate",
+          "domain": "caller",
+          "meaning": "A declared debt has no live owner approval, or it covers a gate that passed or a boundary-drift failure.",
+          "shared": false
+        }
+      ],
+      "routes": [
+        {
+          "domain": "platform",
+          "kind": "operator",
+          "target": "platform.operate"
+        },
+        {
+          "domain": "workspace",
+          "kind": "operator",
+          "target": "workspace.bind"
+        },
+        {
+          "domain": "caller",
+          "kind": "user",
+          "target": null
+        }
+      ]
+    },
+    {
+      "id": "release.deploy",
+      "dir": "release-deploy",
+      "domain": "deployment",
+      "job": "Deploy one immutable release to one declared target under its declared authorization and prove the steady state it reached, taking the recovery or rollback branch inside the same pass rather than assuming the rollout succeeded.",
+      "profile": "luna",
+      "policy": {
+        "webSearch": "bounded",
+        "grammarBound": false,
+        "imageGeneration": "never"
+      },
+      "requires": [
+        "webSearch",
+        "sourceWrite"
+      ],
+      "hasVietnamese": true,
+      "context": [
+        "@remote/ghcr/<image>",
+        "@remote/github-actions/<runId>",
+        "@workspaces/device-state"
+      ],
+      "steps": 10,
+      "requirements": 7,
+      "inputs": [
+        {
+          "kind": "quality-verification",
+          "required": true
+        }
+      ],
+      "outputs": [
+        {
+          "kind": "release-deployment",
+          "file": "response/response.md",
+          "type": "md",
+          "required": true
+        },
+        {
+          "kind": "probes",
+          "file": "response/data/probes.json",
+          "type": "data",
+          "required": true
+        }
+      ],
+      "next": [
+        {
+          "when": "the host, the artifact registry, the credential custody or the safe release needs a shared runtime change",
+          "operator": "platform.operate"
+        }
+      ],
+      "stops": [
+        {
+          "code": "INVALID_INPUT",
+          "disposition": "terminate",
+          "domain": "caller",
+          "meaning": "request.json fails the gate or the operator's Requirements.",
+          "shared": true
+        },
+        {
+          "code": "NO_PROGRESS",
+          "disposition": "terminate",
+          "domain": "caller",
+          "meaning": "A resume adds no evidence, constraint, inventory, or approval delta.",
+          "shared": true
+        },
+        {
+          "code": "AUTHORIZATION_MISSING",
+          "disposition": "terminate",
+          "domain": "approval",
+          "meaning": "No declared grant covers this project, environment, target, or the deploy action, or it had expired when the target was observed.",
+          "shared": false
+        },
+        {
+          "code": "MANIFEST_INVALID",
+          "disposition": "terminate",
+          "domain": "caller",
+          "meaning": "The validated manifest is pinned to another release, and that substitution is how an unreviewed image reaches a reviewed target.",
+          "shared": false
+        },
+        {
+          "code": "APPROVAL_REQUIRED",
+          "disposition": "terminate",
+          "domain": "caller",
+          "meaning": "The transition or the release needs an approval that no request bound.",
+          "shared": false
+        },
+        {
+          "code": "CREDENTIAL_UNAVAILABLE",
+          "disposition": "terminate",
+          "domain": "platform",
+          "meaning": "A declared handle cannot be resolved through existing custody.",
+          "shared": false
+        },
+        {
+          "code": "HOST_UNAVAILABLE",
+          "disposition": "terminate",
+          "domain": "provider",
+          "meaning": "The declared host cannot be prepared.",
+          "shared": false
+        },
+        {
+          "code": "ARTIFACT_MISSING",
+          "disposition": "terminate",
+          "domain": "provider",
+          "meaning": "The immutable digest cannot be resolved, and no replacement may be built and called the same release.",
+          "shared": false
+        },
+        {
+          "code": "MIGRATION_BLOCKED",
+          "disposition": "terminate",
+          "domain": "backend",
+          "meaning": "The declared migration cannot be applied safely.",
+          "shared": false
+        },
+        {
+          "code": "DOMAIN_UNRECONCILED",
+          "disposition": "terminate",
+          "domain": "provider",
+          "meaning": "Domain or TLS state cannot be brought to the declaration.",
+          "shared": false
+        },
+        {
+          "code": "ROLLOUT_FAILED",
+          "disposition": "fallback",
+          "domain": "deployment",
+          "meaning": "The rollout could not place the release on the target.",
+          "shared": false
+        },
+        {
+          "code": "RECOVERY_EXHAUSTED",
+          "disposition": "fallback",
+          "domain": "approval",
+          "meaning": "The approved reversible actions ran out.",
+          "shared": false
+        },
+        {
+          "code": "CONCURRENT_DRIFT",
+          "disposition": "terminate",
+          "domain": "deployment",
+          "meaning": "A release that is neither this one nor its predecessor became active during execution.",
+          "shared": false
+        },
+        {
+          "code": "ROLLBACK_IDENTITY_MISSING",
+          "disposition": "terminate",
+          "domain": "provider",
+          "meaning": "Rollback is required and its exact safe release no longer exists.",
+          "shared": false
+        },
+        {
+          "code": "STEADY_STATE_UNPROVEN",
+          "disposition": "terminate",
+          "domain": "deployment",
+          "meaning": "The steady window never closed before the bounded deadline, and an assumed rollout is not a deployment.",
+          "shared": false
+        }
+      ],
+      "routes": [
+        {
+          "domain": "deployment",
+          "kind": "resume",
+          "target": null
+        },
+        {
+          "domain": "platform",
+          "kind": "operator",
+          "target": "platform.operate"
+        },
+        {
+          "domain": "provider",
+          "kind": "external",
+          "target": null
+        },
+        {
+          "domain": "backend",
+          "kind": "operator",
+          "target": "backend.source.apply"
+        },
+        {
+          "domain": "approval",
+          "kind": "user",
+          "target": null
+        },
+        {
+          "domain": "caller",
+          "kind": "user",
+          "target": null
+        }
+      ]
+    },
+    {
+      "id": "uat.verify",
+      "dir": "uat-verify",
+      "domain": "test",
+      "job": "Verify one product flow end to end on the running product at the pinned commit, and publish one append-only run record with three independently judged lanes, or stop at the exact unavailability instead of manufacturing a verdict.",
+      "profile": "sol-reviewer",
+      "policy": {
+        "webSearch": "bounded",
+        "grammarBound": false,
+        "imageGeneration": "never"
+      },
+      "requires": [
+        "webSearch",
+        "browser"
+      ],
+      "hasVietnamese": true,
+      "context": [
+        "@workspaces/be",
+        "@workspaces/device-state",
+        "@worktrees/_templates",
+        "@worktrees/sessions/central-runtime",
+        "@worktrees/uat/<flow>/<case>"
+      ],
+      "steps": 10,
+      "requirements": 7,
+      "inputs": [
+        {
+          "kind": "frontend-surface-audit",
+          "required": true
+        },
+        {
+          "kind": "quality-verification",
+          "required": true
+        }
+      ],
+      "outputs": [
+        {
+          "kind": "uat-flow-verification",
+          "file": "response/response.md",
+          "type": "md",
+          "required": true
+        },
+        {
+          "kind": "uat-snapshot",
+          "file": "response/data/snapshot.json",
+          "type": "data",
+          "required": true
+        },
+        {
+          "kind": "uat-capture",
+          "file": "response/data/captures/<case>.json",
+          "type": "data",
+          "required": true
+        },
+        {
+          "kind": "uat-verdicts",
+          "file": "response/data/verdicts.json",
+          "type": "data",
+          "required": true
+        },
+        {
+          "kind": "screenshot",
+          "file": "response/artifacts/<case>.png",
+          "type": "artifact",
+          "required": true
+        },
+        {
+          "kind": "sheet",
+          "file": "response/artifacts/sheet.png",
+          "type": "artifact",
+          "required": true
+        }
+      ],
+      "next": [
+        {
+          "when": "all three lanes pass",
+          "operator": "git.publish"
+        },
+        {
+          "when": "the UI lane fails on an application-owned node",
+          "operator": "frontend.presentation.resolve"
+        },
+        {
+          "when": "the behaviour lane fails",
+          "operator": "backend.source.apply"
+        },
+        {
+          "when": "the UX lane fails: a person decides what the experience should be, and the flow is verified again only after that decision",
+          "operator": "user"
+        }
+      ],
+      "stops": [
+        {
+          "code": "INVALID_INPUT",
+          "disposition": "terminate",
+          "domain": "caller",
+          "meaning": "request.json fails the gate or the operator's Requirements.",
+          "shared": true
+        },
+        {
+          "code": "SOURCE_DRIFT",
+          "disposition": "terminate",
+          "domain": "workspace",
+          "meaning": "The observed checkout head differs from the head request.json froze.",
+          "shared": true
+        },
+        {
+          "code": "NO_PROGRESS",
+          "disposition": "terminate",
+          "domain": "caller",
+          "meaning": "A resume adds no evidence, constraint, inventory, or approval delta.",
+          "shared": true
+        },
+        {
+          "code": "ADMISSION_MISSING",
+          "disposition": "terminate",
+          "domain": "quality",
+          "meaning": "The surface audit or the quality verification that admits product UAT is absent, or one of them was taken at another commit than the pinned head.",
+          "shared": false
+        },
+        {
+          "code": "PROVISIONING_UNAVAILABLE",
+          "disposition": "terminate",
+          "domain": "control-panel",
+          "meaning": "The sealed UAT credential cannot be resolved by name, or the flow's dedicated account does not exist; asking a person to sign in is forbidden in every branch.",
+          "shared": false
+        },
+        {
+          "code": "LEASE_INVALID",
+          "disposition": "terminate",
+          "domain": "control-panel",
+          "meaning": "The exclusive lease on the flow directory is expired, foreign, or bound to another run, generation or origin.",
+          "shared": false
+        },
+        {
+          "code": "RUNTIME_UNAVAILABLE",
+          "disposition": "terminate",
+          "domain": "platform",
+          "meaning": "The endpoint does not serve the bound route, or the surface never reaches readiness.",
+          "shared": false
+        },
+        {
+          "code": "EVIDENCE_UNAVAILABLE",
+          "disposition": "terminate",
+          "domain": "runtime",
+          "meaning": "A case produced no capture, no screenshot, or no screenshot whose login field could be masked, so a lane has nothing to be judged on.",
+          "shared": false
+        },
+        {
+          "code": "FIXTURE_VIOLATION",
+          "disposition": "terminate",
+          "domain": "caller",
+          "meaning": "The seed, the run namespace or the cleanup scope could not be satisfied: a seed would have created the outcome under test, or cleanup would have reached outside the namespace.",
+          "shared": false
+        },
+        {
+          "code": "CANONICAL_WRITE_DENIED",
+          "disposition": "terminate",
+          "domain": "backend",
+          "meaning": "The flow directory cannot be written and read back under the exclusive lease, or the write would have rewritten an existing run record.",
+          "shared": false
+        }
+      ],
+      "routes": [
+        {
+          "domain": "control-panel",
+          "kind": "external",
+          "target": null
+        },
+        {
+          "domain": "runtime",
+          "kind": "external",
+          "target": null
+        },
+        {
+          "domain": "backend",
+          "kind": "operator",
+          "target": "backend.source.apply"
+        },
+        {
+          "domain": "quality",
+          "kind": "operator",
+          "target": "quality.verify"
+        },
+        {
+          "domain": "caller",
+          "kind": "user",
+          "target": null
+        },
+        {
+          "domain": "platform",
+          "kind": "operator",
+          "target": "platform.operate"
+        },
+        {
+          "domain": "workspace",
+          "kind": "operator",
+          "target": "workspace.bind"
+        }
+      ]
+    },
+    {
+      "id": "workspace.bind",
+      "dir": "workspace-bind",
+      "domain": "workspace",
+      "job": "Resolve one project and role into a verified checkout identity, its exact source head, and the closed runtime binding it may consume, and return that as one typed route receipt.",
+      "profile": "luna",
+      "policy": {
+        "webSearch": "bounded",
+        "grammarBound": false,
+        "imageGeneration": "never"
+      },
+      "requires": [
+        "webSearch"
+      ],
+      "hasVietnamese": true,
+      "context": [
+        "@workspaces/device-state",
+        "@workspaces/local/routes/<project>/<role>",
+        "@workspaces/ports/<project>",
+        "@workspaces/projects/<project>/<role>",
+        "@worktrees/sessions/central-runtime"
+      ],
+      "steps": 6,
+      "requirements": 6,
+      "inputs": [],
+      "outputs": [
+        {
+          "kind": "workspace-route-binding",
+          "file": "response/response.md",
+          "type": "md",
+          "required": true
+        },
+        {
+          "kind": "route",
+          "file": "response/data/route.json",
+          "type": "data",
+          "required": true
+        }
+      ],
+      "next": [
+        {
+          "when": "the route is bound and the checkout carries a publication to push",
+          "operator": "git.publish"
+        },
+        {
+          "when": "the route is bound and a promise must be decided against its source",
+          "operator": "business.decide"
+        },
+        {
+          "when": "the route is bound and a backend contract must be filled inside it",
+          "operator": "backend.source.apply"
+        },
+        {
+          "when": "the route is bound and a frontend surface must be written inside it",
+          "operator": "frontend.source.apply"
+        },
+        {
+          "when": "the runtime owner is missing or not ready and one coordination request must be raised",
+          "operator": "platform.operate"
+        },
+        {
+          "when": "the route is bound and a frontend surface must be decided inside it",
+          "operator": "frontend.direction.decide"
+        },
+        {
+          "when": "the route is bound and a published head must be verified before it ships",
+          "operator": "quality.verify"
+        }
+      ],
+      "stops": [
+        {
+          "code": "INVALID_INPUT",
+          "disposition": "terminate",
+          "domain": "caller",
+          "meaning": "request.json fails the gate or the operator's Requirements.",
+          "shared": true
+        },
+        {
+          "code": "SOURCE_DRIFT",
+          "disposition": "terminate",
+          "domain": "workspace",
+          "meaning": "The observed checkout head differs from the head request.json froze.",
+          "shared": true
+        },
+        {
+          "code": "NO_PROGRESS",
+          "disposition": "terminate",
+          "domain": "caller",
+          "meaning": "A resume adds no evidence, constraint, inventory, or approval delta.",
+          "shared": true
+        },
+        {
+          "code": "IDENTITY_UNVERIFIED",
+          "disposition": "terminate",
+          "domain": "identity",
+          "meaning": "The machine identity or its encrypted credential roster is missing or stale.",
+          "shared": false
+        },
+        {
+          "code": "ROUTE_UNDECLARED",
+          "disposition": "terminate",
+          "domain": "workspace",
+          "meaning": "No portable declaration names this project and role.",
+          "shared": false
+        },
+        {
+          "code": "ROUTE_UNHYDRATED",
+          "disposition": "terminate",
+          "domain": "workspace",
+          "meaning": "The declaration exists but no local route projects it onto this machine.",
+          "shared": false
+        },
+        {
+          "code": "ROUTE_MISMATCH",
+          "disposition": "terminate",
+          "domain": "workspace",
+          "meaning": "The hydrated route disagrees with the closed portable route, or belongs to another Source.",
+          "shared": false
+        },
+        {
+          "code": "BRANCH_POLICY_VIOLATION",
+          "disposition": "terminate",
+          "domain": "workspace",
+          "meaning": "The checkout is on a branch the routed Git policy forbids for this operation.",
+          "shared": false
+        },
+        {
+          "code": "CHECKOUT_DIRTY",
+          "disposition": "terminate",
+          "domain": "source",
+          "meaning": "Something is dirty outside the declared write roots.",
+          "shared": false
+        },
+        {
+          "code": "ENDPOINT_AUTHORITY_STALE",
+          "disposition": "terminate",
+          "domain": "runtime",
+          "meaning": "The endpoint binding is not the closed port projection, or its fingerprint is stale.",
+          "shared": false
+        },
+        {
+          "code": "RUNTIME_NOT_READY",
+          "disposition": "terminate",
+          "domain": "runtime",
+          "meaning": "The runtime owner registry is missing, stale, or not ready while the caller must consume it.",
+          "shared": false
+        }
+      ],
+      "routes": [
+        {
+          "domain": "workspace",
+          "kind": "resume",
+          "target": null
+        },
+        {
+          "domain": "source",
+          "kind": "resume",
+          "target": null
+        },
+        {
+          "domain": "runtime",
+          "kind": "external",
+          "target": null
+        },
+        {
+          "domain": "identity",
+          "kind": "external",
+          "target": null
+        },
+        {
+          "domain": "caller",
+          "kind": "user",
+          "target": null
+        }
+      ]
+    }
+  ],
+  "domains": [
+    {
+      "id": "frontend",
+      "operatorCount": 4
+    },
+    {
+      "id": "architecture",
+      "operatorCount": 1
+    },
+    {
+      "id": "backend",
+      "operatorCount": 1
+    },
+    {
+      "id": "business",
+      "operatorCount": 1
+    },
+    {
+      "id": "content",
+      "operatorCount": 1
+    },
+    {
+      "id": "deployment",
+      "operatorCount": 1
+    },
+    {
+      "id": "git",
+      "operatorCount": 1
+    },
+    {
+      "id": "platform",
+      "operatorCount": 1
+    },
+    {
+      "id": "quality",
+      "operatorCount": 1
+    },
+    {
+      "id": "test",
+      "operatorCount": 1
+    },
+    {
+      "id": "workspace",
+      "operatorCount": 1
+    }
+  ],
+  "profiles": [
+    {
+      "id": "luna",
+      "operatorCount": 9
+    },
+    {
+      "id": "sol-fresh",
+      "operatorCount": 3
+    },
+    {
+      "id": "sol-reviewer",
+      "operatorCount": 2
+    }
+  ],
+  "kinds": [
+    {
+      "kind": "alternatives",
+      "producedBy": [
+        "architecture.decide"
+      ],
+      "consumedBy": []
+    },
+    {
+      "kind": "architecture-decision",
+      "producedBy": [
+        "architecture.decide"
+      ],
+      "consumedBy": [
+        "architecture.decide",
+        "backend.source.apply",
+        "business.decide",
+        "frontend.direction.decide"
+      ]
+    },
+    {
+      "kind": "article",
+      "producedBy": [
+        "content.generate"
+      ],
+      "consumedBy": []
+    },
+    {
+      "kind": "backend-source-application",
+      "producedBy": [
+        "backend.source.apply"
+      ],
+      "consumedBy": [
+        "backend.source.apply",
+        "business.decide",
+        "frontend.direction.decide",
+        "quality.verify"
+      ]
+    },
+    {
+      "kind": "business-promise-authority",
+      "producedBy": [
+        "business.decide"
+      ],
+      "consumedBy": [
+        "frontend.direction.decide"
+      ]
+    },
+    {
+      "kind": "candidates",
+      "producedBy": [
+        "frontend.direction.decide"
+      ],
+      "consumedBy": []
+    },
+    {
+      "kind": "capture",
+      "producedBy": [
+        "frontend.surface.audit"
+      ],
+      "consumedBy": []
+    },
+    {
+      "kind": "changes",
+      "producedBy": [
+        "backend.source.apply",
+        "frontend.source.apply"
+      ],
+      "consumedBy": [
+        "git.publish",
+        "quality.verify"
+      ]
+    },
+    {
+      "kind": "checks",
+      "producedBy": [
+        "platform.operate"
+      ],
+      "consumedBy": []
+    },
+    {
+      "kind": "claims",
+      "producedBy": [
+        "business.decide"
+      ],
+      "consumedBy": []
+    },
+    {
+      "kind": "conformance",
+      "producedBy": [
+        "backend.source.apply"
+      ],
+      "consumedBy": []
+    },
+    {
+      "kind": "content-brief",
+      "producedBy": [
+        "content.generate"
+      ],
+      "consumedBy": []
+    },
+    {
+      "kind": "content-generation-receipt",
+      "producedBy": [
+        "content.generate"
+      ],
+      "consumedBy": [
+        "content.generate"
+      ]
+    },
+    {
+      "kind": "content-review",
+      "producedBy": [
+        "content.generate"
+      ],
+      "consumedBy": []
+    },
+    {
+      "kind": "coverage",
+      "producedBy": [
+        "quality.verify"
+      ],
+      "consumedBy": []
+    },
+    {
+      "kind": "coverage-matrix",
+      "producedBy": [
+        "business.decide"
+      ],
+      "consumedBy": []
+    },
+    {
+      "kind": "current-state",
+      "producedBy": [
+        "architecture.decide"
+      ],
+      "consumedBy": []
+    },
+    {
+      "kind": "delta",
+      "producedBy": [
+        "platform.operate"
+      ],
+      "consumedBy": []
+    },
+    {
+      "kind": "direction-image",
+      "producedBy": [
+        "frontend.direction.decide"
+      ],
+      "consumedBy": []
+    },
+    {
+      "kind": "e2e",
+      "producedBy": [
+        "content.generate"
+      ],
+      "consumedBy": []
+    },
+    {
+      "kind": "frontend-direction-decision",
+      "producedBy": [
+        "frontend.direction.decide"
+      ],
+      "consumedBy": [
+        "frontend.direction.decide",
+        "frontend.presentation.resolve",
+        "frontend.source.apply",
+        "frontend.surface.audit"
+      ]
+    },
+    {
+      "kind": "frontend-presentation-resolution",
+      "producedBy": [
+        "frontend.presentation.resolve"
+      ],
+      "consumedBy": [
+        "frontend.source.apply",
+        "frontend.surface.audit"
+      ]
+    },
+    {
+      "kind": "frontend-source-application",
+      "producedBy": [
+        "frontend.source.apply"
+      ],
+      "consumedBy": [
+        "frontend.surface.audit",
+        "quality.verify"
+      ]
+    },
+    {
+      "kind": "frontend-surface-audit",
+      "producedBy": [
+        "frontend.surface.audit"
+      ],
+      "consumedBy": [
+        "frontend.presentation.resolve",
+        "uat.verify"
+      ]
+    },
+    {
+      "kind": "gate-result",
+      "producedBy": [
+        "quality.verify"
+      ],
+      "consumedBy": []
+    },
+    {
+      "kind": "git-publication",
+      "producedBy": [
+        "git.publish"
+      ],
+      "consumedBy": []
+    },
+    {
+      "kind": "image",
+      "producedBy": [
+        "content.generate"
+      ],
+      "consumedBy": []
+    },
+    {
+      "kind": "image-prompt",
+      "producedBy": [
+        "content.generate"
+      ],
+      "consumedBy": []
+    },
+    {
+      "kind": "independent-critique",
+      "producedBy": [
+        "architecture.decide"
+      ],
+      "consumedBy": []
+    },
+    {
+      "kind": "inventory",
+      "producedBy": [
+        "frontend.presentation.resolve"
+      ],
+      "consumedBy": []
+    },
+    {
+      "kind": "model",
+      "producedBy": [
+        "business.decide"
+      ],
+      "consumedBy": []
+    },
+    {
+      "kind": "mutations",
+      "producedBy": [
+        "backend.source.apply"
+      ],
+      "consumedBy": []
+    },
+    {
+      "kind": "platform-operation-receipt",
+      "producedBy": [
+        "platform.operate"
+      ],
+      "consumedBy": []
+    },
+    {
+      "kind": "probes",
+      "producedBy": [
+        "release.deploy"
+      ],
+      "consumedBy": []
+    },
+    {
+      "kind": "proof",
+      "producedBy": [
+        "backend.source.apply"
+      ],
+      "consumedBy": []
+    },
+    {
+      "kind": "quality-verification",
+      "producedBy": [
+        "quality.verify"
+      ],
+      "consumedBy": [
+        "git.publish",
+        "release.deploy",
+        "uat.verify"
+      ]
+    },
+    {
+      "kind": "release-deployment",
+      "producedBy": [
+        "release.deploy"
+      ],
+      "consumedBy": []
+    },
+    {
+      "kind": "resolved-tree",
+      "producedBy": [
+        "frontend.presentation.resolve"
+      ],
+      "consumedBy": []
+    },
+    {
+      "kind": "route",
+      "producedBy": [
+        "workspace.bind"
+      ],
+      "consumedBy": []
+    },
+    {
+      "kind": "screenshot",
+      "producedBy": [
+        "frontend.surface.audit",
+        "uat.verify"
+      ],
+      "consumedBy": []
+    },
+    {
+      "kind": "sheet",
+      "producedBy": [
+        "uat.verify"
+      ],
+      "consumedBy": []
+    },
+    {
+      "kind": "stack-model",
+      "producedBy": [
+        "architecture.decide"
+      ],
+      "consumedBy": []
+    },
+    {
+      "kind": "track",
+      "producedBy": [
+        "content.generate"
+      ],
+      "consumedBy": []
+    },
+    {
+      "kind": "uat-capture",
+      "producedBy": [
+        "uat.verify"
+      ],
+      "consumedBy": []
+    },
+    {
+      "kind": "uat-flow-verification",
+      "producedBy": [
+        "uat.verify"
+      ],
+      "consumedBy": []
+    },
+    {
+      "kind": "uat-snapshot",
+      "producedBy": [
+        "uat.verify"
+      ],
+      "consumedBy": []
+    },
+    {
+      "kind": "uat-verdicts",
+      "producedBy": [
+        "uat.verify"
+      ],
+      "consumedBy": []
+    },
+    {
+      "kind": "ui-coverage",
+      "producedBy": [
+        "frontend.direction.decide"
+      ],
+      "consumedBy": []
+    },
+    {
+      "kind": "verdicts",
+      "producedBy": [
+        "frontend.surface.audit"
+      ],
+      "consumedBy": []
+    },
+    {
+      "kind": "workspace-route-binding",
+      "producedBy": [
+        "workspace.bind"
+      ],
+      "consumedBy": [
+        "git.publish"
+      ]
+    },
+    {
+      "kind": "writes",
+      "producedBy": [
+        "frontend.source.apply"
+      ],
+      "consumedBy": []
+    }
+  ],
+  "stopCodes": [
+    {
+      "code": "ADMISSION_MISSING",
+      "scope": [
+        "uat.verify"
+      ],
+      "shared": false,
+      "domain": "quality",
+      "disposition": "terminate",
+      "meaning": "The surface audit or the quality verification that admits product UAT is absent, or one of them was taken at another commit than the pinned head.",
+      "fallback": null,
+      "resume": "Re-run the missing admission at the pinned commit."
+    },
+    {
+      "code": "APPROVAL_MISSING",
+      "scope": [
+        "git.publish"
+      ],
+      "shared": false,
+      "domain": "caller",
+      "disposition": "terminate",
+      "meaning": "No approval covers this exact boundary unit; completion proof is not approval.",
+      "fallback": null,
+      "resume": "Supply an approval issued for this unit."
+    },
+    {
+      "code": "APPROVAL_REQUIRED",
+      "scope": [
+        "business.decide",
+        "release.deploy"
+      ],
+      "shared": false,
+      "domain": "caller",
+      "disposition": "terminate",
+      "meaning": "The transition or the release needs an approval that no request bound.",
+      "fallback": null,
+      "resume": "A person supplies the approval."
+    },
+    {
+      "code": "ARCHITECTURE_REQUIRED",
+      "scope": [
+        "frontend.direction.decide"
+      ],
+      "shared": false,
+      "domain": "architecture",
+      "disposition": "terminate",
+      "meaning": "The direction changes a system or data boundary nobody decided.",
+      "fallback": null,
+      "resume": "Run architecture.decide first."
+    },
+    {
+      "code": "ARTIFACT_MISSING",
+      "scope": [
+        "release.deploy"
+      ],
+      "shared": false,
+      "domain": "provider",
+      "disposition": "terminate",
+      "meaning": "The immutable digest cannot be resolved, and no replacement may be built and called the same release.",
+      "fallback": null,
+      "resume": "Publish the artifact at that digest."
+    },
+    {
+      "code": "AUTHORITY_CONFLICT",
+      "scope": [
+        "business.decide"
+      ],
+      "shared": false,
+      "domain": "workspace",
+      "disposition": "terminate",
+      "meaning": "The head or the businesses root contradicts published authority.",
+      "fallback": null,
+      "resume": "Correct the authority binding."
+    },
+    {
+      "code": "AUTHORITY_DRIFT",
+      "scope": [
+        "platform.operate"
+      ],
+      "shared": false,
+      "domain": "caller",
+      "disposition": "terminate",
+      "meaning": "The approval, the plan hash, or the allowed effect set no longer matches the requested delta.",
+      "fallback": null,
+      "resume": "Bring a fresh approval for this exact plan."
+    },
+    {
+      "code": "AUTHORIZATION_MISSING",
+      "scope": [
+        "release.deploy"
+      ],
+      "shared": false,
+      "domain": "approval",
+      "disposition": "terminate",
+      "meaning": "No declared grant covers this project, environment, target, or the deploy action, or it had expired when the target was observed.",
+      "fallback": null,
+      "resume": "Supply the declared authorization, still valid."
+    },
+    {
+      "code": "BACKEND_REQUIRED",
+      "scope": [
+        "frontend.direction.decide"
+      ],
+      "shared": false,
+      "domain": "backend",
+      "disposition": "terminate",
+      "meaning": "The direction changes a data contract nobody delivered.",
+      "fallback": null,
+      "resume": "Run backend.source.apply first."
+    },
+    {
+      "code": "BRANCH_POLICY_VIOLATION",
+      "scope": [
+        "git.publish",
+        "workspace.bind"
+      ],
+      "shared": false,
+      "domain": "workspace",
+      "disposition": "terminate",
+      "meaning": "The checkout is on a branch the routed Git policy forbids for this operation.",
+      "fallback": null,
+      "resume": "Move to a permitted branch or change the routed policy."
+    },
+    {
+      "code": "BRIEF_UNBOUND",
+      "scope": [
+        "content.generate"
+      ],
+      "shared": false,
+      "domain": "curriculum",
+      "disposition": "terminate",
+      "meaning": "The teacher brief cannot be frozen from the bound curriculum and source evidence.",
+      "fallback": null,
+      "resume": "Supply the missing curriculum or source evidence."
+    },
+    {
+      "code": "BUSINESS_AUTHORITY_MISSING",
+      "scope": [
+        "backend.source.apply"
+      ],
+      "shared": false,
+      "domain": "business",
+      "disposition": "terminate",
+      "meaning": "A business question is open and no approved decision settles it.",
+      "fallback": null,
+      "resume": "Publish the decision and rebind the authority fingerprint."
+    },
+    {
+      "code": "BUSINESS_AUTHORITY_REQUIRED",
+      "scope": [
+        "architecture.decide"
+      ],
+      "shared": false,
+      "domain": "business",
+      "disposition": "terminate",
+      "meaning": "The published business head the architecture must keep is missing or stale.",
+      "fallback": null,
+      "resume": "Run business.decide first."
+    },
+    {
+      "code": "BUSINESS_REQUIRED",
+      "scope": [
+        "frontend.direction.decide"
+      ],
+      "shared": false,
+      "domain": "business",
+      "disposition": "terminate",
+      "meaning": "An actor, promise, permission, adverse outcome or recovery truth the change level requires is unresolved.",
+      "fallback": null,
+      "resume": "Run business.decide first."
+    },
+    {
+      "code": "CANONICAL_WRITE_DENIED",
+      "scope": [
+        "uat.verify"
+      ],
+      "shared": false,
+      "domain": "backend",
+      "disposition": "terminate",
+      "meaning": "The flow directory cannot be written and read back under the exclusive lease, or the write would have rewritten an existing run record.",
+      "fallback": null,
+      "resume": "Restore write authority on the flow directory, or publish under a new runId."
+    },
+    {
+      "code": "CAPABILITY_MISSING",
+      "scope": [
+        "platform.operate"
+      ],
+      "shared": false,
+      "domain": "caller",
+      "disposition": "terminate",
+      "meaning": "The capability the service kind requires is absent or names no custody evidence.",
+      "fallback": null,
+      "resume": "Supply the missing capability handle with its custody."
+    },
+    {
+      "code": "CHANGE_LEVEL_AMBIGUOUS",
+      "scope": [
+        "frontend.direction.decide"
+      ],
+      "shared": false,
+      "domain": "caller",
+      "disposition": "terminate",
+      "meaning": "The authority for new, reconstruct or refine is unresolved or contradicts the intent.",
+      "fallback": null,
+      "resume": "State the exact change level."
+    },
+    {
+      "code": "CHECKOUT_DIRTY",
+      "scope": [
+        "workspace.bind"
+      ],
+      "shared": false,
+      "domain": "source",
+      "disposition": "terminate",
+      "meaning": "Something is dirty outside the declared write roots.",
+      "fallback": null,
+      "resume": "Clean the boundary, or declare the write roots that cover it; this operator never stashes."
+    },
+    {
+      "code": "CHOICE_REQUIRED",
+      "scope": [
+        "architecture.decide"
+      ],
+      "shared": false,
+      "domain": "caller",
+      "disposition": "fallback",
+      "meaning": "Several alternatives remain material after assessment.",
+      "fallback": "Select the alternative with the highest score across tradeoffAxes; on a tie, the one that changes the fewest stack components; record the score table under ## Decision.",
+      "resume": "The person supplies approval."
+    },
+    {
+      "code": "CODE_BUILD_FAILED",
+      "scope": [
+        "content.generate"
+      ],
+      "shared": false,
+      "domain": "content",
+      "disposition": "terminate",
+      "meaning": "A declared implementation track does not build.",
+      "fallback": null,
+      "resume": "Repair the track, then build it again."
+    },
+    {
+      "code": "COMPATIBILITY_UNVERIFIED",
+      "scope": [
+        "architecture.decide"
+      ],
+      "shared": false,
+      "domain": "self",
+      "disposition": "fallback",
+      "meaning": "A retained stack component has no compatibility evidence on at least one axis.",
+      "fallback": "Mark the component replaced-candidate in the stack delta and list the unverified axes under Handoff as unknown.",
+      "resume": "Add the compatibility evidence."
+    },
+    {
+      "code": "CONCURRENT_DRIFT",
+      "scope": [
+        "release.deploy"
+      ],
+      "shared": false,
+      "domain": "deployment",
+      "disposition": "terminate",
+      "meaning": "A release that is neither this one nor its predecessor became active during execution.",
+      "fallback": null,
+      "resume": "Replan against the new observed state."
+    },
+    {
+      "code": "CONSTRAINT_CONTRADICTION",
+      "scope": [
+        "architecture.decide"
+      ],
+      "shared": false,
+      "domain": "caller",
+      "disposition": "terminate",
+      "meaning": "Two fixed-intent constraints cannot both hold.",
+      "fallback": null,
+      "resume": "A person resolves the constraints."
+    },
+    {
+      "code": "CONSUMER_UNPROVEN",
+      "scope": [
+        "business.decide"
+      ],
+      "shared": false,
+      "domain": "business",
+      "disposition": "terminate",
+      "meaning": "A discovered enforcement consumer has no disposition or no proof.",
+      "fallback": null,
+      "resume": "Dispose the consumer with positive and negative proof, then publish the promise again."
+    },
+    {
+      "code": "CONTRACT_UNFROZEN",
+      "scope": [
+        "backend.source.apply"
+      ],
+      "shared": false,
+      "domain": "contract",
+      "disposition": "terminate",
+      "meaning": "The mutation contract is not frozen, or its fingerprint is stale.",
+      "fallback": null,
+      "resume": "Bring the frozen contract."
+    },
+    {
+      "code": "CONTRACT_WEAKENED",
+      "scope": [
+        "content.generate"
+      ],
+      "shared": false,
+      "domain": "content",
+      "disposition": "terminate",
+      "meaning": "The executable contract moved during the repair loop, so the proof measures nothing.",
+      "fallback": null,
+      "resume": "Restore the contract and rerun without touching it."
+    },
+    {
+      "code": "CONTRACT_WIDENED",
+      "scope": [
+        "backend.source.apply"
+      ],
+      "shared": false,
+      "domain": "contract",
+      "disposition": "terminate",
+      "meaning": "The outcome cannot be reached without a boundary the contract does not carry.",
+      "fallback": null,
+      "resume": "The contract owner reopens and refreezes the contract, then the same outcome is implemented again."
+    },
+    {
+      "code": "CONTRADICTION_UNRESOLVED",
+      "scope": [
+        "business.decide"
+      ],
+      "shared": false,
+      "domain": "caller",
+      "disposition": "terminate",
+      "meaning": "Two claims about the same behaviour disagree and nothing resolves them.",
+      "fallback": null,
+      "resume": "The owner resolves the contradiction."
+    },
+    {
+      "code": "COVERAGE_INCOMPLETE",
+      "scope": [
+        "business.decide"
+      ],
+      "shared": false,
+      "domain": "business",
+      "disposition": "terminate",
+      "meaning": "A declared coverage dimension carries no disposition.",
+      "fallback": null,
+      "resume": "Add the missing disposition."
+    },
+    {
+      "code": "CREDENTIAL_UNAVAILABLE",
+      "scope": [
+        "release.deploy"
+      ],
+      "shared": false,
+      "domain": "platform",
+      "disposition": "terminate",
+      "meaning": "A declared handle cannot be resolved through existing custody.",
+      "fallback": null,
+      "resume": "Restore the custody; never an inline value."
+    },
+    {
+      "code": "CRITIQUE_UNRESOLVED",
+      "scope": [
+        "architecture.decide"
+      ],
+      "shared": false,
+      "domain": "self",
+      "disposition": "terminate",
+      "meaning": "An attack on the selected alternative has no resolution.",
+      "fallback": null,
+      "resume": "Resolve the attack or select differently."
+    },
+    {
+      "code": "CURRENT_STATE_UNOBSERVED",
+      "scope": [
+        "architecture.decide"
+      ],
+      "shared": false,
+      "domain": "workspace",
+      "disposition": "terminate",
+      "meaning": "The system today could not be read at the frozen head.",
+      "fallback": null,
+      "resume": "Fix the route or the checkout."
+    },
+    {
+      "code": "DATA_OWNERSHIP_UNASSIGNED",
+      "scope": [
+        "architecture.decide"
+      ],
+      "shared": false,
+      "domain": "self",
+      "disposition": "terminate",
+      "meaning": "A physical store has no owning boundary.",
+      "fallback": null,
+      "resume": "Assign the owner."
+    },
+    {
+      "code": "DEBT_UNAPPROVED",
+      "scope": [
+        "quality.verify"
+      ],
+      "shared": false,
+      "domain": "caller",
+      "disposition": "terminate",
+      "meaning": "A declared debt has no live owner approval, or it covers a gate that passed or a boundary-drift failure.",
+      "fallback": null,
+      "resume": "Supply the unexpired owner approval, or drop the debt."
+    },
+    {
+      "code": "DIRECTION_CHOICE_REQUIRED",
+      "scope": [
+        "frontend.direction.decide"
+      ],
+      "shared": false,
+      "domain": "caller",
+      "disposition": "fallback",
+      "meaning": "Several candidates survive falsification and none dominates.",
+      "fallback": "Select the candidate that survived the most falsification attacks; on a tie, the one that introduces the fewest new nodes; record the table under ## Decision.",
+      "resume": "The person supplies approval naming one candidate."
+    },
+    {
+      "code": "DIRTY_OUTSIDE_BOUNDARY",
+      "scope": [
+        "git.publish"
+      ],
+      "shared": false,
+      "domain": "source",
+      "disposition": "terminate",
+      "meaning": "Something dirty lies outside the declared write roots, so the publish would carry work this boundary does not own.",
+      "fallback": null,
+      "resume": "Clean the tree, or correct the write roots."
+    },
+    {
+      "code": "DOMAIN_UNRECONCILED",
+      "scope": [
+        "release.deploy"
+      ],
+      "shared": false,
+      "domain": "provider",
+      "disposition": "terminate",
+      "meaning": "Domain or TLS state cannot be brought to the declaration.",
+      "fallback": null,
+      "resume": "Fix the provider state, or the provider authority."
+    },
+    {
+      "code": "E2E_FAILED",
+      "scope": [
+        "content.generate"
+      ],
+      "shared": false,
+      "domain": "content",
+      "disposition": "terminate",
+      "meaning": "A declared executable check still fails when maxE2eIterations is spent.",
+      "fallback": null,
+      "resume": "Repair the implementation, or approve more iterations."
+    },
+    {
+      "code": "EFFECT_UNAUTHORIZED",
+      "scope": [
+        "platform.operate"
+      ],
+      "shared": false,
+      "domain": "caller",
+      "disposition": "terminate",
+      "meaning": "A required effect lies outside the approved effect set or outside the branch.",
+      "fallback": null,
+      "resume": "Approve the effect, or bring a narrower plan."
+    },
+    {
+      "code": "ENDPOINT_AUTHORITY_STALE",
+      "scope": [
+        "workspace.bind"
+      ],
+      "shared": false,
+      "domain": "runtime",
+      "disposition": "terminate",
+      "meaning": "The endpoint binding is not the closed port projection, or its fingerprint is stale.",
+      "fallback": null,
+      "resume": "Recompute the authority fingerprint at its owner."
+    },
+    {
+      "code": "EVIDENCE_MISSING",
+      "scope": [
+        "*"
+      ],
+      "shared": true,
+      "domain": "self",
+      "disposition": "terminate",
+      "meaning": "A claim about the system has no file, line, or head behind it.",
+      "fallback": null,
+      "resume": "Add the evidence."
+    },
+    {
+      "code": "EVIDENCE_UNAVAILABLE",
+      "scope": [
+        "uat.verify"
+      ],
+      "shared": false,
+      "domain": "runtime",
+      "disposition": "terminate",
+      "meaning": "A case produced no capture, no screenshot, or no screenshot whose login field could be masked, so a lane has nothing to be judged on.",
+      "fallback": null,
+      "resume": "Restore the dependency and run the frozen case again under a new runId."
+    },
+    {
+      "code": "FIXTURE_VIOLATION",
+      "scope": [
+        "uat.verify"
+      ],
+      "shared": false,
+      "domain": "caller",
+      "disposition": "terminate",
+      "meaning": "The seed, the run namespace or the cleanup scope could not be satisfied: a seed would have created the outcome under test, or cleanup would have reached outside the namespace.",
+      "fallback": null,
+      "resume": "Correct the fixture boundary in seed/records.json."
+    },
+    {
+      "code": "GATE_UNAVAILABLE",
+      "scope": [
+        "quality.verify"
+      ],
+      "shared": false,
+      "domain": "platform",
+      "disposition": "terminate",
+      "meaning": "A required gate cannot be executed at all in this environment, and an unmeasurable gate is not a passed one.",
+      "fallback": null,
+      "resume": "Provide a working gate environment."
+    },
+    {
+      "code": "GRAMMAR_REQUIRED",
+      "scope": [
+        "frontend.direction.decide"
+      ],
+      "shared": false,
+      "domain": "grammar",
+      "disposition": "terminate",
+      "meaning": "A family component the direction needs is unpublished; a composite is never assembled in its place.",
+      "fallback": null,
+      "resume": "A person publishes the component, and the same direction runs again."
+    },
+    {
+      "code": "GRAMMAR_UNPUBLISHED",
+      "scope": [
+        "frontend.presentation.resolve"
+      ],
+      "shared": false,
+      "domain": "grammar",
+      "disposition": "terminate",
+      "meaning": "The Grammar package is unpublished or the bound fingerprint is stale.",
+      "fallback": null,
+      "resume": "A person publishes the exact Grammar package."
+    },
+    {
+      "code": "HOOK_BLOCKED",
+      "scope": [
+        "git.publish"
+      ],
+      "shared": false,
+      "domain": "source",
+      "disposition": "terminate",
+      "meaning": "A Git hook rejected the publication, and no bypass is representable.",
+      "fallback": null,
+      "resume": "Fix the boundary and bring a new head."
+    },
+    {
+      "code": "HOST_UNAVAILABLE",
+      "scope": [
+        "release.deploy"
+      ],
+      "shared": false,
+      "domain": "provider",
+      "disposition": "terminate",
+      "meaning": "The declared host cannot be prepared.",
+      "fallback": null,
+      "resume": "Provide a reachable, prepared host."
+    },
+    {
+      "code": "IDENTITY_UNVERIFIED",
+      "scope": [
+        "workspace.bind"
+      ],
+      "shared": false,
+      "domain": "identity",
+      "disposition": "terminate",
+      "meaning": "The machine identity or its encrypted credential roster is missing or stale.",
+      "fallback": null,
+      "resume": "Verify the machine identity and seal its roster."
+    },
+    {
+      "code": "IMAGE_UNAVAILABLE",
+      "scope": [
+        "content.generate"
+      ],
+      "shared": false,
+      "domain": "engineering",
+      "disposition": "terminate",
+      "meaning": "A required image cannot be generated to the brief's claims.",
+      "fallback": null,
+      "resume": "Provide a working generator, or turn the image stage off."
+    },
+    {
+      "code": "INVALID_INPUT",
+      "scope": [
+        "*"
+      ],
+      "shared": true,
+      "domain": "caller",
+      "disposition": "terminate",
+      "meaning": "request.json fails the gate or the operator's Requirements.",
+      "fallback": null,
+      "resume": "Correct request.json."
+    },
+    {
+      "code": "INVENTORY_DRIFT",
+      "scope": [
+        "platform.operate"
+      ],
+      "shared": false,
+      "domain": "platform",
+      "disposition": "terminate",
+      "meaning": "A declared resource moved since the inventory was bound, so the plan describes a service that no longer exists.",
+      "fallback": null,
+      "resume": "Re-observe the inventory; it must arrive with a new fingerprint."
+    },
+    {
+      "code": "KNOWLEDGE_UNBOUND",
+      "scope": [
+        "frontend.presentation.resolve"
+      ],
+      "shared": false,
+      "domain": "knowledge",
+      "disposition": "terminate",
+      "meaning": "A presentation property is present in the tree and no knowledge topic is bound for it.",
+      "fallback": null,
+      "resume": "Bind the missing topic."
+    },
+    {
+      "code": "LEASE_INVALID",
+      "scope": [
+        "uat.verify"
+      ],
+      "shared": false,
+      "domain": "control-panel",
+      "disposition": "terminate",
+      "meaning": "The exclusive lease on the flow directory is expired, foreign, or bound to another run, generation or origin.",
+      "fallback": null,
+      "resume": "The orchestrator grants the lease again for this run."
+    },
+    {
+      "code": "LIFECYCLE_TRANSITION_INVALID",
+      "scope": [
+        "business.decide"
+      ],
+      "shared": false,
+      "domain": "caller",
+      "disposition": "terminate",
+      "meaning": "The requested target state is unreachable from the observed head.",
+      "fallback": null,
+      "resume": "Ask for a legal transition, or publish the intermediate state first."
+    },
+    {
+      "code": "MANIFEST_INVALID",
+      "scope": [
+        "release.deploy"
+      ],
+      "shared": false,
+      "domain": "caller",
+      "disposition": "terminate",
+      "meaning": "The validated manifest is pinned to another release, and that substitution is how an unreviewed image reaches a reviewed target.",
+      "fallback": null,
+      "resume": "Bring a manifest validated against this release."
+    },
+    {
+      "code": "MIGRATION_BLOCKED",
+      "scope": [
+        "release.deploy"
+      ],
+      "shared": false,
+      "domain": "backend",
+      "disposition": "terminate",
+      "meaning": "The declared migration cannot be applied safely.",
+      "fallback": null,
+      "resume": "Approve a migration boundary the backend owner can apply."
+    },
+    {
+      "code": "NO_PROGRESS",
+      "scope": [
+        "*"
+      ],
+      "shared": true,
+      "domain": "caller",
+      "disposition": "terminate",
+      "meaning": "A resume adds no evidence, constraint, inventory, or approval delta.",
+      "fallback": null,
+      "resume": "Bring a real delta."
+    },
+    {
+      "code": "NO_VIABLE_ALTERNATIVE",
+      "scope": [
+        "architecture.decide"
+      ],
+      "shared": false,
+      "domain": "caller",
+      "disposition": "terminate",
+      "meaning": "No alternative survives the frozen constraints, or the only alternative fails an attack.",
+      "fallback": null,
+      "resume": "Relax a constraint or stop."
+    },
+    {
+      "code": "NO_VIABLE_DIRECTION",
+      "scope": [
+        "frontend.direction.decide"
+      ],
+      "shared": false,
+      "domain": "caller",
+      "disposition": "terminate",
+      "meaning": "Every candidate contradicts authority or fails a mandatory attack.",
+      "fallback": null,
+      "resume": "Change the authority or the constraints; cosmetic variants are not a delta."
+    },
+    {
+      "code": "NON_FAST_FORWARD",
+      "scope": [
+        "git.publish"
+      ],
+      "shared": false,
+      "domain": "remote",
+      "disposition": "terminate",
+      "meaning": "The remote carries commits the local ref does not, so the push is not fast-forward.",
+      "fallback": null,
+      "resume": "The branch owner reconciles the divergence and a new head arrives."
+    },
+    {
+      "code": "OUTCOME_UNCOVERED",
+      "scope": [
+        "content.generate"
+      ],
+      "shared": false,
+      "domain": "content",
+      "disposition": "terminate",
+      "meaning": "A declared language edition leaves a published learning outcome uncovered.",
+      "fallback": null,
+      "resume": "Rewrite the edition, or narrow the brief."
+    },
+    {
+      "code": "OWNER_CEILING_INVALID",
+      "scope": [
+        "frontend.direction.decide"
+      ],
+      "shared": false,
+      "domain": "caller",
+      "disposition": "terminate",
+      "meaning": "The direction needs an owner the declared ceiling does not authorize.",
+      "fallback": null,
+      "resume": "Correct the owner ceiling."
+    },
+    {
+      "code": "OWNER_CONFLICT",
+      "scope": [
+        "backend.source.apply",
+        "frontend.presentation.resolve",
+        "frontend.source.apply"
+      ],
+      "shared": false,
+      "domain": "caller",
+      "disposition": "terminate",
+      "meaning": "A node that must be mutated lies outside the mutable owner ceiling, or the owner sets overlap.",
+      "fallback": null,
+      "resume": "Correct the owner authority."
+    },
+    {
+      "code": "PATTERN_UNBOUND",
+      "scope": [
+        "backend.source.apply"
+      ],
+      "shared": false,
+      "domain": "backend",
+      "disposition": "terminate",
+      "meaning": "A touched aspect has no sibling family bound for it.",
+      "fallback": null,
+      "resume": "Bind the missing pattern; guessing the family from memory is refused."
+    },
+    {
+      "code": "PORT_CONFLICT",
+      "scope": [
+        "platform.operate"
+      ],
+      "shared": false,
+      "domain": "product",
+      "disposition": "terminate",
+      "meaning": "A claimed port is already held by another declared process, and holding it is not permission to reclaim it.",
+      "fallback": null,
+      "resume": "Agree a port, or the holder's owner releases it."
+    },
+    {
+      "code": "PREDECESSOR_MIXED",
+      "scope": [
+        "quality.verify"
+      ],
+      "shared": false,
+      "domain": "caller",
+      "disposition": "terminate",
+      "meaning": "Two predecessor receipts describe different source heads, so their union is a delivery nobody built.",
+      "fallback": null,
+      "resume": "Supply one coherent predecessor set on one head."
+    },
+    {
+      "code": "PREDECESSOR_STALE",
+      "scope": [
+        "quality.verify"
+      ],
+      "shared": false,
+      "domain": "caller",
+      "disposition": "terminate",
+      "meaning": "A predecessor fingerprint no longer matches the frozen source.",
+      "fallback": null,
+      "resume": "Bring a refreshed upstream receipt."
+    },
+    {
+      "code": "PROOF_FAILED",
+      "scope": [
+        "platform.operate"
+      ],
+      "shared": false,
+      "domain": "platform",
+      "disposition": "terminate",
+      "meaning": "A required check is missing, unreadable, or failed after apply, and an unproved operation is not an operated one.",
+      "fallback": null,
+      "resume": "Repair the service, then invoke again."
+    },
+    {
+      "code": "PROOF_UNAVAILABLE",
+      "scope": [
+        "backend.source.apply"
+      ],
+      "shared": false,
+      "domain": "platform",
+      "disposition": "terminate",
+      "meaning": "A declared proof could not be executed in this environment.",
+      "fallback": null,
+      "resume": "Provide a working proof environment; a proof that could not run never becomes a pass."
+    },
+    {
+      "code": "PROVISIONING_UNAVAILABLE",
+      "scope": [
+        "uat.verify"
+      ],
+      "shared": false,
+      "domain": "control-panel",
+      "disposition": "terminate",
+      "meaning": "The sealed UAT credential cannot be resolved by name, or the flow's dedicated account does not exist; asking a person to sign in is forbidden in every branch.",
+      "fallback": null,
+      "resume": "Restore the sealed credential or the account; never a person's sign-in."
+    },
+    {
+      "code": "RECONCILIATION_DISCREPANCY",
+      "scope": [
+        "business.decide"
+      ],
+      "shared": false,
+      "domain": "backend",
+      "disposition": "terminate",
+      "meaning": "Delivered source differs from the frozen coverage matrix.",
+      "fallback": null,
+      "resume": "Correct the source, or revise the matrix."
+    },
+    {
+      "code": "RECOVERY_EXHAUSTED",
+      "scope": [
+        "release.deploy"
+      ],
+      "shared": false,
+      "domain": "approval",
+      "disposition": "fallback",
+      "meaning": "The approved reversible actions ran out.",
+      "fallback": "Take the rollback branch: restore rollbackIdentity by its exact digest, never by tag, and record the restored release under ## Fallbacks taken.",
+      "resume": "Grant rollback authority, or approve an unsafe action."
+    },
+    {
+      "code": "REFERENCE_EVIDENCE_EXHAUSTED",
+      "scope": [
+        "frontend.direction.decide"
+      ],
+      "shared": false,
+      "domain": "caller",
+      "disposition": "terminate",
+      "meaning": "Bounded research cannot close the business or interaction question the decision rests on.",
+      "fallback": null,
+      "resume": "Supply the owning authority or a materially new reference."
+    },
+    {
+      "code": "RESOLUTION_STALE",
+      "scope": [
+        "frontend.source.apply"
+      ],
+      "shared": false,
+      "domain": "resolution",
+      "disposition": "terminate",
+      "meaning": "The resolution actually read differs from the resolution the request bound.",
+      "fallback": null,
+      "resume": "Bind the current resolution, or resolve the tree again."
+    },
+    {
+      "code": "REVIEW_REVISION_REQUIRED",
+      "scope": [
+        "content.generate"
+      ],
+      "shared": false,
+      "domain": "content",
+      "disposition": "fallback",
+      "meaning": "The independent review returned a revision.",
+      "fallback": "Repair exactly the artifacts the review's findings name, by owning stage, record the round under ## Fallbacks taken, and reopen the review exchange for the next round.",
+      "resume": "Nothing is asked of anyone; the branch revises and reviews again until maxReviewRounds is spent."
+    },
+    {
+      "code": "REVIEW_ROUNDS_EXHAUSTED",
+      "scope": [
+        "content.generate"
+      ],
+      "shared": false,
+      "domain": "caller",
+      "disposition": "terminate",
+      "meaning": "maxReviewRounds is spent and the review still returns a revision.",
+      "fallback": null,
+      "resume": "Approve more rounds, or narrow the unit."
+    },
+    {
+      "code": "ROLLBACK_IDENTITY_MISSING",
+      "scope": [
+        "release.deploy"
+      ],
+      "shared": false,
+      "domain": "provider",
+      "disposition": "terminate",
+      "meaning": "Rollback is required and its exact safe release no longer exists.",
+      "fallback": null,
+      "resume": "Restore the safe release at its exact digest."
+    },
+    {
+      "code": "ROLLOUT_FAILED",
+      "scope": [
+        "release.deploy"
+      ],
+      "shared": false,
+      "domain": "deployment",
+      "disposition": "fallback",
+      "meaning": "The rollout could not place the release on the target.",
+      "fallback": "Take the recovery branch: apply only the approved reversible actions against the same release identity, one at a time, and record each attempt with its outcome under ## Fallbacks taken.",
+      "resume": "Correct the target or the plan and roll out again."
+    },
+    {
+      "code": "ROUTE_MISMATCH",
+      "scope": [
+        "workspace.bind"
+      ],
+      "shared": false,
+      "domain": "workspace",
+      "disposition": "terminate",
+      "meaning": "The hydrated route disagrees with the closed portable route, or belongs to another Source.",
+      "fallback": null,
+      "resume": "Correct the hydration."
+    },
+    {
+      "code": "ROUTE_UNDECLARED",
+      "scope": [
+        "workspace.bind"
+      ],
+      "shared": false,
+      "domain": "workspace",
+      "disposition": "terminate",
+      "meaning": "No portable declaration names this project and role.",
+      "fallback": null,
+      "resume": "Declare the route; this operator never repairs one."
+    },
+    {
+      "code": "ROUTE_UNHYDRATED",
+      "scope": [
+        "workspace.bind"
+      ],
+      "shared": false,
+      "domain": "workspace",
+      "disposition": "terminate",
+      "meaning": "The declaration exists but no local route projects it onto this machine.",
+      "fallback": null,
+      "resume": "Hydrate the route on this machine."
+    },
+    {
+      "code": "ROUTE_UNVERIFIED",
+      "scope": [
+        "frontend.direction.decide",
+        "git.publish"
+      ],
+      "shared": false,
+      "domain": "workspace",
+      "disposition": "terminate",
+      "meaning": "The project or the routed frontend checkout identity is not verified.",
+      "fallback": null,
+      "resume": "Bind the route again."
+    },
+    {
+      "code": "RULE_MISSING",
+      "scope": [
+        "frontend.presentation.resolve"
+      ],
+      "shared": false,
+      "domain": "knowledge",
+      "disposition": "terminate",
+      "meaning": "No published case matches the observed condition on a node.",
+      "fallback": null,
+      "resume": "The knowledge owner publishes the case, and the tree is resolved again."
+    },
+    {
+      "code": "RUNTIME_NOT_READY",
+      "scope": [
+        "workspace.bind"
+      ],
+      "shared": false,
+      "domain": "runtime",
+      "disposition": "terminate",
+      "meaning": "The runtime owner registry is missing, stale, or not ready while the caller must consume it.",
+      "fallback": null,
+      "resume": "Raise one coordination request to the registered owner and wait for a ready generation."
+    },
+    {
+      "code": "RUNTIME_UNAVAILABLE",
+      "scope": [
+        "frontend.surface.audit",
+        "uat.verify"
+      ],
+      "shared": false,
+      "domain": "platform",
+      "disposition": "terminate",
+      "meaning": "The endpoint does not serve the bound route, or the surface never reaches readiness.",
+      "fallback": null,
+      "resume": "Whoever runs the service serves the bound route; this operator never starts one."
+    },
+    {
+      "code": "SCOPE_UNFROZEN",
+      "scope": [
+        "frontend.direction.decide"
+      ],
+      "shared": false,
+      "domain": "caller",
+      "disposition": "terminate",
+      "meaning": "The target or the boundary of the surface is incomplete, so the UI contract cannot be closed.",
+      "fallback": null,
+      "resume": "Freeze the scope."
+    },
+    {
+      "code": "SERVICE_UNAVAILABLE",
+      "scope": [
+        "platform.operate"
+      ],
+      "shared": false,
+      "domain": "provider",
+      "disposition": "terminate",
+      "meaning": "The shared service or its provider cannot be reached.",
+      "fallback": null,
+      "resume": "Restore the provider."
+    },
+    {
+      "code": "SOURCE_DRIFT",
+      "scope": [
+        "*"
+      ],
+      "shared": true,
+      "domain": "workspace",
+      "disposition": "terminate",
+      "meaning": "The observed checkout head differs from the head request.json froze.",
+      "fallback": null,
+      "resume": "The orchestrator freezes the head again."
+    },
+    {
+      "code": "STEADY_STATE_UNPROVEN",
+      "scope": [
+        "release.deploy"
+      ],
+      "shared": false,
+      "domain": "deployment",
+      "disposition": "terminate",
+      "meaning": "The steady window never closed before the bounded deadline, and an assumed rollout is not a deployment.",
+      "fallback": null,
+      "resume": "Observe a fresh series after the target recovers."
+    },
+    {
+      "code": "UNKNOWN_RULE",
+      "scope": [
+        "frontend.presentation.resolve",
+        "frontend.surface.audit"
+      ],
+      "shared": false,
+      "domain": "self",
+      "disposition": "terminate",
+      "meaning": "An identifier outside the bound rule inventory was reached for.",
+      "fallback": null,
+      "resume": "Bind the topic that publishes it, or correct the identifier."
+    },
+    {
+      "code": "UNKNOWN_STOP",
+      "scope": [
+        "*"
+      ],
+      "shared": true,
+      "domain": "caller",
+      "disposition": "terminate",
+      "meaning": "The runtime met a code the merged registry does not list.",
+      "fallback": null,
+      "resume": "Register the code or fix the operator."
+    },
+    {
+      "code": "WRITE_REJECTED",
+      "scope": [
+        "frontend.source.apply"
+      ],
+      "shared": false,
+      "domain": "caller",
+      "disposition": "terminate",
+      "meaning": "A file or a value the write would produce lies outside what was authorized, or the committed tree is not the resolved tree.",
+      "fallback": null,
+      "resume": "Declare a corrected write set, or publish a resolution that carries the value."
+    }
+  ],
+  "workflows": [
+    {
+      "id": "backend-feature",
+      "when": {
+        "en": "Server behaviour, an API contract, persistence or a job changes for one business feature; the architecture is decided first and the promise is reconciled after the code lands.",
+        "vi": "Hành vi server, contract API, persistence hay job đổi cho một feature nghiệp vụ; kiến trúc quyết trước, lời hứa được đối chiếu sau khi code đã vào."
+      },
+      "ends": "git.publish",
+      "steps": [
+        [
+          {
+            "operator": "workspace.bind",
+            "fanout": null,
+            "maxParallel": null,
+            "requirements": {
+              "role": "be"
+            }
+          }
+        ],
+        [
+          {
+            "operator": "business.decide",
+            "fanout": null,
+            "maxParallel": null,
+            "requirements": {
+              "mode": "model"
+            }
+          }
+        ],
+        [
+          {
+            "operator": "architecture.decide",
+            "fanout": null,
+            "maxParallel": null,
+            "requirements": {
+              "alternatives": 1,
+              "selectionPolicy": "automatic"
+            }
+          }
+        ],
+        [
+          {
+            "operator": "backend.source.apply",
+            "fanout": null,
+            "maxParallel": null,
+            "requirements": null
+          }
+        ],
+        [
+          {
+            "operator": "quality.verify",
+            "fanout": null,
+            "maxParallel": null,
+            "requirements": null
+          }
+        ],
+        [
+          {
+            "operator": "business.decide",
+            "fanout": null,
+            "maxParallel": null,
+            "requirements": {
+              "mode": "reconcile"
+            }
+          }
+        ],
+        [
+          {
+            "operator": "git.publish",
+            "fanout": null,
+            "maxParallel": null,
+            "requirements": null
+          }
+        ]
+      ],
+      "stepCount": 7,
+      "branchCount": 7,
+      "widestStep": 1,
+      "loops": []
+    },
+    {
+      "id": "content-unit",
+      "when": {
+        "en": "One curriculum unit needs its brief, its language editions, its code tracks and an independent review; publishing to MinIO stays with a person.",
+        "vi": "Một đơn vị giáo trình cần brief, các ấn bản ngôn ngữ, track code và một lượt review độc lập; đưa lên MinIO vẫn là việc của người."
+      },
+      "ends": "user",
+      "steps": [
+        [
+          {
+            "operator": "content.generate",
+            "fanout": null,
+            "maxParallel": null,
+            "requirements": {
+              "maxReviewRounds": 2
+            }
+          }
+        ]
+      ],
+      "stepCount": 1,
+      "branchCount": 1,
+      "widestStep": 1,
+      "loops": []
+    },
+    {
+      "id": "frontend-new-surface",
+      "when": {
+        "en": "A page, flow, or surface that does not exist yet must be created; the person named the target route and its business promise is known or will be decided first.",
+        "vi": "Một trang, luồng hay bề mặt chưa tồn tại cần được tạo; người dùng nêu route đích, lời hứa nghiệp vụ đã có hoặc sẽ được quyết trước."
+      },
+      "ends": "git.publish",
+      "steps": [
+        [
+          {
+            "operator": "workspace.bind",
+            "fanout": null,
+            "maxParallel": null,
+            "requirements": {
+              "role": "be"
+            }
+          },
+          {
+            "operator": "workspace.bind",
+            "fanout": null,
+            "maxParallel": null,
+            "requirements": {
+              "role": "fe",
+              "runtimeNeed": "consume"
+            }
+          }
+        ],
+        [
+          {
+            "operator": "business.decide",
+            "fanout": null,
+            "maxParallel": null,
+            "requirements": {
+              "mode": "model"
+            }
+          }
+        ],
+        [
+          {
+            "operator": "frontend.direction.decide",
+            "fanout": null,
+            "maxParallel": null,
+            "requirements": {
+              "intent": "create",
+              "changeLevel": "new"
+            }
+          }
+        ],
+        [
+          {
+            "operator": "frontend.presentation.resolve",
+            "fanout": null,
+            "maxParallel": null,
+            "requirements": null
+          }
+        ],
+        [
+          {
+            "operator": "frontend.source.apply",
+            "fanout": null,
+            "maxParallel": null,
+            "requirements": {
+              "mode": "apply"
+            }
+          }
+        ],
+        [
+          {
+            "operator": "frontend.surface.audit",
+            "fanout": "matrix",
+            "maxParallel": 3,
+            "requirements": null
+          }
+        ],
+        [
+          {
+            "operator": "quality.verify",
+            "fanout": null,
+            "maxParallel": null,
+            "requirements": null
+          }
+        ],
+        [
+          {
+            "operator": "git.publish",
+            "fanout": null,
+            "maxParallel": null,
+            "requirements": null
+          }
+        ]
+      ],
+      "stepCount": 8,
+      "branchCount": 9,
+      "widestStep": 2,
+      "loops": [
+        {
+          "from": "frontend.surface.audit",
+          "to": "frontend.presentation.resolve",
+          "when": "an application-owned node fails a claim or a proof rule",
+          "maxRounds": 2
+        }
+      ]
+    },
+    {
+      "id": "frontend-reconstruct",
+      "when": {
+        "en": "An existing surface is rebuilt: composition, region order, hierarchy or responsive structure change while business facts, behaviour and API semantics stay.",
+        "vi": "Dựng lại một bề mặt đã có: đổi composition, thứ tự vùng, hierarchy hay cấu trúc responsive trong khi fact nghiệp vụ, hành vi và API giữ nguyên."
+      },
+      "ends": "git.publish",
+      "steps": [
+        [
+          {
+            "operator": "workspace.bind",
+            "fanout": null,
+            "maxParallel": null,
+            "requirements": {
+              "role": "fe",
+              "runtimeNeed": "consume"
+            }
+          }
+        ],
+        [
+          {
+            "operator": "frontend.direction.decide",
+            "fanout": null,
+            "maxParallel": null,
+            "requirements": {
+              "intent": "modify",
+              "changeLevel": "reconstruct"
+            }
+          }
+        ],
+        [
+          {
+            "operator": "frontend.presentation.resolve",
+            "fanout": null,
+            "maxParallel": null,
+            "requirements": null
+          }
+        ],
+        [
+          {
+            "operator": "frontend.source.apply",
+            "fanout": null,
+            "maxParallel": null,
+            "requirements": {
+              "mode": "apply"
+            }
+          }
+        ],
+        [
+          {
+            "operator": "frontend.surface.audit",
+            "fanout": "matrix",
+            "maxParallel": 3,
+            "requirements": null
+          }
+        ],
+        [
+          {
+            "operator": "quality.verify",
+            "fanout": null,
+            "maxParallel": null,
+            "requirements": null
+          }
+        ],
+        [
+          {
+            "operator": "git.publish",
+            "fanout": null,
+            "maxParallel": null,
+            "requirements": null
+          }
+        ]
+      ],
+      "stepCount": 7,
+      "branchCount": 7,
+      "widestStep": 1,
+      "loops": [
+        {
+          "from": "frontend.surface.audit",
+          "to": "frontend.presentation.resolve",
+          "when": "an application-owned node fails a claim or a proof rule",
+          "maxRounds": 2
+        }
+      ]
+    },
+    {
+      "id": "frontend-refine",
+      "when": {
+        "en": "The approved structure of a surface stays; only typography, spacing, labels, controls, states, tokens or Grammar conformance inside it are repaired.",
+        "vi": "Cấu trúc đã duyệt của bề mặt giữ nguyên; chỉ sửa typography, spacing, label, control, state, token hay conformance Grammar bên trong."
+      },
+      "ends": "git.publish",
+      "steps": [
+        [
+          {
+            "operator": "workspace.bind",
+            "fanout": null,
+            "maxParallel": null,
+            "requirements": {
+              "role": "fe",
+              "runtimeNeed": "consume"
+            }
+          }
+        ],
+        [
+          {
+            "operator": "frontend.direction.decide",
+            "fanout": null,
+            "maxParallel": null,
+            "requirements": {
+              "intent": "audit-repair",
+              "changeLevel": "refine"
+            }
+          }
+        ],
+        [
+          {
+            "operator": "frontend.presentation.resolve",
+            "fanout": null,
+            "maxParallel": null,
+            "requirements": null
+          }
+        ],
+        [
+          {
+            "operator": "frontend.source.apply",
+            "fanout": null,
+            "maxParallel": null,
+            "requirements": {
+              "mode": "apply"
+            }
+          }
+        ],
+        [
+          {
+            "operator": "frontend.surface.audit",
+            "fanout": "matrix",
+            "maxParallel": 3,
+            "requirements": null
+          }
+        ],
+        [
+          {
+            "operator": "quality.verify",
+            "fanout": null,
+            "maxParallel": null,
+            "requirements": null
+          }
+        ],
+        [
+          {
+            "operator": "git.publish",
+            "fanout": null,
+            "maxParallel": null,
+            "requirements": null
+          }
+        ]
+      ],
+      "stepCount": 7,
+      "branchCount": 7,
+      "widestStep": 1,
+      "loops": [
+        {
+          "from": "frontend.surface.audit",
+          "to": "frontend.presentation.resolve",
+          "when": "an application-owned node fails a claim or a proof rule",
+          "maxRounds": 2
+        }
+      ]
+    },
+    {
+      "id": "frontend-with-uat",
+      "when": {
+        "en": "A frontend change must also be walked by a real person's journey before it is published; a person asked for the UAT run by name.",
+        "vi": "Một thay đổi frontend còn phải đi qua hành trình của người thật trước khi publish; có người yêu cầu đích danh lần chạy UAT."
+      },
+      "ends": "git.publish",
+      "steps": [
+        [
+          {
+            "operator": "workspace.bind",
+            "fanout": null,
+            "maxParallel": null,
+            "requirements": {
+              "role": "be"
+            }
+          },
+          {
+            "operator": "workspace.bind",
+            "fanout": null,
+            "maxParallel": null,
+            "requirements": {
+              "role": "fe",
+              "runtimeNeed": "consume"
+            }
+          }
+        ],
+        [
+          {
+            "operator": "frontend.direction.decide",
+            "fanout": null,
+            "maxParallel": null,
+            "requirements": {
+              "intent": "modify",
+              "changeLevel": "reconstruct"
+            }
+          }
+        ],
+        [
+          {
+            "operator": "frontend.presentation.resolve",
+            "fanout": null,
+            "maxParallel": null,
+            "requirements": null
+          }
+        ],
+        [
+          {
+            "operator": "frontend.source.apply",
+            "fanout": null,
+            "maxParallel": null,
+            "requirements": {
+              "mode": "apply"
+            }
+          }
+        ],
+        [
+          {
+            "operator": "frontend.surface.audit",
+            "fanout": "matrix",
+            "maxParallel": 3,
+            "requirements": null
+          }
+        ],
+        [
+          {
+            "operator": "quality.verify",
+            "fanout": null,
+            "maxParallel": null,
+            "requirements": null
+          }
+        ],
+        [
+          {
+            "operator": "uat.verify",
+            "fanout": null,
+            "maxParallel": null,
+            "requirements": null
+          }
+        ],
+        [
+          {
+            "operator": "git.publish",
+            "fanout": null,
+            "maxParallel": null,
+            "requirements": null
+          }
+        ]
+      ],
+      "stepCount": 8,
+      "branchCount": 9,
+      "widestStep": 2,
+      "loops": [
+        {
+          "from": "frontend.surface.audit",
+          "to": "frontend.presentation.resolve",
+          "when": "an application-owned node fails a claim or a proof rule",
+          "maxRounds": 2
+        }
+      ]
+    },
+    {
+      "id": "full-feature",
+      "when": {
+        "en": "One feature needs both a backend contract and a new frontend surface; backend implementation and frontend direction run side by side after the architecture is decided.",
+        "vi": "Một feature cần cả contract backend lẫn bề mặt frontend mới; hiện thực backend và hướng frontend chạy song song sau khi kiến trúc đã quyết."
+      },
+      "ends": "git.publish",
+      "steps": [
+        [
+          {
+            "operator": "workspace.bind",
+            "fanout": null,
+            "maxParallel": null,
+            "requirements": {
+              "role": "be"
+            }
+          },
+          {
+            "operator": "workspace.bind",
+            "fanout": null,
+            "maxParallel": null,
+            "requirements": {
+              "role": "fe",
+              "runtimeNeed": "consume"
+            }
+          }
+        ],
+        [
+          {
+            "operator": "business.decide",
+            "fanout": null,
+            "maxParallel": null,
+            "requirements": {
+              "mode": "model"
+            }
+          }
+        ],
+        [
+          {
+            "operator": "architecture.decide",
+            "fanout": null,
+            "maxParallel": null,
+            "requirements": {
+              "alternatives": 1,
+              "selectionPolicy": "automatic"
+            }
+          }
+        ],
+        [
+          {
+            "operator": "backend.source.apply",
+            "fanout": null,
+            "maxParallel": null,
+            "requirements": null
+          },
+          {
+            "operator": "frontend.direction.decide",
+            "fanout": null,
+            "maxParallel": null,
+            "requirements": {
+              "intent": "create",
+              "changeLevel": "new"
+            }
+          }
+        ],
+        [
+          {
+            "operator": "quality.verify",
+            "fanout": null,
+            "maxParallel": null,
+            "requirements": null
+          },
+          {
+            "operator": "frontend.presentation.resolve",
+            "fanout": null,
+            "maxParallel": null,
+            "requirements": null
+          }
+        ],
+        [
+          {
+            "operator": "frontend.source.apply",
+            "fanout": null,
+            "maxParallel": null,
+            "requirements": {
+              "mode": "apply"
+            }
+          }
+        ],
+        [
+          {
+            "operator": "frontend.surface.audit",
+            "fanout": "matrix",
+            "maxParallel": 3,
+            "requirements": null
+          }
+        ],
+        [
+          {
+            "operator": "quality.verify",
+            "fanout": null,
+            "maxParallel": null,
+            "requirements": null
+          }
+        ],
+        [
+          {
+            "operator": "business.decide",
+            "fanout": null,
+            "maxParallel": null,
+            "requirements": {
+              "mode": "reconcile"
+            }
+          }
+        ],
+        [
+          {
+            "operator": "git.publish",
+            "fanout": null,
+            "maxParallel": null,
+            "requirements": null
+          }
+        ]
+      ],
+      "stepCount": 10,
+      "branchCount": 13,
+      "widestStep": 2,
+      "loops": [
+        {
+          "from": "frontend.surface.audit",
+          "to": "frontend.presentation.resolve",
+          "when": "an application-owned node fails a claim or a proof rule",
+          "maxRounds": 2
+        }
+      ]
+    },
+    {
+      "id": "release",
+      "when": {
+        "en": "A published head must reach production: verify it, deploy it, and prove the steady state; recovery and rollback are inside release.deploy.",
+        "vi": "Một head đã publish phải lên production: kiểm, deploy và chứng minh trạng thái ổn định; phục hồi và rollback nằm trong release.deploy."
+      },
+      "ends": "release.deploy",
+      "steps": [
+        [
+          {
+            "operator": "workspace.bind",
+            "fanout": null,
+            "maxParallel": null,
+            "requirements": {
+              "role": "be"
+            }
+          }
+        ],
+        [
+          {
+            "operator": "quality.verify",
+            "fanout": null,
+            "maxParallel": null,
+            "requirements": null
+          }
+        ],
+        [
+          {
+            "operator": "release.deploy",
+            "fanout": null,
+            "maxParallel": null,
+            "requirements": null
+          }
+        ]
+      ],
+      "stepCount": 3,
+      "branchCount": 3,
+      "widestStep": 1,
+      "loops": []
+    }
+  ],
+  "counts": {
+    "operators": 14,
+    "workflows": 8,
+    "routes": 68,
+    "kinds": 51,
+    "stopCodes": 93,
+    "steps": 120,
+    "domains": 11,
+    "profiles": 3,
+    "fallbackCodes": 6
+  }
+}

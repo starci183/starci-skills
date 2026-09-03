@@ -1,0 +1,79 @@
+name: Deploy site
+
+# One Pages deployment carries both sites: the landing page at the root and the documentation under
+# /docs. Both are generated from the runtime tree, so a change to the tree — an operator, a workflow,
+# a kind contract, an alias, a knowledge index — republishes them.
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'sites/**'
+      - 'docs/**'
+      - 'operators/**'
+      - 'workflows/**'
+      - 'templates/kinds/**'
+      - 'alias/**'
+      - 'knowledge/**/INDEX*.md'
+      - '.github/workflows/deploy-site.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# One deployment at a time; a queued run waits for the running one instead of cancelling it.
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Build the landing page
+        working-directory: sites/skills
+        run: |
+          npm ci
+          npm run build
+
+      - name: Build the documentation
+        if: hashFiles('sites/docs/package.json') != ''
+        working-directory: sites/docs
+        run: |
+          npm ci
+          npm run build
+
+      - name: Assemble one artifact
+        run: |
+          rm -rf dist
+          cp -r sites/skills/dist dist
+          if [ -d sites/docs/out ]; then
+            mkdir -p dist/docs
+            cp -r sites/docs/out/. dist/docs/
+          else
+            echo "sites/docs/out is absent; publishing the landing page alone"
+          fi
+          ls -la dist
+
+      - uses: actions/configure-pages@v5
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

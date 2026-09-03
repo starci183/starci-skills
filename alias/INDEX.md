@@ -22,7 +22,7 @@ The @starci/grammar package as the bound app resolves it: the only fact about wh
 
 | Alias | Params | Resolves to | Bind | Writers | Bound by | Purpose |
 | --- | --- | --- | --- | --- | --- | --- |
-| `@grammar` | `<family>` | `the @starci/grammar package as the bound app resolves it (file:packages/grammar inside @workspaces/fe today, source 0.4.0; @remote/npm publishes 0.3.0), narrowed to one family <family>: @grammar/core, @grammar/heritage, @grammar/offset-pop; @grammar/common is the shared layer every family imports` | package.json version + the resolved location's fingerprint (checkout head for file:, tarball integrity for npm) | — | — | The Grammar as it runs: Common renderers, props, owned relationships, data-contract claims, and the family's own CSS. The only fact about what a component owns. |
+| `@grammar` | `<family>` | `the @starci/grammar package as the bound app resolves it (file:packages/grammar inside @workspaces/fe today, source 0.4.1; @remote/npm publishes 0.3.0), narrowed to one family <family>: @grammar/core, @grammar/heritage, @grammar/offset-pop; @grammar/common is the shared layer every family imports` | package.json version + the resolved location's fingerprint (checkout head for file:, tarball integrity for npm) | — | — | The Grammar as it runs: Common renderers, props, owned relationships, data-contract claims, and the family's own CSS. The only fact about what a component owns. |
 
 ## Knowledge — the law
 

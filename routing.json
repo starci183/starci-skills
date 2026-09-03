@@ -1,5 +1,5 @@
 {
-  "schemaVersion": 8,
+  "schemaVersion": 9,
   "note": "Closed routing map. A skill reads a validated operator output and routes on outcome, then on failure.owningDomain. It never reads prose to decide the next step.",
   "kinds": {
     "operator": "Invoke the named operator next.",
