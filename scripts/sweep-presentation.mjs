@@ -99,7 +99,11 @@ export function loadGrammarObjects(root = ROOT) {
     const name = code(r[0]).split(/\s+/)[0];
     if (!name) continue;
     objects.add(name);
-    if (/\b(GAP|PADDING|MARGIN|MEASURE|OVERFLOW)-/.test(r[3] ?? '')) geometryOwners.add(name);
+    // An object owns its ARRANGEMENT when it claims a GAP-, PADDING- or OVERFLOW- rule: how its
+    // children sit, how far apart, what its inset is. MEASURE-/MARGIN-AUTO alone (PageContainer) is
+    // width and centring only; the standing rhythm inside such a container stays App-owned
+    // (GAP-5 Case 2), so a flex/gap stack written on it is lawful, not a reimplementation.
+    if (/\b(GAP|PADDING|OVERFLOW)-/.test(r[3] ?? '')) geometryOwners.add(name);
     if (code(r[1]) === 'composition' && name !== 'GrammarRoot') shellObjects.add(name);
   }
   // The presentation INDEX names these three in prose; `Card` is not a DNA renderer name and would
@@ -109,6 +113,9 @@ export function loadGrammarObjects(root = ROOT) {
 }
 
 // A unit whose job is the shell of a product surface, by the owner's two tests.
+// Grammar containers whose className is a published extension point and whose claims stop at measure
+// and centring; the application arranges its own regions inside them (GAP-5 Case 2).
+const OPEN_CONTAINERS = new Set(['PageContainer']);
 const SHELL_FOLDER = /(?:^|\/)product-shells\//;
 const SHELL_NAME = /(Layout|Shell|TopBar|Navbar|Nav|Sidebar|Rail)$/;
 export const isShellUnit = (relPath) => SHELL_FOLDER.test(relPath) || SHELL_NAME.test(path.basename(path.dirname(relPath)));
@@ -344,6 +351,12 @@ export function sweepSource({ relPath, text, siblingClassNames = '', unitGrammar
     const tokens = values.flatMap(tokensOf);
     const line = lineOf(text, m.index + attr.offset);
     const layout = tokens.filter(isLayoutToken);
+    // An open container publishes className as its extension point and owns only measure and
+    // centring (PageContainerProps extends the div props; DNA claims MARGIN-AUTO MEASURE-1). The
+    // arrangement of the regions inside it is App-owned by GAP-5 Case 2, so a stack of layout and
+    // gap tokens on it is lawful; the tokens still answer to the scales in pass (c). Anything that
+    // paints or insets the container itself is still an override.
+    if (OPEN_CONTAINERS.has(source) && tokens.length && tokens.every((t) => isLayoutToken(t) || /^(?:gap|min-w|min-h)-/.test(utilityOf(t)))) continue;
     if (layout.length && geometryOwners.has(source)) {
       findings.push({
         code: 'APP_REIMPLEMENTATION', file: relPath, line, object: source, token: layout.join(' '),

@@ -97,9 +97,11 @@ test('the closed lists are read out of the knowledge tree, not typed here', () =
   for (const n of ['Button', 'Input', 'Card', 'SurfaceCard', 'SurfaceAccordionCard', 'SurfaceListCard', 'Badge', 'Heading', 'Text']) {
     assert.ok(objects.has(n), `${n} is a Grammar object the sweep knows`);
   }
-  for (const n of ['SectionHeader', 'Rail', 'PrimaryRailLayout', 'PageContainer', 'StaticStateRow', 'HorizontalScrollRegion', 'VerticalScrollRegion']) {
+  for (const n of ['SectionHeader', 'Rail', 'PrimaryRailLayout', 'StaticStateRow', 'HorizontalScrollRegion', 'VerticalScrollRegion']) {
     assert.ok(geometryOwners.has(n), `${n} already owns its geometry`);
   }
+  // Width and centring only: the standing rhythm inside a page container is App-owned (GAP-5 Case 2).
+  assert.ok(!geometryOwners.has('PageContainer'), 'PageContainer owns measure, not the arrangement of its children');
   for (const n of ['NavigationFeatureNav', 'WorkspaceShell', 'Sidebar', 'Rail', 'PageContainer']) {
     assert.ok(shellObjects.has(n), `${n} is a Grammar shell object a product shell may compose`);
   }
