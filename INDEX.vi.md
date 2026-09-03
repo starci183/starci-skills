@@ -1,6 +1,6 @@
-# StarCi Skills 1.2.0
+# StarCi Skills 1.3.0
 
-Cây này chính là runtime. Đọc tiếp `SKILL.vi.md` nếu có, hoặc `SKILL.md`; đó là cửa vào duy nhất,
+Cây này chính là runtime. Đọc tiếp `SKILL.md` (bản tiếng Anh là bản được nạp; `SKILL.vi.md` chỉ để người đọc); đó là cửa vào duy nhất,
 đóng băng phạm vi của một nhiệm vụ, chọn đúng một operator sở hữu kết quả, rồi định tuyến giữa các
 operator dựa trên kết quả có kiểu.
 
@@ -56,12 +56,14 @@ thì không được publish.
   không diễn đạt được force push; `release.deploy` không chạy nổi khi thiếu authorization đã khai;
   `uat.verify` không có trường nào chứa nổi credential.
 - File `.md` tiếng Anh là authority duy nhất lúc chạy. File `.vi.md` cùng tên là bản đọc cho người,
-  không bao giờ vào context manifest, danh sách phụ thuộc, input của validator, hay binding của
-  operator.
+  không bao giờ vào context manifest, danh sách phụ thuộc, hay binding của
+  operator; validator đối chiếu chỉ đọc chúng để chứng minh bản gương không lệch, không bao giờ coi là authority.
 - Mã rule là địa chỉ công khai ổn định. Chỉ thêm; không đánh số lại, không dùng lại, không lặng lẽ
   đổi nghĩa.
 
 ## Dòng dõi
+
+1.3.0 (2026-09-03): gate quét presentation chạy máy (scripts/sweep-presentation.mjs: APP_OVERRIDE, APP_REIMPLEMENTATION, OFF_SCALE, SHELL_GEOMETRY) nối vào frontend.source.apply và quality.verify; phạm vi resolve gồm mọi thư mục leaf/branch app sở hữu; luật twin, spec cặp và hằng số triển khai; luật viết product-agnostic.
 
 1.2.0 (2026-09-03): vòng test thứ hai (tests/) và các sửa từ đó: state.json có schema và liên kết resume được kiểm; workflow khai asks; response.next phải nằm trong bảng Next; UNKNOWN_STOP phát được; quyết định kiến trúc công bố các operation mà kế hoạch backend tiêu thụ và trích dẫn dimension của ma trận bao phủ thay cho BA-<n>; uat.verify chấp nhận lời từ chối hợp luật của chính nó; chủ đề radius.
 

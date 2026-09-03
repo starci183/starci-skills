@@ -33,6 +33,30 @@ rather than merely discouraged. An application class that reimplements an owned 
 overrides Grammar anatomy or sits off the closed scale is removed with its own row, per node and
 never silently.
 
+## The scope is every folder the write set touches
+
+The tree the direction names is the surface, not the boundary. A page reaches its final appearance
+through the leaves and branches it composes, so a leaf that repaints a control, or a branch that
+rebuilds a shell band, changes the same surface the page does and is resolved in the same pass. The
+scope is therefore every leaf and branch folder the application owns that the declared write set
+touches — `packages/ui/**` and `src/components/{leaves,branches}/**` as much as
+`src/components/{pages,blocks}/**` — and not only the target surface's own tree. A folder the write
+set does not touch is out of scope, because resolving it would widen a change nobody asked for; a
+folder the write set does touch is in scope even when the direction never named it, because the
+alternative is a resolved page sitting on an unresolved leaf.
+
+## A Grammar object's className is never a resolution target
+
+There is one thing this operator may not resolve, however the tree presents it: a `className` on a
+Grammar object. Presentation may not "add padding, typography or paint inside `Card`, `Input`,
+`Button` or another Grammar object", so the class is not a property awaiting a value — it is a reach
+through an anatomy the family owns. It is removed at step 7 and recorded under `## Removed`, with
+`overrides Grammar anatomy` when it repaints anatomy, or with `refused by <RULE> Case <n>` naming the
+case that answered no. When the relationship the class was reaching for is real and the component
+publishes no prop for it, the removal is joined by a `## Gaps` row and the family owner gets the
+question. What never happens is a rule being selected for it: choosing a value would legitimise the
+reach and hand the node two owners for one property.
+
 ## A forbidden class is removed, not ruled
 
 When the only case that names an application class states a condition the node does not meet (an

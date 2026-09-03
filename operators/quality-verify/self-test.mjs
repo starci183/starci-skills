@@ -220,4 +220,38 @@ await expectError(baseline({ __predecessorChanges: `# changes — backend.source
 | Predecessor | \`step-1/parallel-1/response/response.md\` |
 ` }), 'PREDECESSOR_STALE', 'a predecessor produced under mode dry');
 
-process.stdout.write('quality.verify self-test: 3 valid branches, 26 rejected mutations\n');
+// A frontend delivery carries the presentation sweep, because nothing else in the plan measures which
+// node a class landed on. The producer receipt carries a commit, so it is a delivery and not a plan.
+function frontendApplication() {
+  return `# frontend-source-application — overview
+
+## Binding
+
+| Field | Value |
+| --- | --- |
+| Target | \`overview\` |
+| Mode | \`apply\` |
+| Branch | \`${BRANCH}\` |
+| Base | \`${OTHER_HEAD}\` |
+| Commit | \`${HEAD}\` |
+`;
+}
+await expectError(baseline({
+  'request/request.json': requestJson({ inputs: { changes: 'step-1/parallel-1/response/changes.md', 'frontend-source-application': 'step-1/parallel-1/response/application.md' } }),
+  'response/application.md': frontendApplication(),
+}), 'plans the presentation-sweep gate', 'a frontend delivery gated without the presentation sweep');
+await expectValid(baseline({
+  'request/request.json': requestJson({
+    gates: [...PLAN, { gate: 'presentation-sweep', commandRef: 'package.json#scripts.sweep:presentation', configRef: '.claude/scripts/sweep-presentation.mjs', required: true }],
+    inputs: { changes: 'step-1/parallel-1/response/changes.md', 'frontend-source-application': 'step-1/parallel-1/response/application.md' },
+  }),
+  'response/application.md': frontendApplication(),
+  'response/data/gates/presentation-sweep.json': gateResult('presentation-sweep', { commandRef: 'package.json#scripts.sweep:presentation', configRef: '.claude/scripts/sweep-presentation.mjs' }),
+  'response/response.json': responseJson({ gates: [...PLAN.map((g) => `response/data/gates/${g.gate}.json`), 'response/data/gates/presentation-sweep.json'] }),
+  'response/response.md': responseMd({
+    plan: [...PLAN, { gate: 'presentation-sweep', commandRef: 'package.json#scripts.sweep:presentation', configRef: '.claude/scripts/sweep-presentation.mjs', required: true }],
+    results: [...PLAN.map((g) => [g.gate, 'pass']), ['presentation-sweep', 'pass']],
+  }),
+}), 'a frontend delivery whose plan carries the presentation sweep');
+
+process.stdout.write('quality.verify self-test: 4 valid branches, 27 rejected mutations\n');

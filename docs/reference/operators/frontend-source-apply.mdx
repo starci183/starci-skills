@@ -58,6 +58,24 @@ whose owner root does not contain it is `OWNER_CONFLICT`, because owner membersh
 ceiling. The inventory check runs on the projection, before anything is written, so a rejected
 application leaves source untouched.
 
+## The conformance check reads the write set, not the plan
+
+The inventory check answers one question: did every value come from the resolution? It cannot answer
+the other one: does the source, as it will sit on disk, still contain a class the laws already forbid?
+A resolution can publish `flex-col` truthfully and the application can still write it onto a
+`SectionHeader` whose CSS owns the collapse, because the inventory records which classes exist and not
+which node they landed on. So the conformance step also runs `node scripts/sweep-presentation.mjs`
+over the projected write set through `@tools/shell`, and reads its four codes: `APP_OVERRIDE`, a class
+reaching into a Grammar object; `APP_REIMPLEMENTATION`, a layout utility on an object that already
+owns its geometry; `OFF_SCALE`, a value outside the closed scale its topic publishes; and
+`SHELL_GEOMETRY`, a product shell drawing a band it should have composed. Any finding is
+`WRITE_REJECTED`, with the sweep output quoted in `response.md` under `## Rejections`, and the
+`sweep` record carried in `writes.json`. It is the same code the inventory check emits because it is
+the same refusal: a value the write is not authorized to produce. Like the inventory check, the sweep
+runs on the projection, before anything is written, so a rejected application leaves source untouched.
+The sweep is a gate, not an author: it never edits a class, and the correct next step is a corrected
+resolution or a corrected write set.
+
 ## An application-owned node becomes an empty leaf
 
 When the direction marks a node as owned by the application, a canvas for instance, the projection
@@ -111,7 +129,7 @@ knows what it wrote, never how it renders.
 | 1 | Validate the gate and resume, and confirm the head | `resume`, `mode` | `request/request.json`, input `frontend-presentation-resolution`, @workspaces/fe at the frozen head | — | `INVALID_INPUT`, `SOURCE_DRIFT`, `NO_PROGRESS` |
 | 2 | Bind the resolution, the direction and the declared write set | — | inputs `frontend-presentation-resolution` (tree fingerprint, class and rule inventory, resolved tree) and `frontend-direction-decision` (intent and owner ceiling), @workspaces/fe (the declared paths and their owner roots) | — | `RESOLUTION_STALE`, `OWNER_CONFLICT` |
 | 3 | Project the resolved tree onto the declared paths | — | input `frontend-presentation-resolution` (the resolved tree), @workspaces/fe (the declared write set) | — | — |
-| 4 | Check every produced value against the inventory | `mode` | input `frontend-presentation-resolution` (the inventory beside the receipt) | `response/data/writes.json` | `WRITE_REJECTED` |
+| 4 | Check every produced value against the inventory, then sweep the projected write set | `mode` | input `frontend-presentation-resolution` (the inventory beside the receipt), @workspaces/fe (the projected write set), @tools/shell | `response/data/writes.json` | `WRITE_REJECTED` |
 | 5 | Write atomically on the session branch and commit once | — | @workspaces/fe (the current content of each declared path, under an exclusive lease) | @workspaces/fe/branch/session, `response/data/writes.json`, @tools/sourcewrite, @tools/git, image assets the direction judged, @tools/imagegen | — |
 | 6 | Read the tree back at the commit | — | @workspaces/fe at the commit | — | `WRITE_REJECTED` |
 | 7 | Emit | — | everything above | `response/response.md`, `response/changes.md`, `response/response.json` | — |
@@ -119,7 +137,9 @@ knows what it wrote, never how it renders.
 Under `mode = dry` the branch stops after step 4 with the plan alone: `writes.json` carries a null
 commit, `response.json` carries no commit, and the checkout is untouched. A dry run is granted neither
 `@tools/sourcewrite` nor `@tools/git`, because a mode that writes nothing needs no tool that can
-write; the grant and this paragraph say the same thing so neither can drift. Under `apply`, step 5 writes
+write; the grant and this paragraph say the same thing so neither can drift. `@tools/shell` is granted
+in both modes and pinned to the one command the sweep is, because a dry run that skipped the sweep
+would publish a plan nobody had checked. Under `apply`, step 5 writes
 and commits exactly once and step 6 proves that the committed tree is the resolved tree. `changes.md`
 is the record the next steps read: which paths moved, which claims they carry, which gates the
 checkout pins for them, and which surfaces must now be observed.

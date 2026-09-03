@@ -1,4 +1,4 @@
-# StarCi Skills 1.2.0
+# StarCi Skills 1.3.0
 
 This tree is the runtime. Read [SKILL.md](SKILL.md) next; it is the single entry that freezes a
 mission's scope, selects the one operator that owns the outcome, and routes between operators on
@@ -57,10 +57,12 @@ head or the head is not publishable.
   express a force push; `release.deploy` cannot run without its declared authorization;
   `uat.verify` has no field that can hold a credential.
 - English `.md` files are the only runtime authority. Same-stem `.vi.md` files are human mirrors and
-  never enter a context manifest, dependency list, validator input, or operator binding.
+  never enter a context manifest, dependency list, or operator binding; a parity validator reads them only to prove the mirror has not drifted, never as authority.
 - Rule IDs are stable public addresses. Append; never renumber, reuse, or silently change meaning.
 
 ## Lineage
+
+1.3.0 (2026-09-03): a mechanical presentation sweep (scripts/sweep-presentation.mjs: APP_OVERRIDE, APP_REIMPLEMENTATION, OFF_SCALE, SHELL_GEOMETRY) wired into frontend.source.apply and quality.verify; resolve scope covers every app-owned leaf/branch folder; twin, paired-spec and deployment-constant rules; rules are written product-agnostic.
 
 1.2.0 (2026-09-03): the second test round (tests/) and its fixes: state.json has a schema and the resume linkage is checked; a workflow declares asks; response.next must be offered by the Next table; UNKNOWN_STOP is emittable; the architecture decision publishes the operations the backend plan consumes and cites coverage-matrix dimensions instead of BA-<n>; uat.verify accepts its own lawful refusal; a radius topic.
 

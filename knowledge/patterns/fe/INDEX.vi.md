@@ -5,7 +5,7 @@ sắc thái nào. `knowledge/patterns/fe/` quyết định mã nguồn tạo ra 
 một đơn vị mã nằm ở đâu, các tệp của nó tên gì, hàm component có hình dạng nào, chuỗi class đặt ở
 đâu, thất bại được biểu diễn thế nào, và spec đi kèm nằm chỗ nào. Một luật mẫu không bao giờ chọn
 hình ảnh; một luật `ui/` không bao giờ chọn tên tệp. Mọi luật dưới đây được rút ra từ
-`starci-academy-fe/src/` và `starci-academy-fe/packages/grammar/src/` bằng cách mở tệp và đếm, và
+ứng dụng tham chiếu (`src/`) và gói Grammar của nó (`packages/grammar/src/`) bằng cách mở tệp và đếm, và
 mỗi bảng đều dẫn nguồn tệp đã đọc. Nơi nào mã nguồn chia hai ngả, tệp ghi lại biến thể chiếm ưu thế
 cùng con số thay vì áp đặt.
 
@@ -24,6 +24,6 @@ cùng con số thay vì áp đặt.
 
 ## Nguồn
 
-Ứng dụng: `D:\Repositories\starci-academy-fe\src\` (976 tệp TypeScript không phải spec, 497 spec).
-Gói Grammar: `D:\Repositories\starci-academy-fe\packages\grammar\src\`. Bộ luật lint chỉ được tra để
+Ứng dụng: `src/` của ứng dụng tham chiếu (976 tệp TypeScript không phải spec, 497 spec).
+Gói Grammar: `packages/grammar/src/` của nó. Bộ luật lint chỉ được tra để
 lấy tên luật: `@starci/eslint-canon-fe` như đã cài trong `node_modules`.

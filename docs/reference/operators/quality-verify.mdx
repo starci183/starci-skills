@@ -94,6 +94,20 @@ End-to-end is never run unless a person asked for it in this invocation, which i
 with an `E2E_NOT_REQUESTED` finding: no command, no exit code, no evidence, and no implication that
 behaviour was proved. Planning the e2e gate without that request is invalid input.
 
+## A frontend delivery is swept as well as compiled
+
+Format, lint, typecheck and build measure whether the source is well formed. None of them measures
+which node a class landed on, so a page that layers `flex-col items-start sm:flex-row` onto a Grammar
+object whose CSS already owns the collapse compiles clean, lints clean, and ships. The
+`presentation-sweep` gate closes that hole: `node scripts/sweep-presentation.mjs` runs over the
+delivered write set and returns `APP_OVERRIDE`, `APP_REIMPLEMENTATION`, `OFF_SCALE` and
+`SHELL_GEOMETRY` findings with their file, line and offending token. It is planned whenever the
+delivery carries a `frontend-source-application`, and a request that names a frontend delivery without
+it is invalid input. `frontend.source.apply` runs the same sweep on the projection before it writes;
+this gate runs it on what was actually delivered, because the two are only the same tree when nothing
+went wrong between them. A finding here is a red gate and therefore a verdict, not a stop: it goes
+back to the frontend owner exactly like a failing test.
+
 ## Coverage carries four thresholds, not one
 
 Statements, lines, functions and branches are each compared against their own threshold, and
@@ -152,7 +166,7 @@ approval expired.
 
 | Field | Type | Default | Ask |
 | --- | --- | --- | --- |
-| `gates` | list of `{gate, commandRef, configRef, required}` | the routed gate plan | Which pinned gates to run, once each, from format, lint, typecheck, build, unit-coverage, integration, e2e and sonar |
+| `gates` | list of `{gate, commandRef, configRef, required}` | the routed gate plan | Which pinned gates to run, once each, from format, lint, typecheck, build, unit-coverage, integration, e2e, sonar and presentation-sweep |
 | `thresholds` | list of `{statements, lines, functions, branches}` | the four percentages the routed gate configuration pins | The percentage each coverage metric must meet, branches on its own |
 | `explicitE2eRequest` | choice | false | false unless a person asked for the end-to-end suite in this invocation; true only then |
 | `sonarScope` | choice | new-code | new-code or overall; it must agree with whether sonar is in the gate plan |

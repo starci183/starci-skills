@@ -3,7 +3,7 @@
 This file answers one question: given a piece of frontend code, which directory and which file
 name does it get?
 
-Sources: `starci-academy-fe/src/components/**`, `src/hooks/**`, `src/modules/api/**`, `src/app/**`,
+Sources: the reference application's `src/components/**`, `src/hooks/**`, `src/modules/api/**`, `src/app/**`,
 `packages/grammar/src/**`. Counts are file counts at the time of reading.
 
 ## FE-FOLDER-1 — Tier directories
@@ -87,6 +87,17 @@ export const authenticationPageClassName = cn(formPageClassName)
 | Case 2 | Class strings in `component.tsx` | Never; they go to `classNames.ts` (lint `class-names-in-colocated-file`, `no-inline-class-name`) |
 | Case 3 | A `__tests__/` folder | 0 across `src/`; specs sit beside their file |
 | Case 4 | A `helpers/` or `utils/` folder | 0 under `src/components` (lint `no-helper-folder-in-components`) |
+| Case 5 | A deployment constant | Never. `process.env.NEXT_PUBLIC_*` lives under `src/modules/` and is reached through the module that owns it. Observed in two products: the one that follows the rule has 7 reads under `src/modules` and 0 `process.env` of any kind under `src/components`; the other has three block folders reading the same host suffix inline, each carrying its own `?? "<default>"`, so one environment change has three homes |
+
+## Open question — currency and locale literals
+
+`currency: "VND"` appears 8 times in connected `index.tsx` files under `src/components` (blocks,
+overlays and pages) and 0 times under `src/modules`; `"vi-VN"` / `"en-US"` appear twice in connected
+halves and 0 times under `src/modules`. The formatter is built where the locale is read, from
+`useLocale()`, so the money literal follows it. FE-FOLDER-6 Case 5 therefore covers deployment
+constants only: the same argument does not hold here, because the evidence points the other way, and
+whether the currency belongs to a `src/modules` money module is an owner decision this file does not
+make.
 
 ## Open question — extra files inside block folders
 

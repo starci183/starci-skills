@@ -22,7 +22,7 @@
       "table": "| Gate | Required | Command | Configuration |",
       "minRows": 1,
       "cell": {
-        "Gate": "^`(format|lint|typecheck|build|unit-coverage|integration|e2e|sonar)`$",
+        "Gate": "^`(format|lint|typecheck|build|unit-coverage|integration|e2e|sonar|presentation-sweep)`$",
         "Required": "^(yes|no)$"
       }
     },
@@ -31,7 +31,7 @@
       "table": "| Gate | Status | Exit code | Evidence | Classification | Statement |",
       "minRows": 1,
       "cell": {
-        "Gate": "^`(format|lint|typecheck|build|unit-coverage|integration|e2e|sonar)`$",
+        "Gate": "^`(format|lint|typecheck|build|unit-coverage|integration|e2e|sonar|presentation-sweep)`$",
         "Status": "^(pass|fail|external-blocker|skipped-not-requested)$",
         "Classification": "^(in-boundary|boundary-drift|flaky|external-blocker|—)$",
         "Statement": "\\S"
@@ -60,7 +60,7 @@
       "heading": "^## Debts$",
       "table": "| Debt | Gate | Approval | Owner | Expires | Statement |",
       "cell": {
-        "Gate": "^`(format|lint|typecheck|build|unit-coverage|integration|e2e|sonar)`$"
+        "Gate": "^`(format|lint|typecheck|build|unit-coverage|integration|e2e|sonar|presentation-sweep)`$"
       }
     },
     {

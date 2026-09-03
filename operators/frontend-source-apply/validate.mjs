@@ -2,7 +2,8 @@
 // written file comes from the bound resolution's inventory, which is read back beside the resolution
 // receipt the request named; the write lands on the session branch and nowhere else; a dry run
 // commits nothing and an applied run commits exactly once; created, modified and unchanged agree with
-// the hashes; and the receipt and changes.md list exactly the files the plan carries.
+// the hashes; the presentation sweep ran over the declared paths and found nothing; and the receipt
+// and changes.md list exactly the files the plan carries.
 import { existsSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
 import path from 'node:path';
@@ -73,6 +74,24 @@ export async function validateApplicationStep(branchDir, root = ROOT) {
       }
     }
   } else if (response.status === 'done') errors.push(`${at}: the resolution inventory could not be read beside the receipt the request bound (RESOLUTION_STALE)`);
+
+  // The presentation sweep is the second half of the conformance check: the inventory proves where a
+  // class came from, the sweep proves the node it landed on may carry it. An applied write set that
+  // carries no sweep record was never checked against the laws the knowledge tree already publishes.
+  const sweep = plan.sweep ?? null;
+  if (mode === 'apply') {
+    if (sweep === null) errors.push(`${at}: an applied write set records the presentation sweep over the declared paths (WRITE_REJECTED)`);
+    else {
+      if (!/sweep-presentation\.mjs/.test(sweep.command)) errors.push(`${at}: the sweep command ${sweep.command} is not scripts/sweep-presentation.mjs`);
+      if (sweep.findings.length && sweep.exitCode === 0) errors.push(`${at}: the sweep reports ${sweep.findings.length} finding(s) with exit code 0; a finding exits 1`);
+      if (!sweep.findings.length && sweep.exitCode !== 0) errors.push(`${at}: the sweep exited ${sweep.exitCode} with no finding recorded`);
+      if (sweep.findings.length && response.status === 'done') {
+        errors.push(`${at}: the sweep found ${sweep.findings.map((f) => `${f.file}:${f.line} ${f.code} ${f.token}`).join('; ')}; any finding is WRITE_REJECTED and the branch is blocked`);
+      }
+      const declared = new Set(plan.files.map((f) => f.path));
+      for (const f of sweep.findings) if (!declared.has(f.file)) errors.push(`${at}: the sweep read ${f.file}, which the declared write set does not carry`);
+    }
+  }
 
   const seen = new Set();
   for (const file of plan.files) {

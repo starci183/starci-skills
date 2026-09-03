@@ -2,7 +2,7 @@
 
 Tệp này trả lời một câu hỏi: cho một mẩu mã frontend, nó nằm ở thư mục nào và mang tên tệp gì?
 
-Nguồn: `starci-academy-fe/src/components/**`, `src/hooks/**`, `src/modules/api/**`, `src/app/**`,
+Nguồn: `src/components/**` của ứng dụng tham chiếu, `src/hooks/**`, `src/modules/api/**`, `src/app/**`,
 `packages/grammar/src/**`. Các con số là số tệp tại thời điểm đọc.
 
 ## FE-FOLDER-1 — Thư mục theo tầng
@@ -85,6 +85,16 @@ export const authenticationPageClassName = cn(formPageClassName)
 | Case 2 | Chuỗi class trong `component.tsx` | Không bao giờ; chúng đi vào `classNames.ts` (lint `class-names-in-colocated-file`, `no-inline-class-name`) |
 | Case 3 | Thư mục `__tests__/` | 0 trong toàn bộ `src/`; spec nằm cạnh tệp của nó |
 | Case 4 | Thư mục `helpers/` hay `utils/` | 0 dưới `src/components` (lint `no-helper-folder-in-components`) |
+| Case 5 | Một hằng triển khai | Không bao giờ. `process.env.NEXT_PUBLIC_*` sống dưới `src/modules/` và được với tới qua đúng module sở hữu nó. Quan sát trên hai sản phẩm: bên theo luật có 7 lượt đọc dưới `src/modules` và 0 `process.env` thuộc bất kỳ loại nào dưới `src/components`; bên kia có ba thư mục block đọc thẳng cùng một hậu tố host, mỗi chỗ mang một mặc định `?? "<default>"` riêng, nên một lần đổi môi trường có ba nhà |
+
+## Câu hỏi để ngỏ — hằng tiền tệ và locale
+
+`currency: "VND"` xuất hiện 8 lần trong các `index.tsx` nối dưới `src/components` (block, overlay và
+page) và 0 lần dưới `src/modules`; `"vi-VN"` / `"en-US"` xuất hiện hai lần trong nửa nối và 0 lần dưới
+`src/modules`. Bộ định dạng được dựng ngay nơi đọc locale, từ `useLocale()`, nên hằng tiền tệ đi theo
+nó. Vì vậy FE-FOLDER-6 Case 5 chỉ phủ hằng triển khai: lập luận ấy không đứng được ở đây, bởi bằng
+chứng chỉ về phía ngược lại, và việc tiền tệ có thuộc về một module tiền dưới `src/modules` hay không
+là quyết định của chủ sở hữu, không phải của tệp này.
 
 ## Câu hỏi để ngỏ — tệp phụ trong thư mục block
 

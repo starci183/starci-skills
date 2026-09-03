@@ -2,9 +2,36 @@
   "$id": "kind:writes",
   "type": "object",
   "additionalProperties": false,
-  "required": ["mode", "base", "branch", "commit", "files"],
+  "required": ["mode", "base", "branch", "commit", "files", "sweep"],
   "properties": {
     "mode": { "enum": ["apply", "dry"] },
+    "sweep": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["command", "exitCode", "findings", "output"],
+      "properties": {
+        "command": { "type": "string", "minLength": 1 },
+        "exitCode": { "type": "integer", "minimum": 0 },
+        "output": { "type": "string" },
+        "findings": {
+          "type": "array",
+          "maxItems": 512,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["code", "file", "line", "token", "statement"],
+            "properties": {
+              "code": { "enum": ["APP_OVERRIDE", "APP_REIMPLEMENTATION", "OFF_SCALE", "SHELL_GEOMETRY"] },
+              "file": { "type": "string", "minLength": 1 },
+              "line": { "type": "integer", "minimum": 1 },
+              "object": { "type": "string" },
+              "token": { "type": "string" },
+              "statement": { "type": "string", "minLength": 1 }
+            }
+          }
+        }
+      }
+    },
     "base": { "type": "string", "pattern": "^[0-9a-f]{40}$" },
     "branch": { "type": "string", "pattern": "^session/[A-Za-z0-9._-]+$" },
     "commit": {

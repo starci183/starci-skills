@@ -55,6 +55,29 @@ chứ không chỉ là điều bị khuyên can. Một class ứng dụng hiện
 phẫu Grammar hay nằm ngoài thang đóng sẽ bị bỏ kèm một dòng ghi của chính nó, theo từng node và không
 bao giờ im lặng.
 
+## Phạm vi là mọi thư mục write set chạm tới
+
+Cây mà hướng đặt tên là bề mặt, không phải ranh giới. Một trang đi tới diện mạo cuối cùng của nó qua
+những leaf và branch nó compose, nên một leaf sơn lại một control, hay một branch dựng lại dải của một
+shell, cũng đổi đúng bề mặt ấy như trang và được resolve trong cùng một lượt. Vì vậy phạm vi là mọi
+thư mục leaf và branch do ứng dụng sở hữu mà write set đã khai chạm tới — `packages/ui/**` và
+`src/components/{leaves,branches}/**` ngang với `src/components/{pages,blocks}/**` — chứ không chỉ cây
+của riêng bề mặt đích. Một thư mục write set không chạm thì nằm ngoài phạm vi, vì resolve nó là nới
+rộng một thay đổi không ai yêu cầu; một thư mục write set có chạm thì nằm trong phạm vi kể cả khi
+hướng chưa từng gọi tên nó, vì đằng nào cũng là một trang đã resolve ngồi trên một leaf chưa resolve.
+
+## className của một đối tượng Grammar không bao giờ là đích resolve
+
+Có đúng một thứ operator này không được resolve, dù cây trình bày nó thế nào: một `className` trên một
+đối tượng Grammar. Trình bày không được "thêm padding, typography hay paint bên trong `Card`, `Input`,
+`Button` hay một đối tượng Grammar khác", nên class ấy không phải một thuộc tính đang chờ giá trị — nó
+là một cú thò qua phần anatomy mà family sở hữu. Nó bị gỡ ở bước 7 và ghi dưới `## Removed`, với
+`overrides Grammar anatomy` khi nó sơn lại anatomy, hoặc với `refused by <RULE> Case <n>` gọi tên
+đúng case đã trả lời không. Khi quan hệ mà class ấy với tới là có thật mà component không publish prop
+nào cho nó, lần gỡ đi kèm một dòng `## Gaps` và câu hỏi về tay chủ family. Điều không bao giờ xảy ra
+là chọn một rule cho nó: chọn một giá trị là hợp thức hoá cú thò và trao cho node hai chủ cho một
+thuộc tính.
+
 ## Class bị cấm thì gỡ, không phải thiếu rule
 
 Khi case duy nhất gọi tên một class của ứng dụng nêu điều kiện mà node không thoả (foreground accent

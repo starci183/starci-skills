@@ -23,11 +23,19 @@ const inventory = () => ({
   gaps: [],
 });
 
-const plan = ({ mode = 'apply', commit = COMMIT } = {}) => ({
+const cleanSweep = () => ({
+  command: 'node scripts/sweep-presentation.mjs . --write-set response/data/write-set.txt --json',
+  exitCode: 0,
+  findings: [],
+  output: 'sweep-presentation: clean, 3 file(s)',
+});
+
+const plan = ({ mode = 'apply', commit = COMMIT, sweep = cleanSweep() } = {}) => ({
   mode,
   base: BASE,
   branch: `session/${SESSION}`,
   commit,
+  sweep,
   files: [
     { path: PAGE, change: 'modified', before: fp('b'), after: fp('c'), classes: ['gap-6'] },
     { path: CANVAS, change: 'created', before: null, after: fp('d'), classes: [] },
@@ -40,6 +48,7 @@ const dryPlan = () => ({
   base: BASE,
   branch: `session/${SESSION}`,
   commit: null,
+  sweep: cleanSweep(),
   files: [
     { path: PAGE, change: 'modified', before: fp('b'), after: null, classes: ['gap-6'] },
     { path: CANVAS, change: 'created', before: null, after: null, classes: [] },
@@ -211,4 +220,12 @@ await expectError({ ...baseline(), 'response/response.md': responseMd().replace(
 await expectError({ ...baseline(), 'response/data/writes.json': null, 'response/response.json': responseJson({ fields: { 'frontend-source-application': 'response/response.md', changes: 'response/changes.md' } }) }, 'required output writes is not in fields', 'missing required output');
 await expectError({ ...baseline(), 'response/response.json': responseJson({ status: 'blocked', stop: 'MADE_UP_CODE', commits: [], next: [] }) }, 'not a registered code', 'unknown stop code');
 
-process.stdout.write('frontend.source.apply self-test: 3 valid branches, 22 rejected mutations\n');
+// The presentation sweep: it ran, it ran the right command, it agrees with its own exit code, it read
+// only declared paths, and a finding blocks the branch instead of riding along with a done receipt.
+await expectError(mutate((p) => { delete p.sweep; }), 'records the presentation sweep over the declared paths', 'applied write set with no sweep');
+await expectError(mutate((p) => { p.sweep.command = 'node scripts/lint.mjs'; }), 'is not scripts/sweep-presentation.mjs', 'a different command wearing the sweep\'s name');
+await expectError(mutate((p) => { p.sweep.findings = [{ code: 'APP_REIMPLEMENTATION', file: PAGE, line: 12, object: 'SectionHeader', token: 'flex-col', statement: 'SectionHeader owns its collapse' }]; }), 'any finding is WRITE_REJECTED', 'a finding carried into a done receipt');
+await expectError(mutate((p) => { p.sweep.exitCode = 1; }), 'exited 1 with no finding recorded', 'a red sweep with an empty finding list');
+await expectError(mutate((p) => { p.sweep.findings = [{ code: 'OFF_SCALE', file: 'app/other/page.tsx', line: 3, object: '—', token: 'gap-5', statement: 'off the closed gap scale' }]; p.sweep.exitCode = 1; }), 'which the declared write set does not carry', 'the sweep read outside the write set');
+
+process.stdout.write('frontend.source.apply self-test: 3 valid branches, 27 rejected mutations\n');

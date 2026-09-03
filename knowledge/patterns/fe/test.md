@@ -55,7 +55,7 @@ Sources: `src/components/pages/CartPage/index.spec.tsx`,
 | Case 1 | Snapshots | 0 `toMatchSnapshot` / `toMatchInlineSnapshot` in `src/` |
 | Case 2 | Network | never reached; `@/hooks` is mocked wholesale, which is why the barrel exists |
 | Case 3 | Translation content | `useTranslations: () => (key: string) => key` — a spec asserts keys, not copy |
-| Case 4 | Class strings in a component spec | dominant practice is not to; see open question |
+| Case 4 | A literal class string in a component or index spec | Nothing. Assert the role, the text, or the prop handed down: 215 of 272 component specs carry no `toHaveClass` or `className` at all. A pinned literal duplicates the presentation authority in a second place, so a class that moves onto the closed scale turns a spec red for a correct change, and a class that is off the scale is locked in by the spec that pins it. Class proof has two homes of its own: `classNames.spec.ts` (2, 11 assertions) and Grammar `styles.spec.ts` (6). The 57 specs that pin one are the open question below, not a second practice |
 
 ## FE-TEST-6 — Grammar package
 
@@ -66,8 +66,27 @@ Sources: `src/components/pages/CartPage/index.spec.tsx`,
 | Case 3 | Package surface | `package-boundary.test.mjs`: `assert.deepEqual(Object.keys(packageJson.peerDependencies).sort(), ["@heroui/react", "react"])` |
 | Case 4 | Family-wide proof | `core/family.spec.tsx`, `core/surface-card-family.spec.tsx`, `core/scrollable-surfaces.spec.tsx` |
 
-## Open question
+## FE-TEST-7 — Coverage is per half, and neither half's spec covers the other
 
-64 of 272 component specs contain `toHaveClass` or `className`. The other 208 assert roles, text
-and handed-down props only, and class proof has dedicated homes (`classNames.spec.ts`,
-`styles.spec.ts`). The majority practice is recorded; the 64 are not declared wrong here.
+A unit with two halves has two subjects. The connected spec mocks `./component` wholesale
+(FE-TEST-2 Case 4) and the pure spec stubs its child owners (FE-TEST-3 Case 3), so each one is
+deliberately blind to the other; a unit with one spec has one uncovered half rather than partial
+coverage of two.
+
+| Case | When | Write |
+| --- | --- | --- |
+| Case 1 | A new block or page with both halves | Both `index.spec.tsx` and `component.spec.tsx`, beside the file each one measures (28 of 101 block folders and 22 of 49 page folders already carry both) |
+| Case 2 | Judging whether the connected spec stands in for the pure one | It does not: `vi.mock("./component", () => ({ CartBlockBase: (input) => { mocks.input = input; return <output /> } }))` replaces the whole pure half, so nothing it renders was measured |
+| Case 3 | Judging whether the pure spec stands in for the connected one | It does not: it renders fixtures and stubs child owners, so no hook, SWR key, translation lookup or action wiring was exercised |
+
+Not this rule: a leaf, which has no `component.tsx` (FE-FOLDER-2 Case 4) and therefore one spec.
+
+## Open questions
+
+- 57 of 272 component and index specs contain `toHaveClass` or `className`, in 167 calls. The other
+  215 assert roles, text and handed-down props only, and class proof has dedicated homes
+  (`classNames.spec.ts`, `styles.spec.ts`). FE-TEST-5 Case 4 records the majority as the rule; the 57
+  are a standing debt against it rather than a second practice, and this file does not say which of
+  them to delete first.
+- FE-TEST-7 Case 1 binds a new unit. It is not a census of the tree: 73 of 101 block folders and 27 of
+  49 page folders carry one spec and not two, and no sweep of that backlog is legislated here.

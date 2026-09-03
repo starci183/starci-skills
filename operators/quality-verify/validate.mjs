@@ -1,7 +1,7 @@
 // quality.verify's own law over one branch, on top of the shared step check: the gate plan the
 // person declared is the plan that ran, one file per gate; every gate file stands on the same head,
 // which is the head the request pinned and the commit the predecessor recorded, and no predecessor was
-// produced under mode dry;  e2e runs only under
+// produced under mode dry; a frontend delivery plans the presentation sweep; e2e runs only under
 // an explicit request and sonar carries the scope it was measured at; a result's exit code, evidence
 // and classification match its status; coverage exists exactly where the unit gate produced it and no
 // metric sits below its own threshold beside a green unit result; a debt is live, in-boundary and
@@ -97,6 +97,13 @@ export async function validateQualityStep(branchDir, root = ROOT) {
   const inputs = Object.keys(request?.inputs ?? {});
   if (response.status !== 'blocked' && !inputs.some((k) => ['backend-source-application', 'frontend-source-application', 'changes'].includes(k))) {
     errors.push('request.json: quality.verify needs at least one of backend-source-application, frontend-source-application, changes');
+  }
+
+  // A frontend delivery is measured against the presentation laws as well as the compilers. The
+  // sweep is a gate here for the same reason it is a conformance check at frontend.source.apply: a
+  // green lint and a green build say nothing about which node a class landed on.
+  if (inputs.includes('frontend-source-application') && !plannedNames.includes('presentation-sweep')) {
+    errors.push('request.json: a frontend delivery plans the presentation-sweep gate; lint and build do not measure which node a class landed on');
   }
 
   // One file per gate, read from disk so a gate file nobody listed is still caught.

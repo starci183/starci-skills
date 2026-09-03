@@ -104,3 +104,113 @@ Record đầy đủ ở `tests/runs/20260903-r2-*.md`, bảng tổng hợp ở `
 - Ngoài cây: `.workspaces/projects/starci-academy/be.json` đã khai `gitPolicy session-only` (commit trên mtp, chưa push).
 
 **Còn để ngỏ** (ghi ở `tests/README.md`): head của `.claude` chưa nằm trong `request.json.contexts` nên sửa cây giữa phiên không bị `SOURCE_DRIFT` bắt; `toleratedDirtRoots` mới là đề xuất; exchange lồng cạnh nhánh song song chưa workflow nào tập; `.worktrees/_templates/uat` và 7 flow còn hình v7; registry runtime báo `ready` khi không gì lắng nghe.
+
+### Gate quét presentation (từ vụ nivo overview)
+
+Một phiên Codex trong `nivo-fe` (`main` `b3f4691`) đã giao ba thứ mà luật cấm sẵn và không cổng nào
+bắt được, nên trò dựng cổng cho chúng.
+
+**Ba vi phạm gốc.** `pages/OverviewPage/classNames.ts` chồng `flex-col items-start sm:flex-row
+sm:items-end sm:justify-between` lên `SectionHeader`, vốn đã sở hữu display, canh và phần gập qua một
+container query. `leaves/PressableInputLike/index.tsx` bơm `h-9 min-h-9 w-64 … rounded-field
+border-[var(--field-border)] … shadow-[var(--field-shadow)]` vào một `Button`. Và `rounded-large` nằm
+ở 5 chỗ trong `packages/ui`, một tên plugin Tailwind 3 mà head này không sinh CSS, nên góc render
+vuông trong khi source đọc như thể đã chọn góc. Thầy bổ sung ca thứ tư: `product-shells/ConsoleTopBar`
+dựng lại cả dải top bar bằng div, chỉ import `Text`, còn dải và đường ngăn thì thuộc về
+`NavigationFeatureNav`.
+
+**`scripts/sweep-presentation.mjs`** (+ `.spec.mjs`, 10 test, đã nằm trong `node --test scripts/*.spec.mjs`).
+Chạy `node scripts/sweep-presentation.mjs <checkout> [--write-set <file>] [--json]`, exit 1 khi có
+phát hiện. Bốn mã: `APP_OVERRIDE` (className thò vào một đối tượng Grammar), `APP_REIMPLEMENTATION`
+(tiện ích layout đặt lên một đối tượng vốn đã sở hữu hình học), `OFF_SCALE` (giá trị ngoài thang đóng
+của topic), `SHELL_GEOMETRY` (product shell tự vẽ dải mà không compose đối tượng shell nào của
+Grammar). Điểm trò cố ý làm: **không danh sách nào được gõ tay**. Danh sách đối tượng Grammar và tập
+"đã sở hữu hình học" đọc từ bảng `## Renderers` của `grammars/starci/DNA.md` (ai có claim
+GAP/PADDING/MARGIN/MEASURE/OVERFLOW là chủ hình học); các thang đọc từ chính bảng `## Scale` của
+`gap.md`, `padding.md`, `margin.md`, `radius.md` và `## Width scale` của `measure.md`. Sửa một topic
+là cổng đổi theo, không có nhà thứ hai để quên cập nhật.
+
+**Nối vào ba operator.** `frontend.source.apply`: bước 4 (bước tuân thủ) chạy lượt quét qua
+`@tools/shell` trên write set đã chiếu, trước khi ghi; mọi phát hiện là `WRITE_REJECTED` (mã cũ, đúng
+nghĩa "giá trị lần ghi không được uỷ quyền tạo ra" — không đăng ký mã mới), đầu ra trích vào
+`response.md` dưới `## Rejections` và bản ghi `sweep` nằm trong `writes.json` (`writes.schema.json` có
+thêm trường ấy; validator đòi nó khi `mode = apply`, kiểm lệnh, kiểm exit code khớp số phát hiện, và
+từ chối một phát hiện đi kèm receipt `done`). `quality.verify`: `presentation-sweep` là một gate;
+delivery nào mang `frontend-source-application` mà không lên kế hoạch gate ấy là `INVALID_INPUT`.
+`frontend.presentation.resolve`: phạm vi là mọi thư mục leaf/branch ứng dụng sở hữu mà write set chạm
+tới, không riêng cây của bề mặt đích; và `className` trên một đối tượng Grammar không bao giờ là đích
+resolve — nó bị gỡ và ghi dưới `## Removed` kèm case đã từ chối.
+
+**Knowledge.** `FE-FUNCTION-4` Case 5: nửa thuần không được chọn giữa một block nối và Base của nó
+(0/150 `component.tsx` ở `starci-academy-fe`; phản ví dụ là OverviewPage:314-317 lặp 4 lần).
+`FE-TEST-5` Case 4 thành luật thật (215/272 spec không ghim class) và `FE-TEST-7` mới: phủ sóng tính
+theo từng nửa, spec nối không thay được spec thuần và ngược lại. `FE-FOLDER-6` Case 5: hằng triển khai
+không sống trong thư mục component (7 lượt `NEXT_PUBLIC_` dưới `src/modules`, 0 dưới `src/components`;
+nivo có 3 chỗ trong block). `FE-IMPORTS-7` Case 7 được bổ chứng cứ shell thay vì thêm rule mới.
+
+**Ba chỗ trò phải nói thật, không tô.**
+- Số liệu không ủng hộ hai điều thầy nêu như đã thành nếp. "Block/page mới ship cả hai spec": thực
+  tế chỉ 28/101 block và 22/49 page có cả hai, nên trò viết `FE-TEST-7` như luật ràng unit mới, có
+  đúng số, và ghi 73 block còn lại vào câu hỏi để ngỏ chứ không giả vờ cây đang sạch. "Hằng tiền tệ
+  và locale sống dưới `@/modules`": bằng chứng ngược lại — `currency: "VND"` có 8 chỗ trong nửa nối
+  dưới `src/components` và 0 chỗ dưới `src/modules`, vì formatter dựng ngay nơi đọc `useLocale()`.
+  Trò chỉ luật hoá phần hằng triển khai (bằng chứng sạch 7–0) và để tiền tệ ở câu hỏi để ngỏ.
+- `ShellNav` của `starci-academy-fe` — ví dụ sạch mà thầy dẫn — thật ra có 11 export layout/spacing
+  trong `classNames.ts`. Điều tách nó khỏi `ConsoleTopBar` không phải "không có class" mà là **có
+  compose một đối tượng shell của Grammar**: `ShellNav` compose `NavigationFeatureNav` và chỉ sắp xếp
+  nội dung *bên trong slot*, còn `ConsoleTopBar` chỉ import `Text` rồi tự dựng dải. Trò cài
+  `SHELL_GEOMETRY` theo lằn ranh ấy, nên nó bắt `ConsoleTopBar` và tha `ShellNav`, `LearnShellLayout`,
+  `ConsoleLayout`, `Sidebar`. Nếu cài theo chữ ("mọi tiện ích layout trong thư mục shell là phát
+  hiện") thì chính nguồn tham chiếu đỏ 11 chỗ.
+- `PressableInputLike` truyền class vào `Button` của **HeroUI**, không phải `Button` của Grammar, nên
+  lượt quét bắt nó bằng `OFF_SCALE` (3 token) chứ không phải `APP_OVERRIDE`. Đó là đúng luật hiện
+  hành: `FE-IMPORTS-4` Case 3 cho phép leaf dùng vendor. Nếu thầy muốn class trên control vendor cũng
+  là `APP_OVERRIDE` thì đó là một luật mới, trò chưa tự viết.
+
+**Nền của lượt quét trên `starci-academy-fe`** (1474 file, gói `@starci/grammar` được loại vì nó là
+thẩm quyền chứ không phải bên tiêu thụ): 12 `APP_OVERRIDE`, 1 `APP_REIMPLEMENTATION`, 36
+`SHELL_GEOMETRY`, 337 `OFF_SCALE`. Phần `OFF_SCALE` do `p-5` (33), `max-w-full` (24), `gap-5` (23),
+`rounded-medium` (14) dẫn đầu. Hai chỗ đáng thầy ngó: `max-w-full` không nằm trên thang cap của
+`measure.md` nên bị báo — có thể thang cần một bậc "không cap", hoặc 24 chỗ kia cần sửa; và
+`SHELL_GEOMETRY` bắt cả `CoursePricingRail`/`IdentityRail` là block chứ không phải shell, vì luật
+nhận diện theo hậu tố tên thư mục ("…Rail") như thầy khai. Cả hai đều là quyết định của thầy, trò
+không tự nới.
+
+**Câu hỏi để ngỏ (chưa luật hoá, chờ thầy chốt).** `data-contract` do ứng dụng tự phát: khi nào một
+node do ứng dụng sở hữu được tự viết token `data-contract`, và ai đối chiếu nó — `frontend.presentation.resolve`
+đang là bên duy nhất phát token ấy (`contractEmission`), nhưng nivo có node ứng dụng tự gõ tay. Trò
+không đụng vào vì thầy chưa quyết. `knowledge/ui/presentation/INDEX.md` không có mục open-questions
+nên ghi ở đây.
+
+**Bổ sung sau hai phán quyết của thầy trong cùng phiên.**
+- Thầy chốt: text của rule và Case phải **không dính sản phẩm** (Skills đang chuẩn hoá cho bất kỳ ai
+  cài). Trò đã viết lại mọi Case trò thêm hôm nay theo hình dạng thay vì theo tên: `FE-FUNCTION-4`
+  Case 5 nói `props.data === null ? <X /> : <XBase {...props.data} />`; `FE-FOLDER-6` Case 5 nói
+  "hằng triển khai" chứ không kể tên block; `FE-IMPORTS-7` Case 7 nói phép thử là "có compose một
+  đối tượng shell của Grammar hay không", Case 9 (mới) nói dải được mount trong route layout, ngang
+  hàng phía trên page, còn `WorkspaceShell.header` là hero tầng page. Tên đối tượng Grammar được giữ
+  vì đó là API công khai của gói. Toàn bộ số liệu cụ thể (repo, file:line, count) dời sang
+  `tests/evidence/20260903-presentation-sweep.md` và ở lại đây. Comment fixture trong
+  `scripts/sweep-presentation.spec.mjs` cũng đã bỏ tên sản phẩm.
+- `FE-IMPORTS-7` Case 9 và lượt quét: `WorkspaceShell` bọc slot `header` trong `<header>` của nó
+  (`WorkspaceShell/index.tsx:52`) còn `NavigationFeatureNav` vốn đã là `<header>`
+  (`NavigationFeatureNav/index.tsx:53`), nên lồng vào nhau ra hai banner. Sweep giờ báo
+  `SHELL_GEOMETRY` khi một phần tử JSX tên `NavigationFeatureNav`, hay một adapter có tên kết thúc
+  bằng `Nav`/`TopBar`, đứng làm giá trị của prop `header=` trên `WorkspaceShell`. Đã thử trên file
+  thật của sản phẩm thứ hai: bắt đúng một phát hiện; adapter shell của sản phẩm tham chiếu (không
+  truyền `header`) vẫn sạch.
+- Thầy chốt: runtime chỉ đọc file tiếng Anh. Trò đã rà `scripts/`, `docs/scripts/`,
+  `sites/skills/scripts/`, `alias/alias.json`, `routing.json`, `resources/*.json`: **không có chỗ nào
+  nạp `.vi.md` làm thẩm quyền**, và không có gì trò thêm hôm nay đọc `.vi.md`
+  (`sweep-presentation.mjs` đọc đúng `knowledge/ui/presentation/{gap,padding,margin,measure,radius}.md`
+  và `knowledge/grammars/starci/DNA.md`). Chỗ duy nhất `.vi.md` bị *đọc* là các generator ghi ra
+  chính bản mirror (`generate-alias-doc`, `generate-operators-index`, `generate-grammar-dna`,
+  `generate-presentation-owned`) và các validator đối chiếu mirror có trôi khỏi bản Anh hay không
+  (`validate-operator.mjs`, `validate-alias.mjs`). Trò **không gỡ** hai validator ấy: chúng không lấy
+  thẩm quyền từ `.vi.md`, chúng chỉ chứng minh mirror khớp bản Anh, và gỡ đi là mất cổng chống trôi.
+  Nhưng câu "`.vi.md` không bao giờ vào ... validator input" ở `INDEX.md` đang nói quá so với thực tế
+  ấy — thầy quyết: hoặc nới câu đó, hoặc trò gỡ cổng parity.
+- Còn một chỗ trò cố ý không đụng: `knowledge/patterns/fe/INDEX.md` và dòng `Sources:` của
+  `folder.md` vẫn nêu tên repo và cả đường dẫn Windows tuyệt đối. Chúng có từ trước phiên này và là
+  phần khai xuất xứ của cả nhóm `patterns/fe`, không phải text của rule; sửa là phải làm lại mô hình
+  xuất xứ của cả nhóm. Trò để nguyên và báo.

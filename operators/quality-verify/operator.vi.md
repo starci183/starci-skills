@@ -68,6 +68,20 @@ End-to-end không bao giờ chạy trừ khi có người yêu cầu trong chín
 hiện `E2E_NOT_REQUESTED`: không lệnh, không mã thoát, không bằng chứng, và không hàm ý nào rằng hành
 vi đã được chứng minh. Lập kế hoạch cổng e2e mà không có yêu cầu ấy là đầu vào không hợp lệ.
 
+## Một delivery frontend vừa được biên dịch vừa được quét
+
+Format, lint, typecheck và build đo xem source có đúng dạng hay không. Không cổng nào trong số đó đo
+được một class đáp xuống node nào, nên một trang chồng `flex-col items-start sm:flex-row` lên một đối
+tượng Grammar có CSS tự sở hữu phần gập vẫn biên dịch sạch, lint sạch, rồi lên sản phẩm. Cổng
+`presentation-sweep` bịt đúng lỗ hổng ấy: `node scripts/sweep-presentation.mjs` chạy trên write set đã
+giao và trả về các phát hiện `APP_OVERRIDE`, `APP_REIMPLEMENTATION`, `OFF_SCALE` và `SHELL_GEOMETRY`
+kèm file, dòng và token vi phạm. Nó được lên kế hoạch mỗi khi delivery mang một
+`frontend-source-application`, và một request khai delivery frontend mà thiếu nó là đầu vào không hợp
+lệ. `frontend.source.apply` chạy đúng lượt quét ấy trên bản chiếu trước khi ghi; cổng này chạy nó trên
+thứ thực sự đã giao, vì hai cái chỉ là một cây khi không có gì trục trặc ở giữa. Một phát hiện ở đây
+là cổng đỏ nên là một phán quyết chứ không phải một mã dừng: nó quay về chủ frontend đúng như một bài
+test hỏng.
+
 ## Coverage mang bốn ngưỡng, không phải một
 
 Statement, line, function và branch mỗi thứ so với ngưỡng riêng của nó, và branch mang một ngưỡng độc
@@ -122,7 +136,7 @@ khoản nợ không ai duyệt hoặc đã hết hạn.
 
 | Field | Kiểu | Mặc định | Hỏi |
 | --- | --- | --- | --- |
-| `gates` | list of `{gate, commandRef, configRef, required}` | the routed gate plan | Chạy những cổng đã ghim nào, mỗi cổng một lần, trong format, lint, typecheck, build, unit-coverage, integration, e2e và sonar |
+| `gates` | list of `{gate, commandRef, configRef, required}` | the routed gate plan | Chạy những cổng đã ghim nào, mỗi cổng một lần, trong format, lint, typecheck, build, unit-coverage, integration, e2e, sonar và presentation-sweep |
 | `thresholds` | list of `{statements, lines, functions, branches}` | the four percentages the routed gate configuration pins | Mỗi chỉ số coverage phải đạt bao nhiêu phần trăm, branch đứng riêng |
 | `explicitE2eRequest` | choice | false | false trừ khi có người yêu cầu bộ end-to-end trong chính lần gọi này; chỉ khi đó mới true |
 | `sonarScope` | choice | new-code | new-code hoặc overall; phải khớp với việc sonar có nằm trong kế hoạch cổng hay không |

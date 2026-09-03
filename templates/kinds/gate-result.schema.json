@@ -58,7 +58,7 @@
     "statement": { "type": "string", "minLength": 1 }
   },
   "$defs": {
-    "gate": { "enum": ["format", "lint", "typecheck", "build", "unit-coverage", "integration", "e2e", "sonar"] },
+    "gate": { "enum": ["format", "lint", "typecheck", "build", "unit-coverage", "integration", "e2e", "sonar", "presentation-sweep"] },
     "gitHead": { "type": "string", "pattern": "^[0-9a-f]{40}$" }
   }
 }

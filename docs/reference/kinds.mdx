@@ -213,11 +213,11 @@ Skeleton: [`templates/kinds/quality-verification.skeleton.md`](https://github.co
 | Section | Table header | Rows | Cell constraints |
 | --- | --- | --- | --- |
 | `^## Binding$` | `\| Field \| Value \|` | `Operator`, `Step`, `Checkout`, `Head`, `Session branch`, `Predecessors` | `Value`: `\S` |
-| `^## Gate plan$` | `\| Gate \| Required \| Command \| Configuration \|` | minRows 1 | `Gate`: `^`(format\|lint\|typecheck\|build\|unit-coverage\|integration\|e2e\|sonar)`$`<br />`Required`: `^(yes\|no)$` |
-| `^## Results$` | `\| Gate \| Status \| Exit code \| Evidence \| Classification \| Statement \|` | minRows 1 | `Gate`: `^`(format\|lint\|typecheck\|build\|unit-coverage\|integration\|e2e\|sonar)`$`<br />`Status`: `^(pass\|fail\|external-blocker\|skipped-not-requested)$`<br />`Classification`: `^(in-boundary\|boundary-drift\|flaky\|external-blocker\|—)$`<br />`Statement`: `\S` |
+| `^## Gate plan$` | `\| Gate \| Required \| Command \| Configuration \|` | minRows 1 | `Gate`: `^`(format\|lint\|typecheck\|build\|unit-coverage\|integration\|e2e\|sonar\|presentation-sweep)`$`<br />`Required`: `^(yes\|no)$` |
+| `^## Results$` | `\| Gate \| Status \| Exit code \| Evidence \| Classification \| Statement \|` | minRows 1 | `Gate`: `^`(format\|lint\|typecheck\|build\|unit-coverage\|integration\|e2e\|sonar\|presentation-sweep)`$`<br />`Status`: `^(pass\|fail\|external-blocker\|skipped-not-requested)$`<br />`Classification`: `^(in-boundary\|boundary-drift\|flaky\|external-blocker\|—)$`<br />`Statement`: `\S` |
 | `^## Coverage$` | `\| Metric \| Measured \| Threshold \| Verdict \|` | — | `Metric`: `^(statements\|lines\|functions\|branches)$`<br />`Verdict`: `^(at-or-above\|below)$` |
 | `^## Sonar$` | `\| Field \| Value \|` | `Scope`, `Finding` | `Value`: `\S` |
-| `^## Debts$` | `\| Debt \| Gate \| Approval \| Owner \| Expires \| Statement \|` | — | `Gate`: `^`(format\|lint\|typecheck\|build\|unit-coverage\|integration\|e2e\|sonar)`$` |
+| `^## Debts$` | `\| Debt \| Gate \| Approval \| Owner \| Expires \| Statement \|` | — | `Gate`: `^`(format\|lint\|typecheck\|build\|unit-coverage\|integration\|e2e\|sonar\|presentation-sweep)`$` |
 | `^## Findings$` | `\| Code \| Gate \| Statement \|` | minRows 1 | `Code`: `^`(PREDECESSOR_CONSUMED\|SONAR_NEW_CODE_ONLY\|E2E_NOT_REQUESTED\|COVERAGE_BELOW_THRESHOLD\|FLAKY_CONFIRMED\|DEBT_DECLARED)`$`<br />`Statement`: `\S` |
 | `^## Verdict$` | `\| Field \| Value \|` | exactRows 1 | `Value`: `^`(pass\|fail)`$` |
 
@@ -289,4 +289,4 @@ Skeleton: [`templates/kinds/workspace-route-binding.skeleton.md`](https://github
 | `uat-verdicts` | [`templates/kinds/uat-verdicts.schema.json`](https://github.com/starci183/starci-skills/blob/main/templates/kinds/uat-verdicts.schema.json) | `runId`, `commit`, `resultRef`, `latestRef`, `lanes`, `cleanup` |
 | `ui-coverage` | [`templates/kinds/ui-coverage.schema.json`](https://github.com/starci183/starci-skills/blob/main/templates/kinds/ui-coverage.schema.json) | `directionId`, `actions`, `regions`, `states`, `responsive` |
 | `verdicts` | [`templates/kinds/verdicts.schema.json`](https://github.com/starci183/starci-skills/blob/main/templates/kinds/verdicts.schema.json) | `entries` |
-| `writes` | [`templates/kinds/writes.schema.json`](https://github.com/starci183/starci-skills/blob/main/templates/kinds/writes.schema.json) | `mode`, `base`, `branch`, `commit`, `files` |
+| `writes` | [`templates/kinds/writes.schema.json`](https://github.com/starci183/starci-skills/blob/main/templates/kinds/writes.schema.json) | `mode`, `base`, `branch`, `commit`, `files`, `sweep` |

@@ -13,6 +13,7 @@
     "tools": {
       "@tools/fileread": "context-aliases",
       "@tools/sourcewrite": "declared-write-set",
+      "@tools/shell": "declared-commands",
       "@tools/git": "commit-session-branch",
       "@tools/imagegen": "judged"
     }

@@ -35,6 +35,24 @@ tiếp theo là sửa write set, không phải ghi rộng ra. Một path đã kh
 `OWNER_CONFLICT`, vì thuộc về owner nào chưa phải là trần. Phép kiểm kho chạy trên bản chiếu, trước
 khi ghi bất cứ thứ gì, nên một lần áp dụng bị từ chối để source y nguyên.
 
+## Phép kiểm tuân thủ đọc write set, không đọc bản kế hoạch
+
+Phép kiểm kho trả lời đúng một câu hỏi: mọi giá trị có đến từ resolution không? Nó không trả lời được
+câu còn lại: source, đúng như nó sẽ nằm trên đĩa, có còn chứa một class mà luật đã cấm sẵn không? Một
+resolution có thể publish `flex-col` một cách trung thực mà ứng dụng vẫn viết đúng class ấy lên một
+`SectionHeader` có CSS tự sở hữu phần gập, bởi kho chỉ ghi những class nào tồn tại chứ không ghi
+chúng đáp xuống node nào. Vì vậy bước tuân thủ còn chạy `node scripts/sweep-presentation.mjs` trên
+write set đã chiếu, qua `@tools/shell`, và đọc bốn mã của nó: `APP_OVERRIDE`, một class thò vào một
+đối tượng Grammar; `APP_REIMPLEMENTATION`, một tiện ích layout đặt lên một đối tượng vốn đã sở hữu
+hình học của mình; `OFF_SCALE`, một giá trị nằm ngoài thang đóng mà topic của nó publish; và
+`SHELL_GEOMETRY`, một product shell tự vẽ dải mà lẽ ra phải compose. Bất kỳ phát hiện nào cũng là
+`WRITE_REJECTED`, với đầu ra của lượt quét trích vào `response.md` dưới `## Rejections`, và bản ghi
+`sweep` nằm trong `writes.json`. Đó vẫn là mã mà phép kiểm kho phát ra, vì đó vẫn là một lời từ
+chối như nhau: một giá trị mà lần ghi không được uỷ quyền tạo ra. Giống phép kiểm kho, lượt quét chạy
+trên bản chiếu, trước khi ghi bất cứ thứ gì, nên một lần áp dụng bị từ chối để source y nguyên. Lượt
+quét là một cổng chứ không phải một tác giả: nó không bao giờ sửa một class, và bước đúng tiếp theo là
+một resolution đã sửa hoặc một write set đã sửa.
+
 ## Node do ứng dụng sở hữu thành một file lá rỗng
 
 Khi hướng đánh dấu một node là do ứng dụng sở hữu, chẳng hạn một canvas, bản chiếu ghi ra một file lá
@@ -88,7 +106,7 @@ không bao giờ biết nó render ra sao.
 | 1 | Kiểm gate, chạy lại, và xác nhận head | `resume`, `mode` | `request/request.json`, đầu vào `frontend-presentation-resolution`, @workspaces/fe ở head đóng băng | — | `INVALID_INPUT`, `SOURCE_DRIFT`, `NO_PROGRESS` |
 | 2 | Bind resolution, direction và write set đã khai | — | đầu vào `frontend-presentation-resolution` (fingerprint cây, kho class và kho luật, cây đã resolve) và `frontend-direction-decision` (ý đồ và trần owner), @workspaces/fe (các path đã khai và gốc owner của chúng) | — | `RESOLUTION_STALE`, `OWNER_CONFLICT` |
 | 3 | Chiếu cây đã resolve lên các path đã khai | — | đầu vào `frontend-presentation-resolution` (cây đã resolve), @workspaces/fe (write set đã khai) | — | — |
-| 4 | Đối chiếu mọi giá trị tạo ra với kho | `mode` | đầu vào `frontend-presentation-resolution` (kho nằm cạnh biên nhận) | `response/data/writes.json` | `WRITE_REJECTED` |
+| 4 | Đối chiếu mọi giá trị tạo ra với kho, rồi quét write set đã chiếu | `mode` | đầu vào `frontend-presentation-resolution` (kho nằm cạnh biên nhận), @workspaces/fe (write set đã chiếu), @tools/shell | `response/data/writes.json` | `WRITE_REJECTED` |
 | 5 | Ghi nguyên khối trên nhánh phiên và commit một lần | — | @workspaces/fe (nội dung hiện tại của từng path đã khai, dưới một lease độc quyền) | @workspaces/fe/branch/session, `response/data/writes.json`, @tools/sourcewrite, @tools/git, asset ảnh mà direction phán là cần, @tools/imagegen | — |
 | 6 | Đọc lại cây ở commit | — | @workspaces/fe ở commit | — | `WRITE_REJECTED` |
 | 7 | Phát | — | mọi thứ ở trên | `response/response.md`, `response/changes.md`, `response/response.json` | — |
@@ -96,7 +114,9 @@ không bao giờ biết nó render ra sao.
 Dưới `mode = dry`, nhánh dừng sau bước 4 với riêng bản kế hoạch: `writes.json` mang commit rỗng,
 `response.json` không mang commit nào, và checkout y nguyên. Một lượt dry không được cấp
 `@tools/sourcewrite` lẫn `@tools/git`, vì một chế độ không ghi gì thì không cần công cụ nào ghi được;
-phần cấp quyền và đoạn này nói cùng một điều nên chúng không thể trôi khỏi nhau. Dưới `apply`, bước 5 ghi rồi commit đúng
+phần cấp quyền và đoạn này nói cùng một điều nên chúng không thể trôi khỏi nhau. `@tools/shell` được
+cấp ở cả hai chế độ và ghim vào đúng một câu lệnh là lượt quét, vì một lượt dry bỏ qua lượt quét sẽ
+công bố một bản kế hoạch chưa ai kiểm. Dưới `apply`, bước 5 ghi rồi commit đúng
 một lần và bước 6 chứng minh rằng cây đã commit đúng là cây đã resolve. `changes.md` là bản ghi mà
 các bước sau đọc: path nào đã dịch chuyển, chúng mang lời khai nào, checkout ghim cổng nào cho chúng,
 và bề mặt nào bây giờ phải được quan sát.
