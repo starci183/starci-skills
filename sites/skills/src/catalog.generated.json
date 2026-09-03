@@ -1,6 +1,6 @@
 {
-  "version": "1.7.4",
-  "lineageNote": "1.7.4 (2026-09-03): authority comes from the environment declaration — .stacks/<env>/environment.json marks each operation class declared or person, non-production defaults to declared for provisioning and runtime, production to person, and the approval field accepts the declaration reference with its hash; several rendered candidates are ranked by the proof rubric and the dominant one is taken, a person is asked only over a scored tie; a data-volume criterion is measured at the flow's representative seeded volume, routes to seed below it and is data-bound at it; a criterion the person's printed choice was known to fail is person-accepted and does not block quality or uat.",
+  "version": "1.7.5",
+  "lineageNote": "1.7.5 (2026-09-04): a UAT run is triggered by need and authorised by the environment declaration for its seed and identity classes, not by a person named in the request; a state-reading topic — composition, accessibility, the taste lens — is blocked with its coverage gaps named when the matrix does not cover every state the direction declares, and a narrowed round cannot close a loop or exhaust a budget; the serve rung runs the delivery gates the product declares, patch coverage against the merged base included.",
   "entry": {
     "name": "starci",
     "description": "Complete one StarCi mission by freezing its scope, selecting the one operator that owns the outcome, and routing between operators on typed results until the outcome is proved or a person must decide.",
@@ -1579,6 +1579,10 @@
           "operator": "frontend.surface.audit"
         },
         {
+          "when": "a state-reading topic is blocked because the matrix leaves out a state the direction's coverage declares, so the surface is audited again once the matrix covers it",
+          "operator": "frontend.surface.audit"
+        },
+        {
           "when": "a density criterion was measured below the flow's representative seeded volume, so the data is seeded before the surface is judged again",
           "operator": "platform.operate"
         },
@@ -1960,7 +1964,7 @@
           "code": "AUTHORITY_DRIFT",
           "disposition": "terminate",
           "domain": "caller",
-          "meaning": "The approval — an approval id, or the environment declaration it references, whose content hash has moved — the plan hash, or the allowed effect set no longer matches the requested delta.",
+          "meaning": "The approval — an approval id, or the environment declaration it references, whose content hash has moved — no longer matches what the operation asked for.",
           "shared": false
         },
         {
@@ -2602,6 +2606,13 @@
           "domain": "caller",
           "meaning": "A resume adds no evidence, constraint, inventory, or approval delta.",
           "shared": true
+        },
+        {
+          "code": "AUTHORITY_DRIFT",
+          "disposition": "terminate",
+          "domain": "caller",
+          "meaning": "The approval — an approval id, or the environment declaration it references, whose content hash has moved — no longer matches what the operation asked for.",
+          "shared": false
         },
         {
           "code": "ADMISSION_MISSING",
@@ -3788,14 +3799,15 @@
     {
       "code": "AUTHORITY_DRIFT",
       "scope": [
-        "platform.operate"
+        "platform.operate",
+        "uat.verify"
       ],
       "shared": false,
       "domain": "caller",
       "disposition": "terminate",
-      "meaning": "The approval — an approval id, or the environment declaration it references, whose content hash has moved — the plan hash, or the allowed effect set no longer matches the requested delta.",
+      "meaning": "The approval — an approval id, or the environment declaration it references, whose content hash has moved — no longer matches what the operation asked for.",
       "fallback": null,
-      "resume": "Bring a fresh approval for this exact plan: a new id, or the declaration's current reference."
+      "resume": "Bring a fresh approval for this exact operation: a new id, or the declaration's current reference."
     },
     {
       "code": "AUTHORIZATION_MISSING",

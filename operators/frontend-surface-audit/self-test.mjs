@@ -169,6 +169,11 @@ ${tasteTable(lens)}
 | --- | --- | --- |
 ${verdictTable(lens)}
 
+## Coverage gaps
+
+| Topic | Missing state |
+| --- | --- |
+
 ## Regressions
 
 | Matrix | Node | Rule | Measured | Routes to |
@@ -249,7 +254,7 @@ const decisionMd = ({ policy = 'approval-required', selected = 'one-column', fai
   '',
 ].join(String.fromCharCode(10));
 
-function writeBranch(files, { decisionClass = 'console', decision = {} } = {}) {
+function writeBranch(files, { decisionClass = 'console', decision = {}, coverageStates = [] } = {}) {
   const session = mkdtempSync(path.join(tmpdir(), 'fe-audit-session-'));
   const branch = path.join(session, 'step-4', 'parallel-1');
   for (const d of ['request', 'response/data/captures', 'response/artifacts']) mkdirSync(path.join(branch, d), { recursive: true });
@@ -264,7 +269,7 @@ function writeBranch(files, { decisionClass = 'console', decision = {} } = {}) {
   writeFileSync(path.join(session, 'step-1', 'parallel-1', 'response', 'data', 'route.json'), JSON.stringify({ served: { branch: 'uat', head: SERVED, contains: [APPLIED], port: 3067 } }, null, 2));
   writeFileSync(
     path.join(session, 'step-1', 'parallel-1', 'response', 'data', 'coverage.json'),
-    JSON.stringify({ directionId: 'plan-picker', ...(decisionClass ? { surfaceClass: decisionClass } : {}), actions: [], regions: [], states: [], responsive: [] }, null, 2),
+    JSON.stringify({ directionId: 'plan-picker', ...(decisionClass ? { surfaceClass: decisionClass } : {}), actions: [], regions: [], states: coverageStates, responsive: [] }, null, 2),
   );
   writeFileSync(path.join(session, 'state.json'), JSON.stringify({ id: 's-test', project: 'starci-academy', startedAt: '2026-09-03T00:00:00Z', requestHashes: {}, chain: [['3/1'], ['4/1']], steps: { '3/1': 'frontend.source.apply', '4/1': 'frontend.surface.audit' }, current: '4/1', status: 'running' }));
   for (const [name, content] of Object.entries(files)) {
@@ -402,4 +407,112 @@ await expectError(lensBranch(() => tastePersonAccepted('step-9/parallel-9'), SHI
 await expectError(lensBranch(tastePersonAccepted, SHIPPED), 'was not shown failing', 'a person-accepted criterion the chosen candidate was never shown failing', { decision: { failing: [] } });
 await expectError(lensBranch(tastePersonAccepted, SHIPPED), 'took by itself', 'a person-accepted row over a decision the operator took automatically', { decision: { policy: 'automatic', failing: ['TASTE-2'] } });
 
-process.stdout.write('frontend.surface.audit self-test: 8 valid branches, 54 rejected mutations\n');
+// The matrix paragraph and TASTE-13 Case 8: a state the direction's coverage declares (`empty`) was
+// never captured, so composition, accessibility and taste — the topics whose rules read across
+// states — are `blocked` over it, even though every result and criterion judged inside the captured
+// matrix passed; the receipt records the covered subset under ## Matrix and names what was missing
+// under ## Coverage gaps, and next may not carry on to quality.verify or back to direction over a
+// gap that is not a composition finding.
+const coverageGapTaste = taste();
+const coverageGapMd = ({ tasteVerdictLine = 'blocked', tasteRoute = 'none', gapRows = '| `composition` | empty |\n| `accessibility` | empty |\n| `taste` | empty |' } = {}) => `# frontend-surface-audit — plan-picker
+
+## Served surface
+
+| Field | Value |
+| --- | --- |
+| Applied commit | ${BT}${APPLIED}${BT} |
+| Served branch | ${BT}uat${BT} |
+| Served head | ${BT}${SERVED}${BT} |
+| Contains applied commit | yes |
+| Browser profile | ${BT}${PROFILE}${BT} |
+| Family version observed | ${BT}${FAMILY}${BT} |
+| Family version resolved against | ${BT}${FAMILY}${BT} |
+
+## Surface class
+
+| Class | Declared by |
+| --- | --- |
+| ${BT}console${BT} | ${BT}frontend-direction-decision${BT}, whose coverage names the class every banded rule reads |
+
+## Matrix
+
+| Matrix | Viewport | Scheme | State | Screenshot |
+| --- | --- | --- | --- | --- |
+| ${BT}${WIDE}${BT} | 1440x900 | light | loaded | ${BT}${SHOT(WIDE)}${BT} |
+| ${BT}${NARROW}${BT} | 390x844 | light | loaded | ${BT}${SHOT(NARROW)}${BT} |
+
+## Verdicts by owner
+
+| Matrix | Owner | Node | Rule | Measured | Verdict |
+| --- | --- | --- | --- | --- | --- |
+| ${BT}${WIDE}${BT} | app | ${BT}${MAIN}${BT} | ${BT}GAP-5${BT} | 1.5rem | pass |
+| ${BT}${WIDE}${BT} | grammar | ${BT}${SECTION}${BT} | ${BT}PADDING-4${BT} | 1rem | pass |
+| ${BT}${NARROW}${BT} | app | ${BT}${MAIN}${BT} | ${BT}GAP-5${BT} | 1rem | fail |
+| ${BT}${NARROW}${BT} | grammar | ${BT}${SECTION}${BT} | ${BT}PADDING-4${BT} | 1rem | pass |
+
+## Taste
+
+| Rule | Measured | Score | Verdict |
+| --- | --- | --- | --- |
+${tasteTable(coverageGapTaste)}
+
+- Mean: ${coverageGapTaste.mean.toFixed(2)}
+- Verdict: ${tasteVerdictLine}
+
+## Verdict
+
+| Topic | Verdict | Route |
+| --- | --- | --- |
+| ${BT}presentation${BT} | fail | resolve |
+| ${BT}composition${BT} | blocked | none |
+| ${BT}responsive${BT} | blocked | none |
+| ${BT}motion${BT} | blocked | none |
+| ${BT}accessibility${BT} | blocked | none |
+| ${BT}contrast${BT} | blocked | none |
+| ${BT}render-truth${BT} | blocked | none |
+| ${BT}taste${BT} | ${tasteVerdictLine} | ${tasteRoute} |
+
+## Coverage gaps
+
+| Topic | Missing state |
+| --- | --- |
+${gapRows}
+
+## Regressions
+
+| Matrix | Node | Rule | Measured | Routes to |
+| --- | --- | --- | --- | --- |
+| ${BT}${NARROW}${BT} | ${BT}${MAIN}${BT} | ${BT}GAP-5${BT} | 1rem | resolve |
+
+## Grammar gaps
+
+| Component | Rule | What the family lacks |
+| --- | --- | --- |
+
+## Printed
+
+| Artifact | Why |
+| --- | --- |
+${PRINTED.join(String.fromCharCode(10))}
+
+## Fallbacks taken
+
+| Code | Action |
+| --- | --- |
+`;
+const coverageGapFiles = (over = {}, next = ['frontend.presentation.resolve']) => ({
+  ...baseline(),
+  'response/data/verdicts.json': verdicts(() => coverageGapTaste),
+  'response/response.md': coverageGapMd(over),
+  'response/response.json': responseJson({ next }),
+});
+const EMPTY_STATE = { coverageStates: [{ meaning: 'empty', carrier: 'the offer region' }] };
+await expectValid(coverageGapFiles(), 'a matrix narrowed against a declared state: composition, accessibility and taste are blocked and the receipt names the missing state', EMPTY_STATE);
+await expectError(coverageGapFiles({ tasteVerdictLine: 'ship', tasteRoute: 'none' }), 'TASTE-13 makes the surface blocked', 'a taste lens recorded ship over a matrix that never captured a declared state', EMPTY_STATE);
+await expectError({ ...coverageGapFiles(), 'response/response.md': coverageGapMd().replace('| `taste` | blocked | none |', '| `taste` | fix-first | direction |') }, "Verdict records fix-first for taste; its own rule made it blocked", 'a state-reading topic recorded fix-first over a matrix gap', EMPTY_STATE);
+await expectError({ ...coverageGapFiles(), 'response/response.md': coverageGapMd({ gapRows: '' }) }, 'Coverage gaps omits', 'a matrix gap left unnamed under ## Coverage gaps', EMPTY_STATE);
+await expectError({ ...coverageGapFiles(), 'response/response.md': coverageGapMd({ gapRows: '| `presentation` | empty |' }) }, 'which this branch\'s coverage and captures do not bear out', 'a Coverage gaps row for a topic that does not read states', EMPTY_STATE);
+await expectError(coverageGapFiles({}, ['frontend.presentation.resolve', 'quality.verify']), 'quality.verify follows only once every topic ships or passes', 'a narrowed round claiming to close the loop into quality.verify', EMPTY_STATE);
+await expectError(coverageGapFiles({}, ['frontend.presentation.resolve', 'frontend.direction.decide']), 'a matrix gap is not a composition finding', 'a narrowed round sent to direction as if it were a composition finding', EMPTY_STATE);
+
+process.stdout.write('frontend.surface.audit self-test: 9 valid branches, 58 rejected mutations\n');

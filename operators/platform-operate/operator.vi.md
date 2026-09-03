@@ -91,9 +91,10 @@ nào trong bốn luật đã áp — bản ghi đó là thứ cho người đọ
 lần đã lấy một bên.
 
 Giải xung đột không đồng nghĩa với tin kết quả. Trước khi server khởi động lại trên head đã gộp,
-`serve` chạy các gate phát hành của sản phẩm trên head đó — typecheck, lint, architecture lint và unit
-test, đúng danh sách mà `quality.verify` chạy — và chỉ một gate đỏ mới dừng bậc này, với
-`INTEGRATION_FAILED` nêu tên gate hỏng và những chỗ đã được giải xung đột. Audit và UAT chạy tiếp trên
+`serve` chạy các gate phát hành mà sản phẩm tự khai cho nó — kể cả patch coverage đo trên base mà lần
+tích hợp đã gộp — đọc chúng từ chính script đã khai của sản phẩm chứ không phải một danh sách chép
+vào cây này, và chỉ một gate đỏ mới dừng bậc này, với `INTEGRATION_FAILED` nêu tên gate hỏng và những
+chỗ đã được giải xung đột. Audit và UAT chạy tiếp trên
 nhánh tích hợp mới là thứ bắt được một kết quả hỏng mà gate không thấy; gate ở đây chỉ từ chối phục vụ
 một head hỏng thứ nó thấy được. `INTEGRATION_FAILED` được nối lại khi một người hoặc chính phiên sở hữu
 sửa trên nhánh phiên rồi xin serve lại — không bao giờ bằng cách rebase, force hay bỏ qua lần merge đã

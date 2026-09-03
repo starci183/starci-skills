@@ -104,10 +104,11 @@ File này không cấp gì cả. Mọi ranh giới thẩm quyền đều do các
 
 - `git.publish` không có yêu cầu nào gọi tên được force push, hook bị bỏ qua, reset, clean, stash hay
   xoá nhánh; nó merge nhánh phiên, push không force, và xung đột là `NON_FAST_FORWARD` cho người xử.
-- `release.deploy` và `platform.operate` đòi `approval`; `release.deploy` chỉ chạy trên đầu vào
-  `quality-verification`.
-- `uat.verify` chỉ chạy khi có `requestedBy`, bản ghi tài khoản từ chối trường password, và validator
-  của nó bác mọi chuỗi có hình dạng credential trong bất cứ thứ gì nó ghi.
+- `release.deploy`, `platform.operate` và `uat.verify` đòi `approval`, lấy từ chính khai báo của môi
+  trường khi khai báo đó đánh dấu lớp thao tác bị chạm là `declared`, và từ một con người chỉ khi môi
+  trường đánh dấu là `person`; `release.deploy` chỉ chạy trên đầu vào `quality-verification`.
+- Bản ghi tài khoản của `uat.verify` từ chối trường password, và validator của nó bác mọi chuỗi có
+  hình dạng credential trong bất cứ thứ gì nó ghi.
 - `frontend.presentation.resolve` và `frontend.surface.audit` chỉ được gọi tên những mã rule mà
   knowledge được bind có publish; `frontend.source.apply` chỉ ghi class có trong inventory đã resolve.
 - Operator ghi source chỉ commit trên `session/<sessionId>`; nhánh của người không bao giờ bị đụng.

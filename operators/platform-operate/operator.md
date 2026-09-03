@@ -93,9 +93,10 @@ file, the hunk's range and which of the four rules applied — the record is wha
 tell a clean merge from one that took a side.
 
 Resolving a conflict is not the same as trusting the result. Before the server restarts on the merged
-head, `serve` runs the product's delivery gates on it — typecheck, lint, architecture lint and unit
-tests, the same list `quality.verify` runs — and only a red gate stops the rung, with
-`INTEGRATION_FAILED` naming the failing gate and the resolutions that were made. The audit and UAT that
+head, `serve` runs the delivery gates the product declares for it — patch coverage against the base
+the integration merged included — reading them from the product's own declared scripts rather than a
+list copied into this tree, and only a red gate stops the rung, with `INTEGRATION_FAILED` naming the
+failing gate and the resolutions that were made. The audit and UAT that
 follow on the integration branch are what catch a broken result the gates cannot see; the gate here
 only refuses to serve a head that fails what it can see. `INTEGRATION_FAILED` is resumed by a person or
 the owning session repairing the session branch and asking to serve again — never by rebasing, forcing

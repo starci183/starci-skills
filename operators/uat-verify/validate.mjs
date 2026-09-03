@@ -1,10 +1,12 @@
-// uat.verify's own law over one branch, on top of the shared step check: a person asked for the run;
-// both admissions are present and taken at the pinned commit; the snapshot froze the requested cases
-// in a contiguous order; every frozen case has a capture and a screenshot; the verdicts carry exactly
-// the three independent lanes; the published result carries the pinned commit; cleanup deletes the run
-// namespace and never a run record; the run history is append-only; and no capture, snapshot, verdict
-// or published sentence contains the password. Masking is proved, not promised: the chosen placeholder
-// for the shared UAT password may appear nowhere this operator writes.
+// uat.verify's own law over one branch, on top of the shared step check: the run's authority is
+// covered — an approval id, or the environment declaration's reference where it marks the run's own
+// classes declared; both admissions are present and taken at the pinned commit; the snapshot froze
+// the requested cases in a contiguous order; every frozen case has a capture and a screenshot; the
+// verdicts carry exactly the three independent lanes; the published result carries the pinned commit;
+// cleanup deletes the run namespace and never a run record; the run history is append-only; and no
+// capture, snapshot, verdict or published sentence contains the password. Masking is proved, not
+// promised: the chosen placeholder for the shared UAT password may appear nowhere this operator
+// writes.
 import { existsSync, readdirSync, statSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
 import path from 'node:path';
@@ -12,9 +14,12 @@ import process from 'node:process';
 import { fileURLToPath } from 'node:url';
 import { validateStep } from '../../scripts/validate-step.mjs';
 import { tableUnder } from '../../scripts/validate-response.mjs';
-import { missingStack } from '../../scripts/validate-request.mjs';
+import { hostRootOf, missingStack, loadEnvironmentSchema, parseDeclarationReference, stackDeclaration } from '../../scripts/validate-request.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
+// What this run itself writes: seeding the frozen records and signing in as the flow's dedicated
+// account. Provisioning the account is platform.operate's own class and is not asked here.
+export const UAT_CLASSES = ['seed', 'identity-provisioning'];
 const LANES = ['behavior', 'ux', 'ui'];
 // knowledge/ui/proof/ux.md: UX-1..UX-11 are the scored criteria and UX-12 is the arithmetic over
 // them. `ship` needs no failure on the five criteria that strand a person mid-task, and a mean of at
@@ -67,7 +72,7 @@ export const PASSWORD_LEAK = /uat-shared-password|password\s*[:=]\s*\S/i;
 const empty = (v) => v === undefined || v === null || v === '' || v === '—';
 const asList = (v) => (Array.isArray(v) ? v : v === undefined || v === null ? [] : [v]);
 
-export async function validateUatStep(branchDir, root = ROOT) {
+export async function validateUatStep(branchDir, root = ROOT, { hostRoot = hostRootOf(root) } = {}) {
   const base = await validateStep(root, branchDir);
   const errors = [...base.errors];
   const { response, request, requirements = {}, present = new Set() } = base;
@@ -76,15 +81,34 @@ export async function validateUatStep(branchDir, root = ROOT) {
   const read = (f) => readFile(path.join(branchDir, f), 'utf8');
   const decided = response.status === 'done';
 
-  // UAT is never routine: a run exists because a person asked for it, and the run identifier and the
-  // exclusive lease arrive from the orchestrator rather than from a person.
-  if (decided && empty(requirements.requestedBy)) errors.push('request.json: UAT runs only when a person asked; requestedBy has no value');
+  // The run identifier and the exclusive lease arrive from the orchestrator, never from a person.
   if (decided && empty(requirements.runId)) errors.push('request.json: the orchestrator supplies runId; a decided run cannot namespace its records without one');
   if (decided && empty(requirements.lease)) errors.push('request.json: the orchestrator supplies the exclusive lease; a decided run cannot write the flow directory without one');
 
   // An env names a stack of this installation; the vocabulary is the folder, not a list kept here.
-  const missing = missingStack(root, requirements.env);
+  const missing = missingStack(root, requirements.env, hostRoot);
   if (missing) errors.push(`request.json: env ${requirements.env} names ${missing}, which this installation does not have`);
+
+  // Authority for this run's own writes: an approval id, or the environment's own declaration when it
+  // marks `seed` and `identity-provisioning` declared for `env`. The declaration is read as it stands,
+  // hashed, and checked against the environment schema; a reference is refused for a declaration that
+  // is absent, moved, belongs to another environment, is refused by its schema, or marks either class
+  // person.
+  if (decided && empty(requirements.approval)) errors.push('request.json: approval has no default; a UAT run is never authorised on silence, and an environment that authorises its seeding and its sign-in says so in a declaration the request references');
+  else if (!empty(requirements.approval)) {
+    const envSchema = await loadEnvironmentSchema(root);
+    const ref = parseDeclarationReference(envSchema, requirements.approval);
+    if (ref) {
+      if (!empty(requirements.env) && ref.env !== String(requirements.env)) errors.push(`request.json: approval references the ${ref.env} declaration while the run drives ${requirements.env}; a declaration authorises its own environment only`);
+      const decl = await stackDeclaration(root, ref.env, hostRoot, envSchema);
+      if (!decl.exists) errors.push(`request.json: approval references ${decl.rel}, which this installation does not have`);
+      else {
+        for (const e of decl.errors) errors.push(`request.json: approval references a declaration the environment schema refuses: ${e}`);
+        if (decl.hash !== ref.hash) errors.push(`request.json: approval references ${decl.rel} at ${ref.hash} and the file hashes to ${decl.hash}; the declaration moved since it was read, which is AUTHORITY_DRIFT and not an approval`);
+        if (decl.authorization) for (const c of UAT_CLASSES) if (decl.authorization[c] !== 'declared') errors.push(`request.json: ${decl.rel} marks ${c} as ${decl.authorization[c]}, so a declaration reference is not an approval for it; an approval id is required`);
+      }
+    }
+  }
 
   const pinned = (request?.contexts ?? []).find((c) => c.alias === '@workspaces/be')?.head ?? null;
 
@@ -108,7 +132,7 @@ export async function validateUatStep(branchDir, root = ROOT) {
     if (!empty(requirements.feature) && snapshot.feature !== requirements.feature) errors.push('response/data/snapshot.json: the snapshot names another feature');
     if (!empty(requirements.flow) && snapshot.flow !== requirements.flow) errors.push('response/data/snapshot.json: the snapshot names another flow');
     if (!empty(requirements.runId) && snapshot.runId !== requirements.runId) errors.push('response/data/snapshot.json: the snapshot names another runId');
-    if (!empty(requirements.requestedBy) && snapshot.requestedBy !== requirements.requestedBy) errors.push('response/data/snapshot.json: the snapshot names another requester than the person who asked');
+    if (!empty(requirements.approval) && snapshot.approval !== requirements.approval) errors.push('response/data/snapshot.json: the snapshot names another authority than the one the request declared');
     if (snapshot.fixtureNamespace !== `uat-${snapshot.runId}`) errors.push(`response/data/snapshot.json: the fixture namespace must be uat-${snapshot.runId}, so cleanup can name exactly what this run wrote`);
     if (snapshot.seed.namespace !== snapshot.fixtureNamespace) errors.push('response/data/snapshot.json: the seed namespace must equal the run fixture namespace');
     // Two sessions may run against one product at once, under the isolation law platform.operate
@@ -203,11 +227,11 @@ export async function validateUatStep(branchDir, root = ROOT) {
 
   if (present.has('uat-flow-verification') && has('response/response.md')) {
     const text = await read('response/response.md');
-    // A verdict nobody was shown is a verdict nobody read: the run summary reaches the person who
-    // asked for the run, and ## Printed records what was handed over.
+    // A verdict nobody was shown is a verdict nobody read: the run summary reaches the person
+    // reading the conversation, and ## Printed records what was handed over.
     const printed = (tableUnder(text, '## Printed') ?? []).map(([artifact]) => artifact);
     if (decided && !printed.some((p) => p.includes('sheet.png'))) {
-      errors.push("response/response.md: ## Printed names no run summary; the stitched sheet is handed to the person who asked before the verdict is published");
+      errors.push("response/response.md: ## Printed names no run summary; the stitched sheet is printed before the verdict is published");
     }
     const snap = Object.fromEntries((tableUnder(text, '## Snapshot') ?? []).map(([k, v]) => [k, v]));
     if (snapshot) {
@@ -216,7 +240,7 @@ export async function validateUatStep(branchDir, root = ROOT) {
       if (snap.Flow !== snapshot.flow) errors.push('response/response.md: Snapshot names another flow');
       if (snap.Commit !== snapshot.commit) errors.push('response/response.md: Snapshot names another commit than the frozen one');
       if (snap.Namespace !== snapshot.fixtureNamespace) errors.push('response/response.md: Snapshot names another fixture namespace');
-      if (snap['Requested by'] !== snapshot.requestedBy) errors.push('response/response.md: Snapshot names another requester');
+      if (snap.Approval !== snapshot.approval) errors.push('response/response.md: Snapshot names another approval');
       if (snap.Environment !== snapshot.env) errors.push('response/response.md: Snapshot names another environment than the run drove');
       if (snap['Flow source'] !== snapshot.flowSource) errors.push(`response/response.md: Snapshot reads ${snap['Flow source']} but the flow was ${snapshot.flowSource}; a drafted flow is honest and an undeclared draft is not`);
       if (!String(snap.Golden ?? '').startsWith(snapshot.golden.state)) errors.push(`response/response.md: Snapshot reads Golden "${snap.Golden}" but the reference is ${snapshot.golden.state}`);

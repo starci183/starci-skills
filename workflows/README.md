@@ -43,8 +43,10 @@ frontend.source.apply → workspace.bind (role fe, runtimeNeed consume) → fron
 
 The second `workspace.bind` is there because the head moved: the surface that must be served, audited
 and walked is the one the write just produced, not the one that was bound before it. `uat.verify`
-needs three things a person owns — `requestedBy`, `feature` and `flow` — so every chain that carries
-it declares them under `asks`, and the run refuses rather than inventing a requester.
+needs `feature`, `flow` and `approval` before it starts — the flow to walk and the authority for its
+own writes, taken from the environment's declaration and asked of a person only where that
+declaration marks the touched class `person` — so every chain that carries it declares them under
+`asks`, and the run refuses rather than inventing an authority.
 
 `staging-uat` is the one example that proves a delivery somewhere other than where it was written.
 It writes nothing — `frontend.source.apply` runs under `mode: dry`, so the long-flow law does not

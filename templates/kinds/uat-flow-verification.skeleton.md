@@ -1,9 +1,9 @@
 # uat-flow-verification — enrollment/paid-enrollment
 
-One paragraph: who asked for this run, which flow it verified at which commit, and what the three
-lanes independently concluded. Written by `uat.verify` as `response/response.md`. The shared UAT
-password never appears here, in a capture, in a run record or in a log: the credential is named, and
-the login field is masked in every screenshot.
+One paragraph: what triggered this run, which flow it verified at which commit, what authorised its
+seeding and its sign-in, and what the three lanes independently concluded. Written by `uat.verify` as
+`response/response.md`. The shared UAT password never appears here, in a capture, in a run record or
+in a log: the credential is named, and the login field is masked in every screenshot.
 
 ## Admission
 
@@ -17,7 +17,7 @@ the login field is masked in every screenshot.
 | Field | Value |
 | --- | --- |
 | Run | `run-2026-01-10-1` |
-| Requested by | the product owner, in the session that opened this run |
+| Approval | `.stacks/local/environment.json#sha256:1111111111111111111111111111111111111111111111111111111111111111` |
 | Feature | `enrollment` |
 | Flow | `paid-enrollment` |
 | Commit | `1111111111111111111111111111111111111111` |
@@ -74,7 +74,7 @@ the login field is masked in every screenshot.
 
 | Artifact | Why |
 | --- | --- |
-| `response/artifacts/sheet.png` | the run's step captures, handed to the person who asked before the verdict was published |
+| `response/artifacts/sheet.png` | the run's step captures, printed before the verdict was published |
 
 ## Fallbacks taken
 

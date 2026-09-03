@@ -21,7 +21,7 @@
       "table": "| Field | Value |",
       "rows": [
         "Run",
-        "Requested by",
+        "Approval",
         "Feature",
         "Flow",
         "Environment",

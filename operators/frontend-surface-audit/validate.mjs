@@ -39,6 +39,15 @@ export const TOPIC_OF_PREFIX = {
 };
 export const AUDIT_TOPICS = ['presentation', 'composition', 'responsive', 'motion', 'accessibility', 'contrast', 'render-truth', 'taste'];
 const topicOf = (rule) => TOPIC_OF_PREFIX[String(rule).replace(/-\d+$/, '')] ?? null;
+// STATE-* and FEEDBACK-* (composition), FOCUS-* (accessibility), and the taste lens (TASTE-13
+// already scores it whole) are each only ever true of one particular coverage state, an absent
+// branch, or a focused target. A matrix narrowed against the direction's declared states can judge
+// every node these rules claim and still never exercise the state the rule is about, which is a
+// silent gap rather than a passing measurement. These topics may only close `pass`, `fail` or
+// `fix-first` when the matrix judged covers every state the direction's coverage declares
+// (operator.md, the matrix paragraph; TASTE-13 Case 8); short of that they are `blocked`, the same
+// value a topic with no evidence at all already carries.
+export const STATE_READING_TOPICS = new Set(['composition', 'accessibility', 'taste']);
 const TASTE_GATES = new Set(['TASTE-1', 'TASTE-2', 'TASTE-5', 'TASTE-8', 'TASTE-12']);
 // TASTE-9 Case 5 and 6: the density criterion depends on data volume and is measured at the flow's
 // representative seeded volume. Measured below it, its row reads `below-volume`, the lens is blocked
@@ -145,6 +154,27 @@ export async function validateAuditStep(branchDir, root = ROOT) {
   }
   for (const [matrixId] of captures) if (!ids.has(matrixId)) errors.push(`${at}: ${matrixId} was captured and never judged`);
 
+  // The states a state-reading topic must see before it may close: the direction's coverage names
+  // them (COVERAGE-1 Case 1 and Case 5, `coverage.actions[].states` and `coverage.states[].meaning`),
+  // and every surface also carries its own baseline `loaded` state. Anything declared and never
+  // captured in this branch is a gap the matrix left, not a gap the surface has. Read once, ahead of
+  // the taste rollup, so a blocked lens is blocked in both the ## Taste line and the ## Verdict row.
+  const decisionRef = base.request?.inputs?.['frontend-direction-decision'];
+  const sessionRoot = sessionRootOf(branchDir);
+  let coverageDoc = null;
+  let missingStates = new Set();
+  if (decisionRef && sessionRoot && response.status === 'done') {
+    const coverageFile = path.join(sessionRoot, path.dirname(String(decisionRef)), 'data', 'coverage.json');
+    if (existsSync(coverageFile)) {
+      try { coverageDoc = JSON.parse(await readFile(coverageFile, 'utf8')); } catch { coverageDoc = null; }
+    }
+    if (coverageDoc) {
+      const declaredStates = new Set(['loaded', ...(coverageDoc.states ?? []).map((s) => s.meaning), ...(coverageDoc.actions ?? []).flatMap((a) => a.states ?? [])]);
+      const capturedStates = new Set([...captures.values()].map((c) => c.doc.state));
+      for (const s of declaredStates) if (!capturedStates.has(s)) missingStates.add(s);
+    }
+  }
+
   // The taste lens. A done audit publishes it for every entry it judged: all twelve scored criteria,
   // each failure routed to direction because no value swap repairs a composition (TASTE-13 Case 4),
   // and the entry's own mean and verdict computed by TASTE-13 Case 2 rather than asserted.
@@ -192,6 +222,10 @@ export async function validateAuditStep(branchDir, root = ROOT) {
   // rolled up across the entries: the lowest score and the failing verdict win.
   const lensRows = TASTE_RULES.filter((r) => rolled.has(r)).map((r) => ({ rule: r, ...rolled.get(r) }));
   const surface = lensRows.length === TASTE_RULES.length ? tasteVerdict(lensRows) : null;
+  // The matrix left out a declared state: the lens is blocked over it (TASTE-13 Case 8), the same as
+  // it is blocked by evidence that never arrived at all, whatever the twelve scored criteria would
+  // otherwise have made it. A below-volume row already routes to seed; that takes precedence.
+  if (surface && missingStates.size && surface.routeTo !== 'seed') { surface.verdict = 'blocked'; surface.routeTo = 'none'; }
   // A blocked branch routes by its stop, not by next; the hand-offs below are read on a done one.
   if (surface && response.status === 'done') {
     const next = response.next ?? [];
@@ -199,11 +233,14 @@ export async function validateAuditStep(branchDir, root = ROOT) {
       if (!next.includes('frontend.direction.decide')) errors.push('response/response.json: the taste lens is fix-first, so next names frontend.direction.decide');
       if (next.includes('quality.verify')) errors.push('response/response.json: the taste lens is fix-first, so the checkout\'s own gates do not run yet; quality.verify follows a ship');
     }
-    if (surface.verdict === 'blocked') {
+    if (surface.verdict === 'blocked' && surface.routeTo === 'seed') {
       if (!next.includes('platform.operate')) errors.push('response/response.json: the density criterion was measured below the flow\'s representative seeded volume, so next names platform.operate, the operator that seeds; the entry is captured again at volume (TASTE-9 Case 5)');
       if (next.includes('frontend.direction.decide')) errors.push('response/response.json: a density measured below representative volume is a data gap, not a composition finding; next does not name frontend.direction.decide');
       if (next.includes('quality.verify')) errors.push('response/response.json: the taste lens is blocked until the entry is captured at representative volume; quality.verify follows a ship');
     }
+    // A lens blocked because the matrix left out a declared state routes the same way every other
+    // state-reading topic does; the shared check below the topic rows covers quality.verify and
+    // frontend.direction.decide for all of them at once.
   }
 
   // One surface, one class: every entry carries the class the coverage declared, and they agree.
@@ -213,15 +250,10 @@ export async function validateAuditStep(branchDir, root = ROOT) {
   // The class is not this operator's to choose: it is read from the direction decision this audit
   // was given, whose coverage declared it (COVERAGE-1 Case 7). A decision that carries none — an
   // older one, written before the coverage declared a class — is SURFACE_CLASS_MISSING, and the
-  // audit stops rather than banding a surface by taste.
-  const decisionRef = base.request?.inputs?.['frontend-direction-decision'];
-  const sessionRoot = sessionRootOf(branchDir);
+  // audit stops rather than banding a surface by taste. `coverageDoc` was already read above, ahead
+  // of the taste rollup, for the state-coverage check.
   if (decisionRef && sessionRoot && response.status === 'done') {
-    const coverageFile = path.join(sessionRoot, path.dirname(String(decisionRef)), 'data', 'coverage.json');
-    let declared = null;
-    if (existsSync(coverageFile)) {
-      try { declared = JSON.parse(await readFile(coverageFile, 'utf8')).surfaceClass ?? null; } catch { declared = null; }
-    }
+    const declared = coverageDoc?.surfaceClass ?? null;
     if (empty(declared)) errors.push(`${at}: the frontend-direction-decision this audit reads declares no surface class, so every banded rule is left without a threshold (SURFACE_CLASS_MISSING)`);
     else for (const cls of classes) if (cls !== declared) errors.push(`${at}: the entries carry ${cls} and the direction's coverage declares ${declared}; the class is read from the decision, never chosen here`);
   }
@@ -254,7 +286,17 @@ export async function validateAuditStep(branchDir, root = ROOT) {
     }
   }
   if (surface) topicRows.set('taste', { verdict: surface.verdict, routeTo: surface.routeTo });
+  // The matrix left out a state the direction declared: every state-reading topic is blocked over
+  // it, whatever the results it did judge would otherwise have made it, because none of them prove
+  // the topic's state-reading rules ever ran (operator.md, the matrix paragraph; TASTE-13 Case 8).
+  if (missingStates.size) for (const topic of STATE_READING_TOPICS) topicRows.set(topic, { verdict: 'blocked', routeTo: 'none' });
   const topicVerdict = (topic) => topicRows.get(topic) ?? { verdict: 'blocked', routeTo: 'none' };
+
+  if (missingStates.size && response.status === 'done') {
+    const next = response.next ?? [];
+    if (next.includes('quality.verify')) errors.push(`${at}: a state-reading topic is blocked because the matrix leaves out ${[...missingStates].join(', ')}, a state the direction's coverage declares; quality.verify follows only once every topic ships or passes`);
+    if (next.includes('frontend.direction.decide')) errors.push(`${at}: a matrix gap is not a composition finding; next does not name frontend.direction.decide for it`);
+  }
 
   const failing = verdicts.entries.flatMap((e) => e.results.filter((r) => r.verdict === 'fail'));
   if (response.status === 'done' && failing.some((r) => r.routeTo === 'resolve') && !(response.next ?? []).includes('frontend.presentation.resolve')) {
@@ -353,6 +395,22 @@ export async function validateAuditStep(branchDir, root = ROOT) {
       if (verdict !== computed.verdict) errors.push(`${rel}: Verdict records ${verdict} for ${topic}; its own rule made it ${computed.verdict}`);
       if (route !== computed.routeTo) errors.push(`${rel}: Verdict routes ${topic} to ${route}; its own rule routes it to ${computed.routeTo}`);
     }
+
+    // A narrowed matrix that left out a declared state is not a quiet omission: ## Coverage gaps
+    // names exactly which state-reading topic is blocked over exactly which missing state, one row
+    // per pair, and no row when the matrix covered everything the direction declared.
+    const gapRows = tableUnder(text, '## Coverage gaps') ?? [];
+    const gapKey = (topic, state) => JSON.stringify([topic, state]);
+    const expectedGaps = new Set();
+    if (missingStates.size) for (const topic of STATE_READING_TOPICS) for (const s of missingStates) expectedGaps.add(gapKey(topic, s));
+    const seenGaps = new Set();
+    for (const [topicCell, state] of gapRows) {
+      const topic = topicCell.replaceAll('`', '');
+      const key = gapKey(topic, state);
+      if (!expectedGaps.has(key)) errors.push(`${rel}: Coverage gaps names ${topic} missing ${state}, which this branch's coverage and captures do not bear out`);
+      seenGaps.add(key);
+    }
+    for (const key of expectedGaps) if (!seenGaps.has(key)) { const [topic, state] = JSON.parse(key); errors.push(`${rel}: Coverage gaps omits ${topic} missing ${state}; the matrix left that state out and the topic is blocked over it`); }
 
     // Serving is not telling: the sheet reaches the person at the moment the verdict is recorded, and
     // ## Printed is where the receipt says what was handed over. An audit that filed its sheet and

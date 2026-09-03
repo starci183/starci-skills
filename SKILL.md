@@ -111,10 +111,12 @@ tables and `validate.mjs`, which this file cannot widen:
 - `git.publish` has no requirement that can name a force push, a bypassed hook, a reset, a clean, a
   stash, or a branch deletion; it merges the session branch, pushes non-force, and a conflict is
   `NON_FAST_FORWARD` for a person.
-- `release.deploy` and `platform.operate` require an `approval`; `release.deploy` runs only on a
+- `release.deploy`, `platform.operate` and `uat.verify` require an `approval`, taken from the
+  environment's own declaration where it marks the touched operation class `declared` and from a
+  person only where the environment marks it `person`; `release.deploy` runs only on a
   `quality-verification` input.
-- `uat.verify` runs only with a `requestedBy`, its account record refuses a password field, and its
-  validator rejects a credential-shaped string anywhere in what it writes.
+- `uat.verify`'s account record refuses a password field, and its validator rejects a
+  credential-shaped string anywhere in what it writes.
 - `frontend.presentation.resolve` and `frontend.surface.audit` may name only rule identifiers the bound
   knowledge publishes; `frontend.source.apply` writes only classes in the resolved inventory.
 - A source-writing operator commits only on `session/<sessionId>`; the person's branch is never touched.

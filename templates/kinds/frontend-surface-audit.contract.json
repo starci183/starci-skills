@@ -82,6 +82,14 @@
       }
     },
     {
+      "heading": "^## Coverage gaps$",
+      "table": "| Topic | Missing state |",
+      "cell": {
+        "Topic": "^`(presentation|composition|responsive|motion|accessibility|contrast|render-truth|taste)`$",
+        "Missing state": "\\S"
+      }
+    },
+    {
       "heading": "^## Regressions$",
       "table": "| Matrix | Node | Rule | Measured | Routes to |",
       "cell": {

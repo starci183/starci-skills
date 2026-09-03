@@ -2,6 +2,22 @@
   "schemaVersion": 9,
   "note": "Stop codes shared by more than one operator. `scope` is the list of operator ids that may emit the code, or [\"*\"] for every operator. A code only one operator emits lives in that operator's own operators/<id>/errors.json with the same entry shape and no scope; scripts/errors-registry.mjs merges both into one registry and refuses a code defined twice. A code has exactly one disposition: `terminate` ends the step with response.json status blocked and stop = code; `fallback` performs the named action, records it under `## Fallbacks taken` in response.md, and continues. `unless` is the only way a disposition changes: it names one Requirements param and the value that flips the code to `then`. `domain` is the routing.json domain the code hands to; `self` means the emitting operator's own domain (a resume). A runtime that meets a code the merged registry does not list terminates with UNKNOWN_STOP.",
   "codes": {
+    "AUTHORITY_DRIFT": {
+      "scope": [
+        "platform.operate",
+        "uat.verify"
+      ],
+      "domain": "caller",
+      "disposition": "terminate",
+      "meaning": {
+        "en": "The approval — an approval id, or the environment declaration it references, whose content hash has moved — no longer matches what the operation asked for.",
+        "vi": "Phê duyệt — một id phê duyệt, hay bản khai báo môi trường mà nó tham chiếu với hash nội dung đã đổi — không còn khớp với điều thao tác đã yêu cầu."
+      },
+      "resume": {
+        "en": "Bring a fresh approval for this exact operation: a new id, or the declaration's current reference.",
+        "vi": "Mang một phê duyệt mới cho đúng thao tác này: một id mới, hoặc tham chiếu hiện hành của bản khai báo."
+      }
+    },
     "INVALID_INPUT": {
       "scope": [
         "*"

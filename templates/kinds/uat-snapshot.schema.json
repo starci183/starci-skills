@@ -4,7 +4,7 @@
   "additionalProperties": false,
   "required": [
     "runId",
-    "requestedBy",
+    "approval",
     "feature",
     "flow",
     "env",
@@ -27,7 +27,8 @@
     "runId": {
       "$ref": "#/$defs/runId"
     },
-    "requestedBy": {
+    "approval": {
+      "description": "The authority that covered this run's own writes: an approval id, or the environment declaration's reference (path and content hash) when the declaration marks `seed` and `identity-provisioning` declared for `env`.",
       "type": "string",
       "minLength": 1
     },

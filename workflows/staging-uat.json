@@ -68,7 +68,7 @@
           "env": "staging"
         },
         "asks": [
-          "requestedBy",
+          "approval",
           "feature",
           "flow"
         ]

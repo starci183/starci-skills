@@ -1,6 +1,6 @@
 {
   "schemaVersion": 9,
-  "note": "Stop codes only uat.verify emits. Same entry shape as operators/errors.json, scope implicit. Shared codes (INVALID_INPUT, SOURCE_DRIFT, NO_PROGRESS, RUNTIME_UNAVAILABLE, PROVISIONING_UNAVAILABLE, IDENTITY_MISSING) come from operators/errors.json. No code asks a person for a credential, and no code reports a record as merely missing: a flow document, a seed or an account that does not exist yet is created, IDENTITY_MISSING hands the account to the operator that owns provisioning, and only a dependency that cannot be reached at all blocks.",
+  "note": "Stop codes only uat.verify emits. Same entry shape as operators/errors.json, scope implicit. Shared codes (INVALID_INPUT, SOURCE_DRIFT, NO_PROGRESS, RUNTIME_UNAVAILABLE, PROVISIONING_UNAVAILABLE, IDENTITY_MISSING, AUTHORITY_DRIFT) come from operators/errors.json. No code asks a person for a credential, and no code reports a record as merely missing: a flow document, a seed or an account that does not exist yet is created, IDENTITY_MISSING hands the account to the operator that owns provisioning, and only a dependency that cannot be reached at all blocks.",
   "codes": {
     "ADMISSION_MISSING": {
       "domain": "quality",

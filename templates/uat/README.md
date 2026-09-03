@@ -21,7 +21,7 @@ names a product.
     data/after.json           the scoped data state the approved run ended with
   runs/<runId>/               append-only; runId is <yyyymmdd-HHMMss>-<commit7>
     snapshot.json             commit, endpoints, registry generation, seed hash, account names,
-                              browser profile, requestedBy
+                              browser profile, approval
     steps/<NN-slug>/
       action.json             what was done, with every input masked
       expected.md             what should have happened
@@ -32,7 +32,7 @@ names a product.
     verdicts.json             the scored criteria, the lane verdicts, the per-step outcome
     run.md                    the receipt
   latest.json                 { "runId": "<runId>" } — a file, never a symlink
-  history.md                  one line per run: runId - commit - verdict - requestedBy
+  history.md                  one line per run: runId - commit - verdict - approval
 ```
 
 ## Laws

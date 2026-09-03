@@ -169,7 +169,12 @@ người từ lần dừng của chính nó. Audit này không dựng gì, khôn
 validator từ chối một route `user` mà còn để một topic bố cục hay thẩm mỹ mở, vì câu trả lời tính được
 từ thang điểm của direction, và một câu hỏi mà câu trả lời tính được thì không đem ra hỏi. Các mã dừng
 về phía caller và `NO_PROGRESS` ở đây là việc vận hành — cùng một head đo lại mà không có delta — nên
-`reason` của chúng nói rõ điều ấy và không mang phương án nào.
+`reason` của chúng nói rõ điều ấy và không mang phương án nào. Một topic `blocked` vì matrix bỏ sót
+một state đã khai không phải là cùng một head đo lại, và cũng không phải một finding bố cục hay thẩm
+mỹ: nó không tính vào `NO_PROGRESS` và không đóng một topic bố cục hay thẩm mỹ thành `fix-first`. Một
+điểm trung bình thẩm mỹ chỉ so được giữa các vòng khi cả hai vòng phủ cùng một tập state; một vòng có
+matrix hẹp hơn về state so với vòng trước không được đem so để tính tiến độ, và không thể đóng vòng
+lặp hay dùng hết ngân sách vòng trên phép so sánh ấy.
 
 Một tiêu chí phụ thuộc vào khối lượng dữ liệu được đo ở khối lượng seed đại diện của luồng, khối
 lượng mà `TASTE-9` Case 5 định nghĩa, không bao giờ ở bất kỳ thứ gì workspace đang phục vụ tình cờ
@@ -203,6 +208,15 @@ orchestrator có thể chia các mục ra tối đa ba nhánh song song của c�
 chỗ khuyết lặng lẽ. Mọi node mang lời khai đều được đo; không bao giờ có phán quyết cho một node chưa
 được đo.
 
+Một phán quyết cho một topic mà rule của nó đọc xuyên state — bố cục và khả năng tiếp cận, nơi các
+rule `STATE-*`, `FEEDBACK-*` và `FOCUS-*` mỗi cái chỉ đúng ở đúng một state, một nhánh vắng mặt, hay
+một mục tiêu đang focus, và lens thẩm mỹ, nơi `TASTE-13` đã chấm nguyên khối — chỉ được ghi là `pass`,
+`fail` hay `fix-first` khi matrix đã phán quyết phủ hết mọi state mà coverage của hướng đã khai. Một
+matrix bị thu hẹp vẫn có thể được audit, vì một lượt resume cần đúng điều đó, nhưng receipt ghi lại
+tập con đã phủ dưới `## Matrix` và gọi tên phần bị thu hẹp bỏ sót dưới `## Coverage gaps`; phán quyết
+của chính topic ấy là `blocked`, cùng giá trị mà một topic không có bằng chứng nào đã mang sẵn, không
+bao giờ là một phán quyết tính trên những state tình cờ đã đến.
+
 ## Đầu ra
 
 | Kind | File | Kiểu | Bắt buộc |
@@ -234,5 +248,6 @@ chỗ khuyết lặng lẽ. Mọi node mang lời khai đều được đo; khô
 | một verdict topic là fix-first, hoặc hướng không khai lớp bề mặt nào, nên bố cục được quyết lại trước khi có giá trị nào được quyết | `frontend.direction.decide` |
 | mọi topic đều ship hoặc đạt, và các cổng của chính checkout phải chạy | `quality.verify` |
 | một lời khai hỏng trên phần render của chính component Grammar, nên một người ghi gap của họ rồi publish | `frontend.surface.audit` |
+| một topic đọc xuyên state bị blocked vì matrix bỏ sót một state mà coverage của hướng đã khai, nên bề mặt được audit lại khi matrix đã phủ đủ | `frontend.surface.audit` |
 | một tiêu chí mật độ được đo dưới khối lượng seed đại diện của luồng, nên dữ liệu được seed trước khi bề mặt được phán lại | `platform.operate` |
 | route đòi một danh tính mà luồng này chưa có tài khoản, nên tài khoản được cấp trước khi bề mặt được quan sát | `platform.operate` |

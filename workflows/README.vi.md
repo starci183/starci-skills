@@ -39,9 +39,10 @@ frontend.source.apply → workspace.bind (role fe, runtimeNeed consume) → fron
 ```
 
 `workspace.bind` lần hai có ở đó vì head đã dịch: bề mặt cần được phục vụ, audit và đi thử là bề mặt
-mà lần ghi vừa sinh ra, không phải bề mặt đã bind trước đó. `uat.verify` cần ba thứ thuộc về con
-người — `requestedBy`, `feature` và `flow` — nên mọi chuỗi mang nó đều khai chúng dưới `asks`, và lần
-chạy thà từ chối chứ không bịa ra người yêu cầu.
+mà lần ghi vừa sinh ra, không phải bề mặt đã bind trước đó. `uat.verify` cần `feature`, `flow` và
+`approval` trước khi chạy — luồng cần đi qua và thẩm quyền cho việc ghi của chính nó, lấy từ khai báo
+của môi trường và chỉ hỏi một con người khi khai báo đó đánh dấu lớp bị chạm là `person` — nên mọi
+chuỗi mang nó đều khai chúng dưới `asks`, và lần chạy thà từ chối chứ không bịa ra thẩm quyền.
 
 `staging-uat` là ví dụ duy nhất chứng minh một bản giao ở nơi khác nơi nó được viết. Nó không ghi gì —
 `frontend.source.apply` chạy dưới `mode: dry`, nên luật chuỗi dài không với tới — và nó mang `env` trên

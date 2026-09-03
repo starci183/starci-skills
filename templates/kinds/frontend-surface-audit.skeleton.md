@@ -64,6 +64,12 @@
 | `render-truth` | pass | none |
 | `taste` | ship | none |
 
+## Coverage gaps
+
+| Topic | Missing state |
+| --- | --- |
+| `composition` | the missing state the matrix left out; no rows when the matrix covers every state the direction's coverage declares |
+
 ## Regressions
 
 | Matrix | Node | Rule | Measured | Routes to |

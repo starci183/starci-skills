@@ -82,7 +82,7 @@
       {
         "operator": "uat.verify",
         "asks": [
-          "requestedBy",
+          "approval",
           "feature",
           "flow"
         ]

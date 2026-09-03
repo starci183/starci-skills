@@ -6,19 +6,32 @@ Verify one product flow end to end on the running product at the pinned commit, 
 append-only run record with three independently judged lanes, or stop at the exact unavailability
 instead of manufacturing a verdict.
 
-## UAT runs only when a person asked for it
+## A run is triggered by need; its authority is the environment's
 
-`requestedBy` names the person who asked; without it the operator has nothing to run for and stops at
-the gate. Nothing about this operator is routine: it signs in as a real user, writes real records into
-a shared runtime and leaves a permanent run record behind, so the trigger is a person and never a
-schedule, a chain default or another agent's convenience. `runId` and `lease` are not questions for a
-person either: the orchestrator generates the run identifier and grants the exclusive lease on the
-flow directory before the branch starts, and an invocation that arrives without them is
-`INVALID_INPUT` at step 1 rather than a prompt. Their Default is therefore `—`: a Default that reads
-"the orchestrator's run id" is prose, not a value the gate can use, and a gate that accepts prose
-accepts an empty field. `LEASE_INVALID` is a different failure and keeps its own place: it is the
-lease that exists and is expired, foreign, or bound to another run, noticed at step 6 against the
-flow directory this run holds.
+Reaching this operator is the need: a chain that walks straight into it once a surface is built and
+proved, or a session deciding a flow must be walked before anything is trusted, is the routine case
+this operator exists to serve, not an exception to police. What keeps a run honest is not a name in a
+requirements field but the trace it cannot avoid leaving: the append-only run directory
+(`runs/<runId>/`), the `latest.json` pointer, the `history.md` line and the printed step-capture
+summary. `runId` and `lease` are not questions for a person: the orchestrator generates the run
+identifier and grants the exclusive lease on the flow directory before the branch starts, and an
+invocation that arrives without them is `INVALID_INPUT` at step 1 rather than a prompt. Their Default
+is therefore `—`: a Default that reads "the orchestrator's run id" is prose, not a value the gate can
+use, and a gate that accepts prose accepts an empty field. `LEASE_INVALID` is a different failure and
+keeps its own place: it is the lease that exists and is expired, foreign, or bound to another run,
+noticed at step 6 against the flow directory this run holds.
+
+What this run touches beyond its own reading — seeding the frozen records into the environment's
+data, and signing in as the flow's dedicated account — is authorised the way every platform operation
+in this installation is: by the environment's own declaration, and by a person only where that
+declaration says a person is needed. `.stacks/<env>/environment.json` marks the `seed` and
+`identity-provisioning` classes `declared` or `person` for `env`, and
+`readiness/initialization/stacks/environment.schema.json` states the shape, the reference format and
+the production default once, read from there and never copied here. A non-production environment
+that has not tightened either class needs nothing further: `approval` carries that declaration's
+reference — its path and the hash of its bytes — and the run proceeds with no person in the loop. An
+environment that marks either class `person`, which production always does, needs an approval id
+instead, and `approval` has no default: silence is not consent, whatever reached this operator.
 
 ## The endpoint is the bound one, never a re-derived one
 
@@ -168,7 +181,7 @@ anything outside its own fixture namespace.
 
 | Field | Type | Default | Ask |
 | --- | --- | --- | --- |
-| `requestedBy` | id | — | Who asked for this UAT run; UAT never starts without a person behind it |
+| `approval` | id | — | The authority covering this run's own writes — seeding the frozen records and signing in as the flow's account: an approval id, or the environment declaration's reference — its path and content hash — when that declaration marks `seed` and `identity-provisioning` `declared` for `env`; no default, because silence is not consent |
 | `feature` | id | — | The feature key that addresses the flow directory |
 | `flow` | id | — | The one product flow this invocation verifies |
 | `env` | id | dev | The stack this run drives: it selects the accounts file, the sealed secret, the runtime registry entry, the seed target and the approved reference |
@@ -181,7 +194,7 @@ anything outside its own fixture namespace.
 
 | # | Step | Params | Reads | Writes | Stops with |
 | --- | --- | --- | --- | --- | --- |
-| 1 | Validate the gate, the resume, the exclusive lease and the person who asked | `requestedBy`, `lease`, `resume` | `request/request.json`, @worktrees/uat/<flow>/<case> for `latest` and the prior run record, @workspaces/be at the pinned commit, @tools/git | — | `INVALID_INPUT`, `SOURCE_DRIFT`, `NO_PROGRESS` |
+| 1 | Validate the gate, the resume, the exclusive lease and the run's authority | `approval`, `lease`, `resume` | `request/request.json`, @worktrees/uat/<flow>/<case> for `latest` and the prior run record, @workspaces/be at the pinned commit, the environment's declaration when `approval` references it, @tools/git | — | `INVALID_INPUT`, `SOURCE_DRIFT`, `NO_PROGRESS`, `AUTHORITY_DRIFT` |
 | 2 | Confirm admission: the surface audit is clean and the quality gate is green at the same pinned commit | — | input `frontend-surface-audit`, input `quality-verification` | — | `ADMISSION_MISSING` |
 | 3 | Preflight the runtime and the flow's identity: the sealed credential resolves by name, the store answers, and a flow with no account hands over instead of stopping | `env` | @workspaces/device-state for the credential named by `accounts.<env>.json`, @worktrees/sessions/central-runtime for the entry of the bound route, its generation and origins, input `uat-account` when the identity was provisioned, @tools/secrets, @tools/http | — | `PROVISIONING_UNAVAILABLE`, `IDENTITY_MISSING` |
 | 4 | Draft from the template whatever the flow folder lacks, then freeze the snapshot from `flow.md`, `accounts.<env>.json` and `seed/` | `feature`, `flow`, `env`, `cases` | @worktrees/uat/<flow>/<case>, @worktrees/_templates for the flow template | @worktrees/uat/<flow>/<case> (snapshot), `response/data/snapshot.json`, @tools/sourcewrite | `CANONICAL_WRITE_DENIED` |
@@ -193,8 +206,8 @@ anything outside its own fixture namespace.
 | 10 | Append `runs/<runId>/`, point `latest.json` at it, add the history line, and emit | `runId` | everything above | @worktrees/uat/<flow>/<case> (runs/<runId>/, latest.json and history.md), `response/response.md`, `response/response.json`, @tools/sourcewrite, @tools/print | — |
 
 A verdict nobody was shown is a verdict nobody read. Step 7 prints the run's step-capture summary and
-step 10 prints the `## Verdict` table over `@tools/print`, into the conversation the person who asked
-for this run is reading, and the receipt lists both under `## Printed` with why each was printed; the
+step 10 prints the `## Verdict` table over `@tools/print`, into the conversation the person is
+reading, and the receipt lists both under `## Printed` with why each was printed; the
 login field stays masked in every frame that is printed, exactly as in every frame that is written.
 
 A blocked run publishes no run record at all, because a half-written record is the artifact a later
@@ -221,6 +234,7 @@ lease, evidence or case change is `NO_PROGRESS`. A second attempt after a publis
 | `INVALID_INPUT` | terminate |
 | `SOURCE_DRIFT` | terminate |
 | `NO_PROGRESS` | terminate |
+| `AUTHORITY_DRIFT` | terminate |
 | `ADMISSION_MISSING` | terminate |
 | `PROVISIONING_UNAVAILABLE` | terminate |
 | `IDENTITY_MISSING` | terminate |

@@ -6,19 +6,34 @@ Kiểm chứng một luồng sản phẩm từ đầu đến cuối trên sản 
 một hồ sơ lượt chạy chỉ-thêm với ba làn được xét độc lập, hoặc dừng đúng chỗ không sẵn sàng thay vì
 chế ra một phán quyết.
 
-## UAT chỉ chạy khi có người yêu cầu
+## Lượt chạy khởi động theo nhu cầu; thẩm quyền của nó thuộc về môi trường
 
-`requestedBy` nêu tên người đã yêu cầu; thiếu nó thì operator không có ai để chạy cho và dừng ngay ở
-cổng. Không có gì ở operator này là thường lệ: nó đăng nhập như một người dùng thật, ghi bản ghi thật
-vào một runtime dùng chung và để lại một hồ sơ lượt chạy vĩnh viễn, nên thứ khởi động nó là một con
-người, không bao giờ là lịch hẹn, mặc định của chain hay sự tiện tay của một agent khác. `runId` và
-`lease` cũng không phải câu hỏi dành cho người: orchestrator sinh mã lượt chạy và cấp lease độc quyền
-trên thư mục luồng trước khi nhánh bắt đầu, và một lần gọi đến mà thiếu chúng là `INVALID_INPUT` ở bước 1 chứ
-không phải một lời hỏi. Vì thế Mặc định của chúng là `—`: một ô Mặc định ghi "mã lượt chạy của
-orchestrator" là lời văn chứ không phải một giá trị cổng dùng được, và một cổng chấp nhận lời văn là
-một cổng chấp nhận ô rỗng. `LEASE_INVALID` là một thất bại khác và giữ chỗ riêng của nó: đó là cái
-lease có tồn tại nhưng đã hết hạn, thuộc về nơi khác, hoặc đang ràng vào một lượt chạy khác, và nó bị
-phát hiện ở bước 6 trên chính thư mục luồng mà lượt chạy này đang giữ.
+Chạm tới operator này chính là nhu cầu: một chain đi thẳng vào đây sau khi một bề mặt đã được dựng và
+chứng minh, hay một session quyết định một luồng phải được đi qua trước khi tin vào nó, đều là
+trường hợp thường lệ mà operator này tồn tại để phục vụ, không phải ngoại lệ cần canh chừng. Thứ giữ
+cho một lượt chạy trung thực không phải một cái tên trong trường yêu cầu, mà là dấu vết nó không thể
+tránh để lại: thư mục lượt chạy chỉ-thêm (`runs/<runId>/`), con trỏ `latest.json`, dòng
+`history.md` và bản tóm tắt chụp-theo-bước được in ra. `runId` và `lease` không phải câu hỏi dành cho
+người: orchestrator sinh mã lượt chạy và cấp lease độc quyền trên thư mục luồng trước khi nhánh bắt
+đầu, và một lần gọi đến mà thiếu chúng là `INVALID_INPUT` ở bước 1 chứ không phải một lời hỏi. Vì thế
+Mặc định của chúng là `—`: một ô Mặc định ghi "mã lượt chạy của orchestrator" là lời văn chứ không
+phải một giá trị cổng dùng được, và một cổng chấp nhận lời văn là một cổng chấp nhận ô rỗng.
+`LEASE_INVALID` là một thất bại khác và giữ chỗ riêng của nó: đó là cái lease có tồn tại nhưng đã hết
+hạn, thuộc về nơi khác, hoặc đang ràng vào một lượt chạy khác, và nó bị phát hiện ở bước 6 trên chính
+thư mục luồng mà lượt chạy này đang giữ.
+
+Thứ mà lượt chạy này chạm tới ngoài việc đọc của chính nó — gieo các bản ghi đã đóng băng vào dữ liệu
+của môi trường, và đăng nhập như tài khoản riêng của luồng — được cấp quyền theo đúng cách mọi thao
+tác nền tảng trong cài đặt này được cấp: bởi chính khai báo của môi trường, và bởi một con người chỉ
+khi khai báo đó nói cần một con người. `.stacks/<env>/environment.json` đánh dấu các lớp `seed` và
+`identity-provisioning` là `declared` hay `person` cho `env`, còn
+`readiness/initialization/stacks/environment.schema.json` nêu hình dạng, khuôn dạng tham chiếu và
+mặc định cho production một lần duy nhất, được đọc từ đó chứ không sao chép lại ở đây. Một môi
+trường không phải production mà chưa siết lớp nào trong hai lớp đó thì không cần gì thêm: `approval`
+mang tham chiếu của khai báo đó — đường dẫn của nó và hash của nội dung — và lượt chạy tiếp tục mà
+không cần một con người trong vòng lặp. Một môi trường đánh dấu một trong hai lớp là `person`, điều
+mà production luôn làm, thì cần một approval id thay vào đó, và `approval` không có mặc định: im
+lặng không phải là đồng ý, bất kể điều gì đã chạm tới operator này.
 
 ## Endpoint là cái đã ràng, không phải cái suy lại
 
@@ -163,7 +178,7 @@ lượt chạy, và không xoá bất cứ thứ gì ngoài namespace fixture c�
 
 | Field | Kiểu | Mặc định | Hỏi |
 | --- | --- | --- | --- |
-| `requestedBy` | id | — | Ai yêu cầu lượt UAT này; UAT không bao giờ khởi động khi không có người đứng sau |
+| `approval` | id | — | Thẩm quyền phủ lấy việc ghi của chính lượt chạy này — gieo các bản ghi đã đóng băng và đăng nhập như tài khoản của luồng: một approval id, hoặc tham chiếu của khai báo môi trường — đường dẫn và hash nội dung của nó — khi khai báo đó đánh dấu `seed` và `identity-provisioning` là `declared` cho `env`; không có mặc định, vì im lặng không phải là đồng ý |
 | `feature` | id | — | Khoá feature dùng để địa chỉ hoá thư mục luồng |
 | `flow` | id | — | Luồng sản phẩm duy nhất mà lần gọi này kiểm chứng |
 | `env` | id | dev | Stack mà lượt chạy này lái: nó chọn file tài khoản, bí mật niêm phong, entry trong sổ đăng ký runtime, đích của seed và bản tham chiếu đã duyệt |
@@ -176,7 +191,7 @@ lượt chạy, và không xoá bất cứ thứ gì ngoài namespace fixture c�
 
 | # | Bước | Tham số | Đọc | Ghi | Dừng với |
 | --- | --- | --- | --- | --- | --- |
-| 1 | Kiểm gate, lần chạy lại, lease độc quyền và người đã yêu cầu | `requestedBy`, `lease`, `resume` | `request/request.json`, @worktrees/uat/<flow>/<case> để lấy `latest` và hồ sơ lượt chạy trước, @workspaces/be tại commit đã ghim, @tools/git | — | `INVALID_INPUT`, `SOURCE_DRIFT`, `NO_PROGRESS` |
+| 1 | Kiểm gate, lần chạy lại, lease độc quyền và thẩm quyền của lượt chạy | `approval`, `lease`, `resume` | `request/request.json`, @worktrees/uat/<flow>/<case> để lấy `latest` và hồ sơ lượt chạy trước, @workspaces/be tại commit đã ghim, khai báo của môi trường khi `approval` tham chiếu tới nó, @tools/git | — | `INVALID_INPUT`, `SOURCE_DRIFT`, `NO_PROGRESS`, `AUTHORITY_DRIFT` |
 | 2 | Xác nhận admission: bề mặt sạch và cổng chất lượng xanh tại cùng một commit đã ghim | — | đầu vào `frontend-surface-audit`, đầu vào `quality-verification` | — | `ADMISSION_MISSING` |
 | 3 | Preflight runtime và danh tính của luồng: thông tin đăng nhập niêm phong giải được theo tên, store trả lời, và luồng chưa có tài khoản thì bàn giao chứ không dừng | `env` | @workspaces/device-state để lấy thông tin đăng nhập mà `accounts.<env>.json` nêu tên, @worktrees/sessions/central-runtime để lấy entry của route đã bind, generation và các origin, đầu vào `uat-account` khi danh tính đã được cấp, @tools/secrets, @tools/http | — | `PROVISIONING_UNAVAILABLE`, `IDENTITY_MISSING` |
 | 4 | Phác từ khuôn những gì thư mục luồng còn thiếu, rồi đóng băng snapshot từ `flow.md`, `accounts.<env>.json` và `seed/` | `feature`, `flow`, `env`, `cases` | @worktrees/uat/<flow>/<case>, @worktrees/_templates để lấy khuôn luồng | @worktrees/uat/<flow>/<case> (snapshot), `response/data/snapshot.json`, @tools/sourcewrite | `CANONICAL_WRITE_DENIED` |
@@ -189,7 +204,7 @@ lượt chạy, và không xoá bất cứ thứ gì ngoài namespace fixture c�
 
 Một phán quyết không ai được cho xem là một phán quyết không ai đọc. Bậc 7 in bản tóm tắt các ảnh
 chụp theo bước và bậc 10 in bảng `## Verdict` qua `@tools/print`, thẳng vào cuộc trò chuyện mà người
-yêu cầu lượt chạy này đang đọc, còn biên nhận liệt kê cả hai dưới `## Printed` kèm lý do in; ô đăng
+đang đọc, còn biên nhận liệt kê cả hai dưới `## Printed` kèm lý do in; ô đăng
 nhập vẫn được che trong mọi khung được in, đúng như trong mọi khung được ghi.
 
 Một lượt bị chặn không phát hồ sơ lượt chạy nào cả, vì một hồ sơ viết nửa vời chính là thứ người đọc
@@ -216,6 +231,7 @@ mới, không bao giờ là một lần sửa lượt cũ.
 | `INVALID_INPUT` | terminate |
 | `SOURCE_DRIFT` | terminate |
 | `NO_PROGRESS` | terminate |
+| `AUTHORITY_DRIFT` | terminate |
 | `ADMISSION_MISSING` | terminate |
 | `PROVISIONING_UNAVAILABLE` | terminate |
 | `IDENTITY_MISSING` | terminate |

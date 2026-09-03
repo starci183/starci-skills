@@ -169,7 +169,13 @@ or, over a tie its own scores prove, asks the person from its own stop. This aud
 ranks nothing and offers nothing: the validator refuses a `user` route that leaves a composition or
 taste topic open, because the answer is computable from the direction's rubric and a question whose
 answer is computable is not asked. The caller stops and `NO_PROGRESS` are operational here — the same
-head measured again with no delta — so their `reason` says so and carries no candidate.
+head measured again with no delta — so their `reason` says so and carries no candidate. A topic
+`blocked` because the matrix left out a declared state is neither of those things: it is not the same
+head measured again, and it is not a composition or taste finding, so it never counts toward
+`NO_PROGRESS` and never closes a composition or taste topic as `fix-first`. A taste mean is
+comparable across rounds only when both covered the same state set; a round whose matrix is narrower
+on states than the round before it is not compared for progress and cannot close the loop or exhaust
+a round budget on that comparison.
 
 A criterion that depends on data volume is measured at the flow's representative seeded volume, the
 volume `TASTE-9` Case 5 defines, never at whatever the served workspace happened to hold. When the
@@ -204,6 +210,15 @@ produces one screenshot and one capture, and an entry that produced neither is `
 rather than a quiet omission. Every node carrying a claim is measured; a verdict is never recorded
 for a node that was not.
 
+A verdict for a topic whose rules read across states — composition and accessibility, whose
+`STATE-*`, `FEEDBACK-*` and `FOCUS-*` rules are each only ever true of one particular state, an
+absent branch, or a focused target, and the taste lens, which `TASTE-13` already scores whole — may
+only be recorded `pass`, `fail` or `fix-first` when the matrix judged covers every state the
+direction's coverage declares. A narrowed matrix may still be audited, since a resume needs exactly
+that, but the receipt records the covered subset under `## Matrix` and names what the narrowing left
+out under `## Coverage gaps`; the topic's own verdict is `blocked`, the same value a topic with no
+evidence at all already carries, never a verdict computed from the states that happened to arrive.
+
 ## Outputs
 
 | Kind | File | Type | Required |
@@ -235,5 +250,6 @@ for a node that was not.
 | a topic verdict is fix-first, or the direction declared no surface class, so the composition is decided again before any value is | `frontend.direction.decide` |
 | every topic ships or passes and the checkout's own gates must run | `quality.verify` |
 | a claim fails on a Grammar component's own render, so a person records the family gap and publishes | `frontend.surface.audit` |
+| a state-reading topic is blocked because the matrix leaves out a state the direction's coverage declares, so the surface is audited again once the matrix covers it | `frontend.surface.audit` |
 | a density criterion was measured below the flow's representative seeded volume, so the data is seeded before the surface is judged again | `platform.operate` |
 | the route requires an identity and this flow has no account yet, so one is provisioned before the surface is observed | `platform.operate` |

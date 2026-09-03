@@ -1,15 +1,17 @@
-// Proves validate.mjs on a synthetic session branch: a run a person asked for, admitted by both
+// Proves validate.mjs on a synthetic session branch: a run triggered by a chain, admitted by both
 // receipts at the pinned commit, with a capture and a screenshot per frozen case, three independent
 // lanes, an appended run record and a moved latest pointer; a behaviour failure that routes to the
-// backend; a UX failure that routes to a person; a run blocked before it published anything; and one
-// mutation per law, each of which must fail with a line that names the defect. Two of the mutations
-// are the custody proof: the placeholder for the shared UAT password may appear in no file this
-// operator writes.
+// backend; a UX failure that routes to a person; a run blocked before it published anything; a run
+// authorised by the environment's own declaration and one authorised only by a person's approval id;
+// and one mutation per law, each of which must fail with a line that names the defect. Two of the
+// mutations are the custody proof: the placeholder for the shared UAT password may appear in no file
+// this operator writes.
 import assert from 'node:assert/strict';
 import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs';
+import { createHash } from 'node:crypto';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
-import { validateUatStep } from './validate.mjs';
+import { validateUatStep, UAT_CLASSES } from './validate.mjs';
 
 const FEATURE = 'enrollment';
 const FLOW = 'paid-enrollment';
@@ -20,6 +22,9 @@ const BT = String.fromCharCode(96);
 const ENTRY = 'demo-product/fe';
 const COMMIT = '1'.repeat(40);
 const OTHER_COMMIT = '2'.repeat(40);
+// A plain approval id, exactly as a person-marked environment requires; most branches below need
+// nothing more specific than that this run's writes were authorised by something.
+const APPROVAL = 'approval-uat-owner-1';
 const FP = (c) => `sha256:${String(c).repeat(64)}`;
 const DIR = `.worktrees/uat/${FEATURE}/${FLOW}`;
 const SNAPSHOT_REF = `${DIR}/snapshot.json`;
@@ -55,7 +60,7 @@ const isolation = (over = {}) => ({
 
 function snapshot(over = {}) {
   return {
-    runId: RUN, requestedBy: 'the product owner', feature: FEATURE, flow: FLOW, env: ENV, commit: COMMIT, frozenAt: T(10),
+    runId: RUN, approval: APPROVAL, feature: FEATURE, flow: FLOW, env: ENV, commit: COMMIT, frozenAt: T(10),
     flowRoot: 'PATCHED-BY-WRITE-BRANCH', snapshotRef: SNAPSHOT_REF, snapshotFingerprint: FP(3),
     lease: { leaseRef: `uat-lease://s-test/${FLOW}`, exclusive: true, expiresAt: T(180) },
     admission: [
@@ -123,13 +128,13 @@ function verdicts(over = {}) {
   };
 }
 
-const PRINTED = [`| ${BT}response/artifacts/sheet.png${BT} | the run's step captures, handed to the person who asked before the verdict was published |`];
+const PRINTED = [`| ${BT}response/artifacts/sheet.png${BT} | the run's step captures, printed before the verdict was published |`];
 
 function responseMd({ snap = snapshot(), verd = verdicts(), outcomes = { 'pay-and-enrol': 'pass', 'abandon-checkout': 'pass' }, printed = PRINTED, note = 'The shared credential is named, never printed, and every login field is masked.' } = {}) {
   return `# uat-flow-verification — ${snap.feature}/${snap.flow}
 
-The product owner asked for this run; it was admitted at one commit, executed case by case in the
-frozen order, and judged on three independent lanes. ${note}
+The chain that built and proved this surface reached this run next; it was admitted at one commit,
+executed case by case in the frozen order, and judged on three independent lanes. ${note}
 
 ## Admission
 
@@ -142,7 +147,7 @@ ${snap.admission.map((a) => `| \`${a.kind}\` | \`${a.ref}\` | \`${a.commit}\` |`
 | Field | Value |
 | --- | --- |
 | Run | \`${snap.runId}\` |
-| Requested by | ${snap.requestedBy} |
+| Approval | ${snap.approval} |
 | Feature | \`${snap.feature}\` |
 | Flow | \`${snap.flow}\` |
 | Commit | \`${snap.commit}\` |
@@ -199,7 +204,7 @@ ${printed.join('\n')}
 const requestJson = ({ extra = {}, inputs, cases = [...CASES] } = {}) => ({
   schemaVersion: 9, operatorId: 'uat.verify', step: 3, parallel: 1, sessionId: 's-test',
   contexts: [{ alias: '@workspaces/be', head: COMMIT }, { alias: '@worktrees/uat/enrollment/paid-enrollment', head: null }],
-  requirements: { requestedBy: 'the product owner', feature: FEATURE, flow: FLOW, env: ENV, cases, runId: RUN, lease: `uat-lease://s-test/${FLOW}`, resume: null, ...extra },
+  requirements: { approval: APPROVAL, feature: FEATURE, flow: FLOW, env: ENV, cases, runId: RUN, lease: `uat-lease://s-test/${FLOW}`, resume: null, ...extra },
   inputs: inputs ?? { 'frontend-surface-audit': AUDIT_IN, 'quality-verification': QUALITY_IN, route: ROUTE_IN },
   resume: null,
 });
@@ -254,7 +259,7 @@ function writeBranch(files, history = 'match') {
     }
     writeFileSync(path.join(flowRoot, 'latest.json'), JSON.stringify({ runId: history === 'stale-latest' ? '20260109-000000-1111111' : RUN }, null, 2));
     if (history === 'ignored') writeFileSync(path.join(flowRoot, '.gitignore'), '# local only\n.worktrees/uat/\n');
-    if (history !== 'no-history') writeFileSync(path.join(flowRoot, 'history.md'), `# history\n\n- ${RUN} - ${COMMIT} - pass - the product owner\n`);
+    if (history !== 'no-history') writeFileSync(path.join(flowRoot, 'history.md'), `# history\n\n- ${RUN} - ${COMMIT} - pass - ${APPROVAL}\n`);
   }
   return { branch, session };
 }
@@ -284,30 +289,30 @@ const blocked = () => ({
   'response/response.json': { schemaVersion: 9, operatorId: 'uat.verify', step: 3, parallel: 1, status: 'blocked', stop: 'ADMISSION_MISSING', fallbacks: [], fields: {}, commits: [], next: [] },
 });
 
-async function expectValid(files, label, history) {
+async function expectValid(files, label, history, options = {}) {
   const { branch, session } = writeBranch(files, history);
-  const { errors } = await validateUatStep(branch);
+  const { errors } = await validateUatStep(branch, undefined, options);
   rmSync(session, { recursive: true, force: true });
   assert.deepEqual(errors, [], `${label} should be valid`);
 }
-async function expectError(files, needle, label, history) {
+async function expectError(files, needle, label, history, options = {}) {
   const { branch, session } = writeBranch(files, history);
-  const { errors } = await validateUatStep(branch);
+  const { errors } = await validateUatStep(branch, undefined, options);
   rmSync(session, { recursive: true, force: true });
   assert.ok(errors.some((e) => e.includes(needle)), `${label}: expected an error containing "${needle}", got:\n${errors.join('\n') || '(none)'}`);
 }
 
-await expectValid(baseline(), 'a run a person asked for, admitted at the pinned commit, three lanes passing');
+await expectValid(baseline(), 'a run triggered by a chain, authorised, admitted at the pinned commit, three lanes passing');
 await expectValid(withVerdicts({ behavior: 'fail' }, { next: ['backend.source.apply', 'user'], outcomes: { 'pay-and-enrol': 'fail', 'abandon-checkout': 'pass' } }), 'a behaviour failure routed to the backend');
 await expectValid(withVerdicts({ ux: 'fail' }, { next: ['user'], outcomes: { 'pay-and-enrol': 'fail', 'abandon-checkout': 'pass' } }), 'a UX failure routed to a person');
 await expectValid(blocked(), 'blocked on a missing admission, publishing nothing', 'none');
 await expectValid({ 'request/request.json': requestJson(), 'response/response.json': { schemaVersion: 9, operatorId: 'uat.verify', step: 3, parallel: 1, status: 'blocked', stop: 'IDENTITY_MISSING', fallbacks: [], fields: {}, commits: [], next: ['platform.operate'] } }, 'a flow with no account yet: handed to provisioning, which creates it', 'none');
 
-// The gate and the person behind the run.
+// The gate and the run's authority.
 await expectError({ ...baseline(), 'response/response.json': { ...responseJson(), stop: 'LEASE_INVALID' } }, 'only a blocked response carries a stop', 'a done branch carrying a stop');
 await expectValid({ ...blocked(), 'response/response.json': { schemaVersion: 9, operatorId: 'uat.verify', step: 3, parallel: 1, status: 'blocked', stop: 'RUNTIME_UNAVAILABLE', fallbacks: [], fields: {}, commits: [], next: [] } }, 'blocked on the shared RUNTIME_UNAVAILABLE code');
 await expectError({ ...baseline(), 'request/request.json': requestJson({ extra: { password: 'x' } }) }, 'requirements.password is not a field', 'a credential has nowhere to go in a request');
-await expectError({ ...baseline(), 'request/request.json': requestJson({ extra: { requestedBy: '' } }) }, 'required field requestedBy has no value', 'a run nobody asked for');
+await expectError({ ...baseline(), 'request/request.json': requestJson({ extra: { approval: '' } }) }, 'required field approval has no value', 'a run with no authority behind it');
 await expectError({ ...baseline(), 'request/request.json': requestJson({ inputs: { 'frontend-surface-audit': AUDIT_IN, route: ROUTE_IN } }) }, 'required input quality-verification is absent', 'a run admitted by one receipt only');
 
 // Admission at the pinned commit.
@@ -397,11 +402,42 @@ await expectError(baseline(), 'appends one line to the flow history', 'a run tha
 await expectError(baseline(), 'excludes the flow folder', 'a flow folder the host repository would never track', 'ignored');
 
 // A verdict nobody was shown is a verdict nobody read.
-await expectError({ ...baseline(), 'response/response.md': responseMd({ printed: [] }) }, 'names no run summary', 'a published verdict the person who asked never saw');
+await expectError({ ...baseline(), 'response/response.md': responseMd({ printed: [] }) }, 'names no run summary', 'a published verdict nobody was shown');
 
 await expectError({ ...baseline(), 'response/data/snapshot.json': snapshot({ isolation: isolation({ sessionId: 's-other' }) }) }, "no run writes another session's folder", 'a run folder written for another session');
 await expectError({ ...baseline(), 'response/data/snapshot.json': snapshot({ isolation: isolation({ servedContainsCommit: false }) }) }, 'does not contain the commit this run pinned', 'a journey driven against a head that never carried this work');
 await expectError({ ...baseline(), 'response/data/snapshot.json': snapshot({ isolation: isolation({ seededIds: [`${NS}-learner`, 'shared-learner-1'] }) }) }, 'lies outside the run namespace', 'a seed that reached a row the run does not own');
 await expectError({ ...baseline(), 'response/data/snapshot.json': snapshot({ isolation: isolation({ rollbackIds: ['someone-elses-row'] }) }) }, 'which this run never seeded', 'a rollback that would delete another run rows');
 
-process.stdout.write('uat.verify self-test: 9 valid branches, 57 rejected mutations\n');
+// Authority from the environment's own declaration, the same mechanism platform.operate uses. A
+// synthetic host holds one declaration per case; the reference a request carries is the declaration's
+// path and the hash of its bytes.
+const HOST = mkdtempSync(path.join(tmpdir(), 'uat-host-'));
+const declare = (env, body) => {
+  mkdirSync(path.join(HOST, '.stacks', env), { recursive: true });
+  const bytes = Buffer.from(JSON.stringify(body, null, 2));
+  writeFileSync(path.join(HOST, '.stacks', env, 'environment.json'), bytes);
+  return `.stacks/${env}/environment.json#sha256:${createHash('sha256').update(bytes).digest('hex')}`;
+};
+const DEV_REF = declare('dev', { schemaVersion: 9, env: 'dev', production: false });
+const TIGHT_REF = declare('tight', { schemaVersion: 9, env: 'tight', production: false, authorization: { seed: 'person' } });
+assert.deepEqual(UAT_CLASSES, ['seed', 'identity-provisioning']);
+const MOVED_REF = DEV_REF.replace(/[0-9a-f]{64}$/, '9'.repeat(64));
+const onHost = { hostRoot: HOST };
+
+const authorityBranch = ({ approval, env = ENV }) => {
+  const snap = snapshot({
+    approval, env,
+    golden: { state: 'candidate', ref: `${DIR}/snapshots/snapshot.json`, approvedBy: null, env },
+    accounts: [account('learner', { credentialRef: `.stacks/${env}/secrets/uat.enc` })],
+  });
+  return { ...baseline(), 'request/request.json': requestJson({ extra: { approval, env } }), 'response/data/snapshot.json': snap, 'response/response.md': responseMd({ snap }) };
+};
+
+await expectValid(authorityBranch({ approval: DEV_REF }), 'a dev walk authorised by the environment declaration itself, no approval id needed', undefined, onHost);
+await expectValid(authorityBranch({ approval: APPROVAL, env: 'tight' }), 'an environment that tightened seed to person satisfied by a plain approval id', undefined, onHost);
+await expectError(authorityBranch({ approval: TIGHT_REF, env: 'tight' }), 'marks seed as person', 'an environment that tightened seed to person refusing a declaration reference', undefined, onHost);
+await expectError(authorityBranch({ approval: MOVED_REF }), 'the declaration moved since it was read', 'a declaration reference whose hash no longer matches the file', undefined, onHost);
+await expectError(authorityBranch({ approval: DEV_REF, env: 'tight' }), 'authorises its own environment only', 'a dev declaration offered as approval for another environment', undefined, onHost);
+
+process.stdout.write('uat.verify self-test: 10 valid branches, 60 rejected mutations\n');
