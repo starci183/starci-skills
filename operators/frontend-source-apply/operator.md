@@ -95,7 +95,9 @@ knows what it wrote, never how it renders.
 | 7 | Emit | — | everything above | `response/response.md`, `response/changes.md`, `response/response.json` | — |
 
 Under `mode = dry` the branch stops after step 4 with the plan alone: `writes.json` carries a null
-commit, `response.json` carries no commit, and the checkout is untouched. Under `apply`, step 5 writes
+commit, `response.json` carries no commit, and the checkout is untouched. A dry run is granted neither
+`@tools/sourcewrite` nor `@tools/git`, because a mode that writes nothing needs no tool that can
+write; the grant and this paragraph say the same thing so neither can drift. Under `apply`, step 5 writes
 and commits exactly once and step 6 proves that the committed tree is the resolved tree. `changes.md`
 is the record the next steps read: which paths moved, which claims they carry, which gates the
 checkout pins for them, and which surfaces must now be observed.

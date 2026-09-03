@@ -16,8 +16,7 @@
       {
         "operator": "workspace.bind",
         "requirements": {
-          "role": "fe",
-          "runtimeNeed": "consume"
+          "role": "fe"
         }
       }
     ],
@@ -26,7 +25,11 @@
         "operator": "business.decide",
         "requirements": {
           "mode": "model"
-        }
+        },
+        "asks": [
+          "featureId",
+          "targetState"
+        ]
       }
     ],
     [
@@ -35,19 +38,31 @@
         "requirements": {
           "alternatives": 1,
           "selectionPolicy": "automatic"
-        }
+        },
+        "asks": [
+          "objective",
+          "constraints"
+        ]
       }
     ],
     [
       {
-        "operator": "backend.source.apply"
+        "operator": "backend.source.apply",
+        "asks": [
+          "featureId",
+          "outcome",
+          "mutableFileRefs"
+        ]
       },
       {
         "operator": "frontend.direction.decide",
         "requirements": {
           "intent": "create",
           "changeLevel": "new"
-        }
+        },
+        "asks": [
+          "target"
+        ]
       }
     ],
     [
@@ -83,12 +98,20 @@
         "operator": "business.decide",
         "requirements": {
           "mode": "reconcile"
-        }
+        },
+        "asks": [
+          "featureId",
+          "targetState"
+        ]
       }
     ],
     [
       {
-        "operator": "git.publish"
+        "operator": "git.publish",
+        "asks": [
+          "boundary",
+          "approval"
+        ]
       }
     ]
   ],

@@ -18,6 +18,7 @@
 | Node | Class | Because |
 | --- | --- | --- |
 | `body>main>div[0]>section` | `p-4` | reimplements an owned relationship |
+| `body>main>div[0]>section>span` | `text-accent-soft-foreground` | refused by SURFACE-4 Case 2 |
 
 ## Gaps
 

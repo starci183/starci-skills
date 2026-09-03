@@ -32,6 +32,18 @@ axis is a partial check wearing a complete label. Every boundary answers the dat
 at least one store or states that it owns none; a store names one owning boundary that writes it,
 and a second writer exists only with an explicit shared-write justification.
 
+## The decision names every write it commits to
+
+A boundary that owns a store says nothing about who writes it, when, or under which transaction, so
+the decision closes that gap itself: `response/data/stack-model.json` carries one `operations` entry
+per write this architecture commits to, and `## Operations` of the receipt restates the same rows.
+Each entry names its transport, its writer, the stores it touches, its transaction boundary, its
+idempotency kind, the migrations it ships, and the coverage-matrix dimensions of the business head it
+implements. That list is the frozen contract `backend.source.apply` fills: the implementation restates
+those operations unchanged and may add none, so an operation nobody declared here cannot be written
+anywhere. Declaring a write is not the same as choosing an implementation, which is why the writer is
+the one file path this operator names.
+
 ## The critique is a nested exchange
 
 After the selected alternative is deepened, the branch pauses: it emits `response/response.json`
@@ -50,12 +62,16 @@ alternative was asked for, and `response.json`; the critique agent writes only
 reconfigure runtime services, name implementation files in the handoff, or claim that an
 implementation, a quality gate, or a UAT run has passed.
 
+When the `model` Input is present it is the authority for this run and the published head is lineage
+only, because a decision taken against yesterday's promise is a decision against the wrong promise.
+When it is absent the published head is the authority.
+
 ## Context
 
 | Alias | Bind | Required |
 | --- | --- | --- |
 | `@workspaces/be` | the routed backend checkout read at the frozen head; the inventory comes from its manifests and deployment files | yes |
-| `@worktrees/businesses/<featureId>` | the published business head, the promise the architecture must keep | yes |
+| `@worktrees/businesses/<featureId>` | the published business head, the promise the architecture must keep; evidence when the session carries a `model` Input | yes |
 | `@knowledge/patterns` | reusable shapes the scope may bind; a shape, never a selection | no |
 
 ## Inputs
@@ -63,6 +79,7 @@ implementation, a quality gate, or a UAT run has passed.
 | Kind | From | Required |
 | --- | --- | --- |
 | `architecture-decision` | a prior run of `architecture.decide` on the same or an adjacent boundary; lineage that may be contradicted, never ignored | no |
+| `model` | `business.decide`; the head that branch modelled, when it has not been published yet | no |
 
 ## Requirements
 
@@ -83,11 +100,11 @@ implementation, a quality gate, or a UAT run has passed.
 | --- | --- | --- | --- | --- | --- |
 | 1 | Validate the gate and resume | `resume`, `approval` | `request/request.json`, input `architecture-decision` when present, @workspaces/be at the frozen head | — | `INVALID_INPUT`, `SOURCE_DRIFT`, `NO_PROGRESS` |
 | 2 | Observe the current state | — | @workspaces/be at the frozen head: manifests, configuration, deployment files, @tools/git | `response/data/current-state.json` | `CURRENT_STATE_UNOBSERVED` |
-| 3 | Bind the inventory to the business promise | — | `response/data/current-state.json`, @worktrees/businesses/<featureId> at its published head | — | `BUSINESS_AUTHORITY_REQUIRED`, `EVIDENCE_MISSING` |
+| 3 | Bind the inventory to the business promise | — | `response/data/current-state.json`, input `model` when present, otherwise @worktrees/businesses/<featureId> at its published head | — | `BUSINESS_AUTHORITY_REQUIRED`, `EVIDENCE_MISSING` |
 | 4 | Frame the decision | `objective`, `decisionId`, `constraints`, `tradeoffAxes` | `request/request.json` requirements | — | `CONSTRAINT_CONTRADICTION` |
 | 5 | Generate the alternatives | `alternatives` | `response/data/current-state.json`, @knowledge/patterns, @tools/websearch | `response/artifacts/<decisionId>-alternatives.html` only when more than one alternative was asked for, @tools/visualize | `NO_VIABLE_ALTERNATIVE` |
 | 6 | Select | `selectionPolicy`, `tradeoffAxes`, `approval` | `response/artifacts/<decisionId>-alternatives.html` when present | — | `CHOICE_REQUIRED` |
-| 7 | Deepen the selected alternative | `constraints` | `response/data/current-state.json` | `response/data/stack-model.json` | `DATA_OWNERSHIP_UNASSIGNED`, `COMPATIBILITY_UNVERIFIED` |
+| 7 | Deepen the selected alternative and declare the operations it commits to | `constraints` | `response/data/current-state.json`, the bound business head's coverage matrix for the dimensions each operation cites | `response/data/stack-model.json`, including its `operations` | `DATA_OWNERSHIP_UNASSIGNED`, `COMPATIBILITY_UNVERIFIED` |
 | 8 | Await the critique: pause, a fresh agent attacks the selection, resume when it answers | — | `critique/response/critique.md` once the exchange is done | `response/response.json` (waiting, awaiting critique) | `CRITIQUE_UNRESOLVED` |
 | 9 | Confirm or return the selection | `selectionPolicy` | `critique/response/critique.md`, `response/data/stack-model.json` | — | `CHOICE_REQUIRED`, `NO_VIABLE_ALTERNATIVE` |
 | 10 | Write the handoff and emit | — | everything above | `response/response.md`, `response/response.json` | — |
@@ -95,7 +112,9 @@ implementation, a quality gate, or a UAT run has passed.
 Under the defaults, step 5 produces one design and no comparison page, step 6 has nothing to
 choose, and the decision's quality rests on step 8. When the only alternative fails an attack, step 9
 stops with `NO_VIABLE_ALTERNATIVE`, not `CHOICE_REQUIRED`. The handoff names contracts, never
-implementation files, because choosing the files is the next domain's job.
+implementation files, because choosing the files is the next domain's job; the one exception is the
+writer of each declared operation, which this operator does name, because the implementation may not
+choose its own writer.
 
 ## Outputs
 
@@ -106,6 +125,10 @@ implementation files, because choosing the files is the next domain's job.
 | `stack-model` | `response/data/stack-model.json` | data | yes |
 | `alternatives` | `response/artifacts/<decisionId>-alternatives.html` | artifact | no |
 | `independent-critique` | `critique/response/critique.md` | md | yes |
+
+`response/response.md` carries the `## Operations` table and `response/data/stack-model.json` carries
+the matching `operations` array; together they are the mutation contract `backend.source.apply`
+consumes, and no other output of this operator crosses into that step.
 
 ## Stops
 

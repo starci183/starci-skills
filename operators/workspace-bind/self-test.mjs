@@ -50,6 +50,7 @@ function responseMd({ binding = routeBinding(), findings = null, runtimeRows = n
     ['ROUTE_HYDRATED_FROM_PORTABLE', binding.hydratedRouteRef, 'the portable declaration resolved to this local route'],
     ['IDENTITY_ROSTER_SEALED', 'the credential roster reference', 'the roster was bound by name and never read'],
     ...(binding.gitPolicy.worktreeBranches === 'forbidden' ? [['WORKTREE_BRANCH_FORBIDDEN', binding.gitPolicy.mutationBranch, 'the routed policy forbids task and worktree branches']] : []),
+    ...(binding.gitPolicy.worktreeBranches === 'session-only' ? [['WORKTREE_BRANCH_SESSION_ONLY', binding.gitPolicy.mutationBranch, 'the routed policy permits a session worktree branch']] : []),
     ...(binding.provenanceHeadRef ? [['PROVENANCE_HEAD_BOUND', binding.provenanceHeadRef, 'a redacted conversation head was attached']] : []),
     ...(binding.runtime ? [['RUNTIME_CONSUMED_NOT_OWNED', binding.runtime.ownerTaskId, 'the caller consumes the owner endpoints and owns no lifecycle']] : []),
   ];
@@ -131,7 +132,7 @@ function writeBranch(files) {
   const session = mkdtempSync(path.join(tmpdir(), 'workspace-session-'));
   const branch = path.join(session, 'step-1', 'parallel-1');
   for (const d of ['request', 'response/data', 'response/artifacts']) mkdirSync(path.join(branch, d), { recursive: true });
-  writeFileSync(path.join(session, 'state.json'), JSON.stringify({ id: 's-test', chain: [['1/1']], steps: { '1/1': 'workspace.bind' }, current: '1/1', status: 'running' }));
+  writeFileSync(path.join(session, 'state.json'), JSON.stringify({ id: 's-test', project: 'starci-academy', startedAt: '2026-09-03T00:00:00Z', requestHashes: {}, chain: [['1/1']], steps: { '1/1': 'workspace.bind' }, current: '1/1', status: 'running' }));
   for (const [name, content] of Object.entries(files)) {
     if (content === null) continue;
     writeFileSync(path.join(branch, name), typeof content === 'string' ? content : JSON.stringify(content, null, 2));
@@ -196,6 +197,7 @@ await expectError({ ...baseline(), 'response/response.md': responseMd({ findings
 await expectError({ ...baseline(), 'response/response.md': responseMd({ findings: [['ROUTE_HYDRATED_FROM_PORTABLE', HYDRATED, 'resolved'], ['IDENTITY_ROSTER_SEALED', 'roster', 'sealed'], ['WORKTREE_BRANCH_FORBIDDEN', 'mtp', 'forbidden'], ['HINT_REJECTED', 'D:/Repositories/starci-academy', 'a similar directory name']] }) }, 'a hint is INVALID_INPUT at the gate', 'a receipt that weighs a hint');
 await expectError({ ...baseline(), 'response/response.md': responseMd({ findings: [['ROUTE_HYDRATED_FROM_PORTABLE', HYDRATED, 'resolved'], ['WORKTREE_BRANCH_FORBIDDEN', 'mtp', 'forbidden']] }) }, 'the credential roster was sealed and never read', 'no sealed roster finding');
 await expectError({ ...baseline(), 'response/response.md': responseMd({ findings: [['ROUTE_HYDRATED_FROM_PORTABLE', HYDRATED, 'resolved'], ['IDENTITY_ROSTER_SEALED', 'roster', 'sealed']] }) }, 'a forbidden worktree policy must be recorded', 'a forbidden policy that was never recorded');
+await expectError({ ...baseline(), 'response/data/route.json': routeBinding({ gitPolicy: { worktreeBranches: 'session-only', mutationBranch: 'mtp' } }), 'request/request.json': requestJson({ extra: { gitPolicy: { worktreeBranches: 'session-only', mutationBranch: 'mtp' } } }) }, 'a session-only worktree policy must be recorded', 'a session-only policy that was never recorded');
 await expectError({ ...baseline(), 'response/response.md': responseMd({ findings: [['ROUTE_HYDRATED_FROM_PORTABLE', HYDRATED, 'resolved'], ['ROUTE_HYDRATED_FROM_PORTABLE', HYDRATED, 'resolved again'], ['IDENTITY_ROSTER_SEALED', 'roster', 'sealed'], ['WORKTREE_BRANCH_FORBIDDEN', 'mtp', 'forbidden']] }) }, 'repeats subject', 'a repeated finding subject');
 await expectError({ ...baseline(), 'response/response.md': responseMd().replace('## Policy', '## Git policy') }, 'missing section ^## Policy$', 'response section renamed');
 await expectError({ ...baseline(), 'response/response.md': responseMd().replace('| Branch | mtp |', '| Branch | feature/x |') }, 'differs from the route binding', 'the receipt and the binding disagree on the branch');

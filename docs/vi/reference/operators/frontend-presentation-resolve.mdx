@@ -128,6 +128,12 @@ source sản phẩm, và không ghi phán quyết, điểm số hay tuyên bố 
 | 8 | Phát lời khai contract lên các node do ứng dụng sở hữu | `contractEmission` | @knowledge/ui/presentation (kho luật đã đóng băng) | — | `UNKNOWN_RULE` |
 | 9 | Phát | — | mọi thứ ở trên | `response/artifacts/<target>.resolved.tsx`, `response/data/inventory.json`, `response/response.md`, `response/response.json` | — |
 
+Bước 8 chỉ khai thứ mà một node mang nổi: một thuộc tính do ứng dụng sở hữu nằm trên `className` của
+một component Grammar thì không mang thuộc tính nào, bởi component ấy chuyển tiếp `className` và không
+công bố prop nào cho quan hệ đó, nên luật của nó được ghi dưới `## Gaps` thay vì được phát ra. Chuyển
+tiếp `data-contract` từ mọi component Common có nhận `className` là một thay đổi của Grammar và thuộc
+về chủ họ ấy, không thuộc về operator này.
+
 Lượt đi thăm mọi node theo thứ tự tài liệu và ghi một node path ổn định; node nằm ngoài trần mà hướng
 mang theo thì chỉ quan sát chứ không bao giờ bị sửa. Bước 4 đến 8 chạy theo từng node, nên một cây cho
 đúng một quyết định cho mỗi cặp node và thuộc tính. Biên nhận uỷ quyền cho một lượt audit sau đo kết

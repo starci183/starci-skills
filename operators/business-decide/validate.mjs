@@ -71,10 +71,12 @@ export async function validateBusinessStep(branchDir, root = ROOT) {
   const declaredDimensions = Array.isArray(requirements.dimensions) ? requirements.dimensions : [];
 
   let claims = new Map();
+  let claimsDoc = null;
   if (present.has('claims') && has('response/data/claims.json')) {
     let doc = null;
     try { doc = JSON.parse(await read('response/data/claims.json')); } catch { doc = null; }
     if (doc) {
+      claimsDoc = doc;
       if (!empty(requirements.featureId) && doc.featureId !== requirements.featureId) errors.push(`response/data/claims.json: featureId ${doc.featureId} differs from the request's ${requirements.featureId}`);
       for (const claim of doc.claims ?? []) {
         if (claims.has(claim.claimId)) errors.push(`response/data/claims.json: claim ${claim.claimId} is declared more than once`);
@@ -197,6 +199,7 @@ export async function validateBusinessStep(branchDir, root = ROOT) {
     if (model.lineage.previousState !== null && model.lineage.previousHeadRef === null) errors.push('response/data/model.json: a transition from an existing state must name the previous head, because rejection preserves lineage');
 
     if (matrix && model.coverageFingerprint !== matrix.fingerprint) errors.push('response/data/model.json: coverageFingerprint must equal the frozen matrix fingerprint, or backend and UAT cannot correlate the same matrix');
+    if (claimsDoc && model.claimsFingerprint !== claimsDoc.fingerprint) errors.push('response/data/model.json: claimsFingerprint must equal the frozen claims fingerprint, or the head names claims nobody froze');
     if (mode === 'model' && model.reconciliation !== null) errors.push('response/data/model.json: mode model reconciles nothing, so reconciliation must be null');
     if (mode === 'reconcile') {
       if (model.reconciliation === null) errors.push('response/data/model.json: mode reconcile must carry the reconciliation it performed');

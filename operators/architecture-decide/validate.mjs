@@ -4,7 +4,8 @@
 // owner among its writers and shared writes are justified; retained components are verified on all
 // five axes or carry the COMPATIBILITY_UNVERIFIED fallback; the critique came from the nested
 // exchange, attacks the selected alternative, and a failing attack cannot end in status done; the
-// handoff names contracts, never implementation files.
+// handoff names contracts, never implementation files; every declared operation is named once, names a
+// writer, cites at least one business dimension, and is restated by the receipt's Operations table.
 import { existsSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
 import path from 'node:path';
@@ -62,6 +63,14 @@ export async function validateArchitectureStep(branchDir, root = ROOT) {
       if (b.ownsData && n === 0) errors.push(`response/data/stack-model.json: boundary ${b.boundaryId} claims data and owns no store`);
       if (!b.ownsData && n > 0) errors.push(`response/data/stack-model.json: boundary ${b.boundaryId} claims no data and owns ${n} store(s)`);
     }
+    const seenOperations = new Set();
+    for (const o of model.operations ?? []) {
+      if (seenOperations.has(o.operationId)) errors.push(`response/data/stack-model.json: operation ${o.operationId} is declared twice`);
+      seenOperations.add(o.operationId);
+      for (const storeRef of o.storeRefs) if (!model.stores.some((st) => st.storeId === storeRef)) errors.push(`response/data/stack-model.json: operation ${o.operationId} names store ${storeRef}, which this decision does not own`);
+      if (o.transactionBoundary === 'read-only' && o.migrationRefs.length) errors.push(`response/data/stack-model.json: operation ${o.operationId} is read-only and ships a migration`);
+      if (o.transport === 'event-consumer' && o.idempotencyKind === 'none') errors.push(`response/data/stack-model.json: operation ${o.operationId} consumes events with no idempotency, so a redelivery applies it twice`);
+    }
     const fallbacks = new Set(response.fallbacks ?? []);
     for (const c of model.components) {
       if (c.status === 'removed') { if (c.compatibility.length) errors.push(`response/data/stack-model.json: removed component ${c.componentId} carries a compatibility verdict`); continue; }
@@ -81,6 +90,25 @@ export async function validateArchitectureStep(branchDir, root = ROOT) {
     if (!empty(requirements.decisionId) && decision['Decision id'] !== requirements.decisionId) errors.push('response/response.md: Decision id differs from the request');
     const alts = tableUnder(text, '## Alternatives') ?? [];
     if (model && alts.length !== model.alternatives.length) errors.push(`response/response.md: Alternatives has ${alts.length} rows, stack-model has ${model.alternatives.length}`);
+    const operationRows = tableUnder(text, '## Operations') ?? [];
+    if (model) {
+      const declared = new Map((model.operations ?? []).map((o) => [o.operationId, o]));
+      if (operationRows.length !== declared.size) errors.push(`response/response.md: Operations has ${operationRows.length} rows, stack-model declares ${declared.size}`);
+      for (const [operationId, transport, writer, stores, transaction, idempotency, dimensions] of operationRows) {
+        const id = String(operationId).replace(/`/g, '');
+        const o = declared.get(id);
+        if (!o) { errors.push(`response/response.md: Operations names ${id}, which stack-model does not declare`); continue; }
+        if (transport !== o.transport) errors.push(`response/response.md: operation ${id} reports transport ${transport}, stack-model declares ${o.transport}`);
+        if (String(writer).replace(/`/g, '') !== o.writerRef) errors.push(`response/response.md: operation ${id} names another writer than stack-model`);
+        if (transaction !== o.transactionBoundary) errors.push(`response/response.md: operation ${id} reports transaction ${transaction}, stack-model declares ${o.transactionBoundary}`);
+        if (idempotency !== o.idempotencyKind) errors.push(`response/response.md: operation ${id} reports idempotency ${idempotency}, stack-model declares ${o.idempotencyKind}`);
+        const cited = String(dimensions).split(',').map((v) => v.trim().replace(/`/g, '')).filter(Boolean);
+        for (const dimensionId of cited) if (!o.authorityDimensionIds.includes(dimensionId)) errors.push(`response/response.md: operation ${id} cites dimension ${dimensionId}, which stack-model does not declare`);
+        for (const dimensionId of o.authorityDimensionIds) if (!cited.includes(dimensionId)) errors.push(`response/response.md: operation ${id} does not restate declared dimension ${dimensionId}`);
+        const declaredStores = String(stores).split(',').map((v) => v.trim().replace(/`/g, '')).filter((v) => v && v !== '—');
+        for (const storeRef of o.storeRefs) if (!declaredStores.includes(storeRef)) errors.push(`response/response.md: operation ${id} does not restate store ${storeRef}`);
+      }
+    }
     for (const [item, kind, detail] of tableUnder(text, '## Handoff') ?? []) if (kind === 'contract' && IMPLEMENTATION_FILE.test(detail)) errors.push(`response/response.md: handoff contract "${item}" names an implementation file`);
     for (const [component, status] of tableUnder(text, '## Stack delta') ?? []) if (status === 'replaced-candidate' && !(response.fallbacks ?? []).includes('COMPATIBILITY_UNVERIFIED')) errors.push(`response/response.md: ${component} is replaced-candidate without the COMPATIBILITY_UNVERIFIED fallback`);
   }

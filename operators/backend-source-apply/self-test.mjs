@@ -23,7 +23,7 @@ const PROOF_KINDS = ['unit', 'integration'];
 const operation = (overrides = {}) => ({
   operationId: OP, name: 'enrolCourse', transport: 'graphql-mutation', writerRef: WRITER,
   storeRefs: ['enrollments'], transactionBoundary: 'single-transaction', idempotencyKind: 'request-token',
-  migrationRefs: [], authorityDecisionIds: ['BA-1'], facets: FACETS, proofKinds: PROOF_KINDS,
+  migrationRefs: [], authorityDimensionIds: ['effective-access'], facets: FACETS, proofKinds: PROOF_KINDS,
   ...overrides,
 });
 const CHANGES = [
@@ -40,7 +40,7 @@ const conformancePath = (operationId, facet) => `response/data/conformance/${ope
 const proofPath = (operationId, proofKind) => `response/data/proofs/${operationId}.${proofKind}.json`;
 
 function responseMd({ operations = null, changes = null, findings = null, contractFingerprint = CONTRACT_FP, commit = COMMIT, base = BASE, branch = BRANCH, mode = 'apply' } = {}) {
-  const operationRows = (operations ?? [[OP, 'graphql-mutation', WRITER, 'single-transaction', 'request-token', 'BA-1']]).map((r) => `| \`${r[0]}\` | ${r[1]} | \`${r[2]}\` | ${r[3]} | ${r[4]} | ${r[5]} |`).join('\n');
+  const operationRows = (operations ?? [[OP, 'graphql-mutation', WRITER, 'single-transaction', 'request-token', 'effective-access']]).map((r) => `| \`${r[0]}\` | ${r[1]} | \`${r[2]}\` | ${r[3]} | ${r[4]} | ${r[5]} |`).join('\n');
   const changeRows = (changes ?? [[WRITER, 'added', OP, '—', hash('1')], [SPEC, 'added', OP, '—', hash('2')]]).map((r) => `| \`${r[0]}\` | ${r[1]} | \`${r[2]}\` | ${r[3]} | ${r[4]} |`).join('\n');
   const findingRows = (findings ?? [['PATTERN_BOUND', OP, WRITER, 'the mutation handler mirrors the published command family']]).map(([code, op, file, statement]) => `| \`${code}\` | ${op === null ? '—' : `\`${op}\``} | ${file === null ? '—' : `\`${file}\``} | ${statement} |`).join('\n');
   return `# backend-source-application — enrol-course
@@ -138,7 +138,7 @@ function writeBranch(files) {
   for (const d of ['request', 'response/data/conformance', 'response/data/proofs', 'response/artifacts']) mkdirSync(path.join(branch, d), { recursive: true });
   mkdirSync(path.join(session, 'step-1', 'parallel-2', 'response'), { recursive: true });
   writeFileSync(path.join(session, 'step-1', 'parallel-2', 'response', 'response.md'), '# architecture-decision — enrol-course\n');
-  writeFileSync(path.join(session, 'state.json'), JSON.stringify({ id: 's-test', chain: [['1/1']], steps: { '1/1': 'backend.source.apply' }, current: '1/1', status: 'running' }));
+  writeFileSync(path.join(session, 'state.json'), JSON.stringify({ id: 's-test', project: 'starci-academy', startedAt: '2026-09-03T00:00:00Z', requestHashes: {}, chain: [['1/1']], steps: { '1/1': 'backend.source.apply' }, current: '1/1', status: 'running' }));
   for (const [name, content] of Object.entries(files)) {
     if (content === null) continue;
     writeFileSync(path.join(branch, name), typeof content === 'string' ? content : JSON.stringify(content, null, 2));
@@ -201,7 +201,7 @@ const withOperation = (patch) => {
         conformance: op.facets.map((f) => conformancePath(OP, f)), proof: op.proofKinds.map((k) => proofPath(OP, k)),
       },
     }),
-    'response/response.md': responseMd({ operations: [[OP, op.transport, op.writerRef, op.transactionBoundary, op.idempotencyKind, op.authorityDecisionIds.join(', ')]] }),
+    'response/response.md': responseMd({ operations: [[OP, op.transport, op.writerRef, op.transactionBoundary, op.idempotencyKind, op.authorityDimensionIds.join(', ')]] }),
   };
 };
 
@@ -239,8 +239,8 @@ await expectError({ ...baseline(), 'response/data/mutations.json': mutationsJson
 await expectError({ ...baseline(), 'response/data/mutations.json': mutationsJson({ changes: [CHANGES[0], { ...CHANGES[1], path: WRITER, afterHash: hash('2') }] }) }, 'carries more than one change record', 'one file changed twice');
 await expectError({ ...baseline(), 'response/data/mutations.json': mutationsJson({ changes: [CHANGES[0], { ...CHANGES[1], operationId: 'ghost-op' }] }) }, 'names undeclared operation ghost-op', 'a change owned by no operation');
 await expectError({ ...baseline(), 'response/data/mutations.json': mutationsJson({ changes: [CHANGES[0], { ...CHANGES[1], path: 'src/other/thing.ts' }] }) }, 'lies outside the mutable ceiling', 'a change outside the ceiling');
-await expectError({ ...baseline(), 'response/response.md': responseMd({ operations: [[OP, 'rest', WRITER, 'single-transaction', 'request-token', 'BA-1']] }) }, 'reports transport rest, the contract froze graphql-mutation', 'a transport the contract did not freeze');
-await expectError({ ...baseline(), 'response/response.md': responseMd({ operations: [[OP, 'graphql-mutation', WRITER, 'single-transaction', 'request-token', 'BA-9']] }) }, 'cites decision BA-9, which the contract does not bind', 'an unapproved business decision');
+await expectError({ ...baseline(), 'response/response.md': responseMd({ operations: [[OP, 'rest', WRITER, 'single-transaction', 'request-token', 'effective-access']] }) }, 'reports transport rest, the contract froze graphql-mutation', 'a transport the contract did not freeze');
+await expectError({ ...baseline(), 'response/response.md': responseMd({ operations: [[OP, 'graphql-mutation', WRITER, 'single-transaction', 'request-token', 'unapproved-dimension']] }) }, 'cites dimension unapproved-dimension, which the contract does not bind', 'an unapproved business dimension');
 await expectError({ ...baseline(), 'response/response.md': responseMd({ findings: [['BUSINESS_QUESTION_RAISED', OP, null, 'the voucher rule on a foreign gateway was never decided']] }) }, 'cannot raise an unresolved business question', 'shipping with an open business question');
 await expectError({ ...baseline(), 'response/response.md': responseMd({ contractFingerprint: hash('9') }) }, 'differs from the fingerprint the mutations were measured against', 'a receipt measured against another contract');
 await expectError({ ...baseline(), 'response/changes.md': changesMd({ files: [[WRITER, 'created']] }) }, 'which the change record omits', 'a changed file missing from the change record');

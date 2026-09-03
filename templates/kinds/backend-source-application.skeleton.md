@@ -19,7 +19,7 @@ the conformance and proof records that measure it live beside it in `response/da
 
 | Operation | Transport | Writer | Transaction | Idempotency | Decisions |
 | --- | --- | --- | --- | --- | --- |
-| `operation-id` | graphql-mutation | `src/features/api/core/graphql/mutations/handler.ts` | single-transaction | request-token | BA-1 |
+| `operation-id` | graphql-mutation | `src/features/api/core/graphql/mutations/handler.ts` | single-transaction | request-token | effective-access |
 
 ## Changes
 

@@ -39,6 +39,12 @@
 | --- | --- | --- | --- | --- |
 | `component-id` | existing | measured-constraint | `path@head` | 5/5 verified, or the axes still unknown |
 
+## Operations
+
+| Operation | Transport | Writer | Stores | Transaction | Idempotency | Dimensions |
+| --- | --- | --- | --- | --- | --- | --- |
+| `operation-id` | graphql-mutation | `src/features/api/core/graphql/mutations/handler.ts` | `store-id` | single-transaction | request-token | effective-access |
+
 ## Handoff
 
 | Item | Kind | Detail |

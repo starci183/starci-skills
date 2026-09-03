@@ -146,7 +146,7 @@ function writeBranch(files) {
   for (const d of ['request', 'response/data', 'response/artifacts']) mkdirSync(path.join(branch, d), { recursive: true });
   mkdirSync(path.join(session, 'step-1', 'parallel-1', 'response'), { recursive: true });
   writeFileSync(path.join(session, 'step-1', 'parallel-1', 'response', 'response.md'), '# business-promise-authority — plans\n');
-  writeFileSync(path.join(session, 'state.json'), JSON.stringify({ id: 's-test', chain: [['1/1'], ['2/1']], steps: { '1/1': 'business.decide', '2/1': 'frontend.direction.decide' }, current: '2/1', status: 'running' }));
+  writeFileSync(path.join(session, 'state.json'), JSON.stringify({ id: 's-test', project: 'starci-academy', startedAt: '2026-09-03T00:00:00Z', requestHashes: {}, chain: [['1/1'], ['2/1']], steps: { '1/1': 'business.decide', '2/1': 'frontend.direction.decide' }, current: '2/1', status: 'running' }));
   for (const [name, content] of Object.entries(files)) {
     if (content === null) continue;
     writeFileSync(path.join(branch, name), typeof content === 'string' ? content : JSON.stringify(content, null, 2));

@@ -12,7 +12,8 @@ import { fileURLToPath } from 'node:url';
 import { validateAgainst } from './json-schema.mjs';
 import { loadOperatorPackages, kindOf, isYes, exchangeOf } from './operator-md.mjs';
 
-const unquote = (s) => String(s ?? '').trim().replace(/^`|`$/g, '');
+// Only a fully quoted cell is unquoted: a sentence that opens with a code span keeps its backticks.
+const unquote = (s) => { const t = String(s ?? '').trim(); return /^`[^`]*`$/.test(t) ? t.slice(1, -1) : t; };
 export const isRequiredField = (row) => row.default.trim().startsWith('—');
 export const isEmpty = (v) => v === undefined || v === null || v === '' || v === '—';
 
@@ -59,6 +60,16 @@ export async function validateRequest(root, dir, packages) {
   if (sessionRoot && existsSync(path.join(sessionRoot, 'state.json'))) {
     try {
       const state = JSON.parse(await readFile(path.join(sessionRoot, 'state.json'), 'utf8'));
+      errors.push(...validateAgainst(JSON.parse(await readFile(path.join(root, 'templates', 'step', 'state.schema.json'), 'utf8')), state, 'state.json'));
+      // A resume re-enters the same operator and names a branch state.json knows; a re-entry state.json does not record is unrecorded evidence.
+      if (request.resume) {
+        const target = `${request.resume.step}/${request.resume.parallel}`;
+        if (state.steps?.[target] === undefined) errors.push(`request.json: resume names ${target}, which state.json does not record`);
+        else if (state.steps[target] !== request.operatorId) errors.push(`request.json: resume names ${target}, a ${state.steps[target]} branch, but this request runs ${request.operatorId}`);
+        const mine = `${request.step}/${request.parallel}`;
+        if (state.resumes && !state.resumes[mine]) errors.push(`request.json: state.json records no resumes[${mine}] for this re-entry`);
+        else if (state.resumes?.[mine] && state.resumes[mine].resumes !== target) errors.push(`request.json: state.json resumes[${mine}] names ${state.resumes[mine].resumes}, the request names ${target}`);
+      }
       const key = `${request.step}/${request.parallel}${request.exchange ? `/${request.exchange}` : ''}`;
       const expected = state.requestHashes?.[key];
       if (expected) {

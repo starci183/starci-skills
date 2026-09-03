@@ -11,7 +11,10 @@
         "operator": "content.generate",
         "requirements": {
           "maxReviewRounds": 2
-        }
+        },
+        "asks": [
+          "unit"
+        ]
       }
     ]
   ],

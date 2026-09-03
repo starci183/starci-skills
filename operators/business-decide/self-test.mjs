@@ -142,7 +142,7 @@ function writeBranch(files) {
   for (const d of ['request', 'response/data', 'response/artifacts']) mkdirSync(path.join(branch, d), { recursive: true });
   mkdirSync(path.join(session, 'step-1', 'parallel-2', 'response'), { recursive: true });
   writeFileSync(path.join(session, DELIVERED), '# backend-source-application — delivered source\n');
-  writeFileSync(path.join(session, 'state.json'), JSON.stringify({ id: 's-test', chain: [['1/1']], steps: { '1/1': 'business.decide' }, current: '1/1', status: 'running' }));
+  writeFileSync(path.join(session, 'state.json'), JSON.stringify({ id: 's-test', project: 'starci-academy', startedAt: '2026-09-03T00:00:00Z', requestHashes: {}, chain: [['1/1']], steps: { '1/1': 'business.decide' }, current: '1/1', status: 'running' }));
   for (const [name, content] of Object.entries(files)) {
     if (content === null) continue;
     writeFileSync(path.join(branch, name), typeof content === 'string' ? content : JSON.stringify(content, null, 2));
@@ -217,6 +217,7 @@ await expectError({ ...baseline(), 'request/request.json': requestJson({ extra: 
 await expectError({ ...baseline(), 'response/response.md': responseMd({ dispositions: DISPOSITIONS.map(([d, p]) => (d === 'legacy-read' ? [d, 'defer'] : [d, p])) }) }, 'is defer here and preserve in the matrix', 'the response and the matrix disagree on a disposition');
 await expectError({ ...baseline(), 'response/response.md': responseMd().replace('## Coverage', '## Coverage matrix') }, 'missing section ^## Coverage$', 'response section renamed');
 await expectError({ ...baseline(), 'response/response.md': responseMd({ findings: [['LEGACY_COEXISTENCE', 'error', 'legacy-create', 'the legacy sale path still creates rights']] }) }, 'is still an open error, so the promise cannot be published', 'published with an open error finding');
+await expectError({ ...baseline(), 'response/data/claims.json': claimsDoc({ fingerprint: `sha256:${'b'.repeat(64)}` }) }, 'claimsFingerprint must equal the frozen claims fingerprint', 'a head naming another claims fingerprint');
 await expectError({ ...baseline(), 'response/data/claims.json': claimsDoc({ claims: [CLAIMS[0], { ...CLAIMS[0], kind: 'intent' }] }) }, 'is declared more than once', 'a duplicated claim');
 await expectError({ ...baseline(), 'response/data/claims.json': claimsDoc({ claims: [{ ...CLAIMS[0], sourceHead: null }, CLAIMS[1]] }) }, 'must bind the observed source head', 'a fact claim with no head');
 await expectError({ ...baseline(), 'response/response.md': responseMd({ claims: [['c-fact', 'fact']] }) }, 'which Cited claims omits', 'a claim the response never cites');

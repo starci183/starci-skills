@@ -25,6 +25,7 @@ const CASES = ['pay-and-enrol', 'abandon-checkout'];
 const ASSERTIONS = { 'pay-and-enrol': ['entry', 'commitment', 'terminal'], 'abandon-checkout': ['entry', 'recovery'] };
 const AUDIT_IN = 'step-1/parallel-1/response/response.md';
 const QUALITY_IN = 'step-2/parallel-1/response/response.md';
+const ROUTE_IN = 'step-1/parallel-2/response/data/route.json';
 // The placeholder this operator's law forbids anywhere it writes.
 const LEAK = 'UAT-SHARED-PASSWORD';
 
@@ -118,7 +119,7 @@ const requestJson = ({ extra = {}, inputs, cases = [...CASES] } = {}) => ({
   schemaVersion: 9, operatorId: 'uat.verify', step: 3, parallel: 1, sessionId: 's-test',
   contexts: [{ alias: '@workspaces/be', head: COMMIT }, { alias: '@worktrees/uat/enrollment/paid-enrollment', head: null }],
   requirements: { requestedBy: 'the product owner', feature: FEATURE, flow: FLOW, cases, runId: RUN, lease: `uat-lease://s-test/${FLOW}`, resume: null, ...extra },
-  inputs: inputs ?? { 'frontend-surface-audit': AUDIT_IN, 'quality-verification': QUALITY_IN },
+  inputs: inputs ?? { 'frontend-surface-audit': AUDIT_IN, 'quality-verification': QUALITY_IN, route: ROUTE_IN },
   resume: null,
 });
 
@@ -142,11 +143,11 @@ function writeBranch(files, history = 'match') {
   const session = mkdtempSync(path.join(tmpdir(), 'uat-session-'));
   const branch = path.join(session, 'step-3', 'parallel-1');
   for (const d of ['request', 'response/data/captures', 'response/artifacts']) mkdirSync(path.join(branch, d), { recursive: true });
-  for (const input of [AUDIT_IN, QUALITY_IN]) {
+  for (const input of [AUDIT_IN, QUALITY_IN, ROUTE_IN]) {
     mkdirSync(path.dirname(path.join(session, input)), { recursive: true });
-    writeFileSync(path.join(session, input), '# admitting receipt\n');
+    writeFileSync(path.join(session, input), input.endsWith('.json') ? '{}\n' : '# admitting receipt\n');
   }
-  writeFileSync(path.join(session, 'state.json'), JSON.stringify({ id: 's-test', chain: [['3/1']], steps: { '3/1': 'uat.verify' }, current: '3/1', status: 'running' }));
+  writeFileSync(path.join(session, 'state.json'), JSON.stringify({ id: 's-test', project: 'starci-academy', startedAt: '2026-09-03T00:00:00Z', requestHashes: {}, chain: [['3/1']], steps: { '3/1': 'uat.verify' }, current: '3/1', status: 'running' }));
   for (const c of CASES) writeFileSync(path.join(branch, 'response', 'artifacts', `${c}.png`), 'png');
   writeFileSync(path.join(branch, 'response', 'artifacts', 'sheet.png'), 'png');
 
@@ -222,7 +223,7 @@ await expectError({ ...baseline(), 'response/response.json': { ...responseJson()
 await expectValid({ ...blocked(), 'response/response.json': { schemaVersion: 9, operatorId: 'uat.verify', step: 3, parallel: 1, status: 'blocked', stop: 'RUNTIME_UNAVAILABLE', fallbacks: [], fields: {}, commits: [], next: [] } }, 'blocked on the shared RUNTIME_UNAVAILABLE code');
 await expectError({ ...baseline(), 'request/request.json': requestJson({ extra: { password: 'x' } }) }, 'requirements.password is not a field', 'a credential has nowhere to go in a request');
 await expectError({ ...baseline(), 'request/request.json': requestJson({ extra: { requestedBy: '' } }) }, 'required field requestedBy has no value', 'a run nobody asked for');
-await expectError({ ...baseline(), 'request/request.json': requestJson({ inputs: { 'frontend-surface-audit': AUDIT_IN } }) }, 'required input quality-verification is absent', 'a run admitted by one receipt only');
+await expectError({ ...baseline(), 'request/request.json': requestJson({ inputs: { 'frontend-surface-audit': AUDIT_IN, route: ROUTE_IN } }) }, 'required input quality-verification is absent', 'a run admitted by one receipt only');
 
 // Admission at the pinned commit.
 await expectError({ ...baseline(), 'response/data/snapshot.json': snapshot({ admission: [{ kind: 'frontend-surface-audit', ref: AUDIT_IN, commit: COMMIT }, { kind: 'quality-verification', ref: QUALITY_IN, commit: OTHER_COMMIT }] }) }, 'ADMISSION_MISSING — quality-verification was taken at', 'an admission from another commit');

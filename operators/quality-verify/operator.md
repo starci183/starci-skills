@@ -15,7 +15,11 @@ predecessor receipt must report the same source head, and that head must be the 
 `request/request.json` froze; two predecessors on different heads describe two different deliveries,
 and gating the union of them measures something nobody built. That is `PREDECESSOR_MIXED`, refused
 before a single command runs rather than discovered later as a confusing gate failure. A predecessor
-whose fingerprint no longer matches the frozen source is `PREDECESSOR_STALE`. What a predecessor
+whose fingerprint no longer matches the frozen source is `PREDECESSOR_STALE`. So is a predecessor
+produced under `mode: dry`: it carries no commit and describes a plan rather than a delivery, its
+change record says `nothing written` and its receipt's `Commit` reads `—`, and it is refused at step 2
+before any command runs, because a plan has no head to stand on and gating the base head would
+publish a green verdict about code nobody wrote. What a predecessor
 decided is consumed unchanged: this operator never re-plans the delivery, re-opens its boundary, or
 forms an opinion about whether the change was a good one.
 

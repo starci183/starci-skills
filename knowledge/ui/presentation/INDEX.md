@@ -43,9 +43,14 @@ is context, not a presentation recommendation.
 | [Tone](tone.md) | Default, muted, and accent by information rank; never a raw colour | TONE-1 to TONE-3 |
 | [Surface](surface.md) | Which semantic surface an app-owned region takes, with its paired foreground | SURFACE-1 to SURFACE-6 |
 | [Boundary](boundary.md) | Which separator or border draws an app-owned edge, and which edge drops it | BOUNDARY-1 to BOUNDARY-6 |
+| [Radius](radius.md) | How round the corner of an app-owned surface, mark, or pill is | RADIUS-2 to RADIUS-9, on a ramp with reserved addresses |
 | [Measure](measure.md) | `width`, `height`, and their minima and maxima for app-owned regions | MEASURE-1 to MEASURE-7 |
 | [Text flow](text-flow.md) | `text-align`, wrapping, `white-space`, truncation, line clamping | FLOW-1 to FLOW-5 |
 | [Overflow](overflow.md) | Scroll, clip, and containment boundaries owned by the app | OVERFLOW-1 to OVERFLOW-5 |
+
+Radius has its own closed ramp, every step a fixed multiple of the theme's one `--radius` number, so
+its rule numbers are ordinal positions there and a step nobody writes twice keeps a reserved address
+rather than a rule.
 
 Gap, padding, and margin share `COMMON_SPACING_SCALE`, so their rule numbers are ordinal positions on
 that one closed scale. Font and tone have their own closed scales. Measure, surface, boundary, text

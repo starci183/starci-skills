@@ -145,7 +145,7 @@ function writeBranch(files, { inventoryDoc = inventory(), withInventory = true }
   writeFileSync(path.join(session, 'step-1', 'parallel-1', 'response', 'response.md'), '# frontend-direction-decision — plan-picker\n');
   writeFileSync(path.join(session, 'step-2', 'parallel-1', 'response', 'response.md'), '# frontend-presentation-resolution — plan-picker\n');
   if (withInventory) writeFileSync(path.join(upstream, 'inventory.json'), JSON.stringify(inventoryDoc, null, 2));
-  writeFileSync(path.join(session, 'state.json'), JSON.stringify({ id: SESSION, chain: [['2/1'], ['3/1']], steps: { '2/1': 'frontend.presentation.resolve', '3/1': 'frontend.source.apply' }, current: '3/1', status: 'running' }));
+  writeFileSync(path.join(session, 'state.json'), JSON.stringify({ id: SESSION, project: 'starci-academy', startedAt: '2026-09-03T00:00:00Z', requestHashes: {}, chain: [['2/1'], ['3/1']], steps: { '2/1': 'frontend.presentation.resolve', '3/1': 'frontend.source.apply' }, current: '3/1', status: 'running' }));
   for (const [name, content] of Object.entries(files)) {
     if (content === null) continue;
     writeFileSync(path.join(branch, name), typeof content === 'string' ? content : JSON.stringify(content, null, 2));

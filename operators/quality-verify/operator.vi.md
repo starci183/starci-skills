@@ -15,7 +15,11 @@ tiền nhiệm phải báo cùng một source head, và head đó phải là hea
 băng; hai tiền nhiệm trên hai head khác nhau mô tả hai delivery khác nhau, và gác hợp của chúng là đo
 một thứ không ai xây. Đó là `PREDECESSOR_MIXED`, bị từ chối trước khi có lệnh nào chạy thay vì lộ ra
 về sau dưới dạng một lỗi cổng khó hiểu. Một tiền nhiệm có fingerprint không còn khớp source đã đóng
-băng là `PREDECESSOR_STALE`. Điều tiền nhiệm đã quyết được tiêu thụ nguyên vẹn: operator này không
+băng là `PREDECESSOR_STALE`. Một tiền nhiệm làm ra dưới `mode: dry` cũng vậy: nó không mang commit nào
+và mô tả một bản kế hoạch chứ không phải một delivery, bản ghi thay đổi của nó ghi `nothing written`
+và ô `Commit` của biên nhận ghi `—`, nên nó bị từ chối ở bước 2 trước khi có lệnh nào chạy, bởi một
+bản kế hoạch không có head nào để đứng lên và gác head gốc là công bố một phán quyết xanh về đoạn code
+chưa ai viết. Điều tiền nhiệm đã quyết được tiêu thụ nguyên vẹn: operator này không
 bao giờ lập lại kế hoạch delivery, mở lại ranh giới của nó, hay có ý kiến về việc thay đổi ấy hay dở.
 
 ## Head được xác nhận ngay trong cổng vào

@@ -34,6 +34,14 @@ function stackModel({ alternatives = 1 } = {}) {
       { boundaryId: 'course-api', responsibility: 'serves course content', owner: 'learning-team', interfaces: ['CourseQuery'], ownsData: false },
     ],
     stores: [{ storeId: 'entitlement-store', owningBoundaryId: 'entitlement', writers: ['entitlement'], readers: ['course-api'], migrators: ['entitlement'], transactionScope: 'per request', backup: 'nightly snapshot', restore: 'tested weekly', sharedWriteJustification: null }],
+    operations: [
+      {
+        operationId: 'grant-entitlement', name: 'grantEntitlement', transport: 'graphql-mutation',
+        writerRef: 'src/entitlement/graphql/mutations/grant-entitlement.ts', storeRefs: ['entitlement-store'],
+        transactionBoundary: 'single-transaction', idempotencyKind: 'request-token', migrationRefs: [],
+        authorityDimensionIds: ['effective-access'],
+      },
+    ],
     components: [
       { componentId: 'nestjs', status: 'existing', justification: 'observed-evidence', evidence: ev('package.json:12'), compatibility: verdicts() },
       { componentId: 'postgres', status: 'existing', justification: 'measured-constraint', evidence: ev('compose.yaml:30'), compatibility: verdicts() },
@@ -88,6 +96,12 @@ ${altRows.join('\n')}
 | \`nestjs\` | existing | observed-evidence | \`package.json:12@${head}\` | 5/5 verified |
 | \`postgres\` | existing | measured-constraint | \`compose.yaml:30@${head}\` | 5/5 verified |
 | \`redis-cache\` | removed | — | — | — |
+
+## Operations
+
+| Operation | Transport | Writer | Stores | Transaction | Idempotency | Dimensions |
+| --- | --- | --- | --- | --- | --- | --- |
+| \`grant-entitlement\` | graphql-mutation | \`src/entitlement/graphql/mutations/grant-entitlement.ts\` | \`entitlement-store\` | single-transaction | request-token | effective-access |
 
 ## Handoff
 
@@ -148,7 +162,7 @@ function writeBranch(files) {
   const session = mkdtempSync(path.join(tmpdir(), 'arch-session-'));
   const branch = path.join(session, 'step-1', 'parallel-1');
   for (const d of ['request', 'response/data', 'response/artifacts', 'critique/request', 'critique/response']) mkdirSync(path.join(branch, d), { recursive: true });
-  writeFileSync(path.join(session, 'state.json'), JSON.stringify({ id: 's-test', chain: [['1/1']], steps: { '1/1': 'architecture.decide' }, current: '1/1', status: 'running' }));
+  writeFileSync(path.join(session, 'state.json'), JSON.stringify({ id: 's-test', project: 'starci-academy', startedAt: '2026-09-03T00:00:00Z', requestHashes: {}, chain: [['1/1']], steps: { '1/1': 'architecture.decide' }, current: '1/1', status: 'running' }));
   for (const [name, content] of Object.entries(files)) {
     if (content === null) continue;
     writeFileSync(path.join(branch, name), typeof content === 'string' ? content : JSON.stringify(content, null, 2));
@@ -213,6 +227,9 @@ await expectError({ ...baseline(), 'response/data/stack-model.json': { ...stackM
 await expectError({ ...baseline(), 'response/data/stack-model.json': stackModel({ alternatives: 2 }) }, 'but the request asked for 1', 'more alternatives than asked');
 await expectError({ ...baseline(), 'response/response.md': responseMd({ handoffDetail: 'src/entitlement/query.ts returns one answer' }) }, 'names an implementation file', 'handoff names a file');
 await expectError({ ...baseline(), 'response/response.md': responseMd().replace('| Selected alternative | `shared-boundary` |', '| Selected alternative | `edge-cache` |') }, 'Decision names edge-cache', 'response and model disagree on the selection');
+await expectError({ ...baseline(), 'response/data/stack-model.json': (() => { const m = stackModel(); m.operations = [{ ...m.operations[0], storeRefs: ['ghost-store'] }]; return m; })() }, 'which this decision does not own', 'an operation writing a store the decision does not own');
+await expectError({ ...baseline(), 'response/data/stack-model.json': (() => { const m = stackModel(); m.operations = [{ ...m.operations[0], transport: 'event-consumer', idempotencyKind: 'none' }]; return m; })() }, 'a redelivery applies it twice', 'an event consumer with no idempotency');
+await expectError({ ...baseline(), 'response/data/stack-model.json': (() => { const m = stackModel(); m.operations = [{ ...m.operations[0], authorityDimensionIds: ['another-dimension'] }]; return m; })() }, 'does not restate declared dimension another-dimension', 'a receipt that drops a declared dimension');
 await expectError({ ...baseline(), 'response/response.md': responseMd().replace('## Handoff', '## Hand-off') }, 'missing section ^## Handoff$', 'response section renamed');
 await expectError({ ...baseline(), 'response/data/current-state.json': { ...currentState(), observedHead: 'nope' } }, 'observedHead', 'current-state schema');
 await expectError({ ...baseline(), 'response/response.json': (() => { const o = responseJson(); delete o.fields['stack-model']; return o; })() }, 'required output stack-model is not in fields', 'missing required output');

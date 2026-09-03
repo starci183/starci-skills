@@ -109,10 +109,12 @@ function writeBranch(files) {
   const session = mkdtempSync(path.join(tmpdir(), 'quality-session-'));
   const branch = path.join(session, 'step-1', 'parallel-1');
   for (const d of ['request', 'response/data/gates', 'response/artifacts']) mkdirSync(path.join(branch, d), { recursive: true });
-  writeFileSync(path.join(session, 'state.json'), JSON.stringify({ id: 's-test', chain: [['1/1']], steps: { '1/1': 'quality.verify' }, current: '1/1', status: 'running' }));
+  writeFileSync(path.join(session, 'state.json'), JSON.stringify({ id: 's-test', project: 'starci-academy', startedAt: '2026-09-03T00:00:00Z', requestHashes: {}, chain: [['1/1']], steps: { '1/1': 'quality.verify' }, current: '1/1', status: 'running' }));
   mkdirSync(path.join(session, 'step-1', 'parallel-1', 'response'), { recursive: true });
   writeFileSync(path.join(session, 'step-1', 'parallel-1', 'response', 'changes.md'), '# changes\n');
+  if (files.__predecessorChanges !== undefined) writeFileSync(path.join(session, 'step-1', 'parallel-1', 'response', 'changes.md'), files.__predecessorChanges);
   for (const [name, content] of Object.entries(files)) {
+    if (name === '__predecessorChanges') continue;
     if (content === null) continue;
     writeFileSync(path.join(branch, name), typeof content === 'string' ? content : JSON.stringify(content, null, 2));
   }
@@ -206,5 +208,16 @@ await expectError(baseline({ 'response/response.md': responseMd().replace('## Ve
 await expectError(baseline({ 'response/data/gates/lint.json': { ...gateResult('lint'), sourceHead: 'nope' } }), 'sourceHead', 'gate-result schema');
 await expectError(baseline({ 'response/response.json': responseJson({ gates: ['response/data/gates/format.json', 'response/data/gates/lint.json'] }) }), 'gate-result does not list', 'a gate file the response never lists');
 await expectError(baseline({ 'request/request.json': requestJson({ inputs: {} }) }), 'needs at least one of', 'a verification with no producer receipt');
+await expectError(baseline({ __predecessorChanges: `# changes — backend.source.apply step-1/parallel-1
 
-process.stdout.write('quality.verify self-test: 3 valid branches, 25 rejected mutations\n');
+## Binding
+
+| Field | Value |
+| --- | --- |
+| Operator | \`backend.source.apply\` |
+| Step | \`step-1/parallel-1\` |
+| Checkout | \`@workspaces/be\` at \`${HEAD}\` on \`session/s-test\`, nothing written |
+| Predecessor | \`step-1/parallel-1/response/response.md\` |
+` }), 'PREDECESSOR_STALE', 'a predecessor produced under mode dry');
+
+process.stdout.write('quality.verify self-test: 3 valid branches, 26 rejected mutations\n');

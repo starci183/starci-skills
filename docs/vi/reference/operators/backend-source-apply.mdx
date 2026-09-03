@@ -69,13 +69,19 @@ hoạch làm thật thà là một câu trả lời trọn vẹn cho một câu 
 mọi path đã định là `unchanged`, đúng như cây làm việc đang cho thấy, và nêu thay đổi nó sẽ làm ở cột
 `Why`. Một lượt dry không đo gì cả, nên nó không mang bản ghi conformance và không mang bản ghi
 proof: không thể đo một facet trên đoạn code chưa từng được viết, và một bản kế hoạch mà ship kèm
-phán quyết thì không phân biệt nổi với một lần cài đặt thật. Đó cũng là lý do một lượt dry không bao
+phán quyết thì không phân biệt nổi với một lần cài đặt thật. Một lượt dry cũng không được cấp `@tools/sourcewrite` lẫn
+`@tools/git`, vì một chế độ không ghi gì thì không cần công cụ nào ghi được; phần cấp quyền và đoạn
+này nói cùng một điều nên chúng không thể trôi khỏi nhau. Đó cũng là lý do một lượt dry không bao
 giờ là lượt thoả contract — nó là cách đọc trước tập ghi trước khi trả giá cho nó, không phải một
 cách áp dụng rẻ hơn.
 
 ## Backend không bao giờ bịa hành vi nghiệp vụ
 
-Mỗi operation dẫn các quyết định đã duyệt mà nó cài đặt. Khi đoạn code tới chỗ câu trả lời phụ thuộc
+Mỗi operation dẫn các quyết định đã duyệt mà nó cài đặt. Một quyết định đã duyệt không phải con số
+operator này được tự đặt: nó là một `dimension` của ma trận phủ thuộc head nghiệp vụ đã ràng, địa chỉ
+bằng chính định danh kebab của dimension ấy, và fingerprint của ma trận đi cùng lời dẫn để người đọc
+sau biết ma trận nào đã duyệt nó. Một lời dẫn nêu thứ mà ma trận đã ràng không mang thì không phải một
+lần duyệt, nó là một phỏng đoán có nhãn. Khi đoạn code tới chỗ câu trả lời phụ thuộc
 vào một luật nghiệp vụ chưa ai duyệt, nhánh dừng với `BUSINESS_AUTHORITY_MISSING` và nêu tên câu hỏi
 còn mở. Nó không chọn cách đọc dễ dãi, không bắt chước feature bên cạnh tình cờ làm gì, và không chọn
 nhánh nào làm test xanh. Đây là luật gánh nặng nhất của operator, vì một luật nghiệp vụ đoán ra mà qua
@@ -119,11 +125,15 @@ lên nhánh mà người đang checkout, không push, merge hay tag gì, không 
 nêu bằng chứng đã đo nó, và không ghi phán quyết chất lượng, thị giác hay UAT; đó là những việc khác
 với cổng riêng của chúng.
 
+Khi đầu vào `model` có mặt, nó là thẩm quyền của lượt chạy này và head đã publish chỉ còn là dòng dõi:
+một chuỗi vừa mô hình hoá xong một head không được quyết ngược lại một lời hứa cũ hơn chỉ vì lần
+publish bị giữ lại. Khi nó vắng, head đã publish là thẩm quyền.
+
 ## Context
 
 | Alias | Bind | Bắt buộc |
 | --- | --- | --- |
-| `@worktrees/businesses/<featureId>` | head nghiệp vụ đã publish, nguồn duy nhất của hành vi nghiệp vụ | có |
+| `@worktrees/businesses/<featureId>` | head nghiệp vụ đã publish, nguồn duy nhất của hành vi nghiệp vụ; chỉ là bằng chứng khi phiên mang đầu vào `model` | có |
 | `@knowledge/patterns/be` | các họ anh em mà thay đổi này bắt chước, mỗi khía cạnh một họ; nguồn quy ước hợp lệ duy nhất | có |
 | `@workspaces/be` | checkout backend được route ở head đóng băng, chỉ ghi trên worktree nhánh phiên của nó | có |
 
@@ -131,7 +141,8 @@ với cổng riêng của chúng.
 
 | Kind | Từ đâu | Bắt buộc |
 | --- | --- | --- |
-| `architecture-decision` | `architecture.decide`; contract mutation đã đóng băng mà phần cài đặt điền vào và không được nới | có |
+| `architecture-decision` | `architecture.decide`; contract mutation đã đóng băng mà phần cài đặt điền vào và không được nới, và là nguồn của mọi operation lượt chạy này thuật lại | có |
+| `model` | `business.decide`; head mà nhánh đó đã mô hình hoá, khi nó chưa được publish | không |
 | `backend-source-application` | một lượt chạy trước của `backend.source.apply` cho cùng kết quả; lịch sử hồi quy, vắng mặt ở lần đầu | không |
 
 ## Yêu cầu
@@ -149,7 +160,7 @@ với cổng riêng của chúng.
 | # | Bước | Tham số | Đọc | Ghi | Dừng với |
 | --- | --- | --- | --- | --- | --- |
 | 1 | Kiểm gate và chạy lại | `resume`, `mode` | `request/request.json`, đầu vào `backend-source-application` nếu có, @workspaces/be ở head đóng băng | — | `INVALID_INPUT`, `SOURCE_DRIFT`, `NO_PROGRESS` |
-| 2 | Ràng thẩm quyền, contract và pattern | `featureId` | @worktrees/businesses/&lt;featureId> ở head đã publish, đầu vào `architecture-decision` làm contract đóng băng, @knowledge/patterns/be mỗi khía cạnh một pattern | — | `CONTRACT_UNFROZEN`, `BUSINESS_AUTHORITY_MISSING`, `PATTERN_UNBOUND` |
+| 2 | Ràng thẩm quyền, contract và pattern | `featureId` | đầu vào `model` khi có, nếu không thì @worktrees/businesses/&lt;featureId> ở head đã publish, đầu vào `architecture-decision` làm contract đóng băng và làm nguồn `operations` của nó, @knowledge/patterns/be mỗi khía cạnh một pattern | — | `CONTRACT_UNFROZEN`, `BUSINESS_AUTHORITY_MISSING`, `PATTERN_UNBOUND` |
 | 3 | Điền từng operation của contract, trên nhánh phiên | `mutableFileRefs` | @knowledge/patterns/be cho từng khía cạnh, @workspaces/be trong trần được sửa | @workspaces/be/branch/session trong trần được sửa, dưới một lease độc quyền, @tools/sourcewrite | `CONTRACT_WIDENED`, `OWNER_CONFLICT` |
 | 4 | Đối chiếu mọi mutation với contract đóng băng và ghi nó kèm hash trước và sau | `mode` | @workspaces/be, các file bị chạm và contract đóng băng | `response/data/mutations.json` | — |
 | 5 | Kiểm lại snapshot đã lưu khi đọc | — | @workspaces/be, snapshot đã lưu, @knowledge/patterns/be cho các luật trôi sau nó | — | — |
@@ -205,6 +216,7 @@ không thể cho một câu trả lời khác.
 | contract đã điền xong và một bề mặt frontend phải tiêu thụ nó | `frontend.direction.decide` |
 | một file cần sửa nằm ngoài trần ghi được route | `workspace.bind` |
 | một proof đã khai không chạy được trong môi trường này | `platform.operate` |
+| bản kế hoạch được làm ra dưới mode dry và một người quyết có trả giá cho nó hay không | `user` |
 
 ---
 

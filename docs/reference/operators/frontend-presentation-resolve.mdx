@@ -130,6 +130,12 @@ write product source, or record a verdict, score or pass claim on any node.
 | 8 | Emit the contract claims onto the application-owned nodes | `contractEmission` | @knowledge/ui/presentation (the frozen rule inventory) | — | `UNKNOWN_RULE` |
 | 9 | Emit | — | everything above | `response/artifacts/<target>.resolved.tsx`, `response/data/inventory.json`, `response/response.md`, `response/response.json` | — |
 
+Step 8 claims only what a node can carry: a property the application owns on a Grammar component's
+`className` carries no attribute, because the component forwards `className` and publishes no prop for
+the relationship, so its rule is recorded under `## Gaps` instead of being emitted. Forwarding
+`data-contract` from every Common component that accepts `className` is a Grammar change and belongs
+to the family owner, not to this operator.
+
 The walk visits every node in document order and records a stable node path; a node outside the
 ceiling the direction carries is observed and never mutated. Steps 4 to 8 run per node, so a single
 tree yields one decision per node and property. The receipt authorizes a later audit to measure the

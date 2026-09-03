@@ -51,7 +51,13 @@ anything: this operator does not stash, clean, or reset a working tree to make a
 The businesses authority root is derived as `<git root>/.worktrees/businesses` when that worktree
 exists on a source checkout and is absent otherwise; it is never accepted from the person, because a
 typed authority root is how a second business tree is born. Provenance and freshness are not a step
-of their own: they are written inside the emit, next to the binding they describe.
+of their own: they are written inside the emit, next to the binding they describe. The head a hydrated
+route recorded is a record of the hydration and never route authority: the observed head wins, and a
+hydration head two commits behind the checkout is not a stop.
+
+A blocked branch emits no receipt and no route: `response.json` is the whole record, and `reason`
+carries the observation that justified the stop, including the registry generation, the endpoints
+probed and what each answered.
 
 ## Boundary
 
@@ -87,7 +93,7 @@ workspace, or provisions an account. It makes no product decision and carries no
 | --- | --- | --- | --- |
 | `project` | id | — | The project to bind |
 | `role` | choice | — | `fe` or `be`: the role of that project to bind |
-| `gitPolicy` | list of `{worktreeBranches, mutationBranch}` | the policy the route declaration carries | The branch law this binding is verified against; `forbidden` keeps every write on the mutation branch |
+| `gitPolicy` | list of `{worktreeBranches, mutationBranch}` | the policy the route declaration carries; a declaration that carries none is `INVALID_INPUT` at step 1, never a guessed policy | The branch law this binding is verified against; `forbidden` keeps every write on the mutation branch |
 | `declaredWriteRoots` | list | empty | The only paths later work may write; anything dirty outside them is `CHECKOUT_DIRTY` |
 | `runtimeNeed` | choice | none | `none` binds no runtime and skips step 5; `consume` binds the owner's endpoints as a consumer |
 | `resume` | token | null | The blocked branch's token when re-entering after a stop |
@@ -106,8 +112,15 @@ workspace, or provisions an account. It makes no product decision and carries no
 Step 5 recomputes nothing: the endpoint fingerprint either matches the closed projection or the
 branch stops. Under `worktreeBranches` set to forbidden, a route binds only on the mutation branch and
 records `WORKTREE_BRANCH_FORBIDDEN`; under `session-only` it binds on the mutation branch or on a
-`session/<sessionId>` worktree branch, the only shape a source-writing operator may commit to; a redacted conversation head records `PROVENANCE_HEAD_BOUND`, and
-a cached receipt matching the same identity tuple and fingerprints records `CACHED_ROUTE_REUSED`. A
+`session/<sessionId>` worktree branch, the only shape a source-writing operator may commit to, and
+records `WORKTREE_BRANCH_SESSION_ONLY`, because a policy that opens a write path is exactly the
+finding a later reader looks for; a redacted conversation head records `PROVENANCE_HEAD_BOUND`, and
+a cached receipt matching the same identity tuple and fingerprints records `CACHED_ROUTE_REUSED`. `mutationReadiness` is
+`ready` when the observed branch is one the routed policy permits a write on — the mutation branch, or
+a `session/<sessionId>` branch under `session-only` — and the working tree is clean outside the
+declared write roots; it is `read-only` in every other case, including a route bound with no declared
+write roots. It is derived here and never accepted from the request, because a readiness a caller can
+assert is a readiness nobody measured. A
 resume begins again at step 1, reuses only unchanged fingerprinted observations, and consumes the
 exact delta; a republished route arrives as a new route fingerprint, because the same fingerprint
 cannot yield a different binding.
@@ -146,3 +159,4 @@ cannot yield a different binding.
 | the runtime owner is missing or not ready and one coordination request must be raised | `platform.operate` |
 | the route is bound and a frontend surface must be decided inside it | `frontend.direction.decide` |
 | the route is bound and a published head must be verified before it ships | `quality.verify` |
+| the route is bound and a served surface must be observed | `frontend.surface.audit` |

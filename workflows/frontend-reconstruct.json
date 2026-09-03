@@ -10,8 +10,7 @@
       {
         "operator": "workspace.bind",
         "requirements": {
-          "role": "fe",
-          "runtimeNeed": "consume"
+          "role": "fe"
         }
       }
     ],
@@ -21,7 +20,10 @@
         "requirements": {
           "intent": "modify",
           "changeLevel": "reconstruct"
-        }
+        },
+        "asks": [
+          "target"
+        ]
       }
     ],
     [
@@ -51,7 +53,11 @@
     ],
     [
       {
-        "operator": "git.publish"
+        "operator": "git.publish",
+        "asks": [
+          "boundary",
+          "approval"
+        ]
       }
     ]
   ],

@@ -1,0 +1,205 @@
+{
+  "$id": "step:state",
+  "description": "state.json at the session root; the orchestrator writes it, no agent does. Documented in resources/orchestrator.json#session.manifest.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "id",
+    "project",
+    "startedAt",
+    "status",
+    "chain",
+    "steps",
+    "requestHashes"
+  ],
+  "properties": {
+    "id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "project": {
+      "type": "string",
+      "minLength": 1
+    },
+    "workflow": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "startedAt": {
+      "type": "string",
+      "minLength": 1
+    },
+    "status": {
+      "enum": [
+        "running",
+        "blocked",
+        "done",
+        "stopped"
+      ]
+    },
+    "chain": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "array",
+        "minItems": 1,
+        "items": {
+          "type": "string",
+          "pattern": "^[0-9]+/[0-9]+$"
+        }
+      }
+    },
+    "steps": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "string",
+        "pattern": "^[a-z]+(?:\\.[a-z]+)+$"
+      }
+    },
+    "current": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "pattern": "^[0-9]+/[0-9]+$"
+    },
+    "leases": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "agent",
+          "holds"
+        ],
+        "properties": {
+          "agent": {
+            "type": "string"
+          },
+          "holds": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      }
+    },
+    "requestHashes": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "string",
+        "pattern": "^sha256:[0-9a-f]{64}$"
+      }
+    },
+    "resumes": {
+      "description": "branch \"N/M\" that re-enters a blocked branch: which one, and the stop it answered",
+      "type": "object",
+      "additionalProperties": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "resumes",
+          "stop"
+        ],
+        "properties": {
+          "resumes": {
+            "type": "string",
+            "pattern": "^[0-9]+/[0-9]+$"
+          },
+          "stop": {
+            "type": "string",
+            "pattern": "^[A-Z][A-Z0-9_]+$"
+          }
+        }
+      }
+    },
+    "stoppedAt": {
+      "description": "where the session ended: a terminating stop, a response that failed a validator (stop null), or a person",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "branch",
+        "operator",
+        "stop",
+        "why"
+      ],
+      "properties": {
+        "branch": {
+          "type": "string",
+          "pattern": "^[0-9]+/[0-9]+$"
+        },
+        "operator": {
+          "type": "string"
+        },
+        "stop": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^[A-Z][A-Z0-9_]+$"
+        },
+        "domain": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "route": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "why": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "substitutions": {
+      "description": "codes the orchestrator read as UNKNOWN_STOP: branch -> the code the agent wrote",
+      "type": "object",
+      "additionalProperties": {
+        "type": "string"
+      }
+    },
+    "transitions": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "at",
+          "branch",
+          "event"
+        ],
+        "properties": {
+          "at": {
+            "type": "string"
+          },
+          "branch": {
+            "type": "string",
+            "pattern": "^[0-9]+/[0-9]+(?:/[a-z][a-z-]*)?$"
+          },
+          "event": {
+            "enum": [
+              "dispatched",
+              "waiting",
+              "resumed",
+              "done",
+              "blocked",
+              "invalid",
+              "resolved"
+            ]
+          },
+          "note": {
+            "type": "string"
+          }
+        }
+      }
+    }
+  }
+}

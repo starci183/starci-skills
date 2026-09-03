@@ -19,7 +19,11 @@
         "operator": "business.decide",
         "requirements": {
           "mode": "model"
-        }
+        },
+        "asks": [
+          "featureId",
+          "targetState"
+        ]
       }
     ],
     [
@@ -28,12 +32,21 @@
         "requirements": {
           "alternatives": 1,
           "selectionPolicy": "automatic"
-        }
+        },
+        "asks": [
+          "objective",
+          "constraints"
+        ]
       }
     ],
     [
       {
-        "operator": "backend.source.apply"
+        "operator": "backend.source.apply",
+        "asks": [
+          "featureId",
+          "outcome",
+          "mutableFileRefs"
+        ]
       }
     ],
     [
@@ -46,12 +59,20 @@
         "operator": "business.decide",
         "requirements": {
           "mode": "reconcile"
-        }
+        },
+        "asks": [
+          "featureId",
+          "targetState"
+        ]
       }
     ],
     [
       {
-        "operator": "git.publish"
+        "operator": "git.publish",
+        "asks": [
+          "boundary",
+          "approval"
+        ]
       }
     ]
   ],

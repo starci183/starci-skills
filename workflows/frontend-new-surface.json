@@ -16,8 +16,7 @@
       {
         "operator": "workspace.bind",
         "requirements": {
-          "role": "fe",
-          "runtimeNeed": "consume"
+          "role": "fe"
         }
       }
     ],
@@ -26,7 +25,11 @@
         "operator": "business.decide",
         "requirements": {
           "mode": "model"
-        }
+        },
+        "asks": [
+          "featureId",
+          "targetState"
+        ]
       }
     ],
     [
@@ -35,7 +38,10 @@
         "requirements": {
           "intent": "create",
           "changeLevel": "new"
-        }
+        },
+        "asks": [
+          "target"
+        ]
       }
     ],
     [
@@ -65,7 +71,11 @@
     ],
     [
       {
-        "operator": "git.publish"
+        "operator": "git.publish",
+        "asks": [
+          "boundary",
+          "approval"
+        ]
       }
     ]
   ],

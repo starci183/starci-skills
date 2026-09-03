@@ -122,6 +122,7 @@ export async function validateWorkspaceStep(branchDir, root = ROOT) {
       // rather than assumed.
       if (!findingKeys.has(`ROUTE_HYDRATED_FROM_PORTABLE|${route.hydratedRouteRef}`)) errors.push('response/response.md: a bound route must record the hydrated route it resolved from');
       if (route.gitPolicy.worktreeBranches === 'forbidden' && !findingKeys.has(`WORKTREE_BRANCH_FORBIDDEN|${route.gitPolicy.mutationBranch}`)) errors.push('response/response.md: a forbidden worktree policy must be recorded on the bound route');
+      if (route.gitPolicy.worktreeBranches === 'session-only' && !findingKeys.has(`WORKTREE_BRANCH_SESSION_ONLY|${route.gitPolicy.mutationBranch}`)) errors.push('response/response.md: a session-only worktree policy must be recorded on the bound route');
       if (route.provenanceHeadRef !== null && !findingKeys.has(`PROVENANCE_HEAD_BOUND|${route.provenanceHeadRef}`)) errors.push('response/response.md: a bound provenance head must be recorded');
       if (route.runtime !== null) {
         if (!findingKeys.has(`RUNTIME_CONSUMED_NOT_OWNED|${route.runtime.ownerTaskId}`)) errors.push('response/response.md: a consumed runtime must record that the caller does not own it');

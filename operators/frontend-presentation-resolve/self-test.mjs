@@ -1,7 +1,7 @@
 // Proves validate.mjs on a synthetic session branch: one conforming resolution of a three-node tree
 // (one application-owned gap, one Grammar-owned padding, one recorded gap), one branch with the
-// contract emission off, one blocked on RULE_MISSING before anything was written, and one mutation
-// per law, each of which must fail with a line that names the defect.
+// contract emission off, one blocked on RULE_MISSING before anything was written, one whose gap rule
+// claims no attribute because its node publishes no path for one, and one mutation per law, each of which must fail with a line that names the defect.
 import assert from 'node:assert/strict';
 import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -107,7 +107,7 @@ function writeBranch(files) {
   for (const d of ['request', 'response/data', 'response/artifacts']) mkdirSync(path.join(branch, d), { recursive: true });
   mkdirSync(path.join(session, 'step-1', 'parallel-1', 'response'), { recursive: true });
   writeFileSync(path.join(session, 'step-1', 'parallel-1', 'response', 'response.md'), '# frontend-direction-decision — plan-picker\n');
-  writeFileSync(path.join(session, 'state.json'), JSON.stringify({ id: 's-test', chain: [['1/1'], ['2/1']], steps: { '1/1': 'frontend.direction.decide', '2/1': 'frontend.presentation.resolve' }, current: '2/1', status: 'running' }));
+  writeFileSync(path.join(session, 'state.json'), JSON.stringify({ id: 's-test', project: 'starci-academy', startedAt: '2026-09-03T00:00:00Z', requestHashes: {}, chain: [['1/1'], ['2/1']], steps: { '1/1': 'frontend.direction.decide', '2/1': 'frontend.presentation.resolve' }, current: '2/1', status: 'running' }));
   for (const [name, content] of Object.entries(files)) {
     if (content === null) continue;
     writeFileSync(path.join(branch, name), typeof content === 'string' ? content : JSON.stringify(content, null, 2));
@@ -140,13 +140,14 @@ const mutate = (change) => { const m = inventory(); change(m); return { ...basel
 await expectValid(baseline(), 'one application-owned gap, one Grammar-owned padding, one recorded gap');
 await expectValid({ ...baseline(), 'request/request.json': requestJson({ extra: { contractEmission: 'off' } }), [TREE]: resolvedTree({ emission: 'off' }) }, 'contract emission off leaves the tree bare');
 await expectValid({ 'request/request.json': requestJson(), 'response/response.json': responseJson({ status: 'blocked', stop: 'RULE_MISSING', next: [], fields: {} }) }, 'blocked on RULE_MISSING before anything was written');
+await expectValid({ ...baseline(), [TREE]: resolvedTree().replace(' data-contract="GAP-1"', '') }, 'a rule whose only node is recorded under Gaps claims no attribute');
 
 await expectError({ ...baseline(), 'request/request.json': requestJson({ extra: { mystery: 1 } }) }, 'requirements.mystery is not a field', 'undeclared requirement');
 await expectError({ ...baseline(), 'request/request.json': requestJson({ extra: { maxRounds: 0 } }) }, 'maxRounds must be a positive whole number', 'no rounds allowed');
 await expectError(mutate((m) => { m.ruleIds.push('GAP-99'); }), 'is outside the published presentation inventory', 'unpublished rule');
 await expectError(mutate((m) => { m.classNames.push('gap-11'); }), 'is in the inventory and not in the resolved tree', 'class that never reached the tree');
 await expectError(mutate((m) => { m.treeFingerprint = 'nope'; }), 'treeFingerprint', 'inventory schema');
-await expectError({ ...baseline(), [TREE]: resolvedTree().replace(' data-contract="GAP-1"', '') }, 'no node claims it under data-contract', 'applied rule with no claim');
+await expectError({ ...baseline(), [TREE]: resolvedTree().replace(' data-contract="GAP-5"', '') }, 'no node claims it under data-contract', 'applied rule with no claim');
 await expectError({ ...baseline(), 'request/request.json': requestJson({ extra: { contractEmission: 'off' } }) }, 'contract emission is off and the resolved tree carries a data-contract', 'claims written under emission off');
 await expectError({ ...baseline(), 'response/response.md': responseMd().replace('| `body>main` | `GAP-5` | `gap-6` |', '| `body>main` | `GAP-5` | `gap-5` |'), 'response/data/inventory.json': (() => { const m = inventory(); m.classNames = ['gap-5', 'gap-1']; return m; })(), [TREE]: resolvedTree().replace('gap-6', 'gap-5') }, 'renders GAP-5 as gap-5, expected step 6', 'ordinal written as the step');
 await expectError({ ...baseline(), 'response/response.md': responseMd().replace(`| \`${SECTION}\` | padding | grammar | \`PADDING-4\` |`, `| \`${SECTION}\` | padding | app | \`PADDING-4\` |`) }, 'owns PADDING-4 and chooses no class for it', 'application claims an owned property and writes nothing');
@@ -160,4 +161,4 @@ await expectError({ ...baseline(), 'response/data/inventory.json': null, 'respon
 await expectError({ ...baseline(), 'response/response.json': responseJson({ status: 'blocked', stop: 'MADE_UP_CODE', next: [] }) }, 'not a registered code', 'unknown stop code');
 await expectError({ ...baseline(), 'response/response.json': responseJson({ fallbacks: ['RULE_MISSING'] }) }, 'has disposition terminate under these requirements', 'a terminate code taken as a fallback');
 
-process.stdout.write('frontend.presentation.resolve self-test: 3 valid branches, 18 rejected mutations\n');
+process.stdout.write('frontend.presentation.resolve self-test: 4 valid branches, 18 rejected mutations\n');

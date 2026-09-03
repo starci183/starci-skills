@@ -20,9 +20,11 @@ that names their own branch.
 ```
 
 The id is `<yyyymmdd-HHMMss>-<project>-<first operator>`. `state.json` is the manifest: id, project,
-`startedAt`, status (`running | blocked | done`), the chain as a list of branch keys, `steps` mapping
-each key to its operator, `current`, the `leases` each agent holds, and the sha256 of every branch's
-`request/request.json`.
+`startedAt`, status (`running | blocked | done | stopped`), the chain as a list of branch keys, `steps` mapping
+each key to its operator, `current`, the `leases` each agent holds, the sha256 of every branch's
+`request/request.json`, `resumes` for every re-entry, and `stoppedAt` when the session ended. Its shape is
+`templates/step/state.schema.json`, and `validate-request` checks it on every branch: a request that carries
+`resume` must name a branch the manifest records for the same operator.
 
 ## One branch
 

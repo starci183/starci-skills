@@ -21,6 +21,8 @@ người chỉ bị hỏi những field không có mặc định. Không khớp 
 lên các file này:
 
 - mỗi nhánh gọi tên một operator có thật và chỉ preset field mà operator đó khai;
+- mọi field Requirements không có Default thì được preset hoặc nằm trong `asks` của nhánh, để chuỗi nói
+  trước những field nào cửa vào lấy từ phạm vi nhiệm vụ hay hỏi người trước khi nhánh đó chạy;
 - mọi Input bắt buộc của một nhánh phải do một bậc trước sinh ra;
 - các nhánh trong cùng một bậc không dùng chung alias ghi — hai operator không được ghi cùng một
   checkout hay cùng một gốc cùng lúc, còn `frontend.surface.audit` được fan-out theo ma trận vì nó

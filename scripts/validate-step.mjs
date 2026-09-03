@@ -12,7 +12,8 @@ import { loadOperatorPackages, exchangeOf } from './operator-md.mjs';
 import { loadKindTemplates } from './validate-templates.mjs';
 import { loadErrorsRegistry } from './errors-registry.mjs';
 
-const unquote = (s) => String(s ?? '').trim().replace(/^`|`$/g, '');
+// Only a fully quoted cell is unquoted: a sentence that opens with a code span keeps its backticks.
+const unquote = (s) => { const t = String(s ?? '').trim(); return /^`[^`]*`$/.test(t) ? t.slice(1, -1) : t; };
 
 export async function validateStep(root, branchDir) {
   const packages = await loadOperatorPackages(root);

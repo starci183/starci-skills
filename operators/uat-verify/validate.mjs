@@ -33,11 +33,18 @@ export async function validateUatStep(branchDir, root = ROOT) {
 
   // UAT is never routine: a run exists because a person asked for it, and the run identifier and the
   // exclusive lease arrive from the orchestrator rather than from a person.
-  if (empty(requirements.requestedBy)) errors.push('request.json: UAT runs only when a person asked; requestedBy has no value');
+  if (decided && empty(requirements.requestedBy)) errors.push('request.json: UAT runs only when a person asked; requestedBy has no value');
   if (decided && empty(requirements.runId)) errors.push('request.json: the orchestrator supplies runId; a decided run cannot namespace its records without one');
   if (decided && empty(requirements.lease)) errors.push('request.json: the orchestrator supplies the exclusive lease; a decided run cannot write the flow directory without one');
 
   const pinned = (request?.contexts ?? []).find((c) => c.alias === '@workspaces/be')?.head ?? null;
+
+  // A branch that never froze a snapshot is judged on its admissions too: the code that names the
+  // missing receipt is the one whose resume instruction is right for a person, and it must be
+  // reachable on the branch that blocked before any snapshot existed.
+  for (const kind of ADMISSIONS) {
+    if (request?.inputs?.[kind] === undefined) errors.push(`request.json: ADMISSION_MISSING — input ${kind} is absent`);
+  }
 
   let snapshot = null;
   if (present.has('uat-snapshot') && has('response/data/snapshot.json')) {
@@ -65,8 +72,7 @@ export async function validateUatStep(branchDir, root = ROOT) {
       if (!entry) { errors.push(`response/data/snapshot.json: ADMISSION_MISSING — ${kind} is absent from the admission record`); continue; }
       if (entry.commit !== snapshot.commit) errors.push(`response/data/snapshot.json: ADMISSION_MISSING — ${kind} was taken at ${entry.commit}, not at the pinned commit ${snapshot.commit}`);
       const given = request?.inputs?.[kind];
-      if (given === undefined) errors.push(`request.json: ADMISSION_MISSING — input ${kind} is absent`);
-      else if (entry.ref !== given) errors.push(`response/data/snapshot.json: ${kind} admits ${entry.ref}, but the request handed in ${given}`);
+      if (given !== undefined && entry.ref !== given) errors.push(`response/data/snapshot.json: ${kind} admits ${entry.ref}, but the request handed in ${given}`);
     }
 
     // The frozen order is declared in advance, not discovered while running.
@@ -164,7 +170,7 @@ export async function validateUatStep(branchDir, root = ROOT) {
   } else if (decided) errors.push('response/response.md: a done branch needs the verification receipt');
 
   // Custody is proved on the written bytes, not asserted in prose.
-  const scanned = ['response/response.md', 'response/data/snapshot.json', 'response/data/verdicts.json', ...asList(response.fields?.['uat-capture'])];
+  const scanned = ['response/response.md', 'response/response.json', 'response/data/snapshot.json', 'response/data/verdicts.json', ...asList(response.fields?.['uat-capture'])];
   for (const f of scanned) {
     if (!has(f)) continue;
     if (PASSWORD_LEAK.test(await read(f))) errors.push(`${f}: the shared UAT password appears in a file this operator writes; the credential is resolved by name at login and is never recorded`);

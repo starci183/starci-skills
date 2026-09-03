@@ -8,6 +8,7 @@
     { "heading": "^## Boundaries$", "table": "| Boundary | Responsibility | Owner | Interfaces | Owns data |", "minRows": 1, "cell": { "Owns data": "^(yes|no)$" } },
     { "heading": "^## Data ownership$", "table": "| Store | Owning boundary | Writers | Readers | Migrators | Transaction scope | Backup | Restore |" },
     { "heading": "^## Stack delta$", "table": "| Component | Status | Justification | Evidence | Compatibility |", "minRows": 1, "cell": { "Status": "^(existing|added|replaced|removed|replaced-candidate)$", "Justification": "^(measured-constraint|observed-evidence|requirement-fit|—)$" } },
+    { "heading": "^## Operations$", "table": "| Operation | Transport | Writer | Stores | Transaction | Idempotency | Dimensions |", "minRows": 1, "cell": { "Transport": "^(graphql-mutation|graphql-query|rest|worker|cron|event-consumer)$", "Transaction": "^(single-transaction|per-item|read-only|none)$", "Idempotency": "^(none|natural-key|request-token|event-id)$", "Dimensions": "^[a-z0-9][a-z0-9-]*(?:, [a-z0-9][a-z0-9-]*)*$" } },
     { "heading": "^## Handoff$", "table": "| Item | Kind | Detail |", "minRows": 1, "cell": { "Kind": "^(invariant|risk|contract|migration|rollback|proof|unknown)$" } },
     { "heading": "^## Fallbacks taken$", "table": "| Code | Action |", "cell": { "Code": "^`[A-Z][A-Z0-9_]+`$" } }
   ]

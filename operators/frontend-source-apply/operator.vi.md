@@ -94,7 +94,9 @@ không bao giờ biết nó render ra sao.
 | 7 | Phát | — | mọi thứ ở trên | `response/response.md`, `response/changes.md`, `response/response.json` | — |
 
 Dưới `mode = dry`, nhánh dừng sau bước 4 với riêng bản kế hoạch: `writes.json` mang commit rỗng,
-`response.json` không mang commit nào, và checkout y nguyên. Dưới `apply`, bước 5 ghi rồi commit đúng
+`response.json` không mang commit nào, và checkout y nguyên. Một lượt dry không được cấp
+`@tools/sourcewrite` lẫn `@tools/git`, vì một chế độ không ghi gì thì không cần công cụ nào ghi được;
+phần cấp quyền và đoạn này nói cùng một điều nên chúng không thể trôi khỏi nhau. Dưới `apply`, bước 5 ghi rồi commit đúng
 một lần và bước 6 chứng minh rằng cây đã commit đúng là cây đã resolve. `changes.md` là bản ghi mà
 các bước sau đọc: path nào đã dịch chuyển, chúng mang lời khai nào, checkout ghim cổng nào cho chúng,
 và bề mặt nào bây giờ phải được quan sát.

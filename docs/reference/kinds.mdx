@@ -27,6 +27,7 @@ Skeleton: [`templates/kinds/architecture-decision.skeleton.md`](https://github.c
 | `^## Boundaries$` | `\| Boundary \| Responsibility \| Owner \| Interfaces \| Owns data \|` | minRows 1 | `Owns data`: `^(yes\|no)$` |
 | `^## Data ownership$` | `\| Store \| Owning boundary \| Writers \| Readers \| Migrators \| Transaction scope \| Backup \| Restore \|` | — | — |
 | `^## Stack delta$` | `\| Component \| Status \| Justification \| Evidence \| Compatibility \|` | minRows 1 | `Status`: `^(existing\|added\|replaced\|removed\|replaced-candidate)$`<br />`Justification`: `^(measured-constraint\|observed-evidence\|requirement-fit\|—)$` |
+| `^## Operations$` | `\| Operation \| Transport \| Writer \| Stores \| Transaction \| Idempotency \| Dimensions \|` | minRows 1 | `Transport`: `^(graphql-mutation\|graphql-query\|rest\|worker\|cron\|event-consumer)$`<br />`Transaction`: `^(single-transaction\|per-item\|read-only\|none)$`<br />`Idempotency`: `^(none\|natural-key\|request-token\|event-id)$`<br />`Dimensions`: `^[a-z0-9][a-z0-9-]*(?:, [a-z0-9][a-z0-9-]*)*$` |
 | `^## Handoff$` | `\| Item \| Kind \| Detail \|` | minRows 1 | `Kind`: `^(invariant\|risk\|contract\|migration\|rollback\|proof\|unknown)$` |
 | `^## Fallbacks taken$` | `\| Code \| Action \|` | — | `Code`: `^`[A-Z][A-Z0-9_]+`$` |
 
@@ -38,7 +39,7 @@ Skeleton: [`templates/kinds/backend-source-application.skeleton.md`](https://git
 | Section | Table header | Rows | Cell constraints |
 | --- | --- | --- | --- |
 | `^## Binding$` | `\| Field \| Value \|` | `Outcome`, `Feature`, `Contract fingerprint`, `Base`, `Branch`, `Commit` | `Value`: `\S` |
-| `^## Operations$` | `\| Operation \| Transport \| Writer \| Transaction \| Idempotency \| Decisions \|` | minRows 1 | `Transport`: `^(graphql-mutation\|graphql-query\|rest\|worker\|cron\|event-consumer)$`<br />`Transaction`: `^(single-transaction\|per-item\|read-only\|none)$`<br />`Idempotency`: `^(none\|natural-key\|request-token\|event-id)$`<br />`Decisions`: `^BA-[0-9]+(?:, BA-[0-9]+)*$` |
+| `^## Operations$` | `\| Operation \| Transport \| Writer \| Transaction \| Idempotency \| Decisions \|` | minRows 1 | `Transport`: `^(graphql-mutation\|graphql-query\|rest\|worker\|cron\|event-consumer)$`<br />`Transaction`: `^(single-transaction\|per-item\|read-only\|none)$`<br />`Idempotency`: `^(none\|natural-key\|request-token\|event-id)$`<br />`Decisions`: `^[a-z0-9][a-z0-9-]*(?:, [a-z0-9][a-z0-9-]*)*$` |
 | `^## Changes$` | `\| Path \| Change \| Operation \| Before \| After \|` | minRows 1 | `Change`: `^(added\|modified\|deleted)$`<br />`Before`: `^(sha256:[0-9a-f]{64}\|—)$`<br />`After`: `^(sha256:[0-9a-f]{64}\|—)$` |
 | `^## Findings$` | `\| Code \| Operation \| File \| Statement \|` | — | `Code`: `^`(PATTERN_BOUND\|NEW_CONVENTION_REFUSED\|SNAPSHOT_REVALIDATED\|MIGRATION_INCLUDED\|EXCEPTION_IDENTITY_REUSED\|BUSINESS_QUESTION_RAISED)`$`<br />`Statement`: `\S` |
 
@@ -135,7 +136,7 @@ Skeleton: [`templates/kinds/frontend-presentation-resolution.skeleton.md`](https
 | --- | --- | --- | --- |
 | `^## Owner map$` | `\| Node \| Property \| Owner \| Rule \|` | minRows 1 | `Node`: `^`[^`]+`$`<br />`Owner`: `^(app\|grammar)$`<br />`Rule`: `^`[A-Z][A-Z0-9-]*-[0-9]+`$` |
 | `^## Rules chosen$` | `\| Node \| Rule \| Class \| Condition \|` | minRows 1 | `Node`: `^`[^`]+`$`<br />`Rule`: `^`[A-Z][A-Z0-9-]*-[0-9]+`$`<br />`Class`: `^`[^`]+`$`<br />`Condition`: `\S` |
-| `^## Removed$` | `\| Node \| Class \| Because \|` | — | `Node`: `^`[^`]+`$`<br />`Because`: `^(reimplements an owned relationship\|overrides Grammar anatomy\|off the closed scale)$` |
+| `^## Removed$` | `\| Node \| Class \| Because \|` | — | `Node`: `^`[^`]+`$`<br />`Because`: `^(reimplements an owned relationship\|overrides Grammar anatomy\|off the closed scale\|refused by [A-Z][A-Z0-9-]*-[0-9]+ Case [0-9]+)$` |
 | `^## Gaps$` | `\| Node \| Property \| Missing path \|` | — | `Node`: `^`[^`]+`$`<br />`Missing path`: `\S` |
 | `^## Fallbacks taken$` | `\| Code \| Action \|` | — | `Code`: `^`[A-Z][A-Z0-9_]+`$` |
 
@@ -258,9 +259,9 @@ Skeleton: [`templates/kinds/workspace-route-binding.skeleton.md`](https://github
 | `^## Binding$` | `\| Field \| Value \|` | `Project`, `Role`, `Portable route`, `Hydrated route`, `Source head` | `Value`: `\S` |
 | `^## Checkout$` | `\| Field \| Value \|` | `Disk path`, `Git root`, `Git repository`, `Branch`, `Repository kind`, `Directory`, `Source head`, `Mutation readiness`, `Businesses root` | `Value`: `\S` |
 | `^## Policy$` | `\| Field \| Value \|` | `Worktree branches`, `Mutation branch` | `Value`: `\S` |
-| `^## Write roots$` | `\| Path \| Why \|` | minRows 1 | `Path`: `\S`<br />`Why`: `\S` |
+| `^## Write roots$` | `\| Path \| Why \|` | — | `Path`: `\S`<br />`Why`: `\S` |
 | `^## Runtime$` | `\| Field \| Value \|` | — | `Value`: `\S` |
-| `^## Findings$` | `\| Code \| Subject \| Statement \|` | minRows 1 | `Code`: `^`(ROUTE_HYDRATED_FROM_PORTABLE\|RUNTIME_CONSUMED_NOT_OWNED\|IDENTITY_ROSTER_SEALED\|PROVENANCE_HEAD_BOUND\|CACHED_ROUTE_REUSED\|WORKTREE_<br />ANCH_FORBIDDEN)`$`<br />`Subject`: `\S`<br />`Statement`: `\S` |
+| `^## Findings$` | `\| Code \| Subject \| Statement \|` | minRows 1 | `Code`: `^`(ROUTE_HYDRATED_FROM_PORTABLE\|RUNTIME_CONSUMED_NOT_OWNED\|IDENTITY_ROSTER_SEALED\|PROVENANCE_HEAD_BOUND\|CACHED_ROUTE_REUSED\|WORKTREE_<br />ANCH_FORBIDDEN\|WORKTREE_<br />ANCH_SESSION_ONLY)`$`<br />`Subject`: `\S`<br />`Statement`: `\S` |
 
 ## Data schemas
 
@@ -282,7 +283,7 @@ Skeleton: [`templates/kinds/workspace-route-binding.skeleton.md`](https://github
 | `probes` | [`templates/kinds/probes.schema.json`](https://github.com/starci183/starci-skills/blob/main/templates/kinds/probes.schema.json) | `deadlineSeconds`, `elapsedSeconds`, `backoffSeconds`, `observations`, `finalCondition` |
 | `proof` | [`templates/kinds/proof.schema.json`](https://github.com/starci183/starci-skills/blob/main/templates/kinds/proof.schema.json) | `operationId`, `proofKind`, `commandRef`, `exitCode`, `result`, `output`, `statement`, `contractFingerprint` |
 | `route` | [`templates/kinds/route.schema.json`](https://github.com/starci183/starci-skills/blob/main/templates/kinds/route.schema.json) | `project`, `role`, `portableRouteRef`, `hydratedRouteRef`, `routeFingerprint`, `identityFingerprint`, `sourceHead`, `checkout`, `gitPolicy`, `mutationReadiness`, `writeRoots`, `authorityRoots`, `runtime`, `provenanceHeadRef` |
-| `stack-model` | [`templates/kinds/stack-model.schema.json`](https://github.com/starci183/starci-skills/blob/main/templates/kinds/stack-model.schema.json) | `decisionId`, `selectedAlternativeId`, `alternatives`, `boundaries`, `stores`, `components` |
+| `stack-model` | [`templates/kinds/stack-model.schema.json`](https://github.com/starci183/starci-skills/blob/main/templates/kinds/stack-model.schema.json) | `decisionId`, `selectedAlternativeId`, `alternatives`, `boundaries`, `stores`, `components`, `operations` |
 | `uat-capture` | [`templates/kinds/uat-capture.schema.json`](https://github.com/starci183/starci-skills/blob/main/templates/kinds/uat-capture.schema.json) | `caseId`, `runId`, `order`, `executedAt`, `screenshotRef`, `loginFieldMasked`, `outcome`, `assertions` |
 | `uat-snapshot` | [`templates/kinds/uat-snapshot.schema.json`](https://github.com/starci183/starci-skills/blob/main/templates/kinds/uat-snapshot.schema.json) | `runId`, `requestedBy`, `feature`, `flow`, `commit`, `frozenAt`, `flowRoot`, `snapshotRef`, `snapshotFingerprint`, `lease`, `admission`, `account`, `fixtureNamespace`, `seed`, `cases` |
 | `uat-verdicts` | [`templates/kinds/uat-verdicts.schema.json`](https://github.com/starci183/starci-skills/blob/main/templates/kinds/uat-verdicts.schema.json) | `runId`, `commit`, `resultRef`, `latestRef`, `lanes`, `cleanup` |

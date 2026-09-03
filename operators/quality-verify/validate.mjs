@@ -1,6 +1,7 @@
 // quality.verify's own law over one branch, on top of the shared step check: the gate plan the
 // person declared is the plan that ran, one file per gate; every gate file stands on the same head,
-// which is the head the request pinned and the commit the predecessor recorded; e2e runs only under
+// which is the head the request pinned and the commit the predecessor recorded, and no predecessor was
+// produced under mode dry;  e2e runs only under
 // an explicit request and sonar carries the scope it was measured at; a result's exit code, evidence
 // and classification match its status; coverage exists exactly where the unit gate produced it and no
 // metric sits below its own threshold beside a green unit result; a debt is live, in-boundary and
@@ -11,6 +12,7 @@ import path from 'node:path';
 import process from 'node:process';
 import { fileURLToPath } from 'node:url';
 import { validateStep } from '../../scripts/validate-step.mjs';
+import { sessionRootOf } from '../../scripts/validate-request.mjs';
 import { tableUnder } from '../../scripts/validate-response.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
@@ -74,6 +76,24 @@ export async function validateQualityStep(branchDir, root = ROOT) {
   for (const d of debts) if (!plannedNames.includes(d.gate)) errors.push(`request.json: debt ${d.debtId} covers ${d.gate}, which is not a planned gate`);
 
   // At least one producer receipt: a verification with no predecessor has no delivery to measure.
+  // A dry predecessor is a plan, not a delivery: it has no commit, so there is no head for a gate to
+  // stand on. It is refused here, at step 2, rather than later as a confusing gate failure.
+  const sessionRoot = sessionRootOf(branchDir);
+  if (sessionRoot) {
+    for (const kind of ['changes', 'backend-source-application', 'frontend-source-application']) {
+      const ref = request?.inputs?.[kind];
+      if (!ref) continue;
+      const full = path.join(sessionRoot, ref);
+      if (!existsSync(full)) continue;
+      let text; try { text = await readFile(full, 'utf8'); } catch { continue; }
+      const binding = Object.fromEntries((tableUnder(text, '## Binding') ?? []).map(([k, v]) => [k, v]));
+      const wroteNothing = kind === 'changes'
+        ? /nothing written/.test(String(binding.Checkout ?? ''))
+        : empty(binding.Commit);
+      if (wroteNothing) errors.push(`request.json: PREDECESSOR_STALE — the ${kind} input ${ref} was produced under mode dry and carries no commit; a plan has no head for a gate to stand on`);
+    }
+  }
+
   const inputs = Object.keys(request?.inputs ?? {});
   if (response.status !== 'blocked' && !inputs.some((k) => ['backend-source-application', 'frontend-source-application', 'changes'].includes(k))) {
     errors.push('request.json: quality.verify needs at least one of backend-source-application, frontend-source-application, changes');

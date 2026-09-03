@@ -20,9 +20,11 @@ Phiên là nơi duy nhất công việc của một nhiệm vụ tồn tại tro
 ```
 
 Id có dạng `<yyyymmdd-HHMMss>-<project>-<operator đầu tiên>`. `state.json` là bản kê: id, project,
-`startedAt`, trạng thái (`running | blocked | done`), chuỗi dưới dạng danh sách khoá nhánh, `steps`
-ánh xạ từng khoá tới operator của nó, `current`, các `leases` mỗi agent đang giữ, và sha256 của
-`request/request.json` từng nhánh.
+`startedAt`, trạng thái (`running | blocked | done | stopped`), chuỗi dưới dạng danh sách khoá nhánh, `steps`
+ánh xạ từng khoá tới operator của nó, `current`, các `leases` mỗi agent đang giữ, sha256 của
+`request/request.json` từng nhánh, `resumes` cho mỗi lần vào lại, và `stoppedAt` khi phiên kết thúc. Hình dạng
+của nó là `templates/step/state.schema.json`, và `validate-request` kiểm nó ở mọi nhánh: request mang `resume`
+phải gọi tên một nhánh mà bản kê ghi cho cùng operator.
 
 ## Một nhánh
 

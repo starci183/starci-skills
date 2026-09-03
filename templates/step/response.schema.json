@@ -109,6 +109,16 @@
       "minLength": 1,
       "maxLength": 2000,
       "description": "One paragraph for a person: why the branch blocked or waits, when the kind files could not be written"
+    },
+    "boundProfile": {
+      "type": "string",
+      "pattern": "^[a-z][a-z-]*$",
+      "description": "The profile operator.json binds; recorded with ranProfile when the processor ran a stand-in (resources/orchestrator.json#profileEquivalents)"
+    },
+    "ranProfile": {
+      "type": "string",
+      "pattern": "^[a-z][a-z-]*$",
+      "description": "The profile that actually ran the branch"
     }
   },
   "allOf": [

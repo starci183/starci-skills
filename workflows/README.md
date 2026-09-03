@@ -11,6 +11,9 @@ How the entry uses them:
 2. If none matches, compose a chain from the operators' `## Next` tables and `routing.json`, under the
    same rules `scripts/validate-workflows.mjs` enforces on these files:
    - every branch names a real operator and presets only fields that operator declares;
+   - every Requirements field with no Default is either preset or listed under the branch's `asks`, so a
+     chain says up front which fields the entry must take from the mission scope or ask a person for
+     before that branch starts;
    - every required Input of a branch is produced by an earlier step;
    - branches of one step share no write alias (two operators may not write the same checkout or
      root at once; `frontend.surface.audit` fans out by matrix entry because it writes nothing);

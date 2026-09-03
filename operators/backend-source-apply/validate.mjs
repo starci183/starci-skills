@@ -84,7 +84,7 @@ export async function validateBackendStep(branchDir, root = ROOT) {
       if (operation.transport === 'event-consumer' && operation.idempotencyKind === 'none') errors.push(`${at} consumes events with no idempotency and will apply twice on redelivery`);
       if (new Set(operation.facets).size !== operation.facets.length) errors.push(`${at} repeats a contract facet`);
       if (new Set(operation.proofKinds).size !== operation.proofKinds.length) errors.push(`${at} repeats a proof kind`);
-      if (new Set(operation.authorityDecisionIds).size !== operation.authorityDecisionIds.length) errors.push(`${at} repeats a business decision identifier`);
+      if (new Set(operation.authorityDimensionIds).size !== operation.authorityDimensionIds.length) errors.push(`${at} repeats a business dimension identifier`);
     }
     if (declared.length && declaredById.size !== declared.length) errors.push('response/data/mutations.json: the contract repeats an operationId');
 
@@ -177,8 +177,8 @@ export async function validateBackendStep(branchDir, root = ROOT) {
       if (transaction !== operation.transactionBoundary) errors.push(`response/response.md: operation ${operationId} reports transaction ${transaction}, the contract froze ${operation.transactionBoundary}`);
       if (idempotency !== operation.idempotencyKind) errors.push(`response/response.md: operation ${operationId} reports idempotency ${idempotency}, the contract froze ${operation.idempotencyKind}`);
       const cited = String(decisions).split(',').map((s) => s.trim()).filter(Boolean);
-      for (const decisionId of cited) if (!operation.authorityDecisionIds.includes(decisionId)) errors.push(`response/response.md: operation ${operationId} cites decision ${decisionId}, which the contract does not bind`);
-      for (const decisionId of operation.authorityDecisionIds) if (!cited.includes(decisionId)) errors.push(`response/response.md: operation ${operationId} does not restate approved decision ${decisionId}`);
+      for (const dimensionId of cited) if (!operation.authorityDimensionIds.includes(dimensionId)) errors.push(`response/response.md: operation ${operationId} cites dimension ${dimensionId}, which the contract does not bind`);
+      for (const dimensionId of operation.authorityDimensionIds) if (!cited.includes(dimensionId)) errors.push(`response/response.md: operation ${operationId} does not restate approved dimension ${dimensionId}`);
     }
     if (response.status === 'done') for (const operationId of declaredById.keys()) if (!applied.has(operationId)) errors.push(`response/response.md: operation ${operationId} was declared but never applied`);
 

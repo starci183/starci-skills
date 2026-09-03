@@ -41,8 +41,52 @@ policy for the fe route.
 - Orchestrator: who owns `declaredWriteRoots` for a bind (the workflow target should derive them); a
   `.claude` edit mid-session is invisible to `SOURCE_DRIFT` because the head does not move.
 
-## Round 2 — planned
+## Round 2 — 2026-09-03, tree at 1.0.3 → 1.1.0
 
-`frontend-refine` again on subscriptions (expect resolve to pass `PADDING-9` and remove the accent marker
-class), `backend-feature` through a dry apply once the mode exists, `full-feature` for the parallel step,
-`frontend-with-uat` for the admission stop, and one resume of a blocked branch.
+Five sessions, each run by a processor agent (Claude Opus standing in for every bound profile), every branch
+through the four validators, source-writing steps in `mode: dry`, nothing written to a checkout or the
+businesses worktree. The shared runtime was down on the machine (registry generation 6 says `ready`, ports
+3000/3001 refuse), which every chain that bound `runtimeNeed: consume` met at step 1.
+
+| Workflow | Target | Reached | Stopped by | Judged | Report |
+| --- | --- | --- | --- | --- | --- |
+| `frontend-refine` | `/[lang]/subscriptions` | bind `RUNTIME_NOT_READY` → resume (`runtimeNeed: none`) → direction done → resolve: `PADDING-9` selected, accent marker removed by the new law, 0 `RULE_MISSING` | resolve failed its own contract: `## Removed` cannot say "refused by a case"; a claim on a Grammar `className` has no attribute to land on; `unquote` ate a leading backtick | the knowledge fix worked; three gate defects exposed on new ground | [record](runs/20260903-r2-frontend-refine-subscriptions.md) |
+| `backend-feature` | `pro-subscription` | bind `CHECKOUT_DIRTY` → resume → business → architecture + critique → `backend.source.apply` dry | `BUSINESS_AUTHORITY_MISSING`: the plan must cite `BA-<n>` and nothing in the tree publishes one | correct refusal; the dry path itself untested for a second round | [record](runs/20260903-r2-backend-feature-dry-apply.md) |
+| `full-feature` | `pro-subscription` | step 1 parallel (be done, fe `RUNTIME_NOT_READY`) → resume → business → architecture waiting → done → step 5 parallel | `5/1` `CONTRACT_UNFROZEN` (the architecture decision carries no operations the backend plan can consume); `5/2` `CHANGE_LEVEL_AMBIGUOUS` (preset `new` on an existing route) | the parallel step and the nested exchange lay out and validate as designed; the architecture → backend handoff does not typecheck | [record](runs/20260903-r2-full-feature-parallel.md) |
+| `frontend-with-uat` | `/[lang]/subscriptions` | step 1: be `CHECKOUT_DIRTY`, fe `RUNTIME_NOT_READY`; `uat.verify` probed out of chain | `INVALID_INPUT` at the request gate (no `requestedBy`, no flow, no admissions); `ADMISSION_MISSING` unreachable | correct stop; the uat validator could not accept its own lawful refusal | [record](runs/20260903-r2-frontend-with-uat-admission.md) |
+| resume | `frontend-reconstruct`, learner dashboard | bind `RUNTIME_NOT_READY` → resume as step 2 with linkage → direction → resolve done | — (probe branches: an unregistered code fails both checks; `UNKNOWN_STOP` itself was unemittable) | resume layout holds; routing sent `runtime` to `external` while the operator's Next said `platform.operate`; `state.json` had no schema | [record](runs/20260903-r2-resume-blocked-branch.md) |
+
+## What the round changed in the tree
+
+See `onichan.md` for the owner-facing log. Gates: `unquote` only unquotes a fully quoted cell; `UNKNOWN_STOP`
+needs no Stops-table row; `response.next` must be offered by the operator's Next table; `boundProfile` /
+`ranProfile` recorded as a pair; `state.json` has `templates/step/state.schema.json` and `validate-request`
+checks it and the resume linkage; `validate-workflows` requires every no-Default field to be preset or
+declared under `asks`. Routing: `workspace.bind` sends `runtime` to `platform.operate`. Orchestrator: the
+block lifecycle for `operator | user | external` answers, who converts to `UNKNOWN_STOP`, dry mode exempt from
+the read-only policy and granted no write tools, `stoppedAt` for a done-but-invalid response. Workflows:
+`runtimeNeed: consume` only in `frontend-with-uat`; `asks` generated from the Requirements tables. Kinds and
+operators: `BA-<n>` retired for coverage-matrix dimensions; the architecture decision publishes the
+operations the backend plan consumes; `## Removed` can cite a refusing case; uat.verify's validator accepts a
+lawful refusal and reads the fe route; workspace.bind states the blocked-branch record, the
+`mutationReadiness` derivation and refuses a route with no `gitPolicy`; a dry predecessor is
+`PREDECESSOR_STALE` for quality.verify; an unpublished business `model` reaches architecture and backend.
+Outside the tree: `.workspaces/projects/starci-academy/be.json` now declares `session-only`.
+
+## Still open after round 2
+
+- The `.claude` head is not in `request.json.contexts`, so a tree edit under a running session is invisible
+  to `SOURCE_DRIFT` (both rounds saw it happen).
+- Fingerprints: `routeFingerprint` now has a stated method; a general canonicalisation note for document
+  fingerprints is not written.
+- `declaredWriteRoots` still doubles as the dirt boundary; `toleratedDirtRoots` is proposed, not built.
+- A nested exchange beside a running sibling is exercised by no published workflow.
+- The v7-era result/snapshot pair under `.worktrees/_templates/uat` and the seven flow folders still do not
+  match the flow layout `uat.verify` reads.
+- The shared runtime registry claims `ready` with nothing listening; `platform.operate` territory.
+
+## Round 3 — planned
+
+`backend-feature` through the dry plan now that the authority citation and the operations handoff exist;
+`frontend-refine` through a valid resolution into a dry apply; a served preview so `frontend.surface.audit`
+produces a matrix; one `platform.operate` run against the stale registry.

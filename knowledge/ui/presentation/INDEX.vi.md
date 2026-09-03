@@ -43,6 +43,7 @@ không phải recommendation của presentation.
 | Nhấn mạnh text default, muted và accent | [Tone](tone.vi.md) |
 | Surface ngữ nghĩa của vùng do app sở hữu, kèm foreground đi cặp | [Surface](surface.vi.md) |
 | Separator hay border vẽ cạnh do app sở hữu, và cạnh nào bỏ đường kẻ | [Boundary](boundary.vi.md) |
+| Góc của surface, mark hay pill do app sở hữu tròn tới đâu | [Radius](radius.vi.md) |
 | Giới hạn width và height của content region | [Measure](measure.vi.md) |
 | Wrapping, alignment và truncation | [Text flow](text-flow.vi.md) |
 | Scroll và clipping boundary do app sở hữu | [Overflow](overflow.vi.md) |

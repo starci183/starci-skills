@@ -3,7 +3,8 @@
 // carries appears in the resolved tree; a Grammar-owned property emits no application class while an
 // application-owned one emits a class whose step matches the ordinal of its rule; the gaps the
 // receipt lists are exactly the gaps the inventory records; and with emission on every claimed rule
-// reaches the tree as a data-contract token.
+// reaches the tree as a data-contract token, except a rule whose every node the receipt records under
+// `## Gaps`, which has no attribute to reach.
 import { existsSync } from 'node:fs';
 import { readFile, readdir } from 'node:fs/promises';
 import path from 'node:path';
@@ -67,6 +68,21 @@ export async function validateResolutionStep(branchDir, root = ROOT) {
     if (!published.has(ruleId)) errors.push(`${at}: rule ${ruleId} is outside the published presentation inventory (UNKNOWN_RULE)`);
   }
 
+  // The receipt is read before the tree, because a rule recorded under `## Gaps` is a rule whose node
+  // publishes no path for the attribute: the emission check below must know that before it accuses the
+  // tree of hiding a claim that could never have been written.
+  const receiptText = present.has('frontend-presentation-resolution') && has('response/response.md') ? await read('response/response.md') : null;
+  const gapRows = receiptText === null ? [] : (tableUnder(receiptText, '## Gaps') ?? []);
+  const gapNodes = new Set(gapRows.map(([node]) => node));
+  const chosenRows = receiptText === null ? [] : (tableUnder(receiptText, '## Rules chosen') ?? []);
+  // A rule is exempt only when every node that chose it is a gap node; one ordinary node still owes
+  // its attribute.
+  const gapOnlyRules = new Set();
+  for (const [, rule] of chosenRows) {
+    const nodes = chosenRows.filter(([, r]) => r === rule).map(([n]) => n);
+    if (nodes.length && nodes.every((n) => gapNodes.has(n))) gapOnlyRules.add(String(rule).replace(/`/g, ''));
+  }
+
   // The resolved tree is the only place the classes may land, so every class the inventory claims
   // must actually be in it.
   const treeRefs = list(response.fields?.['resolved-tree']);
@@ -79,19 +95,23 @@ export async function validateResolutionStep(branchDir, root = ROOT) {
     }
     if (emission === 'on') {
       for (const ruleId of inventory.ruleIds) {
+        // A property the application owns on a Grammar component's className carries no attribute:
+        // the component forwards className and nothing else, so the claim is recorded under `## Gaps`
+        // instead of being demanded of a tree that cannot carry it.
+        if (gapOnlyRules.has(ruleId)) continue;
         const claimed = [...tree.matchAll(/data-contract="([^"]*)"/g)].some((m) => m[1].split(/\s+/).includes(ruleId));
         if (!claimed) errors.push(`${at}: rule ${ruleId} is applied and no node claims it under data-contract`);
       }
     } else if (/data-contract=/.test(tree)) errors.push('response/artifacts: contract emission is off and the resolved tree carries a data-contract attribute');
   }
 
-  if (present.has('frontend-presentation-resolution') && has('response/response.md')) {
-    const text = await read('response/response.md');
+  if (receiptText !== null) {
+    const text = receiptText;
     const rel = 'response/response.md';
     const owners = tableUnder(text, '## Owner map') ?? [];
-    const chosen = tableUnder(text, '## Rules chosen') ?? [];
+    const chosen = chosenRows;
     const removed = tableUnder(text, '## Removed') ?? [];
-    const gaps = tableUnder(text, '## Gaps') ?? [];
+    const gaps = gapRows;
 
     const appRules = new Set();
     const grammarRules = new Set();
@@ -129,7 +149,11 @@ export async function validateResolutionStep(branchDir, root = ROOT) {
     const receiptGaps = gaps.map(([node, property, missing]) => `${node}|${property}|${missing}`).sort();
     const dataGaps = inventory.gaps.map((g) => `${g.nodePath}|${g.property}|${g.missingPath}`).sort();
     if (receiptGaps.join('\n') !== dataGaps.join('\n')) {
-      errors.push(`${rel}: the Gaps table and inventory.gaps differ (${receiptGaps.length} rows against ${dataGaps.length})`);
+      // Two counts say nothing about which row is wrong, so the first row that differs is named.
+      const width = Math.max(receiptGaps.length, dataGaps.length);
+      let first = 0;
+      while (first < width && receiptGaps[first] === dataGaps[first]) first += 1;
+      errors.push(`${rel}: the Gaps table and inventory.gaps differ (${receiptGaps.length} rows against ${dataGaps.length}); the first differing row is the receipt's ${receiptGaps[first] ?? '(absent)'} against the inventory's ${dataGaps[first] ?? '(absent)'}`);
     }
   }
   return { errors };

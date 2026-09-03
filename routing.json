@@ -259,7 +259,8 @@
         "kind": "resume"
       },
       "runtime": {
-        "kind": "external"
+        "kind": "operator",
+        "target": "platform.operate"
       },
       "identity": {
         "kind": "external"

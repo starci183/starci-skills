@@ -17,7 +17,8 @@ import { loadOperatorPackages, kindOf, isYes, exchangeOf } from './operator-md.m
 import { loadErrorsRegistry } from './errors-registry.mjs';
 import { sessionRootOf } from './validate-request.mjs';
 
-const unquote = (s) => String(s ?? '').trim().replace(/^`|`$/g, '');
+// Only a fully quoted cell is unquoted: a sentence that opens with a code span keeps its backticks.
+const unquote = (s) => { const t = String(s ?? '').trim(); return /^`[^`]*`$/.test(t) ? t.slice(1, -1) : t; };
 
 // Rows of the first table under `## <heading>`, cells unquoted.
 export function tableUnder(text, heading) {
@@ -98,7 +99,8 @@ export async function validateResponse(root, dir, { requirements = {}, exchange 
   const dispositionOf = (code) => { const e = registry.codes[code]; return e && registry.allowed(code, op.id) ? effectiveDisposition(e, requirements) : null; };
   if (response.status === 'blocked') {
     const d = dispositionOf(response.stop);
-    if (!stopsTable.has(response.stop)) errors.push(`${rel('response/response.json')}: stop ${response.stop} is not in the Stops table of ${op.id}`);
+    // UNKNOWN_STOP is the one code no operator declares: the orchestrator writes it when it meets a code the merged registry does not list.
+    if (response.stop !== 'UNKNOWN_STOP' && !stopsTable.has(response.stop)) errors.push(`${rel('response/response.json')}: stop ${response.stop} is not in the Stops table of ${op.id}`);
     if (d === null) errors.push(`${rel('response/response.json')}: stop ${response.stop} is not a registered code ${op.id} may emit`);
     else if (d !== 'terminate') errors.push(`${rel('response/response.json')}: ${response.stop} has disposition fallback under these requirements; the step should have continued`);
   }
@@ -121,7 +123,16 @@ export async function validateResponse(root, dir, { requirements = {}, exchange 
     for (const c of taken) if (!declaredTaken.has(c)) errors.push(`${rel('response/response.md')}: Fallbacks taken lists ${c}, which response.json does not`);
     for (const c of declaredTaken) if (!taken.includes(c)) errors.push(`${rel('response/response.json')}: fallback ${c} is not recorded under ## Fallbacks taken in response.md`);
   }
-  for (const nextId of response.next ?? []) if (nextId !== 'user' && nextId !== 'external' && !packages.some((p) => p.manifest.id === nextId)) errors.push(`${rel('response/response.json')}: next names unknown operator ${nextId}`);
+  // next names only what the operator's own Next table offers (or user / external); a workflow cannot add a hand-off the operator does not declare.
+  const nextTable = new Set((op.tables.next?.rows ?? []).map((r) => unquote(r.operator)));
+  for (const nextId of response.next ?? []) {
+    if (nextId === 'user' || nextId === 'external') continue;
+    if (!packages.some((p) => p.manifest.id === nextId)) errors.push(`${rel('response/response.json')}: next names unknown operator ${nextId}`);
+    else if (!nextTable.has(nextId)) errors.push(`${rel('response/response.json')}: next names ${nextId}, which the Next table of ${op.id} does not offer`);
+  }
+  // A stand-in is recorded as a pair: the profile operator.json binds and the profile that actually ran.
+  if ((response.boundProfile === undefined) !== (response.ranProfile === undefined)) errors.push(`${rel('response/response.json')}: boundProfile and ranProfile are recorded together or not at all`);
+  if (response.boundProfile !== undefined && response.boundProfile !== pkg.manifest.resources?.profile) errors.push(`${rel('response/response.json')}: boundProfile ${response.boundProfile} is not the profile ${op.id} binds (${pkg.manifest.resources?.profile})`);
   if (exchange && (response.next ?? []).length) errors.push(`${rel('response/response.json')}: a nested exchange does not route; next must be empty`);
   return { errors, response, present, pkg };
 }

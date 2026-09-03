@@ -11,6 +11,9 @@ Cửa vào dùng chúng như sau:
 2. Không khớp cái nào thì tự ghép chuỗi từ bảng `## Next` của các operator và `routing.json`, theo
    đúng luật mà `scripts/validate-workflows.mjs` ép lên các file này:
    - mỗi nhánh gọi tên một operator có thật và chỉ preset field mà operator đó khai;
+   - mọi field Requirements không có Default thì hoặc được preset, hoặc nằm trong `asks` của nhánh, để
+     chuỗi nói trước những field nào cửa vào phải lấy từ phạm vi nhiệm vụ hay hỏi người trước khi nhánh
+     đó chạy;
    - mọi Input bắt buộc của một nhánh phải do một bậc trước sinh ra;
    - các nhánh cùng bậc không chung alias ghi (hai operator không được cùng ghi một checkout hay một
      root; `frontend.surface.audit` toả theo entry của matrix vì nó không ghi gì);

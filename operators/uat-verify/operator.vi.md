@@ -13,8 +13,21 @@ cổng. Không có gì ở operator này là thường lệ: nó đăng nhập n
 vào một runtime dùng chung và để lại một hồ sơ lượt chạy vĩnh viễn, nên thứ khởi động nó là một con
 người, không bao giờ là lịch hẹn, mặc định của chain hay sự tiện tay của một agent khác. `runId` và
 `lease` cũng không phải câu hỏi dành cho người: orchestrator sinh mã lượt chạy và cấp lease độc quyền
-trên thư mục luồng trước khi nhánh bắt đầu, và một lần gọi đến mà thiếu chúng là `INVALID_INPUT` chứ
-không phải một lời hỏi.
+trên thư mục luồng trước khi nhánh bắt đầu, và một lần gọi đến mà thiếu chúng là `INVALID_INPUT` ở bước 1 chứ
+không phải một lời hỏi. Vì thế Mặc định của chúng là `—`: một ô Mặc định ghi "mã lượt chạy của
+orchestrator" là lời văn chứ không phải một giá trị cổng dùng được, và một cổng chấp nhận lời văn là
+một cổng chấp nhận ô rỗng. `LEASE_INVALID` là một thất bại khác và giữ chỗ riêng của nó: đó là cái
+lease có tồn tại nhưng đã hết hạn, thuộc về nơi khác, hoặc đang ràng vào một lượt chạy khác, và nó bị
+phát hiện ở bước 6 trên chính thư mục luồng mà lượt chạy này đang giữ.
+
+## Endpoint là cái đã ràng, không phải cái suy lại
+
+Luồng được lái theo endpoint mà đầu vào `route` mang, chính cái mà nhánh `workspace.bind` của chuỗi
+này đã quan sát và đóng lại. Operator này không suy lại sự sẵn sàng từ sổ đăng ký runtime: một sổ
+đăng ký báo `ready` trong khi không ai lắng nghe đúng là nguồn đẩy trình duyệt vào một cổng chết, và
+bước ràng đã từ chối một cổng chỉ-lắng-nghe thay cho chuỗi này rồi. Khi endpoint đã ràng không trả
+lời, mã dừng là `RUNTIME_UNAVAILABLE` trên một endpoint có tên, chứ không phải một phỏng đoán xem
+origin nào mới là origin được nhắc tới.
 
 ## Mật khẩu là một cái tên, không bao giờ là một giá trị
 
@@ -80,8 +93,8 @@ lượt chạy, và không xoá bất cứ thứ gì ngoài namespace fixture c�
 | Alias | Bind | Bắt buộc |
 | --- | --- | --- |
 | `@worktrees/uat/<flow>/<case>` | thư mục luồng: `flow.md`, `account.json`, `seed/`, lịch sử chỉ-thêm `runs/<runId>/` và con trỏ `latest`, bind theo fingerprint từng file và chỉ ghi khi giữ lease độc quyền | có |
-| `@worktrees/_templates` | khuôn luồng UAT dùng để tạo thư mục luồng mới; tiêu thụ, không sửa | có |
-| `@worktrees/sessions/central-runtime` | chủ runtime đã sẵn sàng, generation và các origin chính xác của nó; sự sẵn sàng phải được chứng minh, không được giả định | có |
+| `@worktrees/_templates` | khuôn luồng UAT dùng để tạo thư mục luồng mới, đúng ba thứ mà bước 4 đọc: `uat/flow.md` với các case và những khẳng định có tên của chúng, `uat/account.json` với username, vai, tên thông tin đăng nhập và đường dẫn file niêm phong, không trường nào có thể chứa bí mật, và `uat/seed/` với các bản ghi mà một lượt chạy đặt namespace lên; tiêu thụ, không sửa | có |
+| `@worktrees/sessions/central-runtime` | generation của chủ runtime đứng sau endpoint đã ràng; sự sẵn sàng do đầu vào `route` chứng minh, không bao giờ suy lại từ sổ đăng ký này | có |
 | `@workspaces/device-state` | sổ thông tin đăng nhập niêm phong; mật khẩu UAT dùng chung được giải theo tên ở đây lúc đăng nhập và không đọc ở đâu khác | có |
 | `@workspaces/be` | checkout backend được route tại commit đã ghim, nơi luồng kiểm hành vi và nơi store giữ các bản ghi có namespace | có |
 
@@ -91,6 +104,7 @@ lượt chạy, và không xoá bất cứ thứ gì ngoài namespace fixture c�
 | --- | --- | --- |
 | `frontend-surface-audit` | lượt soi bề mặt kết luận frontend sạch, lấy tại commit đã ghim | có |
 | `quality-verification` | cổng chất lượng đã xanh, lấy tại đúng commit đã ghim ấy | có |
+| `route` | `workspace.bind` ở vai fe; route đã ràng mà lượt chạy này lái theo endpoint của nó | có |
 
 ## Yêu cầu
 
@@ -100,8 +114,8 @@ lượt chạy, và không xoá bất cứ thứ gì ngoài namespace fixture c�
 | `feature` | id | — | Khoá feature dùng để địa chỉ hoá thư mục luồng |
 | `flow` | id | — | Luồng sản phẩm duy nhất mà lần gọi này kiểm chứng |
 | `cases` | list `caseId` | every case of the flow | Chạy những case đã đóng băng nào; mặc định là mọi case `flow.md` khai, theo đúng thứ tự của nó |
-| `runId` | id | the orchestrator's run id | Không hỏi người: orchestrator sinh ra nó và nó namespace mọi bản ghi lượt chạy này ghi ra |
-| `lease` | token | the orchestrator's lease | Không hỏi người: orchestrator cấp lease độc quyền trên thư mục luồng trước khi nhánh bắt đầu |
+| `runId` | id | — | Không hỏi người: orchestrator điền nó, và nó namespace mọi bản ghi lượt chạy này ghi ra |
+| `lease` | token | — | Không hỏi người: orchestrator điền nó, cấp lease độc quyền trên thư mục luồng trước khi nhánh bắt đầu |
 | `resume` | token | null | Token của nhánh bị chặn khi vào lại sau một mã dừng |
 
 ## Các bước
@@ -113,7 +127,7 @@ lượt chạy, và không xoá bất cứ thứ gì ngoài namespace fixture c�
 | 3 | Preflight runtime: thông tin đăng nhập niêm phong giải được theo tên, tài khoản tồn tại, store trả lời | — | @workspaces/device-state để lấy thông tin đăng nhập mà `account.json` nêu tên, @worktrees/sessions/central-runtime để lấy generation và các origin, @tools/secrets, @tools/http | — | `PROVISIONING_UNAVAILABLE` |
 | 4 | Đóng băng snapshot từ `flow.md`, `account.json` và `seed/` | `feature`, `flow`, `cases` | @worktrees/uat/<flow>/<case>, @worktrees/_templates để lấy khuôn luồng | @worktrees/uat/<flow>/<case> (snapshot), `response/data/snapshot.json`, @tools/sourcewrite | `CANONICAL_WRITE_DENIED` |
 | 5 | Gieo các bản ghi đã đóng băng vào namespace lượt chạy | `runId` | `response/data/snapshot.json`, @workspaces/be | @tools/database | `FIXTURE_VIOLATION` |
-| 6 | Chạy các case đã đóng băng theo thứ tự trên worktree phiên tại commit đã ghim | — | `response/data/snapshot.json`, @worktrees/sessions/central-runtime để lấy origin và generation, @workspaces/device-state để lấy thông tin đăng nhập chỉ lúc đăng nhập, @tools/browsercontrol, @tools/websearch | — | `LEASE_INVALID`, `RUNTIME_UNAVAILABLE` |
+| 6 | Chạy các case đã đóng băng theo thứ tự trên endpoint mà route đã ràng mang, tại commit đã ghim | — | `response/data/snapshot.json`, đầu vào `route` để lấy endpoint lượt chạy này lái theo, @worktrees/sessions/central-runtime để lấy generation đứng sau endpoint đó, @workspaces/device-state để lấy thông tin đăng nhập chỉ lúc đăng nhập, @tools/browsercontrol, @tools/websearch | — | `LEASE_INVALID`, `RUNTIME_UNAVAILABLE` |
 | 7 | Capture tại từng khẳng định có tên với ô mật khẩu đã che, rồi ghép tấm sheet | — | `response/data/snapshot.json`, @worktrees/sessions/central-runtime để lấy bằng chứng runtime trực tiếp nhất | `response/data/captures/<case>.json`, `response/artifacts/<case>.png`, `response/artifacts/sheet.png`, @tools/visualize | `EVIDENCE_UNAVAILABLE` |
 | 8 | Xét ba làn tách rời nhau | — | `response/data/captures/<case>.json` | `response/data/verdicts.json` | — |
 | 9 | Kiểm chỉ-đọc, rồi xoá namespace lượt chạy và không gì khác | `runId` | @workspaces/be để lấy các bản ghi mang `is_uat=true` và namespace này, `response/data/verdicts.json` | @tools/database | — |

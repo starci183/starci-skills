@@ -12,8 +12,11 @@ writers, stores, transaction boundaries, idempotency kinds, and migrations it li
 set the implementation may touch, and this operator answers only one question per operation: does the
 code that now exists do exactly what the contract says, and what measurement shows it. The operations
 are not a Requirement, because a person retyping a contract into a request is how the contract and
-the implementation quietly diverge; step 3 reads them from the frozen input and restates them in
-`response/data/mutations.json`. Three prohibitions carry that, and each is enforced rather than
+the implementation quietly diverge; step 3 reads them from the frozen input's `operations` — one row of the
+architecture decision's `## Operations` table, one object of its `stack-model.json`, per write the
+decision commits to — and restates them in `response/data/mutations.json`, carrying each operation's
+`writerRef`, `transactionBoundary`, `idempotencyKind`, `migrationRefs` and dimension ids across
+unchanged. Three prohibitions carry that, and each is enforced rather than
 advised. An operation, writer, store, transaction, migration, or event outside the contract is
 `CONTRACT_WIDENED`, returned to the contract owner before any product write. A file outside the
 mutable ceiling is `OWNER_CONFLICT`, even when the change there would be one line. A convention no
@@ -48,13 +51,19 @@ ends `done`, because a plan honestly produced is a finished answer to a question
 `changes.md` lists every planned path as `unchanged`, which is what the working tree actually shows,
 and names the change it would have made in `Why`. A dry run measures nothing, so it carries no
 conformance record and no proof record: a facet cannot be measured on code that was never written,
-and a plan that shipped verdicts would be indistinguishable from an implementation. That is also why
+and a plan that shipped verdicts would be indistinguishable from an implementation. A dry run is also granted neither `@tools/sourcewrite` nor `@tools/git`, because a
+mode that writes nothing needs no tool that can write; the grant and this paragraph say the same
+thing so neither can drift. That is also why
 a dry run can never be the run that satisfies the contract — it is a way to read the write set before
 paying for it, not a cheaper way to apply it.
 
 ## The backend never invents business behaviour
 
-Every operation cites the approved decisions it implements. When the code reaches a point where the
+Every operation cites the approved decisions it implements. An approved decision is not a number this
+operator may coin: it is a coverage-matrix `dimension` of the bound business head, addressed by that
+dimension's own kebab identifier, and the matrix fingerprint travels with the citation so a later
+reader can tell which matrix approved it. A citation naming anything the bound matrix does not carry
+is not an approval, it is a guess with a label. When the code reaches a point where the
 answer depends on a business rule nobody approved, the branch stops with `BUSINESS_AUTHORITY_MISSING`
 and names the open question. It does not pick the lenient reading, mirror what a neighbouring feature
 happens to do, or choose whichever branch makes the test go green. This is the most load-bearing rule
@@ -101,11 +110,15 @@ writes on the person's checked-out branch, pushes, merges, or tags anything, cla
 without naming the evidence that measured it, or records a quality, visual, or UAT verdict; those are
 other jobs with their own gates.
 
+When the `model` Input is present it is the authority for this run and the published head is lineage
+only: a chain that has just modelled a head must not decide against an older promise merely because
+the publication was withheld. When it is absent the published head is the authority.
+
 ## Context
 
 | Alias | Bind | Required |
 | --- | --- | --- |
-| `@worktrees/businesses/<featureId>` | the published business head, the only source of business behaviour | yes |
+| `@worktrees/businesses/<featureId>` | the published business head, the only source of business behaviour; evidence when the session carries a `model` Input | yes |
 | `@knowledge/patterns/be` | the sibling families this change mirrors, one per aspect; the only source of valid conventions | yes |
 | `@workspaces/be` | the routed backend checkout at the frozen head, written only on its session branch worktree | yes |
 
@@ -113,7 +126,8 @@ other jobs with their own gates.
 
 | Kind | From | Required |
 | --- | --- | --- |
-| `architecture-decision` | `architecture.decide`; the frozen mutation contract the implementation fills and may not widen | yes |
+| `architecture-decision` | `architecture.decide`; the frozen mutation contract the implementation fills and may not widen, and the source of every operation this run restates | yes |
+| `model` | `business.decide`; the head that branch modelled, when it has not been published yet | no |
 | `backend-source-application` | a prior run of `backend.source.apply` for the same outcome; regression history, absent on the first run | no |
 
 ## Requirements
@@ -131,7 +145,7 @@ other jobs with their own gates.
 | # | Step | Params | Reads | Writes | Stops with |
 | --- | --- | --- | --- | --- | --- |
 | 1 | Validate the gate and resume | `resume`, `mode` | `request/request.json`, input `backend-source-application` when present, @workspaces/be at the frozen head | — | `INVALID_INPUT`, `SOURCE_DRIFT`, `NO_PROGRESS` |
-| 2 | Bind authority, contract and patterns | `featureId` | @worktrees/businesses/<featureId> at its published head, input `architecture-decision` as the frozen contract, @knowledge/patterns/be one pattern per aspect | — | `CONTRACT_UNFROZEN`, `BUSINESS_AUTHORITY_MISSING`, `PATTERN_UNBOUND` |
+| 2 | Bind authority, contract and patterns | `featureId` | input `model` when present, otherwise @worktrees/businesses/<featureId> at its published head, input `architecture-decision` as the frozen contract and the source of its `operations`, @knowledge/patterns/be one pattern per aspect | — | `CONTRACT_UNFROZEN`, `BUSINESS_AUTHORITY_MISSING`, `PATTERN_UNBOUND` |
 | 3 | Fill one contract operation at a time, on the session branch | `mutableFileRefs` | @knowledge/patterns/be for each aspect, @workspaces/be inside the mutable ceiling | @workspaces/be/branch/session inside the mutable ceiling, under an exclusive lease, @tools/sourcewrite | `CONTRACT_WIDENED`, `OWNER_CONFLICT` |
 | 4 | Check every mutation against the frozen contract and record it with its before and after hash | `mode` | @workspaces/be, the touched files and the frozen contract | `response/data/mutations.json` | — |
 | 5 | Revalidate persisted snapshots on read | — | @workspaces/be, the persisted snapshot, @knowledge/patterns/be for the rules that drift after it | — | — |
@@ -187,3 +201,4 @@ fingerprint cannot yield a different answer.
 | the contract is filled and a frontend surface must consume it | `frontend.direction.decide` |
 | a file needing mutation lies outside the routed write ceiling | `workspace.bind` |
 | a declared proof cannot be executed in this environment | `platform.operate` |
+| the plan was produced under mode dry and a person decides whether to pay for it | `user` |

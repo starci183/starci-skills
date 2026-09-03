@@ -21,7 +21,13 @@
     ],
     [
       {
-        "operator": "release.deploy"
+        "operator": "release.deploy",
+        "asks": [
+          "release",
+          "target",
+          "approval",
+          "rollbackIdentity"
+        ]
       }
     ]
   ],

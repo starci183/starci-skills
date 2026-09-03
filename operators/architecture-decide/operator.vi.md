@@ -29,6 +29,18 @@ tiếp, quyền sở hữu datastore, sao lưu và khôi phục; phán quyết b
 không sở hữu; một store gọi tên đúng một boundary chủ và boundary đó ghi nó, người ghi thứ hai chỉ
 tồn tại khi có lý do chia sẻ ghi rõ ràng.
 
+## Quyết định gọi tên mọi lần ghi nó cam kết
+
+Một boundary sở hữu store không nói gì về việc ai ghi nó, lúc nào, dưới transaction nào, nên quyết
+định tự lấp khoảng trống đó: `response/data/stack-model.json` mang một mục `operations` cho mỗi lần
+ghi mà kiến trúc này cam kết, và bảng `## Operations` của biên nhận thuật lại đúng những hàng ấy. Mỗi
+mục gọi tên transport, writer, các store nó chạm, ranh giới transaction, kiểu idempotency, các
+migration nó mang, và các `dimension` của ma trận phủ thuộc head nghiệp vụ mà nó hiện thực. Danh sách
+đó chính là hợp đồng đóng băng mà `backend.source.apply` lấp: phần hiện thực thuật lại nguyên vẹn
+những operation đó và không được thêm cái nào, nên một operation không ai khai ở đây thì không thể
+được viết ở đâu cả. Khai một lần ghi không phải là chọn một cách hiện thực, và đó là lý do writer là
+đường dẫn file duy nhất operator này gọi tên.
+
 ## Phản biện là một cuộc trao đổi lồng
 
 Sau khi phương án đã chọn được đào sâu, nhánh tạm ngưng: nó phát `response/response.json` với status
@@ -47,12 +59,16 @@ source được route, không publish thẩm quyền nghiệp vụ, không khở
 runtime, không nêu tên file implementation trong handoff, và không tuyên bố implementation, cổng
 chất lượng hay UAT đã qua.
 
+Khi đầu vào `model` có mặt, nó là thẩm quyền của lần chạy này và head đã publish chỉ còn là dòng dõi,
+bởi một quyết định lấy theo lời hứa của hôm qua là quyết định lấy theo lời hứa sai. Khi nó vắng, head
+đã publish là thẩm quyền.
+
 ## Context
 
 | Alias | Bind | Bắt buộc |
 | --- | --- | --- |
 | `@workspaces/be` | checkout backend được route, đọc ở head đóng băng; inventory lấy từ manifest và file deploy | có |
-| `@worktrees/businesses/<featureId>` | head nghiệp vụ đã publish, lời hứa mà kiến trúc phải giữ | có |
+| `@worktrees/businesses/<featureId>` | head nghiệp vụ đã publish, lời hứa mà kiến trúc phải giữ; chỉ là bằng chứng khi phiên mang đầu vào `model` | có |
 | `@knowledge/patterns` | hình dạng tái dùng mà scope có thể ràng; là hình dạng, không bao giờ là lựa chọn | không |
 
 ## Đầu vào
@@ -60,6 +76,7 @@ chất lượng hay UAT đã qua.
 | Kind | Từ đâu | Bắt buộc |
 | --- | --- | --- |
 | `architecture-decision` | một lần chạy `architecture.decide` trước trên cùng hoặc kề ranh giới; dòng dõi có thể bị phản bác, không được bỏ qua | không |
+| `model` | `business.decide`; head mà nhánh đó đã mô hình hoá, khi nó chưa được publish | không |
 
 ## Yêu cầu
 
@@ -80,11 +97,11 @@ chất lượng hay UAT đã qua.
 | --- | --- | --- | --- | --- | --- |
 | 1 | Kiểm gate và chạy lại | `resume`, `approval` | `request/request.json`, đầu vào `architecture-decision` nếu có, @workspaces/be ở head đóng băng | — | `INVALID_INPUT`, `SOURCE_DRIFT`, `NO_PROGRESS` |
 | 2 | Quan sát hiện trạng | — | @workspaces/be ở head đóng băng: manifest, cấu hình, file deploy, @tools/git | `response/data/current-state.json` | `CURRENT_STATE_UNOBSERVED` |
-| 3 | Ràng inventory với lời hứa nghiệp vụ | — | `response/data/current-state.json`, @worktrees/businesses/<featureId> ở head đã publish | — | `BUSINESS_AUTHORITY_REQUIRED`, `EVIDENCE_MISSING` |
+| 3 | Ràng inventory với lời hứa nghiệp vụ | — | `response/data/current-state.json`, đầu vào `model` khi có, nếu không thì @worktrees/businesses/<featureId> ở head đã publish | — | `BUSINESS_AUTHORITY_REQUIRED`, `EVIDENCE_MISSING` |
 | 4 | Đóng khung quyết định | `objective`, `decisionId`, `constraints`, `tradeoffAxes` | phần requirements của `request/request.json` | — | `CONSTRAINT_CONTRADICTION` |
 | 5 | Sinh các phương án | `alternatives` | `response/data/current-state.json`, @knowledge/patterns, @tools/websearch | `response/artifacts/<decisionId>-alternatives.html` chỉ khi được yêu cầu nhiều hơn một phương án, @tools/visualize | `NO_VIABLE_ALTERNATIVE` |
 | 6 | Chọn | `selectionPolicy`, `tradeoffAxes`, `approval` | `response/artifacts/<decisionId>-alternatives.html` khi có | — | `CHOICE_REQUIRED` |
-| 7 | Đào sâu phương án đã chọn | `constraints` | `response/data/current-state.json` | `response/data/stack-model.json` | `DATA_OWNERSHIP_UNASSIGNED`, `COMPATIBILITY_UNVERIFIED` |
+| 7 | Đào sâu phương án đã chọn và khai các operation nó cam kết | `constraints` | `response/data/current-state.json`, ma trận phủ của head nghiệp vụ đã ràng cho các dimension mỗi operation trích dẫn | `response/data/stack-model.json`, gồm cả `operations` của nó | `DATA_OWNERSHIP_UNASSIGNED`, `COMPATIBILITY_UNVERIFIED` |
 | 8 | Chờ phản biện: tạm ngưng, một agent mới tấn công lựa chọn, chạy tiếp khi nó trả lời | — | `critique/response/critique.md` khi cuộc trao đổi done | `response/response.json` (waiting, awaiting critique) | `CRITIQUE_UNRESOLVED` |
 | 9 | Xác nhận hoặc trả lại lựa chọn | `selectionPolicy` | `critique/response/critique.md`, `response/data/stack-model.json` | — | `CHOICE_REQUIRED`, `NO_VIABLE_ALTERNATIVE` |
 | 10 | Viết handoff và phát | — | mọi thứ ở trên | `response/response.md`, `response/response.json` | — |
@@ -92,7 +109,9 @@ chất lượng hay UAT đã qua.
 Với mặc định, bước 5 sinh một thiết kế và không có trang so sánh, bước 6 không có gì để chọn, và
 chất lượng quyết định dựa vào bước 8. Khi phương án duy nhất chết dưới một đòn tấn công, bước 9 dừng
 với `NO_VIABLE_ALTERNATIVE`, không phải `CHOICE_REQUIRED`. Handoff nêu tên contract, không bao giờ
-nêu file implementation, vì chọn file là việc của domain kế tiếp.
+nêu file implementation, vì chọn file là việc của domain kế tiếp; ngoại lệ duy nhất là writer của mỗi
+operation đã khai, cái mà operator này có gọi tên, bởi phần hiện thực không được tự chọn writer cho
+mình.
 
 ## Đầu ra
 

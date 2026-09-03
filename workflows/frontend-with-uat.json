@@ -27,7 +27,10 @@
         "requirements": {
           "intent": "modify",
           "changeLevel": "reconstruct"
-        }
+        },
+        "asks": [
+          "target"
+        ]
       }
     ],
     [
@@ -57,12 +60,21 @@
     ],
     [
       {
-        "operator": "uat.verify"
+        "operator": "uat.verify",
+        "asks": [
+          "requestedBy",
+          "feature",
+          "flow"
+        ]
       }
     ],
     [
       {
-        "operator": "git.publish"
+        "operator": "git.publish",
+        "asks": [
+          "boundary",
+          "approval"
+        ]
       }
     ]
   ],

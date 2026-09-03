@@ -1,4 +1,4 @@
-# StarCi Skills 1.1.0
+# StarCi Skills 1.2.0
 
 Cây này chính là runtime. Đọc tiếp `SKILL.vi.md` nếu có, hoặc `SKILL.md`; đó là cửa vào duy nhất,
 đóng băng phạm vi của một nhiệm vụ, chọn đúng một operator sở hữu kết quả, rồi định tuyến giữa các
@@ -62,6 +62,8 @@ thì không được publish.
   đổi nghĩa.
 
 ## Dòng dõi
+
+1.2.0 (2026-09-03): vòng test thứ hai (tests/) và các sửa từ đó: state.json có schema và liên kết resume được kiểm; workflow khai asks; response.next phải nằm trong bảng Next; UNKNOWN_STOP phát được; quyết định kiến trúc công bố các operation mà kế hoạch backend tiêu thụ và trích dẫn dimension của ma trận bao phủ thay cho BA-<n>; uat.verify chấp nhận lời từ chối hợp luật của chính nó; chủ đề radius.
 
 1.1.0 (2026-09-03): cây phát hành thành gói npm @starci/skills; npx @starci/skills init cài nó làm runtime .claude của một repository kèm bootstrap CLAUDE.md và AGENTS.md, update giữ sửa đổi tay, doctor chạy validator trên bản đã cài; @starci/grammar 0.4.2 (entry core re-export Common).
 

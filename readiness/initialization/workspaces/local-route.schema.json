@@ -44,7 +44,7 @@
           "pattern": "^https://github\\.com/[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+(?:\\.git)?$"
         },
         "branch": { "type": "string", "minLength": 1, "maxLength": 255 },
-        "head": { "type": "string", "pattern": "^[0-9a-f]{40}$" },
+        "head": { "type": "string", "pattern": "^[0-9a-f]{40}$", "description": "The head recorded when this route was hydrated. It is never route authority: a binding reports the head it observes on the checkout, and an observed head ahead of this one is the current one, not a stop." },
         "gitPolicy": { "$ref": "#/$defs/gitPolicy" }
       }
     },

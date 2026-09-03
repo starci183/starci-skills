@@ -2,7 +2,7 @@
   "$id": "kind:stack-model",
   "type": "object",
   "additionalProperties": false,
-  "required": ["decisionId", "selectedAlternativeId", "alternatives", "boundaries", "stores", "components"],
+  "required": ["decisionId", "selectedAlternativeId", "alternatives", "boundaries", "stores", "components", "operations"],
   "$defs": {
     "id": { "type": "string", "pattern": "^[a-z0-9][a-z0-9-]*$" },
     "verdict": {
@@ -67,6 +67,28 @@
           "backup": { "type": "string", "minLength": 1 },
           "restore": { "type": "string", "minLength": 1 },
           "sharedWriteJustification": { "type": ["string", "null"] }
+        }
+      }
+    },
+    "operations": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 64,
+      "description": "One row per write this decision commits to. The implementation restates these unchanged as the operations of its mutation record; it may not add one, and it may not choose its own writer.",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["operationId", "name", "transport", "writerRef", "storeRefs", "transactionBoundary", "idempotencyKind", "migrationRefs", "authorityDimensionIds"],
+        "properties": {
+          "operationId": { "$ref": "#/$defs/id" },
+          "name": { "type": "string", "minLength": 1, "maxLength": 256 },
+          "transport": { "enum": ["graphql-mutation", "graphql-query", "rest", "worker", "cron", "event-consumer"] },
+          "writerRef": { "type": "string", "minLength": 1, "maxLength": 1024, "description": "The one file path this operator names: the implementation may not choose its own writer." },
+          "storeRefs": { "type": "array", "maxItems": 64, "items": { "type": "string", "minLength": 1 } },
+          "transactionBoundary": { "enum": ["single-transaction", "per-item", "read-only", "none"] },
+          "idempotencyKind": { "enum": ["none", "natural-key", "request-token", "event-id"] },
+          "migrationRefs": { "type": "array", "maxItems": 64, "items": { "type": "string", "minLength": 1 } },
+          "authorityDimensionIds": { "type": "array", "minItems": 1, "maxItems": 64, "items": { "$ref": "#/$defs/id" }, "description": "The coverage-matrix dimensions of the bound business head this operation implements." }
         }
       }
     },

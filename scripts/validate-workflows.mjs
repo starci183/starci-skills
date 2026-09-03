@@ -11,12 +11,15 @@ import { fileURLToPath } from 'node:url';
 import { loadOperatorPackages, cellAliases, kindOf, isYes } from './operator-md.mjs';
 import { loadAliasRegistry, baseOf } from './alias-registry.mjs';
 
-const unquote = (s) => String(s ?? '').trim().replace(/^`|`$/g, '');
+// Only a fully quoted cell is unquoted: a sentence that opens with a code span keeps its backticks.
+const unquote = (s) => { const t = String(s ?? '').trim(); return /^`[^`]*`$/.test(t) ? t.slice(1, -1) : t; };
 
 export async function validateWorkflows(root) {
   const errors = [];
   const packages = (await loadOperatorPackages(root)).filter((p) => p.shape === 'v9');
   const aliases = (await loadAliasRegistry(root)).aliases;
+  // Fields the orchestrator fills from the session or the mission scope: neither preset nor asked (resources/orchestrator.json#agent.fills).
+  const fills = new Set(JSON.parse(await readFile(path.join(root, 'resources', 'orchestrator.json'), 'utf8')).agent?.fills ?? []);
   const ops = new Map(packages.map((p) => {
     const op = p.en;
     const writes = new Set();
@@ -26,6 +29,8 @@ export async function validateWorkflows(root) {
     for (const r of op.tables.context?.rows ?? []) { const a = cellAliases(r.alias)[0]; const m = a && /^@workspaces\/(fe|be)\b/.exec(a); if (m && isYes(r.required)) roles.add(m[1]); }
     return [p.manifest.id, {
       fields: new Set((op.tables.requirements?.rows ?? []).map((r) => unquote(r.field))),
+      // Fields with no Default: the workflow presets them or declares under asks who supplies them before the branch starts.
+      mustSupply: (op.tables.requirements?.rows ?? []).filter((r) => r.default.trim().startsWith('—')).map((r) => unquote(r.field)),
       required: (op.tables.inputs?.rows ?? []).filter((r) => isYes(r.required)).map((r) => kindOf(r.kind)),
       outputs: new Set((op.tables.outputs?.rows ?? []).map((r) => kindOf(r.kind))),
       next: new Set((op.tables.next?.rows ?? []).map((r) => unquote(r.operator))),
@@ -67,6 +72,8 @@ export async function validateWorkflows(root) {
         if (!op) { errors.push(`${at}: unknown operator ${b.operator}`); return; }
         if (!positions.has(b.operator)) positions.set(b.operator, n);
         for (const key of Object.keys(b.requirements ?? {})) if (!op.fields.has(key)) errors.push(`${at}: requirement ${key} is not a field of ${b.operator}`);
+        for (const key of b.asks ?? []) { if (!op.fields.has(key)) errors.push(`${at}: asks ${key}, which is not a field of ${b.operator}`); else if (key in (b.requirements ?? {})) errors.push(`${at}: asks ${key} and presets it`); else if (fills.has(key)) errors.push(`${at}: asks ${key}, which the orchestrator fills`); }
+        for (const key of op.mustSupply) if (!fills.has(key) && !(key in (b.requirements ?? {})) && !(b.asks ?? []).includes(key)) errors.push(`${at}: ${b.operator} requires ${key} (no Default); preset it or list it under asks`);
         for (const kind of op.required) if (!produced.has(kind)) errors.push(`${at}: ${b.operator} requires input ${kind}, which no earlier step produces`);
         // A required @workspaces/<role> context needs a workspace.bind of that role in an earlier step.
         if (b.operator !== 'workspace.bind') for (const role of op.roles) if (!boundRoles.has(role)) errors.push(`${at}: ${b.operator} requires @workspaces/${role}, which no earlier workspace.bind (role ${role}) bound`);

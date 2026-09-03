@@ -1,6 +1,6 @@
 {
-  "version": "1.1.0",
-  "lineageNote": "1.1.0 (2026-09-03): the tree ships as the npm package @starci/skills; npx @starci/skills init installs it as a repository's .claude runtime with the CLAUDE.md and AGENTS.md bootstraps, update keeps local edits, doctor runs the validators on the installed copy; @starci/grammar 0.4.2 (the core entry re-exports Common).",
+  "version": "1.2.0",
+  "lineageNote": "1.2.0 (2026-09-03): the second test round (tests/) and its fixes: state.json has a schema and the resume linkage is checked; a workflow declares asks; response.next must be offered by the Next table; UNKNOWN_STOP is emittable; the architecture decision publishes the operations the backend plan consumes and cites coverage-matrix dimensions instead of BA-<n>; uat.verify accepts its own lawful refusal; a radius topic.",
   "entry": {
     "name": "starci",
     "description": "Complete one StarCi mission by freezing its scope, selecting the one operator that owns the outcome, and routing between operators on typed results until the outcome is proved or a person must decide.",
@@ -69,7 +69,7 @@
       {
         "id": "operator",
         "meaning": "Invoke the named operator next.",
-        "count": 28
+        "count": 29
       },
       {
         "id": "resume",
@@ -84,7 +84,7 @@
       {
         "id": "external",
         "meaning": "Stop. The blocker is outside the runtime and no operator can clear it.",
-        "count": 7
+        "count": 6
       }
     ]
   },
@@ -125,6 +125,10 @@
       "inputs": [
         {
           "kind": "architecture-decision",
+          "required": false
+        },
+        {
+          "kind": "model",
           "required": false
         }
       ],
@@ -322,6 +326,10 @@
           "required": true
         },
         {
+          "kind": "model",
+          "required": false
+        },
+        {
           "kind": "backend-source-application",
           "required": false
         }
@@ -378,6 +386,10 @@
         {
           "when": "a declared proof cannot be executed in this environment",
           "operator": "platform.operate"
+        },
+        {
+          "when": "the plan was produced under mode dry and a person decides whether to pay for it",
+          "operator": "user"
         }
       ],
       "stops": [
@@ -2323,6 +2335,10 @@
         {
           "kind": "quality-verification",
           "required": true
+        },
+        {
+          "kind": "route",
+          "required": true
         }
       ],
       "outputs": [
@@ -2573,6 +2589,10 @@
         {
           "when": "the route is bound and a published head must be verified before it ships",
           "operator": "quality.verify"
+        },
+        {
+          "when": "the route is bound and a served surface must be observed",
+          "operator": "frontend.surface.audit"
         }
       ],
       "stops": [
@@ -2667,8 +2687,8 @@
         },
         {
           "domain": "runtime",
-          "kind": "external",
-          "target": null
+          "kind": "operator",
+          "target": "platform.operate"
         },
         {
           "domain": "identity",
@@ -3279,7 +3299,10 @@
       "producedBy": [
         "business.decide"
       ],
-      "consumedBy": []
+      "consumedBy": [
+        "architecture.decide",
+        "backend.source.apply"
+      ]
     },
     {
       "kind": "mutations",
@@ -3339,7 +3362,9 @@
       "producedBy": [
         "workspace.bind"
       ],
-      "consumedBy": []
+      "consumedBy": [
+        "uat.verify"
+      ]
     },
     {
       "kind": "screenshot",
@@ -4680,8 +4705,7 @@
             "fanout": null,
             "maxParallel": null,
             "requirements": {
-              "role": "fe",
-              "runtimeNeed": "consume"
+              "role": "fe"
             }
           }
         ],
@@ -4775,8 +4799,7 @@
             "fanout": null,
             "maxParallel": null,
             "requirements": {
-              "role": "fe",
-              "runtimeNeed": "consume"
+              "role": "fe"
             }
           }
         ],
@@ -4860,8 +4883,7 @@
             "fanout": null,
             "maxParallel": null,
             "requirements": {
-              "role": "fe",
-              "runtimeNeed": "consume"
+              "role": "fe"
             }
           }
         ],
@@ -5054,8 +5076,7 @@
             "fanout": null,
             "maxParallel": null,
             "requirements": {
-              "role": "fe",
-              "runtimeNeed": "consume"
+              "role": "fe"
             }
           }
         ],

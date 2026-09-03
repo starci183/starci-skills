@@ -127,7 +127,7 @@ function writeBranch(files) {
   const session = mkdtempSync(path.join(tmpdir(), 'release-session-'));
   const branch = path.join(session, 'step-1', 'parallel-1');
   for (const d of ['request', 'response/data', 'response/artifacts']) mkdirSync(path.join(branch, d), { recursive: true });
-  writeFileSync(path.join(session, 'state.json'), JSON.stringify({ id: 's-test', chain: [['1/1']], steps: { '1/1': 'release.deploy' }, current: '1/1', status: 'running' }));
+  writeFileSync(path.join(session, 'state.json'), JSON.stringify({ id: 's-test', project: 'starci-academy', startedAt: '2026-09-03T00:00:00Z', requestHashes: {}, chain: [['1/1']], steps: { '1/1': 'release.deploy' }, current: '1/1', status: 'running' }));
   writeFileSync(path.join(branch, 'response', 'quality.md'), '# quality\n');
   for (const [name, content] of Object.entries(files)) {
     if (content === null) continue;

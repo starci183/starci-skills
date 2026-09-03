@@ -14,7 +14,20 @@ a shared runtime and leaves a permanent run record behind, so the trigger is a p
 schedule, a chain default or another agent's convenience. `runId` and `lease` are not questions for a
 person either: the orchestrator generates the run identifier and grants the exclusive lease on the
 flow directory before the branch starts, and an invocation that arrives without them is
-`INVALID_INPUT` rather than a prompt.
+`INVALID_INPUT` at step 1 rather than a prompt. Their Default is therefore `—`: a Default that reads
+"the orchestrator's run id" is prose, not a value the gate can use, and a gate that accepts prose
+accepts an empty field. `LEASE_INVALID` is a different failure and keeps its own place: it is the
+lease that exists and is expired, foreign, or bound to another run, noticed at step 6 against the
+flow directory this run holds.
+
+## The endpoint is the bound one, never a re-derived one
+
+The flow is driven against the endpoint the `route` Input carries, the one the `workspace.bind` branch
+of this chain observed and closed. This operator does not re-derive readiness from the runtime
+registry: a registry that advertises `ready` while nothing listens is exactly the source that sends a
+browser at a dead port, and the bind step already refused a merely listening port on this chain's
+behalf. When the bound endpoint does not answer, the stop is `RUNTIME_UNAVAILABLE` against a named
+endpoint rather than a guess about which origin was meant.
 
 ## The password is a name, never a value
 
@@ -81,8 +94,8 @@ anything outside its own fixture namespace.
 | Alias | Bind | Required |
 | --- | --- | --- |
 | `@worktrees/uat/<flow>/<case>` | the flow directory: `flow.md`, `account.json`, `seed/`, the append-only `runs/<runId>/` history and the `latest` pointer, bound by fingerprint per file and written only under the exclusive lease | yes |
-| `@worktrees/_templates` | the UAT flow template a new flow directory is created from; consumed, never modified | yes |
-| `@worktrees/sessions/central-runtime` | the ready runtime owner, its generation and its exact origins; readiness is proved, not assumed | yes |
+| `@worktrees/_templates` | the UAT flow template a new flow directory is created from, which is exactly the three things step 4 reads: `uat/flow.md` with the cases and their named assertions, `uat/account.json` with a username, a role, a credential name and the sealed file's path and no field that could hold a secret, and `uat/seed/` with the records a run namespaces; consumed, never modified | yes |
+| `@worktrees/sessions/central-runtime` | the runtime owner's generation behind the bound endpoint; readiness is proved by the `route` Input, never re-derived from this registry | yes |
 | `@workspaces/device-state` | the sealed credential roster; the shared UAT password is resolved by name here at login and read nowhere else | yes |
 | `@workspaces/be` | the routed backend checkout at the pinned commit, whose behaviour the flow verifies and whose store holds the namespaced records | yes |
 
@@ -92,6 +105,7 @@ anything outside its own fixture namespace.
 | --- | --- | --- |
 | `frontend-surface-audit` | the surface audit that found the frontend clean, taken at the pinned commit | yes |
 | `quality-verification` | the quality gate that passed, taken at the same pinned commit | yes |
+| `route` | `workspace.bind` on the fe role; the bound route whose endpoint this run drives | yes |
 
 ## Requirements
 
@@ -101,8 +115,8 @@ anything outside its own fixture namespace.
 | `feature` | id | — | The feature key that addresses the flow directory |
 | `flow` | id | — | The one product flow this invocation verifies |
 | `cases` | list of `caseId` | every case of the flow | Which frozen cases to run; the default is every case `flow.md` declares, in its order |
-| `runId` | id | the orchestrator's run id | Not asked of a person: the orchestrator generates it and it namespaces every record this run writes |
-| `lease` | token | the orchestrator's lease | Not asked of a person: the orchestrator grants the exclusive lease on the flow directory before the branch starts |
+| `runId` | id | — | Not asked of a person: the orchestrator fills it, and it namespaces every record this run writes |
+| `lease` | token | — | Not asked of a person: the orchestrator fills it, granting the exclusive lease on the flow directory before the branch starts |
 | `resume` | token | null | The blocked branch's token when re-entering after a stop |
 
 ## Steps
@@ -114,7 +128,7 @@ anything outside its own fixture namespace.
 | 3 | Preflight the runtime: the sealed credential resolves by name, the account exists, the store answers | — | @workspaces/device-state for the credential named by `account.json`, @worktrees/sessions/central-runtime for the generation and origins, @tools/secrets, @tools/http | — | `PROVISIONING_UNAVAILABLE` |
 | 4 | Freeze the snapshot from `flow.md`, `account.json` and `seed/` | `feature`, `flow`, `cases` | @worktrees/uat/<flow>/<case>, @worktrees/_templates for the flow template | @worktrees/uat/<flow>/<case> (snapshot), `response/data/snapshot.json`, @tools/sourcewrite | `CANONICAL_WRITE_DENIED` |
 | 5 | Seed the frozen records into the run namespace | `runId` | `response/data/snapshot.json`, @workspaces/be | @tools/database | `FIXTURE_VIOLATION` |
-| 6 | Execute the frozen cases in order on the session worktree at the pinned commit | — | `response/data/snapshot.json`, @worktrees/sessions/central-runtime for the origin and generation, @workspaces/device-state for the credential at login only, @tools/browsercontrol, @tools/websearch | — | `LEASE_INVALID`, `RUNTIME_UNAVAILABLE` |
+| 6 | Execute the frozen cases in order against the endpoint the bound route carries, at the pinned commit | — | `response/data/snapshot.json`, input `route` for the endpoint this run drives, @worktrees/sessions/central-runtime for the generation behind that endpoint, @workspaces/device-state for the credential at login only, @tools/browsercontrol, @tools/websearch | — | `LEASE_INVALID`, `RUNTIME_UNAVAILABLE` |
 | 7 | Capture at each named assertion with the login field masked, and stitch the sheet | — | `response/data/snapshot.json`, @worktrees/sessions/central-runtime for the most direct runtime evidence | `response/data/captures/<case>.json`, `response/artifacts/<case>.png`, `response/artifacts/sheet.png`, @tools/visualize | `EVIDENCE_UNAVAILABLE` |
 | 8 | Judge the three lanes apart | — | `response/data/captures/<case>.json` | `response/data/verdicts.json` | — |
 | 9 | Verify read-only, then delete the run namespace and nothing else | `runId` | @workspaces/be for the records carrying `is_uat=true` and this namespace, `response/data/verdicts.json` | @tools/database | — |

@@ -34,10 +34,12 @@
       "minLength": 1
     },
     "routeFingerprint": {
-      "$ref": "#/$defs/fingerprint"
+      "$ref": "#/$defs/fingerprint",
+      "description": "sha256 over the bytes of the portable declaration followed by the bytes of the hydrated route, each exactly as stored on disk, with no normalisation."
     },
     "identityFingerprint": {
-      "$ref": "#/$defs/fingerprint"
+      "$ref": "#/$defs/fingerprint",
+      "description": "sha256 over the bytes of .workspaces/device-state.json, exactly as stored on disk, with no normalisation."
     },
     "sourceHead": {
       "$ref": "#/$defs/gitHead"

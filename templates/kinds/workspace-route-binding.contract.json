@@ -5,8 +5,8 @@
     { "heading": "^## Binding$", "table": "| Field | Value |", "rows": ["Project", "Role", "Portable route", "Hydrated route", "Source head"], "cell": { "Value": "\\S" } },
     { "heading": "^## Checkout$", "table": "| Field | Value |", "rows": ["Disk path", "Git root", "Git repository", "Branch", "Repository kind", "Directory", "Source head", "Mutation readiness", "Businesses root"], "cell": { "Value": "\\S" } },
     { "heading": "^## Policy$", "table": "| Field | Value |", "rows": ["Worktree branches", "Mutation branch"], "cell": { "Value": "\\S" } },
-    { "heading": "^## Write roots$", "table": "| Path | Why |", "minRows": 1, "cell": { "Path": "\\S", "Why": "\\S" } },
+    { "heading": "^## Write roots$", "table": "| Path | Why |", "cell": { "Path": "\\S", "Why": "\\S" } },
     { "heading": "^## Runtime$", "table": "| Field | Value |", "cell": { "Value": "\\S" } },
-    { "heading": "^## Findings$", "table": "| Code | Subject | Statement |", "minRows": 1, "cell": { "Code": "^`(ROUTE_HYDRATED_FROM_PORTABLE|RUNTIME_CONSUMED_NOT_OWNED|IDENTITY_ROSTER_SEALED|PROVENANCE_HEAD_BOUND|CACHED_ROUTE_REUSED|WORKTREE_BRANCH_FORBIDDEN)`$", "Subject": "\\S", "Statement": "\\S" } }
+    { "heading": "^## Findings$", "table": "| Code | Subject | Statement |", "minRows": 1, "cell": { "Code": "^`(ROUTE_HYDRATED_FROM_PORTABLE|RUNTIME_CONSUMED_NOT_OWNED|IDENTITY_ROSTER_SEALED|PROVENANCE_HEAD_BOUND|CACHED_ROUTE_REUSED|WORKTREE_BRANCH_FORBIDDEN|WORKTREE_BRANCH_SESSION_ONLY)`$", "Subject": "\\S", "Statement": "\\S" } }
   ]
 }

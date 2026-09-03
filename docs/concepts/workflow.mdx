@@ -21,6 +21,8 @@ composes a chain from the operators' `## Next` tables and `routing.json`, under 
 `scripts/validate-workflows.mjs` enforces on these files:
 
 - every branch names a real operator and presets only fields that operator declares;
+- every Requirements field with no Default is preset or listed under the branch's `asks`, so the chain
+  declares which fields the entry takes from the mission scope or asks a person for before that branch starts;
 - every required Input of a branch is produced by an earlier step;
 - branches of one step share no write alias — two operators may not write the same checkout or root
   at once, and `frontend.surface.audit` fans out by matrix entry because it writes nothing;
