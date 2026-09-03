@@ -118,6 +118,7 @@ Skeleton: [`templates/kinds/frontend-direction-decision.skeleton.md`](https://gi
 | Section | Table header | Rows | Cell constraints |
 | --- | --- | --- | --- |
 | `^## Decision$` | `\| Field \| Value \|` | `Direction id`, `Target`, `Intent`, `Change level`, `Owner ceiling`, `Classification`, `Selection policy`, `Selected candidate` | `Value`: `\S` |
+| `^## Surface class$` | `\| Class \| Why \|` | exactRows 1 | `Class`: `^`[a-z][a-z0-9-]*`$`<br />`Why`: `\S` |
 | `^## Observed$` | `\| Item \| Evidence \|` | minRows 1 | `Evidence`: `^`[^`]+@[0-9a-f]{7,40}`$` |
 | `^## UI contract$` | `\| Element \| Kind \| Responsibility \|` | minRows 1 | `Kind`: `^(region\|action\|state\|responsive\|content\|accessibility)$`<br />`Responsibility`: `\S` |
 | `^## Coverage$` | `\| Concern \| Enumerated \|` | `Actions`, `Regions`, `States`, `Responsive` | `Enumerated`: `\S` |
@@ -293,6 +294,6 @@ Skeleton: [`templates/kinds/workspace-route-binding.skeleton.md`](https://github
 | `uat-capture` | [`templates/kinds/uat-capture.schema.json`](https://github.com/starci183/starci-skills/blob/main/templates/kinds/uat-capture.schema.json) | `caseId`, `runId`, `order`, `executedAt`, `screenshotRef`, `loginFieldMasked`, `outcome`, `assertions` |
 | `uat-snapshot` | [`templates/kinds/uat-snapshot.schema.json`](https://github.com/starci183/starci-skills/blob/main/templates/kinds/uat-snapshot.schema.json) | `runId`, `requestedBy`, `feature`, `flow`, `commit`, `frozenAt`, `flowRoot`, `snapshotRef`, `snapshotFingerprint`, `lease`, `admission`, `account`, `fixtureNamespace`, `seed`, `cases` |
 | `uat-verdicts` | [`templates/kinds/uat-verdicts.schema.json`](https://github.com/starci183/starci-skills/blob/main/templates/kinds/uat-verdicts.schema.json) | `runId`, `commit`, `resultRef`, `latestRef`, `lanes`, `experience`, `cleanup` |
-| `ui-coverage` | [`templates/kinds/ui-coverage.schema.json`](https://github.com/starci183/starci-skills/blob/main/templates/kinds/ui-coverage.schema.json) | `directionId`, `actions`, `regions`, `states`, `responsive` |
+| `ui-coverage` | [`templates/kinds/ui-coverage.schema.json`](https://github.com/starci183/starci-skills/blob/main/templates/kinds/ui-coverage.schema.json) | `directionId`, `surfaceClass`, `actions`, `regions`, `states`, `responsive` |
 | `verdicts` | [`templates/kinds/verdicts.schema.json`](https://github.com/starci183/starci-skills/blob/main/templates/kinds/verdicts.schema.json) | `entries` |
 | `writes` | [`templates/kinds/writes.schema.json`](https://github.com/starci183/starci-skills/blob/main/templates/kinds/writes.schema.json) | `mode`, `base`, `branch`, `commit`, `files`, `sweep` |

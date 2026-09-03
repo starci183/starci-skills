@@ -1,7 +1,8 @@
 // frontend.surface.audit's own law over one branch, on top of the shared step check: every matrix entry in
 // the verdicts has both a capture and a screenshot; every judged node was measured in that entry's
 // capture and judged on a rule it actually claimed; a Grammar-owned node never routes a failure into
-// the resolve loop and an application-owned failure always does; and the receipt reads what the
+// the resolve loop and an application-owned failure always does; the surface class is the one the
+// direction decision's coverage declared, never one chosen here; and the receipt reads what the
 // verdicts carry.
 import { existsSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
@@ -10,6 +11,7 @@ import process from 'node:process';
 import { fileURLToPath } from 'node:url';
 import { validateStep } from '../../scripts/validate-step.mjs';
 import { tableUnder } from '../../scripts/validate-response.mjs';
+import { sessionRootOf } from '../../scripts/validate-request.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 const empty = (v) => v === undefined || v === null || v === '' || v === '—';
@@ -164,6 +166,22 @@ export async function validateAuditStep(branchDir, root = ROOT) {
   // One surface, one class: every entry carries the class the coverage declared, and they agree.
   const classes = new Set(verdicts.entries.map((e) => e.surfaceClass));
   if (classes.size > 1) errors.push(`${at}: the entries declare ${[...classes].join(' and ')}; one surface has one class, and every banded rule reads its threshold from it`);
+
+  // The class is not this operator's to choose: it is read from the direction decision this audit
+  // was given, whose coverage declared it (COVERAGE-1 Case 7). A decision that carries none — an
+  // older one, written before the coverage declared a class — is SURFACE_CLASS_MISSING, and the
+  // audit stops rather than banding a surface by taste.
+  const decisionRef = base.request?.inputs?.['frontend-direction-decision'];
+  const sessionRoot = sessionRootOf(branchDir);
+  if (decisionRef && sessionRoot && response.status === 'done') {
+    const coverageFile = path.join(sessionRoot, path.dirname(String(decisionRef)), 'data', 'coverage.json');
+    let declared = null;
+    if (existsSync(coverageFile)) {
+      try { declared = JSON.parse(await readFile(coverageFile, 'utf8')).surfaceClass ?? null; } catch { declared = null; }
+    }
+    if (empty(declared)) errors.push(`${at}: the frontend-direction-decision this audit reads declares no surface class, so every banded rule is left without a threshold (SURFACE_CLASS_MISSING)`);
+    else for (const cls of classes) if (cls !== declared) errors.push(`${at}: the entries carry ${cls} and the direction's coverage declares ${declared}; the class is read from the decision, never chosen here`);
+  }
 
   // Each topic's row is the verdict its own closing rule produced over the results of that topic.
   const topicRows = new Map();

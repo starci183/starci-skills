@@ -20,6 +20,15 @@
       }
     },
     {
+      "heading": "^## Surface class$",
+      "table": "| Class | Why |",
+      "exactRows": 1,
+      "cell": {
+        "Class": "^`[a-z][a-z0-9-]*`$",
+        "Why": "\\S"
+      }
+    },
+    {
       "heading": "^## Observed$",
       "table": "| Item | Evidence |",
       "minRows": 1,

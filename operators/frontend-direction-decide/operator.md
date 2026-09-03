@@ -129,7 +129,7 @@ business promise did not make. The asset and its prompt land under `response/art
 | 2 | Check the request: route, scope, change level, owner ceiling | `target`, `intent`, `changeLevel`, `ownerCeiling` | @workspaces/fe at the frozen head, @tools/git | — | `ROUTE_UNVERIFIED`, `SCOPE_UNFROZEN`, `CHANGE_LEVEL_AMBIGUOUS`, `OWNER_CEILING_INVALID` |
 | 3 | Bind the inputs the change level requires | `changeLevel` | inputs `business-promise-authority`, `backend-source-application` and `architecture-decision` | — | `BUSINESS_REQUIRED`, `BACKEND_REQUIRED`, `ARCHITECTURE_REQUIRED` |
 | 4 | Observe the existing context | — | @workspaces/fe (the target's direct artifacts, or the authorized host and product family when the target is absent), @worktrees/uat/<flow>/<case> when present | — | `EVIDENCE_MISSING` |
-| 5 | Compile one UI contract and its coverage | — | @knowledge/ui/composition, input `business-promise-authority` when present, the observed context | `response/data/coverage.json` | `SCOPE_UNFROZEN` |
+| 5 | Compile one UI contract and its coverage, and declare the surface class | — | @knowledge/ui/composition (`COVERAGE-1` Case 7 publishes the class vocabulary), input `business-promise-authority` when present, the observed context | `response/data/coverage.json` | `SCOPE_UNFROZEN` |
 | 6 | Resolve the reference standards by class, bounded | `references`, `changeLevel` | @knowledge/ui/composition (the gap the research must close), @tools/websearch | — | `REFERENCE_EVIDENCE_EXHAUSTED`, `REFERENCE_MISSING` |
 | 7 | Form the candidates | `candidates` | the compiled UI contract | — | `NO_VIABLE_DIRECTION` |
 | 8 | Apply the Grammar filter | `ownerCeiling` | @grammar/core (what a component owns and which props exist), @knowledge/grammars/starci | — | `GRAMMAR_REQUIRED` |
@@ -137,6 +137,13 @@ business promise did not make. The asset and its prompt land under `response/art
 | 10 | Falsify | — | the candidates, inputs `business-promise-authority` and `backend-source-application`, `response/data/coverage.json` | — | `NO_VIABLE_DIRECTION` |
 | 11 | Decide | `selectionPolicy`, `approval` | the falsification table | — | `DIRECTION_CHOICE_REQUIRED` |
 | 12 | Emit | — | everything above | `response/response.md`, `response/response.json` | — |
+
+Step 5 also settles which kind of surface this is. `COVERAGE-1` Case 7 publishes the vocabulary, the
+coverage carries the name in `surfaceClass`, and the receipt says the same name under
+`## Surface class` with what puts the surface in that class. The two must agree, because the name
+is what every banded proof rule later reads its threshold from: the audit takes the class from this
+decision and never chooses one of its own, so a direction that names none leaves the audit with no
+band and stops it. Every change level declares one; a refine inherits nothing and states it again.
 
 Step 6 leaves the receipt with the standards this surface is aiming at, each named by class, each
 carrying what is borrowed and what it does not settle. Under `new` and `reconstruct` that table has

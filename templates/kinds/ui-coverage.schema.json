@@ -2,9 +2,19 @@
   "$id": "kind:ui-coverage",
   "type": "object",
   "additionalProperties": false,
-  "required": ["directionId", "actions", "regions", "states", "responsive"],
+  "required": ["directionId", "surfaceClass", "actions", "regions", "states", "responsive"],
   "properties": {
     "directionId": { "type": "string", "pattern": "^[a-z0-9][a-z0-9-]*$" },
+    "surfaceClass": {
+      "description": "The one class this direction declares, from the vocabulary COVERAGE-1 Case 7 publishes. The name carries no numbers: every banded threshold lives in the proof topic that owns the measure, and this is how the topics agree which surface they are looking at. A later audit reads it here.",
+      "enum": [
+        "console",
+        "form",
+        "landing",
+        "catalog",
+        "reader"
+      ]
+    },
     "actions": {
       "type": "array",
       "maxItems": 64,

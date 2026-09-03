@@ -188,7 +188,7 @@ const responseJson = ({ status = 'done', stop, fields, next = ['frontend.present
   next,
 });
 
-function writeBranch(files) {
+function writeBranch(files, { decisionClass = 'console' } = {}) {
   const session = mkdtempSync(path.join(tmpdir(), 'fe-audit-session-'));
   const branch = path.join(session, 'step-4', 'parallel-1');
   for (const d of ['request', 'response/data/captures', 'response/artifacts']) mkdirSync(path.join(branch, d), { recursive: true });
@@ -197,6 +197,13 @@ function writeBranch(files) {
     mkdirSync(dir, { recursive: true });
     writeFileSync(path.join(dir, 'response.md'), `# ${name} — plan-picker\n`);
   }
+  // The class this audit carries is the one the direction decided; the coverage beside that receipt
+  // is where it is read from, and a decision written before the class was declared carries none.
+  mkdirSync(path.join(session, 'step-1', 'parallel-1', 'response', 'data'), { recursive: true });
+  writeFileSync(
+    path.join(session, 'step-1', 'parallel-1', 'response', 'data', 'coverage.json'),
+    JSON.stringify({ directionId: 'plan-picker', ...(decisionClass ? { surfaceClass: decisionClass } : {}), actions: [], regions: [], states: [], responsive: [] }, null, 2),
+  );
   writeFileSync(path.join(session, 'state.json'), JSON.stringify({ id: 's-test', project: 'starci-academy', startedAt: '2026-09-03T00:00:00Z', requestHashes: {}, chain: [['3/1'], ['4/1']], steps: { '3/1': 'frontend.source.apply', '4/1': 'frontend.surface.audit' }, current: '4/1', status: 'running' }));
   for (const [name, content] of Object.entries(files)) {
     if (content === null) continue;
@@ -216,14 +223,14 @@ const baseline = () => ({
   [SHOT(NARROW)]: 'PNG',
 });
 
-async function expectValid(files, label) {
-  const { branch, session } = writeBranch(files);
+async function expectValid(files, label, options) {
+  const { branch, session } = writeBranch(files, options);
   const { errors } = await validateAuditStep(branch);
   rmSync(session, { recursive: true, force: true });
   assert.deepEqual(errors, [], `${label} should be valid`);
 }
-async function expectError(files, needle, label) {
-  const { branch, session } = writeBranch(files);
+async function expectError(files, needle, label, options) {
+  const { branch, session } = writeBranch(files, options);
   const { errors } = await validateAuditStep(branch);
   rmSync(session, { recursive: true, force: true });
   assert.ok(errors.some((e) => e.includes(needle)), `${label}: expected an error containing "${needle}", got:\n${errors.join('\n') || '(none)'}`);
@@ -281,7 +288,9 @@ await expectError(fixFirst({ 'response/response.md': responseMd() }), 'TASTE-2 i
 // The surface class and the per-topic verdict rows.
 await expectError(mutate((v) => { v.entries[1].surfaceClass = 'landing'; }), 'one surface has one class', 'two classes over one surface');
 await expectError(mutate((v) => { delete v.entries[0].surfaceClass; }), 'surfaceClass', 'an entry with no declared class');
+await expectError(baseline(), 'declares no surface class', 'a direction decision written before the class was declared', { decisionClass: null });
+await expectError(baseline(), "the entries carry console and the direction's coverage declares landing", 'an audit that banded the surface by a class the direction never decided', { decisionClass: 'landing' });
 await expectError({ ...baseline(), 'response/response.md': responseMd().replace(`| ${BT}presentation${BT} | fail | resolve |`, `| ${BT}presentation${BT} | pass | none |`) }, 'Verdict records pass for presentation', 'a Verdict row that hides a failing topic');
 await expectError({ ...baseline(), 'response/response.md': responseMd().replace(`| ${BT}contrast${BT} | blocked | none |`, `| ${BT}contrast${BT} | pass | none |`) }, 'Verdict records pass for contrast', 'a topic passed on evidence nobody took');
 
-process.stdout.write('frontend.surface.audit self-test: 3 valid branches, 34 rejected mutations\n');
+process.stdout.write('frontend.surface.audit self-test: 3 valid branches, 36 rejected mutations\n');

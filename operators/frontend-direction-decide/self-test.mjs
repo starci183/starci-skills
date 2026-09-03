@@ -14,6 +14,7 @@ const NAMES = ['one-column', 'split-view', 'stepper'];
 
 const coverage = ({ regions = 2, actions = 1 } = {}) => ({
   directionId: 'plan-picker',
+  surfaceClass: 'catalog',
   actions: [{ action: 'choose a plan', pointerRoute: 'the plan card', keyboardRoute: 'tab to the card, enter', states: ['pending', 'confirmed'], pendingPaths: [{ path: 'server accepts', settlement: 'the confirmed plan replaces the picker' }] }].slice(0, actions),
   regions: [
     { region: 'offer', idiomRef: 'idioms#offer-block', compositionRef: '@grammar/core#SurfaceCard' },
@@ -26,6 +27,7 @@ const coverage = ({ regions = 2, actions = 1 } = {}) => ({
 function responseMd({
   intent = 'modify', changeLevel = 'reconstruct', ownerCeiling = 'surface-and-nested-layouts',
   classification = 'dominant', policy = 'automatic', selected = 'one-column', candidates = 1,
+  surfaceClass = 'catalog',
   refClass = 'plan-comparison', selectedFails = false, rejectAll = true, references = changeLevel === 'refine' ? 0 : 1, fallbacks = [],
 } = {}) {
   const formed = NAMES.slice(0, candidates);
@@ -47,6 +49,12 @@ function responseMd({
 | Classification | \`${classification}\` |
 | Selection policy | \`${policy}\` |
 | Selected candidate | \`${selected}\` |
+
+## Surface class
+
+| Class | Why |
+| --- | --- |
+${surfaceClass ? `| \`${surfaceClass}\` | the surface is a set of comparable offers the reader picks from |` : ''}
 
 ## Observed
 
@@ -203,6 +211,11 @@ const withCoverage = (change) => { const c = coverage(); change(c); return { ...
 
 await expectValid(baseline(), 'defaults (modify, reconstruct, one candidate, automatic, its page rendered)');
 await expectValid(refine(), 'a refine under the defaults renders no page');
+await expectValid({
+  ...baseline(),
+  'response/response.md': responseMd({ surfaceClass: 'console' }),
+  'response/data/coverage.json': { ...coverage(), surfaceClass: 'console' },
+}, 'another class of the published vocabulary, declared in the receipt and carried by the coverage');
 await expectValid(threeCandidates(), 'three candidates, the choice taken as a fallback');
 await expectValid(threeCandidates({ policy: 'approval-required', approval: 'one-column' }), 'three candidates approved by the person');
 await expectValid({
@@ -241,9 +254,13 @@ await expectError(withCoverage((c) => { c.actions = []; }), 'COVERAGE-1: actions
 await expectError(withCoverage((c) => { c.states[1].carrier = 'the offer region'; }), 'COVERAGE-1: two meanings share one carrier', 'two meanings on one carrier');
 await expectError(withCoverage((c) => { c.actions[0].pendingPaths[0].settlement = ''; }), 'pending path without a settlement', 'unsettled pending path');
 await expectError(withCoverage((c) => { c.directionId = 'other-picker'; }), 'differs from the receipt', 'coverage names another direction');
+await expectError({ ...baseline(), 'response/response.md': responseMd({ surfaceClass: '' }) }, 'Surface class', 'a decided direction that declares no surface class');
+await expectError({ ...baseline(), 'response/response.md': responseMd({ surfaceClass: 'dashboard' }), 'response/data/coverage.json': { ...coverage(), surfaceClass: 'dashboard' } }, 'outside the vocabulary COVERAGE-1 Case 7 publishes', 'a class name nobody publishes');
+await expectError(withCoverage((c) => { delete c.surfaceClass; }), 'surfaceClass', 'coverage with no declared class');
+await expectError(withCoverage((c) => { c.surfaceClass = 'console'; }), "surfaceClass console differs from the receipt's catalog", 'receipt and coverage declare two classes');
 await expectError({ ...baseline(), 'response/data/coverage.json': null, 'response/response.json': responseJson({ fields: { 'frontend-direction-decision': 'response/response.md' } }) }, 'required output ui-coverage is not in fields', 'missing required output');
 await expectError({ ...baseline(), 'response/response.md': responseMd().replace('## Observed', '## Observations') }, 'missing section ^## Observed$', 'receipt section renamed');
 await expectError({ ...baseline(), 'response/response.json': responseJson({ status: 'blocked', stop: 'DIRECTION_CHOICE_REQUIRED', next: [] }) }, 'has disposition fallback under these requirements', 'terminating on the choice under automatic');
 await expectError({ ...baseline(), 'response/response.json': responseJson({ status: 'blocked', stop: 'MADE_UP_CODE', next: [] }) }, 'not a registered code', 'unknown stop code');
 
-process.stdout.write('frontend.direction.decide self-test: 6 valid branches, 30 rejected mutations\n');
+process.stdout.write('frontend.direction.decide self-test: 7 valid branches, 34 rejected mutations\n');

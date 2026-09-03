@@ -1,6 +1,6 @@
 {
-  "version": "1.5.1",
-  "lineageNote": "1.5.1 (2026-09-03): the contrast topic's verdict rule takes the topic's own prefix (CONTRAST-1); COLOR-6 is retired and points at it.",
+  "version": "1.5.2",
+  "lineageNote": "1.5.2 (2026-09-03): the direction decision declares the surface class (coverage.surfaceClass and a ## Surface class row read from COVERAGE-1); the audit copies it from the decision instead of declaring one.",
   "entry": {
     "name": "starci",
     "description": "Complete one StarCi mission by freezing its scope, selecting the one operator that owns the outcome, and routing between operators on typed results until the outcome is proved or a person must decide.",

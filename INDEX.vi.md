@@ -1,4 +1,4 @@
-# StarCi Skills 1.5.1
+# StarCi Skills 1.5.2
 
 Cây này chính là runtime. Đọc tiếp `SKILL.md` (bản tiếng Anh là bản được nạp; `SKILL.vi.md` chỉ để người đọc); đó là cửa vào duy nhất,
 đóng băng phạm vi của một nhiệm vụ, chọn đúng một operator sở hữu kết quả, rồi định tuyến giữa các
@@ -67,6 +67,8 @@ thì không được publish.
   đổi nghĩa.
 
 ## Dòng dõi
+
+1.5.2 (2026-09-03): quyết định direction khai surface class (coverage.surfaceClass + ## Surface class, đọc từ COVERAGE-1), audit chép class từ decision thay vì tự khai.
 
 1.5.1 (2026-09-03): rule kết luận của topic contrast lấy tiền tố của chính topic (CONTRAST-1); COLOR-6 nghỉ, trỏ sang nó.
 

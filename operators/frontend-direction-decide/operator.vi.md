@@ -129,7 +129,7 @@ dưới `response/artifacts/images/`; `frontend.source.apply` ghi chúng cùng w
 | 2 | Soát lời yêu cầu: route, scope, change level, trần owner | `target`, `intent`, `changeLevel`, `ownerCeiling` | @workspaces/fe ở head đóng băng, @tools/git | — | `ROUTE_UNVERIFIED`, `SCOPE_UNFROZEN`, `CHANGE_LEVEL_AMBIGUOUS`, `OWNER_CEILING_INVALID` |
 | 3 | Bind các đầu vào mà change level đòi | `changeLevel` | đầu vào `business-promise-authority`, `backend-source-application` và `architecture-decision` | — | `BUSINESS_REQUIRED`, `BACKEND_REQUIRED`, `ARCHITECTURE_REQUIRED` |
 | 4 | Quan sát context đang có | — | @workspaces/fe (artifact trực tiếp của target, hoặc host được uỷ quyền và họ sản phẩm khi target chưa tồn tại), @worktrees/uat/<flow>/<case> nếu có | — | `EVIDENCE_MISSING` |
-| 5 | Biên một UI contract và coverage của nó | — | @knowledge/ui/composition, đầu vào `business-promise-authority` nếu có, context đã quan sát | `response/data/coverage.json` | `SCOPE_UNFROZEN` |
+| 5 | Biên một UI contract và coverage của nó, và khai lớp bề mặt | — | @knowledge/ui/composition (`COVERAGE-1` Case 7 publish bộ từ vựng lớp), đầu vào `business-promise-authority` nếu có, context đã quan sát | `response/data/coverage.json` | `SCOPE_UNFROZEN` |
 | 6 | Chốt các chuẩn tham chiếu theo lớp, có giới hạn | `references`, `changeLevel` | @knowledge/ui/composition (khoảng trống mà nghiên cứu phải lấp), @tools/websearch | — | `REFERENCE_EVIDENCE_EXHAUSTED`, `REFERENCE_MISSING` |
 | 7 | Hình thành các phương án | `candidates` | UI contract vừa biên | — | `NO_VIABLE_DIRECTION` |
 | 8 | Áp bộ lọc Grammar | `ownerCeiling` | @grammar/core (component sở hữu gì và có prop nào), @knowledge/grammars/starci | — | `GRAMMAR_REQUIRED` |
@@ -137,6 +137,13 @@ dưới `response/artifacts/images/`; `frontend.source.apply` ghi chúng cùng w
 | 10 | Phản chứng | — | các phương án, đầu vào `business-promise-authority` và `backend-source-application`, `response/data/coverage.json` | — | `NO_VIABLE_DIRECTION` |
 | 11 | Quyết | `selectionPolicy`, `approval` | bảng phản chứng | — | `DIRECTION_CHOICE_REQUIRED` |
 | 12 | Phát | — | mọi thứ ở trên | `response/response.md`, `response/response.json` | — |
+
+Bước 5 còn chốt luôn đây là loại bề mặt nào. `COVERAGE-1` Case 7 publish bộ từ vựng, coverage mang
+tên ấy ở `surfaceClass`, còn biên nhận nói đúng cái tên ấy dưới `## Surface class` kèm điều gì xếp bề
+mặt vào lớp đó. Hai chỗ phải khớp, vì cái tên ấy là nơi mọi rule proof có dải đọc ngưỡng của mình về
+sau: audit lấy lớp từ chính quyết định này chứ không tự chọn, nên một direction không khai lớp nào là
+để audit không có dải và dừng nó lại. Mức thay đổi nào cũng khai một lớp; một `refine` không thừa kế
+ngầm mà nêu lại.
 
 Bước 6 để lại trong biên nhận các chuẩn mà bề mặt này nhắm tới, mỗi chuẩn gọi tên theo lớp, kèm thứ
 được mượn và thứ nó không giải quyết. Dưới `new` và `reconstruct` bảng ấy có ít nhất một dòng và bước

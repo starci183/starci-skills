@@ -13,6 +13,12 @@
 | Selection policy | `automatic` |
 | Selected candidate | `candidate-id` |
 
+## Surface class
+
+| Class | Why |
+| --- | --- |
+| `console` | one name from the vocabulary `COVERAGE-1` Case 7 publishes, and what about this surface puts it in that class; the coverage carries the same name and every banded proof rule reads its threshold from it |
+
 ## Observed
 
 | Item | Evidence |

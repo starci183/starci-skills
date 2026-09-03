@@ -81,7 +81,7 @@ a node passes.
 | --- | --- | --- | --- | --- | --- |
 | 1 | Validate the gate and resume, and confirm the head and the served route | `resume` | `request/request.json`, input `frontend-source-application` (its commit must equal the pinned head), @workspaces/fe at the frozen head, @worktrees/sessions/central-runtime (the preview serving the session worktree at that commit), @tools/git | — | `INVALID_INPUT`, `SOURCE_DRIFT`, `NO_PROGRESS` |
 | 2 | Bind the authority | — | @knowledge/ui/proof (every topic with its fingerprint and inventory), input `frontend-source-application` (the claims), input `frontend-presentation-resolution` (the owner of every node), @worktrees/sessions/central-runtime | — | — |
-| 3 | Select the matrix entries and carry the declared surface class | `matrix` | input `frontend-direction-decision` (the coverage: state by viewport by colour scheme, and `coverage.surfaceClass`) | — | `SURFACE_CLASS_MISSING` |
+| 3 | Select the matrix entries and read the declared surface class | `matrix` | input `frontend-direction-decision` (its `response/data/coverage.json`: state by viewport by colour scheme, and the `surfaceClass` that decision declared) | — | `SURFACE_CLASS_MISSING` |
 | 4 | Reach readiness for each entry | `readinessProbe` | @worktrees/sessions/central-runtime, @tools/http | — | `RUNTIME_UNAVAILABLE` |
 | 5 | Capture and measure each entry | — | @worktrees/sessions/central-runtime, @workspaces/fe (the observed owners and the identifiers each node carries), @tools/browsercontrol | `response/artifacts/<matrixId>.png`, `response/data/captures/<matrixId>.json` | `EVIDENCE_MISSING` |
 | 6 | Compare against the claims and the proof rules, judge by owner, let each topic close itself, and emit | — | @knowledge/ui/proof, @knowledge/grammars/starci, the captures, @tools/websearch | `response/data/verdicts.json`, `response/response.md`, `response/response.json`, `response/artifacts/host.json`, @tools/visualize, @tools/host | `UNKNOWN_RULE` |
@@ -102,10 +102,13 @@ the first free port from 60000 up to 60100 and records the URL, the port, the fo
 `response/artifacts/host.json`, stopping when the branch ends or is resumed; a person opens the sheet
 and sees every matrix entry beside its verdicts. Nothing binds `0.0.0.0`.
 
-The surface class is not this operator's to choose. The direction's coverage declared it from the
-vocabulary `COVERAGE-1` Case 7 publishes, every banded proof rule reads its threshold from that name,
-and the audit carries it into `## Surface class` and into the verdicts. A decision that declares none,
-or a name outside the vocabulary, is `SURFACE_CLASS_MISSING`: no band, no threshold, nothing to judge.
+The surface class is not this operator's to choose or to declare. It is read from the coverage of the
+`frontend-direction-decision` this audit was given, where the direction declared it from the
+vocabulary `COVERAGE-1` Case 7 publishes; every banded proof rule reads its threshold from that name,
+and the audit only carries it into `## Surface class` and into the verdicts, unchanged. An input
+decision that carries none — one written before the class was declared — or a name outside the
+vocabulary, is `SURFACE_CLASS_MISSING`: no band, no threshold, nothing to judge, and the direction is
+decided again before the surface is.
 
 The matrix is the direction's coverage, not a new decision: `matrix` may only narrow it, and the
 orchestrator may split the entries across up to three parallel branches of the same step. Every entry

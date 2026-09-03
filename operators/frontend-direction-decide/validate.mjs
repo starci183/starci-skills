@@ -2,8 +2,9 @@
 // change level agree; the selection policy and the approval agree; the receipt names exactly one
 // selected candidate, falsifies every candidate it formed, and rejects the others by name; a refine
 // forms no structural candidate and consults no external reference; more than one candidate is
-// rendered; and COVERAGE-1 holds, meaning the coverage enumerates every action, region, state and
-// responsive branch the UI contract declares.
+// rendered; and COVERAGE-1 holds, meaning the coverage declares one surface class from the published
+// vocabulary and enumerates every action, region, state and responsive branch the UI contract
+// declares, with the receipt naming the same class the coverage carries.
 import { existsSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
 import path from 'node:path';
@@ -16,11 +17,34 @@ const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '.
 const empty = (v) => v === undefined || v === null || v === '' || v === '—';
 const list = (v) => (Array.isArray(v) ? v : empty(v) ? [] : [v]);
 
+// The surface class vocabulary is not copied here: it is read out of the rule that publishes it,
+// COVERAGE-1 Case 7 in knowledge/ui/composition/coverage.md, so widening the rule widens the gate and
+// there is no second place to forget. The Case names the classes in one sentence, each in backticks.
+export async function surfaceClasses(root = ROOT) {
+  const file = path.join(root, 'knowledge', 'ui', 'composition', 'coverage.md');
+  if (!existsSync(file)) return [];
+  const text = await readFile(file, 'utf8');
+  const row = text.split(/\r?\n/).find((l) => /^\|\s*Case 7\s*\|/.test(l) && l.includes('surfaceClass'));
+  if (!row) return [];
+  const from = row.indexOf('one of');
+  if (from === -1) return [];
+  const after = row.slice(from);
+  const end = after.indexOf('.');
+  const sentence = end === -1 ? after : after.slice(0, end);
+  return [...sentence.matchAll(/`([a-z][a-z0-9-]*)`/g)].map((m) => m[1]);
+}
+
 // COVERAGE-1 (knowledge/ui/composition): a decided direction enumerates what a later operator has to
 // exercise. Every element the UI contract declares is covered, every pending path settles, every
 // meaning has its own carrier, and every responsive branch has one owner.
-export function coverageErrors(coverage, declared, at) {
+export function coverageErrors(coverage, declared, at, classes = []) {
   const errors = [];
+  // Case 7: a decided direction names exactly one surface class, and it names it from the published
+  // vocabulary. Without it every banded proof rule downstream is left without a threshold.
+  if (classes.length) {
+    if (empty(coverage.surfaceClass)) errors.push(`${at}: COVERAGE-1: the coverage declares no surfaceClass; the audit that reads it has no band and stops with SURFACE_CLASS_MISSING`);
+    else if (!classes.includes(coverage.surfaceClass)) errors.push(`${at}: COVERAGE-1: surfaceClass ${coverage.surfaceClass} is outside the vocabulary COVERAGE-1 Case 7 publishes: ${classes.join(', ')}`);
+  }
   const need = (kind) => declared.filter((d) => d.kind === kind).map((d) => d.element);
   const actions = need('action');
   if (actions.length) {
@@ -144,11 +168,24 @@ export async function validateDirectionStep(branchDir, root = ROOT) {
     for (const [standard, klass] of refs) {
       if (empty(klass)) errors.push(`${at}: the reference ${standard} names no class; a standard is named by the class a reader would sort it into, never by an adjective`);
     }
+    // The surface class is declared once, here, and the later audit reads it from the coverage. The
+    // receipt says the same name in prose so a person reads it without opening the data, and the two
+    // must agree: a receipt and a coverage naming two classes leave the audit banding the wrong one.
+    const classes = await surfaceClasses(root);
+    const declaredClass = (tableUnder(text, '## Surface class') ?? [])[0]?.[0];
+    if (response.status === 'done') {
+      if (empty(declaredClass)) errors.push(`${at}: a decided direction names one surface class under ## Surface class; without it every banded proof rule downstream has no threshold`);
+      else if (classes.length && !classes.includes(declaredClass)) errors.push(`${at}: surface class ${declaredClass} is outside the vocabulary COVERAGE-1 Case 7 publishes: ${classes.join(', ')}`);
+    }
+
     const contract = (tableUnder(text, '## UI contract') ?? []).map(([element, kind]) => ({ element, kind }));
     if (coverage) {
-      errors.push(...coverageErrors(coverage, contract, 'response/data/coverage.json'));
+      errors.push(...coverageErrors(coverage, contract, 'response/data/coverage.json', classes));
       if (!empty(decision['Direction id']) && coverage.directionId !== decision['Direction id']) {
         errors.push(`response/data/coverage.json: directionId ${coverage.directionId} differs from the receipt's ${decision['Direction id']}`);
+      }
+      if (!empty(declaredClass) && coverage.surfaceClass !== declaredClass) {
+        errors.push(`response/data/coverage.json: surfaceClass ${coverage.surfaceClass} differs from the receipt's ${declaredClass}`);
       }
     }
   }
