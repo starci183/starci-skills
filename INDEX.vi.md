@@ -1,4 +1,4 @@
-# StarCi Skills 1.5.3
+# StarCi Skills 1.5.4
 
 Cây này chính là runtime. Đọc tiếp `SKILL.md` (bản tiếng Anh là bản được nạp; `SKILL.vi.md` chỉ để người đọc); đó là cửa vào duy nhất,
 đóng băng phạm vi của một nhiệm vụ, chọn đúng một operator sở hữu kết quả, rồi định tuyến giữa các
@@ -67,6 +67,8 @@ thì không được publish.
   đổi nghĩa.
 
 ## Dòng dõi
+
+1.5.4 (2026-09-03): host dò cổng bằng cách kết nối trước khi bind (Windows cho hai server cùng bind một cổng loopback); 1.5.3 đã phát hành với spec host đỏ.
 
 1.5.3 (2026-09-03): @tools/host có script đi kèm (scripts/host-artifacts.mjs), không phiên nào phải tự viết server nữa; .gitattributes khoá LF.
 

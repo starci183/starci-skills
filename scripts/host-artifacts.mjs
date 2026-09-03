@@ -9,6 +9,7 @@
 // foreground; a branch that ends or resumes stops it (SIGINT/SIGTERM) and the receipt says so.
 import { createReadStream, existsSync, readdirSync, statSync, writeFileSync, readFileSync } from 'node:fs';
 import http from 'node:http';
+import net from 'node:net';
 import path from 'node:path';
 import process from 'node:process';
 
@@ -53,12 +54,27 @@ function serve(folder) {
   });
 }
 
-export function listen(server, port = PORT_RANGE.first) {
-  return new Promise((resolve, reject) => {
-    if (port > PORT_RANGE.last) { reject(new Error(`no free port in ${PORT_RANGE.first}-${PORT_RANGE.last}`)); return; }
-    server.once('error', (err) => { if (err.code === 'EADDRINUSE') listen(server, port + 1).then(resolve, reject); else reject(err); });
-    server.listen(port, HOST, () => resolve(port));
+// On Windows libuv binds TCP servers with address reuse, so two servers can bind one loopback port
+// without EADDRINUSE. A port is therefore judged taken by connecting to it: an accepted connection
+// means someone answers there, a refused one means it is free.
+export function portTaken(port) {
+  return new Promise((resolve) => {
+    const probe = net.connect({ port, host: HOST });
+    probe.once('connect', () => { probe.destroy(); resolve(true); });
+    probe.once('error', () => resolve(false));
   });
+}
+
+export async function listen(server, port = PORT_RANGE.first) {
+  for (let candidate = port; candidate <= PORT_RANGE.last; candidate += 1) {
+    if (await portTaken(candidate)) continue;
+    const bound = await new Promise((resolve, reject) => {
+      server.once('error', (err) => { if (err.code === 'EADDRINUSE') resolve(false); else reject(err); });
+      server.listen({ port: candidate, host: HOST, exclusive: true }, () => resolve(true));
+    });
+    if (bound) return candidate;
+  }
+  throw new Error(`no free port in ${PORT_RANGE.first}-${PORT_RANGE.last}`);
 }
 
 export async function start(folder, receiptPath = path.join(folder, 'host.json')) {
