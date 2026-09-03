@@ -11,9 +11,13 @@ phán xét một kết quả.
    trong số đó là một câu hỏi tập trung, không phải một phỏng đoán.
 2. Chạy `workspace.bind` cho mọi nhiệm vụ có đọc hoặc ghi source đã route. Không thứ gì khác được
    phép tự tìm checkout, và một thư mục trùng tên không bao giờ là thẩm quyền route.
-3. Chọn operator đầu tiên theo bảng dưới. Chỉ đọc `operator.md` và `operator.json` của đúng
+3. Tìm workflow trước: đọc `when` của mọi ví dụ trong `workflows/`. Khớp thì chạy đúng như đã ghi,
+   preset điền vào `request.json`. Không khớp thì tự ghép chuỗi từ bảng `## Kế tiếp` của các operator
+   theo luật trong `workflows/README.md` (input bắt buộc phải được sinh trước, không chung alias ghi
+   trong một bậc, vòng lặp có trần, có điểm kết thúc); chuỗi tự ghép đáng giữ thì thành ví dụ mới.
+4. Chọn operator đầu tiên của chuỗi đó. Chỉ đọc `operator.md` và `operator.json` của đúng
    operator đó.
-4. Chạy operator đó, từ đầu tới cuối, trên đúng một profile mà `operator.json` của nó gọi tên dưới
+5. Chạy operator đó, từ đầu tới cuối, trên đúng một profile mà `operator.json` của nó gọi tên dưới
    `resources`, với đúng những quyền nó liệt kê. Một operator không có model khác, không thừa hưởng lượt nào,
    và không có quyền nào mà assignment bỏ sót.
 

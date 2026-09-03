@@ -1,0 +1,71 @@
+{
+  "schemaVersion": 9,
+  "id": "frontend-with-uat",
+  "when": {
+    "en": "A frontend change must also be walked by a real person's journey before it is published; a person asked for the UAT run by name.",
+    "vi": "Một thay đổi frontend còn phải đi qua hành trình của người thật trước khi publish; có người yêu cầu đích danh lần chạy UAT."
+  },
+  "chain": [
+    [
+      {
+        "operator": "workspace.bind",
+        "requirements": {
+          "role": "fe"
+        }
+      }
+    ],
+    [
+      {
+        "operator": "frontend.direction.decide",
+        "requirements": {
+          "intent": "modify",
+          "changeLevel": "reconstruct"
+        }
+      }
+    ],
+    [
+      {
+        "operator": "frontend.presentation.resolve"
+      }
+    ],
+    [
+      {
+        "operator": "frontend.source.apply",
+        "requirements": {
+          "mode": "apply"
+        }
+      }
+    ],
+    [
+      {
+        "operator": "frontend.surface.audit",
+        "fanout": "matrix",
+        "maxParallel": 3
+      }
+    ],
+    [
+      {
+        "operator": "quality.verify"
+      }
+    ],
+    [
+      {
+        "operator": "uat.verify"
+      }
+    ],
+    [
+      {
+        "operator": "git.publish"
+      }
+    ]
+  ],
+  "ends": "git.publish",
+  "loops": [
+    {
+      "from": "frontend.surface.audit",
+      "to": "frontend.presentation.resolve",
+      "when": "an application-owned node fails a claim or a proof rule",
+      "maxRounds": 2
+    }
+  ]
+}

@@ -1,0 +1,74 @@
+{
+  "schemaVersion": 9,
+  "id": "frontend-new-surface",
+  "when": {
+    "en": "A page, flow, or surface that does not exist yet must be created; the person named the target route and its business promise is known or will be decided first.",
+    "vi": "Một trang, luồng hay bề mặt chưa tồn tại cần được tạo; người dùng nêu route đích, lời hứa nghiệp vụ đã có hoặc sẽ được quyết trước."
+  },
+  "chain": [
+    [
+      {
+        "operator": "workspace.bind",
+        "requirements": {
+          "role": "fe"
+        }
+      }
+    ],
+    [
+      {
+        "operator": "business.decide",
+        "requirements": {
+          "mode": "model"
+        }
+      }
+    ],
+    [
+      {
+        "operator": "frontend.direction.decide",
+        "requirements": {
+          "intent": "create",
+          "changeLevel": "new"
+        }
+      }
+    ],
+    [
+      {
+        "operator": "frontend.presentation.resolve"
+      }
+    ],
+    [
+      {
+        "operator": "frontend.source.apply",
+        "requirements": {
+          "mode": "apply"
+        }
+      }
+    ],
+    [
+      {
+        "operator": "frontend.surface.audit",
+        "fanout": "matrix",
+        "maxParallel": 3
+      }
+    ],
+    [
+      {
+        "operator": "quality.verify"
+      }
+    ],
+    [
+      {
+        "operator": "git.publish"
+      }
+    ]
+  ],
+  "ends": "git.publish",
+  "loops": [
+    {
+      "from": "frontend.surface.audit",
+      "to": "frontend.presentation.resolve",
+      "when": "an application-owned node fails a claim or a proof rule",
+      "maxRounds": 2
+    }
+  ]
+}

@@ -1,6 +1,6 @@
 {
   "schemaVersion": 9,
-  "note": "Stop codes only workspace.bind emits. Same entry shape as errors/errors.json, scope implicit. Shared codes (INVALID_INPUT, SOURCE_DRIFT, NO_PROGRESS) come from errors/errors.json, and BRANCH_POLICY_VIOLATION is not defined here because git.publish emits it too: a code two operators emit belongs in errors/errors.json with both ids in scope. Every domain below is the one the old package's OWNING_DOMAIN table published, and routing.json answers each of them for this operator: workspace resumes, source resumes, identity and runtime are external, caller is a person.",
+  "note": "Stop codes only workspace.bind emits. Same entry shape as operators/errors.json, scope implicit. Shared codes (INVALID_INPUT, SOURCE_DRIFT, NO_PROGRESS) come from operators/errors.json, and BRANCH_POLICY_VIOLATION is not defined here because git.publish emits it too: a code two operators emit belongs in operators/errors.json with both ids in scope. Every domain below is the one the old package's OWNING_DOMAIN table published, and routing.json answers each of them for this operator: workspace resumes, source resumes, identity and runtime are external, caller is a person.",
   "codes": {
     "IDENTITY_UNVERIFIED": {
       "domain": "identity",

@@ -1,8 +1,8 @@
-// One registry of stop codes from two homes: errors/errors.json (codes shared by several operators,
+// One registry of stop codes from two homes: operators/errors.json (codes shared by several operators,
 // each with a `scope` list or ["*"]) and operators/<id>/errors.json (codes only that operator emits,
 // scope implicit). Merging here is what lets a code live next to its only operator without the
 // validators, the generator, or the runtime having to know where it came from. A code defined in
-// two places is refused: the fix is to move it to errors/errors.json with both ids in scope.
+// two places is refused: the fix is to move it to operators/errors.json with both ids in scope.
 import { existsSync } from 'node:fs';
 import { readdir, readFile } from 'node:fs/promises';
 import path from 'node:path';
@@ -24,7 +24,7 @@ export async function loadErrorsRegistry(root) {
   const codes = {};
   const DOMAINS = await loadDomains(root);
   const define = (id, entry, scope, home) => {
-    if (codes[id]) { errors.push(`${home}: ${id} is already defined in ${codes[id].home}; a code two operators emit belongs in errors/errors.json with both ids in scope`); return; }
+    if (codes[id]) { errors.push(`${home}: ${id} is already defined in ${codes[id].home}; a code two operators emit belongs in operators/errors.json with both ids in scope`); return; }
     if (!/^[A-Z][A-Z0-9_]+$/.test(id)) errors.push(`${home}: code ${id} must be UPPER_SNAKE`);
     if (!DISPOSITIONS.has(entry.disposition)) errors.push(`${home}: ${id} disposition must be terminate or fallback`);
     if (!DOMAINS.has(entry.domain)) errors.push(`${home}: ${id} domain ${entry.domain} is not a routing domain`);
@@ -38,13 +38,13 @@ export async function loadErrorsRegistry(root) {
     }
     codes[id] = { ...entry, scope, home };
   };
-  const sharedPath = path.join(root, 'errors', 'errors.json');
+  const sharedPath = path.join(root, 'operators', 'errors.json');
   const shared = JSON.parse(await readFile(sharedPath, 'utf8'));
-  if (shared.schemaVersion !== 9) errors.push('errors/errors.json: schemaVersion must be 9');
+  if (shared.schemaVersion !== 9) errors.push('operators/errors.json: schemaVersion must be 9');
   for (const [id, entry] of Object.entries(shared.codes ?? {})) {
-    if (!Array.isArray(entry.scope) || entry.scope.length === 0) { errors.push(`errors/errors.json: ${id} needs a scope list`); continue; }
-    if (entry.scope.length === 1 && entry.scope[0] !== '*') errors.push(`errors/errors.json: ${id} is scoped to one operator ${entry.scope[0]}; move it to operators/<id>/errors.json`);
-    define(id, entry, entry.scope, 'errors/errors.json');
+    if (!Array.isArray(entry.scope) || entry.scope.length === 0) { errors.push(`operators/errors.json: ${id} needs a scope list`); continue; }
+    if (entry.scope.length === 1 && entry.scope[0] !== '*') errors.push(`operators/errors.json: ${id} is scoped to one operator ${entry.scope[0]}; move it to operators/<id>/errors.json`);
+    define(id, entry, entry.scope, 'operators/errors.json');
   }
   const opsDir = path.join(root, 'operators');
   const operatorIds = new Set();

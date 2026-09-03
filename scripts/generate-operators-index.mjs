@@ -7,9 +7,12 @@ import path from 'node:path';
 import process from 'node:process';
 import { fileURLToPath } from 'node:url';
 import { loadOperatorPackages, cellCodes, cellAliases, kindOf, isYes } from './operator-md.mjs';
+import { loadErrorsRegistry } from './errors-registry.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const packages = (await loadOperatorPackages(root)).filter((p) => p.shape === 'v9');
+const registry = await loadErrorsRegistry(root);
+if (registry.errors.length) { process.stderr.write(`${registry.errors.join('\n')}\n`); process.exit(1); }
 const ops = packages.map((p) => {
   const op = p.en;
   const reads = new Set();
@@ -54,6 +57,22 @@ function render(lang) {
   for (const k of [...kinds].sort()) out.push(`| ${code(k)} | ${list(producers.get(k) ?? [])} | ${list(consumers.get(k) ?? [])} |`);
   out.push('', t.h3, '', t.c3, '| --- | --- |');
   for (const op of ops) out.push(`| ${code(op.id)} | ${op.job} |`);
+  // Stop codes: the merged registry (operators/errors.json + every operators/<id>/errors.json).
+  const s = lang === 'en' ? {
+    h: '## Stop codes', intro: 'Every code an operator may stop with, merged from `operators/errors.json` (codes several operators share, with a scope list) and each `operators/<id>/errors.json`. A code has exactly one disposition: **terminate** ends the branch blocked; **fallback** performs the named action, records it under `## Fallbacks taken` in `response.md`, and continues. `unless` names the one Requirements param whose value flips the disposition. `domain` is the `routing.json` domain the stop hands to; `self` is the emitting operator\'s own domain, a resume. A runtime meeting an unlisted code terminates with `UNKNOWN_STOP`.',
+    head: '| Code | Scope | Domain | Disposition | Meaning | Fallback | Unless | Resume |',
+  } : {
+    h: '## Mã dừng', intro: 'Mọi mã một operator có thể dừng với, gộp từ `operators/errors.json` (mã nhiều operator dùng chung, có danh sách scope) và từng `operators/<id>/errors.json`. Một mã có đúng một cách xử lý: **terminate** kết thúc nhánh ở trạng thái blocked; **fallback** làm đúng hành động đã ghi, ghi lại dưới `## Fallbacks taken` trong `response.md`, rồi chạy tiếp. `unless` gọi tên đúng một tham số Yêu cầu mà giá trị của nó đảo cách xử lý. `domain` là vùng trong `routing.json` mà mã dừng bàn giao tới; `self` là vùng của chính operator phát mã, tức chạy lại. Runtime gặp mã không có trong sổ thì dừng với `UNKNOWN_STOP`.',
+    head: '| Mã | Phạm vi | Vùng | Xử lý | Nghĩa | Fallback | Trừ khi | Chạy lại |',
+  };
+  out.push('', s.h, '', s.intro, '', s.head, '| --- | --- | --- | --- | --- | --- | --- | --- |');
+  const esc = (v) => String(v).replace(/\|/g, '\\|');
+  const scopeKey = (c) => (c.scope.includes('*') ? '' : c.scope.join(','));
+  const entries = Object.entries(registry.codes).sort(([a, x], [b, y]) => scopeKey(x).localeCompare(scopeKey(y)) || a.localeCompare(b));
+  for (const [id, c] of entries) {
+    const unless = c.unless ? `${code(c.unless.param)} = ${code(c.unless.equals)} → ${c.unless.then}` : '—';
+    out.push(`| ${code(id)} | ${c.scope.map(code).join(', ')} | ${code(c.domain)} | ${c.disposition} | ${esc(c.meaning[lang])} | ${c.fallback ? esc(c.fallback[lang]) : '—'} | ${unless} | ${esc(c.resume?.[lang] ?? '—')} |`);
+  }
   return `${out.join('\n')}\n`;
 }
 

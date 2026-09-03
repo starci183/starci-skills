@@ -1,0 +1,19 @@
+{
+  "schemaVersion": 9,
+  "id": "content-unit",
+  "when": {
+    "en": "One curriculum unit needs its brief, its language editions, its code tracks and an independent review; publishing to MinIO stays with a person.",
+    "vi": "Một đơn vị giáo trình cần brief, các ấn bản ngôn ngữ, track code và một lượt review độc lập; đưa lên MinIO vẫn là việc của người."
+  },
+  "chain": [
+    [
+      {
+        "operator": "content.generate",
+        "requirements": {
+          "maxReviewRounds": 2
+        }
+      }
+    ]
+  ],
+  "ends": "user"
+}

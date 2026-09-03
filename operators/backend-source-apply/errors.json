@@ -1,6 +1,6 @@
 {
   "schemaVersion": 9,
-  "note": "Stop codes only backend.source.apply emits. Same entry shape as errors/errors.json, scope implicit. Shared codes (INVALID_INPUT, SOURCE_DRIFT, NO_PROGRESS) come from errors/errors.json, and OWNER_CONFLICT is not defined here because frontend.presentation.resolve emits it too: a code two operators emit belongs in errors/errors.json with both ids in scope. Every domain below is the one the old package's owningDomain enum published for this operator: backend, business, contract, platform, workspace, caller. `contract` is a routing domain of its own, answered with a person, and it is not spelled caller: the person who reopens a frozen contract is not the person who wrote the request.",
+  "note": "Stop codes only backend.source.apply emits. Same entry shape as operators/errors.json, scope implicit. Shared codes (INVALID_INPUT, SOURCE_DRIFT, NO_PROGRESS) come from operators/errors.json, and OWNER_CONFLICT is not defined here because frontend.presentation.resolve emits it too: a code two operators emit belongs in operators/errors.json with both ids in scope. Every domain below is the one the old package's owningDomain enum published for this operator: backend, business, contract, platform, workspace, caller. `contract` is a routing domain of its own, answered with a person, and it is not spelled caller: the person who reopens a frozen contract is not the person who wrote the request.",
   "codes": {
     "CONTRACT_UNFROZEN": {
       "domain": "contract",

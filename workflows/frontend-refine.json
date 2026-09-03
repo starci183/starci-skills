@@ -1,0 +1,66 @@
+{
+  "schemaVersion": 9,
+  "id": "frontend-refine",
+  "when": {
+    "en": "The approved structure of a surface stays; only typography, spacing, labels, controls, states, tokens or Grammar conformance inside it are repaired.",
+    "vi": "Cấu trúc đã duyệt của bề mặt giữ nguyên; chỉ sửa typography, spacing, label, control, state, token hay conformance Grammar bên trong."
+  },
+  "chain": [
+    [
+      {
+        "operator": "workspace.bind",
+        "requirements": {
+          "role": "fe"
+        }
+      }
+    ],
+    [
+      {
+        "operator": "frontend.direction.decide",
+        "requirements": {
+          "intent": "audit-repair",
+          "changeLevel": "refine"
+        }
+      }
+    ],
+    [
+      {
+        "operator": "frontend.presentation.resolve"
+      }
+    ],
+    [
+      {
+        "operator": "frontend.source.apply",
+        "requirements": {
+          "mode": "apply"
+        }
+      }
+    ],
+    [
+      {
+        "operator": "frontend.surface.audit",
+        "fanout": "matrix",
+        "maxParallel": 3
+      }
+    ],
+    [
+      {
+        "operator": "quality.verify"
+      }
+    ],
+    [
+      {
+        "operator": "git.publish"
+      }
+    ]
+  ],
+  "ends": "git.publish",
+  "loops": [
+    {
+      "from": "frontend.surface.audit",
+      "to": "frontend.presentation.resolve",
+      "when": "an application-owned node fails a claim or a proof rule",
+      "maxRounds": 2
+    }
+  ]
+}

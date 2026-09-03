@@ -1,5 +1,5 @@
 {
   "schemaVersion": 9,
-  "note": "Stop codes frontend.surface.audit emits. INVALID_INPUT, SOURCE_DRIFT, EVIDENCE_MISSING and NO_PROGRESS come from errors/errors.json. RUNTIME_UNAVAILABLE is defined here and also emitted by uat.verify; UNKNOWN_RULE is emitted here too and is defined in operators/frontend-presentation-resolve/errors.json. Both belong in errors/errors.json with a scope list naming every operator that emits them.",
+  "note": "Stop codes frontend.surface.audit emits. INVALID_INPUT, SOURCE_DRIFT, EVIDENCE_MISSING and NO_PROGRESS come from operators/errors.json. RUNTIME_UNAVAILABLE is defined here and also emitted by uat.verify; UNKNOWN_RULE is emitted here too and is defined in operators/frontend-presentation-resolve/errors.json. Both belong in operators/errors.json with a scope list naming every operator that emits them.",
   "codes": {}
 }

@@ -16,9 +16,14 @@ result.
    question, not a guess.
 2. Run `workspace.bind` for any mission that reads or writes routed source. Nothing else may resolve a
    checkout, and a similar directory name is never route authority.
-3. Select the first operator from the table below. Read only that operator's `operator.md` and
+3. Look for a workflow first: read the `when` of every example in `workflows/`. A match is run as
+   written, its presets filling `request.json`. No match means composing a chain from the operators'
+   `## Next` tables under the rules `workflows/README.md` states (required inputs produced earlier,
+   no shared write alias inside a step, loops capped, a declared end); a composed chain worth keeping
+   becomes a new example.
+4. Select the first operator of that chain. Read only that operator's `operator.md` and
    `operator.json`.
-4. Run that operator, end to end, on the one profile its `operator.json` names under `resources`, with
+5. Run that operator, end to end, on the one profile its `operator.json` names under `resources`, with
    only the grants it lists. An operator has no other model, no inherited turns, and no grant the
    assignment omits.
 

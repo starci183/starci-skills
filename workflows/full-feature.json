@@ -1,0 +1,103 @@
+{
+  "schemaVersion": 9,
+  "id": "full-feature",
+  "when": {
+    "en": "One feature needs both a backend contract and a new frontend surface; backend implementation and frontend direction run side by side after the architecture is decided.",
+    "vi": "Một feature cần cả contract backend lẫn bề mặt frontend mới; hiện thực backend và hướng frontend chạy song song sau khi kiến trúc đã quyết."
+  },
+  "chain": [
+    [
+      {
+        "operator": "workspace.bind",
+        "requirements": {
+          "role": "be"
+        }
+      },
+      {
+        "operator": "workspace.bind",
+        "requirements": {
+          "role": "fe"
+        }
+      }
+    ],
+    [
+      {
+        "operator": "business.decide",
+        "requirements": {
+          "mode": "model"
+        }
+      }
+    ],
+    [
+      {
+        "operator": "architecture.decide",
+        "requirements": {
+          "alternatives": 1,
+          "selectionPolicy": "automatic"
+        }
+      }
+    ],
+    [
+      {
+        "operator": "backend.source.apply"
+      },
+      {
+        "operator": "frontend.direction.decide",
+        "requirements": {
+          "intent": "create",
+          "changeLevel": "new"
+        }
+      }
+    ],
+    [
+      {
+        "operator": "quality.verify"
+      },
+      {
+        "operator": "frontend.presentation.resolve"
+      }
+    ],
+    [
+      {
+        "operator": "frontend.source.apply",
+        "requirements": {
+          "mode": "apply"
+        }
+      }
+    ],
+    [
+      {
+        "operator": "frontend.surface.audit",
+        "fanout": "matrix",
+        "maxParallel": 3
+      }
+    ],
+    [
+      {
+        "operator": "quality.verify"
+      }
+    ],
+    [
+      {
+        "operator": "business.decide",
+        "requirements": {
+          "mode": "reconcile"
+        }
+      }
+    ],
+    [
+      {
+        "operator": "git.publish"
+      }
+    ]
+  ],
+  "ends": "git.publish",
+  "loops": [
+    {
+      "from": "frontend.surface.audit",
+      "to": "frontend.presentation.resolve",
+      "when": "an application-owned node fails a claim or a proof rule",
+      "maxRounds": 2
+    }
+  ]
+}

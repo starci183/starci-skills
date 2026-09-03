@@ -12,8 +12,8 @@ typed results.
 3. `resources/` — which execution profile runs each operator role, which runtime grants it may use,
    and its standing answers on web search, Grammar binding, and image generation. Also validated.
 4. The one operator the mission needs: its `operator.md` (Job, Context, Inputs, Requirements, Steps,
-   Outputs, Stops, Next) plus `operator.json` (id, domain, resources). Stop codes resolve through
-   `errors/INDEX.md`.
+   Outputs, Stops, Next) plus `operator.json` (id, domain, resources). Stop codes resolve through the
+   Stop codes table of `operators/INDEX.md`.
 5. Only the knowledge topics that operator binds.
 
 Do not preload the tree. An operator binds the smallest set of topics its decision needs, each with
@@ -23,11 +23,11 @@ its fingerprint and complete rule inventory, and may emit no identifier outside 
 
 ```text
 SKILL.md                 one entry, fourteen operators, one routing map
-routing.json             14 operators, 73 routes, four kinds: operator | resume | user | external
+routing.json             14 operators, 68 routes, four kinds: operator | resume | user | external
 alias/                   alias.json (machine registry: location, scheme, binding, writers, zone) + INDEX.md (generated map by zone); every operator reads by alias only
 resources/               agents/profiles/{openai,claude}.json (6 profiles) + orchestrator.json (one agent per operator, max 3); validated
-operators/INDEX.md       generated matrix: what each operator reads (static, dynamic), writes, its steps and stop codes
-errors/                  errors.json (stop codes shared by several operators, with scope) + INDEX.md (generated, merged with each operators/<id>/errors.json): one disposition per code, terminate or fallback
+workflows/               example chains (steps of parallel branches, loops, presets) the entry reuses when a request matches their when; otherwise it composes its own under the same rules; validated
+operators/INDEX.md       generated: what each operator reads, which kinds it consumes and produces, its steps, and every stop code with its disposition; operators/errors.json holds the codes several operators share
 operators/<id>/          operator.md (+vi) one authored file per operator, operator.json (id, domain, resources), errors.json (its own codes), validate.mjs, self-test.mjs
 knowledge/
   ui/composition/        what a tree must contain, before it exists   -> frontend.direction.decide
@@ -37,7 +37,7 @@ knowledge/
   grammars/<family>/     one visual family's realization of Common
 templates/               one template per document kind; each carries the json template-contract the tree is checked against;
                          kinds/ types every file that crosses between steps (<kind>.contract.json + <kind>.skeleton.md for markdown, <kind>.schema.json for data); step/ holds the request.json and response.json gates
-scripts/                 validate-routing.mjs, validate-resources.mjs, validate-knowledge-citations.mjs, validate-alias.mjs, validate-templates.mjs, validate-operator.mjs, validate-request.mjs, validate-response.mjs, validate-step.mjs, run-operator-self-tests.mjs;
+scripts/                 validate-routing.mjs, validate-resources.mjs, validate-knowledge-citations.mjs, validate-alias.mjs, validate-templates.mjs, validate-operator.mjs, validate-workflows.mjs, validate-request.mjs, validate-response.mjs, validate-step.mjs, run-operator-self-tests.mjs;
                          device-state.mjs and workspace-portable.mjs (+ specs), which the backend package.json calls
 readiness/               workspaces/ schemas that the portable and hydrated route declarations name as $schema
 ```

@@ -1,6 +1,6 @@
 {
   "schemaVersion": 9,
-  "note": "Stop codes only uat.verify emits. Same entry shape as errors/errors.json, scope implicit. Shared codes (INVALID_INPUT, SOURCE_DRIFT, NO_PROGRESS) come from errors/errors.json. RUNTIME_UNAVAILABLE is emitted here too but is defined in operators/frontend-surface-audit/errors.json; it belongs in errors/errors.json with both operators in scope, and until that move validate-operator reports it as out of scope here. No code asks a person for a credential: the shared UAT password is resolved by name at login, and unavailable provisioning blocks instead of prompting.",
+  "note": "Stop codes only uat.verify emits. Same entry shape as operators/errors.json, scope implicit. Shared codes (INVALID_INPUT, SOURCE_DRIFT, NO_PROGRESS) come from operators/errors.json. RUNTIME_UNAVAILABLE is emitted here too but is defined in operators/frontend-surface-audit/errors.json; it belongs in operators/errors.json with both operators in scope, and until that move validate-operator reports it as out of scope here. No code asks a person for a credential: the shared UAT password is resolved by name at login, and unavailable provisioning blocks instead of prompting.",
   "codes": {
     "ADMISSION_MISSING": {
       "domain": "quality",

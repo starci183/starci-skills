@@ -1,0 +1,59 @@
+{
+  "schemaVersion": 9,
+  "id": "backend-feature",
+  "when": {
+    "en": "Server behaviour, an API contract, persistence or a job changes for one business feature; the architecture is decided first and the promise is reconciled after the code lands.",
+    "vi": "Hành vi server, contract API, persistence hay job đổi cho một feature nghiệp vụ; kiến trúc quyết trước, lời hứa được đối chiếu sau khi code đã vào."
+  },
+  "chain": [
+    [
+      {
+        "operator": "workspace.bind",
+        "requirements": {
+          "role": "be"
+        }
+      }
+    ],
+    [
+      {
+        "operator": "business.decide",
+        "requirements": {
+          "mode": "model"
+        }
+      }
+    ],
+    [
+      {
+        "operator": "architecture.decide",
+        "requirements": {
+          "alternatives": 1,
+          "selectionPolicy": "automatic"
+        }
+      }
+    ],
+    [
+      {
+        "operator": "backend.source.apply"
+      }
+    ],
+    [
+      {
+        "operator": "quality.verify"
+      }
+    ],
+    [
+      {
+        "operator": "business.decide",
+        "requirements": {
+          "mode": "reconcile"
+        }
+      }
+    ],
+    [
+      {
+        "operator": "git.publish"
+      }
+    ]
+  ],
+  "ends": "git.publish"
+}

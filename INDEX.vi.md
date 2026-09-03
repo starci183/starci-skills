@@ -12,7 +12,7 @@ operator dựa trên kết quả có kiểu.
 3. `resources/`: profile thực thi nào chạy từng vai trò của operator, nó được dùng quyền nào lúc
    chạy, và câu trả lời thường trực về tìm mạng, ràng Grammar, sinh hình. Cũng được kiểm.
 4. Đúng một operator mà nhiệm vụ cần: `operator.md` (Việc, Context, Đầu vào, Yêu cầu, Các bước, Đầu ra,
-   Dừng, Kế tiếp) cùng `operator.json` (id, domain, resources). Mã dừng tra ở `errors/INDEX.md`.
+   Dừng, Kế tiếp) cùng `operator.json` (id, domain, resources). Mã dừng tra ở bảng Mã dừng trong `operators/INDEX.md`.
 5. Chỉ những topic knowledge mà operator đó bind.
 
 Không nạp trước cả cây. Một operator bind tập topic nhỏ nhất mà quyết định của nó cần, mỗi topic kèm
@@ -22,11 +22,11 @@ fingerprint và danh sách rule đầy đủ, và không được phát ra mã n
 
 ```text
 SKILL.md                 một cửa vào, mười bốn operator, một bảng định tuyến
-routing.json             14 operator, 73 route, bốn loại: operator | resume | user | external
+routing.json             14 operator, 68 route, bốn loại: operator | resume | user | external
 alias/                   alias.json (sổ cho máy: vị trí, scheme, bind, ai ghi, vùng) + INDEX.md (bản đồ sinh theo vùng); operator chỉ đọc qua alias
 resources/               agents/profiles/{openai,claude}.json (6 profile) + orchestrator.json (mỗi operator một agent, tối đa 3); có kiểm
-operators/INDEX.md       ma trận sinh tự động: mỗi operator đọc gì (tĩnh, động), ghi gì, các bước và mã dừng
-errors/                  errors.json (mã dừng dùng chung cho nhiều operator, có scope) + INDEX.md (sinh, gộp với từng operators/<id>/errors.json): mỗi mã một cách xử lý, terminate hoặc fallback
+workflows/               chuỗi mẫu (các bậc gồm nhánh song song, vòng lặp, preset) mà cửa vào dùng lại khi request khớp when; không khớp thì tự ghép theo cùng luật; có kiểm
+operators/INDEX.md       sinh tự động: mỗi operator đọc gì, tiêu thụ và sinh kind nào, số bước, và mọi mã dừng kèm cách xử lý; operators/errors.json giữ mã dùng chung
 operators/<id>/          operator.md (+vi) một file viết tay cho mỗi operator, operator.json (id, domain, resources), errors.json (mã riêng), validate.mjs, self-test.mjs
 knowledge/
   ui/composition/        cây phải chứa gì, trước khi nó tồn tại      -> frontend.direction.decide
@@ -36,7 +36,7 @@ knowledge/
   grammars/<họ>/         cách một họ hình ảnh hiện thực Common
 templates/               mỗi loại tài liệu một template; mỗi template mang khối json template-contract dùng để kiểm cả cây;
                          kinds/ định kiểu mọi file đi qua giữa các bước (<kind>.contract.json + <kind>.skeleton.md cho markdown, <kind>.schema.json cho dữ liệu); step/ giữ hai gate request.json và response.json
-scripts/                 validate-routing.mjs, validate-resources.mjs, validate-knowledge-citations.mjs, validate-alias.mjs, validate-templates.mjs, validate-operator.mjs, validate-request.mjs, validate-response.mjs, validate-step.mjs, run-operator-self-tests.mjs;
+scripts/                 validate-routing.mjs, validate-resources.mjs, validate-knowledge-citations.mjs, validate-alias.mjs, validate-templates.mjs, validate-operator.mjs, validate-workflows.mjs, validate-request.mjs, validate-response.mjs, validate-step.mjs, run-operator-self-tests.mjs;
                          device-state.mjs và workspace-portable.mjs (+ spec), thứ package.json của backend gọi tới
 readiness/               các schema workspaces/ mà khai báo route portable và hydrate gọi tên trong $schema
 ```

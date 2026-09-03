@@ -1,6 +1,6 @@
 {
   "schemaVersion": 9,
-  "note": "Stop codes only business.decide emits. Same entry shape as errors/errors.json, scope implicit. Shared codes (INVALID_INPUT, SOURCE_DRIFT, NO_PROGRESS, EVIDENCE_MISSING) come from errors/errors.json, and APPROVAL_REQUIRED is not defined here because more than one operator emits it: a code two operators emit belongs in errors/errors.json with both ids in scope. Every domain here is the routing domain the old package's owningDomain enum published for this operator: business, backend, frontend, architecture, workspace, caller.",
+  "note": "Stop codes only business.decide emits. Same entry shape as operators/errors.json, scope implicit. Shared codes (INVALID_INPUT, SOURCE_DRIFT, NO_PROGRESS, EVIDENCE_MISSING) come from operators/errors.json, and APPROVAL_REQUIRED is not defined here because more than one operator emits it: a code two operators emit belongs in operators/errors.json with both ids in scope. Every domain here is the routing domain the old package's owningDomain enum published for this operator: business, backend, frontend, architecture, workspace, caller.",
   "codes": {
     "CONTRADICTION_UNRESOLVED": {
       "domain": "caller",
