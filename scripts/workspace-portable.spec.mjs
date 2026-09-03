@@ -213,6 +213,18 @@ test('current V6 rejects legacy grammar fields, mixed versions, and non-FE gramm
   }), /mutationBranch must equal repository\.branch/);
 });
 
+test('a session-only worktree policy hydrates and is kept verbatim', (t) => {
+  const f = fixture(t);
+  const declPath = join(f.source, '.workspaces', 'projects', 'nivo', 'fe.json');
+  const decl = JSON.parse(readFileSync(declPath, 'utf8'));
+  decl.repository.gitPolicy.worktreeBranches = 'session-only';
+  writeFileSync(declPath, JSON.stringify(decl, null, 2));
+  const result = runScript(f, 'hydrate', '--apply');
+  assert.equal(result.status, 0, result.stderr);
+  const v6 = JSON.parse(readFileSync(join(f.source, '.workspaces', 'local', 'routes', 'nivo', 'fe', 'config.json'), 'utf8'));
+  assert.equal(v6.repository.gitPolicy.worktreeBranches, 'session-only');
+});
+
 test('direct-main policy blocks hydration from a feature branch', (t) => {
   const f = fixture(t);
   git(f.frontend, 'switch', '-c', 'feature/task');

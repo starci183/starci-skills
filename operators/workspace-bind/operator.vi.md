@@ -105,7 +105,8 @@ và không mang phán quyết nào.
 
 Bước 5 không tính lại gì cả: fingerprint endpoint hoặc khớp phép chiếu đóng, hoặc nhánh dừng. Dưới
 `worktreeBranches` đặt là forbidden, một route chỉ ràng trên nhánh mutation và ghi
-`WORKTREE_BRANCH_FORBIDDEN`; một head hội thoại đã che ghi `PROVENANCE_HEAD_BOUND`, và một biên nhận
+`WORKTREE_BRANCH_FORBIDDEN`; một head hội thoại đã che ghi `PROVENANCE_HEAD_BOUND`, và một biên nhận Đặt là `session-only` thì route ràng trên nhánh mutation hoặc trên nhánh worktree
+`session/<sessionId>`, hình dạng duy nhất mà operator ghi source được commit lên;
 cache khớp cùng bộ định danh và fingerprint ghi `CACHED_ROUTE_REUSED`. Chạy lại thì bắt đầu lại từ
 bước 1, chỉ dùng lại quan sát có fingerprint không đổi, và tiêu thụ đúng phần delta; một route
 publish lại tới dưới dạng một fingerprint route mới, vì cùng một fingerprint không thể cho một ràng

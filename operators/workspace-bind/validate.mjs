@@ -64,6 +64,7 @@ export async function validateWorkspaceStep(branchDir, root = ROOT) {
     const declaredRoots = Array.isArray(requirements.declaredWriteRoots) ? requirements.declaredWriteRoots : [];
     for (const root of declaredRoots) if (!route.writeRoots.includes(root)) errors.push(`response/data/route.json: the request declared the write root ${root}, which the binding does not carry`);
     if (mutationReadiness === 'ready' && checkout.branch !== gitPolicy.mutationBranch) errors.push(`response/data/route.json: mutation is ready only on ${gitPolicy.mutationBranch}, not on ${checkout.branch}`);
+    if (gitPolicy.worktreeBranches === 'session-only' && checkout.branch !== gitPolicy.mutationBranch && !/^session\//.test(checkout.branch)) errors.push(`response/data/route.json: a session-only worktree policy binds only on ${gitPolicy.mutationBranch} or on a session/<sessionId> branch, not on ${checkout.branch}`);
     if (gitPolicy.worktreeBranches === 'forbidden' && checkout.branch !== gitPolicy.mutationBranch) errors.push('response/data/route.json: a forbidden worktree policy cannot bind a route on another branch');
 
     if (runtime !== null) {

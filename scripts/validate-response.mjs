@@ -131,7 +131,8 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
   const target = process.argv[2];
   if (!target) { process.stderr.write('usage: node scripts/validate-response.mjs <session>/step-N/parallel-M[/<exchange>]\n'); process.exit(2); }
   const dir = path.resolve(target);
-  const exchange = /^step-\d+$/.test(path.basename(path.dirname(path.dirname(dir)))) ? null : path.basename(dir);
+  // A branch is <session>/step-N/parallel-M (its parent is step-N); an exchange is <branch>/<exchange> (its parent is parallel-M).
+  const exchange = /^step-\d+$/.test(path.basename(path.dirname(dir))) ? null : path.basename(dir);
   let requirements = {};
   const reqFile = path.join(exchange ? path.dirname(dir) : dir, 'request', 'request.json');
   if (existsSync(reqFile)) requirements = JSON.parse(await readFile(reqFile, 'utf8')).requirements ?? {};

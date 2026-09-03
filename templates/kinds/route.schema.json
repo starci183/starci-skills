@@ -19,92 +19,272 @@
     "provenanceHeadRef"
   ],
   "properties": {
-    "project": { "$ref": "#/$defs/slug" },
-    "role": { "$ref": "#/$defs/slug" },
-    "portableRouteRef": { "type": "string", "minLength": 1 },
-    "hydratedRouteRef": { "type": "string", "minLength": 1 },
-    "routeFingerprint": { "$ref": "#/$defs/fingerprint" },
-    "identityFingerprint": { "$ref": "#/$defs/fingerprint" },
-    "sourceHead": { "$ref": "#/$defs/gitHead" },
+    "project": {
+      "$ref": "#/$defs/slug"
+    },
+    "role": {
+      "$ref": "#/$defs/slug"
+    },
+    "portableRouteRef": {
+      "type": "string",
+      "minLength": 1
+    },
+    "hydratedRouteRef": {
+      "type": "string",
+      "minLength": 1
+    },
+    "routeFingerprint": {
+      "$ref": "#/$defs/fingerprint"
+    },
+    "identityFingerprint": {
+      "$ref": "#/$defs/fingerprint"
+    },
+    "sourceHead": {
+      "$ref": "#/$defs/gitHead"
+    },
     "checkout": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["diskPath", "gitRoot", "gitRepository", "branch", "repositoryKind", "directory", "sourceHead"],
+      "required": [
+        "diskPath",
+        "gitRoot",
+        "gitRepository",
+        "branch",
+        "repositoryKind",
+        "directory",
+        "sourceHead"
+      ],
       "properties": {
-        "diskPath": { "type": "string", "minLength": 1 },
-        "gitRoot": { "type": "string", "minLength": 1 },
-        "gitRepository": { "type": "string", "minLength": 1 },
-        "branch": { "type": "string", "minLength": 1 },
-        "repositoryKind": { "enum": ["source", "sibling"] },
-        "directory": { "oneOf": [{ "type": "string", "minLength": 1 }, { "type": "null" }] },
-        "sourceHead": { "$ref": "#/$defs/gitHead" }
+        "diskPath": {
+          "type": "string",
+          "minLength": 1
+        },
+        "gitRoot": {
+          "type": "string",
+          "minLength": 1
+        },
+        "gitRepository": {
+          "type": "string",
+          "minLength": 1
+        },
+        "branch": {
+          "type": "string",
+          "minLength": 1
+        },
+        "repositoryKind": {
+          "enum": [
+            "source",
+            "sibling"
+          ]
+        },
+        "directory": {
+          "oneOf": [
+            {
+              "type": "string",
+              "minLength": 1
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "sourceHead": {
+          "$ref": "#/$defs/gitHead"
+        }
       }
     },
     "gitPolicy": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["worktreeBranches", "mutationBranch"],
+      "required": [
+        "worktreeBranches",
+        "mutationBranch"
+      ],
       "properties": {
-        "worktreeBranches": { "enum": ["forbidden", "allowed"] },
-        "mutationBranch": { "type": "string", "minLength": 1 }
+        "worktreeBranches": {
+          "enum": [
+            "forbidden",
+            "session-only"
+          ]
+        },
+        "mutationBranch": {
+          "type": "string",
+          "minLength": 1
+        }
       }
     },
-    "mutationReadiness": { "enum": ["ready", "read-only"] },
-    "writeRoots": { "type": "array", "minItems": 1, "maxItems": 256, "items": { "type": "string", "minLength": 1 } },
+    "mutationReadiness": {
+      "enum": [
+        "ready",
+        "read-only"
+      ]
+    },
+    "writeRoots": {
+      "type": "array",
+      "minItems": 0,
+      "maxItems": 256,
+      "items": {
+        "type": "string",
+        "minLength": 1
+      },
+      "description": "The write roots the request declared; empty for a read-only binding (declaredWriteRoots defaults to empty)."
+    },
     "authorityRoots": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["businesses"],
+      "required": [
+        "businesses"
+      ],
       "properties": {
-        "businesses": { "oneOf": [{ "type": "string", "pattern": "\\.worktrees/businesses$" }, { "type": "null" }] }
+        "businesses": {
+          "oneOf": [
+            {
+              "type": "string",
+              "pattern": "\\.worktrees/businesses$"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
       }
     },
-    "runtime": { "oneOf": [{ "$ref": "#/$defs/runtimeConsumption" }, { "type": "null" }] },
-    "provenanceHeadRef": { "oneOf": [{ "type": "string", "minLength": 1 }, { "type": "null" }] }
+    "runtime": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/runtimeConsumption"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "provenanceHeadRef": {
+      "oneOf": [
+        {
+          "type": "string",
+          "minLength": 1
+        },
+        {
+          "type": "null"
+        }
+      ]
+    }
   },
   "$defs": {
-    "fingerprint": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
-    "gitHead": { "type": "string", "pattern": "^[0-9a-f]{40}$" },
-    "slug": { "type": "string", "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$" },
-    "serviceKey": { "type": "string", "pattern": "^[A-Za-z][A-Za-z0-9]*$" },
+    "fingerprint": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "gitHead": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{40}$"
+    },
+    "slug": {
+      "type": "string",
+      "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$"
+    },
+    "serviceKey": {
+      "type": "string",
+      "pattern": "^[A-Za-z][A-Za-z0-9]*$"
+    },
     "runtimeConsumption": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["ownerTaskId", "generation", "status", "consumerRole", "endpointBinding", "endpoints"],
+      "required": [
+        "ownerTaskId",
+        "generation",
+        "status",
+        "consumerRole",
+        "endpointBinding",
+        "endpoints"
+      ],
       "properties": {
-        "ownerTaskId": { "type": "string", "minLength": 1 },
-        "generation": { "type": "integer", "minimum": 1 },
-        "status": { "enum": ["starting", "ready", "degraded", "stopped"] },
-        "consumerRole": { "const": "consumer" },
+        "ownerTaskId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "generation": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "status": {
+          "enum": [
+            "starting",
+            "ready",
+            "degraded",
+            "stopped"
+          ]
+        },
+        "consumerRole": {
+          "const": "consumer"
+        },
         "endpointBinding": {
           "type": "object",
           "additionalProperties": false,
-          "required": ["authority", "project", "application", "services", "authorityFingerprint"],
+          "required": [
+            "authority",
+            "project",
+            "application",
+            "services",
+            "authorityFingerprint"
+          ],
           "properties": {
-            "authority": { "const": "workspace-route-port-projection" },
-            "project": { "$ref": "#/$defs/slug" },
-            "application": { "$ref": "#/$defs/slug" },
+            "authority": {
+              "const": "workspace-route-port-projection"
+            },
+            "project": {
+              "$ref": "#/$defs/slug"
+            },
+            "application": {
+              "$ref": "#/$defs/slug"
+            },
             "services": {
               "type": "object",
               "additionalProperties": false,
-              "required": ["frontend", "api", "identity"],
+              "required": [
+                "frontend",
+                "api",
+                "identity"
+              ],
               "properties": {
-                "frontend": { "$ref": "#/$defs/serviceKey" },
-                "api": { "$ref": "#/$defs/serviceKey" },
-                "identity": { "$ref": "#/$defs/serviceKey" }
+                "frontend": {
+                  "$ref": "#/$defs/serviceKey"
+                },
+                "api": {
+                  "$ref": "#/$defs/serviceKey"
+                },
+                "identity": {
+                  "$ref": "#/$defs/serviceKey"
+                }
               }
             },
-            "authorityFingerprint": { "$ref": "#/$defs/fingerprint" }
+            "authorityFingerprint": {
+              "$ref": "#/$defs/fingerprint"
+            }
           }
         },
         "endpoints": {
           "type": "object",
           "additionalProperties": false,
-          "required": ["frontend", "api", "identity"],
+          "required": [
+            "frontend",
+            "api",
+            "identity"
+          ],
           "properties": {
-            "frontend": { "type": "string", "minLength": 1 },
-            "api": { "type": "string", "minLength": 1 },
-            "identity": { "type": "string", "minLength": 1 }
+            "frontend": {
+              "type": "string",
+              "minLength": 1
+            },
+            "api": {
+              "type": "string",
+              "minLength": 1
+            },
+            "identity": {
+              "type": "string",
+              "minLength": 1
+            }
           }
         }
       }

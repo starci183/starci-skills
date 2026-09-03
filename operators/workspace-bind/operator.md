@@ -105,7 +105,8 @@ workspace, or provisions an account. It makes no product decision and carries no
 
 Step 5 recomputes nothing: the endpoint fingerprint either matches the closed projection or the
 branch stops. Under `worktreeBranches` set to forbidden, a route binds only on the mutation branch and
-records `WORKTREE_BRANCH_FORBIDDEN`; a redacted conversation head records `PROVENANCE_HEAD_BOUND`, and
+records `WORKTREE_BRANCH_FORBIDDEN`; under `session-only` it binds on the mutation branch or on a
+`session/<sessionId>` worktree branch, the only shape a source-writing operator may commit to; a redacted conversation head records `PROVENANCE_HEAD_BOUND`, and
 a cached receipt matching the same identity tuple and fingerprints records `CACHED_ROUTE_REUSED`. A
 resume begins again at step 1, reuses only unchanged fingerprinted observations, and consumes the
 exact delta; a republished route arrives as a new route fingerprint, because the same fingerprint

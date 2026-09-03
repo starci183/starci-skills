@@ -52,6 +52,7 @@
     "rule": "an operator that writes source (frontend.source.apply, backend.source.apply) writes only on the session branch session/<sessionId> of the routed checkout, in a git worktree the orchestrator prepared from the frozen head; it commits the declared write set once and records the sha in response.json.commits; the person's checked-out branch is never touched",
     "track": "changes.md names every path with before/after hashes and the commit; the next requests pin @workspaces/<role> at that sha (contexts[].head) so quality.verify and frontend.surface.audit verify exactly what was written",
     "publish": "git.publish merges the session branch into the target branch: fast-forward when the target has not moved; a merge commit only when there is no conflict and the gates are re-run on the merge result; a conflict is NON_FAST_FORWARD and a person resolves it; never rebase, never force",
-    "cleanup": "after a successful publish the worktree and the session branch are removed together with the session folder; a blocked session keeps both"
+    "cleanup": "after a successful publish the worktree and the session branch are removed together with the session folder; a blocked session keeps both",
+    "policy": "the routed checkout must declare gitPolicy.worktreeBranches = session-only (readiness/initialization/workspaces); a route declaring forbidden binds read-only and no source-writing operator may run against it"
   }
 }

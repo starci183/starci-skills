@@ -54,7 +54,7 @@
       "required": ["mutationBranch", "worktreeBranches", "incomingBranchRefs"],
       "properties": {
         "mutationBranch": { "type": "string", "minLength": 1, "maxLength": 255 },
-        "worktreeBranches": { "const": "forbidden" },
+        "worktreeBranches": { "enum": ["forbidden", "session-only"], "description": "forbidden: no branch or worktree besides the mutation branch; session-only: a git worktree on session/<sessionId> may be created for one runtime session and is merged into the mutation branch by git.publish, then removed" },
         "incomingBranchRefs": { "const": "merge-into-mutation-branch" }
       }
     },
