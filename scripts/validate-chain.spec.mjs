@@ -84,16 +84,16 @@ test('a required input is fed by an imported slot the request names, and only wh
   try {
     const tree = [fakePackage({ id: 'release.note', primary: 'release-note', outputs: ['release-note'], inputs: [['git-publication', '`git.publish`; the publication it annotates', true]] })];
     const g = operatorGraph(tree);
-    const byBranch = { '1/1': { operatorId: 'release.note', sessionId: 'receiver', requirements: {}, inputs: { 'git-publication': 'step-10/parallel-1/response/response.md' } } };
+    const byBranch = { '1/1': { operatorId: 'release.note', sessionId: 'receiver', requirements: {}, inputs: { 'git-publication': 'step-100/parallel-1/response/response.md' } } };
     const gate = async () => validateChain(root, tree, [['1/1']], { '1/1': 'release.note' }, byBranch, { graph: g, imported: await readImportedInputs(root, f.targetSession, byBranch, { hostRoot: f.host }) });
     assert.ok((await gate()).some((e) => e.includes('requires input git-publication')), 'nothing imported yet');
     await importProducer(f.args);
     assert.deepEqual(await gate(), [], 'an accepted import feeds the branch');
     // Before the request is written the plan carries the reference (state.json.planned[cell].inputs) and the same gate credits it.
-    const planned = { '1/1': { requirements: {}, inputs: { 'git-publication': 'step-10/parallel-1/response/response.md' } } };
+    const planned = { '1/1': { requirements: {}, inputs: { 'git-publication': 'step-100/parallel-1/response/response.md' } } };
     assert.deepEqual(await validateChain(root, tree, [['1/1']], { '1/1': 'release.note' }, { '1/1': null }, { graph: g, planned, imported: await readImportedInputs(root, f.targetSession, { '1/1': null }, { hostRoot: f.host, planned }) }), [], 'a planned import feeds the branch before its request exists');
     // The slot as the planner reads it: its cell, origin and the outputs the origin operator declares.
-    assert.deepEqual(await readImportedSlots(f.targetSession, graph), [{ cell: '10/1', operatorId: 'git.publish', sourceSessionId: 'original', sourceStep: 1, sourceParallel: 1, outputs: { 'git-publication': 'step-10/parallel-1/response/response.md' } }]);
+    assert.deepEqual(await readImportedSlots(f.targetSession, graph), [{ cell: '100/1', operatorId: 'git.publish', sourceSessionId: 'original', sourceStep: 1, sourceParallel: 1, outputs: { 'git-publication': 'step-100/parallel-1/response/response.md' } }]);
     assert.deepEqual((await readImportedSlots(f.targetSession, g))[0].outputs, {}, 'an origin operator the graph cannot name declares nothing');
     // A slot the gate refuses feeds nothing; a slot without import.json is not an import at all.
     write(path.join(f.target, 'response/artifacts/raw.log'), 'tampered');

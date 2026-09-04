@@ -53,12 +53,12 @@ test('imported migration validates original critique and the actual request CLI'
     write(path.join(original, 'state.json'), originalState);
     const receiverState = state('receiver', { '2/1': 'backend.generate' });
     write(path.join(receiver, 'state.json'), receiverState);
-    await importProducer({ sourceSessionId: 'original', sourceStep: 2, sourceParallel: 1, targetSessionId: 'receiver', targetStep: 10, targetParallel: 1, root, hostRoot: host });
+    await importProducer({ sourceSessionId: 'original', sourceStep: 2, sourceParallel: 1, targetSessionId: 'receiver', targetStep: 100, targetParallel: 1, root, hostRoot: host });
     const request = {
       schemaVersion: 9, operatorId: 'backend.generate', sessionId: 'receiver', step: 2, parallel: 1,
       contexts: [{ alias: '@workspaces/be', head: 'b'.repeat(40) }, { alias: '@worktrees/businesses/fixture', head: null }, { alias: '@knowledge/patterns/be', head: null }],
       requirements: { featureId: 'fixture', outcome: 'add a bounded persistence scope', mutableFileRefs: [files['response/data/stack-model.json'].operations[0].writerRef], contractFingerprint: hash(readFileSync(path.join(producer, 'response/data/stack-model.json'))) },
-      inputs: { 'architecture-decision': 'step-10/parallel-1/response/response.md' }, resume: null,
+      inputs: { 'architecture-decision': 'step-100/parallel-1/response/response.md' }, resume: null,
     };
     write(path.join(branch, 'request/request.json'), request);
     receiverState.requestHashes['2/1'] = hash(readFileSync(path.join(branch, 'request/request.json')));

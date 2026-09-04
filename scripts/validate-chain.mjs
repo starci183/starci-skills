@@ -140,6 +140,8 @@ export function validateChain(root, packages, chain, steps, byBranch = {}, optio
     });
   });
   for (const cell of Object.keys(steps ?? {})) if (!cells.has(cell)) errors.push(`state.json: steps records ${cell}, which the chain does not name`);
+  // Evidence is not a step: a chain that grows onto an imported slot's coordinate would overwrite the producer it was planned on.
+  for (const cell of options.evidenceCells ?? []) if (cells.has(cell)) errors.push(`state.json: chain names ${cell}, which is an imported evidence slot; imported slots live from step ${options.importStepBase ?? 100} upward and a chain never reaches them`);
   for (const cell of Object.keys(planned)) if (!cells.has(cell)) errors.push(`state.json: planned records ${cell}, which the chain does not name`);
   const produced = new Set(); // kinds produced by earlier steps
   const boundRoles = new Set(); // roles bound by earlier workspace.bind branches
@@ -269,7 +271,8 @@ export async function validateSessionChain(root, session, state, packages) {
   packages ??= await loadOperatorPackages(root);
   const graph = await loadOperatorGraph(root, packages);
   const byBranch = await readBranchRequests(session, state.steps);
-  return validateChain(root, packages, state.chain, state.steps, byBranch, { graph, mission: state.mission ?? null, maxParallel: await loadMaxParallel(root), planned: state.planned ?? {}, imported: await readImportedInputs(root, session, byBranch, { planned: state.planned ?? {} }) });
+  const slots = await readImportedSlots(session, graph, root);
+  return validateChain(root, packages, state.chain, state.steps, byBranch, { graph, mission: state.mission ?? null, maxParallel: await loadMaxParallel(root), planned: state.planned ?? {}, imported: await readImportedInputs(root, session, byBranch, { planned: state.planned ?? {} }), evidenceCells: slots.map((s) => s.cell) });
 }
 
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {

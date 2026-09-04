@@ -31,7 +31,10 @@ function roots(hostRoot,sourceSessionId,targetSessionId,sourceStep,sourceParalle
   const target=within(targetSession,`step-${targetStep}/parallel-${targetParallel}`,{missing:true});
   return {sourceSession,targetSession,source,target};
 }
-function evidenceOnly(targetSession,step,parallel){
+// The evidence range: imported slots sit at step numbers from resources/orchestrator.json#session.imports.stepBase upward, where no chain cell is ever numbered.
+export function importStepBase(root){try{return JSON.parse(readFileSync(path.join(root,'resources','orchestrator.json'),'utf8')).session?.imports?.stepBase??100;}catch{return 100;}}
+function evidenceOnly(targetSession,step,parallel,stepBase=100){
+  if(!(Number.isInteger(step)&&step>=stepBase))throw Error(`import coordinate step ${step} is below the evidence range (orchestrator.json#session.imports.stepBase = ${stepBase}); a chain is numbered from 1 and must never grow onto an imported slot`);
   const state=json(within(targetSession,'state.json')),key=`${step}/${parallel}`;
   if(state.steps?.[key]!==undefined||state.requestHashes?.[key]!==undefined||state.current===key||(state.chain??[]).flat(Infinity).includes(key)||JSON.stringify(state.leases??{}).includes(`"${key}"`))throw Error('import coordinate is reserved for executed work; imports are evidence-only');
 }
@@ -95,7 +98,7 @@ export async function importProducer({sourceSessionId,sourceStep,sourceParallel,
   const m={schemaVersion:1,sourceSessionId,sourceStep,sourceParallel,targetSessionId,targetStep,targetParallel,files:[]};
   const r=roots(hostRoot,sourceSessionId,targetSessionId,sourceStep,sourceParallel,targetStep,targetParallel);
   if(existsSync(r.target))throw Error('import target already exists; never overwrite evidence');
-  evidenceOnly(r.targetSession,targetStep,targetParallel);await originAuthority(root,r,m);m.files=inventory(r.source);manifestShape(m);
+  evidenceOnly(r.targetSession,targetStep,targetParallel,importStepBase(root));await originAuthority(root,r,m);m.files=inventory(r.source);manifestShape(m);
   const bytes=m.files.map(f=>[f.path,readFileSync(within(r.source,f.path))]);
   if(bytes.some(([p,b])=>hash(b)!==m.files.find(f=>f.path===p).sha256))throw Error('origin changed during import');
   mkdirSync(r.target,{recursive:true});
