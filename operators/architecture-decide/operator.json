@@ -10,6 +10,7 @@
   "resources": {
     "profile": "sol-fresh",
     "grammarBound": false,
+    "dispatch": "fresh",
     "tools": {
       "@tools/fileread": "context-aliases",
       "@tools/git": "read",

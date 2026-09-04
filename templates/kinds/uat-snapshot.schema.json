@@ -385,7 +385,7 @@
             "type": "string",
             "minLength": 1
           },
-          "description": "Every identifier this run seeded. Each carries the run fixture namespace, which is what makes \"touched no shared row\" a fact rather than an intention."
+          "description": "Every row this run seeded, as an identifier. Each is attributable to the flow — owned by its provisioned account, or carrying the run fixture namespace where the store has no owner column — which is what makes \"touched no shared row\" a fact rather than an intention."
         },
         "rollbackIds": {
           "type": "array",

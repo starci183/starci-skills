@@ -122,27 +122,36 @@ ${reconciliationRows}${reconciliationRows ? '\n' : ''}
 ${findingRows}${findingRows ? '\n' : ''}`;
 }
 
-const requestJson = ({ mode = 'model', targetState = 'pending', inputs = {}, extra = {} } = {}) => ({
-  schemaVersion: 9, operatorId: 'business.decide', step: 1, parallel: 1, sessionId: 's-test',
+// `choice` turns the request into a re-entry of the blocked restatement branch 1/1 that answers
+// restatement:<feature> with the given option; the branch then lives at step 2.
+const requestJson = ({ mode = 'model', targetState = 'pending', inputs = {}, extra = {}, choice = null, step = choice ? 2 : 1 } = {}) => ({
+  schemaVersion: 9, operatorId: 'business.decide', step, parallel: 1, sessionId: 's-test',
+  ...(choice ? { decisionId: RESTATEMENT_ID, selectedOption: choice } : {}),
   contexts: [{ alias: '@workspaces/be', head }, { alias: '@worktrees/businesses/paid-access', head: null }],
-  requirements: { featureId: FEATURE, mode, targetState, dimensions: DIMENSIONS, approval: null, resume: null, ...extra },
-  inputs, resume: null,
+  requirements: { featureId: FEATURE, mode, targetState, dimensions: DIMENSIONS, approval: null, resume: choice ? 't-1' : null, ...extra },
+  inputs, resume: choice ? { step: 1, parallel: 1, token: 't-1' } : null,
 });
-function responseJson({ status = 'done', stop, fallbacks = [], fields = null, next = ['backend.source.apply'] } = {}) {
+const ALL_FIELDS = { 'business-promise-authority': 'response/response.md', claims: 'response/data/claims.json', 'coverage-matrix': 'response/data/coverage-matrix.json', model: 'response/data/model.json' };
+function responseJson({ status = 'done', stop, fallbacks = [], fields = null, next = ['backend.source.apply'], step = 1 } = {}) {
   return {
-    schemaVersion: 9, operatorId: 'business.decide', step: 1, parallel: 1, status, ...(stop ? { stop } : {}), fallbacks,
-    fields: fields ?? { 'business-promise-authority': 'response/response.md', claims: 'response/data/claims.json', 'coverage-matrix': 'response/data/coverage-matrix.json', model: 'response/data/model.json' },
+    schemaVersion: 9, operatorId: 'business.decide', step, parallel: 1, status, ...(stop ? { stop } : {}), fallbacks,
+    fields: fields ?? ALL_FIELDS,
     commits: [], next,
   };
 }
 
-function writeBranch(files) {
+// `branch` places the branch under test; `state` patches state.json; `session` writes session-relative files.
+function writeBranch(files, { branch: branchRel = 'step-1/parallel-1', state = {}, session: sessionFiles = {} } = {}) {
   const session = mkdtempSync(path.join(tmpdir(), 'business-session-'));
-  const branch = path.join(session, 'step-1', 'parallel-1');
+  const branch = path.join(session, ...branchRel.split('/'));
   for (const d of ['request', 'response/data', 'response/artifacts']) mkdirSync(path.join(branch, d), { recursive: true });
   mkdirSync(path.join(session, 'step-1', 'parallel-2', 'response'), { recursive: true });
   writeFileSync(path.join(session, DELIVERED), '# backend-source-application — delivered source\n');
-  writeFileSync(path.join(session, 'state.json'), JSON.stringify({ id: 's-test', project: 'starci-academy', startedAt: '2026-09-03T00:00:00Z', requestHashes: {}, chain: [['1/1']], steps: { '1/1': 'business.decide' }, current: '1/1', status: 'running' }));
+  writeFileSync(path.join(session, 'state.json'), JSON.stringify({ id: 's-test', project: 'starci-academy', startedAt: '2026-09-03T00:00:00Z', requestHashes: {}, chain: [['1/1']], steps: { '1/1': 'business.decide' }, current: '1/1', status: 'running', ...state }));
+  for (const [name, content] of Object.entries(sessionFiles)) {
+    mkdirSync(path.dirname(path.join(session, name)), { recursive: true });
+    writeFileSync(path.join(session, name), typeof content === 'string' ? content : JSON.stringify(content, null, 2));
+  }
   for (const [name, content] of Object.entries(files)) {
     if (content === null) continue;
     writeFileSync(path.join(branch, name), typeof content === 'string' ? content : JSON.stringify(content, null, 2));
@@ -158,18 +167,57 @@ const baseline = () => ({
   'response/data/model.json': modelDoc(),
 });
 
+// `files` is the branch's files, or a [files, writeBranch options] pair for a branch placed elsewhere.
+const placed = (files) => (Array.isArray(files) ? files : [files, undefined]);
 async function expectValid(files, label) {
-  const { branch, session } = writeBranch(files);
+  const { branch, session } = writeBranch(...placed(files));
   const { errors } = await validateBusinessStep(branch);
   rmSync(session, { recursive: true, force: true });
   assert.deepEqual(errors, [], `${label} should be valid`);
 }
 async function expectError(files, needle, label) {
-  const { branch, session } = writeBranch(files);
+  const { branch, session } = writeBranch(...placed(files));
   const { errors } = await validateBusinessStep(branch);
   rmSync(session, { recursive: true, force: true });
   assert.ok(errors.some((e) => e.includes(needle)), `${label}: expected an error containing "${needle}", got:\n${errors.join('\n') || '(none)'}`);
 }
+
+// The restatement gate: the person's promise, restated in their words and put back to them.
+const PROMISE = 'a paying learner reads every course in the plan';
+const RESTATEMENT_ID = `restatement:${FEATURE}`;
+const restatementMd = ({ id = FEATURE, field = 'promise', quoted = PROMISE, lines = ['a learner whose purchase settled can open every course the plan covers', 'a learner outside the plan is turned away at the guard'] } = {}) => `# restatement — ${id}
+
+## Restatement
+
+| Line | Statement |
+| --- | --- |
+${lines.map((line, i) => `| ${i + 1} | ${line} |`).join('\n')}
+
+## Source
+
+| Field | Value |
+| --- | --- |
+| Field | \`${field}\` |
+| Quoted | ${quoted} |
+`;
+const restatementQuestion = (decisionId = RESTATEMENT_ID) => ({ kind: 'restatement-confirm', decisionId, options: [{ id: 'as-stated', label: 'The reading is right', tradeoff: 'the promise is modelled as restated' }, { id: 'corrected', label: 'Correct the reading', tradeoff: 'the corrected promise re-enters this branch and is restated again' }] });
+// A first run: the promise is supplied, restated, and the branch holds for the person.
+const firstRunBlocked = ({ interaction = restatementQuestion(), restatement = restatementMd() } = {}) => ({
+  'request/request.json': requestJson({ extra: { promise: PROMISE } }),
+  'response/response.json': { ...responseJson({ status: 'blocked', stop: 'RESTATEMENT_UNCONFIRMED', fields: { restatement: 'response/restatement.md' }, next: [] }), ...(interaction ? { interaction } : {}) },
+  'response/restatement.md': restatement,
+});
+// A re-entry at 2/1 of the blocked 1/1, with the person's choice recorded in state.json.
+const reentry = ({ selected = 'as-stated', promise = PROMISE, blockedPromise = PROMISE, response = null } = {}) => [{
+  ...baseline(),
+  'request/request.json': requestJson({ extra: { promise }, choice: selected }),
+  'response/response.json': response ?? responseJson({ step: 2, fields: { ...ALL_FIELDS, restatement: 'response/restatement.md' } }),
+  'response/restatement.md': restatementMd({ quoted: promise }),
+}, {
+  branch: 'step-2/parallel-1',
+  state: { chain: [['1/1'], ['2/1']], steps: { '1/1': 'business.decide', '2/1': 'business.decide' }, current: '2/1', resumes: { '2/1': { resumes: '1/1', stop: 'RESTATEMENT_UNCONFIRMED' } }, choices: { [RESTATEMENT_ID]: { selected, selectedBy: 'user', sourceRef: 'message:42' } } },
+  session: { 'step-1/parallel-1/request/request.json': requestJson({ extra: { promise: blockedPromise } }) },
+}];
 
 const RECONCILE_FIELDS = { 'business-promise-authority': 'response/response.md', claims: 'response/data/claims.json', model: 'response/data/model.json' };
 const reconciled = (overrides = {}) => ({
@@ -182,8 +230,11 @@ const reconciled = (overrides = {}) => ({
   ...overrides,
 });
 
-await expectValid(baseline(), 'a first publication of one feature head under mode model');
+await expectValid(baseline(), 'a first publication of one feature head under mode model, reusing the previous head\'s promise and owing no restatement');
 await expectValid(reconciled(), 'a reconcile pass against delivered source');
+await expectValid(firstRunBlocked(), 'a first run restates the supplied promise and holds for the person');
+await expectValid(reentry(), 'a re-entry carrying the recorded as-stated choice proceeds to a done head that still carries the restatement');
+await expectValid(reentry({ selected: 'corrected', promise: 'a paying learner reads every course in the plan for one year' }), 'a re-entry carrying the recorded corrected choice with a changed promise');
 await expectValid({ ...baseline(), 'response/response.json': responseJson({ status: 'blocked', stop: 'CONSUMER_UNPROVEN', fields: {}, next: [] }), 'response/response.md': null, 'response/data/claims.json': null, 'response/data/coverage-matrix.json': null, 'response/data/model.json': null }, 'blocked on an undisposed consumer');
 
 await expectError({ ...baseline(), 'response/response.json': { ...responseJson(), stop: 'CONSUMER_UNPROVEN' } }, 'only a blocked response carries a stop', 'done with a stop');
@@ -223,4 +274,20 @@ await expectError({ ...baseline(), 'response/data/claims.json': claimsDoc({ clai
 await expectError({ ...baseline(), 'response/response.md': responseMd({ claims: [['c-fact', 'fact']] }) }, 'which Cited claims omits', 'a claim the response never cites');
 await expectError({ ...baseline(), 'response/response.json': (() => { const o = responseJson(); delete o.fields.model; return o; })() }, 'required output model is not in fields', 'missing required output');
 
-process.stdout.write('business.decide self-test: 3 valid branches, 33 rejected mutations\n');
+// Restatement gate mutations.
+await expectError({ ...baseline(), 'request/request.json': requestJson({ extra: { promise: PROMISE } }) }, 'ends blocked with RESTATEMENT_UNCONFIRMED', 'a first run designing on a promise nobody confirmed');
+await expectError({ ...baseline(), 'request/request.json': requestJson({ extra: { promise: PROMISE } }), 'response/response.json': responseJson({ fields: { ...ALL_FIELDS, restatement: 'response/restatement.md' } }), 'response/restatement.md': restatementMd() }, 'ends blocked with RESTATEMENT_UNCONFIRMED', 'a first run done with a restatement but no recorded choice');
+await expectError(firstRunBlocked({ interaction: null }), 'carries interaction', 'blocked on the restatement without the typed question');
+await expectError(firstRunBlocked({ interaction: restatementQuestion('restatement:other-feature') }), 'interaction.decisionId is restatement:other-feature', 'the question keyed by another feature');
+await expectError(firstRunBlocked({ interaction: { ...restatementQuestion(), options: restatementQuestion().options.slice(0, 1).concat([{ id: 'maybe', label: 'Maybe', tradeoff: 'nothing' }]) } }), 'offers exactly as-stated and corrected', 'the question offering another option');
+await expectError(firstRunBlocked({ restatement: restatementMd({ lines: ['one', 'two', 'three', 'four', 'five', 'six'] }) }), 'table takes at most 5 rows', 'a restatement of six lines');
+await expectError(firstRunBlocked({ restatement: restatementMd({ quoted: 'a paying learner reads some courses' }) }), 'quoted verbatim', 'a restatement misquoting the person');
+await expectError(firstRunBlocked({ restatement: restatementMd({ field: 'objective' }) }), 'the restated requirement is promise', 'a restatement of another field');
+await expectError({ ...firstRunBlocked(), 'request/request.json': requestJson({ extra: { promise: PROMISE } }), 'response/response.json': { ...firstRunBlocked()['response/response.json'], fields: { restatement: 'response/restatement.md', claims: 'response/data/claims.json' } }, 'response/data/claims.json': claimsDoc() }, 'written before the restatement is confirmed', 'claims normalized on an unconfirmed reading');
+await expectError({ ...firstRunBlocked(), 'response/restatement.md': null, 'response/response.json': { ...firstRunBlocked()['response/response.json'], fields: {} } }, 'fields.restatement names response/restatement.md whatever the status', 'blocked on the restatement without writing it');
+await expectError({ ...baseline(), 'response/response.json': responseJson({ fields: { ...ALL_FIELDS, restatement: 'response/restatement.md' } }), 'response/restatement.md': restatementMd() }, 'nothing to restate', 'a restatement when the request supplies no promise');
+await expectError(reentry({ selected: 'corrected' }), 'carries the same promise as the blocked branch', 'corrected with the promise unchanged');
+await expectError(reentry({ selected: 'as-stated', promise: 'a paying learner reads every course in the plan for one year' }), 'differs from the blocked branch', 'as-stated with the promise changed');
+await expectError(reentry({ response: { ...responseJson({ step: 2, status: 'blocked', stop: 'RESTATEMENT_UNCONFIRMED', fields: { restatement: 'response/restatement.md' }, next: [] }), interaction: restatementQuestion() } }), 'does not ask again', 'a re-entry asking the recorded question again');
+
+process.stdout.write('business.decide self-test: 6 valid branches, 47 rejected mutations\n');

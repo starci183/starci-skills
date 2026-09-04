@@ -5,6 +5,8 @@
     { "heading": "^## Binding$", "table": "| Field | Value |", "rows": ["Outcome", "Feature", "Contract fingerprint", "Base", "Branch", "Commit"], "cell": { "Value": "\\S" } },
     { "heading": "^## Operations$", "table": "| Operation | Transport | Writer | Transaction | Idempotency | Decisions |", "minRows": 1, "cell": { "Transport": "^(graphql-mutation|graphql-query|rest|worker|cron|event-consumer|migration)$", "Transaction": "^(single-transaction|per-item|read-only|none)$", "Idempotency": "^(none|natural-key|request-token|event-id)$", "Decisions": "^[a-z0-9][a-z0-9-]*(?:, [a-z0-9][a-z0-9-]*)*$" } },
     { "heading": "^## Changes$", "table": "| Path | Change | Operation | Before | After |", "minRows": 1, "cell": { "Change": "^(added|modified|deleted)$", "Before": "^(sha256:[0-9a-f]{64}|—)$", "After": "^(sha256:[0-9a-f]{64}|—)$" } },
-    { "heading": "^## Findings$", "table": "| Code | Operation | File | Statement |", "cell": { "Code": "^`(PATTERN_BOUND|NEW_CONVENTION_REFUSED|SNAPSHOT_REVALIDATED|MIGRATION_INCLUDED|EXCEPTION_IDENTITY_REUSED|BUSINESS_QUESTION_RAISED)`$", "Statement": "\\S" } }
+    { "heading": "^## Widened$", "table": "| Path | Nearest boundary | Why |", "cell": { "Path": "^`[^`]+`$", "Nearest boundary": "^`[^`]+`$", "Why": "\\S" } },
+    { "heading": "^## Findings$", "table": "| Code | Operation | File | Statement |", "cell": { "Code": "^`(PATTERN_BOUND|NEW_CONVENTION_REFUSED|SNAPSHOT_REVALIDATED|MIGRATION_INCLUDED|EXCEPTION_IDENTITY_REUSED|BUSINESS_QUESTION_RAISED)`$", "Statement": "\\S" } },
+    { "heading": "^## Fallbacks taken$", "table": "| Code | Action |", "cell": { "Code": "^`[A-Z][A-Z0-9_]+`$", "Action": "\\S" } }
   ]
 }

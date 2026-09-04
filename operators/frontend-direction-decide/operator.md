@@ -17,6 +17,14 @@ nothing a promise could contradict. A backend implementation is required when a 
 changes, an architecture decision when a boundary changes; neither is required otherwise, and
 neither is ever invented. `create` occurs with `new` and only with it.
 
+The decision also declares its presentation delta, under `Presentation delta` of `## Decision`:
+`app-owned` when at least one application-owned presentation property changes and the resolution
+that follows owes a rule for it, `none` when the change is copy, behaviour or binding only and the
+resolution owes nothing. A direction that carries no such row reads as `app-owned`. Declaring `none`
+is what lets a translation pass or a behaviour repair reach `frontend.source.apply` without a
+presentation row invented to satisfy a contract; a direction that declares `none` and then changes a
+class is refused by the resolution, not forgiven by it.
+
 ## Evidence contradicts, it does not authorize
 
 The current implementation, a green test, a rendered DOM and a prior UAT pass are all evidence, and

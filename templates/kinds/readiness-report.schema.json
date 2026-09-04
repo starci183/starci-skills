@@ -1,0 +1,182 @@
+{
+  "$id": "kind:readiness-report",
+  "description": "What environment.preflight found, as data: one record per readiness check and one per wall. The Checks table of the environment-readiness receipt and `checks` agree one-to-one by id and status; every `wall` check has exactly one entry in `walls`. The check vocabulary is closed and lives in `$defs.checkIds`: the validator expands `<role>` over the requested roles and `<class>` over the operation classes the environment schema publishes, and the id set of a report equals that expansion exactly, so a check that was not run is visible as a missing id and never as silence. A check's family is the first segment of its id.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "project",
+    "roles",
+    "env",
+    "flow",
+    "declarationRef",
+    "checks",
+    "walls",
+    "generatedAt"
+  ],
+  "properties": {
+    "project": {
+      "$ref": "#/$defs/slug"
+    },
+    "roles": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "$ref": "#/$defs/slug"
+      }
+    },
+    "env": {
+      "$ref": "#/$defs/slug"
+    },
+    "flow": {
+      "description": "The flow whose account record and sign-in were probed; null when the request named none, in which case the identity.flow checks are skipped.",
+      "oneOf": [
+        {
+          "$ref": "#/$defs/slug"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "declarationRef": {
+      "description": "The environment declaration the approval checks were read from, as its path from the host repository root and the sha256 of its bytes; null when the environment declares nothing, in which case every approval check is a wall.",
+      "oneOf": [
+        {
+          "type": "string",
+          "pattern": "^\\.stacks/[a-z0-9]+(?:-[a-z0-9]+)*/environment\\.json#sha256:[0-9a-f]{64}$"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "checks": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "family",
+          "status",
+          "evidence",
+          "owner"
+        ],
+        "properties": {
+          "id": {
+            "$ref": "#/$defs/checkId"
+          },
+          "family": {
+            "$ref": "#/$defs/family"
+          },
+          "status": {
+            "enum": [
+              "ok",
+              "wall",
+              "skipped"
+            ]
+          },
+          "evidence": {
+            "type": "string",
+            "minLength": 1,
+            "description": "What was observed: an outcome, a name, a length or a digest; never a credential value, which the response gate sweeps for."
+          },
+          "owner": {
+            "description": "Who clears the wall; null for a check that is ok or skipped.",
+            "oneOf": [
+              {
+                "$ref": "#/$defs/owner"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        }
+      }
+    },
+    "walls": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "checkId",
+          "owner",
+          "repair"
+        ],
+        "properties": {
+          "checkId": {
+            "$ref": "#/$defs/checkId"
+          },
+          "owner": {
+            "$ref": "#/$defs/owner"
+          },
+          "repair": {
+            "type": "string",
+            "minLength": 1,
+            "description": "What clears the wall. A declaration wall whose requested name is a near match of one declaration names it as suggested `<id>`, and that phrase is what makes ROUTE_NAME_NEAR_MATCH a taken fallback."
+          }
+        }
+      }
+    },
+    "generatedAt": {
+      "type": "string",
+      "format": "date-time"
+    }
+  },
+  "$defs": {
+    "slug": {
+      "type": "string",
+      "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$"
+    },
+    "checkId": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9-]*(?:\\.[a-z0-9][a-z0-9-]*)+$"
+    },
+    "family": {
+      "enum": [
+        "declaration",
+        "checkout",
+        "identity",
+        "runtime",
+        "host",
+        "approval"
+      ]
+    },
+    "owner": {
+      "enum": [
+        "declaration",
+        "checkout",
+        "identity",
+        "runtime",
+        "host",
+        "approval",
+        "person"
+      ]
+    },
+    "checkIds": {
+      "description": "The closed vocabulary of checks, one template per readiness question. `<role>` expands over the requested roles, `<class>` over the operation classes the environment schema publishes under authorization. declaration: the portable declaration exists and its hydrated route projects it. checkout: the route carries a git policy, the tree is clean, the branch is one the policy permits. identity: the sealed admin credential preflight, and the flow's account record and sign-in probe when a flow is named. runtime: the registry entry of the route, the served head containing the bound head, the projected port answering, and no foreign process holding it. host: a browser binary for the audit profile, a reachable container daemon, installed dependencies per checkout, and no ancestor node_modules leaking types into the checkout's typecheck. approval: who authorises each operation class.",
+      "templates": [
+        "declaration.<role>",
+        "checkout.<role>.policy",
+        "checkout.<role>.clean",
+        "checkout.<role>.branch",
+        "identity.custody",
+        "identity.flow.account",
+        "identity.flow.signin",
+        "runtime.<role>.entry",
+        "runtime.<role>.head",
+        "runtime.<role>.port",
+        "runtime.<role>.holder",
+        "host.browser",
+        "host.container",
+        "host.deps.<role>",
+        "host.types.<role>",
+        "approval.<class>"
+      ]
+    }
+  }
+}

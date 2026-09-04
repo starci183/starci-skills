@@ -9,8 +9,8 @@ với source thực sự đã được giao.
 ## Hai chế độ, một head
 
 `mode` quyết định nửa nào của operator này chạy. Dưới `model`, lời hứa được mô hình hoá và ma trận
-phủ được đóng băng: bước 4, 5 và 6 chạy, và nhánh ghi `response/data/coverage-matrix.json`. Dưới
-`reconcile` không mô hình lại gì cả; bước 7 đối chiếu head đã publish với source mà một lượt backend
+phủ được đóng băng: bước 5, 6 và 7 chạy, và nhánh ghi `response/data/coverage-matrix.json`. Dưới
+`reconcile` không mô hình lại gì cả; bước 8 đối chiếu head đã publish với source mà một lượt backend
 đã giao, và Input `backend-source-application` là bắt buộc trong chế độ ấy, vì một cuộc đối chiếu không
 có source đã giao chỉ là ý kiến về đoạn code chưa ai đọc. Bảng Đầu vào ghi nó là tuỳ chọn vì tính bắt
 buộc phụ thuộc chế độ, và `validate.mjs` từ chối một nhánh `reconcile` mà request không ràng nó. Hai
@@ -25,6 +25,22 @@ Một feature chưa có source hiện thực thì theo định nghĩa không có
 `EVIDENCE_MISSING` áp cho claim fact không có file đứng sau, không bao giờ áp cho intent của một lời
 hứa đang được quyết lần đầu. Mọi hàng enforcing của coverage matrix vẫn phải tựa trên claim fact, nên
 head greenfield publish với các hàng enforcing còn mở, đó chính là nghĩa của `pending`.
+
+## Lời hứa được nói lại trước khi được mô hình hoá
+
+Khi request cung cấp `promise` dưới chế độ model, ở lần chạy đầu hay ở lần chạy mà lời hứa đã đổi,
+bước 2 ghi `response/restatement.md` trước khi bất cứ thứ gì được mô hình hoá: những dòng bằng ngôn
+ngữ thường, trong số dòng mà kind `restatement` cho phép, nói lời hứa đã được hiểu là gì, và nguyên
+văn lời của người dưới `## Source`. Các dòng ấy viết bằng ngôn ngữ của `promise`, vì một bản nói lại
+mà người không đọc được thì không xác nhận được gì; validator kiểm hình dạng và phần trích dẫn chứ
+không kiểm ngôn ngữ, nên ngôn ngữ là bổn phận của agent. Trừ khi request mang `decisionId` cấp gốc
+`restatement:<featureId>` cùng một `selectedOption` đã ghi trong state.json.choices, nhánh kết thúc
+`blocked` với `RESTATEMENT_UNCONFIRMED`, có `fields.restatement` và không có đầu ra nào khác, cùng
+`interaction` kiểu `restatement-confirm` trên đúng decisionId ấy với đúng hai lựa chọn `as-stated` và
+`corrected`. Một lần vào lại chọn `corrected` nêu nhánh bị chặn trong `resume` và mang một `promise`
+khác với promise của nhánh ấy; lần vào lại chọn `as-stated` mang cùng promise; nhánh sau đó chạy tiếp
+và receipt done vẫn mang `fields.restatement`. Một lần chạy mà request không có `promise` dùng lại lời
+hứa của head trước và không nợ bản nói lại nào.
 
 ## Tách loại claim trước khi mô hình hoá
 
@@ -68,7 +84,7 @@ là một disposition nên nhánh được hoãn không chặn publish; thứ ch
 ## Một gốc thẩm quyền phẳng
 
 Một feature sở hữu đúng một thư mục head, `<gốc businesses>/features/<featureId>`, mà `model.json`
-trong đó là head, và bước 8 giữ lease độc quyền trên alias ấy trước khi ghi. Hai nhánh của cùng một
+trong đó là head, và bước 9 giữ lease độc quyền trên alias ấy trước khi ghi. Hai nhánh của cùng một
 bước không được publish cùng một feature. `features/` là đoạn duy nhất giữa gốc và một feature: chèn
 một đoạn project dưới gốc là sinh ra cây thẩm quyền thứ hai mà người đọc sau không bao giờ tìm ra,
 nên mọi head không đúng `features/<featureId>` đều bị từ chối. Head được phân loại absent, fresh hay
@@ -80,8 +96,9 @@ với ma trận đóng băng trước, dưới `reconcile`.
 ## Ranh giới
 
 Context chỉ đọc, trừ đúng một head feature. Operator chỉ ghi `response/` của nhánh mình, gồm
-`response.md`, `response/data/claims.json`, `response/data/coverage-matrix.json` dưới chế độ model,
-`response/data/model.json` và `response.json`, cùng một head feature dưới
+`response.md`, `response/restatement.md` khi request cung cấp `promise`, `response/data/claims.json`,
+`response/data/coverage-matrix.json` dưới chế độ model, `response/data/model.json` và
+`response.json`, cùng một head feature dưới
 `@worktrees/businesses/<featureId>`. Nó không bao giờ publish một lời hứa khi còn một consumer hay
 nhánh vòng đời đã phát hiện chưa có disposition, không nâng một ví dụ, một ảnh chụp hay một claim ý
 định thành sự thật sản phẩm, không bịa hành vi actor, entitlement, quota, thanh toán, tất toán hay
@@ -121,14 +138,15 @@ cài đặt, một cổng chất lượng hay một lượt UAT đã qua.
 | # | Bước | Tham số | Đọc | Ghi | Dừng với |
 | --- | --- | --- | --- | --- | --- |
 | 1 | Kiểm gate và chạy lại | `resume`, `mode` | `request/request.json`, @workspaces/be ở head đóng băng | — | `INVALID_INPUT`, `SOURCE_DRIFT`, `NO_PROGRESS` |
-| 2 | Chuẩn hoá bằng chứng thành claim | — | @workspaces/be, mọi quan sát kèm vai, path, khoảng dòng và head, đầu vào `architecture-decision` nếu có và chỉ như bằng chứng, @tools/git | `response/data/claims.json` | `EVIDENCE_MISSING`, `CONTRADICTION_UNRESOLVED` |
-| 3 | Kiểm head đã publish và thẩm quyền chuyển trạng thái | `featureId`, `targetState`, `approval` | @worktrees/businesses/<featureId>: head hiện tại, trạng thái và bằng chứng đóng băng của nó | — | `LIFECYCLE_TRANSITION_INVALID`, `AUTHORITY_CONFLICT`, `APPROVAL_REQUIRED` |
-| 4 | Mô hình lời hứa, actor và eligibility dưới chế độ model: claim fact gánh mọi hàng enforcing, claim intent gánh chính lời hứa | `promise` | `response/data/claims.json`, @workspaces/be ở head đóng băng, @tools/websearch | — | `EVIDENCE_MISSING` |
-| 5 | Đóng băng ma trận phủ, dưới chế độ model | `dimensions` | `response/data/claims.json`, @workspaces/be và bề mặt nó phát hiện | `response/data/coverage-matrix.json` | `COVERAGE_INCOMPLETE`, `CONSUMER_UNPROVEN` |
-| 6 | Xử lý phần chung sống với legacy, dưới chế độ model | — | `response/data/coverage-matrix.json`: các hàng legacy create, read, settle và bằng chứng của chúng | — | `CONTRADICTION_UNRESOLVED` |
-| 7 | Đối chiếu với source đã giao, dưới chế độ reconcile | — | đầu vào `backend-source-application`, @workspaces/be ở head đóng băng, ma trận phủ đã đóng băng ở head đã publish | — | `RECONCILIATION_DISCREPANCY` |
-| 8 | Publish một head dưới lease độc quyền | — | `response/data/claims.json`, @worktrees/businesses/<featureId> ở head trước | @worktrees/businesses/<featureId> thành model.json head mới, `response/data/model.json`, @tools/sourcewrite | `SOURCE_DRIFT` |
-| 9 | Phát | — | mọi thứ ở trên | `response/response.md`, `response/response.json` | — |
+| 2 | Nói lại lời hứa bằng ngôn ngữ của người và chờ họ xác nhận, dưới chế độ model khi request cung cấp nó | `promise` | `request/request.json`: `requirements.promise`, cùng `decisionId` và `selectedOption` của nó khi lựa chọn đã được ghi | `restatement` | `RESTATEMENT_UNCONFIRMED` |
+| 3 | Chuẩn hoá bằng chứng thành claim | — | @workspaces/be, mọi quan sát kèm vai, path, khoảng dòng và head, đầu vào `architecture-decision` nếu có và chỉ như bằng chứng, @tools/git | `response/data/claims.json` | `EVIDENCE_MISSING`, `CONTRADICTION_UNRESOLVED` |
+| 4 | Kiểm head đã publish và thẩm quyền chuyển trạng thái | `featureId`, `targetState`, `approval` | @worktrees/businesses/<featureId>: head hiện tại, trạng thái và bằng chứng đóng băng của nó | — | `LIFECYCLE_TRANSITION_INVALID`, `AUTHORITY_CONFLICT`, `APPROVAL_REQUIRED` |
+| 5 | Mô hình lời hứa, actor và eligibility dưới chế độ model: claim fact gánh mọi hàng enforcing, claim intent gánh chính lời hứa | `promise` | `response/data/claims.json`, @workspaces/be ở head đóng băng, @tools/websearch | — | `EVIDENCE_MISSING` |
+| 6 | Đóng băng ma trận phủ, dưới chế độ model | `dimensions` | `response/data/claims.json`, @workspaces/be và bề mặt nó phát hiện | `response/data/coverage-matrix.json` | `COVERAGE_INCOMPLETE`, `CONSUMER_UNPROVEN` |
+| 7 | Xử lý phần chung sống với legacy, dưới chế độ model | — | `response/data/coverage-matrix.json`: các hàng legacy create, read, settle và bằng chứng của chúng | — | `CONTRADICTION_UNRESOLVED` |
+| 8 | Đối chiếu với source đã giao, dưới chế độ reconcile | — | đầu vào `backend-source-application`, @workspaces/be ở head đóng băng, ma trận phủ đã đóng băng ở head đã publish | — | `RECONCILIATION_DISCREPANCY` |
+| 9 | Publish một head dưới lease độc quyền | — | `response/data/claims.json`, @worktrees/businesses/<featureId> ở head trước | @worktrees/businesses/<featureId> thành model.json head mới, `response/data/model.json`, @tools/sourcewrite | `SOURCE_DRIFT` |
+| 10 | Phát | — | mọi thứ ở trên | `response/response.md`, `response/response.json` | — |
 
 Legacy create, read và settle mỗi thứ giữ một hàng riêng khi chúng được khai: một đường bán mới chỉ
 được retire phần tạo legacy khi quyền đã mua vẫn đọc được và phần tất toán legacy còn treo vẫn hoàn
@@ -144,6 +162,7 @@ một câu trả lời khác.
 | Kind | File | Kiểu | Bắt buộc |
 | --- | --- | --- | --- |
 | `business-promise-authority` | `response/response.md` | md | có |
+| `restatement` | `response/restatement.md` | md | không |
 | `claims` | `response/data/claims.json` | data | có |
 | `coverage-matrix` | `response/data/coverage-matrix.json` | data | không |
 | `model` | `response/data/model.json` | data | có |
@@ -155,6 +174,7 @@ một câu trả lời khác.
 | `INVALID_INPUT` | terminate |
 | `SOURCE_DRIFT` | terminate |
 | `NO_PROGRESS` | terminate |
+| `RESTATEMENT_UNCONFIRMED` | terminate |
 | `EVIDENCE_MISSING` | terminate |
 | `CONTRADICTION_UNRESOLVED` | terminate |
 | `LIFECYCLE_TRANSITION_INVALID` | terminate |

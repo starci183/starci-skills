@@ -1,6 +1,6 @@
 {
   "$id": "kind:mutations",
-  "title": "Every mutation one source-writing step made or planned, the contract it filled, and the single commit that carries them on the session branch; under mode dry the commit is null and the record is a plan.",
+  "title": "Every mutation one source-writing step made or planned, the contract it filled, and the single commit that carries them on the session branch; under mode dry the commit is null and the record is a plan. A change carries widened: true exactly when its path lies outside every owner boundary and the receipt lists it under ## Widened.",
   "type": "object",
   "additionalProperties": false,
   "required": ["mode", "contractFingerprint", "base", "branch", "commit", "operations", "changes"],
@@ -58,7 +58,8 @@
         "change": { "enum": ["added", "modified", "deleted"] },
         "operationId": { "$ref": "#/$defs/identifier" },
         "beforeHash": { "$ref": "#/$defs/nullableHash" },
-        "afterHash": { "$ref": "#/$defs/nullableHash" }
+        "afterHash": { "$ref": "#/$defs/nullableHash" },
+        "widened": { "type": "boolean" }
       }
     }
   }

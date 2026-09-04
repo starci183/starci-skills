@@ -270,8 +270,11 @@ mỗi điều là một cổng chứ không phải một ý định.
   trong hồ sơ của nó.
 - Mỗi phiên lái profile trình duyệt của riêng nó, ghi trong snapshot của chính lượt chạy, để cookie
   của phiên này không bao giờ là phiên đăng nhập của phiên kia.
-- Seed được scope bằng tiền tố của chính luồng và không đụng hàng dùng chung: mọi định danh được seed
-  đều mang tiền tố đó, và phần rollback liệt kê đúng những định danh đó, không gì khác.
+- Seed quy được về đúng luồng và không đụng hàng dùng chung: mọi hàng được seed thuộc sở hữu của tài
+  khoản đã cấp cho luồng, hoặc mang tiền tố của luồng trong một định danh ở kho không có cột chủ sở
+  hữu, và rollback liệt kê đúng những hàng đó chứ không hơn. Kho không có cột chủ sở hữu lẫn định danh
+  gắn tiền tố được là một giới hạn được ghi lại của seed đó, không bao giờ là một thay đổi schema làm
+  ra để thoả luật này.
 - Không operator nào ghi lease, tài khoản hay thư mục lượt chạy của phiên khác: lease, phần ghi công
   cấp tài khoản và snapshot của lượt chạy đều nêu tên phiên đã hỏi, và một lần ghi mà phiên khác đi thì
   bị từ chối chứ không hoà vào.

@@ -220,6 +220,7 @@ export async function validateDirectionStep(branchDir, root = ROOT) {
     if (!empty(requirements.ownerCeiling) && decision['Owner ceiling'] !== requirements.ownerCeiling) errors.push(`${at}: Owner ceiling differs from the request`);
     if (decision['Selection policy'] !== policy) errors.push(`${at}: Selection policy ${decision['Selection policy']} differs from the request's ${policy}`);
     if (changeLevel === 'refine' && decision.Classification !== 'locked-refine') errors.push(`${at}: a refine is classified locked-refine, not ${decision.Classification}`);
+    if (!['app-owned', 'none'].includes(decision['Presentation delta'])) errors.push(`${at}: Presentation delta ${decision['Presentation delta'] ?? '(absent)'} is neither app-owned nor none`);
     if (changeLevel !== 'refine' && decision.Classification === 'locked-refine') errors.push(`${at}: locked-refine requires change level refine`);
 
     // Exactly one candidate is selected, every candidate formed is falsified, and every candidate

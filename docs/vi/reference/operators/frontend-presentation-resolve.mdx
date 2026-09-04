@@ -34,6 +34,10 @@ Cấu trúc, thứ tự phần tử, việc chọn component Grammar, chữ, d�
 xong, và trần owner cũng vậy: nó do chính cái hướng mà nhánh này resolve mang theo, không bao giờ
 được khai lại ở đây. Operator này chỉ trả lời, cho từng node ứng dụng sở hữu, mỗi thuộc tính trình
 bày nhận giá trị nào và luật nào uỷ quyền cho giá trị ấy. Nó không đổi gì về thứ cây render ra.
+`Presentation delta` của hướng nói ở đây có nợ gì hay không: dưới `app-owned` receipt resolve ít nhất
+một thuộc tính do ứng dụng sở hữu; dưới `none` nó mang owner map rỗng, không chọn luật nào và
+inventory rỗng, vì thay đổi chỉ chữ, hành vi hay binding không nợ giá trị trình bày nào, và một giá
+trị bịa ra để lấp bảng chính là thứ bịa đặt mà operator này tồn tại để từ chối.
 
 ## Không có luật bịa
 

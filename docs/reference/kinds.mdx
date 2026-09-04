@@ -43,7 +43,9 @@ Skeleton: [`templates/kinds/backend-source-application.skeleton.md`](https://git
 | `^## Binding$` | `\| Field \| Value \|` | `Outcome`, `Feature`, `Contract fingerprint`, `Base`, `Branch`, `Commit` | `Value`: `\S` |
 | `^## Operations$` | `\| Operation \| Transport \| Writer \| Transaction \| Idempotency \| Decisions \|` | minRows 1 | `Transport`: `^(graphql-mutation\|graphql-query\|rest\|worker\|cron\|event-consumer\|migration)$`<br />`Transaction`: `^(single-transaction\|per-item\|read-only\|none)$`<br />`Idempotency`: `^(none\|natural-key\|request-token\|event-id)$`<br />`Decisions`: `^[a-z0-9][a-z0-9-]*(?:, [a-z0-9][a-z0-9-]*)*$` |
 | `^## Changes$` | `\| Path \| Change \| Operation \| Before \| After \|` | minRows 1 | `Change`: `^(added\|modified\|deleted)$`<br />`Before`: `^(sha256:[0-9a-f]{64}\|—)$`<br />`After`: `^(sha256:[0-9a-f]{64}\|—)$` |
+| `^## Widened$` | `\| Path \| Nearest boundary \| Why \|` | — | `Path`: `^`[^`]+`$`<br />`Nearest boundary`: `^`[^`]+`$`<br />`Why`: `\S` |
 | `^## Findings$` | `\| Code \| Operation \| File \| Statement \|` | — | `Code`: `^`(PATTERN_BOUND\|NEW_CONVENTION_REFUSED\|SNAPSHOT_REVALIDATED\|MIGRATION_INCLUDED\|EXCEPTION_IDENTITY_REUSED\|BUSINESS_QUESTION_RAISED)`$`<br />`Statement`: `\S` |
+| `^## Fallbacks taken$` | `\| Code \| Action \|` | — | `Code`: `^`[A-Z][A-Z0-9_]+`$`<br />`Action`: `\S` |
 
 ### `business-promise-authority`
 
@@ -118,6 +120,19 @@ Skeleton: [`templates/kinds/content-review.skeleton.md`](https://github.com/star
 | `^## Findings$` | `\| Owning stage \| Severity \| Statement \| Evidence \|` | — | `Owning stage`: `^(brief\|write\|image\|code\|e2e\|critique)$`<br />`Severity`: `^(error\|improvement)$`<br />`Evidence`: `\S` |
 | `^## Verdict$` | `\| Field \| Value \|` | `Verdict` | `Value`: `\S` |
 
+### `environment-readiness`
+
+Title: `^# environment-readiness — [a-z0-9][a-z0-9-]*$`
+
+Skeleton: [`templates/kinds/environment-readiness.skeleton.md`](https://github.com/starci183/starci-skills/blob/main/templates/kinds/environment-readiness.skeleton.md)
+
+| Section | Table header | Rows | Cell constraints |
+| --- | --- | --- | --- |
+| `^## Binding$` | `\| Field \| Value \|` | `Project`, `Roles`, `Environment`, `Flow`, `Declaration` | `Value`: `\S` |
+| `^## Checks$` | `\| Check \| Family \| Status \| Evidence \|` | minRows 1 | `Check`: `^`[a-z][a-z0-9-]*(?:\.[a-z0-9][a-z0-9-]*)+`$`<br />`Family`: `^(declaration\|checkout\|identity\|runtime\|host\|approval)$`<br />`Status`: `^(ok\|wall\|skipped)$`<br />`Evidence`: `\S` |
+| `^## Walls$` | `\| Wall \| Owner \| Repair \|` | — | `Wall`: `^`[a-z][a-z0-9-]*(?:\.[a-z0-9][a-z0-9-]*)+`$`<br />`Owner`: `^(declaration\|checkout\|identity\|runtime\|host\|approval\|person)$`<br />`Repair`: `\S` |
+| `^## Fallbacks taken$` | `\| Code \| Action \|` | — | `Code`: `^`[A-Z][A-Z0-9_]+`$`<br />`Action`: `\S` |
+
 ### `frontend-direction-decision`
 
 Title: `^# frontend-direction-decision — [a-z0-9][a-z0-9-]*$`
@@ -126,7 +141,7 @@ Skeleton: [`templates/kinds/frontend-direction-decision.skeleton.md`](https://gi
 
 | Section | Table header | Rows | Cell constraints |
 | --- | --- | --- | --- |
-| `^## Decision$` | `\| Field \| Value \|` | `Direction id`, `Target`, `Intent`, `Change level`, `Owner ceiling`, `Classification`, `Selection policy`, `Selected candidate` | `Value`: `\S` |
+| `^## Decision$` | `\| Field \| Value \|` | `Direction id`, `Target`, `Intent`, `Change level`, `Owner ceiling`, `Classification`, `Presentation delta`, `Selection policy`, `Selected candidate` | `Value`: `\S` |
 | `^## Surface class$` | `\| Class \| Why \|` | exactRows 1 | `Class`: `^`[a-z][a-z0-9-]*`$`<br />`Why`: `\S` |
 | `^## Observed$` | `\| Item \| Evidence \|` | minRows 1 | `Evidence`: `^`[^`]+@[0-9a-f]{7,40}`$` |
 | `^## UI contract$` | `\| Element \| Kind \| Responsibility \|` | minRows 1 | `Kind`: `^(region\|action\|state\|responsive\|content\|accessibility)$`<br />`Responsibility`: `\S` |
@@ -148,8 +163,8 @@ Skeleton: [`templates/kinds/frontend-presentation-resolution.skeleton.md`](https
 
 | Section | Table header | Rows | Cell constraints |
 | --- | --- | --- | --- |
-| `^## Owner map$` | `\| Node \| Property \| Owner \| Rule \|` | minRows 1 | `Node`: `^`[^`]+`$`<br />`Owner`: `^(app\|grammar)$`<br />`Rule`: `^`[A-Z][A-Z0-9-]*-[0-9]+`$` |
-| `^## Rules chosen$` | `\| Node \| Rule \| Class \| Condition \|` | minRows 1 | `Node`: `^`[^`]+`$`<br />`Rule`: `^`[A-Z][A-Z0-9-]*-[0-9]+`$`<br />`Class`: `^`[^`]+`$`<br />`Condition`: `\S` |
+| `^## Owner map$` | `\| Node \| Property \| Owner \| Rule \|` | minRows 0 | `Node`: `^`[^`]+`$`<br />`Owner`: `^(app\|grammar)$`<br />`Rule`: `^`[A-Z][A-Z0-9-]*-[0-9]+`$` |
+| `^## Rules chosen$` | `\| Node \| Rule \| Class \| Condition \|` | minRows 0 | `Node`: `^`[^`]+`$`<br />`Rule`: `^`[A-Z][A-Z0-9-]*-[0-9]+`$`<br />`Class`: `^`[^`]+`$`<br />`Condition`: `\S` |
 | `^## Removed$` | `\| Node \| Class \| Because \|` | — | `Node`: `^`[^`]+`$`<br />`Because`: `^(reimplements an owned relationship\|overrides Grammar anatomy\|off the closed scale\|refused by [A-Z][A-Z0-9-]*-[0-9]+ Case [0-9]+)$` |
 | `^## Gaps$` | `\| Node \| Property \| Missing path \|` | — | `Node`: `^`[^`]+`$`<br />`Missing path`: `\S` |
 | `^## Fallbacks taken$` | `\| Code \| Action \|` | — | `Code`: `^`[A-Z][A-Z0-9_]+`$` |
@@ -254,7 +269,7 @@ Skeleton: [`templates/kinds/quality-verification.skeleton.md`](https://github.co
 | `^## Binding$` | `\| Field \| Value \|` | `Operator`, `Step`, `Checkout`, `Head`, `Session branch`, `Predecessors` | `Value`: `\S` |
 | `^## Gate plan$` | `\| Gate \| Required \| Command \| Configuration \|` | minRows 1 | `Gate`: `^`(format\|lint\|typecheck\|build\|unit-coverage\|integration\|e2e\|sonar\|presentation-sweep)`$`<br />`Required`: `^(yes\|no)$` |
 | `^## Results$` | `\| Gate \| Status \| Exit code \| Evidence \| Classification \| Statement \|` | minRows 1 | `Gate`: `^`(format\|lint\|typecheck\|build\|unit-coverage\|integration\|e2e\|sonar\|presentation-sweep)`$`<br />`Status`: `^(pass\|fail\|external-blocker\|skipped-not-requested)$`<br />`Classification`: `^(in-boundary\|boundary-drift\|flaky\|external-blocker\|—)$`<br />`Statement`: `\S` |
-| `^## Coverage$` | `\| Metric \| Measured \| Threshold \| Verdict \|` | — | `Metric`: `^(statements\|lines\|functions\|branches)$`<br />`Verdict`: `^(at-or-above\|below)$` |
+| `^## Coverage$` | `\| Metric \| Measured \| Threshold \| Verdict \|` | — | `Metric`: `^(statements\|lines\|functions\|branches)$`<br />`Verdict`: `^(at-or-above\|below\|unconfigured)$` |
 | `^## Sonar$` | `\| Field \| Value \|` | `Scope`, `Finding` | `Value`: `\S` |
 | `^## Debts$` | `\| Debt \| Gate \| Approval \| Owner \| Expires \| Statement \|` | — | `Gate`: `^`(format\|lint\|typecheck\|build\|unit-coverage\|integration\|e2e\|sonar\|presentation-sweep)`$` |
 | `^## Findings$` | `\| Code \| Gate \| Statement \|` | minRows 1 | `Code`: `^`(PREDECESSOR_CONSUMED\|SONAR_NEW_CODE_ONLY\|E2E_NOT_REQUESTED\|COVERAGE_BELOW_THRESHOLD\|FLAKY_CONFIRMED\|DEBT_DECLARED)`$`<br />`Statement`: `\S` |
@@ -277,6 +292,17 @@ Skeleton: [`templates/kinds/release-deployment.skeleton.md`](https://github.com/
 | `^## Steady state$` | `\| Metric \| Value \|` | — | `Value`: `\S` |
 | `^## Findings$` | `\| Code \| Step \| Statement \|` | — | `Code`: `^`(IDEMPOTENT_NO_OP\|PROBE_TRANSIENT\|TARGET_UNAVAILABLE\|SUPERSEDED_TARGET_ACTIVE\|FOREIGN_RELEASE_OBSERVED\|APPROVED_ACTION_REPEATED\|CREDENTIAL_VALUE_IN_OUTPUT)`$`<br />`Statement`: `\S` |
 | `^## Fallbacks taken$` | `\| Code \| Action \|` | — | `Code`: `^`[A-Z][A-Z0-9_]+`$` |
+
+### `restatement`
+
+Title: `^# restatement — [a-z0-9][a-z0-9-]*$`
+
+Skeleton: [`templates/kinds/restatement.skeleton.md`](https://github.com/starci183/starci-skills/blob/main/templates/kinds/restatement.skeleton.md)
+
+| Section | Table header | Rows | Cell constraints |
+| --- | --- | --- | --- |
+| `^## Restatement$` | `\| Line \| Statement \|` | minRows 1 | `Line`: `^[1-5]$`<br />`Statement`: `\S` |
+| `^## Source$` | `\| Field \| Value \|` | `Field`, `Quoted` | `Value`: `\S` |
 
 ### `uat-flow-verification`
 
@@ -343,6 +369,7 @@ Skeleton: [`templates/kinds/workspace-route-binding.skeleton.md`](https://github
 | `probes` | [`templates/kinds/probes.schema.json`](https://github.com/starci183/starci-skills/blob/main/templates/kinds/probes.schema.json) | `deadlineSeconds`, `elapsedSeconds`, `backoffSeconds`, `observations`, `finalCondition` |
 | `producer-import` | [`templates/kinds/producer-import.schema.json`](https://github.com/starci183/starci-skills/blob/main/templates/kinds/producer-import.schema.json) | `schemaVersion`, `sourceSessionId`, `sourceStep`, `sourceParallel`, `targetSessionId`, `targetStep`, `targetParallel`, `files` |
 | `proof` | [`templates/kinds/proof.schema.json`](https://github.com/starci183/starci-skills/blob/main/templates/kinds/proof.schema.json) | `operationId`, `proofKind`, `commandRef`, `exitCode`, `result`, `output`, `statement`, `contractFingerprint` |
+| `readiness-report` | [`templates/kinds/readiness-report.schema.json`](https://github.com/starci183/starci-skills/blob/main/templates/kinds/readiness-report.schema.json) | `project`, `roles`, `env`, `flow`, `declarationRef`, `checks`, `walls`, `generatedAt` |
 | `route` | [`templates/kinds/route.schema.json`](https://github.com/starci183/starci-skills/blob/main/templates/kinds/route.schema.json) | `project`, `role`, `portableRouteRef`, `hydratedRouteRef`, `routeFingerprint`, `identityFingerprint`, `sourceHead`, `checkout`, `gitPolicy`, `mutationReadiness`, `writeRoots`, `authorityRoots`, `runtime`, `provenanceHeadRef` |
 | `stack-model` | [`templates/kinds/stack-model.schema.json`](https://github.com/starci183/starci-skills/blob/main/templates/kinds/stack-model.schema.json) | `decisionId`, `selectedAlternativeId`, `alternatives`, `boundaries`, `stores`, `components`, `operations` |
 | `uat-account` | [`templates/kinds/uat-account.schema.json`](https://github.com/starci183/starci-skills/blob/main/templates/kinds/uat-account.schema.json) | `env`, `flow`, `identity`, `accounts`, `plaintextRecorded` |

@@ -13,8 +13,13 @@ buộc bên dưới vẫn giữ nguyên. Cột Ask hay reason chẩn đoán khô
 1. Đóng băng một phạm vi nhiệm vụ: đơn vị, đích, phần bao gồm và phần loại trừ, các gốc được ghi,
    hiệu ứng ra bên ngoài, và thứ sẽ được tính là bằng chứng. Hai cách đọc làm đổi bất kỳ điểm nào
    trong số đó là một câu hỏi tập trung, không phải một phỏng đoán.
-2. Chạy `workspace.bind` cho mọi nhiệm vụ có đọc hoặc ghi source đã route. Không thứ gì khác được
-   phép tự tìm checkout, và một thư mục trùng tên không bao giờ là thẩm quyền route.
+2. Chạy `environment.preflight` trước cho mọi nhiệm vụ chạm tới source đã route hay một runtime:
+   mọi bức tường nhiệm vụ có thể gặp — route chưa khai hay gần trùng tên, thiếu chính sách git,
+   checkout bẩn, đăng nhập thất bại, head đang phục vụ không chứa head đã bind, port bị giữ, thiếu
+   trình duyệt hay container, một phê duyệt mà môi trường giữ lại cho người — được báo cùng lúc trong
+   một báo cáo sẵn sàng có kiểu, thay vì mỗi giờ một bức khi chuỗi đâm vào chúng. Rồi chạy
+   `workspace.bind` cho mọi nhiệm vụ có đọc hoặc ghi source đã route. Không thứ gì khác được phép tự
+   tìm checkout, và một thư mục trùng tên không bao giờ là thẩm quyền route.
 3. Tìm workflow trước: đọc `when` của mọi ví dụ trong `workflows/`. Khớp trọn thì chạy đúng như đã
    ghi, preset điền vào `request.json`. Các ví dụ là tham chiếu chứ không phải toàn bộ số chuỗi có
    thể có: khi chỉ khớp một phần, hoặc bài toán nghiệp vụ khó hơn mọi `when` mô tả, cửa vào tự nghĩ
@@ -54,6 +59,7 @@ Bằng chứng giữa các phiên dùng scripts/producer-import.mjs. Chép bundl
 
 | Yêu cầu nói về | Operator đầu tiên |
 | --- | --- |
+| Máy này, route, danh tính, runtime và phê duyệt của nó đã sẵn sàng cho nhiệm vụ chưa | `environment.preflight` |
 | Dự án nào, checkout nào, hay binding runtime nào | `workspace.bind` |
 | Sản phẩm hứa gì, ai được hưởng, hỏng thì ra sao | `business.decide` |
 | Ranh giới hệ thống, quyền sở hữu dữ liệu, hay tech stack | `architecture.decide` |
@@ -89,14 +95,19 @@ request/request.json -> validate-request.mjs -> agent ghi response/ -> validate-
 3. `blocked` đọc `stop`, tra mã trong sổ gộp (`operators/errors.json` cộng `errors.json` của chính
    operator) lấy `domain`, rồi tra domain đó trong `routing.json`:
    - `operator` gọi operator được nêu tên, rồi quay lại đây;
-   - `resume` vào lại chính operator đó ở một bậc mới, `request.json.resume` trỏ về nhánh bị chặn;
-   - `user` dừng và báo người phải quyết hoặc phải publish gì;
+   - `resume` vào lại chính operator đó ở một bậc mới, `request.json.resume` gọi tên nhánh đã bị chặn;
+   - `chain` chạy workflow ví dụ được nêu tên trong một phiên anh em (rồi workflow mà `then` nêu),
+     nhánh bị chặn chờ phiên đó kết thúc và vào lại với thứ nó sinh ra — một lỗi thư viện owner được
+     sửa và tiêu thụ theo cách này, và không hỏi người điều gì;
+   - `user` dừng và báo điều người phải quyết hay công bố;
    - `external` dừng và báo thứ gì ngoài runtime phải thay đổi.
    Mã có cách xử lý `fallback` không bao giờ chặn: agent làm đúng fallback, ghi dưới
    `## Fallbacks taken`, rồi chạy tiếp, trừ khi tham số `unless` của mã nói khác.
 
 Response trượt một trong hai validator thì không định tuyến. Văn xuôi trong `response.md` không định
-tuyến. Chỉ một trường đã validate của `response.json` mới định tuyến.
+tuyến. Chỉ một trường đã validate của `response.json` mới định tuyến. Orchestrator ghi `response.json` thành khung `running` lúc dispatch; agent thoát mà không thay
+khung ấy thì được follow-up đúng một lần rồi ghi nhận là `RECEIPT_MISSING`, để một nhánh kể lại việc
+mình làm mà không ghi receipt hiện rõ trong sổ thay vì bị lặng lẽ bỏ qua.
 
 `routing.json` là bảng đóng và được kiểm: mọi domain mà mã dừng của một operator bàn giao tới đều có
 đúng một route, và không route nào gọi tên một domain không mã nào chạm tới. Thiếu một route là lỗi
@@ -108,8 +119,24 @@ Mỗi operator tự mang ngữ nghĩa resume và fingerprint của nó, nên fil
 hay trạng thái handoff nào. Một route `resume` trả về `NO_PROGRESS` nghĩa là cùng một input đụng
 cùng một bức tường: hãy báo bức tường thay vì thử lại.
 
-Một vòng giữa hai operator chỉ hợp lệ khi fingerprint tiến độ còn thay đổi. Fingerprint lặp lại,
-hoặc cùng một finding đáng kể xuất hiện hai lần, kết thúc vòng lặp và báo về chủ nhỏ hơn.
+\1
+
+Phiên chạy dưới một budget (`state.json.budget`, lấy từ `resources/orchestrator.json#budget`): trần
+số bậc và trần cùng-operator. Request nào vượt một trong hai là `BUDGET_EXHAUSTED`, và người trả lời
+một `budget-choice` có kiểu — thu hẹp, tiếp tục, dừng — được ghi vào `state.json.choices`; tiếp tục
+nới trần có ghi nhận. Trí nhớ của chính orchestrator là `state.json.brief` — đã chứng minh gì, đang
+kẹt ở đâu và chờ ai, tiếp theo là gì, phiên anh em nào giữ head nào, và bản báo cáo cuối người đã
+nhận — viết lại sau mỗi chuyển bước và đọc lại sau mỗi lần nén ngữ cảnh; không file ghi chú nào bên
+cạnh được công nhận. `scripts/validate-session.mjs` kiểm cả sổ sau mỗi chuyển bước.
+
+Một luật người nêu bằng lời của họ được nói lại cho họ trước khi thiết kế bất cứ gì trên đó:
+`business.decide` và `architecture.decide` viết một `restatement` tối đa năm dòng bằng ngôn ngữ của
+người và dừng với `RESTATEMENT_UNCONFIRMED` cho tới khi người chọn `as-stated` hay `corrected` trên
+một lựa chọn `restatement-confirm`; cách đọc đã sửa đến dưới dạng yêu cầu đã sửa và cùng nhánh đó
+chạy lại. Mỗi lượt orchestrator kết thúc với người là một trong các dạng báo cáo mà
+`resources/interaction.json` khai — đã giao, đang chờ anh quyết, đang làm — bằng ngôn ngữ của người;
+bàn giao cho phiên anh em là một nhánh `waiting` có điều kiện đánh thức, không bao giờ là kết thúc
+lượt.
 
 ## Thẩm quyền
 
@@ -148,12 +175,18 @@ operator.
 
 ## Điều phối
 
-Một lần gọi một operator là một agent, tạo mới trên profile mà `operator.json` của nó gọi tên, với
-đúng những alias mà bảng Context của nó khai và những tool mà `operator.json` của nó khai (`@tools/<id>` từ `resources/tools.json`, mỗi tool một mode), không hơn. `resources/orchestrator.json` chốt
-luật: tối đa ba agent cùng lúc, các nhánh cùng bậc không bao giờ chung alias ghi, điều phối theo
-workflow và `routing.json`, bàn giao chỉ qua các trường của `response.json` trong phiên (`state.json`,
+Một lần gọi một operator là một lần dispatch, theo chế độ mà `operator.json` khai dưới
+`resources.dispatch`: `inline`, orchestrator tự thực hiện các bước của operator như một checklist dưới
+chính validator của operator đó (bind route, chạy gate, công bố), hoặc `fresh`, tạo đúng một agent mới
+trên profile operator gọi tên, với `operators/<id>/brief.md` sinh ra và `request.json` của nó làm toàn
+bộ prompt, đúng những alias mà bảng Context của nó khai và những tool mà `operator.json` của nó khai
+(`@tools/<id>` từ `resources/tools.json`, mỗi tool một mode), không hơn. Agent mới được chờ theo sự
+kiện hoàn tất, không bao giờ theo đồng hồ. `resources/orchestrator.json` chốt luật: tối đa ba agent
+cùng lúc, các nhánh cùng bậc không bao giờ chung alias ghi, điều phối theo workflow và `routing.json`,
+bàn giao chỉ qua các trường của `response.json` trong phiên (`state.json`,
 `step-N/parallel-M/{request,response}`), phiên do orchestrator tạo trước và xoá sau `git.publish`. Agent
 không bao giờ khởi động agent khác; một cuộc trao đổi lồng (phản biện, review) là một agent mới do
-orchestrator tạo cho nhánh đang `waiting`. `alias/alias.json` là nơi duy nhất một alias phân giải ra vị
+orchestrator tạo cho nhánh đang `waiting`. Mọi file agent ghi dưới `response/` được gate response quét
+giá trị hình dạng bí mật (`scripts/sweep-secrets.mjs`) trước khi nhánh được định tuyến. `alias/alias.json` là nơi duy nhất một alias phân giải ra vị
 trí, và `alias/INDEX.md` là bản đồ đọc được của nó theo vùng (workspaces, grammar, knowledge, worktrees,
 remote, dynamic); operator chỉ đọc những gì bảng Context của nó gọi tên.

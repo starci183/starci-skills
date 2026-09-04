@@ -39,6 +39,13 @@ mà một lời hứa có thể phản bác. Backend implementation là bắt bu
 architecture decision khi một ranh giới đổi; ngoài ra không bắt buộc, và không bao giờ được bịa ra.
 `create` đi cùng `new` và chỉ đi cùng nó.
 
+Quyết định cũng khai delta trình bày của nó, ở dòng `Presentation delta` trong `## Decision`:
+`app-owned` khi ít nhất một thuộc tính trình bày do ứng dụng sở hữu thay đổi và lượt resolve theo sau
+nợ một luật cho nó, `none` khi thay đổi chỉ là chữ, hành vi hay binding và lượt resolve không nợ gì.
+Một hướng không mang dòng ấy được đọc là `app-owned`. Khai `none` chính là thứ cho phép một lượt dịch
+hay một lần sửa hành vi tới được `frontend.source.apply` mà không phải bịa một dòng trình bày để thoả
+contract; hướng khai `none` rồi lại đổi class thì bị lượt resolve từ chối, chứ không được tha.
+
 ## Bằng chứng phản bác, chứ không uỷ quyền
 
 Hiện trạng implementation, một test xanh, DOM đã render và một lần UAT pass trước đều là bằng chứng,

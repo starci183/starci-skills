@@ -1,4 +1,4 @@
-# StarCi Skills 1.9.0
+# StarCi Skills 2.0.0
 
 This tree is the runtime. Read [SKILL.md](SKILL.md) next; it is the single entry that freezes a
 mission's scope, selects the one operator that owns the outcome, and routes between operators on
@@ -29,12 +29,12 @@ its fingerprint and complete rule inventory, and may emit no identifier outside 
 
 ```text
 SKILL.md                 one entry, operators listed in operators/INDEX.md, one routing map
-routing.json             closed operator routes, four kinds: operator | resume | user | external
+routing.json             closed operator routes, five kinds: operator | resume | chain | user | external
 alias/                   alias.json (machine registry: location, scheme, binding, writers, zone) + INDEX.md (generated map by zone); every operator reads by alias only
-resources/               tools.json (the closed tool registry: modes and per-runtime support, addressed as @tools/<id>) + agents/profiles/{openai,claude}.json (6 profiles, permits per tool) + orchestrator.json (one agent per operator, max 3, profile equivalents); validated
+resources/               tools.json (the closed tool registry: modes and per-runtime support, addressed as @tools/<id>) + agents/profiles/{openai,claude}.json (6 profiles, permits per tool) + orchestrator.json (dispatch modes inline | fresh, max 3 agents, completion waits, the running skeleton, the brief, the budget, profile equivalents) + interaction.json (question kinds and report shapes); validated
 workflows/               example chains (steps of parallel branches, loops, presets) the entry reuses when a request matches their when; otherwise it composes its own under the same rules; validated
 operators/INDEX.md       generated: what each operator reads, which kinds it consumes and produces, its steps, and every stop code with its disposition; operators/errors.json holds the codes several operators share
-operators/<id>/          operator.md (+vi) one authored file per operator, operator.json (id, domain, resources), errors.json (its own codes), validate.mjs, self-test.mjs
+operators/<id>/          operator.md (+vi) one authored file per operator, operator.json (id, domain, resources incl. dispatch), errors.json (its own codes), validate.mjs, self-test.mjs, brief.md (generated: the dispatch prompt of one fresh agent, at most orchestrator.json#briefBytes)
 knowledge/
   ui/composition/        what a tree must contain, before it exists   -> frontend.direction.decide
   ui/presentation/       which CSS value an app-owned boundary takes  -> frontend.presentation.resolve
@@ -43,12 +43,12 @@ knowledge/
   grammars/<family>/     one visual family's realization of Common
 templates/               one template per document kind; each carries the json template-contract the tree is checked against;
                          kinds/ types every file that crosses between steps (<kind>.contract.json + <kind>.skeleton.md for markdown, <kind>.schema.json for data); step/ holds the request.json and response.json gates
-scripts/                 validate-routing.mjs, validate-resources.mjs, validate-knowledge-citations.mjs, validate-alias.mjs, validate-templates.mjs, validate-operator.mjs, validate-workflows.mjs, validate-request.mjs, validate-response.mjs, validate-step.mjs, run-operator-self-tests.mjs;
+scripts/                 validate-routing.mjs, validate-resources.mjs, validate-knowledge-citations.mjs, validate-alias.mjs, validate-templates.mjs, validate-operator.mjs, validate-workflows.mjs, validate-request.mjs, validate-response.mjs, validate-step.mjs, validate-session.mjs (the whole ledger: brief, budget, abandoned branches), sweep-secrets.mjs (the one home of secret-shaped patterns, run by the response gate), generate-operator-briefs.mjs, run-operator-self-tests.mjs;
                          device-state.mjs and workspace-portable.mjs (+ specs), which the backend package.json calls
 readiness/               workspaces/ schemas that the portable and hydrated route declarations name as $schema
 ```
 
-`npm test` runs the routing validation, the resources validation, the knowledge citation check, the template check, every operator self-test, and the script specs. It is green at the published
+`npm test` runs the routing validation, the resources validation, the knowledge citation check, the template check, the generated briefs check, every operator self-test, and the script specs. It is green at the published
 head or the head is not publishable.
 
 ## Rules that hold everywhere
@@ -66,6 +66,8 @@ head or the head is not publishable.
 - Rule IDs are stable public addresses. Append; never renumber, reuse, or silently change meaning.
 
 ## Lineage
+
+2.0.0 (2026-09-04): five Codex missions on the 1.7–1.9 tree spent most of their wall clock inside timed waits, re-dispatches of the same operator and walls nobody owned (tests/evidence/20260904-codex-five-tasks-retrospective.md); 2.0 answers each wall with a gate. `environment.preflight` opens every chain and reports every wall at once; a `chain` route repairs and consumes an owner library through its own workflows instead of stopping at a person; a direction declares its `Presentation delta` and a copy-only or behaviour-only change owes no presentation row; `backend.source.apply` owns by boundary (globs and protected refs) and records a genuinely needed widening as `OWNER_WIDENED` instead of dying on a frozen path list; a seed is attributable by account ownership or prefix, never by a schema column made for the law; the orchestrator writes a `running` skeleton at dispatch and an agent that exits without a receipt is `RECEIPT_MISSING`; dispatch is `inline` or `fresh` per operator and waits on completion, never on a timer; `state.json.brief` is the orchestrator's only memory and `state.json.budget` caps steps and same-operator re-entries (`BUDGET_EXHAUSTED`, answered by a typed `budget-choice`); `business.decide` and `architecture.decide` restate a person's rule in at most five lines and stop with `RESTATEMENT_UNCONFIRMED` until it is confirmed; every turn ends as one of three report shapes; fresh agents receive a generated `brief.md` under 2 KB instead of the tree; the response gate sweeps every receipt for secret-shaped values; the environment declares `external-upload` beside its other classes. Major: the routing contract gains a kind, the response status gains `running`, and a stop may be written by the orchestrator.
 
 1.9.0 (2026-09-04): owner library repairs and verified dependency updates have bounded operators with regression proofs; identity provisioning binds actual provider custody and proves product login; UI audits prioritize selected primary surfaces and preserve the limits of deferred secondary states.
 

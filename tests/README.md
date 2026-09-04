@@ -139,8 +139,15 @@ this folder yet contains a UAT verdict — an absence that is now legible instea
   `frontend.surface.audit` has ever looked at that surface rendered and no `uat.verify` has walked it,
   so the tree still knows nothing about how it behaves. Round 3 should do both.
 
-## Round 3 — planned
+## Round 3 — 2026-09-04, five live Codex missions on 1.7–1.9, judged for 2.0
 
-`backend-feature` through the dry plan now that the authority citation and the operations handoff exist;
-`frontend-refine` through a valid resolution into a dry apply; a served preview so `frontend.surface.audit`
-produces a matrix; one `platform.operate` run against the stale registry.
+Not a dry run: five missions ran the tree for real on two products, on the Codex processor, and left
+their session ledgers under `.worktrees/sessions/`. The record is
+[`evidence/20260904-codex-five-tasks-retrospective.md`](evidence/20260904-codex-five-tasks-retrospective.md):
+per mission its wall clock, steps, agents, waits, interrupts and compactions; every stop by kind
+(walls nobody owned, walls the tree's own contracts raised, orchestration walls, misread rules); and
+what held up. What the round changed is the 2.0 lineage line of the root index, one gate per wall.
+
+Still open after round 3: the readiness operator and the chain route have self-tests and validators
+but no live run yet; a served preview for `frontend.surface.audit` and a `platform.operate` run against
+the stale registry remain owed from round 2.

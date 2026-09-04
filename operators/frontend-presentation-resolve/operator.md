@@ -11,7 +11,12 @@ instead of inventing a value.
 Structure, element order, Grammar component selection, copy, data and behaviour arrive decided, and
 so does the owner ceiling: it is carried by the direction this branch resolves, never re-declared
 here. This operator only answers, for each node the application owns, which value each presentation
-property takes and which rule authorizes it. It changes nothing about what the tree renders.
+property takes and which rule authorizes it. It changes nothing about what the tree renders. The
+direction's `Presentation delta` says whether anything is owed here at all: under `app-owned` the
+receipt resolves at least one application-owned property; under `none` it carries an empty owner
+map, no chosen rule and an empty inventory, because a copy, behaviour or binding change owes no
+presentation value and a value invented to fill a table is exactly the fabrication this operator
+exists to refuse.
 
 ## No fabricated rule
 

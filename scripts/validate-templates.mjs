@@ -44,7 +44,7 @@ export async function loadKindTemplates(root) {
     if (errors.length) throw new Error(errors.join('\n'));
     if (contract.kind !== name.replace(/\.contract\.json$/, '')) throw new Error(`${rel}: contract.kind must equal the file name`);
     for (const s of contract.sections) {
-      if (!s.table && (s.rows || s.cell || s.minRows !== undefined || s.exactRows !== undefined)) throw new Error(`${rel}: section ${s.heading} has row rules but no table`);
+      if (!s.table && (s.rows || s.cell || s.minRows !== undefined || s.maxRows !== undefined || s.exactRows !== undefined)) throw new Error(`${rel}: section ${s.heading} has row rules but no table`);
       if (s.table && s.cell) {
         const cols = s.table.split('|').slice(1, -1).map((c) => c.trim());
         for (const col of Object.keys(s.cell)) if (!cols.includes(col)) throw new Error(`${rel}: section ${s.heading} names cell column ${col}, which its table lacks`);
@@ -140,6 +140,7 @@ export function checkDocument(rel, text, contract, lang) {
         const rows = tableRowsAt(lines, tables[0].line);
         const at = `${rel}:${tables[0].line}`;
         if (section.minRows !== undefined && rows.length < section.minRows) errors.push(`${at}: table needs at least ${section.minRows} rows, found ${rows.length}`);
+        if (section.maxRows !== undefined && rows.length > section.maxRows) errors.push(`${at}: table takes at most ${section.maxRows} rows, found ${rows.length}`);
         if (section.exactRows !== undefined && rows.length !== section.exactRows) errors.push(`${at}: table needs exactly ${section.exactRows} rows, found ${rows.length}`);
         const firsts = new Set(rows.map((r) => unquote(r[0] ?? '')));
         for (const need of section.rows ?? []) if (!firsts.has(need)) errors.push(`${at}: table lacks a row for ${need}`);

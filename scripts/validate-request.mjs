@@ -75,6 +75,34 @@ export async function stackDeclaration(root, env, hostRoot = hostRootOf(root), s
   return out;
 }
 
+// The caps a session runs under, after every extension a recorded user choice of continue granted.
+export function effectiveBudget(state) {
+  const budget = state?.budget;
+  if (!budget) return null;
+  const caps = { maxSteps: budget.maxSteps, maxSameOperator: budget.maxSameOperator };
+  for (const ext of budget.extensions ?? []) {
+    const choice = state.choices?.[ext.decisionId];
+    if (!choice || choice.selected !== 'continue') continue;
+    caps.maxSteps = Math.max(caps.maxSteps, ext.maxSteps);
+    caps.maxSameOperator = Math.max(caps.maxSameOperator, ext.maxSameOperator);
+  }
+  return caps;
+}
+// A live session (one with a transition) carries brief and budget; a request that would pass a cap is
+// BUDGET_EXHAUSTED for the orchestrator to write, and the gate names the cap it would pass.
+export function sessionBudgetErrors(state, request) {
+  const errors = [];
+  const live = (state?.transitions ?? []).length > 0;
+  if (live && !state.brief) errors.push("state.json: a session with a transition carries brief, the orchestrator's memory of the mission");
+  if (live && !state.budget) errors.push('state.json: a session with a transition carries budget, the caps it runs under');
+  const caps = effectiveBudget(state);
+  if (!caps || request.exchange) return errors;
+  if (request.step > caps.maxSteps) errors.push(`state.json: step ${request.step} passes budget.maxSteps ${caps.maxSteps} (BUDGET_EXHAUSTED); a recorded user choice of continue on a budget:<id> decision extends it`);
+  const same = Object.entries(state.steps ?? {}).filter(([branch, op]) => op === request.operatorId && Number(branch.split('/')[0]) !== request.step).length;
+  if (same + 1 > caps.maxSameOperator) errors.push(`state.json: ${request.operatorId} would run for the ${same + 1}th time, past budget.maxSameOperator ${caps.maxSameOperator} (BUDGET_EXHAUSTED); the same operator re-entered this often is the loop NO_PROGRESS exists to end`);
+  return errors;
+}
+
 export async function validateRequest(root, dir, packages) {
   const errors = [];
   if(existsSync(path.join(dir,'import.json')))return {errors:['request.json: an imported producer slot is evidence-only and cannot execute an operator'],request:null};
@@ -125,6 +153,9 @@ export async function validateRequest(root, dir, packages) {
         if (state.resumes && !state.resumes[mine]) errors.push(`request.json: state.json records no resumes[${mine}] for this re-entry`);
         else if (state.resumes?.[mine] && state.resumes[mine].resumes !== target) errors.push(`request.json: state.json resumes[${mine}] names ${state.resumes[mine].resumes}, the request names ${target}`);
       }
+      // From the first transition on, the session carries the orchestrator's brief and its budget, and a
+      // request past a cap is refused unless a recorded user choice of continue extended it.
+      errors.push(...sessionBudgetErrors(state, request));
       const key = `${request.step}/${request.parallel}${request.exchange ? `/${request.exchange}` : ''}`;
       const expected = state.requestHashes?.[key];
       if (expected) {
@@ -138,6 +169,10 @@ export async function validateRequest(root, dir, packages) {
   if (!errors.length && request.operatorId === 'workspace.bind' && !request.exchange) {
     const { validateWorkspaceCheckoutRequest } = await import('./workspace-checkout.mjs');
     errors.push(...validateWorkspaceCheckoutRequest(root, request, dir));
+  }
+  if (!errors.length && request.operatorId === 'quality.verify' && !request.exchange) {
+    const { validateCoveragePolicyRequest } = await import('./coverage-policy.mjs');
+    errors.push(...validateCoveragePolicyRequest(root, dir, request));
   }
   if (!errors.length && request.operatorId === 'backend.source.apply') {
     const { validateMigrationContract } = await import('./migration-contract.mjs');

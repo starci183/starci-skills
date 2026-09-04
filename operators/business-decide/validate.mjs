@@ -6,7 +6,9 @@
 // carries exactly one row per declared dimension and no other; a mandatory dimension and a discovered
 // lifecycle branch are never not-applicable; each disposition carries the substance it owes and no
 // more; every enforcing row rests on a fact claim from claims.json; every discovered consumer is
-// disposed once, under the dimension it was discovered in; and a blocked branch publishes no head.
+// disposed once, under the dimension it was discovered in; a blocked branch publishes no head; and a
+// promise the request supplies is restated in the person's words and confirmed by them before it is
+// modelled (RESTATEMENT_UNCONFIRMED until the request carries the recorded choice).
 import { existsSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
 import path from 'node:path';
@@ -14,6 +16,7 @@ import process from 'node:process';
 import { fileURLToPath } from 'node:url';
 import { validateStep } from '../../scripts/validate-step.mjs';
 import { tableUnder } from '../../scripts/validate-response.mjs';
+import { sessionRootOf } from '../../scripts/validate-request.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 
@@ -38,6 +41,63 @@ const BUSINESSES_ROOT = /\.worktrees\/businesses$/;
 const empty = (v) => v === undefined || v === null || v === '' || v === '—';
 const fields = (rows) => Object.fromEntries((rows ?? []).map(([k, v]) => [k, v]));
 
+// The restatement gate. A rule the person stated in one line is restated in their words and put back
+// to them before any operator designs on it: `field` is the requirement restated, `id` keys the choice
+// `restatement:<id>`, and `owed` says whether this request supplied the rule at all. Until the request
+// carries that choice, the branch is blocked on RESTATEMENT_UNCONFIRMED with the typed question and
+// nothing else written; once it does, a corrected reading arrives as a changed `field` and an
+// as-stated one as the same `field`, both compared against the blocked branch the request resumes.
+// The generic response gate already refuses a question on a done branch and a re-asked recorded choice;
+// the request gate already checks the choice against state.json; neither is repeated here.
+const RESTATEMENT_KIND = 'restatement-confirm';
+const RESTATEMENT_OPTIONS = ['as-stated', 'corrected'];
+const RESTATEMENT_STOP = 'RESTATEMENT_UNCONFIRMED';
+const collapse = (s) => String(s ?? '').replace(/\\\|/g, '|').replace(/\s+/g, ' ').trim();
+export async function restatementErrors({ branchDir, request, response, requirements, present, field, id, owed }) {
+  const errors = [];
+  const decisionId = `restatement:${id}`;
+  const asked = response.status === 'blocked' && response.stop === RESTATEMENT_STOP;
+  if (!owed) {
+    if (present.has('restatement')) errors.push(`response/response.json: the request supplies no ${field}, so there is nothing to restate and fields.restatement is refused`);
+    if (asked) errors.push(`response/response.json: the request supplies no ${field}, so no restatement is owed and ${RESTATEMENT_STOP} cannot be the stop`);
+    return errors;
+  }
+  const file = path.join(branchDir, 'response', 'restatement.md');
+  if (!present.has('restatement')) errors.push(`response/response.json: the request supplies ${field}, so fields.restatement names response/restatement.md whatever the status`);
+  else if (existsSync(file)) {
+    const text = await readFile(file, 'utf8');
+    if ((text.split(/\r?\n/)[0] ?? '') !== `# restatement — ${id}`) errors.push(`response/restatement.md:1: the title names ${id}, the id the choice ${decisionId} is keyed by`);
+    const source = fields(tableUnder(text, '## Source'));
+    if (source.Field !== field) errors.push(`response/restatement.md: Source Field is ${source.Field ?? 'absent'}; the restated requirement is ${field}`);
+    if (collapse(source.Quoted) !== collapse(requirements[field])) errors.push(`response/restatement.md: Source Quoted differs from the request's ${field}; the person's words are quoted verbatim`);
+  }
+  const confirmed = request?.decisionId === decisionId && !empty(request?.selectedOption);
+  if (!confirmed) {
+    if (!asked) errors.push(`response/response.json: the ${field} is restated and the request records no choice on ${decisionId}, so the branch ends blocked with ${RESTATEMENT_STOP}, not ${response.status}${response.stop ? ` ${response.stop}` : ''}`);
+    const q = response.interaction;
+    if (!q) errors.push(`response/response.json: a branch blocked on ${RESTATEMENT_STOP} carries interaction: kind ${RESTATEMENT_KIND}, decisionId ${decisionId}, options ${RESTATEMENT_OPTIONS.join(' and ')}`);
+    else {
+      if (q.kind !== RESTATEMENT_KIND) errors.push(`response/response.json: interaction.kind is ${q.kind}; a restatement is confirmed through ${RESTATEMENT_KIND}`);
+      if (q.decisionId !== decisionId) errors.push(`response/response.json: interaction.decisionId is ${q.decisionId}; the restatement choice is keyed ${decisionId}`);
+      const ids = (q.options ?? []).map((o) => o?.id).sort();
+      if (ids.join() !== [...RESTATEMENT_OPTIONS].sort().join()) errors.push(`response/response.json: interaction.options are ${ids.join(', ') || 'none'}; a restatement offers exactly ${RESTATEMENT_OPTIONS.join(' and ')}`);
+    }
+    for (const kind of present) if (kind !== 'restatement') errors.push(`response/response.json: fields.${kind} is written before the restatement is confirmed; nothing is modelled on an unconfirmed reading`);
+    return errors;
+  }
+  if (asked) errors.push(`response/response.json: the request carries the recorded choice ${request.selectedOption} on ${decisionId}, so the branch does not ask again with ${RESTATEMENT_STOP}`);
+  if (!RESTATEMENT_OPTIONS.includes(request.selectedOption)) { errors.push(`request.json: selectedOption ${request.selectedOption} on ${decisionId} is neither ${RESTATEMENT_OPTIONS.join(' nor ')}`); return errors; }
+  if (!request.resume) { errors.push(`request.json: a re-entry that answers ${decisionId} names the blocked branch in resume, so its ${field} can be compared against that branch's request`); return errors; }
+  const resumed = `step-${request.resume.step}/parallel-${request.resume.parallel}`;
+  const target = path.join(sessionRootOf(branchDir) ?? branchDir, resumed, 'request', 'request.json');
+  if (!existsSync(target)) { errors.push(`request.json: resume names ${resumed}, whose request/request.json is missing, so the ${field} cannot be compared`); return errors; }
+  let previous; try { previous = JSON.parse(await readFile(target, 'utf8')).requirements?.[field]; } catch { previous = undefined; }
+  const same = collapse(previous) === collapse(requirements[field]);
+  if (request.selectedOption === 'corrected' && same) errors.push(`request.json: selectedOption corrected carries the same ${field} as the blocked branch ${resumed}; a correction arrives as a changed ${field}`);
+  if (request.selectedOption === 'as-stated' && !same) errors.push(`request.json: selectedOption as-stated carries a ${field} that differs from the blocked branch ${resumed}; a changed ${field} is a corrected reading`);
+  return errors;
+}
+
 export async function validateBusinessStep(branchDir, root = ROOT) {
   const base = await validateStep(root, branchDir);
   const errors = [...base.errors];
@@ -47,6 +107,9 @@ export async function validateBusinessStep(branchDir, root = ROOT) {
   const read = (f) => readFile(path.join(branchDir, f), 'utf8');
   const mode = requirements.mode ?? 'model';
   const inputs = request?.inputs ?? {};
+
+  // The promise is restated before it is modelled: owed whenever this request supplied one under mode model.
+  errors.push(...await restatementErrors({ branchDir, request, response, requirements, present, field: 'promise', id: String(requirements.featureId ?? ''), owed: mode === 'model' && !empty(requirements.promise) }));
 
   // The Inputs table cannot say "required under one mode", so the mode says it here.
   if (mode === 'reconcile' && empty(inputs['backend-source-application'])) {

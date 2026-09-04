@@ -18,8 +18,13 @@ authorizations below remain in force. An Ask column or diagnostic reason is not 
 1. Freeze one mission scope: the unit, the target, inclusions and exclusions, write roots, external
    effects, and what will count as proof. Two readings that would change any of those is one focused
    question, not a guess.
-2. Run `workspace.bind` for any mission that reads or writes routed source. Nothing else may resolve a
-   checkout, and a similar directory name is never route authority.
+2. Run `environment.preflight` first for any mission that touches routed source or a runtime: every
+   wall the mission could meet — an undeclared or near-named route, a missing git policy, a dirty
+   checkout, a sign-in that fails, a served head that does not contain the bound one, a held port, a
+   missing browser or container, an approval the environment keeps with a person — is reported at
+   once, as one typed readiness report, rather than one per hour as the chain runs into them. Then
+   run `workspace.bind` for any mission that reads or writes routed source. Nothing else may resolve
+   a checkout, and a similar directory name is never route authority.
 3. Look for a workflow first: read the `when` of every example in `workflows/`. A full match is run as
    written, its presets filling `request.json`. The examples are references, not the only chains
    there are: when the match is partial, or the business is harder than any `when` describes, the
@@ -60,6 +65,7 @@ Cross-session evidence uses scripts/producer-import.mjs. Copy a completed produc
 
 | The request is about | First operator |
 | --- | --- |
+| Whether this machine, its routes, identities, runtimes and approvals are ready for the mission | `environment.preflight` |
 | Which project, checkout, or runtime binding applies | `workspace.bind` |
 | What the product promises, who may have it, what happens when it fails | `business.decide` |
 | System boundaries, data ownership, or the tech stack | `architecture.decide` |
@@ -96,13 +102,19 @@ Routing reads `response.json` and nothing else:
    operator's own `errors.json`) for its `domain`, and resolves that domain in `routing.json`:
    - `operator` invokes the named operator, then returns here;
    - `resume` re-enters the same operator in a new step, `request.json.resume` naming the blocked one;
+   - `chain` runs the named example workflow in a sibling session (and the one `then` names after
+     it), the blocked branch waiting on that session's end and re-entering with what it produced — an
+     owner library defect is repaired and consumed this way, and a person is asked nothing;
    - `user` stops and reports what the person must decide or publish;
    - `external` stops and reports what outside the runtime must change.
    A code whose disposition is `fallback` never blocks: the agent performs the fallback, records it
    under `## Fallbacks taken`, and continues, unless the code's `unless` param says otherwise.
 
 A response that fails either validator does not route. Prose in `response.md` does not route. Only a
-validated field of `response.json` does.
+validated field of `response.json` does. The orchestrator writes `response.json` as a `running`
+skeleton at dispatch; an agent that exits without replacing it is followed up once and then recorded
+as `RECEIPT_MISSING`, so a branch that narrated its work and wrote no receipt is visible in the ledger
+instead of silently passed.
 
 `routing.json` is closed and checked: every domain an operator's stop codes hand to has exactly one
 route, and no route names a domain no code reaches. A missing route is a build failure, not a
@@ -116,6 +128,24 @@ reached the same wall: report the wall rather than trying again.
 
 A cycle between two operators is valid only while the progress fingerprint changes. A repeated
 fingerprint, or the same material finding twice, ends the loop and reports the smaller owner.
+
+The session runs under a budget (`state.json.budget`, from `resources/orchestrator.json#budget`): a
+step cap and a same-operator cap. A request that would pass either is `BUDGET_EXHAUSTED`, and the
+person answers one typed `budget-choice` — narrow, continue, stop — recorded in `state.json.choices`;
+continue extends the cap on record. The orchestrator's own memory is `state.json.brief` — what is
+proven, what is blocked and on whom, what is next, which peer session owns which head, and the last
+report the person received — rewritten after every transition and read back after a compaction; no
+note file beside it is recognised. `scripts/validate-session.mjs` checks the whole ledger after every
+transition.
+
+A rule a person states in their own words is restated to them before anything is designed on it:
+`business.decide` and `architecture.decide` write a `restatement` of at most five lines in the
+person's language and stop with `RESTATEMENT_UNCONFIRMED` until the person selects `as-stated` or
+`corrected` on a `restatement-confirm` choice; a corrected reading arrives as the corrected
+requirement and the same branch runs again. Every turn the orchestrator ends with a person is one of
+the report shapes `resources/interaction.json` declares — delivered, blocked on you, working — in the
+person's language; a hand-off to a peer session is a waiting branch with a wake condition, never the
+end of a turn.
 
 ## Authority
 
@@ -155,13 +185,19 @@ never enter a context manifest, a dependency list, a validator input, or an oper
 
 ## Orchestration
 
-One invocation of one operator is one agent, created fresh on the profile its `operator.json` names,
-with the aliases its Context table declares and the tools its `operator.json` declares (`@tools/<id>` from `resources/tools.json`, one mode each) and nothing else. `resources/orchestrator.json`
-fixes the rules: at most three agents at once, branches of one step never sharing a write alias,
-dispatch by workflow and `routing.json`, hand-off only through `response.json` fields inside the
-session (`state.json`, `step-N/parallel-M/{request,response}`), a session the orchestrator creates
-first and deletes after `git.publish`. An agent never starts another agent; a nested exchange (a
-critique, a review) is a second fresh agent the orchestrator spawns for a branch that paused with
-`waiting`. `alias/alias.json` is the one place an alias resolves to a location, and `alias/INDEX.md` is
+One invocation of one operator is one dispatch, in the mode its `operator.json` declares under
+`resources.dispatch`: `inline`, where the orchestrator performs the operator's Steps itself as a
+checklist under the operator's own validators (a route binding, a gate run, a publication), or
+`fresh`, where one new agent is created on the profile the operator names, with the generated
+`operators/<id>/brief.md` and its `request.json` as its whole prompt, the aliases its Context table
+declares and the tools its `operator.json` declares (`@tools/<id>` from `resources/tools.json`, one
+mode each) and nothing else. A fresh agent is awaited on its completion event, never on a timer.
+`resources/orchestrator.json` fixes the rules: at most three agents at once, branches of one step
+never sharing a write alias, dispatch by workflow and `routing.json`, hand-off only through
+`response.json` fields inside the session (`state.json`, `step-N/parallel-M/{request,response}`), a
+session the orchestrator creates first and deletes after `git.publish`. An agent never starts another
+agent; a nested exchange (a critique, a review) is a second fresh agent the orchestrator spawns for a
+branch that paused with `waiting`. Every file an agent writes under `response/` is swept for
+secret-shaped values by the response gate (`scripts/sweep-secrets.mjs`) before the branch can route. `alias/alias.json` is the one place an alias resolves to a location, and `alias/INDEX.md` is
 its readable map by zone (workspaces, grammar, knowledge, worktrees, remote, dynamic); an operator
 reads only what its Context table names.

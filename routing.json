@@ -1,9 +1,10 @@
 {
   "schemaVersion": 9,
-  "note": "Closed routing map. A skill reads a validated operator output and routes on outcome, then on failure.owningDomain. It never reads prose to decide the next step.",
+  "note": "Closed routing map. A skill reads a validated operator output and routes on outcome, then on failure.owningDomain. It never reads prose to decide the next step. A chain route hands a wall to the example workflow that clears it, run in a sibling session; the blocked branch waits on that session's end and re-enters with what it produced.",
   "kinds": {
     "operator": "Invoke the named operator next.",
     "resume": "Invoke the same operator again with the required delta from its resume token.",
+    "chain": "Run the named example workflow (workflows/<target>.json) in a sibling session, then the one named by `then` when present; the blocked branch stays waiting on that session and re-enters with the delta it produced. A person is asked nothing.",
     "user": "Stop. A person owns this and must decide or publish before the mission continues.",
     "external": "Stop. The blocker is outside the runtime and no operator can clear it."
   },
@@ -95,7 +96,9 @@
         "target": "architecture.decide"
       },
       "grammar": {
-        "kind": "user"
+        "kind": "chain",
+        "target": "library-maintenance",
+        "then": "dependency-maintenance"
       },
       "workspace": {
         "kind": "operator",
@@ -110,7 +113,9 @@
     },
     "frontend.presentation.resolve": {
       "grammar": {
-        "kind": "user"
+        "kind": "chain",
+        "target": "library-maintenance",
+        "then": "dependency-maintenance"
       },
       "knowledge": {
         "kind": "user"
@@ -298,6 +303,14 @@
       },
       "dependency": {
         "kind": "resume"
+      }
+    },
+    "environment.preflight": {
+      "environment": {
+        "kind": "resume"
+      },
+      "caller": {
+        "kind": "user"
       }
     }
   }

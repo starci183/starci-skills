@@ -26,6 +26,16 @@ Cửa vào dùng chúng như sau:
    - chuỗi kết thúc ở `git.publish`, `release.deploy` hoặc `user`.
 3. Chuỗi tự ghép mà còn dùng lại được thì thành một file mới ở đây, kèm `when`.
 
+## Mọi chuỗi mở bằng kiểm sẵn sàng
+
+Mọi ví dụ chạm tới source đã route hay một runtime đều mở bằng `environment.preflight`: một nhánh,
+trước các bind, báo mọi bức tường chuỗi có thể gặp — route chưa khai hay gần trùng tên, thiếu chính
+sách git, checkout bẩn, đăng nhập thất bại, head đang phục vụ không chứa head đã bind, port bị giữ,
+thiếu trình duyệt hay container, phê duyệt mà môi trường giữ lại cho người — trong một báo cáo sẵn
+sàng có kiểu. Chuỗi gặp những bức tường ấy mỗi giờ một bức là hình dạng mà bằng chứng hồi cứu ghi lại;
+chuỗi gặp tất cả ở phút thứ năm là hình dạng các ví dụ này mang. `content-unit` không ghi source đã
+route và không tiêu thụ runtime, nên mở bằng operator của chính nó.
+
 ## Mọi ví dụ đều là một dòng dài
 
 Chuỗi ghi một bề mặt không kết thúc khi source biên dịch được. Giữa lần ghi và lần publish có hai
@@ -63,16 +73,16 @@ operator.
 
 | Workflow | Khi | Các bậc | Song song | Kết thúc |
 | --- | --- | --- | --- | --- |
-| `library-maintenance` | hành vi package owner hiện có và patch kế tiếp, không đổi presentation sản phẩm | bind → library apply → quality | — | `user` |
-| `dependency-maintenance` | tiêu thụ package đã kiểm qua metadata dependency chính xác | bind → dependency update → quality | — | `user` |
-| `frontend-new-surface` | bề mặt chưa tồn tại (`new`) | bind ×2 → business → direction → resolve → apply → bind (consume) → audit → quality → uat → publish | audit theo matrix | `git.publish` |
-| `frontend-reconstruct` | dựng lại bề mặt đã có, giữ fact nghiệp vụ | bind ×2 → direction → resolve → apply → bind (consume) → audit → quality → uat → publish | audit theo matrix | `git.publish` |
-| `frontend-refine` | sửa bên trong cấu trúc đã duyệt | bind ×2 → direction → resolve → apply → bind (consume) → audit → quality → uat → publish | audit theo matrix | `git.publish` |
-| `backend-feature` | một contract backend cho một feature, không có bề mặt | bind → business (model) → architecture → backend apply → quality → business (reconcile) → publish | — | `git.publish` |
-| `full-feature` | backend và bề mặt frontend mới cùng lúc | bind ×2 → business → architecture → [backend apply ∥ direction] → [quality ∥ resolve] → apply → bind (consume) → audit → quality → uat → business (reconcile) → publish | hai bậc hai nhánh, audit theo matrix | `git.publish` |
-| `frontend-with-uat` | thay đổi frontend mà người yêu cầu đích danh đi thử | bind ×2 → direction → resolve → apply → bind (consume) → audit → quality → uat → publish | audit theo matrix | `git.publish` |
-| `staging-uat` | một bản giao đã publish phải được đi thử trên stack khác trước khi release | bind ×2 (consume) → direction → resolve → apply (dry) → audit (env staging) → quality → uat (env staging) | audit theo matrix | `user` |
-| `release` | head đã publish phải lên production | bind → quality → release | — | `release.deploy` |
+| `library-maintenance` | hành vi package owner hiện có và patch kế tiếp, không đổi presentation sản phẩm | preflight → bind → library apply → quality | — | `user` |
+| `dependency-maintenance` | tiêu thụ package đã kiểm qua metadata dependency chính xác | preflight → bind → dependency update → quality | — | `user` |
+| `frontend-new-surface` | bề mặt chưa tồn tại (`new`) | preflight → bind ×2 → business → direction → resolve → apply → bind (consume) → audit → quality → uat → publish | audit theo matrix | `git.publish` |
+| `frontend-reconstruct` | dựng lại bề mặt đã có, giữ fact nghiệp vụ | preflight → bind ×2 → direction → resolve → apply → bind (consume) → audit → quality → uat → publish | audit theo matrix | `git.publish` |
+| `frontend-refine` | sửa bên trong cấu trúc đã duyệt | preflight → bind ×2 → direction → resolve → apply → bind (consume) → audit → quality → uat → publish | audit theo matrix | `git.publish` |
+| `backend-feature` | một contract backend cho một feature, không có bề mặt | preflight → bind → business (model) → architecture → backend apply → quality → business (reconcile) → publish | — | `git.publish` |
+| `full-feature` | backend và bề mặt frontend mới cùng lúc | preflight → bind ×2 → business → architecture → [backend apply ∥ direction] → [quality ∥ resolve] → apply → bind (consume) → audit → quality → uat → business (reconcile) → publish | hai bậc hai nhánh, audit theo matrix | `git.publish` |
+| `frontend-with-uat` | thay đổi frontend mà người yêu cầu đích danh đi thử | preflight → bind ×2 → direction → resolve → apply → bind (consume) → audit → quality → uat → publish | audit theo matrix | `git.publish` |
+| `staging-uat` | một bản giao đã publish phải được đi thử trên stack khác trước khi release | preflight → bind ×2 (consume) → direction → resolve → apply (dry) → audit (env staging) → quality → uat (env staging) | audit theo matrix | `user` |
+| `release` | head đã publish phải lên production | preflight → bind → quality → release | — | `release.deploy` |
 | `content-unit` | một đơn vị giáo trình từ đầu tới cuối | content.generate (có exchange review bên trong) | — | `user` |
 
 Hình dạng file (`schemaVersion` 9): `id` bằng tên file; `when` có `en` và `vi`; `chain` là mảng bậc,

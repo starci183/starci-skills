@@ -10,6 +10,7 @@
 | Change level | `reconstruct` |
 | Owner ceiling | `surface-and-nested-layouts` |
 | Classification | `dominant` |
+| Presentation delta | `app-owned` |
 | Selection policy | `automatic` |
 | Selected candidate | `candidate-id` |
 

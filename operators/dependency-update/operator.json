@@ -1,1 +1,21 @@
-{"schemaVersion":9,"id":"dependency.update","domain":"dependency","job":"Consume one verified package release through exact dependency metadata, proving the existing consumer regression and declared delivery gates.","package":"operator.md","errors":"errors.json","validator":"validate.mjs","selfTest":"self-test.mjs","resources":{"profile":"luna","grammarBound":false,"tools":{"@tools/fileread":"context-aliases","@tools/sourcewrite":"declared-write-set","@tools/git":"commit-session-branch","@tools/shell":"declared-commands"}}}
+{
+  "schemaVersion": 9,
+  "id": "dependency.update",
+  "domain": "dependency",
+  "job": "Consume one verified package release through exact dependency metadata, proving the existing consumer regression and declared delivery gates.",
+  "package": "operator.md",
+  "errors": "errors.json",
+  "validator": "validate.mjs",
+  "selfTest": "self-test.mjs",
+  "resources": {
+    "profile": "luna",
+    "grammarBound": false,
+    "dispatch": "inline",
+    "tools": {
+      "@tools/fileread": "context-aliases",
+      "@tools/sourcewrite": "declared-write-set",
+      "@tools/git": "commit-session-branch",
+      "@tools/shell": "declared-commands"
+    }
+  }
+}

@@ -57,7 +57,7 @@ const coverage = ({ regions = 2, actions = 1 } = {}) => ({
 function responseMd({
   intent = 'modify', changeLevel = 'reconstruct', ownerCeiling = 'surface-and-nested-layouts',
   classification = 'dominant', policy = 'automatic', selected = 'one-column', candidates = 1,
-  surfaceClass = 'catalog',
+  surfaceClass = 'catalog', presentationDelta = 'app-owned',
   refClass = 'plan-comparison', selectedFails = false, rejectAll = true, references = changeLevel === 'refine' ? 0 : 1, fallbacks = [],
   printed = null, scores = 'dominant', winner = null, limits = [], scoreOverrides = [],
 } = {}) {
@@ -82,6 +82,7 @@ function responseMd({
 | Change level | \`${changeLevel}\` |
 | Owner ceiling | \`${ownerCeiling}\` |
 | Classification | \`${classification}\` |
+| Presentation delta | \`${presentationDelta}\` |
 | Selection policy | \`${policy}\` |
 | Selected candidate | \`${selected}\` |
 

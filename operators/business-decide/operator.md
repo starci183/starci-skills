@@ -9,8 +9,8 @@ the source that was actually delivered.
 ## Two modes, one head
 
 `mode` decides which half of this operator runs. Under `model` the promise is modelled and the
-coverage matrix is frozen: steps 4, 5 and 6 run and the branch writes
-`response/data/coverage-matrix.json`. Under `reconcile` nothing is modelled again; step 7 compares the
+coverage matrix is frozen: steps 5, 6 and 7 run and the branch writes
+`response/data/coverage-matrix.json`. Under `reconcile` nothing is modelled again; step 8 compares the
 head that was already published against the source a backend run delivered, and the Input
 `backend-source-application` is required in that mode, because a reconciliation with no delivered source
 is an opinion about code nobody read. The Inputs table marks it optional because the requirement is
@@ -26,6 +26,22 @@ model, the promise the person stated in `promise` is recorded as the one intent 
 `EVIDENCE_MISSING` applies to a fact claim without a file behind it, never to the intent of a promise
 that is being decided for the first time. Every enforcing row of the coverage matrix still rests on a
 fact claim, so a greenfield head publishes with its enforcing rows open, which is what `pending` means.
+
+## The promise is restated before it is modelled
+
+When the request supplies `promise` under mode model, on a first run or a run whose promise changed,
+step 2 writes `response/restatement.md` before anything is modelled: plain-language lines, within the
+count the `restatement` kind allows, saying what the promise was read to mean, and the person's own
+words quoted verbatim under `## Source`. The lines are written in the language of `promise`, because
+a restatement the person cannot read confirms nothing; the validator checks the shape and the quote,
+not the language, so the language is the agent's duty. Unless the request carries the top-level
+`decisionId` `restatement:<featureId>` with a `selectedOption` recorded in state.json.choices, the
+branch ends `blocked` with `RESTATEMENT_UNCONFIRMED`, `fields.restatement` set and no other output,
+and `interaction` of kind `restatement-confirm` on that decisionId offering exactly `as-stated` and
+`corrected`. A re-entry that selects `corrected` names the blocked branch in `resume` and carries a
+`promise` that differs from that branch's; one that selects `as-stated` carries the same promise; the
+branch then proceeds and the done receipt still carries `fields.restatement`. A run whose request has
+no `promise` reuses the previous head's promise and owes no restatement.
 
 ## Separate the claim before modelling it
 
@@ -70,7 +86,7 @@ blocks publication is silence.
 ## One flat authority root
 
 One feature owns exactly one head directory, `<businesses root>/features/<featureId>`, whose
-`model.json` is the head, and step 8 takes an exclusive lease on that alias before it writes. Two
+`model.json` is the head, and step 9 takes an exclusive lease on that alias before it writes. Two
 branches of the same step may not publish the same feature. `features/` is the only segment between
 the root and a feature: a project segment inserted below the root starts a second authority tree that
 later readers never find, so any head that is not exactly `features/<featureId>` is refused. The head
@@ -82,8 +98,9 @@ of a plan: delivered source is compared against the frozen matrix first, under `
 ## Boundary
 
 Context is read-only apart from the one feature head. The operator writes only `response/` of its own
-branch, `response.md`, `response/data/claims.json`, `response/data/coverage-matrix.json` under mode
-model, `response/data/model.json` and `response.json`, plus the one feature head under
+branch, `response.md`, `response/restatement.md` when the request supplies `promise`,
+`response/data/claims.json`, `response/data/coverage-matrix.json` under mode model,
+`response/data/model.json` and `response.json`, plus the one feature head under
 `@worktrees/businesses/<featureId>`. It never publishes a promise while a discovered consumer or
 lifecycle branch carries no disposition, promotes an example, a screenshot, or an intent claim into
 product truth, invents an actor, entitlement, quota, payment, settlement, or lifecycle behaviour the
@@ -123,14 +140,15 @@ implementation, a quality gate, or a UAT run has passed.
 | # | Step | Params | Reads | Writes | Stops with |
 | --- | --- | --- | --- | --- | --- |
 | 1 | Validate the gate and resume | `resume`, `mode` | `request/request.json`, @workspaces/be at the frozen head | — | `INVALID_INPUT`, `SOURCE_DRIFT`, `NO_PROGRESS` |
-| 2 | Normalize the evidence into claims | — | @workspaces/be, every observation with its role, path, line range and head, input `architecture-decision` when present as evidence only, @tools/git | `response/data/claims.json` | `EVIDENCE_MISSING`, `CONTRADICTION_UNRESOLVED` |
-| 3 | Check the published head and the transition authority | `featureId`, `targetState`, `approval` | @worktrees/businesses/<featureId>: the current head, its state and its frozen evidence | — | `LIFECYCLE_TRANSITION_INVALID`, `AUTHORITY_CONFLICT`, `APPROVAL_REQUIRED` |
-| 4 | Model the promise, its actor and its eligibility, under mode model: fact claims carry every enforcing row, the intent claim carries the promise itself | `promise` | `response/data/claims.json`, @workspaces/be at the frozen head, @tools/websearch | — | `EVIDENCE_MISSING` |
-| 5 | Freeze the coverage matrix, under mode model | `dimensions` | `response/data/claims.json`, @workspaces/be and the surface it discovers | `response/data/coverage-matrix.json` | `COVERAGE_INCOMPLETE`, `CONSUMER_UNPROVEN` |
-| 6 | Dispose legacy coexistence, under mode model | — | `response/data/coverage-matrix.json`: the legacy create, read and settle rows and their proof | — | `CONTRADICTION_UNRESOLVED` |
-| 7 | Reconcile against delivered source, under mode reconcile | — | input `backend-source-application`, @workspaces/be at the frozen head, the coverage matrix frozen at the published head | — | `RECONCILIATION_DISCREPANCY` |
-| 8 | Publish one head under an exclusive lease | — | `response/data/claims.json`, @worktrees/businesses/<featureId> at the previous head | @worktrees/businesses/<featureId> as the new model.json head, `response/data/model.json`, @tools/sourcewrite | `SOURCE_DRIFT` |
-| 9 | Emit | — | everything above | `response/response.md`, `response/response.json` | — |
+| 2 | Restate the promise in the person's language and hold for their confirmation, under mode model when the request supplies it | `promise` | `request/request.json`: `requirements.promise`, and its `decisionId` and `selectedOption` when the choice is already recorded | `restatement` | `RESTATEMENT_UNCONFIRMED` |
+| 3 | Normalize the evidence into claims | — | @workspaces/be, every observation with its role, path, line range and head, input `architecture-decision` when present as evidence only, @tools/git | `response/data/claims.json` | `EVIDENCE_MISSING`, `CONTRADICTION_UNRESOLVED` |
+| 4 | Check the published head and the transition authority | `featureId`, `targetState`, `approval` | @worktrees/businesses/<featureId>: the current head, its state and its frozen evidence | — | `LIFECYCLE_TRANSITION_INVALID`, `AUTHORITY_CONFLICT`, `APPROVAL_REQUIRED` |
+| 5 | Model the promise, its actor and its eligibility, under mode model: fact claims carry every enforcing row, the intent claim carries the promise itself | `promise` | `response/data/claims.json`, @workspaces/be at the frozen head, @tools/websearch | — | `EVIDENCE_MISSING` |
+| 6 | Freeze the coverage matrix, under mode model | `dimensions` | `response/data/claims.json`, @workspaces/be and the surface it discovers | `response/data/coverage-matrix.json` | `COVERAGE_INCOMPLETE`, `CONSUMER_UNPROVEN` |
+| 7 | Dispose legacy coexistence, under mode model | — | `response/data/coverage-matrix.json`: the legacy create, read and settle rows and their proof | — | `CONTRADICTION_UNRESOLVED` |
+| 8 | Reconcile against delivered source, under mode reconcile | — | input `backend-source-application`, @workspaces/be at the frozen head, the coverage matrix frozen at the published head | — | `RECONCILIATION_DISCREPANCY` |
+| 9 | Publish one head under an exclusive lease | — | `response/data/claims.json`, @worktrees/businesses/<featureId> at the previous head | @worktrees/businesses/<featureId> as the new model.json head, `response/data/model.json`, @tools/sourcewrite | `SOURCE_DRIFT` |
+| 10 | Emit | — | everything above | `response/response.md`, `response/response.json` | — |
 
 Legacy create, read, and settle each take their own row when they are declared: a new sale path may
 retire legacy creation only while already-purchased rights stay readable and pending legacy
@@ -146,6 +164,7 @@ cannot yield a different answer.
 | Kind | File | Type | Required |
 | --- | --- | --- | --- |
 | `business-promise-authority` | `response/response.md` | md | yes |
+| `restatement` | `response/restatement.md` | md | no |
 | `claims` | `response/data/claims.json` | data | yes |
 | `coverage-matrix` | `response/data/coverage-matrix.json` | data | no |
 | `model` | `response/data/model.json` | data | yes |
@@ -157,6 +176,7 @@ cannot yield a different answer.
 | `INVALID_INPUT` | terminate |
 | `SOURCE_DRIFT` | terminate |
 | `NO_PROGRESS` | terminate |
+| `RESTATEMENT_UNCONFIRMED` | terminate |
 | `EVIDENCE_MISSING` | terminate |
 | `CONTRADICTION_UNRESOLVED` | terminate |
 | `LIFECYCLE_TRANSITION_INVALID` | terminate |

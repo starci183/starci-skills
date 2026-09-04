@@ -28,6 +28,25 @@ Decide one architecture with its tech stack, system boundaries, and data ownersh
 against the observed current state, the rejected alternatives, verified compatibility, and an
 independent critique.
 
+## The objective is restated before it is designed
+
+When the request supplies `objective`, which every run does, step 2 writes `response/restatement.md`
+before the current state is observed: plain-language lines, within the count the `restatement` kind
+allows, saying what the objective was read to mean, and the person's own words quoted verbatim under
+`## Source`. The lines are written in the language of `objective`, because a restatement the person
+cannot read confirms nothing; the validator checks the shape and the quote, not the language, so the
+language is the agent's duty. The choice is keyed `restatement:<decisionId>` by the effective
+`decisionId`: the requirement, or its default when the request leaves it empty. Unless the request
+carries that top-level `decisionId` with a `selectedOption` recorded in state.json.choices, the branch
+ends `blocked` with `RESTATEMENT_UNCONFIRMED`, `fields.restatement` set and no other output, and
+`interaction` of kind `restatement-confirm` on that decisionId offering exactly `as-stated` and
+`corrected`. A re-entry that selects `corrected` names the blocked branch in `resume` and carries an
+`objective` that differs from that branch's; one that selects `as-stated` carries the same objective;
+the branch then proceeds and the done receipt still carries `fields.restatement`. A request that also
+carries the `model` Input from `business.decide`, whose promise was confirmed there, still restates
+the objective: the objective is the architecture's own reading, and a confirmation of the promise does
+not transfer to it.
+
 ## Observe before proposing
 
 Nothing is proposed before the current state has been observed at the frozen head of
@@ -83,7 +102,7 @@ agent resumes at the confirmation step. Other branches of the same step keep run
 ## Boundary
 
 Context is read-only. The operator writes only `response/` of its own branch: `response.md`,
-`data/current-state.json`, `data/stack-model.json`, the alternatives page when more than one
+`restatement.md`, `data/current-state.json`, `data/stack-model.json`, the alternatives page when more than one
 alternative was asked for, and `response.json`; the critique agent writes only
 `critique/response/`. It does not mutate routed source, publish business authority, start or
 reconfigure runtime services, name implementation files in the handoff, or claim that an
@@ -126,18 +145,19 @@ When it is absent the published head is the authority.
 | # | Step | Params | Reads | Writes | Stops with |
 | --- | --- | --- | --- | --- | --- |
 | 1 | Validate the gate and resume | `resume`, `approval` | `request/request.json`, input `architecture-decision` when present, @workspaces/be at the frozen head | — | `INVALID_INPUT`, `SOURCE_DRIFT`, `NO_PROGRESS` |
-| 2 | Observe the current state | — | @workspaces/be at the frozen head: manifests, configuration, deployment files, @tools/git | `response/data/current-state.json` | `CURRENT_STATE_UNOBSERVED` |
-| 3 | Bind the inventory to the business promise | — | `response/data/current-state.json`, input `model` when present, otherwise @worktrees/businesses/&lt;featureId> at its published head | — | `BUSINESS_AUTHORITY_REQUIRED`, `EVIDENCE_MISSING` |
-| 4 | Frame the decision | `objective`, `decisionId`, `constraints`, `tradeoffAxes` | `request/request.json` requirements | — | `CONSTRAINT_CONTRADICTION` |
-| 5 | Generate the alternatives | `alternatives` | `response/data/current-state.json`, @knowledge/patterns, @tools/websearch | `response/artifacts/<decisionId>-alternatives.html` only when more than one alternative was asked for, @tools/visualize | `NO_VIABLE_ALTERNATIVE` |
-| 6 | Select | `selectionPolicy`, `tradeoffAxes`, `approval` | `response/artifacts/<decisionId>-alternatives.html` when present | — | `CHOICE_REQUIRED` |
-| 7 | Deepen the selected alternative and declare the operations it commits to | `constraints` | `response/data/current-state.json`, the bound business head's coverage matrix for the dimensions each operation cites | `response/data/stack-model.json`, including its `operations` | `DATA_OWNERSHIP_UNASSIGNED`, `COMPATIBILITY_UNVERIFIED` |
-| 8 | Await the critique: pause, a fresh agent attacks the selection, resume when it answers | — | `critique/response/critique.md` once the exchange is done | `response/response.json` (waiting, awaiting critique) | `CRITIQUE_UNRESOLVED` |
-| 9 | Confirm or return the selection | `selectionPolicy` | `critique/response/critique.md`, `response/data/stack-model.json` | — | `CHOICE_REQUIRED`, `NO_VIABLE_ALTERNATIVE` |
-| 10 | Write the handoff and emit | — | everything above | `response/response.md`, `response/response.json` | — |
+| 2 | Restate the objective in the person's language and hold for their confirmation | `objective`, `decisionId` | `request/request.json`: `requirements.objective`, and its top-level `decisionId` and `selectedOption` when the choice is already recorded | `restatement` | `RESTATEMENT_UNCONFIRMED` |
+| 3 | Observe the current state | — | @workspaces/be at the frozen head: manifests, configuration, deployment files, @tools/git | `response/data/current-state.json` | `CURRENT_STATE_UNOBSERVED` |
+| 4 | Bind the inventory to the business promise | — | `response/data/current-state.json`, input `model` when present, otherwise @worktrees/businesses/&lt;featureId> at its published head | — | `BUSINESS_AUTHORITY_REQUIRED`, `EVIDENCE_MISSING` |
+| 5 | Frame the decision | `objective`, `decisionId`, `constraints`, `tradeoffAxes` | `request/request.json` requirements | — | `CONSTRAINT_CONTRADICTION` |
+| 6 | Generate the alternatives | `alternatives` | `response/data/current-state.json`, @knowledge/patterns, @tools/websearch | `response/artifacts/<decisionId>-alternatives.html` only when more than one alternative was asked for, @tools/visualize | `NO_VIABLE_ALTERNATIVE` |
+| 7 | Select | `selectionPolicy`, `tradeoffAxes`, `approval` | `response/artifacts/<decisionId>-alternatives.html` when present | — | `CHOICE_REQUIRED` |
+| 8 | Deepen the selected alternative and declare the operations it commits to | `constraints` | `response/data/current-state.json`, the bound business head's coverage matrix for the dimensions each operation cites | `response/data/stack-model.json`, including its `operations` | `DATA_OWNERSHIP_UNASSIGNED`, `COMPATIBILITY_UNVERIFIED` |
+| 9 | Await the critique: pause, a fresh agent attacks the selection, resume when it answers | — | `critique/response/critique.md` once the exchange is done | `response/response.json` (waiting, awaiting critique) | `CRITIQUE_UNRESOLVED` |
+| 10 | Confirm or return the selection | `selectionPolicy` | `critique/response/critique.md`, `response/data/stack-model.json` | — | `CHOICE_REQUIRED`, `NO_VIABLE_ALTERNATIVE` |
+| 11 | Write the handoff and emit | — | everything above | `response/response.md`, `response/response.json` | — |
 
-Under the defaults, step 5 produces one design and no comparison page, step 6 has nothing to
-choose, and the decision's quality rests on step 8. When the only alternative fails an attack, step 9
+Under the defaults, step 6 produces one design and no comparison page, step 7 has nothing to
+choose, and the decision's quality rests on step 9. When the only alternative fails an attack, step 10
 stops with `NO_VIABLE_ALTERNATIVE`, not `CHOICE_REQUIRED`. The handoff names contracts, never
 implementation files, because choosing the files is the next domain's job; the one exception is the
 writer of each declared operation, which this operator does name, because the implementation may not
@@ -148,6 +168,7 @@ choose its own writer.
 | Kind | File | Type | Required |
 | --- | --- | --- | --- |
 | `architecture-decision` | `response/response.md` | md | yes |
+| `restatement` | `response/restatement.md` | md | no |
 | `current-state` | `response/data/current-state.json` | data | yes |
 | `stack-model` | `response/data/stack-model.json` | data | yes |
 | `alternatives` | `response/artifacts/<decisionId>-alternatives.html` | artifact | no |
@@ -164,6 +185,7 @@ consumes, and no other output of this operator crosses into that step.
 | `INVALID_INPUT` | terminate |
 | `SOURCE_DRIFT` | terminate |
 | `NO_PROGRESS` | terminate |
+| `RESTATEMENT_UNCONFIRMED` | terminate |
 | `EVIDENCE_MISSING` | terminate |
 | `CURRENT_STATE_UNOBSERVED` | terminate |
 | `BUSINESS_AUTHORITY_REQUIRED` | terminate |

@@ -6,6 +6,7 @@ import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { migrationFiles } from '../operators/backend-source-apply/self-test.mjs';
+import { confirmed } from '../operators/architecture-decide/self-test.mjs';
 import { migrationDigest as hash, migrationConnectionFingerprint } from './migration-release.mjs';
 import { writeMigrationReleaseProducers } from './migration-release-producers-fixture.mjs';
 
@@ -66,17 +67,26 @@ export async function migrationReleaseFixture(t, { mode = 'valid', sealed = fals
   }
   files['request/request.json'].requirements.mutableFileRefs.push('runner.mjs');
   files['response/data/mutations.json'].changes.push({ path: 'runner.mjs', change: 'added', operationId: mutation.operations[0].operationId, beforeHash: null, afterHash: fileHash('runner.mjs') });
-  files['response/response.md'] = files['response/response.md'].replace(/\r?\n\r?\n## Findings/, `\n| \`runner.mjs\` | added | \`${mutation.operations[0].operationId}\` | — | ${fileHash('runner.mjs')} |\n\n## Findings`);
+  // The runner row belongs to the Changes table, which the Widened section follows when the receipt carries one.
+  files['response/response.md'] = files['response/response.md'].replace(/\r?\n\r?\n## (Widened|Findings)/, `\n| \`runner.mjs\` | added | \`${mutation.operations[0].operationId}\` | — | ${fileHash('runner.mjs')} |\n\n## $1`);
   files['response/changes.md'] = files['response/changes.md'].replace(/\r?\n\r?\n## What the next step must know/, '\n| `runner.mjs` | created | fixed migration runner | BE-1 |\n\n## What the next step must know');
   const session = path.join(host, '.worktrees/sessions/s-test'), backend = path.join(session, 'step-1/parallel-1');
-  for (const [name, content] of Object.entries(files.producer)) {
+  // The done architecture producer is a confirmed re-entry at step-1/parallel-2; the branch it resumes,
+  // blocked on RESTATEMENT_UNCONFIRMED, sits beside it at step-1/parallel-3.
+  const [producer, patch] = confirmed(files.producer);
+  for (const [name, content] of Object.entries(producer)) {
     if (content === null) continue;
-    if (name.endsWith('request.json') || name.endsWith('response.json')) content.parallel = 2;
-    if (name === 'critique/request/request.json') content.inputs['stack-model'] = 'step-1/parallel-2/response/data/stack-model.json';
+    if (name.endsWith('request.json') || name.endsWith('response.json')) { content.step = 1; content.parallel = 2; }
+    if (name === 'request/request.json') content.resume = { step: 1, parallel: 3, token: 't-1' };
+    if (name === 'critique/request/request.json') content.inputs = Object.fromEntries(Object.entries(content.inputs).map(([k, v]) => [k, String(v).replace('step-2/parallel-1/', 'step-1/parallel-2/')]));
     write(path.join(session, 'step-1/parallel-2', name), content);
   }
+  for (const [name, content] of Object.entries(patch.session)) {
+    const blocked = { ...content, step: 1, parallel: 3 };
+    write(path.join(session, name.replace('step-1/parallel-1/', 'step-1/parallel-3/')), blocked);
+  }
   for (const [name, content] of Object.entries(files)) if (name !== 'producer' && content !== null) write(path.join(backend, name), content);
-  const state = { id: 's-test', project: 'migration-fixture', startedAt: '2026-09-04T00:00:00Z', status: 'running', chain: [['1/1','1/2'],['2/1'],['3/1'],['4/1']], steps: {}, requestHashes: {}, current: '4/1' };
+  const state = { id: 's-test', project: 'migration-fixture', startedAt: '2026-09-04T00:00:00Z', status: 'running', chain: [['1/1','1/2','1/3'],['2/1'],['3/1'],['4/1']], steps: {}, requestHashes: {}, current: '4/1', resumes: { '1/2': { resumes: '1/3', stop: 'RESTATEMENT_UNCONFIRMED' } }, choices: patch.state.choices };
   write(path.join(session, 'state.json'), state);
   const { routeRef, qualityRef } = await writeMigrationReleaseProducers({ root, session, checkout, head, backendRef: 'step-1/parallel-1/response/response.md' });
   const connectionFingerprint = migrationConnectionFingerprint(fixtureConnection), connectionRef = 'secret-ref://fixture/primary';

@@ -1,15 +1,16 @@
 // Proves validate.mjs on a synthetic session branch: one conforming implementation of a frozen
 // contract committed once on the session branch, with its change record, one conformance file per
 // facet and one proof file per proof kind, one dry run that plans the same write set and commits,
-// measures and writes nothing, one branch blocked on a terminate code, and one mutation per law,
-// each of which must fail with a line that names the defect.
+// measures and writes nothing, one branch blocked on a terminate code, one branch that widened the
+// owner boundary by one recorded path, one branch bounded by a glob, and one mutation per law, each
+// of which must fail with a line that names the defect.
 import assert from 'node:assert/strict';
 import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createHash } from 'node:crypto';
-import { migrationFixture } from '../architecture-decide/self-test.mjs';
+import { migrationFixture, confirmed } from '../architecture-decide/self-test.mjs';
 import { validateBackendStep } from './validate.mjs';
 
 const BASE = 'f'.repeat(40);
@@ -42,10 +43,12 @@ const proofRecord = (proofKind, overrides = {}) => ({ operationId: OP, proofKind
 const conformancePath = (operationId, facet) => `response/data/conformance/${operationId}.${facet}.json`;
 const proofPath = (operationId, proofKind) => `response/data/proofs/${operationId}.${proofKind}.json`;
 
-function responseMd({ operations = null, changes = null, findings = null, contractFingerprint = CONTRACT_FP, commit = COMMIT, base = BASE, branch = BRANCH, mode = 'apply' } = {}) {
+function responseMd({ operations = null, changes = null, widened = [], findings = null, fallbacks = [], contractFingerprint = CONTRACT_FP, commit = COMMIT, base = BASE, branch = BRANCH, mode = 'apply' } = {}) {
   const operationRows = (operations ?? [[OP, 'graphql-mutation', WRITER, 'single-transaction', 'request-token', 'effective-access']]).map((r) => `| \`${r[0]}\` | ${r[1]} | \`${r[2]}\` | ${r[3]} | ${r[4]} | ${r[5]} |`).join('\n');
   const changeRows = (changes ?? [[WRITER, 'added', OP, '—', hash('1')], [SPEC, 'added', OP, '—', hash('2')]]).map((r) => `| \`${r[0]}\` | ${r[1]} | \`${r[2]}\` | ${r[3]} | ${r[4]} |`).join('\n');
+  const widenedRows = widened.map(([file, nearest, why]) => `| \`${file}\` | \`${nearest}\` | ${why} |`).join('\n');
   const findingRows = (findings ?? [['PATTERN_BOUND', OP, WRITER, 'the mutation handler mirrors the published command family']]).map(([code, op, file, statement]) => `| \`${code}\` | ${op === null ? '—' : `\`${op}\``} | ${file === null ? '—' : `\`${file}\``} | ${statement} |`).join('\n');
+  const fallbackRows = fallbacks.map(([code, action]) => `| \`${code}\` | ${action} |`).join('\n');
   return `# backend-source-application — enrol-course
 
 The enrolment mutation, filled inside the frozen contract and measured on every declared facet.
@@ -74,11 +77,23 @@ ${operationRows}
 | --- | --- | --- | --- | --- |
 ${changeRows}
 
+## Widened
+
+| Path | Nearest boundary | Why |
+| --- | --- | --- |
+${widenedRows}
+
 ## Findings
 
 | Code | Operation | File | Statement |
 | --- | --- | --- | --- |
 ${findingRows}
+
+## Fallbacks taken
+
+| Code | Action |
+| --- | --- |
+${fallbackRows}
 `;
 }
 
@@ -143,18 +158,32 @@ function writeBranch(files) {
   writeFileSync(path.join(session, 'step-1', 'parallel-2', 'response', 'response.md'), '# architecture-decision — enrol-course\n');
   const state = { id: 's-test', project: 'starci-academy', startedAt: '2026-09-03T00:00:00Z', requestHashes: {}, chain: [['1/1']], steps: { '1/1': 'backend.source.apply' }, current: '1/1', status: 'running' };
   if (files.producer) {
-    const producer = structuredClone(files.producer);
+    // A done architecture producer is a confirmed re-entry: its restatement was answered as-stated on
+    // the branch it resumes, which sits beside it as step-1/parallel-3.
+    const [producer, patch] = confirmed(structuredClone(files.producer));
     for (const [name, content] of Object.entries(producer)) {
       if (content === null) continue;
       const target = path.join(session, 'step-1/parallel-2', name);
       mkdirSync(path.dirname(target), { recursive: true });
-      if (name.endsWith('request.json') || name.endsWith('response.json')) content.parallel = 2;
-      if (name === 'critique/request/request.json') content.inputs['stack-model'] = 'step-1/parallel-2/response/data/stack-model.json';
+      if (name.endsWith('request.json') || name.endsWith('response.json')) { content.step = 1; content.parallel = 2; }
+      if (name === 'request/request.json') content.resume = { step: 1, parallel: 3, token: 't-1' };
+      if (name === 'critique/request/request.json') content.inputs = Object.fromEntries(Object.entries(content.inputs).map(([k, v]) => [k, String(v).replace('step-2/parallel-1/', 'step-1/parallel-2/')]));
       const bytes = typeof content === 'string' ? content : JSON.stringify(content, null, 2);
       writeFileSync(target, bytes);
       if (name === 'request/request.json') state.requestHashes['1/2'] = 'sha256:' + createHash('sha256').update(bytes).digest('hex');
     }
+    for (const [name, content] of Object.entries(patch.session)) {
+      const blocked = structuredClone(content);
+      blocked.step = 1; blocked.parallel = 3;
+      const target = path.join(session, name.replace('step-1/parallel-1/', 'step-1/parallel-3/'));
+      mkdirSync(path.dirname(target), { recursive: true });
+      writeFileSync(target, JSON.stringify(blocked, null, 2));
+    }
+    state.chain = [['1/1', '1/2', '1/3']];
     state.steps['1/2'] = 'architecture.decide';
+    state.steps['1/3'] = 'architecture.decide';
+    state.resumes = { '1/2': { resumes: '1/3', stop: 'RESTATEMENT_UNCONFIRMED' } };
+    state.choices = patch.state.choices;
   }
   writeFileSync(path.join(session, 'state.json'), JSON.stringify(state));
   for (const [name, content] of Object.entries(files)) {
@@ -206,6 +235,29 @@ const blockedFiles = () => ({
   'request/request.json': requestJson(),
   'response/response.json': responseJson({ status: 'blocked', stop: 'CONTRACT_WIDENED', fields: {}, commits: [], next: [] }),
 });
+// One path the outcome genuinely requires outside every boundary, written and recorded as a widening:
+// marked in the mutation record, listed under ## Widened with its nearest boundary, OWNER_WIDENED taken.
+const MODULE = 'src/features/api/core/graphql/api.module.ts';
+const MODULE_CHANGE = { path: MODULE, change: 'modified', operationId: OP, beforeHash: hash('3'), afterHash: hash('4'), widened: true };
+const WIDENED_ROW = [MODULE, WRITER, 'the module must register the handler for the transport to reach it'];
+const WIDENED_FALLBACK = ['OWNER_WIDENED', 'wrote the module registration outside the boundary and listed it under Widened'];
+const widenedFiles = ({ widened = [WIDENED_ROW], fallbacks = [WIDENED_FALLBACK], taken = ['OWNER_WIDENED'], extra = {} } = {}) => ({
+  ...baseline(),
+  'request/request.json': requestJson({ extra }),
+  'response/response.json': responseJson({ fallbacks: taken }),
+  'response/response.md': responseMd({ changes: [[WRITER, 'added', OP, '—', hash('1')], [SPEC, 'added', OP, '—', hash('2')], [MODULE, 'modified', OP, hash('3'), hash('4')]], widened, fallbacks }),
+  'response/changes.md': changesMd({ files: [[WRITER, 'created'], [SPEC, 'created'], [MODULE, 'modified', 'the handler is registered where the transport looks for it']] }),
+  'response/data/mutations.json': mutationsJson({ changes: [...CHANGES, MODULE_CHANGE] }),
+});
+// The same conforming branch with every product path moved under one glob boundary.
+const globFiles = () => {
+  const from = 'src/features/api/core/graphql/mutations/';
+  const to = 'src/modules/recovery/graphql/mutations/';
+  const files = {};
+  for (const [key, value] of Object.entries(baseline())) files[key] = typeof value === 'string' ? value.replaceAll(from, to) : JSON.parse(JSON.stringify(value).replaceAll(from, to));
+  files['request/request.json'].requirements.mutableFileRefs = ['src/modules/recovery/**'];
+  return files;
+};
 // One mutation of the frozen contract, with the receipt and the records that must follow it.
 const withOperation = (patch) => {
   const op = operation(patch);
@@ -299,6 +351,17 @@ for (const [key, value] of [['transport', 'worker'], ['writerRef', 'src/other.ts
 await expectValid(baseline(), 'one operation filled inside the frozen contract and committed once');
 await expectValid(dryFiles(), 'a dry run that plans the write set and commits, measures and writes nothing');
 await expectValid(blockedFiles(), 'blocked on a contract the outcome would widen');
+await expectValid(widenedFiles(), 'one required path outside the boundary, written and recorded as a widening');
+await expectValid(globFiles(), 'a glob boundary covering every nested product path');
+
+await expectError(widenedFiles({ widened: [], fallbacks: [], taken: [] }), 'not listed under ## Widened; an unrecorded widening is OWNER_CONFLICT', 'a change outside every boundary with no Widened row');
+await expectError(widenedFiles({ extra: { protectedRefs: ['src/features/api/core/graphql/*.module.ts'] } }), 'lies inside protected ref src/features/api/core/graphql/*.module.ts', 'a change inside a protected ref, even when listed as widened');
+await expectError({ ...baseline(), 'response/response.json': responseJson({ fallbacks: ['OWNER_WIDENED'] }), 'response/response.md': responseMd({ widened: [[SPEC, WRITER, 'the spec sits beside the handler']], fallbacks: [WIDENED_FALLBACK] }) }, 'listed under ## Widened but lies inside boundary', 'a Widened row for a path a boundary already covers');
+await expectError({ ...baseline(), 'response/response.json': responseJson({ fallbacks: ['OWNER_WIDENED'] }), 'response/response.md': responseMd({ fallbacks: [WIDENED_FALLBACK] }) }, 'OWNER_WIDENED was taken but ## Widened lists no path', 'OWNER_WIDENED taken over an empty Widened table');
+await expectError(widenedFiles({ fallbacks: [], taken: [] }), 'does not record OWNER_WIDENED as taken', 'a Widened row with no OWNER_WIDENED fallback');
+await expectError({ ...baseline(), 'response/data/mutations.json': mutationsJson({ changes: [CHANGES[0], { ...CHANGES[1], widened: true }] }) }, 'is marked widened but lies inside boundary', 'a change marked widened inside its boundary');
+await expectError(widenedFiles({ widened: [[MODULE, 'src/nowhere.ts', 'the module registers the handler']] }), 'which mutableFileRefs does not declare', 'a Widened row naming an undeclared nearest boundary');
+await expectError({ ...baseline(), 'request/request.json': requestJson({ extra: { protectedRefs: [SPEC] } }) }, 'overlapping owner sets are OWNER_CONFLICT', 'a boundary that is also a protected ref');
 
 await expectError({ ...baseline(), 'response/response.json': { ...responseJson(), stop: 'CONTRACT_WIDENED' } }, 'only a blocked response carries a stop', 'done with a stop');
 await expectError({ ...blockedFiles(), 'response/response.json': responseJson({ status: 'blocked', stop: 'MADE_UP_CODE', fields: {}, commits: [], next: [] }) }, 'not a registered code', 'unknown stop code');
@@ -312,7 +375,7 @@ await expectError({ ...baseline(), 'response/data/mutations.json': mutationsJson
 await expectError({ ...baseline(), 'response/changes.md': changesMd({ checkout: `\`@workspaces/be\` at \`${BASE}\` → uncommitted` }) }, 'so the next request can pin exactly what was written', 'a change record that pins no commit');
 await expectError({ ...baseline(), 'request/request.json': requestJson({ extra: { mystery: 1 } }) }, 'requirements.mystery is not a field', 'undeclared requirement');
 await expectError({ ...baseline(), 'request/request.json': requestJson({ extra: { outcome: '' } }) }, 'required field outcome has no value', 'missing required outcome');
-await expectError(withOperation({ writerRef: 'src/other/handler.ts' }), 'outside the mutable ceiling', 'a writer outside the mutable ceiling');
+await expectError(withOperation({ writerRef: 'src/other/handler.ts' }), 'names writer src/other/handler.ts outside every owner boundary and not listed under ## Widened', 'a writer outside every boundary with no Widened row');
 await expectError(withOperation({ migrationRefs: ['1700000000000-AddEnrolment.ts'], facets: [...FACETS, 'migration'] }), 'ships a migration without declaring the migration-replay proof', 'a migration with no replay proof');
 await expectError(withOperation({ migrationRefs: ['1700000000000-AddEnrolment.ts'], proofKinds: [...PROOF_KINDS, 'migration-replay'] }), 'ships a migration without declaring the migration facet', 'a migration with no migration facet');
 await expectError(withOperation({ transactionBoundary: 'read-only', migrationRefs: ['m.ts'], facets: [...FACETS, 'migration'], proofKinds: [...PROOF_KINDS, 'migration-replay'] }), 'is read-only but ships a migration', 'a read-only operation shipping a migration');
@@ -329,7 +392,7 @@ await expectError({ ...baseline(), 'response/data/mutations.json': mutationsJson
 await expectError({ ...baseline(), 'response/data/mutations.json': mutationsJson({ changes: [{ ...CHANGES[0], beforeHash: hash('1') }, CHANGES[1]] }) }, 'is added with the wrong before hash', 'an added file carrying a before hash');
 await expectError({ ...baseline(), 'response/data/mutations.json': mutationsJson({ changes: [CHANGES[0], { ...CHANGES[1], path: WRITER, afterHash: hash('2') }] }) }, 'carries more than one change record', 'one file changed twice');
 await expectError({ ...baseline(), 'response/data/mutations.json': mutationsJson({ changes: [CHANGES[0], { ...CHANGES[1], operationId: 'ghost-op' }] }) }, 'names undeclared operation ghost-op', 'a change owned by no operation');
-await expectError({ ...baseline(), 'response/data/mutations.json': mutationsJson({ changes: [CHANGES[0], { ...CHANGES[1], path: 'src/other/thing.ts' }] }) }, 'lies outside the mutable ceiling', 'a change outside the ceiling');
+await expectError({ ...baseline(), 'response/data/mutations.json': mutationsJson({ changes: [CHANGES[0], { ...CHANGES[1], path: 'src/other/thing.ts' }] }) }, 'lies outside every owner boundary and is not marked widened: true', 'a change outside every boundary, unmarked');
 await expectError({ ...baseline(), 'response/response.md': responseMd({ operations: [[OP, 'rest', WRITER, 'single-transaction', 'request-token', 'effective-access']] }) }, 'reports transport rest, the contract froze graphql-mutation', 'a transport the contract did not freeze');
 await expectError({ ...baseline(), 'response/response.md': responseMd({ operations: [[OP, 'graphql-mutation', WRITER, 'single-transaction', 'request-token', 'unapproved-dimension']] }) }, 'cites dimension unapproved-dimension, which the contract does not bind', 'an unapproved business dimension');
 await expectError({ ...baseline(), 'response/response.md': responseMd({ findings: [['BUSINESS_QUESTION_RAISED', OP, null, 'the voucher rule on a foreign gateway was never decided']] }) }, 'cannot raise an unresolved business question', 'shipping with an open business question');
@@ -345,6 +408,6 @@ await expectError({ ...dryFiles(), ...records(), 'response/response.json': respo
 await expectError({ ...dryFiles(), 'response/changes.md': changesMd({ files: [[WRITER, 'created'], [SPEC, 'created']], checkout: `\`@workspaces/be\` at \`${BASE}\` on \`${BRANCH}\`, nothing written` }) }, 'under a dry run, which leaves every path unchanged', 'a dry change record reporting a move');
 await expectError({ ...dryFiles(), 'response/data/mutations.json': mutationsJson({ commit: null, changes: DRY_CHANGES }) }, "mode apply differs from the request's dry", 'a plan that re-decides the mode');
 
-process.stdout.write('backend.source.apply self-test: 5 valid branches, 55 rejected mutations\n');
+process.stdout.write('backend.source.apply self-test: 7 valid branches, 63 rejected mutations\n');
 
 }

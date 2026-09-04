@@ -8,6 +8,16 @@
   "chain": [
     [
       {
+        "operator": "environment.preflight",
+        "requirements": {
+          "roles": [
+            "fe"
+          ]
+        }
+      }
+    ],
+    [
+      {
         "operator": "workspace.bind",
         "requirements": {
           "role": "fe",

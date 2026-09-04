@@ -12,6 +12,7 @@ import process from 'node:process';
 import { fileURLToPath } from 'node:url';
 import { validateStep } from '../../scripts/validate-step.mjs';
 import { tableUnder } from '../../scripts/validate-response.mjs';
+import { sessionRootOf } from '../../scripts/validate-request.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 const empty = (v) => v === undefined || v === null || v === '' || v === '—';
@@ -41,6 +42,17 @@ export async function publishedRuleIds(root = ROOT) {
   return ids;
 }
 
+// The Decision table of the direction this branch consumes, read through the request's input path.
+export async function declaredPresentationDelta(branchDir, request) {
+  const rel = request?.inputs?.['frontend-direction-decision'];
+  const sessionRoot = sessionRootOf(branchDir);
+  if (!rel || !sessionRoot) return 'app-owned';
+  const file = path.join(sessionRoot, rel);
+  if (!existsSync(file)) return 'app-owned';
+  const decision = Object.fromEntries((tableUnder(await readFile(file, 'utf8'), '## Decision') ?? []).map(([k, v]) => [k, v]));
+  return decision['Presentation delta'] ?? 'app-owned';
+}
+
 export async function validateResolutionStep(branchDir, root = ROOT) {
   const base = await validateStep(root, branchDir);
   const errors = [...base.errors];
@@ -49,6 +61,12 @@ export async function validateResolutionStep(branchDir, root = ROOT) {
   const has = (f) => existsSync(path.join(branchDir, f));
   const read = (f) => readFile(path.join(branchDir, f), 'utf8');
 
+  // The direction declares the presentation delta this resolution owes: `app-owned` (the default when the
+  // decision carries no such row) means at least one application-owned property is resolved; `none`
+  // means the change is copy, behaviour or binding only, and this resolution carries zero rows and an
+  // empty inventory rather than inventing a property to resolve.
+  const presentationDelta = await declaredPresentationDelta(branchDir, base.request);
+  if (!['app-owned', 'none'].includes(presentationDelta)) errors.push(`input frontend-direction-decision: Presentation delta ${presentationDelta} is neither app-owned nor none`);
   const maxRounds = Number(requirements.maxRounds ?? 2);
   if (!Number.isInteger(maxRounds) || maxRounds < 1) errors.push(`request.json: maxRounds must be a positive whole number, not ${requirements.maxRounds}`);
   const emission = requirements.contractEmission ?? 'on';
@@ -113,6 +131,12 @@ export async function validateResolutionStep(branchDir, root = ROOT) {
     const removed = tableUnder(text, '## Removed') ?? [];
     const gaps = gapRows;
 
+    if (response.status === 'done') {
+      if (presentationDelta === 'none') {
+        if (owners.length || chosen.length) errors.push(`${rel}: the direction declares Presentation delta none and the resolution still resolves ${owners.length} owner row(s) and ${chosen.length} chosen rule(s); a copy, behaviour or binding change owes no presentation value`);
+        if (inventory.ruleIds.length || inventory.classNames.length) errors.push('response/data/inventory.json: Presentation delta none carries an empty inventory');
+      } else if (!owners.some(([, , owner]) => owner === 'app') || !chosen.length) errors.push(`${rel}: an app-owned presentation delta resolves at least one application-owned property; the owner map and the rules chosen cannot both be empty (declare Presentation delta none in the direction when nothing is owed)`);
+    }
     const appRules = new Set();
     const grammarRules = new Set();
     const seen = new Set();

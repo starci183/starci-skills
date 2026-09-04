@@ -247,6 +247,7 @@ const decisionMd = ({ policy = 'approval-required', selected = 'one-column', fai
   '| --- | --- |',
   `| Direction id | ${BT}plan-picker${BT} |`,
   `| Selection policy | ${BT}${policy}${BT} |`,
+  `| Presentation delta | ${BT}app-owned${BT} |`,
   `| Selected candidate | ${BT}${selected}${BT} |`,
   '',
   '## Scores',

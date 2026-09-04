@@ -17,6 +17,7 @@ import { loadOperatorPackages, kindOf, isYes, exchangeOf } from './operator-md.m
 import { loadErrorsRegistry } from './errors-registry.mjs';
 import { sessionRootOf } from './validate-request.mjs';
 import { loadInteractionPolicy, interactionErrors } from './validate-interaction.mjs';
+import { secretErrors } from './sweep-secrets.mjs';
 
 // Only a fully quoted cell is unquoted: a sentence that opens with a code span keeps its backticks.
 const unquote = (s) => { const t = String(s ?? '').trim(); return /^`[^`]*`$/.test(t) ? t.slice(1, -1) : t; };
@@ -120,6 +121,10 @@ export async function validateResponse(root, dir, { requirements = {}, exchange 
     catch (e) { errors.push(`state.json: ${e.message}`); }
   }
   errors.push(...interactionErrors(await loadInteractionPolicy(root), response.interaction, choices, response.status));
+  // The skeleton the orchestrator wrote at dispatch: the agent has not answered, so nothing routes.
+  if (response.status === 'running') errors.push(`${rel('response/response.json')}: status running is the dispatch skeleton, not a receipt; the agent replaces it with done, blocked or waiting, and an agent that exits leaving it is RECEIPT_MISSING`);
+  // A sealed value never reaches a receipt, an artifact or a log an agent kept.
+  errors.push(...secretErrors(path.join(dir, 'response'), { relativeTo: sessionRootOf(dir) ?? dir }));
   if (response.status !== 'blocked' && response.stop !== undefined) errors.push(`${rel('response/response.json')}: only a blocked response carries a stop`);
   if (response.status !== 'waiting' && response.awaiting !== undefined) errors.push(`${rel('response/response.json')}: only a waiting response carries awaiting`);
   if ((response.exchange ?? null) !== exchange) errors.push(`${rel('response/response.json')}: exchange ${response.exchange ?? 'none'} does not match the folder ${exchange ?? 'none'}`);
@@ -168,8 +173,9 @@ export async function validateResponse(root, dir, { requirements = {}, exchange 
   const dispositionOf = (code) => { const e = registry.codes[code]; return e && registry.allowed(code, op.id) ? effectiveDisposition(e, requirements) : null; };
   if (response.status === 'blocked') {
     const d = dispositionOf(response.stop);
-    // UNKNOWN_STOP is the one code no operator declares: the orchestrator writes it when it meets a code the merged registry does not list.
-    if (response.stop !== 'UNKNOWN_STOP' && !stopsTable.has(response.stop)) errors.push(`${rel('response/response.json')}: stop ${response.stop} is not in the Stops table of ${op.id}`);
+    // A code the orchestrator writes on the agent's behalf (UNKNOWN_STOP, RECEIPT_MISSING, BUDGET_EXHAUSTED)
+    // is declared by the registry's writer field, never by an operator's Stops table.
+    if (registry.codes[response.stop]?.writer !== 'orchestrator' && !stopsTable.has(response.stop)) errors.push(`${rel('response/response.json')}: stop ${response.stop} is not in the Stops table of ${op.id}`);
     if (d === null) errors.push(`${rel('response/response.json')}: stop ${response.stop} is not a registered code ${op.id} may emit`);
     else if (d !== 'terminate') errors.push(`${rel('response/response.json')}: ${response.stop} has disposition fallback under these requirements; the step should have continued`);
   }

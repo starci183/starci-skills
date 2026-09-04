@@ -1,6 +1,6 @@
 {
   "$id": "step:state",
-  "description": "state.json at the session root; the orchestrator writes it, no agent does. Documented in resources/orchestrator.json#session.manifest.",
+  "description": "state.json at the session root; the orchestrator writes it, no agent does. Documented in resources/orchestrator.json#session.manifest. brief and budget are written at create and are required from the first transition on.",
   "type": "object",
   "additionalProperties": false,
   "required": [
@@ -18,11 +18,25 @@
       "additionalProperties": {
         "type": "object",
         "additionalProperties": false,
-        "required": ["selected", "selectedBy", "sourceRef"],
+        "required": [
+          "selected",
+          "selectedBy",
+          "sourceRef"
+        ],
         "properties": {
-          "selected": { "type": "string", "minLength": 1 },
-          "selectedBy": { "type": "string", "description": "Checked against resources/interaction.json.selectionSource." },
-          "sourceRef": { "type": "string", "minLength": 1, "description": "Reference to the actual user message selecting this option." }
+          "selected": {
+            "type": "string",
+            "minLength": 1
+          },
+          "selectedBy": {
+            "type": "string",
+            "description": "Checked against resources/interaction.json.selectionSource."
+          },
+          "sourceRef": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Reference to the actual user message selecting this option."
+          }
         }
       }
     },
@@ -205,11 +219,175 @@
               "done",
               "blocked",
               "invalid",
-              "resolved"
+              "resolved",
+              "abandoned"
             ]
           },
           "note": {
             "type": "string"
+          }
+        }
+      }
+    },
+    "brief": {
+      "description": "the orchestrator's own memory of the mission, rewritten after every transition and read back after a context compaction: what is proven, what is blocked and on whom, what comes next, which peer session owns which head, and the last report the person received; the only orchestrator memory the tree recognises — a note file beside it is a second home",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "proven",
+        "blocked",
+        "next",
+        "peers",
+        "report"
+      ],
+      "properties": {
+        "proven": {
+          "type": "array",
+          "maxItems": 24,
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 240
+          }
+        },
+        "blocked": {
+          "type": "array",
+          "maxItems": 12,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "what",
+              "owner",
+              "since"
+            ],
+            "properties": {
+              "what": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 240
+              },
+              "owner": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 120,
+                "description": "who clears it: a domain of routing.json, a peer session id, a person, or an outside party"
+              },
+              "since": {
+                "type": "string",
+                "minLength": 1
+              },
+              "branch": {
+                "type": "string",
+                "pattern": "^[0-9]+/[0-9]+$"
+              }
+            }
+          }
+        },
+        "next": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 400
+        },
+        "peers": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "owns",
+              "head"
+            ],
+            "properties": {
+              "owns": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 240
+              },
+              "head": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "pattern": "^[0-9a-f]{7,40}$"
+              },
+              "wake": {
+                "type": "string",
+                "maxLength": 240,
+                "description": "the condition on which this session resumes waiting on that peer"
+              }
+            }
+          }
+        },
+        "report": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "shape",
+            "text",
+            "at"
+          ],
+          "properties": {
+            "shape": {
+              "type": "string",
+              "description": "one of resources/interaction.json reportShapes"
+            },
+            "text": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 600,
+              "description": "the last message the person received, in the person's language"
+            },
+            "at": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        }
+      }
+    },
+    "budget": {
+      "description": "the caps the session runs under, written at create from resources/orchestrator.json#budget; a request past a cap is refused (BUDGET_EXHAUSTED) unless an extension recorded here points at a user choice of continue",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "maxSteps",
+        "maxSameOperator"
+      ],
+      "properties": {
+        "maxSteps": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "maxSameOperator": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "extensions": {
+          "type": "array",
+          "maxItems": 8,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "decisionId",
+              "maxSteps",
+              "maxSameOperator"
+            ],
+            "properties": {
+              "decisionId": {
+                "type": "string",
+                "pattern": "^budget:[a-z0-9-]+$"
+              },
+              "maxSteps": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "maxSameOperator": {
+                "type": "integer",
+                "minimum": 1
+              }
+            }
           }
         }
       }

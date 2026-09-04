@@ -28,6 +28,17 @@ How the entry uses them:
    - the chain ends at `git.publish`, `release.deploy`, or `user`.
 3. A composed chain that would be useful again becomes a new file here, with its `when`.
 
+## Every chain opens with readiness
+
+Every example that touches routed source or a runtime opens with `environment.preflight`: one branch,
+before the binds, that reports every wall the chain could meet — an undeclared or near-named route, a
+missing git policy, a dirty checkout, a sign-in that fails, a served head that does not contain the
+bound one, a held port, a missing browser or container, an approval the environment keeps with a
+person — in one typed readiness report. A chain that met those walls one per hour as it ran into them
+is the shape the retrospective evidence records; a chain that meets them all at minute five is the
+shape these examples take. `content-unit` writes no routed source and consumes no runtime, so it opens
+with its own operator.
+
 ## Every example is a long flow
 
 A chain that writes a surface is not finished when the source compiles. Between the write and the
@@ -67,16 +78,16 @@ session branch whose session carries no source-application receipt and no audit 
 
 | Workflow | When | Steps | Parallel | Ends |
 | --- | --- | --- | --- | --- |
-| `library-maintenance` | existing owner package behavior and next patch, without product presentation changes | bind → library apply → quality | — | `user` |
-| `dependency-maintenance` | verified package consumption through exact dependency metadata | bind → dependency update → quality | — | `user` |
-| `frontend-new-surface` | a surface that does not exist yet (`new`) | bind ×2 → business → direction → resolve → apply → bind (consume) → audit → quality → uat → publish | audit by matrix | `git.publish` |
-| `frontend-reconstruct` | rebuild an existing surface, business facts kept | bind ×2 → direction → resolve → apply → bind (consume) → audit → quality → uat → publish | audit by matrix | `git.publish` |
-| `frontend-refine` | repair inside an approved structure | bind ×2 → direction → resolve → apply → bind (consume) → audit → quality → uat → publish | audit by matrix | `git.publish` |
-| `backend-feature` | a backend contract for one feature, no surface | bind → business (model) → architecture → backend apply → quality → business (reconcile) → publish | — | `git.publish` |
-| `full-feature` | backend and a new frontend surface together | bind ×2 → business → architecture → [backend apply ∥ direction] → [quality ∥ resolve] → apply → bind (consume) → audit → quality → uat → business (reconcile) → publish | two steps of two, audit by matrix | `git.publish` |
-| `frontend-with-uat` | a frontend change a person asked to walk through by name | bind ×2 → direction → resolve → apply → bind (consume) → audit → quality → uat → publish | audit by matrix | `git.publish` |
-| `staging-uat` | a published delivery must be walked on another stack before release | bind ×2 (consume) → direction → resolve → apply (dry) → audit (env staging) → quality → uat (env staging) | audit by matrix | `user` |
-| `release` | a published head must reach production | bind → quality → release | — | `release.deploy` |
+| `library-maintenance` | existing owner package behavior and next patch, without product presentation changes | preflight → bind → library apply → quality | — | `user` |
+| `dependency-maintenance` | verified package consumption through exact dependency metadata | preflight → bind → dependency update → quality | — | `user` |
+| `frontend-new-surface` | a surface that does not exist yet (`new`) | preflight → bind ×2 → business → direction → resolve → apply → bind (consume) → audit → quality → uat → publish | audit by matrix | `git.publish` |
+| `frontend-reconstruct` | rebuild an existing surface, business facts kept | preflight → bind ×2 → direction → resolve → apply → bind (consume) → audit → quality → uat → publish | audit by matrix | `git.publish` |
+| `frontend-refine` | repair inside an approved structure | preflight → bind ×2 → direction → resolve → apply → bind (consume) → audit → quality → uat → publish | audit by matrix | `git.publish` |
+| `backend-feature` | a backend contract for one feature, no surface | preflight → bind → business (model) → architecture → backend apply → quality → business (reconcile) → publish | — | `git.publish` |
+| `full-feature` | backend and a new frontend surface together | preflight → bind ×2 → business → architecture → [backend apply ∥ direction] → [quality ∥ resolve] → apply → bind (consume) → audit → quality → uat → business (reconcile) → publish | two steps of two, audit by matrix | `git.publish` |
+| `frontend-with-uat` | a frontend change a person asked to walk through by name | preflight → bind ×2 → direction → resolve → apply → bind (consume) → audit → quality → uat → publish | audit by matrix | `git.publish` |
+| `staging-uat` | a published delivery must be walked on another stack before release | preflight → bind ×2 (consume) → direction → resolve → apply (dry) → audit (env staging) → quality → uat (env staging) | audit by matrix | `user` |
+| `release` | a published head must reach production | preflight → bind → quality → release | — | `release.deploy` |
 | `content-unit` | one curriculum unit end to end | content.generate (review exchange inside) | — | `user` |
 
 File shape (`schemaVersion` 9): `id` equals the file name; `when` has `en` and `vi`; `chain` is an

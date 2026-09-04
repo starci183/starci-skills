@@ -5,6 +5,7 @@ export default {
   "business-decide": "business.decide",
   "content-generate": "content.generate",
   "dependency-update": "dependency.update",
+  "environment-preflight": "environment.preflight",
   "frontend-direction-decide": "frontend.direction.decide",
   "frontend-presentation-resolve": "frontend.presentation.resolve",
   "frontend-source-apply": "frontend.source.apply",

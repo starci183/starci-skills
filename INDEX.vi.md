@@ -1,4 +1,4 @@
-# StarCi Skills 1.9.0
+# StarCi Skills 2.0.0
 
 Cây này chính là runtime. Đọc tiếp `SKILL.md` (bản tiếng Anh là bản được nạp; `SKILL.vi.md` chỉ để người đọc); đó là cửa vào duy nhất,
 đóng băng phạm vi của một nhiệm vụ, chọn đúng một operator sở hữu kết quả, rồi định tuyến giữa các
@@ -28,12 +28,12 @@ fingerprint và danh sách rule đầy đủ, và không được phát ra mã n
 
 ```text
 SKILL.md                 một cửa vào, operator được liệt kê ở operators/INDEX.md, một bảng định tuyến
-routing.json             route operator đóng, bốn loại: operator | resume | user | external
+routing.json             route operator đóng, năm loại: operator | resume | chain | user | external
 alias/                   alias.json (sổ cho máy: vị trí, scheme, bind, ai ghi, vùng) + INDEX.md (bản đồ sinh theo vùng); operator chỉ đọc qua alias
-resources/               tools.json (sổ tool đóng: mode và hỗ trợ theo runtime, gọi bằng @tools/<id>) + agents/profiles/{openai,claude}.json (6 profile, quyền theo tool) + orchestrator.json (mỗi operator một agent, tối đa 3, profile tương đương); có kiểm
+resources/               tools.json (sổ tool đóng: mode và hỗ trợ theo runtime, gọi bằng @tools/<id>) + agents/profiles/{openai,claude}.json (6 profile, quyền theo tool) + orchestrator.json (chế độ dispatch inline | fresh, tối đa 3 agent, chờ theo hoàn tất, khung running, brief, budget, profile tương đương) + interaction.json (loại câu hỏi và dạng báo cáo); có kiểm
 workflows/               chuỗi mẫu (các bậc gồm nhánh song song, vòng lặp, preset) mà cửa vào dùng lại khi request khớp when; không khớp thì tự ghép theo cùng luật; có kiểm
 operators/INDEX.md       sinh tự động: mỗi operator đọc gì, tiêu thụ và sinh kind nào, số bước, và mọi mã dừng kèm cách xử lý; operators/errors.json giữ mã dùng chung
-operators/<id>/          operator.md (+vi) một file viết tay cho mỗi operator, operator.json (id, domain, resources), errors.json (mã riêng), validate.mjs, self-test.mjs
+operators/<id>/          operator.md (+vi) một file viết tay cho mỗi operator, operator.json (id, domain, resources gồm dispatch), errors.json (mã riêng), validate.mjs, self-test.mjs, brief.md (sinh tự động: prompt dispatch cho một agent mới, tối đa orchestrator.json#briefBytes)
 knowledge/
   ui/composition/        cây phải chứa gì, trước khi nó tồn tại      -> frontend.direction.decide
   ui/presentation/       ranh giới do app sở hữu lấy giá trị CSS nào -> frontend.presentation.resolve
@@ -42,12 +42,12 @@ knowledge/
   grammars/<họ>/         cách một họ hình ảnh hiện thực Common
 templates/               mỗi loại tài liệu một template; mỗi template mang khối json template-contract dùng để kiểm cả cây;
                          kinds/ định kiểu mọi file đi qua giữa các bước (<kind>.contract.json + <kind>.skeleton.md cho markdown, <kind>.schema.json cho dữ liệu); step/ giữ hai gate request.json và response.json
-scripts/                 validate-routing.mjs, validate-resources.mjs, validate-knowledge-citations.mjs, validate-alias.mjs, validate-templates.mjs, validate-operator.mjs, validate-workflows.mjs, validate-request.mjs, validate-response.mjs, validate-step.mjs, run-operator-self-tests.mjs;
+scripts/                 validate-routing.mjs, validate-resources.mjs, validate-knowledge-citations.mjs, validate-alias.mjs, validate-templates.mjs, validate-operator.mjs, validate-workflows.mjs, validate-request.mjs, validate-response.mjs, validate-step.mjs, validate-session.mjs (cả sổ: brief, budget, nhánh bị bỏ rơi), sweep-secrets.mjs (nhà duy nhất của các mẫu hình dạng bí mật, gate response chạy), generate-operator-briefs.mjs, run-operator-self-tests.mjs;
                          device-state.mjs và workspace-portable.mjs (+ spec), thứ package.json của backend gọi tới
 readiness/               các schema workspaces/ mà khai báo route portable và hydrate gọi tên trong $schema
 ```
 
-`npm test` chạy kiểm định tuyến, kiểm resources, kiểm trích dẫn knowledge, kiểm template, mọi self-test của operator, và các spec của script. Head đã publish phải xanh, không xanh
+`npm test` chạy kiểm định tuyến, kiểm resources, kiểm trích dẫn knowledge, kiểm template, kiểm brief sinh ra, mọi self-test của operator, và các spec của script. Head đã publish phải xanh, không xanh
 thì không được publish.
 
 ## Luật áp dụng khắp nơi
@@ -67,6 +67,8 @@ thì không được publish.
   đổi nghĩa.
 
 ## Dòng dõi
+
+2.0.0 (2026-09-04): năm nhiệm vụ Codex trên cây 1.7–1.9 tiêu phần lớn thời gian vào chờ theo đồng hồ, dispatch lại cùng một operator và những bức tường không ai sở hữu (tests/evidence/20260904-codex-five-tasks-retrospective.md); 2.0 trả lời mỗi bức tường bằng một gate. `environment.preflight` mở mọi chuỗi và báo mọi bức tường cùng lúc; route `chain` sửa và tiêu thụ thư viện owner qua chính workflow của nó thay vì dừng ở người; direction khai `Presentation delta` và thay đổi chỉ copy hay chỉ hành vi không nợ dòng trình bày nào; `backend.source.apply` sở hữu theo ranh giới (glob và protected ref) và ghi nhận mở rộng thật sự cần thiết là `OWNER_WIDENED` thay vì chết trên một danh sách path đông cứng; seed quy được về luồng bằng sở hữu tài khoản hay tiền tố, không bao giờ bằng một cột schema làm ra cho luật; orchestrator ghi khung `running` lúc dispatch và agent thoát không receipt là `RECEIPT_MISSING`; dispatch là `inline` hay `fresh` theo operator và chờ theo hoàn tất, không theo đồng hồ; `state.json.brief` là trí nhớ duy nhất của orchestrator và `state.json.budget` giới hạn số bậc và số lần vào lại cùng operator (`BUDGET_EXHAUSTED`, trả lời bằng `budget-choice` có kiểu); `business.decide` và `architecture.decide` nói lại luật của người trong tối đa năm dòng và dừng với `RESTATEMENT_UNCONFIRMED` cho tới khi được xác nhận; mỗi lượt kết thúc bằng một trong ba dạng báo cáo; agent mới nhận `brief.md` sinh ra dưới 2 KB thay vì cả cây; gate response quét mọi receipt tìm giá trị hình dạng bí mật; môi trường khai `external-upload` bên cạnh các lớp khác. Major: hợp đồng định tuyến thêm một loại, trạng thái response thêm `running`, và một mã dừng có thể do orchestrator ghi.
 
 1.9.0 (2026-09-04): sửa thư viện owner và cập nhật dependency đã kiểm có operator giới hạn cùng bằng chứng regression; provisioning bind đúng custody provider và chứng minh đăng nhập sản phẩm; audit UI ưu tiên các bề mặt chính đã chọn và giữ rõ giới hạn của các state phụ để sau.
 

@@ -101,12 +101,47 @@ const responseJson = ({ status = 'done', stop, fields, fallbacks = [], next = ['
   next,
 });
 
-function writeBranch(files) {
+// The direction this resolution consumes; a Decision table is present only when a delta is declared,
+// because an older decision carries none and reads as app-owned.
+const directionMd = (delta) => `# frontend-direction-decision — plan-picker\n${delta ? `\n## Decision\n\n| Field | Value |\n| --- | --- |\n| Presentation delta | \`${delta}\` |\n` : ''}`;
+
+// A resolution that owes nothing: the direction declared Presentation delta none.
+const noneReceipt = () => `# frontend-presentation-resolution — plan-picker
+
+## Owner map
+
+| Node | Property | Owner | Rule |
+| --- | --- | --- | --- |
+
+## Rules chosen
+
+| Node | Rule | Class | Condition |
+| --- | --- | --- | --- |
+
+## Removed
+
+| Node | Class | Because |
+| --- | --- | --- |
+
+## Gaps
+
+| Node | Property | Missing path |
+| --- | --- | --- |
+
+## Fallbacks taken
+
+| Code | Action |
+| --- | --- |
+`;
+const noneInventory = () => ({ treeFingerprint: FINGERPRINT, classNames: [], ruleIds: [], gaps: [] });
+const noneBranch = () => ({ ...baseline(), 'response/response.md': noneReceipt(), 'response/data/inventory.json': noneInventory(), [TREE]: resolvedTree({ emission: 'off' }) });
+
+function writeBranch(files, direction = null) {
   const session = mkdtempSync(path.join(tmpdir(), 'fe-resolve-session-'));
   const branch = path.join(session, 'step-2', 'parallel-1');
   for (const d of ['request', 'response/data', 'response/artifacts']) mkdirSync(path.join(branch, d), { recursive: true });
   mkdirSync(path.join(session, 'step-1', 'parallel-1', 'response'), { recursive: true });
-  writeFileSync(path.join(session, 'step-1', 'parallel-1', 'response', 'response.md'), '# frontend-direction-decision — plan-picker\n');
+  writeFileSync(path.join(session, 'step-1', 'parallel-1', 'response', 'response.md'), directionMd(direction));
   writeFileSync(path.join(session, 'state.json'), JSON.stringify({ id: 's-test', project: 'starci-academy', startedAt: '2026-09-03T00:00:00Z', requestHashes: {}, chain: [['1/1'], ['2/1']], steps: { '1/1': 'frontend.direction.decide', '2/1': 'frontend.presentation.resolve' }, current: '2/1', status: 'running' }));
   for (const [name, content] of Object.entries(files)) {
     if (content === null) continue;
@@ -123,14 +158,14 @@ const baseline = () => ({
   [TREE]: resolvedTree(),
 });
 
-async function expectValid(files, label) {
-  const { branch, session } = writeBranch(files);
+async function expectValid(files, label, direction = null) {
+  const { branch, session } = writeBranch(files, direction);
   const { errors } = await validateResolutionStep(branch);
   rmSync(session, { recursive: true, force: true });
   assert.deepEqual(errors, [], `${label} should be valid`);
 }
-async function expectError(files, needle, label) {
-  const { branch, session } = writeBranch(files);
+async function expectError(files, needle, label, direction = null) {
+  const { branch, session } = writeBranch(files, direction);
   const { errors } = await validateResolutionStep(branch);
   rmSync(session, { recursive: true, force: true });
   assert.ok(errors.some((e) => e.includes(needle)), `${label}: expected an error containing "${needle}", got:\n${errors.join('\n') || '(none)'}`);
@@ -141,6 +176,12 @@ await expectValid(baseline(), 'one application-owned gap, one Grammar-owned padd
 await expectValid({ ...baseline(), 'request/request.json': requestJson({ extra: { contractEmission: 'off' } }), [TREE]: resolvedTree({ emission: 'off' }) }, 'contract emission off leaves the tree bare');
 await expectValid({ 'request/request.json': requestJson(), 'response/response.json': responseJson({ status: 'blocked', stop: 'RULE_MISSING', next: [], fields: {} }) }, 'blocked on RULE_MISSING before anything was written');
 await expectValid({ ...baseline(), [TREE]: resolvedTree().replace(' data-contract="GAP-1"', '') }, 'a rule whose only node is recorded under Gaps claims no attribute');
+await expectValid(noneBranch(), 'a copy-only change under Presentation delta none resolves nothing', 'none');
+await expectValid(baseline(), 'a declared app-owned delta resolves as before', 'app-owned');
+await expectError(baseline(), 'declares Presentation delta none and the resolution still resolves', 'values resolved under a none delta', 'none');
+await expectError({ ...noneBranch(), 'response/response.md': responseMd(), [TREE]: resolvedTree() }, 'declares Presentation delta none', 'receipt rows under a none delta', 'none');
+await expectError(noneBranch(), 'cannot both be empty', 'nothing resolved under the default app-owned delta');
+await expectError(baseline(), 'is neither app-owned nor none', 'an unknown delta value', 'cosmetic');
 
 await expectError({ ...baseline(), 'request/request.json': requestJson({ extra: { mystery: 1 } }) }, 'requirements.mystery is not a field', 'undeclared requirement');
 await expectError({ ...baseline(), 'request/request.json': requestJson({ extra: { maxRounds: 0 } }) }, 'maxRounds must be a positive whole number', 'no rounds allowed');
@@ -161,4 +202,4 @@ await expectError({ ...baseline(), 'response/data/inventory.json': null, 'respon
 await expectError({ ...baseline(), 'response/response.json': responseJson({ status: 'blocked', stop: 'MADE_UP_CODE', next: [] }) }, 'not a registered code', 'unknown stop code');
 await expectError({ ...baseline(), 'response/response.json': responseJson({ fallbacks: ['RULE_MISSING'] }) }, 'has disposition terminate under these requirements', 'a terminate code taken as a fallback');
 
-process.stdout.write('frontend.presentation.resolve self-test: 4 valid branches, 18 rejected mutations\n');
+process.stdout.write('frontend.presentation.resolve self-test: 6 valid branches, 22 rejected mutations\n');

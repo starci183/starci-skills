@@ -15,13 +15,19 @@ Yêu cầu, vì việc một người gõ lại contract vào request chính là
 tách nhau; bước 3 đọc chúng từ đầu vào đã đóng băng và ghi lại vào `response/data/mutations.json`. Ba
 điều cấm gánh phần đó, và mỗi điều được cưỡng chế chứ không phải khuyên. Một operation, writer, store,
 giao dịch, migration hay event nằm ngoài contract là `CONTRACT_WIDENED`, trả về cho chủ contract trước
-mọi lần ghi vào sản phẩm. Một file ngoài trần file được sửa là `OWNER_CONFLICT`, kể cả khi thay đổi ở
-đó chỉ một dòng. Một quy ước mà không pattern anh em nào đã ràng công bố thì bị từ chối và ghi lại là
-`NEW_CONVENTION_REFUSED`, còn một khía cạnh không có pattern nào cả là `PATTERN_UNBOUND`. Phát hiện
-giữa chừng rằng kết quả cần một ranh giới rộng hơn là cách kết thúc dự kiến của operator này, không
-phải sự nhụt chí: chủ contract mở lại và đóng băng lại, rồi cùng kết quả ấy được cài đặt lại theo
-fingerprint mới. Với tay ra ngoài danh sách không phải là thay đổi nhỏ hơn việc mở lại contract; nó là
-cùng một thay đổi nhưng không có dấu vết.
+mọi lần ghi vào sản phẩm. `mutableFileRefs` là ranh giới chủ sở hữu, gồm path chính xác hoặc glob nêu
+những gì kết quả được chạm; một path mà kết quả thực sự đòi nằm ngoài mọi ranh giới thì được ghi và
+được ghi nhận là một lần nới — `OWNER_WIDENED` dưới `## Fallbacks taken`, path cùng ranh giới gần nhất
+và lý do dưới `## Widened`, và `widened: true` trên bản ghi thay đổi của nó — nên biên nhận khiến mọi
+lần nới đều kiểm được từ diff. Một lần nới không bao giờ im lặng và không bao giờ vượt qua một ref
+được bảo vệ: một thay đổi bắt buộc nằm trong `protectedRefs`, một path đã ghi mà không hàng `## Widened`
+nào thừa nhận, hay hai tập chủ sở hữu chồng nhau là `OWNER_CONFLICT`. Một quy ước mà không pattern anh
+em nào đã ràng công bố thì bị từ chối và ghi lại là `NEW_CONVENTION_REFUSED`, còn một khía cạnh không có
+pattern nào cả là `PATTERN_UNBOUND`. Phát hiện giữa chừng rằng kết quả cần một contract rộng hơn là
+cách kết thúc dự kiến của operator này, không phải sự nhụt chí: chủ contract mở lại và đóng băng lại,
+rồi cùng kết quả ấy được cài đặt lại theo fingerprint mới. Với tay ra ngoài contract không phải là thay
+đổi nhỏ hơn việc mở lại nó; nó là cùng một thay đổi nhưng không có dấu vết, và đó cũng là lý do một path
+đã nới chẳng đáng gì cho tới khi hàng ghi của nó tồn tại.
 
 Migration độc lập tuân theo
 [`stack-model.schema.json#/$defs/migrationOperation`](../../templates/kinds/stack-model.schema.json#/$defs/migrationOperation).
@@ -111,14 +117,16 @@ sửa mà hai hash bằng nhau ghi lại một mutation không hề xảy ra.
 
 ## Ranh giới
 
-Operator chỉ ghi source sản phẩm bên trong trần file được sửa, chỉ bên trong worktree nhánh phiên của
+Operator chỉ ghi source sản phẩm bên trong ranh giới chủ sở hữu hoặc bên ngoài nó dưới dạng một lần
+nới có ghi nhận mà không ref được bảo vệ nào phủ, chỉ bên trong worktree nhánh phiên của
 `@workspaces/be`, và ghi mọi thứ khác vào `response/` của nhánh mình: `response.md`,
 `response/changes.md`, `response/data/mutations.json`, một bản ghi conformance cho mỗi facet đã khai,
 một bản ghi proof cho mỗi proof đã khai, và `response.json`. Nó không bao giờ thêm một operation,
 writer, store, giao dịch, migration hay event mà contract đóng băng không mang, không quyết một luật
 nghiệp vụ mà thẩm quyền đã duyệt không nói, không đưa vào một quy ước mà không pattern anh em nào công
 bố, không làm yếu, bỏ qua, chặn hay thay thế một proof đã khai để một lượt chạy thành xanh, không sửa
-contract, thẩm quyền nghiệp vụ hay một file ngoài trần được sửa, không commit quá một lần, không ghi
+contract, thẩm quyền nghiệp vụ hay một ref được bảo vệ, không ghi một path ngoài ranh giới mà thiếu
+hàng `## Widened` của nó, không commit quá một lần, không ghi
 lên nhánh mà người đang checkout, không push, merge hay tag gì, không tuyên bố conformance mà không
 nêu bằng chứng đã đo nó, và không ghi phán quyết chất lượng, thị giác hay UAT; đó là những việc khác
 với cổng riêng của chúng.
@@ -149,7 +157,8 @@ publish bị giữ lại. Khi nó vắng, head đã publish là thẩm quyền.
 | --- | --- | --- | --- |
 | `featureId` | id | — | Feature mà head nghiệp vụ đã publish của nó quyết hành vi này |
 | `outcome` | prompt | — | Một thứ duy nhất đang được cài đặt, bằng lời của người dùng |
-| `mutableFileRefs` | list | — | Những file duy nhất mà source sản phẩm được ghi vào |
+| `mutableFileRefs` | list | — | Ranh giới chủ sở hữu: path chính xác tương đối theo repository hoặc glob (`*` trong một đoạn, `**` xuyên nhiều đoạn) mà source sản phẩm được ghi vào; một path kết quả thực sự đòi nằm ngoài mọi ranh giới thì được ghi và ghi nhận dưới Widened |
+| `protectedRefs` | list | empty | Path hoặc glob không bao giờ được ghi, kể cả khi nới: module của chủ sở hữu khác, file sinh tự động, lockfile, migration của feature khác |
 | `contractFingerprint` | id | null | SHA-256 của byte stack-model từ producer; orchestrator ràng giá trị này cho contract migration độc lập |
 | `mode` | choice | apply | `apply` điền contract rồi commit, `dry` chỉ phát bản kế hoạch và không ghi gì |
 | `resume` | token | null | Token của nhánh bị chặn khi vào lại sau một mã dừng |
@@ -160,7 +169,7 @@ publish bị giữ lại. Khi nó vắng, head đã publish là thẩm quyền.
 | --- | --- | --- | --- | --- | --- |
 | 1 | Kiểm gate, chạy lại và xác nhận phiên | `resume`, `mode` | `request/request.json`, `state.json` của phiên và `step-N/parallel-M` của nhánh này, đầu vào `backend-source-application` nếu có, @workspaces/be ở head đóng băng | — | `INVALID_INPUT`, `SESSION_MISSING`, `SOURCE_DRIFT`, `NO_PROGRESS` |
 | 2 | Ràng thẩm quyền, contract và pattern | `featureId`, `contractFingerprint` | đầu vào `model` khi có, nếu không thì @worktrees/businesses/<featureId> ở head đã publish, đầu vào `architecture-decision` làm contract đóng băng và làm nguồn `operations` của nó, @knowledge/patterns/be mỗi khía cạnh một pattern | — | `CONTRACT_UNFROZEN`, `BUSINESS_AUTHORITY_MISSING`, `PATTERN_UNBOUND` |
-| 3 | Điền từng operation của contract, trên nhánh phiên | `mutableFileRefs` | @knowledge/patterns/be cho từng khía cạnh, @workspaces/be trong trần được sửa | @workspaces/be/branch/session trong trần được sửa, dưới một lease độc quyền, @tools/sourcewrite | `CONTRACT_WIDENED`, `OWNER_CONFLICT` |
+| 3 | Điền từng operation của contract, trên nhánh phiên | `mutableFileRefs`, `protectedRefs` | @knowledge/patterns/be cho từng khía cạnh, @workspaces/be trong ranh giới chủ sở hữu | @workspaces/be/branch/session trong ranh giới chủ sở hữu, hoặc ngoài nó dưới dạng một lần nới có ghi nhận và không bao giờ trong một ref được bảo vệ, dưới một lease độc quyền, @tools/sourcewrite | `CONTRACT_WIDENED`, `OWNER_WIDENED`, `OWNER_CONFLICT` |
 | 4 | Đối chiếu mọi mutation với contract đóng băng và ghi nó kèm hash trước và sau | `mode` | @workspaces/be, các file bị chạm và contract đóng băng | `response/data/mutations.json` | — |
 | 5 | Kiểm lại snapshot đã lưu khi đọc | — | @workspaces/be, snapshot đã lưu, @knowledge/patterns/be cho các luật trôi sau nó | — | — |
 | 6 | Chứng minh từng facet đã khai | — | @workspaces/be, phép đo đứng sau mỗi facet | `response/data/conformance/<operationId>.<facet>.json` | — |
@@ -204,6 +213,7 @@ không thể cho một câu trả lời khác.
 | `CONTRACT_WIDENED` | terminate |
 | `BUSINESS_AUTHORITY_MISSING` | terminate |
 | `OWNER_CONFLICT` | terminate |
+| `OWNER_WIDENED` | fallback |
 | `PATTERN_UNBOUND` | terminate |
 | `PROOF_UNAVAILABLE` | terminate |
 
@@ -214,6 +224,6 @@ không thể cho một câu trả lời khác.
 | contract đã điền xong và các cổng mà bản ghi thay đổi nêu tên phải chạy | `quality.verify` |
 | lời hứa phải được đối chiếu với source đã giao | `business.decide` |
 | contract đã điền xong và một bề mặt frontend phải tiêu thụ nó | `frontend.direction.decide` |
-| một file cần sửa nằm ngoài trần ghi được route | `workspace.bind` |
+| một thay đổi bắt buộc nằm trong một ref được bảo vệ, hoặc hai tập chủ sở hữu chồng nhau, và thẩm quyền chủ sở hữu phải được sửa | `workspace.bind` |
 | một proof đã khai không chạy được trong môi trường này | `platform.operate` |
 | bản kế hoạch được làm ra dưới mode dry và một người quyết có trả giá cho nó hay không | `user` |

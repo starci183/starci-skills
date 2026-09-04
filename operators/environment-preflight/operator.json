@@ -1,0 +1,23 @@
+{
+  "schemaVersion": 9,
+  "id": "environment.preflight",
+  "domain": "environment",
+  "job": "Run, once and before any chain, every readiness check a mission would otherwise meet one wall at a time — declarations, checkouts, identity custody, the runtime, the host and the environment's approvals — and return them all at once as one typed readiness report, repairing nothing.",
+  "package": "operator.md",
+  "errors": "errors.json",
+  "validator": "validate.mjs",
+  "selfTest": "self-test.mjs",
+  "resources": {
+    "profile": "luna",
+    "grammarBound": false,
+    "dispatch": "inline",
+    "tools": {
+      "@tools/fileread": "context-aliases",
+      "@tools/git": "read",
+      "@tools/shell": "declared-commands",
+      "@tools/http": "probe",
+      "@tools/secrets": "resolve-by-name",
+      "@tools/container": "read"
+    }
+  }
+}

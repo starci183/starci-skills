@@ -5,7 +5,9 @@
 // five axes or carry the COMPATIBILITY_UNVERIFIED fallback; the critique came from the nested
 // exchange, attacks the selected alternative, and a failing attack cannot end in status done; the
 // handoff names contracts, never implementation files; every declared operation is named once, names a
-// writer, cites at least one business dimension, and is restated by the receipt's Operations table.
+// writer, cites at least one business dimension, and is restated by the receipt's Operations table;
+// and the objective is restated in the person's words and confirmed by them before anything is
+// observed or designed (RESTATEMENT_UNCONFIRMED until the request carries the recorded choice).
 import { existsSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
 import path from 'node:path';
@@ -14,19 +16,27 @@ import { fileURLToPath } from 'node:url';
 import { validateStep } from '../../scripts/validate-step.mjs';
 import { tableUnder } from '../../scripts/validate-response.mjs';
 import { validateMigrationOperation } from '../../scripts/migration-operation.mjs';
+import { restatementErrors } from '../business-decide/validate.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 const AXES = ['runtime-version', 'deployable-unit', 'communication-failure', 'datastore-ownership', 'backup-restore'];
 const IMPLEMENTATION_FILE = /\b[\w./-]+\.(ts|tsx|js|jsx|mjs|cjs|py|go|java|rb|rs|php|sql)\b/i;
 const empty = (v) => v === undefined || v === null || v === '' || v === '—';
+// The Requirements default of decisionId: the slug of the objective, computed here so the choice key
+// restatement:<decisionId> resolves when the request leaves the field to its default.
+const slug = (s) => String(s ?? '').normalize('NFKD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
 
 export async function validateArchitectureStep(branchDir, root = ROOT) {
   const base = await validateStep(root, branchDir);
   const errors = [...base.errors];
-  const { response, requirements = {}, present = new Set() } = base;
+  const { request, response, requirements = {}, present = new Set() } = base;
   if (!response || response.operatorId !== 'architecture.decide') return { errors };
   const has = (f) => existsSync(path.join(branchDir, f));
   const read = (f) => readFile(path.join(branchDir, f), 'utf8');
+  // The objective is restated before it is designed: every request supplies one, and the promise's
+  // confirmation in business.decide does not transfer to the architecture's own reading.
+  const decisionId = empty(requirements.decisionId) ? slug(requirements.objective) : String(requirements.decisionId);
+  errors.push(...await restatementErrors({ branchDir, request, response, requirements, present, field: 'objective', id: decisionId, owed: !empty(requirements.objective) }));
   const wanted = Number(requirements.alternatives ?? 1);
   const policy = requirements.selectionPolicy ?? 'automatic';
   const approval = requirements.approval;

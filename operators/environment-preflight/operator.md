@@ -1,0 +1,160 @@
+# environment.preflight
+
+## Job
+
+Run, once and before any chain, every readiness check a mission would otherwise meet one wall at a
+time — declarations, checkouts, identity custody, the runtime, the host and the environment's
+approvals — and return them all at once as one typed readiness report, repairing nothing.
+
+## Every wall at once
+
+A mission that discovers its walls in sequence pays for each one separately: a route nobody
+declared, a checkout with no branch policy, an identity provider that refuses its own admin
+credential, a browser the audit profile cannot find, a port a previous process still holds and an
+outbound upload no declaration allows each stop a different operator, hours apart, and each stop
+hands a person one item. This operator runs the same questions in one pass before the chain opens
+and reports every wall in one place, so the person clears them together and the chain that follows
+meets none of them. A check is a question with one of three answers: `ok`, `wall`, or `skipped` when
+the thing it asks about cannot be inspected because an earlier wall of the same role stands or the
+requirement it needs was not named. A wall is a finding with an owner and a repair; it is never an
+action. The vocabulary of checks is closed and lives in the data kind `readiness-report`, expanded
+over the requested roles and the operation classes the environment schema publishes, so a check that
+did not run is visible as a missing id and never as silence.
+
+## Declaration is the only route authority
+
+A route exists because a portable declaration in `@workspaces/projects/<project>/<role>` says so and
+a hydrated route in `@workspaces/local/routes/<project>/<role>` projects it onto this machine. A
+directory whose name resembles the project, a sibling checkout, the working directory and the origin
+open in a browser establish nothing, and this operator has no field to hold them. When the requested
+project or role is declared by nothing and exactly one declaration differs from the requested name by
+a hyphen, a suffix or letter case, the declaration check is a wall whose repair names the declaration
+as suggested `<id>`, and `ROUTE_NAME_NEAR_MATCH` records the same suggestion under
+`## Fallbacks taken`. The wall stands and the requested name is never switched, because a name
+corrected silently is a route nobody declared. The checkout checks then read the policy the
+declaration carries — a route with no policy is a wall, never a guessed policy — and observe the
+resolved checkout's branch and working tree through `@tools/git`: the branch must be one the policy
+permits, and any dirt on the mutation branch is a wall, since that branch has no in-progress state of
+its own to account for it.
+
+## Identity custody is proved, never printed
+
+The sealed admin credential of the environment's identity provider is checked through the tree's own
+preflight, `scripts/identity-custody.mjs`, which binds the provider, its realm, its container and the
+mounted custody before any value resolves and returns a fixed outcome code. The evidence of that
+check is the outcome, the credential's name and its length or digest; it is never the value, and a
+check that cannot be written that way is not run. When `flow` is named, the flow's account record
+under `@worktrees/uat/<flow>` must exist for `env`, and a sign-in probe against the identity provider
+the route's registry entry declares must succeed with the password resolved by name at the call
+through `@tools/secrets` and reaching nothing but the request body. When no flow is named, both flow
+checks are `skipped` and say so.
+
+## Runtime and host are observed, never operated
+
+The runtime registry at `@worktrees/sessions/central-runtime` holds one entry per `<project>/<role>`;
+each requested role reads the entry of its own route and no other, so a sibling route's entry never
+answers for it. The entry is ready for this mission when the head it serves contains the head the
+route's checkout is at — present among the commits the entry records as contained — and the ports
+`@workspaces/ports/<project>` projects for the role answer a probe through `@tools/http`. A port that
+answers while the entry names no server, or is held by a process the registry does not record, is a
+wall with the holder as evidence and never permission to reclaim it. The host checks ask whether a
+browser binary exists for the audit profile, whether the container daemon answers an inspection
+through `@tools/container`, whether each checkout's dependencies are installed as its lockfile
+records, and whether a checkout nested under another repository would have that repository's
+`node_modules/@types` enter its typecheck — a leak that fails a typecheck for reasons no source
+change explains. Every observation here is a declared command through `@tools/shell` with its output
+kept as evidence; nothing is started, stopped, installed or killed.
+
+## Approvals are read from the declaration
+
+The environment declaration `.stacks/<env>/environment.json`, in the shape
+`readiness/initialization/stacks/environment.schema.json` gives, says who authorises each operation
+class in this environment. One approval check per class the schema publishes states `declared` or
+`person`; a class the declaration omits takes the default the schema gives for its `production`
+value, so a chain knows before it starts which of its rungs the declaration answers and which will
+wait for a person. The receipt's Declaration row and the report's `declarationRef` carry the
+declaration's path and the hash of its bytes; a declaration that is missing or does not match its
+schema makes every approval check a wall owned by `approval`.
+
+## Boundary
+
+Context is read-only. The operator writes only `response/` of its own branch: `response.md`,
+`response/data/readiness-report.json` and `response.json`. It never repairs a declaration, hydrates a
+route, declares a policy, stashes or cleans a tree, provisions an account, rotates a credential,
+starts or stops a server or a container, installs a dependency, claims a port, or writes a
+credential, token, cookie or password into the receipt or any evidence. Every wall in the report is
+the whole of what it does about that wall; a blocked branch still carries the complete report,
+because a report that stopped at the first wall is the sequence of walls this operator exists to
+replace. It makes no product decision and carries no verdict about the source.
+
+## Context
+
+| Alias | Bind | Required |
+| --- | --- | --- |
+| `@workspaces/projects/<project>/<role>` | the portable route declaration of each requested role, read by fingerprint; the only route authority | yes |
+| `@workspaces/local/routes/<project>/<role>` | the hydrated route this machine projects each declaration onto, and the checkout it resolves to | yes |
+| `@workspaces/device-state` | machine identity and the sealed credential roster, bound by name and never read | yes |
+| `@workspaces/ports/<project>` | the port projection whose ports the runtime checks probe | yes |
+| `@worktrees/sessions/central-runtime` | the runtime registry: the entry of each requested route, the head it serves and what that head contains | yes |
+| `@worktrees/uat/<flow>` | the flow's account record for `env`, read only when `flow` is named | no |
+
+## Inputs
+
+| Kind | From | Required |
+| --- | --- | --- |
+| — | this operator opens the chain, so it consumes no earlier branch | no |
+
+## Requirements
+
+| Field | Type | Default | Ask |
+| --- | --- | --- | --- |
+| `project` | id | — | The project whose routes, runtime and identity are checked |
+| `roles` | list | `fe, be` | The roles of that project the chain will bind; each gets its own declaration, checkout, runtime and host checks |
+| `env` | id | dev | The environment whose declaration, secrets and flow accounts are read |
+| `flow` | id | null | The flow whose account record and sign-in are probed; null skips both flow checks |
+| `resume` | token | null | The blocked branch's token when re-entering after a stop |
+
+## Steps
+
+| # | Step | Params | Reads | Writes | Stops with |
+| --- | --- | --- | --- | --- | --- |
+| 1 | Validate the gate and resume | `resume` | `request/request.json`, its requirements and the blocked report when resuming | — | `INVALID_INPUT`, `NO_PROGRESS` |
+| 2 | Check the declarations: every requested role is declared and its hydrated route projects it, with a near match reported as a suggestion and never adopted | `project`, `roles` | @workspaces/projects/<project>/<role>, @workspaces/local/routes/<project>/<role> | — | `ROUTE_NAME_NEAR_MATCH` |
+| 3 | Check each checkout: the route carries a git policy, the tree is clean and the branch is one the policy permits | — | @workspaces/local/routes/<project>/<role>, the resolved checkout, its branch and its working tree, @tools/git | — | — |
+| 4 | Check identity custody: the sealed admin credential preflight through `scripts/identity-custody.mjs`, and when a flow is named its account record and a sign-in probe | `flow`, `env` | @workspaces/device-state, @worktrees/uat/<flow> for the account record of `env`, @worktrees/sessions/central-runtime for the identity provider of each route's entry, @tools/secrets, @tools/http | — | — |
+| 5 | Check the runtime: the registry entry of each route, whether the served head contains the checkout's head, whether the projected ports answer, and any port a foreign process holds | — | @worktrees/sessions/central-runtime, @workspaces/ports/<project>, @tools/http, @tools/shell | — | — |
+| 6 | Check the host: a browser binary for the audit profile, a reachable container daemon, installed dependencies per checkout and ancestor type isolation | — | the resolved checkouts and their lockfiles, @tools/shell, @tools/container | — | — |
+| 7 | Check the approvals: which operation classes the environment declaration marks declared or person, an omitted class taking the schema default | `env` | the environment declaration of `env` and the environment schema | — | — |
+| 8 | Emit the report, blocked with every wall named when any stands | — | everything above | `response/response.md`, `response/data/readiness-report.json`, `response/response.json` | `ENVIRONMENT_NOT_READY` |
+
+Step 8 is the only step that stops on a wall: a wall found at steps 2 to 7 is recorded and the next
+step runs, so the report the person reads is complete whichever check failed first. A role whose
+declaration is a wall has every other check of that role `skipped`, because there is no checkout to
+inspect; a flow that was not named has both flow checks `skipped`. A resume begins again at step 1
+and runs every check again; a re-entry whose report names the same walls as the branch it resumes is
+`NO_PROGRESS`.
+
+## Outputs
+
+| Kind | File | Type | Required |
+| --- | --- | --- | --- |
+| `environment-readiness` | `response/response.md` | md | yes |
+| `readiness-report` | `response/data/readiness-report.json` | data | yes |
+
+## Stops
+
+| Code | Disposition |
+| --- | --- |
+| `INVALID_INPUT` | terminate |
+| `NO_PROGRESS` | terminate |
+| `ROUTE_NAME_NEAR_MATCH` | fallback |
+| `ENVIRONMENT_NOT_READY` | terminate |
+
+## Next
+
+| When | Operator |
+| --- | --- |
+| every wall is cleared and the chain binds its routes | `workspace.bind` |
+| a runtime or identity wall the platform owns must be cleared first | `platform.operate` |
+| the mission routes no source and a curriculum unit follows | `content.generate` |
+| a wall stands that only a person can clear | `user` |

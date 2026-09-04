@@ -1,8 +1,10 @@
 // backend.source.apply's own law over one branch, on top of the shared step check: the write set arrives
 // as exactly one commit on the session branch, and the mutation record, response.json.commits and the
 // change record name that same sha; every operation the frozen contract carries is restated once and
-// applied; every change lies inside the mutable ceiling, names a declared operation, appears once, and
-// carries the hash pair its kind demands; a dry run commits nothing, writes no after hash, measures no
+// applied; every change lies inside an owner boundary or is a recorded widening (listed under
+// ## Widened, marked widened in the mutation record, OWNER_WIDENED taken) and never inside a protected
+// ref, names a declared operation, appears once, and carries the hash pair its kind demands; a dry run
+// commits nothing, writes no after hash, measures no
 // facet and runs no proof, and reports every planned path as unchanged in the change record; every
 // declared facet of an applied run has its own conformance file, named for
 // the operation and facet it measures, with evidence, and every verdict in a done branch conforms;
@@ -28,6 +30,25 @@ const empty = (v) => v === undefined || v === null || v === '' || v === '—';
 const fields = (rows) => Object.fromEntries((rows ?? []).map(([k, v]) => [k, v]));
 const listed = (value) => (value === undefined ? [] : Array.isArray(value) ? value : [value]);
 
+// An owner ref is an exact repository-relative path or a glob: `*` within one segment, `**` across
+// segments (`a/**/b` also matches `a/b`, `a/**` matches everything under `a/`). A ref with no glob
+// character matches itself only.
+const isGlob = (ref) => /[*]/.test(ref);
+export function refToRegExp(ref) {
+  const segments = ref.split('/');
+  let source = '';
+  segments.forEach((seg, i) => {
+    const last = i === segments.length - 1;
+    if (seg === '**') source += last ? '.*' : '(?:[^/]+/)*';
+    else source += seg.replace(/[.+^${}()|[\]\\?]/g, '\\$&').replace(/\*/g, '[^/]*') + (last ? '' : '/');
+  });
+  return new RegExp(`^${source}$`);
+}
+const matcherOf = (refs) => {
+  const rules = refs.map((ref) => ({ ref, re: refToRegExp(ref) }));
+  return (file) => rules.find((r) => r.re.test(file))?.ref ?? null;
+};
+
 export async function validateBackendStep(branchDir, root = ROOT) {
   const base = await validateStep(root, branchDir);
   const errors = [...base.errors];
@@ -36,7 +57,18 @@ export async function validateBackendStep(branchDir, root = ROOT) {
   const has = (f) => existsSync(path.join(branchDir, f));
   const read = (f) => readFile(path.join(branchDir, f), 'utf8');
   const readJson = async (f) => { try { return JSON.parse(await read(f)); } catch { return null; } };
-  const mutable = new Set(Array.isArray(requirements.mutableFileRefs) ? requirements.mutableFileRefs : []);
+  // Ownership is a boundary, not a list: `mutableFileRefs` says what the outcome may touch, `protectedRefs`
+  // what it may never touch, and a required path outside every boundary is written as a recorded widening.
+  const boundaries = Array.isArray(requirements.mutableFileRefs) ? requirements.mutableFileRefs.map(String) : [];
+  const protectedRefs = Array.isArray(requirements.protectedRefs) ? requirements.protectedRefs.map(String) : [];
+  const insideBoundary = matcherOf(boundaries);
+  const insideProtected = matcherOf(protectedRefs);
+  const bounded = boundaries.length > 0;
+  // Owner sets that overlap: a ref both lists carry, or an exact boundary a protected ref covers, is a boundary nothing may write into.
+  for (const ref of boundaries) {
+    if (protectedRefs.includes(ref)) errors.push(`request/request.json: ${ref} is both a boundary and a protected ref; overlapping owner sets are OWNER_CONFLICT`);
+    else if (!isGlob(ref) && insideProtected(ref)) errors.push(`request/request.json: boundary ${ref} lies inside protected ref ${insideProtected(ref)}; overlapping owner sets are OWNER_CONFLICT`);
+  }
   // `mode` decides whether this branch touched the checkout at all; everything below reads differently under dry.
   const mode = requirements.mode ?? 'apply';
 
@@ -76,7 +108,7 @@ export async function validateBackendStep(branchDir, root = ROOT) {
     for (const operation of declared) {
       const at = `response/data/mutations.json: operation ${operation.operationId}`;
       errors.push(...await validateMigrationOperation(root, operation, at));
-      if (mutable.size && !mutable.has(operation.writerRef)) errors.push(`${at} names writer ${operation.writerRef} outside the mutable ceiling`);
+      if (insideProtected(operation.writerRef)) errors.push(`${at} names writer ${operation.writerRef} inside protected ref ${insideProtected(operation.writerRef)}; a protected ref is never written, so this is OWNER_CONFLICT`);
       const shipsMigration = (operation.migrationRefs ?? []).length > 0;
       // A migration without a replay proof is a schema change nobody re-ran.
       if (shipsMigration && !operation.proofKinds.includes('migration-replay')) errors.push(`${at} ships a migration without declaring the migration-replay proof`);
@@ -97,7 +129,10 @@ export async function validateBackendStep(branchDir, root = ROOT) {
       if (changedPaths.has(change.path)) errors.push(`response/data/mutations.json: file ${change.path} carries more than one change record`);
       changedPaths.add(change.path);
       if (declaredById.size && !declaredById.has(change.operationId)) errors.push(`response/data/mutations.json: change on ${change.path} names undeclared operation ${change.operationId}`);
-      if (mutable.size && !mutable.has(change.path)) errors.push(`response/data/mutations.json: change on ${change.path} lies outside the mutable ceiling`);
+      if (insideProtected(change.path)) errors.push(`response/data/mutations.json: change on ${change.path} lies inside protected ref ${insideProtected(change.path)}; a protected ref is never written, even as a widening, so this is OWNER_CONFLICT`);
+      // The flag and the boundary must agree: widened means outside every boundary, and nothing else does.
+      if (bounded && insideBoundary(change.path) && change.widened === true) errors.push(`response/data/mutations.json: change on ${change.path} is marked widened but lies inside boundary ${insideBoundary(change.path)}; there is nothing to widen`);
+      if (bounded && !insideBoundary(change.path) && change.widened !== true) errors.push(`response/data/mutations.json: change on ${change.path} lies outside every owner boundary and is not marked widened: true`);
       const shape = HASH_SHAPE[change.change];
       if ((shape.before === 'set') !== (change.beforeHash !== null)) errors.push(`response/data/mutations.json: change on ${change.path} is ${change.change} with the wrong before hash`);
       if (mode === 'dry') {
@@ -201,6 +236,29 @@ export async function validateBackendStep(branchDir, root = ROOT) {
     }
     if (mutations) for (const p of changeById.keys()) if (!seenFiles.has(p)) errors.push(`response/response.md: the mutation record changed ${p}, which the receipt omits`);
     receiptFiles = seenFiles;
+
+    // ## Widened is the receipt's admission of every write outside the owner boundary: one row per
+    // widened path, naming a declared boundary as the nearest one, never a path a boundary already covers
+    // and never a protected ref; a written path outside every boundary with no row is an unrecorded
+    // widening, which is OWNER_CONFLICT. The rows and the OWNER_WIDENED fallback exist together or not at all.
+    const widenedRows = tableUnder(text, '## Widened') ?? [];
+    const widened = new Map();
+    const touched = new Set([...changeById.keys(), ...declared.map((o) => o.writerRef)]);
+    for (const [file, nearest] of widenedRows) {
+      if (widened.has(file)) errors.push(`response/response.md: ${file} is listed under ## Widened more than once`);
+      widened.set(file, nearest);
+      if (bounded && insideBoundary(file)) errors.push(`response/response.md: ${file} is listed under ## Widened but lies inside boundary ${insideBoundary(file)}; there is nothing to widen`);
+      if (insideProtected(file)) errors.push(`response/response.md: ${file} is listed under ## Widened but lies inside protected ref ${insideProtected(file)}; a protected ref is never written, so this is OWNER_CONFLICT`);
+      if (bounded && !boundaries.includes(nearest)) errors.push(`response/response.md: ${file} names nearest boundary ${nearest}, which mutableFileRefs does not declare`);
+      if (mutations && !touched.has(file)) errors.push(`response/response.md: ${file} is listed under ## Widened but no change record or writer touches it`);
+    }
+    if (bounded && mutations) {
+      for (const p of changeById.keys()) if (!insideBoundary(p) && !widened.has(p)) errors.push(`response/data/mutations.json: change on ${p} lies outside every owner boundary and is not listed under ## Widened; an unrecorded widening is OWNER_CONFLICT`);
+      for (const operation of declared) if (!insideBoundary(operation.writerRef) && !widened.has(operation.writerRef)) errors.push(`response/data/mutations.json: operation ${operation.operationId} names writer ${operation.writerRef} outside every owner boundary and not listed under ## Widened; an unrecorded widening is OWNER_CONFLICT`);
+    }
+    const tookWidening = (response.fallbacks ?? []).includes('OWNER_WIDENED');
+    if (tookWidening && widened.size === 0) errors.push('response/response.json: OWNER_WIDENED was taken but ## Widened lists no path; a fallback with nothing behind it was not taken');
+    if (!tookWidening && widened.size > 0) errors.push('response/response.md: ## Widened lists a path but response.json does not record OWNER_WIDENED as taken');
 
     for (const [code, operationId] of tableUnder(text, '## Findings') ?? []) {
       if (!empty(operationId) && declaredById.size && !declaredById.has(operationId)) errors.push(`response/response.md: finding ${code} names undeclared operation ${operationId}`);

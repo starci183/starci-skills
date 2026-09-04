@@ -10,6 +10,7 @@
   "resources": {
     "profile": "luna",
     "grammarBound": false,
+    "dispatch": "fresh",
     "tools": {
       "@tools/fileread": "context-aliases",
       "@tools/shell": "declared-commands",

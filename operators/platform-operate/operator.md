@@ -195,8 +195,11 @@ and each is a gate rather than an intention.
 - Each flow's actors are its own account aliases, provisioned for that flow and named in its record.
 - Each session drives its own browser profile, recorded in the run's own snapshot, so one session's
   cookies are never the other's session.
-- Seeds are scoped by the flow's own prefix and touch no shared row: every seeded identifier carries
-  that prefix, and the rollback lists those identifiers and nothing else.
+- Seeds are attributable to the flow and touch no shared row: every seeded row is owned by the
+  flow's provisioned account, or carries the flow's prefix in an identifier where the store has no
+  owner column, and the rollback lists exactly those rows and nothing else. A store with neither an
+  owner column nor a prefixable identifier is a recorded limitation of that seed, never a schema
+  change made to satisfy this law.
 - No operator writes another session's lease, account or run folder: the lease, the account's
   provisioning attribution and the run's snapshot all name the session that asked, and a write whose
   session differs is refused rather than merged.

@@ -10,6 +10,7 @@
   "resources": {
     "profile": "sol-reviewer",
     "grammarBound": true,
+    "dispatch": "fresh",
     "tools": {
       "@tools/fileread": "context-aliases",
       "@tools/git": "read",

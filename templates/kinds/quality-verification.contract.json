@@ -42,7 +42,7 @@
       "table": "| Metric | Measured | Threshold | Verdict |",
       "cell": {
         "Metric": "^(statements|lines|functions|branches)$",
-        "Verdict": "^(at-or-above|below)$"
+        "Verdict": "^(at-or-above|below|unconfigured)$"
       }
     },
     {

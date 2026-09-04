@@ -1,0 +1,48 @@
+{
+  "kind": "environment-readiness",
+  "title": "^# environment-readiness — [a-z0-9][a-z0-9-]*$",
+  "sections": [
+    {
+      "heading": "^## Binding$",
+      "table": "| Field | Value |",
+      "rows": [
+        "Project",
+        "Roles",
+        "Environment",
+        "Flow",
+        "Declaration"
+      ],
+      "cell": {
+        "Value": "\\S"
+      }
+    },
+    {
+      "heading": "^## Checks$",
+      "table": "| Check | Family | Status | Evidence |",
+      "minRows": 1,
+      "cell": {
+        "Check": "^`[a-z][a-z0-9-]*(?:\\.[a-z0-9][a-z0-9-]*)+`$",
+        "Family": "^(declaration|checkout|identity|runtime|host|approval)$",
+        "Status": "^(ok|wall|skipped)$",
+        "Evidence": "\\S"
+      }
+    },
+    {
+      "heading": "^## Walls$",
+      "table": "| Wall | Owner | Repair |",
+      "cell": {
+        "Wall": "^`[a-z][a-z0-9-]*(?:\\.[a-z0-9][a-z0-9-]*)+`$",
+        "Owner": "^(declaration|checkout|identity|runtime|host|approval|person)$",
+        "Repair": "\\S"
+      }
+    },
+    {
+      "heading": "^## Fallbacks taken$",
+      "table": "| Code | Action |",
+      "cell": {
+        "Code": "^`[A-Z][A-Z0-9_]+`$",
+        "Action": "\\S"
+      }
+    }
+  ]
+}

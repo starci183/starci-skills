@@ -128,10 +128,12 @@ export async function validateMigrationContract(root, branchDir, request, mutati
     const verified = await validateArchitectureStep(producer, root);
     if (verified.errors.length) { result.errors.push(...verified.errors.map((error) => `migration producer: ${error}`)); return result; }
     result.operations = model.operations;
-    const mutable = new Set(Array.isArray(requirements.mutableFileRefs) ? requirements.mutableFileRefs : []);
+    // The owner boundary is a list of exact refs or globs; the one matcher lives with the backend operator's law.
+    const { refToRegExp } = await import('../operators/backend-source-apply/validate.mjs');
+    const boundaries = (Array.isArray(requirements.mutableFileRefs) ? requirements.mutableFileRefs : []).map(refToRegExp);
     for (const operation of model.operations.filter((item) => item.transport === 'migration')) {
       for (const ref of new Set([operation.writerRef, ...operation.migrationRefs])) {
-        if (!mutable.has(ref)) result.errors.push(`migration operation ${operation.operationId}: ${ref} lies outside mutableFileRefs`);
+        if (!boundaries.some((re) => re.test(ref))) result.errors.push(`migration operation ${operation.operationId}: ${ref} lies outside mutableFileRefs`);
       }
     }
     if (mutations !== null) {

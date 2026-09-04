@@ -129,8 +129,9 @@ export async function validateMigrationReleaseRequest(root, branchDir, request) 
     fail(mutations.operations.length && mutations.operations.every((operation) => operation.transport === 'migration'), 'migration release requires only migration operations');
     const refs = [...new Set(mutations.operations.flatMap((operation) => operation.migrationRefs))].sort();
     fail(same(refs, plan.migrations.map((item) => item.path).sort()), 'migration files differ from the frozen backend operations');
-    const mutable = new Set(backend.request.requirements.mutableFileRefs);
-    fail(mutable.has(plan.runner.path), 'migration runner is outside the backend source ceiling');
+    const { refToRegExp } = await import('../operators/backend-source-apply/validate.mjs');
+    const boundaries = (backend.request.requirements.mutableFileRefs ?? []).map(refToRegExp);
+    fail(boundaries.some((re) => re.test(plan.runner.path)), 'migration runner is outside the backend owner boundary');
     for (const file of [plan.runner, ...plan.migrations]) fail(mutations.changes.some((change) => change.path === file.path && change.afterHash === file.sha256), 'migration runner or migration file lacks its backend source change proof');
     const qtext = fs.readFileSync(quality.file, 'utf8');
     fail(Object.fromEntries(tableUnder(qtext, '## Gate verdict') ?? []).Verdict === 'pass', 'migration quality verdict did not pass');

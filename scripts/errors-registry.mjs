@@ -8,6 +8,8 @@ import { readdir, readFile } from 'node:fs/promises';
 import path from 'node:path';
 
 export const DISPOSITIONS = new Set(['terminate', 'fallback']);
+// Who writes a code into response.json: the agent that ran the branch, or the orchestrator on its behalf.
+export const WRITERS = new Set(['agent', 'orchestrator']);
 
 // The domains a code may hand to are exactly the domains routing.json routes, plus `self` (the
 // emitting operator's own domain, answered with kind resume). Deriving the set from routing.json keeps
@@ -28,6 +30,8 @@ export async function loadErrorsRegistry(root) {
     if (!/^[A-Z][A-Z0-9_]+$/.test(id)) errors.push(`${home}: code ${id} must be UPPER_SNAKE`);
     if (!DISPOSITIONS.has(entry.disposition)) errors.push(`${home}: ${id} disposition must be terminate or fallback`);
     if (!DOMAINS.has(entry.domain)) errors.push(`${home}: ${id} domain ${entry.domain} is not a routing domain`);
+    if (entry.writer !== undefined && !WRITERS.has(entry.writer)) errors.push(`${home}: ${id} writer must be agent or orchestrator`);
+    if (entry.writer === 'orchestrator' && (scope.length !== 1 || scope[0] !== '*')) errors.push(`${home}: ${id} is written by the orchestrator and is therefore scoped to every operator`);
     for (const key of ['meaning', 'resume']) if (!entry[key]?.en || !entry[key]?.vi) errors.push(`${home}: ${id} needs ${key}.en and ${key}.vi`);
     if (entry.disposition === 'fallback' && (!entry.fallback?.en || !entry.fallback?.vi)) errors.push(`${home}: ${id} is a fallback and needs fallback.en and fallback.vi`);
     if (entry.disposition === 'terminate' && entry.fallback) errors.push(`${home}: ${id} terminates and may not carry a fallback`);
@@ -36,7 +40,7 @@ export async function loadErrorsRegistry(root) {
       if (typeof u.param !== 'string' || u.equals === undefined || !DISPOSITIONS.has(u.then)) errors.push(`${home}: ${id} unless needs param, equals, then`);
       if (u.then === entry.disposition) errors.push(`${home}: ${id} unless.then equals its own disposition`);
     }
-    codes[id] = { ...entry, scope, home };
+    codes[id] = { writer: 'agent', ...entry, scope, home };
   };
   const sharedPath = path.join(root, 'operators', 'errors.json');
   const shared = JSON.parse(await readFile(sharedPath, 'utf8'));

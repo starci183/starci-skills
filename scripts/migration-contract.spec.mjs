@@ -6,7 +6,7 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createHash } from 'node:crypto';
-import { migrationFixture } from '../operators/architecture-decide/self-test.mjs';
+import { migrationFixture, confirmed } from '../operators/architecture-decide/self-test.mjs';
 import { importProducer } from './producer-import.mjs';
 import { validateMigrationContract } from './migration-contract.mjs';
 
@@ -36,20 +36,24 @@ test('imported migration validates original critique and the actual request CLI'
     const sessions = path.join(host, '.worktrees/sessions');
     const original = path.join(sessions, 'original');
     const receiver = path.join(sessions, 'receiver');
-    const producer = path.join(original, 'step-1/parallel-1');
+    // The done producer is a confirmed re-entry at step-2/parallel-1; the branch it resumes, blocked on
+    // RESTATEMENT_UNCONFIRMED, sits at step-1/parallel-1 with the same objective.
+    const producer = path.join(original, 'step-2/parallel-1');
     const branch = path.join(receiver, 'step-2/parallel-1');
-    const files = migrationFixture();
+    const [files, patch] = confirmed(migrationFixture());
     for (const [name, content] of Object.entries(files)) {
       if (name.endsWith('request.json')) content.sessionId = 'original';
       write(path.join(producer, name), content);
     }
+    for (const [name, content] of Object.entries(patch.session)) { content.sessionId = 'original'; write(path.join(original, name), content); }
     const state = (id, steps) => ({ id, project: 'fixture', startedAt: '2026-09-04T00:00:00Z', status: 'running', steps, chain: [Object.keys(steps)], requestHashes: {} });
-    const originalState = state('original', { '1/1': 'architecture.decide' });
-    originalState.requestHashes['1/1'] = hash(readFileSync(path.join(producer, 'request/request.json')));
+    const originalState = { ...state('original', patch.state.steps), chain: patch.state.chain, current: patch.state.current, resumes: patch.state.resumes, choices: patch.state.choices };
+    originalState.requestHashes['2/1'] = hash(readFileSync(path.join(producer, 'request/request.json')));
+    originalState.requestHashes['1/1'] = hash(readFileSync(path.join(original, 'step-1/parallel-1/request/request.json')));
     write(path.join(original, 'state.json'), originalState);
     const receiverState = state('receiver', { '2/1': 'backend.source.apply' });
     write(path.join(receiver, 'state.json'), receiverState);
-    await importProducer({ sourceSessionId: 'original', sourceStep: 1, sourceParallel: 1, targetSessionId: 'receiver', targetStep: 10, targetParallel: 1, root, hostRoot: host });
+    await importProducer({ sourceSessionId: 'original', sourceStep: 2, sourceParallel: 1, targetSessionId: 'receiver', targetStep: 10, targetParallel: 1, root, hostRoot: host });
     const request = {
       schemaVersion: 9, operatorId: 'backend.source.apply', sessionId: 'receiver', step: 2, parallel: 1,
       contexts: [{ alias: '@workspaces/be', head: 'b'.repeat(40) }, { alias: '@worktrees/businesses/fixture', head: null }, { alias: '@knowledge/patterns/be', head: null }],

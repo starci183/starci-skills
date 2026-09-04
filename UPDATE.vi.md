@@ -127,6 +127,7 @@ lại và commit kết quả:
 | File sinh ra | Sinh lại bằng |
 | --- | --- |
 | `operators/INDEX.md` (+ bản soi) | `node scripts/generate-operators-index.mjs` |
+| `operators/<id>/brief.md` | `node scripts/generate-operator-briefs.mjs` |
 | `alias/INDEX.md` (+ bản soi) | `node scripts/generate-alias-doc.mjs` |
 | `docs/reference/**` (+ `docs/vi/reference/**`) | `node docs/scripts/generate-docs.mjs` |
 | catalog của trang đã publish | bước sinh của chính trang đó |

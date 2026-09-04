@@ -133,6 +133,7 @@ regenerate them and commit the result:
 | --- | --- |
 | `operators/INDEX.md` (+ mirror) | `node scripts/generate-operators-index.mjs` |
 | `alias/INDEX.md` (+ mirror) | `node scripts/generate-alias-doc.mjs` |
+| `operators/<id>/brief.md` | `node scripts/generate-operator-briefs.mjs` |
 | `docs/reference/**` (+ `docs/vi/reference/**`) | `node docs/scripts/generate-docs.mjs` |
 | the published site catalog | the site's own generation step |
 

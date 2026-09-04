@@ -1,6 +1,6 @@
 {
   "schemaVersion": 9,
-  "note": "Stop codes shared by more than one operator. `scope` is the list of operator ids that may emit the code, or [\"*\"] for every operator. A code only one operator emits lives in that operator's own operators/<id>/errors.json with the same entry shape and no scope; scripts/errors-registry.mjs merges both into one registry and refuses a code defined twice. A code has exactly one disposition: `terminate` ends the step with response.json status blocked and stop = code; `fallback` performs the named action, records it under `## Fallbacks taken` in response.md, and continues. `unless` is the only way a disposition changes: it names one Requirements param and the value that flips the code to `then`. `domain` is the routing.json domain the code hands to; `self` means the emitting operator's own domain (a resume). A runtime that meets a code the merged registry does not list terminates with UNKNOWN_STOP.",
+  "note": "Stop codes shared by more than one operator. `scope` is the list of operator ids that may emit the code, or [\"*\"] for every operator. A code only one operator emits lives in that operator's own operators/<id>/errors.json with the same entry shape and no scope; scripts/errors-registry.mjs merges both into one registry and refuses a code defined twice. A code has exactly one disposition: `terminate` ends the step with response.json status blocked and stop = code; `fallback` performs the named action, records it under `## Fallbacks taken` in response.md, and continues. `unless` is the only way a disposition changes: it names one Requirements param and the value that flips the code to `then`. `domain` is the routing.json domain the code hands to; `self` means the emitting operator's own domain (a resume). A runtime that meets a code the merged registry does not list terminates with UNKNOWN_STOP. `writer` says who writes the code into response.json: `agent` (the default) or `orchestrator`, for a code the runtime writes on the agent's behalf when the agent produced no valid receipt; an orchestrator-written code is read from this registry, never from an operator's Stops table.",
   "codes": {
     "AUTHORITY_DRIFT": {
       "scope": [
@@ -91,7 +91,8 @@
       "resume": {
         "en": "Register the code or fix the operator.",
         "vi": "Đăng ký mã hoặc sửa operator."
-      }
+      },
+      "writer": "orchestrator"
     },
     "OWNER_CONFLICT": {
       "scope": [
@@ -102,12 +103,12 @@
       "domain": "caller",
       "disposition": "terminate",
       "meaning": {
-        "en": "A node that must be mutated lies outside the mutable owner ceiling, or the owner sets overlap.",
-        "vi": "Một node cần sửa nằm ngoài trần owner được sửa, hoặc hai tập owner chồng nhau."
+        "en": "A node that must be mutated lies inside a protected ref, or outside every owner boundary where the operator's law allows no widening, or the owner sets overlap.",
+        "vi": "Một node cần sửa nằm trong protected ref, hoặc ngoài mọi ranh giới owner ở nơi luật của operator không cho phép mở rộng, hoặc hai tập owner chồng nhau."
       },
       "resume": {
-        "en": "Correct the owner authority.",
-        "vi": "Sửa thẩm quyền owner."
+        "en": "Correct the owner authority: widen the boundary, release the protection, or split the owner sets.",
+        "vi": "Sửa thẩm quyền owner: nới ranh giới, bỏ bảo vệ, hoặc tách hai tập owner."
       }
     },
     "ROUTE_UNVERIFIED": {
@@ -237,6 +238,54 @@
       "resume": {
         "en": "The identity operator provisions the flow's account against the registry entry, and this branch runs again with it.",
         "vi": "Operator danh tính cấp tài khoản của luồng theo entry trong registry, rồi nhánh này chạy lại cùng tài khoản đó."
+      }
+    },
+    "RECEIPT_MISSING": {
+      "scope": [
+        "*"
+      ],
+      "domain": "caller",
+      "disposition": "terminate",
+      "writer": "orchestrator",
+      "meaning": {
+        "en": "The agent exited and its branch still carries the running skeleton the orchestrator wrote at dispatch: no done, blocked or waiting receipt replaced it, so the work it narrated has no record the chain can route on.",
+        "vi": "Agent đã thoát mà nhánh vẫn mang khung running do orchestrator ghi lúc dispatch: không có receipt done, blocked hay waiting nào thay thế, nên việc nó kể lại không có bản ghi nào để chuỗi định tuyến."
+      },
+      "resume": {
+        "en": "The orchestrator sends one follow-up to the same agent naming the skeleton; a second exit without a receipt terminates the branch with this code and a person reads the transcript.",
+        "vi": "Orchestrator gửi đúng một follow-up cho cùng agent nêu tên khung; lần thoát thứ hai không có receipt sẽ kết thúc nhánh bằng mã này và một người đọc transcript."
+      }
+    },
+    "BUDGET_EXHAUSTED": {
+      "scope": [
+        "*"
+      ],
+      "domain": "caller",
+      "disposition": "terminate",
+      "writer": "orchestrator",
+      "meaning": {
+        "en": "The session reached the step cap or the same-operator cap its budget declares, and no recorded choice raised it: more of the same chain is not progress until a person narrows, continues or stops it.",
+        "vi": "Phiên đã chạm trần số bước hoặc trần cùng-operator mà budget khai báo, và không có lựa chọn nào đã ghi nâng trần đó: chạy thêm cùng chuỗi không phải tiến triển cho đến khi một người thu hẹp, tiếp tục hay dừng."
+      },
+      "resume": {
+        "en": "A person answers the typed budget choice (narrow, continue, stop); the choice is recorded in state.json.choices and the next request carries it.",
+        "vi": "Một người trả lời lựa chọn budget có kiểu (thu hẹp, tiếp tục, dừng); lựa chọn được ghi vào state.json.choices và request kế tiếp mang nó."
+      }
+    },
+    "RESTATEMENT_UNCONFIRMED": {
+      "scope": [
+        "business.decide",
+        "architecture.decide"
+      ],
+      "domain": "caller",
+      "disposition": "terminate",
+      "meaning": {
+        "en": "The operator consumed a rule stated in a person's own words and restated it in plain language, and the person has not yet confirmed or corrected that restatement: designing on an unconfirmed reading is how a chain spends hours on the wrong promise.",
+        "vi": "Operator đã tiêu thụ một luật do người nói bằng lời của họ và nói lại bằng ngôn ngữ thường, mà người đó chưa xác nhận hay sửa lại bản nói lại ấy: thiết kế trên một cách đọc chưa xác nhận là cách một chuỗi tiêu hàng giờ cho một lời hứa sai."
+      },
+      "resume": {
+        "en": "The person selects as-stated or corrected on the restatement choice; a corrected reading arrives as the corrected requirement in the re-entry request, and the same branch runs again.",
+        "vi": "Người chọn as-stated hay corrected trên lựa chọn restatement; cách đọc đã sửa đến dưới dạng yêu cầu đã sửa trong request vào lại, và cùng nhánh đó chạy lại."
       }
     }
   }

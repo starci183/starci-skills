@@ -57,10 +57,12 @@
     },
     "status": {
       "enum": [
+        "running",
         "done",
         "blocked",
         "waiting"
-      ]
+      ],
+      "description": "running is the skeleton the orchestrator writes at dispatch and never routes; the agent replaces it with done, blocked or waiting, and an agent that exits leaving it in place is RECEIPT_MISSING"
     },
     "stop": {
       "type": "string",

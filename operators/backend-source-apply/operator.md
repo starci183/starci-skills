@@ -18,14 +18,20 @@ decision commits to — and restates them in `response/data/mutations.json`, car
 `writerRef`, `transactionBoundary`, `idempotencyKind`, `migrationRefs` and dimension ids across
 unchanged. Three prohibitions carry that, and each is enforced rather than
 advised. An operation, writer, store, transaction, migration, or event outside the contract is
-`CONTRACT_WIDENED`, returned to the contract owner before any product write. A file outside the
-mutable ceiling is `OWNER_CONFLICT`, even when the change there would be one line. A convention no
-bound sibling pattern publishes is refused and recorded as `NEW_CONVENTION_REFUSED`, while an aspect
-with no pattern at all is `PATTERN_UNBOUND`. Discovering mid-implementation that the outcome needs a
-wider boundary is the expected way this operator ends, not a failure of nerve: the contract is
-reopened by its owner and the same outcome is implemented again against the new fingerprint. Reaching
-outside the list is not a smaller change than reopening the contract; it is the same change made
-without a record.
+`CONTRACT_WIDENED`, returned to the contract owner before any product write. `mutableFileRefs` is the
+owner boundary, exact paths or globs naming what the outcome may touch; a path the outcome genuinely
+requires outside every boundary is written and recorded as a widening — `OWNER_WIDENED` under
+`## Fallbacks taken`, the path with its nearest boundary and the reason under `## Widened`, and
+`widened: true` on its change record — so the receipt makes every widening auditable from the diff. A
+widening is never silent and never crosses a protected ref: a required change inside `protectedRefs`,
+a written path no `## Widened` row admits to, or owner sets that overlap is `OWNER_CONFLICT`. A
+convention no bound sibling pattern publishes is refused and recorded as `NEW_CONVENTION_REFUSED`,
+while an aspect with no pattern at all is `PATTERN_UNBOUND`. Discovering mid-implementation that the
+outcome needs a wider contract is the expected way this operator ends, not a failure of nerve: the
+contract is reopened by its owner and the same outcome is implemented again against the new
+fingerprint. Reaching outside the contract is not a smaller change than reopening it; it is the same
+change made without a record, which is also why a widened path counts for nothing until its row
+exists.
 
 Standalone migrations follow
 [`stack-model.schema.json#/$defs/migrationOperation`](../../templates/kinds/stack-model.schema.json#/$defs/migrationOperation).
@@ -119,14 +125,16 @@ not happen.
 
 ## Boundary
 
-The operator writes product source only inside the mutable file ceiling, only inside the session
-branch worktree of `@workspaces/be`, and writes everything else into `response/` of its own branch:
+The operator writes product source only inside the owner boundary or outside it as a recorded
+widening that no protected ref covers, only inside the session branch worktree of `@workspaces/be`,
+and writes everything else into `response/` of its own branch:
 `response.md`, `response/changes.md`, `response/data/mutations.json`, one conformance record per
 declared facet, one proof record per declared proof, and `response.json`. It never adds an operation,
 writer, store, transaction, migration, or event the frozen contract does not carry, decides a business
 rule the approved authority does not state, introduces a convention no bound sibling pattern
 publishes, weakens, skips, suppresses, or substitutes a declared proof to make a run go green, edits
-the contract, the business authority, or a file outside the mutable ceiling, commits more than once,
+the contract, the business authority, or a protected ref, writes a path outside the boundary without
+its `## Widened` row, commits more than once,
 writes on the person's checked-out branch, pushes, merges, or tags anything, claims conformance
 without naming the evidence that measured it, or records a quality, visual, or UAT verdict; those are
 other jobs with their own gates.
@@ -157,7 +165,8 @@ the publication was withheld. When it is absent the published head is the author
 | --- | --- | --- | --- |
 | `featureId` | id | — | The feature whose published business head decides this behaviour |
 | `outcome` | prompt | — | The one thing being implemented, in the person's words |
-| `mutableFileRefs` | list | — | The only files product source may be written into |
+| `mutableFileRefs` | list | — | The owner boundary: exact repository-relative paths or globs (`*` within a segment, `**` across segments) product source may be written into; a path the outcome genuinely requires outside every boundary is written and recorded under Widened |
+| `protectedRefs` | list | empty | Paths or globs never written, even by widening: another owner's module, generated files, lockfiles, migrations of another feature |
 | `contractFingerprint` | id | null | SHA-256 of the producer stack-model bytes; the orchestrator binds it for a standalone migration contract |
 | `mode` | choice | apply | `apply` fills the contract and commits, `dry` emits the plan and writes nothing |
 | `resume` | token | null | The blocked branch's token when re-entering after a stop |
@@ -168,7 +177,7 @@ the publication was withheld. When it is absent the published head is the author
 | --- | --- | --- | --- | --- | --- |
 | 1 | Validate the gate and resume, and confirm the session | `resume`, `mode` | `request/request.json`, the session's `state.json` and this branch's `step-N/parallel-M`, input `backend-source-application` when present, @workspaces/be at the frozen head | — | `INVALID_INPUT`, `SESSION_MISSING`, `SOURCE_DRIFT`, `NO_PROGRESS` |
 | 2 | Bind authority, contract and patterns | `featureId`, `contractFingerprint` | input `model` when present, otherwise @worktrees/businesses/<featureId> at its published head, input `architecture-decision` as the frozen contract and the source of its `operations`, @knowledge/patterns/be one pattern per aspect | — | `CONTRACT_UNFROZEN`, `BUSINESS_AUTHORITY_MISSING`, `PATTERN_UNBOUND` |
-| 3 | Fill one contract operation at a time, on the session branch | `mutableFileRefs` | @knowledge/patterns/be for each aspect, @workspaces/be inside the mutable ceiling | @workspaces/be/branch/session inside the mutable ceiling, under an exclusive lease, @tools/sourcewrite | `CONTRACT_WIDENED`, `OWNER_CONFLICT` |
+| 3 | Fill one contract operation at a time, on the session branch | `mutableFileRefs`, `protectedRefs` | @knowledge/patterns/be for each aspect, @workspaces/be inside the owner boundary | @workspaces/be/branch/session inside the owner boundary, or outside it as a recorded widening and never inside a protected ref, under an exclusive lease, @tools/sourcewrite | `CONTRACT_WIDENED`, `OWNER_WIDENED`, `OWNER_CONFLICT` |
 | 4 | Check every mutation against the frozen contract and record it with its before and after hash | `mode` | @workspaces/be, the touched files and the frozen contract | `response/data/mutations.json` | — |
 | 5 | Revalidate persisted snapshots on read | — | @workspaces/be, the persisted snapshot, @knowledge/patterns/be for the rules that drift after it | — | — |
 | 6 | Prove each declared facet | — | @workspaces/be, the measurement behind each facet | `response/data/conformance/<operationId>.<facet>.json` | — |
@@ -212,6 +221,7 @@ fingerprint cannot yield a different answer.
 | `CONTRACT_WIDENED` | terminate |
 | `BUSINESS_AUTHORITY_MISSING` | terminate |
 | `OWNER_CONFLICT` | terminate |
+| `OWNER_WIDENED` | fallback |
 | `PATTERN_UNBOUND` | terminate |
 | `PROOF_UNAVAILABLE` | terminate |
 
@@ -222,6 +232,6 @@ fingerprint cannot yield a different answer.
 | the contract is filled and the gates the change record names must run | `quality.verify` |
 | the promise must be reconciled against the source that was delivered | `business.decide` |
 | the contract is filled and a frontend surface must consume it | `frontend.direction.decide` |
-| a file needing mutation lies outside the routed write ceiling | `workspace.bind` |
+| a required change lies inside a protected ref, or the owner sets overlap, and the owner authority must be corrected | `workspace.bind` |
 | a declared proof cannot be executed in this environment | `platform.operate` |
 | the plan was produced under mode dry and a person decides whether to pay for it | `user` |

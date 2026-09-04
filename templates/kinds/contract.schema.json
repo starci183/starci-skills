@@ -18,6 +18,7 @@
           "heading": { "type": "string", "pattern": "^\\^## " },
           "table": { "type": "string", "pattern": "^\\| .+ \\|$" },
           "minRows": { "type": "integer", "minimum": 0 },
+          "maxRows": { "type": "integer", "minimum": 1 },
           "exactRows": { "type": "integer", "minimum": 0 },
           "rows": { "type": "array", "items": { "type": "string", "minLength": 1 }, "uniqueItems": true },
           "cell": { "type": "object", "additionalProperties": { "type": "string", "minLength": 1 } }

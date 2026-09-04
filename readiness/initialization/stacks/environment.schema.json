@@ -2,13 +2,22 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://starci.dev/v9/readiness/initialization/stacks/environment.schema.json",
   "title": "Environment declaration",
-  "description": "`<Source>/.stacks/<env>/environment.json`: what one environment of the installation declares about itself. The folder's presence is what names the environment — an `env` requirement is checked against the folder, never against a list. This file declares who authorises each operation class and which nonsecret migration targets the environment owns. Authority for a platform operation comes from the environment's declaration, not from a per-run approval, whenever the declaration marks that operation's class `declared`; a class marked `person` needs an approval id. A request's `approval` therefore accepts either an approval id or a reference to this file — its path and the hash of its bytes, in the shape `$defs.reference` gives — and the reference is an approval only for a class this declaration marks `declared`, in this environment. A class the declaration omits takes the default `$defs.defaults` gives for its `production` value: a non-production environment authorises identity provisioning, seeding, the shared runtime's rungs and the stack's bring-up by declaration and keeps release with a person; a production environment keeps every class with a person. Any declaration may tighten a class to `person`; a production declaration may not loosen `release`, and this schema refuses one that tries. Silence remains silence: a request with no `approval` is not one whose environment answered.",
+  "description": "`<Source>/.stacks/<env>/environment.json`: what one environment of the installation declares about itself. The folder's presence is what names the environment — an `env` requirement is checked against the folder, never against a list. This file declares who authorises each operation class and which nonsecret migration targets the environment owns. Authority for a platform operation comes from the environment's declaration, not from a per-run approval, whenever the declaration marks that operation's class `declared`; a class marked `person` needs an approval id. A request's `approval` therefore accepts either an approval id or a reference to this file — its path and the hash of its bytes, in the shape `$defs.reference` gives — and the reference is an approval only for a class this declaration marks `declared`, in this environment. A class the declaration omits takes the default `$defs.defaults` gives for its `production` value: a non-production environment authorises identity provisioning, seeding, the shared runtime's rungs, the stack's bring-up and outbound quality uploads by declaration and keeps release with a person; a production environment keeps every class with a person. Any declaration may tighten a class to `person`; a production declaration may not loosen `release`, and this schema refuses one that tries. Silence remains silence: a request with no `approval` is not one whose environment answered.",
   "type": "object",
   "additionalProperties": false,
-  "required": ["schemaVersion", "env", "production"],
+  "required": [
+    "schemaVersion",
+    "env",
+    "production"
+  ],
   "properties": {
-    "$schema": { "type": "string", "minLength": 1 },
-    "schemaVersion": { "const": 9 },
+    "$schema": {
+      "type": "string",
+      "minLength": 1
+    },
+    "schemaVersion": {
+      "const": 9
+    },
     "env": {
       "type": "string",
       "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
@@ -25,16 +34,48 @@
       "items": {
         "type": "object",
         "additionalProperties": false,
-        "required": ["project", "target", "connectionRef", "connection"],
+        "required": [
+          "project",
+          "target",
+          "connectionRef",
+          "connection"
+        ],
         "properties": {
-          "project": { "type": "string", "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$" },
-          "target": { "type": "string", "minLength": 1 },
-          "connectionRef": { "type": "string", "pattern": "^secret-ref://[A-Za-z0-9][A-Za-z0-9_./-]*$" },
-          "connectionFingerprint": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$", "description": "The environment owner's canonical full connection commitment, prepared privately using the runner protocol. Required when username is sealed: the full hash includes the resolved username, while the declaration carries only its custody reference. The migration executor never creates or replaces this commitment." },
-          "connection": { "$ref": "#/$defs/migrationConnection" }
+          "project": {
+            "type": "string",
+            "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$"
+          },
+          "target": {
+            "type": "string",
+            "minLength": 1
+          },
+          "connectionRef": {
+            "type": "string",
+            "pattern": "^secret-ref://[A-Za-z0-9][A-Za-z0-9_./-]*$"
+          },
+          "connectionFingerprint": {
+            "type": "string",
+            "pattern": "^sha256:[0-9a-f]{64}$",
+            "description": "The environment owner's canonical full connection commitment, prepared privately using the runner protocol. Required when username is sealed: the full hash includes the resolved username, while the declaration carries only its custody reference. The migration executor never creates or replaces this commitment."
+          },
+          "connection": {
+            "$ref": "#/$defs/migrationConnection"
+          }
         },
-        "if": { "properties": { "connection": { "required": ["usernameRef"] } } },
-        "then": { "required": ["connectionFingerprint"] }
+        "if": {
+          "properties": {
+            "connection": {
+              "required": [
+                "usernameRef"
+              ]
+            }
+          }
+        },
+        "then": {
+          "required": [
+            "connectionFingerprint"
+          ]
+        }
       }
     },
     "authorization": {
@@ -58,6 +99,10 @@
           "$ref": "#/$defs/authority",
           "description": "Bringing up the environment's declared infrastructure."
         },
+        "external-upload": {
+          "$ref": "#/$defs/authority",
+          "description": "Sending repository source or metadata to a service outside the machine — a code-quality scanner, a hosted analyser — as a gate of quality.verify. A host that reviews outbound uploads reads this class as the declaration's answer."
+        },
         "release": {
           "$ref": "#/$defs/authority",
           "description": "Deploying a release to this environment. Never `declared` where `production` is true."
@@ -66,14 +111,22 @@
     }
   },
   "if": {
-    "required": ["production"],
-    "properties": { "production": { "const": true } }
+    "required": [
+      "production"
+    ],
+    "properties": {
+      "production": {
+        "const": true
+      }
+    }
   },
   "then": {
     "properties": {
       "authorization": {
         "properties": {
-          "release": { "const": "person" }
+          "release": {
+            "const": "person"
+          }
         }
       }
     }
@@ -82,21 +135,71 @@
     "migrationConnection": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["driver", "host", "port", "database", "schema"],
-      "allOf": [{ "oneOf": [{ "required": ["username"] }, { "required": ["usernameRef"] }] }],
+      "required": [
+        "driver",
+        "host",
+        "port",
+        "database",
+        "schema"
+      ],
+      "allOf": [
+        {
+          "oneOf": [
+            {
+              "required": [
+                "username"
+              ]
+            },
+            {
+              "required": [
+                "usernameRef"
+              ]
+            }
+          ]
+        }
+      ],
       "description": "The effective database identity with its username either explicitly nonsecret or represented only by sealed custody. Strings are exact, without hostname alias folding; the effective schema is explicit. A sealed username stays private and enters only the full connection commitment during preparation and connection verification. The runner resolves its actual configuration, verifies database, schema and username against the connected server before effects, and fingerprints the full identity using the runner protocol. Credential values, connection URLs and userinfo are forbidden.",
       "properties": {
-        "driver": { "type": "string", "pattern": "^[a-z][a-z0-9-]*$" },
-        "host": { "type": "string", "pattern": "^[A-Za-z0-9_:.-]+$", "maxLength": 255 },
-        "port": { "type": "integer", "minimum": 1, "maximum": 65535 },
-        "database": { "type": "string", "minLength": 1, "pattern": "^[^\\u0000-\\u001f\\u007f]+$" },
-        "schema": { "type": "string", "minLength": 1, "pattern": "^[^\\u0000-\\u001f\\u007f]+$" },
-        "username": { "type": "string", "minLength": 1, "pattern": "^[^\\u0000-\\u001f\\u007f]+$" },
-        "usernameRef": { "type": "string", "pattern": "^secret-ref://[A-Za-z0-9][A-Za-z0-9_./-]*$" }
+        "driver": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9-]*$"
+        },
+        "host": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9_:.-]+$",
+          "maxLength": 255
+        },
+        "port": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 65535
+        },
+        "database": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "^[^\\u0000-\\u001f\\u007f]+$"
+        },
+        "schema": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "^[^\\u0000-\\u001f\\u007f]+$"
+        },
+        "username": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "^[^\\u0000-\\u001f\\u007f]+$"
+        },
+        "usernameRef": {
+          "type": "string",
+          "pattern": "^secret-ref://[A-Za-z0-9][A-Za-z0-9_./-]*$"
+        }
       }
     },
     "authority": {
-      "enum": ["declared", "person"],
+      "enum": [
+        "declared",
+        "person"
+      ],
       "description": "`declared`: this declaration is the approval, and a request names it by `$defs.reference`. `person`: an approval id is required, and a declaration reference is refused for the class."
     },
     "defaults": {
@@ -106,6 +209,7 @@
         "seed": "person",
         "runtime": "person",
         "stack-up": "person",
+        "external-upload": "person",
         "release": "person"
       },
       "non-production": {
@@ -113,6 +217,7 @@
         "seed": "declared",
         "runtime": "declared",
         "stack-up": "declared",
+        "external-upload": "declared",
         "release": "person"
       }
     },

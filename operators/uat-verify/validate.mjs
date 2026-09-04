@@ -15,6 +15,7 @@ import path from 'node:path';
 import process from 'node:process';
 import { fileURLToPath } from 'node:url';
 import { validateStep } from '../../scripts/validate-step.mjs';
+import { PASSWORD_LEAK } from '../../scripts/sweep-secrets.mjs';
 import { tableUnder } from '../../scripts/validate-response.mjs';
 import { auditScopeCarryErrors, upstreamAuditScope } from '../../scripts/audit-scope.mjs';
 import { hostRootOf, sessionRootOf, missingStack, loadEnvironmentSchema, parseDeclarationReference, stackDeclaration } from '../../scripts/validate-request.mjs';
@@ -69,9 +70,9 @@ export function ignoredLine(text) {
   }
   return null;
 }
-// The password placeholder this operator's self-test injects, plus any inline assignment of one. The
-// shared UAT password is resolved by name at login; a run that wrote it anywhere failed its custody.
-export const PASSWORD_LEAK = /uat-shared-password|password\s*[:=]\s*\S/i;
+// The shared UAT password is resolved by name at login; a run that wrote it anywhere failed its
+// custody. The pattern lives with every other secret shape in scripts/sweep-secrets.mjs.
+export { PASSWORD_LEAK };
 const empty = (v) => v === undefined || v === null || v === '' || v === '—';
 const asList = (v) => (Array.isArray(v) ? v : v === undefined || v === null ? [] : [v]);
 

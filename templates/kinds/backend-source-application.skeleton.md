@@ -26,9 +26,22 @@ the conformance and proof records that measure it live beside it in `response/da
 | Path | Change | Operation | Before | After |
 | --- | --- | --- | --- | --- |
 | `src/features/api/core/graphql/mutations/handler.ts` | added | `operation-id` | — | sha256:1111111111111111111111111111111111111111111111111111111111111111 |
+| `src/features/api/core/graphql/mutations/api.module.ts` | modified | `operation-id` | sha256:2222222222222222222222222222222222222222222222222222222222222222 | sha256:3333333333333333333333333333333333333333333333333333333333333333 |
+
+## Widened
+
+| Path | Nearest boundary | Why |
+| --- | --- | --- |
+| `src/features/api/core/graphql/mutations/api.module.ts` | `src/features/api/core/graphql/mutations/handler.ts` | the module must register the handler for the transport to reach it; no rows when no path outside a boundary was written |
 
 ## Findings
 
 | Code | Operation | File | Statement |
 | --- | --- | --- | --- |
 | `PATTERN_BOUND` | `operation-id` | `src/features/api/core/graphql/mutations/handler.ts` | the sibling family this aspect mirrors |
+
+## Fallbacks taken
+
+| Code | Action |
+| --- | --- |
+| `OWNER_WIDENED` | one path outside every boundary was written and listed under Widened; no rows when none was taken |
