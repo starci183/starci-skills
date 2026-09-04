@@ -76,6 +76,9 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
   const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
   const target = process.argv[2];
   if (!target) { process.stderr.write('usage: node scripts/validate-step.mjs <session>/step-N/parallel-M\n'); process.exit(2); }
-  const { errors } = await validateStep(root, path.resolve(target), { operator: true });
-  if (errors.length) { process.stderr.write(`${errors.join('\n')}\n`); process.exitCode = 1; } else process.stdout.write('step valid\n');
+  // No top-level await here: the operator validator this dispatch imports imports this file back for the
+  // shared laws, and a module still awaiting at top level cannot be imported until it settles.
+  validateStep(root, path.resolve(target), { operator: true }).then(({ errors }) => {
+    if (errors.length) { process.stderr.write(`${errors.join('\n')}\n`); process.exitCode = 1; } else process.stdout.write('step valid\n');
+  }, (error) => { process.stderr.write(`${error.message}\n`); process.exitCode = 1; });
 }
