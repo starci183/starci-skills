@@ -33,6 +33,18 @@ công bố nó là `fixSize` trong tài nguyên của chính nó, và validator 
 ghi cứng ngưỡng nào: một cây mà orchestrator không công bố ngưỡng thì chỉ được kiểm theo hình dạng, và
 hình dạng là nửa còn lại của luật.
 
+## Loại và độ kiên nhẫn cũng là của orchestrator
+
+Cỡ không phải ranh giới duy nhất. Cùng tài nguyên ấy gọi tên những loại phát hiện không bao giờ là
+một fix dù miếng vá có nhỏ đến đâu — các topic của `knowledge/ui` nó liệt kê dưới `generateTopics`,
+các tiền tố rule nó liệt kê dưới `generatePrefixes` — vì một phát hiện về composition hay về gu là một
+quyết định về bề mặt chứ không phải về một giá trị, và quyết định là của `interface.generate`. Nó cũng
+gọi tên một phát hiện được fix bao nhiêu lần: quá `escalateAfter` nhánh fix cho cùng một phát hiện
+trong một phiên, lần sửa kế tiếp là của bộ sinh chứ không phải một fix nữa, vì một phát hiện sống sót
+qua một lần fix đang nói với cây rằng fix là sai công cụ. Cả hai lời từ chối đều thuộc cổng request
+(`scripts/validate-request.mjs#fixKindErrors`) và cả hai dừng nhánh với `FIX_TOO_LARGE` trước khi một
+agent được dispatch.
+
 ## Không đổi bố cục
 
 Một fix không dịch chuyển cấu trúc. Nó không tạo path và không xoá path: một lá mới hay một nhánh bị

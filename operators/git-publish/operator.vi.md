@@ -146,6 +146,7 @@ giới đã duyệt; và không publish khi chưa có route đã kiểm và mộ
 | `workspace-route-binding` | `workspace.bind`; một lần publish không bao giờ tự phân giải checkout của mình | có |
 | `changes` | `interface.generate`, `interface.fix`, `backend.generate` hoặc `library.update`, đúng tập file mà lần publish này mang | có |
 | `quality-verification` | `quality.verify`, biên bản có commit đã đo chính là commit lần publish này đẩy | có |
+| `business-reconciliation` | `business.reconcile`, bản đối chiếu head lời hứa với source đã giao cho phép lần publish này; vắng khi nhiệm vụ không hứa gì để đối chiếu | không |
 
 ## Yêu cầu
 

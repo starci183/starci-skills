@@ -6,8 +6,8 @@
 // names its goal (a done-when line this operator produces, or the branch it enables); an isolated
 // operator's request names nothing its Context table does not cover. A request that fails here is the
 // orchestrator's or the person's mistake, never the agent's.
-import { existsSync, readFileSync } from 'node:fs';
-import { readFile } from 'node:fs/promises';
+import { existsSync, readFileSync, statSync } from 'node:fs';
+import { readFile, readdir } from 'node:fs/promises';
 import { createHash } from 'node:crypto';
 import path from 'node:path';
 import process from 'node:process';
@@ -228,6 +228,67 @@ export async function loadUnits(root, file, at = 'units.json') {
   if (!errors.length) errors.push(...unitsErrors(doc, at));
   return { units: errors.length ? null : doc, errors };
 }
+// The line between a fix and a regeneration, in kind and in patience (resources/orchestrator.json#fixSize;
+// the count half is the operator's own validator). Kind: the rule a finding cites is published under one
+// topic folder of knowledge/ui, and a finding of a folder the orchestrator lists under generateTopics, or
+// whose prefix it lists under generatePrefixes, is a decision about composition or taste — a surface
+// generated again, not patched. Patience: a finding that survived escalateAfter fix branches of this
+// session is not fixed a further time; it is the same regeneration. Both refusals name FIX_TOO_LARGE,
+// the code the operator's Stops table already hands to the interface domain.
+export const FIX_OPERATOR = 'interface.fix';
+const RULE_ID = /^([A-Z][A-Z0-9]*)-\d+$/;
+const stepOfCell = (cell) => Number(String(cell).split('/')[0]);
+const parallelOfCell = (cell) => Number(String(cell).split('/')[1]);
+// prefix → topic folder, read from the ## headings knowledge/ui publishes; a prefix belongs to the first folder that publishes it.
+export async function rulePrefixTopics(root) {
+  const out = new Map();
+  const base = path.join(root, 'knowledge', 'ui');
+  if (!existsSync(base)) return out;
+  for (const topic of await readdir(base)) {
+    const dir = path.join(base, topic);
+    if (!statSync(dir).isDirectory()) continue;
+    for (const f of await readdir(dir)) {
+      if (!f.endsWith('.md') || f.endsWith('.vi.md')) continue;
+      for (const m of (await readFile(path.join(dir, f), 'utf8')).matchAll(/^## ([A-Z][A-Z0-9]*)-\d+/gm)) if (!out.has(m[1])) out.set(m[1], topic);
+    }
+  }
+  return out;
+}
+export async function loadFixSize(root) {
+  const file = path.join(root, 'resources', 'orchestrator.json');
+  if (!existsSync(file)) return null;
+  try { return JSON.parse(await readFile(file, 'utf8')).fixSize ?? null; } catch { return null; }
+}
+export async function fixKindErrors(root, state, request, sessionRoot, { size = undefined, topics = undefined } = {}) {
+  const errors = [];
+  if (request?.operatorId !== FIX_OPERATOR || request.exchange) return errors;
+  size = size === undefined ? await loadFixSize(root) : size;
+  if (!size) return errors;
+  const finding = request.requirements?.finding;
+  if (typeof finding !== 'string' || !finding) return errors;
+  const rule = finding.split('/').pop();
+  const m = RULE_ID.exec(rule);
+  if (m) {
+    const prefix = m[1];
+    topics = topics === undefined ? await rulePrefixTopics(root) : topics;
+    const topic = topics.get(prefix) ?? null;
+    if ((size.generatePrefixes ?? []).includes(prefix)) errors.push(`request.json: finding ${finding} cites ${rule}, and ${prefix} is a lens the orchestrator lists under fixSize.generatePrefixes; a taste or direction finding is a surface generated again, not a fix (FIX_TOO_LARGE)`);
+    else if (topic && (size.generateTopics ?? []).includes(topic)) errors.push(`request.json: finding ${finding} cites ${rule}, a ${topic} rule, and the orchestrator lists ${topic} under fixSize.generateTopics; a ${topic} finding is a surface generated again, not a fix (FIX_TOO_LARGE)`);
+  }
+  const after = Number.isInteger(size.escalateAfter) ? size.escalateAfter : null;
+  if (after !== null && state?.steps && sessionRoot) {
+    const cells = [];
+    for (const [cell, id] of Object.entries(state.steps)) {
+      if (id !== FIX_OPERATOR || !(stepOfCell(cell) < request.step)) continue;
+      const f = path.join(sessionRoot, `step-${stepOfCell(cell)}`, `parallel-${parallelOfCell(cell)}`, 'request', 'request.json');
+      if (!existsSync(f)) continue;
+      try { if (JSON.parse(await readFile(f, 'utf8')).requirements?.finding === finding) cells.push(cell); } catch { /* an unreadable earlier request is its own branch's error */ }
+    }
+    if (cells.length >= after) errors.push(`request.json: finding ${finding} was already fixed ${cells.length} time(s) in this session (${cells.join(', ')}) and fixSize.escalateAfter is ${after}; a finding that survives a fix is a surface generated again, not fixed once more (FIX_TOO_LARGE)`);
+  }
+  return errors;
+}
+
 // An operator plans when its Outputs table declares the kind `units`; the plan operator of a domain is
 // `<domain>.plan`, the domain being the first segment of an operator id (`uat.verify` → `uat`).
 export const domainOfId = (operatorId) => String(operatorId ?? '').split('.')[0];
@@ -333,6 +394,8 @@ export async function validateRequest(root, dir, packages) {
       errors.push(...branchGoalErrors(state, request));
       // A unit branch names one unit of a plan an earlier branch produced; a mission with several units for one execute operator fans out one unit per branch.
       errors.push(...await unitGateErrors(root, state, request, packages, sessionRoot));
+      // A fix answers a finding of a fixable kind, and answers it once: a composition or taste finding, or one that survived a fix, is a surface generated again.
+      errors.push(...await fixKindErrors(root, state, request, sessionRoot));
       const key = `${request.step}/${request.parallel}${request.exchange ? `/${request.exchange}` : ''}`;
       const expected = state.requestHashes?.[key];
       if (expected) {

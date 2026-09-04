@@ -133,6 +133,7 @@ a node passes.
 | `route` | `workspace.bind`, the bound route: the verified checkout and the source head the applied commit descends from; the endpoint comes from the runtime owner's entry, never from here | yes |
 | `uat-account` | `identity.provision`, the account the guarded route is reached as; absent on the first pass, which is what `IDENTITY_MISSING` hands over | no |
 | `platform-operation-receipt` | `runtime.serve`, the serve that put the commit under observation on the product port; absent when the surface is already served | no |
+| `seed-receipt` | `data.seed`, the rows placed at the flow's representative volume so density is judged against data, not against an empty store | no |
 
 ## Requirements
 

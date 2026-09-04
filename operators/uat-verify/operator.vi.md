@@ -196,6 +196,8 @@ bước chạm tới sản phẩm bằng cách khác — một endpoint, một m
 | `route` | `workspace.bind` ở vai fe; route đã ràng mà lượt chạy này lái theo endpoint của nó | có |
 | `uat-account` | `identity.provision`, tài khoản riêng nó đã cấp cho luồng này; vắng ở lượt đầu, và đó chính là thứ `IDENTITY_MISSING` bàn giao | không |
 | `units` | `uat.plan`; danh sách luồng mà nhánh này đi đúng một luồng, gọi tên bằng `request.unit` | không |
+| `uat-plan` | `uat.plan`; biên bản kế hoạch đã định route vào, ngân sách bước, alias tài khoản và namespace của luồng này | không |
+| `seed-receipt` | `data.seed`; những dòng luồng này đi trên đó, quy được về namespace của nó, kèm rollback | không |
 
 ## Yêu cầu
 

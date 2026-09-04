@@ -18,6 +18,18 @@
     "perUnit": 4,
     "note": "written into state.json.budget at create; a request past a cap is BUDGET_EXHAUSTED and the person answers a budget-choice (narrow, continue, stop) recorded in state.json.choices; continue is recorded as a budget.extensions entry; when a plan branch produced N units (a units.json), the orchestrator raises maxSteps to maxSteps + perUnit × N at that transition, so a fan-out is paid for by the units it runs and never by the base cap"
   },
+  "fixSize": {
+    "maxFiles": 3,
+    "generateTopics": [
+      "composition"
+    ],
+    "generatePrefixes": [
+      "TASTE",
+      "UX"
+    ],
+    "escalateAfter": 1,
+    "note": "the line between interface.fix and interface.generate, in count, in kind and in patience. Count: a fix moves at most maxFiles declared paths, creates and deletes none, and writes only classes the frozen inventory publishes (operators/interface-fix/validate.mjs#fixSizeErrors). Kind: a finding whose rule is published under a generateTopics folder of knowledge/ui, or whose rule prefix is in generatePrefixes, is a composition or a taste decision and goes to interface.generate however small its patch would be; every other rule (a presentation value, a proof measurement, a UAT step) is fix-eligible (scripts/validate-request.mjs#fixKindErrors). Patience: after escalateAfter interface.fix branches for one finding in a session, the next repair of that finding is interface.generate, never another fix"
+  },
   "interactionPolicy": "resources/interaction.json",
   "agent": {
     "profile": "operator.json → resources.profile",

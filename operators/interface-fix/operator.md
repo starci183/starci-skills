@@ -33,6 +33,18 @@ finding travels back to `interface.generate`, which decides a direction again in
 composition three files at a time. This operator hard-codes no threshold: a tree whose orchestrator
 publishes none is checked on shape alone, and shape is the second half of the rule.
 
+## The kind and the patience are the orchestrator's too
+
+Size is not the only line. The same resource names the kinds of finding that are never a fix however
+small their patch would be — the topics of `knowledge/ui` it lists under `generateTopics`, the rule
+prefixes it lists under `generatePrefixes` — because a composition or a taste finding is a decision
+about the surface and not about a value, and a decision is `interface.generate`'s. And it names how
+often one finding may be fixed: past `escalateAfter` fix branches for the same finding in one session,
+the next repair is the generator's, not a further fix, because a finding that survives a fix is telling
+the tree the fix was the wrong instrument. Both refusals are the request gate's
+(`scripts/validate-request.mjs#fixKindErrors`) and both stop the branch with `FIX_TOO_LARGE` before an
+agent is dispatched.
+
 ## No layout change
 
 A fix moves no structure. It creates no path and deletes none: a new leaf or a removed branch is a

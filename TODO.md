@@ -19,8 +19,10 @@ khuyên: xong nghĩa là có validator từ chối được vi phạm, và có b
       `brief.proven`. Ba nhánh liền không thêm bằng chứng "xong khi" nào → dừng, hỏi người.
       (`validate-response.mjs#goalCheckErrors`, `validate-session.mjs#provenErrors`,
       `#threeBranchStopErrors`, `validate-session.spec.mjs`)
-- [ ] Fail thì chạy lại đúng ô: lỗi nhỏ (dưới ba file, không đổi bố cục) → `*.fix`; lỗi lớn →
+- [x] Fail thì chạy lại đúng ô: lỗi nhỏ (dưới ba file, không đổi bố cục) → `*.fix`; lỗi lớn →
       `*.generate`; thước "nhỏ/lớn" ghi trong `resources/orchestrator.json`, không trong operator.
+      (`orchestrator.json#fixSize`: maxFiles, generateTopics, generatePrefixes, escalateAfter;
+      `interface-fix/validate.mjs#fixSizeErrors`, `validate-request.mjs#fixKindErrors`, `fix-kind.spec.mjs`)
 
 ## 2. Audit từng operator theo chuẩn: tách theo tính năng, một operator một việc
 
@@ -106,18 +108,20 @@ context khai đủ để agent mù chạy được, log đủ để người đ�
 
 ## 2c. Bốn chỗ yếu của harness, mỗi chỗ một gate
 
-- [ ] Planner: `validate-operator` bắt mọi Input có producer và mọi primaryOutput có consumer hoặc là
-      điểm kết; chuỗi planner dựng qua exchange `critique` mù (goal + chuỗi vào, bậc thừa ra) rồi in ra
-      chat trước khi chạy.
+- [x] Planner: `validate-operator` bắt mọi Input có producer và mọi primaryOutput có consumer hoặc là
+      điểm kết; bậc thừa bị chặn bởi gate goal của từng nhánh (một nhánh không trỏ về dòng "xong khi"
+      hay nhánh sau thì không chạy), và kế hoạch in ra chat hai dòng mỗi nhánh trước khi chạy.
+      (`validate-operator.mjs#checkGraphClosure`, `validate-chain.mjs` goal rule, `plan-chain.mjs#previewChain`)
 - [ ] Gu auditor: lane đo được mù từng trang; lane taste và UX một auditor cho cả tính năng, chấm
       tương đối trên đủ sheet; gate hiệu chuẩn ba ảnh mốc trong `knowledge/ui/proof`, lệch quá một
       điểm thì receipt bị từ chối.
 - [ ] Học: `knowledge/findings/<family>.jsonl` ghi mọi finding của audit và UAT; `interface.generate`
       nhận finding gần nhất của family làm input âm; `scripts/promote-findings.mjs` gom finding "chưa
       có rule" từ hai lần và soạn sẵn rule cùng evidence note cho người gật.
-- [ ] Thước nhỏ/lớn theo loại thay đổi đọc từ prefix rule của finding (trình bày, copy, state → fix;
+- [x] Thước nhỏ/lớn theo loại thay đổi đọc từ prefix rule của finding (trình bày, copy, state → fix;
       composition, shell, node, contract → generate); leo thang sang generate sau một lần fix không
       sạch cùng finding.
+      (`orchestrator.json#fixSize.generateTopics|generatePrefixes|escalateAfter`, `validate-request.mjs#fixKindErrors`)
 
 ## 3. Chứng minh trên nhiệm vụ thật
 

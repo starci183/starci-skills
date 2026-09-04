@@ -199,6 +199,8 @@ pass.
 | `route` | `workspace.bind` on the fe role; the bound route whose endpoint this run drives | yes |
 | `uat-account` | `identity.provision`, the dedicated account it provisioned for this flow; absent on the first pass, which is what `IDENTITY_MISSING` hands over | no |
 | `units` | `uat.plan`; the flow list whose one flow this branch walks, named by `request.unit` | no |
+| `uat-plan` | `uat.plan`; the plan receipt that defined this flow's entry route, step budget, account alias and namespace | no |
+| `seed-receipt` | `data.seed`; the rows this flow walks on, attributable to its namespace, with their rollback | no |
 
 ## Requirements
 

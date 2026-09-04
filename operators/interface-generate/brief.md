@@ -14,7 +14,7 @@ Primary output: `frontend-source-application`
 
 ## Inputs
 
-`business-promise-authority` (optional), `backend-source-application` (optional), `architecture-decision` (optional), `frontend-direction-decision` (optional), `frontend-surface-audit` (optional), `units` (optional)
+`business-promise-authority` (optional), `backend-source-application` (optional), `architecture-decision` (optional), `frontend-direction-decision` (optional), `frontend-surface-audit` (optional), `library-source-application` (optional), `units` (optional)
 
 ## Outputs
 
