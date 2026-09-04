@@ -34,16 +34,16 @@
       ],
       "properties": {
         "statements": {
-          "$ref": "#/$defs/percentage"
+          "$ref": "#/$defs/threshold"
         },
         "lines": {
-          "$ref": "#/$defs/percentage"
+          "$ref": "#/$defs/threshold"
         },
         "functions": {
-          "$ref": "#/$defs/percentage"
+          "$ref": "#/$defs/threshold"
         },
         "branches": {
-          "$ref": "#/$defs/percentage"
+          "$ref": "#/$defs/threshold"
         }
       }
     },
@@ -53,6 +53,24 @@
     }
   },
   "$defs": {
+    "threshold": {
+      "description": "A percentage bar, including explicit zero, or null when pinned effective configuration and requested bars establish no bar for this metric.",
+      "oneOf": [{ "$ref": "#/$defs/percentage" }, { "type": "null" }]
+    },
+    "policyEvidence": {
+      "description": "Frozen request.coveragePolicy binding for the raw resolved configuration report. It is data only; the validator never executes a project configuration.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["format", "sourceHead", "commandRef", "configRef", "evidenceRef", "evidenceSha256"],
+      "properties": {
+        "format": { "const": "jest-show-config-29" },
+        "sourceHead": { "type": "string", "pattern": "^[0-9a-f]{40}$" },
+        "commandRef": { "type": "string", "minLength": 1 },
+        "configRef": { "type": "string", "minLength": 1 },
+        "evidenceRef": { "type": "string", "pattern": "^request/artifacts/[A-Za-z0-9][A-Za-z0-9._/-]*\\.json$" },
+        "evidenceSha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" }
+      }
+    },
     "percentage": {
       "type": "number",
       "minimum": 0,

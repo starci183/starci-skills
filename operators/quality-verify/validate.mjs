@@ -16,6 +16,7 @@ import { sessionRootOf } from '../../scripts/validate-request.mjs';
 import { tableUnder } from '../../scripts/validate-response.mjs';
 import { auditScopeCarryErrors } from '../../scripts/audit-scope.mjs';
 import { integrationChangesErrors } from '../platform-operate/validate.mjs';
+import { coveragePolicyResult, coverageTableErrors } from '../../scripts/coverage-policy.mjs';
 
 // The nine topics the scorecard reports. Eight are closed by the surface audit and one by the UAT
 // run; this operator copies each verdict and never recomputes one.
@@ -161,6 +162,7 @@ export async function validateQualityStep(branchDir, root = ROOT) {
     if (!plannedNames.includes(r.gate)) errors.push(`${rel}: gate ${r.gate} reports a result but the request never planned it`);
     const planned = plan.find((g) => g.gate === r.gate);
     if (planned && r.required !== (planned.required !== false)) errors.push(`${at} records required ${r.required} but the plan declares ${planned.required !== false}`);
+    if (planned && (r.commandRef !== planned.commandRef || r.configRef !== planned.configRef)) errors.push(`${at} commandRef or configRef differs from the planned gate`);
     checkResultShape(r, at, errors);
   }
   for (const g of plannedNames) if (!byGate.has(g) && response.status === 'done') errors.push(`response/data/gates/${g}.json: the plan names ${g} but no result was measured`);
@@ -207,15 +209,12 @@ export async function validateQualityStep(branchDir, root = ROOT) {
   if (coverage === null && unit?.status === 'pass') errors.push('response/data/coverage.json: the unit-coverage gate passed but reports no coverage measurement');
   if (coverage !== null && !unitMeasured) errors.push('response/data/coverage.json: coverage is reported without a measured unit-coverage gate');
   let below = [];
+  let coveragePolicy = null;
   if (coverage !== null) {
-    below = METRICS.filter((m) => coverage[m] < coverage.thresholds[m]);
+    coveragePolicy = coveragePolicyResult(root, branchDir, request, coverage);
+    errors.push(...coveragePolicy.errors);
+    below = METRICS.filter((m) => typeof coverage.thresholds?.[m] === 'number' && coverage[m] < coverage.thresholds[m]);
     if (below.length && unit?.status === 'pass') errors.push(`response/data/coverage.json: unit-coverage passed while ${below.join(', ')} sit below their own threshold`);
-    if (!empty(requirements.thresholds)) {
-      for (const m of METRICS) {
-        const want = requirements.thresholds?.[m];
-        if (want !== undefined && coverage.thresholds[m] !== want) errors.push(`response/data/coverage.json: threshold for ${m} is ${coverage.thresholds[m]} but the request pinned ${want}`);
-      }
-    }
   }
 
   // The verdict follows the required gates, and the receipt is the only place it is stated.
@@ -229,6 +228,7 @@ export async function validateQualityStep(branchDir, root = ROOT) {
 
   if (present.has('quality-verification') && has('response/response.md')) {
     const text = await read('response/response.md');
+    if (coverage !== null) errors.push(...coverageTableErrors(tableUnder(text, '## Coverage'), coverage, coveragePolicy?.requireCompleteTable));
     const findingKeys = new Set((tableUnder(text, '## Findings') ?? []).map(([code, gate]) => `${code}|${gate === '—' ? 'null' : gate}`));
     const verdict = Object.fromEntries((tableUnder(text, '## Gate verdict') ?? []).map(([k, v]) => [k, v]));
     if (verdict.Verdict !== expected) errors.push(`response/response.md: Verdict says ${verdict.Verdict} but ${unmet.length ? `required gates ${unmet.join(', ')} neither passed nor carry a debt` : 'every required gate passed or is debt-covered'}`);

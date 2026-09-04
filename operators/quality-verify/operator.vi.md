@@ -82,13 +82,23 @@ thứ thực sự đã giao, vì hai cái chỉ là một cây khi không có g�
 là cổng đỏ nên là một phán quyết chứ không phải một mã dừng: nó quay về chủ frontend đúng như một bài
 test hỏng.
 
-## Coverage mang bốn ngưỡng, không phải một
+## Coverage giữ mọi ngưỡng được cấu hình và yêu cầu
 
-Statement, line, function và branch mỗi thứ so với ngưỡng riêng của nó, và branch mang một ngưỡng độc
-lập vì gộp ngưỡng branch vào con số statement chính là cách một nhánh lỗi chưa test đi lọt. Ngưỡng
-mặc định lấy bốn phần trăm mà cấu hình cổng của route đã ghim, nên người không nêu ngưỡng nào vẫn được
-đo theo đúng thanh của dự án. Một chỉ số dưới ngưỡng của nó làm cổng unit thành fail và ghi
-`COVERAGE_BELOW_THRESHOLD`; nó không bao giờ là một ghi chú bên cạnh một kết quả xanh.
+Statement, line, function và branch giữ phần trăm đo được cùng ngưỡng riêng. Mỗi ngưỡng là phần trăm
+cao nhất được cấu hình hoặc yêu cầu cho chỉ số đó. Số không được khai tường minh là một ngưỡng số;
+`null` nghĩa là cả hai nguồn đều không khai ngưỡng và được ghi là `unconfigured` với `—` trong biên
+nhận. Ngưỡng vắng mặt không cung cấp phần trăm nào và không thể xóa một lỗi unit đã đo được. Một chỉ
+số dưới ngưỡng số làm cổng unit thành fail và ghi `COVERAGE_BELOW_THRESHOLD`; nó không bao giờ là
+một ghi chú bên cạnh một kết quả xanh.
+
+`coveragePolicy` ghim báo cáo cấu hình có hiệu lực nguyên bản cùng digest của nó vào lệnh, cấu hình
+và source head của cổng unit. Nó bắt buộc khi có ngưỡng null hoặc request không ghim tường minh
+ngưỡng số cho cả bốn chỉ số; báo cáo được cung cấp luôn phải được kiểm. Báo cáo phải theo định dạng
+được hỗ trợ và giữ mọi ngưỡng áp dụng; cấu hình không đọc được, mơ hồ hoặc không được hỗ trợ không
+phải bằng chứng về sự vắng mặt. Báo cáo được thu bằng các đối số và môi trường ảnh hưởng đến cấu
+hình của cổng đã đo, chỉ thêm tùy chọn xuất báo cáo. Validator đọc artifact ấy mà không thực thi
+cấu hình. Biên nhận dùng chính sách này ghi đủ bốn giá trị đo, ngưỡng và verdict đúng như dữ liệu
+coverage của nó.
 
 ## Nợ phải tường minh và có chủ
 
@@ -157,7 +167,8 @@ Gate result giữ nhánh đo thực trong sessionBranch. Giá trị ngoài sessi
 | Field | Kiểu | Mặc định | Hỏi |
 | --- | --- | --- | --- |
 | `gates` | list of `{gate, commandRef, configRef, required}` | the routed gate plan | Chạy những cổng đã ghim nào, mỗi cổng một lần, trong format, lint, typecheck, build, unit-coverage, integration, e2e, sonar và presentation-sweep |
-| `thresholds` | list of `{statements, lines, functions, branches}` | the four percentages the routed gate configuration pins | Mỗi chỉ số coverage phải đạt bao nhiêu phần trăm, branch đứng riêng |
+| `thresholds` | object or list of `{statements, lines, functions, branches}` | [] | Ngưỡng phần trăm được yêu cầu cho từng chỉ số có tên; áp ngưỡng cao nhất được cấu hình hoặc yêu cầu |
+| `coveragePolicy` | object `{format, sourceHead, commandRef, configRef, evidenceRef, evidenceSha256}` | null | Bằng chứng cấu hình có hiệu lực đã đóng băng cho các ngưỡng coverage |
 | `explicitE2eRequest` | choice | false | false trừ khi có người yêu cầu bộ end-to-end trong chính lần gọi này; chỉ khi đó mới true |
 | `sonarScope` | choice | new-code | new-code hoặc overall; phải khớp với việc sonar có nằm trong kế hoạch cổng hay không |
 | `declaredDebts` | list of `{debtId, gate, approvalRef, ownerRef, expiresAt}` | [] | Những khoản nợ được chủ duyệt cho phép một cổng có tên ở lại màu đỏ |
@@ -170,7 +181,7 @@ Gate result giữ nhánh đo thực trong sessionBranch. Giá trị ngoài sessi
 | 1 | Kiểm cổng vào, xác nhận head đã đóng băng và resume | `resume` | `request/request.json`, @workspaces/be hoặc @workspaces/fe tại commit mà request đã ghim, @tools/git | — | `INVALID_INPUT`, `SOURCE_DRIFT`, `NO_PROGRESS` |
 | 2 | Tiêu thụ tiền nhiệm nguyên vẹn | — | Đầu vào `backend-source-application`, `frontend-source-application` và `changes` tại fingerprint của chúng, cùng commit mà mỗi cái đã ghi | — | `PREDECESSOR_MIXED`, `PREDECESSOR_STALE` |
 | 3 | Chạy các cổng theo thứ tự đã khai | `gates`, `explicitE2eRequest`, `sonarScope` | @workspaces/<project>/<role>/gates, @workspaces/be hoặc @workspaces/fe là chủ thể mỗi cổng đo, @tools/http | `response/data/gates/<gate>.json`, @tools/shell | `GATE_UNAVAILABLE` |
-| 4 | Áp chính sách coverage | `thresholds` | `response/data/gates/<gate>.json` của cổng unit | `response/data/coverage.json` | — |
+| 4 | Áp chính sách coverage | `thresholds`, `coveragePolicy` | artifact cấu hình có hiệu lực đã đóng băng, `response/data/gates/<gate>.json` của cổng unit | `response/data/coverage.json` | — |
 | 5 | Phân loại từng lỗi từ chẩn đoán của nó | — | `response/data/gates/<gate>.json` của mọi cổng đỏ | — | — |
 | 6 | Áp nợ đã được duyệt | `declaredDebts` | @worktrees/debts, `response/data/gates/<gate>.json` | — | `DEBT_UNAPPROVED` |
 | 7 | Chép verdict của từng topic từ biên nhận đã tính ra nó | — | đầu vào `frontend-surface-audit` và `uat-flow-verification` ở cùng head đã ghim | — | `PREDECESSOR_MIXED` |

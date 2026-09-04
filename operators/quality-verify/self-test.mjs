@@ -2,6 +2,7 @@
 // verdict and not a stop, one blocked on an unavailable gate, and one mutation per law, each of which
 // must fail with a line that names the defect.
 import assert from 'node:assert/strict';
+import { createHash } from 'node:crypto';
 import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
@@ -17,6 +18,8 @@ const PLAN = [
   { gate: 'unit-coverage', commandRef: 'package.json#scripts.test', configRef: 'jest.config.ts', required: true },
 ];
 const THRESHOLDS = { statements: 80, lines: 80, functions: 80, branches: 80 };
+const METRICS = ['statements', 'lines', 'functions', 'branches'];
+const UNCONFIGURED = Object.fromEntries(METRICS.map((metric) => [metric, null]));
 const DEBT = { debtId: 'lint-debt', gate: 'lint', approvalRef: '@worktrees/debts/be.md#lint', ownerRef: 'be-team', expiresAt: '2026-06-01T00:00:00.000Z' };
 
 const gateResult = (gate, over = {}) => ({
@@ -49,7 +52,7 @@ const scorecardLine = (rows) => {
   return rows.some((r) => r[1] === 'fail' || r[1] === 'fix-first') ? 'fix-first' : 'ship';
 };
 
-function responseMd({ results = PLAN.map((g) => [g.gate, 'pass']), verdict = 'pass', scorecard = SCORECARD, findings = [['PREDECESSOR_CONSUMED', '—', 'the producer receipt was consumed unchanged']], plan = PLAN, sonarScope = 'new-code', head = HEAD, cov = coverage() } = {}) {
+function responseMd({ results = PLAN.map((g) => [g.gate, 'pass']), verdict = 'pass', scorecard = SCORECARD, findings = [['PREDECESSOR_CONSUMED', '—', 'the producer receipt was consumed unchanged']], plan = PLAN, sonarScope = 'new-code', head = HEAD, cov = coverage(), coverageMetrics = ['branches'] } = {}) {
   return `# quality-verification — ${head}
 
 The delivery was verified at one frozen head against the routed gate plan, and the verdict rests on
@@ -82,7 +85,7 @@ ${results.map(([gate, status]) => `| \`${gate}\` | ${status} | ${status === 'pas
 
 | Metric | Measured | Threshold | Verdict |
 | --- | --- | --- | --- |
-| branches | ${cov.branches} | ${cov.thresholds.branches} | ${cov.branches < cov.thresholds.branches ? 'below' : 'at-or-above'} |
+${coverageMetrics.map((metric) => `| ${metric} | ${cov[metric]} | ${cov.thresholds[metric] === null ? '—' : cov.thresholds[metric]} | ${cov.thresholds[metric] === null ? 'unconfigured' : cov[metric] < cov.thresholds[metric] ? 'below' : 'at-or-above'} |`).join('\n')}
 
 ## Sonar
 
@@ -146,6 +149,7 @@ function writeBranch(files) {
   for (const [name, content] of Object.entries(files)) {
     if (name === '__predecessorChanges') continue;
     if (content === null) continue;
+    mkdirSync(path.dirname(path.join(branch, name)), { recursive: true });
     writeFileSync(path.join(branch, name), typeof content === 'string' ? content : JSON.stringify(content, null, 2));
   }
   return { branch, session };
@@ -161,6 +165,36 @@ const baseline = (over = {}) => ({
   'response/data/coverage.json': coverage(),
   ...over,
 });
+
+const effectiveReport = (configured) => ({
+  version: '29.7.0',
+  globalConfig: configured === undefined ? {} : { coverageThreshold: configured },
+  configs: [{ rootDir: '/fixture' }],
+});
+function policyBaseline({ requested = [], configured, report = effectiveReport(configured), emitted = UNCONFIGURED, unitFails = false, policyOver = {}, over = {} } = {}) {
+  const evidenceRef = 'request/artifacts/effective-config.json';
+  const raw = typeof report === 'string' ? report : JSON.stringify(report, null, 2);
+  const unitPlan = PLAN.find((gate) => gate.gate === 'unit-coverage');
+  const coveragePolicy = {
+    format: 'jest-show-config-29', sourceHead: HEAD,
+    commandRef: unitPlan.commandRef, configRef: unitPlan.configRef,
+    evidenceRef, evidenceSha256: createHash('sha256').update(raw).digest('hex'),
+    ...policyOver,
+  };
+  const cov = coverage({ thresholds: emitted });
+  return baseline({
+    'request/request.json': requestJson({ thresholds: requested, extra: { coveragePolicy } }),
+    [evidenceRef]: raw,
+    'response/data/coverage.json': cov,
+    'response/data/gates/unit-coverage.json': unitFails ? failing('unit-coverage') : gateResult('unit-coverage'),
+    'response/response.json': responseJson({ next: unitFails ? ['backend.source.apply'] : ['git.publish'] }),
+    'response/response.md': responseMd({
+      cov, coverageMetrics: METRICS, verdict: unitFails ? 'fail' : 'pass',
+      results: PLAN.map(({ gate }) => [gate, unitFails && gate === 'unit-coverage' ? 'fail' : 'pass']),
+    }),
+    ...over,
+  });
+}
 
 // A red gate is a verdict, not a stop: the branch is done and the receipt says fail.
 const red = () => baseline({
@@ -219,6 +253,61 @@ await expectError(baseline({ 'response/data/gates/lint.json': gateResult('lint',
 await expectError(baseline({ 'response/data/gates/unit-coverage.json': gateResult('unit-coverage', { gate: 'unit-coverage' }), 'response/data/coverage.json': coverage({ branches: 40 }), 'response/response.md': responseMd({ cov: coverage({ branches: 40 }) }) }), 'sit below their own threshold', 'a green unit gate over a red branch metric');
 await expectError(baseline({ 'response/data/coverage.json': coverage({ thresholds: { ...THRESHOLDS, branches: 50 } }) }), 'but the request pinned', 'a threshold lowered under the request');
 await expectError(baseline({ 'response/data/coverage.json': null, 'response/response.json': responseJson({ coverageField: null }) }), 'reports no coverage measurement', 'a passing unit gate with no coverage');
+
+// Absence is established by the frozen effective configuration, while measured unit failures keep
+// their original result. A numeric zero remains distinct from a metric with no threshold.
+await expectValid(policyBaseline(), 'measured coverage with no configured or requested thresholds');
+await expectValid(policyBaseline({ configured: {} }), 'an empty effective threshold map');
+await expectValid(policyBaseline({ configured: { global: {} } }), 'an empty global threshold map');
+await expectValid(policyBaseline({ unitFails: true }), 'a raw unit failure with every coverage threshold unconfigured');
+await expectValid(policyBaseline({ configured: { global: { branches: 0 } }, emitted: { ...UNCONFIGURED, branches: 0 } }), 'a configured explicit zero');
+await expectValid(policyBaseline({ requested: { branches: 0 }, emitted: { ...UNCONFIGURED, branches: 0 } }), 'a requested explicit zero');
+await expectValid(policyBaseline({
+  requested: [{ statements: 70, lines: 75 }, { functions: 60, branches: 70 }, { branches: 80 }],
+  configured: { global: { functions: 65, branches: 75 } },
+  emitted: { statements: 70, lines: 75, functions: 65, branches: 80 },
+}), 'all configured and requested bars survive list normalization');
+await expectValid(policyBaseline({ requested: THRESHOLDS, configured: { global: { statements: 85 } }, emitted: { ...THRESHOLDS, statements: 85 } }), 'supplied configuration evidence strengthens a fully numeric request');
+
+await expectError(policyBaseline({ configured: { global: { branches: 0 } } }), 'threshold', 'configured zero replaced by absent');
+await expectError(policyBaseline({ requested: { branches: 0 } }), 'threshold', 'requested zero replaced by absent');
+await expectError(policyBaseline({ configured: { global: { branches: 75 } }, emitted: { ...UNCONFIGURED, branches: 70 } }), 'threshold', 'a configured threshold lowered in coverage');
+await expectError(policyBaseline({ requested: [{ branches: 70 }, { branches: 80 }], emitted: { ...UNCONFIGURED, branches: 70 } }), 'threshold', 'a requested list bar dropped during normalization');
+await expectError(policyBaseline({ requested: THRESHOLDS, configured: { global: { statements: 85 } }, emitted: THRESHOLDS }), 'threshold', 'opt-in evidence ignored for an otherwise complete numeric request');
+await expectError(policyBaseline({ emitted: Object.fromEntries(METRICS.map((metric) => [metric, 0])) }), 'threshold', 'unconfigured metrics fabricated as zero');
+await expectError(baseline({ 'request/request.json': requestJson({ thresholds: [] }) }), 'coveragePolicy', 'an empty request with invented numeric thresholds and no evidence');
+await expectError(policyBaseline({ over: { 'request/request.json': requestJson({ thresholds: [] }) } }), 'coveragePolicy', 'null thresholds without effective-configuration evidence');
+
+await expectError(policyBaseline({ policyOver: { evidenceSha256: '0'.repeat(64) } }), 'coveragePolicy', 'a tampered effective-configuration digest');
+await expectError(policyBaseline({ over: { 'request/artifacts/effective-config.json': JSON.stringify(effectiveReport({ global: { branches: 80 } }), null, 2) } }), 'coveragePolicy', 'the raw report changed after its digest was pinned');
+await expectError(policyBaseline({ over: { 'request/artifacts/effective-config.json': null } }), 'coveragePolicy', 'a missing raw effective-configuration report');
+for (const [field, value] of [['sourceHead', OTHER_HEAD], ['commandRef', 'package.json#scripts.other'], ['configRef', 'other.config.json']]) {
+  await expectError(policyBaseline({ policyOver: { [field]: value } }), 'coveragePolicy', `effective configuration bound to another ${field}`);
+}
+await expectError(policyBaseline({ over: { 'response/data/gates/unit-coverage.json': gateResult('unit-coverage', { commandRef: 'package.json#scripts.other' }) } }), 'commandRef', 'the measured command differs from the gate plan');
+await expectError(policyBaseline({ over: { 'response/data/gates/unit-coverage.json': gateResult('unit-coverage', { configRef: 'other.config.json' }) } }), 'configRef', 'the measured configuration differs from the gate plan');
+
+for (const [report, label] of [
+  ['not JSON', 'an unreadable report'],
+  [{}, 'a missing report envelope'],
+  [{ version: '29.7.0', globalConfig: {}, configs: [] }, 'a report with no project configurations'],
+  [{ version: '29.7.0', globalConfig: {}, configs: [null] }, 'a malformed project configuration'],
+  [{ version: '29.7.0', configs: [{}] }, 'a missing global configuration'],
+  [{ ...effectiveReport(), version: '30.0.0' }, 'an unsupported report version'],
+  [effectiveReport({ global: { branches: '80' } }), 'a nonnumeric configured threshold'],
+  [effectiveReport({ global: { branches: -1 } }), 'an uncovered-count threshold'],
+  [effectiveReport({ global: { branches: 101 } }), 'a percentage outside its range'],
+  [effectiveReport({ './scoped/': { branches: 80 } }), 'a scoped threshold'],
+  [{ ...effectiveReport(), configs: [{ coverageThreshold: { global: { branches: 80 } } }] }, 'a project-local threshold'],
+]) {
+  await expectError(policyBaseline({ report }), 'coverage', `${label} cannot prove threshold absence`);
+}
+
+const unconfiguredMd = policyBaseline()['response/response.md'];
+await expectError(policyBaseline({ over: { 'response/response.md': unconfiguredMd.replace('| branches | 81.4 | — | unconfigured |', '| branches | 81.4 | — | at-or-above |') } }), 'Coverage', 'an unconfigured metric narrated as meeting a threshold');
+await expectError(policyBaseline({ over: { 'response/response.md': unconfiguredMd.replace('| branches | 81.4 | — | unconfigured |', '| branches | 99 | — | unconfigured |') } }), 'Coverage', 'a measured percentage changed in the receipt');
+await expectError(policyBaseline({ over: { 'response/response.md': responseMd({ cov: coverage({ thresholds: UNCONFIGURED }) }) } }), 'all four metrics', 'a policy receipt that omits three measured metrics');
+
 await expectError(baseline({ 'response/response.md': responseMd({ verdict: 'fail' }) }), 'every required gate passed or is debt-covered', 'a red verdict over green gates');
 await expectError({ ...red(), 'response/response.md': responseMd({ results: [['format', 'pass'], ['lint', 'fail'], ['unit-coverage', 'pass']], verdict: 'pass' }) }, 'neither passed nor carry a debt', 'a green verdict over a red required gate');
 await expectError(baseline({

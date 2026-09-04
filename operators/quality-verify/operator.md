@@ -86,14 +86,23 @@ this gate runs it on what was actually delivered, because the two are only the s
 went wrong between them. A finding here is a red gate and therefore a verdict, not a stop: it goes
 back to the frontend owner exactly like a failing test.
 
-## Coverage carries four thresholds, not one
+## Coverage preserves every configured and requested threshold
 
-Statements, lines, functions and branches are each compared against their own threshold, and
-branches carry an independent one because a branch threshold folded into the statement figure is how
-an untested error path passes. The thresholds default to the four percentages the routed gate
-configuration already pins, so a person who names none is measured against the project's own bar. A
-metric under its threshold makes the unit gate a failure and records `COVERAGE_BELOW_THRESHOLD`; it
-is never a note beside a green result.
+Statements, lines, functions and branches retain their measured percentages and separate thresholds.
+Each threshold is the strongest configured or requested percentage for that metric. An explicit zero
+is a numeric threshold; `null` means neither source declares one and is recorded as `unconfigured`
+with `—` in the receipt. An absent threshold supplies no percentage and cannot erase a measured unit
+failure. A metric under a numeric threshold makes the unit gate a failure and records
+`COVERAGE_BELOW_THRESHOLD`; it is never a note beside a green result.
+
+`coveragePolicy` pins the raw effective-configuration report and its digest to the unit gate's
+command, configuration and source head. It is required when any threshold is null or the request
+does not explicitly pin numeric bars for all four metrics, and a supplied report is always checked.
+The report must use a supported format and preserve all applicable thresholds; an unreadable,
+ambiguous or unsupported configuration is not evidence of absence. The report is captured using
+the measured gate's configuration-affecting arguments and environment, with only the reporting
+option added. Validation reads that artifact without executing configuration. A receipt using this
+policy reports all four measured values, thresholds and verdicts exactly as its coverage data does.
 
 ## Debt is explicit and owned
 
@@ -165,7 +174,8 @@ Gate results retain their actual measured branch in sessionBranch. A non-session
 | Field | Type | Default | Ask |
 | --- | --- | --- | --- |
 | `gates` | list of `{gate, commandRef, configRef, required}` | the routed gate plan | Which pinned gates to run, once each, from format, lint, typecheck, build, unit-coverage, integration, e2e, sonar and presentation-sweep |
-| `thresholds` | list of `{statements, lines, functions, branches}` | the four percentages the routed gate configuration pins | The percentage each coverage metric must meet, branches on its own |
+| `thresholds` | object or list of `{statements, lines, functions, branches}` | [] | Requested percentage bars for the named metrics; the strongest configured or requested bar applies |
+| `coveragePolicy` | object `{format, sourceHead, commandRef, configRef, evidenceRef, evidenceSha256}` | null | Frozen effective-configuration evidence for coverage thresholds |
 | `explicitE2eRequest` | choice | false | false unless a person asked for the end-to-end suite in this invocation; true only then |
 | `sonarScope` | choice | new-code | new-code or overall; it must agree with whether sonar is in the gate plan |
 | `declaredDebts` | list of `{debtId, gate, approvalRef, ownerRef, expiresAt}` | [] | Owner-approved debts that let a named gate stay red |
@@ -178,7 +188,7 @@ Gate results retain their actual measured branch in sessionBranch. A non-session
 | 1 | Validate the gate, confirm the frozen head and the resume | `resume` | `request/request.json`, @workspaces/be or @workspaces/fe at the commit the request pinned, @tools/git | — | `INVALID_INPUT`, `SOURCE_DRIFT`, `NO_PROGRESS` |
 | 2 | Consume the predecessors unchanged | — | inputs `backend-source-application`, `frontend-source-application` and `changes` at their fingerprints, and the commit each one recorded | — | `PREDECESSOR_MIXED`, `PREDECESSOR_STALE` |
 | 3 | Run the gates in declared order | `gates`, `explicitE2eRequest`, `sonarScope` | @workspaces/<project>/<role>/gates, @workspaces/be or @workspaces/fe as the subject each gate measures, @tools/http | `response/data/gates/<gate>.json`, @tools/shell | `GATE_UNAVAILABLE` |
-| 4 | Apply the coverage policy | `thresholds` | `response/data/gates/<gate>.json` of the unit gate | `response/data/coverage.json` | — |
+| 4 | Apply the coverage policy | `thresholds`, `coveragePolicy` | the frozen effective-configuration artifact, `response/data/gates/<gate>.json` of the unit gate | `response/data/coverage.json` | — |
 | 5 | Classify each failure from its diagnostics | — | `response/data/gates/<gate>.json` of every red gate | — | — |
 | 6 | Apply approved debt | `declaredDebts` | @worktrees/debts, `response/data/gates/<gate>.json` | — | `DEBT_UNAPPROVED` |
 | 7 | Copy each topic verdict from the receipt that computed it | — | inputs `frontend-surface-audit` and `uat-flow-verification` at the same pinned head | — | `PREDECESSOR_MIXED` |
