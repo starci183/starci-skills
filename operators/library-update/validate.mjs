@@ -67,7 +67,20 @@ export const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
 // runners wrap titles and print the block over several lines, so the match reads the whole output with
 // its whitespace collapsed, never one line.
 const collapse = (s) => String(s ?? '').replace(/\s+/g, ' ').trim();
-export const regressionFailed = (output, assertion) => /FAIL|×|✕|✗|not ok/.test(String(output ?? '')) && collapse(output).includes(collapse(assertion));
+const FAIL_MARK = /FAIL|×|✕|✗|not ok/;
+const PASS_MARK = /^\s*(?:ok\b|✓|✔|PASS\b)/;
+export const regressionFailed = (output, assertion) => {
+  const lines = String(output ?? '').split(/\r?\n/);
+  const want = collapse(assertion);
+  for (let i = 0; i < lines.length; i += 1) {
+    if (!FAIL_MARK.test(lines[i])) continue;
+    // The failing block: the marker line and what follows until the next test result.
+    const block = [lines[i]];
+    for (let j = i + 1; j < lines.length && !FAIL_MARK.test(lines[j]) && !PASS_MARK.test(lines[j]); j += 1) block.push(lines[j]);
+    if (collapse(block.join(' ')).includes(want)) return true;
+  }
+  return false;
+};
 export function nextPatch(version) { const [a, b, c] = version.split('.').map(Number); return `${a}.${b}.${c + 1}`; }
 // The modes, and which half each of them runs. `full` is the default, so a request that names no mode
 // is the two-halves-one-checkout job this operator has always done.

@@ -678,18 +678,35 @@ const auditResult = (w) => ({
   schemaVersion: 9, mode: 'playwright', walkRef: WALK_REF(w.id), walkFingerprint: walkFingerprint(Buffer.from(JSON.stringify(w, null, 2))), route: ROUTE,
   outcome: 'pass', startedAt: '2026-09-03T00:10:00Z', finishedAt: '2026-09-03T00:10:05Z',
   driver: { playwright: '1.0.0', browser: 'chromium', browserVersion: '100.0.0.0', headless: true, context: { fresh: true, viewport: [w.entry.viewport.width, w.entry.viewport.height], deviceScaleFactor: 1, colorScheme: 'light', reducedMotion: 'reduce', locale: 'en' } },
-  steps: w.steps.map((s) => ({ id: s.id, action: s.action, control: stepControl(w, s.id), outcome: 'pass', url: ROUTE, ms: 1 })),
+  steps: w.steps.map((s) => ({ id: s.id, action: s.action, control: stepOwnControl(w, s.id), outcome: 'pass', url: ROUTE, ms: 1 })),
   firstFailure: null,
-  captures: [{ name: w.id, stepId: 'shot', screenshotRef: SHOT(w.id), axRef: `response/artifacts/${w.id}.ax.txt`, domRef: `response/artifacts/${w.id}.dom.json` }],
+  captures: [{ name: w.id, stepId: 'shot', screenshotRef: SHOT(w.id), axRef: `response/artifacts/${w.id}.ax.txt`, domRef: `response/artifacts/${w.id}.dom.json`, measurementsRef: MEAS_REF(w.id) }],
 });
-const drivenCapture = (w, over = {}) => ({ ...capture(w.id), driver: { mode: 'playwright', walkRef: WALK_REF(w.id), resultRef: RESULT_REF(w.id), stepId: 'shot', control: stepControl(w, 'shot'), ...over } });
-function drivenFiles({ walks = [auditWalk(WIDE), auditWalk(NARROW)], captures = {} } = {}) {
+const drivenCapture = (w, over = {}) => ({ ...capture(w.id), driver: { mode: 'playwright', walkRef: WALK_REF(w.id), resultRef: RESULT_REF(w.id), stepId: 'shot', control: stepControl(w, 'shot'), measurementsRef: MEAS_REF(w.id), ...over } });
+function drivenFiles({ walks = [auditWalk(WIDE), auditWalk(NARROW)], captures = {}, verdictsDoc = drivenVerdicts(), measurements = {} } = {}) {
   const files = baseline();
   files['response/response.json'] = responseJson({ fields: { 'frontend-surface-audit': 'response/response.md', verdicts: 'response/data/verdicts.json', capture: [CAP(WIDE), CAP(NARROW)], screenshot: [SHOT(WIDE), SHOT(NARROW)], 'uat-walk': walks.map((w) => WALK_REF(w.id)), 'walk-result': walks.map((w) => RESULT_REF(w.id)) } });
-  for (const w of walks) { files[WALK_REF(w.id)] = w; files[RESULT_REF(w.id)] = auditResult(w); files[CAP(w.id)] = captures[w.id] ?? drivenCapture(w); }
+  files['response/data/verdicts.json'] = verdictsDoc;
+  for (const w of walks) { files[WALK_REF(w.id)] = w; files[RESULT_REF(w.id)] = auditResult(w); files[CAP(w.id)] = captures[w.id] ?? drivenCapture(w); files[MEAS_REF(w.id)] = measurements[w.id] ?? measurementsDoc(w.id); }
   return files;
 }
-await expectValid(drivenFiles(), 'two entries, each captured by the runner from its own walk at its own viewport');
+await expectValid(drivenFiles(), 'two entries, each captured by the runner from its own walk at its own viewport, every presentation result citing the ref and value it read');
+// A capture is not a measurement: under mode playwright a presentation, contrast, accessibility or
+// responsive result cites the runner's record — ref and value — and a number the runner did not
+// record is refused, whatever the capture's own measured cell says.
+await expectError(drivenFiles({ verdictsDoc: verdicts() }), 'cites no measurement', 'a driven audit whose presentation results state numbers with no citation');
+await expectError(drivenFiles({ verdictsDoc: (() => { const v = drivenVerdicts(); v.entries[0].results[0].measurement = cite(MAIN, 'computed.gap.row', '2rem'); return v; })() }), 'the runner recorded "1.5rem"; the value is the runner\'s', 'a citation whose value the runner never recorded');
+await expectError(drivenFiles({ verdictsDoc: (() => { const v = drivenVerdicts(); v.entries[0].results[0].measurement = cite('body>footer', 'computed.gap.row', '1.5rem'); return v; })() }), 'a citation names an element the runner measured', 'a citation of an element the record does not carry');
+await expectError(drivenFiles({ verdictsDoc: (() => { const v = drivenVerdicts(); v.entries[0].results[0].measurement = cite(MAIN, 'computed.gap', '1.5rem'); return v; })() }), 'carries no single value for', 'a citation of a group, not a value');
+await expectError(drivenFiles({ verdictsDoc: (() => { const v = drivenVerdicts(); v.entries[1].results[0].measurement = cite(MAIN, 'computed.padding.top', '0px'); return v; })(), captures: { [NARROW]: (() => { const c = drivenCapture(auditWalk(NARROW)); c.nodes[0].measured.gap = '0.5rem'; return c; })() } }), 'the number a verdict states is the one it cites', 'a verdict stating one number while citing another');
+await expectError(drivenFiles({ measurements: { [WIDE]: { ...measurementsDoc(WIDE), elements: [{ ref: MAIN, tag: 'main' }] } } }), 'elements[0].bbox: required', 'a measurements record that lost its shape is refused at the walk gate');
+{
+  const files = drivenFiles();
+  delete files[MEAS_REF(NARROW)];
+  await expectError(files, 'which is not on disk; a capture the runner measured keeps its record beside the screenshot', 'a result that names a record nobody wrote');
+}
+await expectError(drivenFiles({ captures: { [WIDE]: drivenCapture(auditWalk(WIDE), { measurementsRef: MEAS_REF(NARROW) }) } }), 'the record is the runner\'s', 'a capture naming another entry\'s measurements');
+await expectError(mutate((v) => { v.entries[0].results[0].measurement = cite(MAIN, 'computed.gap.row', '1.5rem'); }), 'only a presentation, contrast, accessibility, responsive result of a capture the runner drove reads from a capture-measurements record', 'a citation on a capture no runner drove');
 {
   const w = auditWalk(WIDE); w.steps[1].target = { css: 'h1' };
   await expectError(drivenFiles({ walks: [w, auditWalk(NARROW)] }), 'no unique allowed schema branch', 'a walk whose target is a selector');
@@ -713,4 +730,4 @@ await expectError(drivenFiles({ captures: { [NARROW]: capture(NARROW) } }), 'thi
 }
 await expectError(drivenFiles({ captures: { [WIDE]: { ...drivenCapture(auditWalk(WIDE)), viewport: [1280, 800] } } }), 'the walk ran at 1440x900', 'a capture claiming a viewport the walk did not run');
 
-process.stdout.write('interface.audit self-test: scope, owner routing, evidence, walk and mutation checks passed\n');
+process.stdout.write('interface.audit self-test: scope, owner routing, evidence, walk, measurement citation and mutation checks passed\n');

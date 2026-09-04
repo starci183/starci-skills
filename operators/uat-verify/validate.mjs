@@ -304,7 +304,9 @@ export async function validateUatStep(branchDir, root = ROOT, { hostRoot = hostR
       const ran = resultOutcome.get(a.stepId);
       if (ran !== a.outcome) errors.push(`${f}: assertion ${a.assertionId} is ${a.outcome} here and the runner recorded step ${a.stepId} as ${ran ?? 'not run'}; the outcome is the runner's`);
     }
-    if (!result.captures.some((c) => c.screenshotRef === capture.screenshotRef)) errors.push(`${f}: points at ${capture.screenshotRef}, which the runner did not produce for this walk`);
+    const produced = result.captures.find((c) => c.screenshotRef === capture.screenshotRef);
+    if (!produced) errors.push(`${f}: points at ${capture.screenshotRef}, which the runner did not produce for this walk`);
+    else if (driver.measurementsRef !== undefined && driver.measurementsRef !== produced.measurementsRef) errors.push(`${f}: names measurements ${driver.measurementsRef} and the runner recorded ${produced.measurementsRef ?? 'none'} beside ${capture.screenshotRef}; the record is the runner's`);
   }
 
   if (verdicts) {
