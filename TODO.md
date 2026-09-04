@@ -55,6 +55,28 @@ context khai đủ để agent mù chạy được, log đủ để người đ�
       `resources/interaction.json`.
 - [ ] `content.generate`: tách brief / sinh / review ở đợt sau, domain riêng.
 
+## 2b. Dynamic flows và cặp plan/execute
+
+- [ ] Xoá 11 workflow ví dụ khỏi runtime: cửa vào không đọc `when` nữa; chuỗi được `scripts/plan-chain.mjs`
+      suy ngược từ các dòng "xong khi" của mission qua bảng Inputs/Next và `primaryOutput`; 11 ví dụ
+      thành fixture cho spec của planner (planner phải suy ra được chúng từ goal tương ứng).
+- [ ] `scripts/validate-chain.mjs`: luật cũ của validate-workflows (Next, input có producer, không chung
+      alias ghi, tối đa ba nhánh, luật dòng dài khi có publish) áp lên `state.json.chain` mỗi lần vẽ;
+      vẽ lại là transition `replanned`.
+- [ ] Đơn vị của một agent mù là một trang, một modal, một luồng. Cặp plan/execute cho mọi operator có
+      thể có N đơn vị: `X.plan` in danh sách đơn vị ra chat gốc (kind chung `units`: `{id, goal, inputs}`,
+      validator từ chối đơn vị không có goal); `X.execute` mù, một đơn vị mỗi nhánh, phải trỏ về đúng
+      `unit.id` của plan bậc trước; fan-out tối đa ba nhánh một bậc, mỗi nhánh một nhánh ghi riêng.
+- [ ] Áp cặp này: `interface.plan` (bản đồ bề mặt: trang, modal, shell chung, contract dữ liệu, goal
+      từng trang) + `interface.generate` một trang; `uat.plan` + `uat.verify` một luồng; `seed.plan` +
+      `seed.run`; `backend.plan` + `backend.generate` khi contract có nhiều module.
+- [ ] Gộp có thứ tự: `runtime.serve` merge N nhánh vào nhánh tích hợp, xung đột trả về đúng đơn vị.
+- [ ] Audit hai tầng: `interface.audit` từng trang, cộng một lần audit chéo lấy bản đồ làm input (shell,
+      tên, điều hướng); lỗi chéo về `interface.plan`.
+- [ ] Budget theo đơn vị: `maxSteps = cơ bản + N × mỗi đơn vị`, N đọc từ số dòng "xong khi".
+- [ ] `interface.audit` chấp nhận audit một trang đang chạy: input source-application và decision tuỳ
+      chọn khi target là bề mặt có sẵn.
+
 ## 3. Chứng minh trên nhiệm vụ thật
 
 - [ ] Chạy lại một nhiệm vụ đã hỏng (seed UAT của S2, hoặc refactor Setup) trên 2.0 với Sol 5.6 và
