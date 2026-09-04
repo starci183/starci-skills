@@ -9,7 +9,8 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
 import { fileURLToPath } from 'node:url';
-import { walkErrors, sweepWalkText, sweepWalkRun, sweepFindingErrors, originOf, stepControl, controlOfStep, validateWalkFile, walkFingerprint, walkFiles, SECRET_FIELD, AGENT_CODE } from './validate-walk.mjs';
+import { walkErrors, sweepWalkText, sweepWalkRun, sweepFindingErrors, originOf, stepControl, stepOwnControl, controlOfStep, citedMeasurement, loadMeasurementsSchema, validateWalkFile, walkFingerprint, walkFiles, SECRET_FIELD, AGENT_CODE } from './validate-walk.mjs';
+import { validateAgainst } from './json-schema.mjs';
 import { playwrightInstallOf, playwrightInstallStatus, missingInstallMessage, loadPlaywright, runWalk, CHECK_ID } from './browser-walk.mjs';
 import { hostRootOf } from './validate-request.mjs';
 import { start } from './host-artifacts.mjs';
@@ -44,6 +45,12 @@ test('a lawful walk passes, and its controls are the walk\'s own targets', () =>
   assert.equal(stepControl(walk(), 'shot'), 'heading "Welcome"', 'a capture follows the control pressed before it');
   assert.equal(stepControl(walk(), 'open'), `entry ${ROUTE}`);
   assert.deepEqual(controlOfStep(walk(), 'nowhere'), null);
+  // The ledger's spelling: what the step itself named, never the previous step's target.
+  assert.equal(stepOwnControl(walk(), 'submit'), 'button "Sign in"');
+  assert.equal(stepOwnControl(walk(), 'open'), `entry ${ROUTE}`);
+  assert.equal(stepOwnControl(walk(), 'shot'), null, 'a targetless capture names no control');
+  assert.equal(stepOwnControl(walk({ steps: [{ id: 'open', action: 'goto', target: null, value: ROUTE }, { id: 'w', action: 'wait', target: null, value: 10 }, { id: 'u', action: 'expect', target: null, expect: { url: '/x' } }], run: undefined }), 'u'), null, 'a url-only expectation names no control');
+  assert.equal(stepOwnControl(walk(), 'nowhere'), null);
   assert.equal(stepControl(walk({ steps: [{ id: 'open', action: 'goto', target: null, value: ROUTE }, { id: 'n', action: 'expect', target: { role: 'button', name: 'Go', exact: true, nth: 1 }, expect: { visible: true } }], run: undefined }), 'n'), 'button "Go" exact nth=1');
 });
 
@@ -76,6 +83,39 @@ test('the sweep refuses foreign URLs, secret-shaped values and browser code, and
   for (const e of sweepFindingErrors(found)) { assert.ok(!e.includes('hunter2')); assert.ok(!e.includes('eyJ')); }
   assert.deepEqual(sweepWalkText(`{ "route": "${ROUTE}", "url": "http://127.0.0.1:60000/dashboard" }`, origin), [], 'URLs under the route origin are the walk\'s own');
   assert.ok(AGENT_CODE.test("page.locator('#x')") && AGENT_CODE.test('page.request.post') && !AGENT_CODE.test('the locator of the button'));
+});
+
+test('the sweep reads what a run wrote under the response folder and leaves the tree\'s own scripts alone', () => {
+  const runner = readFileSync(path.join(root, 'scripts', 'browser-walk.mjs'), 'utf8');
+  assert.ok(runner.split(/\r?\n/).some((l) => AGENT_CODE.test(l)), 'the runner is browser code by design, and the pattern would flag it if the sweep read it');
+  const dir = mkdtempSync(path.join(tmpdir(), 'walk-sweep-'));
+  try {
+    const response = path.join(dir, 'response');
+    const w = walk();
+    mkdirSync(path.join(response, 'data', 'walks', w.id), { recursive: true });
+    mkdirSync(path.join(response, 'artifacts'), { recursive: true });
+    mkdirSync(path.join(response, 'scripts'), { recursive: true });
+    mkdirSync(path.join(dir, 'scripts'), { recursive: true });
+    for (const f of ['scripts/browser-walk.mjs', 'response/scripts/browser-walk.mjs', 'response/artifacts/browser-walk.mjs']) writeFileSync(path.join(dir, f), runner);
+    const walkText = JSON.stringify(w, null, 2);
+    writeFileSync(path.join(response, 'data', 'walks', w.id, 'walk.json'), walkText);
+    assert.deepEqual(sweepWalkRun(walkText, response, w.id, { relativeTo: dir }), [], 'a script beside, under or inside the response folder is never the sweep\'s input');
+    writeFileSync(path.join(response, 'artifacts', 'entry.measurements.json'), '{ "text": "await page.evaluate(() => 1)" }');
+    const found = sweepWalkRun(walkText, response, w.id, { relativeTo: dir });
+    assert.deepEqual(found.map((f) => [f.file, f.pattern]), [['response/artifacts/entry.measurements.json', 'agent-code']], 'a record the run wrote is swept, and only that');
+  } finally { rmSync(dir, { recursive: true, force: true }); }
+});
+
+test('a verdict\'s citation resolves against the measurements record by ref and dotted property', () => {
+  const doc = { schemaVersion: 9, capture: 'entry', viewport: [1280, 800], deviceScaleFactor: 1, colorScheme: 'light', elements: [{ ref: 'heading "Sign in"', tag: 'h1', bbox: { x: 8, y: 21, width: 1264, height: 37 }, computed: { fontSize: '32px', fontWeight: '700', lineHeight: 'normal', color: 'rgb(0, 0, 0)', backgroundColor: 'rgb(255, 255, 255)', minHeight: '0px', padding: { top: '0px', right: '0px', bottom: '0px', left: '0px' }, margin: { top: '21px', right: '0px', bottom: '21px', left: '0px' }, gap: { row: 'normal', column: 'normal' }, borderRadius: '0px', border: { top: '0px none rgb(0, 0, 0)', right: '0px none rgb(0, 0, 0)', bottom: '0px none rgb(0, 0, 0)', left: '0px none rgb(0, 0, 0)' }, overflow: { x: 'visible', y: 'visible' }, display: 'block', visibility: 'visible' }, contrast: 21, text: 'Sign in' }] };
+  assert.deepEqual(validateAgainst(loadMeasurementsSchema(root), doc, 'm'), []);
+  assert.deepEqual(citedMeasurement(doc, { ref: 'heading "Sign in"', property: 'computed.fontSize' }).recorded, '32px');
+  assert.deepEqual(citedMeasurement(doc, { ref: 'heading "Sign in"', property: 'bbox.height' }).recorded, 37);
+  assert.deepEqual(citedMeasurement(doc, { ref: 'heading "Sign in"', property: 'contrast' }).recorded, 21);
+  assert.equal(citedMeasurement(doc, { ref: 'heading "Sign in"', property: 'computed.padding' }).found, false, 'a citation names one value, not a group');
+  assert.equal(citedMeasurement(doc, { ref: 'heading "Sign in"', property: 'computed.gap.diagonal' }).found, false);
+  assert.equal(citedMeasurement(doc, { ref: 'button "Go"', property: 'bbox.height' }).element, null);
+  assert.equal(loadMeasurementsSchema(root).properties.elements.maxItems > 0, true, 'the cap lives in the kind');
 });
 
 test('a run beside its walk: the result hashes the walk, and every text the run wrote is swept', () => {
@@ -130,7 +170,8 @@ test('the runner drives a static page and writes what the receipt is checked aga
   writeFileSync(path.join(folder, 'index.html'), `<!doctype html><meta charset="utf-8"><title>sign in</title>
 <main><h1>Sign in</h1><form onsubmit="event.preventDefault(); document.getElementById('h').textContent='Welcome ' + document.getElementById('u').value; document.getElementById('h').hidden=false;">
 <label for="u">Username</label><input id="u"><label for="p">Password</label><input id="p" type="password">
-<button type="submit">Sign in</button></form><h2 id="h" hidden></h2></main>`);
+<button type="submit">Sign in</button></form><h2 id="h" hidden></h2>
+<p id="muted" style="color: rgb(119, 119, 119)">Forgot your password? Ask an administrator.</p></main>`);
   const served = await start(folder);
   try {
     const route = `${served.receipt.url}index.html`;
@@ -149,17 +190,40 @@ test('the runner drives a static page and writes what the receipt is checked aga
     assert.deepEqual(run.errors, []);
     assert.equal(run.code, 0);
     const files = walkFiles(w.id);
-    for (const f of [files.walk, files.result, files.ledger, files.trace, 'artifacts/entry.png', 'artifacts/entry.ax.txt', 'artifacts/entry.dom.json', 'data/captures/entry.json']) assert.ok(existsSync(path.join(response, f.replace(/^response\//, ''))), `${f} written`);
+    for (const f of [files.walk, files.result, files.ledger, files.trace, 'artifacts/entry.png', 'artifacts/entry.ax.txt', 'artifacts/entry.dom.json', 'artifacts/entry.measurements.json', 'data/captures/entry.json']) assert.ok(existsSync(path.join(response, f.replace(/^response\//, ''))), `${f} written`);
     const result = JSON.parse(readFileSync(path.join(response, files.result.replace(/^response\//, '')), 'utf8'));
     assert.equal(result.outcome, 'pass');
     assert.equal(result.walkFingerprint, walkFingerprint(readFileSync(walkFile)));
-    assert.deepEqual(result.steps.map((s) => [s.id, s.outcome, s.control]), w.steps.map((s) => [s.id, 'pass', stepControl(w, s.id)]));
+    // The ledger names what each step itself named: the entry, the field, the button, the heading the
+    // expectation read; nothing for the url-only expectation and nothing for the capture.
+    assert.deepEqual(result.steps.map((s) => [s.id, s.outcome, s.control]), w.steps.map((s) => [s.id, 'pass', stepOwnControl(w, s.id)]));
+    assert.deepEqual(result.steps.map((s) => s.control), [`entry ${route}`, 'textbox "Username"', 'button "Sign in"', 'heading "Welcome uat-learner"', null, null]);
+    // A capture is also a measurement: the record beside the screenshot carries the numbers a
+    // measurable lane judges, computed by the runner and never by the agent.
+    assert.equal(result.captures[0].measurementsRef, 'response/artifacts/entry.measurements.json');
+    const measurements = JSON.parse(readFileSync(path.join(response, 'artifacts', 'entry.measurements.json'), 'utf8'));
+    assert.deepEqual(validateAgainst(loadMeasurementsSchema(root), measurements, 'entry.measurements.json'), []);
+    assert.equal(measurements.capture, 'entry');
+    assert.deepEqual([measurements.viewport, measurements.deviceScaleFactor, measurements.colorScheme], [[1280, 800], 1, 'light']);
+    const heading = citedMeasurement(measurements, { ref: 'heading "Sign in"', property: 'computed.fontSize' });
+    assert.ok(heading.found && /^\d+(\.\d+)?px$/.test(heading.recorded) && parseFloat(heading.recorded) >= 24 && parseFloat(heading.recorded) <= 40, `an h1 renders between 24 and 40px, recorded ${heading.recorded}`);
+    assert.equal(heading.element.tag, 'h1');
+    const button = citedMeasurement(measurements, { ref: 'button "Sign in"', property: 'bbox.height' });
+    assert.ok(button.found && button.recorded >= 16 && button.recorded <= 48, `a default button stands between 16 and 48px tall, recorded ${button.recorded}`);
+    assert.equal(citedMeasurement(measurements, { ref: 'button "Sign in"', property: 'computed.display' }).recorded, 'inline-block');
+    const muted = citedMeasurement(measurements, { ref: 'p#muted', property: 'contrast' });
+    assert.ok(muted.found && muted.recorded >= 4 && muted.recorded <= 5, `rgb(119,119,119) over white contrasts about 4.5:1, recorded ${muted.recorded}`);
+    assert.equal(muted.element.computed.backgroundColor, 'rgb(255, 255, 255)', 'the effective background is the canvas when nothing paints one');
+    assert.equal(muted.element.computed.color, 'rgb(119, 119, 119)');
+    assert.ok(citedMeasurement(measurements, { ref: 'textbox "Username"', property: 'bbox.width' }).recorded > 0);
+    assert.equal(citedMeasurement(measurements, { ref: 'textbox "Password"', property: 'text' }).recorded, '', 'a field carries no text, so no value can reach the record');
+    assert.equal(citedMeasurement(measurements, { ref: 'heading "Welcome uat-learner"', property: 'computed.display' }).recorded, 'block', 'the heading the expectation read is rendered at capture time and enters the record');
     assert.equal(result.driver.browser, 'chromium');
     assert.deepEqual(result.driver.context, { fresh: true, viewport: [1280, 800], deviceScaleFactor: 1, colorScheme: 'light', reducedMotion: 'reduce', locale: 'en' });
     const capture = JSON.parse(readFileSync(path.join(response, 'data', 'captures', 'entry.json'), 'utf8'));
     assert.equal(capture.caseId, 'entry');
     assert.equal(capture.outcome, 'pass');
-    assert.deepEqual(capture.driver, { mode: 'playwright', walkRef: files.walk, resultRef: files.result });
+    assert.deepEqual(capture.driver, { mode: 'playwright', walkRef: files.walk, resultRef: files.result, measurementsRef: 'response/artifacts/entry.measurements.json' });
     assert.deepEqual(capture.assertions.map((a) => [a.assertionId, a.stepId, a.control, a.outcome]), [['entry', 'landed', 'heading "Welcome uat-learner"', 'pass'], ['terminal', 'path', 'heading "Welcome uat-learner"', 'pass']]);
     assert.match(readFileSync(path.join(response, 'artifacts', 'entry.ax.txt'), 'utf8'), /Welcome uat-learner/);
     assert.deepEqual(validateWalkFile(path.join(response, 'data', 'walks', w.id, 'walk.json'), response, { root }).errors, []);

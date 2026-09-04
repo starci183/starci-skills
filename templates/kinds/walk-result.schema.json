@@ -49,7 +49,7 @@
         "properties": {
           "id": { "type": "string", "pattern": "^[a-z0-9][a-z0-9-]*$" },
           "action": { "enum": ["goto", "click", "fill", "press", "select", "check", "expect", "capture", "wait"] },
-          "control": { "description": "The control this step pressed, copied from the walk's target and never from anything else; the entry route for the first step; null for a step that pressed nothing and followed nothing.", "oneOf": [{ "type": "null" }, { "type": "string", "minLength": 1 }] },
+          "control": { "description": "The control this step itself named, copied from the walk's own target for this step and never from another step's; the entry route for the goto; null for a step that names no target (a capture, a wait, a url-only expectation) — never the previous step's target.", "oneOf": [{ "type": "null" }, { "type": "string", "minLength": 1 }] },
           "outcome": { "enum": ["pass", "fail", "skipped"] },
           "url": { "oneOf": [{ "type": "null" }, { "type": "string", "minLength": 1 }] },
           "ms": { "type": "integer", "minimum": 0 }
@@ -82,7 +82,8 @@
           "stepId": { "type": "string", "pattern": "^[a-z0-9][a-z0-9-]*$" },
           "screenshotRef": { "type": "string", "pattern": "^response/artifacts/[a-z0-9][a-z0-9-]*\\.png$" },
           "axRef": { "type": "string", "pattern": "^response/artifacts/[a-z0-9][a-z0-9-]*\\.ax\\.txt$" },
-          "domRef": { "type": "string", "pattern": "^response/artifacts/[a-z0-9][a-z0-9-]*\\.dom\\.json$" }
+          "domRef": { "type": "string", "pattern": "^response/artifacts/[a-z0-9][a-z0-9-]*\\.dom\\.json$" },
+          "measurementsRef": { "description": "The capture-measurements record the runner computed at this step, beside the screenshot; the only source a measurable proof lane may cite a number from under mode playwright.", "type": "string", "pattern": "^response/artifacts/[a-z0-9][a-z0-9-]*\\.measurements\\.json$" }
         }
       }
     },

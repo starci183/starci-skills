@@ -3,7 +3,9 @@
 // capture and judged on a rule it actually claimed; a Grammar-owned node never routes a failure into
 // the resolve loop and an application-owned failure always does; the surface class is the one the
 // direction decision's coverage declared, never one chosen here; and the receipt reads what the
-// verdicts carry.
+// verdicts carry. Under @tools/browsercontrol mode playwright a capture is the runner's, and so is
+// every number: a result of a measurable lane cites the element and value of the runner's
+// capture-measurements record it read, and a value the runner did not record is refused.
 import { existsSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
 import path from 'node:path';
@@ -14,7 +16,7 @@ import { tableUnder, userRouted } from '../../scripts/validate-response.mjs';
 import { loadErrorsRegistry } from '../../scripts/errors-registry.mjs';
 import { sessionRootOf, missingStack } from '../../scripts/validate-request.mjs';
 import { validateAgainst } from '../../scripts/json-schema.mjs';
-import { validateWalkFile, stepControl } from '../../scripts/validate-walk.mjs';
+import { validateWalkFile, stepControl, citedMeasurement } from '../../scripts/validate-walk.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 const empty = (v) => v === undefined || v === null || v === '' || v === '—';
@@ -41,6 +43,10 @@ export const TOPIC_OF_PREFIX = {
 };
 export const AUDIT_TOPICS = ['presentation', 'composition', 'responsive', 'motion', 'accessibility', 'contrast', 'render-truth', 'taste'];
 const topicOf = (rule) => TOPIC_OF_PREFIX[String(rule).replace(/-\d+$/, '')] ?? null;
+// The lanes whose verdict is a number the browser computed — a size, a box, a ratio, an overflow.
+// Under mode playwright the agent runs no browser code, so that number exists only in the runner's
+// capture-measurements record, and a result of one of these lanes cites the entry it read.
+export const MEASURED_TOPICS = new Set(['presentation', 'contrast', 'accessibility', 'responsive']);
 // STATE-* and FEEDBACK-* (composition), FOCUS-* (accessibility), and the taste lens (TASTE-13
 // already scores it whole) are each only ever true of one particular coverage state, an absent
 // branch, or a focused target. A matrix narrowed against the direction's declared states can judge
@@ -185,6 +191,7 @@ export async function validateAuditStep(branchDir, root = ROOT) {
     if (walk) walks.set(ref, { walk, result });
   }
   const resultRefs = new Set(list(response.fields?.['walk-result']));
+  const measurementsOf = new Map(); // matrixId -> { ref, doc } the runner recorded at the capture step
   for (const [matrixId, { doc, ref }] of captures) {
     const driver = doc.driver ?? null;
     if (!driver) { if (walks.size) errors.push(`${ref}: the receipt records mode playwright (it declares a uat-walk) and this capture carries no driver; under that mode every screenshot is produced by the runner from a walk`); continue; }
@@ -200,6 +207,13 @@ export async function validateAuditStep(branchDir, root = ROOT) {
     if (doc.scheme !== walk.entry.colorScheme) errors.push(`${ref}: claims scheme ${doc.scheme} and the walk ran ${walk.entry.colorScheme}`);
     const produced = result.captures.find((c) => c.name === matrixId && c.stepId === driver.stepId);
     if (!produced || produced.screenshotRef !== `response/artifacts/${matrixId}.png` || result.steps.find((s) => s.id === driver.stepId)?.outcome !== 'pass') errors.push(`${ref}: the runner did not produce response/artifacts/${matrixId}.png at step ${driver.stepId} of this walk`);
+    // The measurements record of this entry is the one the runner names beside the screenshot; the
+    // walk gate has already checked its shape. A capture that names another is refused.
+    const measurementsRef = produced?.measurementsRef ?? null;
+    if (driver.measurementsRef !== undefined && driver.measurementsRef !== measurementsRef) errors.push(`${ref}: names measurements ${driver.measurementsRef} and the runner recorded ${measurementsRef ?? 'none'} at step ${driver.stepId}; the record is the runner's`);
+    let measurements = null;
+    if (measurementsRef && has(measurementsRef)) { try { measurements = JSON.parse(await read(measurementsRef)); } catch { measurements = null; } }
+    measurementsOf.set(matrixId, { ref: measurementsRef, doc: measurements });
   }
 
   const ids = new Set();
@@ -222,6 +236,23 @@ export async function validateAuditStep(branchDir, root = ROOT) {
       if (!node.claims.includes(result.rule)) errors.push(`${at}: ${result.path} is judged on ${result.rule}, which that node never claimed`);
       const measured = Object.values(node.measured);
       if (!measured.includes(result.measured)) errors.push(`${at}: ${result.path} is judged against ${result.measured}, which the capture did not measure`);
+      // Mode playwright: a number of a measurable lane is the runner's. The result cites the element
+      // and the property it read from the capture-measurements record, the value is the one recorded
+      // there, and the measurement the verdict states carries that value.
+      const topic = topicOf(result.rule);
+      const citation = result.measurement ?? null;
+      if (capture.doc.driver && MEASURED_TOPICS.has(topic)) {
+        const record = measurementsOf.get(entry.matrixId) ?? { ref: null, doc: null };
+        if (!citation) errors.push(`${at}: ${result.path} is judged on ${result.rule} under ${entry.matrixId}, a capture the runner drove, and cites no measurement; under mode playwright a ${topic} result names the ref and the value it read from the runner's capture-measurements record, and a receipt states no number the runner did not record`);
+        else if (!record.doc) errors.push(`${at}: ${result.path} cites a measurement under ${entry.matrixId} and the runner left no capture-measurements record for that capture`);
+        else {
+          const { element, found, recorded } = citedMeasurement(record.doc, citation);
+          if (!element) errors.push(`${at}: ${result.path} cites ${JSON.stringify(citation.ref)}, which ${record.ref} does not carry; a citation names an element the runner measured`);
+          else if (!found) errors.push(`${at}: ${result.path} cites ${citation.property} of ${JSON.stringify(citation.ref)}, which the record carries no single value for`);
+          else if (JSON.stringify(recorded) !== JSON.stringify(citation.value)) errors.push(`${at}: ${result.path} cites ${citation.property} of ${JSON.stringify(citation.ref)} as ${JSON.stringify(citation.value)} and the runner recorded ${JSON.stringify(recorded)}; the value is the runner's`);
+          else if (!String(result.measured).includes(String(citation.value))) errors.push(`${at}: ${result.path} is judged against ${result.measured} and cites ${JSON.stringify(citation.value)}; the number a verdict states is the one it cites`);
+        }
+      } else if (citation) errors.push(`${at}: ${result.path} cites a measurement for ${result.rule} under ${entry.matrixId}; only a ${[...MEASURED_TOPICS].join(', ')} result of a capture the runner drove reads from a capture-measurements record`);
       if (result.verdict === 'pass' && result.routeTo !== 'none') errors.push(`${at}: ${result.path} passes and still routes to ${result.routeTo}`);
       if (result.verdict === 'fail') {
         if (result.owner === 'grammar' && result.routeTo === 'resolve') errors.push(`${at}: ${result.path} is a Grammar component's own render; a failure there is a grammar-gap, never a resolve loop`);

@@ -8,7 +8,19 @@
 // one; a UAT walk's assertions name a frozen case with a capture of the case's own name, taken after
 // the sign-in redirect has landed. The sweep refuses, in a walk or in anything a run wrote, a URL not
 // under the entry route's origin, a credential-shaped value, and the three spellings of agent-authored
-// browser code (page.evaluate, page.request, locator( ) — a walk carries targets, never code.
+// browser code (page.evaluate, page.request, locator( ) — a walk carries targets, never code. The
+// sweep reads the walk folder, the kind captures and the artifacts under a response folder, and
+// nothing else: the tree's own scripts are code by design and are never its input.
+//
+// A control has two spellings here, for two questions. `stepControl` answers what a step's observation
+// is evidence of — its own target, else the nearest earlier target pressed, else the entry — and is
+// what an assertion and an audit capture carry. `stepOwnControl` answers what the step itself named —
+// its own target, `entry <route>` for the goto, null otherwise — and is what the runner's ledger
+// carries, so a targetless step never reads as though the previous control were at fault.
+//
+// A run also writes one capture-measurements record per capture (templates/kinds/
+// capture-measurements.schema.json); the result names it, this gate checks its shape, and
+// `citedMeasurement` resolves the ref-and-property citation an audit verdict carries against it.
 //
 //   node scripts/validate-walk.mjs <walk.json> [<response dir>]
 import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
@@ -22,6 +34,7 @@ import { SECRET_PATTERNS, PASSWORD_LEAK } from './sweep-secrets.mjs';
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 export const WALK_SCHEMA = path.join('templates', 'kinds', 'uat-walk.schema.json');
 export const RESULT_SCHEMA = path.join('templates', 'kinds', 'walk-result.schema.json');
+export const MEASUREMENTS_SCHEMA = path.join('templates', 'kinds', 'capture-measurements.schema.json');
 // A field whose accessible name reads as a secret takes its value by credential name and never as text.
 export const SECRET_FIELD = /password|passcode|passphrase|secret|\btoken\b|\bpin\b|otp|mật khẩu/i;
 // The three spellings of browser code an agent might smuggle into a walk or a capture.
@@ -59,9 +72,35 @@ export function controlString(control) {
   return `${control.role} ${JSON.stringify(control.name)}${control.exact ? ' exact' : ''}${control.nth !== undefined ? ` nth=${control.nth}` : ''}`;
 }
 export const stepControl = (walk, stepId) => controlString(controlOfStep(walk, stepId));
+// The control a step itself named, for the ledger: its own target, the entry route for the goto, and
+// null for a step that names none — never another step's target.
+export function ownControlOfStep(walk, stepId) {
+  const step = (walk?.steps ?? []).find((s) => s.id === stepId);
+  if (!step) return null;
+  if (step.target) return { kind: 'target', ...step.target };
+  if (step.action === 'goto') return { kind: 'entry', route: walk.entry?.route ?? null };
+  return null;
+}
+export const stepOwnControl = (walk, stepId) => controlString(ownControlOfStep(walk, stepId));
 
 export function loadWalkSchema(root = ROOT) { return JSON.parse(readFileSync(path.join(root, WALK_SCHEMA), 'utf8')); }
 export function loadResultSchema(root = ROOT) { return JSON.parse(readFileSync(path.join(root, RESULT_SCHEMA), 'utf8')); }
+export function loadMeasurementsSchema(root = ROOT) { return JSON.parse(readFileSync(path.join(root, MEASUREMENTS_SCHEMA), 'utf8')); }
+
+// A verdict's citation resolved against the record: the element whose ref it names and the value the
+// runner recorded at the dotted property. `element` is null when no entry carries the ref; `found`
+// is false when the entry carries no such property; otherwise `recorded` is the runner's value.
+export function citedMeasurement(measurements, { ref, property }) {
+  const element = (measurements?.elements ?? []).find((e) => e.ref === ref) ?? null;
+  if (!element) return { element: null, found: false, recorded: undefined };
+  let recorded = element;
+  for (const key of String(property).split('.')) {
+    if (recorded === null || typeof recorded !== 'object' || !Object.hasOwn(recorded, key)) return { element, found: false, recorded: undefined };
+    recorded = recorded[key];
+  }
+  if (recorded !== null && typeof recorded === 'object') return { element, found: false, recorded: undefined };
+  return { element, found: true, recorded };
+}
 
 // Schema plus relations. `at` labels the file in every message.
 export function walkErrors(walk, { root = ROOT, at = 'walk.json', schema = loadWalkSchema(root) } = {}) {
@@ -197,6 +236,18 @@ export function validateWalkFile(walkFile, responseDir = null, { root = ROOT } =
       errors.push(...validateAgainst(loadResultSchema(root), result, at.replace(/walk\.json$/, 'walk-result.json')));
       if (result.walkFingerprint !== walkFingerprint(bytes)) errors.push(`${at}: the result beside this walk ran ${result.walkFingerprint} and the walk hashes to ${walkFingerprint(bytes)}; a walk edited after its run is a walk nobody ran`);
       if (walk?.id && result.walkRef !== walkFiles(walk.id).walk) errors.push(`${at}: the result names ${result.walkRef}, not this walk`);
+      // Every measurements record the result names is the runner's and keeps the kind's shape.
+      if (responseDir) {
+        const schema = loadMeasurementsSchema(root);
+        for (const c of result.captures ?? []) {
+          if (!c.measurementsRef) continue;
+          const file = path.join(responseDir, c.measurementsRef.replace(/^response\//, ''));
+          if (!existsSync(file)) { errors.push(`${at}: the result names ${c.measurementsRef} for capture ${c.name}, which is not on disk; a capture the runner measured keeps its record beside the screenshot`); continue; }
+          let doc = null; try { doc = JSON.parse(readFileSync(file, 'utf8')); } catch (e) { errors.push(`${c.measurementsRef}: ${e.message}`); continue; }
+          errors.push(...validateAgainst(schema, doc, c.measurementsRef));
+          if (doc?.capture !== undefined && doc.capture !== c.name) errors.push(`${c.measurementsRef}: records capture ${doc.capture} and the result names it for ${c.name}`);
+        }
+      }
     }
   }
   return { errors, walk, result, fingerprint: walkFingerprint(bytes) };

@@ -139,6 +139,33 @@
                   "type": "string",
                   "minLength": 1
                 },
+                "measurement": {
+                  "description": "Under @tools/browsercontrol mode playwright, the runner's number this result was judged on: the ref of one element of the entry's capture-measurements record, the dotted property read from it (computed.fontSize, bbox.height, contrast, computed.padding.top, ...) and the value as recorded. Required there for every result of a measurable lane — presentation, contrast, accessibility, responsive — so a receipt states no number the runner did not record; the validator resolves it against the record the walk-result names.",
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "ref",
+                    "property",
+                    "value"
+                  ],
+                  "properties": {
+                    "ref": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "property": {
+                      "type": "string",
+                      "pattern": "^[a-zA-Z]+(\\.[a-zA-Z]+)*$"
+                    },
+                    "value": {
+                      "type": [
+                        "string",
+                        "number",
+                        "null"
+                      ]
+                    }
+                  }
+                },
                 "verdict": {
                   "enum": [
                     "pass",

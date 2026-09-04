@@ -52,7 +52,8 @@
       "properties": {
         "mode": { "const": "playwright" },
         "walkRef": { "type": "string", "pattern": "^response/data/walks/[a-z0-9][a-z0-9-]*/walk\\.json$" },
-        "resultRef": { "type": "string", "pattern": "^response/data/walks/[a-z0-9][a-z0-9-]*/walk-result\\.json$" }
+        "resultRef": { "type": "string", "pattern": "^response/data/walks/[a-z0-9][a-z0-9-]*/walk-result\\.json$" },
+        "measurementsRef": { "description": "The capture-measurements record the runner wrote beside this case's screenshot, as the walk-result names it.", "type": "string", "pattern": "^response/artifacts/[a-z0-9][a-z0-9-]*\\.measurements\\.json$" }
       }
     }
   }

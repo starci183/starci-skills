@@ -62,7 +62,12 @@ export function baseWorkingBytes(checkout, base, file) {
   try { return execFileSync('git', ['-C', checkout, 'cat-file', '--filters', `${base}:${file}`], { windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'] }); } catch { return null; }
 }
 export const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
-export const regressionFailed = (output, assertion) => output.split(/\r?\n/).some((line) => line.includes(assertion) && /FAIL|×|✕|✗|not ok/.test(line));
+// The declared regression failed when the runner printed a failure marker and the assertion — the failing
+// test's title as the runner prints it, or a sentence the failing block contains — appears in that output;
+// runners wrap titles and print the block over several lines, so the match reads the whole output with
+// its whitespace collapsed, never one line.
+const collapse = (s) => String(s ?? '').replace(/\s+/g, ' ').trim();
+export const regressionFailed = (output, assertion) => /FAIL|×|✕|✗|not ok/.test(String(output ?? '')) && collapse(output).includes(collapse(assertion));
 export function nextPatch(version) { const [a, b, c] = version.split('.').map(Number); return `${a}.${b}.${c + 1}`; }
 // The modes, and which half each of them runs. `full` is the default, so a request that names no mode
 // is the two-halves-one-checkout job this operator has always done.
@@ -437,7 +442,9 @@ export function metadataErrors({ packageName, fromVersion, toVersion, manifests,
   return errors;
 }
 
-export const archiveFile = (artifact, file) => execFileSync('tar', ['-xOf', artifact, file], { windowsHide: true, maxBuffer: 32 * 1024 * 1024, stdio: ['ignore', 'pipe', 'pipe'] });
+// tar is run beside the archive on its base name: a GNU tar on Windows reads a drive letter in an absolute path as a remote host.
+const tarAt = (artifact) => ({ file: path.basename(artifact), cwd: path.dirname(artifact) });
+export const archiveFile = (artifact, file) => { const t = tarAt(artifact); return execFileSync('tar', ['-xOf', t.file, file], { cwd: t.cwd, windowsHide: true, maxBuffer: 32 * 1024 * 1024, stdio: ['ignore', 'pipe', 'pipe'] }); };
 export const releaseFileName = (plan) => `${plan.packageName.replace(/^@/, '').replace('/', '-')}-${plan.targetVersion}.tgz`;
 export const releaseRef = (plan) => `response/artifacts/release/${releaseFileName(plan)}`;
 
@@ -445,9 +452,9 @@ export const releaseRef = (plan) => `response/artifacts/release/${releaseFileNam
 export function releaseErrors(ctx, artifact) {
   const errors = [];
   if (!existsSync(artifact)) return [`packed release is missing: ${releaseRef(ctx.plan)}`];
-  const verbose = execFileSync('tar', ['-tvf', artifact], { encoding: 'utf8', windowsHide: true });
+  const verbose = execFileSync('tar', ['-tvf', tarAt(artifact).file], { cwd: tarAt(artifact).cwd, encoding: 'utf8', windowsHide: true });
   if (verbose.split(/\r?\n/).some((line) => /^[lh]/.test(line))) errors.push('release tarball cannot contain linked entries');
-  const entries = execFileSync('tar', ['-tf', artifact], { encoding: 'utf8', windowsHide: true }).split(/\r?\n/).filter((file) => file && !file.endsWith('/'));
+  const entries = execFileSync('tar', ['-tf', tarAt(artifact).file], { cwd: tarAt(artifact).cwd, encoding: 'utf8', windowsHide: true }).split(/\r?\n/).filter((file) => file && !file.endsWith('/'));
   if (entries.some((file) => !file.startsWith('package/') || !safeRelative(file.slice(8)))) errors.push('release tarball has an unsafe package path');
   let packaged = null;
   try { packaged = JSON.parse(archiveFile(artifact, 'package/package.json')); } catch { errors.push('release tarball carries no package.json'); }

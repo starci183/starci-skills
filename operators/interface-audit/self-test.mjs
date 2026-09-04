@@ -638,10 +638,32 @@ await expectError(repairToPerson, 'not handed to a person to publish', 'existing
 // Mode playwright: one walk per matrix entry, written by the auditor and run by the runner; the
 // screenshot the audit measures came from that run and the capture says which step took it. Each
 // mutation below is one way a screenshot nobody drove could have read like a driven one.
-const { walkFingerprint, stepControl } = await import('../../scripts/validate-walk.mjs');
+const { walkFingerprint, stepControl, stepOwnControl } = await import('../../scripts/validate-walk.mjs');
 const ROUTE = 'http://127.0.0.1:60000/plans';
 const WALK_REF = (id) => `response/data/walks/${id}/walk.json`;
 const RESULT_REF = (id) => `response/data/walks/${id}/walk-result.json`;
+const MEAS_REF = (id) => `response/artifacts/${id}.measurements.json`;
+// The runner's record at the capture step: the two nodes the capture judges, with the gap and the
+// padding the browser computed, in the shape of capture-measurements.schema.json.
+const measuredElement = (ref, tag, over = {}) => ({
+  ref, tag, bbox: { x: 0, y: 0, width: 1440, height: 900 },
+  computed: { fontSize: '16px', fontWeight: '400', lineHeight: '24px', color: 'rgb(0, 0, 0)', backgroundColor: 'rgb(255, 255, 255)', minHeight: '0px', padding: { top: '0px', right: '0px', bottom: '0px', left: '0px' }, margin: { top: '0px', right: '0px', bottom: '0px', left: '0px' }, gap: { row: 'normal', column: 'normal' }, borderRadius: '0px', border: { top: '0px none rgb(0, 0, 0)', right: '0px none rgb(0, 0, 0)', bottom: '0px none rgb(0, 0, 0)', left: '0px none rgb(0, 0, 0)' }, overflow: { x: 'visible', y: 'visible' }, display: 'block', visibility: 'visible', ...over },
+  contrast: 21, text: '',
+});
+const measurementsDoc = (id) => ({
+  schemaVersion: 9, capture: id, viewport: id === WIDE ? [1440, 900] : [390, 844], deviceScaleFactor: 1, colorScheme: 'light',
+  elements: [measuredElement(MAIN, 'main', { gap: { row: id === WIDE ? '1.5rem' : '1rem', column: '0px' } }), measuredElement(SECTION, 'section', { padding: { top: '1rem', right: '1rem', bottom: '1rem', left: '1rem' } })],
+});
+// The verdicts of a driven audit: every presentation result cites the element and value it read.
+const cite = (ref, property, value) => ({ ref, property, value });
+const drivenVerdicts = () => {
+  const v = verdicts();
+  v.entries[0].results[0].measurement = cite(MAIN, 'computed.gap.row', '1.5rem');
+  v.entries[0].results[1].measurement = cite(SECTION, 'computed.padding.top', '1rem');
+  v.entries[1].results[0].measurement = cite(MAIN, 'computed.gap.row', '1rem');
+  v.entries[1].results[1].measurement = cite(SECTION, 'computed.padding.top', '1rem');
+  return v;
+};
 const auditWalk = (id) => ({
   schemaVersion: 9, id, flow: 'plan-picker',
   entry: { route: ROUTE, viewport: { width: id === WIDE ? 1440 : 390, height: id === WIDE ? 900 : 844, deviceScaleFactor: 1 }, colorScheme: 'light', reducedMotion: 'reduce', locale: 'en' },

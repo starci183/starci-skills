@@ -13,8 +13,20 @@
 // name from the sealed reference the walk's account declares, at the fill and nowhere else: it reaches
 // the form field, is masked in every screenshot, and is refused from every file this runner writes.
 // Under <response dir> it writes data/walks/<id>/{walk.json, walk-result.json, capture.json, trace.zip},
-// artifacts/<name>.{png,ax.txt,dom.json} per capture, and for a UAT walk data/captures/<case>.json in
-// the uat-capture shape with every control copied from the walk.
+// artifacts/<name>.{png,ax.txt,dom.json,measurements.json} per capture, and for a UAT walk
+// data/captures/<case>.json in the uat-capture shape with every control copied from the walk.
+//
+// A capture is not a measurement: a screenshot, an accessibility snapshot and a DOM record carry no
+// computed value, and the agent may run no browser code. So this runner — tree code, not agent code —
+// evaluates one self-contained function in the page at every capture and writes the
+// capture-measurements record (templates/kinds/capture-measurements.schema.json): boxes, computed
+// styles, effective backgrounds and WCAG contrast for the accessibility tree's elements and every
+// element carrying an id, a data-contract or a data-testid. Every number a measurable proof lane
+// judges under this mode is read from that record and cited by ref.
+//
+// The ledger labels each step with the control the step itself named (validate-walk#stepOwnControl):
+// its own target, the entry route for the goto, null for a capture, a wait or a url-only expectation —
+// never the previous step's target, so a failed targetless step is not read as a failure of a button.
 import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
 import { createRequire } from 'node:module';
@@ -23,7 +35,7 @@ import path from 'node:path';
 import process from 'node:process';
 import { fileURLToPath } from 'node:url';
 import { hostRootOf } from './validate-request.mjs';
-import { walkErrors, sweepWalkText, sweepFindingErrors, walkFingerprint, originOf, isCredential, walkFiles, stepControl, controlString, controlOfStep } from './validate-walk.mjs';
+import { walkErrors, sweepWalkText, sweepFindingErrors, walkFingerprint, originOf, isCredential, walkFiles, stepControl, stepOwnControl, controlString, controlOfStep, loadMeasurementsSchema } from './validate-walk.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 export const CHECK_ID = 'host.playwright';
@@ -94,6 +106,139 @@ function refuseLeak(text, secrets, what) {
 }
 const locatorOf = (page, target) => { let l = page.getByRole(target.role, { name: target.name, exact: target.exact ?? false }); if (target.nth !== undefined) l = l.nth(target.nth); return l; };
 
+// Runs inside the page, once per capture, serialized by Playwright: it may reference nothing from this
+// module and loads no library. It returns the `elements` of a capture-measurements record — one entry
+// per element the accessibility tree exposes (an explicit role, or the implicit role of its tag, and
+// rendered) plus every element carrying an id, a data-contract or a data-testid, in document order,
+// capped at `cap` with the tagged, interactive, heading, landmark, image, dialog and status elements
+// kept first. `ref` spells role and accessible name the way a walk target does, with ` nth=<n>` when
+// the pair repeats, else a stable CSS path from body. `computed.backgroundColor` is the effective
+// background — the nearest opaque one up the tree, composited through translucent layers, the canvas
+// counting as white — and `contrast` is the WCAG ratio of the colour over it, null when either does
+// not resolve to sRGB.
+function measurePage({ cap }) {
+  const IMPLICIT = { area: 'link', button: 'button', h1: 'heading', h2: 'heading', h3: 'heading', h4: 'heading', h5: 'heading', h6: 'heading', img: 'img', select: 'combobox', textarea: 'textbox', nav: 'navigation', main: 'main', header: 'banner', footer: 'contentinfo', aside: 'complementary', form: 'form', table: 'table', thead: 'rowgroup', tbody: 'rowgroup', tfoot: 'rowgroup', tr: 'row', th: 'columnheader', td: 'cell', ul: 'list', ol: 'list', menu: 'list', li: 'listitem', p: 'paragraph', dialog: 'dialog', article: 'article', hr: 'separator', progress: 'progressbar', meter: 'meter', option: 'option', optgroup: 'group', datalist: 'listbox', summary: 'button', details: 'group', fieldset: 'group', figure: 'figure', blockquote: 'blockquote', code: 'code', em: 'emphasis', strong: 'strong', time: 'time', output: 'status', search: 'search', sub: 'subscript', sup: 'superscript', del: 'deletion', ins: 'insertion', math: 'math' };
+  const INPUT = { button: 'button', submit: 'button', reset: 'button', image: 'button', checkbox: 'checkbox', radio: 'radio', range: 'slider', number: 'spinbutton', search: 'searchbox', hidden: null };
+  const NAME_FROM_CONTENT = new Set(['button', 'link', 'heading', 'cell', 'columnheader', 'rowheader', 'option', 'tab', 'menuitem', 'menuitemcheckbox', 'menuitemradio', 'checkbox', 'radio', 'switch', 'tooltip', 'treeitem']);
+  const KEPT_FIRST = new Set(['button', 'link', 'heading', 'textbox', 'searchbox', 'combobox', 'checkbox', 'radio', 'switch', 'slider', 'spinbutton', 'tab', 'menuitem', 'menuitemcheckbox', 'menuitemradio', 'option', 'treeitem', 'navigation', 'main', 'banner', 'contentinfo', 'complementary', 'region', 'form', 'search', 'img', 'dialog', 'alertdialog', 'alert', 'status', 'progressbar', 'meter']);
+  const collapse = (s) => String(s || '').replace(/\s+/g, ' ').trim();
+  const textOf = (el) => collapse(typeof el.innerText === 'string' ? el.innerText : el.textContent);
+  const roleOf = (el) => {
+    const explicit = el.getAttribute('role');
+    if (explicit && collapse(explicit)) return collapse(explicit).split(' ')[0];
+    const tag = el.tagName.toLowerCase();
+    if (tag === 'input') { const type = (el.getAttribute('type') || 'text').toLowerCase(); if (Object.hasOwn(INPUT, type)) return INPUT[type]; return el.hasAttribute('list') ? 'combobox' : 'textbox'; }
+    if (tag === 'a' || tag === 'area') return el.hasAttribute('href') ? 'link' : null;
+    if (tag === 'section') return el.hasAttribute('aria-label') || el.hasAttribute('aria-labelledby') ? 'region' : null;
+    if (tag === 'header' || tag === 'footer') return el.parentElement && el.parentElement.closest('article, aside, main, nav, section') ? null : IMPLICIT[tag];
+    return Object.hasOwn(IMPLICIT, tag) ? IMPLICIT[tag] : null;
+  };
+  const nameOf = (el, role) => {
+    const label = el.getAttribute('aria-label');
+    if (label && collapse(label)) return collapse(label);
+    const by = el.getAttribute('aria-labelledby');
+    if (by) { const t = collapse(by.split(/\s+/).map((id) => { const n = document.getElementById(id); return n ? n.textContent : ''; }).join(' ')); if (t) return t; }
+    const tag = el.tagName.toLowerCase();
+    if (tag === 'img' || tag === 'area') { const alt = el.getAttribute('alt'); if (alt !== null && collapse(alt)) return collapse(alt); }
+    if (tag === 'input' && role === 'button') { const v = el.getAttribute('value'); if (v && collapse(v)) return collapse(v); }
+    if (el.labels && el.labels.length) { const t = collapse(Array.from(el.labels).map((l) => l.textContent).join(' ')); if (t) return t; }
+    if (NAME_FROM_CONTENT.has(role)) { const t = textOf(el); if (t) return t; }
+    const title = el.getAttribute('title');
+    if (title && collapse(title)) return collapse(title);
+    const placeholder = el.getAttribute('placeholder');
+    if (placeholder && collapse(placeholder)) return collapse(placeholder);
+    return '';
+  };
+  const pathOf = (el) => {
+    const parts = [];
+    for (let n = el; n && n !== document.documentElement; n = n.parentElement) {
+      const tag = n.tagName.toLowerCase();
+      if (tag !== 'body' && n.id && /^[A-Za-z_][\w-]*$/.test(n.id)) { parts.unshift(`${tag}#${n.id}`); break; }
+      const same = n.parentElement ? Array.from(n.parentElement.children).filter((c) => c.tagName === n.tagName) : [n];
+      parts.unshift(same.length > 1 ? `${tag}:nth-of-type(${same.indexOf(n) + 1})` : tag);
+      if (tag === 'body') break;
+    }
+    return parts.join('>');
+  };
+  const alphaOf = (s) => (s === undefined ? 1 : s.endsWith('%') ? parseFloat(s) / 100 : parseFloat(s));
+  const parseColor = (s) => {
+    const text = String(s || '').trim();
+    const m = /^rgba?\(\s*([\d.]+)\s*[, ]\s*([\d.]+)\s*[, ]\s*([\d.]+)\s*(?:[,/]\s*([\d.]+%?)\s*)?\)$/.exec(text);
+    if (m) return { r: +m[1], g: +m[2], b: +m[3], a: alphaOf(m[4]) };
+    const c = /^color\(srgb\s+([\d.]+)\s+([\d.]+)\s+([\d.]+)\s*(?:\/\s*([\d.]+%?)\s*)?\)$/.exec(text);
+    if (c) return { r: +c[1] * 255, g: +c[2] * 255, b: +c[3] * 255, a: alphaOf(c[4]) };
+    return null;
+  };
+  const blend = (top, under) => ({ r: top.r * top.a + under.r * (1 - top.a), g: top.g * top.a + under.g * (1 - top.a), b: top.b * top.a + under.b * (1 - top.a), a: 1 });
+  const WHITE = { r: 255, g: 255, b: 255, a: 1 };
+  const bgCache = new Map();
+  const effectiveBg = (el) => {
+    if (!el) return WHITE;
+    if (bgCache.has(el)) return bgCache.get(el);
+    const own = parseColor(getComputedStyle(el).backgroundColor);
+    let out;
+    if (!own) out = null;
+    else if (own.a >= 1) out = own;
+    else { const under = effectiveBg(el.parentElement); out = under === null ? null : own.a <= 0 ? under : blend(own, under); }
+    bgCache.set(el, out);
+    return out;
+  };
+  const channel = (v) => { v /= 255; return v <= 0.04045 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4; };
+  const luminance = ({ r, g, b }) => 0.2126 * channel(r) + 0.7152 * channel(g) + 0.0722 * channel(b);
+  const rgbString = (c) => `rgb(${Math.round(c.r)}, ${Math.round(c.g)}, ${Math.round(c.b)})`;
+  const round2 = (n) => Math.round(n * 100) / 100;
+  const picked = [];
+  const all = document.body ? Array.from(document.body.querySelectorAll('*')) : [];
+  for (const el of all) {
+    const tagged = Boolean(el.id) || el.hasAttribute('data-contract') || el.hasAttribute('data-testid');
+    const role = roleOf(el);
+    const rendered = el.getClientRects().length > 0 && !el.closest('[aria-hidden="true"]') && getComputedStyle(el).visibility !== 'hidden';
+    if (!tagged && !(role && rendered)) continue;
+    picked.push({ el, role, tagged, order: picked.length });
+  }
+  let chosen = picked;
+  if (picked.length > cap) {
+    const first = picked.filter((p) => p.tagged || KEPT_FIRST.has(p.role));
+    const rest = picked.filter((p) => !(p.tagged || KEPT_FIRST.has(p.role)));
+    chosen = [...first.slice(0, cap), ...rest.slice(0, Math.max(0, cap - first.length))].sort((a, b) => a.order - b.order);
+  }
+  const keyed = chosen.map((p) => { const name = p.role ? nameOf(p.el, p.role) : ''; return { ...p, key: p.role && name ? `${p.role} ${JSON.stringify(name)}` : null }; });
+  const counts = new Map();
+  for (const p of keyed) if (p.key) counts.set(p.key, (counts.get(p.key) || 0) + 1);
+  const seen = new Map();
+  return keyed.map((p) => {
+    const { el } = p;
+    let ref = pathOf(el);
+    if (p.key) { const n = seen.get(p.key) || 0; seen.set(p.key, n + 1); ref = counts.get(p.key) > 1 ? `${p.key} nth=${n}` : p.key; }
+    const style = getComputedStyle(el);
+    const rect = el.getBoundingClientRect();
+    const fg = parseColor(style.color);
+    const bg = effectiveBg(el);
+    let contrast = null;
+    if (fg && bg) { const over = fg.a < 1 ? blend(fg, bg) : fg; const l1 = luminance(over); const l2 = luminance(bg); contrast = round2((Math.max(l1, l2) + 0.05) / (Math.min(l1, l2) + 0.05)); }
+    const entry = {
+      ref, tag: el.tagName.toLowerCase(),
+      bbox: { x: round2(rect.x), y: round2(rect.y), width: round2(rect.width), height: round2(rect.height) },
+      computed: {
+        fontSize: style.fontSize, fontWeight: style.fontWeight, lineHeight: style.lineHeight, color: style.color,
+        backgroundColor: bg ? rgbString(bg) : style.backgroundColor, minHeight: style.minHeight,
+        padding: { top: style.paddingTop, right: style.paddingRight, bottom: style.paddingBottom, left: style.paddingLeft },
+        margin: { top: style.marginTop, right: style.marginRight, bottom: style.marginBottom, left: style.marginLeft },
+        gap: { row: style.rowGap, column: style.columnGap },
+        borderRadius: style.borderRadius,
+        border: { top: style.borderTop, right: style.borderRight, bottom: style.borderBottom, left: style.borderLeft },
+        overflow: { x: style.overflowX, y: style.overflowY },
+        display: style.display, visibility: style.visibility,
+      },
+      contrast,
+      text: textOf(el).slice(0, 80),
+    };
+    const contract = el.getAttribute('data-contract');
+    if (contract !== null) entry.dataContract = collapse(contract).split(' ').filter(Boolean);
+    return entry;
+  });
+}
+
 export async function runWalk(walkFile, responseDir, { hostRoot = hostRootOf(ROOT), root = ROOT, log = () => {} } = {}) {
   const bytes = readFileSync(walkFile);
   const text = bytes.toString('utf8');
@@ -107,6 +252,7 @@ export async function runWalk(walkFile, responseDir, { hostRoot = hostRootOf(ROO
   if (existsSync(under(files.result))) return { code: 2, errors: [`${files.result}: a result already exists; a walk is run once, and a second attempt is a new walk id`] };
   let loaded; try { loaded = loadPlaywright(hostRoot, root); } catch (e) { return { code: 3, errors: [e.message] }; }
   const { playwright, version } = loaded;
+  const measureCap = loadMeasurementsSchema(root).properties.elements.maxItems;
 
   mkdirSync(walkDir, { recursive: true });
   mkdirSync(path.join(responseDir, 'artifacts'), { recursive: true });
@@ -137,9 +283,13 @@ export async function runWalk(walkFile, responseDir, { hostRoot = hostRootOf(ROO
     let ax;
     try { ax = await page.locator('body').ariaSnapshot(); } catch { ax = JSON.stringify(await page.accessibility.snapshot(), null, 2); }
     const dom = JSON.stringify({ url: page.url(), title: await page.title(), html: await page.content() }, null, 2);
+    // The measurement, in one evaluation of the page-side function above; the cap is the kind's own.
+    const elements = await page.evaluate(measurePage, { cap: measureCap });
+    const measurements = JSON.stringify({ schemaVersion: 9, capture: name, viewport: [walk.entry.viewport.width, walk.entry.viewport.height], deviceScaleFactor: walk.entry.viewport.deviceScaleFactor, colorScheme: walk.entry.colorScheme, elements }, null, 2);
     writeFileSync(path.join(responseDir, 'artifacts', `${name}.ax.txt`), refuseLeak(ax, secrets, `${name}.ax.txt`));
     writeFileSync(path.join(responseDir, 'artifacts', `${name}.dom.json`), refuseLeak(dom, secrets, `${name}.dom.json`));
-    const record = { name, stepId: step.id, screenshotRef: `response/artifacts/${name}.png`, axRef: `response/artifacts/${name}.ax.txt`, domRef: `response/artifacts/${name}.dom.json` };
+    writeFileSync(path.join(responseDir, 'artifacts', `${name}.measurements.json`), refuseLeak(measurements, secrets, `${name}.measurements.json`));
+    const record = { name, stepId: step.id, screenshotRef: `response/artifacts/${name}.png`, axRef: `response/artifacts/${name}.ax.txt`, domRef: `response/artifacts/${name}.dom.json`, measurementsRef: `response/artifacts/${name}.measurements.json` };
     captures.push(record);
     return record;
   };
@@ -182,7 +332,7 @@ export async function runWalk(walkFile, responseDir, { hostRoot = hostRootOf(ROO
 
   try {
     for (const step of walk.steps) {
-      const control = stepControl(walk, step.id);
+      const control = stepOwnControl(walk, step.id);
       if (firstFailure) { ledger.push({ id: step.id, action: step.action, control, outcome: 'skipped', url: null, startedAt: null, ms: 0 }); continue; }
       const t0 = Date.now();
       const stepStart = now();
@@ -237,7 +387,7 @@ export async function runWalk(walkFile, responseDir, { hostRoot = hostRootOf(ROO
       caseId: c.caseId, runId: walk.run.runId, order: c.order, executedAt: entries.find(({ row }) => row.startedAt)?.row.startedAt ?? startedAt,
       screenshotRef: shot.screenshotRef, loginFieldMasked: true, captureStartedAfterRedirect: true,
       outcome: assertions.every((a) => a.outcome === 'pass') && entries.length === assertions.length ? 'pass' : 'fail',
-      driver: { mode: 'playwright', walkRef: files.walk, resultRef: files.result },
+      driver: { mode: 'playwright', walkRef: files.walk, resultRef: files.result, measurementsRef: shot.measurementsRef },
       assertions,
     };
     const file = `response/data/captures/${c.caseId}.json`;
