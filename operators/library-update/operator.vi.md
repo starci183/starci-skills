@@ -59,7 +59,9 @@ nhánh trước qua `producer-import`; một route `chain` gọi tên operator n
 
 Manifest package tại base đóng băng chứng minh danh tính package; tên thư mục do caller đưa không đủ.
 Mọi file đã khai nằm trong package và write roots của route. Từ chối symlink, package lồng, file
-consumer, dependency mới, sửa script, CSS, asset, cấu trúc markup, class và inline style. Chỉ sửa file
+consumer, dependency mới, sửa script, asset, cấu trúc markup, class và inline style. File behavior là một
+script, hoặc chính style sheet mà package giao các recipe của nó trong đó — họ nào giữ luật bằng CSS thì sửa
+sheet ấy như behavior, với cùng regression cặp đôi đọc recipe. Chỉ sửa file
 hành vi hiện có, regression test đi cặp, version patch kế tiếp trong manifest hiện có, changelog
 package và metadata version của package trong lockfile. Lockfile workspace chỉ được phép khi cả plan và
 route đều gọi tên; JSON chỉ được thay version của entry package đã bind. Presentation đi qua pipeline

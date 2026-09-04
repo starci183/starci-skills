@@ -83,8 +83,10 @@ through `producer-import`; a `chain` route that names this operator is asking fo
 
 The package manifest at the frozen base proves the package's identity; a caller-supplied directory
 name does not. Every declared file is inside that package and the route's write roots. Symlinks,
-nested package boundaries, consumer files, new dependencies, script changes, CSS, assets, markup
-structure, classes and inline style changes are refused. Only existing behavior files, their paired
+nested package boundaries, consumer files, new dependencies, script changes, assets, markup
+structure, classes and inline style changes are refused. A behavior file is a script, or the style
+sheet a package ships its recipes in — a family whose law lives in CSS repairs that sheet as behavior,
+with the same paired regression reading the recipe. Only existing behavior files, their paired
 regression tests, the existing manifest's next patch version, the package changelog and package
 version metadata in a lockfile may change. A workspace lockfile is allowed only when the plan and
 route both name it; its parsed content may change only the bound package entry's version. Presentation

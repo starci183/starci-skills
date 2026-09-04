@@ -110,7 +110,8 @@ export function planErrors(plan, manifest) {
   for (const file of plan.files) {
     if (seen.has(file.path)) errors.push(`duplicate file: ${file.path}`); seen.add(file.path);
     if (!safeRelative(file.path)) errors.push(`unsafe file: ${file.path}`);
-    if (file.kind === 'behavior' && (!/\.(?:[cm]?[jt]sx?)$/.test(file.path) || /\.(spec|test)\./.test(file.path))) errors.push(`invalid behavior file: ${file.path}`);
+    // A package ships its behavior as script, or as the style sheet its recipes live in: both are behavior files a paired regression can read.
+    if (file.kind === 'behavior' && (!/\.(?:[cm]?[jt]sx?|s?css)$/.test(file.path) || /\.(spec|test)\./.test(file.path))) errors.push(`invalid behavior file: ${file.path}`);
     if (file.kind === 'test' && !/\.(?:spec|test)\.[cm]?[jt]sx?$/.test(file.path)) errors.push(`invalid test file: ${file.path}`);
     if (file.kind === 'docs' && path.posix.basename(file.path) !== 'CHANGELOG.md') errors.push('only the package changelog is a docs write');
     if (file.kind === 'lockfile' && path.posix.basename(file.path) !== 'package-lock.json') errors.push('only package-lock.json metadata may be synchronized');
