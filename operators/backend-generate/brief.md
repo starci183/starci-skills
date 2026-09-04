@@ -14,7 +14,7 @@ Primary output: `backend-source-application`
 
 ## Inputs
 
-`architecture-decision`, `model` (optional), `backend-source-application` (optional), `units` (optional)
+`business-reconciliation` (optional), `architecture-decision`, `model` (optional), `backend-source-application` (optional), `units` (optional)
 
 ## Outputs
 

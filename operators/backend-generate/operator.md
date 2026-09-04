@@ -178,6 +178,7 @@ the publication was withheld. When it is absent the published head is the author
 
 | Kind | From | Required |
 | --- | --- | --- |
+| `business-reconciliation` | `business.reconcile`; the discrepancies a reconciliation recorded against the delivered source, repaired under scope `fix` without widening the contract | no |
 | `architecture-decision` | `architecture.decide`; the frozen mutation contract the implementation fills and may not widen, and the source of every operation this run restates | yes |
 | `model` | `business.decide`; the head that branch modelled, when it has not been published yet | no |
 | `backend-source-application` | a prior run of `backend.generate` for the same outcome; regression history, absent on the first run | no |

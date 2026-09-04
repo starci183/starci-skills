@@ -173,6 +173,12 @@ export async function validateResponse(root, dir, { requirements = {}, exchange 
   registry ??= await loadErrorsRegistry(root);
   errors.push(...registry.errors);
   const op = pkg.en;
+  // An origin frozen under a retired id owed the outputs, file names, sections and profile of its own operator and
+  // tree, not its successor's: it is judged on the outputs it declares — each file present and readable, each data
+  // kind against its schema — and not on today's required outputs, declared file patterns, markdown contracts or
+  // profile, which are this tree's history, exactly as `next` and the operator id are. An origin of an operator
+  // that still exists owes today's contract in full.
+  const renamed = origin && pkg.manifest.id !== response.operatorId;
 
   // Which Outputs belong to this folder: the branch owns files without an exchange prefix, an exchange owns its own.
   const outputs = (op.tables.outputs?.rows ?? []).filter((r) => exchangeOf(unquote(r.file)) === exchange);
@@ -184,16 +190,15 @@ export async function validateResponse(root, dir, { requirements = {}, exchange 
     const declaredFile = exchange ? unquote(row.file).replace(`${exchange}/`, '') : unquote(row.file);
     const value = response.fields?.[kind];
     const files = value === undefined ? [] : Array.isArray(value) ? value : [value];
-    // An origin frozen under a retired id owed the outputs of its own operator, not its successor's: only what it declares is judged. An origin of an operator that still exists owes today's required outputs.
-  const renamed = origin && pkg.manifest.id !== response.operatorId;
     if (files.length === 0) { if (isYes(row.required) && response.status === 'done' && !renamed) errors.push(`${rel('response/response.json')}: required output ${kind} is not in fields`); continue; }
     present.add(kind);
     const re = patternOf(declaredFile);
     for (const f of files) {
-      if (!re.test(f)) errors.push(`${rel('response/response.json')}: fields.${kind} = ${f} does not match the declared file ${declaredFile}`);
+      if (!re.test(f) && !renamed) errors.push(`${rel('response/response.json')}: fields.${kind} = ${f} does not match the declared file ${declaredFile}`);
       const full = path.join(dir, f);
       if (!existsSync(full)) { errors.push(`${rel(f)}: listed in response.json but missing`); continue; }
       if (type === 'md') {
+        if (renamed) continue;
         const contract = kinds.get(kind);
         if (!contract) { errors.push(`templates/kinds/${kind}.contract.json: missing`); continue; }
         errors.push(...checkDocument(rel(f), await readFile(full, 'utf8'), contract, 'en'));
@@ -247,7 +252,7 @@ export async function validateResponse(root, dir, { requirements = {}, exchange 
   }
   // A stand-in is recorded as a pair: the profile operator.json binds and the profile that actually ran.
   if ((response.boundProfile === undefined) !== (response.ranProfile === undefined)) errors.push(`${rel('response/response.json')}: boundProfile and ranProfile are recorded together or not at all`);
-  if (response.boundProfile !== undefined && response.boundProfile !== pkg.manifest.resources?.profile) errors.push(`${rel('response/response.json')}: boundProfile ${response.boundProfile} is not the profile ${op.id} binds (${pkg.manifest.resources?.profile})`);
+  if (response.boundProfile !== undefined && !renamed && response.boundProfile !== pkg.manifest.resources?.profile) errors.push(`${rel('response/response.json')}: boundProfile ${response.boundProfile} is not the profile ${op.id} binds (${pkg.manifest.resources?.profile})`);
   if (exchange && (response.next ?? []).length) errors.push(`${rel('response/response.json')}: a nested exchange does not route; next must be empty`);
   return { errors, response, present, pkg };
 }
