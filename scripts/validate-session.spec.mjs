@@ -235,6 +235,8 @@ test('on a mission every transition is logged as the two-line log; without one, 
 test('the history check reads the ledger alone', () => {
   assert.deepEqual(missionHistoryErrors({ id: 'x', mission: mission(1), choices: confirmed() }), []);
   assert.ok(missionHistoryErrors({ id: 'x', transitions: [{ event: 'replanned', goalVersion: 2, note: 'n' }] }).some((e) => e.includes('carries no mission')));
+  // A chain redrawn under the same goal — a red gate routed back to its owner — is a replanned transition at the current version, and asks the person nothing.
+  assert.deepEqual(missionHistoryErrors({ id: 'x', mission: mission(1), choices: confirmed(), transitions: [{ event: 'replanned', goalVersion: 1, note: 'quality.verify red on lint; the chain grows by a fix, a re-verification and a reconciliation' }] }), []);
   assert.ok(missionHistoryErrors({ id: 'x', mission: mission(1), choices: confirmed(), transitions: [{ event: 'replanned', goalVersion: 3, note: 'n' }] }).some((e) => e.includes('past mission.version')));
 });
 

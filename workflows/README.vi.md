@@ -93,8 +93,10 @@ của từng nhánh, và từ chối chuỗi trong đó:
 Chuỗi được vẽ một lần trước dispatch đầu tiên, và vẽ lại ở mỗi lần dừng làm đổi thứ nhiệm vụ cần:
 nhánh `blocked` mà route vào lại hay thêm operator, một plan đã biết đơn vị, một goal được sửa. Mỗi
 lần vẽ lại là một chuyển bước `replanned` trong `state.json.transitions` mang ghi chú và phiên bản
-goal nó chuyển tới, được xác nhận qua `goal-confirm` như plan đầu, không bao giờ viết lại trong im
-lặng (`scripts/validate-session.mjs#missionHistoryErrors`).
+goal nó chạy dưới: phiên bản hiện tại khi chỉ chuỗi đổi (một cổng đỏ đưa về chủ sở hữu, một plan đã ra
+đơn vị, một lần dừng thêm operator), và phiên bản kế — được xác nhận qua `goal-confirm` như plan đầu —
+khi chính goal được sửa; không bao giờ viết lại trong im lặng
+(`scripts/validate-session.mjs#missionHistoryErrors`).
 
 ## Các fixture
 

@@ -252,8 +252,8 @@
           },
           "goalVersion": {
             "type": "integer",
-            "minimum": 2,
-            "description": "the mission version a replanned transition moved to; required when event is replanned"
+            "minimum": 1,
+            "description": "the mission version the redrawn chain runs under; required when event is replanned: equal to mission.version when only the chain changed (a red gate routed back to an owner, a plan produced its units, a stop added an operator) and the goal did not, the next version when the goal was corrected and confirmed again"
           },
           "logged": {
             "const": true,

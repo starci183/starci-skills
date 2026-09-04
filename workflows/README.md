@@ -93,8 +93,10 @@ and the JSON block for a session on disk.
 A chain is drawn once, before the first dispatch, and again on every stop that changes what the
 mission needs: a `blocked` branch whose route re-enters or adds an operator, a plan whose units are
 known, a corrected goal. Each redraw is a `replanned` transition in `state.json.transitions`
-carrying its note and the goal version it moves to, confirmed through `goal-confirm` like the first
-plan, never a silent rewrite (`scripts/validate-session.mjs#missionHistoryErrors`).
+carrying its note and the goal version it runs under: the current version when only the chain
+changed (a red gate routed back to its owner, a plan produced its units, a stop added an operator),
+and the next version — confirmed through `goal-confirm` like the first plan — when the goal itself
+was corrected; never a silent rewrite (`scripts/validate-session.mjs#missionHistoryErrors`).
 
 ## The fixtures
 

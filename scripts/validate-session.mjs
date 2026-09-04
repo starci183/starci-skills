@@ -89,7 +89,9 @@ export function loggedErrors(state) {
 
 // The mission's version history, read from the ledger: a version below the current one was answered
 // (corrected, or as-stated and then replanned), the current one is as-stated (missionGateErrors), and
-// a version that superseded a confirmed one was reached through a replanned transition naming it.
+// a version that superseded a confirmed one was reached through a replanned transition naming it. A
+// replanned transition at the current version is a chain that changed under a goal that did not — a
+// routed re-entry, a fan-out, a stop that added an operator — and asks the person nothing.
 export function missionHistoryErrors(state) {
   const errors = [];
   const mission = state?.mission;
