@@ -365,6 +365,36 @@ const servingDeclared = () => {
 };
 
 await expectValid(provisioningDeclared(), 'dev provisioning approved by the environment declaration itself, no person asked', onHost);
+const readOnlyIdentity = (withReceipt = false) => {
+  const files = provisioningDeclared({ effects: [] });
+  files['request/request.json'].requirements.desiredState.mutableResourceRefs = [];
+  files['request/request.json'].requirements.desiredState.observationOnlyResourceRefs = [ENTRY];
+  const d = files['response/data/delta.json'];
+  d.convergence = 'already-converged'; d.mutableResourceRefs = []; d.observationOnlyResourceRefs = [ENTRY];
+  const finding = { code: 'SHARED_SERVICE_INVENTORIED', resourceRef: ENTRY, port: null, holderRef: null, statement: 'the flow inventory was observed without an effect' };
+  files['response/data/checks.json'] = entryChecks('identity', [finding]);
+  files['response/response.md'] = responseMd({ kind: 'identity', service: ENTRY, approval: DEV_REF,
+    convergence: 'already-converged', resources: [resource(ENTRY, 'identity', 'g-6')], mutations: [],
+    list: KIND_CHECKS.identity.map((n) => rtCheck(n)), findings: [[finding.code, ENTRY, '—', '—', finding.statement]] });
+  delete files['response/response.json'].fields['uat-account'];
+  delete files['response/data/account.json'];
+  if (!withReceipt) {
+    files['response/response.json'] = responseJson({ status: 'blocked', stop: 'PROOF_FAILED', next: [] });
+    for (const name of ['response/response.md', 'response/data/delta.json', 'response/data/checks.json']) delete files[name];
+  }
+  return files;
+};
+await expectValid(readOnlyIdentity(), 'an empty identity effect set authorizes no rotation and permits its scoped read-only inventory', onHost);
+const smuggledEffect = readOnlyIdentity(true);
+Object.assign(smuggledEffect['response/data/delta.json'], {
+  convergence: 'converged', allowedEffects: ['seed-flow-fixtures'], appliedEffects: ['seed-flow-fixtures'],
+  mutableResourceRefs: [ENTRY], observationOnlyResourceRefs: [],
+  mutations: [mutation('seed-flow-fixtures', { resourceRef: ENTRY, beforeRevision: 'g-5', afterRevision: 'g-6' })],
+});
+await expectError(smuggledEffect, 'outside the requested effect set', 'a seed effect smuggled into an observation-only request', onHost);
+const unapprovedEffect = provisioningDeclared();
+unapprovedEffect['response/data/delta.json'].allowedEffects = ['provision-identity'];
+await expectError(unapprovedEffect, 'outside the approved effect set', 'an applied effect not permitted by the bound delta', onHost);
 await expectValid(servingDeclared(), 'a serve on the dev runtime approved by the environment declaration', onHost);
 await expectError(provisioningDeclared({ approval: PROD_REF, env: 'production' }), 'marks identity-provisioning as person', 'a declaration reference for production provisioning, which the production defaults keep with a person', onHost);
 await expectError(provisioningDeclared({ approval: LOOSE_REF, env: 'loose' }), 'the environment schema refuses', 'a production declaration that loosened release to declared', onHost);

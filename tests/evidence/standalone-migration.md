@@ -63,3 +63,14 @@ A separate concurrent validation reproduction rejected one of two valid consumer
 tracking used a process-wide Set. Invocation-scoped async tracking preserves recursive cycle
 rejection without treating an independent validation as a cycle. This is an enforcement repair,
 not a new operational rule or a claim of a second production incident.
+
+The Nivo owner's subsequent step 33 prepared connection and journal commitments through the existing
+seed inventory path, with effects and mutable resources explicitly empty. It observed only, and did
+not claim successful seeding. operationClasses nevertheless replaced the empty list with all
+identity effects, so the newly available administrator rotation made the declaration fail approval.
+The classification now uses exactly the requested effects. Independent review also found that the
+delta's applied effects were not compared to that frozen request: a coherent extra seed mutation
+could accompany an empty request. Each applied effect now has to occur in both the request and the
+approved delta. A legitimate read-only blocked preflight validates, while a smuggled seed effect and
+an effect outside the approved set are rejected. Approval values, environment hashes and capability
+grants are unchanged; a read-only preflight is not a completed seed receipt.

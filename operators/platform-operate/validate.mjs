@@ -59,10 +59,9 @@ export const EFFECT_CLASSES = {
   ...Object.fromEntries(KIND_EFFECTS.runtime.filter((e) => e !== 'bring-up-infra-stack').map((e) => [e, 'runtime'])),
 };
 export function operationClasses(kind, effects) {
-  const set = effects.length ? effects : (KIND_EFFECTS[kind] ?? []);
   return {
-    classes: [...new Set(set.map((e) => EFFECT_CLASSES[e]).filter(Boolean))],
-    unclassified: set.filter((e) => !EFFECT_CLASSES[e]),
+    classes: [...new Set(effects.map((e) => EFFECT_CLASSES[e]).filter(Boolean))],
+    unclassified: effects.filter((e) => !EFFECT_CLASSES[e]),
   };
 }
 // The runtime branch publishes its proof set per rung, not per branch: a rung below the server cannot
@@ -363,6 +362,10 @@ export async function validatePlatformStep(branchDir, root = ROOT, { hostRoot = 
 
     const portHolderRefs = new Set(delta.observedPortHolders.map((h) => h.holderRef));
     const applied = new Set(delta.appliedEffects);
+    for (const effect of applied) {
+      if (!desiredEffects.includes(effect)) errors.push(`response/data/delta.json: applied effect ${effect} is outside the requested effect set`);
+      if (!delta.allowedEffects.includes(effect)) errors.push(`response/data/delta.json: applied effect ${effect} is outside the approved effect set`);
+    }
     const mutatedEffects = new Set();
     for (const m of delta.mutations) {
       if (KIND_EFFECTS[kind] && !KIND_EFFECTS[kind].includes(m.effect)) errors.push(`response/data/delta.json: effect ${m.effect} does not belong to the ${kind} service kind`);
