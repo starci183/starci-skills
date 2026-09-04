@@ -186,6 +186,15 @@ context khai đủ để agent mù chạy được, log đủ để người đ�
       (`templates/kinds/uat-walk.schema.json`, `walk-result.schema.json`, `scripts/browser-walk.mjs`,
       `validate-walk.mjs`, `browser-walk.spec.mjs` — runner chạy thật trên một trang tĩnh qua
       `host-artifacts.mjs`, bỏ qua có nêu lý do khi máy chủ chưa cài; self-test của ba operator)
+- [x] Một bức chụp không phải một phép đo (lượt đi sản phẩm đầu tiên, D4): runner ghi kind
+      `capture-measurements` cạnh mỗi ảnh chụp — một lần `page.evaluate` của hàm tự chứa, hộp, style
+      đã tính, nền hiệu dụng, tương phản WCAG, `ref` theo role + name hay đường CSS ổn định, giới hạn
+      nằm trong schema; `walk-result` nêu tên nó, `validate-walk` kiểm hình dạng, sweep vẫn không đọc
+      `scripts/*.mjs`; validator `interface.audit` đòi mọi kết quả presentation/contrast/accessibility/
+      responsive của bức chụp runner lái trích dẫn `ref` + giá trị (`verdicts.results[].measurement`);
+      sổ từng bước gắn control chính bước ấy nêu, null cho bước không target, entry cho goto.
+      (`templates/kinds/capture-measurements.schema.json`, `browser-walk.mjs#measurePage`,
+      `validate-walk.mjs#stepOwnControl|citedMeasurement`, `interface-audit/validate.mjs#MEASURED_TOPICS`)
 
 ## 3. Chứng minh trên nhiệm vụ thật
 
