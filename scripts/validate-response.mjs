@@ -213,9 +213,13 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
   const dir = path.resolve(target);
   // A branch is <session>/step-N/parallel-M (its parent is step-N); an exchange is <branch>/<exchange> (its parent is parallel-M).
   const exchange = /^step-\d+$/.test(path.basename(path.dirname(dir))) ? null : path.basename(dir);
-  let requirements = {};
-  const reqFile = path.join(exchange ? path.dirname(dir) : dir, 'request', 'request.json');
-  if (existsSync(reqFile)) requirements = JSON.parse(await readFile(reqFile, 'utf8')).requirements ?? {};
-  const { errors } = await validateResponse(root, dir, { requirements, exchange });
-  if (errors.length) { process.stderr.write(`${errors.join('\n')}\n`); process.exitCode = 1; } else process.stdout.write('response valid\n');
+  const run = async () => {
+    let requirements = {};
+    const reqFile = path.join(exchange ? path.dirname(dir) : dir, 'request', 'request.json');
+    if (existsSync(reqFile)) requirements = JSON.parse(await readFile(reqFile, 'utf8')).requirements ?? {};
+    return validateResponse(root, dir, { requirements, exchange });
+  };
+  run().then(({ errors }) => {
+    if (errors.length) { process.stderr.write(`${errors.join('\n')}\n`); process.exitCode = 1; } else process.stdout.write('response valid\n');
+  }, (error) => { process.stderr.write(`${error.message}\n`); process.exitCode = 1; });
 }

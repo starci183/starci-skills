@@ -142,6 +142,7 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
   const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
   const target = process.argv[2];
   if (!target) { process.stderr.write('usage: node scripts/validate-request.mjs <session>/step-N/parallel-M[/<exchange>]\n'); process.exit(2); }
-  const { errors } = await validateRequest(root, path.resolve(target));
-  if (errors.length) { process.stderr.write(`${errors.join('\n')}\n`); process.exitCode = 1; } else process.stdout.write('request valid\n');
+  validateRequest(root, path.resolve(target)).then(({ errors }) => {
+    if (errors.length) { process.stderr.write(`${errors.join('\n')}\n`); process.exitCode = 1; } else process.stdout.write('request valid\n');
+  }, (error) => { process.stderr.write(`${error.message}\n`); process.exitCode = 1; });
 }
