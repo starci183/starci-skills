@@ -55,23 +55,23 @@ A summary of what each `operator.json` declares; the validator rejects a row tha
 
 | Operator | Profile | Grammar | Tools | Dispatch | Why |
 | --- | --- | --- | --- | --- | --- |
-| `environment.preflight` | luna | no | `fileread:context-aliases`, `git:read`, `shell:declared-commands`, `http:probe`, `secrets:resolve-by-name`, `container:read` | inline | Reads declarations, checkouts, custody, the registry and the host once and reports every wall together; repairs nothing |
-| `workspace.bind` | luna | no | `fileread:context-aliases`, `git:read`, `shell:declared-commands`, `http:probe`, `secrets:resolve-by-name` | inline | Reads canonical files and a registry; no judgement |
+| `environment.preflight` | sol-fresh | no | `fileread:context-aliases`, `git:read`, `shell:declared-commands`, `http:probe`, `secrets:resolve-by-name`, `container:read` | inline | Reads declarations, checkouts, custody, the registry and the host once and reports every wall together; repairs nothing |
+| `workspace.bind` | sol-fresh | no | `fileread:context-aliases`, `git:read`, `shell:declared-commands`, `http:probe`, `secrets:resolve-by-name` | inline | Reads canonical files and a registry; no judgement |
 | `business.decide` | sol-fresh | no | `fileread:context-aliases`, `sourcewrite:declared-write-set`, `git:read`, `websearch:bounded` | fresh | An unfamiliar business model may need reference research before coverage can be frozen |
 | `architecture.decide` | sol-fresh | no | `fileread:context-aliases`, `git:read`, `websearch:bounded`, `visualize:html` | fresh | Alternatives and compatibility need evidence beyond the repo; schema pins the model |
-| `backend.source.apply` | luna | no | `fileread:context-aliases`, `sourcewrite:declared-write-set`, `git:commit-session-branch`, `shell:declared-commands` | fresh | Writes inside a frozen contract following patterns/be |
-| `library.source.apply` | luna | no | `fileread:context-aliases`, `sourcewrite:declared-write-set`, `git:commit-session-branch`, `shell:declared-commands` | fresh | Repairs a bound owner package with before/after regression evidence and complete package gates |
-| `dependency.update` | luna | no | `fileread:context-aliases`, `sourcewrite:declared-write-set`, `git:commit-session-branch`, `shell:declared-commands` | inline | Consumes one verified package release within exact dependency metadata and unchanged consumer regression gates |
+| `backend.source.apply` | sol-fresh | no | `fileread:context-aliases`, `sourcewrite:declared-write-set`, `git:commit-session-branch`, `shell:declared-commands` | fresh | Writes inside a frozen contract following patterns/be |
+| `library.source.apply` | sol-fresh | no | `fileread:context-aliases`, `sourcewrite:declared-write-set`, `git:commit-session-branch`, `shell:declared-commands` | fresh | Repairs a bound owner package with before/after regression evidence and complete package gates |
+| `dependency.update` | sol-fresh | no | `fileread:context-aliases`, `sourcewrite:declared-write-set`, `git:commit-session-branch`, `shell:declared-commands` | inline | Consumes one verified package release within exact dependency metadata and unchanged consumer regression gates |
 | `frontend.direction.decide` | sol-fresh | yes | `fileread:context-aliases`, `git:read`, `websearch:bounded`, `imagegen:judged`, `visualize:html`, `host:loopback`, `print:decision-points` | fresh | Research only for an unfamiliar domain; renders candidates as pages and judges for itself when a region is too empty to stand without an image |
-| `frontend.presentation.resolve` | luna | yes | `fileread:context-aliases`, `git:read`, `registry:read` | inline | A lookup against a closed inventory |
-| `frontend.source.apply` | luna | yes | `fileread:context-aliases`, `sourcewrite:declared-write-set`, `shell:declared-commands`, `git:commit-session-branch`, `imagegen:judged` | fresh | Writes only what the resolution already contains, following patterns/fe |
+| `frontend.presentation.resolve` | sol-fresh | yes | `fileread:context-aliases`, `git:read`, `registry:read` | inline | A lookup against a closed inventory |
+| `frontend.source.apply` | sol-fresh | yes | `fileread:context-aliases`, `sourcewrite:declared-write-set`, `shell:declared-commands`, `git:commit-session-branch`, `imagegen:judged` | fresh | Writes only what the resolution already contains, following patterns/fe |
 | `frontend.surface.audit` | sol-reviewer | yes | `fileread:context-aliases`, `git:read`, `websearch:bounded`, `visualize:html`, `browsercontrol:required`, `http:probe`, `host:loopback`, `secrets:resolve-by-name`, `print:decision-points` | fresh | Browser only, no source write: the auditor cannot repair what it measures, and it signs in by credential name to reach a guarded route |
-| `quality.verify` | luna | no | `fileread:context-aliases`, `git:read`, `shell:declared-commands`, `http:probe` | inline | Runs gates, repairs nothing |
+| `quality.verify` | sol-fresh | no | `fileread:context-aliases`, `git:read`, `shell:declared-commands`, `http:probe` | inline | Runs gates, repairs nothing |
 | `uat.verify` | sol-fresh | no | `fileread:context-aliases`, `sourcewrite:declared-write-set`, `git:read`, `websearch:bounded`, `visualize:html`, `browsercontrol:required`, `http:probe`, `secrets:resolve-by-name`, `database:namespaced-write`, `print:decision-points` | fresh | Drives the real journey in a browser and may write nothing; fresh verdict per lane |
-| `release.deploy` | luna | no | `fileread:context-aliases`, `git:read`, `shell:declared-commands`, `http:probe`, `container:operate`, `ci:read`, `secrets:resolve-by-name` | inline | Immutable release under declared authorization |
-| `platform.operate` | luna | no | `fileread:context-aliases`, `git:merge-into-integration-branch`, `shell:declared-commands`, `http:probe`, `container:operate`, `secrets:resolve-by-name`, `sourcewrite:declared-write-set`, `browsercontrol:required`, `database:namespaced-write` | inline | Shared services from exact evidence, and the identity and runtime entry a bound route needs: it creates the account and seeds rather than reporting one missing |
-| `content.generate` | luna | no | `fileread:context-aliases`, `shell:declared-commands`, `websearch:bounded`, `imagegen:required`, `objectstorage:read` | fresh | Researches the brief within bounds, then writes, codes, and draws to a claim; the schema pins this model |
-| `git.publish` | luna | no | `fileread:context-aliases`, `git:merge-and-push`, `shell:declared-commands`, `ci:read` | inline | Non-force publication; destructive operations are unrepresentable |
+| `release.deploy` | sol-fresh | no | `fileread:context-aliases`, `git:read`, `shell:declared-commands`, `http:probe`, `container:operate`, `ci:read`, `secrets:resolve-by-name` | inline | Immutable release under declared authorization |
+| `platform.operate` | sol-fresh | no | `fileread:context-aliases`, `git:merge-into-integration-branch`, `shell:declared-commands`, `http:probe`, `container:operate`, `secrets:resolve-by-name`, `sourcewrite:declared-write-set`, `browsercontrol:required`, `database:namespaced-write` | inline | Shared services from exact evidence, and the identity and runtime entry a bound route needs: it creates the account and seeds rather than reporting one missing |
+| `content.generate` | sol-fresh | no | `fileread:context-aliases`, `shell:declared-commands`, `websearch:bounded`, `imagegen:required`, `objectstorage:read` | fresh | Researches the brief within bounds, then writes, codes, and draws to a claim; the schema pins this model |
+| `git.publish` | sol-fresh | no | `fileread:context-aliases`, `git:merge-and-push`, `shell:declared-commands`, `ci:read` | inline | Non-force publication; destructive operations are unrepresentable |
 
 ## Profiles
 
@@ -81,14 +81,12 @@ A summary of what each `operator.json` declares; the validator rejects a row tha
 | --- | --- | --- | --- | --- |
 | `sol-fresh` | `gpt-5.6-sol` | web, images, browser, source | web, images, browser, source | Decisions and direction, end to end |
 | `sol-reviewer` | `gpt-5.6-sol` | web, images, browser, source | browser | Audits and UAT; observes, never writes |
-| `luna` | `gpt-5.6-luna` | web, images, source | web, images, source | Authored content, end to end |
 
 ### Runtime `claude` (provider `anthropic`)
 
 | Profile | Model | Capabilities | Permits | Used for |
 | --- | --- | --- | --- | --- |
 | `opus` | `claude-opus-5` | web, browser, source | browser, source | Heavy authoring and high-stakes mutation |
-| `sonnet` | `claude-sonnet-5` | web, browser, source | source | Deterministic and mechanical work |
 | `fable` | `claude-fable-5-1` | web, browser, source | source | Source-grounded extraction and audits |
 
 `fable` is registered for the audit and extraction work that produced `patterns/`; no operator binds

@@ -49,51 +49,6 @@
         "print": true
       }
     },
-    "sonnet": {
-      "model": "claude-sonnet-5",
-      "isolation": "fresh",
-      "forkTurns": "none",
-      "count": 1,
-      "role": "Deterministic and mechanical work: lookups against a closed inventory, gate execution, route verification, non-force publication.",
-      "capabilities": {
-        "fileread": true,
-        "sourcewrite": true,
-        "git": true,
-        "shell": true,
-        "websearch": true,
-        "imagegen": false,
-        "visualize": true,
-        "browsercontrol": true,
-        "http": true,
-        "registry": true,
-        "container": true,
-        "ci": true,
-        "objectstorage": true,
-        "secrets": true,
-        "database": true,
-        "host": true,
-        "print": true
-      },
-      "permits": {
-        "fileread": true,
-        "sourcewrite": true,
-        "git": true,
-        "shell": true,
-        "websearch": true,
-        "imagegen": false,
-        "visualize": true,
-        "browsercontrol": true,
-        "http": true,
-        "registry": true,
-        "container": true,
-        "ci": true,
-        "objectstorage": true,
-        "secrets": true,
-        "database": true,
-        "host": true,
-        "print": true
-      }
-    },
     "fable": {
       "model": "claude-fable-5-1",
       "isolation": "fresh",

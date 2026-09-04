@@ -8,7 +8,7 @@
   "validator": "validate.mjs",
   "selfTest": "self-test.mjs",
   "resources": {
-    "profile": "luna",
+    "profile": "sol-fresh",
     "grammarBound": false,
     "dispatch": "inline",
     "mode": "inline",

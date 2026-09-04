@@ -82,10 +82,8 @@
     "rule": "an operator binds one profile; when the processor runs on a runtime that lacks that profile, it runs the equivalent profile of its own runtime with exactly the grants the operator requires, and response.json records both (boundProfile, ranProfile) so an audit can tell a stand-in from the binding",
     "pairs": {
       "opus": "sol-fresh",
-      "sonnet": "luna",
       "fable": "sol-reviewer",
       "sol-fresh": "opus",
-      "luna": "sonnet",
       "sol-reviewer": "fable"
     },
     "grants": "the equivalent runs with the tools the operator declares that its own profile permits and its runtime supports (resources/tools.json); a tool the runtime does not support is unavailable for that run: a judged imagegen step records that no artwork could be made and continues, any other unsupported tool blocks the branch with the operator's own code",
