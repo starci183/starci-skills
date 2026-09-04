@@ -85,6 +85,21 @@ context khai đủ để agent mù chạy được, log đủ để người đ�
 - [ ] `interface.audit` chấp nhận audit một trang đang chạy: input source-application và decision tuỳ
       chọn khi target là bề mặt có sẵn.
 
+## 2c. Bốn chỗ yếu của harness, mỗi chỗ một gate
+
+- [ ] Planner: `validate-operator` bắt mọi Input có producer và mọi primaryOutput có consumer hoặc là
+      điểm kết; chuỗi planner dựng qua exchange `critique` mù (goal + chuỗi vào, bậc thừa ra) rồi in ra
+      chat trước khi chạy.
+- [ ] Gu auditor: lane đo được mù từng trang; lane taste và UX một auditor cho cả tính năng, chấm
+      tương đối trên đủ sheet; gate hiệu chuẩn ba ảnh mốc trong `knowledge/ui/proof`, lệch quá một
+      điểm thì receipt bị từ chối.
+- [ ] Học: `knowledge/findings/<family>.jsonl` ghi mọi finding của audit và UAT; `interface.generate`
+      nhận finding gần nhất của family làm input âm; `scripts/promote-findings.mjs` gom finding "chưa
+      có rule" từ hai lần và soạn sẵn rule cùng evidence note cho người gật.
+- [ ] Thước nhỏ/lớn theo loại thay đổi đọc từ prefix rule của finding (trình bày, copy, state → fix;
+      composition, shell, node, contract → generate); leo thang sang generate sau một lần fix không
+      sạch cùng finding.
+
 ## 3. Chứng minh trên nhiệm vụ thật
 
 - [ ] Chạy lại một nhiệm vụ đã hỏng (seed UAT của S2, hoặc refactor Setup) trên 2.0 với Sol 5.6 và
