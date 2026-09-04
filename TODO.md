@@ -129,6 +129,10 @@ context khai đủ để agent mù chạy được, log đủ để người đ�
       `validate-chain` (D2); cổng origin của `producer-import` kiểm output và byte, không kiểm `next` (D5);
       chuỗi hợp lệ trước khi request của nhánh bind tồn tại, kế hoạch mang `role` (D3); `gitPolicy` đúng
       kiểu route khai (D4).
+- [x] Preflight chỉ kiểm họ runtime cho vai mà chuỗi phục vụ, quan sát hay đi thử: `runtimeRoles` do planner đặt sẵn
+      (mọi vai đã bind khi chuỗi có `runtime.serve`/`interface.audit`/`uat.verify`, không vai nào khi không có);
+      sửa package thư viện không còn thừa hưởng tường của server nó không chạm (`environment-preflight/validate.mjs`,
+      `plan-chain.mjs#RUNTIME_OPERATORS`).
 - [x] Hai tường của lần chạy Setup trên 2.0.3: id operator đã đổi tên trong bundle 1.x (`operators/retired.json`,
       `scripts/retired-operators.mjs`, đọc bởi validate-response chế độ origin, producer-import, validate-chain); chuỗi
       fix → consume → serve → audit có dòng Next (`interface.fix → runtime.serve|library.update`,

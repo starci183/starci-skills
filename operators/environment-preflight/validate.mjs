@@ -143,6 +143,18 @@ export async function validateEnvironmentStep(branchDir, root = ROOT, hostRoot =
       if (decl.status === 'wall') for (const c of others) if (c.status !== 'skipped') errors.push(`${REPORT}: check ${c.id} is ${c.status} while declaration.${role} is a wall; a role with no declared route has nothing to inspect and its other checks are skipped`);
       if (decl.status === 'ok') for (const c of others.filter((x) => x.family === 'checkout')) if (c.status === 'skipped') errors.push(`${REPORT}: check ${c.id} is skipped while declaration.${role} is ok; a declared route has a checkout to inspect`);
     }
+    // The runtime family follows the request: a role the chain serves, observes or walks has its runtime
+    // checked; a role that is merely bound has it skipped, so a package repair never inherits the readiness
+    // of a server it never touches.
+    const runtimeRoles = new Set(Array.isArray(requirements.runtimeRoles) ? requirements.runtimeRoles : []);
+    for (const role of report.roles) {
+      const decl = byId.get(`declaration.${role}`);
+      if (!decl || decl.status !== 'ok') continue;
+      for (const c of [...byId.values()].filter((x) => x.family === 'runtime' && roleScoped(x.id, role))) {
+        if (runtimeRoles.has(role) && c.status === 'skipped') errors.push(`${REPORT}: check ${c.id} is skipped while the chain touches the ${role} runtime (runtimeRoles); a runtime the chain serves, observes or walks is inspected`);
+        if (!runtimeRoles.has(role) && c.status !== 'skipped') errors.push(`${REPORT}: check ${c.id} is ${c.status} while the chain touches no ${role} runtime (runtimeRoles); a runtime nobody serves, observes or walks is skipped, never a wall`);
+      }
+    }
     const flowChecks = [...byId.values()].filter((c) => c.id.startsWith('identity.flow.'));
     if (report.flow === null) {
       for (const c of flowChecks) if (c.status !== 'skipped') errors.push(`${REPORT}: check ${c.id} is ${c.status} while no flow was named; both flow checks are skipped`);

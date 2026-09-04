@@ -37,7 +37,10 @@ test('required inputs and context roles are walked back to their producers; an e
   const mission = fakeMission([line('uat.verify')]);
   const p = planChain({ packages, mission, options: { graph } });
   assert.deepEqual(ops(p), [['environment.preflight'], ['workspace.bind#be', 'workspace.bind#fe'], ['interface.generate'], ['interface.audit'], ['quality.verify'], ['uat.verify']]);
-  assert.deepEqual(p.presets['1/1'], { roles: ['be', 'fe'] });
+  // The surface chain serves and observes a runtime, so the preflight checks the runtime family of every bound role.
+  assert.deepEqual(p.presets['1/1'], { roles: ['be', 'fe'], runtimeRoles: ['be', 'fe'] });
+  // A chain that touches no runtime binds a checkout and owes no server: the runtime family is skipped.
+  assert.deepEqual(plan([line('library.update')], { roles: ['fe'] }).presets['1/1'], { roles: ['fe'], runtimeRoles: [] });
   assert.deepEqual(p.goals['6/1'], { doneWhen: 0 });
   assert.deepEqual(p.goals['1/1'], { prerequisite: '2/1' });
   assert.deepEqual(p.goals['2/1'], { prerequisite: '6/1' }, 'the be bind enables uat.verify, the earliest branch that depends on it');

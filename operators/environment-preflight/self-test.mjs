@@ -103,7 +103,7 @@ ${taken}${taken ? '\n' : ''}`;
 const requestJson = ({ project = PROJECT, roles = ['fe', 'be'], flow = null, env = ENV, extra = {} } = {}) => ({
   schemaVersion: 9, operatorId: OPERATOR, step: 1, parallel: 1, sessionId: 's-test',
   contexts: [{ alias: `@workspaces/projects/${project}/fe`, head: null }, { alias: '@workspaces/device-state', head: null }, { alias: '@worktrees/sessions/central-runtime', head: null }],
-  requirements: { project, roles, env, flow, resume: null, ...extra },
+  requirements: { project, roles, env, flow, runtimeRoles: roles, resume: null, ...extra },
   inputs: {}, resume: null,
 });
 const responseJson = ({ status = 'done', stop, fallbacks = [], reason, fields = null, next = [] } = {}) => ({
@@ -136,8 +136,8 @@ async function expectError(files, needle, label) {
 }
 
 // One lawful branch with every wall clear.
-const ready = () => {
-  const report = buildReport();
+const ready = ({ statuses } = {}) => {
+  const report = buildReport({ statuses });
   return { 'request/request.json': requestJson(), 'response/response.json': responseJson({ next: ['workspace.bind'] }), 'response/response.md': receiptOf(report), 'response/data/readiness-report.json': report };
 };
 // One lawful branch blocked on two walls: a role whose name nearly matches a declaration, and a port
@@ -166,6 +166,12 @@ const flowNamed = () => {
 };
 
 await expectValid(ready(), 'every check ok and the branch done');
+// The runtime family follows runtimeRoles: skipped for a role the chain never touches, inspected for one it does.
+const runtimeIds = (role) => expectedCheckIds(reportSchema, [role], CLASSES).filter((id) => id.startsWith(`runtime.${role}.`));
+const skippedRuntime = (roles) => Object.fromEntries(roles.flatMap((r) => runtimeIds(r).map((id) => [id, 'skipped'])));
+await expectValid({ ...ready({ statuses: skippedRuntime(['fe', 'be']) }), 'request/request.json': requestJson({ extra: { runtimeRoles: [] } }) }, 'a chain that touches no runtime skips the runtime family and is done');
+await expectError({ ...ready(), 'request/request.json': requestJson({ extra: { runtimeRoles: [] } }) }, 'while the chain touches no fe runtime', 'a runtime inspected for a role the chain never touches');
+await expectError({ ...ready({ statuses: skippedRuntime(['fe']) }), 'request/request.json': requestJson({ extra: { runtimeRoles: ['fe', 'be'] } }) }, 'while the chain touches the fe runtime', 'a runtime skipped for a role the chain observes');
 await expectValid(flowNamed(), 'a named flow with both flow checks run');
 await expectValid(blocked(), 'blocked on two walls with a near-match fallback');
 await expectValid({ ...ready(), 'response/response.json': responseJson({ status: 'blocked', stop: 'INVALID_INPUT', fields: {} }), 'response/response.md': null, 'response/data/readiness-report.json': null }, 'a gate stop with no report');
