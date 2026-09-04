@@ -2539,14 +2539,23 @@
       "context": [
         "@remote/ghcr/<image>",
         "@remote/github-actions/<runId>",
+        "@workspaces/be",
         "@workspaces/device-state"
       ],
       "steps": 10,
-      "requirements": 7,
+      "requirements": 8,
       "inputs": [
         {
           "kind": "quality-verification",
           "required": true
+        },
+        {
+          "kind": "backend-source-application",
+          "required": false
+        },
+        {
+          "kind": "route",
+          "required": false
         }
       ],
       "outputs": [
@@ -2554,13 +2563,25 @@
           "kind": "release-deployment",
           "file": "response/response.md",
           "type": "md",
-          "required": true
+          "required": false
         },
         {
           "kind": "probes",
           "file": "response/data/probes.json",
           "type": "data",
-          "required": true
+          "required": false
+        },
+        {
+          "kind": "migration-release",
+          "file": "response/migration-release.md",
+          "type": "md",
+          "required": false
+        },
+        {
+          "kind": "migration-release-proof",
+          "file": "response/data/migration-release.json",
+          "type": "data",
+          "required": false
         }
       ],
       "next": [
@@ -3642,7 +3663,8 @@
         "backend.source.apply",
         "business.decide",
         "frontend.direction.decide",
-        "quality.verify"
+        "quality.verify",
+        "release.deploy"
       ]
     },
     {
@@ -3897,6 +3919,20 @@
       "consumedBy": []
     },
     {
+      "kind": "migration-release",
+      "producedBy": [
+        "release.deploy"
+      ],
+      "consumedBy": []
+    },
+    {
+      "kind": "migration-release-proof",
+      "producedBy": [
+        "release.deploy"
+      ],
+      "consumedBy": []
+    },
+    {
       "kind": "model",
       "producedBy": [
         "business.decide"
@@ -3968,6 +4004,7 @@
         "dependency.update",
         "frontend.surface.audit",
         "library.source.apply",
+        "release.deploy",
         "uat.verify"
       ]
     },
@@ -6280,7 +6317,7 @@
     "operators": 16,
     "workflows": 11,
     "routes": 76,
-    "kinds": 59,
+    "kinds": 61,
     "stopCodes": 103,
     "steps": 133,
     "domains": 13,

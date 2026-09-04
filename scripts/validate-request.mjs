@@ -139,6 +139,10 @@ export async function validateRequest(root, dir, packages) {
     const { validateMigrationContract } = await import('./migration-contract.mjs');
     errors.push(...(await validateMigrationContract(root, dir, request)).errors);
   }
+  if (!errors.length && request.operatorId === 'release.deploy' && request.requirements?.migration != null) {
+    const { validateMigrationReleaseRequest } = await import('./migration-release.mjs');
+    errors.push(...(await validateMigrationReleaseRequest(root, dir, request)).errors);
+  }
   return { errors, request, pkg };
 }
 

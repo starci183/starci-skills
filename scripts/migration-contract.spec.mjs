@@ -62,6 +62,8 @@ test('imported migration validates original critique and the actual request CLI'
     const checked = await validateMigrationContract(root, branch, request);
     assert.deepEqual(checked.errors, []);
     assert.equal(checked.active, true);
+    const concurrent = await Promise.all([validateMigrationContract(root, branch, request), validateMigrationContract(root, branch, request)]);
+    assert.deepEqual(concurrent.map(result => result.errors), [[], []], 'independent consumers of one producer may validate concurrently');
     const cli = () => spawnSync(process.execPath, [path.join(root, 'scripts/validate-request.mjs'), branch], { cwd: host, encoding: 'utf8', shell: false, windowsHide: true, timeout: 30000 });
     const accepted = cli();
     assert.equal(accepted.error, undefined);

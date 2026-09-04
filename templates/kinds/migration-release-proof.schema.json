@@ -1,0 +1,154 @@
+{
+  "$id": "kind:migration-release-proof",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "outcome",
+    "planSha256",
+    "sourceHead",
+    "contractFingerprint",
+    "connectionFingerprint",
+    "journalExistsBefore",
+    "journalExistsAfter",
+    "journalBefore",
+    "journalAfter",
+    "executions",
+    "journalFingerprintBefore",
+    "journalFingerprintAfter"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "const": 1
+    },
+    "outcome": {
+      "const": "migrated"
+    },
+    "planSha256": {
+      "$ref": "#/$defs/digest"
+    },
+    "sourceHead": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{40}$"
+    },
+    "contractFingerprint": {
+      "$ref": "#/$defs/digest"
+    },
+    "connectionFingerprint": {
+      "$ref": "#/$defs/digest"
+    },
+    "journalExistsBefore": {
+      "type": "boolean"
+    },
+    "journalExistsAfter": {
+      "type": "boolean"
+    },
+    "journalBefore": {
+      "$ref": "#/$defs/identities"
+    },
+    "journalAfter": {
+      "$ref": "#/$defs/identities"
+    },
+    "executions": {
+      "type": "array",
+      "minItems": 2,
+      "maxItems": 2,
+      "items": {
+        "$ref": "#/$defs/execution"
+      }
+    },
+    "journalFingerprintBefore": {
+      "$ref": "#/$defs/digest"
+    },
+    "journalFingerprintAfter": {
+      "$ref": "#/$defs/digest"
+    }
+  },
+  "$defs": {
+    "digest": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "identity": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"
+    },
+    "identities": {
+      "type": "array",
+      "minItems": 0,
+      "maxItems": 256,
+      "uniqueItems": true,
+      "items": {
+        "$ref": "#/$defs/identity"
+      }
+    },
+    "execution": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "invocation",
+        "applied",
+        "pendingBefore",
+        "pendingAfter",
+        "journalExistsBefore",
+        "journalExistsAfter",
+        "journalBefore",
+        "journalAfter",
+        "exitCode",
+        "logRef",
+        "logSha256",
+        "journalFingerprintBefore",
+        "journalFingerprintAfter",
+        "preservedJournalFingerprint"
+      ],
+      "properties": {
+        "invocation": {
+          "enum": [
+            1,
+            2
+          ]
+        },
+        "applied": {
+          "$ref": "#/$defs/identities"
+        },
+        "pendingBefore": {
+          "$ref": "#/$defs/identities"
+        },
+        "pendingAfter": {
+          "$ref": "#/$defs/identities"
+        },
+        "journalExistsBefore": {
+          "type": "boolean"
+        },
+        "journalExistsAfter": {
+          "type": "boolean"
+        },
+        "journalBefore": {
+          "$ref": "#/$defs/identities"
+        },
+        "journalAfter": {
+          "$ref": "#/$defs/identities"
+        },
+        "exitCode": {
+          "const": 0
+        },
+        "logRef": {
+          "type": "string",
+          "pattern": "^response/artifacts/migration-[12]\\.log$"
+        },
+        "logSha256": {
+          "$ref": "#/$defs/digest"
+        },
+        "journalFingerprintBefore": {
+          "$ref": "#/$defs/digest"
+        },
+        "journalFingerprintAfter": {
+          "$ref": "#/$defs/digest"
+        },
+        "preservedJournalFingerprint": {
+          "$ref": "#/$defs/digest"
+        }
+      }
+    }
+  }
+}

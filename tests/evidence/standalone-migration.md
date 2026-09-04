@@ -28,3 +28,38 @@ verified original producer rather than pretending it was copied with those direc
 These are observations from one operational case and its independent gate review, not two invented
 operational incidents. No new knowledge rule is introduced. Source operation acceptance does not
 authorize shared database DDL; the release owner must supply its own bounded apply path and approval.
+
+The continuation also found no image-free migration apply branch in release.deploy, although that
+operator already owned the migration effect and its shell grant. The bound backend had neither a
+standalone migration command nor a CLI DataSource. The release extension therefore consumes a
+source-owned, committed and quality-proved runner; it does not invent an existing CLI, start the
+application to trigger schema synchronization, or give product DDL to platform's seed operation.
+
+Independent review identified an authorization counterexample: a caller-selected connection could
+match its own fingerprint while borrowing a nonproduction environment's name. The environment now
+owns optional nonsecret migration target identities, and the plan pins its exact declaration bytes.
+The gate matches the project, target, custody reference and full connection identity there. No
+actual environment declaration or approval default was changed during this runtime maintenance.
+The owner's database username was also sealed. The declaration therefore supports its custody
+reference plus an owner-prepared full connection commitment, without copying that value into a
+portable file. The runner protocol still hashes the actual full identity privately. Independent
+review reproduced the shared schema engine's oneOf sibling-constraint short circuit; nesting the
+exclusive username choice under allOf preserves this branch's closed object checks. That bounded
+schema fix does not claim the shared engine itself was repaired.
+The executor also keeps the initially validated checkout identity across revalidation, so a changed
+producer route cannot make it validate one checkout and then launch the runner from another.
+The Nivo owner supplied its existing committed development compose declaration and separately
+observed API-to-database mapping; a contradictory unused environment variable was not accepted as
+the target merely because it was easy to read.
+
+Other review counterexamples were a quality verdict with only optional failed/skipped gates and a
+runner that exited before consuming stdin. The latter was reproduced on Windows as an unhandled
+write EOF with a large JSON input. The release gate requires positive required-gate evidence, and
+the transport handles stream failure without exposing raw child output or claiming no mutation
+after an attempted apply. Protocol proofs distinguish read-only inspection, initial apply, preserved
+prior journal rows, and a no-op replay; journal initialization is explicit.
+
+A separate concurrent validation reproduction rejected one of two valid consumers because cycle
+tracking used a process-wide Set. Invocation-scoped async tracking preserves recursive cycle
+rejection without treating an independent validation as a cycle. This is an enforcement repair,
+not a new operational rule or a claim of a second production incident.

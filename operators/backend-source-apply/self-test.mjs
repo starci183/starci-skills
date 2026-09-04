@@ -7,6 +7,7 @@ import assert from 'node:assert/strict';
 import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { createHash } from 'node:crypto';
 import { migrationFixture } from '../architecture-decide/self-test.mjs';
 import { validateBackendStep } from './validate.mjs';
@@ -222,7 +223,7 @@ const withOperation = (patch) => {
   };
 };
 
-const migrationFiles = ({ dry = false } = {}) => {
+export const migrationFiles = ({ dry = false } = {}) => {
   const producer = migrationFixture({ operationId: OP, name: 'addIsolationScope' });
   const contract = producer['response/data/stack-model.json'];
   const original = contract.operations[0];
@@ -252,6 +253,7 @@ const migrationFiles = ({ dry = false } = {}) => {
   return files;
 };
 
+if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
 await expectValid(migrationFiles(), 'standalone migration bound to a complete fingerprinted architecture producer');
 await expectValid(migrationFiles({ dry: true }), 'standalone migration dry plan with the same frozen producer');
 for (const [key, value] of [['transport', 'worker'], ['writerRef', 'src/other.ts'], ['migrationRefs', ['src/other.ts']], ['storeRefs', ['other-store']]]) {
@@ -344,3 +346,5 @@ await expectError({ ...dryFiles(), 'response/changes.md': changesMd({ files: [[W
 await expectError({ ...dryFiles(), 'response/data/mutations.json': mutationsJson({ commit: null, changes: DRY_CHANGES }) }, "mode apply differs from the request's dry", 'a plan that re-decides the mode');
 
 process.stdout.write('backend.source.apply self-test: 5 valid branches, 55 rejected mutations\n');
+
+}

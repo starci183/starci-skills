@@ -2,11 +2,12 @@
 // exact operation projection into the receipt. Unpinned legacy operations retain their existing gate.
 import { existsSync, lstatSync, readFileSync, realpathSync } from 'node:fs';
 import { createHash } from 'node:crypto';
+import { AsyncLocalStorage } from 'node:async_hooks';
 import path from 'node:path';
 import { validateAgainst } from './json-schema.mjs';
 import { validateImportedInput } from './producer-import.mjs';
 
-const validating = new Set();
+const validationScope = new AsyncLocalStorage();
 const digest = (bytes) => `sha256:${createHash('sha256').update(bytes).digest('hex')}`;
 const json = (file) => JSON.parse(readFileSync(file, 'utf8'));
 const hasMigration = (value) => Array.isArray(value?.operations)
@@ -74,6 +75,10 @@ function metadata(session, relative, sessionId, step, parallel) {
 }
 
 export async function validateMigrationContract(root, branchDir, request, mutations = null) {
+  if (!validationScope.getStore()) {
+    return validationScope.run(new Set(), () => validateMigrationContract(root, branchDir, request, mutations));
+  }
+  const validating = validationScope.getStore();
   const result = { errors: [], active: false, operations: [], fingerprint: null };
   if (request?.operatorId !== 'backend.source.apply') return result;
   const requirements = request.requirements ?? {};

@@ -331,7 +331,7 @@ function kindsPage(kinds, lang) {
     const skeleton = `${c.kind}.skeleton.md`;
     if (kinds.skeletons.includes(skeleton)) meta.push(`${t.kindsSkeleton}: [\`templates/kinds/${skeleton}\`](${blob(`templates/kinds/${skeleton}`)})`);
     if (c.example) meta.push(`${t.kindsExample}: [\`${c.example}\`](${blob(c.example)})`);
-    out.push(`\n${mdx(meta.join('  \n'))}\n`);
+    out.push(`\n${mdx(meta.join('\n\n'))}\n`);
     out.push(`\n${mdx(table(t.kindsSectionTable, rows))}\n`);
   }
   out.push(`\n## ${t.kindsSchemas}\n`);

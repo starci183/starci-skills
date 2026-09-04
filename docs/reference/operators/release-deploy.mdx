@@ -28,6 +28,39 @@ Deploy one immutable release to one declared target under its declared authoriza
 steady state it reached, taking the recovery or rollback branch inside the same pass rather than
 assuming the rollout succeeded.
 
+## Source migration releases
+
+A non-null `migration` requirement selects a source migration release. Its `planRef` is
+`request/migration-release.json`; its `sha256` freezes the exact bytes shaped by
+`templates/kinds/migration-release-plan.schema.json`. The route input supplies the checkout, and the
+backend source application and passing quality input prove the same source commit. The plan names
+the exact migration files, a source-owned runner, its configuration, the connection custody reference,
+and the migration journal boundary. The runner is written and proved by the backend owner before
+this operator consumes it. A missing runner returns to that owner; this operator creates no runner.
+
+This branch is limited to an existing non-production environment and uses that environment's
+`release` authorization class. The plan freezes the environment declaration bytes with
+`environmentSha256` and matches exactly one `migrationTargets` entry by project, target and
+connection reference. Its connection fingerprint and journal schema must match that authority.
+A sealed `usernameRef` uses the environment owner's privately prepared full connection commitment;
+the executor never resolves or records the username. A seed or runtime grant does not authorize it. The request gate
+validates the producer receipts, immutable files and actual checkout head before effects. Run
+`scripts/migration-release-run.mjs <runtime-root> <branch>` through the declared shell grant; its
+internal gate repeats the authorization and source checks immediately before each apply. The fixed
+runner receives only `migration-release-input.schema.json` JSON and returns the closed
+`migration-release-runner` kind. It independently compares the expected connection, complete pending
+set, journal existence and full-row journal fingerprint immediately before effects. Inspect reads
+without creating the journal. Journal initialization requires the plan's explicit permission.
+
+The first apply fills exactly the declared migration set; readback preserves every prior journal row.
+A second invocation proves no pending migration and no journal change. Successful stdout is preserved
+verbatim inside hashed transcripts only after its closed schema passes; a failed or malformed process
+returns output hashes and a failure category. Resolved values and arbitrary process output are never
+persisted. Failure or uncertainty blocks without retrying a partial effect or running a down migration.
+This branch emits `migration-release` and `migration-release-proof`, with outcome `migrated` and an
+observed no-op replay. It uses no image rollout, public readiness series or image rollback identity.
+The image deployment branch below retains its own required outputs and recovery sequence.
+
 ## Recovery and rollback are branches of this job
 
 A rollout that does not stabilize is still this operator's problem. The run ends on one of three
@@ -117,7 +150,9 @@ serves is always something a person said yes to.
 Context is read-only apart from the declared mutations. The operator applies only the declared host,
 migration, domain and rollout mutations against the frozen release identity, restores the exact
 declared rollback release when that branch is taken, and writes only `response/` of its own branch:
-`data/probes.json`, `response.md` and `response.json`. It does not log, persist, echo, or return a
+`response.json` and the selected branch's pair: `data/probes.json` with `response.md`, or
+`migration-release.md` with `data/migration-release.json` and its hashed `artifacts/migration-1.log`
+and `artifacts/migration-2.log` transcripts. It does not log, persist, echo, or return a
 resolved credential value; does not deploy a release the declared authorization does not cover; does
 not rebuild, retag, or otherwise alter the immutable artifact identified by the frozen digest; does
 not edit the intent or revalidate the manifest into something else; does not recover or roll back a
@@ -129,7 +164,8 @@ probe observation or from an assumed rollout.
 
 | Alias | Bind | Required |
 | --- | --- | --- |
-| `@remote/ghcr/<image>` | the immutable image by digest; a tag is never a binding | yes |
+| `@remote/ghcr/<image>` | the immutable image by digest, required for the image branch | no |
+| `@workspaces/be` | the route input's backend checkout at the frozen source commit, required for a migration release | no |
 | `@workspaces/device-state` | credential handles by name and their custody; values never appear | yes |
 | `@remote/github-actions/<runId>` | CI evidence of the build and the rollout, read only | no |
 
@@ -137,7 +173,9 @@ probe observation or from an assumed rollout.
 
 | Kind | From | Required |
 | --- | --- | --- |
-| `quality-verification` | `quality.verify`; verification precedes an immutable build, and it is the authorization this run stands on | yes |
+| `quality-verification` | `quality.verify`; passing verification at the release source commit | yes |
+| `backend-source-application` | `backend.source.apply`; the applied migration contract and source-owned runner | no |
+| `route` | `workspace.bind`; the source checkout and route authority for a migration release | no |
 
 ## Requirements
 
@@ -148,7 +186,8 @@ probe observation or from an assumed rollout.
 | `approval` | id | — | The declared deploy grant covering this project, environment and target; changing what production serves always needs a person |
 | `probes` | list of `{probeId, kind, endpointRef, expectStatus}` | the probes the validated manifest declares | What steady state is measured by; at least one probe is public |
 | `steadyDeadline` | number | 600 | The bounded monitoring deadline in seconds, measured against the boot time this project shows |
-| `rollbackIdentity` | `{releaseId, artifactRef, digest, dataCompatible}` | — | The exact safe release the rollback fallback restores, by digest |
+| `migration` | `{planRef, sha256}` | null | The exact source migration plan; selects the migration branch |
+| `rollbackIdentity` | `{releaseId, artifactRef, digest, dataCompatible}` | null | The exact safe release the rollback fallback restores, by digest |
 | `resume` | token | null | The blocked branch's token when re-entering after a stop |
 
 ## Steps
@@ -156,7 +195,7 @@ probe observation or from an assumed rollout.
 | # | Step | Params | Reads | Writes | Stops with |
 | --- | --- | --- | --- | --- | --- |
 | 1 | Validate the gate, the authorization the input carries, and the resume | `resume` | `request/request.json`, input `quality-verification` as the authorization this run stands on | — | `INVALID_INPUT`, `AUTHORIZATION_MISSING`, `NO_PROGRESS` |
-| 2 | Bind the release and compile the plan | `release`, `target`, `approval` | @remote/ghcr/&lt;image> at the frozen digest, @remote/github-actions/&lt;runId> for the observed state, @tools/git, @tools/ci | — | `MANIFEST_INVALID`, `APPROVAL_REQUIRED` |
+| 2 | Bind the release and compile the plan | `release`, `target`, `approval`, `migration` | @remote/ghcr/&lt;image> at the frozen digest, @remote/github-actions/&lt;runId> for the observed state, or the migration plan and inputs `route`, `backend-source-application`, `quality-verification` at the frozen source head; @tools/git, @tools/ci | — | `MANIFEST_INVALID`, `APPROVAL_REQUIRED` |
 | 3 | Initialize the execution root and resolve the credentials by name | — | @workspaces/device-state for the declared handles and their custody, @tools/secrets | — | `CREDENTIAL_UNAVAILABLE` |
 | 4 | Prepare the host, publish the artifact by digest, migrate and reconcile the domain | — | @remote/ghcr/&lt;image> for the artifact by digest, @remote/github-actions/&lt;runId> for each boundary's revision before and after | @tools/shell | `HOST_UNAVAILABLE`, `ARTIFACT_MISSING`, `MIGRATION_BLOCKED`, `DOMAIN_UNRECONCILED` |
 | 5 | Roll out | — | @remote/ghcr/&lt;image> for the target revision before and after | @tools/container | `ROLLOUT_FAILED` |
@@ -164,7 +203,9 @@ probe observation or from an assumed rollout.
 | 7 | Detect concurrent drift before acting | — | `response/data/probes.json`, @remote/ghcr/&lt;image> for the active release by digest | — | `CONCURRENT_DRIFT` |
 | 8 | Take the recovery branch when the failure persists | — | `response/data/probes.json`, @remote/ghcr/&lt;image> at the same release identity | @tools/container | `RECOVERY_EXHAUSTED` |
 | 9 | Take the rollback branch when recovery cannot hold | `rollbackIdentity` | @remote/ghcr/&lt;image> at the exact safe digest | @tools/container | `ROLLBACK_IDENTITY_MISSING` |
-| 10 | Prove the steady state, write the receipt and emit | — | everything above | `response/response.md`, `response/response.json` | `STEADY_STATE_UNPROVEN` |
+| 10 | Prove the selected branch's outcome, write the receipt and emit | — | everything above | `response/response.md`, `response/migration-release.md`, `response/data/migration-release.json`, `response/response.json` | `STEADY_STATE_UNPROVEN` |
+
+For a migration release, steps 1–4 bind the route, backend and quality inputs and run the fixed migration helper; step 10 emits its migration receipt and proof. The image rollout, monitoring and fallback steps do not run. The validator requires exactly the output pair of the selected branch. For an image release, the GHCR context and rollback identity remain required.
 
 Steps 8 and 9 are the two fallbacks in order, not a sequence every run walks: a run enters step 8
 only under `ROLLOUT_FAILED` and step 9 only under `RECOVERY_EXHAUSTED`, and a run that took neither
@@ -177,8 +218,10 @@ deployment; a resume that adds no authorization, manifest, credential or observa
 
 | Kind | File | Type | Required |
 | --- | --- | --- | --- |
-| `release-deployment` | `response/response.md` | md | yes |
-| `probes` | `response/data/probes.json` | data | yes |
+| `release-deployment` | `response/response.md` | md | no |
+| `probes` | `response/data/probes.json` | data | no |
+| `migration-release` | `response/migration-release.md` | md | no |
+| `migration-release-proof` | `response/data/migration-release.json` | data | no |
 
 ## Stops
 

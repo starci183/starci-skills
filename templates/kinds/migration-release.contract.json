@@ -1,0 +1,43 @@
+{
+  "kind": "migration-release",
+  "title": "^# migration-release — release:[A-Za-z0-9._-]+$",
+  "sections": [
+    {
+      "heading": "^## Binding$",
+      "table": "| Field | Value |",
+      "rows": [
+        "Operator",
+        "Step",
+        "Project",
+        "Environment",
+        "Target",
+        "Release",
+        "Source head",
+        "Plan digest",
+        "Contract fingerprint",
+        "Approval",
+        "Connection fingerprint"
+      ],
+      "cell": { "Value": "\\S" }
+    },
+    {
+      "heading": "^## Outcome$",
+      "table": "| Field | Value |",
+      "exactRows": 4,
+      "rows": ["Outcome", "Journal before", "Journal after", "Replay"],
+      "cell": { "Value": "\\S" }
+    },
+    {
+      "heading": "^## Executions$",
+      "table": "| Invocation | Applied migrations | Exit code | Log | Digest |",
+      "exactRows": 2,
+      "cell": {
+        "Invocation": "^[12]$",
+        "Applied migrations": "\\S",
+        "Exit code": "^0$",
+        "Log": "^`response/artifacts/migration-[12]\\.log`$",
+        "Digest": "^`sha256:[0-9a-f]{64}`$"
+      }
+    }
+  ]
+}
