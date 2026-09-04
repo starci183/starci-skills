@@ -251,6 +251,11 @@ await expectError(baseline({ 'response/data/gates/lint.json': gateResult('lint',
 await expectError(baseline({ 'request/request.json': requestJson({ head: OTHER_HEAD }), 'response/response.md': responseMd({ head: OTHER_HEAD }) }), 'but the request pinned', 'gates measured off the pinned commit');
 await expectError(baseline({ 'response/data/gates/lint.json': gateResult('lint', { predecessorCommit: OTHER_HEAD }) }), 'which is not the head', 'a predecessor describing another commit');
 await expectError(baseline({ 'response/data/gates/lint.json': gateResult('lint', { sonarScope: 'new-code' }) }), 'belongs to the sonar gate alone', 'a sonar scope on a lint result');
+// A backend-only delivery owes no surface verdict: nine not-applicable rows ship on the gates; a request that binds fe may not say so.
+const NOT_APPLICABLE = SCORECARD.map(([topic]) => [topic, 'not-applicable', 'none']);
+await expectValid(baseline({ 'response/response.md': responseMd({ scorecard: NOT_APPLICABLE }) }), 'a backend-only delivery ships on its gates with every surface topic not-applicable');
+await expectError(baseline({ 'request/request.json': { ...requestJson(), contexts: [{ alias: '@workspaces/be', head: HEAD }, { alias: '@workspaces/fe', head: HEAD }] }, 'response/response.md': responseMd({ scorecard: NOT_APPLICABLE }) }), 'binds @workspaces/fe', 'a surface delivery that calls its topics not-applicable');
+await expectError(baseline({ 'response/response.md': responseMd({ scorecard: SCORECARD.map(([t]) => [t, 'not-applicable', 'interface.generate']) }) }), 'still routes to', 'a not-applicable row that routes somewhere');
 // Lint under the default changed scope: the delivery's own errors decide, a red base is a finding.
 await expectError(baseline({ 'response/data/gates/lint.json': gateResult('lint', { lint: null }) }), 'records lint { baseline, delivery, changedFiles }', 'a changed-scope lint result with no counts');
 await expectError(baseline({ 'response/data/gates/lint.json': gateResult('lint', { lint: { baseline: 4030, delivery: 127, changedFiles: 18 } }) }), 'passes exactly when the delivery added none', 'a passing lint gate over a delivery that added errors');

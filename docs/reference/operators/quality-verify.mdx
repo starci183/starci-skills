@@ -163,6 +163,11 @@ observed the running product: `interface.audit` closed eight proof topics on its
 it. It may not rescore a topic, may not average across rows, and may not substitute its own judgement
 for a measurement it did not take.
 
+A delivery that touches no surface owes no surface verdict. When the request binds no `@workspaces/fe`
+checkout — a backend-only delivery — every surface topic row reads `not-applicable` with route `none`, and
+the verdict is decided by the gates alone; a request that binds a frontend checkout may not say
+`not-applicable` about anything, because the audit and the walk it owes are what the row copies.
+
 The line under that table is the whole answer. Any row missing, or `blocked`, makes it `blocked`,
 because a topic nobody observed has earned neither a pass nor a failure. Any row `fail` or
 `fix-first` makes it `fix-first`, and the receipt names that row and the route it carries. Only when

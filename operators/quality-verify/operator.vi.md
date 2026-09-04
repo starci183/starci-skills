@@ -134,6 +134,11 @@ và có dùng được hay không, và những câu ấy đã được trả l�
 không được chấm lại một topic, không được lấy trung bình qua các hàng, và không được thay một phép đo
 nó chưa từng thực hiện bằng phán đoán của chính mình.
 
+Bản giao không chạm bề mặt nào thì không nợ phán quyết bề mặt nào. Khi request không bind checkout
+`@workspaces/fe` — bản giao chỉ có backend — mọi hàng topic bề mặt ghi `not-applicable` với route `none`, và
+phán quyết do các cổng quyết định; request có bind checkout frontend thì không được ghi `not-applicable` cho
+bất cứ gì, vì audit và lượt đi thử nó nợ chính là thứ hàng đó sao chép.
+
 Dòng dưới bảng ấy là toàn bộ câu trả lời. Một hàng thiếu, hay `blocked`, làm cả bảng thành `blocked`,
 vì một topic không ai quan sát thì chưa xứng với cả đạt lẫn hỏng. Một hàng `fail` hay `fix-first` làm
 cả bảng thành `fix-first`, và biên nhận gọi tên hàng ấy cùng đường đi nó mang. Chỉ khi mọi hàng đều

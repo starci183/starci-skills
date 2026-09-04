@@ -100,7 +100,7 @@
       ],
       "cell": {
         "Topic": "^`(presentation|composition|responsive|motion|accessibility|contrast|render-truth|taste|experience)`$",
-        "Verdict": "^(pass|fail|ship|fix-first|blocked)$",
+        "Verdict": "^(pass|fail|ship|fix-first|blocked|not-applicable)$",
         "Route": "^(resolve|direction|flow-owner|grammar-gap|none)$"
       }
     },

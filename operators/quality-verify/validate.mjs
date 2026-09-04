@@ -24,12 +24,16 @@ export const SCORECARD_TOPICS = ['presentation', 'composition', 'responsive', 'm
 // Any row missing or blocked makes the answer blocked; any fail or fix-first makes it fix-first;
 // otherwise ship. Nothing is averaged across rows, because each row already carries its own
 // arithmetic.
+// A delivery that touches no surface owes no surface verdict: a row marked not-applicable is neither
+// blocked nor failed, so a backend-only delivery ships on its gates alone. Which deliveries may say so
+// is the receipt gate's (the request binds no frontend checkout), not this arithmetic's.
 export function scorecardVerdict(rows) {
   const byTopic = new Map(rows.map((r) => [r.topic, r]));
   if (SCORECARD_TOPICS.some((t) => !byTopic.has(t) || byTopic.get(t).verdict === 'blocked')) return 'blocked';
   if (rows.some((r) => r.verdict === 'fail' || r.verdict === 'fix-first')) return 'fix-first';
   return 'ship';
 }
+export const bindsSurface = (request) => (request?.contexts ?? []).some((c) => /^@workspaces\/fe(?:\/|$)/.test(String(c.alias ?? '')));
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 const METRICS = ['statements', 'lines', 'functions', 'branches'];
@@ -256,8 +260,13 @@ export async function validateQualityStep(branchDir, root = ROOT) {
     // The scorecard: one row per topic, and the line that says whether it passed.
     const rows = (tableUnder(text, '## Verdict') ?? []).map(([topic, v, route]) => ({ topic: topic.replaceAll('`', ''), verdict: v, routeTo: route }));
     for (const topic of SCORECARD_TOPICS) if (!rows.some((r) => r.topic === topic)) errors.push(`response/response.md: Verdict carries no ${topic} row; a topic nobody reported is not a topic that passed`);
+    const surface = bindsSurface(request);
     for (const row of rows) {
       if (!SCORECARD_TOPICS.includes(row.topic)) errors.push(`response/response.md: Verdict names ${row.topic}, which is not one of the nine topics`);
+      if (row.verdict === 'not-applicable') {
+        if (surface) errors.push(`response/response.md: ${row.topic} is not-applicable while the request binds @workspaces/fe; a delivery that touches a surface owes every surface topic`);
+        if (row.routeTo !== 'none') errors.push(`response/response.md: ${row.topic} is not-applicable and still routes to ${row.routeTo}`);
+      }
       if (row.verdict === 'blocked' && row.routeTo !== 'none') errors.push(`response/response.md: ${row.topic} is blocked and still routes to ${row.routeTo}; a topic nobody observed has no owner to send it to`);
       if ((row.verdict === 'pass' || row.verdict === 'ship') && row.routeTo !== 'none') errors.push(`response/response.md: ${row.topic} ${row.verdict === 'ship' ? 'ships' : 'passes'} and still routes to ${row.routeTo}`);
       if ((row.verdict === 'fail' || row.verdict === 'fix-first') && row.routeTo === 'none') errors.push(`response/response.md: ${row.topic} is ${row.verdict} and routes nowhere`);
