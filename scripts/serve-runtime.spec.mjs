@@ -10,7 +10,7 @@ import path from 'node:path';
 import {
   commandFor, pidFileOf, previousFileOf, readRecord, stop, start, portTaken, recordListener,
   manifestPaths, manifestDigest, buildCacheDirs, cacheDecision, clearBuildCache, parseArgs,
-} from './serve-runtime.mjs';
+  reusable } from './serve-runtime.mjs';
 
 test('the route declaration publishes the dev command, and the convention is the last resort', () => {
   assert.equal(commandFor({ routeConfig: { dev: 'pnpm dev --port 3067' }, command: 'npm start', port: 3067 }), 'pnpm dev --port 3067');
@@ -172,4 +172,13 @@ test('the conventional build caches are found at every package directory within 
   assert.equal(existsSync(path.join(dir, 'apps/app/src/page.tsx')), true);
   assert.equal(existsSync(path.join(dir, 'node_modules/dep/.next')), true);
   rmSync(dir, { recursive: true, force: true });
+});
+
+test('a live server is reused only while it serves this head with these manifests; a moved worktree is not reused', () => {
+  const record = { pid: 1, head: 'a'.repeat(40), manifestDigest: 'sha256:m' };
+  assert.equal(reusable(record, 'a'.repeat(40), 'sha256:m'), true);
+  assert.equal(reusable(record, 'b'.repeat(40), 'sha256:m'), false, 'the head moved');
+  assert.equal(reusable(record, 'a'.repeat(40), 'sha256:n'), false, 'the manifests changed');
+  assert.equal(reusable({ pid: 1 }, 'a'.repeat(40), 'sha256:m'), false, 'a record with no head is never reused');
+  assert.equal(reusable(null, 'a'.repeat(40), 'sha256:m'), false);
 });

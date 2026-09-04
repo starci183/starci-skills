@@ -257,21 +257,30 @@ export async function recordListener(pidFile, { wait = DEFAULT_WAIT, probe = por
   return updated;
 }
 
+// A live record is reusable when it serves exactly this head with exactly these manifests.
+export const reusable = (record, head, digest) => Boolean(record && record.head && record.head === head && record.manifestDigest === digest);
+
 export async function start({ worktree, port, log, command, route, clean = false, wait = DEFAULT_WAIT }) {
   if (!existsSync(worktree)) throw new Error(`no worktree at ${worktree}`);
   if (!Number.isInteger(port) || port < 1 || port > 65535) throw new Error(`${port} is not a port`);
   if (!log) throw new Error('--log names the file the detached server writes to');
   mkdirSync(path.dirname(log), { recursive: true });
   const pidFile = pidFileOf(log);
-  const existing = readRecord(pidFile);
-  if (recordAlive(existing, alive)) return { ...existing, reused: true };
-  if (existing) retire(pidFile, existing, { stoppedAt: null });
-  if (await portTaken(port)) throw new Error(`port ${port} is held by another process${(() => { const p = listenerPidByPort(port); return p ? ` (pid ${p})` : ''; })()}; the port is fixed, so this is a conflict to coordinate and never a reason to move`);
   const routeConfig = route && existsSync(route) ? JSON.parse(readFileSync(route, 'utf8')) : null;
-  const cmd = commandFor({ routeConfig, command, port });
-  const previous = readRecord(previousFileOf(log));
   const head = headOf(worktree);
   const { digest, files } = manifestDigest(worktree, routeConfig);
+  const existing = readRecord(pidFile);
+  // Idempotent by head, not by liveness: a live server is reused only while it serves this head with these
+  // manifests; a server whose worktree moved under it is stopped and started again, or it would go on
+  // answering for a head it no longer serves while the registry claimed otherwise.
+  if (recordAlive(existing, alive)) {
+    if (reusable(existing, head, digest)) return { ...existing, reused: true };
+    const stopped = await stop(pidFile);
+    if (!stopped.stopped) throw new Error(`the server on port ${port} serves ${existing.head ?? 'an unknown head'} and the worktree is at ${head}, but it could not be stopped: ${stopped.reason}`);
+  } else if (existing) retire(pidFile, existing, { stoppedAt: null });
+  if (await portTaken(port)) throw new Error(`port ${port} is held by another process${(() => { const p = listenerPidByPort(port); return p ? ` (pid ${p})` : ''; })()}; the port is fixed, so this is a conflict to coordinate and never a reason to move`);
+  const cmd = commandFor({ routeConfig, command, port });
+  const previous = readRecord(previousFileOf(log));
   const decision = cacheDecision({ clean, previous, digest });
   const cache = { cleared: decision.clear, reason: decision.reason, directories: decision.clear ? clearBuildCache(worktree) : [], previousHead: previous?.head ?? null };
   const out = openSync(log, 'a');
