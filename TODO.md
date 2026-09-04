@@ -55,6 +55,14 @@ context khai đủ để agent mù chạy được, log đủ để người đ�
       `resources/interaction.json`.
 - [ ] `content.generate`: tách brief / sinh / review ở đợt sau, domain riêng.
 
+## 2a. Full Sol
+
+- [ ] Bỏ profile `luna`: mọi operator bind `sol-fresh` (producer, quyết định, execute) hoặc
+      `sol-reviewer` (audit, critique, review); gỡ `luna` khỏi `resources/agents/profiles/openai.json`,
+      khỏi `profileEquivalents` (cặp với `sonnet`), khỏi cột Profile của `resources/INDEX.md` và mọi
+      `operator.json`; `validate-resources` từ chối profile không còn khai. Bằng chứng: 17 nhánh thoát
+      không receipt trong S1/S4 đều là Luna.
+
 ## 2b. Dynamic flows và cặp plan/execute
 
 - [ ] Xoá 11 workflow ví dụ khỏi runtime: cửa vào không đọc `when` nữa; chuỗi được `scripts/plan-chain.mjs`
