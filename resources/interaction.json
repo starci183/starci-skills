@@ -1,0 +1,9 @@
+{
+  "schemaVersion": 1,
+  "questionKinds": ["tier-choice"],
+  "minOptions": 2,
+  "maxOptions": 3,
+  "selectionSource": "user",
+  "rule": "Within work already authorized by the user, do not request routine confirmation. Ask only when the user must choose between materially different tiers or directions, such as UX/UI alternatives. Tier does not mean execution model profile. Present the alternatives and their tradeoffs, let the user select, and reuse the selection on continuation without asking again. Obtain ordinary missing inputs from existing context and evidence. This is a communication policy only: it grants no source write, package publication, deployment, credential access or other external action, and overrides no mandatory host approval, access control, operator boundary or quality gate. When work cannot proceed within existing authority, report the exact limitation and continue independent authorized work; never invent approval or claim completion.",
+  "gate": "scripts/validate-interaction.mjs"
+}

@@ -126,8 +126,8 @@
       "domain": "caller",
       "disposition": "fallback",
       "meaning": {
-        "en": "Several candidates survive falsification and the scores under ## Scores prove none dominant: the top means are equal, or the top scorer loses a failed criterion to another.",
-        "vi": "Nhiều phương án cùng sống sót qua phản chứng và bảng điểm dưới ## Scores chứng minh không cái nào trội: các điểm trung bình dẫn đầu bằng nhau, hoặc phương án dẫn đầu thua một phương án khác trên một tiêu chí đã rớt."
+        "en": "Under automatic, several candidates survive and the scores prove none dominant. Under approval-required, material tier or direction alternatives await the user's choice; scores inform the recommendation, not the selection.",
+        "vi": "Dưới automatic, nhiều phương án sống sót và bảng điểm không cho thấy phương án trội. Dưới approval-required, các tier hoặc hướng khác nhau về bản chất chờ người dùng chọn; điểm hỗ trợ đề xuất, không thay lựa chọn."
       },
       "fallback": {
         "en": "Among the tied top scorers, select the candidate that introduces the fewest new nodes; the scores stay under ## Scores and the pick under ## Decision.",

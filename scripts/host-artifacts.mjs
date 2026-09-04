@@ -69,8 +69,17 @@ export async function listen(server, port = PORT_RANGE.first) {
   for (let candidate = port; candidate <= PORT_RANGE.last; candidate += 1) {
     if (await portTaken(candidate)) continue;
     const bound = await new Promise((resolve, reject) => {
-      server.once('error', (err) => { if (err.code === 'EADDRINUSE') resolve(false); else reject(err); });
-      server.listen({ port: candidate, host: HOST, exclusive: true }, () => resolve(true));
+      const cleanup = () => { server.off('error', onError); server.off('listening', onListening); };
+      const onError = (err) => {
+        cleanup();
+        // Windows excluded port ranges cannot be bound even when no listener answers.
+        if (err.code === 'EADDRINUSE' || err.code === 'EACCES') resolve(false);
+        else reject(err);
+      };
+      const onListening = () => { cleanup(); resolve(true); };
+      server.once('error', onError);
+      server.once('listening', onListening);
+      server.listen({ port: candidate, host: HOST, exclusive: true });
     });
     if (bound) return candidate;
   }

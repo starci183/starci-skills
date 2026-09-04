@@ -4,7 +4,29 @@ import { mkdtempSync, rmSync, writeFileSync, readFileSync, existsSync } from 'no
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { test } from 'node:test';
-import { start, HOST, PORT_RANGE } from './host-artifacts.mjs';
+import { EventEmitter } from 'node:events';
+import { start, listen, HOST, PORT_RANGE } from './host-artifacts.mjs';
+
+test('unavailable ports keep the bounded host search alive without leaving event listeners', async () => {
+  const server = new EventEmitter();
+  const attempts = [];
+  server.listen = ({ port, host, exclusive }) => {
+    attempts.push(port);
+    assert.equal(host, HOST);
+    assert.equal(exclusive, true);
+    queueMicrotask(() => {
+      if (attempts.length === 1) server.emit('error', Object.assign(new Error('excluded'), { code: 'EACCES' }));
+      else if (attempts.length === 2) server.emit('error', Object.assign(new Error('raced'), { code: 'EADDRINUSE' }));
+      else server.emit('listening');
+    });
+    return server;
+  };
+  const port = await listen(server);
+  assert.equal(attempts.length, 3);
+  assert.ok(port > attempts[0] && port <= PORT_RANGE.last);
+  assert.equal(server.listenerCount('error'), 0);
+  assert.equal(server.listenerCount('listening'), 0);
+});
 
 test('serves a folder on 127.0.0.1 from the 60000 range, records host.json and stops cleanly', async () => {
   const folder = mkdtempSync(path.join(tmpdir(), 'host-'));

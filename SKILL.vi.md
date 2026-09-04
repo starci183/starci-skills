@@ -6,6 +6,10 @@ phán xét một kết quả.
 
 ## Chuẩn bị
 
+Trước khi đặt câu hỏi, áp dụng [chính sách tương tác](resources/interaction.md).
+Điều này chỉ thay đổi giao tiếp: mọi chuyển bước định tuyến, ranh giới operator và thẩm quyền bắt
+buộc bên dưới vẫn giữ nguyên. Cột Ask hay reason chẩn đoán không phải câu hỏi tự động đem chuyển.
+
 1. Đóng băng một phạm vi nhiệm vụ: đơn vị, đích, phần bao gồm và phần loại trừ, các gốc được ghi,
    hiệu ứng ra bên ngoài, và thứ sẽ được tính là bằng chứng. Hai cách đọc làm đổi bất kỳ điểm nào
    trong số đó là một câu hỏi tập trung, không phải một phỏng đoán.
@@ -149,4 +153,3 @@ không bao giờ khởi động agent khác; một cuộc trao đổi lồng (ph
 orchestrator tạo cho nhánh đang `waiting`. `alias/alias.json` là nơi duy nhất một alias phân giải ra vị
 trí, và `alias/INDEX.md` là bản đồ đọc được của nó theo vùng (workspaces, grammar, knowledge, worktrees,
 remote, dynamic); operator chỉ đọc những gì bảng Context của nó gọi tên.
-

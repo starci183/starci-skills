@@ -10,15 +10,15 @@ into the nearest example.
 How the entry uses them:
 
 1. Read the `when` of every example. If the request matches one fully, run that chain; its presets
-   fill `request.json` and the person is asked only for fields with no default.
+   fill `request.json`; obtain missing fields under [the interaction policy](../resources/interaction.md).
 2. If the match is partial, or the business is harder than any `when` describes, compose a chain
    rather than bending a near-miss example into shape: brainstorm it from the operators' `## Next`
    tables and `routing.json`, under the same rules `scripts/validate-workflows.mjs` enforces on these
    files:
    - every branch names a real operator and presets only fields that operator declares;
    - every Requirements field with no Default is either preset or listed under the branch's `asks`, so a
-     chain says up front which fields the entry must take from the mission scope or ask a person for
-     before that branch starts;
+     chain says up front which fields the entry must obtain before that branch starts; `asks` is an
+     input inventory, not permission to send a question;
    - every required Input of a branch is produced by an earlier step;
    - branches of one step share no write alias (two operators may not write the same checkout or
      root at once; `frontend.surface.audit` fans out by matrix entry because it writes nothing);

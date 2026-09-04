@@ -4,11 +4,12 @@
   "agentPerOperator": true,
   "maxConcurrentAgents": 3,
   "dispatch": "routing.json",
+  "interactionPolicy": "resources/interaction.json",
   "agent": {
     "profile": "operator.json → resources.profile",
     "grants": "operator.json → resources.tools: each @tools/<id> with one mode from resources/tools.json, and nothing the profile would otherwise permit. A tool whose only use the operator's mode forbids is not granted for that run: backend.source.apply and frontend.source.apply under mode dry receive neither @tools/sourcewrite nor @tools/git",
     "refs": "operator.md → Context table, resolved through alias/alias.json; an unlisted location is unreadable",
-    "requirements": "operator.md → Requirements table; the orchestrator fills defaults into request.json and asks a person only for fields whose Default is — or whose value a stop code names. Fields under agent.fills (project from the mission scope, runId and lease from the session) the orchestrator supplies itself: a workflow neither presets them nor asks a person for them",
+    "requirements": "operator.md → Requirements table; fill defaults into request.json and obtain required values from the mission, existing decisions and declared inputs. Fields under agent.fills (project, runId and lease) come from the session. A missing default does not itself authorize a question: apply interactionPolicy. Unavailable required authorization still blocks under the existing operator gate; this communication rule supplies no grant.",
     "prompt": "rendered at dispatch from operator.md plus request.json; never stored",
     "isolation": "fresh, no inherited turns",
     "writes": "only response/ of its own branch (step-N/parallel-M/response/); a nested-exchange agent writes only <exchange>/response/ of that branch; a source-writing operator also writes the session branch of its checkout under an exclusive lease (see sourceWrites)",

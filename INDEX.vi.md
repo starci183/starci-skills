@@ -1,4 +1,4 @@
-# StarCi Skills 1.7.9
+# StarCi Skills 1.8.0
 
 Cây này chính là runtime. Đọc tiếp `SKILL.md` (bản tiếng Anh là bản được nạp; `SKILL.vi.md` chỉ để người đọc); đó là cửa vào duy nhất,
 đóng băng phạm vi của một nhiệm vụ, chọn đúng một operator sở hữu kết quả, rồi định tuyến giữa các
@@ -67,6 +67,8 @@ thì không được publish.
   đổi nghĩa.
 
 ## Dòng dõi
+
+1.8.0 (2026-09-04): tương tác có một chính sách giao tiếp cùng gate câu hỏi/lựa chọn có kiểu; người dùng chọn hướng khác biệt dựa trên bằng chứng render, lựa chọn đã ghi được dùng tiếp, và bỏ hỏi xác nhận thường lệ trong việc đã được giao; quyền thao tác và định tuyến giữ nguyên.
 
 1.7.9 (2026-09-04): mở phiên là hành động đầu tiên của một nhiệm vụ có viết, không phải câu hỏi đặt cho người và không phải việc làm sau lần viết đầu tiên — nhiệm vụ đã lỡ viết ngoài phiên thì mở phiên rồi chuyển việc lên nhánh của nó; một lần bind thấy source chưa commit trên nhánh mutation thì từ chối, dù write root đã khai có phủ nó hay không.
 1.7.8 (2026-09-04): một giá trị niêm phong chỉ được phân giải tại đúng chỗ tiêu thụ — một lệnh chẩn đoán chứng minh tham chiếu phân giải được thì báo kết quả, tên, độ dài hay digest, không bao giờ báo giá trị, và lệnh nào không viết được như vậy thì không chạy; receipt trước đây chỉ có mục fallback nay có mục finding để ghi sự cố ấy.

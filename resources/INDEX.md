@@ -1,5 +1,7 @@
 # Resources
 
+Questions and recorded choices follow [interaction](interaction.md).
+
 Who runs each operator, with what, and under which standing policies. Two closed places carry it:
 
 - `agents/profiles/<runtime>.json` — one file per runtime (`openai.json`, `claude.json`); the file owns

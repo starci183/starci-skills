@@ -1,4 +1,4 @@
-# StarCi Skills 1.7.9
+# StarCi Skills 1.8.0
 
 This tree is the runtime. Read [SKILL.md](SKILL.md) next; it is the single entry that freezes a
 mission's scope, selects the one operator that owns the outcome, and routes between operators on
@@ -66,6 +66,8 @@ head or the head is not publishable.
 - Rule IDs are stable public addresses. Append; never renumber, reuse, or silently change meaning.
 
 ## Lineage
+
+1.8.0 (2026-09-04): interaction has one communication policy and typed question/selection gates; material directions are chosen by the user with rendered evidence, recorded choices are reused, and routine confirmation is omitted within authorized work; operational grants and routing remain unchanged.
 
 1.7.9 (2026-09-04): opening a session is the first act of a mission that writes, never a question put to a person and never something done after the first write — a mission that has already written outside a session opens one and moves the work onto its branch; a bind that finds uncommitted source on the mutation branch refuses, whether or not a declared write root covers it.
 1.7.8 (2026-09-04): a sealed value is resolved only where it is consumed — a diagnostic that proves a reference resolves reports the outcome, the name, a length or a digest, never the value, and one that cannot be written that way is not run; a receipt that had only a fallback section now has a finding section to record the lapse in.

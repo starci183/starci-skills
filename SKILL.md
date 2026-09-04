@@ -11,6 +11,10 @@ result.
 
 ## Setup
 
+Before communicating a question, apply [the interaction policy](resources/interaction.md).
+This changes communication only: all routing transitions, operator boundaries and required
+authorizations below remain in force. An Ask column or diagnostic reason is not a prompt to forward.
+
 1. Freeze one mission scope: the unit, the target, inclusions and exclusions, write roots, external
    effects, and what will count as proof. Two readings that would change any of those is one focused
    question, not a guess.
@@ -157,4 +161,3 @@ critique, a review) is a second fresh agent the orchestrator spawns for a branch
 `waiting`. `alias/alias.json` is the one place an alias resolves to a location, and `alias/INDEX.md` is
 its readable map by zone (workspaces, grammar, knowledge, worktrees, remote, dynamic); an operator
 reads only what its Context table names.
-

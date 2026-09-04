@@ -172,6 +172,7 @@ const requestJson = ({ extra = {} } = {}) => ({
   step: 2,
   parallel: 1,
   sessionId: 's-test',
+  ...(extra.approval ? { decisionId: 'layout-direction', selectedOption: extra.approval } : {}),
   contexts: [{ alias: '@workspaces/fe', head: HEAD }, { alias: '@grammar/core', head: null }, { alias: '@knowledge/ui/composition', head: null }],
   requirements: {
     target: '/plans',
@@ -190,7 +191,7 @@ const requestJson = ({ extra = {} } = {}) => ({
   resume: null,
 });
 
-const responseJson = ({ status = 'done', stop, fields, fallbacks = [], next = ['frontend.presentation.resolve'], reason } = {}) => ({
+const responseJson = ({ status = 'done', stop, fields, fallbacks = [], next = ['frontend.presentation.resolve'], reason, interaction } = {}) => ({
   schemaVersion: 9,
   operatorId: 'frontend.direction.decide',
   step: 2,
@@ -198,6 +199,7 @@ const responseJson = ({ status = 'done', stop, fields, fallbacks = [], next = ['
   status,
   ...(stop ? { stop } : {}),
   ...(reason ? { reason } : {}),
+  ...(interaction ? { interaction } : {}),
   fallbacks,
   fields: fields ?? { 'frontend-direction-decision': 'response/response.md', 'ui-coverage': 'response/data/coverage.json' },
   commits: [],
@@ -210,7 +212,8 @@ function writeBranch(files) {
   for (const d of ['request', 'response/data', 'response/artifacts']) mkdirSync(path.join(branch, d), { recursive: true });
   mkdirSync(path.join(session, 'step-1', 'parallel-1', 'response'), { recursive: true });
   writeFileSync(path.join(session, 'step-1', 'parallel-1', 'response', 'response.md'), '# business-promise-authority — plans\n');
-  writeFileSync(path.join(session, 'state.json'), JSON.stringify({ id: 's-test', project: 'starci-academy', startedAt: '2026-09-03T00:00:00Z', requestHashes: {}, chain: [['1/1'], ['2/1']], steps: { '1/1': 'business.decide', '2/1': 'frontend.direction.decide' }, current: '2/1', status: 'running' }));
+  const approval = files['request/request.json']?.requirements?.approval;
+  writeFileSync(path.join(session, 'state.json'), JSON.stringify({ id: 's-test', project: 'starci-academy', startedAt: '2026-09-03T00:00:00Z', requestHashes: {}, chain: [['1/1'], ['2/1']], steps: { '1/1': 'business.decide', '2/1': 'frontend.direction.decide' }, current: '2/1', status: 'running', ...(approval ? { choices: { 'layout-direction': { selected: approval, selectedBy: 'user', sourceRef: 'fixture:user-selected-direction' } } } : {}) }));
   for (const [name, content] of Object.entries(files)) {
     if (content === null) continue;
     writeFileSync(path.join(branch, name), typeof content === 'string' ? content : JSON.stringify(content, null, 2));
@@ -275,13 +278,10 @@ await expectValid({
 }, 'another class of the published vocabulary, declared in the receipt and carried by the coverage');
 await expectValid(threeCandidates(), 'three candidates, the scores make one dominant and the operator decides');
 await expectValid(threeCandidates({ tie: true }), 'three candidates level on the scores, the tie broken by the fallback');
-await expectValid(threeCandidates({ policy: 'approval-required' }), 'three candidates under approval-required, one dominant, decided without asking');
+await expectError(threeCandidates({ policy: 'approval-required' }), 'the user selects the tier', 'a dominant recommendation cannot replace a required user choice');
 await expectValid(threeCandidates({ policy: 'approval-required', approval: 'one-column', tie: true }), 'three candidates level on the scores, the tie approved by the person');
-// The choice is the person's only over a tie the scores prove: DIRECTION_CHOICE_REQUIRED under
-// approval-required stops with the receipt, its ## Scores shows the tie, and its ## Printed table is
-// the choice — every candidate served at every viewport, at least three of them, and a reason that
-// names the sheet and asks one question. `printedChoice()` is that stop; its mutations are options
-// narrated in prose, printed short, scored with a winner, or not scored at all.
+// Material choices reach the person as typed options backed by rendered and scored candidates.
+// A dominant recommendation does not replace a user answer.
 const CHOICE_REASON = 'http://127.0.0.1:60000/ — which of the three compositions do you take?';
 const printedChoice = ({ candidates = 3, printed = NAMES.slice(0, candidates), reason = CHOICE_REASON, receipt = true, scores = 'tie' } = {}) => ({
   'request/request.json': requestJson({ extra: { candidates, selectionPolicy: 'approval-required' } }),
@@ -290,6 +290,7 @@ const printedChoice = ({ candidates = 3, printed = NAMES.slice(0, candidates), r
     stop: 'DIRECTION_CHOICE_REQUIRED',
     next: [],
     reason,
+    interaction: { kind: 'tier-choice', decisionId: 'layout-direction', options: NAMES.slice(0, candidates).map((id) => ({ id, label: id, tradeoff: `Distinct experience of ${id}` })) },
     fields: { ...(receipt ? { 'frontend-direction-decision': 'response/response.md', 'ui-coverage': 'response/data/coverage.json' } : {}), candidates: NAMES.slice(0, candidates).map((n) => `response/artifacts/${n}.html`) },
   }),
   ...(receipt ? { 'response/response.md': responseMd({ policy: 'approval-required', candidates, selected: '—', rejectAll: false, printed, scores }), 'response/data/coverage.json': coverage() } : {}),
@@ -358,10 +359,25 @@ await expectError({ ...baseline(), 'response/response.json': responseJson({ stat
 // The hand-off to the person.
 await expectError(printedChoice({ printed: [], reason: 'Accept the composition and record the density band as seeded-data-limited, or handle the density band and three family gaps first?' }), 'lists no rendered candidate', 'a choice handed over as two prose options');
 await expectError(printedChoice({ candidates: 2, printed: ['one-column'] }), 'option split-view is offered and never printed', 'a two-option choice printed with one candidate');
-await expectError(printedChoice({ candidates: 2 }), 'shows 2 rendered candidate(s) for a choice of 3', 'a composition choice with fewer than three candidates in front of the person');
+await expectValid(printedChoice({ candidates: 2 }), 'two rendered directions are a complete tier choice');
 await expectError(printedChoice({ receipt: false }), 'with no receipt', 'a choice stop that carries no receipt and so printed nothing');
 await expectError(printedChoice({ reason: 'http://127.0.0.1:60000/ — one-column keeps the offer above the fold and split-view reads denser; which do you prefer, or should I refine first?' }), 'is not one question', 'a message that narrates the options instead of asking one question');
-await expectError(printedChoice({ scores: 'dominant' }), 'so the choice was the operator\'s', 'a choice handed to the person while the scores name a winner');
+await expectValid(printedChoice({ scores: 'dominant' }), 'a recommendation does not replace the user tier choice');
 await expectError(printedChoice({ scores: 'none' }), 'with no ## Scores', 'a choice handed to the person with nothing scored');
 
-process.stdout.write('frontend.direction.decide self-test: 12 valid branches, 51 rejected mutations\n');
+const untypedChoice = printedChoice();
+const disguisedChoice = printedChoice();
+disguisedChoice['response/response.json'].stop = 'INVALID_INPUT';
+disguisedChoice['response/response.json'].fields = {};
+await expectError(disguisedChoice, 'must use DIRECTION_CHOICE_REQUIRED', 'another stop cannot bypass visual choice evidence');
+delete untypedChoice['response/response.json'].interaction;
+await expectError(untypedChoice, 'needs a typed tier-choice interaction', 'a prose question cannot bypass the interaction gate');
+const mismatchedChoice = printedChoice();
+mismatchedChoice['response/response.json'].interaction.options[0].id = 'unrendered';
+await expectError(mismatchedChoice, 'tier options must match', 'a typed option must identify its rendered candidate');
+const unrecordedApproval = threeCandidates({ policy: 'approval-required', approval: 'one-column', tie: true });
+delete unrecordedApproval['request/request.json'].decisionId;
+delete unrecordedApproval['request/request.json'].selectedOption;
+await expectError(unrecordedApproval, 'approval must match a recorded user choice', 'approval alone is not a user choice');
+
+process.stdout.write('frontend.direction.decide self-test: lawful branches and rejected mutations passed\n');

@@ -186,10 +186,10 @@ liệt kê từng artifact đã in dưới `## Printed` kèm lý do. Một phán
 Một phán quyết bố cục hay thẩm mỹ không bao giờ được đóng bằng cách hỏi. Khi một topic như thế đóng ở
 fail hay fix-first, hàng của nó định tuyến về `direction` và chuỗi bàn giao sang
 `frontend.direction.decide`, nơi chấm các phương án đã render theo đúng các tiêu chí mà audit này đã
-đánh rớt rồi chọn phương án trội, hoặc, trên một thế hoà mà chính bảng điểm của nó chứng minh, hỏi
-người từ lần dừng của chính nó. Audit này không dựng gì, không xếp hạng gì và không mời chọn gì:
-validator từ chối một route `user` mà còn để một topic bố cục hay thẩm mỹ mở, vì câu trả lời tính được
-từ thang điểm của direction, và một câu hỏi mà câu trả lời tính được thì không đem ra hỏi. Các mã dừng
+đánh rớt rồi áp dụng chính sách lựa chọn cùng [chính sách tương tác](../../resources/interaction.vi.md).
+Audit này không dựng gì, không xếp hạng gì và không mời chọn gì: validator từ chối một route `user`
+mà còn để một topic bố cục hay thẩm mỹ mở; direction sở hữu việc so sánh phương án và lựa chọn hướng
+khác biệt. Các mã dừng
 về phía caller và `NO_PROGRESS` ở đây là việc vận hành — cùng một head đo lại mà không có delta — nên
 `reason` của chúng nói rõ điều ấy và không mang phương án nào. Một topic `blocked` vì matrix bỏ sót
 một state đã khai không phải là cùng một head đo lại, và cũng không phải một finding bố cục hay thẩm

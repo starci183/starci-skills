@@ -100,6 +100,11 @@ const orchestrator = JSON.parse(await readFile(path.join(root, 'resources', 'orc
 if (orchestrator.agentPerOperator !== true) errors.push('orchestrator.json: agentPerOperator must be true');
 if (!Number.isInteger(orchestrator.maxConcurrentAgents) || orchestrator.maxConcurrentAgents < 1 || orchestrator.maxConcurrentAgents > 3) errors.push('orchestrator.json: maxConcurrentAgents must be an integer from 1 to 3');
 if (orchestrator.dispatch !== 'routing.json') errors.push('orchestrator.json: dispatch must be routing.json');
+if (orchestrator.interactionPolicy !== 'resources/interaction.json') errors.push('orchestrator.json: interactionPolicy must name resources/interaction.json');
+const interaction = JSON.parse(await readFile(path.join(root, 'resources/interaction.json'), 'utf8'));
+if (interaction.schemaVersion !== 1 || !Array.isArray(interaction.questionKinds) || !interaction.questionKinds.length || interaction.questionKinds.some((kind) => typeof kind !== 'string' || !kind.trim())) errors.push('interaction.json: schemaVersion and questionKinds must declare a communication contract');
+if (!Number.isInteger(interaction.minOptions) || !Number.isInteger(interaction.maxOptions) || interaction.minOptions < 1 || interaction.maxOptions < interaction.minOptions) errors.push('interaction.json: option bounds must be ordered positive integers');
+if (!interaction.selectionSource || !interaction.rule || interaction.gate !== 'scripts/validate-interaction.mjs') errors.push('interaction.json: selectionSource, rule and interaction gate must be declared');
 const pairs = orchestrator.profileEquivalents?.pairs ?? {};
 for (const [id, profile] of Object.entries(profiles)) {
   const eq = pairs[id];

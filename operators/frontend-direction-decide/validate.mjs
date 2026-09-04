@@ -2,8 +2,8 @@
 // change level agree; the selection policy and the approval agree; the receipt names exactly one
 // selected candidate, falsifies every candidate it formed, and rejects the others by name; a refine
 // forms no structural candidate and consults no external reference; more than one candidate is
-// rendered, scored, and the dominant one selected, a choice reaching the person only over a tie the
-// scores prove; and COVERAGE-1 holds, meaning the coverage declares one surface class from the published
+// rendered and scored, with selection following the request policy and recorded user choice;
+// and COVERAGE-1 holds, meaning the coverage declares one surface class from the published
 // vocabulary and enumerates every action, region, state and responsive branch the UI contract
 // declares, with the receipt naming the same class the coverage carries.
 import { existsSync } from 'node:fs';
@@ -172,6 +172,7 @@ export async function validateDirectionStep(branchDir, root = ROOT) {
   const errors = [...base.errors];
   const { response, requirements = {}, present = new Set() } = base;
   if (!response || response.operatorId !== 'frontend.direction.decide') return { errors };
+  if (response.interaction !== undefined && response.stop !== 'DIRECTION_CHOICE_REQUIRED') errors.push('response/response.json: a direction interaction must use DIRECTION_CHOICE_REQUIRED with rendered evidence');
   const has = (f) => existsSync(path.join(branchDir, f));
   const read = (f) => readFile(path.join(branchDir, f), 'utf8');
 
@@ -181,6 +182,7 @@ export async function validateDirectionStep(branchDir, root = ROOT) {
   const preview = requirements.preview ?? 'no';
   const policy = requirements.selectionPolicy ?? 'automatic';
   const approval = empty(requirements.approval) ? null : requirements.approval;
+  if (policy === 'approval-required' && approval !== null && (!base.request?.decisionId || base.request.selectedOption !== approval)) errors.push('request.json: approval must match a recorded user choice through decisionId and selectedOption');
   const references = list(requirements.references);
 
   if (intent === 'create' && changeLevel !== 'new') errors.push('request.json: intent create requires changeLevel new');
@@ -239,9 +241,8 @@ export async function validateDirectionStep(branchDir, root = ROOT) {
         if (candidate === selected && verdict === 'fails') errors.push(`${at}: the selected candidate ${selected} fails an attack, so the direction is not decided`);
       }
     }
-    // Several rendered candidates are ranked before one is selected. The scores decide a dominant
-    // candidate under either policy; only a tie they prove is a choice, taken by the fallback under
-    // automatic and by the person under approval-required.
+    // Scores select an internal comparison under automatic and inform a recommendation under
+    // approval-required, where the recorded user choice selects the material direction.
     const rendered = [...artifacts].map((page) => page.replace(/^.*\//, '').replace(/\.html$/, ''));
     const printedMap = printedCandidates(tableUnder(text, '## Printed') ?? []);
     const scores = scoreRows(tableUnder(text, '## Scores'));
@@ -251,7 +252,7 @@ export async function validateDirectionStep(branchDir, root = ROOT) {
     if (response.status === 'done') {
       errors.push(...scoreCoverageErrors({ at, scores, rendered, printed: printedMap }));
       errors.push(...candidateLimitErrors({ at, limits, scores }));
-      if (scored && ranking.dominant && selected !== ranking.dominant) {
+      if (scored && ranking.dominant && selected !== ranking.dominant && !(policy === 'approval-required' && approval === selected)) {
         errors.push(`${at}: the scores make ${ranking.dominant} dominant (mean ${ranking.means[0].mean.toFixed(2)}) and the receipt selects ${selected}; a dominant candidate is the one selected`);
       }
       const tookFallback = list(response.fallbacks).includes('DIRECTION_CHOICE_REQUIRED');
@@ -259,7 +260,7 @@ export async function validateDirectionStep(branchDir, root = ROOT) {
       if (scored && !ranking.dominant && policy === 'automatic' && !tookFallback) errors.push(`${at}: no candidate dominates (${ranking.tie}) and no DIRECTION_CHOICE_REQUIRED fallback is recorded; a tie under automatic is broken by the fallback and recorded`);
     }
     if (policy === 'approval-required' && response.status === 'done') {
-      if (approval === null && !(scored && ranking.dominant)) errors.push('response/response.json: approval-required with no approval cannot end done unless the scores make one candidate dominant; over a tie DIRECTION_CHOICE_REQUIRED terminates here');
+      if (approval === null) errors.push('response/response.json: approval-required with no approval cannot end done; the user selects the tier even when one candidate scores higher');
       else if (approval !== null && approval !== selected) errors.push(`${at}: the receipt selects ${selected} but approval names ${approval}`);
     }
 
@@ -300,18 +301,20 @@ export async function validateDirectionStep(branchDir, root = ROOT) {
       }
     }
     // When the choice is the person's, the same table is the whole hand-off: one rendered candidate
-    // per option, at least three because a composition is chosen by eye, a capture per viewport,
+    // per typed option, a capture per viewport,
     // and a reason that names the sheet and asks one question. Two options written out in prose
     // are advice, and advice is what the print law exists to refuse.
     if (response.status === 'blocked' && response.stop === 'DIRECTION_CHOICE_REQUIRED' && await userRouted(root, await loadErrorsRegistry(root), 'frontend.direction.decide', response)) {
+      if (response.interaction?.kind !== 'tier-choice') errors.push('response/response.json: a direction choice needs a typed tier-choice interaction');
+      const offered = (Array.isArray(response.interaction?.options) ? response.interaction.options : []).map((option) => option?.id);
+      if (offered.length !== rendered.length || rendered.some((id) => !offered.includes(id))) errors.push('response/response.json: tier options must match the rendered candidate ids');
       errors.push(...choiceHandoffErrors({ at, printedRows, options: rendered, reason: response.reason }));
-      // The stop is lawful only over a tie the scores prove: a sheet whose scores name a winner is a
-      // confirmation whose answer is already known, and that is never a stop.
-      if (scores.length === 0) errors.push(`${at}: the choice is handed to the person with no ## Scores; the stop is lawful only over a tie the scores prove`);
+      // Every offered direction has scored evidence, including when one is recommended.
+      if (scores.length === 0) errors.push(`${at}: the choice is handed to the person with no ## Scores; every offered direction needs scored evidence`);
       else {
         errors.push(...scoreCoverageErrors({ at, scores, rendered, printed: printedMap }));
         errors.push(...candidateLimitErrors({ at, limits, scores }));
-        if (ranking.dominant) errors.push(`${at}: the scores make ${ranking.dominant} dominant (mean ${ranking.means[0].mean.toFixed(2)}), so the choice was the operator's; a confirmation whose answer the receipt already shows is never a stop`);
+        // Scores inform a recommendation; they do not replace the user's explicit tier choice.
       }
     }
 

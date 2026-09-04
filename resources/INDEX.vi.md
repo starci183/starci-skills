@@ -1,5 +1,7 @@
 # Resources
 
+Câu hỏi và lựa chọn đã ghi nhận tuân theo [tương tác](interaction.vi.md).
+
 Ai chạy operator nào, bằng gì, và dưới những chính sách thường trực nào. Hai chỗ đóng mang việc đó:
 
 - `agents/profiles/<runtime>.json`: mỗi runtime một file (`openai.json`, `claude.json`); file giữ provider,

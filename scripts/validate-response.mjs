@@ -16,6 +16,7 @@ import { checkDocument, loadKindTemplates } from './validate-templates.mjs';
 import { loadOperatorPackages, kindOf, isYes, exchangeOf } from './operator-md.mjs';
 import { loadErrorsRegistry } from './errors-registry.mjs';
 import { sessionRootOf } from './validate-request.mjs';
+import { loadInteractionPolicy, interactionErrors } from './validate-interaction.mjs';
 
 // Only a fully quoted cell is unquoted: a sentence that opens with a code span keeps its backticks.
 const unquote = (s) => { const t = String(s ?? '').trim(); return /^`[^`]*`$/.test(t) ? t.slice(1, -1) : t; };
@@ -72,7 +73,7 @@ export function printedCandidates(rows) {
 // asked to choose between (every one must be printed), `minimum` is the floor for a composition or
 // taste choice, `viewports` is how many captures each candidate carries, and `reason` is the stop's
 // message, which names the sheet and asks one question and nothing more.
-export function choiceHandoffErrors({ at, printedRows, options = [], minimum = 3, viewports = 2, reason }) {
+export function choiceHandoffErrors({ at, printedRows, options = [], minimum = options.length, viewports = 2, reason }) {
   const errors = [];
   const candidates = printedCandidates(printedRows);
   const needed = Math.max(minimum, options.length);
@@ -112,6 +113,13 @@ export async function validateResponse(root, dir, { requirements = {}, exchange 
   let response; try { response = JSON.parse(await readFile(file, 'utf8')); } catch (e) { return { errors: [`${rel('response/response.json')}: ${e.message}`], response: null, present: new Set() }; }
   const schema = JSON.parse(await readFile(path.join(root, 'templates', 'step', 'response.schema.json'), 'utf8'));
   errors.push(...validateAgainst(schema, response, rel('response/response.json')));
+  const stateFile = path.join(sessionRootOf(dir) ?? dir, 'state.json');
+  let choices = {};
+  if (existsSync(stateFile)) {
+    try { choices = JSON.parse(await readFile(stateFile, 'utf8')).choices ?? {}; }
+    catch (e) { errors.push(`state.json: ${e.message}`); }
+  }
+  errors.push(...interactionErrors(await loadInteractionPolicy(root), response.interaction, choices, response.status));
   if (response.status !== 'blocked' && response.stop !== undefined) errors.push(`${rel('response/response.json')}: only a blocked response carries a stop`);
   if (response.status !== 'waiting' && response.awaiting !== undefined) errors.push(`${rel('response/response.json')}: only a waiting response carries awaiting`);
   if ((response.exchange ?? null) !== exchange) errors.push(`${rel('response/response.json')}: exchange ${response.exchange ?? 'none'} does not match the folder ${exchange ?? 'none'}`);

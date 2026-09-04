@@ -9,14 +9,14 @@ thì tự ghép chuỗi của mình theo cùng bộ luật, thay vì nhét mình
 Cửa vào dùng chúng như sau:
 
 1. Đọc `when` của mọi ví dụ. Request khớp trọn ví dụ nào thì chạy chuỗi đó; preset điền vào
-   `request.json`, người chỉ bị hỏi những field không có mặc định.
+   `request.json`; lấy field còn thiếu theo [chính sách tương tác](../resources/interaction.md).
 2. Khớp một phần, hoặc bài toán nghiệp vụ khó hơn mọi `when` mô tả, thì tự ghép chuỗi thay vì bẻ một
    ví dụ gần đúng cho vừa: nghĩ ra nó từ bảng `## Next` của các operator và `routing.json`, theo
    đúng luật mà `scripts/validate-workflows.mjs` ép lên các file này:
    - mỗi nhánh gọi tên một operator có thật và chỉ preset field mà operator đó khai;
    - mọi field Requirements không có Default thì hoặc được preset, hoặc nằm trong `asks` của nhánh, để
-     chuỗi nói trước những field nào cửa vào phải lấy từ phạm vi nhiệm vụ hay hỏi người trước khi nhánh
-     đó chạy;
+     chuỗi nói trước những field nào cửa vào phải lấy trước khi nhánh chạy; `asks` là danh sách input,
+     không phải quyền gửi câu hỏi;
    - mọi Input bắt buộc của một nhánh phải do một bậc trước sinh ra;
    - các nhánh cùng bậc không chung alias ghi (hai operator không được cùng ghi một checkout hay một
      root; `frontend.surface.audit` toả theo entry của matrix vì nó không ghi gì);

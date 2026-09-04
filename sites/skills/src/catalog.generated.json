@@ -1,6 +1,6 @@
 {
-  "version": "1.7.9",
-  "lineageNote": "1.7.9 (2026-09-04): opening a session is the first act of a mission that writes, never a question put to a person and never something done after the first write — a mission that has already written outside a session opens one and moves the work onto its branch; a bind that finds uncommitted source on the mutation branch refuses, whether or not a declared write root covers it.",
+  "version": "1.8.0",
+  "lineageNote": "1.8.0 (2026-09-04): interaction has one communication policy and typed question/selection gates; material directions are chosen by the user with rendered evidence, recorded choices are reused, and routine confirmation is omitted within authorized work; operational grants and routing remain unchanged.",
   "entry": {
     "name": "starci",
     "description": "Complete one StarCi mission by freezing its scope, selecting the one operator that owns the outcome, and routing between operators on typed results until the outcome is proved or a person must decide.",
@@ -1101,7 +1101,7 @@
           "code": "DIRECTION_CHOICE_REQUIRED",
           "disposition": "fallback",
           "domain": "caller",
-          "meaning": "Several candidates survive falsification and the scores under ## Scores prove none dominant: the top means are equal, or the top scorer loses a failed criterion to another.",
+          "meaning": "Under automatic, several candidates survive and the scores prove none dominant. Under approval-required, material tier or direction alternatives await the user's choice; scores inform the recommendation, not the selection.",
           "shared": false
         },
         {
@@ -4142,7 +4142,7 @@
       "shared": false,
       "domain": "caller",
       "disposition": "fallback",
-      "meaning": "Several candidates survive falsification and the scores under ## Scores prove none dominant: the top means are equal, or the top scorer loses a failed criterion to another.",
+      "meaning": "Under automatic, several candidates survive and the scores prove none dominant. Under approval-required, material tier or direction alternatives await the user's choice; scores inform the recommendation, not the selection.",
       "fallback": "Among the tied top scorers, select the candidate that introduces the fewest new nodes; the scores stay under ## Scores and the pick under ## Decision.",
       "resume": "The person supplies approval naming one candidate."
     },

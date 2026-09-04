@@ -12,6 +12,7 @@ import process from 'node:process';
 import { fileURLToPath } from 'node:url';
 import { validateAgainst } from './json-schema.mjs';
 import { loadOperatorPackages, kindOf, isYes, exchangeOf } from './operator-md.mjs';
+import { loadInteractionPolicy, selectionErrors } from './validate-interaction.mjs';
 
 // Only a fully quoted cell is unquoted: a sentence that opens with a code span keeps its backticks.
 const unquote = (s) => { const t = String(s ?? '').trim(); return /^`[^`]*`$/.test(t) ? t.slice(1, -1) : t; };
@@ -87,6 +88,7 @@ export async function validateRequest(root, dir, packages) {
   if (pkg.shape !== 'v9') { errors.push(`${request.operatorId} is not an operator.md package`); return { errors, request }; }
   const op = pkg.en;
   const sessionRoot = sessionRootOf(dir);
+  let recordedChoices = {};
 
   if (request.exchange) {
     // A nested exchange: it must be one the operator's Outputs declare, and it carries no person-facing requirements.
@@ -109,6 +111,7 @@ export async function validateRequest(root, dir, packages) {
   if (sessionRoot && existsSync(path.join(sessionRoot, 'state.json'))) {
     try {
       const state = JSON.parse(await readFile(path.join(sessionRoot, 'state.json'), 'utf8'));
+      recordedChoices = state.choices ?? {};
       errors.push(...validateAgainst(JSON.parse(await readFile(path.join(root, 'templates', 'step', 'state.schema.json'), 'utf8')), state, 'state.json'));
       // A resume re-enters the same operator and names a branch state.json knows; a re-entry state.json does not record is unrecorded evidence.
       if (request.resume) {
@@ -128,6 +131,7 @@ export async function validateRequest(root, dir, packages) {
       }
     } catch (e) { errors.push(`state.json: ${e.message}`); }
   }
+  errors.push(...selectionErrors(await loadInteractionPolicy(root), request, recordedChoices));
   return { errors, request, pkg };
 }
 

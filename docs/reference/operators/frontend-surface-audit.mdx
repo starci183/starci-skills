@@ -186,11 +186,11 @@ itself.
 
 A composition or taste verdict is never closed by asking. When such a topic closes as fail or
 fix-first, its row routes to `direction` and the chain hands to `frontend.direction.decide`, which
-scores the rendered candidates against the criteria this audit failed and selects the dominant one,
-or, over a tie its own scores prove, asks the person from its own stop. This audit composes nothing,
+scores the rendered candidates against the criteria this audit failed and applies its selection
+policy and [interaction policy](../../resources/interaction.md). This audit composes nothing,
 ranks nothing and offers nothing: the validator refuses a `user` route that leaves a composition or
-taste topic open, because the answer is computable from the direction's rubric and a question whose
-answer is computable is not asked. The caller stops and `NO_PROGRESS` are operational here — the same
+taste topic open; direction owns the candidate comparison and any material choice. The caller stops
+and `NO_PROGRESS` are operational here — the same
 head measured again with no delta — so their `reason` says so and carries no candidate. A topic
 `blocked` because the matrix left out a declared state is neither of those things: it is not the same
 head measured again, and it is not a composition or taste finding, so it never counts toward

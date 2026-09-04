@@ -13,6 +13,19 @@
     "requestHashes"
   ],
   "properties": {
+    "choices": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["selected", "selectedBy", "sourceRef"],
+        "properties": {
+          "selected": { "type": "string", "minLength": 1 },
+          "selectedBy": { "type": "string", "description": "Checked against resources/interaction.json.selectionSource." },
+          "sourceRef": { "type": "string", "minLength": 1, "description": "Reference to the actual user message selecting this option." }
+        }
+      }
+    },
     "id": {
       "type": "string",
       "minLength": 1
