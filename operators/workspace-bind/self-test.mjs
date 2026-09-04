@@ -6,6 +6,8 @@ import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { validateWorkspaceStep } from './validate.mjs';
+import { resolveWorkspaceCheckout } from '../../scripts/workspace-checkout.mjs';
+import { workspaceCheckoutFixture } from '../../scripts/workspace-checkout-fixture.mjs';
 
 const head = 'd'.repeat(40);
 const fp = (c) => `sha256:${c.repeat(64)}`;
@@ -215,4 +217,25 @@ await expectError(withBinding(routeBinding({ runtime: runtimeConsumption({ serve
 await expectError(withBinding(routeBinding({ runtime: runtimeConsumption({ served: { branch: 'uat', head: 'f'.repeat(40), contains: [head], port: 3999, leaseSessionId: null } }) }), { runtimeNeed: 'consume' }), 'and the entry serves this route on http://localhost:3999', 'an endpoint that is not the port the entry serves this route on');
 await expectError({ ...consuming(), 'response/response.md': responseMd({ binding: routeBinding({ runtime: runtimeConsumption() }), findings: [['ROUTE_HYDRATED_FROM_PORTABLE', HYDRATED, 'resolved'], ['IDENTITY_ROSTER_SEALED', 'roster', 'sealed'], ['WORKTREE_BRANCH_FORBIDDEN', 'mtp', 'forbidden'], ['RUNTIME_CONSUMED_NOT_OWNED', OWNER, 'consumed']] }) }, 'the served head contains the head this route bound', 'a consumed runtime whose ancestry the receipt never states');
 
-process.stdout.write('workspace.bind self-test: 3 valid branches, 33 rejected mutations\n');
+// New session bindings use real isolated Git worktrees and the installed portable hydrator.
+// Legacy fixtures above remain unbound observations and are never silently re-resolved.
+{
+  const fixture = workspaceCheckoutFixture({ attachRuntime: true });
+  try {
+    const request = requestJson({ extra: { project: fixture.project, checkout: 'session', gitPolicy: { worktreeBranches: 'session-only', mutationBranch: 'main' }, declaredWriteRoots: ['src'] } });
+    request.contexts = [{ alias: `@workspaces/projects/${fixture.project}/be`, head: null }, { alias: `@workspaces/local/routes/${fixture.project}/be`, head: fixture.sessionHead }, { alias: '@workspaces/device-state', head: null }];
+    const branch = fixture.freezeRequest(request);
+    const binding = { ...resolveWorkspaceCheckout(fixture.options), identityFingerprint: fp('c'), authorityRoots: { businesses: null }, runtime: null, provenanceHeadRef: null };
+    fixture.write(path.join(branch, 'response/response.json'), responseJson());
+    fixture.write(path.join(branch, 'response/response.md'), responseMd({ binding }));
+    fixture.write(path.join(branch, 'response/data/route.json'), binding);
+    assert.deepEqual((await validateWorkspaceStep(branch, fixture.runtime)).errors, [], 'registered current-session branch is parent-valid');
+    fixture.write(path.join(branch, 'response/data/route.json'), { ...binding, sessionCheckout: { ...binding.sessionCheckout, sessionId: 'another-session' } });
+    assert.ok((await validateWorkspaceStep(branch, fixture.runtime)).errors.some(error => error.includes('sessionCheckout differs')), 'response validator independently rejects a foreign session identity');
+    fixture.write(path.join(branch, 'response/data/route.json'), binding);
+    fixture.write(path.join(branch, 'response/response.md'), responseMd({ binding }).replace(`| Disk path | ${binding.checkout.diskPath} |`, `| Disk path | ${fixture.canonical} |`));
+    assert.ok((await validateWorkspaceStep(branch, fixture.runtime)).errors.some(error => error.includes('Disk path differs from the selected checkout')), 'receipt cannot describe canonical path while route selects session worktree');
+  } finally { fixture.dispose(); }
+}
+
+process.stdout.write('workspace.bind self-test: legacy cases and independently verified session checkout branches passed\n');

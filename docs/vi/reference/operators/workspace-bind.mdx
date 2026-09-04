@@ -41,6 +41,16 @@ khai trông bất tiện. Hai nửa của route phải khớp nhau về project,
 đối an toàn và phân giải bên cạnh nó, còn một route đã hydrate nêu tên một Source khác là của máy
 khác và bị từ chối.
 
+`checkout` mặc định chọn checkout đã khai. Với `session`, hai khai báo được kiểm trước, rồi
+`scripts/workspace-checkout.mjs` chọn worktree duy nhất Git đã đăng ký có nhánh đúng bằng
+`session/<request.sessionId>` trong cùng thư mục Git common của checkout chuẩn. Chỉ chính sách
+`session-only` cho phép chọn như vậy. Không nhận đường dẫn hay tên phiên khác; helper không tạo,
+chuyển hay sửa chữa gì. Checkout và source head trong route mô tả worktree đã chọn, còn
+`sessionCheckout` giữ đường dẫn, nhánh, head chuẩn đã quan sát, thư mục common và định danh phiên
+hiện tại. Head chuẩn là quan sát, không phải base gốc của phiên; biên nhận ghi source sở hữu base ấy.
+Đăng ký thiếu, thuộc kho khác, không duy nhất hoặc không khả dụng đều bị từ chối. Biên nhận route
+hiện có không bao giờ được âm thầm ràng lại.
+
 ## Ràng endpoint là một phép chiếu đóng
 
 Một endpoint không bao giờ là URL ai đó chọn. Nó là `workspace-route-port-projection`: route frontend
@@ -140,6 +150,7 @@ và không mang phán quyết nào.
 | --- | --- | --- | --- |
 | `project` | id | — | Project cần ràng |
 | `role` | choice | — | `fe` hay `be`: vai của project ấy cần ràng |
+| `checkout` | choice | routed | `routed` chọn checkout chuẩn; `session` chỉ chọn worktree đã đăng ký của chính phiên trong request theo chính sách đã khai |
 | `gitPolicy` | list `{worktreeBranches, mutationBranch}` | the policy the route declaration carries; a declaration that carries none is `INVALID_INPUT` at step 1, never a guessed policy | Luật nhánh mà binding này được kiểm theo; `forbidden` giữ mọi lần ghi trên nhánh mutation |
 | `declaredWriteRoots` | list | empty | Những đường dẫn duy nhất mà việc sau được ghi; bẩn ngoài chúng là `CHECKOUT_DIRTY`, và bẩn bất kỳ khi checkout đang ở nhánh mutation thay vì nhánh `session/<sessionId>` cũng vậy |
 | `runtimeNeed` | choice | none | `none` không ràng runtime và bỏ qua bước 5; `consume` ràng endpoint của chủ với vai tiêu thụ |
@@ -151,7 +162,7 @@ và không mang phán quyết nào.
 | --- | --- | --- | --- | --- | --- |
 | 1 | Kiểm gate và chạy lại, và từ chối mọi hint nó mang | `resume` | `request/request.json`, phần requirements và head đóng băng của nó | — | `INVALID_INPUT`, `SOURCE_DRIFT`, `NO_PROGRESS` |
 | 2 | Ràng bootstrap và identity | — | @workspaces/device-state, định danh máy và roster credential đã niêm phong, @tools/secrets | — | `IDENTITY_UNVERIFIED` |
-| 3 | Phân giải route | `project`, `role` | @workspaces/projects/&lt;project>/&lt;role> đúng project và role này, @workspaces/local/routes/&lt;project>/&lt;role>, @tools/git | — | `ROUTE_UNDECLARED`, `ROUTE_UNHYDRATED`, `ROUTE_MISMATCH` |
+| 3 | Phân giải route | `project`, `role`, `checkout` | @workspaces/projects/&lt;project>/&lt;role> đúng project và role này, @workspaces/local/routes/&lt;project>/&lt;role>, @tools/git | — | `ROUTE_UNDECLARED`, `ROUTE_UNHYDRATED`, `ROUTE_MISMATCH` |
 | 4 | Kiểm checkout: chính sách nhánh, cây sạch và các write root | `gitPolicy`, `declaredWriteRoots` | @workspaces/local/routes/&lt;project>/&lt;role>, checkout đã phân giải, nhánh, head và cây làm việc của nó, @tools/git, @tools/shell | — | `<br />ANCH_POLICY_VIOLATION`, `CHECKOUT_DIRTY` |
 | 5 | Ràng runtime mà người gọi tiêu thụ từ entry của đúng project route này, chỉ khi `runtimeNeed` khác none | `runtimeNeed` | @worktrees/sessions/central-runtime, entry của `<project>/<role>` này cùng head đang phục vụ, những gì head đó chứa, lease, generation, bằng chứng health và khai báo danh tính của nó, @workspaces/ports/&lt;project>, @tools/http | — | `ENDPOINT_AUTHORITY_STALE`, `RUNTIME_NOT_READY`, `RUNTIME_BUSY` |
 | 6 | Ràng provenance và độ tươi, rồi phát | — | mọi thứ ở trên, @workspaces/device-state | `response/response.md`, `response/data/route.json`, `response/response.json` | — |
@@ -170,9 +181,16 @@ nó để miễn trừ, nên bất kỳ vết bẩn nào thấy ở đó — tro
 source được ghi mà không có phiên nào chịu trách nhiệm, và bước 4 dừng với `CHECKOUT_DIRTY` thay vì
 báo một mức sẵn sàng sẽ mang vi phạm đi tiếp mà không ghi lại. Nó được suy ra ở đây và không bao giờ nhận từ request, vì một mức sẵn sàng mà người gọi khẳng
 định được là một mức sẵn sàng không ai đo. Chạy lại thì bắt đầu lại từ
-bước 1, chỉ dùng lại quan sát có fingerprint không đổi, và tiêu thụ đúng phần delta; một route
-publish lại tới dưới dạng một fingerprint route mới, vì cùng một fingerprint không thể cho một ràng
-buộc khác.
+bước 1, chỉ dùng lại quan sát có fingerprint không đổi, và tiêu thụ đúng phần delta. Byte khai báo
+thay đổi tạo fingerprint route mới; dùng lại còn đòi hỏi cùng chế độ chọn, định danh checkout được
+chọn và source head đã quan sát.
+
+Lệnh chọn chỉ đọc là `node scripts/workspace-checkout.mjs <project> <role> <sessionId>
+&lt;routed|session> [declaredWriteRoot ...]`. Lệnh nhận trần ghi tương đối trong kho, không nhận đường
+dẫn checkout. JSON đó là quan sát checkout; operator vẫn phải ràng identity, gốc thẩm quyền và runtime
+đã yêu cầu để tạo biên nhận route đầy đủ. Bước 4 kiểm cây đã chọn; chọn phiên còn yêu cầu checkout mutation chuẩn sạch.
+Validator phản hồi tự chạy lại phép chọn và so các field route; gate request kiểm phép chọn phiên
+trước khi dispatch và ràng id phiên vào tọa độ chứa request, trạng thái phiên và hash request đã đóng băng.
 
 ## Đầu ra
 

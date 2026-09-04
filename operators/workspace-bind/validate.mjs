@@ -13,6 +13,7 @@ import process from 'node:process';
 import { fileURLToPath } from 'node:url';
 import { validateStep } from '../../scripts/validate-step.mjs';
 import { tableUnder } from '../../scripts/validate-response.mjs';
+import { validateWorkspaceCheckoutBinding } from '../../scripts/workspace-checkout.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 // Only an origin-only localhost URL is an endpoint. 127.0.0.1, a host, or a path is not.
@@ -40,6 +41,7 @@ export async function validateWorkspaceStep(branchDir, root = ROOT) {
   }
 
   if (route) {
+    errors.push(...validateWorkspaceCheckoutBinding(root, base.request, route, branchDir));
     const { checkout, gitPolicy, mutationReadiness, runtime } = route;
     if (!empty(requirements.project) && route.project !== requirements.project) errors.push(`response/data/route.json: project ${route.project} differs from the request's ${requirements.project}`);
     if (!empty(requirements.role) && route.role !== requirements.role) errors.push(`response/data/route.json: role ${route.role} differs from the request's ${requirements.role}`);
@@ -123,6 +125,9 @@ export async function validateWorkspaceStep(branchDir, root = ROOT) {
       if (binding['Source head'] !== route.sourceHead) errors.push('response/response.md: Source head differs from the route binding');
       if (binding['Hydrated route'] !== route.hydratedRouteRef) errors.push('response/response.md: Hydrated route differs from the route binding');
       if (checkout.Branch !== route.checkout.branch) errors.push(`response/response.md: Branch ${checkout.Branch} differs from the route binding's ${route.checkout.branch}`);
+      for (const [label, key] of [['Disk path', 'diskPath'], ['Git root', 'gitRoot'], ['Git repository', 'gitRepository'], ['Source head', 'sourceHead']]) {
+        if (checkout[label] !== route.checkout[key]) errors.push(`response/response.md: ${label} differs from the selected checkout`);
+      }
       if (checkout['Mutation readiness'] !== route.mutationReadiness) errors.push('response/response.md: Mutation readiness differs from the route binding');
       if (checkout['Repository kind'] !== route.checkout.repositoryKind) errors.push('response/response.md: Repository kind differs from the route binding');
       const businesses = route.authorityRoots.businesses;

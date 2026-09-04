@@ -42,6 +42,16 @@ directory and resolves to the Source root itself, a `sibling` kind carries a saf
 and resolves beside it, and a hydrated route that names another Source belongs to another machine and
 is refused.
 
+`checkout` selects the declared checkout by default. With `session`, the same declarations are
+verified first, then `scripts/workspace-checkout.mjs` selects the unique Git-registered worktree whose
+branch is exactly `session/<request.sessionId>` in the canonical checkout's Git common directory.
+Only `session-only` policy permits that selection. Neither a path nor another session can be supplied;
+the helper creates, switches and repairs nothing. The route's checkout and source head describe the
+selected worktree, while `sessionCheckout` preserves the observed canonical path, branch and head,
+the common directory and the current session identity. The canonical head is an observation, not the
+session's original base; source-writing receipts own that base. A missing, foreign, ambiguous or
+unavailable registration is refused. Existing route receipts are never silently rebound.
+
 ## Endpoint binding is a closed projection
 
 An endpoint is never a URL somebody chose. It is the `workspace-route-port-projection`: the verified
@@ -140,6 +150,7 @@ workspace, or provisions an account. It makes no product decision and carries no
 | --- | --- | --- | --- |
 | `project` | id | — | The project to bind |
 | `role` | choice | — | `fe` or `be`: the role of that project to bind |
+| `checkout` | choice | routed | `routed` selects the canonical checkout; `session` selects only this request session's registered worktree under the declared policy |
 | `gitPolicy` | list of `{worktreeBranches, mutationBranch}` | the policy the route declaration carries; a declaration that carries none is `INVALID_INPUT` at step 1, never a guessed policy | The branch law this binding is verified against; `forbidden` keeps every write on the mutation branch |
 | `declaredWriteRoots` | list | empty | The only paths later work may write; anything dirty outside them is `CHECKOUT_DIRTY`, and so is anything dirty at all when the checkout sits on the mutation branch rather than a `session/<sessionId>` branch |
 | `runtimeNeed` | choice | none | `none` binds no runtime and skips step 5; `consume` binds the owner's endpoints as a consumer |
@@ -151,7 +162,7 @@ workspace, or provisions an account. It makes no product decision and carries no
 | --- | --- | --- | --- | --- | --- |
 | 1 | Validate the gate and resume, and refuse every hint it carries | `resume` | `request/request.json`, its requirements and its frozen head | — | `INVALID_INPUT`, `SOURCE_DRIFT`, `NO_PROGRESS` |
 | 2 | Bind bootstrap and identity | — | @workspaces/device-state, the machine identity and the sealed credential roster, @tools/secrets | — | `IDENTITY_UNVERIFIED` |
-| 3 | Resolve the route | `project`, `role` | @workspaces/projects/&lt;project>/&lt;role> for exactly this project and role, @workspaces/local/routes/&lt;project>/&lt;role>, @tools/git | — | `ROUTE_UNDECLARED`, `ROUTE_UNHYDRATED`, `ROUTE_MISMATCH` |
+| 3 | Resolve the route | `project`, `role`, `checkout` | @workspaces/projects/&lt;project>/&lt;role> for exactly this project and role, @workspaces/local/routes/&lt;project>/&lt;role>, @tools/git | — | `ROUTE_UNDECLARED`, `ROUTE_UNHYDRATED`, `ROUTE_MISMATCH` |
 | 4 | Verify the checkout: branch policy, a clean tree, and the write roots | `gitPolicy`, `declaredWriteRoots` | @workspaces/local/routes/&lt;project>/&lt;role>, the resolved checkout, its branch, its head and its working tree, @tools/git, @tools/shell | — | `<br />ANCH_POLICY_VIOLATION`, `CHECKOUT_DIRTY` |
 | 5 | Bind the runtime the caller consumes from the registry entry of this project route, only when `runtimeNeed` is not none | `runtimeNeed` | @worktrees/sessions/central-runtime, the entry of this `<project>/<role>` with its served head, what that head contains, its lease, its generation, health evidence and identity declaration, @workspaces/ports/&lt;project>, @tools/http | — | `ENDPOINT_AUTHORITY_STALE`, `RUNTIME_NOT_READY`, `RUNTIME_BUSY` |
 | 6 | Bind provenance and freshness, then emit | — | everything above, @workspaces/device-state | `response/response.md`, `response/data/route.json`, `response/response.json` | — |
@@ -174,8 +185,16 @@ reporting a readiness that would carry the violation forward unrecorded. It is d
 accepted from the request, because a readiness a caller can
 assert is a readiness nobody measured. A
 resume begins again at step 1, reuses only unchanged fingerprinted observations, and consumes the
-exact delta; a republished route arrives as a new route fingerprint, because the same fingerprint
-cannot yield a different binding.
+exact delta. Changed declaration bytes produce a new route fingerprint; reuse also requires the
+same selection mode, selected checkout identity and observed source head.
+
+The read-only selection command is `node scripts/workspace-checkout.mjs <project> <role> <sessionId>
+&lt;routed|session> [declaredWriteRoot ...]`. It accepts repository-relative write ceilings, never a
+checkout path. Its JSON is a checkout observation; the operator still binds identity, authority roots
+and any requested runtime to produce the complete route receipt. Step 4 checks the selected tree, and a session selection also requires the canonical
+mutation checkout to be clean. The response validator independently repeats the selection and
+compares the route fields; request validation checks session selection before dispatch and binds the
+session id to its containing coordinate, session state and frozen request hash.
 
 ## Outputs
 

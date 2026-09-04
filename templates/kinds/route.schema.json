@@ -19,6 +19,19 @@
     "provenanceHeadRef"
   ],
   "properties": {
+    "sessionCheckout": {
+      "description": "Present only for checkout=session. The selected checkout is the unique Git-registered worktree on session/<sessionId> in the canonical checkout's common directory. canonicalSourceHead records the current canonical observation, not the session's original base. Canonical declarations remain unchanged.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["sessionId", "canonicalDiskPath", "canonicalSourceHead", "canonicalBranch", "gitCommonDir"],
+      "properties": {
+        "sessionId": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$" },
+        "canonicalDiskPath": { "type": "string", "minLength": 1 },
+        "canonicalSourceHead": { "$ref": "#/$defs/gitHead" },
+        "canonicalBranch": { "type": "string", "minLength": 1 },
+        "gitCommonDir": { "type": "string", "minLength": 1 }
+      }
+    },
     "project": {
       "$ref": "#/$defs/slug"
     },

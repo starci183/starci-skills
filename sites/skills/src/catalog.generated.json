@@ -3045,7 +3045,7 @@
         "@worktrees/sessions/central-runtime"
       ],
       "steps": 6,
-      "requirements": 6,
+      "requirements": 7,
       "inputs": [],
       "outputs": [
         {

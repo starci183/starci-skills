@@ -135,6 +135,10 @@ export async function validateRequest(root, dir, packages) {
     } catch (e) { errors.push(`state.json: ${e.message}`); }
   }
   errors.push(...selectionErrors(await loadInteractionPolicy(root), request, recordedChoices));
+  if (!errors.length && request.operatorId === 'workspace.bind' && !request.exchange) {
+    const { validateWorkspaceCheckoutRequest } = await import('./workspace-checkout.mjs');
+    errors.push(...validateWorkspaceCheckoutRequest(root, request, dir));
+  }
   if (!errors.length && request.operatorId === 'backend.source.apply') {
     const { validateMigrationContract } = await import('./migration-contract.mjs');
     errors.push(...(await validateMigrationContract(root, dir, request)).errors);

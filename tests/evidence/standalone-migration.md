@@ -74,3 +74,15 @@ could accompany an empty request. Each applied effect now has to occur in both t
 approved delta. A legitimate read-only blocked preflight validates, while a smuggled seed effect and
 an effect outside the approved set are rejected. Approval values, environment hashes and capability
 grants are unchanged; a read-only preflight is not a completed seed receipt.
+
+The same continuation reached a workspace composition gap: route step 31 selected the canonical
+Nivo backend checkout at cfb8379a, while backend source step 32 used the Git-registered worktree
+on session/20260904-042915-nivo-workspace.bind. Source writing already requires that session branch,
+and release correctly requires the exact source head and checkout it will execute. Publishing main
+or editing the portable declaration merely to join those owners would introduce an unrelated effect.
+The existing workspace.bind owner therefore gains an explicit session selection, derived from the
+verified canonical declaration and actual Git worktree registry, without a caller-selected path.
+This is an extension of the existing session-checkout rule, not a new product-specific rule.
+Its regression cases use disposable local Git repositories; this maintenance does not edit a live
+route, switch a product branch, run a product migration or seed a database. The canonical head can
+advance independently; source receipts retain responsibility for their original base provenance.
