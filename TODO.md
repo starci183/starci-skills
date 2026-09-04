@@ -169,6 +169,8 @@ context khai đủ để agent mù chạy được, log đủ để người đ�
 - [x] Sửa nóng làm gãy phiên đang chạy (`b21fd9ab`): dải slot import bị áp cả trên đường đọc nên slot cũ (8/1, 9/1) mất
       tín nhiệm, 3/1 và 6/1 của recovery đỏ trong 20 phút. Sửa ở `541142a6`: dải chỉ áp khi ghi import mới. Luật cho
       người sửa harness: bản vá chạm đường đọc phải được probe trên ledger sống trước khi ff runtime.
+- [x] D16: head đã `implemented` không reconcile lại được sau khi bản giao dời đi → transition `implemented->implemented`
+      (rebinding, không sai lệch) ở `business.reconcile`; head publish trích đúng commit gate đã pass.
 - [ ] Preflight trước lần ghi đầu: session Setup viết bản sửa owner rồi mới chạy `--preflight`; brief của operator
       ghi source nên đặt preflight là dòng Steps đầu và validator từ chối receipt không có bằng chứng preflight.
 
