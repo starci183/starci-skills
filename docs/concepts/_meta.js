@@ -1,6 +1,6 @@
 export default {
   "operator": "Operator",
-  "workflow": "Workflow",
+  "chain": "Chain",
   "session": "Session",
   "kinds-and-contracts": "Kinds and contracts",
   "stop-codes": "Stop codes",

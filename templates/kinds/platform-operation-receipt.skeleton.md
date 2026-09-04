@@ -1,20 +1,21 @@
-# platform-operation-receipt — observability prometheus/shared
+# platform-operation-receipt — runtime project/role
 
-One paragraph: which shared service was inventoried, which approved delta was applied, and which
-proof set was proved. Written by `platform.operate` as `response/response.md`. It proves the shared
-service reached the approved state; it proves nothing about any product.
+One paragraph: which route entry was inventoried, which rung was climbed and attested, and which proof
+set was proved. Written by `runtime.serve` (kind `runtime`) and `identity.provision` (kind `identity`)
+as `response/response.md`. It proves the entry reached the approved state; it proves nothing about
+any product.
 
 ## Binding
 
 | Field | Value |
 | --- | --- |
-| Operator | `platform.operate` |
+| Operator | `runtime.serve` |
 | Step | `step-1/parallel-1` |
 | Project | `project` |
-| Service | `prometheus/shared` |
-| Service kind | observability |
+| Service | `project/role` |
+| Service kind | runtime |
 | Owner | `platform-team` |
-| Approval | `@worktrees/debts/be.md#metrics-approval` |
+| Approval | `.stacks/dev/environment.json#sha256:0000000000000000000000000000000000000000000000000000000000000000` |
 | Desired state | `sha256:0000000000000000000000000000000000000000000000000000000000000000` |
 | Inventory fingerprint | `sha256:1111111111111111111111111111111111111111111111111111111111111111` |
 
@@ -28,7 +29,7 @@ service reached the approved state; it proves nothing about any product.
 
 | Resource | Kind | Revision | Owner |
 | --- | --- | --- | --- |
-| `prometheus/shared` | observability | r-14 | `platform-team` |
+| `project/role` | runtime | g-14 | `platform-team` |
 
 ## Port holders
 
@@ -44,11 +45,10 @@ service reached the approved state; it proves nothing about any product.
 
 | Check | Resource | Status | Evidence |
 | --- | --- | --- | --- |
-| `service-health` | `prometheus/shared` | passed | `logs/health.txt` |
+| `endpoints-served` | `project/role` | passed | `probes/endpoints-served.json` |
 
 ## Findings
 
 | Code | Resource | Port | Holder | Statement |
 | --- | --- | --- | --- | --- |
-| `SHARED_SERVICE_INVENTORIED` | `prometheus/shared` | — | — | the service was inventoried before anything changed |
-| `ALREADY_CONVERGED` | `prometheus/shared` | — | — | the service already matched the approved plan |
+| `RUNTIME_HEAD_REUSED` | `project/role` | — | — | the running head already contained the wanted commit and its endpoint answered, so nothing was restarted |

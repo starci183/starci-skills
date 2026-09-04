@@ -1,0 +1,138 @@
+# library.update
+
+## Việc
+
+Cập nhật một package của owner đã được uỷ quyền rõ ràng từ đầu tới cuối: tái hiện regression trong
+package, sửa nó, tăng version patch, build và gate package, rồi tiêu thụ đúng bản phát hành ấy trong
+metadata dependency của consumer cùng proof regression consumer không đổi, trong hai commit phiên chịu
+trách nhiệm cho từng byte của cả hai.
+
+## Xong khi
+
+Xong khi `library-source-application` ghi nhận đúng một commit một cha trên nhánh phiên mà tập thay
+đổi của nó là đúng tập file đã khai bên trong package owner được uỷ quyền và không gì khác, các bản
+ghi `library-proof` có hash khớp với byte đã commit cho thấy regression đi kèm thất bại trước và đạt
+sau cùng mọi script test, typecheck và build hiện có của package đạt không lọc, `library-release`
+đóng gói từ commit ấy mang version patch kế tiếp dưới integrity mà `dependency-update` ghi, delta
+metadata của commit thứ hai ấy chỉ chạm các mục dependency được nêu tên trong các manifest và lockfile
+consumer đã khai với package đã cài khớp từng file với bản phát hành, mỗi `dependency-proof` cùng
+`dependency-log` thô của nó cho thấy regression consumer không đổi và mọi gate consumer đã khai đạt
+trên đó, và `changes` nêu các đường dẫn của cả hai commit.
+
+## Một package, một consumer, một việc
+
+Một package được sửa mà không ai tiêu thụ thì chẳng sửa được gì người thấy, và một consumer nâng lên
+bản phát hành không ai chứng minh chỉ là một con số version. Operator này là cả hai nửa trong một
+agent mù, theo thứ tự: nửa package viết regression đi cặp, sửa hành vi, tăng version patch, chạy gate
+package rồi commit; nửa consumer đóng gói commit ấy thành bản phát hành, cài vào consumer với metadata
+chính xác, chứng minh regression consumer không đổi cùng các gate consumer, rồi commit lần nữa.
+Package owner và consumer nằm trong checkout được route; consumer ở repository khác là một route khác
+và một phiên khác.
+
+## Ranh giới nửa package
+
+Manifest package tại base đóng băng chứng minh danh tính package; tên thư mục do caller đưa không đủ.
+Mọi file đã khai nằm trong package và write roots của route. Từ chối symlink, package lồng, file
+consumer, dependency mới, sửa script, CSS, asset, cấu trúc markup, class và inline style. Chỉ sửa file
+hành vi hiện có, regression test đi cặp, version patch kế tiếp trong manifest hiện có, changelog
+package và metadata version của package trong lockfile. Lockfile workspace chỉ được phép khi cả plan và
+route đều gọi tên; JSON chỉ được thay version của entry package đã bind. Presentation đi qua pipeline
+interface. Package không bao giờ được publish, push, merge hay tag ở đây.
+
+## Ranh giới nửa consumer
+
+Plan consumer pin các manifest consumer, npm lockfile, regression không đổi và các gate bàn giao đầy
+đủ. Bản phát hành là tarball mà lần chạy này đóng gói từ commit package, định danh bằng integrity
+sha512 và version mà nửa package đã tăng lên; không lấy gì từ registry. Chỉ giá trị dependency được
+gọi tên trong dependencies hiện có của các manifest consumer được đổi. Lock chỉ đổi các entry
+dependency manifest đó và entry cài đặt của chính package đó; một entry link workspace giữ nguyên.
+Version mà workspace khác đang dùng giữ nguyên. Không đổi dependency gián tiếp, script, option, UI,
+test, source hoặc presentation.
+
+## Chứng minh trước khi ghi
+
+Chạy `validate.mjs <branch> --preflight` trước khi ghi. Gate đọc cả hai plan có kiểu, route đã bind và
+Git, từ chối cây bẩn và chứng minh ranh giới package, consumer và session. Viết test đi cặp trước rồi
+chạy `run-proof.mjs <branch> before`; helper buộc hành vi và manifest còn đúng base và ghi assertion
+regression thất bại. Sửa hành vi cùng version patch kế tiếp rồi chạy helper cho `after` và mọi gate
+package đã khai. Mỗi script test, typecheck, build hiện có của package phải chạy đầy đủ không filter.
+Commit tập package đã khai một lần. Rồi chạy `install.mjs <branch> baseline` và
+`run-proof.mjs <branch> consumer-before` trên version đang cài và regression consumer không đổi,
+`install.mjs <branch> release` để tiêu thụ bản phát hành đã đóng gói trong ranh giới metadata chính
+xác, và helper cho `consumer-after` cùng mọi gate consumer đã khai; `test:ci` nhận `COVERAGE_BASE_SHA`
+từ commit package và ghi vào proof. Helper chỉ chạy script hiện có hoặc binary regression của dependency
+đã khai, truyền mảng đối số không qua shell interpolation, và ghi output, exit status, hash từng file,
+nội dung script và thời điểm. Mỗi file thường đã cài được so byte với bản phát hành đã đóng gói; nhãn
+version không đủ. Commit metadata consumer một lần. Validator cuối kiểm từng commit một cha so với base
+của nó, toàn bộ diff Git của mỗi commit, hash đã commit và mọi proof đã ghi. Từ chối lời khẳng định
+pass không có log hoặc proof đo những byte khác.
+
+## Context
+
+| Alias | Bind | Bắt buộc |
+| --- | --- | --- |
+| `@workspaces/fe` | checkout được route chứa package owner và consumer của nó, tại base đóng băng; chỉ ghi nhánh phiên | có |
+
+## Đầu vào
+
+| Kind | Từ đâu | Bắt buộc |
+| --- | --- | --- |
+| `route` | `workspace.bind`; checkout, policy session và write roots đã kiểm chứng | có |
+
+## Yêu cầu
+
+| Field | Kiểu | Mặc định | Hỏi |
+| --- | --- | --- | --- |
+| `plan` | object | — | Schema library-behavior-plan đóng: danh tính package, tập file, regression đi cặp, script hiện có và patch kế tiếp |
+| `consumer` | object | — | Schema dependency-plan đóng: các manifest và lockfile consumer pin package, regression consumer không đổi và các gate bàn giao đầy đủ |
+| `resume` | token | null | Token nhánh bị chặn khi vào lại với plan hoặc proof thay đổi |
+
+## Các bước
+
+| # | Bước | Tham số | Đọc | Ghi | Dừng với |
+| --- | --- | --- | --- | --- | --- |
+| 1 | Kiểm request và preflight cả hai plan trước lần ghi đầu | `plan`, `consumer`, `resume` | `request/request.json`, đầu vào `route`, @workspaces/fe tại base, @tools/git | — | `INVALID_INPUT`, `SOURCE_DRIFT`, `NO_PROGRESS`, `LIBRARY_BOUNDARY_REJECTED`, `DEPENDENCY_BOUNDARY_REJECTED` |
+| 2 | Chỉ viết regression test đi cặp trong package owner và chứng minh thất bại | `plan` | @workspaces/fe tại base, @tools/shell | @workspaces/fe/branch/session trong trần test, @tools/sourcewrite, `library-proof` | `LIBRARY_PROOF_FAILED` |
+| 3 | Sửa hành vi đã khai và tăng version patch kế tiếp | `plan` | @workspaces/fe trong trần package | @workspaces/fe/branch/session trong tập file đã khai, @tools/sourcewrite | `LIBRARY_BOUNDARY_REJECTED` |
+| 4 | Chạy regression cùng toàn bộ script test, typecheck và build của package | `plan` | @workspaces/fe, @tools/shell | `library-proof` | `LIBRARY_PROOF_FAILED` |
+| 5 | Commit bản bàn giao package một lần rồi kiểm diff Git và hash proof của nó | `plan` | @workspaces/fe tại commit package, @tools/git | @workspaces/fe/branch/session, `library-source-application` | `LIBRARY_BOUNDARY_REJECTED`, `LIBRARY_PROOF_FAILED` |
+| 6 | Đóng gói bản phát hành từ commit package và ghi integrity của nó | `plan` | @workspaces/fe tại commit package, @tools/shell | `library-release` | `DEPENDENCY_BOUNDARY_REJECTED` |
+| 7 | Cài baseline trong consumer và chạy regression consumer không đổi | `consumer` | @workspaces/fe, @tools/shell | `dependency-proof`, `dependency-log` | `DEPENDENCY_PROOF_FAILED` |
+| 8 | Cài bản phát hành đã đóng gói trong ranh giới metadata consumer chính xác | `consumer` | @workspaces/fe và bản phát hành đã đóng gói, @tools/shell | @workspaces/fe/branch/session trong trần metadata, @tools/sourcewrite | `DEPENDENCY_BOUNDARY_REJECTED` |
+| 9 | Kiểm byte đã cài và chạy regression consumer cùng gate đầy đủ | `consumer` | @workspaces/fe, @tools/shell | `dependency-proof`, `dependency-log` | `DEPENDENCY_PROOF_FAILED` |
+| 10 | Commit metadata consumer một lần rồi kiểm delta và hash proof của nó | `consumer` | @workspaces/fe tại commit consumer, @tools/git | @workspaces/fe/branch/session, `dependency-update` | `DEPENDENCY_BOUNDARY_REJECTED`, `DEPENDENCY_PROOF_FAILED` |
+| 11 | Phát | — | mọi thứ ở trên | `changes`, `response/response.json` | — |
+
+`response.json` mang cả hai sha dưới `commits`, commit package trước; `dependency-update` gọi commit
+package là `base` của nó. Các proof consumer là các phase `consumer-before`, `consumer-after` và
+`consumer-<gate>`, để chúng nằm cạnh các proof package mà không ghi đè.
+
+## Đầu ra
+
+| Kind | File | Kiểu | Bắt buộc |
+| --- | --- | --- | --- |
+| `library-source-application` | `response/data/library.json` | data | có |
+| `library-proof` | `response/data/proofs/<phase>.json` | data | có |
+| `library-release` | `response/artifacts/release/<file>.tgz` | artifact | có |
+| `dependency-update` | `response/data/dependency.json` | data | có |
+| `dependency-proof` | `response/data/proofs/consumer-<phase>.json` | data | có |
+| `dependency-log` | `response/artifacts/proofs/consumer-<phase>.log` | artifact | có |
+| `changes` | `response/changes.md` | md | có |
+
+## Dừng
+
+| Code | Xử lý |
+| --- | --- |
+| `INVALID_INPUT` | terminate |
+| `SOURCE_DRIFT` | terminate |
+| `NO_PROGRESS` | terminate |
+| `LIBRARY_BOUNDARY_REJECTED` | terminate |
+| `LIBRARY_PROOF_FAILED` | terminate |
+| `DEPENDENCY_BOUNDARY_REJECTED` | terminate |
+| `DEPENDENCY_PROOF_FAILED` | terminate |
+
+## Kế tiếp
+
+| Khi | Operator |
+| --- | --- |
+| commit package và commit consumer cần kiểm chất lượng độc lập | `quality.verify` |

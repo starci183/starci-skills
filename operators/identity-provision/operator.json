@@ -1,0 +1,24 @@
+{
+  "schemaVersion": 9,
+  "id": "identity.provision",
+  "domain": "identity",
+  "job": "Provision the identity one flow signs in as: create each alias's account at the identity provider the bound route's registry entry declares, set its password from the sealed credential resolved by name, prove the account signs in, and publish the record of names the flow folder keeps; or rotate the administrator custody the same provider stands on.",
+  "package": "operator.md",
+  "errors": "errors.json",
+  "validator": "validate.mjs",
+  "selfTest": "self-test.mjs",
+  "resources": {
+    "profile": "sol-fresh",
+    "grammarBound": false,
+    "mode": "inline",
+    "tools": {
+      "@tools/fileread": "context-aliases",
+      "@tools/shell": "declared-commands",
+      "@tools/http": "probe",
+      "@tools/secrets": "resolve-by-name",
+      "@tools/sourcewrite": "declared-write-set",
+      "@tools/browsercontrol": "required"
+    }
+  },
+  "primaryOutput": "uat-account"
+}

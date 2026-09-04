@@ -1,0 +1,28 @@
+{
+  "schemaVersion": 9,
+  "id": "interface.generate",
+  "domain": "interface",
+  "job": "Generate one frontend surface end to end from the Grammar, the business promise, the previous source and the person's reference: form, render and print the candidates, decide one direction, resolve every application-owned presentation value to a published rule, and write the resolved tree on the session branch in one commit.",
+  "package": "operator.md",
+  "errors": "errors.json",
+  "validator": "validate.mjs",
+  "selfTest": "self-test.mjs",
+  "resources": {
+    "profile": "sol-fresh",
+    "grammarBound": true,
+    "mode": "isolated",
+    "tools": {
+      "@tools/fileread": "context-aliases",
+      "@tools/git": "commit-session-branch",
+      "@tools/websearch": "bounded",
+      "@tools/imagegen": "judged",
+      "@tools/visualize": "html",
+      "@tools/host": "loopback",
+      "@tools/print": "decision-points",
+      "@tools/registry": "read",
+      "@tools/sourcewrite": "declared-write-set",
+      "@tools/shell": "declared-commands"
+    }
+  },
+  "primaryOutput": "frontend-source-application"
+}

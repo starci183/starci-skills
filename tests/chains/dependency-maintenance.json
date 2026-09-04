@@ -1,0 +1,42 @@
+{
+  "schemaVersion": 1,
+  "id": "dependency-maintenance",
+  "when": {
+    "en": "One verified package release must be consumed through exact frontend dependency metadata, without source or presentation changes. Package consumption and quality evidence precede the separately bound runtime surface audit and UAT; this chain alone never claims a user-facing delivery.",
+    "vi": "Một bản phát hành package đã kiểm cần được tiêu thụ qua metadata dependency frontend chính xác, không đổi source hay presentation. Bằng chứng tiêu thụ package và chất lượng đi trước audit runtime và UAT đã bind riêng; riêng chuỗi này không xác nhận bàn giao luồng người dùng."
+  },
+  "mission": {
+    "goal": "the verified package release is consumed",
+    "doneWhen": [
+      {
+        "evidence": "the release is consumed through exact dependency metadata",
+        "producedBy": "library.update"
+      },
+      {
+        "evidence": "the checkout gates pass at the consumed head",
+        "producedBy": "quality.verify"
+      }
+    ]
+  },
+  "options": {
+    "roles": [
+      "fe"
+    ]
+  },
+  "example": [
+    [
+      "environment.preflight"
+    ],
+    [
+      "workspace.bind#fe"
+    ],
+    [
+      "library.update"
+    ],
+    [
+      "quality.verify"
+    ]
+  ],
+  "ends": "user",
+  "rewrite": "dependency.update → library.update; after the fold this fixture plans the same chain as library-maintenance and differs only in what the done-when line says."
+}

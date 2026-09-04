@@ -24,6 +24,14 @@ anything run (`scripts/validate-request.mjs#missionGateErrors`, `scripts/validat
 a mission writes or touches a runtime is read from the tools its operators declare, never from a list
 of operator ids.
 
+After every transition of a mission the orchestrator prints to the root chat exactly the two lines
+`interaction.json#transitionLog` declares — the branch's goal, then its outcome with the count of
+evidenced done-when lines, the artifact paths and the next cell — and records `logged: true` on the
+transition, which `scripts/validate-session.mjs` requires on every transition of a session that
+carries a mission. `scripts/validate-interaction.mjs#transitionLogErrors` checks a printed pair
+against the declared shape, compiled from the policy rather than copied. Full outputs stay in the
+session folder; the person who wants them reads the ledger.
+
 The standalone `scripts/validate-interaction.mjs <branch>` gate and the generic response gate check
 proposed questions. These gates validate communication only; passing them authorizes no operation.
 

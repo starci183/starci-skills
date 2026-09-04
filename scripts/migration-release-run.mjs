@@ -19,7 +19,7 @@ export async function executeMigrationRelease(root, branchDir) {
     const request = readJson(migrationPath(branchDir, 'request/request.json'));
     const session = path.resolve(branchDir, '..', '..'), key = `${request.step}/${request.parallel}`;
     const state = readJson(migrationPath(session, 'state.json'));
-    requireThat(state.id === request.sessionId && state.steps?.[key] === 'release.deploy'
+    requireThat(state.id === request.sessionId && state.steps?.[key] === 'migration.release'
       && state.requestHashes?.[key] === migrationDigest(fs.readFileSync(migrationPath(branchDir, 'request/request.json'))), 'REQUEST_NOT_FROZEN');
     const gated = await validateRequest(root, branchDir);
     requireThat(!gated.errors.length, 'REQUEST_INVALID');
@@ -39,7 +39,7 @@ export async function executeMigrationRelease(root, branchDir) {
       // Re-read request, approval, source, runner and configuration immediately before every effect.
       if (operation === 'apply') {
         const currentState = readJson(migrationPath(session, 'state.json'));
-        requireThat(currentState.steps?.[key] === 'release.deploy' && currentState.requestHashes?.[key] === state.requestHashes[key]
+        requireThat(currentState.steps?.[key] === 'migration.release' && currentState.requestHashes?.[key] === state.requestHashes[key]
           && state.requestHashes[key] === migrationDigest(fs.readFileSync(migrationPath(branchDir, 'request/request.json'))), 'REQUEST_DRIFT');
         binding = await validateMigrationReleaseRequest(root, branchDir, request);
         requireThat(!binding.errors.length && binding.planSha256 === planSha256 && binding.checkout === checkout, 'PREFLIGHT_DRIFT');
@@ -93,7 +93,7 @@ export async function executeMigrationRelease(root, branchDir) {
       journalFingerprintAfter: expected.journalFingerprint, executions };
     requireThat(!migrationReleaseProofErrors(root, branchDir, plan, planSha256, proof).length, 'MIGRATION_PROOF_INVALID');
     fs.writeFileSync(path.join(branchDir, 'response/data/migration-release.json'), JSON.stringify(proof, null, 2) + '\n', { flag: 'wx' });
-    const bindingRows = { Operator: 'release.deploy', Step: `step-${request.step}/parallel-${request.parallel}`, Project: plan.project, Environment: plan.env,
+    const bindingRows = { Operator: 'migration.release', Step: `step-${request.step}/parallel-${request.parallel}`, Project: plan.project, Environment: plan.env,
       Target: plan.target, Release: request.requirements.release, 'Source head': plan.sourceHead, 'Plan digest': planSha256,
       'Contract fingerprint': plan.contractFingerprint, Approval: request.requirements.approval, 'Connection fingerprint': plan.connectionFingerprint };
     const receipt = `# migration-release — ${request.requirements.release}\n\n## Binding\n\n| Field | Value |\n| --- | --- |\n${Object.entries(bindingRows).map(([field, value]) => `| ${field} | ${value} |`).join('\n')}\n\n## Outcome\n\n| Field | Value |\n| --- | --- |\n| Outcome | migrated |\n| Journal before | ${proof.journalFingerprintBefore} |\n| Journal after | ${proof.journalFingerprintAfter} |\n| Replay | no-op |\n\n## Executions\n\n| Invocation | Applied migrations | Exit code | Log | Digest |\n| --- | --- | --- | --- | --- |\n${executions.map((entry) => `| ${entry.invocation} | ${entry.applied.join(', ') || '—'} | 0 | \`${entry.logRef}\` | \`${entry.logSha256}\` |`).join('\n')}\n`;

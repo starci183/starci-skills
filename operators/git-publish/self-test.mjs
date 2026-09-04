@@ -104,11 +104,11 @@ const responseJson = ({ status = 'done', stop, commits = [HEAD], next = ['releas
 // The producer branch whose receipt authorized the commits this publish carries, plus the optional
 // audit that looked at the surface and the optional UAT that walked it. `session` shapes all three;
 // `null` leaves that branch off disk, and `chain` is what state.json says the session declared.
-function writeBranch(files, { producer = { operatorId: 'frontend.source.apply', status: 'done', commits: [HEAD] }, audit = null, walk = null, chain = null } = {}) {
+function writeBranch(files, { producer = { operatorId: 'interface.generate', status: 'done', commits: [HEAD] }, audit = null, walk = null, chain = null } = {}) {
   const session = mkdtempSync(path.join(tmpdir(), 'publish-session-'));
   const branch = path.join(session, 'step-2', 'parallel-1');
   for (const d of ['request', 'response/data', 'response/artifacts']) mkdirSync(path.join(branch, d), { recursive: true });
-  const steps = { '1/1': producer?.operatorId ?? 'frontend.source.apply', '2/1': 'git.publish' };
+  const steps = { '1/1': producer?.operatorId ?? 'interface.generate', '2/1': 'git.publish' };
   if (chain) Object.assign(steps, chain);
   writeFileSync(path.join(session, 'state.json'), JSON.stringify({ id: 's-test', project: 'starci-academy', startedAt: '2026-09-03T00:00:00Z', requestHashes: {}, chain: [['1/1'], ['2/1']], steps, current: '2/1', status: 'running' }));
 
@@ -121,7 +121,7 @@ function writeBranch(files, { producer = { operatorId: 'frontend.source.apply', 
       fallbacks: [], fields: {}, commits: producer.commits, next: ['git.publish'],
     }, null, 2));
   }
-  for (const [proof, operatorId, parallel, next] of [[audit, 'frontend.surface.audit', 2, 'quality.verify'], [walk, 'uat.verify', 3, 'git.publish']]) {
+  for (const [proof, operatorId, parallel, next] of [[audit, 'interface.audit', 2, 'quality.verify'], [walk, 'uat.verify', 3, 'git.publish']]) {
     if (!proof) continue;
     const dir = path.join(session, 'step-1', `parallel-${parallel}`);
     mkdirSync(path.join(dir, 'response', 'artifacts'), { recursive: true });
@@ -177,17 +177,17 @@ await expectValid({
 const AUDITED = {
   audit: { screenshots: ['response/artifacts/desktop.png', 'response/artifacts/narrow.png'] },
   walk: { screenshots: ['response/artifacts/sheet.png'] },
-  chain: { '1/2': 'frontend.surface.audit', '1/3': 'uat.verify' },
+  chain: { '1/2': 'interface.audit', '1/3': 'uat.verify' },
 };
-await expectValid(baseline(), 'a publication over a session whose backend producer left the receipt', { producer: { operatorId: 'backend.source.apply', status: 'done', commits: [HEAD] } });
+await expectValid(baseline(), 'a publication over a session whose backend producer left the receipt', { producer: { operatorId: 'backend.generate', status: 'done', commits: [HEAD] } });
 await expectValid(baseline(), 'a long flow that audited the surface, walked the journey and kept both sets of pictures', AUDITED);
 
-await expectError(baseline(), 'no done frontend.source.apply or backend.source.apply branch', 'a session branch with no source-application receipt', { producer: null });
-await expectError(baseline(), 'no done frontend.source.apply or backend.source.apply branch', 'a producer that never finished', { producer: { operatorId: 'frontend.source.apply', status: 'blocked', commits: [] } });
-await expectError(baseline(), 'no done frontend.source.apply or backend.source.apply branch', 'a receipt that registers another commit', { producer: { operatorId: 'frontend.source.apply', status: 'done', commits: [OTHER] } });
-await expectError(baseline(), 'no done frontend.surface.audit branch is on disk', 'an audit step the chain declared and never ran', { chain: { '1/2': 'frontend.surface.audit' } });
-await expectError(baseline(), 'with no screenshot artifact', 'an audit that produced no picture', { audit: { screenshots: null }, chain: { '1/2': 'frontend.surface.audit' } });
-await expectError(baseline(), 'which is not on disk', 'an audit naming a screenshot nobody kept', { audit: { screenshots: ['response/artifacts/desktop.png'], onDisk: [] }, chain: { '1/2': 'frontend.surface.audit' } });
+await expectError(baseline(), 'branch in the session registers', 'a session branch with no source-application receipt', { producer: null });
+await expectError(baseline(), 'branch in the session registers', 'a producer that never finished', { producer: { operatorId: 'interface.generate', status: 'blocked', commits: [] } });
+await expectError(baseline(), 'branch in the session registers', 'a receipt that registers another commit', { producer: { operatorId: 'interface.generate', status: 'done', commits: [OTHER] } });
+await expectError(baseline(), 'no done interface.audit branch is on disk', 'an audit step the chain declared and never ran', { chain: { '1/2': 'interface.audit' } });
+await expectError(baseline(), 'with no screenshot artifact', 'an audit that produced no picture', { audit: { screenshots: null }, chain: { '1/2': 'interface.audit' } });
+await expectError(baseline(), 'which is not on disk', 'an audit naming a screenshot nobody kept', { audit: { screenshots: ['response/artifacts/desktop.png'], onDisk: [] }, chain: { '1/2': 'interface.audit' } });
 await expectError(baseline(), 'no done uat.verify branch is on disk', 'a uat step the chain declared and never ran', { ...AUDITED, walk: null });
 await expectError(baseline(), 'is a done uat.verify with no screenshot artifact', 'a UAT run that kept no picture of the journey', { ...AUDITED, walk: { screenshots: null } });
 

@@ -1,13 +1,13 @@
 ---
 title: "Introduction"
-description: "What StarCi Skills is: one entry, operators with explicit boundaries, example workflows, and a session made of typed requests and responses."
+description: "What StarCi Skills is: one entry, operators with explicit boundaries, a chain planned from the mission, and a session made of typed requests and responses."
 ---
 
 # StarCi Skills
 
 StarCi Skills is the runtime that completes one StarCi mission. It is a tree of files, not a
-framework: `SKILL.md` is the entry, `operators/` holds the units of work, `workflows/` holds
-the example chains, and `routing.json` is the closed map that decides what happens after each one.
+framework: `SKILL.md` is the entry, `operators/` holds the units of work, the chain between them is planned
+from the mission, and `routing.json` is the closed map that decides what happens after each one.
 `INDEX.md` states the load order and says plainly what the tree is for — it "is the runtime", and
 `SKILL.md` is "the single entry that freezes a mission's scope, selects the one operator that owns the
 outcome, and routes between operators on typed results."
@@ -19,12 +19,12 @@ generated from the same files the runtime reads.
 ## One entry
 
 There is exactly one way in. `SKILL.md` freezes the mission scope, runs `workspace.bind` for anything
-that touches routed source, looks for a workflow, selects the first operator, and then sequences the
+that touches routed source, plans the chain from the confirmed mission, selects the first operator, and then sequences the
 rest. It does no work of its own: "it never decides a value, writes source, or judges a result."
 
 Its Entry table maps a request to its first operator — which project applies goes to
 `workspace.bind`, what the product promises goes to `business.decide`, whether a rendered surface
-holds up goes to `frontend.surface.audit`, and so on. A request that names no owner, or two owners
+holds up goes to `interface.audit`, and so on. A request that names no owner, or two owners
 whose scopes differ materially, stops there with one focused question.
 
 ## Operators
@@ -38,14 +38,15 @@ an `operator.json`, an `errors.json`, a `validate.mjs` and a `self-test.mjs`.
 See [Operator](/concepts/operator) for the shape, and [the operator reference](/reference/operators)
 for all operator packages.
 
-## Workflows
+## Chains
 
-A workflow is a pre-composed chain: ordered steps, each step a list of branches that run in parallel,
-with optional loops back to an earlier step and presets for a branch's Requirements. The files
-in `workflows/` are examples, not the only chains allowed; when none matches, the entry composes one
-under the rules `scripts/validate-workflows.mjs` enforces on those same files.
+No chain is stored. Once the person confirms the mission goal, `scripts/plan-chain.mjs` derives the
+chain from the operators the "done when" lines name, walking back through the Inputs, Context and
+Next tables of the operators; a feature with many pages or flows runs its `<domain>.plan` first and
+fans out one blind agent per unit, at most three branches a step; `scripts/validate-chain.mjs`
+accepts the chain before anything is dispatched and again every time a stop redraws it.
 
-See [Workflow](/concepts/workflow) and [the workflow reference](/reference/workflows).
+See [Chain](/concepts/chain).
 
 ## The request/response session
 

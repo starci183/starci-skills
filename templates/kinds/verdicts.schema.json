@@ -211,7 +211,7 @@
     },
     "auditScope": {
       "type": "object",
-      "description": "Selection and coverage limits validated against audit-scope by frontend.surface.audit; downstream receipts preserve this scope."
+      "description": "Selection and coverage limits validated against audit-scope by interface.audit; downstream receipts preserve this scope."
     }
   }
 }

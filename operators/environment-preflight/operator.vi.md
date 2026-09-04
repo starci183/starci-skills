@@ -162,6 +162,7 @@ chạy lại là `NO_PROGRESS`.
 | Khi | Operator |
 | --- | --- |
 | mọi bức tường đã dọn và chuỗi ràng các route của nó | `workspace.bind` |
-| một bức tường runtime hay danh tính thuộc về nền tảng phải được dọn trước | `platform.operate` |
+| một bức tường danh tính phải được dọn trước | `identity.provision` |
+| một bức tường runtime phải được dọn trước | `runtime.serve` |
 | nhiệm vụ không route source nào và một đơn vị giáo trình theo sau | `content.generate` |
 | một bức tường chỉ một người mới dọn được đang đứng | `user` |

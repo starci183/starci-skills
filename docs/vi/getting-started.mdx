@@ -1,6 +1,6 @@
 ---
 title: "Bắt đầu"
-description: "Một nhiệm vụ chạy như thế nào: workspace.bind, khớp workflow hay tự ghép chuỗi, request.json, layout nhánh, hai validator, mã dừng và chạy lại."
+description: "Một nhiệm vụ chạy như thế nào: workspace.bind, chuỗi vẽ từ nhiệm vụ, request.json, layout nhánh, hai validator, mã dừng và chạy lại."
 ---
 
 # Một nhiệm vụ chạy như thế nào
@@ -22,14 +22,16 @@ tự tìm checkout, và một thư mục trùng tên không bao giờ là thẩm
 route có kiểu: danh tính checkout đã xác minh, head nguồn chính xác, và binding runtime đóng mà nhiệm
 vụ được phép tiêu thụ. Xem [`workspace.bind`](/vi/reference/operators/workspace-bind).
 
-## 3. Khớp một workflow, hoặc tự ghép
+## 3. Vẽ chuỗi
 
-Cửa vào đọc `when` của mọi ví dụ trong `workflows/`. Khớp thì chạy đúng như đã ghi, preset điền vào
-`request.json`, và người chỉ bị hỏi những field không có mặc định. Không khớp thì tự ghép một chuỗi
-từ bảng `## Kế tiếp` của các operator, theo đúng luật mà `scripts/validate-workflows.mjs` ép lên các
-ví dụ: mọi Input bắt buộc của một nhánh phải do một bậc trước sinh ra, các nhánh trong cùng một bậc
-không dùng chung alias ghi, mỗi vòng lặp quay về bậc trước và mang `maxRounds`, và chuỗi kết thúc ở
-`git.publish`, `release.deploy` hoặc `user`. Chuỗi tự ghép đáng giữ thì thành một ví dụ mới.
+Không tra cứu gì. Người xác nhận goal của nhiệm vụ — gồm gì, không gồm gì, và những dòng "xong khi"
+kết thúc nó — rồi `scripts/plan-chain.mjs` suy chuỗi từ các dòng đó qua bảng `## Đầu vào`,
+`## Context` và `## Kế tiếp` của các operator: mọi input bắt buộc do một bậc trước sinh ra, mọi vai
+được bind, audit và đi thử nằm giữa bề mặt đã áp và lần publish của nó, một `<domain>.plan` đứng
+trước operator mà nhiều dòng gọi tên để các đơn vị toả ra mỗi đơn vị một agent mù, tối đa ba nhánh một
+bậc. Kế hoạch được in ra hai dòng cho mỗi nhánh, và `scripts/validate-chain.mjs` chấp nhận nó trước
+khi bước 4 bắt đầu; chỗ mập mờ trong các bảng là một lời từ chối gọi tên nó, không phải phỏng đoán.
+Xem [Chuỗi](/vi/concepts/chain).
 
 ## 4. Một agent, một operator
 
@@ -85,7 +87,7 @@ request/request.json -> validate-request.mjs -> agent ghi response/ -> validate-
 `validate-response.mjs` kiểm cổng chung và nạp contract của từng kind; `validate.mjs` của operator
 kiểm những gì chỉ operator đó kiểm được. Sau đó định tuyến mới nhìn `response.json`:
 
-- `done` đẩy chuỗi sang bậc kế tiếp mà workflow gọi tên;
+- `done` đẩy chuỗi sang bậc kế tiếp mà kế hoạch gọi tên;
 - `waiting` chạy trao đổi lồng mà response đang chờ, rồi khôi phục chính agent đó, trong khi các nhánh
   anh em vẫn chạy;
 - `blocked` đọc `stop`.
@@ -114,7 +116,7 @@ tường thay vì thử lại.
 ## 10. Runtime mà một phiên được audit trên đó
 
 Không thứ nào ở trên cần một sản phẩm đang chạy, cho tới lúc phải nhìn một bề mặt hay đi một hành
-trình. Khi cần, runtime không do operator đang cần nó khởi động: `platform.operate` sở hữu nó, và nó
+trình. Khi cần, runtime không do operator đang cần nó khởi động: `runtime.serve` sở hữu nó, và nó
 leo một cái thang, mỗi lần gọi một bậc, mỗi bậc được chứng thực trước khi thử bậc kế.
 
 | Bậc | Nó làm gì |
@@ -143,15 +145,16 @@ cho biết vị trí, chứ không được phát một server thứ hai trên m
 `uat.verify` lái một sản phẩm thật như một người thật, và nó là bằng chứng duy nhất không suy ra được
 từ bất cứ thứ gì khác, nên đáng nói thẳng khi nào nó chạy và khi nào sự vắng mặt của nó là thành thật.
 
-Nó chỉ chạy trong một workflow có bước `uat.verify` — sau vòng này là mọi ví dụ có ghi source frontend
-dưới `mode: apply`: `frontend-refine`, `frontend-reconstruct`, `frontend-new-surface`,
-`frontend-with-uat` và `full-feature`. `backend-feature` không ghi bề mặt nào và `when` của nó nói rõ
-điều đó; `release` và `content-unit` cũng không publish bề mặt nào.
+Nó chạy mỗi khi dòng "xong khi" của nhiệm vụ gọi tên nó, và planner tự thêm nó vào mọi chuỗi có ghi
+source frontend dưới `mode: apply` rồi tới `git.publish`: luật dòng dài. Nhiệm vụ có nhiều hành trình
+thì chạy `uat.plan` trước, gọi tên mỗi hành trình một luồng, rồi `uat.verify` mỗi luồng một lần, tối
+đa ba lượt cùng lúc. Nhiệm vụ chỉ có backend không nợ lượt đi thử nào, và nói vậy bằng cách không nêu
+bề mặt nào.
 
 Trong một chuỗi như vậy, đúng hai thứ phải tới từ bên ngoài:
 
-- một người đã yêu cầu, đích danh — `requestedBy`, `feature` và `flow` không có mặc định và workflow
-  khai chúng dưới `asks`, nên nhánh thà từ chối chứ không bịa ra người yêu cầu;
+- một người đã yêu cầu, đích danh — `requestedBy`, `feature` và `flow` không có mặc định, nên cửa vào
+  lấy chúng từ nhiệm vụ đã xác nhận và nhánh thà từ chối chứ không bịa ra người yêu cầu;
 - cả hai giấy thông hành lấy tại commit đã ghim — `frontend-surface-audit` và `quality-verification` —
   cộng biên nhận `route` mà lượt chạy lái vào endpoint của nó.
 
@@ -161,7 +164,7 @@ chiếu đã duyệt, và không thứ nào trong đó chặn được cái gì:
 
 - tài liệu luồng và seed được phác từ khuôn đi kèm cây rồi nêu trong biên nhận là bản nháp, vì một
   luồng đã phác là thành thật còn một luồng vắng mặt mới là một lần dừng;
-- tài khoản do `platform.operate` cấp theo danh tính mà sổ đăng ký runtime khai cho route đã bind, mật
+- tài khoản do `identity.provision` cấp theo danh tính mà sổ đăng ký runtime khai cho route đã bind, mật
   khẩu đặt từ thông tin đăng nhập niêm phong dùng chung giải theo tên. Một luồng gọi các vai của nó
   bằng alias và mỗi alias có tài khoản riêng, theo từng môi trường, trong `accounts.<env>.json`.
   `IDENTITY_MISSING` là lần bàn giao xin điều đó, không phải một phán quyết;

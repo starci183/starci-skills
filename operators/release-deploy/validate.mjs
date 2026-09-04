@@ -12,7 +12,6 @@ import process from 'node:process';
 import { fileURLToPath } from 'node:url';
 import { validateStep } from '../../scripts/validate-step.mjs';
 import { tableUnder } from '../../scripts/validate-response.mjs';
-import { validateMigrationReleaseRequest, migrationReleaseProofErrors } from '../../scripts/migration-release.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 const DIGEST = /^sha256:[0-9a-f]{64}$/;
@@ -29,43 +28,10 @@ export async function validateReleaseStep(branchDir, root = ROOT) {
   const read = (f) => readFile(path.join(branchDir, f), 'utf8');
   const has = (f) => existsSync(path.join(branchDir, f));
 
-  if (requirements.migration != null) {
-    const binding = await validateMigrationReleaseRequest(root, branchDir, request);
-    errors.push(...binding.errors);
-    if (present.has('release-deployment') || present.has('probes')) errors.push('migration release cannot carry image rollout outputs');
-    if ((response.commits ?? []).length || (response.fallbacks ?? []).length) errors.push('migration release commits no source and takes no image recovery or rollback branch');
-    if (response.status === 'done') for (const kind of ['migration-release', 'migration-release-proof']) if (!present.has(kind)) errors.push(`migration release requires ${kind}`);
-    if (response.status !== 'done') {
-      if (present.has('migration-release') || present.has('migration-release-proof')) errors.push('blocked migration release cannot claim a completed migration');
-      return { errors };
-    }
-    if (!binding.plan || binding.errors.length || !has('response/data/migration-release.json') || !has('response/migration-release.md')) return { errors };
-    let proof;
-    try { proof = JSON.parse(await read('response/data/migration-release.json')); }
-    catch { errors.push('migration release proof is not readable JSON'); return { errors }; }
-    const proofErrors = migrationReleaseProofErrors(root, branchDir, binding.plan, binding.planSha256, proof);
-    errors.push(...proofErrors);
-    if (proofErrors.length) return { errors };
-    const text = await read('response/migration-release.md');
-    if (SECRET.test(text)) errors.push('migration release receipt contains a credential-shaped value');
-    const actual = fields(text, '## Binding'), outcome = fields(text, '## Outcome');
-    const expected = { Operator: 'release.deploy', Step: `step-${request.step}/parallel-${request.parallel}`, Project: binding.plan.project,
-      Environment: binding.plan.env, Target: binding.plan.target, Release: requirements.release, 'Source head': binding.plan.sourceHead,
-      'Plan digest': binding.planSha256, 'Contract fingerprint': binding.plan.contractFingerprint,
-      Approval: requirements.approval, 'Connection fingerprint': binding.plan.connectionFingerprint };
-    for (const [key, value] of Object.entries(expected)) if (actual[key] !== value) errors.push(`migration release receipt changed ${key}`);
-    if (outcome.Outcome !== 'migrated' || outcome.Replay !== 'no-op' || outcome['Journal before'] !== proof.journalFingerprintBefore || outcome['Journal after'] !== proof.journalFingerprintAfter) errors.push('migration release outcome or journal revisions differ from the proof');
-    const executionRows = rows(text, '## Executions');
-    for (const [index, row] of executionRows.entries()) {
-      const record = proof.executions?.[index];
-      if (!record || row[0] !== String(record.invocation) || row[1] !== (record.applied.join(', ') || '—') || row[2] !== '0' || row[3] !== record.logRef || row[4] !== record.logSha256) errors.push('migration release execution receipt differs from its captured proof');
-    }
-    return { errors };
-  }
-  if (present.has('migration-release') || present.has('migration-release-proof')) errors.push('migration outputs require a frozen migration binding');
+  // A source migration plan is migration.release's; an image release carries none of its shape.
+  if (requirements.migration !== undefined) errors.push('request.json: migration belongs to migration.release; an image release carries no frozen migration plan');
   if (!requirements.rollbackIdentity) errors.push('image release requires rollbackIdentity');
   if (!request.contexts?.some((context) => context.alias.startsWith('@remote/ghcr/'))) errors.push('image release requires its immutable GHCR context');
-  if (response.status === 'done') for (const kind of ['release-deployment', 'probes']) if (!present.has(kind)) errors.push(`image release requires ${kind}`);
 
   if (empty(requirements.approval)) errors.push('request.json: approval has no default; changing what production serves is always something a person said yes to');
   const deadline = Number(requirements.steadyDeadline ?? 600);

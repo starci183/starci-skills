@@ -1,0 +1,20 @@
+{
+  "schemaVersion": 9,
+  "id": "interface.plan",
+  "domain": "interface",
+  "job": "Name every page and modal of one feature once, decide the shared shell once, and give every unit its own goal line, so that the blind generators that follow each build one unit inside one shell instead of each inventing a shell of their own.",
+  "package": "operator.md",
+  "errors": "errors.json",
+  "validator": "validate.mjs",
+  "selfTest": "self-test.mjs",
+  "resources": {
+    "profile": "sol-fresh",
+    "grammarBound": true,
+    "mode": "isolated",
+    "tools": {
+      "@tools/fileread": "context-aliases",
+      "@tools/git": "read"
+    }
+  },
+  "primaryOutput": "surface-map"
+}

@@ -10,6 +10,8 @@ Run, once and before any chain, every readiness check a mission would otherwise 
 
 Done when the `readiness-report` carries an answer of ok, wall or skipped for every check of the closed vocabulary across every requested role and every operation class, no check answers wall, and the `environment-readiness` receipt names the declaration it read by path and hash.
 
+Primary output: `environment-readiness`
+
 ## Inputs
 
 none

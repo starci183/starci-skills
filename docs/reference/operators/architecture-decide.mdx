@@ -88,7 +88,7 @@ the decision closes that gap itself: `response/data/stack-model.json` carries on
 per write this architecture commits to, and `## Operations` of the receipt restates the same rows.
 Each entry names its transport, its writer, the stores it touches, its transaction boundary, its
 idempotency kind, the migrations it ships, and the coverage-matrix dimensions of the business head it
-implements. That list is the frozen contract `backend.source.apply` fills: the implementation restates
+implements. That list is the frozen contract `backend.generate` fills: the implementation restates
 those operations unchanged and may add none, so an operation nobody declared here cannot be written
 anywhere. Declaring a write is not the same as choosing an implementation, which is why the writer is
 the one file path this operator names.
@@ -183,7 +183,7 @@ choose its own writer.
 | `independent-critique` | `critique/response/critique.md` | md | yes |
 
 `response/response.md` carries the `## Operations` table and `response/data/stack-model.json` carries
-the matching `operations` array; together they are the mutation contract `backend.source.apply`
+the matching `operations` array; together they are the mutation contract `backend.generate`
 consumes, and no other output of this operator crosses into that step.
 
 ## Stops
@@ -209,8 +209,8 @@ consumes, and no other output of this operator crosses into that step.
 | When | Operator |
 | --- | --- |
 | the business promise must be modelled again against the decided boundaries | `business.decide` |
-| the decision is confirmed and a backend contract changes | `backend.source.apply` |
-| the decision is confirmed and a frontend surface changes | `frontend.direction.decide` |
+| the decision is confirmed and a backend contract changes | `backend.generate` |
+| the decision is confirmed and a frontend surface changes | `interface.generate` |
 
 ---
 

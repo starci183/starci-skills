@@ -2,7 +2,7 @@
   "schemaVersion": 9,
   "id": "workspace.bind",
   "domain": "workspace",
-  "job": "Resolve one project and role into a verified checkout identity, its exact source head, and the closed runtime binding it may consume, and return that as one typed route receipt.",
+  "job": "Resolve one project and role into a verified checkout identity and its exact source head, and return that as one typed route receipt; the runtime a caller consumes is the runtime owner's to serve and bind.",
   "package": "operator.md",
   "errors": "errors.json",
   "validator": "validate.mjs",
@@ -10,13 +10,11 @@
   "resources": {
     "profile": "sol-fresh",
     "grammarBound": false,
-    "dispatch": "inline",
     "mode": "inline",
     "tools": {
       "@tools/fileread": "context-aliases",
       "@tools/git": "read",
       "@tools/shell": "declared-commands",
-      "@tools/http": "probe",
       "@tools/secrets": "resolve-by-name"
     }
   },

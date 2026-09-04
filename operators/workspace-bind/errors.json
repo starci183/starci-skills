@@ -1,6 +1,6 @@
 {
   "schemaVersion": 9,
-  "note": "Stop codes only workspace.bind emits. Same entry shape as operators/errors.json, scope implicit. Shared codes (INVALID_INPUT, SOURCE_DRIFT, NO_PROGRESS) come from operators/errors.json, and BRANCH_POLICY_VIOLATION is not defined here because git.publish emits it too: a code two operators emit belongs in operators/errors.json with both ids in scope. Every domain below is the one the old package's OWNING_DOMAIN table published, and routing.json answers each of them for this operator: workspace resumes, source resumes, identity and runtime are external, caller is a person.",
+  "note": "Stop codes only workspace.bind emits. Same entry shape as operators/errors.json, scope implicit. Shared codes (INVALID_INPUT, SOURCE_DRIFT, NO_PROGRESS) come from operators/errors.json, and BRANCH_POLICY_VIOLATION is not defined here because git.publish emits it too: a code two operators emit belongs in operators/errors.json with both ids in scope. Every domain below is the one the old package's OWNING_DOMAIN table published, and routing.json answers each of them for this operator: workspace resumes, source resumes, identity is external, caller is a person. The runtime codes this operator once emitted (ENDPOINT_AUTHORITY_STALE, RUNTIME_NOT_READY, RUNTIME_BUSY) left with the runtime half: the runtime owner serves and binds the entry a caller consumes.",
   "codes": {
     "IDENTITY_UNVERIFIED": {
       "domain": "identity",
@@ -60,42 +60,6 @@
       "resume": {
         "en": "Clean the boundary, or declare the write roots that cover it when the checkout is already on a session/<sessionId> branch; on the mutation branch the repair is to open the session and move the change onto its branch, not to declare a write root over it — this operator never stashes.",
         "vi": "Dọn sạch ranh giới, hoặc khai báo write root bao được nó khi checkout đã ở nhánh session/<sessionId>; trên nhánh mutation, cách sửa là mở phiên và chuyển thay đổi sang nhánh của phiên đó, không phải khai báo write root đè lên nó — operator này không bao giờ stash."
-      }
-    },
-    "ENDPOINT_AUTHORITY_STALE": {
-      "domain": "runtime",
-      "disposition": "terminate",
-      "meaning": {
-        "en": "The endpoint binding is not the closed port projection, or its fingerprint is stale.",
-        "vi": "Ràng buộc endpoint không phải phép chiếu port đóng, hoặc fingerprint của nó đã cũ."
-      },
-      "resume": {
-        "en": "Recompute the authority fingerprint at its owner.",
-        "vi": "Tính lại fingerprint thẩm quyền ở phía chủ của nó."
-      }
-    },
-    "RUNTIME_NOT_READY": {
-      "domain": "runtime",
-      "disposition": "terminate",
-      "meaning": {
-        "en": "The runtime owner registry is missing, stale, or not ready while the caller must consume it.",
-        "vi": "Registry chủ runtime thiếu, cũ hoặc chưa sẵn sàng trong khi người gọi phải tiêu thụ nó."
-      },
-      "resume": {
-        "en": "Raise one coordination request to the registered owner and wait for a ready generation.",
-        "vi": "Nêu một yêu cầu phối hợp tới chủ đã đăng ký và chờ một generation sẵn sàng."
-      }
-    },
-    "RUNTIME_BUSY": {
-      "domain": "runtime",
-      "disposition": "terminate",
-      "meaning": {
-        "en": "The integration branch of this route is leased by another session while it merges and restarts, so the head this binding needs is not served yet.",
-        "vi": "Nhánh tích hợp của route này đang bị một phiên khác giữ lease trong lúc merge và khởi động lại, nên head mà lần bind này cần chưa được phục vụ."
-      },
-      "resume": {
-        "en": "Wait for the holder to release the lease, then bind again: the same endpoint serves the merged head next. The reason names the holding session, the operation it is in and the queue position.",
-        "vi": "Chờ bên đang giữ nhả lease, rồi bind lại: chính endpoint đó sẽ phục vụ head đã merge kế tiếp. Phần reason nêu tên phiên đang giữ, thao tác nó đang chạy và vị trí xếp hàng."
       }
     }
   }

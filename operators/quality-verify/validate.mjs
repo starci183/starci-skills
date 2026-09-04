@@ -15,7 +15,7 @@ import { validateStep } from '../../scripts/validate-step.mjs';
 import { sessionRootOf } from '../../scripts/validate-request.mjs';
 import { tableUnder } from '../../scripts/validate-response.mjs';
 import { auditScopeCarryErrors } from '../../scripts/audit-scope.mjs';
-import { integrationChangesErrors } from '../platform-operate/validate.mjs';
+import { integrationChangesErrors } from '../runtime-serve/validate.mjs';
 import { coveragePolicyResult, coverageTableErrors } from '../../scripts/coverage-policy.mjs';
 
 // The nine topics the scorecard reports. Eight are closed by the surface audit and one by the UAT
@@ -47,7 +47,7 @@ const isTrue = (v) => v === true || v === 'true' || v === 'yes';
 export function integrationGateBindingErrors(result, producer) {
   if(/^session\/[A-Za-z0-9._-]+$/.test(result.sessionBranch))return [];
   const ladder=producer?.delta?.runtimeLadder;
-  if(producer?.operatorId!=='platform.operate' || producer?.status!=='done' || ladder?.rung!=='serve' || ladder.integration?.branch!==result.sessionBranch || ladder.servedHead!==result.sourceHead)return ['integration gate must bind the completed platform changes producer at its actual branch and head'];
+  if(producer?.operatorId!=='runtime.serve' || producer?.status!=='done' || ladder?.rung!=='serve' || ladder.integration?.branch!==result.sessionBranch || ladder.servedHead!==result.sourceHead)return ['integration gate must bind the completed platform changes producer at its actual branch and head'];
   return [];
 }
 
@@ -107,13 +107,13 @@ export async function validateQualityStep(branchDir, root = ROOT) {
   const changesRef=request?.inputs?.changes;
   if(sessionRoot && changesRef)try{
     const changesPath=path.join(sessionRoot,changesRef),producerResponseDir=path.dirname(changesPath),producerBranch=path.dirname(producerResponseDir);
-    integrationInputSeen=Object.fromEntries(tableUnder(await readFile(changesPath,'utf8'),'## Binding')??[]).Operator==='platform.operate';
+    integrationInputSeen=Object.fromEntries(tableUnder(await readFile(changesPath,'utf8'),'## Binding')??[]).Operator==='runtime.serve';
     const producerResponse=JSON.parse(await readFile(path.join(producerResponseDir,'response.json'),'utf8'));
-    if(producerResponse.operatorId==='platform.operate'){
+    if(producerResponse.operatorId==='runtime.serve'){
       integrationInputSeen=true;
       const producerRequest=JSON.parse(await readFile(path.join(producerBranch,'request/request.json'),'utf8'));
       const delta=JSON.parse(await readFile(path.join(producerResponseDir,'data/delta.json'),'utf8'));
-      if(producerRequest.operatorId!=='platform.operate' || producerResponse.status!=='done' || path.resolve(producerBranch,producerResponse.fields?.changes??'')!==path.resolve(changesPath))errors.push('integration changes must be emitted by a completed platform owner');
+      if(producerRequest.operatorId!=='runtime.serve' || producerResponse.status!=='done' || path.resolve(producerBranch,producerResponse.fields?.changes??'')!==path.resolve(changesPath))errors.push('integration changes must be emitted by a completed platform owner');
       errors.push(...integrationChangesErrors(delta,await readFile(changesPath,'utf8')));
       integrationProducer={...producerResponse,delta};
     }
@@ -139,7 +139,7 @@ export async function validateQualityStep(branchDir, root = ROOT) {
   }
 
   // A frontend delivery is measured against the presentation laws as well as the compilers. The
-  // sweep is a gate here for the same reason it is a conformance check at frontend.source.apply: a
+  // sweep is a gate here for the same reason it is a conformance check at interface.generate: a
   // green lint and a green build say nothing about which node a class landed on.
   if (inputs.includes('frontend-source-application') && !plannedNames.includes('presentation-sweep')) {
     errors.push('request.json: a frontend delivery plans the presentation-sweep gate; lint and build do not measure which node a class landed on');

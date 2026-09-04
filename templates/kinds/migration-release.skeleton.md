@@ -8,7 +8,7 @@ invoked again against the resulting journal.
 
 | Field | Value |
 | --- | --- |
-| Operator | `release.deploy` |
+| Operator | `migration.release` |
 | Step | `step-1/parallel-1` |
 | Project | `project` |
 | Environment | non-production |

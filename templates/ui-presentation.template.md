@@ -1,7 +1,7 @@
 # <Topic> presentation
 
 One or two paragraphs: which CSS property family this topic resolves on app-owned boundaries, and
-that `frontend.presentation.resolve` reads it.
+that `interface.generate` reads it.
 
 ## Scale
 

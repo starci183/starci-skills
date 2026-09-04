@@ -1,0 +1,22 @@
+{
+  "schemaVersion": 9,
+  "id": "interface.fix",
+  "domain": "interface",
+  "job": "Repair one finding an audit verdict row or a UAT verdict raised against a generated surface with one small commit on the session branch: inside the orchestrator's fix size, without a layout change, and with every value taken from the resolution inventory the surface was generated from.",
+  "package": "operator.md",
+  "errors": "errors.json",
+  "validator": "validate.mjs",
+  "selfTest": "self-test.mjs",
+  "resources": {
+    "profile": "sol-fresh",
+    "grammarBound": true,
+    "mode": "inline",
+    "tools": {
+      "@tools/fileread": "context-aliases",
+      "@tools/sourcewrite": "declared-write-set",
+      "@tools/shell": "declared-commands",
+      "@tools/git": "commit-session-branch"
+    }
+  },
+  "primaryOutput": "frontend-source-application"
+}

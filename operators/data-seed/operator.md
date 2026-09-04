@@ -1,0 +1,137 @@
+# data.seed
+
+## Job
+
+Place one flow's seed in the environment's store from the flow document, every row attributable to
+the flow by account ownership or prefix, at the representative volume the flow declares, and list
+exactly what undoes it; or remove that rollback set and nothing else.
+
+## Done when
+
+Done when the `seed-receipt` lists every row the flow's seed placed with its attribution — the
+flow's provisioned account, or the flow's prefix where the store has no owner column, a store with
+neither recorded as a limitation and never as a schema change — its rollback set as a subset of
+those rows, and the expected state proved against the seed's own expectation; or, under mode
+rollback, the `seed-receipt` lists the rows removed and no other row.
+
+## A seed is attributable, or it is a limitation
+
+This operator works inside the isolation law the runtime owner publishes under
+[Two sessions, one product](../runtime-serve/operator.md#two-sessions-one-product) and does not
+restate it; the one clause it carries is the fourth, and this receipt is where that clause is checked.
+Every row placed is owned by the flow's provisioned account, or carries the flow's namespace in an
+identifier where the store has no owner column, and the rollback set names exactly those rows. A
+store with neither an owner column nor a prefixable identifier is recorded as a limitation of that
+seed in the receipt, so the reader knows which rows cannot be told apart from another session's;
+it is never a migration added to satisfy the law, because a schema changed for a test marker is a
+product changed for a fixture. A row that already stands in the store outside the flow's namespace
+is a shared row: the seed touches none, and a record that would land on one stops the branch as
+`SEED_SHARED_ROW` before anything is written.
+
+## The seed is the flow's preconditions, at the flow's volume
+
+The seed places what the flow needs before it starts — the catalogue row, the account's starting
+state, the thing that must already exist — and never the outcome the flow is meant to produce, because
+a seeded outcome turns a broken flow into a passing run. The count of records per entity is the
+flow's representative volume, read from the flow document: the surface criteria that depend on data
+volume are measured at it, so a seed places as many rows as the surface is meant to carry, not the
+one row that lets the flow pass. The seed directory's own contract (`seed/README.md` of the flow
+template) says what is placed, how placing it again changes nothing, and how the scoped state is
+taken; a seed that only works on an empty store is a seed that works once, so a second application
+over the same namespace is `SEED_ALREADY_APPLIED` and a no-op, not a failure.
+
+## A missing seed is drafted, not reported
+
+A flow whose folder has no seed directory is a flow nobody has seeded yet. The seed is drafted from
+the shipped template and the flow document's steps, marked `Drafted` in the receipt, and applied in
+the same branch. The account the rows are owned by is the one `identity.provision` created; a flow
+with no account record yet is `IDENTITY_MISSING`, a hand-off to that operator and not a verdict. The
+only other honest stop on this path is a store that cannot be reached at all, which is
+`PROVISIONING_UNAVAILABLE`.
+
+## The seed carries no credential
+
+A record that needs an authenticated identity names the alias in the account record instead of a
+credential; the shared password is resolved by name at the moment a request is made and reaches a
+request body and nothing else. Nothing under the seed directory, the receipt or a fixture carries a
+secret, and the receipt is swept for one.
+
+## Boundary
+
+Context is read-only apart from the seed. The operator writes the flow's seed directory under
+`@worktrees/uat/<flow>` — the drafted records, the expectation and the fingerprint the snapshot
+freezes — places or removes rows in the environment's store through its declared connection or the
+product's own API, and writes only `response/` of its own branch: `response.md` and
+`response.json`. It does not create an account, serve a runtime, change a schema, touch a row
+outside the flow's namespace, seed the outcome under test, or write a credential value anywhere; and
+it does not claim a placed seed while any check is absent or failed.
+
+## Context
+
+| Alias | Bind | Required |
+| --- | --- | --- |
+| `@worktrees/uat/<flow>` | the flow folder: the flow document the seed is drafted from, the account record the rows are owned by, and the seed directory this operator writes | yes |
+| `@worktrees/sessions/central-runtime` | the entry of the bound route: the store and the endpoints the seed is applied through, read by fingerprint and generation | yes |
+| `@workspaces/device-state` | the store's credential by name and its custody; values never appear | yes |
+| `@worktrees/_templates` | the seed template a missing seed directory is drafted from, consumed and never modified | no |
+
+## Inputs
+
+| Kind | From | Required |
+| --- | --- | --- |
+| `uat-account` | `identity.provision`; the account record the rows are owned by, when this chain provisioned it; otherwise read from the flow folder | no |
+
+## Requirements
+
+| Field | Type | Default | Ask |
+| --- | --- | --- | --- |
+| `flow` | id | — | The flow whose seed is placed or rolled back |
+| `routeKey` | id | — | The `<project>/<role>` registry entry whose store and endpoints the seed goes through |
+| `env` | id | dev | The stack whose store receives the seed; a seed of one stack is not a seed in another |
+| `approval` | id | — | The authority that covers the seed: an approval id, or the environment declaration's reference — its path and content hash — when that declaration marks `seed` `declared` for `env`; no default, because silence is not consent |
+| `operation` | choice | apply | `apply` places the seed at the flow's volume; `rollback` removes the rollback set the last application listed and nothing else |
+| `resume` | token | null | The blocked branch's token when re-entering after a stop |
+
+## Steps
+
+| # | Step | Params | Reads | Writes | Stops with |
+| --- | --- | --- | --- | --- | --- |
+| 1 | Validate the gate and the resume against the frozen flow folder | `resume` | `request/request.json`, @worktrees/uat/<flow> at the frozen fingerprint | — | `INVALID_INPUT`, `SOURCE_DRIFT`, `NO_PROGRESS` |
+| 2 | Bind the authority for the seed class, the flow's account record and the route entry's store, resolving the store credential by name | `approval`, `env`, `routeKey`, `flow` | @worktrees/uat/<flow> for the account record, input `uat-account` when the chain carries it, @worktrees/sessions/central-runtime for the store and endpoints, @workspaces/device-state for the credential by name, the environment's declaration when `approval` references it, @tools/secrets | — | `AUTHORITY_DRIFT`, `IDENTITY_MISSING` |
+| 3 | Draft the seed directory from the template and the flow document's steps when it is absent, and record it as a draft | — | @worktrees/uat/<flow> for the flow document, @worktrees/_templates for the seed template | @worktrees/uat/<flow>, @tools/sourcewrite | — |
+| 4 | Observe the store under the flow's namespace before changing it, and refuse a record that would land on a row outside it | `operation` | @worktrees/sessions/central-runtime for the store, @tools/database, @tools/http | — | `SEED_SHARED_ROW`, `PROVISIONING_UNAVAILABLE` |
+| 5 | Apply the records one at a time under the flow's account or prefix, or remove the rollback set, and write the seed fingerprint | — | @worktrees/uat/<flow> for the records and the rollback set, @tools/database, @tools/http | @worktrees/uat/<flow> | `PROVISIONING_UNAVAILABLE` |
+| 6 | Prove the expected state against the seed's expectation and the rollback set against the rows placed | — | @worktrees/uat/<flow> for the expectation, @tools/database, @tools/http | — | `SEED_UNPROVEN` |
+| 7 | Write the receipt and emit | — | everything above | `response/response.md`, `response/response.json` | — |
+
+A resume begins again at validation, reuses only the unchanged seed fingerprint, and applies only
+what the store does not yet hold; a resume that adds no authority, account, seed or store change is
+`NO_PROGRESS`.
+
+## Outputs
+
+| Kind | File | Type | Required |
+| --- | --- | --- | --- |
+| `seed-receipt` | `response/response.md` | md | yes |
+
+## Stops
+
+| Code | Disposition |
+| --- | --- |
+| `INVALID_INPUT` | terminate |
+| `SOURCE_DRIFT` | terminate |
+| `NO_PROGRESS` | terminate |
+| `AUTHORITY_DRIFT` | terminate |
+| `IDENTITY_MISSING` | terminate |
+| `SEED_SHARED_ROW` | terminate |
+| `PROVISIONING_UNAVAILABLE` | terminate |
+| `SEED_UNPROVEN` | terminate |
+
+## Next
+
+| When | Operator |
+| --- | --- |
+| the flow folder or the store moved since the request froze them | `workspace.bind` |
+| the flow has no account record yet, so the identity is provisioned before the seed is placed | `identity.provision` |
+| the seed is placed at volume and the surface that was measured below it is captured again | `interface.audit` |
+| the seed is placed and the run that waited on it may walk the flow | `uat.verify` |

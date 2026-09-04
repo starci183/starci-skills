@@ -4,7 +4,7 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import test from 'node:test';
-import { loadInteractionPolicy, interactionErrors, selectionErrors, interactionDisposition, branchInteraction } from './validate-interaction.mjs';
+import { loadInteractionPolicy, interactionErrors, selectionErrors, interactionDisposition, branchInteraction, transitionLogErrors, compileLogShape } from './validate-interaction.mjs';
 import { validateRequest } from './validate-request.mjs';
 import { validateResponse } from './validate-response.mjs';
 
@@ -43,6 +43,34 @@ test('owner and external routes are reports, never automatic questions or action
   assert.equal(interactionDisposition({ kind: 'external' }), 'blocked-report');
   assert.equal(interactionDisposition({ kind: 'resume' }), 'continue');
   assert.deepEqual(interactionErrors(policy, undefined), []);
+});
+
+// The two-line transition log: interaction.json#transitionLog declares it, the gate compiles its shape.
+const goalLine = '[2/1 quality.verify] goal: doneWhen:0 the committed head passes the gates';
+const doneLine = '[2/1 quality.verify] done · 1/3 done-when evidenced · response/response.md, response/data/gates.json · 3/1 git.publish';
+test('interaction.json declares exactly two lines per transition, a shape for each, and the rule that full outputs stay in the session', () => {
+  assert.equal(policy.transitionLog.linesPerBranch, 2);
+  assert.equal(policy.transitionLog.shape.length, 2);
+  assert.ok(/session folder/.test(policy.transitionLog.rule));
+});
+test('a lawful pair passes: a goal line and an outcome line on one branch, done or blocked with its stop', () => {
+  assert.deepEqual(transitionLogErrors(policy, [goalLine, doneLine]), []);
+  assert.deepEqual(transitionLogErrors(policy, ['[1/1 workspace.bind] goal: prerequisite: 2/1', '[1/1 workspace.bind] blocked CHECKOUT_DIRTY · 0/3 done-when evidenced · response/response.md · user']), []);
+});
+test('one line, three lines, two branches, a multi-line line and an outcome without its count are refused', () => {
+  assert.ok(transitionLogErrors(policy, [goalLine]).some((e) => e.includes('exactly 2 lines')));
+  assert.ok(transitionLogErrors(policy, [goalLine, doneLine, doneLine]).some((e) => e.includes('exactly 2 lines')));
+  assert.ok(transitionLogErrors(policy, [goalLine, doneLine.replace('2/1', '3/1')]).some((e) => e.includes('one branch')));
+  assert.ok(transitionLogErrors(policy, [`${goalLine}\nmore`, doneLine]).some((e) => e.includes('more than one line')));
+  assert.ok(transitionLogErrors(policy, [goalLine, '[2/1 quality.verify] done · everything went fine']).some((e) => e.includes('line 2') && e.includes('does not follow')));
+  assert.ok(transitionLogErrors(policy, ['[2/1 quality.verify] finished the gates', doneLine]).some((e) => e.includes('line 1') && e.includes('does not follow')));
+  assert.ok(transitionLogErrors(policy, [goalLine, doneLine.replace('done ·', 'failed ·')]).some((e) => e.includes('line 2')));
+});
+test('the shape is compiled from the policy, not copied into the gate', () => {
+  const re = compileLogShape('[N/M operator] <done | blocked STOP> · <k>/<n> done-when evidenced · <artifact paths> · <next cell>');
+  assert.ok(re.test('[4/2 uat.verify] blocked RUNTIME_UNAVAILABLE · 2/3 done-when evidenced · response/response.md · user'));
+  assert.ok(!re.test('[4/2 uat.verify] blocked runtime · 2/3 done-when evidenced · response/response.md · user'));
+  assert.equal(re.exec('[4/2 uat.verify] done · 2/3 done-when evidenced · x · y')[1], '4/2');
 });
 
 async function fixture(run) {

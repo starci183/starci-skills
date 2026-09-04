@@ -1,10 +1,10 @@
 {
   "schemaVersion": 9,
-  "note": "Closed routing map. A skill reads a validated operator output and routes on outcome, then on failure.owningDomain. It never reads prose to decide the next step. A chain route hands a wall to the example workflow that clears it, run in a sibling session; the blocked branch waits on that session's end and re-enters with what it produced.",
+  "note": "Closed routing map. A skill reads a validated operator output and routes on outcome, then on failure.owningDomain. It never reads prose to decide the next step. A chain route hands a wall to a sibling session whose goal is the named operator's primary output; the blocked branch waits on that session's end and re-enters with what it produced.",
   "kinds": {
     "operator": "Invoke the named operator next.",
     "resume": "Invoke the same operator again with the required delta from its resume token.",
-    "chain": "Run the named example workflow (workflows/<target>.json) in a sibling session, then the one named by `then` when present; the blocked branch stays waiting on that session and re-enters with the delta it produced. A person is asked nothing.",
+    "chain": "Open a sibling session whose mission's done-when is the primary output of the named operator (planned by plan-chain like any mission); the blocked branch stays waiting on that session and re-enters with the delta it produced. A person is asked nothing.",
     "user": "Stop. A person owns this and must decide or publish before the mission continues.",
     "external": "Stop. The blocker is outside the runtime and no operator can clear it."
   },
@@ -25,36 +25,9 @@
         "kind": "user"
       }
     },
-    "backend.source.apply": {
-      "backend": {
-        "kind": "resume"
-      },
-      "business": {
-        "kind": "operator",
-        "target": "business.decide"
-      },
-      "contract": {
-        "kind": "user"
-      },
-      "platform": {
-        "kind": "operator",
-        "target": "platform.operate"
-      },
-      "workspace": {
-        "kind": "operator",
-        "target": "workspace.bind"
-      },
-      "caller": {
-        "kind": "user"
-      }
-    },
     "business.decide": {
       "business": {
         "kind": "resume"
-      },
-      "backend": {
-        "kind": "operator",
-        "target": "backend.source.apply"
       },
       "workspace": {
         "kind": "operator",
@@ -82,88 +55,6 @@
         "kind": "user"
       }
     },
-    "frontend.direction.decide": {
-      "business": {
-        "kind": "operator",
-        "target": "business.decide"
-      },
-      "backend": {
-        "kind": "operator",
-        "target": "backend.source.apply"
-      },
-      "architecture": {
-        "kind": "operator",
-        "target": "architecture.decide"
-      },
-      "grammar": {
-        "kind": "chain",
-        "target": "library-maintenance",
-        "then": "dependency-maintenance"
-      },
-      "workspace": {
-        "kind": "operator",
-        "target": "workspace.bind"
-      },
-      "caller": {
-        "kind": "user"
-      },
-      "frontend": {
-        "kind": "resume"
-      }
-    },
-    "frontend.presentation.resolve": {
-      "grammar": {
-        "kind": "chain",
-        "target": "library-maintenance",
-        "then": "dependency-maintenance"
-      },
-      "knowledge": {
-        "kind": "user"
-      },
-      "workspace": {
-        "kind": "operator",
-        "target": "workspace.bind"
-      },
-      "caller": {
-        "kind": "user"
-      },
-      "frontend": {
-        "kind": "resume"
-      }
-    },
-    "frontend.source.apply": {
-      "resolution": {
-        "kind": "operator",
-        "target": "frontend.presentation.resolve"
-      },
-      "workspace": {
-        "kind": "operator",
-        "target": "workspace.bind"
-      },
-      "caller": {
-        "kind": "user"
-      }
-    },
-    "frontend.surface.audit": {
-      "workspace": {
-        "kind": "operator",
-        "target": "workspace.bind"
-      },
-      "caller": {
-        "kind": "user"
-      },
-      "platform": {
-        "kind": "operator",
-        "target": "platform.operate"
-      },
-      "frontend": {
-        "kind": "resume"
-      },
-      "direction": {
-        "kind": "operator",
-        "target": "frontend.direction.decide"
-      }
-    },
     "git.publish": {
       "workspace": {
         "kind": "operator",
@@ -180,31 +71,10 @@
         "kind": "user"
       }
     },
-    "platform.operate": {
-      "platform": {
-        "kind": "resume"
-      },
-      "provider": {
-        "kind": "external"
-      },
-      "product": {
-        "kind": "user"
-      },
-      "workspace": {
-        "kind": "operator",
-        "target": "workspace.bind"
-      },
-      "caller": {
-        "kind": "user"
-      },
-      "control-panel": {
-        "kind": "external"
-      }
-    },
     "quality.verify": {
       "platform": {
         "kind": "operator",
-        "target": "platform.operate"
+        "target": "runtime.serve"
       },
       "workspace": {
         "kind": "operator",
@@ -220,14 +90,14 @@
       },
       "platform": {
         "kind": "operator",
-        "target": "platform.operate"
+        "target": "runtime.serve"
       },
       "provider": {
         "kind": "external"
       },
       "backend": {
         "kind": "operator",
-        "target": "backend.source.apply"
+        "target": "backend.generate"
       },
       "approval": {
         "kind": "user"
@@ -241,11 +111,12 @@
         "kind": "external"
       },
       "runtime": {
-        "kind": "external"
+        "kind": "operator",
+        "target": "runtime.serve"
       },
       "backend": {
         "kind": "operator",
-        "target": "backend.source.apply"
+        "target": "backend.generate"
       },
       "quality": {
         "kind": "operator",
@@ -254,13 +125,13 @@
       "caller": {
         "kind": "user"
       },
-      "platform": {
-        "kind": "operator",
-        "target": "platform.operate"
-      },
       "workspace": {
         "kind": "operator",
         "target": "workspace.bind"
+      },
+      "identity": {
+        "kind": "operator",
+        "target": "identity.provision"
       }
     },
     "workspace.bind": {
@@ -270,10 +141,6 @@
       "source": {
         "kind": "resume"
       },
-      "runtime": {
-        "kind": "operator",
-        "target": "platform.operate"
-      },
       "identity": {
         "kind": "external"
       },
@@ -281,7 +148,113 @@
         "kind": "user"
       }
     },
-    "library.source.apply": {
+    "environment.preflight": {
+      "environment": {
+        "kind": "resume"
+      },
+      "caller": {
+        "kind": "user"
+      }
+    },
+    "backend.generate": {
+      "backend": {
+        "kind": "resume"
+      },
+      "business": {
+        "kind": "operator",
+        "target": "business.decide"
+      },
+      "contract": {
+        "kind": "user"
+      },
+      "platform": {
+        "kind": "operator",
+        "target": "runtime.serve"
+      },
+      "workspace": {
+        "kind": "operator",
+        "target": "workspace.bind"
+      },
+      "caller": {
+        "kind": "user"
+      }
+    },
+    "interface.generate": {
+      "interface": {
+        "kind": "resume"
+      },
+      "business": {
+        "kind": "operator",
+        "target": "business.decide"
+      },
+      "backend": {
+        "kind": "operator",
+        "target": "backend.generate"
+      },
+      "architecture": {
+        "kind": "operator",
+        "target": "architecture.decide"
+      },
+      "grammar": {
+        "kind": "chain",
+        "target": "library.update"
+      },
+      "knowledge": {
+        "kind": "user"
+      },
+      "resolution": {
+        "kind": "resume"
+      },
+      "workspace": {
+        "kind": "operator",
+        "target": "workspace.bind"
+      },
+      "caller": {
+        "kind": "user"
+      }
+    },
+    "interface.audit": {
+      "workspace": {
+        "kind": "operator",
+        "target": "workspace.bind"
+      },
+      "caller": {
+        "kind": "user"
+      },
+      "interface": {
+        "kind": "resume"
+      },
+      "direction": {
+        "kind": "operator",
+        "target": "interface.generate"
+      },
+      "identity": {
+        "kind": "operator",
+        "target": "identity.provision"
+      },
+      "runtime": {
+        "kind": "operator",
+        "target": "runtime.serve"
+      }
+    },
+    "interface.fix": {
+      "interface": {
+        "kind": "operator",
+        "target": "interface.generate"
+      },
+      "resolution": {
+        "kind": "operator",
+        "target": "interface.generate"
+      },
+      "workspace": {
+        "kind": "operator",
+        "target": "workspace.bind"
+      },
+      "caller": {
+        "kind": "user"
+      }
+    },
+    "library.update": {
       "caller": {
         "kind": "user"
       },
@@ -293,21 +266,101 @@
         "kind": "resume"
       }
     },
-    "dependency.update": {
+    "interface.plan": {
+      "interface": {
+        "kind": "resume"
+      },
       "caller": {
         "kind": "user"
+      }
+    },
+    "uat.plan": {
+      "uat": {
+        "kind": "resume"
+      },
+      "caller": {
+        "kind": "user"
+      }
+    },
+    "identity.provision": {
+      "identity": {
+        "kind": "resume"
       },
       "workspace": {
         "kind": "operator",
         "target": "workspace.bind"
       },
-      "dependency": {
-        "kind": "resume"
+      "control-panel": {
+        "kind": "external"
+      },
+      "caller": {
+        "kind": "user"
       }
     },
-    "environment.preflight": {
-      "environment": {
+    "data.seed": {
+      "data": {
         "kind": "resume"
+      },
+      "workspace": {
+        "kind": "operator",
+        "target": "workspace.bind"
+      },
+      "control-panel": {
+        "kind": "external"
+      },
+      "caller": {
+        "kind": "user"
+      },
+      "identity": {
+        "kind": "operator",
+        "target": "identity.provision"
+      }
+    },
+    "runtime.serve": {
+      "runtime": {
+        "kind": "resume"
+      },
+      "workspace": {
+        "kind": "operator",
+        "target": "workspace.bind"
+      },
+      "product": {
+        "kind": "user"
+      },
+      "provider": {
+        "kind": "external"
+      },
+      "control-panel": {
+        "kind": "external"
+      },
+      "caller": {
+        "kind": "user"
+      }
+    },
+    "migration.release": {
+      "workspace": {
+        "kind": "operator",
+        "target": "workspace.bind"
+      },
+      "backend": {
+        "kind": "operator",
+        "target": "backend.generate"
+      },
+      "caller": {
+        "kind": "user"
+      }
+    },
+    "business.reconcile": {
+      "business": {
+        "kind": "resume"
+      },
+      "backend": {
+        "kind": "operator",
+        "target": "backend.generate"
+      },
+      "workspace": {
+        "kind": "operator",
+        "target": "workspace.bind"
       },
       "caller": {
         "kind": "user"

@@ -8,7 +8,9 @@ Publish one approved Git boundary from the exact commit quality verified, with n
 
 ## Done when
 
-Done when the `git-publication` records that the exact commit the quality receipt measured reached the routed ref on the remote through a non-force push that created or fast-forwarded it with every hook passed, the session branch was merged and never rebased, at most one annotated tag points at the head this same publication pushed, and the session worktree, branch and folder are removed with the runtime owner asked by name to stop the server it started.
+Done when the `git-publication` records that the exact commit the quality receipt measured reached the routed ref on the remote through a non-force push that created or fast-forwarded it with every hook passed, the session branch was merged and never rebased, at most one annotated tag points at the head this same publication pushed, and the session worktree, branch and folder are removed.
+
+Primary output: `git-publication`
 
 ## Inputs
 

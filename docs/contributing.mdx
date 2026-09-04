@@ -1,6 +1,6 @@
 ---
 title: "Contributing"
-description: "npm test, the templates, how a rule is added with its evidence, and how a workflow example is added."
+description: "npm test, the templates, how a rule is added with its evidence, and how a planner fixture is added."
 ---
 
 # Contributing
@@ -9,7 +9,7 @@ Before any of this, read `UPDATE.md` at the root of the tree. It is the standard
 skills tree of this shape — the four questions asked in order, what may be added and what may not, how
 an id is modified and how one is retired, the evidence bar, enforcement before advice, and the
 pre-commit checklist — and this page does not restate it. What follows is only the mechanics of this
-repository: which commands run, which templates apply, and where a rule or a workflow example is
+repository: which commands run, which templates apply, and where a rule or a planner fixture is
 filed.
 
 Every change to this tree lands with a green `npm test`. `INDEX.md` states the standard without a
@@ -18,8 +18,8 @@ grace period: `npm test` "is green at the published head or the head is not publ
 ## What `npm test` runs
 
 From `package.json`, in order: routing validation, resources validation, the knowledge citation check,
-alias validation and the alias doc `--check`, operator validation, workflow validation, the operators
-index `--check`, template validation, every operator's self-test, and the script specs
+alias validation and the alias doc `--check`, operator validation, the defaults check, the operators
+index `--check`, the briefs `--check`, template validation, every operator's self-test, and the script specs
 (`node --test scripts/*.spec.mjs`).
 
 Two of those are regeneration checks rather than assertions: `operators/INDEX.md` and
@@ -58,14 +58,15 @@ A rule is an address, not a paragraph. The constraints that hold everywhere:
 
 A rule that no operator's bound inventory can reach is not a rule; it is a file nobody reads.
 
-## Adding a workflow example
+## Adding a planner fixture
 
-A composed chain that would be useful again becomes a file in `workflows/`, with its `when` in both
-`en` and `vi`. It must satisfy everything `scripts/validate-workflows.mjs` checks: every branch names
-a real operator and presets only fields that operator declares, every required Input is produced by
-an earlier step, branches of one step share no write alias, every loop goes back to an earlier step
-with a `maxRounds`, and the chain ends at `git.publish`, `release.deploy`, or `user`. Add the row to
-the table in `workflows/README.md` and its Vietnamese mirror.
+There is no workflow file to add: the chain is derived from the mission by `scripts/plan-chain.mjs`.
+A chain worth keeping as evidence becomes a fixture under `tests/chains/<id>.json`, carrying the
+mission whose "done when" lines name its outcomes, the operator order expected, and the end it
+declares; `scripts/plan-chain.spec.mjs` then proves the planner still derives it from that mission
+and that the result passes `scripts/validate-chain.mjs`. A shape the planner cannot reach from the
+tables is a gap in an operator's `## Inputs` or `## Next` table, fixed there, never by a hand-written
+chain.
 
 ## Documentation
 

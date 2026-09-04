@@ -1,29 +1,31 @@
 {
   "schemaVersion": 8,
-  "note": "How operators become agents. One invocation of one operator is one agent, created fresh on the operator's own profile (operator.json → resources) with the aliases its Context table declares and nothing else. The orchestrator owns dispatch: it writes the branch's request/request.json, validates it (scripts/validate-request.mjs), starts the agent, validates the response (scripts/validate-response.mjs, then the operator's validate.mjs), and follows routing.json to the next operator, user, or external party. It never merges two operators into one agent and never lets an agent start another; a nested exchange (a step that pauses with status waiting, e.g. architecture.decide's critique) is served by a second fresh agent the orchestrator spawns, with its own request/ and response/ inside the branch. Dispatch has two modes, read from operator.json → resources.dispatch: inline, where the orchestrator runs the operator's steps itself as a checklist under the operator's own validators (a route binding, a gate run, a publication), and fresh, where a new agent is created (a decision, a source write, an audit, a walk, a critique). Neither mode waits by polling: a fresh agent is awaited on its completion event, and a chain route is awaited on the sibling session's end. The orchestrator writes response.json as a running skeleton at dispatch; an agent that exits without replacing it gets one follow-up, then RECEIPT_MISSING. The orchestrator's memory is state.json.brief and nothing else.",
+  "note": "How operators become agents. One invocation of one operator is one run in the mode its operator.json declares (resources.mode): the orchestrator itself, or one new agent on the operator's own profile (operator.json → resources) with the aliases its Context table declares and nothing else. The orchestrator owns dispatch: it writes the branch's request/request.json, validates it (scripts/validate-request.mjs), starts the agent, validates the response (scripts/validate-response.mjs, then the operator's validate.mjs), and follows routing.json to the next operator, user, or external party. It never merges two operators into one agent and never lets an agent start another; a nested exchange (a step that pauses with status waiting, e.g. architecture.decide's critique) is served by a second fresh agent the orchestrator spawns, with its own request/ and response/ inside the branch. An operator runs in one of three modes, read from operator.json → resources.mode (#modes): inline, where the orchestrator runs the operator's steps itself in the chat as a checklist under the operator's own validators (a route binding, a gate run, a publication); dispatch, where one new agent inherits the orchestrator's transcript (at most one at a time, #concurrency.maxDispatch); and isolated, where one new agent starts with an empty context and sees only what request.json names (a decision, a source write, an audit, a walk, a critique). No mode waits by polling: a new agent is awaited on its completion event, and a chain route is awaited on the sibling session's end. The orchestrator writes response.json as a running skeleton at dispatch; an agent that exits without replacing it gets one follow-up, then RECEIPT_MISSING. The orchestrator's memory is state.json.brief and nothing else.",
   "agentPerOperator": true,
   "maxConcurrentAgents": 3,
   "dispatch": "routing.json",
-  "dispatchModes": {
-    "inline": "the orchestrator performs the operator's Steps itself, in order, with the operator's own grants, and runs both validators on what it wrote; no agent is created; the profile recorded is the orchestrator's own",
-    "fresh": "one new agent on the operator's profile, with the brief (operators/<id>/brief.md) and request.json as its whole prompt; awaited on its completion event, never on a timer"
+  "modes": {
+    "inline": "the orchestrator runs the operator's Steps itself, in the chat, in order, with the operator's own grants, and runs both validators on what it wrote; no agent is created; the profile recorded is the orchestrator's own",
+    "dispatch": "one new agent that inherits the orchestrator's transcript (the profile's forkTurns.dispatch turns), on the operator's profile, with the brief (operators/<id>/brief.md) and request.json as its instruction; at most concurrency.maxDispatch such agents at a time; awaited on its completion event, never on a timer",
+    "isolated": "one new agent with an empty context (forkTurns.isolated is none), on the operator's profile, that sees only brief.md, request.json and the files request.inputs and request.contexts name, in its own worktree and browser profile; awaited on its completion event, never on a timer"
   },
-  "wait": "completion: a fresh agent is awaited on its completion event and a chain route on its sibling session's end; a timed poll is not a step of any chain, and a wait that returns nothing is not evidence of anything",
+  "wait": "completion: a dispatched or isolated agent is awaited on its completion event and a chain route on its sibling session's end; a timed poll is not a step of any chain, and a wait that returns nothing is not evidence of anything",
   "receiptSkeleton": true,
-  "briefBytes": 2048,
+  "briefBytes": 3072,
   "budget": {
     "maxSteps": 24,
     "maxSameOperator": 4,
-    "note": "written into state.json.budget at create; a request past a cap is BUDGET_EXHAUSTED and the person answers a budget-choice (narrow, continue, stop) recorded in state.json.choices; continue is recorded as a budget.extensions entry"
+    "perUnit": 4,
+    "note": "written into state.json.budget at create; a request past a cap is BUDGET_EXHAUSTED and the person answers a budget-choice (narrow, continue, stop) recorded in state.json.choices; continue is recorded as a budget.extensions entry; when a plan branch produced N units (a units.json), the orchestrator raises maxSteps to maxSteps + perUnit × N at that transition, so a fan-out is paid for by the units it runs and never by the base cap"
   },
   "interactionPolicy": "resources/interaction.json",
   "agent": {
     "profile": "operator.json → resources.profile",
-    "grants": "operator.json → resources.tools: each @tools/<id> with one mode from resources/tools.json, and nothing the profile would otherwise permit. A tool whose only use the operator's mode forbids is not granted for that run: backend.source.apply and frontend.source.apply under mode dry receive neither @tools/sourcewrite nor @tools/git",
+    "grants": "operator.json → resources.tools: each @tools/<id> with one mode from resources/tools.json, and nothing the profile would otherwise permit. A tool whose only use the operator's mode forbids is not granted for that run: backend.generate and interface.generate under mode dry receive neither @tools/sourcewrite nor @tools/git",
     "refs": "operator.md → Context table, resolved through alias/alias.json; an unlisted location is unreadable",
     "requirements": "operator.md → Requirements table; fill defaults into request.json and obtain required values from the mission, existing decisions and declared inputs. Fields under agent.fills (project, runId and lease) come from the session. A missing default does not itself authorize a question: apply interactionPolicy. Unavailable required authorization still blocks under the existing operator gate; this communication rule supplies no grant.",
-    "prompt": "rendered at dispatch from operators/<id>/brief.md (generated, at most briefBytes) plus request.json; the agent reads operator.md sections through @tools/fileread for the step it is on; never stored",
-    "isolation": "fresh, no inherited turns",
+    "prompt": "rendered at dispatch (mode dispatch or isolated) from operators/<id>/brief.md (generated, at most briefBytes) plus request.json; the agent reads operator.md sections through @tools/fileread for the step it is on; never stored",
+    "isolation": "per resources.mode: isolated starts with no inherited turns and sees only what request.json names; dispatch inherits the orchestrator's transcript for forkTurns.dispatch turns of its profile; inline is the orchestrator itself",
     "writes": "only response/ of its own branch (step-N/parallel-M/response/); a nested-exchange agent writes only <exchange>/response/ of that branch; a source-writing operator also writes the session branch of its checkout under an exclusive lease (see sourceWrites)",
     "profileRecord": "the orchestrator fills response.json boundProfile (operator.json → resources.profile) and ranProfile at dispatch whenever the two differ; validate-response refuses one without the other or a boundProfile that is not the operator's",
     "fills": [
@@ -34,20 +36,23 @@
   },
   "concurrency": {
     "rule": "at most maxConcurrentAgents agents at once; branches of one step run concurrently only when their Writes touch no common alias",
-    "sharedCheckout": "two agents may read one checkout; only one may hold it for writing (backend.source.apply, frontend.source.apply, git.publish are exclusive per checkout)",
-    "sharedRoot": "business.decide is exclusive per businesses root; platform.operate is exclusive per runtime owner"
+    "maxDispatch": 1,
+    "maxParallel": 3,
+    "dispatchRule": "at most maxDispatch agents in mode dispatch at once, because each one carries the orchestrator's transcript and two such transcripts diverge; isolated agents are bounded only by maxConcurrentAgents",
+    "sharedCheckout": "two agents may read one checkout; only one may hold it for writing (backend.generate, interface.generate, git.publish are exclusive per checkout)",
+    "sharedRoot": "business.decide is exclusive per businesses root; runtime.serve is exclusive per runtime owner, identity.provision per provider realm, data.seed per flow namespace"
   },
   "handoff": {
     "carrier": "response.json fields: kind → path relative to the branch; the next branch's request.json inputs point at step-N/parallel-M/<path> from the session root, written explicitly by the orchestrator (nearest earlier producer guides the orchestrator, never the agent)",
     "stop": "response.json status blocked with stop = code; errors/ says whether the code terminates or falls back, and routing.json says where a terminated step hands to. A code the merged registry does not list is read by the orchestrator as UNKNOWN_STOP and routed on domain caller; the branch keeps the code the agent wrote as evidence and the orchestrator records the substitution in state.json.substitutions",
-    "waiting": "response.json status waiting with awaiting { exchange, kind }: the orchestrator validates the fields written so far, creates <exchange>/request/request.json in the same branch, runs a fresh agent for it, and resumes the paused agent when <exchange>/response/response.json is done; other branches of the step keep running",
+    "waiting": "response.json status waiting with awaiting { exchange, kind }: the orchestrator validates the fields written so far, creates <exchange>/request/request.json in the same branch, runs a new agent for it in the operator's own mode, and resumes the paused agent when <exchange>/response/response.json is done; other branches of the step keep running",
     "resume": "a blocked branch re-enters the same operator as a new agent in step-(N+1)/parallel-1, with request.json.resume naming the blocked step and parallel; the blocked branch stays on disk as evidence",
     "chain": "a stop whose routing.json route is kind chain: the orchestrator opens a sibling session on the target workflow (and then on `then`), records it under state.json.brief.peers with a wake condition, marks the blocked branch waiting on it, and re-enters the branch in step-(N+1)/parallel-1 with the produced input when the sibling ends done; a sibling that ends blocked hands its own stop upward",
     "skeleton": "at dispatch the orchestrator writes response/response.json with status running and the branch's identity fields; the agent's first act on finishing is replacing it; an exit that leaves it in place is followed up once, then recorded as blocked with RECEIPT_MISSING and event abandoned"
   },
   "session": {
     "root": "<Source>/.worktrees/sessions/<sessionId>/",
-    "id": "<yyyymmdd-HHMMss>-<project>-<first operator>, e.g. 20260903-142200-project-frontend.direction.decide",
+    "id": "<yyyymmdd-HHMMss>-<project>-<first operator>, e.g. 20260903-142200-project-interface.generate",
     "manifest": "state.json, validated against templates/step/state.schema.json by validate-request: id, project, workflow, startedAt, status (running | blocked | done | stopped), chain [[\"1/1\"], [\"2/1\", \"2/2\"], ...], steps { \"N/M\": operatorId }, current, leases { \"N/M\": { agent, holds } }, requestHashes { \"N/M\": sha256 of request/request.json }, resumes { \"N/M\": { resumes: \"K/L\", stop } } for every re-entry, stoppedAt { branch, operator, stop | null, domain, route, why } when the session ended, substitutions { \"N/M\": code } for codes read as UNKNOWN_STOP, transitions [] as the audit trail, brief { proven, blocked, next, peers, report } (the orchestrator's memory, rewritten after every transition; templates/step/state.schema.json), budget { maxSteps, maxSameOperator, extensions } (from #budget at create), mission { version, language, goal, includes, excludes, doneWhen [{ evidence, producedBy }], sourceRef } (the goal as the person confirmed it, written at create from the request; every doneWhen line names the operator whose receipt is that evidence; confirmed through choices[\"goal:<sessionId>:v<version>\"] with selected as-stated; a mission whose latest version is not as-stated runs nothing; scripts/validate-request.mjs#missionGateErrors)",
     "branch": "step-<N>/parallel-<M>/ — N is the position in the chain, M the parallel branch; parallel-1 always exists",
     "branchLayout": [
@@ -72,11 +77,11 @@
     ]
   },
   "sourceWrites": {
-    "rule": "an operator that writes source (frontend.source.apply, backend.source.apply, library.source.apply, dependency.update) writes only on the session branch session/<sessionId> of the routed checkout, in a git worktree the orchestrator prepared from the frozen head; it commits the declared write set once and records the sha in response.json.commits; the person's checked-out branch is never touched",
-    "track": "changes.md names every path with before/after hashes and the commit; the next requests pin @workspaces/<role> at that sha (contexts[].head) so quality.verify and frontend.surface.audit verify exactly what was written",
+    "rule": "an operator that writes source (interface.generate, backend.generate, library.update, library.update) writes only on the session branch session/<sessionId> of the routed checkout, in a git worktree the orchestrator prepared from the frozen head; it commits the declared write set once and records the sha in response.json.commits; the person's checked-out branch is never touched",
+    "track": "changes.md names every path with before/after hashes and the commit; the next requests pin @workspaces/<role> at that sha (contexts[].head) so quality.verify and interface.audit verify exactly what was written",
     "publish": "git.publish merges the session branch into the target branch: fast-forward when the target has not moved; a merge commit only when there is no conflict and the gates are re-run on the merge result; a conflict is NON_FAST_FORWARD and a person resolves it; never rebase, never force",
     "cleanup": "after a successful publish the worktree and the session branch are removed together with the session folder; a blocked session keeps both",
-    "policy": "the routed checkout must declare gitPolicy.worktreeBranches = session-only (readiness/initialization/workspaces); a route declaring forbidden binds read-only and no source-writing operator may run against it; mode dry is exempt, because it writes nothing: a dry backend.source.apply or frontend.source.apply may run against a read-only binding, and its plan records a null commit"
+    "policy": "the routed checkout must declare gitPolicy.worktreeBranches = session-only (readiness/initialization/workspaces); a route declaring forbidden binds read-only and no source-writing operator may run against it; mode dry is exempt, because it writes nothing: a dry backend.generate or interface.generate may run against a read-only binding, and its plan records a null commit"
   },
   "profileEquivalents": {
     "rule": "an operator binds one profile; when the processor runs on a runtime that lacks that profile, it runs the equivalent profile of its own runtime with exactly the grants the operator requires, and response.json records both (boundProfile, ranProfile) so an audit can tell a stand-in from the binding",

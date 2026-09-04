@@ -1,0 +1,24 @@
+{
+  "schemaVersion": 9,
+  "id": "runtime.serve",
+  "domain": "runtime",
+  "job": "Serve one product route's integration branch on its one fixed port: climb the named rung of the runtime ladder for the bound route - bring the environment's infrastructure up, locate the routed checkouts, start a role, merge this session's commit into the integration branch and serve it, restart, reset or stop the one detached server - attest the entry from what answered, and hold the lease that orders sessions.",
+  "package": "operator.md",
+  "errors": "errors.json",
+  "validator": "validate.mjs",
+  "selfTest": "self-test.mjs",
+  "resources": {
+    "profile": "sol-fresh",
+    "grammarBound": false,
+    "mode": "inline",
+    "tools": {
+      "@tools/fileread": "context-aliases",
+      "@tools/git": "merge-into-integration-branch",
+      "@tools/shell": "declared-commands",
+      "@tools/http": "probe",
+      "@tools/container": "operate",
+      "@tools/secrets": "resolve-by-name"
+    }
+  },
+  "primaryOutput": "platform-operation-receipt"
+}

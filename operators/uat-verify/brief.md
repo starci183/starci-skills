@@ -1,6 +1,6 @@
 # uat.verify — brief
 
-Read operator.md at your step; write only response/ of your branch; replace the running response.json skeleton before you exit; * marks a fallback stop.
+Read operator.md at your step; write only response/ of your branch; replace the running response.json skeleton before you exit; * marks a fallback stop. You see only what request.json names; nothing else exists.
 
 ## Job
 
@@ -10,9 +10,11 @@ Verify one product flow end to end on the running product at the pinned commit, 
 
 Done when the `uat-snapshot` was frozen before any product action, naming the pinned commit, the served head that contains it, the cases in order with their assertions, the account record of names and the seed fingerprint, every frozen case has its `uat-capture` and masked `screenshot` taken after the sign-in redirect landed through the rendered controls alone, the `uat-verdicts` judge the behaviour, experience and interface lanes on their own evidence with the experience lane scored criterion by criterion, the run namespace was deleted and nothing else, the append-only run record exists with its pointer and history line, and the `uat-flow-verification` lists the `sheet` and the verdict table it printed to the person, carrying the `audit-scope` unchanged when the admitted audit had one.
 
+Primary output: `uat-flow-verification`
+
 ## Inputs
 
-`frontend-surface-audit`, `quality-verification`, `route`, `uat-account` (optional)
+`frontend-surface-audit`, `quality-verification`, `route`, `uat-account` (optional), `units` (optional)
 
 ## Outputs
 

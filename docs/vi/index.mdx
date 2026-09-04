@@ -1,13 +1,13 @@
 ---
 title: "Giới thiệu"
-description: "StarCi Skills là gì: một cửa vào, các operator có ranh giới rõ, các workflow mẫu, và một phiên làm việc bằng request/response."
+description: "StarCi Skills là gì: một cửa vào, các operator có ranh giới rõ, một chuỗi vẽ từ nhiệm vụ, và một phiên làm việc bằng request/response."
 ---
 
 # StarCi Skills
 
 StarCi Skills là runtime hoàn tất một nhiệm vụ StarCi. Nó là một cây file, không phải một
-framework: `SKILL.md` là cửa vào, `operators/` giữ các đơn vị làm việc, `workflows/` giữ các
-chuỗi mẫu, còn `routing.json` là bản đồ đóng quyết định điều gì xảy ra sau mỗi bước. `INDEX.md` nói
+framework: `SKILL.md` là cửa vào, `operators/` giữ các đơn vị làm việc, chuỗi giữa chúng được vẽ từ
+nhiệm vụ, còn `routing.json` là bản đồ đóng quyết định điều gì xảy ra sau mỗi bước. `INDEX.md` nói
 thẳng cây này để làm gì: nó "là runtime", và `SKILL.md` là cửa vào duy nhất đóng băng phạm vi nhiệm
 vụ, chọn đúng một operator sở hữu kết quả, rồi định tuyến giữa các operator dựa trên kết quả có kiểu.
 
@@ -18,12 +18,12 @@ trong cây thì trang trích đúng file hoặc dẫn link tới file, và mọi
 ## Một cửa vào
 
 Chỉ có đúng một đường vào. `SKILL.md` đóng băng phạm vi, chạy `workspace.bind` cho mọi thứ chạm vào
-source đã route, tìm workflow, chọn operator đầu tiên, rồi sắp xếp phần còn lại. Bản thân nó không
+source đã route, vẽ chuỗi từ nhiệm vụ đã xác nhận, chọn operator đầu tiên, rồi sắp xếp phần còn lại. Bản thân nó không
 làm việc gì: "không quyết một giá trị, không ghi source, không phán xét một kết quả."
 
 Bảng Cửa vào ánh xạ một yêu cầu tới operator đầu tiên của nó — hỏi dự án nào thì về `workspace.bind`,
 hỏi sản phẩm hứa gì thì về `business.decide`, hỏi một surface đã render có đứng vững không thì về
-`frontend.surface.audit`. Một yêu cầu không gọi tên chủ sở hữu nào, hoặc gọi tên hai chủ sở hữu có
+`interface.audit`. Một yêu cầu không gọi tên chủ sở hữu nào, hoặc gọi tên hai chủ sở hữu có
 phạm vi khác nhau về bản chất, dừng ngay tại đó bằng một câu hỏi tập trung.
 
 ## Các operator
@@ -37,14 +37,15 @@ Kế tiếp — nằm cạnh `operator.json`, `errors.json`, `validate.mjs` và 
 Xem [Operator](/vi/concepts/operator) để biết hình dạng, và
 [trang tham chiếu operator](/vi/reference/operators) để đọc tất cả các gói operator.
 
-## Workflow
+## Chuỗi
 
-Một workflow là một chuỗi ghép sẵn: các bậc theo thứ tự, mỗi bậc là danh sách nhánh chạy song song,
-kèm vòng lặp quay về bậc trước và preset cho Yêu cầu của từng nhánh. Các file trong `workflows/` là
-ví dụ chứ không phải những chuỗi duy nhất được phép; khi không ví dụ nào khớp, cửa vào tự ghép một
-chuỗi theo đúng luật mà `scripts/validate-workflows.mjs` ép lên chính các file đó.
+Không chuỗi nào được lưu sẵn. Khi người đã xác nhận goal của nhiệm vụ, `scripts/plan-chain.mjs` suy
+chuỗi từ các operator mà những dòng "xong khi" gọi tên, đi ngược qua bảng Đầu vào, Context và Kế
+tiếp của các operator; tính năng có nhiều trang hay nhiều luồng thì chạy `<domain>.plan` trước rồi
+toả ra mỗi đơn vị một agent mù, tối đa ba nhánh một bậc; `scripts/validate-chain.mjs` chấp nhận
+chuỗi trước khi dispatch bất cứ gì và mỗi lần một lần dừng vẽ lại nó.
 
-Xem [Workflow](/vi/concepts/workflow) và [trang tham chiếu workflow](/vi/reference/workflows).
+Xem [Chuỗi](/vi/concepts/chain).
 
 ## Phiên làm việc bằng request/response
 

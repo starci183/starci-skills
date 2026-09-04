@@ -1,0 +1,31 @@
+{
+  "schemaVersion": 1,
+  "id": "content-unit",
+  "when": {
+    "en": "One curriculum unit needs its brief, its language editions, its code tracks and an independent review; publishing to object storage stays with a person.",
+    "vi": "Một đơn vị giáo trình cần brief, các ấn bản ngôn ngữ, track code và một lượt review độc lập; đưa lên object storage vẫn là việc của người."
+  },
+  "mission": {
+    "goal": "one curriculum unit exists with its brief, editions, tracks and review",
+    "doneWhen": [
+      {
+        "evidence": "the unit is generated and reviewed",
+        "producedBy": "content.generate"
+      }
+    ]
+  },
+  "options": {
+    "requirements": {
+      "content.generate": {
+        "maxReviewRounds": 2
+      }
+    }
+  },
+  "example": [
+    [
+      "content.generate"
+    ]
+  ],
+  "ends": "user",
+  "rewrite": "Unchanged. content.generate holds no effect tool, so no environment.preflight opens the chain."
+}

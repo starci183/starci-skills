@@ -10,7 +10,7 @@ The instrument is normally the UAT run: `uat.verify` drives one frozen flow at t
 judges the `ux` lane on its own captures, so an `Observe` cell names a step of a real attempt — the
 assertion that was reached, the number of steps it took, the latency between an activation and the
 first visible change, the state after a refresh. Where a criterion is settled by a single render and
-needs no attempt, `frontend.surface.audit` may measure it from a capture it already took; each rule
+needs no attempt, `interface.audit` may measure it from a capture it already took; each rule
 below names which of the two instruments answers it. Neither instrument may substitute intent for
 observation: an approved flow document does not prove a completed task, and a spinner in the markup
 does not prove a progress signal ever appeared.

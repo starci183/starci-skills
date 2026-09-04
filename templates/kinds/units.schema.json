@@ -1,0 +1,82 @@
+{
+  "$id": "kind:units",
+  "description": "What a plan outputs, as data: the closed list of units the execute operators of the same domain do one branch at a time. The unit of a blind agent is one page, one modal, one flow; a table or a module is the same idea for a seed or a backend plan. Every plan operator (<domain>.plan) writes this kind as response/data/units.json and nothing else names a unit: an execute branch carries request.json.unit, which must be an id of a units.json bound as inputs.units (scripts/validate-request.mjs#unitGateErrors). Every unit carries its own goal line, because a unit with no goal is a branch nobody can check. Ids are unique and dependsOn names only ids of the same file; the schema states the shape and the gate that reads the file states those two relations.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "producedBy",
+    "units"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "const": 9
+    },
+    "producedBy": {
+      "type": "string",
+      "pattern": "^[a-z]+(?:\\.[a-z]+)+$",
+      "description": "The plan operator that wrote the file; the unit gate checks it is an operator whose Outputs include this kind."
+    },
+    "units": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 32,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "kind",
+          "goal",
+          "inputs",
+          "dependsOn"
+        ],
+        "properties": {
+          "id": {
+            "$ref": "#/$defs/unitId"
+          },
+          "kind": {
+            "enum": [
+              "page",
+              "modal",
+              "flow",
+              "table",
+              "module"
+            ]
+          },
+          "goal": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 240,
+            "description": "The one line the execute branch is checked against; the plan's receipt repeats it beside the unit."
+          },
+          "inputs": {
+            "type": "array",
+            "maxItems": 16,
+            "uniqueItems": true,
+            "items": {
+              "type": "string",
+              "pattern": "^(?:step-[1-9][0-9]*/parallel-[1-9][0-9]*/)?(?:[a-z][a-z-]*/)?response/(?:(?:[a-z][a-z-]*/)*[A-Za-z0-9_.-]+\\.md|data/[A-Za-z0-9_./-]+\\.json|artifacts/[A-Za-z0-9_./-]+)$"
+            },
+            "description": "Files the unit's execute branch binds beyond the plan itself, branch-relative (response/...) or session-relative (step-N/parallel-M/response/...)."
+          },
+          "dependsOn": {
+            "type": "array",
+            "maxItems": 16,
+            "uniqueItems": true,
+            "items": {
+              "$ref": "#/$defs/unitId"
+            },
+            "description": "Units that must be done before this one runs; each is an id of this file, so the orchestrator orders the fan-out from the plan alone."
+          }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "unitId": {
+      "type": "string",
+      "pattern": "^[a-z0-9][a-z0-9-]*$"
+    }
+  }
+}

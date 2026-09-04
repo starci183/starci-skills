@@ -33,7 +33,7 @@ export async function writeMigrationReleaseProducers({ root, session, checkout, 
   };
   const routeRequest = { schemaVersion: 9, operatorId: 'workspace.bind', step: 2, parallel: 1, sessionId,
     contexts: [{ alias: `@workspaces/projects/${project}/be`, head: null }, { alias: `@workspaces/local/routes/${project}/be`, head }, { alias: '@workspaces/device-state', head: null }],
-    requirements: { project, role: 'be', gitPolicy: route.gitPolicy, declaredWriteRoots: [], runtimeNeed: 'none', resume: null },
+    requirements: { project, role: 'be', gitPolicy: route.gitPolicy, declaredWriteRoots: [], resume: null },
     inputs: {}, resume: null };
   const routeRequestFile = write(routeBranch, 'request/request.json', routeRequest);
   write(routeBranch, 'response/data/route.json', route);

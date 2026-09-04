@@ -1,6 +1,7 @@
-// Proves validate.mjs on a synthetic session branch: one conforming bind of a source checkout with no
-// runtime, one bind that consumes the shared runtime, one branch blocked on a terminate code, and one
-// mutation per law, each of which must fail with a line that names the defect.
+// Proves validate.mjs on a synthetic session branch: one conforming bind of a source checkout, one
+// branch blocked on a terminate code, a route that carries a runtime binding (refused: the runtime
+// owner binds the entry a caller consumes), and one mutation per law, each of which must fail with a
+// line that names the defect.
 import assert from 'node:assert/strict';
 import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -120,10 +121,10 @@ ${rows}
 `;
 }
 
-const requestJson = ({ runtimeNeed = 'none', extra = {} } = {}) => ({
+const requestJson = ({ extra = {} } = {}) => ({
   schemaVersion: 9, operatorId: 'workspace.bind', step: 1, parallel: 1, sessionId: 's-test',
   contexts: [{ alias: '@workspaces/projects/starci-academy/be', head: null }, { alias: '@workspaces/local/routes/starci-academy/be', head }, { alias: '@workspaces/device-state', head: null }],
-  requirements: { project: 'starci-academy', role: 'be', gitPolicy: { worktreeBranches: 'forbidden', mutationBranch: 'mtp' }, declaredWriteRoots: ['src', 'test'], runtimeNeed, resume: null, ...extra },
+  requirements: { project: 'starci-academy', role: 'be', gitPolicy: { worktreeBranches: 'forbidden', mutationBranch: 'mtp' }, declaredWriteRoots: ['src', 'test'], resume: null, ...extra },
   inputs: {}, resume: null,
 });
 function responseJson({ status = 'done', stop, fallbacks = [], fields = null, next = [] } = {}) {
@@ -171,10 +172,10 @@ async function expectError(files, needle, label) {
   assert.ok(errors.some((e) => e.includes(needle)), `${label}: expected an error containing "${needle}", got:\n${errors.join('\n') || '(none)'}`);
 }
 
-const consuming = () => withBinding(routeBinding({ runtime: runtimeConsumption() }), { runtimeNeed: 'consume' });
-
 await expectValid(baseline(), 'a source checkout bound with no runtime');
-await expectValid(consuming(), 'a bind that consumes the shared runtime');
+await expectError(withBinding(routeBinding({ runtime: runtimeConsumption() })), 'the route carries a runtime binding', 'a route that bound a runtime the runtime owner should have');
+await expectError({ ...baseline(), 'response/response.md': responseMd({ runtimeRows: [['Owner task', OWNER]] }) }, 'the Runtime section carries rows', 'a receipt describing a runtime nobody bound');
+await expectError({ ...baseline(), 'response/response.md': responseMd({ findings: [['ROUTE_HYDRATED_FROM_PORTABLE', HYDRATED, 'resolved'], ['IDENTITY_ROSTER_SEALED', 'roster', 'sealed'], ['WORKTREE_BRANCH_FORBIDDEN', 'mtp', 'forbidden'], ['RUNTIME_CONSUMED_NOT_OWNED', OWNER, 'consumed']] }) }, 'records a runtime this route never bound', 'a finding about a runtime nobody bound');
 await expectValid({ ...baseline(), 'response/response.json': responseJson({ status: 'blocked', stop: 'ROUTE_UNDECLARED', fields: {} }), 'response/response.md': null, 'response/data/route.json': null }, 'blocked on an undeclared route');
 
 await expectError({ ...baseline(), 'response/response.json': { ...responseJson(), stop: 'ROUTE_UNDECLARED' } }, 'only a blocked response carries a stop', 'done with a stop');
@@ -192,16 +193,8 @@ await expectValid(withBinding(routeBinding({ gitPolicy: { worktreeBranches: 'ses
 await expectError(withBinding(routeBinding({ checkout: { ...routeBinding().checkout, branch: 'session/not-authorized' } })), 'mutation is ready only', 'forbidden policy still refuses session branch readiness');
 await expectError(withBinding(routeBinding({ checkout: { ...routeBinding().checkout, gitRoot: `${SOURCE}/api` } })), 'the checkout disk path and Git root must be the same checkout', 'the checkout and its Git root disagree');
 await expectError(withBinding(routeBinding({ sourceHead: 'e'.repeat(40) })), 'must name the same source head', 'the binding and the checkout disagree on the head');
-await expectError({ ...baseline(), 'request/request.json': requestJson({ runtimeNeed: 'consume' }) }, 'must bind the runtime owner', 'consuming with no runtime bound');
+await expectError({ ...baseline(), 'request/request.json': requestJson({ extra: { runtimeNeed: 'consume' } }) }, 'requirements.runtimeNeed is not a field', 'the retired runtime half asked for by name');
 await expectError(withBinding(routeBinding({ writeRoots: ['src'] })), 'which the binding does not carry', 'a declared write root the binding drops');
-await expectError(withBinding(routeBinding({ runtime: runtimeConsumption() })), 'runtimeNeed is none, so step 5 never ran and no runtime may be bound', 'a runtime bound without need');
-await expectError(withBinding(routeBinding({ runtime: runtimeConsumption({ status: 'starting' }) }), { runtimeNeed: 'consume' }), 'cannot bind a starting runtime owner for consumption', 'a runtime that is not ready');
-await expectError(withBinding(routeBinding({ runtime: runtimeConsumption({ endpoints: { frontend: 'http://127.0.0.1:3000', api: 'http://localhost:3001', identity: 'http://localhost:8089' } }) }), { runtimeNeed: 'consume' }), 'is not an origin-only localhost projection', 'a loopback alias as an endpoint');
-await expectError(withBinding(routeBinding({ runtime: runtimeConsumption({ endpoints: { frontend: 'http://localhost:3000', api: 'http://localhost:3000', identity: 'http://localhost:8089' } }) }), { runtimeNeed: 'consume' }), 'must resolve to distinct ports', 'two services on one port');
-await expectError(withBinding(routeBinding({ runtime: runtimeConsumption({ endpointBinding: { ...runtimeConsumption().endpointBinding, services: { frontend: 'web', api: 'web', identity: 'keycloak' } } }) }), { runtimeNeed: 'consume' }), 'service keys must be distinct', 'two services under one key');
-await expectError(withBinding(routeBinding({ runtime: runtimeConsumption({ endpointBinding: { ...runtimeConsumption().endpointBinding, project: 'other-project' } }) }), { runtimeNeed: 'consume' }), 'belongs to another project than the bound route', 'an endpoint binding from another project');
-await expectError(withBinding(routeBinding({ runtime: runtimeConsumption({ registryEntryKey: 'starci-academy/fe' }) }), { runtimeNeed: 'consume' }), 'and this route is starci-academy/be', 'a binding that consumed a sibling route entry');
-await expectError({ ...consuming(), 'response/response.md': responseMd({ binding: routeBinding({ runtime: runtimeConsumption() }), findings: [['ROUTE_HYDRATED_FROM_PORTABLE', HYDRATED, 'resolved'], ['IDENTITY_ROSTER_SEALED', 'roster', 'sealed'], ['WORKTREE_BRANCH_FORBIDDEN', 'mtp', 'forbidden'], ['RUNTIME_HEAD_CONTAINS_BOUND_COMMIT', head, 'contained']] }) }, 'must record that the caller does not own it', 'a consumed runtime with no ownership finding');
 await expectError({ ...baseline(), 'response/response.md': responseMd({ findings: [['IDENTITY_ROSTER_SEALED', 'roster', 'sealed'], ['WORKTREE_BRANCH_FORBIDDEN', 'mtp', 'forbidden']] }) }, 'must record the hydrated route it resolved from', 'a bound route with no hydration finding');
 await expectError({ ...baseline(), 'response/response.md': responseMd({ findings: [['ROUTE_HYDRATED_FROM_PORTABLE', HYDRATED, 'resolved'], ['IDENTITY_ROSTER_SEALED', 'roster', 'sealed'], ['WORKTREE_BRANCH_FORBIDDEN', 'mtp', 'forbidden'], ['HINT_REJECTED', 'D:/Repositories/starci-academy', 'a similar directory name']] }) }, 'a hint is INVALID_INPUT at the gate', 'a receipt that weighs a hint');
 await expectError({ ...baseline(), 'response/response.md': responseMd({ findings: [['ROUTE_HYDRATED_FROM_PORTABLE', HYDRATED, 'resolved'], ['WORKTREE_BRANCH_FORBIDDEN', 'mtp', 'forbidden']] }) }, 'the credential roster was sealed and never read', 'no sealed roster finding');
@@ -213,9 +206,6 @@ await expectError({ ...baseline(), 'response/response.md': responseMd().replace(
 await expectError({ ...baseline(), 'response/data/route.json': routeBinding({ sourceHead: 'not-a-head' }) }, 'sourceHead', 'route schema');
 await expectError({ ...baseline(), 'response/response.json': (() => { const o = responseJson(); delete o.fields.route; return o; })() }, 'required output route is not in fields', 'missing required output');
 
-await expectError(withBinding(routeBinding({ runtime: runtimeConsumption({ served: { branch: 'uat', head: 'f'.repeat(40), contains: ['a'.repeat(40)], port: 3001, leaseSessionId: null } }) }), { runtimeNeed: 'consume' }), "does not contain this route's head", 'a served head that carries other work and not this');
-await expectError(withBinding(routeBinding({ runtime: runtimeConsumption({ served: { branch: 'uat', head: 'f'.repeat(40), contains: [head], port: 3999, leaseSessionId: null } }) }), { runtimeNeed: 'consume' }), 'and the entry serves this route on http://localhost:3999', 'an endpoint that is not the port the entry serves this route on');
-await expectError({ ...consuming(), 'response/response.md': responseMd({ binding: routeBinding({ runtime: runtimeConsumption() }), findings: [['ROUTE_HYDRATED_FROM_PORTABLE', HYDRATED, 'resolved'], ['IDENTITY_ROSTER_SEALED', 'roster', 'sealed'], ['WORKTREE_BRANCH_FORBIDDEN', 'mtp', 'forbidden'], ['RUNTIME_CONSUMED_NOT_OWNED', OWNER, 'consumed']] }) }, 'the served head contains the head this route bound', 'a consumed runtime whose ancestry the receipt never states');
 
 // New session bindings use real isolated Git worktrees and the installed portable hydrator.
 // Legacy fixtures above remain unbound observations and are never silently re-resolved.
@@ -238,4 +228,4 @@ await expectError({ ...consuming(), 'response/response.md': responseMd({ binding
   } finally { fixture.dispose(); }
 }
 
-process.stdout.write('workspace.bind self-test: legacy cases and independently verified session checkout branches passed\n');
+process.stdout.write('workspace.bind self-test: checkout binding cases, the refused runtime half and independently verified session checkout branches passed\n');

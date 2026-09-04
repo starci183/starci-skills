@@ -1,0 +1,30 @@
+{
+  "schemaVersion": 9,
+  "note": "Stop codes only data.seed emits. Same entry shape as operators/errors.json, scope implicit. Shared codes (INVALID_INPUT, SOURCE_DRIFT, NO_PROGRESS, AUTHORITY_DRIFT, IDENTITY_MISSING, PROVISIONING_UNAVAILABLE) come from operators/errors.json. A store that cannot be reached is PROVISIONING_UNAVAILABLE; a flow with no account record yet is IDENTITY_MISSING and hands to identity.provision.",
+  "codes": {
+    "SEED_SHARED_ROW": {
+      "domain": "caller",
+      "disposition": "terminate",
+      "meaning": {
+        "en": "A record of the seed would land on a row that already stands in the store outside the flow's namespace, or a store with neither an owner column nor a prefixable identifier holds a row the seed would overwrite. A seed touches no shared row, and nothing was written.",
+        "vi": "Một bản ghi của seed sẽ rơi vào một hàng đã đứng sẵn trong kho ngoài namespace của luồng, hoặc một kho không có cột chủ sở hữu lẫn định danh gắn tiền tố được đang giữ một hàng mà seed sẽ ghi đè. Seed không đụng hàng dùng chung nào, và chưa có gì được ghi."
+      },
+      "resume": {
+        "en": "Rewrite the record so it is owned by the flow's account or carries the flow's prefix, or record the store as a limitation of the seed and drop the record; never change the schema to make the row attributable.",
+        "vi": "Viết lại bản ghi để nó thuộc tài khoản của luồng hay mang tiền tố của luồng, hoặc ghi kho là giới hạn của seed và bỏ bản ghi; không bao giờ đổi schema để hàng quy về được."
+      }
+    },
+    "SEED_UNPROVEN": {
+      "domain": "self",
+      "disposition": "terminate",
+      "meaning": {
+        "en": "The store's state after the seed differs from the seed's own expectation, or the rollback set names a row the seed never placed. A seed nobody proved is not a placed one.",
+        "vi": "Trạng thái của kho sau seed khác với chính kỳ vọng của seed, hoặc tập rollback nêu một hàng mà seed chưa từng đặt. Một seed không ai chứng minh được thì chưa phải đã đặt."
+      },
+      "resume": {
+        "en": "Correct the seed's records or its expectation, then apply again over the same namespace; a second application changes nothing that already stands.",
+        "vi": "Sửa các bản ghi của seed hay kỳ vọng của nó, rồi áp lại trên cùng namespace; lần áp thứ hai không đổi gì đã đứng sẵn."
+      }
+    }
+  }
+}

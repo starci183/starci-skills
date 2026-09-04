@@ -84,7 +84,7 @@ Một boundary sở hữu store không nói gì về việc ai ghi nó, lúc nà
 ghi mà kiến trúc này cam kết, và bảng `## Operations` của biên nhận thuật lại đúng những hàng ấy. Mỗi
 mục gọi tên transport, writer, các store nó chạm, ranh giới transaction, kiểu idempotency, các
 migration nó mang, và các `dimension` của ma trận phủ thuộc head nghiệp vụ mà nó hiện thực. Danh sách
-đó chính là hợp đồng đóng băng mà `backend.source.apply` lấp: phần hiện thực thuật lại nguyên vẹn
+đó chính là hợp đồng đóng băng mà `backend.generate` lấp: phần hiện thực thuật lại nguyên vẹn
 những operation đó và không được thêm cái nào, nên một operation không ai khai ở đây thì không thể
 được viết ở đâu cả. Khai một lần ghi không phải là chọn một cách hiện thực, và đó là lý do writer là
 đường dẫn file duy nhất operator này gọi tên.
@@ -201,8 +201,8 @@ mình.
 | Khi | Operator |
 | --- | --- |
 | lời hứa nghiệp vụ phải được mô hình lại theo các boundary đã quyết | `business.decide` |
-| quyết định đã xác nhận và một contract backend thay đổi | `backend.source.apply` |
-| quyết định đã xác nhận và một bề mặt frontend thay đổi | `frontend.direction.decide` |
+| quyết định đã xác nhận và một contract backend thay đổi | `backend.generate` |
+| quyết định đã xác nhận và một bề mặt frontend thay đổi | `interface.generate` |
 
 ---
 

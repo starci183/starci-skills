@@ -22,7 +22,7 @@ import { hostRootOf, sessionRootOf, missingStack, loadEnvironmentSchema, parseDe
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 // What this run itself writes: seeding the frozen records and signing in as the flow's dedicated
-// account. Provisioning the account is platform.operate's own class and is not asked here.
+// account. Provisioning the account is identity.provision's own job and is not asked here.
 export const UAT_CLASSES = ['seed', 'identity-provisioning'];
 const LANES = ['behavior', 'ux', 'ui'];
 // knowledge/ui/proof/ux.md: UX-1..UX-11 are the scored criteria and UX-12 is the arithmetic over
@@ -99,7 +99,7 @@ async function admissionProvenanceErrors(session, request, snapshot) {
       const receiptPath=path.resolve(session,entry.ref), responseDir=path.dirname(receiptPath), upstreamBranch=path.dirname(responseDir);
       const upstreamRequest=JSON.parse(await readFile(path.join(upstreamBranch,'request/request.json'),'utf8'));
       const upstreamResponse=JSON.parse(await readFile(path.join(responseDir,'response.json'),'utf8'));
-      const operator=entry.kind==='frontend-surface-audit'?'frontend.surface.audit':'quality.verify';
+      const operator=entry.kind==='frontend-surface-audit'?'interface.audit':'quality.verify';
       if(upstreamRequest.operatorId!==operator || upstreamResponse.operatorId!==operator || upstreamResponse.status!=='done')errors.push(`ADMISSION_MISSING — ${entry.kind} has no completed owning operator`);
       if(!upstreamRequest.contexts?.some(c=>c.alias==='@workspaces/fe'&&c.head===snapshot.provenance.fe))errors.push(`ADMISSION_MISSING — ${entry.kind} did not pin the frontend role at this head`);
       const declared=asList(upstreamResponse.fields?.[entry.kind]);
@@ -201,7 +201,7 @@ export async function validateUatStep(branchDir, root = ROOT, { hostRoot = hostR
     if (!empty(requirements.approval) && snapshot.approval !== requirements.approval) errors.push('response/data/snapshot.json: the snapshot names another authority than the one the request declared');
     if (snapshot.fixtureNamespace !== `uat-${snapshot.runId}`) errors.push(`response/data/snapshot.json: the fixture namespace must be uat-${snapshot.runId}, so cleanup can name exactly what this run wrote`);
     if (snapshot.seed.namespace !== snapshot.fixtureNamespace) errors.push('response/data/snapshot.json: the seed namespace must equal the run fixture namespace');
-    // Two sessions may run against one product at once, under the isolation law platform.operate
+    // Two sessions may run against one product at once, under the isolation law runtime.serve
     // publishes. Each clause of it that this receipt can carry is checked here.
     const iso = snapshot.isolation;
     if (iso) {
@@ -286,7 +286,7 @@ export async function validateUatStep(branchDir, root = ROOT, { hostRoot = hostR
     const failing = verdicts.lanes.filter((l) => l.verdict === 'fail').map((l) => l.lane);
     const next = new Set(response.next ?? []);
     if (decided && !failing.length && !next.has('git.publish')) errors.push('response/response.json: all three lanes pass, so the run hands to git.publish');
-    if (decided && failing.includes('behavior') && !next.has('backend.source.apply')) errors.push('response/response.json: the behaviour lane failed, so the run hands to backend.source.apply');
+    if (decided && failing.includes('behavior') && !next.has('backend.generate')) errors.push('response/response.json: the behaviour lane failed, so the run hands to backend.generate');
     if (decided && failing.includes('ux') && !next.has('user')) errors.push('response/response.json: a UX failure is a question of intent; it hands to a person, and the flow is verified again only after that decision');
     if (decided && failing.length && next.has('git.publish')) errors.push('response/response.json: a failing lane cannot hand to git.publish');
   }

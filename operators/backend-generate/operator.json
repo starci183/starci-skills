@@ -1,0 +1,22 @@
+{
+  "schemaVersion": 9,
+  "id": "backend.generate",
+  "domain": "backend",
+  "job": "Generate one backend outcome inside a frozen mutation contract, following the observed sibling family, in full or as a fix inside the orchestrator's fix size, and return the measured conformance and proof receipt that shows the boundary was not widened.",
+  "package": "operator.md",
+  "errors": "errors.json",
+  "validator": "validate.mjs",
+  "selfTest": "self-test.mjs",
+  "resources": {
+    "profile": "sol-fresh",
+    "grammarBound": false,
+    "mode": "isolated",
+    "tools": {
+      "@tools/fileread": "context-aliases",
+      "@tools/sourcewrite": "declared-write-set",
+      "@tools/git": "commit-session-branch",
+      "@tools/shell": "declared-commands"
+    }
+  },
+  "primaryOutput": "backend-source-application"
+}

@@ -8,7 +8,7 @@ import { fileURLToPath } from 'node:url';
 import { assertIdentityPlan, assertIdentityCustody, privateJsonRequest, fingerprint, identityPolicy, IdentityOperationError } from './identity-custody.mjs';
 import { validateRequest, loadEnvironmentSchema, parseDeclarationReference } from './validate-request.mjs';
 import { platformAuthorityErrors } from './platform-authority.mjs';
-import { operationClasses, KIND_CAPABILITIES } from '../operators/platform-operate/validate.mjs';
+import { operationClasses, KIND_CAPABILITIES } from '../operators/identity-provision/validate.mjs';
 import { validateAgainst } from './json-schema.mjs';
 const requireThat = (value, code) => { if (!value) throw new IdentityOperationError(code); };
 const normalized = value => { const resolved = path.resolve(value).replaceAll('\\', '/'); return process.platform === 'win32' ? resolved.toLowerCase() : resolved; };
@@ -102,7 +102,7 @@ export async function provisionIdentity(sourceRoot, branchDir) {
     const gate = await validateRequest(path.join(source, '.claude'), branch);
     requireThat(gate.errors.length === 0, 'REQUEST_INVALID');
     const request = json(path.join(branch, 'request/request.json'));
-    requireThat(request.operatorId === 'platform.operate' && request.requirements?.desiredState?.serviceKind === 'identity', 'OPERATOR_SCOPE');
+    requireThat(request.operatorId === 'identity.provision' && request.requirements?.desiredState?.serviceKind === 'identity', 'OPERATOR_SCOPE');
     const planPath = path.join(branch, 'request/identity-plan.json'), bytes = fs.readFileSync(planPath), plan = JSON.parse(bytes);
     assertIdentityPlan({ plan, sourceRoot: source });
     requireThat(fingerprint(bytes) === request.requirements.desiredState.planSha256, 'PLAN_DRIFT');

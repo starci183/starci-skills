@@ -1,96 +1,82 @@
 # Workflows
 
-A workflow is a pre-composed chain of operators: an ordered list of **steps**, each step a list of
-**branches** that run in parallel (at most three), with optional **loops** back to an earlier step and
-**presets** for a branch's Requirements. The files here are references, not the only chains there are:
-they are the shapes that came up often enough to be worth writing down, and a mission whose business
-is harder than any of them composes its own chain under the same rules rather than forcing itself
-into the nearest example.
+There are no workflow files. A chain is never chosen from an example: it is derived from the
+mission, by `scripts/plan-chain.mjs`, from the operator tables alone, and it is checked by
+`scripts/validate-chain.mjs` every time it is drawn. The example chains this folder used to hold are
+planner fixtures now, under `tests/chains/`, and `scripts/plan-chain.spec.mjs` proves the planner
+still derives each of them from the outcome its mission names.
 
-How the entry uses them:
+## How a chain is derived
 
-1. Read the `when` of every example. If the request matches one fully, run that chain; its presets
-   fill `request.json`; obtain missing fields under [the interaction policy](../resources/interaction.md).
-2. If the match is partial, or the business is harder than any `when` describes, compose a chain
-   rather than bending a near-miss example into shape: brainstorm it from the operators' `## Next`
-   tables and `routing.json`, under the same rules `scripts/validate-workflows.mjs` enforces on these
-   files:
-   - every branch names a real operator and presets only fields that operator declares;
-   - every Requirements field with no Default is either preset or listed under the branch's `asks`, so a
-     chain says up front which fields the entry must obtain before that branch starts; `asks` is an
-     input inventory, not permission to send a question;
-   - every required Input of a branch is produced by an earlier step;
-   - branches of one step share no write alias (two operators may not write the same checkout or
-     root at once; `frontend.surface.audit` fans out by matrix entry because it writes nothing);
-   - a loop goes back to an earlier step and carries `maxRounds`;
-   - a chain that writes frontend source under `mode: apply` runs `frontend.surface.audit` and
-     `uat.verify` between that write and its `git.publish` — the long-flow law below;
-   - the chain ends at `git.publish`, `release.deploy`, or `user`.
-3. A composed chain that would be useful again becomes a new file here, with its `when`.
+The planner starts from the confirmed mission (`state.json.mission`): every "done when" line names
+the operator whose receipt is that evidence, and those operators are the targets. It walks backwards
+through the tables every operator publishes in its `operator.md`:
 
-## Every chain opens with readiness
+- a required **Input** pulls in the operator that produces that kind — a producer already in the
+  chain first, else the one operator whose `primaryOutput` is that kind (two primaries are settled
+  by the operator the Inputs row names), else the only producer; a kind the tables leave ambiguous
+  is a refusal that names the candidates, never a guess;
+- a required `@workspaces/<role>` **Context** row pulls in a `workspace.bind` of that role, and a
+  role the mission declares is bound before every working branch even when no table asks for it;
+- an operator that more than one "done when" line names, when its domain has a `<domain>.plan`
+  operator, runs after that plan and **fans out by units**: one unit per branch, the branch naming
+  its `unit` (the threshold and the unit's validity are `validate-request`'s, `#unitGateErrors`);
+  one line needs no map;
+- any operator holding an effect tool (the same predicate the mission gate reads from
+  `operator.json`) opens the chain with `environment.preflight`;
+- a mission that names `git.publish` while a branch writes frontend source under `mode: apply` owes
+  the audit and the walk in between — the long-flow law, stated in kinds: the operator whose primary
+  output is `frontend-surface-audit`, then `uat.verify`, before the publish.
 
-Every example that touches routed source or a runtime opens with `environment.preflight`: one branch,
-before the binds, that reports every wall the chain could meet — an undeclared or near-named route, a
-missing git policy, a dirty checkout, a sign-in that fails, a served head that does not contain the
-bound one, a held port, a missing browser or container, an approval the environment keeps with a
-person — in one typed readiness report. A chain that met those walls one per hour as it ran into them
-is the shape the retrospective evidence records; a chain that meets them all at minute five is the
-shape these examples take. `content-unit` writes no routed source and consumes no runtime, so it opens
-with its own operator.
+Two ties the required inputs leave open are settled by the tables too: an optional Input orders its
+consumer after a producer already in the chain, and a one-way Next row orders the operator that
+hands over before the one it hands to — each unless it would close a cycle, in which case the hard
+edges win and the dropped edge is on record in the plan. The nodes are then packed into steps:
+a branch runs only when everything it depends on ran in an earlier step and a Next table of the step
+before names it; at most three branches per step (`resources/orchestrator.json#maxConcurrentAgents`,
+or `#concurrency.maxParallel` when declared); never two writers of one alias in one step; a fan-out
+branch alone in its step so its units can expand in place. Every branch gets a goal — the done-when
+line it evidences, or the earliest later branch it enables — which is what `request.json.goal`
+carries and `validate-request` checks.
 
-## Every example is a long flow
+The plan is printed to the person as two lines per branch (the goal, then why the branch is there)
+before anything is dispatched, and `node scripts/plan-chain.mjs <session>` prints the same preview
+and the JSON block for a session on disk.
 
-A chain that writes a surface is not finished when the source compiles. Between the write and the
-publish stand two proofs that nothing else in the tree can supply: `frontend.surface.audit`, which
-renders the surface and keeps the screenshots, and `uat.verify`, which walks a real person's journey
-through it. `quality.verify` sits between them and answers a different question — the build, the
-lint, the types, the coverage — and green gates have never yet noticed that a page reads wrong. So
-every example that applies frontend source ends the same way:
+## What the gate enforces
 
-```text
-frontend.source.apply → workspace.bind (role fe, runtimeNeed consume) → frontend.surface.audit → quality.verify → uat.verify → git.publish
-```
+`validate-chain` reads `state.json.chain`, `state.json.steps` and each branch's `request.json`, and
+refuses a chain in which:
 
-The second `workspace.bind` is there because the head moved: the surface that must be served, audited
-and walked is the one the write just produced, not the one that was bound before it. `uat.verify`
-needs `feature`, `flow` and `approval` before it starts — the flow to walk and the authority for its
-own writes, taken from the environment's declaration and asked of a person only where that
-declaration marks the touched class `person` — so every chain that carries it declares them under
-`asks`, and the run refuses rather than inventing an authority.
+- a branch names an operator the tree does not carry, or a cell sits in a step its number does not
+  name;
+- a step holds an operator that no Next table of the step before permits and that is not a re-entry
+  of the same operator;
+- a branch requires an Input no earlier step produces, or a `@workspaces/<role>` context no earlier
+  `workspace.bind` of that role bound;
+- a step holds more than the parallel cap, or two branches of one step write the same alias;
+- a branch writes frontend source under `mode: apply` and `git.publish` follows with the audit or
+  `uat.verify` missing or outside the write and the publish;
+- `git.publish` or `release.deploy` runs and something other than a publish or a deploy runs after
+  it — a chain ends at `git.publish`, `release.deploy` or a person;
+- on a mission, a branch names no goal, cites a done-when line its operator does not produce, or a
+  prerequisite that is not a later branch of the chain;
+- the chain holds a `<domain>.plan` and a branch executing its units runs in the same or an earlier
+  step; which unit the branch names, and that the plan listed it, is `validate-request#unitGateErrors`.
 
-`staging-uat` is the one example that proves a delivery somewhere other than where it was written.
-It writes nothing — `frontend.source.apply` runs under `mode: dry`, so the long-flow law does not
-reach it — and it carries `env` on the audit and the run, which is what selects the stack's runtime
-registry entry, its accounts file and its approved reference. It ends at `user`, because two receipts
-in a person's hands are the outcome; reaching an environment is `release`'s job and stays there.
+`validate-session` runs it on the whole ledger after every transition.
 
-`backend-feature` is the one delivery chain with neither proof, and its `when` says why: it writes no
-surface, `uat.verify` requires a `frontend-surface-audit` input and a bound fe route, and neither
-exists there. A backend feature whose promise reaches a person through a screen belongs in
-`full-feature`, which walks the journey before it publishes. `release` and `content-unit` write no
-frontend source and publish no boundary, so the law does not reach them.
+## Replanning
 
-Every source-writing branch commits on `session/<sessionId>`; `git.publish` merges it, and refuses a
-session branch whose session carries no source-application receipt and no audit screenshots
-(`SESSION_MISSING`). A blocked branch re-enters as a new step; a loop counts toward the operator's own
-`maxRounds`.
+A chain is drawn once, before the first dispatch, and again on every stop that changes what the
+mission needs: a `blocked` branch whose route re-enters or adds an operator, a plan whose units are
+known, a corrected goal. Each redraw is a `replanned` transition in `state.json.transitions`
+carrying its note and the goal version it moves to, confirmed through `goal-confirm` like the first
+plan, never a silent rewrite (`scripts/validate-session.mjs#missionHistoryErrors`).
 
-| Workflow | When | Steps | Parallel | Ends |
-| --- | --- | --- | --- | --- |
-| `library-maintenance` | existing owner package behavior and next patch, without product presentation changes | preflight → bind → library apply → quality | — | `user` |
-| `dependency-maintenance` | verified package consumption through exact dependency metadata | preflight → bind → dependency update → quality | — | `user` |
-| `frontend-new-surface` | a surface that does not exist yet (`new`) | preflight → bind ×2 → business → direction → resolve → apply → bind (consume) → audit → quality → uat → publish | audit by matrix | `git.publish` |
-| `frontend-reconstruct` | rebuild an existing surface, business facts kept | preflight → bind ×2 → direction → resolve → apply → bind (consume) → audit → quality → uat → publish | audit by matrix | `git.publish` |
-| `frontend-refine` | repair inside an approved structure | preflight → bind ×2 → direction → resolve → apply → bind (consume) → audit → quality → uat → publish | audit by matrix | `git.publish` |
-| `backend-feature` | a backend contract for one feature, no surface | preflight → bind → business (model) → architecture → backend apply → quality → business (reconcile) → publish | — | `git.publish` |
-| `full-feature` | backend and a new frontend surface together | preflight → bind ×2 → business → architecture → [backend apply ∥ direction] → [quality ∥ resolve] → apply → bind (consume) → audit → quality → uat → business (reconcile) → publish | two steps of two, audit by matrix | `git.publish` |
-| `frontend-with-uat` | a frontend change a person asked to walk through by name | preflight → bind ×2 → direction → resolve → apply → bind (consume) → audit → quality → uat → publish | audit by matrix | `git.publish` |
-| `staging-uat` | a published delivery must be walked on another stack before release | preflight → bind ×2 (consume) → direction → resolve → apply (dry) → audit (env staging) → quality → uat (env staging) | audit by matrix | `user` |
-| `release` | a published head must reach production | preflight → bind → quality → release | — | `release.deploy` |
-| `content-unit` | one curriculum unit end to end | content.generate (review exchange inside) | — | `user` |
+## The fixtures
 
-File shape (`schemaVersion` 9): `id` equals the file name; `when` has `en` and `vi`; `chain` is an
-array of steps, each an array of
-`{ operator, requirements?, asks?: [field], fanout?: "matrix", maxParallel?: 1..3 }`;
-`loops` is an array of `{ from, to, when, maxRounds }`; `ends` is `user` or an operator of the last step.
+`tests/chains/<id>.json` holds the eleven 2.0.0 example chains rewritten to the current operator
+ids, each with the mission whose done-when lines name its outcomes, the operator order it expects,
+and a note on how it was rewritten. They are inputs to the planner's spec, not to the runtime: the
+entry never reads them.

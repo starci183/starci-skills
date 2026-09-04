@@ -1,8 +1,8 @@
 # changes — operator.id step-1/parallel-1
 
 One paragraph: what this step changed, in which checkout, at which head. Written by the step that
-wrote source (`backend.source.apply`, `frontend.source.apply`) as `response/changes.md`; read unchanged by the
-next steps (`quality.verify`, `frontend.surface.audit`, `git.publish`) through their `request.json` inputs.
+wrote source (`backend.generate`, `interface.generate`) as `response/changes.md`; read unchanged by the
+next steps (`quality.verify`, `interface.audit`, `git.publish`) through their `request.json` inputs.
 
 ## Binding
 

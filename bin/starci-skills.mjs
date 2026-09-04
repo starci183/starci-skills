@@ -52,7 +52,7 @@ the entry routes, and a rule copied here becomes a second home that nobody remem
 const DOCTOR_QUICK = ['validate-routing.mjs', 'validate-alias.mjs', 'validate-operator.mjs'];
 const DOCTOR_FULL = [
   'validate-routing.mjs', 'validate-resources.mjs', 'validate-knowledge-citations.mjs', 'validate-alias.mjs',
-  ['generate-alias-doc.mjs', '--check'], 'validate-operator.mjs', 'validate-workflows.mjs', 'validate-defaults.mjs',
+  ['generate-alias-doc.mjs', '--check'], 'validate-operator.mjs', 'validate-defaults.mjs',
   ['generate-operators-index.mjs', '--check'], 'validate-templates.mjs', 'run-operator-self-tests.mjs',
 ];
 

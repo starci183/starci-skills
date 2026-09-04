@@ -76,7 +76,7 @@ async function producer(root, session, reference, kind, operatorId, sessionId) {
 }
 
 export async function validateMigrationReleaseRequest(root, branchDir, request) {
-  const result = { errors: [], active: request?.operatorId === 'release.deploy' && request.requirements?.migration != null, plan: null, checkout: null, planSha256: null };
+  const result = { errors: [], active: request?.operatorId === 'migration.release' && request.requirements?.migration != null, plan: null, checkout: null, planSha256: null };
   if (!result.active) return result;
   const key = normalized(branchDir);
   const ancestors = active.getStore() ?? new Set();
@@ -113,10 +113,10 @@ export async function validateMigrationReleaseRequest(root, branchDir, request) 
     for (const names of [plan.journalBefore, plan.migrations.map((item) => item.name)]) fail(same(names, migrationNames(names)) && new Set(names).size === names.length, 'migration identities must be unique and sorted');
     const session = path.resolve(branchDir, '..', '..');
     const route = await producer(root, session, request.inputs?.route, 'route', 'workspace.bind', request.sessionId);
-    const backend = await producer(root, session, request.inputs?.['backend-source-application'], 'backend-source-application', 'backend.source.apply', request.sessionId);
+    const backend = await producer(root, session, request.inputs?.['backend-source-application'], 'backend-source-application', 'backend.generate', request.sessionId);
     const quality = await producer(root, session, request.inputs?.['quality-verification'], 'quality-verification', 'quality.verify', request.sessionId);
     const { validateWorkspaceStep } = await import('../operators/workspace-bind/validate.mjs');
-    const { validateBackendStep } = await import('../operators/backend-source-apply/validate.mjs');
+    const { validateBackendStep } = await import('../operators/backend-generate/validate.mjs');
     const { validateQualityStep } = await import('../operators/quality-verify/validate.mjs');
     for (const [entry, validate] of [[route, validateWorkspaceStep], [backend, validateBackendStep], [quality, validateQualityStep]]) {
       const checked = await validate(entry.branch, root); fail(!checked.errors.length, `migration producer invalid: ${checked.errors.join('; ')}`);
@@ -129,7 +129,7 @@ export async function validateMigrationReleaseRequest(root, branchDir, request) 
     fail(mutations.operations.length && mutations.operations.every((operation) => operation.transport === 'migration'), 'migration release requires only migration operations');
     const refs = [...new Set(mutations.operations.flatMap((operation) => operation.migrationRefs))].sort();
     fail(same(refs, plan.migrations.map((item) => item.path).sort()), 'migration files differ from the frozen backend operations');
-    const { refToRegExp } = await import('../operators/backend-source-apply/validate.mjs');
+    const { refToRegExp } = await import('../operators/backend-generate/validate.mjs');
     const boundaries = (backend.request.requirements.mutableFileRefs ?? []).map(refToRegExp);
     fail(boundaries.some((re) => re.test(plan.runner.path)), 'migration runner is outside the backend owner boundary');
     for (const file of [plan.runner, ...plan.migrations]) fail(mutations.changes.some((change) => change.path === file.path && change.afterHash === file.sha256), 'migration runner or migration file lacks its backend source change proof');

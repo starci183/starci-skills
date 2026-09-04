@@ -5,7 +5,7 @@ Khi provisioning, `scripts/identity-custody.mjs` đối chiếu entry đã chọ
 tham chiếu credential được mount trước khi resolve giá trị. File trùng tên ở repository khác
 không phải nguồn credential thay thế.
 
-Xoay credential quản trị theo [contract identity của platform](../operators/platform-operate/operator.md#requirements), gồm binding môi trường bootstrap đã thu khi provider không mount file credential.
+Xoay credential quản trị theo [contract identity của platform](../operators/identity-provision/operator.md#requirements), gồm binding môi trường bootstrap đã thu khi provider không mount file credential.
 
 Thao tác chạy trong helper cố định, thu pipe của tiến trình con. Byte giải mã đi thẳng vào request
 của provider hoặc sản phẩm đã định. Helper chỉ báo bước, trạng thái, danh tính tài khoản và tham

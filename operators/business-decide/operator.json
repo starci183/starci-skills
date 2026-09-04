@@ -2,7 +2,7 @@
   "schemaVersion": 9,
   "id": "business.decide",
   "domain": "business",
-  "job": "Decide and publish one evidence-backed business promise as durable backend-owned authority, frozen behind a complete promise-to-enforcement coverage matrix.",
+  "job": "Decide and publish one evidence-backed business promise as durable backend-owned authority, frozen behind a complete promise-to-enforcement coverage matrix; the delivered source is compared against it by business.reconcile.",
   "package": "operator.md",
   "errors": "errors.json",
   "validator": "validate.mjs",
@@ -10,7 +10,6 @@
   "resources": {
     "profile": "sol-fresh",
     "grammarBound": false,
-    "dispatch": "fresh",
     "mode": "isolated",
     "tools": {
       "@tools/fileread": "context-aliases",

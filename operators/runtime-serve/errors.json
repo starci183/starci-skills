@@ -1,0 +1,96 @@
+{
+  "schemaVersion": 9,
+  "note": "Stop codes only runtime.serve emits. Same entry shape as operators/errors.json, scope implicit. Shared codes (INVALID_INPUT, SOURCE_DRIFT, NO_PROGRESS, AUTHORITY_DRIFT, PROVISIONING_UNAVAILABLE) come from operators/errors.json. A code whose domain is self resumes this operator with a fresh observation.",
+  "codes": {
+    "CAPABILITY_MISSING": {
+      "domain": "caller",
+      "disposition": "terminate",
+      "meaning": {
+        "en": "The registry-write capability the runtime ladder requires is absent or names no custody evidence.",
+        "vi": "Capability ghi sổ đăng ký mà thang runtime đòi hỏi đang thiếu, hoặc không nêu bằng chứng custody nào."
+      },
+      "resume": {
+        "en": "Supply the missing capability handle with its custody.",
+        "vi": "Cấp handle capability còn thiếu cùng custody của nó."
+      }
+    },
+    "INVENTORY_DRIFT": {
+      "domain": "self",
+      "disposition": "terminate",
+      "meaning": {
+        "en": "The route's entry moved since the inventory was bound, so the delta describes an entry that no longer exists.",
+        "vi": "Entry của route đã đổi kể từ khi inventory được ràng, nên delta mô tả một entry không còn tồn tại."
+      },
+      "resume": {
+        "en": "Re-observe the entry; it must arrive with a new fingerprint.",
+        "vi": "Quan sát lại entry; nó phải tới với một fingerprint mới."
+      }
+    },
+    "PORT_CONFLICT": {
+      "domain": "product",
+      "disposition": "terminate",
+      "meaning": {
+        "en": "A claimed port is already held by another process, and holding it is not permission to reclaim it.",
+        "vi": "Một cổng được claim đang bị một tiến trình khác giữ, và việc nó bị giữ không phải giấy phép giành lại."
+      },
+      "resume": {
+        "en": "The holder's owner releases the port; the port itself never moves.",
+        "vi": "Chủ của kẻ đang giữ nhả cổng ra; bản thân cổng không bao giờ dời."
+      }
+    },
+    "EFFECT_UNAUTHORIZED": {
+      "domain": "caller",
+      "disposition": "terminate",
+      "meaning": {
+        "en": "An effect the rung needs lies outside the approved effect set or outside the runtime ladder.",
+        "vi": "Một effect bậc này cần nằm ngoài tập effect đã duyệt hoặc ngoài thang runtime."
+      },
+      "resume": {
+        "en": "Approve the effect, or ask for a narrower rung.",
+        "vi": "Duyệt effect đó, hoặc xin một bậc hẹp hơn."
+      }
+    },
+    "SERVICE_UNAVAILABLE": {
+      "domain": "provider",
+      "disposition": "terminate",
+      "meaning": {
+        "en": "An endpoint the entry declares does not answer, so the entry cannot be attested as serving.",
+        "vi": "Một endpoint mà entry khai không trả lời, nên entry không thể được chứng thực là đang phục vụ."
+      },
+      "resume": {
+        "en": "Restore the service behind the endpoint.",
+        "vi": "Khôi phục dịch vụ đứng sau endpoint."
+      }
+    },
+    "PROOF_FAILED": {
+      "domain": "self",
+      "disposition": "terminate",
+      "meaning": {
+        "en": "A check of the rung's proof set is missing, unreadable, or failed after the rung was climbed, and an unproved rung is not a climbed one.",
+        "vi": "Một phép kiểm trong bộ chứng minh của bậc bị thiếu, không đọc được, hoặc hỏng sau khi leo bậc, và một bậc chưa chứng minh được thì chưa phải đã leo."
+      },
+      "resume": {
+        "en": "Repair the runtime, then climb the rung again.",
+        "vi": "Sửa runtime, rồi leo lại bậc."
+      }
+    },
+    "INTEGRATION_FAILED": {
+      "domain": "product",
+      "disposition": "terminate",
+      "meaning": {
+        "en": "serve resolved the merge conflict itself and gated the merged head, and a required gate came back red: the merged head does not pass the delivery gates. The receipt names the failing gate and the resolutions that were made.",
+        "vi": "serve đã tự giải xung đột merge rồi chấm gate trên head đã gộp, và một gate bắt buộc trả về đỏ: head đã gộp không qua được các gate phát hành. Biên nhận nêu tên gate hỏng và những chỗ đã được giải xung đột."
+      },
+      "resume": {
+        "en": "A person or the owning session repairs the session branch and asks to serve again; the merge that produced the failing head is never rebased, forced or abandoned to make it apply.",
+        "vi": "Một người hoặc chính phiên sở hữu sửa nhánh phiên rồi xin serve lại; lần merge đã sinh ra head hỏng không bao giờ bị rebase, force hay bỏ qua để cho nó áp được."
+      }
+    }
+  },
+  "retired": {
+    "INTEGRATION_CONFLICT": {
+      "en": "Retired into INTEGRATION_FAILED. A merge conflict is no longer escalated to a person: serve resolves it itself under the closed rule set recorded in operator.md, records the resolution on the merge, and gates the merged head before restarting the server. INTEGRATION_FAILED is what stops now, and only when that gate comes back red.",
+      "vi": "Đã nghỉ hưu, gộp vào INTEGRATION_FAILED. Một xung đột merge không còn bị đẩy lên cho con người: serve tự giải nó theo tập luật đóng ghi trong operator.md, ghi lại cách giải trên đúng lần merge, rồi chấm gate trên head đã gộp trước khi khởi động lại server. INTEGRATION_FAILED mới là thứ dừng lại bây giờ, và chỉ khi gate đó trả về đỏ."
+    }
+  }
+}

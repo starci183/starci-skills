@@ -10,7 +10,6 @@
   "resources": {
     "profile": "sol-fresh",
     "grammarBound": false,
-    "dispatch": "inline",
     "mode": "inline",
     "tools": {
       "@tools/fileread": "context-aliases",

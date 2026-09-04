@@ -3,34 +3,30 @@
 ## Job
 
 Decide and publish one evidence-backed business promise as durable backend-owned authority, frozen
-behind a complete promise-to-enforcement coverage matrix, or reconcile that published head against
-the source that was actually delivered.
+behind a complete promise-to-enforcement coverage matrix.
 
 ## Done when
 
 Done when one feature head is published under the exclusive lease and the `model` says exactly what
 that head now holds, the `claims` separate every observation by role with every fact claim bound to
-the frozen source head, and either, under mode model, the confirmed `restatement` of the promise
-travels with the `business-promise-authority` and the `coverage-matrix` gives every declared
-dimension and every discovered consumer exactly one disposition, or, under mode reconcile, the
-published head has been compared against the delivered source and no discrepancy stands.
+the frozen source head, the confirmed `restatement` of the promise travels with the
+`business-promise-authority`, and the `coverage-matrix` gives every declared dimension and every
+discovered consumer exactly one disposition.
 
-## Two modes, one head
+## One head, decided here and reconciled elsewhere
 
-`mode` decides which half of this operator runs. Under `model` the promise is modelled and the
-coverage matrix is frozen: steps 5, 6 and 7 run and the branch writes
-`response/data/coverage-matrix.json`. Under `reconcile` nothing is modelled again; step 8 compares the
-head that was already published against the source a backend run delivered, and the Input
-`backend-source-application` is required in that mode, because a reconciliation with no delivered source
-is an opinion about code nobody read. The Inputs table marks it optional because the requirement is
-conditional, and `validate.mjs` refuses a `reconcile` branch whose request does not bind it. Both
-modes end at the same place: one head under `@worktrees/businesses/<featureId>` and one
-`response/data/model.json` that says exactly what that head now holds.
+This operator models the promise and freezes the coverage matrix: one head under
+`@worktrees/businesses/<featureId>` and one `response/data/model.json` that says exactly what that
+head now holds, with `reconciliation` null because nothing delivered has been read yet. Comparing
+that head against the source a backend run later delivers is `business.reconcile`'s job, and
+`implemented` is published there or not at all; a request that carries delivered source here is
+refused, because a promise modelled and reconciled in one pass is a promise that grades its own
+delivery.
 
 ## A first run starts from the person's promise
 
-A feature that no source implements yet has no fact claim by construction. On a first run under mode
-model, the promise the person stated in `promise` is recorded as the one intent claim, bound to
+A feature that no source implements yet has no fact claim by construction. On a first run, the
+promise the person stated in `promise` is recorded as the one intent claim, bound to
 `request/request.json#requirements.promise` instead of a source line, and the model is built from it;
 `EVIDENCE_MISSING` applies to a fact claim without a file behind it, never to the intent of a promise
 that is being decided for the first time. Every enforcing row of the coverage matrix still rests on a
@@ -38,8 +34,7 @@ fact claim, so a greenfield head publishes with its enforcing rows open, which i
 
 ## The promise is restated before it is modelled
 
-When the request supplies `promise` under mode model, on a first run or a run whose promise changed,
-step 2 writes `response/restatement.md` before anything is modelled: plain-language lines, within the
+When the request supplies `promise`, on a first run or a run whose promise changed, step 2 writes `response/restatement.md` before anything is modelled: plain-language lines, within the
 count the `restatement` kind allows, saying what the promise was read to mean, and the person's own
 words quoted verbatim under `## Source`. The lines are written in the language of `promise`, because
 a restatement the person cannot read confirms nothing; the validator checks the shape and the quote,
@@ -102,21 +97,21 @@ later readers never find, so any head that is not exactly `features/<featureId>`
 is classified absent, fresh, or stale against the frozen evidence and the frozen source head, and
 that classification decides which lifecycle transition is legal. Rejection preserves lineage by
 naming the previous head rather than erasing it, and `implemented` is never published on the strength
-of a plan: delivered source is compared against the frozen matrix first, under `reconcile`.
+of a plan: delivered source is compared against the frozen matrix first, by `business.reconcile`.
 
 ## Boundary
 
 Context is read-only apart from the one feature head. The operator writes only `response/` of its own
 branch, `response.md`, `response/restatement.md` when the request supplies `promise`,
-`response/data/claims.json`, `response/data/coverage-matrix.json` under mode model,
-`response/data/model.json` and `response.json`, plus the one feature head under
-`@worktrees/businesses/<featureId>`. It never publishes a promise while a discovered consumer or
-lifecycle branch carries no disposition, promotes an example, a screenshot, or an intent claim into
-product truth, invents an actor, entitlement, quota, payment, settlement, or lifecycle behaviour the
-evidence does not state, advances a head through a transition the lifecycle does not allow, or writes
-a head below a project segment under the businesses root. It does not modify product source,
-architecture authority, frontend authority, or backend implementation, and it never claims that an
-implementation, a quality gate, or a UAT run has passed.
+`response/data/claims.json`, `response/data/coverage-matrix.json`, `response/data/model.json` and
+`response.json`, plus the one feature head under `@worktrees/businesses/<featureId>`. It never
+publishes a promise while a discovered consumer or lifecycle branch carries no disposition, promotes
+an example, a screenshot, or an intent claim into product truth, invents an actor, entitlement,
+quota, payment, settlement, or lifecycle behaviour the evidence does not state, advances a head
+through a transition the lifecycle does not allow, publishes `implemented`, reads delivered source,
+or writes a head below a project segment under the businesses root. It does not modify product
+source, architecture authority, frontend authority, or backend implementation, and it never claims
+that an implementation, a quality gate, or a UAT run has passed.
 
 ## Context
 
@@ -130,16 +125,14 @@ implementation, a quality gate, or a UAT run has passed.
 | Kind | From | Required |
 | --- | --- | --- |
 | `architecture-decision` | `architecture.decide`; architecture evidence, never a source of business behaviour | no |
-| `backend-source-application` | `backend.source.apply`; the delivered source a reconciliation reads, required under mode `reconcile` and refused otherwise | no |
 
 ## Requirements
 
 | Field | Type | Default | Ask |
 | --- | --- | --- | --- |
 | `featureId` | id | — | The one feature the promise belongs to |
-| `mode` | choice | model | `model` decides and publishes the promise; `reconcile` compares the published head against delivered source |
 | `promise` | prompt | the promise the previous head states | The promise in the person's words; required on a first run, when no head exists yet, and recorded as the intent claim bound to `request/request.json#requirements.promise` |
-| `targetState` | choice | — | `pending`, `in-progress`, `implemented` or `rejected` for the published head |
+| `targetState` | choice | — | `pending`, `in-progress` or `rejected` for the published head; `implemented` is published by `business.reconcile` |
 | `dimensions` | list | the dimensions of the previous head | The coverage surface this promise is accountable for; required on a first run, because no previous head declares it |
 | `approval` | id | null | The owner approval the transition needs, supplied on resume after `APPROVAL_REQUIRED` |
 | `resume` | token | null | The blocked branch's token when re-entering after a stop |
@@ -148,16 +141,15 @@ implementation, a quality gate, or a UAT run has passed.
 
 | # | Step | Params | Reads | Writes | Stops with |
 | --- | --- | --- | --- | --- | --- |
-| 1 | Validate the gate and resume | `resume`, `mode` | `request/request.json`, @workspaces/be at the frozen head | — | `INVALID_INPUT`, `SOURCE_DRIFT`, `NO_PROGRESS` |
-| 2 | Restate the promise in the person's language and hold for their confirmation, under mode model when the request supplies it | `promise` | `request/request.json`: `requirements.promise`, and its `decisionId` and `selectedOption` when the choice is already recorded | `restatement` | `RESTATEMENT_UNCONFIRMED` |
+| 1 | Validate the gate and resume | `resume` | `request/request.json`, @workspaces/be at the frozen head | — | `INVALID_INPUT`, `SOURCE_DRIFT`, `NO_PROGRESS` |
+| 2 | Restate the promise in the person's language and hold for their confirmation, when the request supplies it | `promise` | `request/request.json`: `requirements.promise`, and its `decisionId` and `selectedOption` when the choice is already recorded | `restatement` | `RESTATEMENT_UNCONFIRMED` |
 | 3 | Normalize the evidence into claims | — | @workspaces/be, every observation with its role, path, line range and head, input `architecture-decision` when present as evidence only, @tools/git | `response/data/claims.json` | `EVIDENCE_MISSING`, `CONTRADICTION_UNRESOLVED` |
 | 4 | Check the published head and the transition authority | `featureId`, `targetState`, `approval` | @worktrees/businesses/<featureId>: the current head, its state and its frozen evidence | — | `LIFECYCLE_TRANSITION_INVALID`, `AUTHORITY_CONFLICT`, `APPROVAL_REQUIRED` |
-| 5 | Model the promise, its actor and its eligibility, under mode model: fact claims carry every enforcing row, the intent claim carries the promise itself | `promise` | `response/data/claims.json`, @workspaces/be at the frozen head, @tools/websearch | — | `EVIDENCE_MISSING` |
-| 6 | Freeze the coverage matrix, under mode model | `dimensions` | `response/data/claims.json`, @workspaces/be and the surface it discovers | `response/data/coverage-matrix.json` | `COVERAGE_INCOMPLETE`, `CONSUMER_UNPROVEN` |
-| 7 | Dispose legacy coexistence, under mode model | — | `response/data/coverage-matrix.json`: the legacy create, read and settle rows and their proof | — | `CONTRADICTION_UNRESOLVED` |
-| 8 | Reconcile against delivered source, under mode reconcile | — | input `backend-source-application`, @workspaces/be at the frozen head, the coverage matrix frozen at the published head | — | `RECONCILIATION_DISCREPANCY` |
-| 9 | Publish one head under an exclusive lease | — | `response/data/claims.json`, @worktrees/businesses/<featureId> at the previous head | @worktrees/businesses/<featureId> as the new model.json head, `response/data/model.json`, @tools/sourcewrite | `SOURCE_DRIFT` |
-| 10 | Emit | — | everything above | `response/response.md`, `response/response.json` | — |
+| 5 | Model the promise, its actor and its eligibility: fact claims carry every enforcing row, the intent claim carries the promise itself | `promise` | `response/data/claims.json`, @workspaces/be at the frozen head, @tools/websearch | — | `EVIDENCE_MISSING` |
+| 6 | Freeze the coverage matrix | `dimensions` | `response/data/claims.json`, @workspaces/be and the surface it discovers | `response/data/coverage-matrix.json` | `COVERAGE_INCOMPLETE`, `CONSUMER_UNPROVEN` |
+| 7 | Dispose legacy coexistence | — | `response/data/coverage-matrix.json`: the legacy create, read and settle rows and their proof | — | `CONTRADICTION_UNRESOLVED` |
+| 8 | Publish one head under an exclusive lease | — | `response/data/claims.json`, @worktrees/businesses/<featureId> at the previous head | @worktrees/businesses/<featureId> as the new model.json head, `response/data/model.json`, @tools/sourcewrite | `SOURCE_DRIFT` |
+| 9 | Emit | — | everything above | `response/response.md`, `response/response.json` | — |
 
 Legacy create, read, and settle each take their own row when they are declared: a new sale path may
 retire legacy creation only while already-purchased rights stay readable and pending legacy
@@ -175,7 +167,7 @@ cannot yield a different answer.
 | `business-promise-authority` | `response/response.md` | md | yes |
 | `restatement` | `response/restatement.md` | md | no |
 | `claims` | `response/data/claims.json` | data | yes |
-| `coverage-matrix` | `response/data/coverage-matrix.json` | data | no |
+| `coverage-matrix` | `response/data/coverage-matrix.json` | data | yes |
 | `model` | `response/data/model.json` | data | yes |
 
 ## Stops
@@ -193,13 +185,12 @@ cannot yield a different answer.
 | `APPROVAL_REQUIRED` | terminate |
 | `COVERAGE_INCOMPLETE` | terminate |
 | `CONSUMER_UNPROVEN` | terminate |
-| `RECONCILIATION_DISCREPANCY` | terminate |
 
 ## Next
 
 | When | Operator |
 | --- | --- |
-| the promise is published and a frontend surface must carry it | `frontend.direction.decide` |
-| the promise is published and a backend contract must carry it | `backend.source.apply` |
+| the promise is published and a frontend surface must carry it | `interface.generate` |
+| the promise is published and a backend contract must carry it | `backend.generate` |
 | the promise needs boundaries and data ownership decided before it can be enforced | `architecture.decide` |
-| the head is reconciled against the delivered source and the delivery may be published | `git.publish` |
+| the promise is published and source delivered against it must be compared with the frozen matrix | `business.reconcile` |

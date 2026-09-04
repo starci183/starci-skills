@@ -1,6 +1,6 @@
 # architecture.decide — brief
 
-Read operator.md at your step; write only response/ of your branch; replace the running response.json skeleton before you exit; * marks a fallback stop.
+Read operator.md at your step; write only response/ of your branch; replace the running response.json skeleton before you exit; * marks a fallback stop. You see only what request.json names; nothing else exists.
 
 ## Job
 
@@ -9,6 +9,8 @@ Decide one architecture with its tech stack, system boundaries, and data ownersh
 ## Done when
 
 Done when the `architecture-decision` names one selected design whose every boundary owns or disowns its stores and whose every committed write is an operation the `stack-model` restates with a verified compatibility verdict on every retained component, the `current-state` it was proposed against was observed at the frozen head, an `independent-critique` from a fresh agent has been answered, and the confirmed `restatement` of the objective travels with the receipt.
+
+Primary output: `architecture-decision`
 
 ## Inputs
 

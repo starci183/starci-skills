@@ -231,6 +231,10 @@
             "type": "integer",
             "minimum": 2,
             "description": "the mission version a replanned transition moved to; required when event is replanned"
+          },
+          "logged": {
+            "const": true,
+            "description": "the two-line transition log (resources/interaction.json#transitionLog) was printed to the root chat for this transition; required on every transition of a session that carries a mission (scripts/validate-session.mjs)"
           }
         },
         "if": {
@@ -384,6 +388,11 @@
         "maxSameOperator": {
           "type": "integer",
           "minimum": 1
+        },
+        "units": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "how many units the latest plan produced; the orchestrator writes it when a units.json lands, and the step cap grows by orchestrator.json#budget.perUnit for each"
         },
         "extensions": {
           "type": "array",

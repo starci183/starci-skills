@@ -4,7 +4,9 @@
   "codes": {
     "AUTHORITY_DRIFT": {
       "scope": [
-        "platform.operate",
+        "runtime.serve",
+        "identity.provision",
+        "data.seed",
         "uat.verify"
       ],
       "domain": "caller",
@@ -96,9 +98,9 @@
     },
     "OWNER_CONFLICT": {
       "scope": [
-        "backend.source.apply",
-        "frontend.presentation.resolve",
-        "frontend.source.apply"
+        "backend.generate",
+        "interface.generate",
+        "interface.fix"
       ],
       "domain": "caller",
       "disposition": "terminate",
@@ -113,7 +115,7 @@
     },
     "ROUTE_UNVERIFIED": {
       "scope": [
-        "frontend.direction.decide",
+        "interface.generate",
         "git.publish"
       ],
       "domain": "workspace",
@@ -129,8 +131,8 @@
     },
     "UNKNOWN_RULE": {
       "scope": [
-        "frontend.presentation.resolve",
-        "frontend.surface.audit"
+        "interface.generate",
+        "interface.audit"
       ],
       "domain": "self",
       "disposition": "terminate",
@@ -145,10 +147,10 @@
     },
     "RUNTIME_UNAVAILABLE": {
       "scope": [
-        "frontend.surface.audit",
+        "interface.audit",
         "uat.verify"
       ],
-      "domain": "platform",
+      "domain": "runtime",
       "disposition": "terminate",
       "meaning": {
         "en": "The endpoint does not serve the bound route, or the surface never reaches readiness.",
@@ -162,6 +164,8 @@
     "APPROVAL_REQUIRED": {
       "scope": [
         "business.decide",
+        "business.reconcile",
+        "migration.release",
         "release.deploy"
       ],
       "domain": "caller",
@@ -177,8 +181,9 @@
     },
     "SESSION_MISSING": {
       "scope": [
-        "backend.source.apply",
-        "frontend.source.apply",
+        "backend.generate",
+        "interface.generate",
+        "interface.fix",
         "git.publish"
       ],
       "domain": "caller",
@@ -190,6 +195,38 @@
       "resume": {
         "en": "Create the session first — state.json and step-1/parallel-1/request/request.json, green under validate-request — and run the operators that owe the receipt; a session cannot be reconstructed after the fact.",
         "vi": "Tạo phiên trước — state.json và step-1/parallel-1/request/request.json, xanh dưới validate-request — rồi chạy các operator còn nợ biên nhận; một phiên không thể dựng lại sau khi việc đã xong."
+      }
+    },
+    "RESOLUTION_STALE": {
+      "scope": [
+        "interface.generate",
+        "interface.fix"
+      ],
+      "domain": "resolution",
+      "disposition": "terminate",
+      "meaning": {
+        "en": "The resolution the write reads is not the one it was frozen for: the inventory's tree fingerprint no longer matches the resolved tree beside it, or the inventory the request bound cannot be read at all.",
+        "vi": "Resolution mà lần ghi đọc không phải resolution nó được đóng băng cho: fingerprint cây của inventory không còn khớp cây đã resolve bên cạnh, hoặc inventory mà request bind không đọc được."
+      },
+      "resume": {
+        "en": "Bind the current resolution, or generate the surface again so the tree and its inventory are frozen together.",
+        "vi": "Bind resolution hiện tại, hoặc sinh lại bề mặt để cây và inventory của nó được đóng băng cùng nhau."
+      }
+    },
+    "WRITE_REJECTED": {
+      "scope": [
+        "interface.generate",
+        "interface.fix"
+      ],
+      "domain": "caller",
+      "disposition": "terminate",
+      "meaning": {
+        "en": "A file or a value the write would produce lies outside what was authorized, the presentation sweep of the projection found something, or the committed tree is not the resolved tree.",
+        "vi": "Một file hay một giá trị lần ghi sẽ tạo ra nằm ngoài phần đã được uỷ quyền, lượt quét trình bày trên bản chiếu thấy gì đó, hoặc cây đã commit không phải cây đã resolve."
+      },
+      "resume": {
+        "en": "Declare a corrected write set, or publish a resolution that carries the value.",
+        "vi": "Khai lại write set cho đúng, hoặc publish một resolution có mang giá trị đó."
       }
     },
     "BRANCH_POLICY_VIOLATION": {
@@ -210,7 +247,9 @@
     },
     "PROVISIONING_UNAVAILABLE": {
       "scope": [
-        "platform.operate",
+        "runtime.serve",
+        "identity.provision",
+        "data.seed",
         "uat.verify"
       ],
       "domain": "control-panel",
@@ -226,10 +265,11 @@
     },
     "IDENTITY_MISSING": {
       "scope": [
-        "frontend.surface.audit",
+        "data.seed",
+        "interface.audit",
         "uat.verify"
       ],
-      "domain": "platform",
+      "domain": "identity",
       "disposition": "terminate",
       "meaning": {
         "en": "The route requires an identity to reach the surface and no account record exists for this flow yet. It is a hand-off and not a verdict: the operator that owns identity provisions the account, and this branch is re-entered with it.",

@@ -1,6 +1,6 @@
 ---
 title: "Đóng góp"
-description: "npm test, các template, thêm một luật kèm bằng chứng, và thêm một workflow mẫu."
+description: "npm test, các template, thêm một luật kèm bằng chứng, và thêm một fixture cho planner."
 ---
 
 # Đóng góp
@@ -9,7 +9,7 @@ Trước hết, đọc `UPDATE.md` ở gốc cây. Đó là chuẩn cập nhật
 hỏi theo thứ tự, được thêm gì và không được thêm gì, sửa một id thế nào và cho một id nghỉ thế nào,
 mức bằng chứng, cưỡng chế trước lời khuyên, và danh mục kiểm trước khi commit — và trang này không
 nhắc lại nó. Phần dưới đây chỉ là cơ chế của repo này: lệnh nào chạy, template nào áp, và một luật hay
-một workflow mẫu được xếp vào đâu.
+một fixture của planner được xếp vào đâu.
 
 Mọi thay đổi trong cây này đều phải hạ cánh cùng một `npm test` xanh. `INDEX.md` nêu chuẩn đó không
 kèm thời gian ân hạn: `npm test` xanh ở head đã publish, hoặc head đó không publish được.
@@ -17,7 +17,7 @@ kèm thời gian ân hạn: `npm test` xanh ở head đã publish, hoặc head �
 ## `npm test` chạy những gì
 
 Theo `package.json`, lần lượt: kiểm định tuyến, kiểm tài nguyên, kiểm trích dẫn tri thức, kiểm alias
-và `--check` của tài liệu alias, kiểm operator, kiểm workflow, `--check` của chỉ mục operator, kiểm
+và `--check` của tài liệu alias, kiểm operator, kiểm mặc định, `--check` của chỉ mục operator, `--check` của brief, kiểm
 template, self-test của từng operator, và các spec script (`node --test scripts/*.spec.mjs`).
 
 Hai trong số đó là kiểm sinh lại chứ không phải kiểm khẳng định: `operators/INDEX.md` và
@@ -57,14 +57,15 @@ Một luật là một địa chỉ, không phải một đoạn văn. Những r
 Một luật mà không kho ràng buộc nào của operator với tới được thì không phải luật; nó là một file
 không ai đọc.
 
-## Thêm một workflow mẫu
+## Thêm một fixture cho planner
 
-Một chuỗi tự ghép còn dùng lại được thì thành một file trong `workflows/`, kèm `when` ở cả `en` và
-`vi`. Nó phải thoả mọi điều `scripts/validate-workflows.mjs` kiểm: mỗi nhánh gọi tên một operator có
-thật và chỉ preset field operator đó khai, mọi Input bắt buộc do một bậc trước sinh ra, các nhánh
-trong một bậc không dùng chung alias ghi, mọi vòng lặp quay về bậc trước kèm `maxRounds`, và chuỗi
-kết thúc ở `git.publish`, `release.deploy` hoặc `user`. Thêm dòng tương ứng vào bảng trong
-`workflows/README.md` và bản đối chiếu tiếng Việt của nó.
+Không có file workflow nào để thêm: chuỗi được `scripts/plan-chain.mjs` suy từ nhiệm vụ. Một chuỗi
+đáng giữ làm bằng chứng thì thành một fixture dưới `tests/chains/<id>.json`, mang nhiệm vụ mà các
+dòng "xong khi" gọi tên kết quả của nó, thứ tự operator mong đợi, và điểm kết nó khai;
+`scripts/plan-chain.spec.mjs` rồi chứng minh planner vẫn suy ra được nó từ nhiệm vụ đó và kết quả
+qua được `scripts/validate-chain.mjs`. Hình dạng nào planner không tới được từ các bảng là một lỗ
+hổng trong bảng `## Đầu vào` hay `## Kế tiếp` của một operator, sửa ở đó, không bao giờ bằng một
+chuỗi viết tay.
 
 ## Tài liệu
 

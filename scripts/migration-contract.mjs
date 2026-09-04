@@ -80,7 +80,7 @@ export async function validateMigrationContract(root, branchDir, request, mutati
   }
   const validating = validationScope.getStore();
   const result = { errors: [], active: false, operations: [], fingerprint: null };
-  if (request?.operatorId !== 'backend.source.apply') return result;
+  if (request?.operatorId !== 'backend.generate') return result;
   const requirements = request.requirements ?? {};
   result.active = requirements.contractFingerprint != null || hasMigration(mutations);
   let producerKey;
@@ -129,7 +129,7 @@ export async function validateMigrationContract(root, branchDir, request, mutati
     if (verified.errors.length) { result.errors.push(...verified.errors.map((error) => `migration producer: ${error}`)); return result; }
     result.operations = model.operations;
     // The owner boundary is a list of exact refs or globs; the one matcher lives with the backend operator's law.
-    const { refToRegExp } = await import('../operators/backend-source-apply/validate.mjs');
+    const { refToRegExp } = await import('../operators/backend-generate/validate.mjs');
     const boundaries = (Array.isArray(requirements.mutableFileRefs) ? requirements.mutableFileRefs : []).map(refToRegExp);
     for (const operation of model.operations.filter((item) => item.transport === 'migration')) {
       for (const ref of new Set([operation.writerRef, ...operation.migrationRefs])) {

@@ -15,7 +15,7 @@ import { validateStep } from '../../scripts/validate-step.mjs';
 import { sessionRootOf } from '../../scripts/validate-request.mjs';
 import { tableUnder } from '../../scripts/validate-response.mjs';
 
-const PRODUCERS = new Set(['frontend.source.apply', 'backend.source.apply']);
+const PRODUCERS = new Set(['interface.generate', 'interface.fix', 'backend.generate', 'library.update']);
 
 // Every step branch of the session this publish belongs to, read once as { dir, response }.
 async function sessionBranches(sessionRoot) {
@@ -48,7 +48,7 @@ export async function sessionReceiptErrors(branchDir, { pushedHeads, sessionBran
   const producers = branches.filter((b) => PRODUCERS.has(b.response.operatorId));
   const receipted = producers.filter((b) => b.response.status === 'done' && [...pushedHeads].every((h) => (b.response.commits ?? []).includes(h)));
   if (receipted.length === 0) {
-    errors.push(`SESSION_MISSING: no done frontend.source.apply or backend.source.apply branch in the session registers ${[...pushedHeads].join(', ') || 'the published head'} under commits; a session branch with no source-application receipt carries commits nobody wrote a request for`);
+    errors.push(`SESSION_MISSING: no done ${[...PRODUCERS].join(', ')} branch in the session registers ${[...pushedHeads].join(', ') || 'the published head'} under commits; a session branch with no source-application receipt carries commits nobody wrote a request for`);
   }
 
   // When the chain declared an audit or a UAT run, that branch is done and the pictures proving it
@@ -57,7 +57,7 @@ export async function sessionReceiptErrors(branchDir, { pushedHeads, sessionBran
   try { state = JSON.parse(await readFile(path.join(sessionRoot, 'state.json'), 'utf8')); } catch { state = {}; }
   const declared = new Set(Object.values(state.steps ?? {}));
   for (const [operatorId, why] of [
-    ['frontend.surface.audit', 'a frontend surface nobody looked at is exactly what this gate refuses to publish'],
+    ['interface.audit', 'a frontend surface nobody looked at is exactly what this gate refuses to publish'],
     ['uat.verify', 'a journey nobody walked is exactly what this gate refuses to publish'],
   ]) {
     if (!declared.has(operatorId)) continue;

@@ -1,0 +1,71 @@
+{
+  "schemaVersion": 1,
+  "id": "backend-feature",
+  "when": {
+    "en": "Server behaviour, an API contract, persistence or a job changes for one business feature; the architecture is decided first and the promise is reconciled after the code lands. This chain writes no surface, so it carries no interface.audit and no uat.verify: uat.verify requires a frontend-surface-audit input and a bound fe route, and neither exists here. A feature whose promise reaches a person through a screen is not this chain — it is full-feature, which walks the journey before it publishes.",
+    "vi": "Hành vi server, contract API, persistence hay job đổi cho một feature nghiệp vụ; kiến trúc quyết trước, lời hứa được đối chiếu sau khi code đã vào. Chuỗi này không ghi bề mặt nào nên không mang interface.audit và không mang uat.verify: uat.verify cần đầu vào frontend-surface-audit và một route fe đã bind, ở đây không có cái nào. Một feature mà lời hứa chạm tới người qua màn hình thì không thuộc chuỗi này — nó là full-feature, nơi hành trình được đi trước khi publish."
+  },
+  "mission": {
+    "goal": "one backend feature lands against a decided architecture and a reconciled promise",
+    "doneWhen": [
+      {
+        "evidence": "the promise is modelled and published",
+        "producedBy": "business.decide"
+      },
+      {
+        "evidence": "the backend contract is filled on the session branch",
+        "producedBy": "backend.generate"
+      },
+      {
+        "evidence": "the promise is reconciled against the delivered source",
+        "producedBy": "business.reconcile"
+      },
+      {
+        "evidence": "the session branch is merged and pushed",
+        "producedBy": "git.publish"
+      }
+    ]
+  },
+  "options": {
+    "roles": [
+      "be"
+    ],
+    "requirements": {
+      "business.decide": {
+        "mode": "model"
+      },
+      "architecture.decide": {
+        "alternatives": 1,
+        "selectionPolicy": "automatic"
+      }
+    }
+  },
+  "example": [
+    [
+      "environment.preflight"
+    ],
+    [
+      "workspace.bind#be"
+    ],
+    [
+      "business.decide"
+    ],
+    [
+      "architecture.decide"
+    ],
+    [
+      "backend.generate"
+    ],
+    [
+      "quality.verify"
+    ],
+    [
+      "business.reconcile"
+    ],
+    [
+      "git.publish"
+    ]
+  ],
+  "ends": "git.publish",
+  "rewrite": "backend.source.apply → backend.generate; business.decide (mode reconcile) → business.reconcile."
+}

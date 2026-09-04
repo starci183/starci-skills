@@ -99,7 +99,7 @@ Một operator vẽ trang so sánh là đang visualize, không phải sinh ảnh
 | Mode | Ở đâu | Nghĩa là gì |
 | --- | --- | --- |
 | không khai | Mọi operator không nằm dưới đây | Operator không sinh artwork |
-| `judged` | `frontend.direction.decide`, `frontend.source.apply` | Operator tự phán xét, dựa trên hướng thiết kế, xem một vùng có trống tới mức cần artwork không, ghi lại lý do, và không bao giờ trang trí |
+| `judged` | `interface.generate` | Operator tự phán xét, dựa trên hướng thiết kế, xem một vùng có trống tới mức cần artwork không, ghi lại lý do, và không bao giờ trang trí |
 | `required` | `content.generate` | Artwork là một bước của việc: làm theo một claim đã nêu và soi lại xem có trung thành với claim đó không |
 
 Ở runtime không vẽ được, một bước `judged` ghi rằng không artwork nào được tạo và nhánh chạy tiếp; một
@@ -133,7 +133,7 @@ giờ để một agent khởi động agent khác — một bậc tạm dừng 
 
 Tối đa ba agent chạy cùng lúc, và các nhánh trong một bậc chỉ chạy song song khi phần ghi của chúng
 không chạm chung alias nào. Hai agent được đọc chung một checkout; chỉ một được giữ nó để ghi.
-`business.decide` độc quyền theo gốc businesses, `platform.operate` độc quyền theo chủ sở hữu runtime.
+`business.decide` độc quyền theo gốc businesses, `runtime.serve` độc quyền theo chủ sở hữu runtime.
 
 ## Profile tương đương
 
@@ -144,7 +144,6 @@ audit phân biệt được bản thay thế với bản ràng buộc. Các cặ
 | Profile đã ràng | Tương đương |
 | --- | --- |
 | `sol-fresh` | `opus` |
-| `luna` | `sonnet` |
 | `sol-reviewer` | `fable` |
 
 Bản tương đương chạy với những công cụ operator khai mà profile của chính nó cho phép và runtime của

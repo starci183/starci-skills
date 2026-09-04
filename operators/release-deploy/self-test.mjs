@@ -116,7 +116,7 @@ const requestJson = ({ release = RELEASE, target = TARGET, approval = APPROVAL, 
   inputs: { 'quality-verification': 'step-1/parallel-1/response/quality.md' }, resume: null,
 });
 
-const responseJson = ({ status = 'done', stop, fallbacks = [], next = ['platform.operate'] } = {}) => ({
+const responseJson = ({ status = 'done', stop, fallbacks = [], next = ['runtime.serve'] } = {}) => ({
   schemaVersion: 9, operatorId: 'release.deploy', step: 1, parallel: 1, status, ...(stop ? { stop } : {}),
   fallbacks,
   fields: status === 'blocked' ? {} : { 'release-deployment': 'response/response.md', probes: 'response/data/probes.json' },
@@ -202,6 +202,8 @@ await expectError(baseline({
   'response/response.md': responseMd({ outcome: 'rolled-back', branch: 'rollback', steps: [...STEPS, ['`rollback`', 'applied', '6', '7', 'restored']], steady: { 'Active digest': SAFE_DIGEST, 'Available targets': '1 of 1', 'Superseded active': '0', 'Window elapsed': '300' }, fallbacksTaken: ['RECOVERY_EXHAUSTED'] }),
 }), 'reached only through an exhausted recovery', 'a rollback that skipped the recovery branch');
 await expectError(baseline({ 'request/request.json': requestJson({ extra: { strategy: 'rolling' } }) }), 'requirements.strategy is not a field', 'a field the operator no longer declares');
+await expectError(baseline({ 'request/request.json': requestJson({ extra: { migration: { planRef: 'request/migration-release.json', sha256: `sha256:${'3'.repeat(64)}` } } }) }), 'requirements.migration is not a field', 'a source migration plan handed to the image release');
+await expectError(baseline({ 'request/request.json': requestJson({ rollbackIdentity: null }) }), 'required field rollbackIdentity has no value', 'an image release with no safe release to restore');
 await expectError(baseline({ 'request/request.json': requestJson({ approval: null }) }), 'required field approval has no value', 'a production deploy nobody approved');
 await expectError(baseline({ 'request/request.json': requestJson({ probes: [{ probeId: 'container-health', kind: 'internal', endpointRef: 'unix:///health', expectStatus: 200 }] }), 'response/data/probes.json': probesJson({ observations: [{ ...observation('2026-01-10T00:01:00.000Z', 'progressing'), probeResults: [{ probeId: 'container-health', status: 'pass', observedStatus: 200, observedAt: '2026-01-10T00:01:00.000Z' }] }, { ...observation('2026-01-10T00:07:00.000Z', 'steady'), probeResults: [{ probeId: 'container-health', status: 'pass', observedStatus: 200, observedAt: '2026-01-10T00:07:00.000Z' }] }] }) }), 'at least one declared probe is public', 'a run proving only container health');
 await expectError(baseline({ 'request/request.json': requestJson({ rollbackIdentity: { ...ROLLBACK, digest: 'v1.4.0' } }) }), 'a rollback by tag restores whatever the tag now points at', 'a rollback identity named by tag');
@@ -232,4 +234,4 @@ await expectError(baseline({ 'response/response.md': responseMd({ monitoring: { 
 await expectError(baseline({ 'response/data/probes.json': { ...probesJson(), finalCondition: 'nope' } }), 'finalCondition', 'probes schema');
 await expectError(baseline({ 'response/response.md': responseMd().replace('## Steady state', '## Stable state') }), 'missing section ^## Steady state$', 'receipt section renamed');
 
-process.stdout.write('release.deploy self-test: 4 valid branches, 26 rejected mutations\n');
+process.stdout.write('release.deploy self-test: 4 valid branches, 28 rejected mutations\n');

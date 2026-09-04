@@ -161,6 +161,7 @@ and runs every check again; a re-entry whose report names the same walls as the 
 | When | Operator |
 | --- | --- |
 | every wall is cleared and the chain binds its routes | `workspace.bind` |
-| a runtime or identity wall the platform owns must be cleared first | `platform.operate` |
+| an identity wall must be cleared first | `identity.provision` |
+| a runtime wall must be cleared first | `runtime.serve` |
 | the mission routes no source and a curriculum unit follows | `content.generate` |
 | a wall stands that only a person can clear | `user` |

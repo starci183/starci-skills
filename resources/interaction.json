@@ -1,5 +1,5 @@
 {
-  "schemaVersion": 2,
+  "schemaVersion": 3,
   "questionKinds": [
     "tier-choice",
     "restatement-confirm",
@@ -15,5 +15,13 @@
     "delivered": "What was delivered and where it is: the head, the served URL or the evidence folder.",
     "blocked-on-you": "What the person must decide or change, in one sentence, and what continues without them.",
     "working": "What is being done now and the next milestone the person will hear about."
+  },
+  "transitionLog": {
+    "linesPerBranch": 2,
+    "shape": [
+      "[N/M operator] goal: <doneWhen:n line | prerequisite: N/M>",
+      "[N/M operator] <done | blocked STOP> · <k>/<n> done-when evidenced · <artifact paths> · <next cell>"
+    ],
+    "rule": "After every transition the orchestrator prints exactly these two lines to the root chat, N/M being the branch and operator its id: the first names the goal the branch serves (request.json.goal), the second its outcome, how many of the mission's done-when lines now carry a validator-accepted goalCheck, the artifact paths the receipt lists, and the next cell of the chain (or the stop code and the domain it routes to). Full outputs stay in the session folder; nothing else about the branch is printed to the chat, and a transition that was printed is recorded with logged: true in state.json.transitions."
   }
 }

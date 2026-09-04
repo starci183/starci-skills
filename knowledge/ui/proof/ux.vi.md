@@ -11,7 +11,7 @@ Dụng cụ đo thông thường là lượt UAT: `uat.verify` lái một flow �
 phán lane `ux` trên chính capture của nó, nên một ô `Quan sát` gọi tên một bước của một lần thử thật —
 assertion đã tới được, số bước đã tốn, độ trễ giữa lúc kích hoạt và thay đổi nhìn thấy đầu tiên,
 trạng thái sau khi tải lại. Ở đâu một tiêu chí đã ngã ngũ chỉ với một bản render và không cần một lần
-thử, `frontend.surface.audit` được phép đo nó từ capture nó đã chụp sẵn; mỗi rule dưới đây gọi tên
+thử, `interface.audit` được phép đo nó từ capture nó đã chụp sẵn; mỗi rule dưới đây gọi tên
 dụng cụ nào trả lời nó. Không dụng cụ nào được thay quan sát bằng ý định: một tài liệu flow đã duyệt
 không chứng minh một nhiệm vụ đã xong, và một spinner nằm trong markup không chứng minh một tín hiệu
 tiến trình từng xuất hiện.

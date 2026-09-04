@@ -2,16 +2,18 @@
 // runs: the gate schema; the operator exists and is an operator.md package; every requirement key is
 // one the operator declares and every required one (Default —) has a value; every declared input is
 // present when required, points inside the session, and the file exists; a nested exchange's request
-// names an exchange the operator's Outputs declare. A request that fails here is the orchestrator's
-// or the person's mistake, never the agent's.
-import { existsSync } from 'node:fs';
+// names an exchange the operator's Outputs declare; on a session that carries a mission the branch
+// names its goal (a done-when line this operator produces, or the branch it enables); an isolated
+// operator's request names nothing its Context table does not cover. A request that fails here is the
+// orchestrator's or the person's mistake, never the agent's.
+import { existsSync, readFileSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
 import { createHash } from 'node:crypto';
 import path from 'node:path';
 import process from 'node:process';
 import { fileURLToPath } from 'node:url';
 import { validateAgainst } from './json-schema.mjs';
-import { loadOperatorPackages, kindOf, isYes, exchangeOf } from './operator-md.mjs';
+import { loadOperatorPackages, kindOf, isYes, exchangeOf, cellAliases } from './operator-md.mjs';
 import { loadInteractionPolicy, selectionErrors } from './validate-interaction.mjs';
 import { validateImportedInput } from './producer-import.mjs';
 
@@ -76,10 +78,12 @@ export async function stackDeclaration(root, env, hostRoot = hostRootOf(root), s
 }
 
 // The caps a session runs under, after every extension a recorded user choice of continue granted.
-export function effectiveBudget(state) {
+const PER_UNIT = JSON.parse(readFileSync(path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'resources', 'orchestrator.json'), 'utf8')).budget?.perUnit ?? 0;
+export function effectiveBudget(state, perUnit = PER_UNIT) {
   const budget = state?.budget;
   if (!budget) return null;
-  const caps = { maxSteps: budget.maxSteps, maxSameOperator: budget.maxSameOperator };
+  // A plan that produced N units earns N × perUnit more steps: the cap is per unit, not per mission.
+  const caps = { maxSteps: budget.maxSteps + perUnit * (budget.units ?? 0), maxSameOperator: budget.maxSameOperator + (budget.units ?? 0) };
   for (const ext of budget.extensions ?? []) {
     const choice = state.choices?.[ext.decisionId];
     if (!choice || choice.selected !== 'continue') continue;
@@ -151,6 +155,121 @@ export function missionGateErrors(state, request, packages, policy = { selection
   return errors;
 }
 
+// The branch goal. On a session that carries a mission, every branch says what it is for: the one
+// done-when line its receipt evidences (goal.doneWhen, an index into state.json.mission.doneWhen whose
+// producedBy is this operator) or the branch it is a prerequisite of (goal.prerequisite, a branch
+// state.json.steps records). A branch that points at nothing does not run. A nested exchange belongs
+// to its branch and carries no goal of its own. Guarded by state.mission exactly as missionGateErrors
+// is, so a fixture with a bare state.json stays green.
+export function branchGoalErrors(state, request) {
+  const errors = [];
+  if (!state?.mission || !request) return errors;
+  if (request.exchange) { if (request.goal !== undefined) errors.push('request.json: a nested exchange carries no goal; the branch it belongs to does'); return errors; }
+  const lines = state.mission.doneWhen ?? [];
+  const goal = request.goal;
+  if (!goal) { errors.push(`request.json: the session carries a mission, so the branch names its goal: goal.doneWhen, the index (0–${lines.length - 1}) of the mission line ${request.operatorId} produces the evidence for, or goal.prerequisite, the branch N/M it enables; a branch that points at nothing does not run`); return errors; }
+  if (goal.doneWhen !== undefined) {
+    const line = lines[goal.doneWhen];
+    if (!line) errors.push(`request.json: goal.doneWhen ${goal.doneWhen} is not a line of state.json.mission.doneWhen (${lines.length} lines, indexes 0–${lines.length - 1})`);
+    else if (line.producedBy !== request.operatorId) errors.push(`request.json: goal.doneWhen ${goal.doneWhen} ("${line.evidence}") is produced by ${line.producedBy}, not by ${request.operatorId}; a branch serves only a line its own receipt evidences`);
+  }
+  if (goal.prerequisite !== undefined) {
+    const mine = `${request.step}/${request.parallel}`;
+    if (goal.prerequisite === mine) errors.push(`request.json: goal.prerequisite names this branch itself (${mine}); a prerequisite enables another branch`);
+    else if (state.steps?.[goal.prerequisite] === undefined) errors.push(`request.json: goal.prerequisite names ${goal.prerequisite}, which state.json.steps does not record; a prerequisite enables a branch of the chain`);
+  }
+  return errors;
+}
+
+// Whether a Context table row covers a request alias: the row's alias, with each <placeholder> standing
+// for one path segment, is the alias itself or a prefix of it at a segment boundary.
+export function contextCovers(rowAlias, alias) {
+  const pattern = String(rowAlias).replace(/[.+^${}()|[\]\\]/g, '\\$&').replace(/<[^>]+>/g, '[A-Za-z0-9_.@#:-]+');
+  return new RegExp(`^${pattern}(?:/|$)`).test(alias);
+}
+// An isolated agent (operator.json → resources.mode) starts with an empty context and sees only
+// brief.md, request.json and what request.json names. A context alias the operator's Context table
+// does not cover is therefore a location it cannot read, and the request that names it is refused.
+export function isolatedContextErrors(pkg, request) {
+  const errors = [];
+  if (pkg?.manifest?.resources?.mode !== 'isolated' || !pkg.en) return errors;
+  const rows = (pkg.en.tables.context?.rows ?? []).map((r) => cellAliases(r.alias)[0]).filter(Boolean);
+  (request.contexts ?? []).forEach((c, i) => {
+    if (!rows.some((row) => contextCovers(row, c.alias))) errors.push(`request.json: contexts[${i}].alias ${c.alias} is covered by no Context row of ${pkg.manifest.id}; an isolated agent reads only the aliases its Context table declares (${rows.join(', ') || 'none'})`);
+  });
+  return errors;
+}
+
+// The unit of a blind agent is one page, one modal, one flow. A plan operator, <domain>.plan, writes the
+// data kind `units` (templates/kinds/units.schema.json): the closed list of what the execute operators
+// of its domain do one branch at a time. The schema states the shape; the two relations a schema cannot
+// state are read here — ids are unique, and dependsOn names ids of the same file — so the plan's own
+// validator, the fan-out gate and the spec share one reading of the file.
+export const UNITS_SCHEMA = path.join('templates', 'kinds', 'units.schema.json');
+export function unitsErrors(doc, at = 'units.json') {
+  const errors = [];
+  const ids = new Set();
+  for (const u of doc?.units ?? []) {
+    if (ids.has(u.id)) errors.push(`${at}: unit ${u.id} is declared twice; a unit id is the address an execute branch names, and an address resolves to one unit`);
+    ids.add(u.id);
+  }
+  for (const u of doc?.units ?? []) for (const d of u.dependsOn ?? []) {
+    if (d === u.id) errors.push(`${at}: unit ${u.id} depends on itself`);
+    else if (!ids.has(d)) errors.push(`${at}: unit ${u.id} depends on ${d}, which this file does not declare; dependsOn names units of the same plan`);
+  }
+  return errors;
+}
+// Reads one units.json against its schema and the relations above; `units` is null when it cannot be read.
+export async function loadUnits(root, file, at = 'units.json') {
+  if (!existsSync(file)) return { units: null, errors: [`${at}: missing`] };
+  let doc; try { doc = JSON.parse(await readFile(file, 'utf8')); } catch (e) { return { units: null, errors: [`${at}: ${e.message}`] }; }
+  const schema = JSON.parse(await readFile(path.join(root, UNITS_SCHEMA), 'utf8'));
+  const errors = validateAgainst(schema, doc, at);
+  if (!errors.length) errors.push(...unitsErrors(doc, at));
+  return { units: errors.length ? null : doc, errors };
+}
+// An operator plans when its Outputs table declares the kind `units`; the plan operator of a domain is
+// `<domain>.plan`, the domain being the first segment of an operator id (`uat.verify` → `uat`).
+export const domainOfId = (operatorId) => String(operatorId ?? '').split('.')[0];
+export const producesUnits = (pkg) => (pkg?.en?.tables?.outputs?.rows ?? []).some((r) => kindOf(r.kind) === 'units');
+export function planOperatorOf(operatorId, packages) {
+  const id = `${domainOfId(operatorId)}.plan`;
+  const pkg = (packages ?? []).find((p) => p.manifest?.id === id);
+  return pkg && producesUnits(pkg) ? pkg : null;
+}
+// The fan-out gate. A branch that runs one unit names it in request.json.unit and binds the plan's file
+// as inputs.units, a units.json an earlier branch produced; the id must be one that file carries, and
+// the branch sits within orchestrator.json#concurrency.maxParallel. On a mission that names more than
+// one done-when line for an execute operator whose domain has a plan operator, a branch without a unit
+// is refused: it would take every unit at once, and a blind agent takes one. Guarded by state.mission
+// exactly as the other mission gates are, so a fixture with a bare state.json stays green.
+export async function unitGateErrors(root, state, request, packages, sessionRoot) {
+  const errors = [];
+  if (!state?.mission || !request || request.exchange) return errors;
+  const plan = planOperatorOf(request.operatorId, packages);
+  if (request.unit === undefined) {
+    if (!plan || /\.plan$/.test(String(request.operatorId))) return errors;
+    const lines = (state.mission.doneWhen ?? []).filter((l) => l.producedBy === request.operatorId).length;
+    if (lines > 1) errors.push(`request.json: ${request.operatorId} runs one unit per branch: the mission names ${lines} done-when lines for it and ${plan.manifest.id} exists, so the branch carries unit, an id of the units.json ${plan.manifest.id} produced, bound as inputs.units; a branch without a unit would take every unit at once, and a blind agent takes one`);
+    return errors;
+  }
+  const orchestrator = JSON.parse(await readFile(path.join(root, 'resources', 'orchestrator.json'), 'utf8'));
+  const cap = orchestrator.concurrency?.maxParallel;
+  if (Number.isInteger(cap) && request.parallel > cap) errors.push(`request.json: parallel ${request.parallel} passes concurrency.maxParallel ${cap} (resources/orchestrator.json); a step fans out to at most ${cap} unit branches, and the rest wait for the next step`);
+  const file = request.inputs?.units;
+  const m = /^step-(\d+)\/parallel-(\d+)\/response\/data\/units\.json$/.exec(String(file ?? ''));
+  if (!m) { errors.push(`request.json: unit ${request.unit} names no plan: inputs.units binds a units.json an earlier branch produced (step-N/parallel-M/response/data/units.json), and the unit is one of its ids`); return errors; }
+  if (Number(m[1]) >= request.step) errors.push(`request.json: inputs.units ${file} is not produced earlier than step ${request.step}; a unit comes from a plan that already ran`);
+  if (!sessionRoot) return errors;
+  const { units, errors: unitErrors } = await loadUnits(root, path.join(sessionRoot, file), file);
+  errors.push(...unitErrors);
+  if (!units) return errors;
+  const producer = (packages ?? []).find((p) => p.manifest?.id === units.producedBy);
+  if (!producer || !producesUnits(producer)) errors.push(`${file}: producedBy ${units.producedBy} is not an operator whose Outputs declare units; a unit list comes from a plan operator`);
+  if (!units.units.some((u) => u.id === request.unit)) errors.push(`request.json: unit ${request.unit} is not an id of ${file} (${units.units.map((u) => u.id).join(', ')}); an execute branch runs one unit the plan named`);
+  return errors;
+}
+
 export async function validateRequest(root, dir, packages) {
   const errors = [];
   if(existsSync(path.join(dir,'import.json')))return {errors:['request.json: an imported producer slot is evidence-only and cannot execute an operator'],request:null};
@@ -180,7 +299,10 @@ export async function validateRequest(root, dir, packages) {
     for (const [key, row] of declared) if (isRequiredField(row) && isEmpty(request.requirements?.[key])) errors.push(`request.json: required field ${key} has no value`);
     const declaredInputs = new Map((op.tables.inputs?.rows ?? []).map((r) => [kindOf(r.kind), r]));
     for (const kind of Object.keys(request.inputs ?? {})) if (!declaredInputs.has(kind)) errors.push(`request.json: inputs.${kind} is not an Input ${op.id} declares`);
-    for (const [kind, row] of declaredInputs) if (isYes(row.required) && isEmpty(request.inputs?.[kind])) errors.push(`request.json: required input ${kind} is absent`);
+    // An isolated agent cannot go and find a missing input: what request.json does not name does not exist for it.
+    const isolated = pkg.manifest.resources?.mode === 'isolated' ? `; ${op.id} runs isolated and sees only what request.json names, so the input is not there to be found` : '';
+    for (const [kind, row] of declaredInputs) if (isYes(row.required) && isEmpty(request.inputs?.[kind])) errors.push(`request.json: required input ${kind} is absent${isolated}`);
+    errors.push(...isolatedContextErrors(pkg, request));
   }
   for (const [kind, p] of Object.entries(request.inputs ?? {})) {
     if (!sessionRoot) { errors.push(`request.json: inputs.${kind} cannot be resolved; the branch is not under a session`); continue; }
@@ -207,6 +329,10 @@ export async function validateRequest(root, dir, packages) {
       errors.push(...sessionBudgetErrors(state, request));
       // A mission that writes routed source or touches a runtime runs nothing until the person confirmed its goal.
       errors.push(...missionGateErrors(state, request, packages, policy));
+      // On a mission, every branch points at the done-when line it serves or the branch it enables.
+      errors.push(...branchGoalErrors(state, request));
+      // A unit branch names one unit of a plan an earlier branch produced; a mission with several units for one execute operator fans out one unit per branch.
+      errors.push(...await unitGateErrors(root, state, request, packages, sessionRoot));
       const key = `${request.step}/${request.parallel}${request.exchange ? `/${request.exchange}` : ''}`;
       const expected = state.requestHashes?.[key];
       if (expected) {
@@ -225,11 +351,11 @@ export async function validateRequest(root, dir, packages) {
     const { validateCoveragePolicyRequest } = await import('./coverage-policy.mjs');
     errors.push(...validateCoveragePolicyRequest(root, dir, request));
   }
-  if (!errors.length && request.operatorId === 'backend.source.apply') {
+  if (!errors.length && request.operatorId === 'backend.generate') {
     const { validateMigrationContract } = await import('./migration-contract.mjs');
     errors.push(...(await validateMigrationContract(root, dir, request)).errors);
   }
-  if (!errors.length && request.operatorId === 'release.deploy' && request.requirements?.migration != null) {
+  if (!errors.length && request.operatorId === 'migration.release' && request.requirements?.migration != null) {
     const { validateMigrationReleaseRequest } = await import('./migration-release.mjs');
     errors.push(...(await validateMigrationReleaseRequest(root, dir, request)).errors);
   }

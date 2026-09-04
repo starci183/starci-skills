@@ -1,0 +1,26 @@
+{
+  "kind": "uat-plan",
+  "title": "^# uat-plan — [a-z0-9][a-z0-9-]*$",
+  "sections": [
+    {
+      "heading": "^## Flows$",
+      "table": "| Flow | Entry | Steps | Account | Seed namespace |",
+      "minRows": 1,
+      "cell": {
+        "Flow": "^`[a-z0-9][a-z0-9-]*`$",
+        "Entry": "\\S",
+        "Steps": "^[1-9][0-9]*$",
+        "Account": "^`[a-z][a-z0-9-]*`$",
+        "Seed namespace": "^`uat-[A-Za-z0-9._-]+`$"
+      }
+    },
+    {
+      "heading": "^## Fallbacks taken$",
+      "table": "| Code | Action |",
+      "cell": {
+        "Code": "^`[A-Z][A-Z0-9_]+`$",
+        "Action": "\\S"
+      }
+    }
+  ]
+}

@@ -1,6 +1,6 @@
 export default {
   "operator": "Operator",
-  "workflow": "Workflow",
+  "chain": "Chuỗi",
   "session": "Phiên",
   "kinds-and-contracts": "Kind và contract",
   "stop-codes": "Mã dừng",

@@ -13,11 +13,11 @@ có thể quyết.
 
 | Nhánh | Quyết điều gì | Ai đọc |
 | --- | --- | --- |
-| `ui/composition/` | Ràng buộc mà một hướng phải thoả, sau khi gu đã được quyết trong grammars | `frontend.direction.decide` |
-| `ui/presentation/` | Một ranh giới do app sở hữu lấy giá trị CSS nào | `frontend.presentation.resolve` |
-| `ui/proof/` | Điều chỉ trở thành đúng khi đã render | `frontend.surface.audit` |
+| `ui/composition/` | Ràng buộc mà một hướng phải thoả, sau khi gu đã được quyết trong grammars | `interface.generate` |
+| `ui/presentation/` | Một ranh giới do app sở hữu lấy giá trị CSS nào | `interface.generate` |
+| `ui/proof/` | Điều chỉ trở thành đúng khi đã render | `interface.audit` |
 | `grammars/<family>/` | Cách một gia đình thị giác hiện thực hoá Common | mọi operator soạn gia đình đó |
-| `patterns/fe`, `patterns/be` | Mã sinh ra tất cả những thứ trên được viết thế nào | `frontend.source.apply`, `backend.source.apply` |
+| `patterns/fe`, `patterns/be` | Mã sinh ra tất cả những thứ trên được viết thế nào | `interface.generate`, `interface.fix`, `backend.generate` |
 
 Một chủ đề sống cùng operator đọc nó. Chủ đề không operator nào đọc thì không có lý do tồn tại.
 

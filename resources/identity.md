@@ -5,7 +5,7 @@ For provisioning, `scripts/identity-custody.mjs` checks the selected registry en
 container, published port and mounted credential references before any value is resolved. A
 same-named file in another repository is not an alternative credential source.
 
-Administrator rotation follows the [platform identity contract](../operators/platform-operate/operator.md#requirements), including a captured bootstrap-environment binding when the provider does not mount credential files.
+Administrator rotation follows the [platform identity contract](../operators/identity-provision/operator.md#requirements), including a captured bootstrap-environment binding when the provider does not mount credential files.
 
 The operation runs inside a fixed helper with captured child-process pipes. It consumes decrypted
 bytes directly into the intended provider or product request. The helper reports stage, status,

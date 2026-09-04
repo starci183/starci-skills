@@ -1,7 +1,7 @@
 # The UAT flow folder
 
 This directory is the template a flow folder is created from, and this file is the contract that
-folder is held to. `uat.verify` reads the shape, `platform.operate` provisions what is missing, and
+folder is held to. `uat.verify` reads the shape, `identity.provision` and `data.seed` provision what is missing, and
 both validators refuse a folder that has drifted from it. Nothing here is a secret and nothing here
 names a product.
 

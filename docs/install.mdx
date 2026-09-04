@@ -64,7 +64,7 @@ npx @starci/skills doctor
 ```
 
 `doctor` runs the tree's own validators on the installed copy, in the order `npm test` runs them in
-the package: routing, resources, knowledge citations, alias, the alias map, operators, workflows,
+the package: routing, resources, knowledge citations, alias, the alias map, operators,
 defaults, the operators index, templates, every operator self-test, and the script specs. It
 first prints how many files changed since install. `--quick` keeps the three fastest checks. A
 non-zero exit means the tree a mission would run on is not the tree the validators accept; fix the

@@ -41,7 +41,7 @@ xuyên suốt các renderer của mình; một vùng của ứng dụng có bọ
 ## Thang chiều rộng
 
 Một chiều rộng bị chặn trần lấy đúng một bậc của thang đóng này, không gì khác; chiều rộng tuỳ ý như
-`max-w-[720px]` nằm ngoài thang và bị `frontend.presentation.resolve` gỡ bỏ. Trần cho văn xuôi `max-w-[65ch]`
+`max-w-[720px]` nằm ngoài thang và bị `interface.generate` gỡ bỏ. Trần cho văn xuôi `max-w-[65ch]`
 là bậc duy nhất tính theo ký tự, vì độ dài dòng đi theo con chữ. Chốt của owner ngày 2026-09-03: thang
 này cố định cho mọi ứng dụng, không suy ra theo từng dự án.
 

@@ -105,8 +105,37 @@ export function effectiveDisposition(entry, requirements) {
   return entry.disposition;
 }
 
-// `dir` is the branch (or exchange) folder; `requirements` come from the branch's request.json.
-export async function validateResponse(root, dir, { requirements = {}, exchange = null, packages, kinds, registry } = {}) {
+// The agent's own check against its branch goal (request.json.goal). A done response whose request
+// serves a mission done-when line carries goalCheck { achieved, evidence }; every evidence path is a
+// file this response's fields declare and that exists on disk; achieved true rests on at least one. A
+// goalCheck that passes here is what validate-session counts as validator-accepted, and only those
+// reach state.json.brief.proven. A nested exchange belongs to its branch and carries none.
+export function goalCheckErrors(dir, response, goal, { rel = (f) => f, exchange = null } = {}) {
+  const errors = [];
+  const check = response?.goalCheck;
+  const serves = goal?.doneWhen !== undefined;
+  if (check === undefined) {
+    if (serves && response?.status === 'done') errors.push(`${rel('response/response.json')}: the request serves mission doneWhen ${goal.doneWhen}, so a done response carries goalCheck { achieved, evidence }; the line is evidenced by files this receipt declares or it is not evidenced`);
+    return errors;
+  }
+  if (exchange) errors.push(`${rel('response/response.json')}: a nested exchange carries no goalCheck; the branch it belongs to does`);
+  const declared = new Set(Object.values(response.fields ?? {}).flatMap((v) => (Array.isArray(v) ? v : [v])));
+  for (const p of check.evidence ?? []) {
+    if (!declared.has(p)) errors.push(`${rel('response/response.json')}: goalCheck.evidence ${p} is not a file this response's fields declare; evidence is a declared output, never a path invented for the check`);
+    else if (!existsSync(path.join(dir, p))) errors.push(`${rel(p)}: named as goalCheck evidence but missing`);
+  }
+  if (check.achieved === true && !(check.evidence ?? []).length) errors.push(`${rel('response/response.json')}: goalCheck.achieved is true with no evidence; an achieved done-when line is evidenced by at least one declared file`);
+  return errors;
+}
+// The goal the branch's request carried, read from disk when the caller did not pass it.
+async function requestGoalOf(dir, exchange) {
+  const file = path.join(exchange ? path.dirname(dir) : dir, 'request', 'request.json');
+  if (!existsSync(file)) return null;
+  try { return JSON.parse(await readFile(file, 'utf8')).goal ?? null; } catch { return null; }
+}
+
+// `dir` is the branch (or exchange) folder; `requirements` and `goal` come from the branch's request.json.
+export async function validateResponse(root, dir, { requirements = {}, exchange = null, goal, packages, kinds, registry } = {}) {
   const errors = [];
   const rel = (f) => path.relative(sessionRootOf(dir) ?? dir, path.join(dir, f)).split(path.sep).join('/');
   const file = path.join(dir, 'response', 'response.json');
@@ -125,6 +154,8 @@ export async function validateResponse(root, dir, { requirements = {}, exchange 
   if (response.status === 'running') errors.push(`${rel('response/response.json')}: status running is the dispatch skeleton, not a receipt; the agent replaces it with done, blocked or waiting, and an agent that exits leaving it is RECEIPT_MISSING`);
   // A sealed value never reaches a receipt, an artifact or a log an agent kept.
   errors.push(...secretErrors(path.join(dir, 'response'), { relativeTo: sessionRootOf(dir) ?? dir }));
+  // The branch goal is answered in the receipt: a done branch that serves a done-when line says whether it evidenced it.
+  errors.push(...goalCheckErrors(dir, response, goal === undefined ? await requestGoalOf(dir, exchange) : goal, { rel, exchange }));
   if (response.status !== 'blocked' && response.stop !== undefined) errors.push(`${rel('response/response.json')}: only a blocked response carries a stop`);
   if (response.status !== 'waiting' && response.awaiting !== undefined) errors.push(`${rel('response/response.json')}: only a waiting response carries awaiting`);
   if ((response.exchange ?? null) !== exchange) errors.push(`${rel('response/response.json')}: exchange ${response.exchange ?? 'none'} does not match the folder ${exchange ?? 'none'}`);
@@ -221,9 +252,10 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
   const exchange = /^step-\d+$/.test(path.basename(path.dirname(dir))) ? null : path.basename(dir);
   const run = async () => {
     let requirements = {};
+    let goal = null;
     const reqFile = path.join(exchange ? path.dirname(dir) : dir, 'request', 'request.json');
-    if (existsSync(reqFile)) requirements = JSON.parse(await readFile(reqFile, 'utf8')).requirements ?? {};
-    return validateResponse(root, dir, { requirements, exchange });
+    if (existsSync(reqFile)) { const request = JSON.parse(await readFile(reqFile, 'utf8')); requirements = request.requirements ?? {}; goal = request.goal ?? null; }
+    return validateResponse(root, dir, { requirements, exchange, goal });
   };
   run().then(({ errors }) => {
     if (errors.length) { process.stderr.write(`${errors.join('\n')}\n`); process.exitCode = 1; } else process.stdout.write('response valid\n');

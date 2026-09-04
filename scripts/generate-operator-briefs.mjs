@@ -1,7 +1,8 @@
-// operators/<id>/brief.md is generated from operator.md: the dispatch prompt of one fresh agent, capped
-// at resources/orchestrator.json#briefBytes. It carries what an agent must know before its first tool
-// call — the job, when it is done, the inputs, the outputs, the stop codes — and nothing the agent can
-// read for itself at the step it is on or in its request.json. Generating it keeps the brief and the
+// operators/<id>/brief.md is generated from operator.md: the prompt of one dispatched or isolated agent
+// (resources.mode), capped at resources/orchestrator.json#briefBytes. It carries what an agent must know
+// before its first tool call — the job, when it is done and its primary output, the inputs, the outputs,
+// the stop codes, and for an isolated agent that nothing outside request.json exists — and nothing the
+// agent can read for itself at the step it is on or in its request.json. Generating it keeps the brief and the
 // operator one home: a table edited in operator.md reaches the brief on the next run, and `--check`
 // inside `npm test` refuses a stale or oversized brief.
 //
@@ -28,10 +29,13 @@ export function renderBrief(pkg) {
   // there. The Next table is the orchestrator's, not the agent's: an agent ends its branch and never
   // routes. The profile and dispatch mode are the orchestrator's too. Output types are not repeated
   // either; the file name carries them, and the kind contract is read at the step that writes it.
+  // An isolated agent (resources.mode) starts with an empty context: the brief says so in one line,
+  // because nothing else in its context could.
+  const isolated = pkg.manifest.resources?.mode === 'isolated';
   const lines = [
     `# ${id} — brief`,
     '',
-    'Read operator.md at your step; write only response/ of your branch; replace the running response.json skeleton before you exit; * marks a fallback stop.',
+    `Read operator.md at your step; write only response/ of your branch; replace the running response.json skeleton before you exit; * marks a fallback stop.${isolated ? ' You see only what request.json names; nothing else exists.' : ''}`,
     '',
     '## Job',
     '',
@@ -40,6 +44,8 @@ export function renderBrief(pkg) {
     '## Done when',
     '',
     op.doneWhen,
+    '',
+    `Primary output: \`${pkg.manifest.primaryOutput}\``,
     '',
     '## Inputs',
     '',

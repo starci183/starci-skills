@@ -63,6 +63,20 @@ Khung: [`templates/kinds/business-promise-authority.skeleton.md`](https://github
 | `^## Reconciliation$` | `\| Dimension \| Delivered evidence \| Discrepancy \|` | — | — |
 | `^## Findings$` | `\| Code \| Severity \| Dimension \| Statement \|` | — | `Code`: `^`[A-Z][A-Z0-9_]*`$`<br />`Severity`: `^(info\|warning\|error)$` |
 
+### `business-reconciliation`
+
+Tiêu đề: `^# business-reconciliation — [a-z0-9][a-z0-9-]*$`
+
+Khung: [`templates/kinds/business-reconciliation.skeleton.md`](https://github.com/starci183/starci-skills/blob/main/templates/kinds/business-reconciliation.skeleton.md)
+
+| Mục | Dòng đầu của bảng | Số dòng | Ràng buộc ô |
+| --- | --- | --- | --- |
+| `^## Binding$` | `\| Field \| Value \|` | `Feature`, `Target state`, `Head`, `Claims fingerprint`, `Coverage fingerprint`, `Delivered source` | `Value`: `\S` |
+| `^## Lineage$` | `\| Field \| Value \|` | `Previous head`, `Previous state`, `Transition` | `Value`: `\S` |
+| `^## Cited claims$` | `\| Claim \| Kind \| Role \| Source \| Lines \| Head \|` | minRows 1 | `Claim`: `^`[a-z0-9][a-z0-9-]*`$`<br />`Kind`: `^(fact\|intent\|example\|unknown\|contradiction)$`<br />`Lines`: `^\d+-\d+$` |
+| `^## Reconciliation$` | `\| Dimension \| Delivered evidence \| Discrepancy \|` | minRows 1 | `Dimension`: `^`[a-z0-9][a-z0-9-]*`$`<br />`Delivered evidence`: `\S`<br />`Discrepancy`: `\S` |
+| `^## Findings$` | `\| Code \| Severity \| Dimension \| Statement \|` | — | `Code`: `^`[A-Z][A-Z0-9_]*`$`<br />`Severity`: `^(info\|warning\|error)$` |
+
 ### `changes`
 
 Tiêu đề: `^# changes — [a-z]+(?:\.[a-z]+)+ step-\d+/parallel-\d+$`
@@ -304,6 +318,32 @@ Khung: [`templates/kinds/restatement.skeleton.md`](https://github.com/starci183/
 | `^## Restatement$` | `\| Line \| Statement \|` | minRows 1 | `Line`: `^[1-5]$`<br />`Statement`: `\S` |
 | `^## Source$` | `\| Field \| Value \|` | `Field`, `Quoted` | `Value`: `\S` |
 
+### `seed-receipt`
+
+Tiêu đề: `^# seed-receipt — [a-z0-9][a-z0-9-]*$`
+
+Khung: [`templates/kinds/seed-receipt.skeleton.md`](https://github.com/starci183/starci-skills/blob/main/templates/kinds/seed-receipt.skeleton.md)
+
+| Mục | Dòng đầu của bảng | Số dòng | Ràng buộc ô |
+| --- | --- | --- | --- |
+| `^## Binding$` | `\| Field \| Value \|` | `Operator`, `Step`, `Flow`, `Environment`, `Route`, `Account`, `Operation`, `Approval`, `Namespace`, `Seed fingerprint`, `Drafted` | `Value`: `\S` |
+| `^## Records$` | `\| Id \| Store \| Attribution \| Rollback \|` | — | `Id`: `\S`<br />`Store`: `\S`<br />`Attribution`: `^(owner\|prefix\|limitation)$`<br />`Rollback`: `^(yes\|no)$` |
+| `^## Checks$` | `\| Check \| Status \| Evidence \|` | minRows 1 | `Check`: `^`(store-reachable\|rows-attributable\|expected-state\|rollback-listed)`$`<br />`Status`: `^(passed\|failed)$`<br />`Evidence`: `\S` |
+| `^## Findings$` | `\| Code \| Statement \|` | — | `Code`: `^`(SEED_DRAFTED\|SEED_ALREADY_APPLIED\|SEED_LIMITATION\|SEED_ROLLED_BACK\|SHARED_ROW_REFUSED)`$`<br />`Statement`: `\S` |
+
+### `surface-map`
+
+Tiêu đề: `^# surface-map — [a-z0-9][a-z0-9-]*$`
+
+Khung: [`templates/kinds/surface-map.skeleton.md`](https://github.com/starci183/starci-skills/blob/main/templates/kinds/surface-map.skeleton.md)
+
+| Mục | Dòng đầu của bảng | Số dòng | Ràng buộc ô |
+| --- | --- | --- | --- |
+| `^## Map$` | `\| Unit \| Kind \| Route or host \| Goal \|` | minRows 1 | `Unit`: `^`[a-z0-9][a-z0-9-]*`$`<br />`Kind`: `^(page\|modal)$`<br />`Route or host`: `\S`<br />`Goal`: `\S` |
+| `^## Shell$` | `\| Element \| Owner \| Decided \|` | minRows 1 | `Element`: `^(sidebar\|header\|breadcrumb\|navigation order)$`<br />`Owner`: `\S`<br />`Decided`: `\S` |
+| `^## Data contracts$` | `\| Unit \| Reads \| Writes \|` | minRows 1 | `Unit`: `^`[a-z0-9][a-z0-9-]*`$`<br />`Reads`: `\S`<br />`Writes`: `\S` |
+| `^## Fallbacks taken$` | `\| Code \| Action \|` | — | `Code`: `^`[A-Z][A-Z0-9_]+`$`<br />`Action`: `\S` |
+
 ### `uat-flow-verification`
 
 Tiêu đề: `^# uat-flow-verification — [a-z0-9][a-z0-9-]*/[a-z0-9][a-z0-9-]*$`
@@ -322,6 +362,17 @@ Khung: [`templates/kinds/uat-flow-verification.skeleton.md`](https://github.com/
 | `^## Findings$` | `\| Code \| Statement \|` | — | `Code`: `^`(CREDENTIAL_VALUE_IN_OUTPUT)`$`<br />`Statement`: `\S` |
 | `^## Fallbacks taken$` | `\| Code \| Action \|` | — | — |
 | `^## Audit scope$` | `\| Field \| Value \|` | `Mode`, `Coverage claim`, `Deferred states` | `Value`: `\S` |
+
+### `uat-plan`
+
+Tiêu đề: `^# uat-plan — [a-z0-9][a-z0-9-]*$`
+
+Khung: [`templates/kinds/uat-plan.skeleton.md`](https://github.com/starci183/starci-skills/blob/main/templates/kinds/uat-plan.skeleton.md)
+
+| Mục | Dòng đầu của bảng | Số dòng | Ràng buộc ô |
+| --- | --- | --- | --- |
+| `^## Flows$` | `\| Flow \| Entry \| Steps \| Account \| Seed namespace \|` | minRows 1 | `Flow`: `^`[a-z0-9][a-z0-9-]*`$`<br />`Entry`: `\S`<br />`Steps`: `^[1-9][0-9]*$`<br />`Account`: `^`[a-z][a-z0-9-]*`$`<br />`Seed namespace`: `^`uat-[A-Za-z0-9._-]+`$` |
+| `^## Fallbacks taken$` | `\| Code \| Action \|` | — | `Code`: `^`[A-Z][A-Z0-9_]+`$`<br />`Action`: `\S` |
 
 ### `workspace-route-binding`
 
@@ -351,9 +402,9 @@ Khung: [`templates/kinds/workspace-route-binding.skeleton.md`](https://github.co
 | `coverage` | [`templates/kinds/coverage.schema.json`](https://github.com/starci183/starci-skills/blob/main/templates/kinds/coverage.schema.json) | `statements`, `lines`, `functions`, `branches`, `thresholds`, `evidenceRef` |
 | `current-state` | [`templates/kinds/current-state.schema.json`](https://github.com/starci183/starci-skills/blob/main/templates/kinds/current-state.schema.json) | `observedHead`, `fingerprint`, `components`, `boundaries` |
 | `delta` | [`templates/kinds/delta.schema.json`](https://github.com/starci183/starci-skills/blob/main/templates/kinds/delta.schema.json) | `serviceRef`, `serviceKind`, `ownerRef`, `approvalRef`, `planSha256`, `inventoryFingerprint`, `generation`, `observedAt`, `inventoriedResources`, `observedPortHolders`, `portClaims`, `mutableResourceRefs`, `observationOnlyResourceRefs`, `allowedEffects`, `appliedEffects`, `capabilities`, `convergence`, `mutations` |
-| `dependency-plan` | [`templates/kinds/dependency-plan.schema.json`](https://github.com/starci183/starci-skills/blob/main/templates/kinds/dependency-plan.schema.json) | `base`, `packageName`, `fromVersion`, `toVersion`, `manifests`, `lockfile`, `release`, `regression`, `gates` |
+| `dependency-plan` | [`templates/kinds/dependency-plan.schema.json`](https://github.com/starci183/starci-skills/blob/main/templates/kinds/dependency-plan.schema.json) | `manifests`, `lockfile`, `regression`, `gates` |
 | `dependency-proof` | [`templates/kinds/dependency-proof.schema.json`](https://github.com/starci183/starci-skills/blob/main/templates/kinds/dependency-proof.schema.json) | `phase`, `base`, `planHash`, `command`, `commandHash`, `files`, `regressionHash`, `installed`, `exitCode`, `outputRef`, `outputHash`, `startedAt`, `finishedAt` |
-| `dependency-update` | [`templates/kinds/dependency-update.schema.json`](https://github.com/starci183/starci-skills/blob/main/templates/kinds/dependency-update.schema.json) | `base`, `commit`, `planHash`, `files`, `proofs` |
+| `dependency-update` | [`templates/kinds/dependency-update.schema.json`](https://github.com/starci183/starci-skills/blob/main/templates/kinds/dependency-update.schema.json) | `base`, `commit`, `planHash`, `files`, `proofs`, `release` |
 | `e2e` | [`templates/kinds/e2e.schema.json`](https://github.com/starci183/starci-skills/blob/main/templates/kinds/e2e.schema.json) | `unitId`, `contractFingerprintBefore`, `contractFingerprintAfter`, `iterations`, `maxIterations`, `tracks`, `runs` |
 | `gate-result` | [`templates/kinds/gate-result.schema.json`](https://github.com/starci183/starci-skills/blob/main/templates/kinds/gate-result.schema.json) | `gate`, `required`, `sourceHead`, `sessionBranch`, `predecessorCommit`, `observedAt`, `commandRef`, `configRef`, `status`, `exitCode`, `evidenceRef`, `classification`, `sonarScope`, `debt`, `statement` |
 | `inventory` | [`templates/kinds/inventory.schema.json`](https://github.com/starci183/starci-skills/blob/main/templates/kinds/inventory.schema.json) | `treeFingerprint`, `classNames`, `ruleIds`, `gaps` |
@@ -377,5 +428,6 @@ Khung: [`templates/kinds/workspace-route-binding.skeleton.md`](https://github.co
 | `uat-snapshot` | [`templates/kinds/uat-snapshot.schema.json`](https://github.com/starci183/starci-skills/blob/main/templates/kinds/uat-snapshot.schema.json) | `runId`, `approval`, `feature`, `flow`, `env`, `commit`, `frozenAt`, `flowRoot`, `snapshotRef`, `snapshotFingerprint`, `lease`, `admission`, `accounts`, `fixtureNamespace`, `seed`, `cases`, `flowSource`, `golden`, `isolation` |
 | `uat-verdicts` | [`templates/kinds/uat-verdicts.schema.json`](https://github.com/starci183/starci-skills/blob/main/templates/kinds/uat-verdicts.schema.json) | `runId`, `commit`, `resultRef`, `latestRef`, `historyRef`, `lanes`, `experience`, `cleanup` |
 | `ui-coverage` | [`templates/kinds/ui-coverage.schema.json`](https://github.com/starci183/starci-skills/blob/main/templates/kinds/ui-coverage.schema.json) | `directionId`, `surfaceClass`, `actions`, `regions`, `states`, `responsive` |
+| `units` | [`templates/kinds/units.schema.json`](https://github.com/starci183/starci-skills/blob/main/templates/kinds/units.schema.json) | `schemaVersion`, `producedBy`, `units` |
 | `verdicts` | [`templates/kinds/verdicts.schema.json`](https://github.com/starci183/starci-skills/blob/main/templates/kinds/verdicts.schema.json) | `entries` |
 | `writes` | [`templates/kinds/writes.schema.json`](https://github.com/starci183/starci-skills/blob/main/templates/kinds/writes.schema.json) | `mode`, `base`, `branch`, `commit`, `files`, `sweep` |

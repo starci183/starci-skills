@@ -1,0 +1,71 @@
+{
+  "schemaVersion": 1,
+  "id": "frontend-with-uat",
+  "when": {
+    "en": "A frontend change must also be walked by a real person's journey before it is published; a person asked for the UAT run by name.",
+    "vi": "Một thay đổi frontend còn phải đi qua hành trình của người thật trước khi publish; có người yêu cầu đích danh lần chạy UAT."
+  },
+  "mission": {
+    "goal": "a frontend change is walked by a named journey before it is published",
+    "doneWhen": [
+      {
+        "evidence": "the surface is committed on the session branch",
+        "producedBy": "interface.generate"
+      },
+      {
+        "evidence": "the committed head is served on the product port",
+        "producedBy": "runtime.serve"
+      },
+      {
+        "evidence": "the served surface passes the audit with its screenshots kept",
+        "producedBy": "interface.audit"
+      },
+      {
+        "evidence": "a person's journey completes on the served surface",
+        "producedBy": "uat.verify"
+      },
+      {
+        "evidence": "the session branch is merged and pushed",
+        "producedBy": "git.publish"
+      }
+    ]
+  },
+  "options": {
+    "requirements": {
+      "interface.generate": {
+        "intent": "modify",
+        "changeLevel": "reconstruct",
+        "mode": "apply"
+      }
+    }
+  },
+  "example": [
+    [
+      "environment.preflight"
+    ],
+    [
+      "workspace.bind#be",
+      "workspace.bind#fe"
+    ],
+    [
+      "interface.generate"
+    ],
+    [
+      "runtime.serve"
+    ],
+    [
+      "interface.audit"
+    ],
+    [
+      "quality.verify"
+    ],
+    [
+      "uat.verify"
+    ],
+    [
+      "git.publish"
+    ]
+  ],
+  "ends": "git.publish",
+  "rewrite": "frontend trio → interface.generate; post-write bind → runtime.serve; frontend.surface.audit → interface.audit. Since 1.5.0 every published surface is walked, so this fixture plans the same chain as frontend-reconstruct."
+}

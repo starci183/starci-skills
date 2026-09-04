@@ -1,7 +1,7 @@
 # business-promise-authority — feature-id
 
 One paragraph: which promise was decided, for which feature, and against which evidence. Written by
-`business.decide` as `response/response.md`; read by `backend.source.apply`, `quality.verify` and
+`business.decide` as `response/response.md`; read by `backend.generate`, `quality.verify` and
 `uat.verify`, which correlate against the same coverage fingerprint rather than a paraphrase of it.
 
 ## Binding

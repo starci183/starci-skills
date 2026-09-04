@@ -55,9 +55,9 @@
         "scheme": "source://<repository>",
         "bind": "fingerprint + sourceHead (git rev-parse HEAD of the checkout)",
         "writers": [
-          "frontend.source.apply",
-          "library.source.apply",
-          "dependency.update"
+          "interface.generate",
+          "interface.fix",
+          "library.update"
         ],
         "purpose": "The routed frontend checkout of the bound project."
       },
@@ -68,7 +68,7 @@
         "scheme": "source://<repository>",
         "bind": "fingerprint + sourceHead (git rev-parse HEAD of the checkout)",
         "writers": [
-          "backend.source.apply"
+          "backend.generate"
         ],
         "purpose": "The routed backend checkout of the bound project."
       },
@@ -171,7 +171,9 @@
           "scheme": "runtime://owner",
           "bind": "fingerprint + generation",
           "writers": [
-            "platform.operate"
+            "identity.provision",
+            "data.seed",
+            "runtime.serve"
           ],
           "purpose": "The shared runtime owner, keyed per project route: each entry carries its own generation, status, endpoints, health evidence and identity provider. Callers consume the entry of their own route, never own it."
         }
@@ -183,7 +185,9 @@
         "scheme": "uat://<flow>/<case>",
         "bind": "fingerprint of snapshot.json and result.json",
         "writers": [
-          "platform.operate",
+          "identity.provision",
+          "data.seed",
+          "runtime.serve",
           "uat.verify"
         ],
         "purpose": "UAT authority per flow: the flow document, its dedicated account, its seed, the approved reference, and the append-only history of every run with the commit it verified. A record that is absent is created by the runtime, never reported as missing."

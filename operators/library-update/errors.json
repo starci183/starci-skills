@@ -1,0 +1,54 @@
+{
+  "schemaVersion": 9,
+  "note": "Stop codes only library.update emits. Same entry shape as operators/errors.json, scope implicit. Shared codes (INVALID_INPUT, SOURCE_DRIFT, NO_PROGRESS) come from operators/errors.json. The LIBRARY_* codes belong to the package half of the job, the DEPENDENCY_* codes to the consumer half; both halves are one job because a repaired package nobody consumes repairs nothing.",
+  "codes": {
+    "LIBRARY_BOUNDARY_REJECTED": {
+      "domain": "caller",
+      "disposition": "terminate",
+      "meaning": {
+        "en": "The package identity, exact write set, behavior-only boundary or session binding cannot be proved.",
+        "vi": "Không chứng minh được danh tính package, tập file chính xác, ranh giới chỉ sửa hành vi hoặc binding session."
+      },
+      "resume": {
+        "en": "Supply corrected owner authority or a bounded plan; product presentation still uses the interface pipeline.",
+        "vi": "Cung cấp thẩm quyền owner hoặc kế hoạch có giới hạn đã sửa; presentation sản phẩm vẫn theo pipeline interface."
+      }
+    },
+    "LIBRARY_PROOF_FAILED": {
+      "domain": "self",
+      "disposition": "terminate",
+      "meaning": {
+        "en": "The regression did not fail before and pass after, or a required package gate did not pass on the delivered tree.",
+        "vi": "Regression chưa thất bại trước và đạt sau sửa, hoặc gate package bắt buộc chưa đạt trên cây bàn giao."
+      },
+      "resume": {
+        "en": "Repair the declared behavior and rerun the complete proof set on the changed tree.",
+        "vi": "Sửa hành vi đã khai và chạy lại toàn bộ bằng chứng trên cây thay đổi."
+      }
+    },
+    "DEPENDENCY_BOUNDARY_REJECTED": {
+      "domain": "caller",
+      "disposition": "terminate",
+      "meaning": {
+        "en": "The packed release, the package identity or the exact consumer metadata boundary cannot be proved.",
+        "vi": "Không chứng minh được bản phát hành đã đóng gói, danh tính package hoặc ranh giới metadata consumer chính xác."
+      },
+      "resume": {
+        "en": "Supply a corrected consumer plan; source changes stay inside the package half of this job.",
+        "vi": "Cung cấp plan consumer đã sửa; thay đổi source vẫn ở nửa package của việc này."
+      }
+    },
+    "DEPENDENCY_PROOF_FAILED": {
+      "domain": "self",
+      "disposition": "terminate",
+      "meaning": {
+        "en": "The unchanged consumer regression or a required delivery gate lacks valid evidence at the consumed release.",
+        "vi": "Regression consumer không đổi hoặc gate bàn giao bắt buộc thiếu bằng chứng hợp lệ tại bản phát hành đã tiêu thụ."
+      },
+      "resume": {
+        "en": "Repair the package or the installation, then repeat the unchanged consumer proof.",
+        "vi": "Sửa package hoặc phần cài đặt rồi chạy lại nguyên proof consumer."
+      }
+    }
+  }
+}

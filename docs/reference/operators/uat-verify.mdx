@@ -132,7 +132,7 @@ begins only after the sign-in redirect has landed, and every capture record says
 that moment are the frames a credential can be standing in. An
 account record therefore carries a username, a role, a credential name and the sealed file's path,
 and nothing that could hold a secret. The preflight check that the credential resolves (step 3) is a
-diagnostic under the same law `platform.operate` states for its own identity branch: it reports that
+diagnostic under the same law `identity.provision` states for its own job: it reports that
 the store answered, never what it answered with, so proving readiness never becomes the second way a
 value leaves custody.
 
@@ -219,7 +219,8 @@ pass.
 | `frontend-surface-audit` | the surface audit that found the frontend clean, taken at the pinned commit | yes |
 | `quality-verification` | the quality gate that passed, taken at the same pinned commit | yes |
 | `route` | `workspace.bind` on the fe role; the bound route whose endpoint this run drives | yes |
-| `uat-account` | `platform.operate`, the dedicated account it provisioned for this flow; absent on the first pass, which is what `IDENTITY_MISSING` hands over | no |
+| `uat-account` | `identity.provision`, the dedicated account it provisioned for this flow; absent on the first pass, which is what `IDENTITY_MISSING` hands over | no |
+| `units` | `uat.plan`; the flow list whose one flow this branch walks, named by `request.unit` | no |
 
 ## Requirements
 
@@ -302,10 +303,10 @@ The frozen snapshot also retains the unchanged scope in `auditScope` before exec
 | When | Operator |
 | --- | --- |
 | all three lanes pass | `git.publish` |
-| all three lanes pass and the promise must be reconciled against the journey that was actually walked | `business.decide` |
-| the UI lane fails on an application-owned node | `frontend.presentation.resolve` |
-| the behaviour lane fails | `backend.source.apply` |
-| the flow has no dedicated account yet, so the identity is provisioned before the run continues | `platform.operate` |
+| all three lanes pass and the promise must be reconciled against the journey that was actually walked | `business.reconcile` |
+| the UI lane fails on an application-owned node | `interface.generate` |
+| the behaviour lane fails | `backend.generate` |
+| the flow has no dedicated account yet, so the identity is provisioned before the run continues | `identity.provision` |
 | the UX lane fails: a person decides what the experience should be, and the flow is verified again only after that decision | `user` |
 | the run produced the first baseline of this flow, so a person promotes the candidate before it is a reference | `user` |
 

@@ -5,7 +5,7 @@ import path from 'node:path';
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
-import { migrationFiles } from '../operators/backend-source-apply/self-test.mjs';
+import { migrationFiles } from '../operators/backend-generate/self-test.mjs';
 import { confirmed } from '../operators/architecture-decide/self-test.mjs';
 import { migrationDigest as hash, migrationConnectionFingerprint } from './migration-release.mjs';
 import { writeMigrationReleaseProducers } from './migration-release-producers-fixture.mjs';
@@ -100,9 +100,9 @@ export async function migrationReleaseFixture(t, { mode = 'valid', sealed = fals
     connectionRef, connectionFingerprint, migrations: [{ name: 'AddScope', path: writer, sha256: fileHash(writer) }],
     journal: { schema: 'public', table: 'migrations', allowInitialization: true }, journalBefore: [], journalExistsBefore: false, journalFingerprintBefore: hash('[]') };
   const branch = path.join(session, 'step-4/parallel-1');
-  const request = { schemaVersion: 9, operatorId: 'release.deploy', step: 4, parallel: 1, sessionId: 's-test',
+  const request = { schemaVersion: 9, operatorId: 'migration.release', step: 4, parallel: 1, sessionId: 's-test',
     contexts: [{ alias: '@workspaces/be', head }, { alias: '@workspaces/device-state', head: null }],
-    requirements: { release: 'release:fixture', target: plan.target, approval: `.stacks/dev/environment.json#${plan.environmentSha256}`, probes: [], steadyDeadline: 60, migration: null, rollbackIdentity: null, resume: null },
+    requirements: { release: 'release:fixture', target: plan.target, approval: `.stacks/dev/environment.json#${plan.environmentSha256}`, migration: null, resume: null },
     inputs: { route: routeRef, 'backend-source-application': 'step-1/parallel-1/response/response.md', 'quality-verification': qualityRef }, resume: null };
   const freeze = () => {
     write(path.join(branch, 'request/migration-release.json'), plan);
@@ -115,6 +115,6 @@ export async function migrationReleaseFixture(t, { mode = 'valid', sealed = fals
     write(path.join(session, 'state.json'), state);
   };
   freeze();
-  const finish = () => write(path.join(branch, 'response/response.json'), { schemaVersion: 9, operatorId: 'release.deploy', step: 4, parallel: 1, status: 'done', fallbacks: [], fields: { 'migration-release': 'response/migration-release.md', 'migration-release-proof': 'response/data/migration-release.json' }, commits: [], next: [] });
+  const finish = () => write(path.join(branch, 'response/response.json'), { schemaVersion: 9, operatorId: 'migration.release', step: 4, parallel: 1, status: 'done', fallbacks: [], fields: { 'migration-release': 'response/migration-release.md', 'migration-release-proof': 'response/data/migration-release.json' }, commits: [], next: [] });
   return { host, root, session, branch, checkout, head, request, plan, environment, environmentFile, freeze, finish, write };
 }

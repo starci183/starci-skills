@@ -12,11 +12,11 @@ Nothing in it describes how a mission proceeds; it describes what is true, so an
 
 | Branch | Decides | Read by |
 | --- | --- | --- |
-| `ui/composition/` | Constraints a direction must satisfy, after taste is decided in grammars | `frontend.direction.decide` |
-| `ui/presentation/` | Which CSS value an app-owned boundary takes | `frontend.presentation.resolve` |
-| `ui/proof/` | What only becomes true once rendered | `frontend.surface.audit` |
+| `ui/composition/` | Constraints a direction must satisfy, after taste is decided in grammars | `interface.plan`, `interface.generate` |
+| `ui/presentation/` | Which CSS value an app-owned boundary takes | `interface.generate` |
+| `ui/proof/` | What only becomes true once rendered | `interface.audit` |
 | `grammars/<family>/` | One visual family's realization of Common | every operator that composes that family |
-| `patterns/fe`, `patterns/be` | How the code that produces all of it is written | `frontend.source.apply`, `backend.source.apply` |
+| `patterns/fe`, `patterns/be` | How the code that produces all of it is written | `interface.generate`, `interface.fix`, `backend.generate` |
 
 "A topic lives with the operator that reads it. A topic no operator reads has no reason to exist."
 

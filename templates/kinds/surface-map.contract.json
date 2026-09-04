@@ -1,0 +1,45 @@
+{
+  "kind": "surface-map",
+  "title": "^# surface-map — [a-z0-9][a-z0-9-]*$",
+  "sections": [
+    {
+      "heading": "^## Map$",
+      "table": "| Unit | Kind | Route or host | Goal |",
+      "minRows": 1,
+      "cell": {
+        "Unit": "^`[a-z0-9][a-z0-9-]*`$",
+        "Kind": "^(page|modal)$",
+        "Route or host": "\\S",
+        "Goal": "\\S"
+      }
+    },
+    {
+      "heading": "^## Shell$",
+      "table": "| Element | Owner | Decided |",
+      "minRows": 1,
+      "cell": {
+        "Element": "^(sidebar|header|breadcrumb|navigation order)$",
+        "Owner": "\\S",
+        "Decided": "\\S"
+      }
+    },
+    {
+      "heading": "^## Data contracts$",
+      "table": "| Unit | Reads | Writes |",
+      "minRows": 1,
+      "cell": {
+        "Unit": "^`[a-z0-9][a-z0-9-]*`$",
+        "Reads": "\\S",
+        "Writes": "\\S"
+      }
+    },
+    {
+      "heading": "^## Fallbacks taken$",
+      "table": "| Code | Action |",
+      "cell": {
+        "Code": "^`[A-Z][A-Z0-9_]+`$",
+        "Action": "\\S"
+      }
+    }
+  ]
+}

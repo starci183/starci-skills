@@ -29,6 +29,24 @@
       "type": "object",
       "additionalProperties": { "type": "string", "pattern": "^step-\\d+/parallel-\\d+/(?:[a-z][a-z-]*/)?response/(?:(?:[a-z][a-z-]*/)*[A-Za-z0-9_.-]+\\.md|data/[A-Za-z0-9_./-]+\\.json|artifacts/[A-Za-z0-9_./-]+)$" }
     },
+    "goal": {
+      "description": "What this branch is for: doneWhen, the index of the one state.json.mission.doneWhen line whose evidence this branch produces (its producedBy is this operator), or prerequisite, the branch N/M this one enables. Required on every branch of a session that carries a mission (scripts/validate-request.mjs#branchGoalErrors); a branch that points at nothing does not run.",
+      "type": "object",
+      "additionalProperties": false,
+      "oneOf": [
+        { "required": ["doneWhen"] },
+        { "required": ["prerequisite"] }
+      ],
+      "properties": {
+        "doneWhen": { "type": "integer", "minimum": 0 },
+        "prerequisite": { "type": "string", "pattern": "^[0-9]+/[0-9]+$" }
+      }
+    },
+    "unit": {
+      "description": "The one unit this branch runs: an id of the units.json bound as inputs.units, which an earlier <domain>.plan branch produced (templates/kinds/units.schema.json). Required on a mission branch of an execute operator whose domain has a plan operator and whose done-when lines number more than one (scripts/validate-request.mjs#unitGateErrors); a blind agent takes one page, one modal, one flow.",
+      "type": "string",
+      "pattern": "^[a-z0-9][a-z0-9-]*$"
+    },
     "resume": {
       "oneOf": [
         { "type": "null" },

@@ -1,0 +1,66 @@
+---
+title: "Chuỗi"
+description: "Chuỗi operator được suy từ các dòng \"xong khi\" của nhiệm vụ ra sao, cổng chuỗi từ chối gì, và khi nào chuỗi được vẽ lại."
+---
+
+# Chuỗi
+
+`workflows/README.vi.md` mở đầu bằng trọn luật:
+
+> Không còn file workflow nào. Chuỗi không bao giờ được chọn từ một ví dụ: nó được suy từ nhiệm vụ,
+> bởi `scripts/plan-chain.mjs`, chỉ từ các bảng của operator, và được `scripts/validate-chain.mjs`
+> kiểm mỗi lần vẽ.
+
+Một chuỗi là danh sách **bậc** theo thứ tự, mỗi bậc là danh sách **nhánh** chạy song song, tối đa
+ba. Không thứ gì trong cây lưu sẵn một chuỗi: cửa vào vẽ nó sau khi người xác nhận goal của nhiệm vụ,
+in ra hai dòng cho mỗi nhánh — goal, rồi vì sao nhánh đó có mặt — và không dispatch gì trước khi
+`validate-chain` chấp nhận.
+
+## Suy ra thế nào
+
+Planner bắt đầu từ nhiệm vụ đã xác nhận trong `state.json`. Mỗi dòng "xong khi" gọi tên operator mà
+biên nhận của nó là bằng chứng ấy; các operator đó là đích, và planner đi ngược qua những bảng mà mỗi
+operator công bố trong `operator.md` của mình:
+
+- một **Đầu vào** bắt buộc kéo vào operator sinh ra kind đó — ưu tiên producer đã có trong chuỗi, rồi
+  đến operator duy nhất có `primaryOutput` là kind đó, rồi đến producer duy nhất; kind mà các bảng để
+  mập mờ là một lời từ chối gọi tên các ứng viên, không bao giờ là phỏng đoán;
+- một dòng **Context** `@workspaces/<role>` bắt buộc kéo vào một `workspace.bind` cho vai đó, và vai
+  mà nhiệm vụ khai được bind trước mọi nhánh làm việc dù không bảng nào đòi;
+- operator được hơn một dòng "xong khi" gọi tên, khi domain của nó có operator `<domain>.plan`, chạy
+  sau plan đó và toả ra theo đơn vị: mỗi nhánh một đơn vị, mỗi agent mù một đơn vị — một trang, một
+  modal, một luồng;
+- operator nào cầm tool có tác dụng phụ thì chuỗi mở bằng `environment.preflight`;
+- nhiệm vụ gọi tên `git.publish` trong khi có nhánh ghi source frontend dưới `mode: apply` thì nợ
+  lượt audit và lượt đi thử ở giữa: operator có primary output là `frontend-surface-audit`, rồi
+  `uat.verify`, trước khi publish.
+
+Các nút rồi được xếp thành bậc: một nhánh chỉ chạy khi mọi thứ nó phụ thuộc đã chạy ở bậc trước và
+một bảng `## Kế tiếp` của bậc trước gọi tên nó; không bao giờ hai bên ghi cùng một alias trong một
+bậc; nhánh toả ra đứng một mình trong bậc của nó để các đơn vị nở ra tại chỗ. Mỗi nhánh có một goal —
+dòng "xong khi" nó chứng minh, hoặc nhánh sau sớm nhất mà nó mở đường — và goal đó chính là thứ
+`request.json.goal` mang.
+
+## Cổng từ chối gì
+
+`validate-chain` đọc `state.json.chain`, `state.json.steps` và `request.json` của từng nhánh, và từ
+chối chuỗi nào có một bậc chứa operator mà không bảng Kế tiếp nào của bậc trước cho phép, một nhánh
+đòi Đầu vào không bậc nào trước sinh ra hay một vai không bind nào trước bind, một bậc vượt trần song
+song hay có hai bên ghi cùng một alias, một bề mặt đã áp tới `git.publish` mà thiếu audit và đi thử
+ở giữa, có gì chạy sau publish hay deploy, hay một nhánh trên nhiệm vụ không nêu goal. Danh sách đầy
+đủ nằm trong `workflows/README.vi.md`, và `validate-session` chạy cổng này trên cả sổ sau mỗi
+transition.
+
+## Vẽ lại
+
+Chuỗi được vẽ một lần trước lần dispatch đầu tiên, và vẽ lại ở mỗi lần dừng làm đổi thứ nhiệm vụ cần:
+một nhánh `blocked` mà route của nó thêm operator, một plan đã biết số đơn vị, một goal được sửa. Mỗi
+lần vẽ lại là một transition `replanned` trong `state.json.transitions` mang ghi chú và phiên bản goal
+nó chuyển tới — được xác nhận như kế hoạch đầu, không bao giờ là một lần ghi đè im lặng.
+
+## Các fixture
+
+Mười một chuỗi ví dụ mà 1.x từng để dưới `workflows/` sống tiếp làm fixture của planner trong
+`tests/chains/`, viết lại theo id operator hiện tại. `scripts/plan-chain.spec.mjs` suy từng chuỗi từ
+nhiệm vụ nó mang và chứng minh kết quả qua được cổng: bằng chứng rằng planner vẫn tới được những hình
+dạng người ta từng dùng, chứ không phải những hình dạng để cửa vào chọn.

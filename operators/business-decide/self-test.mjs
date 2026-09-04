@@ -1,6 +1,7 @@
-// Proves validate.mjs on a synthetic session branch: one conforming publication of a first head under
-// mode model, one reconcile pass against delivered source, one branch blocked on a terminate code, and
-// one mutation per law, each of which must fail with a line that names the defect.
+// Proves validate.mjs on a synthetic session branch: one conforming publication of a first head, the
+// restatement gate in both directions, one branch blocked on a terminate code, and one mutation per
+// law, each of which must fail with a line that names the defect. Reconciliation against delivered
+// source is business.reconcile's and is proved there.
 import assert from 'node:assert/strict';
 import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -124,15 +125,15 @@ ${findingRows}${findingRows ? '\n' : ''}`;
 
 // `choice` turns the request into a re-entry of the blocked restatement branch 1/1 that answers
 // restatement:<feature> with the given option; the branch then lives at step 2.
-const requestJson = ({ mode = 'model', targetState = 'pending', inputs = {}, extra = {}, choice = null, step = choice ? 2 : 1 } = {}) => ({
+const requestJson = ({ targetState = 'pending', inputs = {}, extra = {}, choice = null, step = choice ? 2 : 1 } = {}) => ({
   schemaVersion: 9, operatorId: 'business.decide', step, parallel: 1, sessionId: 's-test',
   ...(choice ? { decisionId: RESTATEMENT_ID, selectedOption: choice } : {}),
   contexts: [{ alias: '@workspaces/be', head }, { alias: '@worktrees/businesses/paid-access', head: null }],
-  requirements: { featureId: FEATURE, mode, targetState, dimensions: DIMENSIONS, approval: null, resume: choice ? 't-1' : null, ...extra },
+  requirements: { featureId: FEATURE, targetState, dimensions: DIMENSIONS, approval: null, resume: choice ? 't-1' : null, ...extra },
   inputs, resume: choice ? { step: 1, parallel: 1, token: 't-1' } : null,
 });
 const ALL_FIELDS = { 'business-promise-authority': 'response/response.md', claims: 'response/data/claims.json', 'coverage-matrix': 'response/data/coverage-matrix.json', model: 'response/data/model.json' };
-function responseJson({ status = 'done', stop, fallbacks = [], fields = null, next = ['backend.source.apply'], step = 1 } = {}) {
+function responseJson({ status = 'done', stop, fallbacks = [], fields = null, next = ['backend.generate'], step = 1 } = {}) {
   return {
     schemaVersion: 9, operatorId: 'business.decide', step, parallel: 1, status, ...(stop ? { stop } : {}), fallbacks,
     fields: fields ?? ALL_FIELDS,
@@ -219,19 +220,7 @@ const reentry = ({ selected = 'as-stated', promise = PROMISE, blockedPromise = P
   session: { 'step-1/parallel-1/request/request.json': requestJson({ extra: { promise: blockedPromise } }) },
 }];
 
-const RECONCILE_FIELDS = { 'business-promise-authority': 'response/response.md', claims: 'response/data/claims.json', model: 'response/data/model.json' };
-const reconciled = (overrides = {}) => ({
-  ...baseline(),
-  'request/request.json': requestJson({ mode: 'reconcile', targetState: 'implemented', inputs: { 'backend-source-application': DELIVERED } }),
-  'response/response.json': responseJson({ fields: RECONCILE_FIELDS }),
-  'response/response.md': responseMd({ mode: 'reconcile', state: 'implemented', transition: 'in-progress->implemented', previousHead: `\`${ROOT_REF}/features/${FEATURE}\``, previousState: 'in-progress', coverage: coverageFingerprint, dispositions: [], reconciliation: [['entitlement-consumer', '`src/course/guard.ts`', '—']] }),
-  'response/data/coverage-matrix.json': null,
-  'response/data/model.json': modelDoc({ mode: 'reconcile', state: 'implemented', transition: 'in-progress->implemented', previousHeadRef: `${ROOT_REF}/features/${FEATURE}`, previousState: 'in-progress', reconciliation: { deliveredEvidenceRefs: ['src/course/guard.ts'], discrepancies: [] } }),
-  ...overrides,
-});
-
-await expectValid(baseline(), 'a first publication of one feature head under mode model, reusing the previous head\'s promise and owing no restatement');
-await expectValid(reconciled(), 'a reconcile pass against delivered source');
+await expectValid(baseline(), 'a first publication of one feature head, reusing the previous head\'s promise and owing no restatement');
 await expectValid(firstRunBlocked(), 'a first run restates the supplied promise and holds for the person');
 await expectValid(reentry(), 'a re-entry carrying the recorded as-stated choice proceeds to a done head that still carries the restatement');
 await expectValid(reentry({ selected: 'corrected', promise: 'a paying learner reads every course in the plan for one year' }), 'a re-entry carrying the recorded corrected choice with a changed promise');
@@ -241,9 +230,8 @@ await expectError({ ...baseline(), 'response/response.json': { ...responseJson()
 await expectError({ ...baseline(), 'response/response.json': responseJson({ status: 'blocked', stop: 'MADE_UP_CODE', fields: {}, next: [] }), 'response/response.md': null, 'response/data/claims.json': null, 'response/data/coverage-matrix.json': null, 'response/data/model.json': null }, 'not a registered code', 'unknown stop code');
 await expectError({ ...baseline(), 'response/response.json': responseJson({ fallbacks: ['COVERAGE_INCOMPLETE'] }) }, 'has disposition terminate under these requirements; it cannot be taken as a fallback', 'fallback on a terminate code');
 await expectError({ ...baseline(), 'response/response.json': responseJson({ status: 'blocked', stop: 'CONSUMER_UNPROVEN', next: [] }) }, 'a blocked branch cannot freeze a coverage matrix', 'blocked while freezing the matrix');
-await expectError({ ...baseline(), 'request/request.json': requestJson({ mode: 'reconcile', targetState: 'implemented' }) }, 'input backend-source-application is required', 'reconcile with no delivered source');
-await expectError({ ...baseline(), 'request/request.json': requestJson({ inputs: { 'backend-source-application': DELIVERED } }) }, 'input backend-source-application is refused', 'model mode reading delivered source');
-await expectError(reconciled({ 'response/response.json': responseJson({ fields: { ...RECONCILE_FIELDS, 'coverage-matrix': 'response/data/coverage-matrix.json' } }), 'response/data/coverage-matrix.json': coverageMatrix() }), 'may not freeze a new coverage matrix', 'reconcile freezing a matrix');
+await expectError({ ...baseline(), 'request/request.json': requestJson({ extra: { mode: 'reconcile' } }) }, 'requirements.mode is not a field', 'the retired mode field');
+await expectError({ ...baseline(), 'request/request.json': requestJson({ inputs: { 'backend-source-application': DELIVERED } }) }, 'is not an Input business.decide declares', 'delivered source handed to the operator that models');
 await expectError({ ...baseline(), 'request/request.json': requestJson({ extra: { mystery: 1 } }) }, 'requirements.mystery is not a field', 'undeclared requirement');
 await expectError({ ...baseline(), 'request/request.json': requestJson({ extra: { featureId: '' } }) }, 'required field featureId has no value', 'missing required featureId');
 await expectError({ ...baseline(), 'response/data/model.json': modelDoc({ headRef: `${ROOT_REF}/features/starci/${FEATURE}` }) }, 'no project segment below the businesses root', 'a project segment below the businesses root');
@@ -252,8 +240,10 @@ await expectError({ ...baseline(), 'response/data/model.json': modelDoc({ covera
 await expectError({ ...baseline(), 'response/response.md': responseMd({ coverage: `sha256:${'e'.repeat(64)}` }) }, 'must equal the coverage matrix fingerprint', 'response and matrix disagree on the fingerprint');
 await expectError({ ...baseline(), 'response/data/model.json': modelDoc({ transition: 'pending->in-progress' }) }, 'contradicts previous state null', 'transition contradicts the previous state');
 await expectError({ ...baseline(), 'response/data/model.json': modelDoc({ previousHeadRef: `${ROOT_REF}/features/${FEATURE}` }) }, 'a first publication cannot name a previous head', 'first publication with lineage');
-await expectError({ ...baseline(), 'request/request.json': requestJson({ targetState: 'implemented' }), 'response/data/model.json': modelDoc({ state: 'implemented', transition: 'in-progress->implemented', previousHeadRef: `${ROOT_REF}/features/${FEATURE}`, previousState: 'in-progress' }), 'response/response.md': responseMd({ state: 'implemented', transition: 'in-progress->implemented', previousHead: `\`${ROOT_REF}/features/${FEATURE}\``, previousState: 'in-progress' }) }, 'an implemented head requires reconciliation against delivered source', 'implemented without reconciliation');
-await expectError(reconciled({ 'response/data/model.json': modelDoc({ mode: 'reconcile', state: 'implemented', transition: 'in-progress->implemented', previousHeadRef: `${ROOT_REF}/features/${FEATURE}`, previousState: 'in-progress', reconciliation: { deliveredEvidenceRefs: ['src/settlement.ts'], discrepancies: [{ dimension: 'settlement', statement: 'the webhook still writes the legacy row' }] } }) }), 'reconciliation discrepancy or discrepancies remain', 'reconcile published with a discrepancy');
+await expectError({ ...baseline(), 'request/request.json': requestJson({ targetState: 'implemented' }), 'response/data/model.json': modelDoc({ state: 'implemented', transition: 'in-progress->implemented', previousHeadRef: `${ROOT_REF}/features/${FEATURE}`, previousState: 'in-progress' }), 'response/response.md': responseMd({ state: 'implemented', transition: 'in-progress->implemented', previousHead: `\`${ROOT_REF}/features/${FEATURE}\``, previousState: 'in-progress' }) }, 'implemented is published by business.reconcile', 'implemented published on the strength of a plan');
+await expectError({ ...baseline(), 'response/data/model.json': modelDoc({ reconciliation: { deliveredEvidenceRefs: ['src/settlement.ts'], discrepancies: [] } }) }, 'modelling reconciles nothing, so reconciliation must be null', 'a modelled head that claims a reconciliation');
+await expectError({ ...baseline(), 'response/response.md': responseMd({ reconciliation: [['entitlement-consumer', '`src/course/guard.ts`', '—']] }) }, 'Reconciliation carries no rows', 'a modelling receipt with a reconciliation table');
+await expectError({ ...baseline(), 'response/response.md': responseMd({ mode: 'reconcile' }) }, 'is not model', 'a modelling receipt signed as a reconciliation');
 await expectError({ ...baseline(), 'response/data/coverage-matrix.json': withRow('denial', { disposition: 'not-applicable', enforcementOwner: null, sourceRef: null, positiveProofRef: null, negativeProofRef: null, claimIds: [] }), 'response/response.md': responseMd({ dispositions: DISPOSITIONS.map(([d, p]) => (d === 'denial' ? [d, 'not-applicable'] : [d, p])) }) }, 'is mandatory for a published promise and cannot be marked not-applicable', 'mandatory dimension not applicable');
 await expectError({ ...baseline(), 'response/data/coverage-matrix.json': withRow('renewal', { disposition: 'not-applicable', deferralRef: null }), 'response/response.md': responseMd({ dispositions: DISPOSITIONS.map(([d, p]) => (d === 'renewal' ? [d, 'not-applicable'] : [d, p])) }) }, 'was discovered in the source and cannot be marked not-applicable', 'discovered lifecycle branch not applicable');
 await expectError({ ...baseline(), 'response/data/coverage-matrix.json': withRow('settlement', { negativeProofRef: null }) }, 'has no negative proof', 'preserve without a negative proof');
@@ -290,4 +280,4 @@ await expectError(reentry({ selected: 'corrected' }), 'carries the same promise 
 await expectError(reentry({ selected: 'as-stated', promise: 'a paying learner reads every course in the plan for one year' }), 'differs from the blocked branch', 'as-stated with the promise changed');
 await expectError(reentry({ response: { ...responseJson({ step: 2, status: 'blocked', stop: 'RESTATEMENT_UNCONFIRMED', fields: { restatement: 'response/restatement.md' }, next: [] }), interaction: restatementQuestion() } }), 'does not ask again', 'a re-entry asking the recorded question again');
 
-process.stdout.write('business.decide self-test: 6 valid branches, 47 rejected mutations\n');
+process.stdout.write('business.decide self-test: 5 valid branches, 48 rejected mutations\n');

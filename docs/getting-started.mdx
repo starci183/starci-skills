@@ -1,6 +1,6 @@
 ---
 title: "Getting started"
-description: "How one mission runs: workspace.bind, a workflow match or a composed chain, request.json, the branch layout, the validators, stop codes and resume."
+description: "How one mission runs: workspace.bind, the chain planned from the mission, request.json, the branch layout, the validators, stop codes and resume."
 ---
 
 # How a mission runs
@@ -22,15 +22,16 @@ checkout, and a similar directory name is never route authority. It returns one 
 a verified checkout identity, its exact source head, and the closed runtime binding the mission may
 consume. See [`workspace.bind`](/reference/operators/workspace-bind).
 
-## 3. Match a workflow, or compose one
+## 3. Plan the chain
 
-The entry reads the `when` of every example in `workflows/`. A match is run as written and its
-presets fill `request.json`; the person is asked only for fields with no default. No match means
-composing a chain from the operators' `## Next` tables, under the rules
-`scripts/validate-workflows.mjs` enforces on the examples: every required input of a branch is
-produced by an earlier step, branches of one step share no write alias, a loop goes back to an
-earlier step and carries `maxRounds`, and the chain ends at `git.publish`, `release.deploy`, or
-`user`. A composed chain worth keeping becomes a new example.
+Nothing is looked up. The person confirms the mission goal — what it includes, what it excludes, and
+the "done when" lines that end it — and `scripts/plan-chain.mjs` derives the chain from those lines
+through the operators' `## Inputs`, `## Context` and `## Next` tables: every required input produced
+by an earlier step, every role bound, the audit and the walk between an applied surface and its
+publish, a `<domain>.plan` before an operator that several lines name so its units fan out one blind
+agent each, at most three branches a step. The plan is printed as two lines per branch, and
+`scripts/validate-chain.mjs` accepts it before step 4 begins; an ambiguity in the tables is a refusal
+that names it, not a guess. See [Chain](/concepts/chain).
 
 ## 4. One agent, one operator
 
@@ -86,7 +87,7 @@ request/request.json -> validate-request.mjs -> agent writes response/ -> valida
 `validate.mjs` checks what only that operator can check. Only then does routing look at
 `response.json`:
 
-- `done` advances the chain to the next step the workflow names;
+- `done` advances the chain to the next step the plan names;
 - `waiting` runs the nested exchange the response awaits, then resumes the same agent while sibling
   branches keep running;
 - `blocked` reads `stop`.
@@ -116,7 +117,7 @@ rather than trying again."
 ## 10. The runtime a session is audited against
 
 Nothing above needs a running product until a surface has to be looked at or a journey walked. When
-one does, the runtime is not started by the operator that needs it: `platform.operate` owns it, and
+one does, the runtime is not started by the operator that needs it: `runtime.serve` owns it, and
 it climbs one ladder, one rung per invocation, each rung attested before the next is attempted.
 
 | Rung | What it does |
@@ -145,15 +146,16 @@ and told where it stands, rather than given a second server on another port.
 `uat.verify` drives a real product as a real person, and it is the one proof that cannot be inferred
 from anything else, so it is worth saying plainly when it runs and when its absence is honest.
 
-It runs only in a workflow that carries a `uat.verify` step — after this round, every example that
-writes frontend source under `mode: apply`: `frontend-refine`, `frontend-reconstruct`,
-`frontend-new-surface`, `frontend-with-uat` and `full-feature`. `backend-feature` writes no surface
-and its `when` says so; `release` and `content-unit` publish no surface either.
+It runs whenever the mission's "done when" names it, and the planner adds it on its own to every
+chain that writes frontend source under `mode: apply` and reaches `git.publish`: the long-flow law.
+A mission with several journeys runs `uat.plan` first, which names one flow per journey, and then
+`uat.verify` once per flow, at most three at a time. A backend-only mission owes no walk, and says so
+by naming no surface.
 
 Inside such a chain, exactly two things must come from outside it:
 
-- a person who asked, by name — `requestedBy`, `feature` and `flow` have no defaults and the workflow
-  declares them under `asks`, so the branch refuses rather than inventing a requester;
+- a person who asked, by name — `requestedBy`, `feature` and `flow` have no defaults, so the entry
+  takes them from the confirmed mission and the branch refuses rather than inventing a requester;
 - both admissions taken at the pinned commit — the `frontend-surface-audit` and the
   `quality-verification` — plus the `route` receipt whose endpoint the run drives.
 
@@ -163,7 +165,7 @@ of that stops anything:
 
 - the flow document and the seed are drafted from the shipped template and named in the receipt as
   drafts, because a drafted flow is honest and an absent flow would have been a stop;
-- the account is provisioned by `platform.operate` against the identity the runtime registry declares
+- the account is provisioned by `identity.provision` against the identity the runtime registry declares
   for the bound route, its password set from the sealed shared credential resolved by name. A flow
   names its actors by alias and every alias gets its own dedicated account, per environment, in
   `accounts.<env>.json`. `IDENTITY_MISSING` is the hand-off that asks for this, not a verdict;

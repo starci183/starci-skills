@@ -3,9 +3,8 @@
 // does; the hydrated route belongs to this Source and to the requested project and role; the observed
 // checkout is the one the route resolved to; mutation is ready only on the mutation branch and a
 // forbidden worktree policy binds nowhere else; the businesses root is derived from the checkout, never
-// typed; a consumed runtime is ready, owned by someone else, bound to this project, and reachable only
-// through distinct origin-only localhost projections, and only when runtimeNeed asked for one; no hint
-// survives the gate; and a blocked branch records neither a hydration nor a consumed runtime.
+// typed; the route binds no runtime, because the runtime owner serves and binds the entry a caller
+// consumes; no hint survives the gate; and a blocked branch records no hydration.
 import { existsSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
 import path from 'node:path';
@@ -16,8 +15,6 @@ import { tableUnder } from '../../scripts/validate-response.mjs';
 import { validateWorkspaceCheckoutBinding } from '../../scripts/workspace-checkout.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
-// Only an origin-only localhost URL is an endpoint. 127.0.0.1, a host, or a path is not.
-const LOCAL_ORIGIN = /^http:\/\/localhost:([1-9][0-9]{0,4})$/;
 const empty = (v) => v === undefined || v === null || v === '' || v === '—';
 const fields = (rows) => Object.fromEntries((rows ?? []).map(([k, v]) => [k, v]));
 // Route paths arrive from two files written on different machines, so they are compared as normalised
@@ -70,38 +67,9 @@ export async function validateWorkspaceStep(branchDir, root = ROOT) {
     if (gitPolicy.worktreeBranches === 'session-only' && checkout.branch !== gitPolicy.mutationBranch && !/^session\//.test(checkout.branch)) errors.push(`response/data/route.json: a session-only worktree policy binds only on ${gitPolicy.mutationBranch} or on a session/<sessionId> branch, not on ${checkout.branch}`);
     if (gitPolicy.worktreeBranches === 'forbidden' && checkout.branch !== gitPolicy.mutationBranch) errors.push('response/data/route.json: a forbidden worktree policy cannot bind a route on another branch');
 
-    if (runtime !== null) {
-      // A consumer may run only against a ready owner generation. A port that merely listens, a starting
-      // owner, or a degraded one is evidence to report, not a runtime to use.
-      if ((requirements.runtimeNeed ?? 'none') === 'none') errors.push('response/data/route.json: runtimeNeed is none, so step 5 never ran and no runtime may be bound');
-      if (runtime.status !== 'ready') errors.push(`response/data/route.json: a route cannot bind a ${runtime.status} runtime owner for consumption`);
-      // The registry holds one entry per project route. A binding reads the entry of its own route, so
-      // a route is never reported not ready because a sibling route's entry was the one consulted.
-      if (runtime.registryEntryKey !== `${route.project}/${route.role}`) errors.push(`response/data/route.json: the binding consumed registry entry ${runtime.registryEntryKey}, and this route is ${route.project}/${route.role}`);
-      if (runtime.endpointBinding.project !== route.project) errors.push('response/data/route.json: the endpoint binding belongs to another project than the bound route');
-      // One integration branch carries the work of several sessions, so the served head is almost
-      // never this route's head. What a binding must establish is that its own head is inside it.
-      const served = runtime.served;
-      if (!served.contains.includes(route.sourceHead)) errors.push(`response/data/route.json: the served head ${served.head} does not contain this route's head ${route.sourceHead}, so the running surface carries other work and not this`);
-      const serviceOfRole = { fe: 'frontend', be: 'api' }[route.role];
-      if (serviceOfRole) {
-        const expected = `http://localhost:${served.port}`;
-        if (runtime.endpoints[serviceOfRole] !== expected) errors.push(`response/data/route.json: the ${serviceOfRole} endpoint is ${runtime.endpoints[serviceOfRole]} and the entry serves this route on ${expected}`);
-      }
-      const services = Object.values(runtime.endpointBinding.services);
-      if (new Set(services).size !== services.length) errors.push('response/data/route.json: endpoint binding service keys must be distinct');
-      const ports = [];
-      for (const [role, endpoint] of Object.entries(runtime.endpoints)) {
-        const match = LOCAL_ORIGIN.exec(endpoint);
-        if (match === null) { errors.push(`response/data/route.json: the ${role} endpoint ${endpoint} is not an origin-only localhost projection`); continue; }
-        const port = Number(match[1]);
-        if (port > 65535) errors.push(`response/data/route.json: the ${role} endpoint port exceeds 65535`);
-        ports.push(port);
-      }
-      if (new Set(ports).size !== ports.length) errors.push('response/data/route.json: the frontend, api, and identity endpoints must resolve to distinct ports');
-    } else if (requirements.runtimeNeed === 'consume' && response.status === 'done') {
-      errors.push('response/data/route.json: a caller that consumes the shared runtime must bind the runtime owner');
-    }
+    // The route binds no runtime: the runtime owner serves and binds the entry a caller consumes, so a
+    // receipt that carries one has consumed a shared resource on its own initiative.
+    if (runtime !== null && runtime !== undefined) errors.push('response/data/route.json: the route carries a runtime binding; workspace.bind binds a checkout and a head, and the runtime owner binds the entry a caller consumes');
   }
 
   if (present.has('workspace-route-binding') && has('response/response.md')) {
@@ -142,19 +110,8 @@ export async function validateWorkspaceStep(branchDir, root = ROOT) {
       if (route.gitPolicy.worktreeBranches === 'forbidden' && !findingKeys.has(`WORKTREE_BRANCH_FORBIDDEN|${route.gitPolicy.mutationBranch}`)) errors.push('response/response.md: a forbidden worktree policy must be recorded on the bound route');
       if (route.gitPolicy.worktreeBranches === 'session-only' && !findingKeys.has(`WORKTREE_BRANCH_SESSION_ONLY|${route.gitPolicy.mutationBranch}`)) errors.push('response/response.md: a session-only worktree policy must be recorded on the bound route');
       if (route.provenanceHeadRef !== null && !findingKeys.has(`PROVENANCE_HEAD_BOUND|${route.provenanceHeadRef}`)) errors.push('response/response.md: a bound provenance head must be recorded');
-      if (route.runtime !== null) {
-        if (!findingKeys.has(`RUNTIME_CONSUMED_NOT_OWNED|${route.runtime.ownerTaskId}`)) errors.push('response/response.md: a consumed runtime must record that the caller does not own it');
-        if (runtimeRows['Owner task'] !== route.runtime.ownerTaskId) errors.push('response/response.md: Owner task differs from the route binding');
-        if (runtimeRows.Status !== route.runtime.status) errors.push('response/response.md: Runtime status differs from the route binding');
-        if (runtimeRows['Consumer role'] !== 'consumer') errors.push('response/response.md: the caller consumes the runtime and never owns it');
-        // The two heads are printed side by side, because ancestry a reader cannot see is a claim.
-        if (runtimeRows['Served branch'] !== route.runtime.served.branch) errors.push('response/response.md: Served branch differs from the route binding');
-        if (runtimeRows['Served head'] !== route.runtime.served.head) errors.push('response/response.md: Served head differs from the route binding');
-        if (!findingKeys.has(`RUNTIME_HEAD_CONTAINS_BOUND_COMMIT|${route.sourceHead}`)) errors.push('response/response.md: a consumed runtime must record that the served head contains the head this route bound');
-        for (const [label, key] of [['Frontend', 'frontend'], ['Api', 'api'], ['Identity', 'identity']]) {
-          if (runtimeRows[label] !== route.runtime.endpoints[key]) errors.push(`response/response.md: the ${key} endpoint differs from the route binding`);
-        }
-      } else if (Object.keys(runtimeRows).length) errors.push('response/response.md: the Runtime section carries rows but no runtime was bound');
+      if (Object.keys(runtimeRows).length) errors.push('response/response.md: the Runtime section carries rows; the route binds no runtime');
+      for (const key of findingKeys) if (key.startsWith('RUNTIME_')) errors.push(`response/response.md: finding ${key.split('|')[0]} records a runtime this route never bound`);
     }
 
     // Hints are refused at the gate, so no finding may record one as if it had been weighed.

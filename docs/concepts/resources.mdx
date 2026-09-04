@@ -98,7 +98,7 @@ modes exist:
 | Mode | Where | What it means |
 | --- | --- | --- |
 | absent | Every operator not listed below | The operator produces no artwork at all |
-| `judged` | `frontend.direction.decide`, `frontend.source.apply` | The operator decides for itself, from the direction, whether a region reads empty enough to need artwork, records why, and never decorates |
+| `judged` | `interface.generate` | The operator decides for itself, from the direction, whether a region reads empty enough to need artwork, records why, and never decorates |
 | `required` | `content.generate` | Artwork is a step of the job: made to a stated claim and inspected for fidelity to it |
 
 Where the runtime cannot make artwork, a `judged` step records that none could be made and the branch
@@ -133,7 +133,7 @@ agent, with its own `request/` and `response/` inside the branch.
 
 At most three agents run at once, and branches of one step run concurrently only when their writes
 touch no common alias. Two agents may read one checkout; only one may hold it for writing.
-`business.decide` is exclusive per businesses root, `platform.operate` per runtime owner.
+`business.decide` is exclusive per businesses root, `runtime.serve` per runtime owner.
 
 ## Profile equivalents
 
@@ -145,7 +145,6 @@ cross runtimes:
 | Bound profile | Equivalent |
 | --- | --- |
 | `sol-fresh` | `opus` |
-| `luna` | `sonnet` |
 | `sol-reviewer` | `fable` |
 
 The equivalent runs with the tools the operator declares that its own profile permits and its runtime

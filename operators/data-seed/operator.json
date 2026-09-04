@@ -1,0 +1,23 @@
+{
+  "schemaVersion": 9,
+  "id": "data.seed",
+  "domain": "data",
+  "job": "Place one flow's seed in the environment's store from the flow document, every row attributable to the flow by account ownership or prefix, at the representative volume the flow declares, and list exactly what undoes it; or remove that rollback set and nothing else.",
+  "package": "operator.md",
+  "errors": "errors.json",
+  "validator": "validate.mjs",
+  "selfTest": "self-test.mjs",
+  "resources": {
+    "profile": "sol-fresh",
+    "grammarBound": false,
+    "mode": "inline",
+    "tools": {
+      "@tools/fileread": "context-aliases",
+      "@tools/sourcewrite": "declared-write-set",
+      "@tools/secrets": "resolve-by-name",
+      "@tools/http": "probe",
+      "@tools/database": "namespaced-write"
+    }
+  },
+  "primaryOutput": "seed-receipt"
+}

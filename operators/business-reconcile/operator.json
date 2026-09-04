@@ -1,0 +1,21 @@
+{
+  "schemaVersion": 9,
+  "id": "business.reconcile",
+  "domain": "business",
+  "job": "Compare one published business promise, dimension by dimension of its frozen coverage matrix, against the source that was actually delivered, and republish the head with the reconciliation it now carries or stop on the first discrepancy that stands.",
+  "package": "operator.md",
+  "errors": "errors.json",
+  "validator": "validate.mjs",
+  "selfTest": "self-test.mjs",
+  "resources": {
+    "profile": "sol-fresh",
+    "grammarBound": false,
+    "mode": "isolated",
+    "tools": {
+      "@tools/fileread": "context-aliases",
+      "@tools/sourcewrite": "declared-write-set",
+      "@tools/git": "read"
+    }
+  },
+  "primaryOutput": "business-reconciliation"
+}

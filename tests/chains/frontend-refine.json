@@ -1,0 +1,71 @@
+{
+  "schemaVersion": 1,
+  "id": "frontend-refine",
+  "when": {
+    "en": "The approved structure of a surface stays; only typography, spacing, labels, controls, states, tokens or Grammar conformance inside it are repaired.",
+    "vi": "Cấu trúc đã duyệt của bề mặt giữ nguyên; chỉ sửa typography, spacing, label, control, state, token hay conformance Grammar bên trong."
+  },
+  "mission": {
+    "goal": "a surface is repaired inside its approved structure, proven and published",
+    "doneWhen": [
+      {
+        "evidence": "the surface is committed on the session branch",
+        "producedBy": "interface.generate"
+      },
+      {
+        "evidence": "the committed head is served on the product port",
+        "producedBy": "runtime.serve"
+      },
+      {
+        "evidence": "the served surface passes the audit with its screenshots kept",
+        "producedBy": "interface.audit"
+      },
+      {
+        "evidence": "a person's journey completes on the served surface",
+        "producedBy": "uat.verify"
+      },
+      {
+        "evidence": "the session branch is merged and pushed",
+        "producedBy": "git.publish"
+      }
+    ]
+  },
+  "options": {
+    "requirements": {
+      "interface.generate": {
+        "intent": "audit-repair",
+        "changeLevel": "refine",
+        "mode": "apply"
+      }
+    }
+  },
+  "example": [
+    [
+      "environment.preflight"
+    ],
+    [
+      "workspace.bind#be",
+      "workspace.bind#fe"
+    ],
+    [
+      "interface.generate"
+    ],
+    [
+      "runtime.serve"
+    ],
+    [
+      "interface.audit"
+    ],
+    [
+      "quality.verify"
+    ],
+    [
+      "uat.verify"
+    ],
+    [
+      "git.publish"
+    ]
+  ],
+  "ends": "git.publish",
+  "rewrite": "frontend trio → interface.generate (changeLevel refine); post-write bind → runtime.serve; frontend.surface.audit → interface.audit."
+}

@@ -32,7 +32,6 @@ It reads the tree at build time and produces:
 | Page | Source |
 | --- | --- |
 | `reference/operators/<id>` | `operators/<id>/operator.md` (+ `.vi.md`) and `operator.json` |
-| `reference/workflows/<id>` | `workflows/<id>.json` |
 | `reference/kinds` | `templates/kinds/*.contract.json` and `*.schema.json` |
 | `reference/alias` | `alias/INDEX.md` (+ `.vi.md`) |
 | `reference/stop-codes` | the Stop codes section of `operators/INDEX.md` (+ `.vi.md`) |

@@ -143,6 +143,23 @@
       "type": "string",
       "pattern": "^[a-z][a-z-]*$",
       "description": "The profile that actually ran the branch"
+    },
+    "goalCheck": {
+      "description": "The agent's own check against the branch goal (request.json.goal.doneWhen): whether the done-when line is now evidenced, and by which of this response's declared files. Required on a done response whose request carried goal.doneWhen; every evidence path is one the fields list and exists on disk; achieved true needs at least one (scripts/validate-response.mjs#goalCheckErrors). Only a validator-accepted goalCheck reaches state.json.brief.proven.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["achieved", "evidence"],
+      "properties": {
+        "achieved": { "type": "boolean" },
+        "evidence": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "pattern": "^(?:[a-z][a-z-]*/)?response/(?:(?:[a-z][a-z-]*/)*[A-Za-z0-9_.-]+\\.md|data/[A-Za-z0-9_./-]+\\.json|artifacts/[A-Za-z0-9_./-]+)$"
+          }
+        }
+      }
     }
   },
   "allOf": [

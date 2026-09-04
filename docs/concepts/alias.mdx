@@ -33,10 +33,10 @@ binding; a digest is." `@remote/npm` binds by version, because "latest never is.
 
 ## Writers
 
-Each alias names who may write it. Only `frontend.source.apply` writes `@workspaces/fe`, only
-`backend.source.apply` writes `@workspaces/be`, only `business.decide` writes
+Each alias names who may write it. Only `interface.generate` and `interface.fix` write `@workspaces/fe`, only
+`backend.generate` writes `@workspaces/be`, only `business.decide` writes
 `@worktrees/businesses`, only `uat.verify` writes `@worktrees/uat`. This is the same fact the
-workflow rule leans on when it forbids two branches of one step from sharing a write alias.
+chain gate leans on when it forbids two branches of one step from sharing a write alias.
 
 ## Friendly segments
 

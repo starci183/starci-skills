@@ -1,6 +1,6 @@
 # content.generate — brief
 
-Read operator.md at your step; write only response/ of your branch; replace the running response.json skeleton before you exit; * marks a fallback stop.
+Read operator.md at your step; write only response/ of your branch; replace the running response.json skeleton before you exit; * marks a fallback stop. You see only what request.json names; nothing else exists.
 
 ## Job
 
@@ -9,6 +9,8 @@ Generate or refactor one educational content unit in one linear pass: a teacher 
 ## Done when
 
 Done when the `content-brief` was frozen before any edition, every declared language has an `article` covering the whole published outcome set, every declared `track` was built and checked by its declared command with a zero exit code recorded in `e2e`, an `image` exists only when its stage was on and then with its `image-prompt` beside it, and an independent `content-review` written without the producer's rationale approves the unit with every applicable score at or above the published minimum and no open error finding, as the `content-generation-receipt` states.
+
+Primary output: `content-generation-receipt`
 
 ## Inputs
 

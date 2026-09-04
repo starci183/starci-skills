@@ -1,8 +1,8 @@
-// business.decide's own law over one branch, on top of the shared step check: the mode decides which
-// half ran, and a reconcile branch binds the delivered source it reconciles against; the head is
-// exactly one feature directory below the businesses root; the model, the response and the frozen
-// matrix are the same decision read three ways; the lineage transition is legal and agrees with both
-// states; an implemented head reconciles against delivered source with no discrepancy; the matrix
+// business.decide's own law over one branch, on top of the shared step check: the branch models and
+// never reconciles, so delivered source and an implemented state are refused here and belong to
+// business.reconcile; the head is exactly one feature directory below the businesses root; the model,
+// the response and the frozen matrix are the same decision read three ways; the lineage transition is
+// legal and agrees with both states; the matrix
 // carries exactly one row per declared dimension and no other; a mandatory dimension and a discovered
 // lifecycle branch are never not-applicable; each disposition carries the substance it owes and no
 // more; every enforcing row rests on a fact claim from claims.json; every discovered consumer is
@@ -105,30 +105,19 @@ export async function validateBusinessStep(branchDir, root = ROOT) {
   if (!response || response.operatorId !== 'business.decide') return { errors };
   const has = (f) => existsSync(path.join(branchDir, f));
   const read = (f) => readFile(path.join(branchDir, f), 'utf8');
-  const mode = requirements.mode ?? 'model';
   const inputs = request?.inputs ?? {};
 
-  // The promise is restated before it is modelled: owed whenever this request supplied one under mode model.
-  errors.push(...await restatementErrors({ branchDir, request, response, requirements, present, field: 'promise', id: String(requirements.featureId ?? ''), owed: mode === 'model' && !empty(requirements.promise) }));
+  // The promise is restated before it is modelled: owed whenever this request supplied one.
+  errors.push(...await restatementErrors({ branchDir, request, response, requirements, present, field: 'promise', id: String(requirements.featureId ?? ''), owed: !empty(requirements.promise) }));
 
-  // The Inputs table cannot say "required under one mode", so the mode says it here.
-  if (mode === 'reconcile' && empty(inputs['backend-source-application'])) {
-    errors.push('request.json: mode reconcile reconciles against delivered source, so input backend-source-application is required');
-  }
-  if (mode === 'model' && !empty(inputs['backend-source-application'])) {
-    errors.push('request.json: mode model models the promise and reads no delivered source, so input backend-source-application is refused');
-  }
+  // This operator models; the delivered source and the implemented state belong to business.reconcile.
+  if (!empty(inputs['backend-source-application'])) errors.push('request.json: business.decide models the promise and reads no delivered source; input backend-source-application belongs to business.reconcile');
+  if (requirements.targetState === 'implemented') errors.push('request.json: targetState implemented is published by business.reconcile after the delivered source is compared with the frozen matrix, never by the operator that modelled the promise');
 
   // A blocked branch publishes no head and freezes no coverage fingerprint.
   if (response.status === 'blocked') {
     if (present.has('coverage-matrix')) errors.push('response/response.json: a blocked branch cannot freeze a coverage matrix');
     if (present.has('model')) errors.push('response/response.json: a blocked branch cannot publish a head');
-  }
-  if (response.status === 'done' && mode === 'model' && !present.has('coverage-matrix')) {
-    errors.push('response/response.json: mode model freezes the coverage matrix, so coverage-matrix must be in fields');
-  }
-  if (mode === 'reconcile' && present.has('coverage-matrix')) {
-    errors.push('response/response.json: mode reconcile models nothing, so it may not freeze a new coverage matrix');
   }
 
   const declaredDimensions = Array.isArray(requirements.dimensions) ? requirements.dimensions : [];
@@ -239,7 +228,7 @@ export async function validateBusinessStep(branchDir, root = ROOT) {
   }
   if (model) {
     if (!empty(requirements.featureId) && model.featureId !== requirements.featureId) errors.push(`response/data/model.json: featureId ${model.featureId} differs from the request's ${requirements.featureId}`);
-    if (model.mode !== mode) errors.push(`response/data/model.json: mode ${model.mode} differs from the request's ${mode}`);
+    if (model.mode !== 'model') errors.push(`response/data/model.json: mode ${model.mode} is not model; this operator models the promise and business.reconcile reconciles it`);
     if (!empty(requirements.targetState) && model.state !== requirements.targetState) errors.push(`response/data/model.json: state ${model.state} differs from the request's target ${requirements.targetState}`);
 
     // The head is one flat segment below the businesses root, and the root is the businesses worktree.
@@ -263,13 +252,9 @@ export async function validateBusinessStep(branchDir, root = ROOT) {
 
     if (matrix && model.coverageFingerprint !== matrix.fingerprint) errors.push('response/data/model.json: coverageFingerprint must equal the frozen matrix fingerprint, or backend and UAT cannot correlate the same matrix');
     if (claimsDoc && model.claimsFingerprint !== claimsDoc.fingerprint) errors.push('response/data/model.json: claimsFingerprint must equal the frozen claims fingerprint, or the head names claims nobody froze');
-    if (mode === 'model' && model.reconciliation !== null) errors.push('response/data/model.json: mode model reconciles nothing, so reconciliation must be null');
-    if (mode === 'reconcile') {
-      if (model.reconciliation === null) errors.push('response/data/model.json: mode reconcile must carry the reconciliation it performed');
-      else if (response.status === 'done' && model.reconciliation.discrepancies.length) errors.push(`response/data/model.json: ${model.reconciliation.discrepancies.length} reconciliation discrepancy or discrepancies remain, so the branch is RECONCILIATION_DISCREPANCY rather than done`);
-    }
+    if (model.reconciliation !== null) errors.push('response/data/model.json: modelling reconciles nothing, so reconciliation must be null');
     // implemented is never published on the strength of a plan.
-    if (model.state === 'implemented' && model.reconciliation === null) errors.push('response/data/model.json: an implemented head requires reconciliation against delivered source');
+    if (model.state === 'implemented') errors.push('response/data/model.json: implemented is published by business.reconcile after delivered source is compared with the frozen matrix, never on the strength of a plan');
   }
 
   if (present.has('business-promise-authority') && has('response/response.md')) {
@@ -279,7 +264,7 @@ export async function validateBusinessStep(branchDir, root = ROOT) {
     const featureId = binding.Feature;
 
     if (!empty(requirements.featureId) && featureId !== requirements.featureId) errors.push(`response/response.md: Feature ${featureId} differs from the request's ${requirements.featureId}`);
-    if (binding.Mode !== mode) errors.push(`response/response.md: Mode ${binding.Mode} differs from the request's ${mode}`);
+    if (binding.Mode !== 'model') errors.push(`response/response.md: Mode ${binding.Mode} is not model; a reconciliation is business.reconcile's receipt`);
     if (!empty(requirements.targetState) && binding['Target state'] !== requirements.targetState) errors.push(`response/response.md: Target state ${binding['Target state']} differs from the request's ${requirements.targetState}`);
     if (model) {
       if (binding.Head !== model.headRef) errors.push(`response/response.md: Head ${binding.Head} differs from the published head ${model.headRef}`);
@@ -314,16 +299,10 @@ export async function validateBusinessStep(branchDir, root = ROOT) {
         if (!row) { errors.push(`response/response.md: Coverage names dimension ${dimension}, which the matrix does not carry`); continue; }
         if (row.disposition !== disposition) errors.push(`response/response.md: ${dimension} is ${disposition} here and ${row.disposition} in the matrix`);
       }
-    } else if (mdRows.length) errors.push('response/response.md: Coverage carries rows, but no coverage matrix was frozen in this mode');
+    } else if (mdRows.length) errors.push('response/response.md: Coverage carries rows, but no coverage matrix was frozen');
 
     const reconciliation = tableUnder(text, '## Reconciliation') ?? [];
-    if (mode === 'reconcile') {
-      if (reconciliation.length === 0) errors.push('response/response.md: a reconcile branch requires reconciliation against delivered source');
-      for (const [dimension, delivered, discrepancy] of reconciliation) {
-        if (empty(delivered)) errors.push(`response/response.md: reconciliation of ${dimension} names no delivered evidence`);
-        if (!empty(discrepancy) && response.status === 'done') errors.push(`response/response.md: a published head cannot carry the unresolved reconciliation discrepancy on ${dimension}`);
-      }
-    } else if (reconciliation.length) errors.push('response/response.md: mode model reconciles nothing, so Reconciliation carries no rows');
+    if (reconciliation.length) errors.push('response/response.md: modelling reconciles nothing, so Reconciliation carries no rows; a reconciliation is business.reconcile\'s receipt');
 
     // A published receipt cannot retain an error finding.
     if (response.status === 'done') {

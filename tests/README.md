@@ -1,6 +1,6 @@
-# Tests — workflow dry runs and their assessment
+# Tests — chain dry runs and their assessment
 
-`tests/runs/` holds one record per real session of a workflow: the request, every branch's status and
+`tests/runs/` holds one record per real session of a chain: the request, every branch's status and
 stop code, the validator output verbatim, the artifacts written, and the defects the run exposed. A
 run is executed by a processor agent (Claude Opus in this round) that also plays each operator's agent;
 every branch must pass `validate-request`, `validate-response` and the operator's own `validate.mjs`; a
@@ -12,10 +12,10 @@ valid `blocked` counts as green, a fabricated green is a failure. Source-writing
 
 | Workflow | Target | Reached | Stopped by | Judged | Report |
 | --- | --- | --- | --- | --- | --- |
-| `frontend-refine` | `/[lang]/subscriptions` (`ProSubscriptionBlock`) | bind → direction done | `frontend.presentation.resolve` `RULE_MISSING` (route block inset; accent marker on an unraised row) | correct stop; knowledge added (`PADDING-9`), resolve law added (forbidden class is removed) | [record](runs/20260903-frontend-refine-subscriptions.md) |
-| `frontend-reconstruct` | learner dashboard | bind → direction → resolve (0 `RULE_MISSING`, 27 classes removed, 1 gap) → apply dry (5 paths, 0 `WRITE_REJECTED`) | `frontend.surface.audit` `RUNTIME_UNAVAILABLE` (no preview served) | correct stop; workflows now bind the fe checkout with `runtimeNeed: consume` | [record](runs/20260903-frontend-reconstruct-dashboard.md) |
+| `frontend-refine` | `/[lang]/subscriptions` (`ProSubscriptionBlock`) | bind → direction done | `interface.generate` `RULE_MISSING` (route block inset; accent marker on an unraised row) | correct stop; knowledge added (`PADDING-9`), resolve law added (forbidden class is removed) | [record](runs/20260903-frontend-refine-subscriptions.md) |
+| `frontend-reconstruct` | learner dashboard | bind → direction → resolve (0 `RULE_MISSING`, 27 classes removed, 1 gap) → apply dry (5 paths, 0 `WRITE_REJECTED`) | `interface.audit` `RUNTIME_UNAVAILABLE` (no preview served) | correct stop; workflows now bind the fe checkout with `runtimeNeed: consume` | [record](runs/20260903-frontend-reconstruct-dashboard.md) |
 | `frontend-new-surface` | `/games/billiards` (no promise exists) | bind done | `business.decide` `EVIDENCE_MISSING`; standalone direction `BUSINESS_REQUIRED` | correct refusal to draw an undecided page; design gap fixed: a greenfield promise now enters as the person's `promise` (intent claim) | [record](runs/20260903-frontend-new-surface-billiards.md) |
-| `backend-feature` | `pro-subscription` | bind `CHECKOUT_DIRTY` → resume done → business (22 claims, 15 dimensions) → architecture done with `COMPATIBILITY_UNVERIFIED` fallback and the `critique` exchange (8 attacks hold) | stopped before `backend.source.apply` (no dry mode yet) | correct; the nested exchange and the fallback path work end to end | [record](runs/20260903-backend-feature-pro-subscription.md) |
+| `backend-feature` | `pro-subscription` | bind `CHECKOUT_DIRTY` → resume done → business (22 claims, 15 dimensions) → architecture done with `COMPATIBILITY_UNVERIFIED` fallback and the `critique` exchange (8 attacks hold) | stopped before `backend.generate` (no dry mode yet) | correct; the nested exchange and the fallback path work end to end | [record](runs/20260903-backend-feature-pro-subscription.md) |
 | `content-unit` (Sonnet) | `system-design/lesson-01` | — | `content.generate` `BRIEF_UNBOUND` (MinIO unreachable offline) | correct stop; a Sonnet-class agent satisfied the contracts without retries | [record](runs/20260903-content-unit.md) |
 
 Profiles bound versus models run: every branch ran on Claude Opus except `content-unit` (Claude Sonnet
@@ -33,8 +33,8 @@ policy for the fe route.
 
 ## Still open after round 1
 
-- `backend.source.apply` has no `mode: dry`; the backend chain cannot be dry-run past architecture.
-- A preview of the fe checkout must be served for `frontend.surface.audit` to produce a matrix; the
+- `backend.generate` has no `mode: dry`; the backend chain cannot be dry-run past architecture.
+- A preview of the fe checkout must be served for `interface.audit` to produce a matrix; the
   runtime registry claimed `ready` while no port answered (`platform.operate` territory).
 - Knowledge candidates with a single occurrence (not authored): canvas or media aspect ratio; a page-level
   idiom for the dashboard; `Rail` filling and scrolling at once.
@@ -53,7 +53,7 @@ businesses worktree. The shared runtime was down on the machine (registry genera
 | Workflow | Target | Reached | Stopped by | Judged | Report |
 | --- | --- | --- | --- | --- | --- |
 | `frontend-refine` | `/[lang]/subscriptions` | bind `RUNTIME_NOT_READY` → resume (`runtimeNeed: none`) → direction done → resolve: `PADDING-9` selected, accent marker removed by the new law, 0 `RULE_MISSING` | resolve failed its own contract: `## Removed` cannot say "refused by a case"; a claim on a Grammar `className` has no attribute to land on; `unquote` ate a leading backtick | the knowledge fix worked; three gate defects exposed on new ground | [record](runs/20260903-r2-frontend-refine-subscriptions.md) |
-| `backend-feature` | `pro-subscription` | bind `CHECKOUT_DIRTY` → resume → business → architecture + critique → `backend.source.apply` dry | `BUSINESS_AUTHORITY_MISSING`: the plan must cite `BA-<n>` and nothing in the tree publishes one | correct refusal; the dry path itself untested for a second round | [record](runs/20260903-r2-backend-feature-dry-apply.md) |
+| `backend-feature` | `pro-subscription` | bind `CHECKOUT_DIRTY` → resume → business → architecture + critique → `backend.generate` dry | `BUSINESS_AUTHORITY_MISSING`: the plan must cite `BA-<n>` and nothing in the tree publishes one | correct refusal; the dry path itself untested for a second round | [record](runs/20260903-r2-backend-feature-dry-apply.md) |
 | `full-feature` | `pro-subscription` | step 1 parallel (be done, fe `RUNTIME_NOT_READY`) → resume → business → architecture waiting → done → step 5 parallel | `5/1` `CONTRACT_UNFROZEN` (the architecture decision carries no operations the backend plan can consume); `5/2` `CHANGE_LEVEL_AMBIGUOUS` (preset `new` on an existing route) | the parallel step and the nested exchange lay out and validate as designed; the architecture → backend handoff does not typecheck | [record](runs/20260903-r2-full-feature-parallel.md) |
 | `frontend-with-uat` | `/[lang]/subscriptions` | step 1: be `CHECKOUT_DIRTY`, fe `RUNTIME_NOT_READY`; `uat.verify` probed out of chain | `INVALID_INPUT` at the request gate (no `requestedBy`, no flow, no admissions); `ADMISSION_MISSING` unreachable | correct stop; the uat validator could not accept its own lawful refusal | [record](runs/20260903-r2-frontend-with-uat-admission.md) |
 | resume | `frontend-reconstruct`, learner dashboard | bind `RUNTIME_NOT_READY` → resume as step 2 with linkage → direction → resolve done | — (probe branches: an unregistered code fails both checks; `UNKNOWN_STOP` itself was unemittable) | resume layout holds; routing sent `runtime` to `external` while the operator's Next said `platform.operate`; `state.json` had no schema | [record](runs/20260903-r2-resume-blocked-branch.md) |
@@ -83,8 +83,8 @@ runtime rather than inside it. The session is now a precondition rather than a d
 `SESSION_MISSING` exists, scoped to the two source-writing operators and `git.publish`, domain
 `caller`, route `user`; `git.publish` binds the session's receipts before it merges and refuses a
 session branch with no `done` source-application response carrying its head, or with a declared
-`frontend.surface.audit` or `uat.verify` step whose branch or screenshots are missing;
-`frontend.direction.decide` renders every candidate it forms under `new` and `reconstruct`; and every
+`interface.audit` or `uat.verify` step whose branch or screenshots are missing;
+`interface.generate` renders every candidate it forms under `new` and `reconstruct`; and every
 example workflow that applies frontend source now proves it — `apply` → `workspace.bind` (fe,
 `runtimeNeed: consume`) → `audit` → `quality` → `uat` → `publish` — with
 `scripts/validate-workflows.mjs` refusing a chain that publishes an applied surface with either proof
@@ -135,8 +135,8 @@ this folder yet contains a UAT verdict — an absence that is now legible instea
   ignores the bootstrap is still only caught at the publish — as the Codex record shows, after the
   work is done.
 - The presentation violations that Codex run shipped were found by a person reading source, and the
-  sweep that now catches them runs inside `frontend.source.apply` — the operator the run skipped. No
-  `frontend.surface.audit` has ever looked at that surface rendered and no `uat.verify` has walked it,
+  sweep that now catches them runs inside `interface.generate` — the operator the run skipped. No
+  `interface.audit` has ever looked at that surface rendered and no `uat.verify` has walked it,
   so the tree still knows nothing about how it behaves. Round 3 should do both.
 
 ## Round 3 — 2026-09-04, five live Codex missions on 1.7–1.9, judged for 2.0
@@ -149,5 +149,19 @@ per mission its wall clock, steps, agents, waits, interrupts and compactions; ev
 what held up. What the round changed is the 2.0 lineage line of the root index, one gate per wall.
 
 Still open after round 3: the readiness operator and the chain route have self-tests and validators
-but no live run yet; a served preview for `frontend.surface.audit` and a `platform.operate` run against
-the stale registry remain owed from round 2.
+but no live run yet; a served preview for `interface.audit` and a `runtime.serve` run against
+the stale registry remain owed from round 2. The rebuild that followed — goal per mission, branch
+and operator; one operator one job (21 packages); `inline`/`isolated` modes; plan/execute pairs;
+full Sol; the planned chain — has validators, self-tests and specs, and no live Sol 5.6 mission yet:
+that run is `TODO.md` item 3 and the evidence it leaves decides the publish.
+
+Round 3 also retired the example workflows as runtime inputs. The eleven chains that used to live
+under `workflows/` are planner fixtures now, one file per chain under `tests/chains/`: each carries
+the mission whose done-when lines name the chain's outcomes, the operator order the 2.0.0 example
+expected (rewritten to the split and merged operator ids), the end it declares, and a note on how it
+was rewritten. `scripts/plan-chain.spec.mjs` plans every fixture from its mission on this tree's own
+operator packages and proves the result passes `scripts/validate-chain.mjs`, carries every example
+operator with no pair inverted, ends where the example ends, and puts a `<domain>.plan` before its
+execute branch when the tree has one; a fixture naming an operator the tree does not carry yet is
+skipped by name. They are evidence that the planner still reaches the shapes people used, not
+shapes the entry picks from.

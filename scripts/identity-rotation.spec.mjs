@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { identityRotationErrors, operationClasses } from '../operators/platform-operate/validate.mjs';
+import { identityRotationErrors, operationClasses } from '../operators/identity-provision/validate.mjs';
 import { platformAuthorityErrors } from './platform-authority.mjs';
 import { fileURLToPath } from 'node:url';
 import { hasUserAdminCapability, proveUserAdminCapability } from './identity-provision.mjs';

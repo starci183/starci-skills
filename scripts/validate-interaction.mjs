@@ -35,6 +35,36 @@ export function selectionErrors(policy, request, choices = {}) {
   return errors;
 }
 
+// The two lines the orchestrator prints to the root chat after a transition. Their shape is read from
+// interaction.json#transitionLog.shape and compiled here, so the gate carries no copy of it: `N/M` is
+// a branch cell, `operator` an operator id, `k/n` a count, `<done | blocked STOP>` the outcome, and any
+// other `<…>` placeholder one non-empty run of text. Both lines name the same branch.
+export function compileLogShape(template) {
+  const escaped = String(template).replace(/[.+^${}()|[\]\\]/g, '\\$&');
+  const pattern = escaped
+    .replace(/<done \\\| blocked STOP>/g, '(?:done|blocked [A-Z][A-Z0-9_]+)')
+    .replace(/<k>\/<n>/g, '\\d+/\\d+')
+    .replace(/<[^<>]+>/g, '.+')
+    .replace(/\\\[N\/M operator\\\]/g, '\\[(\\d+/\\d+) [a-z]+(?:\\.[a-z]+)+\\]');
+  return new RegExp(`^${pattern}$`);
+}
+export function transitionLogErrors(policy, lines) {
+  const errors = [];
+  const log = policy.transitionLog ?? {};
+  const want = log.linesPerBranch;
+  if (!Array.isArray(lines) || lines.length !== want) { errors.push(`transition log: exactly ${want} lines are printed per transition (interaction.json#transitionLog), got ${Array.isArray(lines) ? lines.length : 'none'}`); return errors; }
+  const cells = [];
+  lines.forEach((line, i) => {
+    const text = String(line);
+    if (/[\r\n]/.test(text)) errors.push(`transition log line ${i + 1}: spans more than one line`);
+    const m = compileLogShape(log.shape[i]).exec(text);
+    if (!m) errors.push(`transition log line ${i + 1}: does not follow "${log.shape[i]}"`);
+    cells.push(m?.[1] ?? null);
+  });
+  if (cells.every(Boolean) && new Set(cells).size !== 1) errors.push(`transition log: both lines name one branch, got ${cells.join(' and ')}`);
+  return errors;
+}
+
 // A legacy user route names an owner; it is not itself a question or an operation grant.
 export function interactionDisposition(route, interaction) {
   if (interaction) return 'tier-choice';

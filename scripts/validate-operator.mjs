@@ -35,6 +35,36 @@ export function checkDoneWhen(at, op, outputKinds) {
   return errors;
 }
 
+// One operator, one job: a Done when never joins two jobs with "or". Its top-level alternatives are
+// what "; or, " and " or, " separate, and every alternative after the first is a mode or shape clause
+// — it opens with one of ALTERNATIVE_OPENERS (under mode apply / dry, when the direction declared a
+// delta of none, for an image release). Any other alternative is a second job, and a second job is a
+// second operator. Read on the English authority only; the mirror repeats its identifiers.
+export const ALTERNATIVE_OPENERS = ['under mode', 'when', 'for a'];
+export const doneWhenAlternatives = (text) => String(text ?? '').trim().split(/;\s*or,\s+|\s+or,\s+/);
+export function checkDoneWhenAlternatives(at, op) {
+  const errors = [];
+  const h = HEADINGS[op.lang];
+  for (const alt of doneWhenAlternatives(op.doneWhen).slice(1)) {
+    if (ALTERNATIVE_OPENERS.some((o) => alt.startsWith(o))) continue;
+    errors.push(`${at}: ${h.doneWhen} joins two jobs with "or, ${alt.slice(0, 48)}…"; an alternative after "; or, " or " or, " opens with ${ALTERNATIVE_OPENERS.map((o) => `"${o}"`).join(', ')} (a mode or shape clause), and a second job is a second operator`);
+  }
+  return errors;
+}
+
+// One artifact: operator.json → primaryOutput names exactly one kind, that kind is a row of the Outputs
+// table, and the Done when sentence names it in backticks, so the receipt checked against the sentence
+// is the artifact the operator exists to produce.
+export function checkPrimaryOutput(jsonAt, mdAt, manifest, op, outputKinds) {
+  const errors = [];
+  const primary = manifest?.primaryOutput;
+  if (Array.isArray(primary)) { errors.push(`${jsonAt}: primaryOutput names ${primary.length} kinds; one operator has exactly one primary output`); return errors; }
+  if (typeof primary !== 'string' || !primary.trim()) { errors.push(`${jsonAt}: primaryOutput must name exactly one Outputs kind; one operator, one job, one artifact`); return errors; }
+  if (!outputKinds.has(primary)) errors.push(`${jsonAt}: primaryOutput ${primary} is not a kind of the Outputs table`);
+  if (!doneWhenIdentifiers(op.doneWhen).includes(primary)) errors.push(`${mdAt}: ${HEADINGS[op.lang].doneWhen} does not name the primary output \`${primary}\` in backticks`);
+  return errors;
+}
+
 export async function validateOperators(root) {
   const errors = [];
   const packages = await loadOperatorPackages(root);
@@ -78,8 +108,11 @@ export async function validateOperators(root) {
     if (!cellCodes(op.tables.steps.rows[0]?.stops ?? '').includes('INVALID_INPUT')) errors.push(`${at}: step 1 must be the gate and stop with INVALID_INPUT`);
     if (!cellFiles(op.tables.steps.rows[0]?.reads ?? '').length && !/request\/request\.json/.test(op.tables.steps.rows[0]?.reads ?? '')) errors.push(`${at}: step 1 must read request/request.json`);
 
-    // Done when ↔ Outputs.
-    errors.push(...checkDoneWhen(at, op, new Set(op.tables.outputs.rows.map((r) => kindOf(r.kind)))));
+    // Done when ↔ Outputs ↔ primaryOutput: one sentence, one job, one artifact.
+    const outputKinds = new Set(op.tables.outputs.rows.map((r) => kindOf(r.kind)));
+    errors.push(...checkDoneWhen(at, op, outputKinds));
+    errors.push(...checkDoneWhenAlternatives(at, op));
+    errors.push(...checkPrimaryOutput(`operators/${pkg.name}/operator.json`, at, pkg.manifest, op, outputKinds));
 
     // Writes ↔ Outputs ↔ templates/kinds.
     const outputs = new Map();

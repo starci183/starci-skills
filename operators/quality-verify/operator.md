@@ -91,7 +91,7 @@ object whose CSS already owns the collapse compiles clean, lints clean, and ship
 delivered write set and returns `APP_OVERRIDE`, `APP_REIMPLEMENTATION`, `OFF_SCALE` and
 `SHELL_GEOMETRY` findings with their file, line and offending token. It is planned whenever the
 delivery carries a `frontend-source-application`, and a request that names a frontend delivery without
-it is invalid input. `frontend.source.apply` runs the same sweep on the projection before it writes;
+it is invalid input. `interface.generate` runs the same sweep on the projection before it writes;
 this gate runs it on what was actually delivered, because the two are only the same tree when nothing
 went wrong between them. A finding here is a red gate and therefore a verdict, not a stop: it goes
 back to the frontend owner exactly like a failing test.
@@ -128,7 +128,7 @@ gate is always something a person did on purpose.
 
 The gates say whether the delivery is well formed. They say nothing about whether the surface is good,
 reachable, truthful or usable, and those questions were already answered by the operators that
-observed the running product: `frontend.surface.audit` closed eight proof topics on its captures, and
+observed the running product: `interface.audit` closed eight proof topics on its captures, and
 `uat.verify` closed the experience topic on its run. This operator reads both receipts and writes one
 `## Verdict` table: one row per topic, each verdict and route copied from the receipt that computed
 it. It may not rescore a topic, may not average across rows, and may not substitute its own judgement
@@ -158,7 +158,7 @@ add, weaken, skip, suppress, or substitute a declared gate; it does not read a p
 verdict out of a new-code quality gate; and it does not carry a debt no owner approved or whose
 approval expired.
 
-Gate results retain their actual measured branch in sessionBranch. A non-session value requires the changes input emitted by a completed platform.operate serve at that integration branch and merged head; the producer delta and actual Git diff are checked. Do not relabel integration evidence with a session branch.
+Gate results retain their actual measured branch in sessionBranch. A non-session value requires the changes input emitted by a completed runtime.serve at that integration branch and merged head; the producer delta and actual Git diff are checked. Do not relabel integration evidence with a session branch.
 
 ## Context
 
@@ -173,10 +173,10 @@ Gate results retain their actual measured branch in sessionBranch. A non-session
 
 | Kind | From | Required |
 | --- | --- | --- |
-| `backend-source-application` | `backend.source.apply`, the backend delivery to verify | no |
-| `frontend-source-application` | `frontend.source.apply`, the frontend delivery to verify | no |
-| `changes` | `backend.source.apply`, `frontend.source.apply`, `library.source.apply`, `dependency.update` or a completed `platform.operate` serve, the paths that moved and the gates and surfaces they name | no |
-| `frontend-surface-audit` | `frontend.surface.audit`, the eight proof topics it closed at the same head | no |
+| `backend-source-application` | `backend.generate`, the backend delivery to verify | no |
+| `frontend-source-application` | `interface.generate`, the frontend delivery to verify | no |
+| `changes` | `backend.generate`, `interface.generate`, `library.update` or a completed `runtime.serve`, the paths that moved and the gates and surfaces they name | no |
+| `frontend-surface-audit` | `interface.audit`, the eight proof topics it closed at the same head | no |
 | `uat-flow-verification` | `uat.verify`, the experience topic it closed at the same head | no |
 
 ## Requirements
@@ -244,9 +244,9 @@ passed because quality gates or UAT pass. Quality thresholds and frozen UAT case
 
 | When | Operator |
 | --- | --- |
-| a backend gate failed in boundary and the backend owner must fix it | `backend.source.apply` |
-| a frontend gate failed in boundary and the frontend owner must apply the fix | `frontend.source.apply` |
+| a backend gate failed in boundary and the backend owner must fix it | `backend.generate` |
+| a frontend gate failed in boundary and the frontend owner must apply the fix | `interface.generate` |
 | the verdict is green and the delivery is ready to publish | `git.publish` |
 | the verdict is green and the published head must reach an environment | `release.deploy` |
-| the gates are green and the promise must be reconciled against the delivered source | `business.decide` |
+| the gates are green and the promise must be reconciled against the delivered source | `business.reconcile` |
 | the gates are green and a person asked for the journey to be walked | `uat.verify` |

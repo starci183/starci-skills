@@ -20,7 +20,7 @@ export function workspaceCheckoutFixture({ attachRuntime = false, repositoryKind
   mkdirSync(runtime, { recursive: true });
   symlinkSync(path.join(ROOT, 'readiness'), path.join(runtime, 'readiness'), 'junction');
   if (attachRuntime) {
-    for (const directory of ['templates', 'operators', 'resources', 'alias', 'knowledge', 'workflows']) symlinkSync(path.join(ROOT, directory), path.join(runtime, directory), 'junction');
+    for (const directory of ['templates', 'operators', 'resources', 'alias', 'knowledge']) symlinkSync(path.join(ROOT, directory), path.join(runtime, directory), 'junction');
     copyFileSync(path.join(ROOT, 'routing.json'), path.join(runtime, 'routing.json'));
   }
   mkdirSync(canonical, { recursive: true });

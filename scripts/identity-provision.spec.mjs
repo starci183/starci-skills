@@ -6,7 +6,7 @@ import path from 'node:path';
 import { provisionAccount, privateStatusRequest } from './identity-provision.mjs';
 import { assertIdentityPlan, privateJsonRequest, fingerprint } from './identity-custody.mjs';
 import { platformAuthorityErrors } from './platform-authority.mjs';
-import { operationClasses } from '../operators/platform-operate/validate.mjs';
+import { operationClasses } from '../operators/identity-provision/validate.mjs';
 
 const secret = 'test-private-value-never-in-evidence';
 const plan = () => ({ provider: 'http://localhost:8900', realm: 'test', api: 'http://localhost:8901/graphql', clientId: 'test-web', account: { username: 'uat-test-owner', email: 'uat-test@example.test', firstName: 'Test', lastName: 'Owner', usernameMaxLength: 40 } });

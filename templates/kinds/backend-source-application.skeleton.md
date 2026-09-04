@@ -1,7 +1,7 @@
 # backend-source-application — outcome-id
 
 One paragraph: which outcome was implemented, inside which frozen contract, and what measured that
-the contract was filled rather than widened. Written by `backend.source.apply` as `response/response.md`;
+the contract was filled rather than widened. Written by `backend.generate` as `response/response.md`;
 the conformance and proof records that measure it live beside it in `response/data/`, one file each.
 
 ## Binding

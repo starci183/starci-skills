@@ -6,8 +6,13 @@
 // session names where it stopped; a session that writes routed source or touches a runtime carries a
 // mission whose latest version the person confirmed as-stated, every earlier version left its own
 // goal-confirm choice behind, and every change of goal is a replanned transition with its note and
-// goalVersion, never a silent rewrite. The per-branch gates stay in validate-request and
-// validate-response; this file reads only the ledger they leave behind.
+// goalVersion, never a silent rewrite; on such a session brief.proven cites only done-when lines a
+// validator-accepted goalCheck evidenced, three consecutive done branches that served a done-when
+// line and evidenced none stop the chain, and every transition was printed as the two-line log; and
+// the chain itself — planned by scripts/plan-chain.mjs, replanned on every stop — passes
+// scripts/validate-chain.mjs against the operator tables and each branch's request. The per-branch
+// gates stay in validate-request and validate-response; this file reads only the ledger they leave
+// behind.
 import { existsSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
 import path from 'node:path';
@@ -15,11 +20,71 @@ import process from 'node:process';
 import { fileURLToPath } from 'node:url';
 import { validateAgainst } from './json-schema.mjs';
 import { effectiveBudget, missionGateErrors, goalDecisionId } from './validate-request.mjs';
+import { goalCheckErrors } from './validate-response.mjs';
 import { loadOperatorPackages } from './operator-md.mjs';
 import { loadInteractionPolicy } from './validate-interaction.mjs';
+import { validateChain, loadOperatorGraph, loadMaxParallel, readBranchRequests } from './validate-chain.mjs';
 
 const branchDir = (session, branch) => { const [n, m] = branch.split('/'); return path.join(session, `step-${n}`, `parallel-${m}`); };
 const stepOf = (branch) => Number(branch.split('/')[0]);
+const parallelOf = (branch) => Number(branch.split('/')[1]);
+const byChainOrder = (a, b) => stepOf(a) - stepOf(b) || parallelOf(a) - parallelOf(b);
+async function readJson(file) { if (!existsSync(file)) return null; try { return JSON.parse(await readFile(file, 'utf8')); } catch { return null; } }
+
+// The goal ledger of a mission session, read from each branch's request and response: which done-when
+// line the branch served, whether its receipt is done, and whether it carries a goalCheck the response
+// gate accepts with achieved true. Only that last kind of branch proves a line.
+export async function goalLedger(session, state) {
+  const out = [];
+  for (const branch of Object.keys(state?.steps ?? {}).sort(byChainOrder)) {
+    const dir = branchDir(session, branch);
+    const request = await readJson(path.join(dir, 'request', 'request.json'));
+    const response = await readJson(path.join(dir, 'response', 'response.json'));
+    const goal = request?.goal ?? null;
+    const done = response?.status === 'done';
+    const accepted = done && response.goalCheck !== undefined && goalCheckErrors(dir, response, goal).length === 0;
+    out.push({ branch, operator: state.steps[branch], doneWhen: goal?.doneWhen ?? null, done, achieved: accepted && response.goalCheck.achieved === true });
+  }
+  return out;
+}
+// brief.proven on a mission session cites done-when lines and nothing else: every entry opens with
+// "doneWhen:<n> " and that n has a done branch whose validator-accepted goalCheck says achieved.
+export function provenErrors(state, ledger) {
+  const errors = [];
+  if (!state?.mission) return errors;
+  const lines = state.mission.doneWhen ?? [];
+  for (const entry of state.brief?.proven ?? []) {
+    const m = /^doneWhen:(\d+) /.exec(entry);
+    if (!m) { errors.push(`state.json: brief.proven "${entry.slice(0, 60)}" cites no done-when line; on a mission every proven entry opens with "doneWhen:<n> " and only a validator-accepted goalCheck puts it there`); continue; }
+    const n = Number(m[1]);
+    if (!lines[n]) { errors.push(`state.json: brief.proven cites doneWhen:${n}, which the mission does not have (${lines.length} lines)`); continue; }
+    if (!ledger.some((b) => b.doneWhen === n && b.achieved)) errors.push(`state.json: brief.proven cites doneWhen:${n} ("${lines[n].evidence}") and no done branch carries a validator-accepted goalCheck with achieved true for it; what no receipt evidenced is not proven`);
+  }
+  return errors;
+}
+// The stop signal: three consecutive done branches, in chain order, that served a done-when line and
+// evidenced none is a chain that is busy without getting closer; the orchestrator stops and asks the
+// person rather than dispatching a fourth. A prerequisite branch (a bind, a preflight, a gate that
+// enables a later branch) never evidences a done-when line by design and is not counted. The error
+// names the three branches.
+export function threeBranchStopErrors(state, ledger) {
+  const errors = [];
+  if (!state?.mission) return errors;
+  let run = [];
+  for (const b of ledger.filter((x) => x.done && x.doneWhen !== null)) {
+    if (b.achieved) { run = []; continue; }
+    run.push(b);
+    if (run.length === 3) errors.push(`state.json: three consecutive done branches evidenced no done-when line — ${run.map((x) => `${x.branch} ${x.operator}`).join(', ')}; the chain stops here and the person is asked, never a fourth branch dispatched`);
+  }
+  return errors;
+}
+// On a mission every transition was printed to the person as the two-line log (resources/interaction.json#transitionLog) and says so.
+export function loggedErrors(state) {
+  const errors = [];
+  if (!state?.mission) return errors;
+  (state.transitions ?? []).forEach((t, i) => { if (t.logged !== true) errors.push(`state.json: transitions[${i}] (${t.branch} ${t.event}) is not logged; on a mission every transition is printed to the root chat as the two lines interaction.json#transitionLog declares and recorded with logged: true`); });
+  return errors;
+}
 
 // The mission's version history, read from the ledger: a version below the current one was answered
 // (corrected, or as-stated and then replanned), the current one is as-stated (missionGateErrors), and
@@ -43,7 +108,7 @@ export function missionHistoryErrors(state) {
   return errors;
 }
 
-export async function validateSession(root, session) {
+export async function validateSession(root, session, { packages = null } = {}) {
   const errors = [];
   const stateFile = path.join(session, 'state.json');
   if (!existsSync(stateFile)) return { errors: ['state.json: missing'], state: null };
@@ -55,9 +120,17 @@ export async function validateSession(root, session) {
     if (!state.budget) errors.push('state.json: a session with a transition carries budget');
   }
   const policy = await loadInteractionPolicy(root);
+  packages ??= await loadOperatorPackages(root);
   // A chain that writes routed source or touches a runtime ran on a goal the person confirmed, and every change of that goal is on record.
-  errors.push(...missionGateErrors(state, null, await loadOperatorPackages(root), policy));
+  errors.push(...missionGateErrors(state, null, packages, policy));
   errors.push(...missionHistoryErrors(state));
+  // The chain is lawful against the operator tables and each branch's request: reachable, fed, bound, capped, proved, ended, and on a mission every branch names its goal.
+  errors.push(...validateChain(root, packages, state.chain, state.steps, await readBranchRequests(session, state.steps), { graph: await loadOperatorGraph(root, packages), mission: state.mission ?? null, maxParallel: await loadMaxParallel(root) }));
+  // On a mission: proven cites only evidenced done-when lines, three unevidenced done branches in a row stop the chain, every transition was logged.
+  const ledger = await goalLedger(session, state);
+  errors.push(...provenErrors(state, ledger));
+  errors.push(...threeBranchStopErrors(state, ledger));
+  errors.push(...loggedErrors(state));
   if (state.brief?.report) {
     const shapes = Object.keys(policy.reportShapes ?? {});
     if (!shapes.includes(state.brief.report.shape)) errors.push(`state.json: brief.report.shape ${state.brief.report.shape} is not one of ${shapes.join(', ')}`);

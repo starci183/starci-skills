@@ -12,7 +12,6 @@ const routing = JSON.parse(await readFile(path.join(root, 'routing.json'), 'utf8
 const errors = [];
 
 const kinds = new Set(Object.keys(routing.kinds));
-const workflows = new Set((await readdir(path.join(root, 'workflows'))).filter((f) => f.endsWith('.json')).map((f) => f.replace(/\.json$/, '')));
 const operators = new Map();
 const registry = await loadErrorsRegistry(root);
 errors.push(...registry.errors);
@@ -79,11 +78,12 @@ for (const [id, table] of Object.entries(routing.routes)) {
       else if (route.target === id) errors.push(`${id}.${domain}: targets itself; use kind "resume"`);
       if (route.then !== undefined) errors.push(`${id}.${domain}: only a chain route carries then`);
     } else if (route.kind === 'chain') {
-      // A chain route names example workflows: the wall is cleared by running them, not by a person.
-      for (const key of ['target', 'then']) {
-        if (route[key] === undefined) { if (key === 'target') errors.push(`${id}.${domain}: chain route needs a target workflow`); continue; }
-        if (!workflows.has(route[key])) errors.push(`${id}.${domain}: ${key} names unknown workflow ${route[key]}`);
-      }
+      // A chain route names the operator whose primary output a sibling mission must produce; the wall
+      // is cleared by planning and running that mission, not by a person.
+      if (!route.target) errors.push(`${id}.${domain}: chain route needs a target operator`);
+      else if (!operators.has(route.target)) errors.push(`${id}.${domain}: chain targets unknown operator ${route.target}`);
+      else if (route.target === id) errors.push(`${id}.${domain}: chain targets itself`);
+      if (route.then !== undefined) errors.push(`${id}.${domain}: a chain route carries no then; the sibling mission is planned from its goal`);
     } else if (route.target !== undefined || route.then !== undefined) {
       errors.push(`${id}.${domain}: kind ${route.kind} must not carry a target`);
     }

@@ -10,6 +10,8 @@ Verify one bounded delivery by running its declared gates against an unchanged p
 
 Done when the `quality-verification` states one measured verdict, pass or fail, over a delivery whose predecessor receipts all name the frozen head, with one `gate-result` per declared gate carrying its command, exit code, evidence and classification, `coverage` preserving every configured and requested threshold beside its measured value whenever a unit gate ran, every red gate classified to its owner or covered by a live approved debt, every topic row of the scorecard copied unchanged from the receipt that computed it, and the admitted `audit-scope` copied unchanged when the audit carried one.
 
+Primary output: `quality-verification`
+
 ## Inputs
 
 `backend-source-application` (optional), `frontend-source-application` (optional), `changes` (optional), `frontend-surface-audit` (optional), `uat-flow-verification` (optional)

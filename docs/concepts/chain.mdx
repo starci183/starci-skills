@@ -1,0 +1,66 @@
+---
+title: "Chain"
+description: "How the chain of operators is derived from the mission's done-when lines, what the chain gate refuses, and when a chain is redrawn."
+---
+
+# Chain
+
+`workflows/README.md` opens with the whole rule:
+
+> There are no workflow files. A chain is never chosen from an example: it is derived from the
+> mission, by `scripts/plan-chain.mjs`, from the operator tables alone, and it is checked by
+> `scripts/validate-chain.mjs` every time it is drawn.
+
+A chain is an ordered list of **steps**, each step a list of **branches** that run in parallel, at
+most three. Nothing in the tree stores one: the entry draws it after the person confirms the mission
+goal, prints it as two lines per branch — the goal, then why the branch is there — and dispatches
+nothing before `validate-chain` accepts it.
+
+## How it is derived
+
+The planner starts from the confirmed mission in `state.json`. Every "done when" line names the
+operator whose receipt is that evidence; those operators are the targets, and the planner walks
+backwards through the tables every operator publishes in its `operator.md`:
+
+- a required **Input** pulls in the operator that produces that kind — a producer already in the
+  chain first, else the one operator whose `primaryOutput` is that kind, else the only producer; a
+  kind the tables leave ambiguous is a refusal naming the candidates, never a guess;
+- a required `@workspaces/<role>` **Context** row pulls in a `workspace.bind` of that role, and a role
+  the mission declares is bound before every working branch even when no table asks for it;
+- an operator that more than one "done when" line names, when its domain has a `<domain>.plan`
+  operator, runs after that plan and fans out by units: one unit per branch, one unit per blind agent —
+  a page, a modal, a flow;
+- any operator holding an effect tool opens the chain with `environment.preflight`;
+- a mission that names `git.publish` while a branch writes frontend source under `mode: apply` owes
+  the audit and the walk in between: the operator whose primary output is `frontend-surface-audit`,
+  then `uat.verify`, before the publish.
+
+The nodes are then packed into steps: a branch runs only when everything it depends on ran earlier
+and a `## Next` table of the step before names it; never two writers of one alias in one step; a
+fan-out branch alone in its step so its units can expand in place. Every branch gets a goal — the
+done-when line it evidences, or the earliest later branch it enables — and that goal is what
+`request.json.goal` carries.
+
+## What the gate refuses
+
+`validate-chain` reads `state.json.chain`, `state.json.steps` and each branch's `request.json`, and
+refuses a chain in which a step holds an operator no Next table of the step before permits, a
+branch requires an Input no earlier step produces or a role no earlier bind bound, a step exceeds the
+parallel cap or holds two writers of one alias, an applied surface reaches `git.publish` without the
+audit and the walk in between, anything runs after a publish or a deploy, or a branch on a mission
+names no goal. The full list is in `workflows/README.md`, and `validate-session` runs the gate on
+the whole ledger after every transition.
+
+## Replanning
+
+A chain is drawn once, before the first dispatch, and again on every stop that changes what the
+mission needs: a `blocked` branch whose route adds an operator, a plan whose units are now known, a
+corrected goal. Each redraw is a `replanned` transition in `state.json.transitions` carrying its note
+and the goal version it moves to — confirmed like the first plan, never a silent rewrite.
+
+## The fixtures
+
+The eleven example chains 1.x shipped under `workflows/` live on as planner fixtures under
+`tests/chains/`, rewritten to the current operator ids. `scripts/plan-chain.spec.mjs` derives every
+one of them from the mission it carries and proves the result passes the gate: evidence that the
+planner still reaches the shapes people used, not shapes the entry picks from.

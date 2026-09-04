@@ -1,6 +1,6 @@
 // The reference half of docs/ is generated, never authored. Every page under docs/reference/ and
 // docs/vi/reference/ is produced here from the tree that is the runtime: operators/<id>/operator.md
-// (+ .vi.md), workflows/*.json, templates/kinds/*, alias/INDEX.md, the Stop codes section of
+// (+ .vi.md), templates/kinds/*, alias/INDEX.md, the Stop codes section of
 // operators/INDEX.md, and the three knowledge INDEX files. Nothing is retyped: a rule that lives in
 // the tree reaches the site verbatim or as a table computed from the same file the runtime reads, so
 // the docs cannot become a second home for a rule.
@@ -122,11 +122,6 @@ async function loadOperators() {
   return ops.sort((a, b) => a.id.localeCompare(b.id));
 }
 
-async function loadWorkflows() {
-  const files = (await readdir(path.join(root, 'workflows'))).filter((f) => f.endsWith('.json')).sort();
-  return Promise.all(files.map(async (f) => readJson(`workflows/${f}`)));
-}
-
 async function loadKinds() {
   const files = (await readdir(path.join(root, 'templates/kinds'))).sort();
   const contracts = [];
@@ -152,17 +147,6 @@ const L = {
     opBinding: 'Binding',
     opBindingRows: ['Field', 'Value'],
     opSource: (rel) => `Source: [\`${rel}\`](${blob(rel)}).`,
-    wfIndexTitle: 'Workflows',
-    wfIndexDesc: 'The example chains the entry reuses when a request matches their when.',
-    wfIndexIntro: 'A workflow is a pre-composed chain of operators. The entry reads the `when` of every example first; a match is run as written, and no match means composing a chain under the same rules `scripts/validate-workflows.mjs` enforces on these files.',
-    wfTable: ['Workflow', 'Steps', 'Ends', 'When'],
-    wfWhen: 'When',
-    wfChain: 'Chain',
-    wfChainTable: ['Step', 'Branch', 'Operator', 'Presets', 'Fan-out', 'Max parallel'],
-    wfLoops: 'Loops',
-    wfLoopTable: ['From', 'To', 'When', 'Max rounds'],
-    wfEnds: 'Ends',
-    wfNoLoops: 'This chain has no loop.',
     kindsTitle: 'Kinds',
     kindsDesc: 'Every file that crosses between steps, and the contract or schema it is checked against.',
     kindsIntro: 'A kind types a file produced inside a branch and handed to a later branch by an explicit path. A markdown kind carries a `<kind>.contract.json` (title, ordered sections, each table header) and a copyable `<kind>.skeleton.md`; a data kind carries a `<kind>.schema.json`. `scripts/validate-response.mjs` loads contracts by kind after every branch.',
@@ -194,17 +178,6 @@ const L = {
     opBinding: 'Ràng buộc',
     opBindingRows: ['Trường', 'Giá trị'],
     opSource: (rel) => `Nguồn: [\`${rel}\`](${blob(rel)}). Chỉ tệp tiếng Anh mới là thẩm quyền runtime.`,
-    wfIndexTitle: 'Workflow',
-    wfIndexDesc: 'Các chuỗi ví dụ mà entry dùng lại khi yêu cầu khớp với when của chúng.',
-    wfIndexIntro: 'Một workflow là một chuỗi operator đã soạn sẵn. Entry đọc `when` của mọi ví dụ trước; khớp thì chạy đúng như đã viết, không khớp thì tự soạn một chuỗi theo đúng luật mà `scripts/validate-workflows.mjs` áp lên các tệp này.',
-    wfTable: ['Workflow', 'Số bước', 'Kết thúc ở', 'Khi nào'],
-    wfWhen: 'Khi nào',
-    wfChain: 'Chuỗi',
-    wfChainTable: ['Bước', 'Nhánh', 'Operator', 'Preset', 'Fan-out', 'Song song tối đa'],
-    wfLoops: 'Vòng lặp',
-    wfLoopTable: ['Từ', 'Về', 'Khi nào', 'Số vòng tối đa'],
-    wfEnds: 'Kết thúc ở',
-    wfNoLoops: 'Chuỗi này không có vòng lặp.',
     kindsTitle: 'Kind',
     kindsDesc: 'Mọi tệp đi qua giữa các bước, và contract hoặc schema mà nó bị kiểm theo.',
     kindsIntro: 'Một kind định kiểu cho tệp được sinh trong một nhánh rồi bàn giao cho nhánh sau bằng đường dẫn tường minh. Kind dạng markdown mang một `<kind>.contract.json` (tiêu đề, các mục theo thứ tự, dòng đầu của từng bảng) và một `<kind>.skeleton.md` để chép; kind dạng dữ liệu mang một `<kind>.schema.json`. `scripts/validate-response.mjs` nạp contract theo kind sau mỗi nhánh.',
@@ -272,47 +245,6 @@ function presetOf(branch) {
   return Object.entries(req).map(([k, v]) => `\`${k}\` = \`${JSON.stringify(v)}\``).join(BR);
 }
 
-function workflowPage(wf, lang) {
-  const t = L[lang];
-  const rows = [];
-  wf.chain.forEach((step, i) => {
-    step.forEach((branch, j) => {
-      rows.push([
-        String(i + 1),
-        `${i + 1}/${j + 1}`,
-        `[\`${branch.operator}\`](/reference/operators/${branch.operator.replace(/\./g, '-')})`,
-        presetOf(branch),
-        branch.fanout ? tick(branch.fanout) : '—',
-        branch.maxParallel ? String(branch.maxParallel) : '—',
-      ]);
-    });
-  });
-  const loops = (wf.loops ?? []).map((l) => [tick(l.from), tick(l.to), cell(l.when), String(l.maxRounds)]);
-  const rel = `workflows/${wf.id}.json`;
-  const parts = [
-    front(wf.id, wf.when[lang] ?? wf.when.en),
-    callout,
-    `# ${wf.id}\n`,
-    generatedBy(`[\`${rel}\`](${blob(rel)})`),
-    `\n## ${t.wfWhen}\n\n> ${mdx(wf.when[lang] ?? wf.when.en)}\n`,
-    `\n## ${t.wfChain}\n\n${mdx(table(t.wfChainTable, rows))}\n`,
-    `\n## ${t.wfLoops}\n\n${loops.length ? mdx(table(t.wfLoopTable, loops)) : t.wfNoLoops}\n`,
-    `\n## ${t.wfEnds}\n\n${tick(wf.ends)}\n`,
-  ];
-  return parts.join('');
-}
-
-function workflowIndexPage(wfs, lang) {
-  const t = L[lang];
-  const rows = wfs.map((w) => [
-    `[\`${w.id}\`](/reference/workflows/${w.id})`,
-    String(w.chain.length),
-    tick(w.ends),
-    cell(w.when[lang] ?? w.when.en),
-  ]);
-  return `${front(t.wfIndexTitle, t.wfIndexDesc)}# ${t.wfIndexTitle}\n\n${mdx(t.wfIndexIntro)}\n\n${mdx(table(t.wfTable, rows))}\n`;
-}
-
 function kindsPage(kinds, lang) {
   const t = L[lang];
   const out = [front(t.kindsTitle, t.kindsDesc), callout, `# ${t.kindsTitle}\n`,
@@ -358,7 +290,6 @@ function referenceIndexPage(lang) {
   const t = L[lang];
   const rows = [
     [`[${t.opIndexTitle}](/reference/operators)`, '`operators/<id>/operator.md`, `operator.json`'],
-    [`[${t.wfIndexTitle}](/reference/workflows)`, '`workflows/*.json`'],
     [`[${t.kindsTitle}](/reference/kinds)`, '`templates/kinds/*`'],
     [`[${t.aliasTitle}](/reference/alias)`, '`alias/INDEX.md`'],
     [`[${t.stopTitle}](/reference/stop-codes)`, '`operators/INDEX.md` § Stop codes'],
@@ -372,7 +303,6 @@ function referenceIndexPage(lang) {
 // ---------------------------------------------------------------------------
 async function render() {
   const ops = await loadOperators();
-  const wfs = await loadWorkflows();
   const kinds = await loadKinds();
   const aliasEn = await read('alias/INDEX.md');
   const aliasVi = await read('alias/INDEX.vi.md');
@@ -400,7 +330,6 @@ async function render() {
     put('_meta.js', `export default ${JSON.stringify({
       index: lang === 'en' ? 'Overview' : 'Tổng quan',
       operators: t.opIndexTitle,
-      workflows: t.wfIndexTitle,
       kinds: t.kindsTitle,
       alias: t.aliasTitle,
       'stop-codes': t.stopTitle,
@@ -415,11 +344,6 @@ async function render() {
       if (lang === 'vi' && !op.vi) continue;
       put(`operators/${op.dir}.mdx`, operatorPage(op, lang));
     }
-
-    put('workflows/_meta.js', `export default ${JSON.stringify(
-      Object.fromEntries([['index', t.wfIndexTitle], ...wfs.map((w) => [w.id, w.id])]), null, 2)}\n`);
-    put('workflows/index.mdx', workflowIndexPage(wfs, lang));
-    for (const wf of wfs) put(`workflows/${wf.id}.mdx`, workflowPage(wf, lang));
 
     put('kinds.mdx', kindsPage(kinds, lang));
 

@@ -10,5 +10,5 @@
   "preflight": "scripts/identity-custody.mjs",
   "planSchema": "resources/identity-plan.schema.json",
   "runner": "scripts/identity-provision.mjs",
-  "rotationContract": "operators/platform-operate/operator.md#requirements"
+  "rotationContract": "operators/identity-provision/operator.md#requirements"
 }

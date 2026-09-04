@@ -187,7 +187,7 @@ function policyBaseline({ requested = [], configured, report = effectiveReport(c
     [evidenceRef]: raw,
     'response/data/coverage.json': cov,
     'response/data/gates/unit-coverage.json': unitFails ? failing('unit-coverage') : gateResult('unit-coverage'),
-    'response/response.json': responseJson({ next: unitFails ? ['backend.source.apply'] : ['git.publish'] }),
+    'response/response.json': responseJson({ next: unitFails ? ['backend.generate'] : ['git.publish'] }),
     'response/response.md': responseMd({
       cov, coverageMetrics: METRICS, verdict: unitFails ? 'fail' : 'pass',
       results: PLAN.map(({ gate }) => [gate, unitFails && gate === 'unit-coverage' ? 'fail' : 'pass']),
@@ -200,7 +200,7 @@ function policyBaseline({ requested = [], configured, report = effectiveReport(c
 const red = () => baseline({
   'response/data/gates/lint.json': failing('lint'),
   'response/response.md': responseMd({ results: [['format', 'pass'], ['lint', 'fail'], ['unit-coverage', 'pass']], verdict: 'fail' }),
-  'response/response.json': responseJson({ next: ['backend.source.apply'] }),
+  'response/response.json': responseJson({ next: ['backend.generate'] }),
 });
 
 async function expectValid(files, label) {
@@ -217,7 +217,7 @@ async function expectError(files, needle, label) {
 }
 
 await expectValid(baseline(), 'a green verification with one file per gate');
-const integratedGate=gateResult('lint',{sessionBranch:'integration-proof'}),integrationProducer={operatorId:'platform.operate',status:'done',delta:{runtimeLadder:{rung:'serve',servedHead:HEAD,integration:{branch:'integration-proof'}}}};
+const integratedGate=gateResult('lint',{sessionBranch:'integration-proof'}),integrationProducer={operatorId:'runtime.serve',status:'done',delta:{runtimeLadder:{rung:'serve',servedHead:HEAD,integration:{branch:'integration-proof'}}}};
 assert.deepEqual(integrationGateBindingErrors(integratedGate,integrationProducer),[]);
 assert.ok(integrationGateBindingErrors(integratedGate,null).length);
 assert.ok(integrationGateBindingErrors({...integratedGate,sourceHead:OTHER_HEAD},integrationProducer).length);
@@ -334,13 +334,13 @@ await expectError(baseline({ 'response/response.md': responseMd().replace('## Ve
 await expectError(baseline({ 'response/data/gates/lint.json': { ...gateResult('lint'), sourceHead: 'nope' } }), 'sourceHead', 'gate-result schema');
 await expectError(baseline({ 'response/response.json': responseJson({ gates: ['response/data/gates/format.json', 'response/data/gates/lint.json'] }) }), 'gate-result does not list', 'a gate file the response never lists');
 await expectError(baseline({ 'request/request.json': requestJson({ inputs: {} }) }), 'needs at least one of', 'a verification with no producer receipt');
-await expectError(baseline({ __predecessorChanges: `# changes — backend.source.apply step-1/parallel-1
+await expectError(baseline({ __predecessorChanges: `# changes — backend.generate step-1/parallel-1
 
 ## Binding
 
 | Field | Value |
 | --- | --- |
-| Operator | \`backend.source.apply\` |
+| Operator | \`backend.generate\` |
 | Step | \`step-1/parallel-1\` |
 | Checkout | \`@workspaces/be\` at \`${HEAD}\` on \`session/s-test\`, nothing written |
 | Predecessor | \`step-1/parallel-1/response/response.md\` |

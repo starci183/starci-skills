@@ -1,91 +1,80 @@
 # Workflow
 
-Một workflow là một chuỗi operator ghép sẵn: danh sách **bậc** theo thứ tự, mỗi bậc là danh sách
-**nhánh** chạy song song (tối đa ba), kèm **vòng lặp** quay về một bậc trước và **preset** cho Yêu cầu
-của từng nhánh. Các file ở đây là tham chiếu, không phải toàn bộ số chuỗi có thể có: chúng là những
-hình dạng lặp lại đủ nhiều để đáng ghi xuống, và một nhiệm vụ có bài toán nghiệp vụ khó hơn mọi ví dụ
-thì tự ghép chuỗi của mình theo cùng bộ luật, thay vì nhét mình vào ví dụ gần nhất.
+Không còn file workflow nào. Một chuỗi không bao giờ được chọn từ ví dụ: nó được suy ra từ nhiệm
+vụ, bởi `scripts/plan-chain.mjs`, chỉ từ các bảng của operator, và được `scripts/validate-chain.mjs`
+kiểm mỗi lần vẽ. Các chuỗi mẫu thư mục này từng giữ giờ là fixture của planner, nằm ở
+`tests/chains/`, và `scripts/plan-chain.spec.mjs` chứng minh planner vẫn suy ra được từng chuỗi ấy
+từ kết quả mà nhiệm vụ của nó gọi tên.
 
-Cửa vào dùng chúng như sau:
+## Chuỗi được suy ra thế nào
 
-1. Đọc `when` của mọi ví dụ. Request khớp trọn ví dụ nào thì chạy chuỗi đó; preset điền vào
-   `request.json`; lấy field còn thiếu theo [chính sách tương tác](../resources/interaction.md).
-2. Khớp một phần, hoặc bài toán nghiệp vụ khó hơn mọi `when` mô tả, thì tự ghép chuỗi thay vì bẻ một
-   ví dụ gần đúng cho vừa: nghĩ ra nó từ bảng `## Next` của các operator và `routing.json`, theo
-   đúng luật mà `scripts/validate-workflows.mjs` ép lên các file này:
-   - mỗi nhánh gọi tên một operator có thật và chỉ preset field mà operator đó khai;
-   - mọi field Requirements không có Default thì hoặc được preset, hoặc nằm trong `asks` của nhánh, để
-     chuỗi nói trước những field nào cửa vào phải lấy trước khi nhánh chạy; `asks` là danh sách input,
-     không phải quyền gửi câu hỏi;
-   - mọi Input bắt buộc của một nhánh phải do một bậc trước sinh ra;
-   - các nhánh cùng bậc không chung alias ghi (hai operator không được cùng ghi một checkout hay một
-     root; `frontend.surface.audit` toả theo entry của matrix vì nó không ghi gì);
-   - vòng lặp quay về bậc trước và mang `maxRounds`;
-   - chuỗi nào ghi source frontend dưới `mode: apply` thì chạy `frontend.surface.audit` và
-     `uat.verify` giữa lần ghi đó và `git.publish` của nó — luật dòng dài bên dưới;
-   - chuỗi kết thúc ở `git.publish`, `release.deploy` hoặc `user`.
-3. Chuỗi tự ghép mà còn dùng lại được thì thành một file mới ở đây, kèm `when`.
+Planner xuất phát từ nhiệm vụ đã xác nhận (`state.json.mission`): mỗi dòng "xong khi" gọi tên
+operator mà biên nhận của nó là bằng chứng ấy, và các operator đó là đích. Nó đi ngược qua các bảng
+mà mỗi operator công bố trong `operator.md` của mình:
 
-## Mọi chuỗi mở bằng kiểm sẵn sàng
+- một **Đầu vào** bắt buộc kéo vào operator sinh ra kind đó — ưu tiên producer đã có trong chuỗi,
+  rồi đến operator duy nhất có `primaryOutput` là kind ấy (hai primary thì phân xử bằng operator mà
+  dòng Đầu vào gọi tên), rồi đến producer duy nhất; kind nào các bảng để mập mờ thì bị từ chối kèm
+  tên các ứng viên, không bao giờ đoán;
+- một dòng **Context** `@workspaces/<role>` bắt buộc kéo vào một `workspace.bind` của role đó, và
+  role mà nhiệm vụ khai được bind trước mọi nhánh làm việc dù không bảng nào đòi;
+- operator mà hơn một dòng "xong khi" gọi tên, khi domain của nó có operator `<domain>.plan`, thì
+  chạy sau plan ấy và **toả theo đơn vị**: mỗi nhánh một đơn vị, nhánh gọi tên `unit` của mình
+  (ngưỡng và tính hợp lệ của unit thuộc `validate-request`, `#unitGateErrors`); một dòng thì không
+  cần bản đồ;
+- operator nào giữ tool có hiệu ứng (đúng vị từ mà gate nhiệm vụ đọc từ `operator.json`) thì chuỗi
+  mở bằng `environment.preflight`;
+- nhiệm vụ gọi tên `git.publish` trong khi có nhánh ghi source frontend dưới `mode: apply` thì nợ
+  audit và lượt đi thử ở giữa — luật dòng dài, phát biểu theo kind: operator có primary output là
+  `frontend-surface-audit`, rồi `uat.verify`, trước khi publish.
 
-Mọi ví dụ chạm tới source đã route hay một runtime đều mở bằng `environment.preflight`: một nhánh,
-trước các bind, báo mọi bức tường chuỗi có thể gặp — route chưa khai hay gần trùng tên, thiếu chính
-sách git, checkout bẩn, đăng nhập thất bại, head đang phục vụ không chứa head đã bind, port bị giữ,
-thiếu trình duyệt hay container, phê duyệt mà môi trường giữ lại cho người — trong một báo cáo sẵn
-sàng có kiểu. Chuỗi gặp những bức tường ấy mỗi giờ một bức là hình dạng mà bằng chứng hồi cứu ghi lại;
-chuỗi gặp tất cả ở phút thứ năm là hình dạng các ví dụ này mang. `content-unit` không ghi source đã
-route và không tiêu thụ runtime, nên mở bằng operator của chính nó.
+Hai chỗ mà đầu vào bắt buộc để ngỏ cũng do các bảng phân xử: một Đầu vào tuỳ chọn xếp consumer sau
+producer đã có trong chuỗi, và một dòng Kế tiếp một chiều xếp operator bàn giao trước operator được
+bàn giao — mỗi thứ trừ khi nó khép thành vòng, khi ấy cạnh cứng thắng và cạnh bị bỏ được ghi lại
+trong plan. Rồi các nút được xếp thành bậc: một nhánh chỉ chạy khi mọi thứ nó phụ thuộc đã chạy ở
+bậc trước và bảng Kế tiếp của bậc trước gọi tên nó; tối đa ba nhánh một bậc
+(`resources/orchestrator.json#maxConcurrentAgents`, hoặc `#concurrency.maxParallel` khi được khai);
+không bao giờ hai nhánh cùng ghi một alias trong một bậc; nhánh toả đứng riêng một bậc để các đơn
+vị của nó mở rộng tại chỗ. Mỗi nhánh có một goal — dòng "xong khi" nó chứng minh, hoặc nhánh sau
+sớm nhất mà nó mở đường — chính là thứ `request.json.goal` mang và `validate-request` kiểm.
 
-## Mọi ví dụ đều là một dòng dài
+Plan được in cho người dưới dạng hai dòng mỗi nhánh (goal, rồi lý do nhánh có mặt) trước khi bất kỳ
+thứ gì được dispatch, và `node scripts/plan-chain.mjs <session>` in cùng bản xem trước ấy kèm khối
+JSON cho một phiên trên đĩa.
 
-Chuỗi ghi một bề mặt không kết thúc khi source biên dịch được. Giữa lần ghi và lần publish có hai
-bằng chứng mà không thứ gì khác trong cây cấp được: `frontend.surface.audit` render bề mặt và giữ lại
-ảnh chụp, còn `uat.verify` đi hành trình của một người thật xuyên qua nó. `quality.verify` nằm giữa
-hai cái đó và trả lời một câu hỏi khác — build, lint, type, coverage — và cổng xanh chưa bao giờ nhận
-ra một trang đọc lên thấy sai. Nên mọi ví dụ có apply source frontend đều kết thúc như nhau:
+## Gate ép những gì
 
-```text
-frontend.source.apply → workspace.bind (role fe, runtimeNeed consume) → frontend.surface.audit → quality.verify → uat.verify → git.publish
-```
+`validate-chain` đọc `state.json.chain`, `state.json.steps` và `request.json` của từng nhánh, và từ
+chối chuỗi trong đó:
 
-`workspace.bind` lần hai có ở đó vì head đã dịch: bề mặt cần được phục vụ, audit và đi thử là bề mặt
-mà lần ghi vừa sinh ra, không phải bề mặt đã bind trước đó. `uat.verify` cần `feature`, `flow` và
-`approval` trước khi chạy — luồng cần đi qua và thẩm quyền cho việc ghi của chính nó, lấy từ khai báo
-của môi trường và chỉ hỏi một con người khi khai báo đó đánh dấu lớp bị chạm là `person` — nên mọi
-chuỗi mang nó đều khai chúng dưới `asks`, và lần chạy thà từ chối chứ không bịa ra thẩm quyền.
+- một nhánh gọi tên operator cây không có, hay một ô nằm ở bậc không đúng số của nó;
+- một bậc có operator mà không bảng Kế tiếp nào của bậc trước cho phép và cũng không phải vào lại
+  chính operator đó;
+- một nhánh cần Đầu vào không bậc trước nào sinh, hay context `@workspaces/<role>` không
+  `workspace.bind` nào của role đó bind trước;
+- một bậc vượt trần song song, hay hai nhánh cùng bậc ghi cùng alias;
+- một nhánh ghi source frontend dưới `mode: apply` rồi `git.publish` theo sau mà audit hay
+  `uat.verify` thiếu hoặc nằm ngoài khoảng giữa lần ghi và lần publish;
+- `git.publish` hay `release.deploy` chạy rồi còn thứ gì khác ngoài publish hay deploy chạy sau —
+  chuỗi kết thúc ở `git.publish`, `release.deploy` hoặc một con người;
+- trên nhiệm vụ, một nhánh không có goal, trích dòng "xong khi" mà operator của nó không sinh, hay
+  prerequisite không phải một nhánh sau của chuỗi;
+- chuỗi có `<domain>.plan` mà một nhánh thực thi đơn vị của nó lại chạy cùng bậc hay bậc trước;
+  nhánh gọi tên unit nào, và plan có liệt kê nó không, là việc của `validate-request#unitGateErrors`.
 
-`staging-uat` là ví dụ duy nhất chứng minh một bản giao ở nơi khác nơi nó được viết. Nó không ghi gì —
-`frontend.source.apply` chạy dưới `mode: dry`, nên luật chuỗi dài không với tới — và nó mang `env` trên
-lượt audit và lượt chạy, thứ chọn ra entry trong sổ đăng ký runtime, file tài khoản và bản tham chiếu đã
-duyệt của stack ấy. Nó kết thúc ở `user`, vì hai biên nhận trong tay một con người mới là kết quả; đưa
-lên một môi trường là việc của `release` và ở lại đó.
+`validate-session` chạy nó trên cả sổ sau mỗi chuyển bước.
 
-`backend-feature` là chuỗi giao hàng duy nhất không có hai bằng chứng ấy, và `when` của nó nói rõ vì
-sao: nó không ghi bề mặt nào, `uat.verify` cần đầu vào `frontend-surface-audit` và một route fe đã
-bind, ở đó không có cái nào. Một feature backend mà lời hứa chạm tới người qua màn hình thì thuộc về
-`full-feature`, nơi hành trình được đi trước khi publish. `release` và `content-unit` không ghi source
-frontend và không publish ranh giới nào, nên luật này không với tới chúng.
+## Vẽ lại
 
-Mọi nhánh ghi source đều commit trên `session/<sessionId>`; `git.publish` merge nó, và từ chối một
-nhánh phiên mà phiên của nó không có biên nhận source-application lẫn ảnh chụp audit
-(`SESSION_MISSING`). Nhánh bị chặn vào lại thành bậc mới; vòng lặp tính vào `maxRounds` của chính
-operator.
+Chuỗi được vẽ một lần trước dispatch đầu tiên, và vẽ lại ở mỗi lần dừng làm đổi thứ nhiệm vụ cần:
+nhánh `blocked` mà route vào lại hay thêm operator, một plan đã biết đơn vị, một goal được sửa. Mỗi
+lần vẽ lại là một chuyển bước `replanned` trong `state.json.transitions` mang ghi chú và phiên bản
+goal nó chuyển tới, được xác nhận qua `goal-confirm` như plan đầu, không bao giờ viết lại trong im
+lặng (`scripts/validate-session.mjs#missionHistoryErrors`).
 
-| Workflow | Khi | Các bậc | Song song | Kết thúc |
-| --- | --- | --- | --- | --- |
-| `library-maintenance` | hành vi package owner hiện có và patch kế tiếp, không đổi presentation sản phẩm | preflight → bind → library apply → quality | — | `user` |
-| `dependency-maintenance` | tiêu thụ package đã kiểm qua metadata dependency chính xác | preflight → bind → dependency update → quality | — | `user` |
-| `frontend-new-surface` | bề mặt chưa tồn tại (`new`) | preflight → bind ×2 → business → direction → resolve → apply → bind (consume) → audit → quality → uat → publish | audit theo matrix | `git.publish` |
-| `frontend-reconstruct` | dựng lại bề mặt đã có, giữ fact nghiệp vụ | preflight → bind ×2 → direction → resolve → apply → bind (consume) → audit → quality → uat → publish | audit theo matrix | `git.publish` |
-| `frontend-refine` | sửa bên trong cấu trúc đã duyệt | preflight → bind ×2 → direction → resolve → apply → bind (consume) → audit → quality → uat → publish | audit theo matrix | `git.publish` |
-| `backend-feature` | một contract backend cho một feature, không có bề mặt | preflight → bind → business (model) → architecture → backend apply → quality → business (reconcile) → publish | — | `git.publish` |
-| `full-feature` | backend và bề mặt frontend mới cùng lúc | preflight → bind ×2 → business → architecture → [backend apply ∥ direction] → [quality ∥ resolve] → apply → bind (consume) → audit → quality → uat → business (reconcile) → publish | hai bậc hai nhánh, audit theo matrix | `git.publish` |
-| `frontend-with-uat` | thay đổi frontend mà người yêu cầu đích danh đi thử | preflight → bind ×2 → direction → resolve → apply → bind (consume) → audit → quality → uat → publish | audit theo matrix | `git.publish` |
-| `staging-uat` | một bản giao đã publish phải được đi thử trên stack khác trước khi release | preflight → bind ×2 (consume) → direction → resolve → apply (dry) → audit (env staging) → quality → uat (env staging) | audit theo matrix | `user` |
-| `release` | head đã publish phải lên production | preflight → bind → quality → release | — | `release.deploy` |
-| `content-unit` | một đơn vị giáo trình từ đầu tới cuối | content.generate (có exchange review bên trong) | — | `user` |
+## Các fixture
 
-Hình dạng file (`schemaVersion` 9): `id` bằng tên file; `when` có `en` và `vi`; `chain` là mảng bậc,
-mỗi bậc là mảng
-`{ operator, requirements?, asks?: [field], fanout?: "matrix", maxParallel?: 1..3 }`; `loops` là mảng
-`{ from, to, when, maxRounds }`; `ends` là `user` hoặc một operator của bậc cuối.
+`tests/chains/<id>.json` giữ mười một chuỗi mẫu của 2.0.0 viết lại theo id operator hiện tại, mỗi
+chuỗi kèm nhiệm vụ mà các dòng "xong khi" gọi tên kết quả của nó, thứ tự operator nó chờ đợi, và
+ghi chú về cách viết lại. Chúng là đầu vào cho spec của planner, không phải cho runtime: cửa vào
+không bao giờ đọc chúng.

@@ -1,6 +1,6 @@
-# changes — frontend.source.apply step-5/parallel-1
+# changes — interface.generate step-5/parallel-1
 
-`frontend.source.apply` projected the resolved tree for the subscriptions route onto two declared paths of
+`interface.generate` projected the resolved tree for the subscriptions route onto two declared paths of
 the frontend checkout, bound to the direction decided in `step-3/parallel-1` and the presentation
 resolved in `step-4/parallel-1`. Nothing outside the declared write set was touched.
 
@@ -8,7 +8,7 @@ resolved in `step-4/parallel-1`. Nothing outside the declared write set was touc
 
 | Field | Value |
 | --- | --- |
-| Operator | `frontend.source.apply` |
+| Operator | `interface.generate` |
 | Step | `step-5/parallel-1` |
 | Checkout | `@workspaces/fe` at `14e0c20…` → `uncommitted` |
 | Predecessor | `step-4/parallel-1/response/response.md` |
@@ -24,4 +24,4 @@ resolved in `step-4/parallel-1`. Nothing outside the declared write set was touc
 
 - Gates to run: `lint`, `typecheck`, `test:unit` for `src/blocks/commerce/**`.
 - Surfaces to observe: `/subscriptions` at mobile and desktop, light and dark.
-- Not changed on purpose: `src/blocks/commerce/ProSubscriptionBlock/index.stories.tsx` stays until the story audit runs after `frontend.surface.audit`.
+- Not changed on purpose: `src/blocks/commerce/ProSubscriptionBlock/index.stories.tsx` stays until the story audit runs after `interface.audit`.

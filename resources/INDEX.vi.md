@@ -55,24 +55,29 @@ tên nó. Mọi nơi khác, `never`.
 
 Bản tóm tắt những gì mỗi `operator.json` khai; validator từ chối dòng nào lệch.
 
-| Operator | Profile | Grammar | Tool | Vì sao |
-| --- | --- | --- | --- | --- |
-| `workspace.bind` | luna | không | `fileread:context-aliases`, `git:read`, `shell:declared-commands`, `http:probe`, `secrets:resolve-by-name` | Đọc file chuẩn và sổ đăng ký; không phán đoán |
-| `business.decide` | sol-fresh | không | `fileread:context-aliases`, `sourcewrite:declared-write-set`, `git:read`, `websearch:bounded` | Mô hình kinh doanh lạ có thể cần tra cứu trước khi đóng băng độ phủ |
-| `architecture.decide` | sol-fresh | không | `fileread:context-aliases`, `git:read`, `websearch:bounded`, `visualize:html` | Phương án thay thế và tương thích cần bằng chứng ngoài repo; schema đã ghim model |
-| `backend.source.apply` | luna | không | `fileread:context-aliases`, `sourcewrite:declared-write-set`, `git:commit-session-branch`, `shell:declared-commands` | Ghi trong hợp đồng đã đóng băng, theo patterns/be |
-| `library.source.apply` | luna | không | `fileread:context-aliases`, `sourcewrite:declared-write-set`, `git:commit-session-branch`, `shell:declared-commands` | Sửa package owner đã bind, có regression trước/sau và đầy đủ gate package |
-| `dependency.update` | luna | no | `fileread:context-aliases`, `sourcewrite:declared-write-set`, `git:commit-session-branch`, `shell:declared-commands` | Tiêu thụ một bản phát hành package đã kiểm trong metadata dependency chính xác và gate regression consumer không đổi |
-| `frontend.direction.decide` | sol-fresh | có | `fileread:context-aliases`, `git:read`, `websearch:bounded`, `imagegen:judged`, `visualize:html`, `host:loopback`, `print:decision-points` | Chỉ tra cứu khi lĩnh vực lạ; render ứng viên thành trang và tự xét khi một vùng quá trống, cần hình |
-| `frontend.presentation.resolve` | luna | có | `fileread:context-aliases`, `git:read`, `registry:read` | Tra cứu trên một danh sách đóng |
-| `frontend.source.apply` | luna | có | `fileread:context-aliases`, `sourcewrite:declared-write-set`, `shell:declared-commands`, `git:commit-session-branch`, `imagegen:judged` | Chỉ ghi thứ resolution đã chứa, theo patterns/fe |
-| `frontend.surface.audit` | sol-reviewer | có | `fileread:context-aliases`, `git:read`, `websearch:bounded`, `visualize:html`, `browsercontrol:required`, `http:probe`, `host:loopback`, `secrets:resolve-by-name`, `print:decision-points` | Chỉ trình duyệt, không ghi nguồn: người soi không sửa được thứ mình đo, và nó đăng nhập theo tên thông tin đăng nhập để vào một route có cổng canh |
-| `quality.verify` | luna | không | `fileread:context-aliases`, `git:read`, `shell:declared-commands`, `http:probe` | Chạy cổng, không sửa |
-| `uat.verify` | sol-fresh | không | `fileread:context-aliases`, `sourcewrite:declared-write-set`, `git:read`, `websearch:bounded`, `visualize:html`, `browsercontrol:required`, `http:probe`, `secrets:resolve-by-name`, `database:namespaced-write`, `print:decision-points` | Lái hành trình thật trong trình duyệt và không được ghi gì; phán quyết mới cho từng lane |
-| `release.deploy` | luna | không | `fileread:context-aliases`, `git:read`, `shell:declared-commands`, `http:probe`, `container:operate`, `ci:read`, `secrets:resolve-by-name` | Phát hành bất biến dưới authorization đã khai |
-| `platform.operate` | luna | không | `fileread:context-aliases`, `git:merge-into-integration-branch`, `shell:declared-commands`, `http:probe`, `container:operate`, `secrets:resolve-by-name`, `sourcewrite:declared-write-set`, `browsercontrol:required`, `database:namespaced-write` | Dịch vụ dùng chung từ bằng chứng chính xác, cùng danh tính và entry runtime mà một route đã bind cần: nó tạo tài khoản và seed thay vì báo thiếu |
-| `content.generate` | luna | không | `fileread:context-aliases`, `shell:declared-commands`, `websearch:bounded`, `imagegen:required`, `objectstorage:read` | Tra cứu brief trong giới hạn, rồi viết, code và vẽ theo tuyên bố; schema ghim model này |
-| `git.publish` | luna | không | `fileread:context-aliases`, `git:merge-and-push`, `shell:declared-commands`, `ci:read` | Publish không force; thao tác phá hoại không biểu diễn được |
+| Operator | Profile | Grammar | Tool | Chế độ | Vì sao |
+| --- | --- | --- | --- | --- | --- |
+| `environment.preflight` | sol-fresh | không | `fileread:context-aliases`, `git:read`, `shell:declared-commands`, `http:probe`, `secrets:resolve-by-name`, `container:read` | inline | Đọc khai báo, checkout, custody, sổ đăng ký và máy chủ một lần rồi báo mọi bức tường cùng lúc; không sửa gì |
+| `workspace.bind` | sol-fresh | không | `fileread:context-aliases`, `git:read`, `shell:declared-commands`, `secrets:resolve-by-name` | inline | Đọc file chuẩn và một sổ đăng ký; không phán xét |
+| `business.decide` | sol-fresh | không | `fileread:context-aliases`, `sourcewrite:declared-write-set`, `git:read`, `websearch:bounded` | isolated | Một mô hình nghiệp vụ lạ có thể cần tra cứu tham chiếu trước khi chốt coverage |
+| `architecture.decide` | sol-fresh | không | `fileread:context-aliases`, `git:read`, `websearch:bounded`, `visualize:html` | isolated | Phương án và tương thích cần bằng chứng ngoài repo; schema ghim model |
+| `interface.plan` | sol-fresh | có | `fileread:context-aliases`, `git:read` | isolated | Đọc tham chiếu, source và lời hứa một lần rồi gọi tên mọi trang và modal với một shell chung; không quyết gì bên trong một đơn vị |
+| `interface.generate` | sol-fresh | có | `fileread:context-aliases`, `git:commit-session-branch`, `websearch:bounded`, `imagegen:judged`, `visualize:html`, `host:loopback`, `print:decision-points`, `registry:read`, `sourcewrite:declared-write-set`, `shell:declared-commands` | isolated | Một agent mù dựng, render và in các ứng viên, resolve theo inventory đóng và ghi cây một lần |
+| `interface.audit` | sol-reviewer | có | `fileread:context-aliases`, `git:read`, `websearch:bounded`, `visualize:html`, `browsercontrol:required`, `http:probe`, `host:loopback`, `secrets:resolve-by-name`, `print:decision-points` | isolated | Chỉ trình duyệt, không ghi source: người chấm không được sửa thứ mình đo, và đăng nhập bằng tên credential để tới route có cổng canh |
+| `interface.fix` | sol-fresh | có | `fileread:context-aliases`, `sourcewrite:declared-write-set`, `shell:declared-commands`, `git:commit-session-branch` | inline | Một finding, một commit nhỏ từ inventory của generator; lớn hơn là FIX_TOO_LARGE |
+| `library.update` | sol-fresh | không | `fileread:context-aliases`, `sourcewrite:declared-write-set`, `git:commit-session-branch`, `shell:declared-commands` | isolated | Sửa package của owner với bằng chứng trước/sau, đóng gói bản phát hành và tiêu thụ nó bằng metadata chính xác ở phía dùng |
+| `backend.generate` | sol-fresh | không | `fileread:context-aliases`, `sourcewrite:declared-write-set`, `git:commit-session-branch`, `shell:declared-commands` | isolated | Ghi bên trong một contract đã đóng băng theo patterns/be, trọn vẹn hay dưới dạng fix |
+| `identity.provision` | sol-fresh | không | `fileread:context-aliases`, `shell:declared-commands`, `http:probe`, `secrets:resolve-by-name`, `sourcewrite:declared-write-set`, `browsercontrol:required` | inline | Tạo tài khoản của luồng tại provider đã khai bằng credential resolve theo tên và chứng minh đăng nhập được; chỉ ghi tên |
+| `data.seed` | sol-fresh | không | `fileread:context-aliases`, `sourcewrite:declared-write-set`, `secrets:resolve-by-name`, `http:probe`, `database:namespaced-write` | inline | Ghi và áp seed của một luồng theo luật cô lập, mọi dòng quy được nguồn, kèm rollback |
+| `runtime.serve` | sol-fresh | không | `fileread:context-aliases`, `git:merge-into-integration-branch`, `shell:declared-commands`, `http:probe`, `container:operate`, `secrets:resolve-by-name` | inline | Merge một phiên vào nhánh tích hợp, khởi động lại đúng một server theo head, chứng thực entry, giữ lease |
+| `migration.release` | sol-fresh | không | `fileread:context-aliases`, `git:read`, `shell:declared-commands`, `secrets:resolve-by-name` | inline | Áp bộ migration đã khai đúng một lần qua runner do source sở hữu, giữ nguyên journal |
+| `business.reconcile` | sol-fresh | không | `fileread:context-aliases`, `sourcewrite:declared-write-set`, `git:read` | isolated | So head lời hứa đã công bố với source đã giao và ghi lại mọi sai lệch |
+| `quality.verify` | sol-fresh | không | `fileread:context-aliases`, `git:read`, `shell:declared-commands`, `http:probe` | inline | Chạy gate, không sửa gì |
+| `uat.plan` | sol-fresh | không | `fileread:context-aliases` | isolated | Đọc goal và bản đồ một lần rồi gọi tên mỗi hành trình một luồng với alias và namespace riêng; không đi thử gì |
+| `uat.verify` | sol-fresh | không | `fileread:context-aliases`, `sourcewrite:declared-write-set`, `git:read`, `websearch:bounded`, `visualize:html`, `browsercontrol:required`, `http:probe`, `secrets:resolve-by-name`, `database:namespaced-write`, `print:decision-points` | isolated | Đi hành trình thật trong trình duyệt và không được ghi gì; verdict mới cho từng làn |
+| `release.deploy` | sol-fresh | không | `fileread:context-aliases`, `git:read`, `shell:declared-commands`, `http:probe`, `container:operate`, `ci:read`, `secrets:resolve-by-name` | inline | Phát hành image bất biến dưới uỷ quyền đã khai, kèm probe và rollback |
+| `content.generate` | sol-fresh | không | `fileread:context-aliases`, `shell:declared-commands`, `websearch:bounded`, `imagegen:required`, `objectstorage:read` | isolated | Tra cứu brief trong giới hạn, rồi viết, code và vẽ theo một claim; schema ghim model này |
+| `git.publish` | sol-fresh | không | `fileread:context-aliases`, `git:merge-and-push`, `shell:declared-commands`, `ci:read` | inline | Publish không force; thao tác huỷ diệt không biểu diễn được |
 
 ## Profile
 
@@ -82,14 +87,12 @@ Bản tóm tắt những gì mỗi `operator.json` khai; validator từ chối d
 | --- | --- | --- | --- | --- |
 | `sol-fresh` | `gpt-5.6-sol` | mạng, hình, trình duyệt, source | mạng, hình, trình duyệt, source | Quyết định và direction, từ đầu tới cuối |
 | `sol-reviewer` | `gpt-5.6-sol` | mạng, hình, trình duyệt, source | trình duyệt | Audit và UAT; chỉ quan sát, không bao giờ ghi |
-| `luna` | `gpt-5.6-luna` | mạng, hình, source | mạng, hình, source | Nội dung có tác giả, từ đầu tới cuối |
 
 ### Runtime `claude` (provider `anthropic`)
 
 | Profile | Model | Năng lực | Được cấp | Dùng cho |
 | --- | --- | --- | --- | --- |
 | `opus` | `claude-opus-5` | mạng, trình duyệt, source | trình duyệt, source | Tác giả nặng và mutation rủi ro cao |
-| `sonnet` | `claude-sonnet-5` | mạng, trình duyệt, source | source | Việc xác định và cơ học |
 | `fable` | `claude-fable-5-1` | mạng, trình duyệt, source | source | Trích xuất và audit bám source |
 
 `fable` được đăng ký cho việc audit và trích xuất đã tạo ra `patterns/`; hôm nay chưa operator nào

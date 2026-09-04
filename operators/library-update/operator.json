@@ -1,0 +1,22 @@
+{
+  "schemaVersion": 9,
+  "id": "library.update",
+  "domain": "library",
+  "job": "Update one explicitly authorized owner package end to end: reproduce the regression in the package, repair it, bump the patch version, build and gate the package, then consume that exact release in the consumer's dependency metadata with the unchanged consumer regression proof, in two session commits.",
+  "package": "operator.md",
+  "errors": "errors.json",
+  "validator": "validate.mjs",
+  "selfTest": "self-test.mjs",
+  "resources": {
+    "profile": "sol-fresh",
+    "grammarBound": false,
+    "mode": "isolated",
+    "tools": {
+      "@tools/fileread": "context-aliases",
+      "@tools/sourcewrite": "declared-write-set",
+      "@tools/git": "commit-session-branch",
+      "@tools/shell": "declared-commands"
+    }
+  },
+  "primaryOutput": "library-source-application"
+}

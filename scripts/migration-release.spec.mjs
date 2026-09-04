@@ -6,7 +6,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { migrationDigest as hash, migrationRunnerErrors, migrationExecutionErrors, migrationReleaseProofErrors, validateMigrationReleaseRequest, migrationJournalFingerprint, migrationConnectionFingerprint } from './migration-release.mjs';
 import { executeMigrationRelease } from './migration-release-run.mjs';
-import { validateReleaseStep } from '../operators/release-deploy/validate.mjs';
+import { validateMigrationStep } from '../operators/migration-release/validate.mjs';
 import { validateAgainst } from './json-schema.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -111,13 +111,13 @@ test('proof rejects metadata drift even when a receipt and log are both edited',
 });
 test('legacy release requests stay inactive; malformed migration binding fails closed', async () => {
   assert.equal((await validateMigrationReleaseRequest(root, root, { operatorId: 'release.deploy', requirements: {} })).active, false);
-  const result = await validateMigrationReleaseRequest(root, root, { operatorId: 'release.deploy', requirements: { migration: { command: 'anything' } } });
+  const result = await validateMigrationReleaseRequest(root, root, { operatorId: 'migration.release', requirements: { migration: { command: 'anything' } } });
   assert.equal(result.active, true); assert.ok(result.errors.length);
 });
 test('execution refuses before effects when its request was never frozen', async (t) => {
   const { session, branch } = fixture(t); fs.mkdirSync(path.join(branch, 'request'));
-  fs.writeFileSync(path.join(branch, 'request/request.json'), JSON.stringify({ operatorId: 'release.deploy', sessionId: 'test', step: 1, parallel: 1 }));
-  fs.writeFileSync(path.join(session, 'state.json'), JSON.stringify({ id: 'test', steps: { '1/1': 'release.deploy' }, requestHashes: {} }));
+  fs.writeFileSync(path.join(branch, 'request/request.json'), JSON.stringify({ operatorId: 'migration.release', sessionId: 'test', step: 1, parallel: 1 }));
+  fs.writeFileSync(path.join(session, 'state.json'), JSON.stringify({ id: 'test', steps: { '1/1': 'migration.release' }, requestHashes: {} }));
   assert.deepEqual(await executeMigrationRelease(root, branch), { status: 'blocked', code: 'REQUEST_NOT_FROZEN', partialMutation: false });
 });
 
@@ -148,7 +148,7 @@ test('complete migration release runs a source-pinned subprocess and validates t
   for (const result of results) assert.deepEqual(result.errors, []);
   assert.deepEqual(await executeMigrationRelease(f.root, f.branch), { status: 'done', outcome: 'migrated', receipt: 'response/migration-release.md', proof: 'response/data/migration-release.json' });
   f.finish();
-  assert.deepEqual((await validateReleaseStep(f.branch, f.root)).errors, []);
+  assert.deepEqual((await validateMigrationStep(f.branch, f.root)).errors, []);
   const proof = JSON.parse(fs.readFileSync(path.join(f.branch, 'response/data/migration-release.json'), 'utf8'));
   assert.deepEqual(proof.executions.map(row => row.applied), [[NEW], []]);
   assert.equal(proof.journalExistsBefore, false); assert.equal(proof.journalExistsAfter, true);

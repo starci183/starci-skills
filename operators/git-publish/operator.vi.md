@@ -10,8 +10,7 @@ non-force và chỉ fast-forward, và dừng bằng một lỗi có kiểu thay 
 Xong khi `git-publication` ghi nhận rằng đúng commit mà biên nhận quality đã đo đã tới ref được
 route trên remote bằng một lần push non-force tạo mới hoặc fast-forward ref ấy với mọi hook đã qua,
 nhánh phiên đã được merge và không bao giờ rebase, nhiều nhất một tag có chú thích trỏ vào head mà
-chính lần publish này đã push, và worktree, nhánh cùng thư mục phiên đã được gỡ với chủ runtime được
-yêu cầu đích danh dừng server nó đã khởi động.
+chính lần publish này đã push, và worktree, nhánh cùng thư mục phiên đã được gỡ.
 
 ## Nó không quyết gì về bản thân thay đổi
 
@@ -70,11 +69,12 @@ bao giờ rebase, không bao giờ force, và không bao giờ chạy với hook
 ## Nhánh phiên không có biên nhận thì không publish được
 
 Một nhánh phiên chỉ là phần đuôi của một phiên, nên phiên sinh ra nó phải còn trên đĩa lúc operator
-này merge: thư mục phiên tồn tại, và trong đó một nhánh `frontend.source.apply` hay
-`backend.source.apply` ở trạng thái `done` với head của nhánh nằm trong `commits` của nó. Biên nhận
+này merge: thư mục phiên tồn tại, và trong đó một nhánh `interface.generate`, `interface.fix`,
+`backend.generate` hay `library.update` ở trạng thái `done` với head của nhánh nằm trong `commits`
+của nó. Biên nhận
 đó là thứ duy nhất nói được path nào đã khai, giá trị nào được cho phép, và cổng nào đã cho chúng
 qua; một nhánh phiên không có biên nhận ấy mang những commit không ai viết request cho, và merge nó
-là publish thứ chưa từng đi vào runtime. Khi chuỗi mà phiên chạy có bước `frontend.surface.audit`
+là publish thứ chưa từng đi vào runtime. Khi chuỗi mà phiên chạy có bước `interface.audit`
 hay `uat.verify`, response của nhánh đó cùng các artifact `screenshot` cũng phải tồn tại, vì một bề
 mặt không ai nhìn và một hành trình không ai đi chính là những thay đổi mà cổng này sinh ra để chặn.
 Thiếu bất kỳ cái nào cũng là `SESSION_MISSING`, nó
@@ -119,11 +119,8 @@ chúng giữ vừa trở thành một commit đã publish. Một phiên bị ch�
 đã thử làm gì nằm ở đó cho tới khi có người đọc.
 
 
-Có đúng một thứ được nhả chứ không bị xoá. Trong lúc phiên chạy, chủ runtime đã phục vụ phần việc của
-nó từ nhánh tích hợp của sản phẩm và đang giữ lease cùng pid đi kèm; xoá một worktree khi server còn
-sống sẽ để lại một tiến trình phục vụ một cây không còn ở đó, còn tự kill tiến trình đó ở đây là
-operator này giành lấy một vòng đời nó không sở hữu. Nên đây là một lần bàn giao: chủ runtime được yêu
-cầu dừng đúng thứ nó đã khởi động, đích danh, và chính nó kill pid mà nó đã ghi.
+Server đã phục vụ phần việc của phiên không phải của operator này để dừng: chủ runtime giữ lease và
+pid, và nhả chúng là việc của chính nó, đi tới qua bảng Kế tiếp khi lần publish đã xong.
 ## Ranh giới ghi
 
 Context chỉ đọc, trừ merge và push. Operator chỉ ghi vào `response/` của nhánh mình, nhánh đích của
@@ -147,7 +144,7 @@ giới đã duyệt; và không publish khi chưa có route đã kiểm và mộ
 | Kind | Từ đâu | Bắt buộc |
 | --- | --- | --- |
 | `workspace-route-binding` | `workspace.bind`; một lần publish không bao giờ tự phân giải checkout của mình | có |
-| `changes` | `backend.source.apply` hoặc `frontend.source.apply`, đúng tập file mà lần publish này mang | có |
+| `changes` | `interface.generate`, `interface.fix`, `backend.generate` hoặc `library.update`, đúng tập file mà lần publish này mang | có |
 | `quality-verification` | `quality.verify`, biên bản có commit đã đo chính là commit lần publish này đẩy | có |
 
 ## Yêu cầu
@@ -168,7 +165,7 @@ giới đã duyệt; và không publish khi chưa có route đã kiểm và mộ
 | 3 | Ràng phê duyệt vào đúng ranh giới này | `boundary`, `approval` | phần requirements của `request/request.json`, Đầu vào `changes` là tập file, Đầu vào `quality-verification` là commit đã đo | — | `APPROVAL_MISSING` |
 | 4 | Kiểm cây: bẩn ngoài ranh giới, chính sách nhánh | — | @workspaces/local/routes/<project>/<role>, các path bẩn, mọi nhánh, chính sách đã route | — | `DIRTY_OUTSIDE_BOUNDARY`, `BRANCH_POLICY_VIOLATION` |
 | 5 | Chạy hook | — | @workspaces/<project>/<role>/husky: các hook đã cài, trong đó có `pre-push` | @tools/shell | `HOOK_BLOCKED` |
-| 6 | Ràng biên nhận của phiên, rồi merge nhánh phiên vào nhánh đích | — | thư mục phiên: `state.json`, nhánh `frontend.source.apply` hay `backend.source.apply` có `commits` mang head phiên, và các nhánh `frontend.surface.audit` cùng `uat.verify` với artifact `screenshot` của chúng khi chuỗi có các bước đó; @workspaces/local/routes/<project>/<role> cho head đích, base phiên và head phiên | @workspaces/local/routes/<project>/<role>, nhánh đích của checkout đó, @tools/git | `SESSION_MISSING`, `NON_FAST_FORWARD` |
+| 6 | Ràng biên nhận của phiên, rồi merge nhánh phiên vào nhánh đích | — | thư mục phiên: `state.json`, nhánh `interface.generate`, `interface.fix`, `backend.generate` hay `library.update` có `commits` mang head phiên, và các nhánh `interface.audit` cùng `uat.verify` với artifact `screenshot` của chúng khi chuỗi có các bước đó; @workspaces/local/routes/<project>/<role> cho head đích, base phiên và head phiên | @workspaces/local/routes/<project>/<role>, nhánh đích của checkout đó, @tools/git | `SESSION_MISSING`, `NON_FAST_FORWARD` |
 | 7 | Push non-force, chỉ fast-forward | — | @workspaces/local/routes/<project>/<role> cho head đã duyệt, @remote/git/<project>/<role> tại remote head quan sát được, @tools/ci | @remote/git/<project>/<role>, @tools/git | `NON_FAST_FORWARD` |
 | 8 | Push tag tiếp nối | `tag` | @workspaces/local/routes/<project>/<role> cho head mà lần publish này đã đẩy | @remote/git/<project>/<role>, @tools/git | — |
 | 9 | Xóa worktree và nhánh phiên, viết biên bản và phát | — | mọi thứ ở trên | @workspaces/local/routes/<project>/<role>, `response/response.md`, `response/response.json`, @tools/git | — |
@@ -205,4 +202,4 @@ dạng một remote head mới vì cùng một quan sát không thể cho một 
 | Khi | Operator |
 | --- | --- |
 | ranh giới đã publish và head phải tới được một môi trường | `release.deploy` |
-| phiên đã được dọn và runtime từng phục vụ nó phải nhả lease cùng server nó đã khởi động | `platform.operate` |
+| phiên đã được dọn và chủ runtime phải nhả lease của phiên nó đã phục vụ và dừng thứ nó đã khởi động | `runtime.serve` |

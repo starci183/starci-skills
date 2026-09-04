@@ -11,11 +11,14 @@ khuyên: xong nghĩa là có validator từ chối được vi phạm, và có b
 - [x] Goal của nhiệm vụ được người xác nhận trước bước 1: `state.json.mission` (goal, gồm, không gồm,
       xong khi với `producedBy`), lựa chọn `goal:<session>:v<n>`, transition `replanned` có ghi chú.
       (commit `02e97451`)
-- [ ] Goal cho từng nhánh: `request.json.goal` trỏ về đúng một dòng "xong khi" của mission hoặc khai
+- [x] Goal cho từng nhánh: `request.json.goal` trỏ về đúng một dòng "xong khi" của mission hoặc khai
       `prerequisite` cho nhánh nào; `validate-request` từ chối nhánh không trỏ về đâu.
-- [ ] Kiểm sau: `response.json.goalCheck { achieved, evidence[] }` — agent khai, validator đối chiếu
+      (`validate-request.mjs#branchGoalErrors`, `mission-gate.spec.mjs`)
+- [x] Kiểm sau: `response.json.goalCheck { achieved, evidence[] }` — agent khai, validator đối chiếu
       evidence với Output có thật và `producedBy` đúng operator; chỉ cái đã đối chiếu mới vào
       `brief.proven`. Ba nhánh liền không thêm bằng chứng "xong khi" nào → dừng, hỏi người.
+      (`validate-response.mjs#goalCheckErrors`, `validate-session.mjs#provenErrors`,
+      `#threeBranchStopErrors`, `validate-session.spec.mjs`)
 - [ ] Fail thì chạy lại đúng ô: lỗi nhỏ (dưới ba file, không đổi bố cục) → `*.fix`; lỗi lớn →
       `*.generate`; thước "nhỏ/lớn" ghi trong `resources/orchestrator.json`, không trong operator.
 
@@ -26,13 +29,17 @@ trang, cấp tài khoản, seed dữ liệu, serve runtime, đi thử, publish);
 when không nối bằng "or" giữa hai việc, một quy trình tối đa 12 dòng lọt trong brief 2 KB, scope và
 context khai đủ để agent mù chạy được, log đủ để người đọc ledger dựng lại được việc.
 
-- [ ] Gate cho "một việc": `operator.json.primaryOutput` khai đúng một kind; Done when phải gọi tên kind
+- [x] Gate cho "một việc": `operator.json.primaryOutput` khai đúng một kind; Done when phải gọi tên kind
       đó; `validate-operator` từ chối operator có hai primaryOutput hoặc Done when nối hai việc bằng
       "or" ngoài mệnh đề chế độ (apply/dry, delta none).
+      (`validate-operator.mjs#checkPrimaryOutput`, `#checkDoneWhenAlternatives`, `validate-operator.spec.mjs`)
 
-- [ ] Cờ `mode: inline | dispatch | isolated` trên `operator.json` thay cho `dispatch`; `isolated`
+- [x] Cờ `mode: inline | dispatch | isolated` trên `operator.json` thay cho `dispatch`; `isolated`
       chỉ đọc alias trong Context và file trong `inputs`, request thiếu input bắt buộc bị từ chối
       trước khi spawn; tối đa một `dispatch` cùng lúc; profile ghi `forkTurns` theo mode.
+      (`orchestrator.json#modes`, `#concurrency.maxDispatch`, `validate-resources.mjs`,
+      `validate-request.mjs#isolatedContextErrors`; cột `Dispatch` của `resources/INDEX.md` còn phải
+      đổi tên thành `Mode`)
 - [ ] Tách `platform.operate` → `identity.provision`, `data.seed`, `runtime.serve` (Done when hiện
       dài 975 byte, ba nhánh trong một câu; S2 bị chặn 7/10 lượt).
 - [ ] Tách `release.deploy` → `release.deploy` (image) và `migration.release`.
@@ -45,14 +52,17 @@ context khai đủ để agent mù chạy được, log đủ để người đ�
 - [ ] Bỏ nửa runtime khỏi `workspace.bind`; bỏ việc dừng server khỏi `git.publish`.
 - [ ] Luồng rõ: bảng Steps của mọi operator viết lại thành quy trình cụ thể — mỗi dòng mở bằng động từ,
       gọi tên tool hoặc file sinh ra, tối đa 12 dòng; `validate-operator` bắt buộc.
-- [ ] Scope rõ, context rõ: Context table và Inputs là toàn bộ thứ agent mù được thấy; brief in dòng
+- [x] Scope rõ, context rõ: Context table và Inputs là toàn bộ thứ agent mù được thấy; brief in dòng
       "you see only what request.json names" khi mode là isolated.
+      (`generate-operator-briefs.mjs`, `validate-request.mjs#isolatedContextErrors`)
 - [ ] Workflow viết thành quy trình đọc được (`procedure` trong `workflows/*.json`), tối đa ba nhánh
       một bậc, chuỗi suy từ các dòng "xong khi" của mission; vẽ lại chuỗi là transition `replanned`.
-- [ ] Log đủ ra session gốc: sau mỗi transition in đúng hai dòng vào chat — goal của nhánh, rồi
+- [x] Log đủ ra session gốc: sau mỗi transition in đúng hai dòng vào chat — goal của nhánh, rồi
       done/blocked với số dòng "xong khi" đã có bằng chứng, đường dẫn artifact, lỗi và ô kế tiếp;
       output đầy đủ ở lại session folder; cuối lượt một khối báo cáo theo ba dạng của
       `resources/interaction.json`.
+      (`interaction.json#transitionLog`, `state.json.transitions[].logged`,
+      `validate-session.mjs#loggedErrors`, `validate-interaction.mjs#transitionLogErrors`)
 - [ ] `content.generate`: tách brief / sinh / review ở đợt sau, domain riêng.
 
 ## 2a. Full Sol
@@ -65,23 +75,32 @@ context khai đủ để agent mù chạy được, log đủ để người đ�
 
 ## 2b. Dynamic flows và cặp plan/execute
 
-- [ ] Xoá 11 workflow ví dụ khỏi runtime: cửa vào không đọc `when` nữa; chuỗi được `scripts/plan-chain.mjs`
+- [x] Xoá 11 workflow ví dụ khỏi runtime: cửa vào không đọc `when` nữa; chuỗi được `scripts/plan-chain.mjs`
       suy ngược từ các dòng "xong khi" của mission qua bảng Inputs/Next và `primaryOutput`; 11 ví dụ
       thành fixture cho spec của planner (planner phải suy ra được chúng từ goal tương ứng).
-- [ ] `scripts/validate-chain.mjs`: luật cũ của validate-workflows (Next, input có producer, không chung
+      (`plan-chain.mjs#planChain`, `tests/chains/*.json`, `plan-chain.spec.mjs`)
+- [x] `scripts/validate-chain.mjs`: luật cũ của validate-workflows (Next, input có producer, không chung
       alias ghi, tối đa ba nhánh, luật dòng dài khi có publish) áp lên `state.json.chain` mỗi lần vẽ;
       vẽ lại là transition `replanned`.
-- [ ] Đơn vị của một agent mù là một trang, một modal, một luồng. Cặp plan/execute cho mọi operator có
+      (`validate-chain.mjs#validateChain`, nối vào `validate-session.mjs`; `validate-chain.spec.mjs`)
+- [x] Đơn vị của một agent mù là một trang, một modal, một luồng. Cặp plan/execute cho mọi operator có
       thể có N đơn vị: `X.plan` in danh sách đơn vị ra chat gốc (kind chung `units`: `{id, goal, inputs}`,
       validator từ chối đơn vị không có goal); `X.execute` mù, một đơn vị mỗi nhánh, phải trỏ về đúng
       `unit.id` của plan bậc trước; fan-out tối đa ba nhánh một bậc, mỗi nhánh một nhánh ghi riêng.
+      (`templates/kinds/units.schema.json`, `request.schema.json#unit`,
+      `validate-request.mjs#unitGateErrors`, `orchestrator.json#concurrency.maxParallel`,
+      `unit-gate.spec.mjs`; operator execute phải khai Input `units` để bind `inputs.units`)
 - [ ] Áp cặp này: `interface.plan` (bản đồ bề mặt: trang, modal, shell chung, contract dữ liệu, goal
       từng trang) + `interface.generate` một trang; `uat.plan` + `uat.verify` một luồng; `seed.plan` +
       `seed.run`; `backend.plan` + `backend.generate` khi contract có nhiều module.
+      (xong nửa plan: `operators/interface-plan`, `operators/uat-plan`, kind `surface-map`, `uat-plan`;
+      còn `seed.plan`, `backend.plan`, và bảng Inputs `units` của `interface.generate`, `uat.verify`)
 - [ ] Gộp có thứ tự: `runtime.serve` merge N nhánh vào nhánh tích hợp, xung đột trả về đúng đơn vị.
 - [ ] Audit hai tầng: `interface.audit` từng trang, cộng một lần audit chéo lấy bản đồ làm input (shell,
       tên, điều hướng); lỗi chéo về `interface.plan`.
-- [ ] Budget theo đơn vị: `maxSteps = cơ bản + N × mỗi đơn vị`, N đọc từ số dòng "xong khi".
+- [x] Budget theo đơn vị: `maxSteps = cơ bản + N × mỗi đơn vị`, N đọc từ số dòng "xong khi".
+      (`orchestrator.json#budget.perUnit` và câu nâng trần trong `budget.note`; validate-request từ chối
+      nhánh không `unit` khi mission có hơn một dòng "xong khi" cho operator execute có `X.plan`)
 - [ ] `interface.audit` chấp nhận audit một trang đang chạy: input source-application và decision tuỳ
       chọn khi target là bề mặt có sẵn.
 

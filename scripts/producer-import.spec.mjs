@@ -64,17 +64,21 @@ test('actual request and response validator CLIs complete with an imported chang
   const f=fixture();try{
     const table=(name,headers,rows=[])=>`## ${name}\n\n| ${headers.join(' | ')} |\n| ${headers.map(()=>'---').join(' | ')} |\n${rows.map(row=>`| ${row.join(' | ')} |`).join('\n')}\n\n`;
     const requestFile=path.join(f.source,'request/request.json'),request=read(requestFile);
-    request.operatorId='frontend.source.apply';request.requirements={mode:'apply'};write(requestFile,request);
+    request.operatorId='backend.generate';request.requirements={mode:'apply',scope:'full'};write(requestFile,request);
     write(path.join(f.sourceSession,'state.json'),{id:'original',steps:{'1/1':request.operatorId},requestHashes:{'1/1':digest(readFileSync(requestFile))}});
-    write(path.join(f.source,'response/response.md'),'# frontend-source-application — fixture\n\n'+
-      table('Binding',['Field','Value'],[['Target','fixture'],['Mode','apply'],['Branch','session/original'],['Base','2'.repeat(40)],['Commit',HEAD]])+
-      table('Projection',['Path','Change','Classes','Claims','Why'],[['`app/test.tsx`','modified','—','—','Synthetic typed fixture']])+
-      table('Rejections',['Path','Value','Because'])+table('Fallbacks taken',['Code','Action']));
-    write(path.join(f.source,'response/changes.md'),'# changes — frontend.source.apply step-1/parallel-1\n\n'+
+    const fingerprint=digest('contract');
+    write(path.join(f.source,'response/response.md'),'# backend-source-application — fixture\n\n'+
+      table('Binding',['Field','Value'],[['Outcome','fixture'],['Feature','fixture'],['Contract fingerprint',fingerprint],['Base','2'.repeat(40)],['Branch','session/original'],['Commit',HEAD]])+
+      table('Operations',['Operation','Transport','Writer','Transaction','Idempotency','Decisions'],[['fixture-op','rest','`app/test.ts`','single-transaction','none','fixture']])+
+      table('Changes',['Path','Change','Operation','Before','After'],[['`app/test.ts`','modified','fixture-op',digest('before'),digest('after')]])+
+      table('Widened',['Path','Nearest boundary','Why'])+table('Findings',['Code','Operation','File','Statement'])+table('Fallbacks taken',['Code','Action']));
+    write(path.join(f.source,'response/changes.md'),'# changes — backend.generate step-1/parallel-1\n\n'+
       table('Binding',['Field','Value'],[['Operator',request.operatorId],['Step','step-1/parallel-1'],['Checkout','fixture'],['Predecessor','fixture']])+
-      table('Files',['Path','Change','Why','Claims'],[['`app/test.tsx`','modified','Synthetic typed fixture','—']])+'## What the next step must know\n\nFixture only; no source operation was performed.\n');
-    write(path.join(f.source,'response/data/writes.json'),{mode:'apply',base:'2'.repeat(40),branch:'session/original',commit:HEAD,files:[{path:'app/test.tsx',change:'modified',before:digest('before'),after:digest('after'),classes:[]}],sweep:{command:'node scripts/sweep-presentation.mjs',exitCode:0,findings:[],output:'{"scanned":0,"findings":[]}'}});
-    write(path.join(f.source,'response/response.json'),{schemaVersion:9,operatorId:request.operatorId,step:1,parallel:1,status:'done',fields:{'frontend-source-application':'response/response.md',changes:'response/changes.md',writes:'response/data/writes.json'},fallbacks:[],commits:[HEAD],next:[]});
+      table('Files',['Path','Change','Why','Claims'],[['`app/test.ts`','modified','Synthetic typed fixture','—']])+'## What the next step must know\n\nFixture only; no source operation was performed.\n');
+    write(path.join(f.source,'response/data/mutations.json'),{mode:'apply',contractFingerprint:fingerprint,base:'2'.repeat(40),branch:'session/original',commit:HEAD,
+      operations:[{operationId:'fixture-op',name:'fixture',transport:'rest',writerRef:'app/test.ts',storeRefs:[],transactionBoundary:'single-transaction',idempotencyKind:'none',migrationRefs:[],authorityDimensionIds:['fixture'],facets:['transport'],proofKinds:['unit']}],
+      changes:[{path:'app/test.ts',change:'modified',operationId:'fixture-op',beforeHash:digest('before'),afterHash:digest('after')}]});
+    write(path.join(f.source,'response/response.json'),{schemaVersion:9,operatorId:request.operatorId,step:1,parallel:1,status:'done',fields:{'backend-source-application':'response/response.md',changes:'response/changes.md',mutations:'response/data/mutations.json'},fallbacks:[],commits:[HEAD],next:[]});
     await importProducer(f.args);
     const receiver=path.join(f.targetSession,'step-2/parallel-1');
     write(path.join(receiver,'request/request.json'),{schemaVersion:9,operatorId:'quality.verify',step:2,parallel:1,sessionId:'receiver',contexts:[],requirements:{},inputs:{changes:'step-10/parallel-1/response/changes.md'},resume:null});

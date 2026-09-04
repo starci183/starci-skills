@@ -1,0 +1,19 @@
+{
+  "schemaVersion": 9,
+  "id": "uat.plan",
+  "domain": "uat",
+  "job": "Enumerate the user journeys the mission goal names, one flow per journey with its entry route, its step budget, its own account alias and its own seed namespace, so that the blind walkers that follow each walk one flow and no two of them ever share a row.",
+  "package": "operator.md",
+  "errors": "errors.json",
+  "validator": "validate.mjs",
+  "selfTest": "self-test.mjs",
+  "resources": {
+    "profile": "sol-fresh",
+    "grammarBound": false,
+    "mode": "isolated",
+    "tools": {
+      "@tools/fileread": "context-aliases"
+    }
+  },
+  "primaryOutput": "uat-plan"
+}

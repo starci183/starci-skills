@@ -2,12 +2,14 @@
   "schemaVersion": 8,
   "runtime": "claude",
   "provider": "anthropic",
-  "note": "Execution profiles run by the claude runtime. Profile ids are unique across every file in this directory and are what each operator binds under `resources` in its operator.json. `capabilities` states what the model can do in this workspace; `permits` states what a role on this profile may use, and must be a subset of capabilities.",
+  "note": "Execution profiles run by the claude runtime. Profile ids are unique across every file in this directory and are what each operator binds under `resources` in its operator.json. `capabilities` states what the model can do in this workspace; `permits` states what a role on this profile may use, and must be a subset of capabilities. `forkTurns` states, per resources/orchestrator.json#modes, how many of the orchestrator's turns an agent in mode dispatch inherits and that one in mode isolated inherits none; inline runs no agent and has no entry.",
   "profiles": {
     "opus": {
       "model": "claude-opus-5",
-      "isolation": "fresh",
-      "forkTurns": "none",
+      "forkTurns": {
+        "isolated": "none",
+        "dispatch": 40
+      },
       "count": 1,
       "role": "Heavy authoring and high-stakes mutation inside a frozen boundary: source apply, backend implementation, release and platform operations.",
       "capabilities": {
@@ -51,8 +53,10 @@
     },
     "fable": {
       "model": "claude-fable-5-1",
-      "isolation": "fresh",
-      "forkTurns": "none",
+      "forkTurns": {
+        "isolated": "none",
+        "dispatch": 40
+      },
       "count": 1,
       "role": "Long-form extraction and documentation grounded in source, such as pattern catalogs and audits that must count rather than assert.",
       "capabilities": {
