@@ -31,6 +31,7 @@ something that was looked at.
 | [Render truth](render-truth.md) | Whether every rendered claim traces back to real authority | TRUTH-1 to TRUTH-5 |
 | [Taste](taste.md) | Whether a surface that passes every canon rule is still good enough to ship | TASTE-1 to TASTE-13 |
 | [UX](ux.md) | Whether a person with a task actually finished it on the running product | UX-1 to UX-12 (read by `uat.verify`) |
+| [Calibration](calibration/calibration.json) | The scale a scored lens is proved on: three anchor sheets (`calibration/anchor-low.html`, `anchor-mid.html`, `anchor-high.html`), each with the `taste` and `ux` band it is expected to land in and the one-line reason, plus the tolerance; read by TASTE-13 Case 9 | data, no rule of its own |
 
 Every topic here is self-contained. It publishes its criteria, and it closes with its own verdict
 rule: the gating set, the threshold, the verdict, and where a failure routes. There is no rule that

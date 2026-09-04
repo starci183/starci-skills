@@ -1,0 +1,136 @@
+{
+  "$id": "kind:findings",
+  "description": "The findings ledger's answer for the surfaces one branch observed, materialized beside an interface.audit or uat.verify receipt by scripts/record-findings.mjs after the receipt was accepted, and bound by interface.generate as inputs.findings. `lines` are ledger lines in the shape knowledge/findings/<family>.jsonl holds, one JSON object per line ($defs.line): the open findings for `surfaces`, the newest line per id. A generator names every open line for its surface under ## Findings answered or is refused.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "family",
+    "surfaces",
+    "lines"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "const": 9
+    },
+    "family": {
+      "$ref": "#/$defs/family"
+    },
+    "surfaces": {
+      "type": "array",
+      "uniqueItems": true,
+      "maxItems": 64,
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "lines": {
+      "type": "array",
+      "maxItems": 4096,
+      "items": {
+        "$ref": "#/$defs/line"
+      }
+    }
+  },
+  "$defs": {
+    "family": {
+      "description": "The grammar family the route binds (the route's grammarId), which names the ledger file knowledge/findings/<family>.jsonl.",
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9-]*$"
+    },
+    "branch": {
+      "type": "string",
+      "pattern": "^[0-9]+/[0-9]+$"
+    },
+    "line": {
+      "description": "One finding as the ledger records it. The id is derived from what the finding is about (family, session, branch, surface, unit, rule, code and the node or statement), so recording the same receipt twice appends nothing. `fixed` is null on the line that opens a finding; a later line with the same id and `fixed` naming `<sessionId>:<N/M>` closes it, written by the branch whose receipt no longer carries the failure. No line is ever edited.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "at",
+        "session",
+        "branch",
+        "operator",
+        "family",
+        "surface",
+        "unit",
+        "rule",
+        "code",
+        "statement",
+        "severity",
+        "fixed"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^f[0-9a-f]{12}$"
+        },
+        "at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "session": {
+          "type": "string",
+          "minLength": 1
+        },
+        "branch": {
+          "$ref": "#/$defs/branch"
+        },
+        "operator": {
+          "type": "string",
+          "pattern": "^[a-z]+(?:\\.[a-z]+)+$"
+        },
+        "family": {
+          "$ref": "#/$defs/family"
+        },
+        "surface": {
+          "description": "The surface the finding is about: the audit scope's surface id for an audit, `<feature>/<flow>` for a walk.",
+          "type": "string",
+          "minLength": 1
+        },
+        "unit": {
+          "description": "The unit inside the surface: a matrix entry id for an audit, a case id for a walk.",
+          "type": "string",
+          "minLength": 1
+        },
+        "rule": {
+          "description": "The published rule the finding fails, or null when no rule covers it; rule-less findings are what scripts/promote-findings.mjs collects.",
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^[A-Z][A-Z0-9-]*-[0-9]+$"
+        },
+        "code": {
+          "description": "Where the failure routed, or the code the receipt gave it, in UPPER_SNAKE; null when it carries neither.",
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^[A-Z][A-Z0-9_]+$"
+        },
+        "statement": {
+          "description": "What was observed, as the receipt measured it; for an audit result it opens with the node path, then `: ` and the measured value.",
+          "type": "string",
+          "minLength": 1
+        },
+        "severity": {
+          "description": "blocking when the failure routed somewhere and holds the chain; accepted when the receipt left it out of its verdict (data-bound, person-accepted) and it holds nothing.",
+          "enum": [
+            "blocking",
+            "accepted"
+          ]
+        },
+        "fixed": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^[^:\\s]+:[0-9]+/[0-9]+$"
+        }
+      }
+    }
+  }
+}

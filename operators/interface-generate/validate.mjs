@@ -34,6 +34,9 @@ import { fileURLToPath } from 'node:url';
 import { validateStep } from '../../scripts/validate-step.mjs';
 import { tableUnder, userRouted, choiceHandoffErrors, printedCandidates } from '../../scripts/validate-response.mjs';
 import { loadErrorsRegistry } from '../../scripts/errors-registry.mjs';
+import { sessionRootOf } from '../../scripts/validate-request.mjs';
+import { validateAgainst } from '../../scripts/json-schema.mjs';
+import { loadFindingsSchema } from '../../scripts/record-findings.mjs';
 import { TASTE_RULES } from '../interface-audit/validate.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
@@ -137,6 +140,20 @@ export function candidateLimitErrors({ at, limits, scores }) {
       }
     }
   }
+  return errors;
+}
+
+// The findings ledger, answered. When the request binds `findings` — the ledger's open lines for the
+// surfaces the last audit or walk observed, materialized beside that receipt by
+// scripts/record-findings.mjs — every open line for this target or unit is named under
+// `## Findings answered` with how the direction answers it; a generator that ignores a known finding
+// is refused, and a row naming a finding the input does not carry is a claim about nothing.
+export function findingsAnsweredErrors({ at, doc, target, unit, answeredRows }) {
+  const errors = [];
+  const mine = (doc?.lines ?? []).filter((l) => l.fixed === null && (l.surface === target || (unit !== undefined && l.surface === unit)));
+  const answered = new Map((answeredRows ?? []).map(([id, how]) => [id, how]));
+  for (const l of mine) if (!answered.has(l.id)) errors.push(`${at}: finding ${l.id} (${l.rule ?? l.code ?? 'no rule'}: ${l.statement}) is open for ${l.surface} and ## Findings answered does not name it; a generator that ignores a known finding is refused`);
+  for (const id of answered.keys()) if (!(doc?.lines ?? []).some((l) => l.id === id)) errors.push(`${at}: ## Findings answered names ${id}, which the findings input does not carry`);
   return errors;
 }
 
@@ -352,6 +369,19 @@ export async function directionErrors({ branchDir, root = ROOT, request, respons
         errors.push(...scoreCoverageErrors({ at, scores, rendered, printed: printedMap }));
         errors.push(...candidateLimitErrors({ at, limits, scores }));
         // Scores inform a recommendation; they do not replace the user's explicit tier choice.
+      }
+    }
+
+    // What the ledger knows about this surface is answered, not ignored.
+    const findingsRef = request?.inputs?.findings;
+    if (findingsRef) {
+      const sessionRoot = sessionRootOf(branchDir);
+      let doc = null;
+      try { doc = JSON.parse(await readFile(path.join(sessionRoot ?? branchDir, String(findingsRef)), 'utf8')); } catch { doc = null; }
+      if (!doc) errors.push(`${findingsRef}: the findings input cannot be read, so nothing the ledger knows about this surface can be answered`);
+      else {
+        errors.push(...validateAgainst(await loadFindingsSchema(root), doc, String(findingsRef)));
+        errors.push(...findingsAnsweredErrors({ at, doc, target: requirements.target, unit: request?.unit, answeredRows: tableUnder(text, '## Findings answered') }));
       }
     }
 

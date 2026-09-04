@@ -14,7 +14,7 @@ Primary output: `seed-receipt`
 
 ## Inputs
 
-`uat-account` (optional)
+`uat-account` (optional), `units` (optional)
 
 ## Outputs
 

@@ -1,0 +1,78 @@
+{
+  "schemaVersion": 1,
+  "id": "backend-fanout",
+  "when": {
+    "en": "One backend feature whose frozen contract spans more than one writer boundary: the mission names backend.generate once per module, so the planner runs backend.plan after the architecture decision and the generator fans out one module per branch under scope full; the promise is reconciled after the code lands and the session branch is published, as in backend-feature.",
+    "vi": "Một feature backend mà contract đã đóng băng trải qua hơn một ranh giới writer: nhiệm vụ gọi tên backend.generate mỗi module một lần, nên planner chạy backend.plan sau quyết định kiến trúc và generator toả ra mỗi nhánh một module dưới scope full; lời hứa được đối chiếu sau khi code đã vào và nhánh phiên được publish, như backend-feature."
+  },
+  "mission": {
+    "goal": "one backend feature of several modules lands against a decided architecture and a reconciled promise",
+    "doneWhen": [
+      {
+        "evidence": "the promise is modelled and published",
+        "producedBy": "business.decide"
+      },
+      {
+        "evidence": "the enrolment module of the contract is filled on the session branch",
+        "producedBy": "backend.generate"
+      },
+      {
+        "evidence": "the access module of the contract is filled on the session branch",
+        "producedBy": "backend.generate"
+      },
+      {
+        "evidence": "the promise is reconciled against the delivered source",
+        "producedBy": "business.reconcile"
+      },
+      {
+        "evidence": "the session branch is merged and pushed",
+        "producedBy": "git.publish"
+      }
+    ]
+  },
+  "options": {
+    "roles": [
+      "be"
+    ],
+    "requirements": {
+      "business.decide": {
+        "mode": "model"
+      },
+      "architecture.decide": {
+        "alternatives": 1,
+        "selectionPolicy": "automatic"
+      }
+    }
+  },
+  "example": [
+    [
+      "environment.preflight"
+    ],
+    [
+      "workspace.bind#be"
+    ],
+    [
+      "business.decide"
+    ],
+    [
+      "architecture.decide"
+    ],
+    [
+      "backend.plan"
+    ],
+    [
+      "backend.generate"
+    ],
+    [
+      "quality.verify"
+    ],
+    [
+      "business.reconcile"
+    ],
+    [
+      "git.publish"
+    ]
+  ],
+  "ends": "git.publish",
+  "rewrite": "New in 2.0.1: the plan/execute pair for backend. backend-feature with two backend.generate lines: backend.plan takes the frozen architecture-decision and precedes the one backend.generate branch, which fans out by module."
+}

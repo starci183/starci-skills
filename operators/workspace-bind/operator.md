@@ -169,6 +169,8 @@ session id to its containing coordinate, session state and frozen request hash.
 | the route is bound and the checkout carries a publication to push | `git.publish` |
 | the route is bound and a promise must be decided against its source | `business.decide` |
 | the route is bound and a backend contract must be filled inside it | `backend.generate` |
+| the route is bound and the pages and modals a feature needs must be named before one is generated per branch | `interface.plan` |
+| the route is bound and the seeds a mission needs must be planned against its stores before one is placed per branch | `data.plan` |
 | the route is bound and a frontend surface must be generated inside it | `interface.generate` |
 | the route is bound and one finding on a generated surface must be repaired inside it | `interface.fix` |
 | the route binds an explicitly authorized owner package whose existing behavior must be repaired and its release consumed | `library.update` |

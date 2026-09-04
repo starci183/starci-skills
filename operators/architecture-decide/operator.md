@@ -188,4 +188,5 @@ consumes, and no other output of this operator crosses into that step.
 | --- | --- |
 | the business promise must be modelled again against the decided boundaries | `business.decide` |
 | the decision is confirmed and a backend contract changes | `backend.generate` |
+| the decision is confirmed and its operations span more than one writer boundary, so they are grouped into modules before one is filled per branch | `backend.plan` |
 | the decision is confirmed and a frontend surface changes | `interface.generate` |

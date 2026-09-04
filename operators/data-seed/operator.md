@@ -80,6 +80,7 @@ it does not claim a placed seed while any check is absent or failed.
 | Kind | From | Required |
 | --- | --- | --- |
 | `uat-account` | `identity.provision`; the account record the rows are owned by, when this chain provisioned it; otherwise read from the flow folder | no |
+| `units` | `data.plan`; the seed list whose one unit this branch places, named by `request.unit` | no |
 
 ## Requirements
 
@@ -135,3 +136,4 @@ what the store does not yet hold; a resume that adds no authority, account, seed
 | the flow has no account record yet, so the identity is provisioned before the seed is placed | `identity.provision` |
 | the seed is placed at volume and the surface that was measured below it is captured again | `interface.audit` |
 | the seed is placed and the run that waited on it may walk the flow | `uat.verify` |
+| the seed is placed and the mission asked for nothing beyond it, so the person reads the receipt before anything walks the flow | `user` |

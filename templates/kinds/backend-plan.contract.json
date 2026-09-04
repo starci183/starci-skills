@@ -1,0 +1,35 @@
+{
+  "kind": "backend-plan",
+  "title": "^# backend-plan — [a-z0-9][a-z0-9-]*$",
+  "sections": [
+    {
+      "heading": "^## Modules$",
+      "table": "| Module | Goal | Operations | Stores | Proofs | Migrations |",
+      "minRows": 1,
+      "cell": {
+        "Module": "^`[a-z0-9][a-z0-9-]*`$",
+        "Goal": "\\S",
+        "Operations": "^`[a-z0-9][a-z0-9-]*`(?:, `[a-z0-9][a-z0-9-]*`)*$",
+        "Stores": "^(—|`[A-Za-z0-9_.-]+`(?:, `[A-Za-z0-9_.-]+`)*)$",
+        "Proofs": "^`[a-z][a-z-]*`(?:, `[a-z][a-z-]*`)*$",
+        "Migrations": "^(—|`[^`]+`(?:, `[^`]+`)*)$"
+      }
+    },
+    {
+      "heading": "^## Order$",
+      "table": "| Module | After |",
+      "cell": {
+        "Module": "^`[a-z0-9][a-z0-9-]*`$",
+        "After": "^`[a-z0-9][a-z0-9-]*`(?:, `[a-z0-9][a-z0-9-]*`)*$"
+      }
+    },
+    {
+      "heading": "^## Fallbacks taken$",
+      "table": "| Code | Action |",
+      "cell": {
+        "Code": "^`[A-Z][A-Z0-9_]+`$",
+        "Action": "\\S"
+      }
+    }
+  ]
+}

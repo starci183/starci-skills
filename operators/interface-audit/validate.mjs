@@ -76,6 +76,39 @@ export function tasteVerdict(rows) {
   const verdict = !gated && mean >= 4 ? 'ship' : 'fix-first';
   return { mean, verdict, routeTo: verdict === 'ship' ? 'none' : 'direction' };
 }
+// TASTE-13 Case 9: the calibration set. The anchors, their bands and the tolerance are read from
+// the file that publishes them; this gate carries no copy of a band. A scored lens whose receipt
+// carries no anchor, or an anchor further outside its band than the tolerance, is CALIBRATION_OFF.
+export const CALIBRATION_FILE = path.join('knowledge', 'ui', 'proof', 'calibration', 'calibration.json');
+export async function loadCalibration(root = ROOT) {
+  const file = path.join(root, CALIBRATION_FILE);
+  if (!existsSync(file)) return null;
+  try { return JSON.parse(await readFile(file, 'utf8')); } catch { return null; }
+}
+export const bandText = (lens, band) => `${lens} ${band[0]}–${band[1]}`;
+export function calibrationErrors({ at, calibration, scored, lenses }) {
+  const errors = [];
+  if (!lenses.size) return errors;
+  if (!calibration) { errors.push(`${CALIBRATION_FILE}: missing or unreadable, so a scored lens has no scale to be proved on (CALIBRATION_OFF)`); return errors; }
+  const tolerance = Number(calibration.tolerance ?? 0);
+  const anchors = new Map((calibration.anchors ?? []).map((a) => [a.id, a]));
+  const rows = Array.isArray(scored) ? scored : [];
+  for (const row of rows) if (!anchors.has(row.anchor)) errors.push(`${at}: calibration names ${row.anchor}, which the calibration set does not carry`);
+  for (const lens of lenses) {
+    const mine = rows.filter((r) => r.lens === lens);
+    if (!mine.length) { errors.push(`${at}: the ${lens} lens is scored and no anchor of the calibration set is scored for it in the same round; a scale nobody proved makes no score comparable (CALIBRATION_OFF, TASTE-13 Case 9)`); continue; }
+    for (const [id, anchor] of anchors) {
+      const band = anchor.bands?.[lens];
+      if (!band) continue;
+      const hits = mine.filter((r) => r.anchor === id);
+      if (!hits.length) { errors.push(`${at}: ${id} is not scored for the ${lens} lens; all three anchors are scored by the same auditor in the same round (CALIBRATION_OFF)`); continue; }
+      if (hits.length > 1) errors.push(`${at}: ${id} is scored ${hits.length} times for the ${lens} lens`);
+      const score = Number(hits[0].score);
+      if (score < band[0] - tolerance || score > band[1] + tolerance) errors.push(`${at}: ${id} scored ${score} on the ${lens} lens, outside its band ${band[0]}–${band[1]} by more than the tolerance ${tolerance}; the round's scale is unproved (CALIBRATION_OFF, TASTE-13 Case 9)`);
+    }
+  }
+  return errors;
+}
 const sectionText = (text, heading) => {
   const lines = text.split(/\r?\n/);
   const from = lines.findIndex((l) => l.trimEnd() === heading);
@@ -283,6 +316,14 @@ export async function validateAuditStep(branchDir, root = ROOT) {
     // interface.generate for all of them at once.
   }
 
+  // The scale the taste lens was scored on: the three anchors, scored in this round, inside their
+  // bands (TASTE-13 Case 9). Read on any branch that carries a taste block, done or not, because a
+  // blocked branch that scored the surface on an unproved scale has still recorded scores nobody can
+  // compare; a branch that scored nothing owes no anchor.
+  const calibration = await loadCalibration(root);
+  const lenses = new Set(verdicts.entries.some((e) => e.taste) ? ['taste'] : []);
+  errors.push(...calibrationErrors({ at, calibration, scored: verdicts.calibration, lenses }));
+
   // One surface, one class: every entry carries the class the coverage declared, and they agree.
   const classes = new Set(verdicts.entries.map((e) => e.surfaceClass));
   if (classes.size > 1) errors.push(`${at}: the entries declare ${[...classes].join(' and ')}; one surface has one class, and every banded rule reads its threshold from it`);
@@ -429,6 +470,30 @@ export async function validateAuditStep(branchDir, root = ROOT) {
       else if (Math.abs(Number(mean[1]) - surface.mean) > 0.005) errors.push(`${rel}: Taste records a mean of ${mean[1]}; the scored rows average ${surface.mean.toFixed(2)}`);
       if (!verdictLine) errors.push(`${rel}: Taste closes with no "- Verdict: ship|fix-first|blocked" line`);
       else if (verdictLine[1] !== surface.verdict) errors.push(`${rel}: Taste records ${verdictLine[1]}; TASTE-13 makes the surface ${surface.verdict}`);
+    }
+
+    // ## Calibration reads what verdicts.calibration carries — one row per anchor and lens, the band
+    // the set publishes and the score this round took — and ## Ranked against names the sheets the
+    // taste lens was placed among: every other selected surface of the scope when there is more than
+    // one, never a sheet outside it. A table missing while a lens is scored is the same absence the
+    // data check names above.
+    if (lenses.size) {
+      const calRows = tableUnder(text, '## Calibration') ?? [];
+      const scored = Array.isArray(verdicts.calibration) ? verdicts.calibration : [];
+      if (!calRows.length) errors.push(`${rel}: ## Calibration carries no row while the ${[...lenses].join(' and ')} lens is scored; the three anchors are scored in the same round and recorded here (CALIBRATION_OFF)`);
+      if (calRows.length !== scored.length) errors.push(`${rel}: Calibration has ${calRows.length} rows, the verdicts carry ${scored.length} anchor scores`);
+      for (const [anchor, expected, score] of calRows) {
+        const m = /^(taste|ux) ([1-5])–([1-5])$/.exec(expected ?? '');
+        const entry = scored.find((s) => s.anchor === anchor && s.lens === m?.[1]);
+        if (!m || !entry) { errors.push(`${rel}: Calibration names ${anchor} for ${expected}, which the verdicts do not score`); continue; }
+        const band = calibration?.anchors?.find((a) => a.id === anchor)?.bands?.[m[1]];
+        if (band && bandText(m[1], band) !== expected) errors.push(`${rel}: ${anchor} is expected at ${expected} here and the calibration set publishes ${bandText(m[1], band)}`);
+        if (Number(score) !== entry.score) errors.push(`${rel}: ${anchor} scores ${score} here and ${entry.score} in the verdicts`);
+      }
+      const ranked = (tableUnder(text, '## Ranked against') ?? []).map(([sheet]) => sheet);
+      const selectedNames = selectedSurfaces.map((s) => s.id);
+      for (const sheet of ranked) if (!selectedNames.includes(sheet)) errors.push(`${rel}: Ranked against names ${sheet}, which is not a selected surface of this scope; the taste lens is ranked across the sheets of the feature it was scored with and nothing else`);
+      if (selectedNames.length > 1) for (const id of selectedNames) if (!ranked.includes(id)) errors.push(`${rel}: Ranked against omits ${id}; a taste lens scored over several surfaces says which sheets it placed each one among`);
     }
 
     // ## Surface class carries the one the coverage declared, and ## Verdict carries one row per

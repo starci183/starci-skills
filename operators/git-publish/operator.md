@@ -149,6 +149,7 @@ publish without a verified route and an approval bound to this exact boundary.
 | `workspace-route-binding` | `workspace.bind`; a publish never resolves its own checkout | yes |
 | `changes` | `interface.generate`, `interface.fix`, `backend.generate` or `library.update`, the exact file set this publication carries | yes |
 | `quality-verification` | `quality.verify`, the receipt whose measured commit is the one this publication pushes | yes |
+| `business-reconciliation` | `business.reconcile`, the comparison of the promise head against the delivered source that admits this publication; absent when the mission promised nothing to reconcile | no |
 
 ## Requirements
 

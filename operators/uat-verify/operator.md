@@ -226,7 +226,7 @@ pass.
 | 7 | Capture at each named assertion with the login field masked, and stitch the sheet | — | `response/data/snapshot.json`, @worktrees/sessions/central-runtime for the most direct runtime evidence | `response/data/captures/<case>.json`, `response/artifacts/<case>.png`, `response/artifacts/sheet.png`, @tools/visualize, @tools/print | `EVIDENCE_UNAVAILABLE` |
 | 8 | Judge the three lanes apart, and score the experience lane criterion by criterion | — | @knowledge/ui/proof (the UX topic and its closing rule), `response/data/captures/<case>.json` | `response/data/verdicts.json` | — |
 | 9 | Verify read-only, then delete the run namespace and nothing else | `runId` | @workspaces/be for the records carrying `is_uat=true` and this namespace, `response/data/verdicts.json` | @tools/database | — |
-| 10 | Append `runs/<runId>/`, point `latest.json` at it, add the history line, and emit | `runId` | everything above | @worktrees/uat/<flow>/<case> (runs/<runId>/, latest.json and history.md), `response/response.md`, `response/response.json`, `audit-scope`, @tools/sourcewrite, @tools/print | — |
+| 10 | Append `runs/<runId>/`, point `latest.json` at it, add the history line, and emit | `runId` | everything above | @worktrees/uat/<flow>/<case> (runs/<runId>/, latest.json and history.md), `response/response.md`, `response/response.json`, `audit-scope`, `findings`, @tools/sourcewrite, @tools/print | — |
 
 A verdict nobody was shown is a verdict nobody read. Step 7 prints the run's step-capture summary and
 step 10 prints the `## Verdict` table over `@tools/print`, into the conversation the person is
@@ -247,6 +247,12 @@ Coverage claim and Deferred states. The verdict has only that scope; deferred st
 passed because quality gates or UAT pass. Quality thresholds and frozen UAT cases remain unchanged.
 The frozen snapshot also retains the unchanged scope in `auditScope` before execution.
 
+The `findings` output is not this run's to write. Once the receipt is accepted, the orchestrator
+appends every failing lane, criterion, assertion and `## Findings` row to the findings ledger and
+materializes the ledger's open lines for this flow beside the receipt, under the law and the script
+[the findings index](../../knowledge/findings/INDEX.md) states; the session gate refuses a done run
+whose failures the ledger does not hold.
+
 ## Outputs
 
 | Kind | File | Type | Required |
@@ -256,6 +262,7 @@ The frozen snapshot also retains the unchanged scope in `auditScope` before exec
 | `uat-capture` | `response/data/captures/<case>.json` | data | yes |
 | `uat-verdicts` | `response/data/verdicts.json` | data | yes |
 | `audit-scope` | `response/data/audit-scope.json` | data | no |
+| `findings` | `response/data/findings.json` | data | no |
 | `screenshot` | `response/artifacts/<case>.png` | artifact | yes |
 | `sheet` | `response/artifacts/sheet.png` | artifact | yes |
 

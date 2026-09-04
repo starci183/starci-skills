@@ -70,7 +70,7 @@ function directionMd({
   classification = 'dominant', policy = 'automatic', selected = 'one-column', candidates = 1,
   surfaceClass = 'catalog', presentationDelta = 'app-owned',
   refClass = 'plan-comparison', selectedFails = false, rejectAll = true, references = changeLevel === 'refine' ? 0 : 1, fallbacks = [],
-  printed = null, scores = 'dominant', winner = null, limits = [], scoreOverrides = [],
+  printed = null, scores = 'dominant', winner = null, limits = [], scoreOverrides = [], answered = [],
 } = {}) {
   const formed = NAMES.slice(0, candidates);
   const shown = printed ?? formed;
@@ -162,6 +162,12 @@ ${scoreRows.join('\n')}
 | Candidate | Rejected because |
 | --- | --- |
 ${others.join('\n')}
+
+## Findings answered
+
+| Finding | How |
+| --- | --- |
+${answered.map(([id, how]) => `| ${BT}${id}${BT} | ${how} |`).join('\n')}
 
 ## Printed
 
@@ -382,7 +388,23 @@ ${rows.join('\n')}
 // ---------------------------------------------------------------------------------------------------
 // The branch.
 
-const requestJson = ({ extra = {} } = {}) => ({
+// The findings ledger's open lines for the plans surface, materialized beside the last audit of it:
+// one finding on this target, one on another surface the generator owes nothing to.
+const FINDINGS_IN = 'step-1/parallel-2/response/data/findings.json';
+const OPEN = 'f0a1b2c3d4e5f';
+const OTHER = 'f1a1b2c3d4e5f';
+const findingsDoc = ({ target = '/plans', extraLines = [] } = {}) => ({
+  schemaVersion: 9,
+  family: 'core',
+  surfaces: [target, 'checkout'],
+  lines: [
+    { id: OPEN.slice(0, 13), at: '2026-09-04T10:00:00.000Z', session: 's-prior', branch: '4/1', operator: 'interface.audit', family: 'core', surface: target, unit: 'wide-light-loaded', rule: 'TASTE-2', code: 'DIRECTION', statement: 'TASTE-2: a tinted band whose only occupant is an ornament', severity: 'blocking', fixed: null },
+    { id: OTHER.slice(0, 13), at: '2026-09-04T10:00:00.000Z', session: 's-prior', branch: '4/1', operator: 'interface.audit', family: 'core', surface: 'checkout', unit: 'wide-light-loaded', rule: 'GAP-5', code: 'RESOLVE', statement: 'body>main: 1rem', severity: 'blocking', fixed: null },
+    ...extraLines,
+  ],
+});
+
+const requestJson = ({ extra = {}, inputs = {} } = {}) => ({
   schemaVersion: 9,
   operatorId: 'interface.generate',
   step: 2,
@@ -406,7 +428,7 @@ const requestJson = ({ extra = {} } = {}) => ({
     resume: null,
     ...extra,
   },
-  inputs: { 'business-promise-authority': 'step-1/parallel-1/response/response.md' },
+  inputs: { 'business-promise-authority': 'step-1/parallel-1/response/response.md', ...inputs },
   resume: null,
 });
 
@@ -440,7 +462,9 @@ function writeBranch(files) {
   writeFileSync(path.join(session, 'state.json'), JSON.stringify({ id: SESSION, project: 'starci-academy', startedAt: '2026-09-03T00:00:00Z', requestHashes: {}, chain: [['1/1'], ['2/1']], steps: { '1/1': 'business.decide', '2/1': 'interface.generate' }, current: '2/1', status: 'running', ...(approval ? { choices: { 'layout-direction': { selected: approval, selectedBy: 'user', sourceRef: 'fixture:user-selected-direction' } } } : {}) }));
   for (const [name, content] of Object.entries(files)) {
     if (content === null) continue;
-    writeFileSync(path.join(branch, name), typeof content === 'string' ? content : JSON.stringify(content, null, 2));
+    const target = name.startsWith('../../') ? path.join(session, name.slice(6)) : path.join(branch, name);
+    mkdirSync(path.dirname(target), { recursive: true });
+    writeFileSync(target, typeof content === 'string' ? content : JSON.stringify(content, null, 2));
   }
   return { branch, session };
 }
@@ -623,6 +647,25 @@ await expectError({ ...baseline(), 'response/direction.md': directionMd().replac
 await expectError({ ...baseline(), 'response/response.json': responseJson({ status: 'blocked', stop: 'DIRECTION_CHOICE_REQUIRED' }) }, 'has disposition fallback under these requirements', 'terminating on the choice under automatic');
 await expectError({ ...baseline(), 'response/response.json': responseJson({ status: 'blocked', stop: 'MADE_UP_CODE' }) }, 'not a registered code', 'unknown stop code');
 await expectError({ ...baseline(), 'response/direction.md': directionMd({ presentationDelta: 'cosmetic' }) }, 'is neither app-owned nor none', 'an unknown delta value');
+
+// The findings ledger, answered: every open line for this target is named under ## Findings answered
+// with what the direction does about it; a line for another surface is owed nothing; a row naming
+// a finding the input does not carry is refused; and a generator that ignores a known finding is refused.
+const OPEN_ID = OPEN.slice(0, 13);
+const OTHER_ID = OTHER.slice(0, 13);
+const withFindings = ({ answered = [[OPEN_ID, 'the band is removed and the region carries the offer copy']], doc = findingsDoc(), unit } = {}) => ({
+  ...baseline(),
+  'request/request.json': { ...requestJson({ inputs: { findings: FINDINGS_IN } }), ...(unit ? { unit } : {}) },
+  [`../../${FINDINGS_IN}`]: doc,
+  'response/direction.md': directionMd({ answered }),
+});
+await expectValid(withFindings(), 'the one open finding for this target is answered; the other surface\'s is owed nothing');
+await expectError(withFindings({ answered: [] }), `finding ${OPEN_ID}`, 'a generator that ignores a known finding');
+await expectError(withFindings({ answered: [[OPEN_ID, 'answered'], ['f9999999999ff', 'a finding nobody recorded']] }), 'which the findings input does not carry', 'a row naming a finding the ledger never held');
+await expectValid(withFindings({ answered: [], doc: findingsDoc({ target: '/other' }) }), 'no open finding for this target: the table stays empty');
+await expectValid(withFindings({ answered: [[OTHER_ID, 'the gap is resolved again']], doc: findingsDoc({ target: '/other' }), unit: 'checkout' }), 'a unit branch answers the finding recorded on its unit id');
+await expectError(withFindings({ answered: [], doc: findingsDoc({ target: '/other' }), unit: 'checkout' }), `finding ${OTHER_ID}`, 'a unit branch that ignores the finding on its unit');
+await expectError(withFindings({ doc: { schemaVersion: 9, family: 'core', surfaces: ['/plans'], lines: [{ id: 'nope' }] } }), 'lines[0]', 'a findings input outside its kind');
 
 // The hand-off to the person.
 await expectError(printedChoice({ printed: [], reason: 'Accept the composition and record the density band as seeded-data-limited, or handle the density band and three family gaps first?' }), 'lists no rendered candidate', 'a choice handed over as two prose options');

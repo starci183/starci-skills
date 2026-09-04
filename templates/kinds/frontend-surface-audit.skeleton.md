@@ -60,6 +60,20 @@
 - Mean: 4.17
 - Verdict: ship
 
+## Calibration
+
+| Anchor | Expected | Scored |
+| --- | --- | --- |
+| `anchor-low` | taste 1–2 | 2 |
+| `anchor-mid` | taste 3–3 | 3 |
+| `anchor-high` | taste 4–5 | 4 |
+
+## Ranked against
+
+| Sheet | Why |
+| --- | --- |
+| `other-surface-id` | the other selected surface of this scope, scored in the same round on the same scale; no rows when the scope selects one surface, whose scale is the three anchors alone |
+
 ## Verdict
 
 | Topic | Verdict | Route |

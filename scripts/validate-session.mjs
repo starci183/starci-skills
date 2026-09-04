@@ -24,6 +24,7 @@ import { goalCheckErrors } from './validate-response.mjs';
 import { loadOperatorPackages } from './operator-md.mjs';
 import { loadInteractionPolicy } from './validate-interaction.mjs';
 import { validateChain, loadOperatorGraph, loadMaxParallel, readBranchRequests } from './validate-chain.mjs';
+import { extractFindings, readLedger, LEDGER_DIR, LEDGER_OPERATORS } from './record-findings.mjs';
 
 const branchDir = (session, branch) => { const [n, m] = branch.split('/'); return path.join(session, `step-${n}`, `parallel-${m}`); };
 const stepOf = (branch) => Number(branch.split('/')[0]);
@@ -108,7 +109,32 @@ export function missionHistoryErrors(state) {
   return errors;
 }
 
-export async function validateSession(root, session, { packages = null } = {}) {
+// The findings ledger (knowledge/findings/INDEX.md): every done audit or walk branch whose verdicts
+// carry a failure has its findings in the family's ledger, appended by scripts/record-findings.mjs at
+// the transition that accepted the receipt. A done branch with failures the ledger does not hold is a
+// receipt that was accepted and forgotten, and the error names the branch. A branch with no verdicts
+// or no failure owes nothing; a branch whose family cannot be resolved cannot be recorded, and says so.
+export async function findingsLedgerErrors(root, session, state, { ledgerDir = path.join(root, LEDGER_DIR) } = {}) {
+  const errors = [];
+  for (const branch of Object.keys(state?.steps ?? {}).sort(byChainOrder)) {
+    const operator = state.steps[branch];
+    if (!LEDGER_OPERATORS.has(operator)) continue;
+    const dir = branchDir(session, branch);
+    const response = await readJson(path.join(dir, 'response', 'response.json'));
+    if (response?.status !== 'done') continue;
+    let found = null;
+    try { found = await extractFindings(dir, { root }); } catch (e) { errors.push(`step-${branch.replace('/', '/parallel-')}: ${e.message}`); continue; }
+    if (!found || !found.lines.length) continue;
+    const at = `step-${branch.replace('/', '/parallel-')}`;
+    if (!found.family) { errors.push(`${at}: a done ${operator} branch carries ${found.lines.length} finding(s) and no family to record them under; the request binds no @knowledge/grammars/<family> and the route names no grammarId, so the ledger cannot hold them`); continue; }
+    const ledger = await readLedger(path.join(ledgerDir, `${found.family}.jsonl`));
+    const missing = found.lines.filter((l) => !ledger.latest.has(l.id));
+    if (missing.length) errors.push(`${at}: a done ${operator} branch carries ${missing.length} finding(s) the ledger knowledge/findings/${found.family}.jsonl does not hold (${missing.map((l) => l.id).join(', ')}); every done audit or walk with a failing verdict appends its findings (node scripts/record-findings.mjs ${at})`);
+  }
+  return errors;
+}
+
+export async function validateSession(root, session, { packages = null, ledgerDir } = {}) {
   const errors = [];
   const stateFile = path.join(session, 'state.json');
   if (!existsSync(stateFile)) return { errors: ['state.json: missing'], state: null };
@@ -131,6 +157,8 @@ export async function validateSession(root, session, { packages = null } = {}) {
   errors.push(...provenErrors(state, ledger));
   errors.push(...threeBranchStopErrors(state, ledger));
   errors.push(...loggedErrors(state));
+  // Every done audit or walk with a failing verdict left its findings in the family's ledger.
+  errors.push(...await findingsLedgerErrors(root, session, state, ledgerDir ? { ledgerDir } : {}));
   if (state.brief?.report) {
     const shapes = Object.keys(policy.reportShapes ?? {});
     if (!shapes.includes(state.brief.report.shape)) errors.push(`state.json: brief.report.shape ${state.brief.report.shape} is not one of ${shapes.join(', ')}`);

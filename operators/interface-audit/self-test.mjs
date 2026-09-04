@@ -49,6 +49,7 @@ const TASTE_MEASURED = {
   'TASTE-12': 'sorted into the class the direction named',
 };
 const TASTE_RULES = Object.keys(TASTE_MEASURED);
+const BT = String.fromCharCode(96);
 const VOID_BAND = 'a tinted band 180px tall whose only occupant is a decorative artwork';
 const taste = () => ({
   entries: TASTE_RULES.map((rule) => ({ rule, measured: TASTE_MEASURED[rule], score: 4, verdict: 'pass', routeTo: 'none' })),
@@ -70,8 +71,19 @@ const tasteFixFirst = () => {
   return lens;
 };
 
-const verdicts = (lens = taste) => ({
+// TASTE-13 Case 9: the three anchors of the calibration set, scored in the same round, each inside
+// its band. `anchor-low` at 3 is one point outside its band, which the tolerance the set publishes
+// still accepts; 4 is beyond it.
+const CALIBRATION = [
+  { anchor: 'anchor-low', lens: 'taste', score: 2 },
+  { anchor: 'anchor-mid', lens: 'taste', score: 3 },
+  { anchor: 'anchor-high', lens: 'taste', score: 4 },
+];
+const CALIBRATION_ROWS = (scored = CALIBRATION) => scored.map((s) => `| ${BT}${s.anchor}${BT} | taste ${{ 'anchor-low': '1–2', 'anchor-mid': '3–3', 'anchor-high': '4–5' }[s.anchor]} | ${s.score} |`).join(String.fromCharCode(10));
+
+const verdicts = (lens = taste, calibration = CALIBRATION) => ({
   auditScope: scope(),
+  calibration,
   entries: [
     {
       matrixId: WIDE,
@@ -94,7 +106,6 @@ const verdicts = (lens = taste) => ({
   ],
 });
 
-const BT = String.fromCharCode(96);
 const tasteTable = (lens) => lens.entries.map((r) => `| ${BT}${r.rule}${BT} | ${r.measured} | ${r.score} | ${r.verdict} |`).join(String.fromCharCode(10));
 
 // Every rule this audit judges belongs to a topic, and each topic closes itself; the receipt copies
@@ -121,7 +132,7 @@ const PROFILE = '.worktrees/sessions/s-test/browser';
 const FAMILY = '0.4.7';
 const served = (over = {}) => ({ applied: APPLIED, servedBranch: 'uat', servedHead: SERVED, contains: 'yes', profile: PROFILE, familyObserved: FAMILY, familyResolved: FAMILY, ...over });
 
-const responseMd = (lens = taste(), printed = PRINTED, surface = served()) => `# frontend-surface-audit — plan-picker
+const responseMd = (lens = taste(), printed = PRINTED, surface = served(), { calibrationRows = CALIBRATION_ROWS(), rankedRows = '' } = {}) => `# frontend-surface-audit — plan-picker
 
 ## Served surface
 
@@ -165,6 +176,18 @@ ${tasteTable(lens)}
 
 - Mean: ${lens.mean.toFixed(2)}
 - Verdict: ${lens.verdict}
+
+## Calibration
+
+| Anchor | Expected | Scored |
+| --- | --- | --- |
+${calibrationRows}
+
+## Ranked against
+
+| Sheet | Why |
+| --- | --- |
+${rankedRows}
 
 ## Verdict
 
@@ -369,6 +392,26 @@ await expectError(fixFirst({ 'response/response.json': responseJson({ next: ['in
 await expectError(fixFirst({ 'response/response.json': responseJson({ next: ['interface.fix'] }) }), 'the taste lens is fix-first, so next names interface.generate', 'a fix-first lens that never reaches the generator');
 await expectError(fixFirst({ 'response/response.md': responseMd() }), 'TASTE-2 is pass here and fail in the verdicts', 'receipt hides a taste failure');
 
+// The calibration set (TASTE-13 Case 9): the three anchors scored in the same round, inside their
+// bands within the tolerance the set publishes; a drifting anchor, a missing anchor, a lens scored
+// with no anchors, or a receipt that hides the scores it took, is CALIBRATION_OFF; and the sheets
+// the lens was ranked among are the selected surfaces of the scope and nothing outside it.
+const calibrated = (scored) => ({ ...baseline(), 'response/data/verdicts.json': verdicts(taste, scored), 'response/response.md': responseMd(taste(), PRINTED, served(), { calibrationRows: CALIBRATION_ROWS(scored) }) });
+const withLow = (score) => CALIBRATION.map((s) => (s.anchor === 'anchor-low' ? { ...s, score } : s));
+await expectValid(calibrated(withLow(3)), 'the low anchor one point outside its band, inside the tolerance the set publishes');
+await expectError(calibrated(withLow(4)), 'outside its band 1–2 by more than the tolerance 1', 'an auditor whose low anchor drifted two points: the round is CALIBRATION_OFF');
+await expectError(calibrated(CALIBRATION.slice(0, 2)), 'anchor-high is not scored for the taste lens', 'a round that scored two anchors of three');
+await expectError(mutate((v) => { delete v.calibration; }), 'no anchor of the calibration set is scored for it', 'a taste lens scored with no anchors at all');
+await expectError({ ...baseline(), 'response/response.md': responseMd(taste(), PRINTED, served(), { calibrationRows: '' }) }, '## Calibration carries no row', 'a receipt that scored the anchors and does not say so');
+await expectError({ ...baseline(), 'response/response.md': responseMd(taste(), PRINTED, served(), { calibrationRows: CALIBRATION_ROWS(withLow(1)) }) }, 'anchor-low scores 1 here and 2 in the verdicts', 'a receipt whose anchor score differs from the verdicts');
+await expectError({ ...baseline(), 'response/response.md': responseMd(taste(), PRINTED, served(), { calibrationRows: CALIBRATION_ROWS().replace('taste 1–2', 'taste 1–3') }) }, 'the calibration set publishes taste 1–2', 'a receipt that widened an anchor band');
+await expectError({ ...baseline(), 'response/response.md': responseMd(taste(), PRINTED, served(), { rankedRows: `| ${BT}checkout${BT} | a sheet from another feature |` }) }, 'not a selected surface of this scope', 'a taste lens ranked against a sheet outside its scope');
+await expectValid({ 'request/request.json': requestJson(), 'response/response.json': responseJson({ status: 'blocked', stop: 'CALIBRATION_OFF', next: [], fields: {} }) }, 'blocked on CALIBRATION_OFF: the anchors drifted and the auditor re-enters');
+const twoSurfaces = [{ id: 'plan-picker', type: 'page', route: '/plans', matrixIds: [WIDE] }, { id: 'plan-detail', type: 'page', route: '/plans/detail', matrixIds: [NARROW] }];
+const twoSurfaceFiles = (rankedRows) => ({ ...baseline(), 'request/request.json': requestJson({ extra: { auditScope: { surfaces: structuredClone(twoSurfaces) } } }), 'response/data/verdicts.json': { ...verdicts(), auditScope: scope({ surfaces: structuredClone(twoSurfaces) }) }, 'response/response.md': responseMd(taste(), PRINTED, served(), { rankedRows }) });
+await expectValid(twoSurfaceFiles(`| ${BT}plan-picker${BT} | scored in the same round on the same scale |\n| ${BT}plan-detail${BT} | scored in the same round on the same scale |`), 'two selected surfaces ranked against each other in one round');
+await expectError(twoSurfaceFiles(''), 'Ranked against omits plan-picker', 'a taste lens over two surfaces that never says which sheets it placed them among');
+
 // The surface class and the per-topic verdict rows.
 await expectError(mutate((v) => { v.entries[1].surfaceClass = 'landing'; }), 'one surface has one class', 'two classes over one surface');
 await expectError(mutate((v) => { delete v.entries[0].surfaceClass; }), 'surfaceClass', 'an entry with no declared class');
@@ -474,6 +517,17 @@ ${tasteTable(coverageGapTaste)}
 
 - Mean: ${coverageGapTaste.mean.toFixed(2)}
 - Verdict: ${tasteVerdictLine}
+
+## Calibration
+
+| Anchor | Expected | Scored |
+| --- | --- | --- |
+${CALIBRATION_ROWS()}
+
+## Ranked against
+
+| Sheet | Why |
+| --- | --- |
 
 ## Verdict
 

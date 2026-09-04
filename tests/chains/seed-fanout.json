@@ -1,0 +1,38 @@
+{
+  "schemaVersion": 1,
+  "id": "seed-fanout",
+  "when": {
+    "en": "Two flows need their rows standing in the environment's store before anything walks them, each attributable and reversible on its own; the mission names data.seed once per flow, so the planner runs data.plan first and the seeder fans out one unit per branch. No surface is written and nothing is published, so the chain ends in a person's hands with the seed receipts.",
+    "vi": "Hai luồng cần các dòng dữ liệu của mình đứng sẵn trong kho của môi trường trước khi có gì đi qua chúng, mỗi luồng quy được nguồn và gỡ được riêng; nhiệm vụ gọi tên data.seed mỗi luồng một lần, nên planner chạy data.plan trước và seeder toả ra mỗi nhánh một đơn vị. Không bề mặt nào được ghi và không gì được publish, nên chuỗi kết thúc trong tay một con người với các biên nhận seed."
+  },
+  "mission": {
+    "goal": "the seeds of two flows stand in the store, each attributable and reversible",
+    "doneWhen": [
+      {
+        "evidence": "the first flow's seed is placed at its representative volume with its rollback listed",
+        "producedBy": "data.seed"
+      },
+      {
+        "evidence": "the second flow's seed is placed at its representative volume with its rollback listed",
+        "producedBy": "data.seed"
+      }
+    ]
+  },
+  "options": {},
+  "example": [
+    [
+      "environment.preflight"
+    ],
+    [
+      "workspace.bind#be"
+    ],
+    [
+      "data.plan"
+    ],
+    [
+      "data.seed"
+    ]
+  ],
+  "ends": "user",
+  "rewrite": "New in 2.0.1: the plan/execute pair for data. data.plan binds @workspaces/be to read the stores, so workspace.bind#be precedes it; data.seed holds effect tools, so environment.preflight opens the chain; the second done-when line is a unit of the one data.seed branch, not a second branch."
+}

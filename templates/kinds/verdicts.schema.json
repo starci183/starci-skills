@@ -212,6 +212,38 @@
     "auditScope": {
       "type": "object",
       "description": "Selection and coverage limits validated against audit-scope by interface.audit; downstream receipts preserve this scope."
+    },
+    "calibration": {
+      "description": "The anchor scores the auditor took in the same round it scored the surface, one per anchor of the calibration set and per lens the verdicts score (TASTE-13 Case 9). The anchors, their bands and the tolerance are read from knowledge/ui/proof/calibration/calibration.json; this file carries only what was scored.",
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 16,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "anchor",
+          "lens",
+          "score"
+        ],
+        "properties": {
+          "anchor": {
+            "type": "string",
+            "pattern": "^anchor-[a-z]+$"
+          },
+          "lens": {
+            "enum": [
+              "taste",
+              "ux"
+            ]
+          },
+          "score": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 5
+          }
+        }
+      }
     }
   }
 }

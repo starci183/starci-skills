@@ -116,6 +116,14 @@
       }
     },
     {
+      "heading": "^## Findings answered$",
+      "table": "| Finding | How |",
+      "cell": {
+        "Finding": "^`f[0-9a-f]{12}`$",
+        "How": "\\S"
+      }
+    },
+    {
       "heading": "^## Printed$",
       "table": "| Artifact | Why |",
       "cell": {

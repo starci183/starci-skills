@@ -318,6 +318,7 @@ written source: it knows what it decided and what it wrote, never how it renders
 | `frontend-direction-decision` | a prior run of `interface.generate` on the same target, read when resuming | no |
 | `frontend-surface-audit` | `interface.audit`, the findings that opened this round; present only when this is a loop | no |
 | `units` | `interface.plan`; the surface map whose one unit this branch generates, named by `request.unit` | no |
+| `findings` | the findings ledger, as `scripts/record-findings.mjs` materialized its open lines beside the last `interface.audit` or `uat.verify` receipt of this surface; every line for this target or unit is answered under `## Findings answered` of the direction, or the branch is refused | no |
 
 ## Requirements
 

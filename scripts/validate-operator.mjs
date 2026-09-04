@@ -9,6 +9,7 @@ import { fileURLToPath } from 'node:url';
 import { loadOperatorPackages, HEADINGS, cellCodes, cellParams, cellFiles, kindOf, isYes, exchangeOf } from './operator-md.mjs';
 import { loadErrorsRegistry } from './errors-registry.mjs';
 import { loadKindTemplates } from './validate-templates.mjs';
+import { PUBLISH_OPERATOR, DEPLOY_OPERATOR } from './validate-chain.mjs';
 
 const unquote = (s) => String(s ?? '').trim().replace(/^`|`$/g, '');
 const TABLES = ['context', 'inputs', 'requirements', 'steps', 'outputs', 'stops', 'next'];
@@ -62,6 +63,39 @@ export function checkPrimaryOutput(jsonAt, mdAt, manifest, op, outputKinds) {
   if (typeof primary !== 'string' || !primary.trim()) { errors.push(`${jsonAt}: primaryOutput must name exactly one Outputs kind; one operator, one job, one artifact`); return errors; }
   if (!outputKinds.has(primary)) errors.push(`${jsonAt}: primaryOutput ${primary} is not a kind of the Outputs table`);
   if (!doneWhenIdentifiers(op.doneWhen).includes(primary)) errors.push(`${mdAt}: ${HEADINGS[op.lang].doneWhen} does not name the primary output \`${primary}\` in backticks`);
+  return errors;
+}
+
+// The graph is closed: every required Input of every operator is produced by some other operator's
+// Outputs, and every primary output is consumed — an Inputs row of another operator names it — or the
+// operator is where a chain ends: a Next row hands to `user`, or it is the publish or the deploy that
+// carries the boundary out of the session. A required kind nobody produces is a branch the planner can
+// never feed; a primary output nobody consumes and nobody ends on is a job the tree pays for and never
+// reads.
+export function checkGraphClosure(packages) {
+  const errors = [];
+  const v9 = packages.filter((p) => p.shape === 'v9');
+  const producers = new Map(); // kind -> operator ids whose Outputs table lists it
+  const consumers = new Map(); // kind -> operator ids whose Inputs table lists it
+  for (const p of v9) {
+    for (const r of p.en.tables.outputs?.rows ?? []) { const k = kindOf(r.kind); if (!k) continue; if (!producers.has(k)) producers.set(k, new Set()); producers.get(k).add(p.manifest.id); }
+    for (const r of p.en.tables.inputs?.rows ?? []) { const k = kindOf(r.kind); if (!k || k === '—') continue; if (!consumers.has(k)) consumers.set(k, new Set()); consumers.get(k).add(p.manifest.id); }
+  }
+  for (const p of v9) {
+    const id = p.manifest.id;
+    const at = `operators/${p.name}/operator.md`;
+    for (const r of p.en.tables.inputs?.rows ?? []) {
+      const k = kindOf(r.kind);
+      if (!k || k === '—' || !isYes(r.required)) continue;
+      const others = [...(producers.get(k) ?? [])].filter((x) => x !== id);
+      if (!others.length) errors.push(`${at}: required input ${k} is produced by no other operator's Outputs table; the planner can never feed this branch`);
+    }
+    const primary = p.manifest.primaryOutput;
+    if (!primary) continue;
+    const readers = [...(consumers.get(primary) ?? [])].filter((x) => x !== id);
+    const ends = (p.en.tables.next?.rows ?? []).some((r) => unquote(r.operator) === 'user') || [PUBLISH_OPERATOR, DEPLOY_OPERATOR].includes(id);
+    if (!readers.length && !ends) errors.push(`${at}: primary output ${primary} is consumed by no Inputs table and ${id} ends no chain (no Next row hands to user, and it is neither ${PUBLISH_OPERATOR} nor ${DEPLOY_OPERATOR}); a job nobody reads is not a job`);
+  }
   return errors;
 }
 
@@ -186,6 +220,7 @@ export async function validateOperators(root) {
       });
     }
   }
+  errors.push(...checkGraphClosure(packages));
   return { errors, checked, total: packages.length };
 }
 

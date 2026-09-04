@@ -1,0 +1,37 @@
+{
+  "kind": "seed-plan",
+  "title": "^# seed-plan — [a-z0-9][a-z0-9-]*$",
+  "sections": [
+    {
+      "heading": "^## Units$",
+      "table": "| Unit | Serves | Namespace | Goal |",
+      "minRows": 1,
+      "cell": {
+        "Unit": "^`[a-z0-9][a-z0-9-]*`$",
+        "Serves": "^(flow|family) `[a-z0-9][a-z0-9-]*`$",
+        "Namespace": "^`[a-z][A-Za-z0-9._-]*`$",
+        "Goal": "\\S"
+      }
+    },
+    {
+      "heading": "^## Targets$",
+      "table": "| Unit | Store | Attribution | Volume | Rollback |",
+      "minRows": 1,
+      "cell": {
+        "Unit": "^`[a-z0-9][a-z0-9-]*`$",
+        "Store": "^`[A-Za-z0-9_.-]+`$",
+        "Attribution": "^(owner|prefix|limitation)$",
+        "Volume": "^[1-9][0-9]*$",
+        "Rollback": "\\S"
+      }
+    },
+    {
+      "heading": "^## Fallbacks taken$",
+      "table": "| Code | Action |",
+      "cell": {
+        "Code": "^`[A-Z][A-Z0-9_]+`$",
+        "Action": "\\S"
+      }
+    }
+  ]
+}

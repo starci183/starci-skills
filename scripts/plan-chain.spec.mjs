@@ -136,7 +136,7 @@ const fixturesDir = path.join(root, 'tests', 'chains');
 const fixtures = await Promise.all((await readdir(fixturesDir)).filter((f) => f.endsWith('.json')).sort().map(async (f) => JSON.parse(await readFile(path.join(fixturesDir, f), 'utf8'))));
 const strip = (id) => id.split('#')[0];
 test('every fixture names its mission, its example chain and its end, and its id equals its file name', async () => {
-  assert.equal(fixtures.length, 11);
+  assert.equal(fixtures.length, 13);
   for (const fx of fixtures) {
     assert.ok(fx.mission?.doneWhen?.length, `${fx.id}: mission.doneWhen`);
     assert.ok(Array.isArray(fx.example) && fx.example.length, `${fx.id}: example`);
@@ -163,7 +163,7 @@ for (const fx of fixtures) {
     assert.equal(p.ends, fx.ends, `${fx.id}: ends`);
     // Every branch has a goal, and every done-when line has its branch.
     for (const c of Object.keys(p.steps)) assert.ok(p.goals[c], `${fx.id}: ${c} has a goal`);
-    fx.mission.doneWhen.forEach((l, i) => assert.ok(Object.values(p.goals).some((g) => g.doneWhen === i), `${fx.id}: done-when ${i} (${l.producedBy}) has a branch`));
+    fx.mission.doneWhen.forEach((l, i) => assert.ok(Object.values(p.goals).some((g) => g.doneWhen === i) || Object.entries(p.steps).some(([c, op]) => op === l.producedBy && p.fanout[c]), `${fx.id}: done-when ${i} (${l.producedBy}) has a branch, or is a unit of its operator's fanned-out branch`));
     // A plan sibling, when this tree has one and more than one line names the execute operator, precedes
     // its execute branch, which fans out; with one line there is no plan step.
     for (const [c, op] of Object.entries(p.steps)) {

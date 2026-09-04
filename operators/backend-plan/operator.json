@@ -1,0 +1,20 @@
+{
+  "schemaVersion": 9,
+  "id": "backend.plan",
+  "domain": "backend",
+  "job": "Group the operations of one frozen contract into modules once — a module being the operations that share a writer and a store boundary — and give every module its goal, its stores, its proof kinds, its migration refs and its place in the order, so that the blind generators that follow each fill one module and no operation is filled twice.",
+  "package": "operator.md",
+  "errors": "errors.json",
+  "validator": "validate.mjs",
+  "selfTest": "self-test.mjs",
+  "resources": {
+    "profile": "sol-fresh",
+    "grammarBound": false,
+    "mode": "isolated",
+    "tools": {
+      "@tools/fileread": "context-aliases",
+      "@tools/git": "read"
+    }
+  },
+  "primaryOutput": "backend-plan"
+}

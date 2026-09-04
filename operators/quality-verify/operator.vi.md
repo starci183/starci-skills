@@ -242,3 +242,4 @@ thành đạt vì gate hoặc UAT đạt. Các gate chất lượng và các cas
 | phán quyết xanh và head đã publish phải tới được một môi trường | `release.deploy` |
 | các gate xanh và lời hứa phải được đối chiếu với source đã giao | `business.reconcile` |
 | các gate xanh và có người yêu cầu đi thử hành trình | `uat.verify` |
+| các gate xanh và nhiệm vụ nêu hơn một hành trình, nên các luồng được gọi tên trước khi mỗi nhánh đi một luồng | `uat.plan` |

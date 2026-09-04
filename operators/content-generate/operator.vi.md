@@ -162,3 +162,4 @@ quá các phép kiểm đã thực sự chạy.
 | Khi | Operator |
 | --- | --- |
 | đối tượng nội dung được route hoặc runtime dùng chung không trả lời ở ràng buộc đã đóng băng | `workspace.bind` |
+| đơn vị đã viết, đã review và đã lưu, và một người quyết định việc công bố nó | `user` |

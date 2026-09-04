@@ -1,0 +1,20 @@
+{
+  "schemaVersion": 9,
+  "id": "data.plan",
+  "domain": "data",
+  "job": "Name every seed the mission needs once — one unit per flow the UAT plan names and per data family the goal names — each with its goal, its own namespace, its target stores, its representative volume and its rollback, so that the blind seeders that follow each place one unit and no two of them ever share a row.",
+  "package": "operator.md",
+  "errors": "errors.json",
+  "validator": "validate.mjs",
+  "selfTest": "self-test.mjs",
+  "resources": {
+    "profile": "sol-fresh",
+    "grammarBound": false,
+    "mode": "isolated",
+    "tools": {
+      "@tools/fileread": "context-aliases",
+      "@tools/git": "read"
+    }
+  },
+  "primaryOutput": "seed-plan"
+}

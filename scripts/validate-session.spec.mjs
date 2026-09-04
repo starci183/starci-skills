@@ -219,3 +219,32 @@ test('the history check reads the ledger alone', () => {
   assert.ok(missionHistoryErrors({ id: 'x', transitions: [{ event: 'replanned', goalVersion: 2, note: 'n' }] }).some((e) => e.includes('carries no mission')));
   assert.ok(missionHistoryErrors({ id: 'x', mission: mission(1), choices: confirmed(), transitions: [{ event: 'replanned', goalVersion: 3, note: 'n' }] }).some((e) => e.includes('past mission.version')));
 });
+
+// The findings ledger: a done audit or walk whose verdicts carry a failure has its findings in the
+// family's ledger (knowledge/findings/INDEX.md), or the session gate names the branch.
+import { recordFindings } from './record-findings.mjs';
+const AUDIT_VERDICTS = { auditScope: { mode: 'primary-surfaces', surfaces: [{ id: 'plan-picker', type: 'page', route: '/plans', matrixIds: ['wide'] }], deferredStates: [], coverageClaim: 'selected-surfaces' }, entries: [{ matrixId: 'wide', surfaceClass: 'console', results: [{ path: 'body>main', owner: 'app', rule: 'GAP-5', measured: '1rem', verdict: 'fail', routeTo: 'resolve' }] }] };
+const auditChain = { '1/1': 'workspace.bind', '2/1': 'interface.audit' };
+const auditRequests = (contexts) => ({ '1/1': fe, '2/1': { sessionId: 'x', contexts, inputs: {} } });
+// An audit branch's chain errors (its required inputs have no producer here) are the chain gate's; the ledger tests read past them.
+const ledgerOnly = (errors) => errors.filter((e) => e.includes('ledger') || e.includes('finding'));
+async function auditSession({ contexts = [{ alias: '@knowledge/grammars/core', head: null }], verdicts = AUDIT_VERDICTS, record = false } = {}) {
+  const ledger = mkdtempSync(path.join(tmpdir(), 'ledger-'));
+  const s = session({ steps: auditChain, current: '2/1', receipts: { '1/1': 'done', '2/1': { status: 'done', fields: {} } }, requests: auditRequests(contexts) });
+  const branch = path.join(s.dir, 'step-2', 'parallel-1');
+  if (verdicts) { mkdirSync(path.join(branch, 'response', 'data'), { recursive: true }); writeFileSync(path.join(branch, 'response', 'data', 'verdicts.json'), JSON.stringify(verdicts)); }
+  if (record) await recordFindings(branch, { root, ledgerDir: ledger, validate: false });
+  try { return ledgerOnly((await validateSession(root, s.dir, { packages, ledgerDir: ledger })).errors); }
+  finally { rmSync(s.dir, { recursive: true, force: true }); rmSync(ledger, { recursive: true, force: true }); }
+}
+test('a done audit with a failing verdict is refused until its findings are in the family ledger, and named by branch', async () => {
+  const missing = await auditSession();
+  assert.equal(missing.length, 1);
+  assert.ok(missing[0].startsWith('step-2/parallel-1:') && missing[0].includes('knowledge/findings/core.jsonl does not hold'));
+  assert.deepEqual(await auditSession({ record: true }), [], 'recorded, the same session is clean');
+  assert.deepEqual(await auditSession({ verdicts: { ...AUDIT_VERDICTS, entries: [{ ...AUDIT_VERDICTS.entries[0], results: [{ ...AUDIT_VERDICTS.entries[0].results[0], measured: '1.5rem', verdict: 'pass', routeTo: 'none' }] }] } }), [], 'a done audit with no failure owes the ledger nothing');
+  assert.deepEqual(await auditSession({ verdicts: null }), [], 'a done audit with no verdicts owes the ledger nothing');
+  const orphan = await auditSession({ contexts: [] });
+  assert.equal(orphan.length, 1);
+  assert.ok(orphan[0].includes('no family to record them under'));
+});

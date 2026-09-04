@@ -2,6 +2,18 @@
   "schemaVersion": 9,
   "note": "Stop codes interface.audit emits. INVALID_INPUT, SOURCE_DRIFT, EVIDENCE_MISSING and NO_PROGRESS come from operators/errors.json. RUNTIME_UNAVAILABLE is defined here and also emitted by uat.verify; UNKNOWN_RULE is emitted here and by interface.generate; both live in operators/errors.json with a scope list naming every operator that emits them.",
   "codes": {
+    "CALIBRATION_OFF": {
+      "domain": "interface",
+      "disposition": "terminate",
+      "meaning": {
+        "en": "The taste lens was scored with no anchor of the calibration set, or an anchor landed further outside its band than the tolerance the set publishes, so the round's scale is unproved and no score it produced is comparable (TASTE-13 Case 9).",
+        "vi": "Ống kính thẩm mỹ được chấm mà không có tấm mốc nào của bộ hiệu chuẩn, hoặc một tấm mốc rơi ra ngoài dải của nó xa hơn khoảng dung sai bộ ấy công bố, nên cái thang của vòng này chưa được chứng minh và không điểm nào nó sinh ra so sánh được (TASTE-13 Case 9)."
+      },
+      "resume": {
+        "en": "The same auditor scores the three anchors again in a new round and scores the surface on that scale.",
+        "vi": "Chính người chấm ấy chấm lại ba tấm mốc trong một vòng mới rồi chấm bề mặt trên cái thang đó."
+      }
+    },
     "SURFACE_CLASS_MISSING": {
       "domain": "direction",
       "disposition": "terminate",

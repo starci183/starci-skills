@@ -165,3 +165,16 @@ operator with no pair inverted, ends where the example ends, and puts a `<domain
 execute branch when the tree has one; a fixture naming an operator the tree does not carry yet is
 skipped by name. They are evidence that the planner still reaches the shapes people used, not
 shapes the entry picks from.
+## The findings ledger
+
+From 2.0.1 a receipt is not the end of what an audit or a walk knows. Every done `interface.audit`
+and `uat.verify` branch whose verdicts carry a failure appends its findings to
+`knowledge/findings/<family>.jsonl` through `scripts/record-findings.mjs` (idempotent by finding id,
+closures as second lines, the ledger's open lines materialized beside the receipt as the `findings`
+kind), `scripts/validate-session.mjs#findingsLedgerErrors` refuses a session whose done audit or walk
+the ledger does not hold, `interface.generate` answers every open finding for its surface under
+`## Findings answered` or is refused, and `scripts/promote-findings.mjs` drafts a proposal and an
+evidence stub here for any rule-less finding seen in two sessions, for a person to author under
+`UPDATE.md`. Evidence notes the promoter writes land in this folder as
+`evidence/<date>-findings-<slug>.md`; they are occurrences, never law, and a draft under
+`knowledge/findings/proposals/` cites no ordinal until the rule exists.

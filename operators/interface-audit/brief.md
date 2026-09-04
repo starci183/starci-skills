@@ -22,8 +22,9 @@ Primary output: `frontend-surface-audit`
 `capture` `response/data/captures/<matrixId>.json`
 `screenshot` `response/artifacts/<matrixId>.png`
 `verdicts` `response/data/verdicts.json`
+`findings` `response/data/findings.json` (optional)
 `host` `response/artifacts/host.json` (optional)
 
 ## Stops
 
-`INVALID_INPUT`, `SOURCE_DRIFT`, `RUNTIME_UNAVAILABLE`, `IDENTITY_MISSING`, `EVIDENCE_MISSING`, `UNKNOWN_RULE`, `SURFACE_CLASS_MISSING`, `NO_PROGRESS`
+`INVALID_INPUT`, `SOURCE_DRIFT`, `RUNTIME_UNAVAILABLE`, `IDENTITY_MISSING`, `EVIDENCE_MISSING`, `UNKNOWN_RULE`, `SURFACE_CLASS_MISSING`, `CALIBRATION_OFF`, `NO_PROGRESS`

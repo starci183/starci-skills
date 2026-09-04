@@ -75,6 +75,23 @@
       }
     },
     {
+      "heading": "^## Calibration$",
+      "table": "| Anchor | Expected | Scored |",
+      "cell": {
+        "Anchor": "^`anchor-[a-z]+`$",
+        "Expected": "^(taste|ux) [1-5]–[1-5]$",
+        "Scored": "^[1-5]$"
+      }
+    },
+    {
+      "heading": "^## Ranked against$",
+      "table": "| Sheet | Why |",
+      "cell": {
+        "Sheet": "^`[a-z0-9][a-z0-9-]*`$",
+        "Why": "\\S"
+      }
+    },
+    {
       "heading": "^## Verdict$",
       "table": "| Topic | Verdict | Route |",
       "exactRows": 8,

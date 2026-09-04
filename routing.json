@@ -365,6 +365,22 @@
       "caller": {
         "kind": "user"
       }
+    },
+    "data.plan": {
+      "data": {
+        "kind": "resume"
+      },
+      "caller": {
+        "kind": "user"
+      }
+    },
+    "backend.plan": {
+      "backend": {
+        "kind": "resume"
+      },
+      "caller": {
+        "kind": "user"
+      }
     }
   }
 }

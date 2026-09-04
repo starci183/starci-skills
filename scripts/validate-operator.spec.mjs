@@ -48,3 +48,30 @@ test('every operator.md package in the tree passes both checks', async () => {
     assert.deepEqual([...checkDoneWhenAlternatives(pkg.name, pkg.en), ...checkPrimaryOutput(pkg.name, pkg.name, pkg.manifest, pkg.en, kinds)], [], pkg.name);
   }
 });
+
+// The graph is closed: scripts/validate-operator.mjs#checkGraphClosure.
+import { checkGraphClosure } from './validate-operator.mjs';
+const pkgOf = (id, { inputs = [], outputs = [], next = [], primary = null } = {}) => ({
+  shape: 'v9', name: id.replace(/\./g, '-'), manifest: { id, primaryOutput: primary },
+  en: { tables: {
+    inputs: { rows: inputs.map(([kind, required]) => ({ kind: `\`${kind}\``, from: 'x', required: required ? 'yes' : 'no' })) },
+    outputs: { rows: outputs.map((kind) => ({ kind: `\`${kind}\``, file: 'f', type: 'md', required: 'yes' })) },
+    next: { rows: next.map((operator) => ({ when: 'w', operator: `\`${operator}\`` })) },
+  } },
+});
+test('a required input nobody produces, and a primary output nobody reads or ends on, are refused', () => {
+  const closed = [
+    pkgOf('a.plan', { outputs: ['plan'], primary: 'plan', next: ['a.run'] }),
+    pkgOf('a.run', { inputs: [['plan', true]], outputs: ['run'], primary: 'run', next: ['user'] }),
+  ];
+  assert.deepEqual(checkGraphClosure(closed), []);
+  const orphanInput = checkGraphClosure([pkgOf('a.run', { inputs: [['plan', true]], outputs: ['run'], primary: 'run', next: ['user'] })]);
+  assert.ok(orphanInput.some((e) => e.includes('required input plan is produced by no other operator')));
+  const unread = checkGraphClosure([pkgOf('a.plan', { outputs: ['plan'], primary: 'plan', next: ['a.run'] }), pkgOf('a.run', { outputs: ['run'], primary: 'run', next: ['user'] })]);
+  assert.ok(unread.some((e) => e.includes('primary output plan is consumed by no Inputs table')));
+  // Its own earlier run is history, not a producer.
+  const self = checkGraphClosure([pkgOf('a.run', { inputs: [['run', true]], outputs: ['run'], primary: 'run', next: ['user'] })]);
+  assert.ok(self.some((e) => e.includes('required input run is produced by no other operator')));
+  // An optional input needs no producer; the publish and the deploy end a chain without a user row.
+  assert.deepEqual(checkGraphClosure([pkgOf('git.publish', { inputs: [['nothing', false]], outputs: ['pub'], primary: 'pub' })]), []);
+});

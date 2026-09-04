@@ -1,0 +1,128 @@
+# backend.plan
+
+## Job
+
+Group the operations of one frozen contract into modules once — a module being the operations that
+share a writer and a store boundary — and give every module its goal, its stores, its proof kinds,
+its migration refs and its place in the order, so that the blind generators that follow each fill
+one module and no operation is filled twice.
+
+## Done when
+
+Done when the `backend-plan` names every operation of the frozen contract in exactly one module, each
+module with its goal, its stores, its proof kinds and its migration refs, orders a module after the
+ones it depends on, and the `units` file carries one module unit per Modules row with the same id
+and goal.
+
+## The unit of a blind generator is one module
+
+A generator that starts with an empty context can hold one module whole: the operations it fills,
+the writer they share, the stores they touch, the proofs that show them working and the migrations
+they carry. It cannot hold a contract of many writers, and a contract handed to one generator becomes
+the branch that fills half of every operation and proves none of them. This operator is the only
+place the whole contract is seen at once. It reads the frozen decision — every row of its Operations
+table and every object of the `stack-model.json` beside it — and partitions those operations into
+modules: the operations that share a writer and a store boundary are one module, and every operation
+belongs to exactly one. In the `units` vocabulary a module is the `module` kind. The list is written
+twice on purpose — as the Modules table a person reads and as the `units` data the orchestrator fans
+out — and the two are one list: the validator refuses a row without its entry, an entry without its
+row, a goal that differs between them, and an operation that two rows claim.
+
+## A module partitions the contract and never widens it
+
+The contract arrives frozen, and this operator adds nothing to it: no operation, writer, store or
+migration the decision does not carry appears in a module, because a module that names an operation
+the contract lacks is a widening made before the first write, and the generator's own gate would
+refuse the widening anyway. The validator reads the `stack-model.json` beside the bound decision and
+refuses a plan that leaves a contract operation in no module or names one the contract does not
+carry. Each module's stores are the union of its operations' stores, its migration refs the union of
+theirs, so a generator learns what its module touches from this table or from nothing.
+
+## Proof kinds and order come from the plan alone
+
+Every module names the proof kinds the generator must run for it, in the vocabulary the `proof` kind
+publishes; the validator reads that file and refuses a kind it does not list, so the plan cannot coin
+a proof nobody can record. A module that reads a store another module writes, or carries a migration
+another module owns, runs after it: the dependency is recorded once, in the Order table and in
+`dependsOn`, and the validator refuses the two when they disagree, so the orchestrator sequences the
+fan-out from the plan and a generator never waits on a module the plan did not name.
+
+## An operation with no module is not planned
+
+An operation the contract carries that step 5 can place in no module — its writer resolves into no
+folder the source draws a boundary around, or it shares a writer with one module and a store
+boundary with another — is `MODULE_UNDEFINED`. The stop is this operator's own and routes to
+itself: the same plan runs again with the boundary named in the decision's handoff, or with the
+writer corrected by the contract owner. It is never the caller's defect and never becomes
+`INVALID_INPUT`, because a decision is allowed to name a writer in the owner's words and it is this
+operator that turns writers into modules. A folder the plan would name that the checkout does not
+carry at the frozen head is `EVIDENCE_MISSING`: a claim about the source with no file behind it.
+
+## Boundary
+
+Context is read-only. The operator writes only `response/` of its own branch: the plan, the unit list
+and `response.json`. It fills no operation, writes no source, runs no proof, edits no contract and
+decides no business rule; the filling belongs to the generator that receives one module, and the
+contract belongs to its owner.
+
+## Context
+
+| Alias | Bind | Required |
+| --- | --- | --- |
+| `@workspaces/be` | the routed backend checkout at the frozen head: the folders each writer of the contract resolves into and the stores those folders already touch, read so a module boundary is drawn where the source draws one, never as the contract; never written | yes |
+
+## Inputs
+
+| Kind | From | Required |
+| --- | --- | --- |
+| `architecture-decision` | `architecture.decide`; the frozen contract whose Operations table and `stack-model.json` beside it are the complete set the modules partition | yes |
+| `business-promise-authority` | `business.decide`; the promise whose dimensions the operations cite, read so a module's goal is stated in the promise's words, when the feature has one | no |
+
+## Requirements
+
+| Field | Type | Default | Ask |
+| --- | --- | --- | --- |
+| `featureId` | id | — | The feature whose contract the modules partition; it titles the plan |
+| `resume` | token | null | The blocked branch's token when re-entering after a stop |
+
+## Steps
+
+| # | Step | Params | Reads | Writes | Stops with |
+| --- | --- | --- | --- | --- | --- |
+| 1 | Validate the gate and resume | `resume` | `request/request.json`, the blocked plan when resuming | — | `INVALID_INPUT`, `NO_PROGRESS` |
+| 2 | Read the frozen contract: every operation of its Operations table and of the `stack-model.json` beside it, with its writer, stores, migration refs and dimensions | `featureId` | input `architecture-decision` | — | — |
+| 3 | Read the promise when bound: the dimensions each operation cites, so a module's goal is stated in the promise's words | — | input `business-promise-authority` | — | — |
+| 4 | Read the source at the frozen head: the folder each writer resolves into and the stores it already touches, as evidence of where the source draws a boundary | — | @workspaces/be, @tools/git | — | `EVIDENCE_MISSING` |
+| 5 | Group the operations into modules: the operations that share a writer and a store boundary are one module, and every operation belongs to exactly one | — | the operations, the source | — | `MODULE_UNDEFINED` |
+| 6 | Give every module its goal line, its stores, its proof kinds and its migration refs, taken from the operations it carries | — | the modules, the contract | — | — |
+| 7 | Order the modules: a module that reads a store another writes, or carries a migration another owns, runs after it | — | the modules, the contract | — | — |
+| 8 | Write the unit list: one entry per Modules row with the same id and goal, and the modules each depends on | — | the plan | `units` | — |
+| 9 | Emit the plan and the receipt | — | everything above | `backend-plan`, `response/response.json` | — |
+
+Step 5 is the only step that stops on the plan itself: an operation that step 2 read and no module
+can take is `MODULE_UNDEFINED`, with the reason naming it in one paragraph, and nothing is emitted.
+A resume begins again at step 1 and reads the contract and the source again; a re-entry whose plan
+names the same modules as the branch it resumes is `NO_PROGRESS`.
+
+## Outputs
+
+| Kind | File | Type | Required |
+| --- | --- | --- | --- |
+| `backend-plan` | `response/response.md` | md | yes |
+| `units` | `response/data/units.json` | data | yes |
+
+## Stops
+
+| Code | Disposition |
+| --- | --- |
+| `INVALID_INPUT` | terminate |
+| `NO_PROGRESS` | terminate |
+| `EVIDENCE_MISSING` | terminate |
+| `MODULE_UNDEFINED` | terminate |
+
+## Next
+
+| When | Operator |
+| --- | --- |
+| every operation has its module: each module is filled on its own branch by the generator under scope full, carrying its unit id | `backend.generate` |
+| an operation the contract carries is one the person may not want filled in this mission, so the person says whether it belongs | `user` |

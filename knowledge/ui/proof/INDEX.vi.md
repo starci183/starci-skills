@@ -31,6 +31,7 @@ luôn gọi tên được thứ đã thật sự được nhìn.
 | [Render truth](render-truth.vi.md) | Mọi tuyên bố đã render có truy về được authority thật không | TRUTH-1 đến TRUTH-5 |
 | [Taste](taste.vi.md) | Một bề mặt đã qua sạch canon có đủ đẹp để ship không | TASTE-1 đến TASTE-13 |
 | [UX](ux.vi.md) | Một người mang theo nhiệm vụ có thật sự làm xong nó trên sản phẩm đang chạy không | UX-1 đến UX-12 (do `uat.verify` đọc) |
+| [Hiệu chuẩn](calibration/calibration.json) | Cái thang mà một ống kính có chấm điểm được chứng minh trên đó: ba tấm mốc (`calibration/anchor-low.html`, `anchor-mid.html`, `anchor-high.html`), mỗi tấm kèm dải `taste` và `ux` nó được kỳ vọng rơi vào cùng lý do một dòng, và khoảng dung sai; TASTE-13 Case 9 đọc nó | dữ liệu, không có rule riêng |
 
 Mọi topic ở đây đều tự chứa. Nó publish các tiêu chí của mình và đóng lại bằng rule verdict của chính
 nó: tập chặn cửa, ngưỡng, verdict, và một lần fail đi về đâu. Không có rule nào gom các topic lại, vì

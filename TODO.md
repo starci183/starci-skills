@@ -19,8 +19,10 @@ khuyên: xong nghĩa là có validator từ chối được vi phạm, và có b
       `brief.proven`. Ba nhánh liền không thêm bằng chứng "xong khi" nào → dừng, hỏi người.
       (`validate-response.mjs#goalCheckErrors`, `validate-session.mjs#provenErrors`,
       `#threeBranchStopErrors`, `validate-session.spec.mjs`)
-- [ ] Fail thì chạy lại đúng ô: lỗi nhỏ (dưới ba file, không đổi bố cục) → `*.fix`; lỗi lớn →
+- [x] Fail thì chạy lại đúng ô: lỗi nhỏ (dưới ba file, không đổi bố cục) → `*.fix`; lỗi lớn →
       `*.generate`; thước "nhỏ/lớn" ghi trong `resources/orchestrator.json`, không trong operator.
+      (`orchestrator.json#fixSize`: maxFiles, generateTopics, generatePrefixes, escalateAfter;
+      `interface-fix/validate.mjs#fixSizeErrors`, `validate-request.mjs#fixKindErrors`, `fix-kind.spec.mjs`)
 
 ## 2. Audit từng operator theo chuẩn: tách theo tính năng, một operator một việc
 
@@ -90,11 +92,15 @@ context khai đủ để agent mù chạy được, log đủ để người đ�
       (`templates/kinds/units.schema.json`, `request.schema.json#unit`,
       `validate-request.mjs#unitGateErrors`, `orchestrator.json#concurrency.maxParallel`,
       `unit-gate.spec.mjs`; operator execute phải khai Input `units` để bind `inputs.units`)
-- [ ] Áp cặp này: `interface.plan` (bản đồ bề mặt: trang, modal, shell chung, contract dữ liệu, goal
-      từng trang) + `interface.generate` một trang; `uat.plan` + `uat.verify` một luồng; `seed.plan` +
-      `seed.run`; `backend.plan` + `backend.generate` khi contract có nhiều module.
-      (xong nửa plan: `operators/interface-plan`, `operators/uat-plan`, kind `surface-map`, `uat-plan`;
-      còn `seed.plan`, `backend.plan`, và bảng Inputs `units` của `interface.generate`, `uat.verify`)
+- [x] Áp cặp này: `interface.plan` (bản đồ bề mặt: trang, modal, shell chung, contract dữ liệu, goal
+      từng trang) + `interface.generate` một trang; `uat.plan` + `uat.verify` một luồng; `data.plan` +
+      `data.seed` một seed; `backend.plan` + `backend.generate` một module khi contract có nhiều module
+      (planner toả ra qua domain của operator execute, nên id là `data.plan`, không phải `seed.plan`).
+      (`operators/interface-plan`, `uat-plan`, `data-plan`, `backend-plan`; kind `surface-map`, `uat-plan`,
+      `seed-plan`, `backend-plan`; bảng Inputs `units` của `interface.generate`, `uat.verify`, `data.seed`,
+      `backend.generate`; fixture `tests/chains/seed-fanout.json`, `backend-fanout.json`; còn thiếu dòng Next
+      dẫn tới `<domain>.plan` ở `workspace.bind`/`architecture.decide`, không có nó planner không tới được
+      bậc plan nào — kể cả `uat.plan`, `interface.plan`)
 - [ ] Gộp có thứ tự: `runtime.serve` merge N nhánh vào nhánh tích hợp, xung đột trả về đúng đơn vị.
 - [ ] Audit hai tầng: `interface.audit` từng trang, cộng một lần audit chéo lấy bản đồ làm input (shell,
       tên, điều hướng); lỗi chéo về `interface.plan`.
@@ -106,18 +112,24 @@ context khai đủ để agent mù chạy được, log đủ để người đ�
 
 ## 2c. Bốn chỗ yếu của harness, mỗi chỗ một gate
 
-- [ ] Planner: `validate-operator` bắt mọi Input có producer và mọi primaryOutput có consumer hoặc là
-      điểm kết; chuỗi planner dựng qua exchange `critique` mù (goal + chuỗi vào, bậc thừa ra) rồi in ra
-      chat trước khi chạy.
-- [ ] Gu auditor: lane đo được mù từng trang; lane taste và UX một auditor cho cả tính năng, chấm
+- [x] Planner: `validate-operator` bắt mọi Input có producer và mọi primaryOutput có consumer hoặc là
+      điểm kết; bậc thừa bị chặn bởi gate goal của từng nhánh (một nhánh không trỏ về dòng "xong khi"
+      hay nhánh sau thì không chạy), và kế hoạch in ra chat hai dòng mỗi nhánh trước khi chạy.
+      (`validate-operator.mjs#checkGraphClosure`, `validate-chain.mjs` goal rule, `plan-chain.mjs#previewChain`)
+- [x] Gu auditor: lane đo được mù từng trang; lane taste và UX một auditor cho cả tính năng, chấm
       tương đối trên đủ sheet; gate hiệu chuẩn ba ảnh mốc trong `knowledge/ui/proof`, lệch quá một
       điểm thì receipt bị từ chối.
-- [ ] Học: `knowledge/findings/<family>.jsonl` ghi mọi finding của audit và UAT; `interface.generate`
+      (`knowledge/ui/proof/calibration/`, `TASTE-13` Case 9, `interface-audit/validate.mjs#calibrationErrors`,
+      `CALIBRATION_OFF`, `## Calibration` và `## Ranked against` của `frontend-surface-audit`, `interface-audit/self-test.mjs`)
+- [x] Học: `knowledge/findings/<family>.jsonl` ghi mọi finding của audit và UAT; `interface.generate`
       nhận finding gần nhất của family làm input âm; `scripts/promote-findings.mjs` gom finding "chưa
       có rule" từ hai lần và soạn sẵn rule cùng evidence note cho người gật.
-- [ ] Thước nhỏ/lớn theo loại thay đổi đọc từ prefix rule của finding (trình bày, copy, state → fix;
+      (`knowledge/findings/INDEX.md`, kind `findings`, `record-findings.mjs` + spec, `validate-session.mjs#findingsLedgerErrors`,
+      `interface-generate/validate.mjs#findingsAnsweredErrors` với `## Findings answered`, `promote-findings.mjs` + spec)
+- [x] Thước nhỏ/lớn theo loại thay đổi đọc từ prefix rule của finding (trình bày, copy, state → fix;
       composition, shell, node, contract → generate); leo thang sang generate sau một lần fix không
       sạch cùng finding.
+      (`orchestrator.json#fixSize.generateTopics|generatePrefixes|escalateAfter`, `validate-request.mjs#fixKindErrors`)
 
 ## 3. Chứng minh trên nhiệm vụ thật
 
@@ -125,3 +137,18 @@ context khai đủ để agent mù chạy được, log đủ để người đ�
       đo lại: phút báo tường đầu tiên, số `RECEIPT_MISSING`, số bước, số lần cùng operator, số lần người
       phải nhắn "sao dừng". Ghi kết quả vào `tests/evidence/`.
 - [ ] Đạt thì push `origin main` và publish `@starci/skills@2.0.0`; không đạt thì mục 2 chưa xong.
+
+## 4. Playwright cho đi thử và audit (2.0.x, sau khi 2.0.2 chốt)
+
+- [ ] `resources/tools.json`: `browsercontrol` thêm mode `playwright` — một Playwright + Chromium cài chung ở host
+      (`PLAYWRIGHT_BROWSERS_PATH`), mỗi agent mù một browser context riêng (storage, viewport, DPR,
+      `prefers-reduced-motion`, dark mode), ba nhánh song song không giành trình duyệt của người; CUA giữ
+      làm fallback khi người muốn nhìn trực tiếp.
+- [ ] Agent không viết code trình duyệt: nó ghi một walk khai báo (kind `uat-walk`, mở rộng `uat-capture`:
+      goto, click theo role/name, fill, expect), `scripts/browser-walk.mjs` thực thi và chụp; gate quét
+      cấm `page.request`, `page.evaluate` và điều hướng thẳng vào URL sâu, vì một lượt đi bằng API đọc y
+      hệt một lượt đi thật.
+- [ ] Đăng nhập thật qua form của provider; giá trị niêm phong giải vào env của process runner, agent không
+      thấy, không in.
+- [ ] `uat.verify` và `interface.audit` thêm dòng Steps dùng runner; trace/video và accessibility tree vào
+      `response/artifacts/`; ảnh chụp deterministic là đầu vào của làn taste và của bộ hiệu chuẩn.

@@ -82,6 +82,30 @@ Lời khai không bao giờ là bằng chứng của việc pass: một node kha
 ra `1.5rem` là một lần hỏng, và khai bao nhiêu cũng không đổi được phép đo. Đó là toàn bộ cơ chế, và
 đó là lý do lời khai tồn tại.
 
+## Hai loại làn, hai cách phán
+
+Các topic mà lượt audit này đóng không được phán cùng một cách. Presentation, composition, responsive,
+motion, accessibility, contrast và render-truth là những thứ đo được: một gap tính ra, một tỷ lệ tương
+phản, phần tử đang giữ focus, một tuyên bố truy về được authority. Chúng được phán mù, theo từng đơn vị
+— một trang hay một modal, mỗi lần một mục ma trận — vì một phép đo không cần tấm nào khác để đúng, và
+một người chấm đã nhìn trang bên cạnh chẳng đem thêm gì cho cây thước. Ống kính thẩm mỹ không phải phép
+đo trên một tấm; nó là một vị trí trên một cái thang, và cái thang ấy trôi giữa các tấm khi mỗi tấm bị
+chấm một mình. Vì thế thẩm mỹ — và ống kính trải nghiệm ở bất cứ đâu một biên nhận chấm nó từ ảnh chụp
+— được chấm một lần cho cả tính năng bởi một người chấm, trên mọi bề mặt đã chọn của phạm vi đóng băng
+trong cùng một vòng, theo tương quan: các tấm được xếp hạng so với nhau, và biên nhận nói dưới
+`## Ranked against` nó đã xếp những tấm nào, để một điểm đọc ra là một vị trí trên thang chứ không phải
+một tâm trạng.
+
+Thứ giữ cho cái thang ấy là cùng một thang từ vòng này sang vòng khác, từ người chấm này sang người chấm
+khác, là bộ hiệu chuẩn mà `@knowledge/ui/proof` mang dưới `calibration/`: ba tấm mốc, dải mà mỗi tấm
+được kỳ vọng rơi vào cùng lý do một dòng, và khoảng dung sai, nêu một lần trong `calibration.json`.
+Người chấm chấm ba tấm mốc trong cùng vòng chấm bề mặt, ghi chúng dưới `## Calibration` và trong
+`verdicts.calibration`, rồi mới đặt bề mặt lên thang; một ống kính chấm mà không có mốc nào, hay có một
+mốc rơi ra ngoài dải xa hơn khoảng dung sai, là `CALIBRATION_OFF` (`TASTE-13` Case 9): cái thang của
+vòng chưa được chứng minh, không điểm nào nó sinh ra so sánh được, và chính người chấm ấy vào lại rồi
+chấm các mốc lần nữa. Một nhánh đơn vị chấm thẩm mỹ cho một tính năng bị chia qua nhiều nhánh thì xếp
+hạng so với riêng các mốc, và đó chính là thứ khiến điểm của hai nhánh so được với nhau.
+
 ## Chủ sở hữu quyết định chỗ hỏng đi về đâu
 
 Một lời khai hỏng trên node do ứng dụng sở hữu là một giá trị mà resolution phải publish lại, nên nó
@@ -153,26 +177,33 @@ làm bằng chứng rằng node đã pass.
 | 3 | Bind phạm vi bề mặt chính, các mục ma trận và lớp bề mặt đã khai | `auditScope`, `matrix` | đầu vào `frontend-direction-decision` (chính `response/data/coverage.json` của nó: state nhân viewport nhân bảng màu, và `surfaceClass` mà quyết định ấy đã khai) | — | `SURFACE_CLASS_MISSING` |
 | 4 | Chờ từng mục tới lúc sẵn sàng trên cổng mà entry của chủ runtime cho route này mang theo, trong profile trình duyệt của riêng phiên này, đăng nhập bằng tài khoản của luồng khi route đòi một danh tính | `readinessProbe`, `account`, `env` | @worktrees/sessions/central-runtime để lấy entry của đúng route này và endpoint nó phục vụ, đầu vào `uat-account` cho hồ sơ toàn tên, @tools/http, @tools/secrets, @tools/browsercontrol | — | `RUNTIME_UNAVAILABLE`, `IDENTITY_MISSING` |
 | 5 | Chụp và đo từng mục | — | @worktrees/sessions/central-runtime, @workspaces/fe (các owner được quan sát và identifier từng node mang), @tools/browsercontrol | `response/artifacts/<matrixId>.png`, `response/data/captures/<matrixId>.json` | `EVIDENCE_MISSING` |
-| 6 | Đối chiếu với lời khai và luật proof, phán quyết theo chủ sở hữu, để từng topic tự đóng, rồi phát | — | @knowledge/ui/proof, @knowledge/grammars/<family>, các bức chụp | `verdicts`, `frontend-surface-audit`, `response/response.json`, `host` | `UNKNOWN_RULE`, `NO_PROGRESS` |
+| 6 | Phán các làn đo được theo từng mục: đối chiếu với lời khai và luật proof, phán theo chủ sở hữu, và để từng topic đo được tự đóng | — | @knowledge/ui/proof, @knowledge/grammars/<family>, các bức chụp | — | `UNKNOWN_RULE` |
+| 7 | Chấm ống kính thẩm mỹ một lần trên mọi tấm của phạm vi, hiệu chuẩn trên ba tấm mốc và xếp hạng theo tương quan, rồi phát | — | @knowledge/ui/proof (bộ hiệu chuẩn dưới `calibration/`: các mốc, dải của chúng và khoảng dung sai), các bức chụp của mọi bề mặt đã chọn | `verdicts`, `frontend-surface-audit`, `findings`, `response/response.json`, `host` | `CALIBRATION_OFF`, `NO_PROGRESS` |
 
-Bậc 6 phán mọi lời khai rồi để từng topic proof tự đóng lại. Phần phán canon là cái ở trên: mọi lời
-khai đều được đo, phán theo luật đã publish, định tuyến theo chủ sở hữu của node nó đứng lên; tra cứu
-có giới hạn (`@tools/websearch`) chỉ giải nghĩa một referent mà rule gọi tên, không quyết thêm gì. Trên nền
-ấy, mỗi topic được ràng tự tính verdict của mình bằng chính rule đóng của nó — phần số học sống ở đó
-và không nhắc lại ở đây — và biên nhận publish mỗi topic một hàng dưới `## Verdict`: presentation,
+Bậc 6 phán mọi lời khai và để từng topic proof đo được tự đóng lại. Phần phán canon là cái ở trên: mọi
+lời khai đều được đo, phán theo luật đã publish, định tuyến theo chủ sở hữu của node nó đứng lên; tra
+cứu có giới hạn (`@tools/websearch`) chỉ giải nghĩa một referent mà rule gọi tên, không quyết thêm gì.
+Mỗi topic được ràng tự tính verdict của mình bằng chính rule đóng của nó — phần số học sống ở đó và
+không nhắc lại ở đây — và bậc 7 publish mỗi topic một hàng dưới `## Verdict`: presentation,
 composition, responsive, motion, accessibility, contrast, render-truth và taste, mỗi hàng mang verdict
 mà rule của topic ấy sinh ra cùng đường đi của một lần fail. Một topic không có bằng chứng tới nơi là
 `blocked`, và `blocked` không bao giờ được báo thành đạt cũng không bao giờ thành hỏng. Hàng taste
-được chấm theo từng mục ma trận rồi gộp lại, điểm thấp nhất và phán quyết hỏng thắng, vì một bề mặt
-chỉ tốt bằng viewport tệ nhất đã chụp; một `fix-first` ở đó vẫn đứng ngay cả khi mọi luật canon đều
-xanh, và các cổng của chính checkout chờ một `ship`.
+được chấm theo từng mục ma trận trên cái thang đã hiệu chuẩn rồi gộp lại, điểm thấp nhất và phán quyết
+hỏng thắng, vì một bề mặt chỉ tốt bằng viewport tệ nhất đã chụp; một `fix-first` ở đó vẫn đứng ngay cả
+khi mọi luật canon đều xanh, và các cổng của chính checkout chờ một `ship`.
+
+Đầu ra `findings` không phải của agent để ghi. Khi biên nhận này được chấp nhận, orchestrator ghi thêm
+mọi lần hỏng nó đã ghi vào sổ cái findings và vật chất hoá các dòng đang mở của sổ cái cho những bề mặt
+đã quan sát cạnh biên nhận, theo luật và script mà
+[mục lục findings](../../knowledge/findings/INDEX.vi.md) nêu; gate phiên từ chối một lượt audit đã
+xong mà sổ cái không giữ các lần hỏng của nó.
 
 Bảng chụp được dựng bằng `@tools/visualize` và được phục vụ chứ không chỉ được lưu (bằng tool có sẵn trong sổ đăng ký). `@tools/host` đặt `response/artifacts/` lên loopback ở
 cổng trống đầu tiên trong dải của sổ đăng ký và ghi URL, cổng, thư mục cùng pid vào
 `response/artifacts/host.json`, rồi dừng khi nhánh kết thúc hoặc được resume; một người mở bảng ấy và
 thấy từng mục ma trận cạnh phán quyết của nó. Không gì bind `0.0.0.0`.
 
-Phục vụ chưa phải là nói. Bậc 6 in qua `@tools/print`, thẳng vào cuộc trò chuyện người ta đang
+Phục vụ chưa phải là nói. Bậc 7 in qua `@tools/print`, thẳng vào cuộc trò chuyện người ta đang
 đọc, URL của bảng chụp, ảnh chụp điểm thấp nhất của từng topic và bảng `## Verdict`, còn biên nhận
 liệt kê từng artifact đã in dưới `## Printed` kèm lý do. Một phán quyết không ai thấy thì không đưa ai
 đi đâu, và một lượt soi lưu bảng chụp rồi im lặng chỉ soi chính nó.
@@ -244,6 +275,7 @@ Các gate unit, integration và regression giữ nguyên hợp đồng coverage 
 | `capture` | `response/data/captures/<matrixId>.json` | data | có |
 | `screenshot` | `response/artifacts/<matrixId>.png` | artifact | có |
 | `verdicts` | `response/data/verdicts.json` | data | có |
+| `findings` | `response/data/findings.json` | data | không |
 | `host` | `response/artifacts/host.json` | artifact | không |
 
 ## Dừng
@@ -257,6 +289,7 @@ Các gate unit, integration và regression giữ nguyên hợp đồng coverage 
 | `EVIDENCE_MISSING` | terminate |
 | `UNKNOWN_RULE` | terminate |
 | `SURFACE_CLASS_MISSING` | terminate |
+| `CALIBRATION_OFF` | terminate |
 | `NO_PROGRESS` | terminate |
 
 ## Kế tiếp

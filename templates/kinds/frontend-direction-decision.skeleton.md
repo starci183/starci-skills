@@ -81,6 +81,12 @@
 | --- | --- |
 | `other-candidate-id` | which attack it failed, or the scores it lost on; no rows when one candidate was formed |
 
+## Findings answered
+
+| Finding | How |
+| --- | --- |
+| `f0123456789ab` | every open line of the `findings` input for this target or unit, and what the selected direction does about it; no rows when the input carries none |
+
 ## Printed
 
 | Artifact | Why |
