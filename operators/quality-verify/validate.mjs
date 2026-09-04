@@ -93,6 +93,9 @@ export async function validateQualityStep(branchDir, root = ROOT) {
   const sonarScope = empty(requirements.sonarScope) ? 'new-code' : String(requirements.sonarScope);
   if (plannedNames.includes('e2e') && !e2eRequested) errors.push('request.json: the e2e gate cannot be planned without an explicit request');
   if (!['new-code', 'overall'].includes(sonarScope)) errors.push(`request.json: sonarScope ${sonarScope} is neither new-code nor overall`);
+  // Lint is judged on the delivery by default: the errors it added in the files it changed or created, against the base; a red base is a finding, not the delivery's failure.
+  const lintScope = empty(requirements.lintScope) ? 'changed' : String(requirements.lintScope);
+  if (!['changed', 'overall'].includes(lintScope)) errors.push(`request.json: lintScope ${lintScope} is neither changed nor overall`);
 
   const debts = asList(requirements.declaredDebts);
   const debtIds = debts.map((d) => d.debtId);
@@ -187,6 +190,14 @@ export async function validateQualityStep(branchDir, root = ROOT) {
     const at = `response/data/gates/${r.gate}.json`;
     if (r.gate === 'sonar') { if (r.sonarScope !== sonarScope) errors.push(`${at}: sonarScope ${r.sonarScope} differs from the request's ${sonarScope}`); }
     else if (r.sonarScope !== null) errors.push(`${at}: a sonar scope belongs to the sonar gate alone`);
+    if (r.gate === 'lint') {
+      const lint = r.lint ?? null;
+      if (lintScope === 'changed') {
+        const counts = lint && ['baseline', 'delivery', 'changedFiles'].every((k) => Number.isInteger(lint[k]) && lint[k] >= 0);
+        if (!counts) errors.push(`${at}: under lintScope changed the lint result records lint { baseline, delivery, changedFiles }: the errors at the base, the errors the delivery added in the files it changed or created, and how many files it judged`);
+        else if (['pass', 'fail'].includes(r.status) && (r.status === 'pass') !== (lint.delivery === 0)) errors.push(`${at}: lint is ${r.status} while the delivery added ${lint.delivery} error(s); under lintScope changed the gate passes exactly when the delivery added none`);
+      }
+    } else if (r.lint != null) errors.push(`${at}: a lint record belongs to the lint gate alone`);
   }
 
   // Debt is live, in-boundary, and declared before it is carried.
@@ -236,6 +247,7 @@ export async function validateQualityStep(branchDir, root = ROOT) {
     if (pinned && binding.Head !== pinned) errors.push(`response/response.md: Binding names head ${binding.Head} but the request pinned ${pinned}`);
     const sonar = Object.fromEntries((tableUnder(text, '## Sonar') ?? []).map(([k, v]) => [k, v]));
     if (byGate.has('sonar') && sonar.Scope !== sonarScope) errors.push(`response/response.md: Sonar scope ${sonar.Scope} differs from the measured ${sonarScope}`);
+    if (byGate.get('lint')?.status === 'pass' && lintScope === 'changed' && (byGate.get('lint').lint?.baseline ?? 0) > 0 && !findingKeys.has('LINT_BASELINE_RED|lint')) errors.push('response/response.md: a passing changed-scope lint gate over a red base must record LINT_BASELINE_RED, because the project beneath the delivery is not clean');
     if (byGate.get('sonar')?.status === 'pass' && sonarScope === 'new-code' && !findingKeys.has('SONAR_NEW_CODE_ONLY|sonar')) errors.push('response/response.md: a passing new-code Sonar gate must record SONAR_NEW_CODE_ONLY, because the project beneath it may be red');
     if (e2e?.status === 'skipped-not-requested' && !findingKeys.has('E2E_NOT_REQUESTED|e2e')) errors.push('response/response.md: a skipped e2e gate must record E2E_NOT_REQUESTED so the absence is visible');
     if (below.length && !findingKeys.has('COVERAGE_BELOW_THRESHOLD|unit-coverage')) errors.push('response/response.md: coverage below a threshold must record COVERAGE_BELOW_THRESHOLD');

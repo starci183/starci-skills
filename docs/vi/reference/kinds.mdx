@@ -301,7 +301,7 @@ Khung: [`templates/kinds/quality-verification.skeleton.md`](https://github.com/s
 | `^## Coverage$` | `\| Metric \| Measured \| Threshold \| Verdict \|` | — | `Metric`: `^(statements\|lines\|functions\|branches)$`<br />`Verdict`: `^(at-or-above\|below\|unconfigured)$` |
 | `^## Sonar$` | `\| Field \| Value \|` | `Scope`, `Finding` | `Value`: `\S` |
 | `^## Debts$` | `\| Debt \| Gate \| Approval \| Owner \| Expires \| Statement \|` | — | `Gate`: `^`(format\|lint\|typecheck\|build\|unit-coverage\|integration\|e2e\|sonar\|presentation-sweep)`$` |
-| `^## Findings$` | `\| Code \| Gate \| Statement \|` | minRows 1 | `Code`: `^`(PREDECESSOR_CONSUMED\|SONAR_NEW_CODE_ONLY\|E2E_NOT_REQUESTED\|COVERAGE_BELOW_THRESHOLD\|FLAKY_CONFIRMED\|DEBT_DECLARED)`$`<br />`Statement`: `\S` |
+| `^## Findings$` | `\| Code \| Gate \| Statement \|` | minRows 1 | `Code`: `^`(PREDECESSOR_CONSUMED\|SONAR_NEW_CODE_ONLY\|LINT_BASELINE_RED\|E2E_NOT_REQUESTED\|COVERAGE_BELOW_THRESHOLD\|FLAKY_CONFIRMED\|DEBT_DECLARED)`$`<br />`Statement`: `\S` |
 | `^## Gate verdict$` | `\| Field \| Value \|` | exactRows 1 | `Value`: `^`(pass\|fail)`$` |
 | `^## Verdict$` | `\| Topic \| Verdict \| Route \|` | exactRows 9 | `Topic`: `^`(presentation\|composition\|responsive\|motion\|accessibility\|contrast\|render-truth\|taste\|experience)`$`<br />`Verdict`: `^(pass\|fail\|ship\|fix-first\|blocked)$`<br />`Route`: `^(resolve\|direction\|flow-owner\|grammar-gap\|none)$` |
 | `^## Audit scope$` | `\| Field \| Value \|` | `Mode`, `Coverage claim`, `Deferred states` | `Value`: `\S` |

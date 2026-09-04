@@ -27,9 +27,10 @@ const gateResult = (gate, over = {}) => ({
   commandRef: PLAN.find((g) => g.gate === gate)?.commandRef ?? 'package.json#scripts.x',
   configRef: PLAN.find((g) => g.gate === gate)?.configRef ?? 'config.json',
   status: 'pass', exitCode: 0, evidenceRef: `gates/${gate}.log`, classification: null, sonarScope: null, debt: null,
+  ...(gate === 'lint' ? { lint: { baseline: 0, delivery: 0, changedFiles: 3 } } : {}),
   statement: `${gate} measured at the frozen head`, ...over,
 });
-const failing = (gate, over = {}) => gateResult(gate, { status: 'fail', exitCode: 1, classification: 'in-boundary', ...over });
+const failing = (gate, over = {}) => gateResult(gate, { status: 'fail', exitCode: 1, classification: 'in-boundary', ...(gate === 'lint' ? { lint: { baseline: 0, delivery: 2, changedFiles: 3 } } : {}), ...over });
 
 const coverage = (over = {}) => ({ statements: 90, lines: 90, functions: 90, branches: 81.4, thresholds: THRESHOLDS, evidenceRef: 'gates/unit-coverage.log', ...over });
 
@@ -250,6 +251,12 @@ await expectError(baseline({ 'response/data/gates/lint.json': gateResult('lint',
 await expectError(baseline({ 'request/request.json': requestJson({ head: OTHER_HEAD }), 'response/response.md': responseMd({ head: OTHER_HEAD }) }), 'but the request pinned', 'gates measured off the pinned commit');
 await expectError(baseline({ 'response/data/gates/lint.json': gateResult('lint', { predecessorCommit: OTHER_HEAD }) }), 'which is not the head', 'a predecessor describing another commit');
 await expectError(baseline({ 'response/data/gates/lint.json': gateResult('lint', { sonarScope: 'new-code' }) }), 'belongs to the sonar gate alone', 'a sonar scope on a lint result');
+// Lint under the default changed scope: the delivery's own errors decide, a red base is a finding.
+await expectError(baseline({ 'response/data/gates/lint.json': gateResult('lint', { lint: null }) }), 'records lint { baseline, delivery, changedFiles }', 'a changed-scope lint result with no counts');
+await expectError(baseline({ 'response/data/gates/lint.json': gateResult('lint', { lint: { baseline: 4030, delivery: 127, changedFiles: 18 } }) }), 'passes exactly when the delivery added none', 'a passing lint gate over a delivery that added errors');
+await expectError(baseline({ 'response/data/gates/lint.json': gateResult('lint', { lint: { baseline: 4030, delivery: 0, changedFiles: 18 } }) }), 'must record LINT_BASELINE_RED', 'a green changed-scope lint gate over a red base read as project health');
+await expectError(baseline({ 'response/data/gates/typecheck.json': gateResult('typecheck', { lint: { baseline: 0, delivery: 0, changedFiles: 1 } }) }), 'belongs to the lint gate alone', 'a lint record on a typecheck result');
+await expectValid(baseline({ 'request/request.json': requestJson({ extra: { lintScope: 'overall' } }), 'response/data/gates/lint.json': gateResult('lint', { lint: null }) }), 'lint under overall scope carries no delivery counts');
 await expectError(baseline({ 'response/data/gates/unit-coverage.json': gateResult('unit-coverage', { gate: 'unit-coverage' }), 'response/data/coverage.json': coverage({ branches: 40 }), 'response/response.md': responseMd({ cov: coverage({ branches: 40 }) }) }), 'sit below their own threshold', 'a green unit gate over a red branch metric');
 await expectError(baseline({ 'response/data/coverage.json': coverage({ thresholds: { ...THRESHOLDS, branches: 50 } }) }), 'but the request pinned', 'a threshold lowered under the request');
 await expectError(baseline({ 'response/data/coverage.json': null, 'response/response.json': responseJson({ coverageField: null }) }), 'reports no coverage measurement', 'a passing unit gate with no coverage');

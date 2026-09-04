@@ -99,6 +99,13 @@ default `sonarScope` of `new-code`, a passing Sonar result is recorded together 
 `SONAR_NEW_CODE_ONLY` finding; without it a later reader takes a green gate for project health, which
 is the exact misreading this operator exists to prevent.
 
+Lint is judged the same way by default. Under `lintScope` `changed`, the lint result records the errors
+at the base, the errors the delivery added in the files it changed or created, and how many files it
+judged; the gate passes exactly when the delivery added none, and a base that was already red is
+recorded as `LINT_BASELINE_RED` rather than charged to the delivery, because a repo-wide gate on a base
+nobody cleaned would refuse every delivery forever and teach nothing about this one. `overall` judges
+the whole checkout, for the mission whose goal is the base itself.
+
 End-to-end is never run unless a person asked for it in this invocation, which is why
 `explicitE2eRequest` defaults to false. Otherwise the gate is recorded as `skipped-not-requested`
 with an `E2E_NOT_REQUESTED` finding: no command, no exit code, no evidence, and no implication that
@@ -210,6 +217,7 @@ Gate results retain their actual measured branch in sessionBranch. A non-session
 | `coveragePolicy` | object `{format, sourceHead, commandRef, configRef, evidenceRef, evidenceSha256}` | null | Frozen effective-configuration evidence for coverage thresholds |
 | `explicitE2eRequest` | choice | false | false unless a person asked for the end-to-end suite in this invocation; true only then |
 | `sonarScope` | choice | new-code | new-code or overall; it must agree with whether sonar is in the gate plan |
+| `lintScope` | choice | changed | `changed` judges the delivery — the errors it added in the files it changed or created, against the base, a red base recorded as `LINT_BASELINE_RED`; `overall` judges the whole checkout |
 | `declaredDebts` | list of `{debtId, gate, approvalRef, ownerRef, expiresAt}` | [] | Owner-approved debts that let a named gate stay red |
 | `resume` | token | null | The blocked branch's token when re-entering after a stop |
 
@@ -219,7 +227,7 @@ Gate results retain their actual measured branch in sessionBranch. A non-session
 | --- | --- | --- | --- | --- | --- |
 | 1 | Validate the gate, confirm the frozen head and the resume | `resume` | `request/request.json`, @workspaces/be or @workspaces/fe at the commit the request pinned, @tools/git | — | `INVALID_INPUT`, `SOURCE_DRIFT`, `NO_PROGRESS` |
 | 2 | Consume the predecessors unchanged | — | inputs `backend-source-application`, `frontend-source-application` and `changes` at their fingerprints, and the commit each one recorded | — | `PREDECESSOR_MIXED`, `PREDECESSOR_STALE` |
-| 3 | Run the gates in declared order | `gates`, `explicitE2eRequest`, `sonarScope` | @workspaces/&lt;project>/&lt;role>/gates, @workspaces/be or @workspaces/fe as the subject each gate measures, @tools/http | `response/data/gates/<gate>.json`, @tools/shell | `GATE_UNAVAILABLE` |
+| 3 | Run the gates in declared order | `gates`, `explicitE2eRequest`, `sonarScope`, `lintScope` | @workspaces/&lt;project>/&lt;role>/gates, @workspaces/be or @workspaces/fe as the subject each gate measures, @tools/http | `response/data/gates/<gate>.json`, @tools/shell | `GATE_UNAVAILABLE` |
 | 4 | Apply the coverage policy | `thresholds`, `coveragePolicy` | the frozen effective-configuration artifact, `response/data/gates/<gate>.json` of the unit gate | `response/data/coverage.json` | — |
 | 5 | Classify each failure from its diagnostics | — | `response/data/gates/<gate>.json` of every red gate | — | — |
 | 6 | Apply approved debt | `declaredDebts` | @worktrees/debts, `response/data/gates/<gate>.json` | — | `DEBT_UNAPPROVED` |

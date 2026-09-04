@@ -156,6 +156,10 @@ context khai đủ để agent mù chạy được, log đủ để người đ�
       `backend.generate` đã `git stash push` trong checkout sản phẩm (tự khai, không mất gì). Sửa: receipt ghi
       source bị từ chối khi reflog stash của checkout có thêm entry trong thời gian nhánh chạy, hay HEAD reflog có
       reset/checkout không phải commit của nhánh (`validate-response` hoặc `validate.mjs` của operator ghi source).
+- [ ] Junction và xoá tay: một session `rm -rf node_modules` trong worktree tạm có junction tới cây cài chung, Windows đi
+      xuyên junction và xoá `node_modules/.bin` của mọi checkout dùng chung (đã tự phục hồi 174 file bin). Luật: worktree
+      tạm gỡ bằng `git worktree remove --force`, không bao giờ xoá tay bên trong checkout có junction; gate: brief của
+      operator ghi source cấm `rm -rf` trong checkout, và readiness ghi rõ checkout nào là junction.
 - [ ] Preflight trước lần ghi đầu: session Setup viết bản sửa owner rồi mới chạy `--preflight`; brief của operator
       ghi source nên đặt preflight là dòng Steps đầu và validator từ chối receipt không có bằng chứng preflight.
 

@@ -94,6 +94,12 @@ biểu về cái diff chứ không phải về dự án, và dự án bên dư�
 của `sonarScope`, một kết quả Sonar pass được ghi kèm phát hiện `SONAR_NEW_CODE_ONLY`; thiếu nó thì
 người đọc sau hiểu cổng xanh là sức khỏe dự án, đúng cái hiểu sai mà operator này sinh ra để chặn.
 
+Lint mặc định cũng được chấm như vậy. Dưới `lintScope` `changed`, kết quả lint ghi số lỗi ở base, số lỗi bản
+giao thêm vào trong các file nó sửa hay tạo, và số file đã chấm; cổng pass đúng khi bản giao không thêm lỗi
+nào, và base vốn đã đỏ được ghi thành `LINT_BASELINE_RED` chứ không tính cho bản giao, vì một cổng toàn repo
+trên một base không ai dọn sẽ từ chối mọi bản giao mãi mãi mà không nói gì về bản giao này. `overall` chấm
+cả checkout, cho nhiệm vụ mà mục tiêu chính là base.
+
 End-to-end không bao giờ chạy trừ khi có người yêu cầu trong chính lần gọi này, nên
 `explicitE2eRequest` mặc định là false. Ngược lại cổng được ghi là `skipped-not-requested` kèm phát
 hiện `E2E_NOT_REQUESTED`: không lệnh, không mã thoát, không bằng chứng, và không hàm ý nào rằng hành
@@ -202,6 +208,7 @@ Gate result giữ nhánh đo thực trong sessionBranch. Giá trị ngoài sessi
 | `coveragePolicy` | object `{format, sourceHead, commandRef, configRef, evidenceRef, evidenceSha256}` | null | Bằng chứng cấu hình có hiệu lực đã đóng băng cho các ngưỡng coverage |
 | `explicitE2eRequest` | choice | false | false trừ khi có người yêu cầu bộ end-to-end trong chính lần gọi này; chỉ khi đó mới true |
 | `sonarScope` | choice | new-code | new-code hoặc overall; phải khớp với việc sonar có nằm trong kế hoạch cổng hay không |
+| `lintScope` | choice | changed | `changed` chấm bản giao — số lỗi nó thêm trong các file nó sửa hay tạo, so với base, base đỏ sẵn ghi thành `LINT_BASELINE_RED`; `overall` chấm cả checkout |
 | `declaredDebts` | list of `{debtId, gate, approvalRef, ownerRef, expiresAt}` | [] | Những khoản nợ được chủ duyệt cho phép một cổng có tên ở lại màu đỏ |
 | `resume` | token | null | Token của nhánh bị chặn khi vào lại sau một mã dừng |
 
@@ -211,7 +218,7 @@ Gate result giữ nhánh đo thực trong sessionBranch. Giá trị ngoài sessi
 | --- | --- | --- | --- | --- | --- |
 | 1 | Kiểm cổng vào, xác nhận head đã đóng băng và resume | `resume` | `request/request.json`, @workspaces/be hoặc @workspaces/fe tại commit mà request đã ghim, @tools/git | — | `INVALID_INPUT`, `SOURCE_DRIFT`, `NO_PROGRESS` |
 | 2 | Tiêu thụ tiền nhiệm nguyên vẹn | — | Đầu vào `backend-source-application`, `frontend-source-application` và `changes` tại fingerprint của chúng, cùng commit mà mỗi cái đã ghi | — | `PREDECESSOR_MIXED`, `PREDECESSOR_STALE` |
-| 3 | Chạy các cổng theo thứ tự đã khai | `gates`, `explicitE2eRequest`, `sonarScope` | @workspaces/&lt;project>/&lt;role>/gates, @workspaces/be hoặc @workspaces/fe là chủ thể mỗi cổng đo, @tools/http | `response/data/gates/<gate>.json`, @tools/shell | `GATE_UNAVAILABLE` |
+| 3 | Chạy các cổng theo thứ tự đã khai | `gates`, `explicitE2eRequest`, `sonarScope`, `lintScope` | @workspaces/&lt;project>/&lt;role>/gates, @workspaces/be hoặc @workspaces/fe là chủ thể mỗi cổng đo, @tools/http | `response/data/gates/<gate>.json`, @tools/shell | `GATE_UNAVAILABLE` |
 | 4 | Áp chính sách coverage | `thresholds`, `coveragePolicy` | artifact cấu hình có hiệu lực đã đóng băng, `response/data/gates/<gate>.json` của cổng unit | `response/data/coverage.json` | — |
 | 5 | Phân loại từng lỗi từ chẩn đoán của nó | — | `response/data/gates/<gate>.json` của mọi cổng đỏ | — | — |
 | 6 | Áp nợ đã được duyệt | `declaredDebts` | @worktrees/debts, `response/data/gates/<gate>.json` | — | `DEBT_UNAPPROVED` |

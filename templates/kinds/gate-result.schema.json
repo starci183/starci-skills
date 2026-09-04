@@ -20,45 +20,185 @@
     "statement"
   ],
   "properties": {
-    "gate": { "$ref": "#/$defs/gate" },
-    "required": { "type": "boolean" },
-    "sourceHead": { "$ref": "#/$defs/gitHead" },
-    "sessionBranch": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._/-]*$", "description": "Actual measured branch; a non-session branch requires the completed platform changes producer to declare this integration branch and head." },
-    "predecessorCommit": { "$ref": "#/$defs/gitHead" },
-    "observedAt": { "type": "string", "format": "date-time" },
-    "commandRef": { "type": "string", "minLength": 1 },
-    "configRef": { "type": "string", "minLength": 1 },
-    "status": { "enum": ["pass", "fail", "external-blocker", "skipped-not-requested"] },
-    "exitCode": { "oneOf": [{ "type": "integer" }, { "type": "null" }] },
-    "evidenceRef": { "oneOf": [{ "type": "string", "minLength": 1 }, { "type": "null" }] },
-    "classification": {
-      "oneOf": [
-        { "enum": ["in-boundary", "boundary-drift", "flaky", "external-blocker"] },
-        { "type": "null" }
+    "gate": {
+      "$ref": "#/$defs/gate"
+    },
+    "required": {
+      "type": "boolean"
+    },
+    "sourceHead": {
+      "$ref": "#/$defs/gitHead"
+    },
+    "sessionBranch": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._/-]*$",
+      "description": "Actual measured branch; a non-session branch requires the completed platform changes producer to declare this integration branch and head."
+    },
+    "predecessorCommit": {
+      "$ref": "#/$defs/gitHead"
+    },
+    "observedAt": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "commandRef": {
+      "type": "string",
+      "minLength": 1
+    },
+    "configRef": {
+      "type": "string",
+      "minLength": 1
+    },
+    "status": {
+      "enum": [
+        "pass",
+        "fail",
+        "external-blocker",
+        "skipped-not-requested"
       ]
     },
-    "sonarScope": { "oneOf": [{ "enum": ["new-code", "overall"] }, { "type": "null" }] },
+    "exitCode": {
+      "oneOf": [
+        {
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "evidenceRef": {
+      "oneOf": [
+        {
+          "type": "string",
+          "minLength": 1
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "classification": {
+      "oneOf": [
+        {
+          "enum": [
+            "in-boundary",
+            "boundary-drift",
+            "flaky",
+            "external-blocker"
+          ]
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "sonarScope": {
+      "oneOf": [
+        {
+          "enum": [
+            "new-code",
+            "overall"
+          ]
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
     "debt": {
       "oneOf": [
-        { "type": "null" },
+        {
+          "type": "null"
+        },
         {
           "type": "object",
           "additionalProperties": false,
-          "required": ["debtId", "approvalRef", "ownerRef", "expiresAt", "statement"],
+          "required": [
+            "debtId",
+            "approvalRef",
+            "ownerRef",
+            "expiresAt",
+            "statement"
+          ],
           "properties": {
-            "debtId": { "type": "string", "pattern": "^[a-z0-9][a-z0-9-]*$" },
-            "approvalRef": { "type": "string", "minLength": 1 },
-            "ownerRef": { "type": "string", "minLength": 1 },
-            "expiresAt": { "type": "string", "format": "date-time" },
-            "statement": { "type": "string", "minLength": 1 }
+            "debtId": {
+              "type": "string",
+              "pattern": "^[a-z0-9][a-z0-9-]*$"
+            },
+            "approvalRef": {
+              "type": "string",
+              "minLength": 1
+            },
+            "ownerRef": {
+              "type": "string",
+              "minLength": 1
+            },
+            "expiresAt": {
+              "type": "string",
+              "format": "date-time"
+            },
+            "statement": {
+              "type": "string",
+              "minLength": 1
+            }
           }
         }
       ]
     },
-    "statement": { "type": "string", "minLength": 1 }
+    "statement": {
+      "type": "string",
+      "minLength": 1
+    },
+    "lint": {
+      "description": "the lint gate under lintScope changed: errors at the base, errors the delivery added in the files it changed or created, and how many files were judged; null or absent on every other gate and under lintScope overall",
+      "oneOf": [
+        {
+          "type": "null"
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "baseline",
+            "delivery",
+            "changedFiles"
+          ],
+          "properties": {
+            "baseline": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "delivery": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "changedFiles": {
+              "type": "integer",
+              "minimum": 0
+            }
+          }
+        }
+      ]
+    }
   },
   "$defs": {
-    "gate": { "enum": ["format", "lint", "typecheck", "build", "unit-coverage", "integration", "e2e", "sonar", "presentation-sweep"] },
-    "gitHead": { "type": "string", "pattern": "^[0-9a-f]{40}$" }
+    "gate": {
+      "enum": [
+        "format",
+        "lint",
+        "typecheck",
+        "build",
+        "unit-coverage",
+        "integration",
+        "e2e",
+        "sonar",
+        "presentation-sweep"
+      ]
+    },
+    "gitHead": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{40}$"
+    }
   }
 }
