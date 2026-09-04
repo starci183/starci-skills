@@ -160,6 +160,12 @@ context khai đủ để agent mù chạy được, log đủ để người đ�
       xuyên junction và xoá `node_modules/.bin` của mọi checkout dùng chung (đã tự phục hồi 174 file bin). Luật: worktree
       tạm gỡ bằng `git worktree remove --force`, không bao giờ xoá tay bên trong checkout có junction; gate: brief của
       operator ghi source cấm `rm -rf` trong checkout, và readiness ghi rõ checkout nào là junction.
+- [x] `validate-step` chưa từng gọi `operators/<id>/validate.mjs`: mọi "step valid" của ba lần chạy chỉ chứng minh
+      contract chung (session recovery phát hiện bằng cách chèn lỗi cố ý). Sửa: CLI và `validateStep(..., {operator:true})`
+      dispatch validator của operator sau luật chung, CLI không dùng top-level await vì validator import ngược lại
+      (`scripts/validate-step.mjs#operatorValidator`, `validate-step.spec.mjs`).
+- [ ] Receipt của `workspace.bind` không kiểm lại được sau khi chuỗi đã dời head: validator chạy lại phép chọn và thấy
+      head mới; receipt phải được chấm theo head đã ghim lúc request, không theo checkout đang sống.
 - [ ] Preflight trước lần ghi đầu: session Setup viết bản sửa owner rồi mới chạy `--preflight`; brief của operator
       ghi source nên đặt preflight là dòng Steps đầu và validator từ chối receipt không có bằng chứng preflight.
 
