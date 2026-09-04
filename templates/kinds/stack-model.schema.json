@@ -5,6 +5,19 @@
   "required": ["decisionId", "selectedAlternativeId", "alternatives", "boundaries", "stores", "components", "operations"],
   "$defs": {
     "id": { "type": "string", "pattern": "^[a-z0-9][a-z0-9-]*$" },
+    "migrationOperation": {
+      "description": "A standalone migration is invoked by the bound migration runner, not an application endpoint or an arbitrary command. Its writer is one of its migrationRefs; all file references are relative to the bound checkout. Its nonempty owned stores bound the data boundary. Natural-key idempotency uses the migration identity and journal; transactionBoundary states the runner's actual transaction behavior. Source implementation, replay evidence and authorization to apply the migration remain separate gates.",
+      "type": "object",
+      "required": ["transport", "writerRef", "storeRefs", "migrationRefs", "transactionBoundary", "idempotencyKind"],
+      "properties": {
+        "transport": { "const": "migration" },
+        "writerRef": { "type": "string", "minLength": 1 },
+        "storeRefs": { "type": "array", "minItems": 1, "uniqueItems": true },
+        "migrationRefs": { "type": "array", "minItems": 1, "uniqueItems": true },
+        "transactionBoundary": { "enum": ["single-transaction", "per-item", "none"] },
+        "idempotencyKind": { "const": "natural-key" }
+      }
+    },
     "verdict": {
       "type": "object",
       "additionalProperties": false,
@@ -82,7 +95,7 @@
         "properties": {
           "operationId": { "$ref": "#/$defs/id" },
           "name": { "type": "string", "minLength": 1, "maxLength": 256 },
-          "transport": { "enum": ["graphql-mutation", "graphql-query", "rest", "worker", "cron", "event-consumer"] },
+          "transport": { "enum": ["graphql-mutation", "graphql-query", "rest", "worker", "cron", "event-consumer", "migration"] },
           "writerRef": { "type": "string", "minLength": 1, "maxLength": 1024, "description": "The one file path this operator names: the implementation may not choose its own writer." },
           "storeRefs": { "type": "array", "maxItems": 64, "items": { "type": "string", "minLength": 1 } },
           "transactionBoundary": { "enum": ["single-transaction", "per-item", "read-only", "none"] },

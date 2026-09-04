@@ -38,7 +38,7 @@
       "properties": {
         "operationId": { "$ref": "#/$defs/identifier" },
         "name": { "type": "string", "minLength": 1, "maxLength": 256 },
-        "transport": { "enum": ["graphql-mutation", "graphql-query", "rest", "worker", "cron", "event-consumer"] },
+        "transport": { "enum": ["graphql-mutation", "graphql-query", "rest", "worker", "cron", "event-consumer", "migration"] },
         "writerRef": { "type": "string", "minLength": 1, "maxLength": 1024 },
         "storeRefs": { "type": "array", "maxItems": 64, "items": { "type": "string", "minLength": 1 } },
         "transactionBoundary": { "enum": ["single-transaction", "per-item", "read-only", "none"] },

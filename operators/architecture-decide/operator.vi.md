@@ -41,6 +41,11 @@ những operation đó và không được thêm cái nào, nên một operation
 được viết ở đâu cả. Khai một lần ghi không phải là chọn một cách hiện thực, và đó là lý do writer là
 đường dẫn file duy nhất operator này gọi tên.
 
+Một migration độc lập dùng hình dạng operation tại
+[`stack-model.schema.json#/$defs/migrationOperation`](../../templates/kinds/stack-model.schema.json#/$defs/migrationOperation).
+Nó vẫn thuộc cùng quyết định ownership và phản biện độc lập. Khai báo operation source không cấp
+quyền áp migration vào một môi trường.
+
 ## Phản biện là một cuộc trao đổi lồng
 
 Sau khi phương án đã chọn được đào sâu, nhánh tạm ngưng: nó phát `response/response.json` với status

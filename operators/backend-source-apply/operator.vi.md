@@ -23,6 +23,15 @@ phải sự nhụt chí: chủ contract mở lại và đóng băng lại, rồi
 fingerprint mới. Với tay ra ngoài danh sách không phải là thay đổi nhỏ hơn việc mở lại contract; nó là
 cùng một thay đổi nhưng không có dấu vết.
 
+Migration độc lập tuân theo
+[`stack-model.schema.json#/$defs/migrationOperation`](../../templates/kinds/stack-model.schema.json#/$defs/migrationOperation).
+Với contract chứa loại này, orchestrator đặt `contractFingerprint` bằng SHA-256 của đúng byte
+`stack-model.json` từ producer trước khi đóng băng request. Gate request kiểm producer kiến trúc đã
+hoàn tất, phản biện, fingerprint và trần file writer/migration. Gate kết quả đối chiếu mọi trường
+operation với cùng producer; output không tự thay thẩm quyền của nó. Contract import được kiểm với
+producer gốc đã xác minh, gồm phản biện gốc. Conformance migration và proof replay vẫn áp dụng; viết
+source không cấp quyền áp migration vào môi trường dùng chung.
+
 ## Không ghi gì bên ngoài một phiên
 
 Trước khi một byte nguồn được route bị đọc để sửa hay bị ghi, nhánh mà operator này chạy trong đó đã
@@ -141,6 +150,7 @@ publish bị giữ lại. Khi nó vắng, head đã publish là thẩm quyền.
 | `featureId` | id | — | Feature mà head nghiệp vụ đã publish của nó quyết hành vi này |
 | `outcome` | prompt | — | Một thứ duy nhất đang được cài đặt, bằng lời của người dùng |
 | `mutableFileRefs` | list | — | Những file duy nhất mà source sản phẩm được ghi vào |
+| `contractFingerprint` | id | null | SHA-256 của byte stack-model từ producer; orchestrator ràng giá trị này cho contract migration độc lập |
 | `mode` | choice | apply | `apply` điền contract rồi commit, `dry` chỉ phát bản kế hoạch và không ghi gì |
 | `resume` | token | null | Token của nhánh bị chặn khi vào lại sau một mã dừng |
 
@@ -149,7 +159,7 @@ publish bị giữ lại. Khi nó vắng, head đã publish là thẩm quyền.
 | # | Bước | Tham số | Đọc | Ghi | Dừng với |
 | --- | --- | --- | --- | --- | --- |
 | 1 | Kiểm gate, chạy lại và xác nhận phiên | `resume`, `mode` | `request/request.json`, `state.json` của phiên và `step-N/parallel-M` của nhánh này, đầu vào `backend-source-application` nếu có, @workspaces/be ở head đóng băng | — | `INVALID_INPUT`, `SESSION_MISSING`, `SOURCE_DRIFT`, `NO_PROGRESS` |
-| 2 | Ràng thẩm quyền, contract và pattern | `featureId` | đầu vào `model` khi có, nếu không thì @worktrees/businesses/<featureId> ở head đã publish, đầu vào `architecture-decision` làm contract đóng băng và làm nguồn `operations` của nó, @knowledge/patterns/be mỗi khía cạnh một pattern | — | `CONTRACT_UNFROZEN`, `BUSINESS_AUTHORITY_MISSING`, `PATTERN_UNBOUND` |
+| 2 | Ràng thẩm quyền, contract và pattern | `featureId`, `contractFingerprint` | đầu vào `model` khi có, nếu không thì @worktrees/businesses/<featureId> ở head đã publish, đầu vào `architecture-decision` làm contract đóng băng và làm nguồn `operations` của nó, @knowledge/patterns/be mỗi khía cạnh một pattern | — | `CONTRACT_UNFROZEN`, `BUSINESS_AUTHORITY_MISSING`, `PATTERN_UNBOUND` |
 | 3 | Điền từng operation của contract, trên nhánh phiên | `mutableFileRefs` | @knowledge/patterns/be cho từng khía cạnh, @workspaces/be trong trần được sửa | @workspaces/be/branch/session trong trần được sửa, dưới một lease độc quyền, @tools/sourcewrite | `CONTRACT_WIDENED`, `OWNER_CONFLICT` |
 | 4 | Đối chiếu mọi mutation với contract đóng băng và ghi nó kèm hash trước và sau | `mode` | @workspaces/be, các file bị chạm và contract đóng băng | `response/data/mutations.json` | — |
 | 5 | Kiểm lại snapshot đã lưu khi đọc | — | @workspaces/be, snapshot đã lưu, @knowledge/patterns/be cho các luật trôi sau nó | — | — |

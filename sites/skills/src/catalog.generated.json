@@ -327,7 +327,7 @@
         "@worktrees/businesses/<featureId>"
       ],
       "steps": 8,
-      "requirements": 5,
+      "requirements": 6,
       "inputs": [
         {
           "kind": "architecture-decision",

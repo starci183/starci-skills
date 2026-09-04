@@ -135,6 +135,10 @@ export async function validateRequest(root, dir, packages) {
     } catch (e) { errors.push(`state.json: ${e.message}`); }
   }
   errors.push(...selectionErrors(await loadInteractionPolicy(root), request, recordedChoices));
+  if (!errors.length && request.operatorId === 'backend.source.apply') {
+    const { validateMigrationContract } = await import('./migration-contract.mjs');
+    errors.push(...(await validateMigrationContract(root, dir, request)).errors);
+  }
   return { errors, request, pkg };
 }
 

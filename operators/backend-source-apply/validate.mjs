@@ -16,6 +16,8 @@ import process from 'node:process';
 import { fileURLToPath } from 'node:url';
 import { validateStep } from '../../scripts/validate-step.mjs';
 import { tableUnder } from '../../scripts/validate-response.mjs';
+import { validateMigrationOperation } from '../../scripts/migration-operation.mjs';
+import { validateMigrationContract } from '../../scripts/migration-contract.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 // A change record is the only durable trace that a file was mutated, so the hash pair has to agree with
@@ -49,6 +51,7 @@ export async function validateBackendStep(branchDir, root = ROOT) {
   const mutations = present.has('mutations') && has('response/data/mutations.json') ? await readJson('response/data/mutations.json') : null;
   const declared = mutations ? mutations.operations : [];
   const declaredById = new Map(declared.map((o) => [o.operationId, o]));
+  errors.push(...(await validateMigrationContract(root, branchDir, base.request, mutations)).errors);
 
   // The plan cannot re-decide the mode the request asked for.
   if (mutations && mutations.mode !== mode) errors.push(`response/data/mutations.json: mode ${mutations.mode} differs from the request's ${mode}`);
@@ -72,6 +75,7 @@ export async function validateBackendStep(branchDir, root = ROOT) {
     if (mode === 'apply' && mutations.commit === mutations.base) errors.push('response/data/mutations.json: the commit equals the base, so nothing was written on the session branch');
     for (const operation of declared) {
       const at = `response/data/mutations.json: operation ${operation.operationId}`;
+      errors.push(...await validateMigrationOperation(root, operation, at));
       if (mutable.size && !mutable.has(operation.writerRef)) errors.push(`${at} names writer ${operation.writerRef} outside the mutable ceiling`);
       const shipsMigration = (operation.migrationRefs ?? []).length > 0;
       // A migration without a replay proof is a schema change nobody re-ran.

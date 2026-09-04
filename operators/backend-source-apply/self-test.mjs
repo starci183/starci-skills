@@ -7,6 +7,8 @@ import assert from 'node:assert/strict';
 import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
+import { createHash } from 'node:crypto';
+import { migrationFixture } from '../architecture-decide/self-test.mjs';
 import { validateBackendStep } from './validate.mjs';
 
 const BASE = 'f'.repeat(40);
@@ -138,9 +140,24 @@ function writeBranch(files) {
   for (const d of ['request', 'response/data/conformance', 'response/data/proofs', 'response/artifacts']) mkdirSync(path.join(branch, d), { recursive: true });
   mkdirSync(path.join(session, 'step-1', 'parallel-2', 'response'), { recursive: true });
   writeFileSync(path.join(session, 'step-1', 'parallel-2', 'response', 'response.md'), '# architecture-decision — enrol-course\n');
-  writeFileSync(path.join(session, 'state.json'), JSON.stringify({ id: 's-test', project: 'starci-academy', startedAt: '2026-09-03T00:00:00Z', requestHashes: {}, chain: [['1/1']], steps: { '1/1': 'backend.source.apply' }, current: '1/1', status: 'running' }));
+  const state = { id: 's-test', project: 'starci-academy', startedAt: '2026-09-03T00:00:00Z', requestHashes: {}, chain: [['1/1']], steps: { '1/1': 'backend.source.apply' }, current: '1/1', status: 'running' };
+  if (files.producer) {
+    const producer = structuredClone(files.producer);
+    for (const [name, content] of Object.entries(producer)) {
+      if (content === null) continue;
+      const target = path.join(session, 'step-1/parallel-2', name);
+      mkdirSync(path.dirname(target), { recursive: true });
+      if (name.endsWith('request.json') || name.endsWith('response.json')) content.parallel = 2;
+      if (name === 'critique/request/request.json') content.inputs['stack-model'] = 'step-1/parallel-2/response/data/stack-model.json';
+      const bytes = typeof content === 'string' ? content : JSON.stringify(content, null, 2);
+      writeFileSync(target, bytes);
+      if (name === 'request/request.json') state.requestHashes['1/2'] = 'sha256:' + createHash('sha256').update(bytes).digest('hex');
+    }
+    state.steps['1/2'] = 'architecture.decide';
+  }
+  writeFileSync(path.join(session, 'state.json'), JSON.stringify(state));
   for (const [name, content] of Object.entries(files)) {
-    if (content === null) continue;
+    if (content === null || name === 'producer') continue;
     writeFileSync(path.join(branch, name), typeof content === 'string' ? content : JSON.stringify(content, null, 2));
   }
   return { branch, session };
@@ -205,6 +222,78 @@ const withOperation = (patch) => {
   };
 };
 
+const migrationFiles = ({ dry = false } = {}) => {
+  const producer = migrationFixture({ operationId: OP, name: 'addIsolationScope' });
+  const contract = producer['response/data/stack-model.json'];
+  const original = contract.operations[0];
+  const writer = original.writerRef;
+  const spec = writer.replace('.ts', '.spec.ts');
+  const op = { ...original, facets: [...FACETS, 'store', 'migration'], proofKinds: [...PROOF_KINDS, 'migration-replay'] };
+  const files = withOperation(op);
+  files.producer = producer;
+  files['request/request.json'].requirements.mutableFileRefs = [writer, spec];
+  const fingerprint = 'sha256:' + createHash('sha256').update(JSON.stringify(contract, null, 2)).digest('hex');
+  files['request/request.json'].requirements.contractFingerprint = fingerprint;
+  const changes = CHANGES.map((change, index) => ({ ...change, path: index ? spec : writer, ...(dry ? { afterHash: null } : {}) }));
+  files['response/data/mutations.json'] = mutationsJson({ operations: [op], changes, ...(dry ? { mode: 'dry', commit: null } : {}) });
+  files['response/changes.md'] = changesMd({ files: [[writer, dry ? 'unchanged' : 'created'], [spec, dry ? 'unchanged' : 'created']], ...(dry ? { checkout: `\`@workspaces/be\` at \`${BASE}\` on \`${BRANCH}\`, nothing written` } : {}) });
+  files['response/response.md'] = responseMd({ operations: [[OP, op.transport, writer, op.transactionBoundary, op.idempotencyKind, op.authorityDimensionIds.join(', ')]], changes: changes.map(change => [change.path, change.change, OP, '—', change.afterHash ?? '—']), ...(dry ? { mode: 'dry', commit: '—' } : {}) });
+  if (dry) {
+    files['request/request.json'].requirements.mode = 'dry';
+    files['response/response.json'].commits = [];
+    delete files['response/response.json'].fields.conformance;
+    delete files['response/response.json'].fields.proof;
+  }
+  for (const key of Object.keys(files)) {
+    if (key === 'producer') continue;
+    const raw = JSON.stringify(files[key]).replaceAll(CONTRACT_FP, fingerprint);
+    files[key] = JSON.parse(raw);
+  }
+  return files;
+};
+
+await expectValid(migrationFiles(), 'standalone migration bound to a complete fingerprinted architecture producer');
+await expectValid(migrationFiles({ dry: true }), 'standalone migration dry plan with the same frozen producer');
+for (const [key, value] of [['transport', 'worker'], ['writerRef', 'src/other.ts'], ['migrationRefs', ['src/other.ts']], ['storeRefs', ['other-store']]]) {
+  const files = migrationFiles();
+  const op = files['response/data/mutations.json'].operations[0];
+  op[key] = value;
+  files['response/response.md'] = files['response/response.md'].replace('| migration |', `| ${op.transport} |`).replace('`src/persistence/migrations/add-scope.ts`', `\`${op.writerRef}\``);
+  await expectError(files, `changed frozen ${key}`, `coherent output rewrite of frozen ${key}`);
+}
+{
+  const files = migrationFiles(); delete files['request/request.json'].requirements.contractFingerprint;
+  await expectError(files, 'contractFingerprint must match', 'migration request without a frozen input digest');
+}
+{
+  const files = migrationFiles(); files.producer['response/data/stack-model.json'].operations[0].transport = 'worker';
+  await expectError(files, 'contractFingerprint must match', 'producer transport changed after its consumer request was frozen');
+}
+{
+  const files = migrationFiles(); delete files.producer;
+  await expectError(files, 'migration contract:', 'migration output with a heading-only producer');
+}
+{
+  const files = migrationFiles(); files.producer['critique/request/request.json'].operatorId = 'backend.source.apply';
+  await expectError(files, 'critique metadata', 'malformed producer critique cannot recurse through the backend gate');
+}
+{
+  const files = migrationFiles(); files['response/data/mutations.json'].operations = [];
+  await expectError(files, 'declared operation enrol-course is missing', 'migration output dropped its producer operation');
+}
+{
+  const files = migrationFiles(); files['request/request.json'].requirements.mutableFileRefs = [SPEC];
+  await expectError(files, 'outside mutableFileRefs', 'migration writer outside the prewrite ceiling');
+}
+{
+  const files = migrationFiles(); files['response/data/mutations.json'].operations[0].proofKinds = ['unit', 'integration'];
+  await expectError(files, 'without declaring the migration-replay proof', 'standalone migration cannot omit replay');
+}
+{
+  const files = migrationFiles(); files['response/data/mutations.json'].operations[0].facets = FACETS;
+  await expectError(files, 'without declaring the migration facet', 'standalone migration cannot omit migration conformance');
+}
+
 await expectValid(baseline(), 'one operation filled inside the frozen contract and committed once');
 await expectValid(dryFiles(), 'a dry run that plans the write set and commits, measures and writes nothing');
 await expectValid(blockedFiles(), 'blocked on a contract the outcome would widen');
@@ -254,4 +343,4 @@ await expectError({ ...dryFiles(), ...records(), 'response/response.json': respo
 await expectError({ ...dryFiles(), 'response/changes.md': changesMd({ files: [[WRITER, 'created'], [SPEC, 'created']], checkout: `\`@workspaces/be\` at \`${BASE}\` on \`${BRANCH}\`, nothing written` }) }, 'under a dry run, which leaves every path unchanged', 'a dry change record reporting a move');
 await expectError({ ...dryFiles(), 'response/data/mutations.json': mutationsJson({ commit: null, changes: DRY_CHANGES }) }, "mode apply differs from the request's dry", 'a plan that re-decides the mode');
 
-process.stdout.write('backend.source.apply self-test: 3 valid branches, 43 rejected mutations\n');
+process.stdout.write('backend.source.apply self-test: 5 valid branches, 55 rejected mutations\n');

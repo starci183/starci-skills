@@ -27,7 +27,7 @@ Skeleton: [`templates/kinds/architecture-decision.skeleton.md`](https://github.c
 | `^## Boundaries$` | `\| Boundary \| Responsibility \| Owner \| Interfaces \| Owns data \|` | minRows 1 | `Owns data`: `^(yes\|no)$` |
 | `^## Data ownership$` | `\| Store \| Owning boundary \| Writers \| Readers \| Migrators \| Transaction scope \| Backup \| Restore \|` | — | — |
 | `^## Stack delta$` | `\| Component \| Status \| Justification \| Evidence \| Compatibility \|` | minRows 1 | `Status`: `^(existing\|added\|replaced\|removed\|replaced-candidate)$`<br />`Justification`: `^(measured-constraint\|observed-evidence\|requirement-fit\|—)$` |
-| `^## Operations$` | `\| Operation \| Transport \| Writer \| Stores \| Transaction \| Idempotency \| Dimensions \|` | minRows 1 | `Transport`: `^(graphql-mutation\|graphql-query\|rest\|worker\|cron\|event-consumer)$`<br />`Transaction`: `^(single-transaction\|per-item\|read-only\|none)$`<br />`Idempotency`: `^(none\|natural-key\|request-token\|event-id)$`<br />`Dimensions`: `^[a-z0-9][a-z0-9-]*(?:, [a-z0-9][a-z0-9-]*)*$` |
+| `^## Operations$` | `\| Operation \| Transport \| Writer \| Stores \| Transaction \| Idempotency \| Dimensions \|` | minRows 1 | `Transport`: `^(graphql-mutation\|graphql-query\|rest\|worker\|cron\|event-consumer\|migration)$`<br />`Transaction`: `^(single-transaction\|per-item\|read-only\|none)$`<br />`Idempotency`: `^(none\|natural-key\|request-token\|event-id)$`<br />`Dimensions`: `^[a-z0-9][a-z0-9-]*(?:, [a-z0-9][a-z0-9-]*)*$` |
 | `^## Handoff$` | `\| Item \| Kind \| Detail \|` | minRows 1 | `Kind`: `^(invariant\|risk\|contract\|migration\|rollback\|proof\|unknown)$` |
 | `^## Fallbacks taken$` | `\| Code \| Action \|` | — | `Code`: `^`[A-Z][A-Z0-9_]+`$` |
 
@@ -39,7 +39,7 @@ Skeleton: [`templates/kinds/backend-source-application.skeleton.md`](https://git
 | Section | Table header | Rows | Cell constraints |
 | --- | --- | --- | --- |
 | `^## Binding$` | `\| Field \| Value \|` | `Outcome`, `Feature`, `Contract fingerprint`, `Base`, `Branch`, `Commit` | `Value`: `\S` |
-| `^## Operations$` | `\| Operation \| Transport \| Writer \| Transaction \| Idempotency \| Decisions \|` | minRows 1 | `Transport`: `^(graphql-mutation\|graphql-query\|rest\|worker\|cron\|event-consumer)$`<br />`Transaction`: `^(single-transaction\|per-item\|read-only\|none)$`<br />`Idempotency`: `^(none\|natural-key\|request-token\|event-id)$`<br />`Decisions`: `^[a-z0-9][a-z0-9-]*(?:, [a-z0-9][a-z0-9-]*)*$` |
+| `^## Operations$` | `\| Operation \| Transport \| Writer \| Transaction \| Idempotency \| Decisions \|` | minRows 1 | `Transport`: `^(graphql-mutation\|graphql-query\|rest\|worker\|cron\|event-consumer\|migration)$`<br />`Transaction`: `^(single-transaction\|per-item\|read-only\|none)$`<br />`Idempotency`: `^(none\|natural-key\|request-token\|event-id)$`<br />`Decisions`: `^[a-z0-9][a-z0-9-]*(?:, [a-z0-9][a-z0-9-]*)*$` |
 | `^## Changes$` | `\| Path \| Change \| Operation \| Before \| After \|` | minRows 1 | `Change`: `^(added\|modified\|deleted)$`<br />`Before`: `^(sha256:[0-9a-f]{64}\|—)$`<br />`After`: `^(sha256:[0-9a-f]{64}\|—)$` |
 | `^## Findings$` | `\| Code \| Operation \| File \| Statement \|` | — | `Code`: `^`(PATTERN_BOUND\|NEW_CONVENTION_REFUSED\|SNAPSHOT_REVALIDATED\|MIGRATION_INCLUDED\|EXCEPTION_IDENTITY_REUSED\|BUSINESS_QUESTION_RAISED)`$`<br />`Statement`: `\S` |
 

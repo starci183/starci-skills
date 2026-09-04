@@ -49,6 +49,16 @@ reopened by its owner and the same outcome is implemented again against the new 
 outside the list is not a smaller change than reopening the contract; it is the same change made
 without a record.
 
+Standalone migrations follow
+[`stack-model.schema.json#/$defs/migrationOperation`](../../templates/kinds/stack-model.schema.json#/$defs/migrationOperation).
+For a contract containing one, the orchestrator sets `contractFingerprint` to the SHA-256 of the exact
+producer `stack-model.json` bytes before the request is frozen. The request gate verifies the completed
+architecture producer, its critique, the fingerprint and the declared writer and migration file ceiling.
+The result gate compares every operation field to that same producer; the output cannot replace its
+own authority. An imported contract is checked against its verified original producer, including the
+original critique. Migration conformance and replay proof still apply, and implementing source does
+not grant authority to apply the migration to a shared environment.
+
 ## Nothing is written outside a session
 
 Before a single byte of routed source is read for change or written, the branch this operator runs in
@@ -170,6 +180,7 @@ the publication was withheld. When it is absent the published head is the author
 | `featureId` | id | — | The feature whose published business head decides this behaviour |
 | `outcome` | prompt | — | The one thing being implemented, in the person's words |
 | `mutableFileRefs` | list | — | The only files product source may be written into |
+| `contractFingerprint` | id | null | SHA-256 of the producer stack-model bytes; the orchestrator binds it for a standalone migration contract |
 | `mode` | choice | apply | `apply` fills the contract and commits, `dry` emits the plan and writes nothing |
 | `resume` | token | null | The blocked branch's token when re-entering after a stop |
 
@@ -178,7 +189,7 @@ the publication was withheld. When it is absent the published head is the author
 | # | Step | Params | Reads | Writes | Stops with |
 | --- | --- | --- | --- | --- | --- |
 | 1 | Validate the gate and resume, and confirm the session | `resume`, `mode` | `request/request.json`, the session's `state.json` and this branch's `step-N/parallel-M`, input `backend-source-application` when present, @workspaces/be at the frozen head | — | `INVALID_INPUT`, `SESSION_MISSING`, `SOURCE_DRIFT`, `NO_PROGRESS` |
-| 2 | Bind authority, contract and patterns | `featureId` | input `model` when present, otherwise @worktrees/businesses/&lt;featureId> at its published head, input `architecture-decision` as the frozen contract and the source of its `operations`, @knowledge/patterns/be one pattern per aspect | — | `CONTRACT_UNFROZEN`, `BUSINESS_AUTHORITY_MISSING`, `PATTERN_UNBOUND` |
+| 2 | Bind authority, contract and patterns | `featureId`, `contractFingerprint` | input `model` when present, otherwise @worktrees/businesses/&lt;featureId> at its published head, input `architecture-decision` as the frozen contract and the source of its `operations`, @knowledge/patterns/be one pattern per aspect | — | `CONTRACT_UNFROZEN`, `BUSINESS_AUTHORITY_MISSING`, `PATTERN_UNBOUND` |
 | 3 | Fill one contract operation at a time, on the session branch | `mutableFileRefs` | @knowledge/patterns/be for each aspect, @workspaces/be inside the mutable ceiling | @workspaces/be/branch/session inside the mutable ceiling, under an exclusive lease, @tools/sourcewrite | `CONTRACT_WIDENED`, `OWNER_CONFLICT` |
 | 4 | Check every mutation against the frozen contract and record it with its before and after hash | `mode` | @workspaces/be, the touched files and the frozen contract | `response/data/mutations.json` | — |
 | 5 | Revalidate persisted snapshots on read | — | @workspaces/be, the persisted snapshot, @knowledge/patterns/be for the rules that drift after it | — | — |

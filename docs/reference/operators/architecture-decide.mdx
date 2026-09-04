@@ -66,6 +66,11 @@ those operations unchanged and may add none, so an operation nobody declared her
 anywhere. Declaring a write is not the same as choosing an implementation, which is why the writer is
 the one file path this operator names.
 
+A standalone migration uses the operation shape in
+[`stack-model.schema.json#/$defs/migrationOperation`](../../templates/kinds/stack-model.schema.json#/$defs/migrationOperation).
+It remains part of the same ownership decision and independent critique. Naming its source operation
+does not authorize applying it to an environment.
+
 ## The critique is a nested exchange
 
 After the selected alternative is deepened, the branch pauses: it emits `response/response.json`

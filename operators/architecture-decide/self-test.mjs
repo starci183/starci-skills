@@ -6,6 +6,7 @@ import assert from 'node:assert/strict';
 import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { validateArchitectureStep } from './validate.mjs';
 
 const head = 'b'.repeat(40);
@@ -169,7 +170,7 @@ function writeBranch(files) {
   }
   return { branch, session };
 }
-const baseline = () => ({
+export const baseline = () => ({
   'request/request.json': requestJson(),
   'response/response.json': responseJson(),
   'response/response.md': responseMd(),
@@ -201,6 +202,24 @@ const threeAlts = (policy, approval, extraResponse = {}) => ({
   'response/artifacts/entitlement-read-path-alternatives.html': '<!doctype html><title>alternatives</title>',
 });
 
+export function migrationFixture(patch = {}) {
+  const files = baseline();
+  const model = files['response/data/stack-model.json'];
+  const op = { ...model.operations[0], transport: 'migration', writerRef: 'src/persistence/migrations/add-scope.ts', migrationRefs: ['src/persistence/migrations/add-scope.ts'], idempotencyKind: 'natural-key', ...patch };
+  model.operations = [op];
+  files['response/response.md'] = files['response/response.md'].replace(/\| `grant-entitlement` \|[^\n]+/, `| \`${op.operationId}\` | ${op.transport} | \`${op.writerRef}\` | ${op.storeRefs.join(', ') || '—'} | ${op.transactionBoundary} | ${op.idempotencyKind} | ${op.authorityDimensionIds.join(', ')} |`);
+  return files;
+}
+
+async function runSelfTests() {
+await expectValid(migrationFixture(), 'standalone migration with owned stores and an independent critique');
+await expectValid(migrationFixture({ transactionBoundary: 'none' }), 'migration runner with explicit nontransactional behavior');
+await expectError(migrationFixture({ migrationRefs: [] }), 'migrationRefs: array is too short', 'standalone migration without a migration');
+await expectError(migrationFixture({ storeRefs: [] }), 'storeRefs: array is too short', 'standalone migration without a store');
+await expectError(migrationFixture({ writerRef: 'src/other.ts' }), 'writer must be one of its migrationRefs', 'standalone migration with another writer');
+await expectError(migrationFixture({ transactionBoundary: 'read-only' }), 'transactionBoundary: value is outside the allowed enum', 'read-only standalone migration');
+await expectError(migrationFixture({ idempotencyKind: 'none' }), 'idempotencyKind: expected "natural-key"', 'standalone migration without its journal identity');
+await expectError(migrationFixture({ writerRef: '/tmp/migration.ts', migrationRefs: ['/tmp/migration.ts'] }), 'relative to the bound checkout', 'absolute standalone migration path');
 await expectValid(baseline(), 'defaults (one alternative, automatic, critique exchange done)');
 await expectValid(threeAlts('approval-required', 'shared-boundary'), 'three alternatives under approval-required');
 await expectValid({ ...baseline(), 'response/response.json': responseJson({ status: 'blocked', stop: 'DATA_OWNERSHIP_UNASSIGNED', next: [] }), 'critique/request/request.json': null, 'critique/response/response.json': null, 'critique/response/critique.md': null }, 'blocked before the critique on a terminate code');
@@ -235,4 +254,6 @@ await expectError({ ...baseline(), 'response/data/current-state.json': { ...curr
 await expectError({ ...baseline(), 'response/response.json': (() => { const o = responseJson(); delete o.fields['stack-model']; return o; })() }, 'required output stack-model is not in fields', 'missing required output');
 await expectError({ ...baseline(), 'response/response.json': { ...responseJson(), status: 'waiting', awaiting: { exchange: 'review', kind: 'independent-critique' } } }, 'awaiting exchange review is declared by no Output', 'waiting on an undeclared exchange');
 
-process.stdout.write('architecture.decide self-test: 5 valid branches, 25 rejected mutations\n');
+process.stdout.write('architecture.decide self-test: 7 valid branches, 31 rejected mutations\n');
+}
+if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) await runSelfTests();

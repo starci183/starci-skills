@@ -13,6 +13,7 @@ import process from 'node:process';
 import { fileURLToPath } from 'node:url';
 import { validateStep } from '../../scripts/validate-step.mjs';
 import { tableUnder } from '../../scripts/validate-response.mjs';
+import { validateMigrationOperation } from '../../scripts/migration-operation.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 const AXES = ['runtime-version', 'deployable-unit', 'communication-failure', 'datastore-ownership', 'backup-restore'];
@@ -65,6 +66,7 @@ export async function validateArchitectureStep(branchDir, root = ROOT) {
     }
     const seenOperations = new Set();
     for (const o of model.operations ?? []) {
+      errors.push(...await validateMigrationOperation(root, o, `response/data/stack-model.json: operation ${o.operationId}`));
       if (seenOperations.has(o.operationId)) errors.push(`response/data/stack-model.json: operation ${o.operationId} is declared twice`);
       seenOperations.add(o.operationId);
       for (const storeRef of o.storeRefs) if (!model.stores.some((st) => st.storeId === storeRef)) errors.push(`response/data/stack-model.json: operation ${o.operationId} names store ${storeRef}, which this decision does not own`);
