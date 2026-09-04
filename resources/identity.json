@@ -1,0 +1,14 @@
+{
+  "schemaVersion": 1,
+  "provider": "keycloak",
+  "adminMounts": {
+    "username": "/run/secrets/keycloak-admin-user",
+    "password": "/run/secrets/keycloak-admin-password"
+  },
+  "timeoutMs": 15000,
+  "rule": "Bind provisioning to the selected route's provider, realm, API, actual container port and mounted custody before resolving any credential. A same-named credential in the Source repository is not interchangeable with the selected provider's credential. The fixed runner consumes values in memory directly into request bodies and prints only allowlisted status evidence. Diagnostics never print credential files, container environments, provider response bodies or child process errors. Account creation is followed by actual product sign-in; provider existence alone is not a login proof.",
+  "preflight": "scripts/identity-custody.mjs",
+  "planSchema": "resources/identity-plan.schema.json",
+  "runner": "scripts/identity-provision.mjs",
+  "rotationContract": "operators/platform-operate/operator.md#requirements"
+}

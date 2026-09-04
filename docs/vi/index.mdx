@@ -1,12 +1,12 @@
 ---
 title: "Giới thiệu"
-description: "StarCi Skills là gì: một cửa vào, mười bốn operator, các workflow mẫu, và một phiên làm việc bằng request/response."
+description: "StarCi Skills là gì: một cửa vào, các operator có ranh giới rõ, các workflow mẫu, và một phiên làm việc bằng request/response."
 ---
 
 # StarCi Skills
 
 StarCi Skills là runtime hoàn tất một nhiệm vụ StarCi. Nó là một cây file, không phải một
-framework: `SKILL.md` là cửa vào, `operators/` giữ mười bốn đơn vị làm việc, `workflows/` giữ các
+framework: `SKILL.md` là cửa vào, `operators/` giữ các đơn vị làm việc, `workflows/` giữ các
 chuỗi mẫu, còn `routing.json` là bản đồ đóng quyết định điều gì xảy ra sau mỗi bước. `INDEX.md` nói
 thẳng cây này để làm gì: nó "là runtime", và `SKILL.md` là cửa vào duy nhất đóng băng phạm vi nhiệm
 vụ, chọn đúng một operator sở hữu kết quả, rồi định tuyến giữa các operator dựa trên kết quả có kiểu.
@@ -26,7 +26,7 @@ hỏi sản phẩm hứa gì thì về `business.decide`, hỏi một surface đ
 `frontend.surface.audit`. Một yêu cầu không gọi tên chủ sở hữu nào, hoặc gọi tên hai chủ sở hữu có
 phạm vi khác nhau về bản chất, dừng ngay tại đó bằng một câu hỏi tập trung.
 
-## Mười bốn operator
+## Các operator
 
 Một operator là một việc trong một lượt tuyến tính. Nó không gọi operator khác, không điều phối
 workflow, không tự dừng giữa chừng, không trả về chỉ dẫn điều khiển dạng văn xuôi; chỉ nhánh cha mới
@@ -35,12 +35,12 @@ Việc, các mục luật riêng của nó, rồi tám bảng Context, Đầu v�
 Kế tiếp — nằm cạnh `operator.json`, `errors.json`, `validate.mjs` và `self-test.mjs`.
 
 Xem [Operator](/vi/concepts/operator) để biết hình dạng, và
-[trang tham chiếu operator](/vi/reference/operators) để đọc cả mười bốn gói.
+[trang tham chiếu operator](/vi/reference/operators) để đọc tất cả các gói operator.
 
 ## Workflow
 
 Một workflow là một chuỗi ghép sẵn: các bậc theo thứ tự, mỗi bậc là danh sách nhánh chạy song song,
-kèm vòng lặp quay về bậc trước và preset cho Yêu cầu của từng nhánh. Tám file trong `workflows/` là
+kèm vòng lặp quay về bậc trước và preset cho Yêu cầu của từng nhánh. Các file trong `workflows/` là
 ví dụ chứ không phải những chuỗi duy nhất được phép; khi không ví dụ nào khớp, cửa vào tự ghép một
 chuỗi theo đúng luật mà `scripts/validate-workflows.mjs` ép lên chính các file đó.
 

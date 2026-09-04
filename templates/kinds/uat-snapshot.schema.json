@@ -112,6 +112,12 @@
           "commit": {
             "type": "string",
             "pattern": "^[0-9a-f]{40}$"
+          },
+          "role": {
+            "enum": [
+              "fe",
+              "be"
+            ]
           }
         }
       }
@@ -390,6 +396,28 @@
             "minLength": 1
           },
           "description": "What cleanup removes: a subset of what this run seeded, and never one identifier more."
+        }
+      }
+    },
+    "auditScope": {
+      "type": "object",
+      "description": "Frozen scope retained from the admitted surface audit; no claim about deferred states."
+    },
+    "provenance": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "fe",
+        "be"
+      ],
+      "properties": {
+        "fe": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{40}$"
+        },
+        "be": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{40}$"
         }
       }
     }

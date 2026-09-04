@@ -103,6 +103,18 @@
         "Verdict": "^(pass|fail|ship|fix-first|blocked)$",
         "Route": "^(resolve|direction|flow-owner|grammar-gap|none)$"
       }
+    },
+    {
+      "heading": "^## Audit scope$",
+      "table": "| Field | Value |",
+      "rows": [
+        "Mode",
+        "Coverage claim",
+        "Deferred states"
+      ],
+      "cell": {
+        "Value": "\\S"
+      }
     }
   ]
 }

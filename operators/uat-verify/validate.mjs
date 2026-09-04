@@ -16,7 +16,8 @@ import process from 'node:process';
 import { fileURLToPath } from 'node:url';
 import { validateStep } from '../../scripts/validate-step.mjs';
 import { tableUnder } from '../../scripts/validate-response.mjs';
-import { hostRootOf, missingStack, loadEnvironmentSchema, parseDeclarationReference, stackDeclaration } from '../../scripts/validate-request.mjs';
+import { auditScopeCarryErrors, upstreamAuditScope } from '../../scripts/audit-scope.mjs';
+import { hostRootOf, sessionRootOf, missingStack, loadEnvironmentSchema, parseDeclarationReference, stackDeclaration } from '../../scripts/validate-request.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 // What this run itself writes: seeding the frozen records and signing in as the flow's dedicated
@@ -74,11 +75,69 @@ export const PASSWORD_LEAK = /uat-shared-password|password\s*[:=]\s*\S/i;
 const empty = (v) => v === undefined || v === null || v === '' || v === '—';
 const asList = (v) => (Array.isArray(v) ? v : v === undefined || v === null ? [] : [v]);
 
+// A browser journey identifies its frontend delivery and the independent backend it exercised.
+// Legacy backend-only records keep their original single-commit meaning.
+export function provenanceErrors(request, snapshot, verdicts) {
+  const errors = [], heads = Object.fromEntries((request?.contexts ?? []).filter(c => ['@workspaces/fe','@workspaces/be'].includes(c.alias)).map(c => [c.alias.slice(-2), c.head]));
+  const explicit = heads.fe !== undefined || snapshot?.provenance !== undefined || verdicts?.provenance !== undefined;
+  if (!explicit) return errors;
+  if (!heads.fe || !heads.be) errors.push('role provenance requires both frontend and backend context heads');
+  for (const [label, record] of [['snapshot',snapshot],['verdicts',verdicts]]) if (record) {
+    if (!record.provenance || record.provenance.fe !== heads.fe || record.provenance.be !== heads.be) errors.push(`${label}: role provenance differs from the pinned frontend/backend contexts`);
+    if (record.commit !== heads.fe) errors.push(`${label}: the primary commit must be the pinned frontend head`);
+  }
+  for (const entry of snapshot?.admission ?? []) if (entry.role !== 'fe' || entry.commit !== heads.fe) errors.push(`ADMISSION_MISSING — ${entry.kind} must admit the pinned frontend role`);
+  return errors;
+}
+
+async function admissionProvenanceErrors(session, request, snapshot) {
+  const errors=[];
+  for (const entry of snapshot.admission) {
+    try {
+      if(entry.ref!==request.inputs?.[entry.kind])throw new Error('admission reference differs');
+      const receiptPath=path.resolve(session,entry.ref), responseDir=path.dirname(receiptPath), upstreamBranch=path.dirname(responseDir);
+      const upstreamRequest=JSON.parse(await readFile(path.join(upstreamBranch,'request/request.json'),'utf8'));
+      const upstreamResponse=JSON.parse(await readFile(path.join(responseDir,'response.json'),'utf8'));
+      const operator=entry.kind==='frontend-surface-audit'?'frontend.surface.audit':'quality.verify';
+      if(upstreamRequest.operatorId!==operator || upstreamResponse.operatorId!==operator || upstreamResponse.status!=='done')errors.push(`ADMISSION_MISSING — ${entry.kind} has no completed owning operator`);
+      if(!upstreamRequest.contexts?.some(c=>c.alias==='@workspaces/fe'&&c.head===snapshot.provenance.fe))errors.push(`ADMISSION_MISSING — ${entry.kind} did not pin the frontend role at this head`);
+      const declared=asList(upstreamResponse.fields?.[entry.kind]);
+      if(!declared.some(ref=>path.resolve(upstreamBranch,ref)===receiptPath))errors.push(`ADMISSION_MISSING — ${entry.kind} receipt was not emitted by its owner`);
+      const text=await readFile(receiptPath,'utf8');
+      const heading=entry.kind==='frontend-surface-audit'?'## Served surface':'## Binding';
+      const binding=Object.fromEntries(tableUnder(text,heading)??[]);
+      const observed=entry.kind==='frontend-surface-audit'?binding['Applied commit']:binding.Head;
+      if(observed!==snapshot.provenance.fe)errors.push(`ADMISSION_MISSING — ${entry.kind} receipt names a stale or cross-role head`);
+      if(entry.kind==='quality-verification' && !String(binding.Checkout).includes('@workspaces/fe'))errors.push('ADMISSION_MISSING — quality-verification does not identify the frontend checkout');
+    } catch { errors.push(`ADMISSION_MISSING — ${entry.kind} role provenance cannot be read from the actual owner request and receipt`); }
+  }
+  try { const route=JSON.parse(await readFile(path.resolve(session,request.inputs.route),'utf8'));if(route.role!=='fe')errors.push('UAT browser route must identify the frontend role'); }
+  catch { errors.push('UAT frontend route provenance is unavailable'); }
+  return errors;
+}
+
+async function requiresFrontendPin(session, request) {
+  const backend=request.contexts?.find(c=>c.alias==='@workspaces/be')?.head;
+  try {
+    const route=JSON.parse(await readFile(path.resolve(session,request.inputs.route),'utf8'));
+    const head=route.sourceHead ?? route.checkout?.sourceHead;
+    if(route.role==='fe' && head && head!==backend)return true;
+  } catch { /* Existing missing-input gates own an unreadable legacy route. */ }
+  for(const kind of ADMISSIONS)try{
+    const branch=path.dirname(path.dirname(path.resolve(session,request.inputs[kind])));
+    const upstream=JSON.parse(await readFile(path.join(branch,'request/request.json'),'utf8'));
+    const head=upstream.contexts?.find(c=>c.alias==='@workspaces/fe')?.head;
+    if(head && head!==backend)return true;
+  }catch{ /* Legacy admissions can predate role-specific owner metadata. */ }
+  return false;
+}
+
 export async function validateUatStep(branchDir, root = ROOT, { hostRoot = hostRootOf(root) } = {}) {
   const base = await validateStep(root, branchDir);
   const errors = [...base.errors];
   const { response, request, requirements = {}, present = new Set() } = base;
   if (!response || response.operatorId !== 'uat.verify') return { errors };
+  if (response.status === 'done') errors.push(...auditScopeCarryErrors(branchDir, request, response, root));
   const has = (f) => existsSync(path.join(branchDir, f));
   const read = (f) => readFile(path.join(branchDir, f), 'utf8');
   const decided = response.status === 'done';
@@ -112,7 +171,9 @@ export async function validateUatStep(branchDir, root = ROOT, { hostRoot = hostR
     }
   }
 
-  const pinned = (request?.contexts ?? []).find((c) => c.alias === '@workspaces/be')?.head ?? null;
+  const frontend = (request?.contexts ?? []).find((c) => c.alias === '@workspaces/fe')?.head ?? null;
+  const pinned = frontend ?? (request?.contexts ?? []).find((c) => c.alias === '@workspaces/be')?.head ?? null;
+  if(!frontend && await requiresFrontendPin(sessionRootOf(branchDir),request))errors.push('split frontend/backend evidence requires an explicit frontend context and role provenance');
 
   // A branch that never froze a snapshot is judged on its admissions too: the code that names the
   // missing receipt is the one whose resume instruction is right for a person, and it must be
@@ -129,6 +190,8 @@ export async function validateUatStep(branchDir, root = ROOT, { hostRoot = hostR
   if (present.has('uat-verdicts') && has('response/data/verdicts.json')) {
     try { verdicts = JSON.parse(await read('response/data/verdicts.json')); } catch { verdicts = null; }
   } else if (decided) errors.push('response/data/verdicts.json: a done branch needs the three lane verdicts');
+  errors.push(...provenanceErrors(request,snapshot,verdicts));
+  if(snapshot?.provenance)errors.push(...await admissionProvenanceErrors(sessionRootOf(branchDir),request,snapshot));
 
   if (snapshot) {
     if (!empty(requirements.feature) && snapshot.feature !== requirements.feature) errors.push('response/data/snapshot.json: the snapshot names another feature');
@@ -148,7 +211,7 @@ export async function validateUatStep(branchDir, root = ROOT, { hostRoot = hostR
       const seeded = new Set(iso.seededIds);
       for (const id of iso.rollbackIds) if (!seeded.has(id)) errors.push(`response/data/snapshot.json: rollback names ${id}, which this run never seeded`);
     }
-    if (pinned !== null && snapshot.commit !== pinned) errors.push(`response/data/snapshot.json: the snapshot froze commit ${snapshot.commit} but the request pinned @workspaces/be at ${pinned}`);
+    if (pinned !== null && snapshot.commit !== pinned) errors.push(`response/data/snapshot.json: the snapshot froze commit ${snapshot.commit} but the request pinned @workspaces/${frontend?'fe':'be'} at ${pinned}`);
     if (!snapshot.snapshotRef.startsWith(`.worktrees/uat/${snapshot.feature}/${snapshot.flow}/`)) errors.push('response/data/snapshot.json: the snapshot path must address this feature and flow');
 
     // Admission: both receipts, both at the pinned head, both the files the request handed in.
@@ -241,6 +304,7 @@ export async function validateUatStep(branchDir, root = ROOT, { hostRoot = hostR
       if (snap.Feature !== snapshot.feature) errors.push('response/response.md: Snapshot names another feature');
       if (snap.Flow !== snapshot.flow) errors.push('response/response.md: Snapshot names another flow');
       if (snap.Commit !== snapshot.commit) errors.push('response/response.md: Snapshot names another commit than the frozen one');
+      if(snapshot.provenance && (snap['Frontend commit']!==snapshot.provenance.fe || snap['Backend commit']!==snapshot.provenance.be))errors.push('response/response.md: Snapshot must preserve both role-specific commit heads');
       if (snap.Namespace !== snapshot.fixtureNamespace) errors.push('response/response.md: Snapshot names another fixture namespace');
       if (snap.Approval !== snapshot.approval) errors.push('response/response.md: Snapshot names another approval');
       if (snap.Environment !== snapshot.env) errors.push('response/response.md: Snapshot names another environment than the run drove');
@@ -355,6 +419,7 @@ export async function validateUatStep(branchDir, root = ROOT, { hostRoot = hostR
       if (recorded === null) errors.push(`${snapshot.snapshotRef.replace(/snapshot\.json$/, '')}runs/${snapshot.runId}/result.json: the existing run record cannot be read, and a run record is never overwritten`);
       else {
         const same = recorded.runId === verdicts.runId && recorded.commit === verdicts.commit
+          && JSON.stringify(recorded.provenance) === JSON.stringify(verdicts.provenance)
           && JSON.stringify(recorded.lanes) === JSON.stringify(verdicts.lanes);
         if (!same) errors.push(`runs/${snapshot.runId}: a run record already exists with a different result; runs are append-only, so a second attempt is a new runId`);
       }
@@ -395,6 +460,17 @@ export async function validateUatStep(branchDir, root = ROOT, { hostRoot = hostR
     }
   }
 
+  if (snapshot && response.status === 'done') {
+    try {
+      const scope = upstreamAuditScope(branchDir, request, root);
+      if (scope && JSON.stringify(snapshot.auditScope) !== JSON.stringify(scope)) errors.push('UAT frozen snapshot must retain the admitted audit scope');
+      if (scope) {
+        const qualityScope = path.join(sessionRootOf(branchDir), path.dirname(request.inputs['quality-verification']), 'data/audit-scope.json');
+        if (!existsSync(qualityScope) || JSON.stringify(JSON.parse(await readFile(qualityScope, 'utf8'))) !== JSON.stringify(scope)) errors.push('UAT quality admission must retain the same audit scope');
+      }
+    }
+    catch (error) { errors.push(error.message); }
+  }
   return { errors };
 }
 

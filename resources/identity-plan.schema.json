@@ -1,0 +1,193 @@
+{
+  "$id": "identity:provision-plan",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "sessionId",
+    "routeKey",
+    "flow",
+    "provider",
+    "realm",
+    "api",
+    "container",
+    "containerId",
+    "imageId",
+    "inventoryFingerprint",
+    "credentials",
+    "credentialFingerprints",
+    "productContract",
+    "clientId",
+    "account",
+    "capabilities"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "const": 1
+    },
+    "sessionId": {
+      "type": "string",
+      "minLength": 1
+    },
+    "routeKey": {
+      "type": "string",
+      "pattern": "^[a-z0-9-]+/(fe|be)$"
+    },
+    "flow": {
+      "type": "string",
+      "pattern": "^[a-z0-9-]+$"
+    },
+    "provider": {
+      "type": "string",
+      "minLength": 1
+    },
+    "realm": {
+      "type": "string",
+      "minLength": 1
+    },
+    "api": {
+      "type": "string",
+      "minLength": 1
+    },
+    "container": {
+      "type": "string",
+      "minLength": 1
+    },
+    "containerId": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "imageId": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "inventoryFingerprint": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "credentials": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "username",
+        "password",
+        "uat"
+      ],
+      "properties": {
+        "username": {
+          "type": "string",
+          "minLength": 1
+        },
+        "password": {
+          "type": "string",
+          "minLength": 1
+        },
+        "uat": {
+          "type": "string",
+          "pattern": "^\\.stacks/[a-z0-9-]+/secrets/[a-z0-9-]+\\.enc$"
+        }
+      }
+    },
+    "credentialFingerprints": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "username",
+        "password",
+        "uat"
+      ],
+      "properties": {
+        "username": {
+          "type": "string",
+          "pattern": "^sha256:[0-9a-f]{64}$"
+        },
+        "password": {
+          "type": "string",
+          "pattern": "^sha256:[0-9a-f]{64}$"
+        },
+        "uat": {
+          "type": "string",
+          "pattern": "^sha256:[0-9a-f]{64}$"
+        }
+      }
+    },
+    "productContract": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "path",
+        "fingerprint"
+      ],
+      "properties": {
+        "path": {
+          "type": "string",
+          "minLength": 1
+        },
+        "fingerprint": {
+          "type": "string",
+          "pattern": "^sha256:[0-9a-f]{64}$"
+        }
+      }
+    },
+    "clientId": {
+      "type": "string",
+      "minLength": 1
+    },
+    "account": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "username",
+        "email",
+        "firstName",
+        "lastName",
+        "usernameMaxLength"
+      ],
+      "properties": {
+        "username": {
+          "type": "string",
+          "pattern": "^uat-[A-Za-z0-9._-]+$"
+        },
+        "email": {
+          "type": "string",
+          "pattern": "^[^\\s@]+@[^\\s@]+$"
+        },
+        "firstName": {
+          "type": "string",
+          "minLength": 1
+        },
+        "lastName": {
+          "type": "string",
+          "minLength": 1
+        },
+        "usernameMaxLength": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 255
+        }
+      }
+    },
+    "capabilities": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "capability",
+          "custodyEvidenceRef"
+        ],
+        "properties": {
+          "capability": {
+            "const": "identity:account-admin"
+          },
+          "custodyEvidenceRef": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    }
+  }
+}

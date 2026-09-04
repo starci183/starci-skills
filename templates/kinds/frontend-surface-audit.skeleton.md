@@ -12,6 +12,15 @@
 | Family version observed | `0.4.7` |
 | Family version resolved against | `0.4.7` |
 
+## Audit scope
+
+| Field | Value |
+| --- | --- |
+| Mode | primary-surfaces |
+| Selected surfaces | target-id |
+| Coverage claim | selected-surfaces |
+| Deferred states | — |
+
 ## Surface class
 
 | Class | Declared by |

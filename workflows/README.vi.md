@@ -63,6 +63,8 @@ operator.
 
 | Workflow | Khi | Các bậc | Song song | Kết thúc |
 | --- | --- | --- | --- | --- |
+| `library-maintenance` | hành vi package owner hiện có và patch kế tiếp, không đổi presentation sản phẩm | bind → library apply → quality | — | `user` |
+| `dependency-maintenance` | tiêu thụ package đã kiểm qua metadata dependency chính xác | bind → dependency update → quality | — | `user` |
 | `frontend-new-surface` | bề mặt chưa tồn tại (`new`) | bind ×2 → business → direction → resolve → apply → bind (consume) → audit → quality → uat → publish | audit theo matrix | `git.publish` |
 | `frontend-reconstruct` | dựng lại bề mặt đã có, giữ fact nghiệp vụ | bind ×2 → direction → resolve → apply → bind (consume) → audit → quality → uat → publish | audit theo matrix | `git.publish` |
 | `frontend-refine` | sửa bên trong cấu trúc đã duyệt | bind ×2 → direction → resolve → apply → bind (consume) → audit → quality → uat → publish | audit theo matrix | `git.publish` |

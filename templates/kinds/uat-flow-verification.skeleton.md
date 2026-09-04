@@ -85,3 +85,11 @@ in a log: the credential is named, and the login field is masked in every screen
 
 | Code | Action |
 | --- | --- |
+
+## Audit scope
+
+| Field | Value |
+| --- | --- |
+| Mode | not-recorded |
+| Coverage claim | not-recorded |
+| Deferred states | — |

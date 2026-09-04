@@ -66,14 +66,18 @@
                       "minLength": 1
                     },
                     "score": {
-                      "type": "integer",
+                      "type": [
+                        "integer",
+                        "null"
+                      ],
                       "minimum": 1,
                       "maximum": 5
                     },
                     "verdict": {
                       "enum": [
                         "pass",
-                        "fail"
+                        "fail",
+                        "deferred"
                       ]
                     },
                     "routeTo": {
@@ -142,6 +146,7 @@
                   ]
                 },
                 "routeTo": {
+                  "description": "For a failed Grammar-owned claim: grammar-gap binds the library owner to repair existing published behavior; direction requests a new presentation direction or tier through frontend.direction.decide. Neither permits an app CSS workaround.",
                   "enum": [
                     "resolve",
                     "direction",
@@ -203,6 +208,10 @@
           }
         }
       }
+    },
+    "auditScope": {
+      "type": "object",
+      "description": "Selection and coverage limits validated against audit-scope by frontend.surface.audit; downstream receipts preserve this scope."
     }
   }
 }

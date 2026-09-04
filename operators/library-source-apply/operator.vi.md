@@ -1,0 +1,89 @@
+# library.source.apply
+
+## Việc
+
+Sửa hành vi hiện có trong một package của owner đã được uỷ quyền rõ ràng, chứng minh regression và
+các gate của package, rồi commit đúng một bản patch kế tiếp trên nhánh session đã bind.
+
+## Ranh giới
+
+Operator bảo trì implementation thư viện; không dựng hoặc đổi presentation sản phẩm và không nhận
+presentation resolution. Manifest tại base đã đóng băng chứng minh danh tính package; tên thư mục
+do caller đưa không đủ. Mọi file nằm trong package và write roots của route. Từ chối symlink, package
+lồng, file consumer, dependency mới, sửa script, CSS, asset, cấu trúc markup, class và inline style.
+Chỉ sửa file hành vi hiện có, regression test đi cặp, version patch kế tiếp trong manifest hiện có,
+changelog package và metadata version trong lockfile. Lockfile workspace chỉ được phép khi cả plan
+và route đều gọi tên; JSON chỉ được thay version của entry package đã bind. Presentation đi qua
+pipeline frontend.
+
+Không publish package, push, merge, tag, chạm checkout khác, sửa gate hoặc tuyên bố audit/UAT ứng dụng
+đạt. Bản bàn giao còn phải qua quality và ranh giới phát hành được uỷ quyền riêng.
+
+## Chứng minh trước khi ghi
+
+Chạy `validate.mjs <branch> --preflight` trước khi ghi. Gate đọc plan có kiểu, route đã bind và Git,
+từ chối cây bẩn và chứng minh ranh giới package/session. Viết test đi cặp trước rồi chạy
+`run-proof.mjs <branch> before`; helper buộc hành vi và manifest còn đúng base và ghi assertion
+regression thất bại. Sửa hành vi cùng version patch rồi chạy helper cho `after` và mọi gate đã khai.
+Mỗi script test, typecheck, build hiện có phải chạy đầy đủ không filter. Helper chỉ chạy script
+package hiện có hoặc binary regression của dependency đã khai, truyền mảng đối số không qua shell
+interpolation; ghi
+output, exit status, hash từng file, nội dung script và thời điểm. Regression sau sửa và các gate
+chạy trên cùng nội dung; regression test trước và sau giống nhau.
+
+Chỉ stage tập đã khai rồi commit một lần. Validator cuối kiểm tra commit một parent so với base,
+toàn bộ diff Git, hash đã commit và proof. Từ chối lời khẳng định pass không có log hoặc proof đo
+những byte khác.
+
+## Context
+
+| Alias | Bind | Bắt buộc |
+| --- | --- | --- |
+| `@workspaces/fe` | checkout owner đã route tại base đóng băng; chỉ ghi nhánh session | yes |
+
+## Đầu vào
+
+| Kind | Từ đâu | Bắt buộc |
+| --- | --- | --- |
+| `route` | `workspace.bind`; checkout, policy session và write roots đã kiểm chứng | yes |
+
+## Yêu cầu
+
+| Field | Kiểu | Mặc định | Hỏi |
+| --- | --- | --- | --- |
+| `plan` | object | — | Schema library-behavior-plan đóng: danh tính package, tập file, regression đi cặp, script hiện có và patch kế tiếp |
+| `resume` | token | null | Token nhánh bị chặn khi vào lại với plan hoặc proof thay đổi |
+
+## Các bước
+
+| # | Bước | Tham số | Đọc | Ghi | Dừng với |
+| --- | --- | --- | --- | --- | --- |
+| 1 | Kiểm request và preflight trước lần ghi đầu | `plan`, `resume` | `request/request.json`, input `route`, @workspaces/fe tại base, @tools/git | — | `INVALID_INPUT`, `SOURCE_DRIFT`, `NO_PROGRESS`, `LIBRARY_BOUNDARY_REJECTED` |
+| 2 | Chỉ viết regression test đi cặp và chứng minh thất bại | `plan` | @workspaces/fe tại base, @tools/shell | @workspaces/fe/branch/session trong trần test, @tools/sourcewrite, `library-proof` | `LIBRARY_PROOF_FAILED` |
+| 3 | Sửa hành vi đã khai và patch kế tiếp | `plan` | @workspaces/fe trong trần package | @workspaces/fe/branch/session trong tập file đã khai, @tools/sourcewrite | `LIBRARY_BOUNDARY_REJECTED` |
+| 4 | Chạy regression cùng toàn bộ script test và build | `plan` | @workspaces/fe, @tools/shell | `library-proof` | `LIBRARY_PROOF_FAILED` |
+| 5 | Commit một lần rồi kiểm diff Git thực tế cùng hash proof | `plan` | @workspaces/fe tại commit, @tools/git | @workspaces/fe/branch/session, `library-source-application`, `changes`, `response/response.json` | `LIBRARY_BOUNDARY_REJECTED`, `LIBRARY_PROOF_FAILED` |
+
+## Đầu ra
+
+| Kind | File | Kiểu | Bắt buộc |
+| --- | --- | --- | --- |
+| `library-source-application` | `response/data/library.json` | data | yes |
+| `library-proof` | `response/data/proofs/<phase>.json` | data | yes |
+| `changes` | `response/changes.md` | md | yes |
+
+## Dừng
+
+| Code | Xử lý |
+| --- | --- |
+| `INVALID_INPUT` | terminate |
+| `SOURCE_DRIFT` | terminate |
+| `NO_PROGRESS` | terminate |
+| `LIBRARY_BOUNDARY_REJECTED` | terminate |
+| `LIBRARY_PROOF_FAILED` | terminate |
+
+## Kế tiếp
+
+| Khi | Operator |
+| --- | --- |
+| commit package owner cần kiểm chất lượng độc lập | `quality.verify` |

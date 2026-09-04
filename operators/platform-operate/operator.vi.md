@@ -33,7 +33,7 @@ chứng minh `dns-target`, `tunnel-route`, `tls` và `public-https`, và cần `
 `queue-runtime-lease`, chứng minh `entry-declared`, `endpoints-served`, `head-observed`,
 `generation-advanced`, `infra-ports-open`, `cors-origin-admitted`, `checkout-located`,
 `integration-merged`, `server-pid-owned` và `lease-honoured`, và cần
-`runtime:registry-write`. Identity áp `provision-identity` và `seed-flow-fixtures`, chứng minh
+`runtime:registry-write`. Identity áp `provision-identity`, `seed-flow-fixtures` và `rotate-admin-credential`, chứng minh
 `provider-reachable`, `credential-resolvable`, `account-exists`, `account-signs-in` và
 `no-credential-recorded`, và cần `identity:account-admin`. Giữ hai nhánh cuối tách nhau là thứ giữ cho
 mỗi tập chứng minh còn thật: không thể bắt một lần chứng thực chứng minh một tài khoản, và không thể
@@ -194,6 +194,9 @@ bịa ra, và chúng là hai mã dừng duy nhất trên lối này: một entry
 
 ## Thông tin đăng nhập là một cái tên, và nó đi vào một form hay một body
 
+Trước khi resolve giá trị, áp dụng [preflight danh tính](../../resources/identity.vi.md) cho thao tác
+đã chọn qua helper tiêu thụ cố định của nó.
+
 Mỗi môi trường niêm phong đúng một mật khẩu và tài khoản của mọi luồng được đặt từ nó, còn mỗi luồng sở
 hữu username riêng. Nó được giải theo tên đúng lúc gọi, và giá trị của nó chỉ được phép tới đúng hai
 chỗ: body của lời gọi quản trị tới provider, và ô của một form đăng ký trong trình duyệt đang được điều
@@ -319,6 +322,8 @@ release hay bằng chứng UAT nào.
 | Kind | Từ đâu | Bắt buộc |
 | --- | --- | --- |
 
+Xoay credential quản trị dùng capability identity hiện có và cần mã phê duyệt rõ ràng. Chứng minh custody của đúng provider qua credential mount hoặc môi trường bootstrap đã thu trước khi tiêu thụ giá trị. Binding `identityRotation` ghi đúng provider, realm, tên credential, fingerprint principal và toàn bộ file custody được phép ghi; `stagingRefs` cho phép riêng các file staging ciphertext được bảo vệ. Thao tác chạy riêng, không tạo tài khoản UAT và không cần flow. Delta lặp lại binding và chứng minh credential mới dùng được, credential cũ bị từ chối, session của đúng quản trị viên đã bị thu hồi và các bản custody khớp nhau. Vẫn phải đạt đầy đủ bộ check identity. Chỉ stage ciphertext, ghi nhật ký riêng từng tác động lên provider và file, giữ vật liệu phục hồi mã hóa đến khi chứng minh nhất quán; provider và nhiều file không phải một giao dịch atomic. Helper tiêu thụ phải tự kiểm tra request đã đóng băng và quyền platform trước tác động.
+
 ## Yêu cầu
 
 | Field | Kiểu | Mặc định | Hỏi |
@@ -331,6 +336,7 @@ release hay bằng chứng UAT nào.
 | `operation` | choice | serve | Bậc thang runtime mà lần gọi này leo: `stack-up`, `locate`, `start-role`, `serve`, `restart`, `reset` hay `stop` |
 | `commit` | id | null | Commit mà phiên này cần được phục vụ, được merge vào nhánh tích hợp khi head đang phục vụ chưa chứa nó |
 | `flow` | id | null | Luồng có danh tính riêng được cấp, và có thư mục nhận hồ sơ tài khoản, tài liệu đã phác cùng seed |
+| `identityRotation` | `{provider, realm, credentialName, principalFingerprint, custodyRefs, stagingRefs}` | null | Chỉ bắt buộc khi xoay credential quản trị; đúng principal và bộ file custody được ghi |
 | `env` | id | dev | Stack mà entry được chứng thực và các tài khoản được cấp thuộc về; tài khoản của stack này không phải tài khoản của stack khác |
 | `resume` | token | null | Token của nhánh bị chặn khi vào lại sau một mã dừng |
 
@@ -344,8 +350,8 @@ release hay bằng chứng UAT nào.
 | 4 | Phân giải các port claim theo phép chiếu, và quan sát ai đang giữ từng cổng | `portClaims` | @workspaces/ports/<project> cho các cổng được chiếu ra, @worktrees/sessions/central-runtime cho chủ giữ quan sát được của chúng | — | `PORT_CONFLICT` |
 | 5 | Suy ra delta giữa cái quan sát được và cái mong muốn | `desiredState` | @worktrees/sessions/central-runtime cho trạng thái quan sát được, `request/request.json` cho trạng thái mong muốn | `response/data/delta.json` | — |
 | 6 | Áp delta đã duyệt, từng resource một, dưới một lease độc quyền | — | @worktrees/sessions/central-runtime, @workspaces/device-state cho các handle theo tên | @worktrees/sessions/central-runtime, `response/data/delta.json`, @tools/container, @tools/shell | `EFFECT_UNAUTHORIZED`, `SERVICE_UNAVAILABLE` |
-| 7 | Leo đúng bậc đã nêu cho route đã bind — dựng hạ tầng của môi trường, phân giải checkout của nó, khởi động một role, hoặc merge commit của phiên này vào nhánh tích hợp rồi serve, restart, reset hay stop đúng một server detached, xếp hàng sau lease mà phiên khác đang giữ — rồi chứng thực entry: ping các endpoint, ghi head đang phục vụ, những gì nó chứa và bằng chứng, rồi đặt trạng thái | `routeKey`, `operation`, `commit`, `env` | @worktrees/sessions/central-runtime cho entry của route đó cùng server, lease và hàng đợi của nó, @workspaces/projects/<project>/<role> cho lệnh dev của role, worktree tích hợp và nhánh phiên được merge vào đó, hạ tầng đã khai của môi trường, các endpoint được quan sát lại một lần, @tools/git, @tools/http, @tools/container, @tools/shell | @worktrees/sessions/central-runtime, `response/data/delta.json` | `SERVICE_UNAVAILABLE`, `PROVISIONING_UNAVAILABLE`, `INTEGRATION_FAILED`, `INVALID_INPUT` |
-| 8 | Cấp danh tính của luồng theo entry đó: đọc hồ sơ tài khoản hoặc tạo tài khoản, đặt mật khẩu từ tên niêm phong, ghi hồ sơ, phác phần còn thiếu và seed | `routeKey`, `flow`, `env` | @worktrees/uat/<flow> cho hồ sơ tài khoản, tài liệu luồng và seed, @worktrees/_templates cho phần còn thiếu, @worktrees/sessions/central-runtime cho khai báo danh tính của entry, @workspaces/device-state cho thông tin đăng nhập theo tên, @tools/secrets, @tools/http, @tools/browsercontrol, @tools/database | @worktrees/uat/<flow>, `response/data/account.json`, `response/data/delta.json`, @tools/sourcewrite | `INVALID_INPUT`, `PROVISIONING_UNAVAILABLE` |
+| 7 | Leo đúng bậc đã nêu cho route đã bind — dựng hạ tầng của môi trường, phân giải checkout của nó, khởi động một role, hoặc merge commit của phiên này vào nhánh tích hợp rồi serve, restart, reset hay stop đúng một server detached, xếp hàng sau lease mà phiên khác đang giữ — rồi chứng thực entry: ping các endpoint, ghi head đang phục vụ, những gì nó chứa và bằng chứng, rồi đặt trạng thái | `routeKey`, `operation`, `commit`, `env` | @worktrees/sessions/central-runtime cho entry của route đó cùng server, lease và hàng đợi của nó, @workspaces/projects/<project>/<role> cho lệnh dev của role, worktree tích hợp và nhánh phiên được merge vào đó, hạ tầng đã khai của môi trường, các endpoint được quan sát lại một lần, @tools/git, @tools/http, @tools/container, @tools/shell | @worktrees/sessions/central-runtime, `response/data/delta.json`, `changes` | `SERVICE_UNAVAILABLE`, `PROVISIONING_UNAVAILABLE`, `INTEGRATION_FAILED`, `INVALID_INPUT` |
+| 8 | Cấp danh tính của luồng theo entry đó: đọc hồ sơ tài khoản hoặc tạo tài khoản, đặt mật khẩu từ tên niêm phong, ghi hồ sơ, phác phần còn thiếu và seed; hoặc xoay custody quản trị đã bind rõ ràng | `routeKey`, `flow`, `env`, `identityRotation` | @worktrees/uat/<flow> cho hồ sơ tài khoản, tài liệu luồng và seed, @worktrees/_templates cho phần còn thiếu, @worktrees/sessions/central-runtime cho khai báo danh tính của entry, @workspaces/device-state cho thông tin đăng nhập theo tên, @tools/secrets, @tools/http, @tools/browsercontrol, @tools/database | @worktrees/uat/<flow>, `response/data/account.json`, `response/data/delta.json`, @tools/sourcewrite | `INVALID_INPUT`, `PROVISIONING_UNAVAILABLE` |
 | 9 | Chứng minh mọi check bắt buộc | — | @worktrees/sessions/central-runtime đọc lại theo bộ chứng minh đầy đủ của nhánh, @tools/http | `response/data/checks.json` | `PROOF_FAILED` |
 | 10 | Viết biên bản và phát | — | mọi thứ ở trên | `response/response.md`, `response/response.json` | — |
 
@@ -353,6 +359,8 @@ Một lần resume bắt đầu lại từ cổng vào, chỉ dùng lại quan s
 đúng phần delta; một lần resume không thêm thẩm quyền, inventory, trạng thái mong muốn hay phạm vi nào
 là `NO_PROGRESS`, và một inventory quan sát lại phải tới dưới dạng một fingerprint mới vì cùng một
 fingerprint không thể cho một câu trả lời khác.
+
+Serve merge hoàn tất có thể phát changes cho quality kiểm độc lập. Binding giữ Operator, Step, Checkout, Predecessor và thêm Base (parent thứ nhất của merge, hoặc head đã quan sát trước fast-forward), Head (merge thực đang phục vụ), Branch (nhánh tích hợp đã khai). Files là đúng diff Git từ Base tới Head. Validator đọc worktree ấy và từ chối head, branch hoặc danh sách file sai; serve đang xếp hàng, tái dùng hoặc thất bại không phát changes tích hợp mới. Bằng chứng gate thô gắn với đúng head đã merge này.
 
 ## Đầu ra
 
@@ -362,6 +370,7 @@ fingerprint không thể cho một câu trả lời khác.
 | `delta` | `response/data/delta.json` | data | có |
 | `checks` | `response/data/checks.json` | data | có |
 | `uat-account` | `response/data/account.json` | data | không |
+| `changes` | `response/changes.md` | md | không |
 
 ## Dừng
 
@@ -388,3 +397,4 @@ fingerprint không thể cho một câu trả lời khác.
 | runtime mà một bề mặt frontend phải được audit trên đó nay đã phục vụ | `frontend.surface.audit` |
 | dịch vụ dùng chung đã vận hành xong và release đang chờ nó có thể chạy tiếp | `release.deploy` |
 | danh tính của luồng đã được cấp và lượt chạy đang chờ nó có thể kiểm luồng | `uat.verify` |
+| serve hoàn tất phát changes đã merge để kiểm gate bàn giao độc lập | `quality.verify` |

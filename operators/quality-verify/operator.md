@@ -139,6 +139,8 @@ add, weaken, skip, suppress, or substitute a declared gate; it does not read a p
 verdict out of a new-code quality gate; and it does not carry a debt no owner approved or whose
 approval expired.
 
+Gate results retain their actual measured branch in sessionBranch. A non-session value requires the changes input emitted by a completed platform.operate serve at that integration branch and merged head; the producer delta and actual Git diff are checked. Do not relabel integration evidence with a session branch.
+
 ## Context
 
 | Alias | Bind | Required |
@@ -154,7 +156,7 @@ approval expired.
 | --- | --- | --- |
 | `backend-source-application` | `backend.source.apply`, the backend delivery to verify | no |
 | `frontend-source-application` | `frontend.source.apply`, the frontend delivery to verify | no |
-| `changes` | `backend.source.apply` or `frontend.source.apply`, the paths that moved and the gates and surfaces they name | no |
+| `changes` | `backend.source.apply`, `frontend.source.apply`, `library.source.apply`, `dependency.update` or a completed `platform.operate` serve, the paths that moved and the gates and surfaces they name | no |
 | `frontend-surface-audit` | `frontend.surface.audit`, the eight proof topics it closed at the same head | no |
 | `uat-flow-verification` | `uat.verify`, the experience topic it closed at the same head | no |
 
@@ -180,7 +182,7 @@ approval expired.
 | 5 | Classify each failure from its diagnostics | — | `response/data/gates/<gate>.json` of every red gate | — | — |
 | 6 | Apply approved debt | `declaredDebts` | @worktrees/debts, `response/data/gates/<gate>.json` | — | `DEBT_UNAPPROVED` |
 | 7 | Copy each topic verdict from the receipt that computed it | — | inputs `frontend-surface-audit` and `uat-flow-verification` at the same pinned head | — | `PREDECESSOR_MIXED` |
-| 8 | Compute the gate verdict and the scorecard, write the receipt and emit | — | everything above | `response/response.md`, `response/response.json` | — |
+| 8 | Compute the gate verdict and the scorecard, write the receipt and emit | — | everything above | `response/response.md`, `response/response.json`, `audit-scope` | — |
 
 A gate that could not be executed at all in this environment is `GATE_UNAVAILABLE` when it was
 required; a non-required gate the environment blocked is recorded as `external-blocker` and the
@@ -190,6 +192,13 @@ comes back as a new head with a new predecessor fingerprint. A resume reuses onl
 fingerprinted observations and consumes the exact delta; a resume that adds no predecessor, gate,
 debt or source change is `NO_PROGRESS`, because the same fingerprint cannot yield a different answer.
 
+
+When the admitted audit carries scope, run `node scripts/audit-scope.mjs <branch>` to copy
+`verdicts.auditScope` unchanged into `response/data/audit-scope.json` and list the `audit-scope`
+output kind. The receipt includes `## Audit scope`, a `Field | Value` table preserving Mode,
+Coverage claim and Deferred states. The verdict has only that scope; deferred states do not become
+passed because quality gates or UAT pass. Quality thresholds and frozen UAT cases remain unchanged.
+
 ## Outputs
 
 | Kind | File | Type | Required |
@@ -197,6 +206,7 @@ debt or source change is `NO_PROGRESS`, because the same fingerprint cannot yiel
 | `quality-verification` | `response/response.md` | md | yes |
 | `gate-result` | `response/data/gates/<gate>.json` | data | yes |
 | `coverage` | `response/data/coverage.json` | data | no |
+| `audit-scope` | `response/data/audit-scope.json` | data | no |
 
 ## Stops
 

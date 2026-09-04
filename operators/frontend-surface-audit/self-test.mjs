@@ -17,6 +17,8 @@ const MAIN = 'body>main';
 const SECTION = 'body>main>section';
 const CAP = (id) => `response/data/captures/${id}.json`;
 const SHOT = (id) => `response/artifacts/${id}.png`;
+const SURFACES = [{ id: 'plan-picker', type: 'page', route: '/plans', matrixIds: [WIDE, NARROW] }];
+const scope = (over = {}) => ({ mode: 'primary-surfaces', surfaces: structuredClone(SURFACES), deferredStates: [], coverageClaim: 'selected-surfaces', ...over });
 
 const capture = (id) => ({
   matrixId: id,
@@ -69,6 +71,7 @@ const tasteFixFirst = () => {
 };
 
 const verdicts = (lens = taste) => ({
+  auditScope: scope(),
   entries: [
     {
       matrixId: WIDE,
@@ -204,7 +207,7 @@ const requestJson = ({ extra = {} } = {}) => ({
   parallel: 1,
   sessionId: 's-test',
   contexts: [{ alias: '@knowledge/ui/proof', head: null }, { alias: '@workspaces/fe', head: 'e'.repeat(40) }, { alias: '@worktrees/sessions/central-runtime', head: null }],
-  requirements: { matrix: [], readinessProbe: 'route-served', resume: null, ...extra },
+  requirements: { auditScope: { surfaces: structuredClone(SURFACES) }, matrix: [], readinessProbe: 'route-served', resume: null, ...extra },
   inputs: {
     'frontend-source-application': 'step-3/parallel-1/response/response.md',
     'frontend-presentation-resolution': 'step-2/parallel-1/response/response.md',
@@ -255,6 +258,15 @@ const decisionMd = ({ policy = 'approval-required', selected = 'one-column', fai
 ].join(String.fromCharCode(10));
 
 function writeBranch(files, { decisionClass = 'console', decision = {}, coverageStates = [] } = {}) {
+  files = structuredClone(files);
+  const request = files['request/request.json'];
+  const result = files['response/data/verdicts.json'];
+  if (files['response/response.md']) {
+    const recorded = result?.auditScope ?? scope();
+    const inventory = request.requirements.auditScope?.surfaces ?? [];
+    const prefix = '## Audit scope\n\n| Field | Value |\n| --- | --- |\n| Mode | ' + recorded.mode + ' |\n| Selected surfaces | ' + inventory.filter((surface) => surface.priority !== 'deferred').map((surface) => surface.id).join(', ') + ' |\n| Coverage claim | ' + recorded.coverageClaim + ' |\n| Deferred states | ' + (recorded.deferredStates.join(', ') || '—') + ' |\n\n';
+    files['response/response.md'] = files['response/response.md'].replace('## Surface class', prefix + '## Surface class');
+  }
   const session = mkdtempSync(path.join(tmpdir(), 'fe-audit-session-'));
   const branch = path.join(session, 'step-4', 'parallel-1');
   for (const d of ['request', 'response/data/captures', 'response/artifacts']) mkdirSync(path.join(branch, d), { recursive: true });
@@ -274,6 +286,7 @@ function writeBranch(files, { decisionClass = 'console', decision = {}, coverage
   writeFileSync(path.join(session, 'state.json'), JSON.stringify({ id: 's-test', project: 'starci-academy', startedAt: '2026-09-03T00:00:00Z', requestHashes: {}, chain: [['3/1'], ['4/1']], steps: { '3/1': 'frontend.source.apply', '4/1': 'frontend.surface.audit' }, current: '4/1', status: 'running' }));
   for (const [name, content] of Object.entries(files)) {
     if (content === null) continue;
+    mkdirSync(path.dirname(path.join(branch, name)), { recursive: true });
     writeFileSync(path.join(branch, name), typeof content === 'string' ? content : JSON.stringify(content, null, 2));
   }
   return { branch, session };
@@ -502,7 +515,8 @@ ${PRINTED.join(String.fromCharCode(10))}
 `;
 const coverageGapFiles = (over = {}, next = ['frontend.presentation.resolve']) => ({
   ...baseline(),
-  'response/data/verdicts.json': verdicts(() => coverageGapTaste),
+  'request/request.json': requestJson({ extra: { auditScope: { mode: 'exhaustive', surfaces: structuredClone(SURFACES) } } }),
+  'response/data/verdicts.json': { ...verdicts(() => coverageGapTaste), auditScope: scope({ mode: 'exhaustive', coverageClaim: 'incomplete' }) },
   'response/response.md': coverageGapMd(over),
   'response/response.json': responseJson({ next }),
 });
@@ -515,4 +529,53 @@ await expectError({ ...coverageGapFiles(), 'response/response.md': coverageGapMd
 await expectError(coverageGapFiles({}, ['frontend.presentation.resolve', 'quality.verify']), 'quality.verify follows only once every topic ships or passes', 'a narrowed round claiming to close the loop into quality.verify', EMPTY_STATE);
 await expectError(coverageGapFiles({}, ['frontend.presentation.resolve', 'frontend.direction.decide']), 'a matrix gap is not a composition finding', 'a narrowed round sent to direction as if it were a composition finding', EMPTY_STATE);
 
-process.stdout.write('frontend.surface.audit self-test: 9 valid branches, 58 rejected mutations\n');
+const deferredTaste = () => {
+  const lens = taste();
+  lens.entries[9] = { rule: 'TASTE-10', measured: 'deferred secondary state: empty', score: null, verdict: 'deferred', routeTo: 'none' };
+  return lens;
+};
+const primaryDeferred = () => ({
+  ...baseline(),
+  'response/data/verdicts.json': { ...verdicts(deferredTaste), auditScope: scope({ deferredStates: ['empty'] }) },
+  'response/response.md': responseMd(deferredTaste()).replace('| null | deferred |', '| — | deferred |'),
+  'response/response.json': responseJson({ next: ['frontend.presentation.resolve', 'quality.verify'] }),
+});
+await expectValid(primaryDeferred(), 'default primary scope defers secondary states and permits independent quality gates', EMPTY_STATE);
+await expectError({ ...primaryDeferred(), 'response/data/verdicts.json': { ...verdicts(deferredTaste), auditScope: scope({ deferredStates: ['empty'], coverageClaim: 'full-state-matrix' }) } }, 'coverage claim must be selected-surfaces', 'primary audit falsely claiming full-state coverage', EMPTY_STATE);
+await expectError({ ...primaryDeferred(), 'response/data/verdicts.json': { ...verdicts(), auditScope: scope({ deferredStates: ['empty'] }) } }, 'state-comparison criterion must be deferred', 'unobserved secondary states falsely given a passing score', EMPTY_STATE);
+await expectError({ ...baseline(), 'request/request.json': requestJson({ extra: { auditScope: { surfaces: [...SURFACES, { id: 'results', type: 'page', route: '/results', matrixIds: ['results-wide'] }] } } }) }, 'selected surface entry results-wide was not fully audited', 'one of several selected primary pages omitted');
+const deferredDrawer = { id: 'details', type: 'drawer', route: '/plans#details', priority: 'deferred', matrixIds: [] };
+const drawerInventory = [...structuredClone(SURFACES), deferredDrawer];
+await expectValid({ ...baseline(), 'request/request.json': requestJson({ extra: { auditScope: { surfaces: drawerInventory } } }), 'response/data/verdicts.json': { ...verdicts(), auditScope: scope({ surfaces: drawerInventory }) } }, 'deferred drawer stays visible without blocking primary scope');
+await expectError({ ...baseline(), 'request/request.json': requestJson({ extra: { auditScope: { mode: 'exhaustive', surfaces: drawerInventory } } }) }, 'deferred surfaces carry no captured matrix and are unavailable in exhaustive mode', 'exhaustive audit hiding a deferred drawer');
+
+const familyFinding = (routeTo = 'grammar-gap', next = ['workspace.bind']) => {
+  const files = baseline();
+  const data = files['response/data/verdicts.json'];
+  data.entries[1].results[0].verdict = 'pass'; data.entries[1].results[0].routeTo = 'none';
+  data.entries[1].results[1].verdict = 'fail'; data.entries[1].results[1].routeTo = routeTo;
+  let md = files['response/response.md'];
+  md = md.replace(`| ${BT}${NARROW}${BT} | app | ${BT}${MAIN}${BT} | ${BT}GAP-5${BT} | 1rem | fail |`, `| ${BT}${NARROW}${BT} | app | ${BT}${MAIN}${BT} | ${BT}GAP-5${BT} | 1rem | pass |`);
+  md = md.replace(`| ${BT}${NARROW}${BT} | grammar | ${BT}${SECTION}${BT} | ${BT}PADDING-4${BT} | 1rem | pass |`, `| ${BT}${NARROW}${BT} | grammar | ${BT}${SECTION}${BT} | ${BT}PADDING-4${BT} | 1rem | fail |`);
+  md = md.replace('| `presentation` | fail | resolve |', `| ${BT}presentation${BT} | fail | ${routeTo} |`);
+  md = md.replace(`| ${BT}${NARROW}${BT} | ${BT}${MAIN}${BT} | ${BT}GAP-5${BT} | 1rem | resolve |`, `| ${BT}${NARROW}${BT} | ${BT}${SECTION}${BT} | ${BT}PADDING-4${BT} | 1rem | ${routeTo} |`);
+  md = md.replace('| Component | Rule | What the family lacks |\n| --- | --- | --- |', `| Component | Rule | What the family lacks |\n| --- | --- | --- |\n| ${BT}${SECTION}${BT} | ${BT}PADDING-4${BT} | existing published padding behavior differs from its measured contract |`);
+  files['response/response.md'] = md;
+  files['response/response.json'] = responseJson({ next });
+  return files;
+};
+await expectValid(familyFinding(), 'existing library behavior routes to its owner binding without asking');
+await expectError(familyFinding('grammar-gap', ['frontend.surface.audit']), 'first routes to workspace.bind', 'Grammar repair cannot wait for a person to publish then audit itself');
+await expectError(familyFinding('grammar-gap', ['workspace.bind', 'quality.verify']), 'cannot self-loop, pass quality, or skip', 'Grammar repair cannot claim quality completion');
+await expectError(familyFinding('grammar-gap', ['library.source.apply']), 'first routes to workspace.bind', 'Grammar repair cannot skip owner binding');
+await expectError(familyFinding('flow-owner', ['workspace.bind']), 'Grammar-owned; existing behavior routes', 'Grammar failure cannot hide behind unrelated owner');
+await expectValid(familyFinding('direction', ['frontend.direction.decide']), 'genuine new family presentation tier preserves direction choice');
+await expectError(familyFinding('direction', ['workspace.bind']), 'new Grammar presentation direction or tier routes', 'new tier cannot become automatic behavior repair');
+const noFamilyEvidence = familyFinding();
+noFamilyEvidence['response/response.md'] = noFamilyEvidence['response/response.md'].replace(`| ${BT}${SECTION}${BT} | ${BT}PADDING-4${BT} | existing published padding behavior differs from its measured contract |`, '');
+await expectError(noFamilyEvidence, 'Grammar gaps must preserve', 'owner handoff needs the observed family gap');
+const repairToPerson = familyFinding();
+repairToPerson['response/response.json'] = responseJson({ status: 'blocked', stop: 'NO_PROGRESS', next: [], reason: 'wait for a person to publish the library repair' });
+await expectError(repairToPerson, 'not handed to a person to publish', 'existing authorized library behavior repair cannot be handed to the user');
+
+process.stdout.write('frontend.surface.audit self-test: scope, owner routing, evidence and mutation checks passed\n');

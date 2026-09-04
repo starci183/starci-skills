@@ -1,4 +1,4 @@
-# StarCi Skills 1.8.0
+# StarCi Skills 1.9.0
 
 This tree is the runtime. Read [SKILL.md](SKILL.md) next; it is the single entry that freezes a
 mission's scope, selects the one operator that owns the outcome, and routes between operators on
@@ -28,8 +28,8 @@ its fingerprint and complete rule inventory, and may emit no identifier outside 
 ## Layout
 
 ```text
-SKILL.md                 one entry, fourteen operators, one routing map
-routing.json             14 operators, 68 routes, four kinds: operator | resume | user | external
+SKILL.md                 one entry, operators listed in operators/INDEX.md, one routing map
+routing.json             closed operator routes, four kinds: operator | resume | user | external
 alias/                   alias.json (machine registry: location, scheme, binding, writers, zone) + INDEX.md (generated map by zone); every operator reads by alias only
 resources/               tools.json (the closed tool registry: modes and per-runtime support, addressed as @tools/<id>) + agents/profiles/{openai,claude}.json (6 profiles, permits per tool) + orchestrator.json (one agent per operator, max 3, profile equivalents); validated
 workflows/               example chains (steps of parallel branches, loops, presets) the entry reuses when a request matches their when; otherwise it composes its own under the same rules; validated
@@ -66,6 +66,8 @@ head or the head is not publishable.
 - Rule IDs are stable public addresses. Append; never renumber, reuse, or silently change meaning.
 
 ## Lineage
+
+1.9.0 (2026-09-04): owner library repairs and verified dependency updates have bounded operators with regression proofs; identity provisioning binds actual provider custody and proves product login; UI audits prioritize selected primary surfaces and preserve the limits of deferred secondary states.
 
 1.8.0 (2026-09-04): interaction has one communication policy and typed question/selection gates; material directions are chosen by the user with rendered evidence, recorded choices are reused, and routine confirmation is omitted within authorized work; operational grants and routing remain unchanged.
 

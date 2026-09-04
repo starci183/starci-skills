@@ -7,15 +7,37 @@
 // inside the approved set; convergence agreeing with the mutation count; the complete proof set
 // passed before an operated outcome; and no capability handle or credential-shaped token anywhere.
 import { existsSync } from 'node:fs';
+import { execFileSync } from 'node:child_process';
 import { readFile } from 'node:fs/promises';
 import path from 'node:path';
 import process from 'node:process';
 import { fileURLToPath } from 'node:url';
 import { validateStep } from '../../scripts/validate-step.mjs';
 import { tableUnder } from '../../scripts/validate-response.mjs';
-import { hostRootOf, missingStack, loadEnvironmentSchema, parseDeclarationReference, stackDeclaration } from '../../scripts/validate-request.mjs';
+import { hostRootOf, missingStack } from '../../scripts/validate-request.mjs';
+import { platformAuthorityErrors } from '../../scripts/platform-authority.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
+
+export function integrationChangesErrors(delta, text, { verifyGit = true } = {}) {
+  const errors=[], ladder=delta?.runtimeLadder, binding=Object.fromEntries(tableUnder(text,'## Binding')??[]);
+  if(delta?.serviceKind!=='runtime' || ladder?.rung!=='serve' || !ladder.integration || ladder.reused || delta.convergence!=='converged')return ['changes: only a completed serve merge emits integration changes'];
+  if(binding.Operator!=='platform.operate' || binding.Head!==ladder.servedHead || binding.Branch!==ladder.integration.branch)errors.push('changes: operator, head and branch must match the served integration delta');
+  if(!/^[0-9a-f]{40}$/.test(binding.Base??''))errors.push('changes: Base must identify the integration predecessor commit');
+  if(verifyGit)try{
+    const cwd=ladder.integration.worktreeRef;
+    if(!path.isAbsolute(cwd))throw new Error('integration changes require the resolved worktree path');
+    const git=(args)=>execFileSync('git',args,{cwd,encoding:'utf8',windowsHide:true,stdio:['ignore','pipe','pipe']}).trim();
+    if(git(['rev-parse','HEAD'])!==binding.Head || git(['branch','--show-current'])!==binding.Branch)errors.push('changes: actual integration checkout head or branch differs');
+    const parents=git(['rev-list','--parents','-n','1',binding.Head]).split(' ');
+    if(parents.length>=3 ? parents[1]!==binding.Base : ladder.observed?.head!==binding.Base)errors.push('changes: Base must be the actual merge first parent or the observed fast-forward predecessor');
+    if(git(['merge-base',binding.Base,binding.Head])!==binding.Base)errors.push('changes: Base must be an ancestor of the served head');
+    const actual=git(['diff','--name-only','--no-renames',binding.Base,binding.Head]).split('\n').filter(Boolean).sort();
+    const rows=tableUnder(text,'## Files')??[], recorded=rows.map(([file])=>file).sort();
+    if(JSON.stringify(actual)!==JSON.stringify(recorded))errors.push('changes: Files must equal the actual merged Git diff');
+  }catch{errors.push('changes: actual merged Git provenance cannot be verified');}
+  return errors;
+}
 
 // The three service kinds are branches of one job. Each publishes its own closed effect set, its own
 // required proof set, and the exact capabilities it needs; a cross-filed effect is how an unapproved
@@ -25,7 +47,7 @@ export const KIND_EFFECTS = {
   sonar: ['create-project', 'assign-profile', 'assign-gate', 'enforce-setting'],
   tunnel: ['create-tunnel', 'update-tunnel-route', 'upsert-proxied-dns'],
   runtime: ['register-runtime-entry', 'attest-runtime-entry', 'bring-up-infra-stack', 'locate-routed-checkouts', 'start-role-runtime', 'merge-into-integration-branch', 'serve-runtime-head', 'restart-runtime-server', 'reset-runtime-server', 'stop-runtime-server', 'queue-runtime-lease'],
-  identity: ['provision-identity', 'seed-flow-fixtures'],
+  identity: ['provision-identity', 'seed-flow-fixtures', 'rotate-admin-credential'],
 };
 // The join from an effect to the class of authorisation an environment declares for it. The classes,
 // their defaults and the reference shape are the environment schema's; an effect with no class here is
@@ -119,6 +141,29 @@ function forEachString(value, visit, at = '$') {
 }
 const empty = (v) => v === undefined || v === null || v === '' || v === '—';
 const asList = (v) => (Array.isArray(v) ? v : []);
+
+// Rotation is an explicit approval-id operation, not a non-production provisioning default.
+// Its provider, principal and complete protected write set are frozen by the request.
+export function identityRotationErrors(requirements, rotation) {
+  const errors = [];
+  const requested = requirements.desiredState?.effects?.includes('rotate-admin-credential');
+  const bound = requirements.identityRotation;
+  if (!requested) { if (bound || rotation) errors.push('identityRotation requires the rotation effect'); return errors; }
+  if (requirements.desiredState.effects.length !== 1) errors.push('rotation cannot combine other identity effects');
+  if (!bound || !bound.provider || !bound.realm || !bound.credentialName || !/^sha256:[a-f0-9]{64}$/.test(bound.principalFingerprint ?? '') || !Array.isArray(bound.custodyRefs) || !bound.custodyRefs.length) errors.push('rotation requires exact provider, principal and protected custody');
+  else {
+    if (Object.keys(bound).some(k => !['provider', 'realm', 'credentialName', 'principalFingerprint', 'custodyRefs', 'stagingRefs'].includes(k))) errors.push('rotation binding contains unknown fields');
+    if (!/^https?:\/\/[^\s]+$/.test(bound.provider) || !/^[a-zA-Z0-9._-]+$/.test(bound.realm)) errors.push('rotation provider or realm invalid');
+    if (new Set(bound.custodyRefs).size !== bound.custodyRefs.length || bound.custodyRefs.some(ref => typeof ref !== 'string' || !ref.startsWith(`.stacks/${requirements.env}/`) || ref.includes('..') || ref.includes('\\') || ref.includes('/secrets/uat'))) errors.push('rotation custody must be exact protected environment files');
+    if (!Array.isArray(bound.stagingRefs) || !bound.stagingRefs.length || bound.stagingRefs.some(ref => typeof ref !== 'string' || !ref.startsWith(`.stacks/${requirements.env}/`) || !ref.endsWith('.enc') || ref.includes('..') || ref.includes('\\') || bound.custodyRefs.includes(ref))) errors.push('rotation staging requires separately bound protected ciphertext paths');
+    if (rotation) {
+      for (const key of ['provider', 'realm', 'credentialName', 'principalFingerprint']) if (rotation[key] !== bound[key]) errors.push(`rotation ${key} differs from approved principal binding`);
+      if (JSON.stringify([...rotation.custodyRefs].sort()) !== JSON.stringify([...bound.custodyRefs].sort())) errors.push('rotation custody differs from approved write set');
+      for (const key of ['newCredentialWorks', 'oldCredentialRejected', 'sessionsInvalidated', 'custodyConsistent']) if (rotation[key] !== true) errors.push(`rotation requires ${key} proof`);
+    }
+  }
+  return errors;
+}
 
 // The runtime ladder's own law, over the block the delta publishes. One server per route on one fixed
 // port, served from one integration branch: a session gets its commit merged in and the server
@@ -263,27 +308,7 @@ export async function validatePlatformStep(branchDir, root = ROOT, { hostRoot = 
   const portClaims = asList(requirements.portClaims);
   const service = requirements.service;
 
-  // Authority for the desired state: an approval id, or the environment's own declaration when it marks
-  // this operation's class declared. The declaration is read as it stands, hashed, and checked against
-  // the environment schema; a reference is refused for a declaration that is absent, moved, belongs to
-  // another environment, is refused by its schema, or marks the class person.
-  if (empty(requirements.approval)) errors.push('request.json: approval has no default; a shared runtime is never changed on silence, and an environment that authorises the change says so in a declaration the request references');
-  else {
-    const envSchema = await loadEnvironmentSchema(root);
-    const ref = parseDeclarationReference(envSchema, requirements.approval);
-    if (ref) {
-      if (!empty(requirements.env) && ref.env !== String(requirements.env)) errors.push(`request.json: approval references the ${ref.env} declaration while the operation runs in ${requirements.env}; a declaration authorises its own environment only`);
-      const decl = await stackDeclaration(root, ref.env, hostRoot, envSchema);
-      if (!decl.exists) errors.push(`request.json: approval references ${decl.rel}, which this installation does not have`);
-      else {
-        for (const e of decl.errors) errors.push(`request.json: approval references a declaration the environment schema refuses: ${e}`);
-        if (decl.hash !== ref.hash) errors.push(`request.json: approval references ${decl.rel} at ${ref.hash} and the file hashes to ${decl.hash}; the declaration moved since it was read, which is AUTHORITY_DRIFT and not an approval`);
-        const { classes, unclassified } = operationClasses(kind, desiredEffects);
-        if (unclassified.length) errors.push(`request.json: ${unclassified.join(', ')} ${unclassified.length === 1 ? 'belongs' : 'belong'} to no operation class an environment declaration authorises, so approval must be an approval id`);
-        if (decl.authorization) for (const c of classes) if (decl.authorization[c] !== 'declared') errors.push(`request.json: ${decl.rel} marks ${c} as ${decl.authorization[c]}, so a declaration reference is not an approval for it; an approval id is required`);
-      }
-    }
-  }
+  errors.push(...await platformAuthorityErrors({ root, hostRoot, requirements, kind, desiredEffects, operationClasses }));
   if (kind && !KIND_EFFECTS[kind]) errors.push(`request.json: ${kind} is not a service kind this operator operates`);
   if (KIND_EFFECTS[kind]) {
     if (new Set(desiredEffects).size !== desiredEffects.length) errors.push('request.json: desiredState.effects must not repeat an effect');
@@ -305,6 +330,10 @@ export async function validatePlatformStep(branchDir, root = ROOT, { hostRoot = 
   // A red delivery gate is the one failure serve's own resolution work can produce: the merge into
   // the integration branch stands, gated, but nothing restarted on it.
   const gateFailed = Boolean(checks?.checks?.some((c) => c.name === 'gates-passed' && c.status === 'failed'));
+  if(present.has('changes')) {
+    if(response.status!=='done' || gateFailed)errors.push('changes: a failed or incomplete serve cannot publish merged delivery evidence');
+    try{errors.push(...integrationChangesErrors(delta,await read('response/changes.md')));}catch{errors.push('changes: integration receipt is missing');}
+  }
 
   let inventoried = new Set();
   if (delta) {
@@ -425,7 +454,9 @@ export async function validatePlatformStep(branchDir, root = ROOT, { hostRoot = 
   const provisioned = Boolean(delta?.appliedEffects?.includes('provision-identity'));
   const accountFile = 'response/data/account.json';
   if (kind === 'identity') {
-    if (empty(requirements.flow)) errors.push('request.json: the identity branch provisions for one flow and flow names none');
+    if (desiredEffects.some(effect => ['provision-identity', 'seed-flow-fixtures'].includes(effect)) && empty(requirements.flow)) errors.push('request.json: the identity branch provisions for one flow and flow names none');
+    errors.push(...identityRotationErrors(requirements, delta?.identityRotation));
+    if (response.status === 'done' && desiredEffects.includes('rotate-admin-credential') && !delta?.identityRotation) errors.push('rotation requires its bound proof record');
     if (provisioned && !present.has('uat-account')) errors.push(`${accountFile}: provision-identity was applied, so the account record it wrote is published with it`);
     if (checks && provisioned && !checks.findings.some((f) => f.code === 'IDENTITY_PROVISIONED')) errors.push('response/data/checks.json: an identity that was provisioned records the IDENTITY_PROVISIONED finding, so the receipt names what this run created');
   }

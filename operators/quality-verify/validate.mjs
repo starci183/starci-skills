@@ -14,6 +14,8 @@ import { fileURLToPath } from 'node:url';
 import { validateStep } from '../../scripts/validate-step.mjs';
 import { sessionRootOf } from '../../scripts/validate-request.mjs';
 import { tableUnder } from '../../scripts/validate-response.mjs';
+import { auditScopeCarryErrors } from '../../scripts/audit-scope.mjs';
+import { integrationChangesErrors } from '../platform-operate/validate.mjs';
 
 // The nine topics the scorecard reports. Eight are closed by the surface audit and one by the UAT
 // run; this operator copies each verdict and never recomputes one.
@@ -40,6 +42,13 @@ const DEFAULT_GATES = [
 const empty = (v) => v === undefined || v === null || v === '' || v === '—';
 const asList = (v) => (Array.isArray(v) ? v : []);
 const isTrue = (v) => v === true || v === 'true' || v === 'yes';
+
+export function integrationGateBindingErrors(result, producer) {
+  if(/^session\/[A-Za-z0-9._-]+$/.test(result.sessionBranch))return [];
+  const ladder=producer?.delta?.runtimeLadder;
+  if(producer?.operatorId!=='platform.operate' || producer?.status!=='done' || ladder?.rung!=='serve' || ladder.integration?.branch!==result.sessionBranch || ladder.servedHead!==result.sourceHead)return ['integration gate must bind the completed platform changes producer at its actual branch and head'];
+  return [];
+}
 
 // A gate result is measured, never narrated: each status implies an exact shape for the exit code,
 // the evidence and the classification, and a shape mismatch is how a claim with no command behind it
@@ -70,6 +79,7 @@ export async function validateQualityStep(branchDir, root = ROOT) {
   const errors = [...base.errors];
   const { response, request, requirements = {}, present = new Set() } = base;
   if (!response || response.operatorId !== 'quality.verify') return { errors };
+  if (response.status === 'done') errors.push(...auditScopeCarryErrors(branchDir, request, response, root));
   const has = (f) => existsSync(path.join(branchDir, f));
   const read = (f) => readFile(path.join(branchDir, f), 'utf8');
 
@@ -92,6 +102,21 @@ export async function validateQualityStep(branchDir, root = ROOT) {
   // A dry predecessor is a plan, not a delivery: it has no commit, so there is no head for a gate to
   // stand on. It is refused here, at step 2, rather than later as a confusing gate failure.
   const sessionRoot = sessionRootOf(branchDir);
+  let integrationProducer=null, integrationInputSeen=false;
+  const changesRef=request?.inputs?.changes;
+  if(sessionRoot && changesRef)try{
+    const changesPath=path.join(sessionRoot,changesRef),producerResponseDir=path.dirname(changesPath),producerBranch=path.dirname(producerResponseDir);
+    integrationInputSeen=Object.fromEntries(tableUnder(await readFile(changesPath,'utf8'),'## Binding')??[]).Operator==='platform.operate';
+    const producerResponse=JSON.parse(await readFile(path.join(producerResponseDir,'response.json'),'utf8'));
+    if(producerResponse.operatorId==='platform.operate'){
+      integrationInputSeen=true;
+      const producerRequest=JSON.parse(await readFile(path.join(producerBranch,'request/request.json'),'utf8'));
+      const delta=JSON.parse(await readFile(path.join(producerResponseDir,'data/delta.json'),'utf8'));
+      if(producerRequest.operatorId!=='platform.operate' || producerResponse.status!=='done' || path.resolve(producerBranch,producerResponse.fields?.changes??'')!==path.resolve(changesPath))errors.push('integration changes must be emitted by a completed platform owner');
+      errors.push(...integrationChangesErrors(delta,await readFile(changesPath,'utf8')));
+      integrationProducer={...producerResponse,delta};
+    }
+  }catch{ if(integrationInputSeen)errors.push('integration changes producer provenance is unreadable'); }
   if (sessionRoot) {
     for (const kind of ['changes', 'backend-source-application', 'frontend-source-application']) {
       const ref = request?.inputs?.[kind];
@@ -148,6 +173,8 @@ export async function validateQualityStep(branchDir, root = ROOT) {
     const at = `response/data/gates/${r.gate}.json`;
     if (pinned && r.sourceHead !== pinned) errors.push(`${at}: the gate measured ${r.sourceHead} but the request pinned ${pinned}`);
     if (r.predecessorCommit !== r.sourceHead) errors.push(`${at}: the predecessor recorded commit ${r.predecessorCommit}, which is not the head ${r.sourceHead} the gate measured`);
+    errors.push(...integrationGateBindingErrors(r,integrationProducer).map(e=>`${at}: ${e}`));
+    if(integrationProducer && r.sessionBranch!==integrationProducer.delta.runtimeLadder?.integration?.branch)errors.push(`${at}: integration evidence cannot be relabeled as a session branch`);
   }
 
   const e2e = byGate.get('e2e');

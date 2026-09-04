@@ -51,7 +51,7 @@
       "heading": "^## Mutations$",
       "table": "| Effect | Resource | Before | After |",
       "cell": {
-        "Effect": "^`(update-config|restart-service|upsert-dashboard|update-remote-write|create-project|assign-profile|assign-gate|enforce-setting|create-tunnel|update-tunnel-route|upsert-proxied-dns|register-runtime-entry|attest-runtime-entry|bring-up-infra-stack|locate-routed-checkouts|start-role-runtime|merge-into-integration-branch|serve-runtime-head|restart-runtime-server|reset-runtime-server|stop-runtime-server|queue-runtime-lease|provision-identity|seed-flow-fixtures)`$"
+        "Effect": "^`(update-config|restart-service|upsert-dashboard|update-remote-write|create-project|assign-profile|assign-gate|enforce-setting|create-tunnel|update-tunnel-route|upsert-proxied-dns|register-runtime-entry|attest-runtime-entry|bring-up-infra-stack|locate-routed-checkouts|start-role-runtime|merge-into-integration-branch|serve-runtime-head|restart-runtime-server|reset-runtime-server|stop-runtime-server|queue-runtime-lease|provision-identity|seed-flow-fixtures|rotate-admin-credential)`$"
       }
     },
     {

@@ -58,7 +58,10 @@
       {
         "operator": "frontend.surface.audit",
         "fanout": "matrix",
-        "maxParallel": 3
+        "maxParallel": 3,
+        "asks": [
+          "auditScope"
+        ]
       }
     ],
     [

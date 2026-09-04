@@ -57,7 +57,7 @@ proves `dns-target`, `tunnel-route`, `tls` and `public-https`, and needs `tunnel
 `endpoints-served`, `head-observed`, `generation-advanced`, `infra-ports-open`,
 `cors-origin-admitted`, `checkout-located`, `integration-merged`, `server-pid-owned` and
 `lease-honoured`, and needs
-`runtime:registry-write`. Identity applies `provision-identity` and `seed-flow-fixtures`, proves
+`runtime:registry-write`. Identity applies `provision-identity`, `seed-flow-fixtures` and `rotate-admin-credential`, proves
 `provider-reachable`, `credential-resolvable`, `account-exists`, `account-signs-in` and
 `no-credential-recorded`, and needs `identity:account-admin`. Keeping those two apart is what keeps
 each proof set honest: an attestation cannot be asked to prove an account, and provisioning cannot be
@@ -247,6 +247,9 @@ sealed file or store that cannot be reached is `PROVISIONING_UNAVAILABLE`.
 
 ## A credential is a name, and it reaches a form or a body
 
+Before resolving a value, apply [the identity preflight](../../resources/identity.md) for the selected
+operation through its fixed consuming helper.
+
 One password is sealed per environment and every flow's account is set from it, while each flow owns
 its own username. It is resolved by name at the moment of the call, and the only two places its value
 may arrive are the request body of the provider's administrative call and the field of a sign-up form
@@ -351,6 +354,9 @@ proof.
 | Kind | From | Required |
 | --- | --- | --- |
 
+
+Administrator rotation uses the existing identity capability and requires an explicit approval id. The actual provider custody is proved from its credential mounts or captured bootstrap environment before consuming a value. The `identityRotation` binding names the exact provider, realm, credential name, principal fingerprint and protected custody write set; `stagingRefs` separately authorizes protected ciphertext staging. It runs alone, creates no UAT account and needs no flow. The delta repeats that binding and proves the new credential works, the old credential fails, the exact administrator sessions were invalidated and every declared custody projection agrees. The complete identity check set still applies. Stage ciphertext only, journal each provider and file effect separately, and retain encrypted recovery material until consistency is proved; a provider and several files are not one atomic transaction. Every consuming helper validates the frozen request and platform authority internally before effects.
+
 ## Requirements
 
 | Field | Type | Default | Ask |
@@ -363,6 +369,7 @@ proof.
 | `operation` | choice | serve | The rung of the runtime ladder this invocation climbs: `stack-up`, `locate`, `start-role`, `serve`, `restart`, `reset` or `stop` |
 | `commit` | id | null | The commit this session needs served, merged into the integration branch when the served head does not already contain it |
 | `flow` | id | null | The flow whose dedicated identity is provisioned and whose folder receives the account record, the drafted document and the seed |
+| `identityRotation` | `{provider, realm, credentialName, principalFingerprint, custodyRefs, stagingRefs}` | null | Required only for administrator rotation; exact bound principal and protected write set |
 | `env` | id | dev | The stack the attested entry and the provisioned accounts belong to; an account of one stack is not an account in another |
 | `resume` | token | null | The blocked branch's token when re-entering after a stop |
 
@@ -376,8 +383,8 @@ proof.
 | 4 | Resolve the port claims against the projection, and observe who holds each | `portClaims` | @workspaces/ports/&lt;project> for the projected ports, @worktrees/sessions/central-runtime for their observed holders | — | `PORT_CONFLICT` |
 | 5 | Derive the delta between what is observed and what is desired | `desiredState` | @worktrees/sessions/central-runtime for the observed state, `request/request.json` for the desired state | `response/data/delta.json` | — |
 | 6 | Apply the approved delta, one resource at a time, under an exclusive lease | — | @worktrees/sessions/central-runtime, @workspaces/device-state for the handles by name | @worktrees/sessions/central-runtime, `response/data/delta.json`, @tools/container, @tools/shell | `EFFECT_UNAUTHORIZED`, `SERVICE_UNAVAILABLE` |
-| 7 | Climb the named rung for the bound route — bring the environment's infra up, resolve its checkouts, start a role, or merge this session's commit into the integration branch and serve, restart, reset or stop the one detached server, queueing behind a lease another session holds — then attest the entry: probe the endpoints, record the served head, what it contains and the evidence, and set the status | `routeKey`, `operation`, `commit`, `env` | @worktrees/sessions/central-runtime for the entry of that route with its server, lease and queue, @workspaces/projects/&lt;project>/&lt;role> for the role's dev command, the integration worktree and the session branch merged into it, the environment's declared infra, the endpoints re-observed once, @tools/git, @tools/http, @tools/container, @tools/shell | @worktrees/sessions/central-runtime, `response/data/delta.json` | `SERVICE_UNAVAILABLE`, `PROVISIONING_UNAVAILABLE`, `INTEGRATION_FAILED`, `INVALID_INPUT` |
-| 8 | Provision the flow's identity against that entry: read the account record or create the account, set its password from the sealed name, write the record, draft what is absent and seed | `routeKey`, `flow`, `env` | @worktrees/uat/&lt;flow> for the account record, the flow document and the seed, @worktrees/_templates for what is absent, @worktrees/sessions/central-runtime for the entry's identity declaration, @workspaces/device-state for the credential by name, @tools/secrets, @tools/http, @tools/browsercontrol, @tools/database | @worktrees/uat/&lt;flow>, `response/data/account.json`, `response/data/delta.json`, @tools/sourcewrite | `INVALID_INPUT`, `PROVISIONING_UNAVAILABLE` |
+| 7 | Climb the named rung for the bound route — bring the environment's infra up, resolve its checkouts, start a role, or merge this session's commit into the integration branch and serve, restart, reset or stop the one detached server, queueing behind a lease another session holds — then attest the entry: probe the endpoints, record the served head, what it contains and the evidence, and set the status | `routeKey`, `operation`, `commit`, `env` | @worktrees/sessions/central-runtime for the entry of that route with its server, lease and queue, @workspaces/projects/&lt;project>/&lt;role> for the role's dev command, the integration worktree and the session branch merged into it, the environment's declared infra, the endpoints re-observed once, @tools/git, @tools/http, @tools/container, @tools/shell | @worktrees/sessions/central-runtime, `response/data/delta.json`, `changes` | `SERVICE_UNAVAILABLE`, `PROVISIONING_UNAVAILABLE`, `INTEGRATION_FAILED`, `INVALID_INPUT` |
+| 8 | Provision the flow's identity against that entry: read the account record or create the account, set its password from the sealed name, write the record, draft what is absent and seed; or rotate the explicitly bound administrator custody | `routeKey`, `flow`, `env`, `identityRotation` | @worktrees/uat/&lt;flow> for the account record, the flow document and the seed, @worktrees/_templates for what is absent, @worktrees/sessions/central-runtime for the entry's identity declaration, @workspaces/device-state for the credential by name, @tools/secrets, @tools/http, @tools/browsercontrol, @tools/database | @worktrees/uat/&lt;flow>, `response/data/account.json`, `response/data/delta.json`, @tools/sourcewrite | `INVALID_INPUT`, `PROVISIONING_UNAVAILABLE` |
 | 9 | Prove every required check | — | @worktrees/sessions/central-runtime re-read against the branch's complete proof set, @tools/http | `response/data/checks.json` | `PROOF_FAILED` |
 | 10 | Write the receipt and emit | — | everything above | `response/response.md`, `response/response.json` | — |
 
@@ -385,6 +392,8 @@ A resume begins again at validation, reuses only unchanged fingerprinted observa
 the exact delta; a resume that adds no authority, inventory, desired-state or scope change is
 `NO_PROGRESS`, and a re-observed inventory must arrive as a new fingerprint because the same
 fingerprint cannot yield a different answer.
+
+A completed serve merge may emit changes for independent quality verification. Its Binding retains Operator, Step, Checkout and Predecessor and adds Base (the merge first parent, or the observed predecessor for a fast-forward), Head (the actual served merge) and Branch (the declared integration branch). Files is the exact Git diff from Base to Head. The platform validator reads that worktree and refuses a stale head, branch or file list; a queued, reused or failed serve emits no new integration changes. Raw gate evidence stays bound to this merged head.
 
 ## Outputs
 
@@ -394,6 +403,7 @@ fingerprint cannot yield a different answer.
 | `delta` | `response/data/delta.json` | data | yes |
 | `checks` | `response/data/checks.json` | data | yes |
 | `uat-account` | `response/data/account.json` | data | no |
+| `changes` | `response/changes.md` | md | no |
 
 ## Stops
 
@@ -420,6 +430,7 @@ fingerprint cannot yield a different answer.
 | the runtime a frontend surface must be audited against is now serving | `frontend.surface.audit` |
 | the shared service is operated and the release that waited on it may continue | `release.deploy` |
 | the flow's identity is provisioned and the run that waited on it may verify the flow | `uat.verify` |
+| a completed serve emits merged changes for independent delivery gates | `quality.verify` |
 
 ---
 

@@ -238,7 +238,7 @@
       "purpose": "Resolve a sealed credential by name at the moment it is used; never read, print or store its value. The value may enter the request body of the call that consumes it or the field of a form in a driven browser, and nowhere else: not a file, not a fixture, not a recorded command, not a screenshot, not a log and not a receipt.",
       "modes": {
         "never": "no credential is resolved",
-        "resolve-by-name": "the name comes from device-state or a route; decryption happens in the tool that consumes it; the value reaches only a request body or a browser form, and never enters response/, a captured image, or any file the operator writes"
+        "resolve-by-name": "the name comes from device-state or the selected route; identity provisioning first passes resources/identity.json through its fixed consuming helper. Decryption happens in the tool that consumes it; the value reaches only a request body or a browser form, never response/, a capture, a generic file-read result or diagnostic output"
       },
       "support": {
         "openai": {

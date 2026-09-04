@@ -1,0 +1,22 @@
+{
+  "$id": "kind:library-behavior-plan",
+  "type": "object", "additionalProperties": false,
+  "required": ["packageRoot", "packageName", "baseVersion", "targetVersion", "files", "pairs", "regression", "gates"],
+  "properties": {
+    "packageRoot": {"type": "string", "minLength": 1},
+    "packageName": {"type": "string", "minLength": 1},
+    "baseVersion": {"type": "string", "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$"},
+    "targetVersion": {"type": "string", "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$"},
+    "workspaceLockfile": {"const": "package-lock.json"},
+    "files": {"type": "array", "minItems": 3, "items": {"type": "object", "additionalProperties": false, "required": ["path", "kind"], "properties": {"path": {"type": "string", "minLength": 1}, "kind": {"enum": ["behavior", "test", "manifest", "docs", "lockfile"]}}}},
+    "pairs": {"type": "array", "minItems": 1, "items": {"type": "object", "additionalProperties": false, "required": ["source", "test"], "properties": {"source": {"type": "string"}, "test": {"type": "string"}}}},
+    "regression": {"type": "object", "additionalProperties": false, "required": ["command", "assertion"], "properties": {"command": {"$ref": "#/$defs/command"}, "assertion": {"type": "string", "minLength": 8}}},
+    "gates": {"type": "array", "minItems": 2, "items": {"type": "object", "additionalProperties": false, "required": ["id", "command"], "properties": {"id": {"type": "string", "pattern": "^[a-z][a-z-]*$"}, "command": {"$ref": "#/$defs/command"}}}}
+  },
+  "$defs": {
+    "command": {
+      "type": "object", "additionalProperties": false, "required": ["kind", "name", "args"],
+      "properties": {"kind": {"enum": ["npm-script", "package-bin"]}, "name": {"type": "string", "pattern": "^[a-z][a-z0-9-]*$"}, "args": {"type": "array", "items": {"type": "string"}}}
+    }
+  }
+}

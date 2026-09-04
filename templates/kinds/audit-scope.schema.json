@@ -1,0 +1,113 @@
+{
+  "$id": "kind:audit-scope",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "mode",
+    "surfaces",
+    "deferredStates",
+    "coverageClaim"
+  ],
+  "properties": {
+    "mode": {
+      "$ref": "#/$defs/mode"
+    },
+    "surfaces": {
+      "$ref": "#/$defs/surfaces"
+    },
+    "deferredStates": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "coverageClaim": {
+      "enum": [
+        "selected-surfaces",
+        "full-state-matrix",
+        "incomplete"
+      ]
+    }
+  },
+  "$defs": {
+    "mode": {
+      "enum": [
+        "primary-surfaces",
+        "exhaustive"
+      ],
+      "default": "primary-surfaces"
+    },
+    "surfaces": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 64,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "type",
+          "route",
+          "matrixIds"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^[a-z0-9][a-z0-9-]*$"
+          },
+          "matrixIds": {
+            "type": "array",
+            "minItems": 0,
+            "maxItems": 64,
+            "uniqueItems": true,
+            "items": {
+              "type": "string",
+              "pattern": "^[a-z0-9][a-z0-9-]*$"
+            }
+          },
+          "type": {
+            "enum": [
+              "page",
+              "layout",
+              "modal",
+              "drawer"
+            ]
+          },
+          "route": {
+            "type": "string",
+            "minLength": 1
+          },
+          "priority": {
+            "enum": [
+              "primary",
+              "deferred"
+            ],
+            "default": "primary"
+          }
+        }
+      }
+    },
+    "selection": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "surfaces"
+      ],
+      "properties": {
+        "mode": {
+          "$ref": "#/$defs/mode"
+        },
+        "surfaces": {
+          "$ref": "#/$defs/surfaces"
+        }
+      }
+    },
+    "deferredTasteRule": {
+      "enum": [
+        "TASTE-10"
+      ]
+    }
+  }
+}

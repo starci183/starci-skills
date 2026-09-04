@@ -275,6 +275,30 @@
       "caller": {
         "kind": "user"
       }
+    },
+    "library.source.apply": {
+      "caller": {
+        "kind": "user"
+      },
+      "workspace": {
+        "kind": "operator",
+        "target": "workspace.bind"
+      },
+      "library": {
+        "kind": "resume"
+      }
+    },
+    "dependency.update": {
+      "caller": {
+        "kind": "user"
+      },
+      "workspace": {
+        "kind": "operator",
+        "target": "workspace.bind"
+      },
+      "dependency": {
+        "kind": "resume"
+      }
     }
   }
 }

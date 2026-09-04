@@ -53,7 +53,10 @@
           "env": "staging"
         },
         "fanout": "matrix",
-        "maxParallel": 3
+        "maxParallel": 3,
+        "asks": [
+          "auditScope"
+        ]
       }
     ],
     [

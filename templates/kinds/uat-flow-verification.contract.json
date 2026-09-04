@@ -104,6 +104,18 @@
     {
       "heading": "^## Fallbacks taken$",
       "table": "| Code | Action |"
+    },
+    {
+      "heading": "^## Audit scope$",
+      "table": "| Field | Value |",
+      "rows": [
+        "Mode",
+        "Coverage claim",
+        "Deferred states"
+      ],
+      "cell": {
+        "Value": "\\S"
+      }
     }
   ]
 }

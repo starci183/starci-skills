@@ -1,6 +1,7 @@
 # Resources
 
 Câu hỏi và lựa chọn đã ghi nhận tuân theo [tương tác](interaction.vi.md).
+Provision danh tính tuân theo [custody bind theo provider](identity.vi.md).
 
 Ai chạy operator nào, bằng gì, và dưới những chính sách thường trực nào. Hai chỗ đóng mang việc đó:
 
@@ -60,6 +61,8 @@ Bản tóm tắt những gì mỗi `operator.json` khai; validator từ chối d
 | `business.decide` | sol-fresh | không | `fileread:context-aliases`, `sourcewrite:declared-write-set`, `git:read`, `websearch:bounded` | Mô hình kinh doanh lạ có thể cần tra cứu trước khi đóng băng độ phủ |
 | `architecture.decide` | sol-fresh | không | `fileread:context-aliases`, `git:read`, `websearch:bounded`, `visualize:html` | Phương án thay thế và tương thích cần bằng chứng ngoài repo; schema đã ghim model |
 | `backend.source.apply` | luna | không | `fileread:context-aliases`, `sourcewrite:declared-write-set`, `git:commit-session-branch`, `shell:declared-commands` | Ghi trong hợp đồng đã đóng băng, theo patterns/be |
+| `library.source.apply` | luna | không | `fileread:context-aliases`, `sourcewrite:declared-write-set`, `git:commit-session-branch`, `shell:declared-commands` | Sửa package owner đã bind, có regression trước/sau và đầy đủ gate package |
+| `dependency.update` | luna | no | `fileread:context-aliases`, `sourcewrite:declared-write-set`, `git:commit-session-branch`, `shell:declared-commands` | Tiêu thụ một bản phát hành package đã kiểm trong metadata dependency chính xác và gate regression consumer không đổi |
 | `frontend.direction.decide` | sol-fresh | có | `fileread:context-aliases`, `git:read`, `websearch:bounded`, `imagegen:judged`, `visualize:html`, `host:loopback`, `print:decision-points` | Chỉ tra cứu khi lĩnh vực lạ; render ứng viên thành trang và tự xét khi một vùng quá trống, cần hình |
 | `frontend.presentation.resolve` | luna | có | `fileread:context-aliases`, `git:read`, `registry:read` | Tra cứu trên một danh sách đóng |
 | `frontend.source.apply` | luna | có | `fileread:context-aliases`, `sourcewrite:declared-write-set`, `shell:declared-commands`, `git:commit-session-branch`, `imagegen:judged` | Chỉ ghi thứ resolution đã chứa, theo patterns/fe |

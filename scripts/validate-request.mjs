@@ -13,6 +13,7 @@ import { fileURLToPath } from 'node:url';
 import { validateAgainst } from './json-schema.mjs';
 import { loadOperatorPackages, kindOf, isYes, exchangeOf } from './operator-md.mjs';
 import { loadInteractionPolicy, selectionErrors } from './validate-interaction.mjs';
+import { validateImportedInput } from './producer-import.mjs';
 
 // Only a fully quoted cell is unquoted: a sentence that opens with a code span keeps its backticks.
 const unquote = (s) => { const t = String(s ?? '').trim(); return /^`[^`]*`$/.test(t) ? t.slice(1, -1) : t; };
@@ -76,6 +77,7 @@ export async function stackDeclaration(root, env, hostRoot = hostRootOf(root), s
 
 export async function validateRequest(root, dir, packages) {
   const errors = [];
+  if(existsSync(path.join(dir,'import.json')))return {errors:['request.json: an imported producer slot is evidence-only and cannot execute an operator'],request:null};
   const rel = (f) => path.relative(sessionRootOf(dir) ?? dir, path.join(dir, f)).split(path.sep).join('/');
   const file = path.join(dir, 'request', 'request.json');
   if (!existsSync(file)) return { errors: [`${rel('request/request.json')}: missing`], request: null };
@@ -106,6 +108,7 @@ export async function validateRequest(root, dir, packages) {
   for (const [kind, p] of Object.entries(request.inputs ?? {})) {
     if (!sessionRoot) { errors.push(`request.json: inputs.${kind} cannot be resolved; the branch is not under a session`); continue; }
     if (!existsSync(path.join(sessionRoot, p))) errors.push(`request.json: inputs.${kind} = ${p} does not exist in the session`);
+    errors.push(...await validateImportedInput(root,sessionRoot,p,kind,{receivingSessionId:request.sessionId}));
   }
   // The orchestrator hashes every request into state.json; a request that changed since is tampering.
   if (sessionRoot && existsSync(path.join(sessionRoot, 'state.json'))) {

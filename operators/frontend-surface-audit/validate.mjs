@@ -13,6 +13,7 @@ import { validateStep } from '../../scripts/validate-step.mjs';
 import { tableUnder, userRouted } from '../../scripts/validate-response.mjs';
 import { loadErrorsRegistry } from '../../scripts/errors-registry.mjs';
 import { sessionRootOf, missingStack } from '../../scripts/validate-request.mjs';
+import { validateAgainst } from '../../scripts/json-schema.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 const empty = (v) => v === undefined || v === null || v === '' || v === '—';
@@ -68,7 +69,7 @@ export const isBelowVolume = (row) => measuredText(row).includes(BELOW_VOLUME);
 export const isDataBound = (row) => measuredText(row).includes(DATA_BOUND);
 export const isPersonAccepted = (row) => measuredText(row).includes(PERSON_ACCEPTED);
 export function tasteVerdict(rows) {
-  const scored = rows.filter((r) => !isDataBound(r) && !isBelowVolume(r) && !isPersonAccepted(r));
+  const scored = rows.filter((r) => r.verdict !== 'deferred' && !isDataBound(r) && !isBelowVolume(r) && !isPersonAccepted(r));
   const mean = scored.length ? scored.reduce((sum, r) => sum + Number(r.score), 0) / scored.length : 0;
   if (rows.some(isBelowVolume)) return { mean, verdict: 'blocked', routeTo: 'seed' };
   const gated = scored.some((r) => r.verdict === 'fail' && TASTE_GATES.has(r.rule));
@@ -105,6 +106,25 @@ export async function validateAuditStep(branchDir, root = ROOT) {
     return { errors };
   }
   const at = 'response/data/verdicts.json';
+  const scopeSchema = JSON.parse(await readFile(path.join(root, 'templates/kinds/audit-scope.schema.json'), 'utf8'));
+  const selection = requirements.auditScope;
+  const selectionErrors = validateAgainst({ ...scopeSchema, ...scopeSchema.$defs.selection }, selection, 'request.auditScope');
+  errors.push(...selectionErrors);
+  const recordedScopeErrors = validateAgainst(scopeSchema, verdicts.auditScope, `${at}.auditScope`);
+  errors.push(...recordedScopeErrors);
+  if (selectionErrors.length || recordedScopeErrors.length) return { errors };
+  const scopeMode = selection?.mode ?? scopeSchema.$defs.mode.default;
+  const surfaceInventory = Array.isArray(selection?.surfaces) ? selection.surfaces : [];
+  const selectedSurfaces = surfaceInventory.filter((surface) => surface.priority !== 'deferred');
+  const selectedIds = selectedSurfaces.flatMap((surface) => surface.matrixIds ?? []);
+  if (!selectedSurfaces.length) errors.push(`${at}: an audit must select at least one primary surface`);
+  if (new Set(surfaceInventory.map((surface) => surface.id)).size !== surfaceInventory.length) errors.push(`${at}: selected surface ids must be unique`);
+  for (const surface of surfaceInventory) {
+    if (surface.priority === 'deferred' && (surface.matrixIds.length || scopeMode === 'exhaustive')) errors.push(`${at}: deferred surfaces carry no captured matrix and are unavailable in exhaustive mode`);
+    if (surface.priority !== 'deferred' && !surface.matrixIds.length) errors.push(`${at}: each selected surface must declare its required matrix entries`);
+  }
+  if (new Set(selectedIds).size !== selectedIds.length) errors.push(`${at}: one matrix entry must belong to exactly one selected surface`);
+  if (verdicts.auditScope?.mode !== scopeMode || JSON.stringify(verdicts.auditScope?.surfaces) !== JSON.stringify(surfaceInventory)) errors.push(`${at}: audit scope must preserve the request's selected surfaces and mode`);
 
   const captureRefs = new Set(list(response.fields?.capture));
   const shotRefs = new Set(list(response.fields?.screenshot));
@@ -141,6 +161,7 @@ export async function validateAuditStep(branchDir, root = ROOT) {
       if (result.verdict === 'pass' && result.routeTo !== 'none') errors.push(`${at}: ${result.path} passes and still routes to ${result.routeTo}`);
       if (result.verdict === 'fail') {
         if (result.owner === 'grammar' && result.routeTo === 'resolve') errors.push(`${at}: ${result.path} is a Grammar component's own render; a failure there is a grammar-gap, never a resolve loop`);
+        if (result.owner === 'grammar' && !['grammar-gap', 'direction'].includes(result.routeTo)) errors.push(`${at}: ${result.path} is Grammar-owned; existing behavior routes to grammar-gap and a new presentation direction routes to direction`);
         if (result.owner === 'app' && result.routeTo !== 'resolve') errors.push(`${at}: ${result.path} is application-owned and its failure must route to resolve`);
         if (result.routeTo === 'none') errors.push(`${at}: ${result.path} fails and routes nowhere`);
       }
@@ -153,6 +174,9 @@ export async function validateAuditStep(branchDir, root = ROOT) {
     }
   }
   for (const [matrixId] of captures) if (!ids.has(matrixId)) errors.push(`${at}: ${matrixId} was captured and never judged`);
+  const missingSelected = selectedIds.filter((id) => !ids.has(id) || !captures.has(id));
+  for (const id of missingSelected) errors.push(`${at}: selected surface entry ${id} was not fully audited (EVIDENCE_MISSING)`);
+  for (const id of ids) if (!selectedIds.includes(id)) errors.push(`${at}: ${id} is outside the frozen selected surfaces`);
 
   // The states a state-reading topic must see before it may close: the direction's coverage names
   // them (COVERAGE-1 Case 1 and Case 5, `coverage.actions[].states` and `coverage.states[].meaning`),
@@ -163,6 +187,7 @@ export async function validateAuditStep(branchDir, root = ROOT) {
   const sessionRoot = sessionRootOf(branchDir);
   let coverageDoc = null;
   let missingStates = new Set();
+  let deferredStates = [];
   if (decisionRef && sessionRoot && response.status === 'done') {
     const coverageFile = path.join(sessionRoot, path.dirname(String(decisionRef)), 'data', 'coverage.json');
     if (existsSync(coverageFile)) {
@@ -171,9 +196,14 @@ export async function validateAuditStep(branchDir, root = ROOT) {
     if (coverageDoc) {
       const declaredStates = new Set(['loaded', ...(coverageDoc.states ?? []).map((s) => s.meaning), ...(coverageDoc.actions ?? []).flatMap((a) => a.states ?? [])]);
       const capturedStates = new Set([...captures.values()].map((c) => c.doc.state));
-      for (const s of declaredStates) if (!capturedStates.has(s)) missingStates.add(s);
+      const absent = [...declaredStates].filter((s) => !capturedStates.has(s));
+      if (scopeMode === 'exhaustive') missingStates = new Set(absent);
+      else deferredStates = absent;
     }
   }
+  const coverageClaim = missingSelected.length || missingStates.size ? 'incomplete' : scopeMode === 'exhaustive' ? 'full-state-matrix' : 'selected-surfaces';
+  if (JSON.stringify([...(verdicts.auditScope?.deferredStates ?? [])].sort()) !== JSON.stringify(deferredStates.sort())) errors.push(`${at}: deferred states must name exactly the declared secondary states not captured in this primary-surface audit`);
+  if (verdicts.auditScope?.coverageClaim !== coverageClaim) errors.push(`${at}: coverage claim must be ${coverageClaim}; selected surfaces cannot claim full UI state coverage`);
 
   // The taste lens. A done audit publishes it for every entry it judged: all twelve scored criteria,
   // each failure routed to direction because no value swap repairs a composition (TASTE-13 Case 4),
@@ -191,6 +221,13 @@ export async function validateAuditStep(branchDir, root = ROOT) {
       if (seen.has(row.rule)) errors.push(`${at}: ${entry.matrixId} scores ${row.rule} twice`);
       seen.set(row.rule, row);
       if (!TASTE_RULES.includes(row.rule)) errors.push(`${at}: ${entry.matrixId} scores ${row.rule}, which is not one of the twelve scored criteria (TASTE-13 is the arithmetic and is not itself scored)`);
+      const deferable = scopeSchema.$defs.deferredTasteRule.enum.includes(row.rule);
+      if (row.verdict === 'deferred') {
+        if (scopeMode !== 'primary-surfaces' || !deferredStates.length || !deferable || row.score !== null || row.routeTo !== 'none' || !deferredStates.every((state) => row.measured.includes(state))) errors.push(`${at}: deferred criterion must name its deferred states, carry no score and belong to the primary-surface scope`);
+      } else {
+        if (row.score === null) errors.push(`${at}: a judged criterion must carry its measured score`);
+        if (deferable && scopeMode === 'primary-surfaces' && deferredStates.length) errors.push(`${at}: state-comparison criterion must be deferred when its declared secondary states were not captured`);
+      }
       const marker = isBelowVolume(row) ? BELOW_VOLUME : isDataBound(row) ? DATA_BOUND : isPersonAccepted(row) ? PERSON_ACCEPTED : null;
       if ((marker === BELOW_VOLUME || marker === DATA_BOUND) && row.rule !== VOLUME_RULE) errors.push(`${at}: ${entry.matrixId} marks ${row.rule} ${marker}; only the density criterion ${VOLUME_RULE} depends on data volume (TASTE-9 Case 5)`);
       if (marker === PERSON_ACCEPTED) {
@@ -214,7 +251,10 @@ export async function validateAuditStep(branchDir, root = ROOT) {
       for (const row of rows) {
         const prior = rolled.get(row.rule);
         if (!prior) rolled.set(row.rule, { score: row.score, verdict: row.verdict, measured: [row.measured] });
-        else rolled.set(row.rule, { score: Math.min(prior.score, row.score), verdict: prior.verdict === 'fail' || row.verdict === 'fail' ? 'fail' : 'pass', measured: [...prior.measured, row.measured] });
+        else {
+          const verdict = prior.verdict === 'fail' || row.verdict === 'fail' ? 'fail' : prior.verdict === 'deferred' || row.verdict === 'deferred' ? 'deferred' : 'pass';
+          rolled.set(row.rule, { score: verdict === 'deferred' ? null : Math.min(prior.score ?? Infinity, row.score ?? Infinity), verdict, measured: [...prior.measured, row.measured] });
+        }
       }
     }
   }
@@ -302,6 +342,13 @@ export async function validateAuditStep(branchDir, root = ROOT) {
   if (response.status === 'done' && failing.some((r) => r.routeTo === 'resolve') && !(response.next ?? []).includes('frontend.presentation.resolve')) {
     errors.push('response/response.json: a claim fails on an application-owned node, so next names frontend.presentation.resolve');
   }
+  const libraryRepairs = failing.filter((r) => r.owner === 'grammar' && r.routeTo === 'grammar-gap');
+  if (libraryRepairs.length) {
+    if (response.status === 'done' && !(response.next ?? []).includes('workspace.bind')) errors.push('response/response.json: an existing library grammar-gap first routes to workspace.bind for the owner checkout, then library.source.apply under its repair authority');
+    if ((response.next ?? []).some((next) => ['frontend.surface.audit', 'quality.verify', 'library.source.apply'].includes(next))) errors.push('response/response.json: a grammar-gap cannot self-loop, pass quality, or skip the owner workspace binding');
+    if (await userRouted(root, await loadErrorsRegistry(root), 'frontend.surface.audit', response)) errors.push('response/response.json: an already-authorized library repair is not handed to a person to publish; bind its owner checkout');
+  }
+  if (response.status === 'done' && failing.some((r) => r.owner === 'grammar' && r.routeTo === 'direction') && !(response.next ?? []).includes('frontend.direction.decide')) errors.push('response/response.json: a new Grammar presentation direction or tier routes to frontend.direction.decide, preserving the user choice');
 
   // A composition or taste verdict is never closed by asking. An open one routes to direction,
   // which scores the rendered candidates and decides or proves the tie; a density measured below
@@ -315,6 +362,9 @@ export async function validateAuditStep(branchDir, root = ROOT) {
   if (present.has('frontend-surface-audit') && has('response/response.md')) {
     const text = await read('response/response.md');
     const rel = 'response/response.md';
+    const scopeRows = Object.fromEntries(tableUnder(text, '## Audit scope') ?? []);
+    const expectedScopeRows = { Mode: scopeMode, 'Selected surfaces': selectedSurfaces.map((surface) => surface.id).join(', '), 'Coverage claim': coverageClaim, 'Deferred states': deferredStates.join(', ') || '—' };
+    for (const [field, expected] of Object.entries(expectedScopeRows)) if (scopeRows[field] !== expected) errors.push(`${rel}: Audit scope ${field} must preserve ${expected}`);
     // One integration branch carries several sessions' work, so the audit states which head it
     // measured and how its own commit is inside it. Ancestry a reader cannot see is a claim, and a
     // browser profile nobody recorded is how one session's sign-in becomes another session's evidence.
@@ -368,7 +418,7 @@ export async function validateAuditStep(branchDir, root = ROOT) {
       for (const [rule, measured, score, verdict] of tasteRows) {
         const row = rolled.get(rule);
         if (!row) { errors.push(`${rel}: Taste names ${rule}, which the verdicts do not score`); continue; }
-        if (Number(score) !== row.score) errors.push(`${rel}: ${rule} scores ${score} here and ${row.score} in the verdicts`);
+        if ((row.score === null ? score !== '—' : Number(score) !== row.score)) errors.push(`${rel}: ${rule} scores ${score} here and ${row.score} in the verdicts`);
         if (verdict !== row.verdict) errors.push(`${rel}: ${rule} is ${verdict} here and ${row.verdict} in the verdicts`);
         if (!row.measured.includes(measured)) errors.push(`${rel}: ${rule} is scored on "${measured}", which no capture measured`);
       }
@@ -428,6 +478,8 @@ export async function validateAuditStep(branchDir, root = ROOT) {
       if (!result) { errors.push(`${rel}: Regressions names ${rule} on ${node}, which no verdict fails`); continue; }
       if (result.routeTo !== routeTo) errors.push(`${rel}: ${rule} on ${node} routes to ${routeTo} here and ${result.routeTo} in the verdicts`);
     }
+    const familyGaps = tableUnder(text, '## Grammar gaps') ?? [];
+    for (const repair of libraryRepairs) if (!familyGaps.some(([component, rule, evidence]) => component === repair.path && rule === repair.rule && !empty(evidence))) errors.push(`${rel}: Grammar gaps must preserve ${repair.rule} on ${repair.path} for the owner repair handoff`);
   }
   return { errors };
 }

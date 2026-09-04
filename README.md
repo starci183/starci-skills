@@ -1,7 +1,7 @@
 # @starci/skills
 
-StarCi Skills is the `.claude` runtime of a repository: one entry (`SKILL.md`), fourteen operators,
-eight example workflows, one closed routing map and one tool registry. An agent in Claude Code or
+StarCi Skills is the `.claude` runtime of a repository: one entry (`SKILL.md`), operators with explicit boundaries,
+example workflows, one closed routing map and one tool registry. An agent in Claude Code or
 Codex reads `.claude/INDEX.md` through a one-paragraph bootstrap and follows its load order; the tree
 does the rest. Documentation: <https://harness.starci.org/docs/>. Tiếng Việt: [README.vi.md](README.vi.md).
 

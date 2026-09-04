@@ -1,6 +1,6 @@
 # Các operator
 
-Sinh bởi `scripts/generate-operators-index.mjs` từ mọi `operator.md`; `--check` chạy trong `npm test`, nên bảng này không thể lệch với các gói. Alias trong Context có trước phiên; kind được sinh trong một nhánh (`step-N/parallel-M/response/`) và bàn giao cho nhánh sau bằng đường dẫn tường minh trong `request.json` của nhánh đó. 14 operator.
+Sinh bởi `scripts/generate-operators-index.mjs` từ mọi `operator.md`; `--check` chạy trong `npm test`, nên bảng này không thể lệch với các gói. Alias trong Context có trước phiên; kind được sinh trong một nhánh (`step-N/parallel-M/response/`) và bàn giao cho nhánh sau bằng đường dẫn tường minh trong `request.json` của nhánh đó. 16 operator.
 
 ## Mỗi operator cần gì và tạo ra gì
 
@@ -10,15 +10,17 @@ Sinh bởi `scripts/generate-operators-index.mjs` từ mọi `operator.md`; `--c
 | `backend.source.apply` | `luna` | `@knowledge/patterns/be`, `@workspaces/be`, `@worktrees/businesses/<featureId>` | `architecture-decision`, `model`, `backend-source-application` | `backend-source-application`, `changes`, `mutations`, `conformance`, `proof` | 8 | `INVALID_INPUT`, `SESSION_MISSING`, `SOURCE_DRIFT`, `NO_PROGRESS`, `CONTRACT_UNFROZEN`, `CONTRACT_WIDENED`, `BUSINESS_AUTHORITY_MISSING`, `OWNER_CONFLICT`, `PATTERN_UNBOUND`, `PROOF_UNAVAILABLE` |
 | `business.decide` | `sol-fresh` | `@workspaces/be`, `@worktrees/businesses/<featureId>` | `architecture-decision`, `backend-source-application` | `business-promise-authority`, `claims`, `coverage-matrix`, `model` | 9 | `INVALID_INPUT`, `SOURCE_DRIFT`, `NO_PROGRESS`, `EVIDENCE_MISSING`, `CONTRADICTION_UNRESOLVED`, `LIFECYCLE_TRANSITION_INVALID`, `AUTHORITY_CONFLICT`, `APPROVAL_REQUIRED`, `COVERAGE_INCOMPLETE`, `CONSUMER_UNPROVEN`, `RECONCILIATION_DISCREPANCY` |
 | `content.generate` | `luna` | `@remote/minio/<contentId>/<locale>`, `@worktrees/sessions/central-runtime` | `content-generation-receipt` | `content-generation-receipt`, `content-brief`, `e2e`, `content-review`, `article`, `image`, `image-prompt`, `track` | 9 | `INVALID_INPUT`, `SOURCE_DRIFT`, `NO_PROGRESS`, `BRIEF_UNBOUND`, `OUTCOME_UNCOVERED`, `IMAGE_UNAVAILABLE`, `CODE_BUILD_FAILED`, `E2E_FAILED`, `CONTRACT_WEAKENED`, `REVIEW_REVISION_REQUIRED`, `REVIEW_ROUNDS_EXHAUSTED` |
+| `dependency.update` | `luna` | `@workspaces/fe` | `route` | `dependency-update`, `dependency-proof`, `dependency-log`, `changes` | 5 | `INVALID_INPUT`, `SOURCE_DRIFT`, `NO_PROGRESS`, `DEPENDENCY_BOUNDARY_REJECTED`, `DEPENDENCY_PROOF_FAILED` |
 | `frontend.direction.decide` | `sol-fresh` | `@grammar/core`, `@knowledge/grammars/<family>`, `@knowledge/ui/composition`, `@knowledge/ui/proof`, `@workspaces/fe`, `@worktrees/uat/<flow>/<case>` | `business-promise-authority`, `backend-source-application`, `architecture-decision`, `frontend-direction-decision` | `frontend-direction-decision`, `ui-coverage`, `candidates`, `direction-image`, `host` | 12 | `INVALID_INPUT`, `ROUTE_UNVERIFIED`, `SOURCE_DRIFT`, `SCOPE_UNFROZEN`, `CHANGE_LEVEL_AMBIGUOUS`, `OWNER_CEILING_INVALID`, `BUSINESS_REQUIRED`, `BACKEND_REQUIRED`, `ARCHITECTURE_REQUIRED`, `GRAMMAR_REQUIRED`, `EVIDENCE_MISSING`, `REFERENCE_EVIDENCE_EXHAUSTED`, `REFERENCE_MISSING`, `NO_VIABLE_DIRECTION`, `DIRECTION_CHOICE_REQUIRED`, `NO_PROGRESS` |
 | `frontend.presentation.resolve` | `luna` | `@grammar/core`, `@knowledge/ui/presentation`, `@workspaces/fe` | `frontend-direction-decision`, `frontend-surface-audit` | `frontend-presentation-resolution`, `inventory`, `resolved-tree` | 9 | `INVALID_INPUT`, `SOURCE_DRIFT`, `OWNER_CONFLICT`, `KNOWLEDGE_UNBOUND`, `UNKNOWN_RULE`, `RULE_MISSING`, `GRAMMAR_UNPUBLISHED`, `NO_PROGRESS` |
 | `frontend.source.apply` | `luna` | `@workspaces/fe` | `frontend-presentation-resolution`, `frontend-direction-decision` | `frontend-source-application`, `changes`, `writes` | 7 | `INVALID_INPUT`, `SESSION_MISSING`, `SOURCE_DRIFT`, `OWNER_CONFLICT`, `RESOLUTION_STALE`, `WRITE_REJECTED`, `NO_PROGRESS` |
 | `frontend.surface.audit` | `sol-reviewer` | `@knowledge/grammars/<family>`, `@knowledge/ui/proof`, `@workspaces/fe`, `@worktrees/sessions/central-runtime` | `frontend-source-application`, `frontend-presentation-resolution`, `frontend-direction-decision`, `route`, `uat-account` | `frontend-surface-audit`, `capture`, `screenshot`, `verdicts`, `host` | 6 | `INVALID_INPUT`, `SOURCE_DRIFT`, `RUNTIME_UNAVAILABLE`, `IDENTITY_MISSING`, `EVIDENCE_MISSING`, `UNKNOWN_RULE`, `SURFACE_CLASS_MISSING`, `NO_PROGRESS` |
 | `git.publish` | `luna` | `@remote/git/<project>/<role>`, `@workspaces/<project>/<role>/husky`, `@workspaces/local/routes/<project>/<role>` | `workspace-route-binding`, `changes`, `quality-verification` | `git-publication` | 9 | `INVALID_INPUT`, `SOURCE_DRIFT`, `NO_PROGRESS`, `ROUTE_UNVERIFIED`, `SESSION_MISSING`, `APPROVAL_MISSING`, `BRANCH_POLICY_VIOLATION`, `DIRTY_OUTSIDE_BOUNDARY`, `HOOK_BLOCKED`, `NON_FAST_FORWARD` |
-| `platform.operate` | `luna` | `@workspaces/device-state`, `@workspaces/ports/<project>`, `@workspaces/projects/<project>/<role>`, `@worktrees/_templates`, `@worktrees/sessions/central-runtime`, `@worktrees/uat/<flow>` | — | `platform-operation-receipt`, `delta`, `checks`, `uat-account` | 10 | `INVALID_INPUT`, `SOURCE_DRIFT`, `NO_PROGRESS`, `AUTHORITY_DRIFT`, `CAPABILITY_MISSING`, `INVENTORY_DRIFT`, `PORT_CONFLICT`, `EFFECT_UNAUTHORIZED`, `SERVICE_UNAVAILABLE`, `PROVISIONING_UNAVAILABLE`, `INTEGRATION_FAILED`, `PROOF_FAILED` |
-| `quality.verify` | `luna` | `@workspaces/<project>/<role>/gates`, `@workspaces/be`, `@workspaces/fe`, `@worktrees/debts` | `backend-source-application`, `frontend-source-application`, `changes`, `frontend-surface-audit`, `uat-flow-verification` | `quality-verification`, `gate-result`, `coverage` | 8 | `INVALID_INPUT`, `SOURCE_DRIFT`, `NO_PROGRESS`, `PREDECESSOR_MIXED`, `PREDECESSOR_STALE`, `GATE_UNAVAILABLE`, `DEBT_UNAPPROVED` |
+| `library.source.apply` | `luna` | `@workspaces/fe` | `route` | `library-source-application`, `library-proof`, `changes` | 5 | `INVALID_INPUT`, `SOURCE_DRIFT`, `NO_PROGRESS`, `LIBRARY_BOUNDARY_REJECTED`, `LIBRARY_PROOF_FAILED` |
+| `platform.operate` | `luna` | `@workspaces/device-state`, `@workspaces/ports/<project>`, `@workspaces/projects/<project>/<role>`, `@worktrees/_templates`, `@worktrees/sessions/central-runtime`, `@worktrees/uat/<flow>` | — | `platform-operation-receipt`, `delta`, `checks`, `uat-account`, `changes` | 10 | `INVALID_INPUT`, `SOURCE_DRIFT`, `NO_PROGRESS`, `AUTHORITY_DRIFT`, `CAPABILITY_MISSING`, `INVENTORY_DRIFT`, `PORT_CONFLICT`, `EFFECT_UNAUTHORIZED`, `SERVICE_UNAVAILABLE`, `PROVISIONING_UNAVAILABLE`, `INTEGRATION_FAILED`, `PROOF_FAILED` |
+| `quality.verify` | `luna` | `@workspaces/<project>/<role>/gates`, `@workspaces/be`, `@workspaces/fe`, `@worktrees/debts` | `backend-source-application`, `frontend-source-application`, `changes`, `frontend-surface-audit`, `uat-flow-verification` | `quality-verification`, `gate-result`, `coverage`, `audit-scope` | 8 | `INVALID_INPUT`, `SOURCE_DRIFT`, `NO_PROGRESS`, `PREDECESSOR_MIXED`, `PREDECESSOR_STALE`, `GATE_UNAVAILABLE`, `DEBT_UNAPPROVED` |
 | `release.deploy` | `luna` | `@remote/ghcr/<image>`, `@remote/github-actions/<runId>`, `@workspaces/device-state` | `quality-verification` | `release-deployment`, `probes` | 10 | `INVALID_INPUT`, `NO_PROGRESS`, `AUTHORIZATION_MISSING`, `MANIFEST_INVALID`, `APPROVAL_REQUIRED`, `CREDENTIAL_UNAVAILABLE`, `HOST_UNAVAILABLE`, `ARTIFACT_MISSING`, `MIGRATION_BLOCKED`, `DOMAIN_UNRECONCILED`, `ROLLOUT_FAILED`, `RECOVERY_EXHAUSTED`, `CONCURRENT_DRIFT`, `ROLLBACK_IDENTITY_MISSING`, `STEADY_STATE_UNPROVEN` |
-| `uat.verify` | `sol-fresh` | `@knowledge/ui/proof`, `@workspaces/be`, `@workspaces/device-state`, `@worktrees/_templates`, `@worktrees/sessions/central-runtime`, `@worktrees/uat/<flow>/<case>` | `frontend-surface-audit`, `quality-verification`, `route`, `uat-account` | `uat-flow-verification`, `uat-snapshot`, `uat-capture`, `uat-verdicts`, `screenshot`, `sheet` | 10 | `INVALID_INPUT`, `SOURCE_DRIFT`, `NO_PROGRESS`, `AUTHORITY_DRIFT`, `ADMISSION_MISSING`, `PROVISIONING_UNAVAILABLE`, `IDENTITY_MISSING`, `LEASE_INVALID`, `RUNTIME_UNAVAILABLE`, `EVIDENCE_UNAVAILABLE`, `FIXTURE_VIOLATION`, `CANONICAL_WRITE_DENIED` |
+| `uat.verify` | `sol-fresh` | `@knowledge/ui/proof`, `@workspaces/be`, `@workspaces/device-state`, `@workspaces/fe`, `@worktrees/_templates`, `@worktrees/sessions/central-runtime`, `@worktrees/uat/<flow>/<case>` | `frontend-surface-audit`, `quality-verification`, `route`, `uat-account` | `uat-flow-verification`, `uat-snapshot`, `uat-capture`, `uat-verdicts`, `audit-scope`, `screenshot`, `sheet` | 10 | `INVALID_INPUT`, `SOURCE_DRIFT`, `NO_PROGRESS`, `AUTHORITY_DRIFT`, `ADMISSION_MISSING`, `PROVISIONING_UNAVAILABLE`, `IDENTITY_MISSING`, `LEASE_INVALID`, `RUNTIME_UNAVAILABLE`, `EVIDENCE_UNAVAILABLE`, `FIXTURE_VIOLATION`, `CANONICAL_WRITE_DENIED` |
 | `workspace.bind` | `luna` | `@workspaces/device-state`, `@workspaces/local/routes/<project>/<role>`, `@workspaces/ports/<project>`, `@workspaces/projects/<project>/<role>`, `@worktrees/sessions/central-runtime` | — | `workspace-route-binding`, `route` | 6 | `INVALID_INPUT`, `SOURCE_DRIFT`, `NO_PROGRESS`, `IDENTITY_UNVERIFIED`, `ROUTE_UNDECLARED`, `ROUTE_UNHYDRATED`, `ROUTE_MISMATCH`, `BRANCH_POLICY_VIOLATION`, `CHECKOUT_DIRTY`, `ENDPOINT_AUTHORITY_STALE`, `RUNTIME_NOT_READY`, `RUNTIME_BUSY` |
 
 ## Bàn giao giữa các nhánh
@@ -30,11 +32,12 @@ Mọi kind đi qua giữa các operator, ai ghi nó, ai đọc nó. Kind không 
 | `alternatives` | `architecture.decide` | — |
 | `architecture-decision` | `architecture.decide` | `architecture.decide (optional)`, `backend.source.apply`, `business.decide (optional)`, `frontend.direction.decide (optional)` |
 | `article` | `content.generate` | — |
+| `audit-scope` | `quality.verify`, `uat.verify` | — |
 | `backend-source-application` | `backend.source.apply` | `backend.source.apply (optional)`, `business.decide (optional)`, `frontend.direction.decide (optional)`, `quality.verify (optional)` |
 | `business-promise-authority` | `business.decide` | `frontend.direction.decide (optional)` |
 | `candidates` | `frontend.direction.decide` | — |
 | `capture` | `frontend.surface.audit` | — |
-| `changes` | `backend.source.apply`, `frontend.source.apply` | `git.publish`, `quality.verify (optional)` |
+| `changes` | `backend.source.apply`, `dependency.update`, `frontend.source.apply`, `library.source.apply`, `platform.operate` | `git.publish`, `quality.verify (optional)` |
 | `checks` | `platform.operate` | — |
 | `claims` | `business.decide` | — |
 | `conformance` | `backend.source.apply` | — |
@@ -45,6 +48,9 @@ Mọi kind đi qua giữa các operator, ai ghi nó, ai đọc nó. Kind không 
 | `coverage-matrix` | `business.decide` | — |
 | `current-state` | `architecture.decide` | — |
 | `delta` | `platform.operate` | — |
+| `dependency-log` | `dependency.update` | — |
+| `dependency-proof` | `dependency.update` | — |
+| `dependency-update` | `dependency.update` | — |
 | `direction-image` | `frontend.direction.decide` | — |
 | `e2e` | `content.generate` | — |
 | `frontend-direction-decision` | `frontend.direction.decide` | `frontend.direction.decide (optional)`, `frontend.presentation.resolve`, `frontend.source.apply`, `frontend.surface.audit` |
@@ -58,6 +64,8 @@ Mọi kind đi qua giữa các operator, ai ghi nó, ai đọc nó. Kind không 
 | `image-prompt` | `content.generate` | — |
 | `independent-critique` | `architecture.decide` | — |
 | `inventory` | `frontend.presentation.resolve` | — |
+| `library-proof` | `library.source.apply` | — |
+| `library-source-application` | `library.source.apply` | — |
 | `model` | `business.decide` | `architecture.decide (optional)`, `backend.source.apply (optional)` |
 | `mutations` | `backend.source.apply` | — |
 | `platform-operation-receipt` | `platform.operate` | — |
@@ -66,7 +74,7 @@ Mọi kind đi qua giữa các operator, ai ghi nó, ai đọc nó. Kind không 
 | `quality-verification` | `quality.verify` | `git.publish`, `release.deploy`, `uat.verify` |
 | `release-deployment` | `release.deploy` | — |
 | `resolved-tree` | `frontend.presentation.resolve` | — |
-| `route` | `workspace.bind` | `frontend.surface.audit`, `uat.verify` |
+| `route` | `workspace.bind` | `dependency.update`, `frontend.surface.audit`, `library.source.apply`, `uat.verify` |
 | `screenshot` | `frontend.surface.audit`, `uat.verify` | — |
 | `sheet` | `uat.verify` | — |
 | `stack-model` | `architecture.decide` | — |
@@ -89,11 +97,13 @@ Mọi kind đi qua giữa các operator, ai ghi nó, ai đọc nó. Kind không 
 | `backend.source.apply` | Implement one backend outcome inside a frozen mutation contract, following the observed sibling family, and return the measured conformance and proof receipt that shows the boundary was not widened. |
 | `business.decide` | Decide and publish one evidence-backed business promise as durable backend-owned authority, frozen behind a complete promise-to-enforcement coverage matrix, or reconcile that published head against the source that was actually delivered. |
 | `content.generate` | Generate or refactor one educational content unit in one linear pass: a teacher brief that constrains everything after it, one written edition per declared language, images made to a stated claim, code and executable checks that actually run, and an independent review that receives the artifacts without the producer's rationale. |
+| `dependency.update` | Consume one verified package release by changing only its exact dependency metadata, then prove the unchanged consumer regression and complete declared delivery gates before one session commit. |
 | `frontend.direction.decide` | Decide one evidence-backed, implementation-ready frontend direction for one authorized target, and prove it against the business promise, the published Grammar, the observed implementation and a falsification pass that no candidate survives by taste. |
 | `frontend.presentation.resolve` | Resolve every application-owned presentation property on one already-composed tree to exactly one published rule, emit its class and its verifiable contract claim, and stop at the smallest owning gap instead of inventing a value. |
 | `frontend.source.apply` | Write one already-resolved tree into product source on the session branch, inside a frozen owner ceiling and a declared file set, emitting only values the bound resolution already contains, and account for every byte that entered the repository in one commit. |
-| `frontend.surface.audit` | Observe the committed surface at the served route across the matrix the direction's coverage implies, measure every node that carries a claim, and judge each measurement against the published proof rules by the owner of the node it stands on. |
+| `frontend.surface.audit` | Observe the selected primary surfaces at the served route across their frozen audit matrix, measure every node that carries a claim, and judge each measurement against the published proof rules by the owner of the node it stands on. |
 | `git.publish` | Publish one approved Git boundary from the exact commit quality verified, with non-force, fast-forward-only semantics, and stop with a typed failure rather than reaching for a bypass. |
+| `library.source.apply` | Repair existing behavior inside one explicitly authorized owner package, prove its regression and package gates, and commit exactly one next-patch delivery on the bound session branch. |
 | `platform.operate` | Operate one bounded shared service from exact evidence — observability, Sonar, tunnel, the runtime registry, or the identity a bound route authenticates against: inventory it, converge only the approved delta, prove every check the bound knowledge requires, and stop at the smallest owning gap instead of taking product deployment ownership. |
 | `quality.verify` | Verify one bounded delivery by running its declared gates against an unchanged predecessor receipt at one frozen head, and return the exact measured verdict, repairing nothing. |
 | `release.deploy` | Deploy one immutable release to one declared target under its declared authorization and prove the steady state it reached, taking the recovery or rollback branch inside the same pass rather than assuming the rollout succeeded. |
@@ -141,6 +151,8 @@ Mọi mã một operator có thể dừng với, gộp từ `operators/errors.js
 | `OUTCOME_UNCOVERED` | `content.generate` | `content` | terminate | Một bản viết đã khai bỏ trống một kết quả học tập đã công bố. | — | — | Viết lại bản đó, hoặc thu hẹp brief. |
 | `REVIEW_REVISION_REQUIRED` | `content.generate` | `content` | fallback | Phản biện độc lập trả về yêu cầu sửa. | Sửa đúng những artifact mà các finding của phản biện nêu tên, theo giai đoạn chủ, ghi vòng đó dưới ## Fallbacks taken, rồi mở lại cuộc trao đổi phản biện cho vòng kế. | — | Không hỏi ai cả; nhánh tự sửa và phản biện lại cho tới khi hết maxReviewRounds. |
 | `REVIEW_ROUNDS_EXHAUSTED` | `content.generate` | `caller` | terminate | Đã tiêu hết maxReviewRounds mà phản biện vẫn trả về yêu cầu sửa. | — | — | Duyệt thêm vòng, hoặc thu hẹp đơn vị. |
+| `DEPENDENCY_BOUNDARY_REJECTED` | `dependency.update` | `caller` | terminate | Không chứng minh được bản phát hành, danh tính package hoặc ranh giới metadata chính xác. | — | — | Cung cấp artifact đã kiểm chứng và plan metadata đã sửa; thay đổi source vẫn thuộc owner source. |
+| `DEPENDENCY_PROOF_FAILED` | `dependency.update` | `self` | terminate | Regression consumer không đổi hoặc gate bàn giao bắt buộc thiếu bằng chứng hợp lệ tại phiên bản dependency đã cài. | — | — | Sửa bản phát hành owner hoặc phần cài đặt rồi chạy lại nguyên proof consumer. |
 | `ARCHITECTURE_REQUIRED` | `frontend.direction.decide` | `architecture` | terminate | Hướng làm đổi một ranh giới hệ thống hay dữ liệu chưa ai quyết. | — | — | Chạy architecture.decide trước. |
 | `BACKEND_REQUIRED` | `frontend.direction.decide` | `backend` | terminate | Hướng làm đổi một contract dữ liệu chưa ai giao. | — | — | Chạy backend.source.apply trước. |
 | `BUSINESS_REQUIRED` | `frontend.direction.decide` | `business` | terminate | Một actor, lời hứa, quyền, kết cục bất lợi hay đường phục hồi mà change level đòi vẫn chưa được giải quyết. | — | — | Chạy business.decide trước. |
@@ -167,6 +179,8 @@ Mọi mã một operator có thể dừng với, gộp từ `operators/errors.js
 | `HOOK_BLOCKED` | `git.publish` | `source` | terminate | Một Git hook từ chối lần publish, và không có đường vòng nào biểu diễn được. | — | — | Sửa ranh giới và mang một head mới. |
 | `NON_FAST_FORWARD` | `git.publish` | `remote` | terminate | Remote mang những commit mà ref cục bộ không có, nên cú push không phải fast-forward. | — | — | Người sở hữu nhánh hoà giải phần phân kỳ và một head mới tới. |
 | `BRANCH_POLICY_VIOLATION` | `git.publish`, `workspace.bind` | `workspace` | terminate | Checkout đang ở nhánh mà chính sách Git của route cấm với thao tác này. | — | — | Chuyển sang nhánh được phép hoặc đổi chính sách của route. |
+| `LIBRARY_BOUNDARY_REJECTED` | `library.source.apply` | `caller` | terminate | Không chứng minh được danh tính package, tập file chính xác, ranh giới chỉ sửa hành vi hoặc binding session. | — | — | Cung cấp thẩm quyền owner hoặc kế hoạch có giới hạn đã sửa; presentation sản phẩm vẫn theo pipeline frontend. |
+| `LIBRARY_PROOF_FAILED` | `library.source.apply` | `self` | terminate | Regression chưa thất bại trước và đạt sau sửa, hoặc gate package bắt buộc chưa đạt trên cây bàn giao. | — | — | Sửa hành vi đã khai và chạy lại toàn bộ bằng chứng trên cây thay đổi. |
 | `CAPABILITY_MISSING` | `platform.operate` | `caller` | terminate | Capability mà service kind đòi hỏi đang thiếu, hoặc không nêu bằng chứng custody nào. | — | — | Cấp handle capability còn thiếu cùng custody của nó. |
 | `EFFECT_UNAUTHORIZED` | `platform.operate` | `caller` | terminate | Một effect cần thiết nằm ngoài tập effect đã duyệt hoặc ngoài nhánh. | — | — | Duyệt effect đó, hoặc mang một kế hoạch hẹp hơn. |
 | `INTEGRATION_FAILED` | `platform.operate` | `product` | terminate | serve đã tự giải xung đột merge rồi chấm gate trên head đã gộp, và một gate bắt buộc trả về đỏ: head đã gộp không qua được các gate phát hành. Biên nhận nêu tên gate hỏng và những chỗ đã được giải xung đột. | — | — | Một người hoặc chính phiên sở hữu sửa nhánh phiên rồi xin serve lại; lần merge đã sinh ra head hỏng không bao giờ bị rebase, force hay bỏ qua để cho nó áp được. |

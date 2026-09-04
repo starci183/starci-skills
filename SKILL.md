@@ -5,7 +5,7 @@ description: Complete one StarCi mission by freezing its scope, selecting the on
 
 # StarCi
 
-One entry, fourteen operators, eight example workflows, one closed routing map, one tool registry. This file picks the
+One entry, the operators and workflows listed in their indexes, one closed routing map, one tool registry. This file picks the
 workflow or composes one, selects the first operator, and sequences the rest. It does no work of its own: it never decides a value, writes source, or judges a
 result.
 
@@ -54,6 +54,8 @@ authorizations below remain in force. An Ask column or diagnostic reason is not 
    only the grants it lists. An operator has no other model, no inherited turns, and no grant the
    assignment omits.
 
+Cross-session evidence uses scripts/producer-import.mjs. Copy a completed producer request/response bundle into an unused receiving step-N/parallel-M coordinate, preserving every byte and original session/step metadata. import.json binds the source and target coordinates and every file digest. The input gate verifies the original frozen request, its declared completed outputs, origin and copied bytes; imported slots are evidence only and never enter the receiving chain, steps, request hashes or leases. Use the normal step-N/parallel-M/response input path. No operator is rerun, and no source-write authority is imported.
+
 ## Entry
 
 | The request is about | First operator |
@@ -65,6 +67,8 @@ authorizations below remain in force. An Ask column or diagnostic reason is not 
 | Creating, restructuring, or redesigning a page or surface | `frontend.direction.decide` |
 | Which CSS value an already-composed tree takes | `frontend.presentation.resolve` |
 | Writing an already-resolved tree into product source | `frontend.source.apply` |
+| Repairing existing behavior in an explicitly bound owner library package | `workspace.bind`, then `library.source.apply` through `library-maintenance` |
+| Consuming a verified package release through exact dependency metadata | `workspace.bind`, then `dependency.update` through `dependency-maintenance` |
 | Whether a rendered surface actually holds up | `frontend.surface.audit` |
 | Build, lint, typecheck, coverage, or Sonar | `quality.verify` |
 | Whether a real person can complete a real journey | `uat.verify` |

@@ -187,6 +187,8 @@ cannot yield a different binding.
 | the route is bound and a promise must be decided against its source | `business.decide` |
 | the route is bound and a backend contract must be filled inside it | `backend.source.apply` |
 | the route is bound and a frontend surface must be written inside it | `frontend.source.apply` |
+| the route binds an explicitly authorized owner package whose existing behavior must be repaired | `library.source.apply` |
+| a verified package release must be consumed in exact frontend dependency metadata | `dependency.update` |
 | the runtime owner is missing or not ready and one coordination request must be raised | `platform.operate` |
 | the route is bound and a frontend surface must be decided inside it | `frontend.direction.decide` |
 | the route is bound and a published head must be verified before it ships | `quality.verify` |

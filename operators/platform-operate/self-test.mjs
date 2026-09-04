@@ -4,9 +4,10 @@
 import assert from 'node:assert/strict';
 import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs';
 import { createHash } from 'node:crypto';
+import { execFileSync } from 'node:child_process';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
-import { validatePlatformStep, KIND_CHECKS, RUNG_CHECKS, QUEUED_CHECKS } from './validate.mjs';
+import { validatePlatformStep, KIND_CHECKS, RUNG_CHECKS, QUEUED_CHECKS, integrationChangesErrors } from './validate.mjs';
 
 const PLAN = `sha256:${'0'.repeat(64)}`;
 const FP = `sha256:${'1'.repeat(64)}`;
@@ -552,3 +553,30 @@ await expectError(baseline({ 'response/data/delta.json': delta({ runtimeLadder: 
 await expectError({ ...servingFirst(), 'response/data/delta.json': entryDelta('runtime', ['merge-into-integration-branch', 'serve-runtime-head', 'attest-runtime-entry']) }, 'this delta carries no runtimeLadder', 'a runtime branch that never said which rung it climbed');
 
 process.stdout.write('platform.operate self-test: 18 valid branches, 71 rejected mutations\n');
+
+// Integration changes identify an actual two-parent Git merge, including its complete delta.
+const integrationFixture=mkdtempSync(path.join(tmpdir(),'platform-merge-proof-'));
+try {
+  const git=(...args)=>execFileSync('git',args,{cwd:integrationFixture,encoding:'utf8',stdio:['ignore','pipe','pipe']}).trim();
+  git('init','--initial-branch','integration-proof');git('config','user.name','Contract fixture');git('config','user.email','fixture@example.invalid');git('config','core.autocrlf','false');
+  writeFileSync(path.join(integrationFixture,'base.txt'),'base\n');git('add','.');git('commit','-m','base');git('checkout','-b','session/fixture');
+  writeFileSync(path.join(integrationFixture,'topic.txt'),'topic\n');git('add','.');git('commit','-m','topic');const topic=git('rev-parse','HEAD');git('checkout','integration-proof');
+  writeFileSync(path.join(integrationFixture,'existing.txt'),'existing\n');git('add','.');git('commit','-m','integration predecessor');const prior=git('rev-parse','HEAD');git('merge','--no-ff','session/fixture','-m','integrate');const head=git('rev-parse','HEAD');
+  const d={serviceKind:'runtime',convergence:'converged',runtimeLadder:{rung:'serve',reused:false,servedHead:head,integration:{branch:'integration-proof',worktreeRef:integrationFixture}}};
+  const receipt=`# changes — platform.operate step-1/parallel-1\n\n## Binding\n\n| Field | Value |\n| --- | --- |\n| Operator | platform.operate |\n| Base | ${prior} |\n| Head | ${head} |\n| Branch | integration-proof |\n\n## Files\n\n| Path | Change | Why | Claims |\n| --- | --- | --- | --- |\n| topic.txt | created | merged source | — |\n`;
+  assert.deepEqual(integrationChangesErrors(d,receipt),[]);
+  for(const [record,text,needle]of [
+    [{...d,serviceKind:'identity'},receipt,'only a completed serve'],
+    [{...d,runtimeLadder:{...d.runtimeLadder,rung:'restart'}},receipt,'only a completed serve'],
+    [d,receipt.replace(prior,topic),'actual merge first parent'],
+    [d,receipt.replace(head,topic),'head and branch'],
+    [d,receipt.replace('| Branch | integration-proof |','| Branch | unrelated |'),'head and branch'],
+    [d,receipt.replace('| topic.txt |','| missing.txt |'),'actual merged Git diff'],
+  ])assert.ok(integrationChangesErrors(record,text).some(e=>e.includes(needle)),needle);
+  git('checkout','-b','session/ff-fixture');writeFileSync(path.join(integrationFixture,'ff.txt'),'forward\n');git('add','.');git('commit','-m','fast-forward');const forward=git('rev-parse','HEAD');git('checkout','integration-proof');git('merge','--ff-only','session/ff-fixture');
+  const fd={...d,runtimeLadder:{...d.runtimeLadder,servedHead:forward,observed:{head}}};
+  const fr=receipt.replace(prior,head).replace(`| Head | ${head} |`,`| Head | ${forward} |`).replace('topic.txt','ff.txt');
+  assert.deepEqual(integrationChangesErrors(fd,fr),[]);
+  assert.ok(integrationChangesErrors(fd,fr.replace(`| Base | ${head} |`,`| Base | ${prior} |`)).some(e=>e.includes('observed fast-forward predecessor')));
+}finally{if(!path.resolve(integrationFixture).startsWith(path.resolve(tmpdir())+path.sep))throw Error('unsafe fixture cleanup');rmSync(integrationFixture,{recursive:true,force:true});}
+process.stdout.write('platform.operate integration changes: actual merge and rejected provenance mutations passed\n');

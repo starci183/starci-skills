@@ -16,11 +16,11 @@ names a product.
     records.json              the records themselves
     fixtures/                 files a record points at
   snapshots/                  the approved reference, changed only by a person
-    snapshot.json             { commit, env, approvedBy, approvedAt, sourceRunId }
+    snapshot.json             { commit, provenance when present, env, approvedBy, approvedAt, sourceRunId }
     <NN-step>-<viewport>-<scheme>.png
     data/after.json           the scoped data state the approved run ended with
   runs/<runId>/               append-only; runId is <yyyymmdd-HHMMss>-<commit7>
-    snapshot.json             commit, endpoints, registry generation, seed hash, account names,
+    snapshot.json             commit, role provenance {fe, be} for split deliveries, endpoints, registry generation, seed hash, account names,
                               browser profile, approval
     steps/<NN-slug>/
       action.json             what was done, with every input masked
@@ -29,7 +29,7 @@ names a product.
       network.json            console.json            timing.json
     db/before.json  db/after.json
     diff/                     this run against the approved reference
-    verdicts.json             the scored criteria, the lane verdicts, the per-step outcome
+    verdicts.json             the scored criteria, the lane verdicts, the per-step outcome, retained role provenance
     run.md                    the receipt
   latest.json                 { "runId": "<runId>" } — a file, never a symlink
   history.md                  one line per run: runId - commit - verdict - approval

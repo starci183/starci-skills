@@ -113,6 +113,8 @@ phải nêu đúng commit đã ghim; thiếu một trong hai, hoặc một trong
 `ADMISSION_MISSING`, vì một bề mặt sạch và một cổng xanh ở commit khác chẳng nói gì về sản phẩm mà
 lượt chạy này đang lái.
 
+Khi frontend và backend là hai bản bàn giao riêng, bind cả @workspaces/fe và @workspaces/be. snapshot.provenance và verdicts.provenance đóng băng {fe, be} từ đúng hai context; commit và đuôi run-id chỉ frontend. Hai entry admission mang role fe và commit frontend. Request thật của owner phải pin head frontend đó, biên nhận owner phát ra phải nêu đúng head; request quality có thể pin thêm context backend mà admission frontend không biến thành backend. Bảng Snapshot in Frontend commit và Backend commit; result nối thêm lưu cả hai. Nếu route hoặc admission frontend mang head khác backend thì bắt buộc dùng dạng tường minh này, kể cả caller bỏ context frontend. Hồ sơ cũ chỉ có backend vẫn hợp lệ khi không có bằng chứng hai vai trò khác nhau. Không đổi nhãn SHA frontend thành SHA backend.
+
 ## Làn trải nghiệm được chấm, không phải được khẳng định
 
 Làn `ux` không phải một câu tả cảm giác về lượt chạy. `UX-1` đến `UX-11` đều được mang vào biên nhận
@@ -170,6 +172,7 @@ bước chạm tới sản phẩm bằng cách khác — một endpoint, một m
 | `@worktrees/sessions/central-runtime` | generation của chủ runtime đứng sau endpoint đã ràng; sự sẵn sàng do đầu vào `route` chứng minh, không bao giờ suy lại từ sổ đăng ký này | có |
 | `@workspaces/device-state` | sổ thông tin đăng nhập niêm phong; mật khẩu UAT dùng chung được giải theo tên ở đây lúc đăng nhập và không đọc ở đâu khác | có |
 | `@workspaces/be` | checkout backend được route tại commit đã ghim, nơi luồng kiểm hành vi và nơi store giữ các bản ghi có namespace | có |
+| `@workspaces/fe` | head frontend khi bề mặt trình duyệt và backend tách biệt; bắt buộc khi route hoặc admission nêu head frontend khác | không |
 | `@knowledge/ui/proof` | topic UX: các tiêu chí làn trải nghiệm chấm và rule biến chúng thành phán quyết của làn | có |
 
 ## Đầu vào
@@ -199,7 +202,7 @@ bước chạm tới sản phẩm bằng cách khác — một endpoint, một m
 | # | Bước | Tham số | Đọc | Ghi | Dừng với |
 | --- | --- | --- | --- | --- | --- |
 | 1 | Kiểm gate, lần chạy lại, lease độc quyền và thẩm quyền của lượt chạy | `approval`, `lease`, `resume` | `request/request.json`, @worktrees/uat/<flow>/<case> để lấy `latest` và hồ sơ lượt chạy trước, @workspaces/be tại commit đã ghim, khai báo của môi trường khi `approval` tham chiếu tới nó, @tools/git | — | `INVALID_INPUT`, `SOURCE_DRIFT`, `NO_PROGRESS`, `AUTHORITY_DRIFT` |
-| 2 | Xác nhận admission: bề mặt sạch và cổng chất lượng xanh tại cùng một commit đã ghim | — | đầu vào `frontend-surface-audit`, đầu vào `quality-verification` | — | `ADMISSION_MISSING` |
+| 2 | Xác nhận admission bề mặt sạch và chất lượng xanh tại head frontend, giữ riêng head backend | — | đầu vào `frontend-surface-audit`, đầu vào `quality-verification` | — | `ADMISSION_MISSING` |
 | 3 | Preflight runtime và danh tính của luồng: thông tin đăng nhập niêm phong giải được theo tên, store trả lời, và luồng chưa có tài khoản thì bàn giao chứ không dừng | `env` | @workspaces/device-state để lấy thông tin đăng nhập mà `accounts.<env>.json` nêu tên, @worktrees/sessions/central-runtime để lấy entry của route đã bind, generation và các origin, đầu vào `uat-account` khi danh tính đã được cấp, @tools/secrets, @tools/http | — | `PROVISIONING_UNAVAILABLE`, `IDENTITY_MISSING` |
 | 4 | Phác từ khuôn những gì thư mục luồng còn thiếu, rồi đóng băng snapshot từ `flow.md`, `accounts.<env>.json` và `seed/` | `feature`, `flow`, `env`, `cases` | @worktrees/uat/<flow>/<case>, @worktrees/_templates để lấy khuôn luồng | @worktrees/uat/<flow>/<case> (snapshot), `response/data/snapshot.json`, @tools/sourcewrite | `CANONICAL_WRITE_DENIED` |
 | 5 | Gieo các bản ghi đã đóng băng vào namespace lượt chạy | `runId` | `response/data/snapshot.json`, @workspaces/be | @tools/database | `FIXTURE_VIOLATION` |
@@ -207,7 +210,7 @@ bước chạm tới sản phẩm bằng cách khác — một endpoint, một m
 | 7 | Capture tại từng khẳng định có tên với ô mật khẩu đã che, rồi ghép tấm sheet | — | `response/data/snapshot.json`, @worktrees/sessions/central-runtime để lấy bằng chứng runtime trực tiếp nhất | `response/data/captures/<case>.json`, `response/artifacts/<case>.png`, `response/artifacts/sheet.png`, @tools/visualize, @tools/print | `EVIDENCE_UNAVAILABLE` |
 | 8 | Xét ba làn tách rời nhau, và chấm làn trải nghiệm theo từng tiêu chí | — | @knowledge/ui/proof (topic UX và rule đóng của nó), `response/data/captures/<case>.json` | `response/data/verdicts.json` | — |
 | 9 | Kiểm chỉ-đọc, rồi xoá namespace lượt chạy và không gì khác | `runId` | @workspaces/be để lấy các bản ghi mang `is_uat=true` và namespace này, `response/data/verdicts.json` | @tools/database | — |
-| 10 | Thêm `runs/<runId>/`, trỏ `latest.json` vào nó, thêm dòng lịch sử, rồi phát | `runId` | mọi thứ ở trên | @worktrees/uat/<flow>/<case> (runs/<runId>/, latest.json và history.md), `response/response.md`, `response/response.json`, @tools/sourcewrite, @tools/print | — |
+| 10 | Thêm `runs/<runId>/`, trỏ `latest.json` vào nó, thêm dòng lịch sử, rồi phát | `runId` | mọi thứ ở trên | @worktrees/uat/<flow>/<case> (runs/<runId>/, latest.json và history.md), `response/response.md`, `response/response.json`, `audit-scope`, @tools/sourcewrite, @tools/print | — |
 
 Một phán quyết không ai được cho xem là một phán quyết không ai đọc. Bậc 7 in bản tóm tắt các ảnh
 chụp theo bước và bậc 10 in bảng `## Verdict` qua `@tools/print`, thẳng vào cuộc trò chuyện mà người
@@ -220,6 +223,14 @@ sát có fingerprint không đổi, và ghi dưới cùng một lease; lần ch�
 bằng chứng hay case nào là `NO_PROGRESS`. Lần thử thứ hai sau một lượt đã phát hành là một `runId`
 mới, không bao giờ là một lần sửa lượt cũ.
 
+
+Khi đầu vào audit có phạm vi, chạy `node scripts/audit-scope.mjs <branch>` để chép nguyên
+`verdicts.auditScope` vào `response/data/audit-scope.json` và liệt kê kind `audit-scope` trong
+response. Biên nhận có `## Audit scope` với bảng `Field | Value` ghi Mode, Coverage claim và
+Deferred states đúng nguyên bản. Kết quả chỉ có nghĩa trong phạm vi ấy; state deferred không trở
+thành đạt vì gate hoặc UAT đạt. Các gate chất lượng và các case UAT đã đóng băng giữ nguyên.
+Snapshot đóng băng cũng chép nguyên phạm vi vào `auditScope` trước khi bắt đầu chạy.
+
 ## Đầu ra
 
 | Kind | File | Kiểu | Bắt buộc |
@@ -228,6 +239,7 @@ mới, không bao giờ là một lần sửa lượt cũ.
 | `uat-snapshot` | `response/data/snapshot.json` | data | có |
 | `uat-capture` | `response/data/captures/<case>.json` | data | có |
 | `uat-verdicts` | `response/data/verdicts.json` | data | có |
+| `audit-scope` | `response/data/audit-scope.json` | data | không |
 | `screenshot` | `response/artifacts/<case>.png` | artifact | có |
 | `sheet` | `response/artifacts/sheet.png` | artifact | có |
 

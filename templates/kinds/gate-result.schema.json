@@ -23,7 +23,7 @@
     "gate": { "$ref": "#/$defs/gate" },
     "required": { "type": "boolean" },
     "sourceHead": { "$ref": "#/$defs/gitHead" },
-    "sessionBranch": { "type": "string", "pattern": "^session/[A-Za-z0-9._-]+$" },
+    "sessionBranch": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._/-]*$", "description": "Actual measured branch; a non-session branch requires the completed platform changes producer to declare this integration branch and head." },
     "predecessorCommit": { "$ref": "#/$defs/gitHead" },
     "observedAt": { "type": "string", "format": "date-time" },
     "commandRef": { "type": "string", "minLength": 1 },

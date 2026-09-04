@@ -1,6 +1,6 @@
 # StarCi
 
-Một cửa vào, mười bốn operator, một bảng định tuyến đóng. File này chọn operator đầu tiên và sắp
+Một cửa vào, các operator và workflow được liệt kê trong mục lục, một bảng định tuyến đóng. File này chọn operator đầu tiên và sắp
 xếp các operator còn lại. Nó không tự làm việc gì: không quyết một giá trị, không ghi source, không
 phán xét một kết quả.
 
@@ -48,6 +48,8 @@ buộc bên dưới vẫn giữ nguyên. Cột Ask hay reason chẩn đoán khô
    `resources`, với đúng những quyền nó liệt kê. Một operator không có model khác, không thừa hưởng lượt nào,
    và không có quyền nào mà assignment bỏ sót.
 
+Bằng chứng giữa các phiên dùng scripts/producer-import.mjs. Chép bundle request/response của producer đã hoàn tất vào tọa độ step-N/parallel-M chưa dùng của phiên nhận, giữ nguyên từng byte và metadata session/step gốc. import.json bind tọa độ nguồn, đích và digest từng file. Gate input kiểm request gốc đã đóng băng, output hoàn tất đã khai, byte nguồn và bản chép; slot nhập chỉ là bằng chứng, không được đưa vào chain, steps, request hashes hay lease của phiên nhận. Dùng đường input step-N/parallel-M/response thông thường. Không chạy lại operator và không nhập quyền ghi source.
+
 ## Cửa vào
 
 | Yêu cầu nói về | Operator đầu tiên |
@@ -59,6 +61,8 @@ buộc bên dưới vẫn giữ nguyên. Cột Ask hay reason chẩn đoán khô
 | Tạo mới, dựng lại, hay thiết kế lại một trang hoặc một surface | `frontend.direction.decide` |
 | Một cây đã dựng xong lấy giá trị CSS nào | `frontend.presentation.resolve` |
 | Ghi một cây đã resolve vào product source | `frontend.source.apply` |
+| Sửa hành vi hiện có trong package thư viện do owner quản lý và đã bind rõ | `workspace.bind`, rồi `library.source.apply` theo `library-maintenance` |
+| Tiêu thụ bản phát hành package đã kiểm qua metadata dependency chính xác | `workspace.bind`, rồi `dependency.update` qua `dependency-maintenance` |
 | Một surface đã render có thật sự đứng vững không | `frontend.surface.audit` |
 | Build, lint, typecheck, coverage, hay Sonar | `quality.verify` |
 | Một người thật có hoàn thành được một hành trình thật không | `uat.verify` |

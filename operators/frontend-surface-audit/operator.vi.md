@@ -78,8 +78,12 @@ ra `1.5rem` là một lần hỏng, và khai bao nhiêu cũng không đổi đư
 
 Một lời khai hỏng trên node do ứng dụng sở hữu là một giá trị mà resolution phải publish lại, nên nó
 quay về `frontend.presentation.resolve`, chính operator giữ số vòng. Một lời khai hỏng trên phần render của
-chính một component Grammar là một khoảng trống Grammar: nó đi tới một con người và vào bảng gap của
-họ, không bao giờ đi vào vòng lặp resolve, vì không giá trị ứng dụng nào sửa được một component. Phần
+chính một component Grammar, trong hành vi đã công bố, là `grammar-gap`: ghi bằng chứng vào bảng gap
+của họ rồi chuyển `workspace.bind` để bind checkout chủ thư viện. Khi đã bind, yêu cầu sửa đã được cho
+phép đi tiếp `library.source.apply` với kế hoạch chủ sở hữu giới hạn và gate hồi quy; không cần hỏi lại
+thông lệ. Một hướng trình bày hoặc tier thật sự mới mang route `direction`, đi `frontend.direction.decide`
+để giữ quyền chọn của người dùng. Cả hai đường đều không cho phép dùng CSS ứng dụng để vá hành vi riêng
+của component. Phần
 ruột của node do ứng dụng sở hữu không mang lời khai nào và không bị audit; chỉ các luật đo của chính
 node ấy bị audit.
 
@@ -122,7 +126,8 @@ làm bằng chứng rằng node đã pass.
 
 | Field | Kiểu | Mặc định | Hỏi |
 | --- | --- | --- | --- |
-| `matrix` | list | every coverage entry | Các mục ma trận cần chụp; người dùng chỉ được thu hẹp thứ coverage đã suy ra |
+| `auditScope` | object | — | Đóng băng danh mục bề mặt và mục ma trận từ nhiệm vụ; mode mặc định primary-surfaces theo audit-scope.schema.json |
+| `matrix` | list | selected surface entries | Chỉ thu hẹp trong phạm vi đã đóng băng; không bỏ mục bắt buộc của bề mặt đã chọn |
 | `readinessProbe` | choice | route-served | Mức sàn của sẵn sàng; một state cần dữ liệu tự nâng lên `route-and-data-served` |
 | `account` | id | null | Hồ sơ tài khoản dùng để đăng nhập khi route đòi một danh tính; giá trị là tham chiếu tới một hồ sơ toàn tên, không bao giờ là thông tin đăng nhập |
 | `env` | id | dev | Stack mà lượt soi này đọc entry và tài khoản của nó; một bề mặt quan sát ở stack này không nói gì về stack khác |
@@ -134,7 +139,7 @@ làm bằng chứng rằng node đã pass.
 | --- | --- | --- | --- | --- | --- |
 | 1 | Kiểm cổng vào và resume, và xác nhận commit đã áp nằm trong head mà route đang phục vụ | `resume` | `request/request.json`, đầu vào `frontend-source-application` (commit nó đã ghi), đầu vào `route` (nhánh đang phục vụ, head đang phục vụ và những commit head đó chứa), @workspaces/fe tại head đã đóng băng, @worktrees/sessions/central-runtime, @tools/git | — | `INVALID_INPUT`, `SOURCE_DRIFT`, `NO_PROGRESS` |
 | 2 | Bind thẩm quyền | — | @knowledge/ui/proof (mọi topic kèm fingerprint và kho luật), đầu vào `frontend-source-application` (các lời khai), đầu vào `frontend-presentation-resolution` (chủ sở hữu của từng node), @worktrees/sessions/central-runtime | — | — |
-| 3 | Chọn các mục ma trận và đọc lớp bề mặt đã khai | `matrix` | đầu vào `frontend-direction-decision` (chính `response/data/coverage.json` của nó: state nhân viewport nhân bảng màu, và `surfaceClass` mà quyết định ấy đã khai) | — | `SURFACE_CLASS_MISSING` |
+| 3 | Bind phạm vi bề mặt chính, các mục ma trận và lớp bề mặt đã khai | `auditScope`, `matrix` | đầu vào `frontend-direction-decision` (chính `response/data/coverage.json` của nó: state nhân viewport nhân bảng màu, và `surfaceClass` mà quyết định ấy đã khai) | — | `SURFACE_CLASS_MISSING` |
 | 4 | Chờ từng mục tới lúc sẵn sàng trên cổng mà route đã bind mang theo, trong profile trình duyệt của riêng phiên này, đăng nhập bằng tài khoản của luồng khi route đòi một danh tính | `readinessProbe`, `account`, `env` | đầu vào `route` để lấy endpoint mà entry của nó phục vụ, @worktrees/sessions/central-runtime để lấy entry của đúng route này, đầu vào `uat-account` cho hồ sơ toàn tên, @tools/http, @tools/secrets, @tools/browsercontrol | — | `RUNTIME_UNAVAILABLE`, `IDENTITY_MISSING` |
 | 5 | Chụp và đo từng mục | — | @worktrees/sessions/central-runtime, @workspaces/fe (các owner được quan sát và identifier từng node mang), @tools/browsercontrol | `response/artifacts/<matrixId>.png`, `response/data/captures/<matrixId>.json` | `EVIDENCE_MISSING` |
 | 6 | Đối chiếu với lời khai và luật proof, phán quyết theo chủ sở hữu, để từng topic tự đóng, rồi phát | — | @knowledge/ui/proof, @knowledge/grammars/<family>, các bức chụp | `verdicts`, `frontend-surface-audit`, `response/response.json`, `host` | `UNKNOWN_RULE`, `NO_PROGRESS` |
@@ -169,12 +174,11 @@ Audit này không dựng gì, không xếp hạng gì và không mời chọn g�
 mà còn để một topic bố cục hay thẩm mỹ mở; direction sở hữu việc so sánh phương án và lựa chọn hướng
 khác biệt. Các mã dừng
 về phía caller và `NO_PROGRESS` ở đây là việc vận hành — cùng một head đo lại mà không có delta — nên
-`reason` của chúng nói rõ điều ấy và không mang phương án nào. Một topic `blocked` vì matrix bỏ sót
+`reason` của chúng nói rõ điều ấy và không mang phương án nào. Một topic `blocked` vì matrix exhaustive bỏ sót
 một state đã khai không phải là cùng một head đo lại, và cũng không phải một finding bố cục hay thẩm
 mỹ: nó không tính vào `NO_PROGRESS` và không đóng một topic bố cục hay thẩm mỹ thành `fix-first`. Một
 điểm trung bình thẩm mỹ chỉ so được giữa các vòng khi cả hai vòng phủ cùng một tập state; một vòng có
-matrix hẹp hơn về state so với vòng trước không được đem so để tính tiến độ, và không thể đóng vòng
-lặp hay dùng hết ngân sách vòng trên phép so sánh ấy.
+phạm vi chính mới có thể hoàn thành trên bằng chứng riêng nhưng không được đem so với vòng exhaustive để dùng ngân sách tiến độ.
 
 Một tiêu chí phụ thuộc vào khối lượng dữ liệu được đo ở khối lượng seed đại diện của luồng, khối
 lượng mà `TASTE-9` Case 5 định nghĩa, không bao giờ ở bất kỳ thứ gì workspace đang phục vụ tình cờ
@@ -202,20 +206,24 @@ mang nó vào `## Surface class` và vào verdicts, nguyên vẹn. Một quyết
 `SURFACE_CLASS_MISSING`: không dải, không ngưỡng, không có gì để phán, và hướng được quyết lại trước
 khi bề mặt được phán.
 
-Ma trận là coverage của hướng, không phải một quyết định mới: `matrix` chỉ được thu hẹp nó, và
-orchestrator có thể chia các mục ra tối đa ba nhánh song song của cùng một bậc. Mỗi mục cho đúng một
-ảnh màn hình và một bức chụp, và một mục không cho cái nào là `EVIDENCE_MISSING` chứ không phải một
-chỗ khuyết lặng lẽ. Mọi node mang lời khai đều được đo; không bao giờ có phán quyết cho một node chưa
-được đo.
+Phạm vi được đóng băng trước khi chụp bằng `auditScope`, được kiểm bởi
+[schema phạm vi audit](../../templates/kinds/audit-scope.schema.json). Mặc định là `primary-surfaces`:
+soi các màn hình chính và layout quan trọng trước; state phụ và bề mặt hoãn lại vẫn được ghi rõ là
+việc chưa làm. Orchestrator lấy danh mục từ nhiệm vụ và direction hiện có, không hỏi xác nhận thường
+lệ. `exhaustive` chỉ dùng khi chủ động chọn kiểm toàn bộ ma trận state đã khai.
 
-Một phán quyết cho một topic mà rule của nó đọc xuyên state — bố cục và khả năng tiếp cận, nơi các
-rule `STATE-*`, `FEEDBACK-*` và `FOCUS-*` mỗi cái chỉ đúng ở đúng một state, một nhánh vắng mặt, hay
-một mục tiêu đang focus, và lens thẩm mỹ, nơi `TASTE-13` đã chấm nguyên khối — chỉ được ghi là `pass`,
-`fail` hay `fix-first` khi matrix đã phán quyết phủ hết mọi state mà coverage của hướng đã khai. Một
-matrix bị thu hẹp vẫn có thể được audit, vì một lượt resume cần đúng điều đó, nhưng receipt ghi lại
-tập con đã phủ dưới `## Matrix` và gọi tên phần bị thu hẹp bỏ sót dưới `## Coverage gaps`; phán quyết
-của chính topic ấy là `blocked`, cùng giá trị mà một topic không có bằng chứng nào đã mang sẵn, không
-bao giờ là một phán quyết tính trên những state tình cờ đã đến.
+Mỗi mục danh sách ghi id ổn định, loại page/layout/modal/drawer, route và các matrix id bắt buộc.
+Mục chính có entry; mục deferred không có entry. Mọi entry đã chọn phải
+có capture, screenshot và verdict. Mọi lời khai đo trên bề mặt đã chọn vẫn phải được phán. Hoãn bề
+mặt hay state khác không miễn lỗi hoặc assertion còn thiếu trong matrix đã chọn. Thiếu entry đã
+chọn là `EVIDENCE_MISSING`.
+
+`verdicts.auditScope` chép nguyên danh mục cùng mode chuẩn hóa, liệt kê state phụ đã khai nhưng chưa
+chụp trong `deferredStates`, và ghi `coverageClaim`. Audit chính chỉ được khai `selected-surfaces`;
+không được biến các topic đạt thành lời khai đã kiểm toàn bộ state UI. Audit exhaustive thiếu state
+đã khai vẫn bị chặn và ghi `## Coverage gaps`. `TASTE-13` Case 8 sở hữu việc so state và so các vòng.
+Các gate unit, integration và regression giữ nguyên hợp đồng coverage riêng.
+
 
 ## Đầu ra
 
@@ -247,7 +255,8 @@ bao giờ là một phán quyết tính trên những state tình cờ đã đ�
 | một lời khai hỏng trên node do ứng dụng sở hữu, nên phải publish lại một giá trị | `frontend.presentation.resolve` |
 | một verdict topic là fix-first, hoặc hướng không khai lớp bề mặt nào, nên bố cục được quyết lại trước khi có giá trị nào được quyết | `frontend.direction.decide` |
 | mọi topic đều ship hoặc đạt, và các cổng của chính checkout phải chạy | `quality.verify` |
-| một lời khai hỏng trên phần render của chính component Grammar, nên một người ghi gap của họ rồi publish | `frontend.surface.audit` |
+| grammar-gap xác định hành vi thư viện hiện có bị lỗi, nên bind checkout chủ thư viện trước khi thực hiện yêu cầu sửa đã được cho phép | `workspace.bind` |
+| phát hiện trên Grammar đòi hướng trình bày hoặc tier thật sự mới, nên quyết hướng do người dùng chọn trước khi triển khai | `frontend.direction.decide` |
 | một topic đọc xuyên state bị blocked vì matrix bỏ sót một state mà coverage của hướng đã khai, nên bề mặt được audit lại khi matrix đã phủ đủ | `frontend.surface.audit` |
 | một tiêu chí mật độ được đo dưới khối lượng seed đại diện của luồng, nên dữ liệu được seed trước khi bề mặt được phán lại | `platform.operate` |
 | route đòi một danh tính mà luồng này chưa có tài khoản, nên tài khoản được cấp trước khi bề mặt được quan sát | `platform.operate` |

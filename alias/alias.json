@@ -55,7 +55,9 @@
         "scheme": "source://<repository>",
         "bind": "fingerprint + sourceHead (git rev-parse HEAD of the checkout)",
         "writers": [
-          "frontend.source.apply"
+          "frontend.source.apply",
+          "library.source.apply",
+          "dependency.update"
         ],
         "purpose": "The routed frontend checkout of the bound project."
       },

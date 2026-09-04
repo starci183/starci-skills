@@ -760,6 +760,65 @@
           }
         }
       }
+    },
+    "identityRotation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "provider",
+        "realm",
+        "credentialName",
+        "principalFingerprint",
+        "principalId",
+        "custodyRefs",
+        "newCredentialWorks",
+        "oldCredentialRejected",
+        "sessionsInvalidated",
+        "custodyConsistent"
+      ],
+      "properties": {
+        "provider": {
+          "type": "string",
+          "minLength": 1
+        },
+        "realm": {
+          "type": "string",
+          "minLength": 1
+        },
+        "credentialName": {
+          "type": "string",
+          "minLength": 1
+        },
+        "principalFingerprint": {
+          "type": "string",
+          "pattern": "^sha256:[a-f0-9]{64}$"
+        },
+        "principalId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "custodyRefs": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "newCredentialWorks": {
+          "const": true
+        },
+        "oldCredentialRejected": {
+          "const": true
+        },
+        "sessionsInvalidated": {
+          "const": true
+        },
+        "custodyConsistent": {
+          "const": true
+        }
+      }
     }
   },
   "$defs": {
@@ -808,7 +867,8 @@
         "stop-runtime-server",
         "queue-runtime-lease",
         "provision-identity",
-        "seed-flow-fixtures"
+        "seed-flow-fixtures",
+        "rotate-admin-credential"
       ]
     },
     "portHolder": {

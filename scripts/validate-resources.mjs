@@ -106,6 +106,8 @@ if (interaction.schemaVersion !== 1 || !Array.isArray(interaction.questionKinds)
 if (!Number.isInteger(interaction.minOptions) || !Number.isInteger(interaction.maxOptions) || interaction.minOptions < 1 || interaction.maxOptions < interaction.minOptions) errors.push('interaction.json: option bounds must be ordered positive integers');
 if (!interaction.selectionSource || !interaction.rule || interaction.gate !== 'scripts/validate-interaction.mjs') errors.push('interaction.json: selectionSource, rule and interaction gate must be declared');
 const pairs = orchestrator.profileEquivalents?.pairs ?? {};
+const identity = JSON.parse(await readFile(path.join(root, 'resources/identity.json'), 'utf8'));
+if (identity.schemaVersion !== 1 || !identity.provider || !identity.rule || !identity.adminMounts?.username || !identity.adminMounts?.password || identity.preflight !== 'scripts/identity-custody.mjs' || !Number.isInteger(identity.timeoutMs) || identity.timeoutMs < 1) errors.push('identity.json: provider, custody, transport policy and preflight must be declared');
 for (const [id, profile] of Object.entries(profiles)) {
   const eq = pairs[id];
   if (!eq) { errors.push(`orchestrator.json: profileEquivalents lacks ${id}`); continue; }

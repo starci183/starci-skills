@@ -5,7 +5,7 @@ import assert from 'node:assert/strict';
 import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
-import { validateQualityStep } from './validate.mjs';
+import { validateQualityStep, integrationGateBindingErrors } from './validate.mjs';
 
 const HEAD = '1'.repeat(40);
 const OTHER_HEAD = '2'.repeat(40);
@@ -133,6 +133,9 @@ const responseJson = ({ status = 'done', stop, gates = PLAN.map((g) => `response
 });
 
 function writeBranch(files) {
+  files = structuredClone(files);
+  if (files['response/response.md'] && !files['response/response.md'].includes('## Audit scope')) files['response/response.md'] += "\n## Audit scope\n\n| Field | Value |\n| --- | --- |\n| Mode | not-recorded |\n| Coverage claim | not-recorded |\n| Deferred states | — |\n";
+
   const session = mkdtempSync(path.join(tmpdir(), 'quality-session-'));
   const branch = path.join(session, 'step-1', 'parallel-1');
   for (const d of ['request', 'response/data/gates', 'response/artifacts']) mkdirSync(path.join(branch, d), { recursive: true });
@@ -180,6 +183,13 @@ async function expectError(files, needle, label) {
 }
 
 await expectValid(baseline(), 'a green verification with one file per gate');
+const integratedGate=gateResult('lint',{sessionBranch:'integration-proof'}),integrationProducer={operatorId:'platform.operate',status:'done',delta:{runtimeLadder:{rung:'serve',servedHead:HEAD,integration:{branch:'integration-proof'}}}};
+assert.deepEqual(integrationGateBindingErrors(integratedGate,integrationProducer),[]);
+assert.ok(integrationGateBindingErrors(integratedGate,null).length);
+assert.ok(integrationGateBindingErrors({...integratedGate,sourceHead:OTHER_HEAD},integrationProducer).length);
+assert.ok(integrationGateBindingErrors({...integratedGate,sessionBranch:'arbitrary'},integrationProducer).length);
+assert.ok(integrationGateBindingErrors(integratedGate,{...integrationProducer,status:'blocked'}).length);
+await expectError(baseline({'response/data/gates/lint.json':gateResult('lint',{sessionBranch:'uat'})}),'integration gate must bind','an integration label without a platform producer');
 await expectValid(red(), 'a red gate returned as a verdict, not a stop');
 await expectValid({
   'request/request.json': requestJson(),
@@ -288,4 +298,25 @@ await expectError(baseline({ 'response/response.md': responseMd().replace('Verdi
 await expectError(baseline({ 'response/response.md': responseMd({ scorecard: SCORECARD.map((r) => (r[0] === 'taste' ? ['taste', 'fix-first', 'direction'] : r)) }).replace('Verdict: fix-first', 'Verdict: ship') }), 'the rows make it fix-first', 'a fix-first row reported as a ship');
 await expectError(baseline({ 'response/response.md': responseMd({ scorecard: SCORECARD.map((r) => (r[0] === 'motion' ? ['motion', 'blocked', 'direction'] : r)) }) }), 'is blocked and still routes to direction', 'a blocked topic given an owner');
 
-process.stdout.write('quality.verify self-test: 5 valid branches, 31 rejected mutations\n');
+const scopedAudit = { mode: 'primary-surfaces', surfaces: [{ id: 'primary', type: 'page', route: '/primary', matrixIds: ['primary-loaded'] }], deferredStates: ['empty'], coverageClaim: 'selected-surfaces' };
+for (const omitCarry of [false, true]) {
+  const files = baseline();
+  files['request/request.json'].inputs['frontend-surface-audit'] = 'step-2/parallel-1/response/response.md';
+  if (!omitCarry) {
+    files['response/data/audit-scope.json'] = scopedAudit;
+    files['response/response.json'].fields['audit-scope'] = 'response/data/audit-scope.json';
+  }
+  files['response/response.md'] += '\n## Audit scope\n\n| Field | Value |\n| --- | --- |\n| Mode | primary-surfaces |\n| Coverage claim | selected-surfaces |\n| Deferred states | empty |\n';
+  const { branch, session } = writeBranch(files);
+  try {
+    const source = path.join(session, 'step-2/parallel-1/response');
+    mkdirSync(path.join(source, 'data'), { recursive: true });
+    writeFileSync(path.join(source, 'response.md'), '# admitting surface audit\n');
+    writeFileSync(path.join(source, 'data/verdicts.json'), JSON.stringify({ auditScope: scopedAudit }));
+    const { errors } = await validateQualityStep(branch);
+    if (omitCarry) assert.ok(errors.some((error) => error.includes('must carry response/data/audit-scope.json')), errors.join('\n'));
+    else assert.deepEqual(errors, [], 'quality carries limited UI scope while its coverage gates remain unchanged');
+  } finally { rmSync(session, { recursive: true, force: true }); }
+}
+
+process.stdout.write('quality.verify self-test: gate, scope and mutation checks passed\n');

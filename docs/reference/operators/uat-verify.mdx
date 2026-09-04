@@ -136,6 +136,8 @@ must name the same commit as the pinned head; either one absent, or either one t
 commit, is `ADMISSION_MISSING`, because a clean surface and a green gate at some other commit say
 nothing about the product this run drives.
 
+When frontend and backend are separate deliveries, bind both @workspaces/fe and @workspaces/be. snapshot.provenance and verdicts.provenance freeze &#123;fe, be} from those exact contexts; commit and the run-id suffix identify the frontend. Both admission entries carry role fe and the frontend commit. Their actual owning requests must pin that frontend head, and their emitted receipts must identify it; a quality request may also pin backend context without turning its frontend admission into a backend one. The Snapshot table prints Frontend commit and Backend commit, and the appended result retains both. A frontend route or admission with a head distinct from the backend requires this explicit form even if a caller omits frontend context. Backend-only legacy records remain valid when no split-role evidence exists. No frontend SHA is relabeled as a backend SHA.
+
 ## The experience lane is scored, not asserted
 
 The `ux` lane is not a sentence about how the run felt. `UX-1` to `UX-11` are each carried in the run
@@ -195,6 +197,7 @@ pass.
 | `@worktrees/sessions/central-runtime` | the runtime owner's generation behind the bound endpoint; readiness is proved by the `route` Input, never re-derived from this registry | yes |
 | `@workspaces/device-state` | the sealed credential roster; the shared UAT password is resolved by name here at login and read nowhere else | yes |
 | `@workspaces/be` | the routed backend checkout at the pinned commit, whose behaviour the flow verifies and whose store holds the namespaced records | yes |
+| `@workspaces/fe` | the frontend delivery head when the browser surface and backend are distinct; required whenever route or admission evidence identifies a different frontend head | no |
 | `@knowledge/ui/proof` | the UX topic: the criteria the experience lane scores and the rule that turns them into its verdict | yes |
 
 ## Inputs
@@ -224,7 +227,7 @@ pass.
 | # | Step | Params | Reads | Writes | Stops with |
 | --- | --- | --- | --- | --- | --- |
 | 1 | Validate the gate, the resume, the exclusive lease and the run's authority | `approval`, `lease`, `resume` | `request/request.json`, @worktrees/uat/&lt;flow>/&lt;case> for `latest` and the prior run record, @workspaces/be at the pinned commit, the environment's declaration when `approval` references it, @tools/git | — | `INVALID_INPUT`, `SOURCE_DRIFT`, `NO_PROGRESS`, `AUTHORITY_DRIFT` |
-| 2 | Confirm admission: the surface audit is clean and the quality gate is green at the same pinned commit | — | input `frontend-surface-audit`, input `quality-verification` | — | `ADMISSION_MISSING` |
+| 2 | Confirm the clean surface and green quality admissions at the frontend head, preserving the backend head separately | — | input `frontend-surface-audit`, input `quality-verification` | — | `ADMISSION_MISSING` |
 | 3 | Preflight the runtime and the flow's identity: the sealed credential resolves by name, the store answers, and a flow with no account hands over instead of stopping | `env` | @workspaces/device-state for the credential named by `accounts.<env>.json`, @worktrees/sessions/central-runtime for the entry of the bound route, its generation and origins, input `uat-account` when the identity was provisioned, @tools/secrets, @tools/http | — | `PROVISIONING_UNAVAILABLE`, `IDENTITY_MISSING` |
 | 4 | Draft from the template whatever the flow folder lacks, then freeze the snapshot from `flow.md`, `accounts.<env>.json` and `seed/` | `feature`, `flow`, `env`, `cases` | @worktrees/uat/&lt;flow>/&lt;case>, @worktrees/_templates for the flow template | @worktrees/uat/&lt;flow>/&lt;case> (snapshot), `response/data/snapshot.json`, @tools/sourcewrite | `CANONICAL_WRITE_DENIED` |
 | 5 | Seed the frozen records into the run namespace | `runId` | `response/data/snapshot.json`, @workspaces/be | @tools/database | `FIXTURE_VIOLATION` |
@@ -232,7 +235,7 @@ pass.
 | 7 | Capture at each named assertion with the login field masked, and stitch the sheet | — | `response/data/snapshot.json`, @worktrees/sessions/central-runtime for the most direct runtime evidence | `response/data/captures/<case>.json`, `response/artifacts/<case>.png`, `response/artifacts/sheet.png`, @tools/visualize, @tools/print | `EVIDENCE_UNAVAILABLE` |
 | 8 | Judge the three lanes apart, and score the experience lane criterion by criterion | — | @knowledge/ui/proof (the UX topic and its closing rule), `response/data/captures/<case>.json` | `response/data/verdicts.json` | — |
 | 9 | Verify read-only, then delete the run namespace and nothing else | `runId` | @workspaces/be for the records carrying `is_uat=true` and this namespace, `response/data/verdicts.json` | @tools/database | — |
-| 10 | Append `runs/<runId>/`, point `latest.json` at it, add the history line, and emit | `runId` | everything above | @worktrees/uat/&lt;flow>/&lt;case> (runs/&lt;runId>/, latest.json and history.md), `response/response.md`, `response/response.json`, @tools/sourcewrite, @tools/print | — |
+| 10 | Append `runs/<runId>/`, point `latest.json` at it, add the history line, and emit | `runId` | everything above | @worktrees/uat/&lt;flow>/&lt;case> (runs/&lt;runId>/, latest.json and history.md), `response/response.md`, `response/response.json`, `audit-scope`, @tools/sourcewrite, @tools/print | — |
 
 A verdict nobody was shown is a verdict nobody read. Step 7 prints the run's step-capture summary and
 step 10 prints the `## Verdict` table over `@tools/print`, into the conversation the person is
@@ -245,6 +248,14 @@ whose fingerprints are unchanged, and writes under the same lease; a resume that
 lease, evidence or case change is `NO_PROGRESS`. A second attempt after a published run is a new
 `runId`, never an edit of the old one.
 
+
+When the admitted audit carries scope, run `node scripts/audit-scope.mjs <branch>` to copy
+`verdicts.auditScope` unchanged into `response/data/audit-scope.json` and list the `audit-scope`
+output kind. The receipt includes `## Audit scope`, a `Field | Value` table preserving Mode,
+Coverage claim and Deferred states. The verdict has only that scope; deferred states do not become
+passed because quality gates or UAT pass. Quality thresholds and frozen UAT cases remain unchanged.
+The frozen snapshot also retains the unchanged scope in `auditScope` before execution.
+
 ## Outputs
 
 | Kind | File | Type | Required |
@@ -253,6 +264,7 @@ lease, evidence or case change is `NO_PROGRESS`. A second attempt after a publis
 | `uat-snapshot` | `response/data/snapshot.json` | data | yes |
 | `uat-capture` | `response/data/captures/<case>.json` | data | yes |
 | `uat-verdicts` | `response/data/verdicts.json` | data | yes |
+| `audit-scope` | `response/data/audit-scope.json` | data | no |
 | `screenshot` | `response/artifacts/<case>.png` | artifact | yes |
 | `sheet` | `response/artifacts/sheet.png` | artifact | yes |
 

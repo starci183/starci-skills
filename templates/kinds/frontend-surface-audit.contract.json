@@ -19,6 +19,19 @@
       }
     },
     {
+      "heading": "^## Audit scope$",
+      "table": "| Field | Value |",
+      "rows": [
+        "Mode",
+        "Selected surfaces",
+        "Coverage claim",
+        "Deferred states"
+      ],
+      "cell": {
+        "Value": "\\S"
+      }
+    },
+    {
       "heading": "^## Surface class$",
       "table": "| Class | Declared by |",
       "exactRows": 1,
@@ -57,8 +70,8 @@
       "cell": {
         "Rule": "^`TASTE-([1-9]|1[0-2])`$",
         "Measured": "\\S",
-        "Score": "^[1-5]$",
-        "Verdict": "^(pass|fail)$"
+        "Score": "^(?:[1-5]|—)$",
+        "Verdict": "^(pass|fail|deferred)$"
       }
     },
     {
@@ -94,7 +107,7 @@
       "table": "| Matrix | Node | Rule | Measured | Routes to |",
       "cell": {
         "Node": "^`[^`]+`$",
-        "Routes to": "^(resolve|grammar-gap)$",
+        "Routes to": "^(resolve|grammar-gap|direction)$",
         "Matrix": "^`[a-z0-9][a-z0-9-]*`$"
       }
     },

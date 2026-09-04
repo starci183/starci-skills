@@ -1,6 +1,6 @@
 # @starci/skills
 
-StarCi Skills là runtime `.claude` của một repository: một cửa vào (`SKILL.md`), mười bốn operator, tám
+StarCi Skills là runtime `.claude` của một repository: một cửa vào (`SKILL.md`), các operator có ranh giới rõ,
 workflow ví dụ, một bản đồ routing đóng và một sổ tool. Agent trong Claude Code hay Codex đọc
 `.claude/INDEX.md` qua một đoạn bootstrap ngắn rồi theo đúng thứ tự nạp của nó; phần còn lại là việc của
 cây. Tài liệu: <https://harness.starci.org/docs/vi>. Bản tiếng Anh là thẩm quyền khi chạy: [README.md](README.md).

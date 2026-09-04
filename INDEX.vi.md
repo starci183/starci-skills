@@ -1,4 +1,4 @@
-# StarCi Skills 1.8.0
+# StarCi Skills 1.9.0
 
 Cây này chính là runtime. Đọc tiếp `SKILL.md` (bản tiếng Anh là bản được nạp; `SKILL.vi.md` chỉ để người đọc); đó là cửa vào duy nhất,
 đóng băng phạm vi của một nhiệm vụ, chọn đúng một operator sở hữu kết quả, rồi định tuyến giữa các
@@ -27,8 +27,8 @@ fingerprint và danh sách rule đầy đủ, và không được phát ra mã n
 ## Bố cục
 
 ```text
-SKILL.md                 một cửa vào, mười bốn operator, một bảng định tuyến
-routing.json             14 operator, 68 route, bốn loại: operator | resume | user | external
+SKILL.md                 một cửa vào, operator được liệt kê ở operators/INDEX.md, một bảng định tuyến
+routing.json             route operator đóng, bốn loại: operator | resume | user | external
 alias/                   alias.json (sổ cho máy: vị trí, scheme, bind, ai ghi, vùng) + INDEX.md (bản đồ sinh theo vùng); operator chỉ đọc qua alias
 resources/               tools.json (sổ tool đóng: mode và hỗ trợ theo runtime, gọi bằng @tools/<id>) + agents/profiles/{openai,claude}.json (6 profile, quyền theo tool) + orchestrator.json (mỗi operator một agent, tối đa 3, profile tương đương); có kiểm
 workflows/               chuỗi mẫu (các bậc gồm nhánh song song, vòng lặp, preset) mà cửa vào dùng lại khi request khớp when; không khớp thì tự ghép theo cùng luật; có kiểm
@@ -67,6 +67,8 @@ thì không được publish.
   đổi nghĩa.
 
 ## Dòng dõi
+
+1.9.0 (2026-09-04): sửa thư viện owner và cập nhật dependency đã kiểm có operator giới hạn cùng bằng chứng regression; provisioning bind đúng custody provider và chứng minh đăng nhập sản phẩm; audit UI ưu tiên các bề mặt chính đã chọn và giữ rõ giới hạn của các state phụ để sau.
 
 1.8.0 (2026-09-04): tương tác có một chính sách giao tiếp cùng gate câu hỏi/lựa chọn có kiểu; người dùng chọn hướng khác biệt dựa trên bằng chứng render, lựa chọn đã ghi được dùng tiếp, và bỏ hỏi xác nhận thường lệ trong việc đã được giao; quyền thao tác và định tuyến giữ nguyên.
 

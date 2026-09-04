@@ -77,3 +77,11 @@ row and its route; otherwise `ship`. Nothing is averaged across rows.
 | `experience` | ship | none |
 
 Verdict: ship
+
+## Audit scope
+
+| Field | Value |
+| --- | --- |
+| Mode | not-recorded |
+| Coverage claim | not-recorded |
+| Deferred states | — |

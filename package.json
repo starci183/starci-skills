@@ -1,7 +1,7 @@
 {
   "name": "@starci/skills",
-  "version": "1.8.0",
-  "description": "StarCi Skills: one entry, fourteen operators, a closed routing map and a tool registry, installed as the .claude runtime of a repository for Claude Code and Codex.",
+  "version": "1.9.0",
+  "description": "StarCi Skills: one entry, bounded operators, a closed routing map and a tool registry, installed as the .claude runtime of a repository for Claude Code and Codex.",
   "license": "MIT",
   "type": "module",
   "engines": {

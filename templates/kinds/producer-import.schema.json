@@ -1,0 +1,26 @@
+{
+  "$id": "kind:producer-import",
+  "description": "Evidence-only import.json beside a copied request/response bundle. The original producer metadata and every byte remain unchanged.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "sourceSessionId", "sourceStep", "sourceParallel", "targetSessionId", "targetStep", "targetParallel", "files"],
+  "properties": {
+    "schemaVersion": { "const": 1 },
+    "sourceSessionId": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$" },
+    "sourceStep": { "type": "integer", "minimum": 1 },
+    "sourceParallel": { "type": "integer", "minimum": 1 },
+    "targetSessionId": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$" },
+    "targetStep": { "type": "integer", "minimum": 1 },
+    "targetParallel": { "type": "integer", "minimum": 1 },
+    "files": {
+      "type": "array", "minItems": 1, "maxItems": 512,
+      "items": {
+        "type": "object", "additionalProperties": false, "required": ["path", "sha256"],
+        "properties": {
+          "path": { "type": "string", "pattern": "^(request|response)/[^\\\\]+$" },
+          "sha256": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" }
+        }
+      }
+    }
+  }
+}

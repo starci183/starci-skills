@@ -1,12 +1,12 @@
 ---
 title: "Introduction"
-description: "What StarCi Skills is: one entry, fourteen operators, example workflows, and a session made of typed requests and responses."
+description: "What StarCi Skills is: one entry, operators with explicit boundaries, example workflows, and a session made of typed requests and responses."
 ---
 
 # StarCi Skills
 
 StarCi Skills is the runtime that completes one StarCi mission. It is a tree of files, not a
-framework: `SKILL.md` is the entry, `operators/` holds the fourteen units of work, `workflows/` holds
+framework: `SKILL.md` is the entry, `operators/` holds the units of work, `workflows/` holds
 the example chains, and `routing.json` is the closed map that decides what happens after each one.
 `INDEX.md` states the load order and says plainly what the tree is for — it "is the runtime", and
 `SKILL.md` is "the single entry that freezes a mission's scope, selects the one operator that owns the
@@ -27,7 +27,7 @@ Its Entry table maps a request to its first operator — which project applies g
 holds up goes to `frontend.surface.audit`, and so on. A request that names no owner, or two owners
 whose scopes differ materially, stops there with one focused question.
 
-## Fourteen operators
+## Operators
 
 An operator is one job in one linear pass. It never calls another operator, never routes a workflow,
 never pauses internally, and never returns free-form control instructions. The parent alone maps a
@@ -36,12 +36,12 @@ law sections, then the Context, Inputs, Requirements, Steps, Outputs, Stops and 
 an `operator.json`, an `errors.json`, a `validate.mjs` and a `self-test.mjs`.
 
 See [Operator](/concepts/operator) for the shape, and [the operator reference](/reference/operators)
-for all fourteen packages.
+for all operator packages.
 
 ## Workflows
 
 A workflow is a pre-composed chain: ordered steps, each step a list of branches that run in parallel,
-with optional loops back to an earlier step and presets for a branch's Requirements. The eight files
+with optional loops back to an earlier step and presets for a branch's Requirements. The files
 in `workflows/` are examples, not the only chains allowed; when none matches, the entry composes one
 under the rules `scripts/validate-workflows.mjs` enforces on those same files.
 

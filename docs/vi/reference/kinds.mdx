@@ -164,13 +164,14 @@ Khung: [`templates/kinds/frontend-surface-audit.skeleton.md`](https://github.com
 | Mục | Dòng đầu của bảng | Số dòng | Ràng buộc ô |
 | --- | --- | --- | --- |
 | `^## Served surface$` | `\| Field \| Value \|` | `Applied commit`, `Served branch`, `Served head`, `Contains applied commit`, `Browser profile`, `Family version observed`, `Family version resolved against` | `Value`: `\S` |
+| `^## Audit scope$` | `\| Field \| Value \|` | `Mode`, `Selected surfaces`, `Coverage claim`, `Deferred states` | `Value`: `\S` |
 | `^## Surface class$` | `\| Class \| Declared by \|` | exactRows 1 | `Class`: `^`(console\|form\|landing\|catalog\|reader)`$`<br />`Declared by`: `\S` |
 | `^## Matrix$` | `\| Matrix \| Viewport \| Scheme \| State \| Screenshot \|` | minRows 1 | `Matrix`: `^`[a-z0-9][a-z0-9-]*`$`<br />`Viewport`: `^[0-9]{3,4}x[0-9]{3,4}$`<br />`Scheme`: `^(light\|dark)$`<br />`Screenshot`: `^`response/artifacts/[A-Za-z0-9_.-]+[.]png`$` |
 | `^## Verdicts by owner$` | `\| Matrix \| Owner \| Node \| Rule \| Measured \| Verdict \|` | minRows 1 | `Owner`: `^(app\|grammar)$`<br />`Node`: `^`[^`]+`$`<br />`Rule`: `^`[A-Z][A-Z0-9-]*-[0-9]+`$`<br />`Verdict`: `^(pass\|fail)$`<br />`Matrix`: `^`[a-z0-9][a-z0-9-]*`$` |
-| `^## Taste$` | `\| Rule \| Measured \| Score \| Verdict \|` | minRows 12 | `Rule`: `^`TASTE-([1-9]\|1[0-2])`$`<br />`Measured`: `\S`<br />`Score`: `^[1-5]$`<br />`Verdict`: `^(pass\|fail)$` |
+| `^## Taste$` | `\| Rule \| Measured \| Score \| Verdict \|` | minRows 12 | `Rule`: `^`TASTE-([1-9]\|1[0-2])`$`<br />`Measured`: `\S`<br />`Score`: `^(?:[1-5]\|—)$`<br />`Verdict`: `^(pass\|fail\|deferred)$` |
 | `^## Verdict$` | `\| Topic \| Verdict \| Route \|` | exactRows 8 | `Topic`: `^`(presentation\|composition\|responsive\|motion\|accessibility\|contrast\|render-truth\|taste)`$`<br />`Verdict`: `^(pass\|fail\|ship\|fix-first\|blocked)$`<br />`Route`: `^(resolve\|direction\|seed\|flow-owner\|grammar-gap\|none)$` |
 | `^## Coverage gaps$` | `\| Topic \| Missing state \|` | — | `Topic`: `^`(presentation\|composition\|responsive\|motion\|accessibility\|contrast\|render-truth\|taste)`$`<br />`Missing state`: `\S` |
-| `^## Regressions$` | `\| Matrix \| Node \| Rule \| Measured \| Routes to \|` | — | `Node`: `^`[^`]+`$`<br />`Routes to`: `^(resolve\|grammar-gap)$`<br />`Matrix`: `^`[a-z0-9][a-z0-9-]*`$` |
+| `^## Regressions$` | `\| Matrix \| Node \| Rule \| Measured \| Routes to \|` | — | `Node`: `^`[^`]+`$`<br />`Routes to`: `^(resolve\|grammar-gap\|direction)$`<br />`Matrix`: `^`[a-z0-9][a-z0-9-]*`$` |
 | `^## Grammar gaps$` | `\| Component \| Rule \| What the family lacks \|` | — | `What the family lacks`: `\S` |
 | `^## Printed$` | `\| Artifact \| Why \|` | — | `Artifact`: `^(`[^`]+`\|https?://\S+)$`<br />`Why`: `\S` |
 | `^## Fallbacks taken$` | `\| Code \| Action \|` | — | `Code`: `^`[A-Z][A-Z0-9_]+`$` |
@@ -211,7 +212,7 @@ Khung: [`templates/kinds/platform-operation-receipt.skeleton.md`](https://github
 | `^## Convergence$` | `\| Field \| Value \|` | exactRows 1 | `Value`: `^(converged\|already-converged)$` |
 | `^## Inventoried resources$` | `\| Resource \| Kind \| Revision \| Owner \|` | minRows 1 | `Kind`: `^(observability\|sonar\|tunnel\|runtime\|identity)$`<br />`Revision`: `\S` |
 | `^## Port holders$` | `\| Port \| Holder \| Evidence \|` | — | `Port`: `^[0-9]{1,5}$` |
-| `^## Mutations$` | `\| Effect \| Resource \| Before \| After \|` | — | `Effect`: `^`(update-config\|restart-service\|upsert-dashboard\|update-remote-write\|create-project\|assign-profile\|assign-gate\|enforce-setting\|create-tunnel\|update-tunnel-route\|upsert-proxied-dns\|register-runtime-entry\|attest-runtime-entry\|bring-up-infra-stack\|locate-routed-checkouts\|start-role-runtime\|merge-into-integration-branch\|serve-runtime-head\|restart-runtime-server\|reset-runtime-server\|stop-runtime-server\|queue-runtime-lease\|provision-identity\|seed-flow-fixtures)`$` |
+| `^## Mutations$` | `\| Effect \| Resource \| Before \| After \|` | — | `Effect`: `^`(update-config\|restart-service\|upsert-dashboard\|update-remote-write\|create-project\|assign-profile\|assign-gate\|enforce-setting\|create-tunnel\|update-tunnel-route\|upsert-proxied-dns\|register-runtime-entry\|attest-runtime-entry\|bring-up-infra-stack\|locate-routed-checkouts\|start-role-runtime\|merge-into-integration-branch\|serve-runtime-head\|restart-runtime-server\|reset-runtime-server\|stop-runtime-server\|queue-runtime-lease\|provision-identity\|seed-flow-fixtures\|rotate-admin-credential)`$` |
 | `^## Checks$` | `\| Check \| Resource \| Status \| Evidence \|` | minRows 1 | `Status`: `^(passed\|failed)$`<br />`Evidence`: `\S` |
 | `^## Findings$` | `\| Code \| Resource \| Port \| Holder \| Statement \|` | minRows 1 | `Code`: `^`(SHARED_SERVICE_INVENTORIED\|PORT_COORDINATION_REQUIRED\|ALREADY_CONVERGED\|PARTIAL_MUTATION\|PRODUCT_DEPLOYMENT_DECLINED\|RUNTIME_ENTRY_ATTESTED\|IDENTITY_PROVISIONED\|RUNTIME_RUNG_CLIMBED\|RUNTIME_HEAD_SERVED\|RUNTIME_HEAD_REUSED\|RUNTIME_SERVER_RESTARTED\|RUNTIME_SERVER_RESET\|RUNTIME_SERVER_STOPPED\|RUNTIME_LEASE_BUSY\|INTEGRATION_MERGED\|INTEGRATION_RESOLVED\|INTEGRATION_GATE_FAILED\|CREDENTIAL_VALUE_IN_OUTPUT)`$`<br />`Statement`: `\S` |
 
@@ -231,6 +232,7 @@ Khung: [`templates/kinds/quality-verification.skeleton.md`](https://github.com/s
 | `^## Findings$` | `\| Code \| Gate \| Statement \|` | minRows 1 | `Code`: `^`(PREDECESSOR_CONSUMED\|SONAR_NEW_CODE_ONLY\|E2E_NOT_REQUESTED\|COVERAGE_BELOW_THRESHOLD\|FLAKY_CONFIRMED\|DEBT_DECLARED)`$`<br />`Statement`: `\S` |
 | `^## Gate verdict$` | `\| Field \| Value \|` | exactRows 1 | `Value`: `^`(pass\|fail)`$` |
 | `^## Verdict$` | `\| Topic \| Verdict \| Route \|` | exactRows 9 | `Topic`: `^`(presentation\|composition\|responsive\|motion\|accessibility\|contrast\|render-truth\|taste\|experience)`$`<br />`Verdict`: `^(pass\|fail\|ship\|fix-first\|blocked)$`<br />`Route`: `^(resolve\|direction\|flow-owner\|grammar-gap\|none)$` |
+| `^## Audit scope$` | `\| Field \| Value \|` | `Mode`, `Coverage claim`, `Deferred states` | `Value`: `\S` |
 
 ### `release-deployment`
 
@@ -263,6 +265,7 @@ Khung: [`templates/kinds/uat-flow-verification.skeleton.md`](https://github.com/
 | `^## Printed$` | `\| Artifact \| Why \|` | — | `Artifact`: `^(`[^`]+`\|https?://\S+)$`<br />`Why`: `\S` |
 | `^## Findings$` | `\| Code \| Statement \|` | — | `Code`: `^`(CREDENTIAL_VALUE_IN_OUTPUT)`$`<br />`Statement`: `\S` |
 | `^## Fallbacks taken$` | `\| Code \| Action \|` | — | — |
+| `^## Audit scope$` | `\| Field \| Value \|` | `Mode`, `Coverage claim`, `Deferred states` | `Value`: `\S` |
 
 ### `workspace-route-binding`
 
@@ -282,6 +285,7 @@ Khung: [`templates/kinds/workspace-route-binding.skeleton.md`](https://github.co
 
 | Kind | Tệp | Thuộc tính bắt buộc ở cấp cao nhất |
 | --- | --- | --- |
+| `audit-scope` | [`templates/kinds/audit-scope.schema.json`](https://github.com/starci183/starci-skills/blob/main/templates/kinds/audit-scope.schema.json) | `mode`, `surfaces`, `deferredStates`, `coverageClaim` |
 | `capture` | [`templates/kinds/capture.schema.json`](https://github.com/starci183/starci-skills/blob/main/templates/kinds/capture.schema.json) | `matrixId`, `viewport`, `scheme`, `state`, `nodes` |
 | `checks` | [`templates/kinds/checks.schema.json`](https://github.com/starci183/starci-skills/blob/main/templates/kinds/checks.schema.json) | `serviceRef`, `serviceKind`, `requiredCheckNames`, `checks`, `findings` |
 | `claims` | [`templates/kinds/claims.schema.json`](https://github.com/starci183/starci-skills/blob/main/templates/kinds/claims.schema.json) | `featureId`, `sourceHead`, `fingerprint`, `claims` |
@@ -290,12 +294,19 @@ Khung: [`templates/kinds/workspace-route-binding.skeleton.md`](https://github.co
 | `coverage` | [`templates/kinds/coverage.schema.json`](https://github.com/starci183/starci-skills/blob/main/templates/kinds/coverage.schema.json) | `statements`, `lines`, `functions`, `branches`, `thresholds`, `evidenceRef` |
 | `current-state` | [`templates/kinds/current-state.schema.json`](https://github.com/starci183/starci-skills/blob/main/templates/kinds/current-state.schema.json) | `observedHead`, `fingerprint`, `components`, `boundaries` |
 | `delta` | [`templates/kinds/delta.schema.json`](https://github.com/starci183/starci-skills/blob/main/templates/kinds/delta.schema.json) | `serviceRef`, `serviceKind`, `ownerRef`, `approvalRef`, `planSha256`, `inventoryFingerprint`, `generation`, `observedAt`, `inventoriedResources`, `observedPortHolders`, `portClaims`, `mutableResourceRefs`, `observationOnlyResourceRefs`, `allowedEffects`, `appliedEffects`, `capabilities`, `convergence`, `mutations` |
+| `dependency-plan` | [`templates/kinds/dependency-plan.schema.json`](https://github.com/starci183/starci-skills/blob/main/templates/kinds/dependency-plan.schema.json) | `base`, `packageName`, `fromVersion`, `toVersion`, `manifests`, `lockfile`, `release`, `regression`, `gates` |
+| `dependency-proof` | [`templates/kinds/dependency-proof.schema.json`](https://github.com/starci183/starci-skills/blob/main/templates/kinds/dependency-proof.schema.json) | `phase`, `base`, `planHash`, `command`, `commandHash`, `files`, `regressionHash`, `installed`, `exitCode`, `outputRef`, `outputHash`, `startedAt`, `finishedAt` |
+| `dependency-update` | [`templates/kinds/dependency-update.schema.json`](https://github.com/starci183/starci-skills/blob/main/templates/kinds/dependency-update.schema.json) | `base`, `commit`, `planHash`, `files`, `proofs` |
 | `e2e` | [`templates/kinds/e2e.schema.json`](https://github.com/starci183/starci-skills/blob/main/templates/kinds/e2e.schema.json) | `unitId`, `contractFingerprintBefore`, `contractFingerprintAfter`, `iterations`, `maxIterations`, `tracks`, `runs` |
 | `gate-result` | [`templates/kinds/gate-result.schema.json`](https://github.com/starci183/starci-skills/blob/main/templates/kinds/gate-result.schema.json) | `gate`, `required`, `sourceHead`, `sessionBranch`, `predecessorCommit`, `observedAt`, `commandRef`, `configRef`, `status`, `exitCode`, `evidenceRef`, `classification`, `sonarScope`, `debt`, `statement` |
 | `inventory` | [`templates/kinds/inventory.schema.json`](https://github.com/starci183/starci-skills/blob/main/templates/kinds/inventory.schema.json) | `treeFingerprint`, `classNames`, `ruleIds`, `gaps` |
+| `library-behavior-plan` | [`templates/kinds/library-behavior-plan.schema.json`](https://github.com/starci183/starci-skills/blob/main/templates/kinds/library-behavior-plan.schema.json) | `packageRoot`, `packageName`, `baseVersion`, `targetVersion`, `files`, `pairs`, `regression`, `gates` |
+| `library-proof` | [`templates/kinds/library-proof.schema.json`](https://github.com/starci183/starci-skills/blob/main/templates/kinds/library-proof.schema.json) | `phase`, `planHash`, `base`, `head`, `command`, `commandHash`, `files`, `exitCode`, `outputRef`, `outputHash`, `startedAt`, `finishedAt` |
+| `library-source-application` | [`templates/kinds/library-source-application.schema.json`](https://github.com/starci183/starci-skills/blob/main/templates/kinds/library-source-application.schema.json) | `packageName`, `base`, `commit`, `planHash`, `files`, `proofs` |
 | `model` | [`templates/kinds/model.schema.json`](https://github.com/starci183/starci-skills/blob/main/templates/kinds/model.schema.json) | `featureId`, `mode`, `headRef`, `headFingerprint`, `state`, `promise`, `lineage`, `claimsFingerprint`, `coverageFingerprint`, `reconciliation` |
 | `mutations` | [`templates/kinds/mutations.schema.json`](https://github.com/starci183/starci-skills/blob/main/templates/kinds/mutations.schema.json) | `mode`, `contractFingerprint`, `base`, `branch`, `commit`, `operations`, `changes` |
 | `probes` | [`templates/kinds/probes.schema.json`](https://github.com/starci183/starci-skills/blob/main/templates/kinds/probes.schema.json) | `deadlineSeconds`, `elapsedSeconds`, `backoffSeconds`, `observations`, `finalCondition` |
+| `producer-import` | [`templates/kinds/producer-import.schema.json`](https://github.com/starci183/starci-skills/blob/main/templates/kinds/producer-import.schema.json) | `schemaVersion`, `sourceSessionId`, `sourceStep`, `sourceParallel`, `targetSessionId`, `targetStep`, `targetParallel`, `files` |
 | `proof` | [`templates/kinds/proof.schema.json`](https://github.com/starci183/starci-skills/blob/main/templates/kinds/proof.schema.json) | `operationId`, `proofKind`, `commandRef`, `exitCode`, `result`, `output`, `statement`, `contractFingerprint` |
 | `route` | [`templates/kinds/route.schema.json`](https://github.com/starci183/starci-skills/blob/main/templates/kinds/route.schema.json) | `project`, `role`, `portableRouteRef`, `hydratedRouteRef`, `routeFingerprint`, `identityFingerprint`, `sourceHead`, `checkout`, `gitPolicy`, `mutationReadiness`, `writeRoots`, `authorityRoots`, `runtime`, `provenanceHeadRef` |
 | `stack-model` | [`templates/kinds/stack-model.schema.json`](https://github.com/starci183/starci-skills/blob/main/templates/kinds/stack-model.schema.json) | `decisionId`, `selectedAlternativeId`, `alternatives`, `boundaries`, `stores`, `components`, `operations` |

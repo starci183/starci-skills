@@ -131,6 +131,8 @@ thành pass; không chạy bộ end-to-end khi không được hỏi; không th�
 cổng đã khai; không đọc phán quyết mức dự án ra từ một quality gate chỉ đo new code; và không mang một
 khoản nợ không ai duyệt hoặc đã hết hạn.
 
+Gate result giữ nhánh đo thực trong sessionBranch. Giá trị ngoài session cần input changes do platform.operate serve đã hoàn tất phát ra tại đúng nhánh tích hợp và head merge; delta producer và diff Git thật đều được kiểm. Không đổi nhãn bằng chứng tích hợp thành nhánh session.
+
 ## Context
 
 | Alias | Bind | Bắt buộc |
@@ -146,7 +148,7 @@ khoản nợ không ai duyệt hoặc đã hết hạn.
 | --- | --- | --- |
 | `backend-source-application` | `backend.source.apply`, delivery backend cần kiểm định | không |
 | `frontend-source-application` | `frontend.source.apply`, delivery frontend cần kiểm định | không |
-| `changes` | `backend.source.apply` hoặc `frontend.source.apply`, những path đã dịch chuyển cùng cổng và bề mặt chúng nêu | không |
+| `changes` | `backend.source.apply`, `frontend.source.apply`, `library.source.apply`, `dependency.update` hoặc serve hoàn tất của `platform.operate`, những path đã dịch chuyển cùng cổng và bề mặt chúng nêu | không |
 | `frontend-surface-audit` | `frontend.surface.audit`, tám topic proof nó đã đóng ở cùng head | không |
 | `uat-flow-verification` | `uat.verify`, topic trải nghiệm nó đã đóng ở cùng head | không |
 
@@ -172,7 +174,7 @@ khoản nợ không ai duyệt hoặc đã hết hạn.
 | 5 | Phân loại từng lỗi từ chẩn đoán của nó | — | `response/data/gates/<gate>.json` của mọi cổng đỏ | — | — |
 | 6 | Áp nợ đã được duyệt | `declaredDebts` | @worktrees/debts, `response/data/gates/<gate>.json` | — | `DEBT_UNAPPROVED` |
 | 7 | Chép verdict của từng topic từ biên nhận đã tính ra nó | — | đầu vào `frontend-surface-audit` và `uat-flow-verification` ở cùng head đã ghim | — | `PREDECESSOR_MIXED` |
-| 8 | Tính phán quyết cổng và scorecard, viết biên bản và phát | — | mọi thứ ở trên | `response/response.md`, `response/response.json` | — |
+| 8 | Tính phán quyết cổng và scorecard, viết biên bản và phát | — | mọi thứ ở trên | `response/response.md`, `response/response.json`, `audit-scope` | — |
 
 Một cổng hoàn toàn không chạy được ở môi trường này là `GATE_UNAVAILABLE` khi nó bắt buộc; một cổng
 không bắt buộc bị môi trường chặn được ghi là `external-blocker` và phán quyết hấp thụ nó. Không có mã
@@ -182,6 +184,13 @@ tiền nhiệm mới. Một lần resume chỉ dùng lại quan sát có fingerp
 delta; một lần resume không thêm tiền nhiệm, cổng, nợ hay thay đổi source nào là `NO_PROGRESS`, vì
 cùng một fingerprint không thể cho một câu trả lời khác.
 
+
+Khi đầu vào audit có phạm vi, chạy `node scripts/audit-scope.mjs <branch>` để chép nguyên
+`verdicts.auditScope` vào `response/data/audit-scope.json` và liệt kê kind `audit-scope` trong
+response. Biên nhận có `## Audit scope` với bảng `Field | Value` ghi Mode, Coverage claim và
+Deferred states đúng nguyên bản. Kết quả chỉ có nghĩa trong phạm vi ấy; state deferred không trở
+thành đạt vì gate hoặc UAT đạt. Các gate chất lượng và các case UAT đã đóng băng giữ nguyên.
+
 ## Đầu ra
 
 | Kind | File | Kiểu | Bắt buộc |
@@ -189,6 +198,7 @@ cùng một fingerprint không thể cho một câu trả lời khác.
 | `quality-verification` | `response/response.md` | md | có |
 | `gate-result` | `response/data/gates/<gate>.json` | data | có |
 | `coverage` | `response/data/coverage.json` | data | không |
+| `audit-scope` | `response/data/audit-scope.json` | data | không |
 
 ## Dừng
 

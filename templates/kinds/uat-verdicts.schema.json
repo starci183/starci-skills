@@ -184,6 +184,24 @@
           ]
         }
       }
+    },
+    "provenance": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "fe",
+        "be"
+      ],
+      "properties": {
+        "fe": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{40}$"
+        },
+        "be": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{40}$"
+        }
+      }
     }
   }
 }

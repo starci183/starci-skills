@@ -67,6 +67,8 @@ session branch whose session carries no source-application receipt and no audit 
 
 | Workflow | When | Steps | Parallel | Ends |
 | --- | --- | --- | --- | --- |
+| `library-maintenance` | existing owner package behavior and next patch, without product presentation changes | bind → library apply → quality | — | `user` |
+| `dependency-maintenance` | verified package consumption through exact dependency metadata | bind → dependency update → quality | — | `user` |
 | `frontend-new-surface` | a surface that does not exist yet (`new`) | bind ×2 → business → direction → resolve → apply → bind (consume) → audit → quality → uat → publish | audit by matrix | `git.publish` |
 | `frontend-reconstruct` | rebuild an existing surface, business facts kept | bind ×2 → direction → resolve → apply → bind (consume) → audit → quality → uat → publish | audit by matrix | `git.publish` |
 | `frontend-refine` | repair inside an approved structure | bind ×2 → direction → resolve → apply → bind (consume) → audit → quality → uat → publish | audit by matrix | `git.publish` |

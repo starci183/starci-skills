@@ -152,6 +152,7 @@ ${snap.admission.map((a) => `| \`${a.kind}\` | \`${a.ref}\` | \`${a.commit}\` |`
 | Feature | \`${snap.feature}\` |
 | Flow | \`${snap.flow}\` |
 | Commit | \`${snap.commit}\` |
+${snap.provenance ? `| Frontend commit | ${snap.provenance.fe} |\n| Backend commit | ${snap.provenance.be} |\n` : ''}\
 | Snapshot | \`${snap.snapshotRef}\` |
 | Namespace | \`${snap.fixtureNamespace}\` |
 | Accounts | ${snap.accounts.map((a) => BT + a.alias + BT).join(', ')} |
@@ -232,12 +233,24 @@ function responseJson({ status = 'done', stop, next = ['git.publish', 'user'], c
 // 'missing-run' leaves the directory without the record; 'rewritten' leaves another result under the
 // same runId; 'stale-latest' points latest at another run.
 function writeBranch(files, history = 'match') {
+  files = structuredClone(files);
+  if (files['response/response.md'] && !files['response/response.md'].includes('## Audit scope')) files['response/response.md'] += "\n## Audit scope\n\n| Field | Value |\n| --- | --- |\n| Mode | not-recorded |\n| Coverage claim | not-recorded |\n| Deferred states | — |\n";
+
   const session = mkdtempSync(path.join(tmpdir(), 'uat-session-'));
   const branch = path.join(session, 'step-3', 'parallel-1');
   for (const d of ['request', 'response/data/captures', 'response/artifacts']) mkdirSync(path.join(branch, d), { recursive: true });
   for (const input of [AUDIT_IN, QUALITY_IN, ROUTE_IN]) {
     mkdirSync(path.dirname(path.join(session, input)), { recursive: true });
     writeFileSync(path.join(session, input), input.endsWith('.json') ? '{}\n' : '# admitting receipt\n');
+  }
+  if(files['request/request.json']?.contexts?.some(c=>c.alias==='@workspaces/fe')) {
+    for(const [kind,ref,operator]of [['frontend-surface-audit',AUDIT_IN,'frontend.surface.audit'],['quality-verification',QUALITY_IN,'quality.verify']]){
+      const responseDir=path.dirname(path.join(session,ref)),owner=path.dirname(responseDir);mkdirSync(path.join(owner,'request'),{recursive:true});
+      writeFileSync(path.join(owner,'request/request.json'),JSON.stringify({operatorId:operator,contexts:[{alias:'@workspaces/fe',head:COMMIT},{alias:'@workspaces/be',head:OTHER_COMMIT}]}));
+      writeFileSync(path.join(responseDir,'response.json'),JSON.stringify({operatorId:operator,status:'done',fields:{[kind]:'response/response.md'}}));
+      writeFileSync(path.join(session,ref),kind==='frontend-surface-audit'?`# audit\n\n## Served surface\n\n| Field | Value |\n| --- | --- |\n| Applied commit | ${COMMIT} |\n`:`# quality\n\n## Binding\n\n| Field | Value |\n| --- | --- |\n| Head | ${COMMIT} |\n| Checkout | @workspaces/fe |\n`);
+    }
+    writeFileSync(path.join(session,ROUTE_IN),JSON.stringify({role:'fe'}));
   }
   writeFileSync(path.join(session, 'state.json'), JSON.stringify({ id: 's-test', project: 'starci-academy', startedAt: '2026-09-03T00:00:00Z', requestHashes: {}, chain: [['3/1']], steps: { '3/1': 'uat.verify' }, current: '3/1', status: 'running' }));
   for (const c of CASES) writeFileSync(path.join(branch, 'response', 'artifacts', `${c}.png`), 'png');
@@ -249,6 +262,7 @@ function writeBranch(files, history = 'match') {
   if (snap && typeof snap === 'object') prepared['response/data/snapshot.json'] = { ...snap, flowRoot };
   for (const [name, content] of Object.entries(prepared)) {
     if (content === null) continue;
+    mkdirSync(path.dirname(path.join(branch,name)),{recursive:true});
     writeFileSync(path.join(branch, name), typeof content === 'string' ? content : JSON.stringify(content, null, 2));
   }
 
@@ -260,7 +274,7 @@ function writeBranch(files, history = 'match') {
       mkdirSync(runDir, { recursive: true });
       const recorded = history === 'rewritten'
         ? { runId: verd.runId, commit: OTHER_COMMIT, lanes: verd.lanes }
-        : { runId: verd.runId, commit: verd.commit, lanes: verd.lanes };
+        : { runId: verd.runId, commit: verd.commit, lanes: verd.lanes, ...(verd.provenance?{provenance:verd.provenance}:{}) };
       writeFileSync(path.join(runDir, 'result.json'), JSON.stringify(recorded, null, 2));
     }
     writeFileSync(path.join(flowRoot, 'latest.json'), JSON.stringify({ runId: history === 'stale-latest' ? '20260109-000000-1111111' : RUN }, null, 2));
@@ -309,6 +323,32 @@ async function expectError(files, needle, label, history, options = {}) {
 }
 
 await expectValid(baseline(), 'a run triggered by a chain, authorised, admitted at the pinned commit, three lanes passing');
+const splitRole = () => {
+  const files=baseline(), provenance={fe:COMMIT,be:OTHER_COMMIT};
+  files['request/request.json'].contexts=[{alias:'@workspaces/fe',head:COMMIT},{alias:'@workspaces/be',head:OTHER_COMMIT},{alias:'@worktrees/uat/enrollment/paid-enrollment',head:null}];
+  files['response/data/snapshot.json']=snapshot({provenance,admission:snapshot().admission.map(a=>({...a,role:'fe'}))});
+  files['response/data/verdicts.json']=verdicts({provenance});
+  files['response/response.md']=responseMd({snap:files['response/data/snapshot.json'],verd:files['response/data/verdicts.json']});
+  return files;
+};
+await expectValid(splitRole(),'different FE/BE repositories retain their own heads and FE admissions');
+const omittedFrontend=baseline();omittedFrontend['../../step-1/parallel-2/response/data/route.json']={role:'fe',sourceHead:OTHER_COMMIT};
+await expectError(omittedFrontend,'requires an explicit frontend context','omitting FE context cannot conceal a distinct frontend route head');
+const omittedAdmission=baseline();omittedAdmission['../../step-2/parallel-1/request/request.json']={operatorId:'quality.verify',contexts:[{alias:'@workspaces/fe',head:OTHER_COMMIT}]};
+await expectError(omittedAdmission,'requires an explicit frontend context','omitting FE context cannot conceal a distinct actual admission head');
+const sameRepositoryLegacy=baseline();sameRepositoryLegacy['../../step-1/parallel-2/response/data/route.json']={role:'fe',sourceHead:COMMIT};
+await expectValid(sameRepositoryLegacy,'legacy shared-commit frontend/backend remains valid');
+for(const [mutate,needle,label]of [
+  [f=>{delete f['response/data/snapshot.json'].provenance;},'role provenance differs','missing explicit role provenance'],
+  [f=>{f['response/data/snapshot.json'].provenance={fe:OTHER_COMMIT,be:COMMIT};},'role provenance differs','swapped snapshot role heads'],
+  [f=>{f['response/data/verdicts.json'].provenance.be=COMMIT;},'role provenance differs','backend relabeled with frontend sha'],
+  [f=>{f['response/data/snapshot.json'].admission[0].role='be';},'must admit the pinned frontend role','cross-role audit admission'],
+  [f=>{f['response/data/snapshot.json'].admission[1].commit=OTHER_COMMIT;},'must admit the pinned frontend role','backend head used as frontend quality'],
+  [f=>{f['../../step-2/parallel-1/request/request.json']={operatorId:'quality.verify',contexts:[{alias:'@workspaces/be',head:COMMIT}]};},'did not pin the frontend role','actual quality owner has only BE context'],
+  [f=>{f['../../step-1/parallel-1/request/request.json']={operatorId:'frontend.surface.audit',contexts:[{alias:'@workspaces/fe',head:OTHER_COMMIT}]};},'did not pin the frontend role','actual audit owner pinned stale FE head'],
+  [f=>{f['../../step-2/parallel-1/response/response.md']=`# quality\n\n## Binding\n\n| Field | Value |\n| --- | --- |\n| Head | ${OTHER_COMMIT} |\n| Checkout | @workspaces/fe |\n`;},'receipt names a stale or cross-role head','actual quality receipt disagrees with owner context'],
+  [f=>{f['../../step-1/parallel-2/response/data/route.json']={role:'be'};},'browser route must identify the frontend role','backend endpoint cannot stand in for browser route'],
+]){const f=splitRole();mutate(f);await expectError(f,needle,label);}
 await expectValid(withVerdicts({ behavior: 'fail' }, { next: ['backend.source.apply', 'user'], outcomes: { 'pay-and-enrol': 'fail', 'abandon-checkout': 'pass' } }), 'a behaviour failure routed to the backend');
 await expectValid(withVerdicts({ ux: 'fail' }, { next: ['user'], outcomes: { 'pay-and-enrol': 'fail', 'abandon-checkout': 'pass' } }), 'a UX failure routed to a person');
 await expectValid(blocked(), 'blocked on a missing admission, publishing nothing', 'none');
@@ -452,4 +492,26 @@ await expectError(authorityBranch({ approval: TIGHT_REF, env: 'tight' }), 'marks
 await expectError(authorityBranch({ approval: MOVED_REF }), 'the declaration moved since it was read', 'a declaration reference whose hash no longer matches the file', undefined, onHost);
 await expectError(authorityBranch({ approval: DEV_REF, env: 'tight' }), 'authorises its own environment only', 'a dev declaration offered as approval for another environment', undefined, onHost);
 
-process.stdout.write('uat.verify self-test: 10 valid branches, 62 rejected mutations\n');
+const scopedAdmission = { mode: 'primary-surfaces', surfaces: [{ id: 'primary', type: 'page', route: '/primary', matrixIds: ['primary-loaded'] }], deferredStates: ['empty'], coverageClaim: 'selected-surfaces' };
+const scopeMd = '\n## Audit scope\n\n| Field | Value |\n| --- | --- |\n| Mode | primary-surfaces |\n| Coverage claim | selected-surfaces |\n| Deferred states | empty |\n';
+for (const variation of ['valid', 'missing-snapshot-scope', 'changed-quality-scope']) {
+  const files = baseline();
+  files['response/data/snapshot.json'].auditScope = variation === 'missing-snapshot-scope' ? undefined : scopedAdmission;
+  files['response/data/audit-scope.json'] = scopedAdmission;
+  files['response/response.json'].fields['audit-scope'] = 'response/data/audit-scope.json';
+  files['response/response.md'] += scopeMd;
+  const { branch, session } = writeBranch(files);
+  try {
+    const sourceDir = path.dirname(path.join(session, AUDIT_IN));
+    mkdirSync(path.join(sourceDir, 'data'), { recursive: true });
+    writeFileSync(path.join(sourceDir, 'data/verdicts.json'), JSON.stringify({ auditScope: scopedAdmission }));
+    const qualityDir = path.dirname(path.join(session, QUALITY_IN));
+    mkdirSync(path.join(qualityDir, 'data'), { recursive: true });
+    writeFileSync(path.join(qualityDir, 'data/audit-scope.json'), JSON.stringify(variation === 'changed-quality-scope' ? { ...scopedAdmission, deferredStates: [] } : scopedAdmission));
+    const { errors } = await validateUatStep(branch);
+    if (variation === 'valid') assert.deepEqual(errors, [], 'UAT preserves a limited UI audit without changing its frozen cases');
+    else assert.ok(errors.some((error) => error.includes(variation === 'missing-snapshot-scope' ? 'frozen snapshot must retain' : 'quality admission must retain')), errors.join('\n'));
+  } finally { rmSync(session, { recursive: true, force: true }); }
+}
+
+process.stdout.write('uat.verify self-test: admission, scope and mutation checks passed\n');
