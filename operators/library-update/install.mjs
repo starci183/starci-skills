@@ -1,21 +1,23 @@
-// The consumer installs of library.update: `baseline` reinstalls the lock as committed at the package
-// commit and proves the consumer resolves the base version; `release` installs the tarball this run
-// packed, saving the exact version into the declared consumer workspaces only, and proves every
-// packed file is installed byte for byte. Both derive the cwd from the validated route and use fixed
-// npm arguments; a caller-supplied cwd or an ad hoc install command is not accepted.
+// The consumer installs of library.update: `baseline` reinstalls the lock as committed at the commit
+// the consumer half runs on and proves the consumer resolves the base version; `release` installs the
+// bound release archive — packed by this branch under `full`, bound from another branch's
+// library-release under `consume` — saving the exact version into the declared consumer workspaces
+// only, and proves every packed file is installed byte for byte. Both derive the cwd from the
+// validated route and use fixed npm arguments; a caller-supplied cwd or an ad hoc install command is
+// not accepted, and a mode that runs no consumer half runs neither.
 //   node install.mjs <branch> <baseline|release>
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { loadContext, worktreeErrors, consumerChangeErrors, installedIdentity, consumerSnapshots, resolveCommand, hash, same, git, bindPackageCommit, consumerProofErrors, consumerPhase } from './validate.mjs';
+import { loadContext, worktreeErrors, consumerChangeErrors, installedIdentity, consumerSnapshots, resolveCommand, hash, same, git, bindRelease, runsConsumerHalf, consumerProofErrors, consumerPhase, slash } from './validate.mjs';
 
 export function installInvocation(ctx, phase) {
   if (!['baseline', 'release'].includes(phase)) throw new Error('install phase must be baseline or release');
   const script = ctx.consumer.gates.find((gate) => gate.command.kind === 'npm-script')?.command;
   if (!script) throw new Error('an existing npm gate is required to resolve npm');
   const resolved = resolveCommand(ctx, script, ctx.rootManifest, ctx.checkout);
-  const args = phase === 'baseline' ? ['ci'] : ['install', ctx.release.artifact.replace(/^response\//, path.join(ctx.branch, 'response').replaceAll('\\', '/') + '/'), '--save-exact'];
+  const args = phase === 'baseline' ? ['ci'] : ['install', slash(ctx.artifact), '--save-exact'];
   if (phase === 'release') {
     for (const manifest of ctx.consumer.manifests) {
       const workspace = path.posix.dirname(manifest);
@@ -29,7 +31,8 @@ export function installInvocation(ctx, phase) {
 
 export async function install(branch, phase) {
   const ctx = await loadContext(branch);
-  bindPackageCommit(ctx, JSON.parse(readFileSync(path.join(branch, 'response/data/library.json'), 'utf8')));
+  if (!runsConsumerHalf(ctx.mode)) throw new Error(`mode ${ctx.mode} installs nothing in a consumer`);
+  bindRelease(ctx);
   const errors = worktreeErrors(ctx, { phase: 'pristine', head: ctx.packageCommit });
   if (errors.length) throw new Error(errors.join('\n'));
   if (phase === 'release') {

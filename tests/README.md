@@ -197,6 +197,22 @@ origin mode, never by today's session gates or catalogue (`scripts/validate-step
 `scripts/migration-contract.spec.mjs`); D10, the create order is stated: provisional state, import,
 plan, rewrite (`resources/orchestrator.json#session.lifecycle`).
 
+The Setup rerun of the same day
+([`evidence/20260905-nivo-setup-uxui-on-2.0.0.md`](evidence/20260905-nivo-setup-uxui-on-2.0.0.md))
+recorded the one wall that was an operator boundary rather than a defect: `library.update` required
+the owner package and its consumer in one routed checkout and both the `plan` and the `consumer`
+field, so an owner in one repository and a consumer in another could not run at all, not even
+owner-only, and its preflight refused with `missing path: packages/grammar` before any write. This
+cut answers it with the requirement `mode` — `full` unchanged, `publish` the owner half alone ending
+at a recorded `library-release` whose registry publication stays a person's, `consume` the consumer
+half alone against a release a sibling session produced and imported — so a chain route's owner
+mission and the blocked consumer mission are two branches of the same operator. The gate is the
+operator's own: `operators/library-update/validate.mjs` refuses a plan or a release input the mode
+does not take, resolves a package path only where a package half runs, and refuses a receipt section
+belonging to the half the branch never ran; `operators/library-update/self-test.mjs` binds each mode
+over one routed checkout, refuses every cross-mode section and input, and proves that the D7 branch —
+blocked because its plan names a package the checkout does not carry — validates as a lawful block.
+
 ## The findings ledger
 
 From 2.0.1 a receipt is not the end of what an audit or a walk knows. Every done `interface.audit`

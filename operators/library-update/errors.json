@@ -1,6 +1,6 @@
 {
   "schemaVersion": 9,
-  "note": "Stop codes only library.update emits. Same entry shape as operators/errors.json, scope implicit. Shared codes (INVALID_INPUT, SOURCE_DRIFT, NO_PROGRESS) come from operators/errors.json. The LIBRARY_* codes belong to the package half of the job, the DEPENDENCY_* codes to the consumer half; both halves are one job because a repaired package nobody consumes repairs nothing.",
+  "note": "Stop codes only library.update emits. Same entry shape as operators/errors.json, scope implicit. Shared codes (INVALID_INPUT, SOURCE_DRIFT, NO_PROGRESS) come from operators/errors.json. The LIBRARY_* codes belong to the package half of the job, the DEPENDENCY_* codes to the consumer half; both halves are one job because a repaired package nobody consumes repairs nothing, and the requirement mode says which of them a branch runs — a section of the other half, a plan the mode does not take, or a release input a mode that packs its own release cannot accept, is refused under the boundary code of the half it belongs to.",
   "codes": {
     "LIBRARY_BOUNDARY_REJECTED": {
       "domain": "caller",

@@ -34,7 +34,11 @@ mà mỗi operator công bố trong `operator.md` của mình:
   mở bằng `environment.preflight`;
 - nhiệm vụ gọi tên `git.publish` trong khi có nhánh ghi source frontend dưới `mode: apply` thì nợ
   audit và lượt đi thử ở giữa — luật dòng dài, phát biểu theo kind: operator có primary output là
-  `frontend-surface-audit`, rồi `uat.verify`, trước khi publish.
+  `frontend-surface-audit`, rồi `uat.verify`, trước khi publish;
+- nhiệm vụ anh em của một route `chain` được lập kế hoạch từ đích của route như mọi nhiệm vụ khác,
+  nên bức tường mà một thư viện owner dựng lên trở thành một dòng "xong khi" của `library.update`
+  dưới mode `publish` trên route owner, còn nhiệm vụ bị chặn vào lại bằng một nhánh `library.update`
+  dưới mode `consume` bind `library-release` của phiên anh em ấy qua `producer-import`.
 
 Hai chỗ mà đầu vào bắt buộc để ngỏ cũng do các bảng phân xử: một Đầu vào tuỳ chọn xếp consumer sau
 producer đã có trong chuỗi, và một dòng Kế tiếp một chiều xếp operator bàn giao trước operator được

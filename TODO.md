@@ -112,11 +112,15 @@ context khai đủ để agent mù chạy được, log đủ để người đ�
 
 ## 2d. Cửa đóng và tường thật mà hai lần chạy Nivo trên 2.0.0 lộ ra (2026-09-05)
 
-- [ ] `library.update` không tiêu thụ được qua hai repo: owner ở `starci-academy-fe`, consumer ở `nivo-fe`
+- [x] `library.update` không tiêu thụ được qua hai repo: owner ở `starci-academy-fe`, consumer ở `nivo-fe`
       là hai route, hai session, mà operator đòi cả `plan` lẫn `consumer` trong một checkout. Sửa: chế độ
       `publish` (consumer none, dừng ở bản phát hành đã đóng gói; publish lên registry là thẩm quyền của
       người) và chế độ `consume` bind ở route consumer, nhận `library-release` của session anh em qua
       route `chain`.
+      (yêu cầu `mode` `full|publish|consume`; kind `library-release` là bản ghi dữ liệu và
+      `library-archive` là tarball; `validate.mjs#modeSectionErrors`, `#loadReleaseInput`,
+      `#bindRelease` — preflight chỉ giải đường dẫn package nơi có nửa package chạy; self-test bind
+      từng chế độ, từ chối mọi tiết mục và đầu vào chéo chế độ, và có fixture nhánh blocked D7)
 - [x] Reachability: mọi operator phải tới được từ `environment.preflight` qua các bảng Next (D1, D6, D7
       của session recovery). (`validate-operator.mjs#checkReachability`, dòng Next
       `workspace.bind → architecture.decide|interface.plan|data.plan`, `architecture.decide → backend.plan`,
@@ -132,8 +136,8 @@ context khai đủ để agent mù chạy được, log đủ để người đ�
       (`validate-step.mjs#origin`, `migration-contract.mjs`); D10 thứ tự tạo phiên: state tạm → import → plan → ghi lại
       (`orchestrator.json#session.lifecycle` create).
 - [x] `library.update` chấm nhánh blocked theo mã dừng của nó, không nạp checkout trước khi đọc trạng thái
-      (D7 của session Setup: `operators/library-update/validate.mjs#validateLibraryUpdateStep`); còn nợ một
-      fixture nhánh blocked trong self-test.
+      (D7 của session Setup: `operators/library-update/validate.mjs#validateLibraryUpdateStep`; fixture nhánh
+      blocked — plan gọi tên package checkout không có — nằm trong `operators/library-update/self-test.mjs`).
 - [x] Self-test không phụ thuộc vị trí checkout: `data.seed`, `uat.verify` dùng host giả của chính chúng
       cho tra cứu `.stacks/<env>`.
 

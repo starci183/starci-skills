@@ -1,18 +1,20 @@
 // Runs one proof phase of library.update and records it: a package phase (`before`, `after`, a
 // package gate id) runs in the owner package before the package commit; a consumer phase
-// (`consumer-before`, `consumer-after`, `consumer-<gate>`) runs at the consumer root after the package
-// commit, with COVERAGE_BASE_SHA bound to that commit for test:ci. Only existing scripts or the
-// regression binary of a declared dependency run, with argument arrays and no shell.
+// (`consumer-before`, `consumer-after`, `consumer-<gate>`) runs at the consumer root after the commit
+// the consumer half starts from, with COVERAGE_BASE_SHA bound to that commit for test:ci. A phase of a
+// half this branch's mode does not run is refused. Only existing scripts or the regression binary of a
+// declared dependency run, with argument arrays and no shell.
 //   node run-proof.mjs <branch> <phase>
 import { mkdirSync, writeFileSync, readFileSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { loadContext, worktreeErrors, changeErrors, consumerChangeErrors, resolveCommand, consumerCommand, snapshots, consumerSnapshots, baseWorkingBytes, hash, git, same, regressionFailed, proofEnvironment, installedIdentity, bindPackageCommit, bareConsumerPhase, CONSUMER } from './validate.mjs';
+import { loadContext, worktreeErrors, changeErrors, consumerChangeErrors, resolveCommand, consumerCommand, snapshots, consumerSnapshots, baseWorkingBytes, hash, git, same, regressionFailed, proofEnvironment, installedIdentity, bindRelease, runsPackageHalf, runsConsumerHalf, bareConsumerPhase, CONSUMER } from './validate.mjs';
 
 export async function runProof(branch, phase) {
   const ctx = await loadContext(branch);
   const consumer = phase.startsWith(CONSUMER);
+  if (consumer ? !runsConsumerHalf(ctx.mode) : !runsPackageHalf(ctx.mode)) throw new Error(`mode ${ctx.mode} runs no ${consumer ? 'consumer' : 'package'} half, so it proves no ${phase}`);
   const bare = bareConsumerPhase(phase);
   const plan = consumer ? ctx.consumer : ctx.plan;
   const command = ['before', 'after'].includes(bare) ? plan.regression.command : plan.gates.find((g) => g.id === bare)?.command;
@@ -29,7 +31,7 @@ export async function runProof(branch, phase) {
       if (!ctx.plan.files.some((f) => f.kind === 'test' && files[f.path] !== (baseWorkingBytes(ctx.checkout, ctx.base, f.path) ? hash(baseWorkingBytes(ctx.checkout, ctx.base, f.path)) : null))) errors.push('before regression requires the new paired test');
     } else errors.push(...changeErrors(ctx));
   } else {
-    bindPackageCommit(ctx, JSON.parse(readFileSync(path.join(branch, 'response/data/library.json'), 'utf8')));
+    bindRelease(ctx);
     errors.push(...worktreeErrors(ctx, { phase: bare === 'before' ? 'pristine' : 'consumer', head: ctx.packageCommit }));
     if (bare !== 'before') errors.push(...consumerChangeErrors(ctx));
     files = consumerSnapshots(ctx);

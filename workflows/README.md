@@ -34,7 +34,11 @@ through the tables every operator publishes in its `operator.md`:
   `operator.json`) opens the chain with `environment.preflight`;
 - a mission that names `git.publish` while a branch writes frontend source under `mode: apply` owes
   the audit and the walk in between — the long-flow law, stated in kinds: the operator whose primary
-  output is `frontend-surface-audit`, then `uat.verify`, before the publish.
+  output is `frontend-surface-audit`, then `uat.verify`, before the publish;
+- a `chain` route's sibling mission is planned from the route's target like any other, so a wall an
+  owner library raised becomes a `library.update` done-when line under mode `publish` on the owner
+  route, and the blocked mission re-enters through a `library.update` branch under mode `consume`
+  that binds that sibling's `library-release` through `producer-import`.
 
 Two ties the required inputs leave open are settled by the tables too: an optional Input orders its
 consumer after a producer already in the chain, and a one-way Next row orders the operator that

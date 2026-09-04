@@ -10,7 +10,7 @@ import { mkdtempSync, mkdirSync, writeFileSync, rmSync, symlinkSync, unlinkSync 
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { validateAgainst } from '../../scripts/json-schema.mjs';
-import { ROOT, schema, planErrors, consumerPlanErrors, metadataErrors, safeRelative, safePath, nextPatch, hash, git, loadContext, worktreeErrors, proofErrors, consumerProofErrors, resolveCommand, consumerCommand, snapshots, consumerSnapshots, regressionFailed, proofEnvironment, consumerPhase, releaseRef, baseWorkingBytes } from './validate.mjs';
+import { ROOT, schema, planErrors, consumerPlanErrors, metadataErrors, safeRelative, safePath, nextPatch, hash, integrityOf, git, loadContext, worktreeErrors, proofErrors, consumerProofErrors, resolveCommand, consumerCommand, snapshots, consumerSnapshots, regressionFailed, proofEnvironment, consumerPhase, releaseRef, releaseFileName, baseWorkingBytes, modeSectionErrors, bindRelease, validateLibraryUpdateStep } from './validate.mjs';
 import { installInvocation } from './install.mjs';
 
 const manifest = { name: '@example/library', version: '1.2.3', exports: './index.js', scripts: { test: 'node index.spec.js', build: 'node --check index.js', typecheck: 'node --check index.js' } };
@@ -82,8 +82,20 @@ for (const mutate of [
 ]) { const m = structuredClone(newManifest), l = structuredClone(newLock); mutate(m, l); assert.ok(check(m, l).length, 'a metadata mutation is refused'); }
 process.stdout.write('library.update self-test: plan, consumer plan, exact manifest, lock identity and dependency closure mutations passed\n');
 
+// Which receipt sections each mode may carry: the halves it ran and no others.
+const packageSections = { 'library-source-application': 'response/data/library.json', 'library-proof': ['response/data/proofs/before.json'], 'library-release': 'response/data/release.json', 'library-archive': `response/artifacts/release/${releaseFileName(plan)}` };
+const consumerSections = { 'dependency-update': 'response/data/dependency.json', 'dependency-proof': ['response/data/proofs/consumer-before.json'], 'dependency-log': ['response/artifacts/proofs/consumer-before.log'] };
+assert.deepEqual(modeSectionErrors('full', { ...packageSections, ...consumerSections }), []);
+assert.deepEqual(modeSectionErrors('publish', packageSections), []);
+assert.deepEqual(modeSectionErrors('consume', consumerSections), []);
+assert.ok(modeSectionErrors('publish', { ...packageSections, ...consumerSections }).some((e) => e.includes('dependency-update')), 'a consumer section under publish');
+assert.ok(modeSectionErrors('consume', { ...packageSections, ...consumerSections }).some((e) => e.includes('library-source-application')), 'a package section under consume');
+assert.ok(modeSectionErrors('publish', {}).some((e) => e.includes('library-release')), 'publish must record its release');
+assert.ok(modeSectionErrors('consume', {}).some((e) => e.includes('dependency-update')), 'consume must record its metadata commit');
+assert.ok(modeSectionErrors('full', packageSections).some((e) => e.includes('dependency-proof')), 'full runs both halves');
+
 // The install invocation: fixed argv, the consumer root as cwd, the packed release as the spec.
-const fakeCtx = { checkout: 'D:/bound/session-consumer', branch: 'D:/bound/session/step-3/parallel-1', base: 'a'.repeat(40), packageCommit: 'b'.repeat(40), rootManifest, consumer, plan, release: { ...release, artifact: releaseRef(plan) } };
+const fakeCtx = { mode: 'full', checkout: 'D:/bound/session-consumer', branch: 'D:/bound/session/step-3/parallel-1', base: 'a'.repeat(40), packageCommit: 'b'.repeat(40), rootManifest, consumer, plan, artifact: `D:/bound/session/step-3/parallel-1/${releaseRef(plan)}`, release: { ...release, artifact: releaseRef(plan) } };
 assert.deepEqual(proofEnvironment(fakeCtx, { kind: 'npm-script', name: 'test:ci' }), { COVERAGE_BASE_SHA: fakeCtx.packageCommit });
 assert.deepEqual(proofEnvironment(fakeCtx, { kind: 'npm-script', name: 'test' }), {});
 const baseline = installInvocation(fakeCtx, 'baseline'), releaseInstall = installInvocation(fakeCtx, 'release');
@@ -193,6 +205,66 @@ try {
     [consumerPhase('after'), { files: { ...metadataAtBase, 'package-lock.json': hash('moved') } }, 'stale dependency metadata proof'],
   ]) assert.ok(consumerProofErrors(ctx, consumerProof(phase, over), phase, metadataAtBase).some((e) => e.includes(needle)), needle);
   assert.equal(Object.keys(consumerSnapshots(ctx)).length, 2);
+
+  // The three modes over the same routed checkout. `full` is the default this fixture has been running
+  // under; `publish` binds the package half alone, `consume` the consumer half alone against a release
+  // an earlier branch produced, and each refuses the other half's plan and the other half's input.
+  const requestWith = (requirements, inputs = {}) => ({ ...request, requirements: { ...request.requirements, ...requirements }, inputs: { ...request.inputs, ...inputs } });
+  const writeRequest = (value) => write(path.join(branch, 'request/request.json'), value);
+
+  writeRequest(requestWith({ mode: 'publish', consumer: null }));
+  const publishCtx = await loadContext(branch);
+  assert.equal(publishCtx.mode, 'publish');
+  assert.equal(publishCtx.consumer, null);
+  assert.equal(publishCtx.consumerPlanHash, null);
+  assert.equal(path.resolve(publishCtx.packageDir), path.resolve(path.join(checkout, 'package')));
+  assert.deepEqual(worktreeErrors(publishCtx), []);
+  writeRequest(requestWith({ mode: 'publish' }));
+  await assert.rejects(loadContext(branch), /carries no consumer plan/);
+
+  // The release of a synthetic earlier branch: the record, the archive beside it, and the digest that
+  // binds the two. Nothing here unpacks the archive, so no tar runs.
+  const archiveText = 'a synthetic packed archive';
+  const releaseSlot = 'step-1/parallel-2';
+  const archiveRef = `response/artifacts/release/${releaseFileName(plan)}`;
+  write(path.join(session, releaseSlot, archiveRef), archiveText);
+  const releaseRecord = { name: plan.packageName, version: plan.targetVersion, digest: integrityOf(archiveText), artifact: archiveRef, packageCommit: 'b'.repeat(40), publication: { registry: null, state: 'pending' } };
+  const releaseInputRef = `${releaseSlot}/response/data/release.json`;
+  write(path.join(session, releaseInputRef), releaseRecord);
+
+  writeRequest(requestWith({ mode: 'consume', plan: null }, { 'library-release': releaseInputRef }));
+  const consumeCtx = await loadContext(branch);
+  assert.equal(consumeCtx.mode, 'consume');
+  assert.equal(consumeCtx.packageDir, null);
+  assert.equal(consumeCtx.planHash, null);
+  assert.deepEqual(consumeCtx.plan, { packageName: plan.packageName, baseVersion: plan.baseVersion, targetVersion: plan.targetVersion });
+  bindRelease(consumeCtx);
+  assert.equal(consumeCtx.packageCommit, base);
+  assert.equal(consumeCtx.release.integrity, releaseRecord.digest);
+  assert.equal(consumeCtx.release.artifact, archiveRef);
+  assert.equal(path.resolve(consumeCtx.artifact), path.resolve(path.join(session, releaseSlot, archiveRef)));
+  writeRequest(requestWith({ mode: 'consume' }, { 'library-release': releaseInputRef }));
+  await assert.rejects(loadContext(branch), /carries no plan/);
+  writeRequest(requestWith({ mode: 'consume', plan: null }));
+  await assert.rejects(loadContext(branch), /binds a library-release input/);
+  writeRequest(requestWith({ mode: 'publish', consumer: null }, { 'library-release': releaseInputRef }));
+  await assert.rejects(loadContext(branch), /binds no library-release input/);
+  const wrongDigest = { ...releaseRecord, digest: integrityOf('other bytes') };
+  write(path.join(session, releaseInputRef), wrongDigest);
+  writeRequest(requestWith({ mode: 'consume', plan: null }, { 'library-release': releaseInputRef }));
+  await assert.rejects(loadContext(branch), /digest does not match the archive/);
+  write(path.join(session, releaseInputRef), releaseRecord);
+  writeRequest(request);
+
+  // D7: a branch blocked because its plan names a package the routed checkout does not carry is judged
+  // on its stop. The context cannot load — that is why it blocked — and the branch is still lawful.
+  const blockedBranch = path.join(session, 'step-3/parallel-1');
+  const unresolvable = { ...structuredClone(plan), packageRoot: 'packages/grammar' };
+  write(path.join(blockedBranch, 'request/request.json'), { ...request, step: 3, requirements: { ...request.requirements, plan: unresolvable } });
+  write(path.join(blockedBranch, 'response/response.json'), { schemaVersion: 9, operatorId: 'library.update', step: 3, parallel: 1, status: 'blocked', stop: 'LIBRARY_BOUNDARY_REJECTED', reason: 'the plan names an owner package this routed checkout does not carry', fields: {}, fallbacks: [], commits: [], next: [] });
+  await assert.rejects(loadContext(blockedBranch), /missing path: packages\/grammar/);
+  assert.deepEqual((await validateLibraryUpdateStep(blockedBranch)).errors, []);
+
   git(checkout, ['checkout', '-q', '-b', 'other-session']);
   await assert.rejects(loadContext(branch), /exactly one worktree/);
 } finally {
@@ -201,3 +273,4 @@ try {
   rmSync(resolved, { recursive: true, force: true });
 }
 process.stdout.write('library.update self-test: package boundary, session binding, package and consumer proof mutations passed\n');
+process.stdout.write('library.update self-test: publish and consume bind one half each, cross-mode sections and inputs are refused, and a blocked branch whose plan cannot resolve validates\n');

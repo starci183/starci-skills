@@ -1,0 +1,23 @@
+{
+  "$id": "kind:library-release",
+  "description": "The identity of one packed owner release: the package it carries, the version the package half bumped to, the sha512 digest of the tarball, the branch-relative path of that tarball, and the package commit it was packed from. It is what crosses between an owner route and a consumer route: a library.update branch under mode publish writes it beside its archive, and a library.update branch under mode consume reads it as its input. Publishing to a registry is a person's authority and no operator of this tree holds it, so publication.state is pending until a person records otherwise outside the run.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["name", "version", "digest", "artifact", "packageCommit", "publication"],
+  "properties": {
+    "name": { "type": "string", "minLength": 1 },
+    "version": { "type": "string", "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$" },
+    "digest": { "type": "string", "pattern": "^sha512-[A-Za-z0-9+/]+=*$" },
+    "artifact": { "type": "string", "pattern": "^response/artifacts/release/[A-Za-z0-9_.@-]+\\.tgz$" },
+    "packageCommit": { "type": "string", "pattern": "^[0-9a-f]{40}$" },
+    "publication": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["registry", "state"],
+      "properties": {
+        "registry": { "type": ["string", "null"] },
+        "state": { "const": "pending" }
+      }
+    }
+  }
+}

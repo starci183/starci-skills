@@ -1,4 +1,10 @@
-// library.update's own law over one branch, on top of the shared step check: two halves, two commits.
+// library.update's own law over one branch, on top of the shared step check: two halves, and the
+// requirement `mode` says which of them this branch runs — `full` both in one routed checkout (two
+// commits, package first), `publish` the package half alone on an owner route (one commit, ending at
+// the recorded release), `consume` the consumer half alone on a consumer route (one commit, against
+// the library-release another branch produced). Every gate below reads only the half its mode names,
+// the preflight resolves a package path only where a package half runs, and a section belonging to
+// the other half is refused in the receipt: it is work the branch had no authority to do.
 //
 // The package half (moved from the former library source operator): the plan names a distributable
 // owner package whose manifest at the base proves its identity; every declared file is inside that
@@ -58,6 +64,32 @@ export function baseWorkingBytes(checkout, base, file) {
 export const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
 export const regressionFailed = (output, assertion) => output.split(/\r?\n/).some((line) => line.includes(assertion) && /FAIL|×|✕|✗|not ok/.test(line));
 export function nextPatch(version) { const [a, b, c] = version.split('.').map(Number); return `${a}.${b}.${c + 1}`; }
+// The modes, and which half each of them runs. `full` is the default, so a request that names no mode
+// is the two-halves-one-checkout job this operator has always done.
+export const MODES = ['full', 'publish', 'consume'];
+export const DEFAULT_MODE = 'full';
+export const modeOf = (request) => request?.requirements?.mode ?? DEFAULT_MODE;
+export const runsPackageHalf = (mode) => mode === 'full' || mode === 'publish';
+export const runsConsumerHalf = (mode) => mode === 'full' || mode === 'consume';
+// Which receipt sections belong to which half. A done branch declares the sets of the halves its mode
+// runs and no others; a package section under `consume` or a consumer section under `publish` is a
+// claim about work the branch was not authorized to do, whatever its files say.
+export const PACKAGE_FIELDS = ['library-source-application', 'library-proof', 'library-release', 'library-archive'];
+export const CONSUMER_FIELDS = ['dependency-update', 'dependency-proof', 'dependency-log'];
+export function modeSectionErrors(mode, fields = {}) {
+  const errors = [];
+  const present = (kind) => { const v = fields[kind]; return Array.isArray(v) ? v.length > 0 : v !== undefined && v !== null && v !== ''; };
+  for (const [half, kinds, runs] of [['package', PACKAGE_FIELDS, runsPackageHalf(mode)], ['consumer', CONSUMER_FIELDS, runsConsumerHalf(mode)]]) {
+    for (const kind of kinds) {
+      if (runs && !present(kind)) errors.push(`mode ${mode} runs the ${half} half and the receipt declares no ${kind}`);
+      if (!runs && present(kind)) errors.push(`mode ${mode} runs no ${half} half and the receipt declares ${kind}; a section of a half this branch had no authority to run cannot stand in its receipt`);
+    }
+  }
+  return errors;
+}
+// Where the release record and its archive live in the branch that packed them.
+export const RELEASE_RECORD_REF = 'response/data/release.json';
+
 // The consumer phases sit beside the package phases under their own prefix.
 export const CONSUMER = 'consumer-';
 export const consumerPhase = (phase) => `${CONSUMER}${phase}`;
@@ -125,13 +157,36 @@ export function consumerPlanErrors(consumer, plan, rootManifest, { manifestAt = 
   return errors;
 }
 
+// The release a `consume` branch installs, read from the library-release its request binds: the record
+// against its schema, the archive it names inside the producing branch, and the digest against the
+// bytes on disk. Nothing here resolves a package path, because a consumer route holds no package.
+export function loadReleaseInput(root, session, ref) {
+  if (!ref) throw new Error('mode consume installs a release, so the request binds a library-release input');
+  const match = /^(step-\d+\/parallel-\d+)\/(response\/data\/[A-Za-z0-9_.-]+\.json)$/.exec(ref);
+  if (!match) throw new Error(`library-release input must be a step-N/parallel-M release record: ${ref}`);
+  const producer = safePath(session, match[1], false);
+  const record = json(safePath(session, ref, false));
+  const errors = validateAgainst(schema(root, 'library-release'), record, 'library-release');
+  if (errors.length) throw new Error(errors.join('\n'));
+  const archive = safePath(producer, record.artifact, false);
+  if (integrityOf(readFileSync(archive)) !== record.digest) throw new Error('the bound library-release digest does not match the archive beside it');
+  return { ref, producer, record, archive };
+}
+
 export async function loadContext(branch, root = ROOT) {
   const req = await validateRequest(root, branch);
   if (req.errors.length) throw new Error(req.errors.join('\n'));
   const request = req.request;
-  const plan = request.requirements.plan;
-  const consumer = request.requirements.consumer;
-  const errors = [...validateAgainst(schema(root, 'library-behavior-plan'), plan, 'plan'), ...validateAgainst(schema(root, 'dependency-plan'), consumer, 'consumer')];
+  const mode = modeOf(request);
+  if (!MODES.includes(mode)) throw new Error(`mode must be one of ${MODES.join(', ')}`);
+  const plan = request.requirements.plan ?? null;
+  const consumer = request.requirements.consumer ?? null;
+  const errors = [];
+  if (runsPackageHalf(mode)) errors.push(...validateAgainst(schema(root, 'library-behavior-plan'), plan, 'plan'));
+  else if (plan) errors.push(`mode ${mode} writes no package source, so it carries no plan`);
+  if (runsConsumerHalf(mode)) errors.push(...validateAgainst(schema(root, 'dependency-plan'), consumer, 'consumer'));
+  else if (consumer) errors.push(`mode ${mode} touches no consumer metadata, so it carries no consumer plan`);
+  if (mode !== 'consume' && request.inputs['library-release']) errors.push(`mode ${mode} packs its own release, so it binds no library-release input`);
   if (errors.length) throw new Error(errors.join('\n'));
   const session = sessionRootOf(branch);
   const routeRef = request.inputs.route;
@@ -150,41 +205,60 @@ export async function loadContext(branch, root = ROOT) {
   if (!request.contexts.some((c) => c.alias === '@workspaces/fe' && c.head === base)) throw new Error('frozen context must match the route base');
   if (git(checkout, ['branch', '--show-current']) !== `session/${request.sessionId}`) throw new Error('checkout is not this session branch');
   if (path.resolve(git(checkout, ['rev-parse', '--show-toplevel'])) !== path.resolve(checkout)) throw new Error('checkout must be the routed Git root');
-  const packageDir = plan.packageRoot === '.' ? checkout : safePath(checkout, plan.packageRoot, false);
-  const manifestPath = slash(path.relative(checkout, path.join(packageDir, 'package.json')));
-  const original = baseBytes(checkout, base, manifestPath);
-  if (!original) throw new Error('owner manifest must exist at the frozen base');
-  const manifest = JSON.parse(original);
-  errors.push(...planErrors(plan, manifest));
   const writable = (file) => (route.writeRoots ?? []).some((r) => (r === '.' || safeRelative(r)) && inside(path.resolve(checkout, r), safePath(checkout, file)));
-  for (const file of plan.files) {
-    const full = safePath(checkout, file.path);
-    const specialLock = file.kind === 'lockfile' && file.path === plan.workspaceLockfile;
-    if (!inside(packageDir, full) && !specialLock) errors.push(`file outside package: ${file.path}`);
-    if (!writable(file.path)) errors.push(`file outside bound write roots: ${file.path}`);
-    if (file.kind !== 'test' && !baseBytes(checkout, base, file.path)) errors.push(`only a new paired test may be created: ${file.path}`);
-    if (!specialLock) {
-      let parent = path.dirname(full);
-      while (inside(packageDir, parent) && parent !== packageDir) {
-        if (existsSync(path.join(parent, 'package.json'))) errors.push(`nested package boundary: ${file.path}`);
-        parent = path.dirname(parent);
+  const at = (file) => { const bytes = baseBytes(checkout, base, file); return bytes ? JSON.parse(bytes) : null; };
+  // The package half of the binding. A mode that writes no package source resolves no package path,
+  // so a consumer route that has never held the owner package is a lawful checkout here, not a
+  // `missing path` before the first write.
+  let packageDir = null, manifestPath = null, manifest = null, identity = plan, releaseInput = null;
+  if (runsPackageHalf(mode)) {
+    packageDir = plan.packageRoot === '.' ? checkout : safePath(checkout, plan.packageRoot, false);
+    manifestPath = slash(path.relative(checkout, path.join(packageDir, 'package.json')));
+    const original = baseBytes(checkout, base, manifestPath);
+    if (!original) throw new Error('owner manifest must exist at the frozen base');
+    manifest = JSON.parse(original);
+    errors.push(...planErrors(plan, manifest));
+    for (const file of plan.files) {
+      const full = safePath(checkout, file.path);
+      const specialLock = file.kind === 'lockfile' && file.path === plan.workspaceLockfile;
+      if (!inside(packageDir, full) && !specialLock) errors.push(`file outside package: ${file.path}`);
+      if (!writable(file.path)) errors.push(`file outside bound write roots: ${file.path}`);
+      if (file.kind !== 'test' && !baseBytes(checkout, base, file.path)) errors.push(`only a new paired test may be created: ${file.path}`);
+      if (!specialLock) {
+        let parent = path.dirname(full);
+        while (inside(packageDir, parent) && parent !== packageDir) {
+          if (existsSync(path.join(parent, 'package.json'))) errors.push(`nested package boundary: ${file.path}`);
+          parent = path.dirname(parent);
+        }
       }
     }
+    if (plan.workspaceLockfile && !plan.files.some((f) => f.path === plan.workspaceLockfile && f.kind === 'lockfile')) errors.push('workspaceLockfile must be in the exact file set');
+  } else {
+    // Under `consume` the package identity is the bound release's, and the version it moves from is
+    // what every declared consumer manifest pins at the base: one pin, or the manifests disagree
+    // about which package this route consumes.
+    releaseInput = loadReleaseInput(root, session, request.inputs['library-release']);
+    const pins = new Set((consumer.manifests ?? []).map((file) => at(file)?.dependencies?.[releaseInput.record.name]));
+    if (pins.size !== 1 || pins.has(undefined)) errors.push(`the declared consumer manifests do not pin ${releaseInput.record.name} at one version at the frozen base`);
+    const [baseVersion] = [...pins];
+    if (baseVersion === releaseInput.record.version) errors.push('the consumer already pins the bound release version; there is nothing to consume');
+    identity = { packageName: releaseInput.record.name, baseVersion, targetVersion: releaseInput.record.version };
   }
-  if (plan.workspaceLockfile && !plan.files.some((f) => f.path === plan.workspaceLockfile && f.kind === 'lockfile')) errors.push('workspaceLockfile must be in the exact file set');
   // The consumer half: the root manifest names the gates, every metadata path exists at the base and is
   // writable, and a consumer manifest is never a file of the package half.
-  const rootBytes = baseBytes(checkout, base, 'package.json');
-  if (!rootBytes) errors.push('the consumer root manifest must exist at the frozen base');
-  const rootManifest = rootBytes ? JSON.parse(rootBytes) : { scripts: {} };
-  const at = (file) => { const bytes = baseBytes(checkout, base, file); return bytes ? JSON.parse(bytes) : null; };
-  errors.push(...consumerPlanErrors(consumer, plan, rootManifest, { manifestAt: at, lockAt: at, exists: (file) => Boolean(baseBytes(checkout, base, file)) }));
-  for (const file of metadataPaths(consumer)) {
-    if (!writable(file)) errors.push(`metadata path lacks route write authority: ${file}`);
-    if (plan.files.some((f) => f.path === file) && file !== plan.workspaceLockfile) errors.push(`metadata path is also a package file: ${file}`);
+  let rootManifest = { scripts: {} };
+  if (runsConsumerHalf(mode)) {
+    const rootBytes = baseBytes(checkout, base, 'package.json');
+    if (!rootBytes) errors.push('the consumer root manifest must exist at the frozen base');
+    rootManifest = rootBytes ? JSON.parse(rootBytes) : { scripts: {} };
+    errors.push(...consumerPlanErrors(consumer, identity, rootManifest, { manifestAt: at, lockAt: at, exists: (file) => Boolean(baseBytes(checkout, base, file)) }));
+    for (const file of metadataPaths(consumer)) {
+      if (!writable(file)) errors.push(`metadata path lacks route write authority: ${file}`);
+      if (runsPackageHalf(mode) && plan.files.some((f) => f.path === file) && file !== plan.workspaceLockfile) errors.push(`metadata path is also a package file: ${file}`);
+    }
   }
   if (errors.length) throw new Error(errors.join('\n'));
-  return { root, branch, session, request, plan, consumer, route, checkout, base, packageDir, manifestPath, manifest, rootManifest, planHash: hash(JSON.stringify(plan)), consumerPlanHash: hash(JSON.stringify(consumer)) };
+  return { root, branch, session, request, mode, plan: identity, consumer, releaseInput, route, checkout, base, packageDir, manifestPath, manifest, rootManifest, planHash: runsPackageHalf(mode) ? hash(JSON.stringify(plan)) : null, consumerPlanHash: runsConsumerHalf(mode) ? hash(JSON.stringify(consumer)) : null };
 }
 
 export function snapshots(ctx) { return Object.fromEntries(ctx.plan.files.map(({ path: file }) => [file, fileHash(safePath(ctx.checkout, file))])); }
@@ -422,13 +496,21 @@ export function consumerProofErrors(ctx, proof, phase, finalHashes) {
   return errors;
 }
 
-// The package commit named by the delivery, as the base of the consumer half; the release the run
-// packed and its integrity, read from the artifact on disk.
-export function bindPackageCommit(ctx, delivery) {
-  ctx.packageCommit = delivery.commit;
-  const artifact = path.join(ctx.branch, releaseRef(ctx.plan));
-  ctx.artifact = artifact;
-  ctx.release = { version: ctx.plan.targetVersion, integrity: existsSync(artifact) ? integrityOf(readFileSync(artifact)) : null, artifact: releaseRef(ctx.plan) };
+// The release the consumer half installs, and the commit that half runs on — `packageCommit`, because
+// under `full` and `publish` it is the package delivery this branch committed. Under `consume` no
+// package half ran here: the release is the bound library-release of another branch, its archive sits
+// beside that record, and the commit the consumer half starts from is the frozen route base.
+export function bindRelease(ctx) {
+  if (runsPackageHalf(ctx.mode)) {
+    const delivery = json(path.join(ctx.branch, 'response/data/library.json'));
+    ctx.packageCommit = delivery.commit;
+    ctx.artifact = path.join(ctx.branch, releaseRef(ctx.plan));
+    ctx.release = { version: ctx.plan.targetVersion, integrity: existsSync(ctx.artifact) ? integrityOf(readFileSync(ctx.artifact)) : null, artifact: releaseRef(ctx.plan) };
+    return ctx;
+  }
+  ctx.packageCommit = ctx.base;
+  ctx.artifact = ctx.releaseInput.archive;
+  ctx.release = { version: ctx.releaseInput.record.version, integrity: ctx.releaseInput.record.digest, artifact: ctx.releaseInput.record.artifact };
   return ctx;
 }
 
@@ -444,55 +526,73 @@ export async function validateLibraryUpdateStep(branch, root = ROOT, preflight =
     if (base) { errors.push(...base.errors); if (base.response?.status !== 'done') return { errors }; }
     const ctx = await loadContext(branch, root);
     if (preflight) return { errors: worktreeErrors(ctx, { phase: 'pristine' }) };
+    const fields = base.response.fields ?? {};
+    // The receipt carries the sections of the halves this mode ran, and no others.
+    errors.push(...modeSectionErrors(ctx.mode, fields));
     const commits = base.response.commits ?? [];
-    if (commits.length !== 2) errors.push(`response.json records ${commits.length} commits; this job commits the package delivery and then the consumer metadata, in that order`);
+    const expectedCommits = ctx.mode === 'full' ? 2 : 1;
+    if (commits.length !== expectedCommits) errors.push(`response.json records ${commits.length} commits; mode ${ctx.mode} commits ${expectedCommits === 2 ? 'the package delivery and then the consumer metadata, in that order' : ctx.mode === 'publish' ? 'the package delivery alone' : 'the consumer metadata alone'}`);
+    let declared = [];
+    let packageCommit = null;
     // The package half.
-    const delivery = json(path.join(branch, 'response/data/library.json'));
-    const [packageCommit, consumerCommit] = commits;
-    if (delivery.commit !== packageCommit || delivery.base !== ctx.base || delivery.planHash !== ctx.planHash || delivery.packageName !== ctx.plan.packageName) errors.push('package delivery does not match the committed plan');
-    if (git(ctx.checkout, ['rev-list', '--parents', '-n', '1', packageCommit]) !== `${packageCommit} ${ctx.base}`) errors.push('package delivery must be exactly one single-parent commit after the base');
-    const changed = git(ctx.checkout, ['diff', '--name-only', '--no-renames', ctx.base, packageCommit]).split('\n').filter(Boolean).sort();
-    const declared = ctx.plan.files.map((f) => f.path).sort();
-    if (!same(changed, declared)) errors.push('package Git changes must equal the exact declared file set');
-    const finalHashes = Object.fromEntries(ctx.plan.files.map(({ path: file }) => { const bytes = baseWorkingBytes(ctx.checkout, packageCommit, file); return [file, bytes ? hash(bytes) : null]; }));
-    if (!same(delivery.files.map((f) => f.path).sort(), declared)) errors.push('delivery file set differs from plan');
-    for (const file of delivery.files) {
-      const old = baseBytes(ctx.checkout, ctx.base, file.path);
-      if (file.before !== (old ? hash(old) : null) || file.after !== finalHashes[file.path]) errors.push(`delivery hash mismatch: ${file.path}`);
+    if (runsPackageHalf(ctx.mode)) {
+      const delivery = json(path.join(branch, 'response/data/library.json'));
+      packageCommit = commits[0];
+      if (delivery.commit !== packageCommit || delivery.base !== ctx.base || delivery.planHash !== ctx.planHash || delivery.packageName !== ctx.plan.packageName) errors.push('package delivery does not match the committed plan');
+      if (git(ctx.checkout, ['rev-list', '--parents', '-n', '1', packageCommit]) !== `${packageCommit} ${ctx.base}`) errors.push('package delivery must be exactly one single-parent commit after the base');
+      const changed = git(ctx.checkout, ['diff', '--name-only', '--no-renames', ctx.base, packageCommit]).split('\n').filter(Boolean).sort();
+      declared = ctx.plan.files.map((f) => f.path).sort();
+      if (!same(changed, declared)) errors.push('package Git changes must equal the exact declared file set');
+      const finalHashes = Object.fromEntries(ctx.plan.files.map(({ path: file }) => { const bytes = baseWorkingBytes(ctx.checkout, packageCommit, file); return [file, bytes ? hash(bytes) : null]; }));
+      if (!same(delivery.files.map((f) => f.path).sort(), declared)) errors.push('delivery file set differs from plan');
+      for (const file of delivery.files) {
+        const old = baseBytes(ctx.checkout, ctx.base, file.path);
+        if (file.before !== (old ? hash(old) : null) || file.after !== finalHashes[file.path]) errors.push(`delivery hash mismatch: ${file.path}`);
+      }
+      const proofs = {};
+      const expectedRefs = packagePhases(ctx.plan).map((phase) => `response/data/proofs/${phase}.json`);
+      if (!same([...delivery.proofs].sort(), [...expectedRefs].sort()) || !same([...(fields['library-proof'] ?? [])].sort(), [...expectedRefs].sort())) errors.push('delivery and response must list the complete package proof set');
+      for (const ref of expectedRefs) if (existsSync(path.join(branch, ref))) proofs[path.basename(ref, '.json')] = json(path.join(branch, ref));
+      // Package proofs ran on the working tree before the package commit; the committed bytes are what
+      // they must have measured.
+      errors.push(...proofErrors(ctx, proofs, finalHashes));
     }
-    const proofs = {};
-    const expectedRefs = packagePhases(ctx.plan).map((phase) => `response/data/proofs/${phase}.json`);
-    if (!same([...delivery.proofs].sort(), [...expectedRefs].sort()) || !same([...(base.response.fields['library-proof'] ?? [])].sort(), [...expectedRefs].sort())) errors.push('delivery and response must list the complete package proof set');
-    for (const ref of expectedRefs) if (existsSync(path.join(branch, ref))) proofs[path.basename(ref, '.json')] = json(path.join(branch, ref));
-    // Package proofs ran on the working tree before the package commit; the committed bytes are what
-    // they must have measured.
-    const committedCtx = { ...ctx, checkout: ctx.checkout };
-    errors.push(...proofErrors(committedCtx, proofs, finalHashes));
-    // The consumer half.
-    bindPackageCommit(ctx, delivery);
-    if (base.response.fields['library-release'] !== releaseRef(ctx.plan)) errors.push(`response must list the packed release as ${releaseRef(ctx.plan)}`);
+    // The release: packed here under the package half, bound from another branch under `consume`.
+    bindRelease(ctx);
+    if (runsPackageHalf(ctx.mode)) {
+      if (fields['library-archive'] !== releaseRef(ctx.plan)) errors.push(`response must list the packed archive as ${releaseRef(ctx.plan)}`);
+      if (fields['library-release'] !== RELEASE_RECORD_REF) errors.push(`response must list the release record as ${RELEASE_RECORD_REF}`);
+      const record = json(path.join(branch, RELEASE_RECORD_REF));
+      if (record.name !== ctx.plan.packageName || record.version !== ctx.plan.targetVersion || record.artifact !== releaseRef(ctx.plan) || record.packageCommit !== packageCommit || record.digest !== ctx.release.integrity) errors.push('the release record does not identify the archive this branch packed from its package commit');
+      if (record.publication?.state !== 'pending') errors.push('no operator of this tree publishes to a registry, so the release record leaves its publication pending for a person');
+    }
     const release = releaseErrors(ctx, ctx.artifact);
     errors.push(...(release.errors ?? release));
-    const consumerDelivery = json(path.join(branch, 'response/data/dependency.json'));
-    if (consumerDelivery.base !== packageCommit || consumerDelivery.commit !== consumerCommit || consumerDelivery.planHash !== ctx.consumerPlanHash) errors.push('consumer delivery binding mismatch');
-    if (consumerDelivery.release?.integrity !== ctx.release.integrity || consumerDelivery.release?.version !== ctx.plan.targetVersion || consumerDelivery.release?.artifact !== releaseRef(ctx.plan)) errors.push('consumer delivery does not name the packed release this run produced');
-    if (git(ctx.checkout, ['rev-list', '--parents', '-n', '1', consumerCommit]) !== `${consumerCommit} ${packageCommit}`) errors.push('consumer delivery must be exactly one single-parent commit after the package commit');
-    if (git(ctx.checkout, ['rev-parse', 'HEAD']) !== consumerCommit) errors.push('the session branch head is not the consumer commit');
+    // The consumer half.
+    if (runsConsumerHalf(ctx.mode)) {
+      const consumerCommit = commits[expectedCommits - 1];
+      const consumerDelivery = json(path.join(branch, 'response/data/dependency.json'));
+      if (consumerDelivery.base !== ctx.packageCommit || consumerDelivery.commit !== consumerCommit || consumerDelivery.planHash !== ctx.consumerPlanHash) errors.push('consumer delivery binding mismatch');
+      if (consumerDelivery.release?.integrity !== ctx.release.integrity || consumerDelivery.release?.version !== ctx.plan.targetVersion || consumerDelivery.release?.artifact !== ctx.release.artifact) errors.push('consumer delivery does not name the release this branch consumed');
+      if (git(ctx.checkout, ['rev-list', '--parents', '-n', '1', consumerCommit]) !== `${consumerCommit} ${ctx.packageCommit}`) errors.push(`consumer delivery must be exactly one single-parent commit after the ${ctx.mode === 'consume' ? 'frozen base' : 'package commit'}`);
+      if (git(ctx.checkout, ['rev-parse', 'HEAD']) !== consumerCommit) errors.push('the session branch head is not the consumer commit');
+      const consumerChanged = git(ctx.checkout, ['diff', '--name-only', '--no-renames', ctx.packageCommit, consumerCommit]).split('\n').filter(Boolean).sort();
+      if (!same(consumerChanged, metadataPaths(ctx.consumer).sort())) errors.push('consumer Git diff changed outside the exact dependency metadata set');
+      errors.push(...consumerChangeErrors(ctx));
+      installedIdentity(ctx, 'after', ctx.artifact);
+      const hashes = consumerSnapshots(ctx);
+      if (!same(consumerDelivery.files, hashes)) errors.push('consumer delivery metadata hashes differ');
+      const phases = consumerPhases(ctx.consumer);
+      const refs = phases.map((phase) => `response/data/proofs/${phase}.json`), logs = phases.map((phase) => `response/artifacts/proofs/${phase}.log`);
+      if (!same([...consumerDelivery.proofs].sort(), [...refs].sort()) || !same([...(fields['dependency-proof'] ?? [])].sort(), [...refs].sort()) || !same([...(fields['dependency-log'] ?? [])].sort(), [...logs].sort())) errors.push('response must declare every consumer proof and log');
+      const consumerProofs = {};
+      for (const phase of phases) { const proof = json(path.join(branch, `response/data/proofs/${phase}.json`)); consumerProofs[phase] = proof; errors.push(...consumerProofErrors(ctx, proof, phase, hashes)); }
+      if (Date.parse(consumerProofs[consumerPhase('before')].finishedAt) > Date.parse(consumerProofs[consumerPhase('after')].startedAt)) errors.push('consumer before proof must precede consumer after proof');
+    } else if (git(ctx.checkout, ['rev-parse', 'HEAD']) !== packageCommit) errors.push('the session branch head is not the package commit');
     if (git(ctx.checkout, ['status', '--porcelain=v1', '--untracked-files=all'])) errors.push('delivery working tree must be clean');
-    const consumerChanged = git(ctx.checkout, ['diff', '--name-only', '--no-renames', packageCommit, consumerCommit]).split('\n').filter(Boolean).sort();
-    if (!same(consumerChanged, metadataPaths(ctx.consumer).sort())) errors.push('consumer Git diff changed outside the exact dependency metadata set');
-    errors.push(...consumerChangeErrors(ctx));
-    installedIdentity(ctx, 'after', ctx.artifact);
-    const hashes = consumerSnapshots(ctx);
-    if (!same(consumerDelivery.files, hashes)) errors.push('consumer delivery metadata hashes differ');
-    const phases = consumerPhases(ctx.consumer);
-    const refs = phases.map((phase) => `response/data/proofs/${phase}.json`), logs = phases.map((phase) => `response/artifacts/proofs/${phase}.log`);
-    if (!same([...consumerDelivery.proofs].sort(), [...refs].sort()) || !same([...(base.response.fields['dependency-proof'] ?? [])].sort(), [...refs].sort()) || !same([...(base.response.fields['dependency-log'] ?? [])].sort(), [...logs].sort())) errors.push('response must declare every consumer proof and log');
-    const consumerProofs = {};
-    for (const phase of phases) { const proof = json(path.join(branch, `response/data/proofs/${phase}.json`)); consumerProofs[phase] = proof; errors.push(...consumerProofErrors(ctx, proof, phase, hashes)); }
-    if (Date.parse(consumerProofs[consumerPhase('before')].finishedAt) > Date.parse(consumerProofs[consumerPhase('after')].startedAt)) errors.push('consumer before proof must precede consumer after proof');
     const md = readFileSync(path.join(branch, 'response/changes.md'), 'utf8');
-    if (!same((tableUnder(md, '## Files') ?? []).map(([file]) => file).sort(), [...new Set([...declared, ...metadataPaths(ctx.consumer)])].sort())) errors.push('changes receipt differs from the file sets of the two commits');
+    const receiptFiles = [...new Set([...declared, ...(runsConsumerHalf(ctx.mode) ? metadataPaths(ctx.consumer) : [])])].sort();
+    if (!same((tableUnder(md, '## Files') ?? []).map(([file]) => file).sort(), receiptFiles)) errors.push('changes receipt differs from the file sets this mode committed');
   } catch (error) { errors.push(error.message); }
   return { errors };
 }
