@@ -19,10 +19,16 @@ khuyên: xong nghĩa là có validator từ chối được vi phạm, và có b
 - [ ] Fail thì chạy lại đúng ô: lỗi nhỏ (dưới ba file, không đổi bố cục) → `*.fix`; lỗi lớn →
       `*.generate`; thước "nhỏ/lớn" ghi trong `resources/orchestrator.json`, không trong operator.
 
-## 2. Audit từng operator theo chuẩn
+## 2. Audit từng operator theo chuẩn: tách theo tính năng, một operator một việc
 
-Chuẩn: một artifact, một câu Done when, một quy trình tối đa 12 dòng lọt trong brief 2 KB, scope và
+Chuẩn: một operator làm đúng một việc, ứng với một tính năng của luồng (sinh trang, chấm trang, sửa
+trang, cấp tài khoản, seed dữ liệu, serve runtime, đi thử, publish); một artifact chính, một câu Done
+when không nối bằng "or" giữa hai việc, một quy trình tối đa 12 dòng lọt trong brief 2 KB, scope và
 context khai đủ để agent mù chạy được, log đủ để người đọc ledger dựng lại được việc.
+
+- [ ] Gate cho "một việc": `operator.json.primaryOutput` khai đúng một kind; Done when phải gọi tên kind
+      đó; `validate-operator` từ chối operator có hai primaryOutput hoặc Done when nối hai việc bằng
+      "or" ngoài mệnh đề chế độ (apply/dry, delta none).
 
 - [ ] Cờ `mode: inline | dispatch | isolated` trên `operator.json` thay cho `dispatch`; `isolated`
       chỉ đọc alias trong Context và file trong `inputs`, request thiếu input bắt buộc bị từ chối
