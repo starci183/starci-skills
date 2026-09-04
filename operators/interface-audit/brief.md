@@ -14,7 +14,7 @@ Primary output: `frontend-surface-audit`
 
 ## Inputs
 
-`frontend-source-application`, `frontend-presentation-resolution`, `frontend-direction-decision`, `route`, `uat-account` (optional), `platform-operation-receipt` (optional), `seed-receipt` (optional)
+`frontend-source-application`, `frontend-presentation-resolution`, `frontend-direction-decision`, `route`, `uat-account` (optional), `platform-operation-receipt` (optional), `seed-receipt` (optional), `units` (optional)
 
 ## Outputs
 

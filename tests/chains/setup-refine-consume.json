@@ -1,0 +1,84 @@
+{
+  "schemaVersion": 1,
+  "id": "setup-refine-consume",
+  "when": {
+    "en": "A delivered surface has findings at two owners: small ones repaired in place, one repaired at its library owner and consumed, then served, measured and walked again.",
+    "vi": "Một bề mặt đã giao có phát hiện ở hai chủ sở hữu: cái nhỏ sửa tại chỗ, một cái sửa ở owner thư viện rồi tiêu thụ, sau đó phục vụ, đo lại và đi thử lại."
+  },
+  "mission": {
+    "goal": "a delivered surface's findings are closed at their owners, then the surface is served, measured and walked again",
+    "doneWhen": [
+      {
+        "evidence": "the heading finding is fixed on the session branch",
+        "producedBy": "interface.fix"
+      },
+      {
+        "evidence": "the muted-contrast finding is fixed on the session branch",
+        "producedBy": "interface.fix"
+      },
+      {
+        "evidence": "the owner release carrying the hit-area repair is consumed at an exact version",
+        "producedBy": "library.update"
+      },
+      {
+        "evidence": "the served surface passes the audit with the closed findings measured",
+        "producedBy": "interface.audit"
+      },
+      {
+        "evidence": "the checkout's gates are green at the served head",
+        "producedBy": "quality.verify"
+      },
+      {
+        "evidence": "a person's journey completes on the served surface",
+        "producedBy": "uat.verify"
+      }
+    ]
+  },
+  "imported": [
+    {
+      "operatorId": "interface.generate",
+      "outputs": [
+        "frontend-direction-decision",
+        "ui-coverage",
+        "frontend-presentation-resolution",
+        "inventory",
+        "frontend-source-application"
+      ]
+    }
+  ],
+  "options": {
+    "requirements": {
+      "library.update": {
+        "mode": "consume"
+      }
+    }
+  },
+  "example": [
+    [
+      "environment.preflight"
+    ],
+    [
+      "workspace.bind#fe"
+    ],
+    [
+      "interface.fix"
+    ],
+    [
+      "interface.fix"
+    ],
+    [
+      "library.update"
+    ],
+    [
+      "interface.audit"
+    ],
+    [
+      "quality.verify"
+    ],
+    [
+      "uat.verify"
+    ]
+  ],
+  "ends": "user",
+  "note": "The two interface.fix lines are two branches of one operator without a plan (a fix has one finding); the generator outputs the fixes bind are imported from the session that delivered the surface, so no interface.generate branch is drawn. Written for the Setup rerun on 2.0.3."
+}

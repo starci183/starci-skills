@@ -64,6 +64,8 @@ test('the plan operator of a domain is <domain>.plan, and it is one whose Output
   assert.equal(planOperatorOf('uat.verify', packages)?.manifest.id, 'uat.plan');
   assert.equal(planOperatorOf('interface.generate', packages)?.manifest.id, 'interface.plan');
   assert.equal(planOperatorOf('git.publish', packages), null);
+  // Same domain, no units input: a fix is never fanned out through the plan it does not read.
+  assert.equal(planOperatorOf('interface.fix', packages), null);
   assert.ok(producesUnits(packages.find((p) => p.manifest.id === 'uat.plan')));
   assert.ok(!producesUnits(packages.find((p) => p.manifest.id === 'uat.verify')));
   // A <domain>.plan that does not declare units is not a plan operator.

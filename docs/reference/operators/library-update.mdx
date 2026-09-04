@@ -203,6 +203,8 @@ branch had no authority to write.
 | When | Operator |
 | --- | --- |
 | the package or consumer commits must pass independent quality verification | `quality.verify` |
+| the consumer commit is in place and the head must be served before the surface that raised the finding is observed | `runtime.serve` |
+| the release is consumed and the surface that raised the finding must be measured again | `interface.audit` |
 
 ---
 

@@ -129,6 +129,11 @@ context khai đủ để agent mù chạy được, log đủ để người đ�
       `validate-chain` (D2); cổng origin của `producer-import` kiểm output và byte, không kiểm `next` (D5);
       chuỗi hợp lệ trước khi request của nhánh bind tồn tại, kế hoạch mang `role` (D3); `gitPolicy` đúng
       kiểu route khai (D4).
+- [x] Hai tường của lần chạy Setup trên 2.0.3: id operator đã đổi tên trong bundle 1.x (`operators/retired.json`,
+      `scripts/retired-operators.mjs`, đọc bởi validate-response chế độ origin, producer-import, validate-chain); chuỗi
+      fix → consume → serve → audit có dòng Next (`interface.fix → runtime.serve|library.update`,
+      `library.update → runtime.serve|interface.audit`); chỉ operator khai Inputs `units` mới toả qua `<domain>.plan`
+      (`validate-request#planOperatorOf`, `interface.audit` khai `units`); fixture `tests/chains/setup-refine-consume.json`.
 - [x] Ba cửa hẹp lộ ra khi chứng minh kịch bản recovery trên 2.0.2 (tests/evidence/20260905-nivo-recovery-replan-on-2.0.2.md):
       D8 kế hoạch mang cả input import (`state.json.planned[N/M].inputs`, `validate-chain#readImportedInputs` đọc kế
       hoạch khi chưa có request, `validate-request#plannedRequirementErrors` giữ nguyên khi dispatch); D9 producer

@@ -163,6 +163,8 @@ moved, which claims they carry, and which surface must be measured or walked aga
 | --- | --- |
 | the fix is committed and the surface must be measured again | `interface.audit` |
 | the fix is committed and the checkout's own gates must run | `quality.verify` |
+| the fix is committed and the head must be served before it is measured | `runtime.serve` |
+| the fix is committed and a finding the library owner repaired must be consumed at an exact version | `library.update` |
 | the fix answered a UAT verdict and the journey must be walked again | `uat.verify` |
 
 ---

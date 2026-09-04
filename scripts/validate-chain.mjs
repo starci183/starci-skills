@@ -32,6 +32,7 @@ import { fileURLToPath } from 'node:url';
 import { loadOperatorPackages, cellAliases, kindOf, isYes } from './operator-md.mjs';
 import { loadAliasRegistry, baseOf } from './alias-registry.mjs';
 import { operatorEffects, planOperatorOf, plannedRequirementErrors } from './validate-request.mjs';
+import { loadRetired } from './retired-operators.mjs';
 import { validateImportedInput } from './producer-import.mjs';
 
 // Only a fully quoted cell is unquoted: a sentence that opens with a code span keeps its backticks.
@@ -223,9 +224,10 @@ export async function readBranchRequests(session, steps) {
 // (an origin this tree cannot name declares nothing the gate would accept). Each output is the
 // session-relative path a consuming request binds as inputs.<kind>. The planner reads this to treat
 // the kinds as already produced; the bytes are the import gate's (validateImportedInput).
-export async function readImportedSlots(session, graph = null) {
+export async function readImportedSlots(session, graph = null, root = null) {
   const out = [];
   if (!existsSync(session)) return out;
+  const retired = root ? loadRetired(root) : {};
   const numbered = (prefix) => (names) => names.filter((n) => new RegExp(`^${prefix}-\\d+$`).test(n)).sort((a, b) => Number(a.slice(prefix.length + 1)) - Number(b.slice(prefix.length + 1)));
   for (const stepDir of numbered('step')(await readdir(session))) {
     for (const parallelDir of numbered('parallel')(await readdir(path.join(session, stepDir)))) {
@@ -234,9 +236,10 @@ export async function readImportedSlots(session, graph = null) {
       let manifest; let response;
       try { manifest = JSON.parse(await readFile(path.join(dir, 'import.json'), 'utf8')); response = JSON.parse(await readFile(path.join(dir, 'response', 'response.json'), 'utf8')); } catch { continue; }
       const cell = cellOf(Number(stepDir.slice(5)), Number(parallelDir.slice(9)));
-      const node = graph ? graph.get(response.operatorId) ?? null : null;
+      // The operator standing for the origin today: itself, else the successors of a retired id (operators/retired.json).
+      const standing = graph ? (graph.has(response.operatorId) ? [graph.get(response.operatorId)] : (retired[response.operatorId] ?? []).map((id) => graph.get(id)).filter(Boolean)) : [];
       const outputs = {};
-      for (const [kind, ref] of Object.entries(response.fields ?? {})) if (!graph || node?.outputs.has(kind)) outputs[kind] = `${stepDir}/${parallelDir}/${Array.isArray(ref) ? ref[0] : ref}`;
+      for (const [kind, ref] of Object.entries(response.fields ?? {})) if (!graph || standing.some((n) => n.outputs.has(kind))) outputs[kind] = `${stepDir}/${parallelDir}/${Array.isArray(ref) ? ref[0] : ref}`;
       out.push({ cell, operatorId: response.operatorId ?? null, sourceSessionId: manifest.sourceSessionId ?? null, sourceStep: manifest.sourceStep ?? null, sourceParallel: manifest.sourceParallel ?? null, outputs });
     }
   }

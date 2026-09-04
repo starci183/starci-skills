@@ -153,7 +153,7 @@ const fixturesDir = path.join(root, 'tests', 'chains');
 const fixtures = await Promise.all((await readdir(fixturesDir)).filter((f) => f.endsWith('.json')).sort().map(async (f) => JSON.parse(await readFile(path.join(fixturesDir, f), 'utf8'))));
 const strip = (id) => id.split('#')[0];
 test('every fixture names its mission, its example chain and its end, and its id equals its file name', async () => {
-  assert.equal(fixtures.length, 13);
+  assert.equal(fixtures.length, 14);
   for (const fx of fixtures) {
     assert.ok(fx.mission?.doneWhen?.length, `${fx.id}: mission.doneWhen`);
     assert.ok(Array.isArray(fx.example) && fx.example.length, `${fx.id}: example`);
@@ -168,10 +168,13 @@ for (const fx of fixtures) {
     const needed = [...new Set([...fx.example.flat().map(strip), ...fx.mission.doneWhen.map((l) => l.producedBy)])];
     const missing = needed.filter((id) => !realGraph.has(id));
     if (missing.length) return t.skip(`this tree does not carry ${missing.join(', ')} yet`);
-    const p = planChain({ packages: real, mission: fx.mission, options: { graph: realGraph, maxParallel, roles: fx.options?.roles ?? [], requirements: fx.options?.requirements ?? {} } });
+    // A fixture may declare producers an earlier session delivered: the slots the planner would read from the session, as import.json leaves them.
+    const imported = (fx.imported ?? []).map((slot, i) => ({ cell: `0/${i + 1}`, operatorId: slot.operatorId, sourceSessionId: 'fixture', sourceStep: 1, sourceParallel: 1, outputs: Object.fromEntries(slot.outputs.map((k) => [k, `step-0/parallel-${i + 1}/response/${k}`])) }));
+    const p = planChain({ packages: real, mission: fx.mission, options: { graph: realGraph, maxParallel, roles: fx.options?.roles ?? [], requirements: fx.options?.requirements ?? {}, imported } });
     // Accepted by the gate.
     const byBranch = {}; for (const [c, op] of Object.entries(p.steps)) byBranch[c] = { operatorId: op, requirements: p.presets[c] ?? {}, goal: p.goals[c] };
-    assert.deepEqual(validateChain(root, real, p.chain, p.steps, byBranch, { graph: realGraph, mission: fx.mission, maxParallel }), []);
+    const credited = Object.fromEntries(Object.entries(p.imports ?? {}).map(([c, kinds]) => [c, new Set(Object.keys(kinds))]));
+    assert.deepEqual(validateChain(root, real, p.chain, p.steps, byBranch, { graph: realGraph, mission: fx.mission, maxParallel, imported: credited }), []);
     // Every example operator is there, no example order is inverted, and the end matches.
     const planned = ops(p);
     const at = (id) => planned.findIndex((step) => step.includes(id));

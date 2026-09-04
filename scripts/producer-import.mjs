@@ -3,6 +3,7 @@ import { createHash } from 'node:crypto';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { loadOperatorPackages, kindOf } from './operator-md.mjs';
+import { packageForOrigin } from './retired-operators.mjs';
 
 const ROOT=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'..');
 const ID=/^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/;
@@ -84,8 +85,8 @@ export async function validateImportedInput(root,session,inputRef,kind,{hostRoot
     const relative=path.relative(r.target,within(session,inputRef)).split(path.sep).join('/');
     const fields=origin.response.fields?.[kind],refs=Array.isArray(fields)?fields:[fields];
     if(!refs.includes(relative))throw Error('referenced import was not an output emitted by its original producer');
-    const packages=await loadOperatorPackages(root),pkg=packages.find(p=>p.manifest.id===origin.request.operatorId);
-    if(!pkg?.en.tables.outputs?.rows.some(row=>kindOf(row.kind)===kind))throw Error('import kind is not an output the original operator declares');
+    const packages=await loadOperatorPackages(root),pkg=packageForOrigin(root,packages,origin.request.operatorId,kind);
+    if(!pkg)throw Error('import kind is not an output the original operator declares');
     return [];
   }catch(error){return [`request.json: import ${kind}: ${error.message}`];}
 }

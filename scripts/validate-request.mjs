@@ -312,10 +312,15 @@ export async function fixKindErrors(root, state, request, sessionRoot, { size = 
 // `<domain>.plan`, the domain being the first segment of an operator id (`uat.verify` → `uat`).
 export const domainOfId = (operatorId) => String(operatorId ?? '').split('.')[0];
 export const producesUnits = (pkg) => (pkg?.en?.tables?.outputs?.rows ?? []).some((r) => kindOf(r.kind) === 'units');
+// The plan is the execute operator's only when that operator binds the plan's list: an Inputs row of
+// kind `units`. An operator of the same domain that binds no units (a fix answers one finding) is run
+// twice as two branches, never fanned out through a plan it does not read.
+export const bindsUnits = (pkg) => (pkg?.en?.tables?.inputs?.rows ?? []).some((r) => kindOf(r.kind) === 'units');
 export function planOperatorOf(operatorId, packages) {
   const id = `${domainOfId(operatorId)}.plan`;
   const pkg = (packages ?? []).find((p) => p.manifest?.id === id);
-  return pkg && producesUnits(pkg) ? pkg : null;
+  const execute = (packages ?? []).find((p) => p.manifest?.id === operatorId);
+  return pkg && producesUnits(pkg) && (execute ? bindsUnits(execute) : false) ? pkg : null;
 }
 // The fan-out gate. A branch that runs one unit names it in request.json.unit and binds the plan's file
 // as inputs.units, a units.json an earlier branch produced; the id must be one that file carries, and

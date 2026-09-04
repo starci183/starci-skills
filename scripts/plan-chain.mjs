@@ -283,7 +283,7 @@ export async function planSession(root, session, flags = {}) {
   if (!state.mission) throw new PlanError(['state.json carries no mission; the chain is planned from mission.doneWhen']);
   const packages = await loadOperatorPackages(root);
   const graph = await loadOperatorGraph(root, packages);
-  const imported = await readImportedSlots(session, graph);
+  const imported = await readImportedSlots(session, graph, root);
   const plan = planChain({ packages, mission: state.mission, options: { graph, maxParallel: await loadMaxParallel(root), roles: flags.roles ?? [], requirements: flags.requirements ?? {}, imported } });
   return { state, plan };
 }

@@ -42,7 +42,8 @@ test('the graph reads primary output, inputs with their named sources, roles, wr
   assert.equal(primaryProducerOf(graph, 'frontend-surface-audit'), 'interface.audit');
   assert.deepEqual(producersOf(graph, 'route'), ['workspace.bind']);
   assert.equal(planOf(graph, 'interface.generate').id, 'interface.plan');
-  assert.equal(planOf(graph, 'interface.audit').id, 'interface.plan', 'a plan operator is the domain\'s: every other operator of the domain executes its units');
+  assert.equal(planOf(graph, 'interface.audit').id, 'interface.plan', "an operator that binds the plan's units executes them one per branch");
+  assert.equal(planOf(graph, 'interface.fix'), null, 'an operator of the domain that binds no units is never fanned out');
   assert.equal(planOf(graph, 'interface.plan'), null);
   assert.equal(planOf(graph, 'quality.verify'), null);
   assert.equal(writesSurface(graph.get('interface.generate')), true);

@@ -16,6 +16,7 @@ import { checkDocument, loadKindTemplates } from './validate-templates.mjs';
 import { loadOperatorPackages, kindOf, isYes, exchangeOf } from './operator-md.mjs';
 import { loadErrorsRegistry } from './errors-registry.mjs';
 import { sessionRootOf } from './validate-request.mjs';
+import { packageForOrigin } from './retired-operators.mjs';
 import { loadInteractionPolicy, interactionErrors } from './validate-interaction.mjs';
 import { secretErrors } from './sweep-secrets.mjs';
 
@@ -164,7 +165,8 @@ export async function validateResponse(root, dir, { requirements = {}, exchange 
   if (response.status !== 'waiting' && response.awaiting !== undefined) errors.push(`${rel('response/response.json')}: only a waiting response carries awaiting`);
   if ((response.exchange ?? null) !== exchange) errors.push(`${rel('response/response.json')}: exchange ${response.exchange ?? 'none'} does not match the folder ${exchange ?? 'none'}`);
   packages ??= await loadOperatorPackages(root);
-  const pkg = packages.find((p) => p.manifest.id === response.operatorId);
+  // An origin frozen under an older tree may name an id this tree retired: it is judged by the package that produces its kinds today (operators/retired.json).
+  const pkg = packages.find((p) => p.manifest.id === response.operatorId) ?? (origin ? packageForOrigin(root, packages, response.operatorId) : null);
   if (!pkg) { errors.push(`response.json: unknown operator ${response.operatorId}`); return { errors, response, present: new Set() }; }
   if (pkg.shape !== 'v9') { errors.push(`${response.operatorId} is not an operator.md package`); return { errors, response, present: new Set() }; }
   kinds ??= await loadKindTemplates(root);
@@ -182,7 +184,9 @@ export async function validateResponse(root, dir, { requirements = {}, exchange 
     const declaredFile = exchange ? unquote(row.file).replace(`${exchange}/`, '') : unquote(row.file);
     const value = response.fields?.[kind];
     const files = value === undefined ? [] : Array.isArray(value) ? value : [value];
-    if (files.length === 0) { if (isYes(row.required) && response.status === 'done') errors.push(`${rel('response/response.json')}: required output ${kind} is not in fields`); continue; }
+    // An origin frozen under a retired id owed the outputs of its own operator, not its successor's: only what it declares is judged. An origin of an operator that still exists owes today's required outputs.
+  const renamed = origin && pkg.manifest.id !== response.operatorId;
+    if (files.length === 0) { if (isYes(row.required) && response.status === 'done' && !renamed) errors.push(`${rel('response/response.json')}: required output ${kind} is not in fields`); continue; }
     present.add(kind);
     const re = patternOf(declaredFile);
     for (const f of files) {
