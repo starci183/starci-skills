@@ -103,6 +103,54 @@ export function sessionBudgetErrors(state, request) {
   return errors;
 }
 
+// The tools whose declaration in operator.json → resources.tools means the operator writes routed source
+// or touches a runtime. Whether a mission needs its goal confirmed is decided from the tools the
+// operators in its chain declare, never from a list of operator ids: an operator that gains
+// @tools/sourcewrite tomorrow needs the confirmation tomorrow without this file changing. A tool held
+// in mode never or read only inspects (git read, container read, database read) and counts for nothing.
+export const EFFECT_TOOLS = ['sourcewrite', 'git', 'container', 'database', 'browsercontrol', 'host'];
+const READ_ONLY_MODES = ['never', 'read'];
+export const goalDecisionId = (sessionId, version) => `goal:${sessionId}:v${version}`;
+export function operatorEffects(pkg) {
+  return Object.entries(pkg?.manifest?.resources?.tools ?? {})
+    .map(([id, mode]) => ({ id: id.replace(/^@tools\//, ''), mode }))
+    .filter(({ id, mode }) => EFFECT_TOOLS.includes(id) && !READ_ONLY_MODES.includes(mode));
+}
+// The mission writes routed source or touches a runtime when any operator the chain names does.
+export function missionTouchesRuntime(operatorIds, packages) {
+  return operatorIds.map((id) => packages.find((p) => p.manifest?.id === id)).some((pkg) => operatorEffects(pkg).length > 0);
+}
+// The mission's goal is confirmed by the person before anything runs. For a mission that writes routed
+// source or touches a runtime, state.json carries mission (the goal, its inclusions and exclusions, and
+// what counts as done, each done-when line naming the operator whose receipt is that evidence), and its
+// latest version is confirmed by a goal-confirm choice the person selected as-stated. A corrected
+// version was asked again as the next version, so an unconfirmed or corrected latest version runs
+// nothing. Like brief and budget, the gate applies only to a live session (one with a transition) or
+// one that already carries a mission: the self-test fixtures write a bare state.json with neither, and
+// they stay green; the session gate catches a chain that dispatched without a mission at its first
+// transition. `request` may be null when the check runs over the whole session.
+export function missionGateErrors(state, request, packages, policy = { selectionSource: 'user' }) {
+  const errors = [];
+  if (!state) return errors;
+  const live = (state.transitions ?? []).length > 0 || state.mission !== undefined;
+  if (!live) return errors;
+  const operatorIds = [...new Set([...Object.values(state.steps ?? {}), ...(request?.operatorId ? [request.operatorId] : [])])];
+  if (!missionTouchesRuntime(operatorIds, packages)) return errors;
+  const refuse = (what) => errors.push(`state.json: the mission's goal is not confirmed: ${what}`);
+  const mission = state.mission;
+  if (!mission) { refuse('no mission block; the chain writes routed source or touches a runtime, so the goal, its inclusions and exclusions and what counts as done are printed to the person and confirmed before anything runs'); return errors; }
+  for (const line of mission.doneWhen ?? []) if (!packages.some((p) => p.manifest?.id === line.producedBy)) refuse(`doneWhen "${line.evidence}" names ${line.producedBy}, which is not an operator`);
+  const sessionId = state.id ?? request?.sessionId;
+  const decisionId = goalDecisionId(sessionId, mission.version);
+  const choice = state.choices?.[decisionId];
+  if (!choice) { refuse(`no choices["${decisionId}"]; the person answers the goal-confirm question and the answer is recorded before the first dispatch`); return errors; }
+  if (choice.selected === 'corrected') refuse(`version ${mission.version} was corrected; the corrected goal is written as version ${mission.version + 1} and asked again`);
+  else if (choice.selected !== 'as-stated') refuse(`choices["${decisionId}"].selected is ${choice.selected}, not as-stated`);
+  if (choice.selectedBy !== policy.selectionSource) refuse(`choices["${decisionId}"] is selected by ${choice.selectedBy}, never by an agent`);
+  if (typeof choice.sourceRef !== 'string' || !choice.sourceRef.trim()) refuse(`choices["${decisionId}"] carries no sourceRef to the person's message`);
+  return errors;
+}
+
 export async function validateRequest(root, dir, packages) {
   const errors = [];
   if(existsSync(path.join(dir,'import.json')))return {errors:['request.json: an imported producer slot is evidence-only and cannot execute an operator'],request:null};
@@ -119,6 +167,7 @@ export async function validateRequest(root, dir, packages) {
   const op = pkg.en;
   const sessionRoot = sessionRootOf(dir);
   let recordedChoices = {};
+  const policy = await loadInteractionPolicy(root);
 
   if (request.exchange) {
     // A nested exchange: it must be one the operator's Outputs declare, and it carries no person-facing requirements.
@@ -156,6 +205,8 @@ export async function validateRequest(root, dir, packages) {
       // From the first transition on, the session carries the orchestrator's brief and its budget, and a
       // request past a cap is refused unless a recorded user choice of continue extended it.
       errors.push(...sessionBudgetErrors(state, request));
+      // A mission that writes routed source or touches a runtime runs nothing until the person confirmed its goal.
+      errors.push(...missionGateErrors(state, request, packages, policy));
       const key = `${request.step}/${request.parallel}${request.exchange ? `/${request.exchange}` : ''}`;
       const expected = state.requestHashes?.[key];
       if (expected) {
@@ -165,7 +216,7 @@ export async function validateRequest(root, dir, packages) {
       }
     } catch (e) { errors.push(`state.json: ${e.message}`); }
   }
-  errors.push(...selectionErrors(await loadInteractionPolicy(root), request, recordedChoices));
+  errors.push(...selectionErrors(policy, request, recordedChoices));
   if (!errors.length && request.operatorId === 'workspace.bind' && !request.exchange) {
     const { validateWorkspaceCheckoutRequest } = await import('./workspace-checkout.mjs');
     errors.push(...validateWorkspaceCheckoutRequest(root, request, dir));

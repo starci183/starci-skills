@@ -28,6 +28,14 @@ Ghi một cây đã resolve vào source sản phẩm trên nhánh phiên, bên t
 một tập file đã khai, chỉ phát ra những giá trị mà resolution được bind đã chứa sẵn, và chịu trách
 nhiệm cho từng byte đã vào repository trong đúng một commit.
 
+## Xong khi
+
+Xong khi, dưới mode apply, `frontend-source-application` cùng `changes` của nó ghi nhận đúng một
+commit trên nhánh phiên mà `writes` ghi mọi đường dẫn đã khai với hash trước và sau, mọi giá trị đã
+ghi có mặt trong inventory của resolution được bind, lượt quét trình bày trên write set đã chiếu
+không thấy gì, và cây đọc lại tại commit bằng đúng cây đã resolve; hoặc, dưới mode dry, `writes`
+mang kế hoạch với commit null và checkout không bị đụng tới.
+
 ## Người ghi duy nhất
 
 Đây là operator duy nhất trong chuỗi frontend ghi source sản phẩm. Direction quyết dựng cái gì và

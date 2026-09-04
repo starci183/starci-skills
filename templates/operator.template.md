@@ -4,6 +4,12 @@
 
 One sentence: the single thing this operator decides or produces, and what it proves it against.
 
+## Done when
+
+One sentence: the condition under which the branch ends done, stated as what must be true and
+naming in backticks at least one Outputs `kind-name` that proves it; a mode or branch that ends done
+in another shape gets its own clause of the same sentence.
+
 ## <Any law the operator carries>
 
 Free sections between Job and Context hold the operator's own law: what it refuses, what it never
@@ -59,6 +65,7 @@ treats as a reason, what it must observe before it proposes. Prose, not tables.
   "title": { "en": "^# [a-z]+(?:\\.[a-z]+)+$", "vi": "^# [a-z]+(?:\\.[a-z]+)+$" },
   "sections": [
     { "en": "^## Job$", "vi": "^## Việc$" },
+    { "en": "^## Done when$", "vi": "^## Xong khi$" },
     { "free": true },
     { "en": "^## Context$", "vi": "^## Context$", "table": { "en": "| Alias | Bind | Required |", "vi": "| Alias | Bind | Bắt buộc |" }, "minRows": 1 },
     { "en": "^## Inputs$", "vi": "^## Đầu vào$", "table": { "en": "| Kind | From | Required |", "vi": "| Kind | Từ đâu | Bắt buộc |" } },

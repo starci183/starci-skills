@@ -28,6 +28,12 @@ Run, once and before any chain, every readiness check a mission would otherwise 
 time — declarations, checkouts, identity custody, the runtime, the host and the environment's
 approvals — and return them all at once as one typed readiness report, repairing nothing.
 
+## Done when
+
+Done when the `readiness-report` carries an answer of ok, wall or skipped for every check of the
+closed vocabulary across every requested role and every operation class, no check answers wall, and
+the `environment-readiness` receipt names the declaration it read by path and hash.
+
 ## Every wall at once
 
 A mission that discovers its walls in sequence pays for each one separately: a route nobody

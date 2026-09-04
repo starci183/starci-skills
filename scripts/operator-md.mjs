@@ -6,8 +6,8 @@ import { readFile } from 'node:fs/promises';
 import path from 'node:path';
 
 export const HEADINGS = {
-  en: { job: '## Job', context: '## Context', inputs: '## Inputs', requirements: '## Requirements', steps: '## Steps', outputs: '## Outputs', stops: '## Stops', next: '## Next' },
-  vi: { job: '## Việc', context: '## Context', inputs: '## Đầu vào', requirements: '## Yêu cầu', steps: '## Các bước', outputs: '## Đầu ra', stops: '## Dừng', next: '## Kế tiếp' },
+  en: { job: '## Job', doneWhen: '## Done when', context: '## Context', inputs: '## Inputs', requirements: '## Requirements', steps: '## Steps', outputs: '## Outputs', stops: '## Stops', next: '## Next' },
+  vi: { job: '## Việc', doneWhen: '## Xong khi', context: '## Context', inputs: '## Đầu vào', requirements: '## Yêu cầu', steps: '## Các bước', outputs: '## Đầu ra', stops: '## Dừng', next: '## Kế tiếp' },
 };
 export const COLUMNS = {
   context: ['alias', 'bind', 'required'],
@@ -44,9 +44,12 @@ export function parseOperatorMd(text, lang = 'en') {
     const to = idx + 1 < heads.length ? heads[idx + 1].i : lines.length;
     return { from, to, line: heads[idx].i + 1 };
   };
-  const out = { id: (lines[0] ?? '').replace(/^#\s*/, '').replace(/`/g, '').trim(), lang, tables: {}, job: '' };
-  const job = sectionOf(h.job);
-  if (job) out.job = lines.slice(job.from, job.to).map((l) => l.trim()).filter(Boolean).join(' ');
+  // Prose sections are joined into one line; `headings` keeps every `## ` heading in file order so a
+  // validator can check where a section sits, not only that it exists.
+  const prose = (sec) => (sec ? lines.slice(sec.from, sec.to).map((l) => l.trim()).filter(Boolean).join(' ') : '');
+  const out = { id: (lines[0] ?? '').replace(/^#\s*/, '').replace(/`/g, '').trim(), lang, tables: {}, job: '', doneWhen: '', headings: heads.map((x) => x.l) };
+  out.job = prose(sectionOf(h.job));
+  out.doneWhen = prose(sectionOf(h.doneWhen));
   for (const key of Object.keys(COLUMNS)) {
     const sec = sectionOf(h[key]);
     if (!sec) { out.tables[key] = null; continue; }

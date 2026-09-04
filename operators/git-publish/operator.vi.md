@@ -5,6 +5,14 @@
 Publish một ranh giới Git đã được duyệt từ đúng commit mà quality đã kiểm định, theo ngữ nghĩa
 non-force và chỉ fast-forward, và dừng bằng một lỗi có kiểu thay vì với tay sang một đường tắt.
 
+## Xong khi
+
+Xong khi `git-publication` ghi nhận rằng đúng commit mà biên nhận quality đã đo đã tới ref được
+route trên remote bằng một lần push non-force tạo mới hoặc fast-forward ref ấy với mọi hook đã qua,
+nhánh phiên đã được merge và không bao giờ rebase, nhiều nhất một tag có chú thích trỏ vào head mà
+chính lần publish này đã push, và worktree, nhánh cùng thư mục phiên đã được gỡ với chủ runtime được
+yêu cầu đích danh dừng server nó đã khởi động.
+
 ## Nó không quyết gì về bản thân thay đổi
 
 Việc thay đổi có đúng hay không đã được quyết bởi các cổng sinh ra biên bản `quality-verification`,

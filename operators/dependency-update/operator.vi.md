@@ -5,6 +5,13 @@
 Nhận một bản package đã kiểm chứng bằng cách chỉ đổi metadata dependency chính xác, rồi chứng minh
 regression consumer không đổi cùng toàn bộ gate bàn giao trước một commit session.
 
+## Xong khi
+
+Xong khi `dependency-update` ghi nhận đúng một commit phiên mà delta metadata của nó chỉ chạm các
+mục dependency được nêu tên trong các manifest và lockfile đã khai, package đã cài khớp từng file
+với bản phát hành đã kiểm digest, và mỗi `dependency-proof` cùng `dependency-log` thô của nó cho
+thấy regression không đổi và mọi gate đã khai đạt trên commit ấy, mà `changes` nêu các đường dẫn.
+
 ## Ranh giới
 
 Plan pin base consumer, phiên bản, manifest consumer và npm lockfile chính xác, URL/integrity của

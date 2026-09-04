@@ -15,6 +15,15 @@ Record an actual answer in `state.json.choices[decisionId]` with `selected`, `se
 Do not create a new decision id merely to ask the same question again. A mission without a material
 choice needs no choice record.
 
+A `goal-confirm` question is asked once, at the start of a mission that will write routed source or
+touch a runtime, and never for read-only work: the orchestrator prints the block `state.json.mission`
+holds — goal, inclusions and exclusions, the done-when lines — as at most four lines in the person's
+language with one question, and records the answer at `state.json.choices["goal:<sessionId>:v<version>"]`.
+`corrected` writes the next version and asks again; only a latest version selected `as-stated` lets
+anything run (`scripts/validate-request.mjs#missionGateErrors`, `scripts/validate-session.mjs`). Whether
+a mission writes or touches a runtime is read from the tools its operators declare, never from a list
+of operator ids.
+
 The standalone `scripts/validate-interaction.mjs <branch>` gate and the generic response gate check
 proposed questions. These gates validate communication only; passing them authorizes no operation.
 

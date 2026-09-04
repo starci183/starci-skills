@@ -14,6 +14,15 @@ trỏ tới tin nhắn người dùng. Request tiếp tục mang `decisionId`, `
 với bản ghi đó. Đề xuất của agent không phải lựa chọn của người dùng. Không tạo id mới chỉ để hỏi
 lại cùng một điều. Nhiệm vụ không có lựa chọn khác biệt thì không cần bản ghi lựa chọn.
 
+Câu hỏi `goal-confirm` được hỏi một lần, ở đầu nhiệm vụ sẽ ghi source đã route hay chạm tới một
+runtime, và không bao giờ cho việc chỉ đọc: orchestrator in khối mà `state.json.mission` giữ — mục
+tiêu, phần bao gồm và loại trừ, các dòng "xong khi" — thành tối đa bốn dòng bằng ngôn ngữ của người
+kèm một câu hỏi, rồi ghi câu trả lời vào `state.json.choices["goal:<sessionId>:v<version>"]`.
+`corrected` viết phiên bản kế tiếp rồi hỏi lại; chỉ phiên bản mới nhất được chọn `as-stated` mới cho
+phép chạy bất cứ gì (`scripts/validate-request.mjs#missionGateErrors`, `scripts/validate-session.mjs`).
+Nhiệm vụ có ghi hay chạm runtime hay không được đọc từ các tool mà operator của nó khai, không bao
+giờ từ một danh sách id operator.
+
 Gate độc lập `scripts/validate-interaction.mjs <branch>` và gate response chung kiểm câu hỏi dự kiến.
 Các gate này chỉ kiểm giao tiếp; qua gate không cấp quyền thực hiện thao tác nào.
 

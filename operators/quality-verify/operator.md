@@ -5,6 +5,16 @@
 Verify one bounded delivery by running its declared gates against an unchanged predecessor receipt
 at one frozen head, and return the exact measured verdict, repairing nothing.
 
+## Done when
+
+Done when the `quality-verification` states one measured verdict, pass or fail, over a delivery
+whose predecessor receipts all name the frozen head, with one `gate-result` per declared gate
+carrying its command, exit code, evidence and classification, `coverage` preserving every configured
+and requested threshold beside its measured value whenever a unit gate ran, every red gate
+classified to its owner or covered by a live approved debt, every topic row of the scorecard copied
+unchanged from the receipt that computed it, and the admitted `audit-scope` copied unchanged when
+the audit carried one.
+
 ## One delivery, one head, at least one producer receipt
 
 The three Inputs are the three shapes a delivery arrives in: a backend implementation, a frontend

@@ -1,36 +1,25 @@
 # library.source.apply — brief
 
-Generated from `operators/library-source-apply/operator.md`. Profile `luna`, dispatch `fresh`. Read operator.md for the step you are on; write only response/ of your branch; replace the running skeleton in response.json before you exit. A stop marked * is a fallback.
+Read operator.md at your step; write only response/ of your branch; replace the running response.json skeleton before you exit; * marks a fallback stop.
 
 ## Job
 
 Repair existing behavior inside one explicitly authorized owner package, prove its regression and package gates, and commit exactly one next-patch delivery on the bound session branch.
 
+## Done when
+
+Done when the `library-source-application` records exactly one one-parent commit on the session branch whose change set is the declared file set inside the authorized owner package and nothing else, `library-proof` records whose hashes match the committed bytes show the paired regression failing before and passing after and every existing test, typecheck and build script passing unfiltered, and the `changes` names the same paths.
+
 ## Inputs
 
-| Kind | Required |
-| --- | --- |
-| `route` | yes |
-
-## Requirements
-
-| Field | Type | Default |
-| --- | --- | --- |
-| `plan` | object | — |
-| `resume` | token | null |
+`route`
 
 ## Outputs
 
-| Kind | File | Type | Required |
-| --- | --- | --- | --- |
-| `library-source-application` | `response/data/library.json` | data | yes |
-| `library-proof` | `response/data/proofs/<phase>.json` | data | yes |
-| `changes` | `response/changes.md` | md | yes |
+`library-source-application` `response/data/library.json`
+`library-proof` `response/data/proofs/<phase>.json`
+`changes` `response/changes.md`
 
 ## Stops
 
 `INVALID_INPUT`, `SOURCE_DRIFT`, `NO_PROGRESS`, `LIBRARY_BOUNDARY_REJECTED`, `LIBRARY_PROOF_FAILED`
-
-## Next
-
-`quality.verify`

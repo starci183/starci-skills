@@ -17,8 +17,8 @@ operator dựa trên kết quả có kiểu.
    nên thiếu một route là lỗi build. `workflows/` giữ các chuỗi mẫu mà cửa vào dùng lại.
 3. `resources/`: profile thực thi nào chạy từng vai trò của operator, nó được dùng quyền nào lúc
    chạy, và câu trả lời thường trực về tìm mạng, ràng Grammar, sinh hình. Cũng được kiểm.
-4. Đúng một operator mà nhiệm vụ cần: `operator.md` (Việc, Context, Đầu vào, Yêu cầu, Các bước, Đầu ra,
-   Dừng, Kế tiếp) cùng `operator.json` (id, domain, resources). Mã dừng tra ở bảng Mã dừng trong `operators/INDEX.md`.
+4. Đúng một operator mà nhiệm vụ cần: `operator.md` (Việc, Xong khi, Context, Đầu vào, Yêu cầu, Các bước,
+   Đầu ra, Dừng, Kế tiếp) cùng `operator.json` (id, domain, resources). Mã dừng tra ở bảng Mã dừng trong `operators/INDEX.md`.
 5. Chỉ những topic knowledge mà operator đó bind.
 
 Không nạp trước cả cây. Một operator bind tập topic nhỏ nhất mà quyết định của nó cần, mỗi topic kèm

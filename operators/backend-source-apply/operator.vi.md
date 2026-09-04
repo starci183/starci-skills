@@ -5,6 +5,15 @@
 Cài đặt một kết quả backend bên trong một contract mutation đã đóng băng, theo đúng họ anh em quan
 sát được, và trả về biên nhận conformance cùng proof đo được cho thấy ranh giới không bị nới ra.
 
+## Xong khi
+
+Xong khi, dưới mode apply, `backend-source-application` cùng `changes` của nó ghi nhận đúng một
+commit trên nhánh phiên mà `mutations` nhắc lại nguyên vẹn mọi operation của contract và ghi từng
+file bị chạm với hash trước và sau, mọi facet đã khai có bản ghi `conformance` và mọi proof đã khai
+có bản ghi `proof` đã đạt, và mọi đường dẫn ghi ngoài ranh giới owner mang dòng nới rộng của nó;
+hoặc, dưới mode dry, `mutations` mang các operation nó sẽ điền và các đường dẫn nó sẽ chạm với
+commit null, không hash sau, không `conformance` và không `proof`, và checkout không bị đụng tới.
+
 ## Contract đóng băng trước lần ghi đầu tiên
 
 Contract tới dưới dạng Đầu vào `architecture-decision`, có fingerprint và đã đóng. Các operation,

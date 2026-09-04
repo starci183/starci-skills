@@ -6,6 +6,15 @@ Decide one evidence-backed, implementation-ready frontend direction for one auth
 prove it against the business promise, the published Grammar, the observed implementation and a
 falsification pass that no candidate survives by taste.
 
+## Done when
+
+Done when the `frontend-direction-decision` names one selected direction that survived every
+falsification attack, declares its surface class, its presentation delta and its reference standards
+by class, and carries the scores and declared limits of every rendered candidate, the `ui-coverage`
+closes the state set under the same surface class, and every candidate that had to be rendered
+exists as `candidates` served over `host` and printed with a capture per viewport before the
+decision was written.
+
 ## The change level decides what must be bound
 
 The change level is the request's own authority and current source never proves it: an audit that

@@ -28,6 +28,15 @@ Quyết và publish một lời hứa nghiệp vụ có bằng chứng thành th
 băng sau một ma trận phủ đầy đủ từ lời hứa tới điểm thực thi, hoặc đối chiếu chính head đã publish ấy
 với source thực sự đã được giao.
 
+## Xong khi
+
+Xong khi một head feature đã được publish dưới lease độc quyền và `model` nói đúng những gì head ấy
+đang giữ, `claims` tách mọi quan sát theo vai với mọi fact claim ràng vào head source đóng băng, và
+hoặc, dưới mode model, `restatement` đã xác nhận của lời hứa đi cùng `business-promise-authority` và
+`coverage-matrix` cho mọi dimension đã khai cùng mọi consumer phát hiện được đúng một disposition,
+hoặc, dưới mode reconcile, head đã publish đã được đối chiếu với source đã giao và không còn sai
+lệch nào.
+
 ## Hai chế độ, một head
 
 `mode` quyết định nửa nào của operator này chạy. Dưới `model`, lời hứa được mô hình hoá và ma trận

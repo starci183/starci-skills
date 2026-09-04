@@ -163,3 +163,14 @@ were narrower than the truth, then the concepts with two homes.
     with a typed choice (narrow, continue, stop) and a one-paragraph brief. S1 needed this at step 25.
 14. **Redact at the tool boundary.** A sealed value reached a transcript despite 1.7.8. Redaction has
     to sit on tool output before it reaches any agent, as a gate, not as a rule the agent remembers.
+
+## What 2.0.1 adds: the goal is confirmed, not inferred
+
+Item 9 restates a rule inside `business.decide` and `architecture.decide`; section D shows the loss
+happening earlier, at the mission's own goal. S1 read a one-line rule at 22:25 and built three hours
+of typed receipts on a four-store reading the person corrected in one exchange at 01:27; S4 delivered
+at 04:47 on a reading the person restated at 09:54, and neither promise head had been shown as a
+sentence. 2.0.1 writes `state.json.mission` at create — goal, includes, excludes, done-when lines each
+naming the operator that produces the evidence — prints it as at most four lines, and refuses to run
+any chain that writes source or touches a runtime until a `goal-confirm` choice on the latest version
+is `as-stated`; a change of goal is a `replanned` transition with its version, never a rewrite.

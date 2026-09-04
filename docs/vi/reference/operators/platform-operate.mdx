@@ -29,6 +29,19 @@ sổ đăng ký runtime, hay danh tính mà một route đã bind xác thực v�
 delta đã duyệt, chứng minh mọi phép kiểm mà tri thức đã ràng đòi hỏi, và dừng ở khoảng trống sở hữu
 nhỏ nhất thay vì nhận lấy quyền deploy sản phẩm.
 
+## Xong khi
+
+Xong khi `platform-operation-receipt` ràng thẩm quyền đã phủ trạng thái mong muốn, `checks` chứng
+minh trọn bộ proof của nhánh đã bind, theo từng nấc trên nhánh runtime, không thiếu hay thất bại
+phép kiểm nào, và `delta` ghi từng hiệu ứng áp dụng từng tài nguyên một từ một bản kiểm kê được kiểm
+lại trước thay đổi đầu tiên, với revision trước và sau của nó, một dịch vụ đã hội tụ là một no-op
+được chứng minh; trên nhánh runtime, mục của route được nêu mang head được phục vụ, những gì nó
+chứa, bản ghi của server tách rời và lease đã được thả, và một serve đã merge commit của một phiên
+ghi từng cách giải quyết xung đột, các gate đạt trên head đã merge và merge ấy thành `changes`; và
+trên nhánh danh tính, tài khoản của luồng tồn tại tại provider đã khai và đăng nhập được bằng thông
+tin xác thực niêm phong được phân giải theo tên, `uat-account` chỉ mang tên, thư mục luồng giữ tài
+liệu và seed của nó, và một lần xoay chứng minh thông tin xác thực mới dùng được và cái cũ thất bại.
+
 ## Hạ tầng dùng chung, không phải sản phẩm
 
 Operator này phục vụ hạ tầng dùng chung và không bao giờ nhận quyền deploy sản phẩm. Ranh giới đó

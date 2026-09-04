@@ -6,12 +6,34 @@ import { existsSync } from 'node:fs';
 import path from 'node:path';
 import process from 'node:process';
 import { fileURLToPath } from 'node:url';
-import { loadOperatorPackages, cellCodes, cellParams, cellFiles, kindOf, isYes, exchangeOf } from './operator-md.mjs';
+import { loadOperatorPackages, HEADINGS, cellCodes, cellParams, cellFiles, kindOf, isYes, exchangeOf } from './operator-md.mjs';
 import { loadErrorsRegistry } from './errors-registry.mjs';
 import { loadKindTemplates } from './validate-templates.mjs';
 
 const unquote = (s) => String(s ?? '').trim().replace(/^`|`$/g, '');
 const TABLES = ['context', 'inputs', 'requirements', 'steps', 'outputs', 'stops', 'next'];
+
+// Done when: the one sentence that says when the branch ends done. It sits immediately after Job, is
+// exactly one sentence — one `.` outside backticks, and that `.` is the last character — and names in
+// backticks at least one kind of the operator's own Outputs table, so a receipt can be checked against
+// it. The backticked identifiers are what the Vietnamese mirror must repeat, in the same order.
+export const doneWhenIdentifiers = (text) => [...text.matchAll(/`([^`]+)`/g)].map((m) => m[1]);
+export function checkDoneWhen(at, op, outputKinds) {
+  const errors = [];
+  const h = HEADINGS[op.lang];
+  const jobAt = op.headings.indexOf(h.job);
+  const doneAt = op.headings.indexOf(h.doneWhen);
+  if (doneAt === -1) { errors.push(`${at}: no ${h.doneWhen} section`); return errors; }
+  if (jobAt === -1 || doneAt !== jobAt + 1) errors.push(`${at}: ${h.doneWhen} must be the section immediately after ${h.job}, found ${op.headings[jobAt + 1] ?? 'nothing'} there`);
+  const body = op.doneWhen.trim();
+  if (!body) { errors.push(`${at}: ${h.doneWhen} is empty`); return errors; }
+  const outside = body.replace(/`[^`]*`/g, '');
+  const periods = (outside.match(/\./g) ?? []).length;
+  if (periods !== 1 || !body.endsWith('.') || /[?!]/.test(outside)) errors.push(`${at}: ${h.doneWhen} must be exactly one sentence: one "." outside backticks and it the last character, no "?" or "!" (found ${periods} periods)`);
+  const named = doneWhenIdentifiers(body);
+  if (outputKinds && !named.some((k) => outputKinds.has(k))) errors.push(`${at}: ${h.doneWhen} names no Outputs kind in backticks (backticked: ${named.join(', ') || 'none'})`);
+  return errors;
+}
 
 export async function validateOperators(root) {
   const errors = [];
@@ -55,6 +77,9 @@ export async function validateOperators(root) {
     for (const [c, e] of Object.entries(registry.codes)) if (e.scope.length === 1 && e.scope[0] === id && !stops.has(c)) errors.push(`${e.home}: ${c} is defined for ${id} but its Stops table omits it`);
     if (!cellCodes(op.tables.steps.rows[0]?.stops ?? '').includes('INVALID_INPUT')) errors.push(`${at}: step 1 must be the gate and stop with INVALID_INPUT`);
     if (!cellFiles(op.tables.steps.rows[0]?.reads ?? '').length && !/request\/request\.json/.test(op.tables.steps.rows[0]?.reads ?? '')) errors.push(`${at}: step 1 must read request/request.json`);
+
+    // Done when ↔ Outputs.
+    errors.push(...checkDoneWhen(at, op, new Set(op.tables.outputs.rows.map((r) => kindOf(r.kind)))));
 
     // Writes ↔ Outputs ↔ templates/kinds.
     const outputs = new Map();
@@ -104,7 +129,11 @@ export async function validateOperators(root) {
     // en ↔ vi.
     if (!pkg.vi) { errors.push(`operators/${pkg.name}/operator.vi.md: missing`); continue; }
     const vi = pkg.vi;
-    if (vi.id !== id) errors.push(`operators/${pkg.name}/operator.vi.md: title must be ${id}`);
+    const viAt = `operators/${pkg.name}/operator.vi.md`;
+    if (vi.id !== id) errors.push(`${viAt}: title must be ${id}`);
+    const viDone = checkDoneWhen(viAt, vi, null);
+    errors.push(...viDone);
+    if (!viDone.length && doneWhenIdentifiers(vi.doneWhen).join() !== doneWhenIdentifiers(op.doneWhen).join()) errors.push(`${viAt}: ${HEADINGS.vi.doneWhen} backticked identifiers (${doneWhenIdentifiers(vi.doneWhen).join(', ')}) differ from English (${doneWhenIdentifiers(op.doneWhen).join(', ')})`);
     for (const key of TABLES) {
       const a = op.tables[key]; const b = vi.tables[key];
       if (!b) { errors.push(`operators/${pkg.name}/operator.vi.md: no ${key} table`); continue; }

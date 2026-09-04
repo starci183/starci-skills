@@ -17,9 +17,9 @@ typed results.
    missing route is a build failure. `workflows/` holds the example chains the entry reuses.
 3. `resources/` — which execution profile runs each operator role, which runtime grants it may use,
    and its standing answers on web search, Grammar binding, and image generation. Also validated.
-4. The one operator the mission needs: its `operator.md` (Job, Context, Inputs, Requirements, Steps,
-   Outputs, Stops, Next) plus `operator.json` (id, domain, resources). Stop codes resolve through the
-   Stop codes table of `operators/INDEX.md`.
+4. The one operator the mission needs: its `operator.md` (Job, Done when, Context, Inputs,
+   Requirements, Steps, Outputs, Stops, Next) plus `operator.json` (id, domain, resources). Stop codes
+   resolve through the Stop codes table of `operators/INDEX.md`.
 5. Only the knowledge topics that operator binds.
 
 Do not preload the tree. An operator binds the smallest set of topics its decision needs, each with

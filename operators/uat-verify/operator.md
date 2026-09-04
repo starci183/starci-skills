@@ -6,6 +6,18 @@ Verify one product flow end to end on the running product at the pinned commit, 
 append-only run record with three independently judged lanes, or stop at the exact unavailability
 instead of manufacturing a verdict.
 
+## Done when
+
+Done when the `uat-snapshot` was frozen before any product action, naming the pinned commit, the
+served head that contains it, the cases in order with their assertions, the account record of names
+and the seed fingerprint, every frozen case has its `uat-capture` and masked `screenshot` taken
+after the sign-in redirect landed through the rendered controls alone, the `uat-verdicts` judge the
+behaviour, experience and interface lanes on their own evidence with the experience lane scored
+criterion by criterion, the run namespace was deleted and nothing else, the append-only run record
+exists with its pointer and history line, and the `uat-flow-verification` lists the `sheet` and the
+verdict table it printed to the person, carrying the `audit-scope` unchanged when the admitted audit
+had one.
+
 ## A run is triggered by need; its authority is the environment's
 
 Reaching this operator is the need: a chain that walks straight into it once a surface is built and

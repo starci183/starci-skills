@@ -6,6 +6,15 @@ Resolve mọi thuộc tính trình bày do ứng dụng sở hữu trên một c
 publish, phát ra class và lời khai contract kiểm chứng được của nó, và dừng ở khoảng trống có chủ nhỏ
 nhất thay vì bịa ra một giá trị.
 
+## Xong khi
+
+Xong khi `frontend-presentation-resolution` cho mọi thuộc tính trình bày do ứng dụng sở hữu trên mọi
+node mà write set chạm tới đúng một luật mà `inventory` đóng băng công bố, hoặc ghi lại việc gỡ bỏ
+hay khoảng trống của thuộc tính ấy kèm case đã trả lời, và `resolved-tree` chỉ mang những giá trị ấy
+cùng các lời khai contract mà node của nó có thể mang; hoặc, khi hướng đã khai delta trình bày là
+none, biên nhận mang một owner map rỗng, không luật nào được chọn và một `inventory` rỗng mà không
+bịa gì để lấp.
+
 ## Cấu trúc đến nơi là đã quyết xong
 
 Cấu trúc, thứ tự phần tử, việc chọn component Grammar, chữ, dữ liệu và hành vi đến nơi là đã quyết

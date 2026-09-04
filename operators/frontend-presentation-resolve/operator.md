@@ -6,6 +6,15 @@ Resolve every application-owned presentation property on one already-composed tr
 published rule, emit its class and its verifiable contract claim, and stop at the smallest owning gap
 instead of inventing a value.
 
+## Done when
+
+Done when the `frontend-presentation-resolution` gives every application-owned presentation property
+on every node the write set touches exactly one rule the frozen `inventory` publishes, or records
+that property's removal or gap with the case that answered, and the `resolved-tree` carries only
+those values and the contract claims its nodes can hold; or, when the direction declared a
+presentation delta of none, the receipt carries an empty owner map, no chosen rule and an empty
+`inventory` with nothing invented to fill them.
+
 ## Structure arrives decided
 
 Structure, element order, Grammar component selection, copy, data and behaviour arrive decided, and

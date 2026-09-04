@@ -6,6 +6,16 @@ Deploy one immutable release to one declared target under its declared authoriza
 steady state it reached, taking the recovery or rollback branch inside the same pass rather than
 assuming the rollout succeeded.
 
+## Done when
+
+Done when, for an image release, the `release-deployment` records whether the release was deployed
+or the previous release restored, with the `probes` observed across the whole steady window showing
+either the immutable digest active on every declared target with every declared probe passing or the
+exact rollback release restored and never reported as delivery of the rejected one; or, for a
+migration release, the `migration-release` and its `migration-release-proof` record the declared
+migration set applied once through the source-owned runner with every prior journal row preserved
+and a second invocation proving no pending migration and no journal change.
+
 ## Source migration releases
 
 A non-null `migration` requirement selects a source migration release. Its `planRef` is

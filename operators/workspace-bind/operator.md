@@ -5,6 +5,14 @@
 Resolve one project and role into a verified checkout identity, its exact source head, and the closed
 runtime binding it may consume, and return that as one typed route receipt.
 
+## Done when
+
+Done when the `workspace-route-binding` and its `route` name one checkout resolved from the
+declaration and its hydrated projection alone, on a branch the routed policy permits with a working
+tree carrying nothing the policy refuses, at its observed source head with its derived mutation
+readiness, and, when a runtime was to be consumed, the endpoint fingerprint of the closed projection
+together with the registry entry of this route whose served head contains that source head.
+
 ## Declaration is the only authority
 
 A route exists because a portable declaration in `@workspaces/projects/<project>/<role>` says so and a

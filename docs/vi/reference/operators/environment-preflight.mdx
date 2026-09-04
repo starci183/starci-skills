@@ -28,6 +28,12 @@ Chạy một lần, trước mọi chuỗi, mọi phép kiểm sẵn sàng mà m
 tường một — khai báo, checkout, custody danh tính, runtime, máy chủ và các phê duyệt của môi trường —
 rồi trả về tất cả cùng lúc thành một báo cáo sẵn sàng có kiểu, không sửa chữa gì.
 
+## Xong khi
+
+Xong khi `readiness-report` mang câu trả lời ok, wall hoặc skipped cho mọi phép kiểm trong bộ từ
+vựng đóng, trên mọi role được yêu cầu và mọi lớp thao tác, không phép kiểm nào trả lời wall, và biên
+nhận `environment-readiness` gọi tên bản khai báo nó đã đọc bằng đường dẫn và hash.
+
 ## Mọi bức tường cùng lúc
 
 Một nhiệm vụ phát hiện các bức tường của nó theo thứ tự thì trả giá cho từng bức riêng lẻ: một route

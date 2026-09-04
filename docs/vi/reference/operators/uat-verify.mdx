@@ -28,6 +28,18 @@ Kiểm chứng một luồng sản phẩm từ đầu đến cuối trên sản 
 một hồ sơ lượt chạy chỉ-thêm với ba làn được xét độc lập, hoặc dừng đúng chỗ không sẵn sàng thay vì
 chế ra một phán quyết.
 
+## Xong khi
+
+Xong khi `uat-snapshot` đã đóng băng trước mọi hành động trên sản phẩm, gọi tên commit đã ghim, head
+được phục vụ có chứa nó, các case theo thứ tự cùng các khẳng định của chúng, hồ sơ tài khoản chỉ gồm
+tên và fingerprint của seed, mọi case đã đóng băng có `uat-capture` và `screenshot` đã che của nó
+chụp sau khi redirect đăng nhập đã đến chỉ qua các điều khiển được render, `uat-verdicts` phán quyết
+các làn hành vi, trải nghiệm và giao diện trên bằng chứng riêng của mỗi làn với làn trải nghiệm được
+chấm theo từng tiêu chí, namespace của lượt chạy đã bị xoá và không gì khác, hồ sơ lượt chạy
+chỉ-thêm tồn tại cùng con trỏ và dòng lịch sử của nó, và `uat-flow-verification` liệt kê `sheet`
+cùng bảng phán quyết nó đã in cho người xem, mang `audit-scope` nguyên vẹn khi audit được nhận vào
+có nó.
+
 ## Lượt chạy khởi động theo nhu cầu; thẩm quyền của nó thuộc về môi trường
 
 Chạm tới operator này chính là nhu cầu: một chain đi thẳng vào đây sau khi một bề mặt đã được dựng và

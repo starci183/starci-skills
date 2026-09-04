@@ -28,6 +28,16 @@ Deploy một release bất biến lên một target đã khai, dưới đúng th
 trạng thái ổn định mà nó đạt tới, đi nhánh recovery hay rollback ngay trong cùng lượt chạy thay vì
 giả định rollout đã thành công.
 
+## Xong khi
+
+Xong khi, với một release ảnh, `release-deployment` ghi nhận release đã được deploy hay release
+trước đã được khôi phục, với `probes` quan sát trên trọn cửa sổ ổn định cho thấy hoặc digest bất
+biến đang hoạt động trên mọi target đã khai với mọi probe đã khai đạt, hoặc đúng release rollback đã
+được khôi phục và không bao giờ được báo là giao thành công release bị từ chối; hoặc, với một
+release migration, `migration-release` cùng `migration-release-proof` của nó ghi nhận tập migration
+đã khai được áp dụng một lần qua runner do source sở hữu với mọi dòng journal trước đó được giữ
+nguyên và một lần gọi thứ hai chứng minh không còn migration chờ và journal không đổi.
+
 ## Release migration từ source
 
 Requirement `migration` khác null chọn release migration từ source. `planRef` là

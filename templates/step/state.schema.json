@@ -1,6 +1,6 @@
 {
   "$id": "step:state",
-  "description": "state.json at the session root; the orchestrator writes it, no agent does. Documented in resources/orchestrator.json#session.manifest. brief and budget are written at create and are required from the first transition on.",
+  "description": "state.json at the session root; the orchestrator writes it, no agent does. Documented in resources/orchestrator.json#session.manifest. brief and budget are written at create and are required from the first transition on; mission is written at create from the request and is required by the gates for a session that writes routed source or touches a runtime (scripts/validate-request.mjs#missionGateErrors).",
   "type": "object",
   "additionalProperties": false,
   "required": [
@@ -220,12 +220,34 @@
               "blocked",
               "invalid",
               "resolved",
-              "abandoned"
+              "abandoned",
+              "replanned"
             ]
           },
           "note": {
             "type": "string"
+          },
+          "goalVersion": {
+            "type": "integer",
+            "minimum": 2,
+            "description": "the mission version a replanned transition moved to; required when event is replanned"
           }
+        },
+        "if": {
+          "required": [
+            "event"
+          ],
+          "properties": {
+            "event": {
+              "const": "replanned"
+            }
+          }
+        },
+        "then": {
+          "required": [
+            "note",
+            "goalVersion"
+          ]
         }
       }
     },
@@ -389,6 +411,86 @@
               }
             }
           }
+        }
+      }
+    },
+    "mission": {
+      "description": "the mission's goal as the person confirmed it: written at create from the request, printed to the person as one block of at most four lines and confirmed through a goal-confirm choice at choices[\"goal:<sessionId>:v<version>\"]; a corrected reading is written as the next version and asked again; a replan is a replanned transition carrying the new version, never a silent rewrite",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "version",
+        "language",
+        "goal",
+        "includes",
+        "excludes",
+        "doneWhen",
+        "sourceRef"
+      ],
+      "properties": {
+        "version": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "language": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 16,
+          "description": "the person's language tag; the block is printed in it"
+        },
+        "goal": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 240
+        },
+        "includes": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 8,
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 240
+          }
+        },
+        "excludes": {
+          "type": "array",
+          "maxItems": 8,
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 240
+          }
+        },
+        "doneWhen": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 8,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "evidence",
+              "producedBy"
+            ],
+            "properties": {
+              "evidence": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 200
+              },
+              "producedBy": {
+                "type": "string",
+                "pattern": "^[a-z]+(?:\\.[a-z]+)+$",
+                "description": "the operator whose receipt is this evidence"
+              }
+            }
+          }
+        },
+        "sourceRef": {
+          "type": "string",
+          "minLength": 1,
+          "description": "the person's message the block was read from"
         }
       }
     }

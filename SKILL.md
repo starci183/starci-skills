@@ -17,7 +17,15 @@ authorizations below remain in force. An Ask column or diagnostic reason is not 
 
 1. Freeze one mission scope: the unit, the target, inclusions and exclusions, write roots, external
    effects, and what will count as proof. Two readings that would change any of those is one focused
-   question, not a guess.
+   question, not a guess. Freezing is not silent: for a mission that will write routed source or touch
+   a runtime, the frozen scope is printed to the person as one block of at most four lines in their
+   language — the goal, what is in and what is out, the "done when" lines, one question — and
+   confirmed once through a `goal-confirm` choice before step 2. Each "done when" line names the
+   operator whose receipt is that evidence, and a request from which no "done when" line can be
+   written does not start. The block and the answer are what step 4 records as `state.json.mission`
+   and `choices["goal:<sessionId>:v<version>"]`: `corrected` writes the next version and asks again,
+   and a mission whose latest version is not `as-stated` runs nothing
+   (`scripts/validate-request.mjs`). Read-only work asks nothing.
 2. Run `environment.preflight` first for any mission that touches routed source or a runtime: every
    wall the mission could meet — an undeclared or near-named route, a missing git policy, a dirty
    checkout, a sign-in that fails, a served head that does not contain the bound one, a held port, a
@@ -127,7 +135,9 @@ counter and no handoff state. A `resume` route that returns `NO_PROGRESS` means 
 reached the same wall: report the wall rather than trying again.
 
 A cycle between two operators is valid only while the progress fingerprint changes. A repeated
-fingerprint, or the same material finding twice, ends the loop and reports the smaller owner.
+fingerprint, or the same material finding twice, ends the loop and reports the smaller owner. A
+replan is a `replanned` transition carrying its note and the goal version it moves to, confirmed again
+through `goal-confirm`, never a silent rewrite of the chain.
 
 The session runs under a budget (`state.json.budget`, from `resources/orchestrator.json#budget`): a
 step cap and a same-operator cap. A request that would pass either is `BUDGET_EXHAUSTED`, and the

@@ -6,6 +6,14 @@ Decide one architecture with its tech stack, system boundaries, and data ownersh
 against the observed current state, the rejected alternatives, verified compatibility, and an
 independent critique.
 
+## Done when
+
+Done when the `architecture-decision` names one selected design whose every boundary owns or disowns
+its stores and whose every committed write is an operation the `stack-model` restates with a
+verified compatibility verdict on every retained component, the `current-state` it was proposed
+against was observed at the frozen head, an `independent-critique` from a fresh agent has been
+answered, and the confirmed `restatement` of the objective travels with the receipt.
+
 ## The objective is restated before it is designed
 
 When the request supplies `objective`, which every run does, step 2 writes `response/restatement.md`

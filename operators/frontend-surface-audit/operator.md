@@ -6,6 +6,14 @@ Observe the selected primary surfaces at the served route across their frozen au
 measure every node that carries a claim, and judge each measurement against the published proof rules
 by the owner of the node it stands on.
 
+## Done when
+
+Done when every selected matrix entry has its `capture`, its `screenshot` and its row in `verdicts`,
+every claim inside a selected surface was measured on a served head that contains the applied commit
+and judged by the owner of its node, each proof topic has closed by its own rule into one row of the
+`frontend-surface-audit` verdict table with the route a failure carries, and the sheet was served
+over `host` and printed to the person with the worst capture of each topic.
+
 ## Readiness, capture and judgement are one job
 
 Splitting them produced a familiar failure: a capture taken before the surface was ready, judged by a

@@ -1,49 +1,29 @@
 # uat.verify — brief
 
-Generated from `operators/uat-verify/operator.md`. Profile `sol-fresh`, dispatch `fresh`. Read operator.md for the step you are on; write only response/ of your branch; replace the running skeleton in response.json before you exit. A stop marked * is a fallback.
+Read operator.md at your step; write only response/ of your branch; replace the running response.json skeleton before you exit; * marks a fallback stop.
 
 ## Job
 
 Verify one product flow end to end on the running product at the pinned commit, and publish one append-only run record with three independently judged lanes, or stop at the exact unavailability instead of manufacturing a verdict.
 
+## Done when
+
+Done when the `uat-snapshot` was frozen before any product action, naming the pinned commit, the served head that contains it, the cases in order with their assertions, the account record of names and the seed fingerprint, every frozen case has its `uat-capture` and masked `screenshot` taken after the sign-in redirect landed through the rendered controls alone, the `uat-verdicts` judge the behaviour, experience and interface lanes on their own evidence with the experience lane scored criterion by criterion, the run namespace was deleted and nothing else, the append-only run record exists with its pointer and history line, and the `uat-flow-verification` lists the `sheet` and the verdict table it printed to the person, carrying the `audit-scope` unchanged when the admitted audit had one.
+
 ## Inputs
 
-| Kind | Required |
-| --- | --- |
-| `frontend-surface-audit` | yes |
-| `quality-verification` | yes |
-| `route` | yes |
-| `uat-account` | no |
-
-## Requirements
-
-| Field | Type | Default |
-| --- | --- | --- |
-| `approval` | id | — |
-| `feature` | id | — |
-| `flow` | id | — |
-| `env` | id | dev |
-| `cases` | list of `caseId` | every case of the flow |
-| `runId` | id | — |
-| `lease` | token | — |
-| `resume` | token | null |
+`frontend-surface-audit`, `quality-verification`, `route`, `uat-account` (optional)
 
 ## Outputs
 
-| Kind | File | Type | Required |
-| --- | --- | --- | --- |
-| `uat-flow-verification` | `response/response.md` | md | yes |
-| `uat-snapshot` | `response/data/snapshot.json` | data | yes |
-| `uat-capture` | `response/data/captures/<case>.json` | data | yes |
-| `uat-verdicts` | `response/data/verdicts.json` | data | yes |
-| `audit-scope` | `response/data/audit-scope.json` | data | no |
-| `screenshot` | `response/artifacts/<case>.png` | artifact | yes |
-| `sheet` | `response/artifacts/sheet.png` | artifact | yes |
+`uat-flow-verification` `response/response.md`
+`uat-snapshot` `response/data/snapshot.json`
+`uat-capture` `response/data/captures/<case>.json`
+`uat-verdicts` `response/data/verdicts.json`
+`audit-scope` `response/data/audit-scope.json` (optional)
+`screenshot` `response/artifacts/<case>.png`
+`sheet` `response/artifacts/sheet.png`
 
 ## Stops
 
 `INVALID_INPUT`, `SOURCE_DRIFT`, `NO_PROGRESS`, `AUTHORITY_DRIFT`, `ADMISSION_MISSING`, `PROVISIONING_UNAVAILABLE`, `IDENTITY_MISSING`, `LEASE_INVALID`, `RUNTIME_UNAVAILABLE`, `EVIDENCE_UNAVAILABLE`, `FIXTURE_VIOLATION`, `CANONICAL_WRITE_DENIED`
-
-## Next
-
-`git.publish`, `business.decide`, `frontend.presentation.resolve`, `backend.source.apply`, `platform.operate`, `user`

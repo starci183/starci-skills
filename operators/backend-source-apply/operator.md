@@ -5,6 +5,16 @@
 Implement one backend outcome inside a frozen mutation contract, following the observed sibling
 family, and return the measured conformance and proof receipt that shows the boundary was not widened.
 
+## Done when
+
+Done when, under mode apply, the `backend-source-application` and its `changes` account for one
+commit on the session branch whose `mutations` restate every contract operation unchanged and record
+each touched file with its before and after hash, every declared facet has its `conformance` record
+and every declared proof its passed `proof` record, and every path written outside the owner
+boundary carries its widening row; or, under mode dry, the `mutations` carry the operations it would
+fill and the paths it would touch with a null commit, no after hash, no `conformance` and no
+`proof`, and the checkout is untouched.
+
 ## The contract is frozen before the first write
 
 The contract arrives as the Input `architecture-decision`, fingerprinted and closed. The operations,

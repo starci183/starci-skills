@@ -1,7 +1,7 @@
 // operators/<id>/brief.md is generated from operator.md: the dispatch prompt of one fresh agent, capped
 // at resources/orchestrator.json#briefBytes. It carries what an agent must know before its first tool
-// call — the job, the inputs, the requirements, the outputs, the stop codes, the hand-offs — and
-// nothing the agent can read for itself at the step it is on. Generating it keeps the brief and the
+// call — the job, when it is done, the inputs, the outputs, the stop codes — and nothing the agent can
+// read for itself at the step it is on or in its request.json. Generating it keeps the brief and the
 // operator one home: a table edited in operator.md reaches the brief on the next run, and `--check`
 // inside `npm test` refuses a stale or oversized brief.
 //
@@ -22,34 +22,36 @@ export function renderBrief(pkg) {
   const op = pkg.en;
   const id = pkg.manifest.id;
   const inputs = (op.tables.inputs?.rows ?? []).filter((r) => kindOf(r.kind) !== '—' && kindOf(r.kind) !== '');
+  const optional = (r) => (isYes(r.required) ? '' : ' (optional)');
+  // The Requirements are not repeated here: the orchestrator fills their defaults into request.json
+  // before dispatch (resources/orchestrator.json#agent.requirements), so the agent reads every value
+  // there. The Next table is the orchestrator's, not the agent's: an agent ends its branch and never
+  // routes. The profile and dispatch mode are the orchestrator's too. Output types are not repeated
+  // either; the file name carries them, and the kind contract is read at the step that writes it.
   const lines = [
     `# ${id} — brief`,
     '',
-    `Generated from \`operators/${pkg.name}/operator.md\`. Profile \`${pkg.manifest.resources?.profile}\`, dispatch \`${pkg.manifest.resources?.dispatch}\`. Read operator.md for the step you are on; write only response/ of your branch; replace the running skeleton in response.json before you exit. A stop marked * is a fallback.`,
+    'Read operator.md at your step; write only response/ of your branch; replace the running response.json skeleton before you exit; * marks a fallback stop.',
     '',
     '## Job',
     '',
     op.job,
     '',
+    '## Done when',
+    '',
+    op.doneWhen,
+    '',
     '## Inputs',
     '',
-    inputs.length ? '| Kind | Required |\n| --- | --- |\n' + inputs.map((r) => `| \`${kindOf(r.kind)}\` | ${isYes(r.required) ? 'yes' : 'no'} |`).join('\n') : 'none: this operator opens the chain.',
-    '',
-    '## Requirements',
-    '',
-    '| Field | Type | Default |\n| --- | --- | --- |\n' + (op.tables.requirements?.rows ?? []).map((r) => `| \`${unquote(r.field)}\` | ${cell(r.type).slice(0, 20)} | ${cell(r.default).slice(0, 24)} |`).join('\n'),
+    inputs.length ? inputs.map((r) => `\`${kindOf(r.kind)}\`${optional(r)}`).join(', ') : 'none',
     '',
     '## Outputs',
     '',
-    '| Kind | File | Type | Required |\n| --- | --- | --- | --- |\n' + (op.tables.outputs?.rows ?? []).map((r) => `| \`${kindOf(r.kind)}\` | \`${unquote(r.file)}\` | ${cell(r.type)} | ${isYes(r.required) ? 'yes' : 'no'} |`).join('\n'),
+    (op.tables.outputs?.rows ?? []).map((r) => `\`${kindOf(r.kind)}\` \`${unquote(r.file)}\`${optional(r)}`).join('\n'),
     '',
     '## Stops',
     '',
     (op.tables.stops?.rows ?? []).map((r) => `\`${unquote(r.code)}\`${cell(r.disposition) === 'fallback' ? '*' : ''}`).join(', '),
-    '',
-    '## Next',
-    '',
-    [...new Set((op.tables.next?.rows ?? []).map((r) => unquote(r.operator)))].map((o) => `\`${o}\``).join(', '),
     '',
   ];
   return lines.join('\n');
@@ -66,7 +68,7 @@ for (const pkg of packages) {
   const bytes = Buffer.byteLength(content, 'utf8');
   const file = path.join(pkg.dir, 'brief.md');
   const rel = `operators/${pkg.name}/brief.md`;
-  if (bytes > cap) problems.push(`${rel}: ${bytes} bytes exceeds briefBytes ${cap}; shorten the operator's Ask cells or Next table`);
+  if (bytes > cap) problems.push(`${rel}: ${bytes} bytes exceeds briefBytes ${cap}; find the bytes in the brief format, never in its Done when`);
   if (check) {
     const current = existsSync(file) ? (await readFile(file, 'utf8')).replace(/\r\n/g, '\n') : null;
     if (current === null) problems.push(`missing: ${rel}`);

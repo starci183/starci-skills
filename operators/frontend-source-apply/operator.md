@@ -6,6 +6,14 @@ Write one already-resolved tree into product source on the session branch, insid
 ceiling and a declared file set, emitting only values the bound resolution already contains, and
 account for every byte that entered the repository in one commit.
 
+## Done when
+
+Done when, under mode apply, the `frontend-source-application` and its `changes` account for one
+commit on the session branch whose `writes` record every declared path with its before and after
+hash, every value written appears in the bound resolution's inventory, the presentation sweep of the
+projected write set found nothing, and the tree read back at the commit equals the resolved tree;
+or, under mode dry, the `writes` carry the plan with a null commit and the checkout is untouched.
+
 ## The single writer
 
 This is the only operator in the frontend pipeline that writes product source. Direction decides what

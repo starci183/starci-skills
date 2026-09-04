@@ -12,7 +12,15 @@ buộc bên dưới vẫn giữ nguyên. Cột Ask hay reason chẩn đoán khô
 
 1. Đóng băng một phạm vi nhiệm vụ: đơn vị, đích, phần bao gồm và phần loại trừ, các gốc được ghi,
    hiệu ứng ra bên ngoài, và thứ sẽ được tính là bằng chứng. Hai cách đọc làm đổi bất kỳ điểm nào
-   trong số đó là một câu hỏi tập trung, không phải một phỏng đoán.
+   trong số đó là một câu hỏi tập trung, không phải một phỏng đoán. Đóng băng không diễn ra trong im
+   lặng: với nhiệm vụ sẽ ghi source đã route hay chạm tới một runtime, phạm vi đã đóng băng được in
+   cho người thành một khối tối đa bốn dòng bằng ngôn ngữ của họ — mục tiêu, cái gì trong và cái gì
+   ngoài, các dòng "xong khi", một câu hỏi — và được xác nhận một lần qua lựa chọn `goal-confirm`
+   trước bước 2. Mỗi dòng "xong khi" gọi tên operator mà biên nhận của nó là bằng chứng ấy, và một
+   yêu cầu không viết nổi dòng "xong khi" nào thì không bắt đầu. Khối và câu trả lời là thứ bước 4 ghi
+   thành `state.json.mission` và `choices["goal:<sessionId>:v<version>"]`: `corrected` viết phiên
+   bản kế tiếp rồi hỏi lại, và nhiệm vụ mà phiên bản mới nhất chưa là `as-stated` thì không chạy gì
+   (`scripts/validate-request.mjs`). Việc chỉ đọc không hỏi gì.
 2. Chạy `environment.preflight` trước cho mọi nhiệm vụ chạm tới source đã route hay một runtime:
    mọi bức tường nhiệm vụ có thể gặp — route chưa khai hay gần trùng tên, thiếu chính sách git,
    checkout bẩn, đăng nhập thất bại, head đang phục vụ không chứa head đã bind, port bị giữ, thiếu
@@ -119,7 +127,10 @@ Mỗi operator tự mang ngữ nghĩa resume và fingerprint của nó, nên fil
 hay trạng thái handoff nào. Một route `resume` trả về `NO_PROGRESS` nghĩa là cùng một input đụng
 cùng một bức tường: hãy báo bức tường thay vì thử lại.
 
-\1
+Một vòng lặp giữa hai operator chỉ hợp lệ khi fingerprint tiến độ còn thay đổi. Fingerprint lặp
+lại, hay cùng một phát hiện đáng kể xuất hiện hai lần, kết thúc vòng lặp và báo cho owner nhỏ hơn.
+Một lần lập lại kế hoạch là một chuyển bước `replanned` mang ghi chú và phiên bản mục tiêu nó chuyển
+tới, được xác nhận lại qua `goal-confirm`, không bao giờ là viết lại chuỗi trong im lặng.
 
 Phiên chạy dưới một budget (`state.json.budget`, lấy từ `resources/orchestrator.json#budget`): trần
 số bậc và trần cùng-operator. Request nào vượt một trong hai là `BUDGET_EXHAUSTED`, và người trả lời
