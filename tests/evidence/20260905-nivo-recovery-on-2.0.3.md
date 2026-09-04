@@ -449,6 +449,14 @@ was therefore dropped as a `replanned` transition at `goalVersion 1` with its re
 This is the same shape as D6 on 2.0.0 and as the door read ahead before step 5: an operator whose
 lifecycle cannot express the state the work actually reached.
 
+**Repaired in-run at `728abf99`**: `business.reconcile` gains `implemented->implemented`, the same
+state with new bindings, for a delivery that moved after its head was reconciled and where no
+discrepancy stands. `8/2` was restored on that transition — a second `replanned` at `goalVersion 1`,
+reversing the drop and saying why — and re-run against `c87accaf`. The branch was told to re-verify
+all fourteen rows rather than carry the previous verdict forward: a reformat that moved some files by
+hundreds of lines is exactly the change that can relocate or reshape a guard, and a rebinding that
+assumed the old reading would be a promise resting on an assumption. Its outcome is below.
+
 Its consequence was measured rather than assumed. The published head binds its 47 fact claims to
 `1a779998`, and the repair moved 15 of 16 files' line counts — the operation runner from 1518 to 1763
 lines, the recovery container spec from 541 to 838. **The claims' line ranges are stale at the
@@ -457,16 +465,54 @@ duplicate-namespace guard, the launch path's recomputed revision, the provenance
 `nivo-module`, and a migration `down()` that no longer throws are all present at `c87accaf`. The
 substance holds; the citations point at moved lines.
 
+## Step 8/2 — the rebinding, and why "only lint" was not taken on trust
+
+Re-run at `c87accaf` on the newly lawful `implemented->implemented`. Fourteen of fourteen rows still
+enforced, no verdict changed, zero discrepancies, head republished with the coverage fingerprint
+carried unchanged.
+
+The branch was told not to assume the previous verdict carried because the repair was "only lint",
+and it did not. Ignoring whitespace, the diff across the eight non-test files was still 654
+insertions and 236 deletions, so it compared both commits at the token level — comments stripped,
+whitespace removed, streams aligned:
+
+- 20 of the 26 cited files are byte-identical between the two commits, so 24 claims keep their ranges.
+- `chores.service.ts` and `module-knowledge-reconciler.service.ts` moved but have identical token
+  streams: layout only.
+- The migration rewrote template literals as escaped double-quoted strings; decoded and collapsed, its
+  44 SQL statements are identical.
+- One file carried four non-layout differences and none is a guard: an unused import dropped, an
+  unread binding dropped while its call is kept, one import made relative, and a raw
+  `throw new Error("RECOVERY_SESSION_CHANGED")` replaced by the module's own exception with the same
+  status, inside a `try` whose `catch` never reads the error.
+
+23 of the 47 claims were re-bound and all 47 re-stamped to `c87accaf`. Checked here rather than
+accepted: every claim carries `sourceHead` `c87accaf`, and three cited ranges were opened in the
+source — `ownership` at 123-152 holds the advisory lock, the owner-scoped resolution and the
+not-found throw; the health gate re-bound from 574-619 to 706-765 holds the snapshot's `observedAt`;
+the completion compare-and-set re-bound from 653-685 to 806-838 holds `requiredSyncRevision` in the
+match clause, which is defect 4.
+
+One judgement call the branch surfaced rather than hid: `previousHeadRef` names step 5's own
+`model.json`, verified byte-identical to the head it replaces, instead of a path under
+`objects/sha256/`. The convention is the object store, but step 5 never archived its head there and
+this branch's write set excludes `objects/`, so the conventional path would have named a file that
+does not exist. Recorded as a finding; restoring the convention is one file for a publishing step.
+
+**So the stale-citation debt that D16 created is discharged.** The published head cites the commit the
+gates passed on.
+
 ## The mission's own done-when lines
 
 | Done when | Verdict | Checkout + HEAD | Command | Result | Log |
 | --- | --- | --- | --- | --- | --- |
 | a `backend.generate` receipt (scope full) covering the contract and the eight defects | **DONE** | `nivo-be-recovery-20260905-031845` @ `c87accaf` | `validate-step.mjs step-6/parallel-1` | step valid, 24 operations restated with zero drift, 16 change records, no widening | `step-6/parallel-1/response/` |
 | a green `quality.verify` receipt at that head | **DONE** | same @ `c87accaf` | five gates re-measured | all five pass; `Verdict: ship` | `step-7/parallel-1/response/data/evidence/` |
-| a `business.reconcile` receipt against business19 | **DONE, with a caveat** | same @ `1a779998` | `validate-step.mjs step-5/parallel-1` | step valid, 14/14 rows enforced, head published `implemented` | `step-5/parallel-1/response/` |
+| a `business.reconcile` receipt against business19 | **DONE** | same @ `c87accaf` | `validate-step.mjs step-8/parallel-2` | step valid, 14/14 rows re-verified at the gated head, head republished `implemented->implemented`, 47 claims bound to `c87accaf` | `step-8/parallel-2/response/` |
 
-The caveat is D16: the reconciliation is bound to `1a779998`, one commit behind the delivered head,
-and its line citations moved. Its substance was re-verified at `c87accaf`.
+All three are bound to `c87accaf`, the commit every gate passed on. The first reconciliation at
+`step-5/parallel-1` remains in the ledger, bound to `1a779998`, as the reading that was true when it
+ran.
 
 ## The eight product defects at the end
 
@@ -492,18 +538,18 @@ spec exists and passes.
 | Session created | 03:18:45 local; chain green and gated by 03:22 |
 | First wall | 03:30, twelve minutes in: `ENVIRONMENT_NOT_READY`, answered from the recorded choice without stopping |
 | First wall that cost work | 04:45, the dead operator validators (D13) |
-| Branches run | 7, plus 2 imported evidence slots |
+| Branches run | 8, plus 2 imported evidence slots |
 | `RECEIPT_MISSING` | 0 |
-| Same-operator re-entries | 2 (`backend.generate` twice, `quality.verify` twice) |
+| Same-operator re-entries | 3 (`backend.generate`, `quality.verify` and `business.reconcile` twice each) |
 | Times a person had to answer | **0** |
-| Runtime fast-forwards under the running mission | 4 (`35e5b34e`, `569e4858`+`935afab2`, `b21fd9ab`, `aaa77c37`+`541142a6`); three absorbed, one broke the session |
+| Runtime fast-forwards under the running mission | 5 (`35e5b34e`, `569e4858`+`935afab2`, `b21fd9ab`, `aaa77c37`+`541142a6`, `728abf99`); four absorbed, one broke the session |
 | Runtime defects met | D11–D16 plus the `b21fd9ab` regression; D8 and D10 already closed on arrival |
 
 Every branch of this session was gated by `validate-step` **after** D13 was repaired, so the shared
 laws and each operator's own law both ran. Before that repair the same command proved only the shared
 half, which is why the receipts had to be re-examined once the operator law began to run.
 
-At the end, `validate-session` is green and five of the seven branches pass their own operator's law.
+At the end, `validate-session` is green and six of the eight branches pass their own operator's law.
 Two are refused, and both were left refused on purpose:
 
 - `2/1` `workspace.bind` — the validator re-runs the workspace selection and observes the head the
@@ -521,9 +567,10 @@ Two are refused, and both were left refused on purpose:
   with `authorityStatus: in-progress` while the feature directory says `implemented`.
   `business.reconcile`'s declared write set is the feature directory alone, so it correctly refused
   the index; the publish that would fix it is excluded from this mission.
-- **For a person, on the reconciliation:** the 47 fact claims cite line ranges at `1a779998` that the
-  repair moved. Their substance was re-verified at `c87accaf`; their line numbers were not repaired,
-  because D16 leaves no lawful way to republish.
+- **For a person, on the reconciliation:** nothing outstanding. The stale citations were discharged by
+  the rebinding at `8/2` once D16 was repaired. One convention is left unrestored: `previousHeadRef`
+  names step 5's receipt rather than an `objects/sha256/` path, because step 5 archived no object and
+  the rebinding's write set excludes that directory.
 - **Defect 6** stays open by the authority's own words, not by omission.
 - **Dependency drift** stays, and every gate result in this note measured the drifted tree.
 - Nothing was published, deployed, served or installed. `D:/Repositories/nivo-backend` is untouched on
