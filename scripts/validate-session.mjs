@@ -152,7 +152,7 @@ export async function validateSession(root, session, { packages = null, ledgerDi
   errors.push(...missionHistoryErrors(state));
   // The chain is lawful against the operator tables and each branch's request: reachable, fed (by an earlier step or an accepted imported slot), bound (by a written or a planned bind), capped, proved, ended, and on a mission every branch names its goal.
   const byBranch = await readBranchRequests(session, state.steps);
-  errors.push(...validateChain(root, packages, state.chain, state.steps, byBranch, { graph: await loadOperatorGraph(root, packages), mission: state.mission ?? null, maxParallel: await loadMaxParallel(root), planned: state.planned ?? {}, imported: await readImportedInputs(root, session, byBranch) }));
+  errors.push(...validateChain(root, packages, state.chain, state.steps, byBranch, { graph: await loadOperatorGraph(root, packages), mission: state.mission ?? null, maxParallel: await loadMaxParallel(root), planned: state.planned ?? {}, imported: await readImportedInputs(root, session, byBranch, { planned: state.planned ?? {} }) }));
   // On a mission: proven cites only evidenced done-when lines, three unevidenced done branches in a row stop the chain, every transition was logged.
   const ledger = await goalLedger(session, state);
   errors.push(...provenErrors(state, ledger));

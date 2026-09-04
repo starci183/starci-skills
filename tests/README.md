@@ -185,6 +185,18 @@ output still does not (`scripts/producer-import.spec.mjs`). D6 falls with D2, be
 imports its decisions no longer routes through `business.decide`; D7 is closed by the Next rows the
 2.0.2 branch already carries to every plan operator.
 
+The replan proof on 2.0.2 itself
+([`evidence/20260905-nivo-recovery-replan-on-2.0.2.md`](evidence/20260905-nivo-recovery-replan-on-2.0.2.md)):
+on real ledgers, the recovery mission plans as `environment.preflight → workspace.bind#be →
+backend.generate → quality.verify → business.reconcile` with architecture21 imported and no decide
+branch, the same mission on 2.0.0 still refuses with the D1 wording, and three negative controls hold.
+It exposed three narrower doors, closed in the same cut: D8, the plan carries the imported inputs a
+branch binds (`state.json.planned[N/M].inputs`) so the chain gate is fed before the request exists
+(`scripts/validate-chain.spec.mjs`); D9, an imported producer is judged by its own operator's law in
+origin mode, never by today's session gates or catalogue (`scripts/validate-step.mjs#origin`,
+`scripts/migration-contract.spec.mjs`); D10, the create order is stated: provisional state, import,
+plan, rewrite (`resources/orchestrator.json#session.lifecycle`).
+
 ## The findings ledger
 
 From 2.0.1 a receipt is not the end of what an audit or a walk knows. Every done `interface.audit`

@@ -242,16 +242,21 @@ export async function readImportedSlots(session, graph = null) {
   }
   return out;
 }
-// The kinds each branch's request draws from imported slots, credited only when the import gate
-// accepts the reference: { "N/M": Set(kind) }. A slot without import.json is a local input and is not
-// credited here; a slot the gate refuses is not credited at all.
-export async function readImportedInputs(root, session, byBranch, { hostRoot } = {}) {
+// The kinds each branch draws from imported slots, credited only when the import gate accepts the
+// reference: { "N/M": Set(kind) }. The references come from the branch's request when it is written,
+// else from the plan (state.json.planned["N/M"].inputs), so a chain drawn before step 1 is fed. A slot
+// without import.json is a local input and is not credited here; a slot the gate refuses is not
+// credited at all.
+export async function readImportedInputs(root, session, byBranch, { hostRoot, planned } = {}) {
   const out = {};
-  for (const [cell, request] of Object.entries(byBranch ?? {})) {
-    for (const [kind, ref] of Object.entries(request?.inputs ?? {})) {
+  const cells = new Set([...Object.keys(byBranch ?? {}), ...Object.keys(planned ?? {})]);
+  for (const cell of cells) {
+    const request = byBranch?.[cell] ?? null;
+    const refs = request ? request.inputs ?? {} : planned?.[cell]?.inputs ?? {};
+    for (const [kind, ref] of Object.entries(refs)) {
       const m = /^step-(\d+)\/parallel-(\d+)\//.exec(String(ref));
       if (!m || !existsSync(path.join(session, `step-${m[1]}`, `parallel-${m[2]}`, 'import.json'))) continue;
-      const errors = await validateImportedInput(root, session, ref, kind, { ...(hostRoot ? { hostRoot } : {}), receivingSessionId: request.sessionId ?? path.basename(session) });
+      const errors = await validateImportedInput(root, session, ref, kind, { ...(hostRoot ? { hostRoot } : {}), receivingSessionId: request?.sessionId ?? path.basename(session) });
       if (!errors.length) (out[cell] ??= new Set()).add(kind);
     }
   }
@@ -261,7 +266,7 @@ export async function validateSessionChain(root, session, state, packages) {
   packages ??= await loadOperatorPackages(root);
   const graph = await loadOperatorGraph(root, packages);
   const byBranch = await readBranchRequests(session, state.steps);
-  return validateChain(root, packages, state.chain, state.steps, byBranch, { graph, mission: state.mission ?? null, maxParallel: await loadMaxParallel(root), planned: state.planned ?? {}, imported: await readImportedInputs(root, session, byBranch) });
+  return validateChain(root, packages, state.chain, state.steps, byBranch, { graph, mission: state.mission ?? null, maxParallel: await loadMaxParallel(root), planned: state.planned ?? {}, imported: await readImportedInputs(root, session, byBranch, { planned: state.planned ?? {} }) });
 }
 
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {

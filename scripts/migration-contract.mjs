@@ -124,8 +124,11 @@ export async function validateMigrationContract(root, branchDir, request, mutati
     producerKey = realpathSync(producer);
     if (validating.has(producerKey)) { producerKey = null; throw Error('cyclic architecture producer validation'); }
     validating.add(producerKey);
+    // The producer is judged by its operator's own law — the critique it owed, the model it froze — and an
+    // imported one as an origin: its frozen request is held by the import gate, and today's session gates
+    // and catalogue are not the law it ran under (scripts/validate-step.mjs#origin).
     const { validateArchitectureStep } = await import('../operators/architecture-decide/validate.mjs');
-    const verified = await validateArchitectureStep(producer, root);
+    const verified = await validateArchitectureStep(producer, root, { origin: existsSync(path.join(copied, 'import.json')) });
     if (verified.errors.length) { result.errors.push(...verified.errors.map((error) => `migration producer: ${error}`)); return result; }
     result.operations = model.operations;
     // The owner boundary is a list of exact refs or globs; the one matcher lives with the backend operator's law.

@@ -193,6 +193,10 @@ export function plannedRequirementErrors(planned, request, at = 'request.json') 
     const actual = request?.requirements?.[key];
     if (!isDeepStrictEqual(actual, value)) errors.push(`${at}: requirements.${key} ${actual === undefined ? 'is absent' : `is ${JSON.stringify(actual)}`} and the plan fixed it as ${JSON.stringify(value)} (state.json.planned); the chain was validated on the planned value, so the dispatched request carries it`);
   }
+  for (const [kind, ref] of Object.entries(planned?.inputs ?? {})) {
+    const actual = request?.inputs?.[kind];
+    if (actual !== ref) errors.push(`${at}: inputs.${kind} ${actual === undefined ? 'is absent' : `is ${JSON.stringify(actual)}`} and the plan bound it to the imported slot ${ref} (state.json.planned)`);
+  }
   return errors;
 }
 

@@ -122,7 +122,7 @@
       }
     },
     "planned": {
-      "description": "branch \"N/M\" -> the requirements the plan fixed for it (scripts/plan-chain.mjs presets: a bind's role, a preflight's roles, a preset mode), written when the chain is drawn or redrawn and before the branch's request exists; the chain gate reads a bind's role from here until the request is written, and the request that dispatches the branch carries these values unchanged (scripts/validate-request.mjs#plannedRequirementErrors)",
+      "description": "branch \"N/M\" -> the requirements the plan fixed for it (scripts/plan-chain.mjs presets: a bind's role, a preflight's roles, a preset mode), written when the chain is drawn or redrawn and before the branch's request exists; the chain gate reads a bind's role from here until the request is written, and the request that dispatches the branch carries these values unchanged (scripts/validate-request.mjs#plannedRequirementErrors); inputs: the imported slot references the plan bound for the branch (scripts/plan-chain.mjs imports), read by the chain gate until the request is written and carried unchanged by the request that dispatches the branch",
       "type": "object",
       "additionalProperties": {
         "type": "object",
@@ -133,6 +133,13 @@
         "properties": {
           "requirements": {
             "type": "object"
+          },
+          "inputs": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string"
+            },
+            "description": "kind -> step-N/parallel-M/... reference into an imported slot of this session"
           }
         }
       }

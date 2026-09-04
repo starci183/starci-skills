@@ -125,6 +125,12 @@ context khai đủ để agent mù chạy được, log đủ để người đ�
       `validate-chain` (D2); cổng origin của `producer-import` kiểm output và byte, không kiểm `next` (D5);
       chuỗi hợp lệ trước khi request của nhánh bind tồn tại, kế hoạch mang `role` (D3); `gitPolicy` đúng
       kiểu route khai (D4).
+- [x] Ba cửa hẹp lộ ra khi chứng minh kịch bản recovery trên 2.0.2 (tests/evidence/20260905-nivo-recovery-replan-on-2.0.2.md):
+      D8 kế hoạch mang cả input import (`state.json.planned[N/M].inputs`, `validate-chain#readImportedInputs` đọc kế
+      hoạch khi chưa có request, `validate-request#plannedRequirementErrors` giữ nguyên khi dispatch); D9 producer
+      import được chấm theo luật của chính operator ở chế độ origin, không theo gate phiên và catalogue hôm nay
+      (`validate-step.mjs#origin`, `migration-contract.mjs`); D10 thứ tự tạo phiên: state tạm → import → plan → ghi lại
+      (`orchestrator.json#session.lifecycle` create).
 - [x] `library.update` chấm nhánh blocked theo mã dừng của nó, không nạp checkout trước khi đọc trạng thái
       (D7 của session Setup: `operators/library-update/validate.mjs#validateLibraryUpdateStep`); còn nợ một
       fixture nhánh blocked trong self-test.

@@ -26,8 +26,8 @@ const empty = (v) => v === undefined || v === null || v === '' || v === '—';
 // restatement:<decisionId> resolves when the request leaves the field to its default.
 const slug = (s) => String(s ?? '').normalize('NFKD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
 
-export async function validateArchitectureStep(branchDir, root = ROOT) {
-  const base = await validateStep(root, branchDir);
+export async function validateArchitectureStep(branchDir, root = ROOT, { origin = false } = {}) {
+  const base = await validateStep(root, branchDir, { origin });
   const errors = [...base.errors];
   const { request, response, requirements = {}, present = new Set() } = base;
   if (!response || response.operatorId !== 'architecture.decide') return { errors };
