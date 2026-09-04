@@ -71,7 +71,7 @@ authorizations below remain in force. An Ask column or diagnostic reason is not 
    only the grants it lists. An operator has no other model, no inherited turn beyond what its
    `resources.mode` and the profile's `forkTurns` allow, and no grant the assignment omits.
 
-Cross-session evidence uses scripts/producer-import.mjs. Copy a completed producer request/response bundle into an unused receiving step-N/parallel-M coordinate, preserving every byte and original session/step metadata. import.json binds the source and target coordinates and every file digest. The input gate verifies the original frozen request, its declared completed outputs, origin and copied bytes; imported slots are evidence only and never enter the receiving chain, steps, request hashes or leases. Use the normal step-N/parallel-M/response input path. No operator is rerun, and no source-write authority is imported.
+Cross-session evidence uses scripts/producer-import.mjs. Copy a completed producer request/response bundle into an unused receiving step-N/parallel-M coordinate, preserving every byte and original session/step metadata. import.json binds the source and target coordinates and every file digest. The input gate verifies the original frozen request, its declared completed outputs, origin and copied bytes; imported slots are evidence only and never enter the receiving chain, steps, request hashes or leases. Use the normal step-N/parallel-M/response input path. No operator is rerun, and no source-write authority is imported. The kinds an imported slot declares count as already produced for the chain, in the plan and at the gate (`workflows/README.md`, How a chain is derived).
 
 ## Entry
 

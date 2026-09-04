@@ -129,6 +129,19 @@ export function resolveWorkspaceCheckout({ source = path.dirname(ROOT), project,
     gitPolicy, writeRoots: declaredWriteRoots, mutationReadiness: declaredWriteRoots.length ? 'ready' : 'read-only', ...(sessionCheckout ? { sessionCheckout } : {}) };
 }
 
+// The request's gitPolicy is the object {worktreeBranches, mutationBranch}: the two fields of the
+// route declaration's repository.gitPolicy (readiness/initialization/workspaces, $defs.gitPolicy)
+// that a binding is checked against. A refusal names the field and the value the declared route
+// carries, so a request that arrived in the wrong shape (a list, a string, a partial object) learns
+// the shape it wanted; the request gate and the operator's own validator both read this one check.
+export function gitPolicyErrors(asked, declared) {
+  if (asked === undefined || asked === null) return [];
+  const names = Object.keys(declared);
+  const shape = `{${names.join(', ')}}`;
+  if (typeof asked !== 'object' || Array.isArray(asked)) return names.map((field) => `request.json: gitPolicy.${field} is absent because gitPolicy is ${Array.isArray(asked) ? 'a list' : `a ${typeof asked}`}, not the object ${shape} the route declaration carries; it differs from the declared route (${declared[field]})`);
+  return names.filter((field) => asked[field] !== declared[field]).map((field) => `request.json: gitPolicy.${field} ${asked[field] === undefined ? 'is absent and' : `${JSON.stringify(asked[field])}`} differs from the declared route (${declared[field]}); gitPolicy is the object ${shape} the route declaration carries`);
+}
+
 function sessionIdentityErrors(root, request, branchDir) {
   try {
     requireThat(isSessionId(request?.sessionId) && Number.isSafeInteger(request?.step) && request.step > 0 && Number.isSafeInteger(request?.parallel) && request.parallel > 0, 'INVALID_INPUT', 'session identity and coordinates must be safe before resolving paths');
@@ -153,8 +166,7 @@ export function validateWorkspaceCheckoutRequest(root, request, branchDir) {
   if (identityErrors.length) return identityErrors;
   try {
     const result = resolveWorkspaceCheckout({ source: path.dirname(root), project: requirements.project, role: requirements.role, sessionId: request.sessionId, checkout: 'session', declaredWriteRoots: requirements.declaredWriteRoots ?? [] });
-    if (requirements.gitPolicy && (requirements.gitPolicy.worktreeBranches !== result.gitPolicy.worktreeBranches || requirements.gitPolicy.mutationBranch !== result.gitPolicy.mutationBranch)) return ['request.json: requested Git policy differs from the declared route'];
-    return [];
+    return gitPolicyErrors(requirements.gitPolicy, result.gitPolicy);
   } catch (error) { return [`request.json: ${error.message}`]; }
 }
 

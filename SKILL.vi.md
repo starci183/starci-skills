@@ -65,7 +65,7 @@ buộc bên dưới vẫn giữ nguyên. Cột Ask hay reason chẩn đoán khô
    `resources`, với đúng những quyền nó liệt kê. Một operator không có model khác, không thừa hưởng lượt nào,
    và không có quyền nào mà assignment bỏ sót.
 
-Bằng chứng giữa các phiên dùng scripts/producer-import.mjs. Chép bundle request/response của producer đã hoàn tất vào tọa độ step-N/parallel-M chưa dùng của phiên nhận, giữ nguyên từng byte và metadata session/step gốc. import.json bind tọa độ nguồn, đích và digest từng file. Gate input kiểm request gốc đã đóng băng, output hoàn tất đã khai, byte nguồn và bản chép; slot nhập chỉ là bằng chứng, không được đưa vào chain, steps, request hashes hay lease của phiên nhận. Dùng đường input step-N/parallel-M/response thông thường. Không chạy lại operator và không nhập quyền ghi source.
+Bằng chứng giữa các phiên dùng scripts/producer-import.mjs. Chép bundle request/response của producer đã hoàn tất vào tọa độ step-N/parallel-M chưa dùng của phiên nhận, giữ nguyên từng byte và metadata session/step gốc. import.json bind tọa độ nguồn, đích và digest từng file. Gate input kiểm request gốc đã đóng băng, output hoàn tất đã khai, byte nguồn và bản chép; slot nhập chỉ là bằng chứng, không được đưa vào chain, steps, request hashes hay lease của phiên nhận. Dùng đường input step-N/parallel-M/response thông thường. Không chạy lại operator và không nhập quyền ghi source. Các kind mà một slot nhập khai được tính là đã sinh đối với chuỗi, cả trong plan lẫn ở gate (`workflows/README.md`, Chuỗi được suy ra thế nào).
 
 ## Cửa vào
 

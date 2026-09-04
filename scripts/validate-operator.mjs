@@ -9,7 +9,7 @@ import { fileURLToPath } from 'node:url';
 import { loadOperatorPackages, HEADINGS, cellCodes, cellParams, cellFiles, kindOf, isYes, exchangeOf } from './operator-md.mjs';
 import { loadErrorsRegistry } from './errors-registry.mjs';
 import { loadKindTemplates } from './validate-templates.mjs';
-import { PUBLISH_OPERATOR, DEPLOY_OPERATOR } from './validate-chain.mjs';
+import { PUBLISH_OPERATOR, DEPLOY_OPERATOR, PREFLIGHT_OPERATOR } from './validate-chain.mjs';
 
 const unquote = (s) => String(s ?? '').trim().replace(/^`|`$/g, '');
 const TABLES = ['context', 'inputs', 'requirements', 'steps', 'outputs', 'stops', 'next'];
@@ -96,6 +96,22 @@ export function checkGraphClosure(packages) {
     const ends = (p.en.tables.next?.rows ?? []).some((r) => unquote(r.operator) === 'user') || [PUBLISH_OPERATOR, DEPLOY_OPERATOR].includes(id);
     if (!readers.length && !ends) errors.push(`${at}: primary output ${primary} is consumed by no Inputs table and ${id} ends no chain (no Next row hands to user, and it is neither ${PUBLISH_OPERATOR} nor ${DEPLOY_OPERATOR}); a job nobody reads is not a job`);
   }
+  return errors;
+}
+
+// Every operator is reachable: starting from the operator that opens every chain, following the
+// operator ids the Next tables name, every package is met. An operator no table reaches is a door the
+// planner cannot open — a mission naming it plans, and validate-chain refuses the step because no Next
+// table of the step before permits it (the 2.0.0 walls D1, D6 and D7 of tests/evidence).
+export function checkReachability(packages, start = PREFLIGHT_OPERATOR) {
+  const errors = [];
+  const v9 = packages.filter((p) => p.shape === 'v9');
+  const next = new Map(v9.map((p) => [p.manifest.id, (p.en.tables.next?.rows ?? []).map((r) => unquote(r.operator))]));
+  if (!next.has(start)) return [`operators: no package ${start}, the operator every chain opens with`];
+  const seen = new Set([start]);
+  const queue = [start];
+  while (queue.length) { const id = queue.shift(); for (const n of next.get(id) ?? []) if (next.has(n) && !seen.has(n)) { seen.add(n); queue.push(n); } }
+  for (const p of v9) if (!seen.has(p.manifest.id)) errors.push(`operators/${p.name}/operator.md: no Next table reaches ${p.manifest.id} from ${start}; an operator the tables reach from nowhere cannot be placed in any chain`);
   return errors;
 }
 
@@ -221,6 +237,7 @@ export async function validateOperators(root) {
     }
   }
   errors.push(...checkGraphClosure(packages));
+  errors.push(...checkReachability(packages));
   return { errors, checked, total: packages.length };
 }
 

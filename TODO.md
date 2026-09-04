@@ -110,6 +110,24 @@ context khai đủ để agent mù chạy được, log đủ để người đ�
 - [ ] `interface.audit` chấp nhận audit một trang đang chạy: input source-application và decision tuỳ
       chọn khi target là bề mặt có sẵn.
 
+## 2d. Cửa đóng và tường thật mà hai lần chạy Nivo trên 2.0.0 lộ ra (2026-09-05)
+
+- [ ] `library.update` không tiêu thụ được qua hai repo: owner ở `starci-academy-fe`, consumer ở `nivo-fe`
+      là hai route, hai session, mà operator đòi cả `plan` lẫn `consumer` trong một checkout. Sửa: chế độ
+      `publish` (consumer none, dừng ở bản phát hành đã đóng gói; publish lên registry là thẩm quyền của
+      người) và chế độ `consume` bind ở route consumer, nhận `library-release` của session anh em qua
+      route `chain`.
+- [x] Reachability: mọi operator phải tới được từ `environment.preflight` qua các bảng Next (D1, D6, D7
+      của session recovery). (`validate-operator.mjs#checkReachability`, dòng Next
+      `workspace.bind → architecture.decide|interface.plan|data.plan`, `architecture.decide → backend.plan`,
+      `runtime.serve|quality.verify → uat.plan`)
+- [x] Import là producer: slot import được chấp nhận thì kind của nó tính là đã sinh cho planner và cho
+      `validate-chain` (D2); cổng origin của `producer-import` kiểm output và byte, không kiểm `next` (D5);
+      chuỗi hợp lệ trước khi request của nhánh bind tồn tại, kế hoạch mang `role` (D3); `gitPolicy` đúng
+      kiểu route khai (D4).
+- [x] Self-test không phụ thuộc vị trí checkout: `data.seed`, `uat.verify` dùng host giả của chính chúng
+      cho tra cứu `.stacks/<env>`.
+
 ## 2c. Bốn chỗ yếu của harness, mỗi chỗ một gate
 
 - [x] Planner: `validate-operator` bắt mọi Input có producer và mọi primaryOutput có consumer hoặc là

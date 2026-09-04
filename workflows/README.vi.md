@@ -16,6 +16,14 @@ mà mỗi operator công bố trong `operator.md` của mình:
   rồi đến operator duy nhất có `primaryOutput` là kind ấy (hai primary thì phân xử bằng operator mà
   dòng Đầu vào gọi tên), rồi đến producer duy nhất; kind nào các bảng để mập mờ thì bị từ chối kèm
   tên các ứng viên, không bao giờ đoán;
+- một Đầu vào bắt buộc mà kind của nó đã nằm sẵn trong một **slot nhập** của phiên
+  (`scripts/producer-import.mjs`: một tọa độ chỉ-là-bằng-chứng giữ `import.json` bên cạnh bundle
+  producer đã chép) thì coi như đã được sinh khi không nhánh nào của chuỗi sinh ra nó: không thêm
+  producer nào, nhánh tiêu thụ bind output của slot làm `inputs.<kind>`, và bản xem trước in
+  `<kind> imported from <sourceSession> step N`; slot không có `import.json` là input cục bộ, slot
+  mà operator gốc cây này không gọi tên được thì không khai gì, và ở gate kind chỉ được ghi nhận khi
+  `validate-request#validateImportedInput` chấp nhận tham chiếu — plan chỉ biết kind ấy tồn tại,
+  còn gate nhập vẫn là thẩm quyền về byte;
 - một dòng **Context** `@workspaces/<role>` bắt buộc kéo vào một `workspace.bind` của role đó, và
   role mà nhiệm vụ khai được bind trước mọi nhánh làm việc dù không bảng nào đòi;
 - operator mà hơn một dòng "xong khi" gọi tên, khi domain của nó có operator `<domain>.plan`, thì
@@ -38,20 +46,32 @@ không bao giờ hai nhánh cùng ghi một alias trong một bậc; nhánh to�
 vị của nó mở rộng tại chỗ. Mỗi nhánh có một goal — dòng "xong khi" nó chứng minh, hoặc nhánh sau
 sớm nhất mà nó mở đường — chính là thứ `request.json.goal` mang và `validate-request` kiểm.
 
+Plan cố định requirements của một nhánh trước khi request của nó tồn tại — `role` của bind, `roles`
+của preflight, một `mode` đặt sẵn — và orchestrator ghi chúng thành
+`state.json.planned["N/M"].requirements` lúc chuỗi được vẽ hay vẽ lại, trước lần dispatch đầu tiên.
+Gate đọc role của bind từ request khi request đã được ghi, còn không thì từ plan, nên một chuỗi vẽ
+trước bước 1 vẫn hợp lệ; request sau này dispatch một nhánh đã lên plan phải mang nguyên các giá trị
+đã lên plan, nếu không `validate-request#plannedRequirementErrors` từ chối, vì chuỗi đã được kiểm
+trên chính các giá trị ấy và một request đổi đi một giá trị là chạy một nhánh mà chuỗi chưa từng được
+kiểm cho.
+
 Plan được in cho người dưới dạng hai dòng mỗi nhánh (goal, rồi lý do nhánh có mặt) trước khi bất kỳ
 thứ gì được dispatch, và `node scripts/plan-chain.mjs <session>` in cùng bản xem trước ấy kèm khối
 JSON cho một phiên trên đĩa.
 
 ## Gate ép những gì
 
-`validate-chain` đọc `state.json.chain`, `state.json.steps` và `request.json` của từng nhánh, và từ
-chối chuỗi trong đó:
+`validate-chain` đọc `state.json.chain`, `state.json.steps`, `state.json.planned` và `request.json`
+của từng nhánh, và từ chối chuỗi trong đó:
 
-- một nhánh gọi tên operator cây không có, hay một ô nằm ở bậc không đúng số của nó;
+- một nhánh gọi tên operator cây không có, hay một ô nằm ở bậc không đúng số của nó, hay plan cố
+  định requirements cho một ô mà chuỗi không gọi tên;
 - một bậc có operator mà không bảng Kế tiếp nào của bậc trước cho phép và cũng không phải vào lại
   chính operator đó;
-- một nhánh cần Đầu vào không bậc trước nào sinh, hay context `@workspaces/<role>` không
-  `workspace.bind` nào của role đó bind trước;
+- một nhánh cần Đầu vào không bậc trước nào sinh và cũng không slot nhập đã được chấp nhận nào mà
+  request của nó gọi tên cung cấp, hay context `@workspaces/<role>` không `workspace.bind` nào của
+  role đó bind trước hoặc được lên plan để bind (cả hai như đã suy ở trên);
+- request đã ghi của một nhánh khác với requirements mà plan đã cố định cho nó;
 - một bậc vượt trần song song, hay hai nhánh cùng bậc ghi cùng alias;
 - một nhánh ghi source frontend dưới `mode: apply` rồi `git.publish` theo sau mà audit hay
   `uat.verify` thiếu hoặc nằm ngoài khoảng giữa lần ghi và lần publish;

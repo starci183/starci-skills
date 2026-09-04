@@ -99,7 +99,7 @@ workspace, or provisions an account. It makes no product decision and carries no
 | `project` | id | — | The project to bind |
 | `role` | choice | — | `fe` or `be`: the role of that project to bind |
 | `checkout` | choice | routed | `routed` selects the canonical checkout; `session` selects only this request session's registered worktree under the declared policy |
-| `gitPolicy` | list of `{worktreeBranches, mutationBranch}` | the policy the route declaration carries; a declaration that carries none is `INVALID_INPUT` at step 1, never a guessed policy | The branch law this binding is verified against; `forbidden` keeps every write on the mutation branch |
+| `gitPolicy` | object `{worktreeBranches, mutationBranch}`, the two fields of the declared route's `repository.gitPolicy` the binding is checked against | the policy the route declaration carries; a declaration that carries none is `INVALID_INPUT` at step 1, never a guessed policy | The branch law this binding is verified against; `forbidden` keeps every write on the mutation branch |
 | `declaredWriteRoots` | list | empty | The only paths later work may write; anything dirty outside them is `CHECKOUT_DIRTY`, and so is anything dirty at all when the checkout sits on the mutation branch rather than a `session/<sessionId>` branch |
 | `resume` | token | null | The blocked branch's token when re-entering after a stop |
 
@@ -168,6 +168,7 @@ session id to its containing coordinate, session state and frozen request hash.
 | --- | --- |
 | the route is bound and the checkout carries a publication to push | `git.publish` |
 | the route is bound and a promise must be decided against its source | `business.decide` |
+| the route is bound and a boundary must be decided inside it | `architecture.decide` |
 | the route is bound and a backend contract must be filled inside it | `backend.generate` |
 | the route is bound and the pages and modals a feature needs must be named before one is generated per branch | `interface.plan` |
 | the route is bound and the seeds a mission needs must be planned against its stores before one is placed per branch | `data.plan` |

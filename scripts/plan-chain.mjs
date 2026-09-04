@@ -17,14 +17,17 @@
 // into steps: only branches whose dependencies all ran earlier, reached through a Next table of the
 // step before, at most the orchestrator's parallel cap per step, never two writers of one alias in
 // one step, a fan-out branch alone in its step so its units can expand in place. Every branch gets a
-// goal: the done-when line it evidences, or the earliest later branch it enables.
+// goal: the done-when line it evidences, or the earliest later branch it enables. A kind an imported
+// slot of the session already carries (scripts/validate-chain.mjs#readImportedSlots) is already
+// produced: no producer is added for it when no branch of the chain produces it, the consuming
+// branch records which slot it reads (`imports`), and the preview says where the kind came from.
 import { readFile } from 'node:fs/promises';
 import path from 'node:path';
 import process from 'node:process';
 import { fileURLToPath } from 'node:url';
 import { loadOperatorPackages } from './operator-md.mjs';
 import { operatorEffects } from './validate-request.mjs';
-import { operatorGraph, loadOperatorGraph, loadMaxParallel, producersOf, primaryProducerOf, writesSurface, planOf, cellOf, stepOf, parallelOf, SURFACE_AUDIT_KIND, WALK_OPERATOR, PUBLISH_OPERATOR, DEPLOY_OPERATOR, BIND_OPERATOR, PREFLIGHT_OPERATOR, UNITS_KIND } from './validate-chain.mjs';
+import { operatorGraph, loadOperatorGraph, loadMaxParallel, readImportedSlots, producersOf, primaryProducerOf, writesSurface, planOf, cellOf, stepOf, parallelOf, SURFACE_AUDIT_KIND, WALK_OPERATOR, PUBLISH_OPERATOR, DEPLOY_OPERATOR, BIND_OPERATOR, PREFLIGHT_OPERATOR, UNITS_KIND } from './validate-chain.mjs';
 
 export class PlanError extends Error { constructor(errors) { super(errors.join('\n')); this.errors = errors; } }
 
@@ -38,11 +41,13 @@ export function planChain({ packages, mission, options = {} }) {
   const errors = [];
   const lines = mission?.doneWhen ?? [];
   if (!lines.length) throw new PlanError(['mission.doneWhen is empty; a chain is planned from the done-when lines, and a mission with none does not start']);
-  const nodes = new Map(); // key -> { key, operator, presets, deps (hard), soft (optional inputs), order (Next direction), reasons, target, lines, fanout, dropped }
+  const nodes = new Map(); // key -> { key, operator, presets, deps (hard), soft (optional inputs), order (Next direction), reasons, target, lines, fanout, dropped, imports (kind -> imported slot) }
+  // The session's imported slots (options.imported, readImportedSlots): a required kind one of them carries is already produced.
+  const importedSlotFor = (kind) => (options.imported ?? []).find((s) => s.outputs?.[kind] !== undefined) ?? null;
   const add = (key, operator, presets = {}, reason = null) => {
     if (!graph.has(operator)) { errors.push(`${operator} is not an operator of this tree`); return null; }
     let n = nodes.get(key);
-    if (!n) { n = { key, operator, presets: { ...presetsOf(operator), ...presets }, deps: new Set(), soft: new Set(), order: new Set(), reasons: [], target: null, lines: [], fanout: null, dropped: [] }; nodes.set(key, n); }
+    if (!n) { n = { key, operator, presets: { ...presetsOf(operator), ...presets }, deps: new Set(), soft: new Set(), order: new Set(), reasons: [], target: null, lines: [], fanout: null, dropped: [], imports: {} }; nodes.set(key, n); }
     if (reason && !n.reasons.includes(reason)) n.reasons.push(reason);
     return n;
   };
@@ -113,6 +118,9 @@ export function planChain({ packages, mission, options = {} }) {
           if (b) depend(n, b.key);
         }
         for (const input of op.required) {
+          // A producer already in the chain first; else a slot the session imported; else the tables.
+          const slot = producersInChain(input, n).length ? null : importedSlotFor(input.kind);
+          if (slot) { n.imports[input.kind] = slot; continue; }
           for (const key of producerFor(n, input)) {
             const p = nodes.get(key) ?? add(key, key, {}, `produces ${input.kind}, which ${n.operator} requires`);
             if (!p) continue;
@@ -227,13 +235,15 @@ export function planChain({ packages, mission, options = {} }) {
   const cell = new Map();
   steps.forEach((step, n) => step.forEach((k, m) => cell.set(k, cellOf(n + 1, m + 1))));
   const chain = steps.map((step) => step.map((k) => cell.get(k)));
-  const out = { chain, steps: {}, goals: {}, reasons: {}, presets: {}, fanout: {}, dropped: [], ends: 'user' };
+  const out = { chain, steps: {}, goals: {}, reasons: {}, presets: {}, fanout: {}, imports: {}, dropped: [], ends: 'user' };
   for (const step of chain) for (const c of step) {
     const k = [...cell].find(([, v]) => v === c)[0];
     const n = nodes.get(k);
     out.steps[c] = n.operator;
     if (Object.keys(n.presets).length) out.presets[c] = n.presets;
     if (n.fanout) out.fanout[c] = n.fanout;
+    // What the branch reads from an imported slot: kind -> { input (the request's inputs.<kind> path), the slot's cell and origin }.
+    for (const [kind, slot] of Object.entries(n.imports)) (out.imports[c] ??= {})[kind] = { input: slot.outputs[kind], cell: slot.cell, sourceSessionId: slot.sourceSessionId, sourceStep: slot.sourceStep, sourceParallel: slot.sourceParallel };
     if (n.target !== null) out.goals[c] = { doneWhen: n.target };
     else {
       // What this branch enables: the earliest later branch that depends on it through a required input, a
@@ -262,6 +272,7 @@ export function previewChain(plan, mission) {
     const extras = [plan.reasons[c], plan.presets[c] ? Object.entries(plan.presets[c]).map(([k, v]) => `${k}=${JSON.stringify(v)}`).join(' ') : null, plan.fanout[c] ? `fanout: ${plan.fanout[c]}` : null].filter(Boolean);
     out.push(`[${c} ${op}] goal: ${line}`);
     out.push(`[${c} ${op}] ${extras.join(' · ')}`);
+    for (const [kind, from] of Object.entries(plan.imports?.[c] ?? {})) out.push(`[${c} ${op}] ${kind} imported from ${from.sourceSessionId} step ${from.sourceStep} (${from.input})`);
   }
   out.push(`ends: ${plan.ends}`);
   return out.join('\n');
@@ -272,7 +283,8 @@ export async function planSession(root, session, flags = {}) {
   if (!state.mission) throw new PlanError(['state.json carries no mission; the chain is planned from mission.doneWhen']);
   const packages = await loadOperatorPackages(root);
   const graph = await loadOperatorGraph(root, packages);
-  const plan = planChain({ packages, mission: state.mission, options: { graph, maxParallel: await loadMaxParallel(root), roles: flags.roles ?? [], requirements: flags.requirements ?? {} } });
+  const imported = await readImportedSlots(session, graph);
+  const plan = planChain({ packages, mission: state.mission, options: { graph, maxParallel: await loadMaxParallel(root), roles: flags.roles ?? [], requirements: flags.requirements ?? {}, imported } });
   return { state, plan };
 }
 

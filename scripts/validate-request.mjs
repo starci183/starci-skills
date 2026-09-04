@@ -12,6 +12,7 @@ import { createHash } from 'node:crypto';
 import path from 'node:path';
 import process from 'node:process';
 import { fileURLToPath } from 'node:url';
+import { isDeepStrictEqual } from 'node:util';
 import { validateAgainst } from './json-schema.mjs';
 import { loadOperatorPackages, kindOf, isYes, exchangeOf, cellAliases } from './operator-md.mjs';
 import { loadInteractionPolicy, selectionErrors } from './validate-interaction.mjs';
@@ -177,6 +178,20 @@ export function branchGoalErrors(state, request) {
     const mine = `${request.step}/${request.parallel}`;
     if (goal.prerequisite === mine) errors.push(`request.json: goal.prerequisite names this branch itself (${mine}); a prerequisite enables another branch`);
     else if (state.steps?.[goal.prerequisite] === undefined) errors.push(`request.json: goal.prerequisite names ${goal.prerequisite}, which state.json.steps does not record; a prerequisite enables a branch of the chain`);
+  }
+  return errors;
+}
+
+// The requirements the plan fixed for a branch (state.json.planned["N/M"].requirements, written from
+// scripts/plan-chain.mjs presets when the chain is drawn: a bind's role, a preflight's roles, a preset
+// mode) are what the chain was validated on before the branch's request existed; the request that
+// dispatches the branch carries them unchanged, or it runs a branch the chain was never checked for.
+// Read here before dispatch and by scripts/validate-chain.mjs over the ledger.
+export function plannedRequirementErrors(planned, request, at = 'request.json') {
+  const errors = [];
+  for (const [key, value] of Object.entries(planned?.requirements ?? {})) {
+    const actual = request?.requirements?.[key];
+    if (!isDeepStrictEqual(actual, value)) errors.push(`${at}: requirements.${key} ${actual === undefined ? 'is absent' : `is ${JSON.stringify(actual)}`} and the plan fixed it as ${JSON.stringify(value)} (state.json.planned); the chain was validated on the planned value, so the dispatched request carries it`);
   }
   return errors;
 }
@@ -394,6 +409,8 @@ export async function validateRequest(root, dir, packages) {
       errors.push(...branchGoalErrors(state, request));
       // A unit branch names one unit of a plan an earlier branch produced; a mission with several units for one execute operator fans out one unit per branch.
       errors.push(...await unitGateErrors(root, state, request, packages, sessionRoot));
+      // The requirements the plan fixed for this branch are what the chain was validated on: the dispatched request carries them unchanged.
+      if (!request.exchange) errors.push(...plannedRequirementErrors(state.planned?.[`${request.step}/${request.parallel}`], request));
       // A fix answers a finding of a fixable kind, and answers it once: a composition or taste finding, or one that survived a fix, is a surface generated again.
       errors.push(...await fixKindErrors(root, state, request, sessionRoot));
       const key = `${request.step}/${request.parallel}${request.exchange ? `/${request.exchange}` : ''}`;

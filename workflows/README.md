@@ -16,6 +16,14 @@ through the tables every operator publishes in its `operator.md`:
   chain first, else the one operator whose `primaryOutput` is that kind (two primaries are settled
   by the operator the Inputs row names), else the only producer; a kind the tables leave ambiguous
   is a refusal that names the candidates, never a guess;
+- a required Input whose kind an **imported slot** of the session already carries
+  (`scripts/producer-import.mjs`: an evidence-only coordinate holding `import.json` beside a copied
+  producer bundle) is already produced when no branch of the chain produces it: no producer is
+  added, the consuming branch binds the slot's output as `inputs.<kind>`, and the preview prints
+  `<kind> imported from <sourceSession> step N`; a slot without `import.json` is a local input, a
+  slot whose origin operator this tree cannot name declares nothing, and at the gate the kind is
+  credited only when `validate-request#validateImportedInput` accepts the reference — the plan
+  learns that the kind exists, the import gate stays the authority on the bytes;
 - a required `@workspaces/<role>` **Context** row pulls in a `workspace.bind` of that role, and a
   role the mission declares is bound before every working branch even when no table asks for it;
 - an operator that more than one "done when" line names, when its domain has a `<domain>.plan`
@@ -39,21 +47,31 @@ branch alone in its step so its units can expand in place. Every branch gets a g
 line it evidences, or the earliest later branch it enables — which is what `request.json.goal`
 carries and `validate-request` checks.
 
+The plan fixes a branch's requirements before its request exists — a bind's `role`, the preflight's
+`roles`, a preset `mode` — and the orchestrator writes them as `state.json.planned["N/M"].requirements`
+when the chain is drawn or redrawn, before the first dispatch. The gate reads a bind's role from the
+request when it is written, else from the plan, so a chain drawn before step 1 validates; the
+request that later dispatches a planned branch carries the planned values unchanged, or
+`validate-request#plannedRequirementErrors` refuses it, because the chain was validated on those
+values and a request that changed one runs a branch the chain was never checked for.
+
 The plan is printed to the person as two lines per branch (the goal, then why the branch is there)
 before anything is dispatched, and `node scripts/plan-chain.mjs <session>` prints the same preview
 and the JSON block for a session on disk.
 
 ## What the gate enforces
 
-`validate-chain` reads `state.json.chain`, `state.json.steps` and each branch's `request.json`, and
-refuses a chain in which:
+`validate-chain` reads `state.json.chain`, `state.json.steps`, `state.json.planned` and each branch's
+`request.json`, and refuses a chain in which:
 
 - a branch names an operator the tree does not carry, or a cell sits in a step its number does not
-  name;
+  name, or the plan fixed requirements for a cell the chain does not name;
 - a step holds an operator that no Next table of the step before permits and that is not a re-entry
   of the same operator;
-- a branch requires an Input no earlier step produces, or a `@workspaces/<role>` context no earlier
-  `workspace.bind` of that role bound;
+- a branch requires an Input no earlier step produces and no accepted imported slot its request
+  names supplies, or a `@workspaces/<role>` context no earlier `workspace.bind` of that role bound
+  or is planned to bind (both as derived above);
+- a branch's written request differs from the requirements the plan fixed for it;
 - a step holds more than the parallel cap, or two branches of one step write the same alias;
 - a branch writes frontend source under `mode: apply` and `git.publish` follows with the audit or
   `uat.verify` missing or outside the write and the publish;

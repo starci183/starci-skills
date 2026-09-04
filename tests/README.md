@@ -165,6 +165,26 @@ operator with no pair inverted, ends where the example ends, and puts a `<domain
 execute branch when the tree has one; a fixture naming an operator the tree does not carry yet is
 skipped by name. They are evidence that the planner still reaches the shapes people used, not
 shapes the entry picks from.
+## Round 4 — 2026-09-05, the Nivo rerun on 2.0.0, judged for 2.0.2
+
+One live mission rerun on 2.0.0 by an Opus processor met seven runtime defects in its first two
+hours ([`evidence/20260905-nivo-recovery-on-2.0.0.md`](evidence/20260905-nivo-recovery-on-2.0.0.md)).
+This cut closes D1 to D5, each behind a gate that is green at this head: D1, `workspace.bind` hands to
+`architecture.decide` (`scripts/validate-routing.mjs`, `scripts/validate-operator.mjs`, the
+`plan-chain.spec.mjs` fixtures); D2, a kind an imported slot carries is already produced for the
+chain, in the plan and at the gate, credited only through the import gate
+(`scripts/validate-chain.spec.mjs`, `scripts/plan-chain.spec.mjs`); D3, the plan fixes a branch's
+requirements as `state.json.planned` before its request exists, the chain gate reads a bind's role
+from the plan until the request is written, and a dispatched request that left the plan is refused
+(`scripts/validate-session.spec.mjs`, `scripts/validate-chain.spec.mjs`, `templates/step/state.schema.json`);
+D4, `gitPolicy` is typed as the object the route declaration carries and a wrong shape is refused by
+a line naming the field, the shape and the declared value (`operators/workspace-bind/self-test.mjs`,
+`scripts/workspace-checkout.spec.mjs`); D5, an origin's `next` is routing history and not a typed
+output, so a 1.x producer whose receipt hands to a retired operator id imports while a missing typed
+output still does not (`scripts/producer-import.spec.mjs`). D6 falls with D2, because a mission that
+imports its decisions no longer routes through `business.decide`; D7 is closed by the Next rows the
+2.0.2 branch already carries to every plan operator.
+
 ## The findings ledger
 
 From 2.0.1 a receipt is not the end of what an audit or a walk knows. Every done `interface.audit`

@@ -23,7 +23,7 @@ import { effectiveBudget, missionGateErrors, goalDecisionId } from './validate-r
 import { goalCheckErrors } from './validate-response.mjs';
 import { loadOperatorPackages } from './operator-md.mjs';
 import { loadInteractionPolicy } from './validate-interaction.mjs';
-import { validateChain, loadOperatorGraph, loadMaxParallel, readBranchRequests } from './validate-chain.mjs';
+import { validateChain, loadOperatorGraph, loadMaxParallel, readBranchRequests, readImportedInputs } from './validate-chain.mjs';
 import { extractFindings, readLedger, LEDGER_DIR, LEDGER_OPERATORS } from './record-findings.mjs';
 
 const branchDir = (session, branch) => { const [n, m] = branch.split('/'); return path.join(session, `step-${n}`, `parallel-${m}`); };
@@ -150,8 +150,9 @@ export async function validateSession(root, session, { packages = null, ledgerDi
   // A chain that writes routed source or touches a runtime ran on a goal the person confirmed, and every change of that goal is on record.
   errors.push(...missionGateErrors(state, null, packages, policy));
   errors.push(...missionHistoryErrors(state));
-  // The chain is lawful against the operator tables and each branch's request: reachable, fed, bound, capped, proved, ended, and on a mission every branch names its goal.
-  errors.push(...validateChain(root, packages, state.chain, state.steps, await readBranchRequests(session, state.steps), { graph: await loadOperatorGraph(root, packages), mission: state.mission ?? null, maxParallel: await loadMaxParallel(root) }));
+  // The chain is lawful against the operator tables and each branch's request: reachable, fed (by an earlier step or an accepted imported slot), bound (by a written or a planned bind), capped, proved, ended, and on a mission every branch names its goal.
+  const byBranch = await readBranchRequests(session, state.steps);
+  errors.push(...validateChain(root, packages, state.chain, state.steps, byBranch, { graph: await loadOperatorGraph(root, packages), mission: state.mission ?? null, maxParallel: await loadMaxParallel(root), planned: state.planned ?? {}, imported: await readImportedInputs(root, session, byBranch) }));
   // On a mission: proven cites only evidenced done-when lines, three unevidenced done branches in a row stop the chain, every transition was logged.
   const ledger = await goalLedger(session, state);
   errors.push(...provenErrors(state, ledger));

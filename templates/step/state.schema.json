@@ -121,6 +121,22 @@
         "pattern": "^sha256:[0-9a-f]{64}$"
       }
     },
+    "planned": {
+      "description": "branch \"N/M\" -> the requirements the plan fixed for it (scripts/plan-chain.mjs presets: a bind's role, a preflight's roles, a preset mode), written when the chain is drawn or redrawn and before the branch's request exists; the chain gate reads a bind's role from here until the request is written, and the request that dispatches the branch carries these values unchanged (scripts/validate-request.mjs#plannedRequirementErrors)",
+      "type": "object",
+      "additionalProperties": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "requirements"
+        ],
+        "properties": {
+          "requirements": {
+            "type": "object"
+          }
+        }
+      }
+    },
     "resumes": {
       "description": "branch \"N/M\" that re-enters a blocked branch: which one, and the stop it answered",
       "type": "object",

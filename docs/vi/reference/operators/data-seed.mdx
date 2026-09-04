@@ -98,6 +98,7 @@ ngoài namespace của luồng, không seed kết quả đang được kiểm, k
 | Kind | Từ đâu | Bắt buộc |
 | --- | --- | --- |
 | `uat-account` | `identity.provision`; hồ sơ tài khoản sở hữu các hàng, khi chuỗi này đã cấp nó; nếu không thì đọc từ thư mục luồng | không |
+| `units` | `data.plan`; danh sách seed mà nhánh này đặt đúng một đơn vị, gọi tên bằng `request.unit` | không |
 
 ## Yêu cầu
 
@@ -152,6 +153,7 @@ chưa giữ; một lần resume không thêm thẩm quyền, tài khoản, seed 
 | luồng chưa có hồ sơ tài khoản, nên danh tính được cấp trước khi seed được đặt | `identity.provision` |
 | seed đã đặt ở khối lượng và bề mặt từng được đo dưới mức ấy được chụp lại | `interface.audit` |
 | seed đã đặt và lượt chạy đang chờ nó có thể đi qua luồng | `uat.verify` |
+| seed đã đặt và nhiệm vụ không đòi gì hơn thế, nên người đọc biên nhận trước khi có gì đi qua luồng | `user` |
 
 ---
 

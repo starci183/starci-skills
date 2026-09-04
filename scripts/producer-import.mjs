@@ -51,8 +51,9 @@ async function originAuthority(root,r,m){
   const original=metadata(r.source,m),state=json(within(r.sourceSession,'state.json')),key=`${m.sourceStep}/${m.sourceParallel}`;
   if(state.id!==m.sourceSessionId||state.steps?.[key]!==original.request.operatorId||state.requestHashes?.[key]!==hash(readFileSync(within(r.source,'request/request.json'))))throw Error('origin request does not match its original session operator and frozen request hash');
   try{for(const refs of Object.values(original.response.fields??{}))for(const ref of Array.isArray(refs)?refs:[refs])if(!lstatSync(within(r.source,ref)).isFile())throw Error('not a file');}catch{throw Error('origin output is missing or unsafe');}
+  // The origin's declared outputs and bytes are judged by this tree; its `next` is routing history of the tree that ran it, not an output (validate-response.mjs#validateResponse, origin).
   const {validateResponse}=await import('./validate-response.mjs');
-  const result=await validateResponse(root,r.source,{requirements:original.request.requirements??{}});
+  const result=await validateResponse(root,r.source,{requirements:original.request.requirements??{},origin:true});
   if(result.errors.length)throw Error('origin response fails its typed output gate: '+result.errors.slice(0,2).join('; '));
   return original;
 }

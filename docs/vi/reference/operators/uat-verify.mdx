@@ -247,7 +247,7 @@ bước chạm tới sản phẩm bằng cách khác — một endpoint, một m
 | 7 | Capture tại từng khẳng định có tên với ô mật khẩu đã che, rồi ghép tấm sheet | — | `response/data/snapshot.json`, @worktrees/sessions/central-runtime để lấy bằng chứng runtime trực tiếp nhất | `response/data/captures/<case>.json`, `response/artifacts/<case>.png`, `response/artifacts/sheet.png`, @tools/visualize, @tools/print | `EVIDENCE_UNAVAILABLE` |
 | 8 | Xét ba làn tách rời nhau, và chấm làn trải nghiệm theo từng tiêu chí | — | @knowledge/ui/proof (topic UX và rule đóng của nó), `response/data/captures/<case>.json` | `response/data/verdicts.json` | — |
 | 9 | Kiểm chỉ-đọc, rồi xoá namespace lượt chạy và không gì khác | `runId` | @workspaces/be để lấy các bản ghi mang `is_uat=true` và namespace này, `response/data/verdicts.json` | @tools/database | — |
-| 10 | Thêm `runs/<runId>/`, trỏ `latest.json` vào nó, thêm dòng lịch sử, rồi phát | `runId` | mọi thứ ở trên | @worktrees/uat/&lt;flow>/&lt;case> (runs/&lt;runId>/, latest.json và history.md), `response/response.md`, `response/response.json`, `audit-scope`, @tools/sourcewrite, @tools/print | — |
+| 10 | Thêm `runs/<runId>/`, trỏ `latest.json` vào nó, thêm dòng lịch sử, rồi phát | `runId` | mọi thứ ở trên | @worktrees/uat/&lt;flow>/&lt;case> (runs/&lt;runId>/, latest.json và history.md), `response/response.md`, `response/response.json`, `audit-scope`, `findings`, @tools/sourcewrite, @tools/print | — |
 
 Một phán quyết không ai được cho xem là một phán quyết không ai đọc. Bậc 7 in bản tóm tắt các ảnh
 chụp theo bước và bậc 10 in bảng `## Verdict` qua `@tools/print`, thẳng vào cuộc trò chuyện mà người
@@ -268,6 +268,12 @@ Deferred states đúng nguyên bản. Kết quả chỉ có nghĩa trong phạm 
 thành đạt vì gate hoặc UAT đạt. Các gate chất lượng và các case UAT đã đóng băng giữ nguyên.
 Snapshot đóng băng cũng chép nguyên phạm vi vào `auditScope` trước khi bắt đầu chạy.
 
+Đầu ra `findings` không phải của lượt chạy này để ghi. Khi biên nhận được chấp nhận, orchestrator ghi
+thêm mọi làn, tiêu chí, khẳng định và hàng `## Findings` bị hỏng vào sổ cái findings và vật chất hoá
+các dòng đang mở của sổ cái cho luồng này cạnh biên nhận, theo luật và script mà
+[mục lục findings](../../knowledge/findings/INDEX.vi.md) nêu; gate phiên từ chối một lượt chạy đã
+xong mà sổ cái không giữ các lần hỏng của nó.
+
 ## Đầu ra
 
 | Kind | File | Kiểu | Bắt buộc |
@@ -277,6 +283,7 @@ Snapshot đóng băng cũng chép nguyên phạm vi vào `auditScope` trước k
 | `uat-capture` | `response/data/captures/<case>.json` | data | có |
 | `uat-verdicts` | `response/data/verdicts.json` | data | có |
 | `audit-scope` | `response/data/audit-scope.json` | data | không |
+| `findings` | `response/data/findings.json` | data | không |
 | `screenshot` | `response/artifacts/<case>.png` | artifact | có |
 | `sheet` | `response/artifacts/sheet.png` | artifact | có |
 

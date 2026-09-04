@@ -105,6 +105,31 @@ actually renders. A claim is never evidence of passing: a node claiming `GAP-4` 
 gap measures `1.5rem` is a failure, and no amount of claiming changes the measurement. That is the
 whole mechanic, and it is why the claim exists.
 
+## Two kinds of lane, two ways of judging
+
+The topics this audit closes are not all judged the same way. Presentation, composition, responsive,
+motion, accessibility, contrast and render-truth are measurable: a computed gap, a contrast ratio,
+the element that holds focus, a claim traced to its authority. They are judged blind, per unit — one
+page or one modal, one matrix entry at a time — because a measurement needs no other sheet to be
+true, and an auditor who has seen the neighbouring page brings nothing to a ruler. The taste lens is
+not a measurement of one sheet; it is a placement on a scale, and a scale drifts between sheets when
+every sheet is scored alone. So taste — and the experience lens wherever a receipt scores it from a
+capture — is scored once per feature by one auditor, across every selected surface of the frozen
+scope in the same round, relatively: the sheets are ranked against each other, and the receipt says
+under `## Ranked against` which sheets it ranked, so a score reads as a position on a scale and not
+as a mood.
+
+What makes that scale the same one from one round to the next, and from one auditor to the next, is
+the calibration set `@knowledge/ui/proof` carries under `calibration/`: three anchor sheets, the band
+each is expected to land in with its one-line reason, and the tolerance, stated once in
+`calibration.json`. The auditor scores the three anchors in the same round it scores the surface,
+records them under `## Calibration` and in `verdicts.calibration`, and only then places the surface;
+a lens scored with no anchors, or with an anchor landing further outside its band than the
+tolerance, is `CALI<br />ATION_OFF` (`TASTE-13` Case 9): the round's scale is unproved, no score it
+produced is comparable, and the same auditor re-enters and scores the anchors again. A unit branch
+that scores taste for a feature split across branches ranks against the anchors alone, which is what
+lets two branches' scores be compared at all.
+
 ## The owner decides where a failure goes
 
 A failing claim on an application-owned node is a value the resolution has to publish again, so it
@@ -177,26 +202,34 @@ a node passes.
 | 3 | Bind the primary-surface scope, selected matrix entries and declared surface class | `auditScope`, `matrix` | input `frontend-direction-decision` (its `response/data/coverage.json`: state by viewport by colour scheme, and the `surfaceClass` that decision declared) | — | `SURFACE_CLASS_MISSING` |
 | 4 | Reach readiness for each entry on the port the runtime owner's entry for this route carries, in this session's own browser profile, signing in as the flow's account when the route requires an identity | `readinessProbe`, `account`, `env` | @worktrees/sessions/central-runtime for the entry of this project route and the endpoint it serves, input `uat-account` for the account of names, @tools/http, @tools/secrets, @tools/browsercontrol | — | `RUNTIME_UNAVAILABLE`, `IDENTITY_MISSING` |
 | 5 | Capture and measure each entry | — | @worktrees/sessions/central-runtime, @workspaces/fe (the observed owners and the identifiers each node carries), @tools/browsercontrol | `response/artifacts/<matrixId>.png`, `response/data/captures/<matrixId>.json` | `EVIDENCE_MISSING` |
-| 6 | Compare against the claims and the proof rules, judge by owner, let each topic close itself, and emit | — | @knowledge/ui/proof, @knowledge/grammars/&lt;family>, the captures | `verdicts`, `frontend-surface-audit`, `response/response.json`, `host` | `UNKNOWN_RULE`, `NO_PROGRESS` |
+| 6 | Judge the measurable lanes per entry: compare against the claims and the proof rules, judge by owner, and let each measurable topic close itself | — | @knowledge/ui/proof, @knowledge/grammars/&lt;family>, the captures | — | `UNKNOWN_RULE` |
+| 7 | Score the taste lens once over every sheet of the scope, calibrated on the three anchors and ranked relatively, then emit | — | @knowledge/ui/proof (the calibration set under `calibration/`: the anchors, their bands and the tolerance), the captures of every selected surface | `verdicts`, `frontend-surface-audit`, `findings`, `response/response.json`, `host` | `CALI<br />ATION_OFF`, `NO_PROGRESS` |
 
-Step 6 judges every claim and then lets each proof topic close itself. The canon judgement is the one
-above: every claim measured, judged against the published rule, routed by the owner of the node it
-stands on; bounded search (`@tools/websearch`) resolves a referent a rule names and settles nothing
-else. On top of it, each bound topic computes its own verdict by its own closing rule — the
-arithmetic lives there and is not repeated here — and the receipt publishes one row per topic under
-`## Verdict`: presentation, composition, responsive, motion, accessibility, contrast, render-truth
-and taste, each with the verdict that topic's rule produced and the route a failure carries. A topic
-whose evidence never arrived is `blocked`, which is never reported as a pass and never as a failure.
-The taste row is scored per matrix entry and rolled up across them, lowest score and failing verdict
-winning, because a surface is only as good as its worst captured viewport; a `fix-first` there stands
-even when every canon rule passed, and the checkout's own gates wait for a `ship`.
+Step 6 judges every claim and lets each measurable proof topic close itself. The canon judgement is
+the one above: every claim measured, judged against the published rule, routed by the owner of the
+node it stands on; bounded search (`@tools/websearch`) resolves a referent a rule names and settles
+nothing else. Each bound topic computes its own verdict by its own closing rule — the arithmetic
+lives there and is not repeated here — and step 7 publishes one row per topic under `## Verdict`:
+presentation, composition, responsive, motion, accessibility, contrast, render-truth and taste, each
+with the verdict that topic's rule produced and the route a failure carries. A topic whose evidence
+never arrived is `blocked`, which is never reported as a pass and never as a failure. The taste row
+is scored per matrix entry on the calibrated scale and rolled up across them, lowest score and
+failing verdict winning, because a surface is only as good as its worst captured viewport; a
+`fix-first` there stands even when every canon rule passed, and the checkout's own gates wait for a
+`ship`.
+
+The `findings` output is not the agent's to write. Once this receipt is accepted, the orchestrator
+appends every failure it recorded to the findings ledger and materializes the ledger's open lines for
+the observed surfaces beside the receipt, under the law and the script
+[the findings index](../../knowledge/findings/INDEX.md) states; the session gate refuses a done audit
+whose failures the ledger does not hold.
 
 The sheet is composed with `@tools/visualize` and served, not filed. `@tools/host` (the tool the registry ships) puts `response/artifacts/` on the loopback interface at
 the first free port of the registry's range and records the URL, the port, the folder and the pid in
 `response/artifacts/host.json`, stopping when the branch ends or is resumed; a person opens the sheet
 and sees every matrix entry beside its verdicts. Nothing binds `0.0.0.0`.
 
-Serving is not telling. Step 6 prints over `@tools/print`, into the conversation the person is
+Serving is not telling. Step 7 prints over `@tools/print`, into the conversation the person is
 reading, the sheet's URL, the worst-scoring capture of each topic and the `## Verdict` table, and the
 receipt lists each printed artifact under `## Printed` with why it was printed. A verdict a person
 never saw sends nobody anywhere, and an audit that files its sheet and says nothing has audited only
@@ -271,6 +304,7 @@ keep their own coverage contracts unchanged.
 | `capture` | `response/data/captures/<matrixId>.json` | data | yes |
 | `screenshot` | `response/artifacts/<matrixId>.png` | artifact | yes |
 | `verdicts` | `response/data/verdicts.json` | data | yes |
+| `findings` | `response/data/findings.json` | data | no |
 | `host` | `response/artifacts/host.json` | artifact | no |
 
 ## Stops
@@ -284,6 +318,7 @@ keep their own coverage contracts unchanged.
 | `EVIDENCE_MISSING` | terminate |
 | `UNKNOWN_RULE` | terminate |
 | `SURFACE_CLASS_MISSING` | terminate |
+| `CALI<br />ATION_OFF` | terminate |
 | `NO_PROGRESS` | terminate |
 
 ## Next

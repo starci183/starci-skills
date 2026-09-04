@@ -5,6 +5,7 @@ This tree contains decision authority, not workflow.
 | Branch | Owns | Must not own |
 | --- | --- | --- |
 | [`ui/`](ui/INDEX.md) | Cross-family condition-to-Grammar rules, practical Core examples, measurable UI relationships, and review falsifiers | Business facts, page copy, routes, artwork identity, one-off effects, or operator orchestration |
+| [`findings/`](findings/INDEX.md) | The ledger of what audits and walks found, one `<family>.jsonl` per grammar family, and the proposals drafted from rule-less findings for a person to author | Law, a context any operator binds, or a rule a script wrote into `ui/` |
 | [`grammars/<family>/`](grammars/starci/INDEX.md) | Exact `<family>` public exports, component/state/composition contracts, direct consumption, and derived-family extension rules | Product truth, local substitutes, or app-owned repairs of Grammar output |
 
 Load the smallest canonical English `.md` file and indexed rule that can change the current decision.

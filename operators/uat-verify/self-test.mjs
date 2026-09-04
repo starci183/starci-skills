@@ -443,7 +443,20 @@ await expectError({ ...baseline(), 'response/data/snapshot.json': snapshot({ run
 await expectError({ ...baseline(), 'response/data/snapshot.json': snapshot({ golden: { state: 'candidate', ref: `${DIR}/snapshots/snapshot.json`, approvedBy: null, env: 'staging' } }) }, 'is not authority for another', 'a reference taken in another environment');
 await expectError({ ...baseline(), 'response/data/snapshot.json': snapshot({ flowSource: 'drafted-from-template', golden: { state: 'approved', ref: `${DIR}/snapshots/snapshot.json`, approvedBy: 'the product owner', env: ENV } }) }, 'the first run is the candidate a person promotes', 'a flow drafted this run that claims an approved reference');
 await expectError({ ...baseline(), 'response/data/snapshot.json': snapshot({ cases: [{ ...frozenCase(CASES[0], 0), as: 'reviewer' }, frozenCase(CASES[1], 1)] }) }, 'which no frozen account carries', 'a case acting as an alias nobody provisioned');
-await expectError({ ...baseline(), 'request/request.json': requestJson({ extra: { env: 'nowhere' } }) }, 'which this installation does not have', 'a run pointed at a stack nobody installed');
+// The host is the self-test's own: a stack lookup must not depend on where this checkout sits.
+const HOST = mkdtempSync(path.join(tmpdir(), 'uat-host-'));
+const declare = (env, body) => {
+  mkdirSync(path.join(HOST, '.stacks', env), { recursive: true });
+  const bytes = Buffer.from(JSON.stringify(body, null, 2));
+  writeFileSync(path.join(HOST, '.stacks', env, 'environment.json'), bytes);
+  return `.stacks/${env}/environment.json#sha256:${createHash('sha256').update(bytes).digest('hex')}`;
+};
+const DEV_REF = declare('dev', { schemaVersion: 9, env: 'dev', production: false });
+const TIGHT_REF = declare('tight', { schemaVersion: 9, env: 'tight', production: false, authorization: { seed: 'person' } });
+assert.deepEqual(UAT_CLASSES, ['seed', 'identity-provisioning']);
+const MOVED_REF = DEV_REF.replace(/[0-9a-f]{64}$/, '9'.repeat(64));
+const onHost = { hostRoot: HOST };
+await expectError({ ...baseline(), 'request/request.json': requestJson({ extra: { env: 'nowhere' } }) }, 'which this installation does not have', 'a run pointed at a stack nobody installed', undefined, onHost);
 await expectError({ ...baseline(), 'response/data/snapshot.json': snapshot({ accounts: [account('learner'), account('learner')] }) }, 'is frozen twice', 'one alias with two accounts');
 await expectError({ ...baseline(), 'response/data/snapshot.json': snapshot({ accounts: [account('learner', { credentialRef: '.stacks/staging/secrets/uat.enc' })] }) }, 'resolves its credential in another environment', 'an account sealed in another environment than the run drove');
 await expectError({ ...baseline(), 'response/response.json': responseJson({ next: ['git.publish'] }) }, 'no run approves its own reference', 'a first baseline promoted by the run that made it');
@@ -464,18 +477,6 @@ await expectError({ ...baseline(), 'response/data/snapshot.json': snapshot({ iso
 // Authority from the environment's own declaration, the same mechanism runtime.serve uses. A
 // synthetic host holds one declaration per case; the reference a request carries is the declaration's
 // path and the hash of its bytes.
-const HOST = mkdtempSync(path.join(tmpdir(), 'uat-host-'));
-const declare = (env, body) => {
-  mkdirSync(path.join(HOST, '.stacks', env), { recursive: true });
-  const bytes = Buffer.from(JSON.stringify(body, null, 2));
-  writeFileSync(path.join(HOST, '.stacks', env, 'environment.json'), bytes);
-  return `.stacks/${env}/environment.json#sha256:${createHash('sha256').update(bytes).digest('hex')}`;
-};
-const DEV_REF = declare('dev', { schemaVersion: 9, env: 'dev', production: false });
-const TIGHT_REF = declare('tight', { schemaVersion: 9, env: 'tight', production: false, authorization: { seed: 'person' } });
-assert.deepEqual(UAT_CLASSES, ['seed', 'identity-provisioning']);
-const MOVED_REF = DEV_REF.replace(/[0-9a-f]{64}$/, '9'.repeat(64));
-const onHost = { hostRoot: HOST };
 
 const authorityBranch = ({ approval, env = ENV }) => {
   const snap = snapshot({

@@ -12,7 +12,7 @@ import process from 'node:process';
 import { fileURLToPath } from 'node:url';
 import { validateStep } from '../../scripts/validate-step.mjs';
 import { tableUnder } from '../../scripts/validate-response.mjs';
-import { validateWorkspaceCheckoutBinding } from '../../scripts/workspace-checkout.mjs';
+import { validateWorkspaceCheckoutBinding, gitPolicyErrors } from '../../scripts/workspace-checkout.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 const empty = (v) => v === undefined || v === null || v === '' || v === '—';
@@ -55,11 +55,10 @@ export async function validateWorkspaceStep(branchDir, root = ROOT) {
     if (checkout.repositoryKind === 'sibling' && businesses !== null) errors.push('response/data/route.json: a sibling checkout carries no business authority root');
     if (businesses !== null && businesses !== derivedBusinesses) errors.push(`response/data/route.json: authorityRoots.businesses must be derived from the checkout as ${derivedBusinesses}`);
 
+    // The request's policy is the declared route's, in the declared shape (scripts/workspace-checkout.mjs#gitPolicyErrors).
     // Mutation is ready only on the declared mutation branch. Reporting readiness anywhere else is how a
     // task branch acquires permission it was never routed.
-    const asked = requirements.gitPolicy ?? null;
-    if (asked && !empty(asked.worktreeBranches) && gitPolicy.worktreeBranches !== asked.worktreeBranches) errors.push(`response/data/route.json: the routed policy ${gitPolicy.worktreeBranches} differs from the request's ${asked.worktreeBranches}`);
-    if (asked && !empty(asked.mutationBranch) && gitPolicy.mutationBranch !== asked.mutationBranch) errors.push(`response/data/route.json: the routed mutation branch ${gitPolicy.mutationBranch} differs from the request's ${asked.mutationBranch}`);
+    errors.push(...gitPolicyErrors(requirements.gitPolicy, gitPolicy));
     const declaredRoots = Array.isArray(requirements.declaredWriteRoots) ? requirements.declaredWriteRoots : [];
     for (const root of declaredRoots) if (!route.writeRoots.includes(root)) errors.push(`response/data/route.json: the request declared the write root ${root}, which the binding does not carry`);
     const sessionBranch = gitPolicy.worktreeBranches === 'session-only' && /^session\/[A-Za-z0-9._-]+$/.test(checkout.branch);

@@ -15,14 +15,24 @@
 // The operator graph (what each operator produces, requires, binds, writes and may hand to) is built
 // here, once, from the operator.md tables and operator.json, and scripts/plan-chain.mjs plans on the
 // same graph, so the planner and the gate cannot disagree about a table.
+//
+// Two things a chain reads beside its own cells. An imported slot (scripts/producer-import.mjs: an
+// evidence-only coordinate carrying import.json beside a copied producer bundle) never enters the
+// chain, but a branch whose request names one of its outputs as an input has that kind produced —
+// credited here only when the import gate accepts the reference, so this file learns that the kind
+// exists and the gate stays the authority on the bytes. And the plan fixes a branch's requirements
+// (state.json.planned["N/M"].requirements, from the planner's presets) before the branch's request
+// exists: a bind's role is read from the request when written, else from the plan, so a chain drawn
+// before step 1 validates, and a dispatched request carries the planned values unchanged.
 import { existsSync } from 'node:fs';
-import { readFile } from 'node:fs/promises';
+import { readFile, readdir } from 'node:fs/promises';
 import path from 'node:path';
 import process from 'node:process';
 import { fileURLToPath } from 'node:url';
 import { loadOperatorPackages, cellAliases, kindOf, isYes } from './operator-md.mjs';
 import { loadAliasRegistry, baseOf } from './alias-registry.mjs';
-import { operatorEffects, planOperatorOf } from './validate-request.mjs';
+import { operatorEffects, planOperatorOf, plannedRequirementErrors } from './validate-request.mjs';
+import { validateImportedInput } from './producer-import.mjs';
 
 // Only a fully quoted cell is unquoted: a sentence that opens with a code span keeps its backticks.
 const unquote = (s) => { const t = String(s ?? '').trim(); return /^`[^`]*`$/.test(t) ? t.slice(1, -1) : t; };
@@ -104,12 +114,16 @@ export function planOf(graph, id) {
 
 // The gate. `chain` and `steps` are state.json's; `byBranch` maps "N/M" to that branch's request.json
 // (operatorId, requirements, goal) or to null when the request is not written yet. Options: mission
-// (state.json.mission; goal rules apply only when present), maxParallel, graph or aliases.
+// (state.json.mission; goal rules apply only when present), maxParallel, graph or aliases, planned
+// (state.json.planned), imported ({ "N/M": Set of kinds the branch draws from accepted imported slots,
+// readImportedInputs).
 export function validateChain(root, packages, chain, steps, byBranch = {}, options = {}) {
   const errors = [];
   const graph = options.graph ?? operatorGraph(packages, options.aliases ?? {});
   const maxParallel = options.maxParallel ?? 3;
   const mission = options.mission ?? null;
+  const planned = options.planned ?? {};
+  const imported = options.imported ?? {};
   if (!Array.isArray(chain) || !chain.length) { errors.push('state.json: chain must be a non-empty array of steps'); return errors; }
   const req = (cell) => byBranch[cell] ?? null;
   const opOf = (cell) => steps?.[cell];
@@ -125,6 +139,7 @@ export function validateChain(root, packages, chain, steps, byBranch = {}, optio
     });
   });
   for (const cell of Object.keys(steps ?? {})) if (!cells.has(cell)) errors.push(`state.json: steps records ${cell}, which the chain does not name`);
+  for (const cell of Object.keys(planned)) if (!cells.has(cell)) errors.push(`state.json: planned records ${cell}, which the chain does not name`);
   const produced = new Set(); // kinds produced by earlier steps
   const boundRoles = new Set(); // roles bound by earlier workspace.bind branches
   const position = new Map(); // operator -> first step index it runs in, over the whole chain
@@ -141,8 +156,9 @@ export function validateChain(root, packages, chain, steps, byBranch = {}, optio
       if (!node) { errors.push(`${cell}: unknown operator ${id}`); continue; }
       const r = req(cell);
       if (previous && !previous.some((prev) => prev === id || (graph.get(prev)?.next ?? new Set()).has(id))) errors.push(`${cell}: step ${n + 1} runs ${id}, which no Next table of step ${n} (${previous.join(', ')}) permits`);
-      for (const input of node.required) if (!produced.has(input.kind)) errors.push(`${cell}: ${id} requires input ${input.kind}, which no earlier step produces`);
-      if (id !== BIND_OPERATOR) for (const role of node.roles) if (!boundRoles.has(role)) errors.push(`${cell}: ${id} requires @workspaces/${role}, which no earlier ${BIND_OPERATOR} (role ${role}) bound`);
+      for (const input of node.required) if (!produced.has(input.kind) && !imported[cell]?.has(input.kind)) errors.push(`${cell}: ${id} requires input ${input.kind}, which no earlier step produces and no imported slot the request names supplies`);
+      if (id !== BIND_OPERATOR) for (const role of node.roles) if (!boundRoles.has(role)) errors.push(`${cell}: ${id} requires @workspaces/${role}, which no earlier ${BIND_OPERATOR} (role ${role}) bound or is planned to bind`);
+      if (r && planned[cell]) errors.push(...plannedRequirementErrors(planned[cell], r, `${cell}: request.json`));
       for (const w of node.writes) {
         if (seenWrites.has(w)) errors.push(`${cell}: ${id} and ${seenWrites.get(w)} both write ${w} in step ${n + 1}; branches of one step must not share a write alias`);
         seenWrites.set(w, id);
@@ -169,7 +185,8 @@ export function validateChain(root, packages, chain, steps, byBranch = {}, optio
       if (plan && position.has(plan.id) && position.get(plan.id) >= n) errors.push(`${cell}: ${id} runs in step ${n + 1} and ${plan.id}, whose ${UNITS_KIND} it executes, runs in step ${position.get(plan.id) + 1}; a plan runs before the branches that take its units`);
     }
     for (const k of stepProduces) produced.add(k);
-    for (const cell of step) if (opOf(cell) === BIND_OPERATOR && req(cell)?.requirements?.role) boundRoles.add(req(cell).requirements.role);
+    // A bind's role: the request when it is written, else the plan; a chain drawn before step 1 has only the plan.
+    for (const cell of step) { const role = opOf(cell) === BIND_OPERATOR ? req(cell)?.requirements?.role ?? planned[cell]?.requirements?.role : undefined; if (role) boundRoles.add(role); }
     previous = step.map(opOf).filter(Boolean);
   });
   // The long-flow law: a surface written for real and published is audited and walked in between.
@@ -200,11 +217,51 @@ export async function readBranchRequests(session, steps) {
   }
   return out;
 }
+// The imported slots of a session: every step-N/parallel-M that carries import.json, with the origin
+// coordinate the manifest names and the outputs the copied response.json declares under fields,
+// kept to the kinds the origin operator's Outputs table publishes when the graph knows the operator
+// (an origin this tree cannot name declares nothing the gate would accept). Each output is the
+// session-relative path a consuming request binds as inputs.<kind>. The planner reads this to treat
+// the kinds as already produced; the bytes are the import gate's (validateImportedInput).
+export async function readImportedSlots(session, graph = null) {
+  const out = [];
+  if (!existsSync(session)) return out;
+  const numbered = (prefix) => (names) => names.filter((n) => new RegExp(`^${prefix}-\\d+$`).test(n)).sort((a, b) => Number(a.slice(prefix.length + 1)) - Number(b.slice(prefix.length + 1)));
+  for (const stepDir of numbered('step')(await readdir(session))) {
+    for (const parallelDir of numbered('parallel')(await readdir(path.join(session, stepDir)))) {
+      const dir = path.join(session, stepDir, parallelDir);
+      if (!existsSync(path.join(dir, 'import.json'))) continue;
+      let manifest; let response;
+      try { manifest = JSON.parse(await readFile(path.join(dir, 'import.json'), 'utf8')); response = JSON.parse(await readFile(path.join(dir, 'response', 'response.json'), 'utf8')); } catch { continue; }
+      const cell = cellOf(Number(stepDir.slice(5)), Number(parallelDir.slice(9)));
+      const node = graph ? graph.get(response.operatorId) ?? null : null;
+      const outputs = {};
+      for (const [kind, ref] of Object.entries(response.fields ?? {})) if (!graph || node?.outputs.has(kind)) outputs[kind] = `${stepDir}/${parallelDir}/${Array.isArray(ref) ? ref[0] : ref}`;
+      out.push({ cell, operatorId: response.operatorId ?? null, sourceSessionId: manifest.sourceSessionId ?? null, sourceStep: manifest.sourceStep ?? null, sourceParallel: manifest.sourceParallel ?? null, outputs });
+    }
+  }
+  return out;
+}
+// The kinds each branch's request draws from imported slots, credited only when the import gate
+// accepts the reference: { "N/M": Set(kind) }. A slot without import.json is a local input and is not
+// credited here; a slot the gate refuses is not credited at all.
+export async function readImportedInputs(root, session, byBranch, { hostRoot } = {}) {
+  const out = {};
+  for (const [cell, request] of Object.entries(byBranch ?? {})) {
+    for (const [kind, ref] of Object.entries(request?.inputs ?? {})) {
+      const m = /^step-(\d+)\/parallel-(\d+)\//.exec(String(ref));
+      if (!m || !existsSync(path.join(session, `step-${m[1]}`, `parallel-${m[2]}`, 'import.json'))) continue;
+      const errors = await validateImportedInput(root, session, ref, kind, { ...(hostRoot ? { hostRoot } : {}), receivingSessionId: request.sessionId ?? path.basename(session) });
+      if (!errors.length) (out[cell] ??= new Set()).add(kind);
+    }
+  }
+  return out;
+}
 export async function validateSessionChain(root, session, state, packages) {
   packages ??= await loadOperatorPackages(root);
   const graph = await loadOperatorGraph(root, packages);
   const byBranch = await readBranchRequests(session, state.steps);
-  return validateChain(root, packages, state.chain, state.steps, byBranch, { graph, mission: state.mission ?? null, maxParallel: await loadMaxParallel(root) });
+  return validateChain(root, packages, state.chain, state.steps, byBranch, { graph, mission: state.mission ?? null, maxParallel: await loadMaxParallel(root), planned: state.planned ?? {}, imported: await readImportedInputs(root, session, byBranch) });
 }
 
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {

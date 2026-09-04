@@ -194,6 +194,7 @@ publish bị giữ lại. Khi nó vắng, head đã publish là thẩm quyền.
 | `architecture-decision` | `architecture.decide`; contract mutation đã đóng băng mà phần cài đặt điền vào và không được nới, và là nguồn của mọi operation lượt chạy này thuật lại | có |
 | `model` | `business.decide`; head mà nhánh đó đã mô hình hoá, khi nó chưa được publish | không |
 | `backend-source-application` | một lượt chạy trước của `backend.generate` cho cùng kết quả; lịch sử hồi quy, vắng mặt ở lần đầu | không |
+| `units` | `backend.plan`; danh sách module mà nhánh này điền đúng một module dưới scope full, gọi tên bằng `request.unit` | không |
 
 ## Yêu cầu
 

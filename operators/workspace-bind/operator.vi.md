@@ -99,7 +99,7 @@ và không mang phán quyết nào.
 | `project` | id | — | Project cần ràng |
 | `role` | choice | — | `fe` hay `be`: vai của project ấy cần ràng |
 | `checkout` | choice | routed | `routed` chọn checkout chuẩn; `session` chỉ chọn worktree đã đăng ký của chính phiên trong request theo chính sách đã khai |
-| `gitPolicy` | list `{worktreeBranches, mutationBranch}` | the policy the route declaration carries; a declaration that carries none is `INVALID_INPUT` at step 1, never a guessed policy | Luật nhánh mà binding này được kiểm theo; `forbidden` giữ mọi lần ghi trên nhánh mutation |
+| `gitPolicy` | object `{worktreeBranches, mutationBranch}`, hai trường của `repository.gitPolicy` trong khai báo route mà binding được kiểm theo | the policy the route declaration carries; a declaration that carries none is `INVALID_INPUT` at step 1, never a guessed policy | Luật nhánh mà binding này được kiểm theo; `forbidden` giữ mọi lần ghi trên nhánh mutation |
 | `declaredWriteRoots` | list | empty | Những đường dẫn duy nhất mà việc sau được ghi; bẩn ngoài chúng là `CHECKOUT_DIRTY`, và bẩn bất kỳ khi checkout đang ở nhánh mutation thay vì nhánh `session/<sessionId>` cũng vậy |
 | `resume` | token | null | Token của nhánh bị chặn khi vào lại sau một mã dừng |
 
@@ -165,6 +165,7 @@ trước khi dispatch và ràng id phiên vào tọa độ chứa request, trạ
 | --- | --- |
 | route đã ràng và checkout mang một bản publish cần đẩy | `git.publish` |
 | route đã ràng và một lời hứa phải được quyết dựa trên source của nó | `business.decide` |
+| route đã ràng và một ranh giới phải được quyết bên trong nó | `architecture.decide` |
 | route đã ràng và một contract backend phải được điền bên trong nó | `backend.generate` |
 | route đã ràng và các trang, modal một tính năng cần phải được gọi tên trước khi mỗi nhánh sinh một cái | `interface.plan` |
 | route đã ràng và các seed nhiệm vụ cần phải được lên kế hoạch trên các kho của nó trước khi mỗi nhánh đặt một seed | `data.plan` |

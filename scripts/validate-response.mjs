@@ -135,7 +135,11 @@ async function requestGoalOf(dir, exchange) {
 }
 
 // `dir` is the branch (or exchange) folder; `requirements` and `goal` come from the branch's request.json.
-export async function validateResponse(root, dir, { requirements = {}, exchange = null, goal, packages, kinds, registry } = {}) {
+// `origin` is set only by scripts/producer-import.mjs#originAuthority, which revalidates another
+// session's frozen producer before importing it: the origin's status, fields, typed outputs, stops
+// and secrets are judged by this tree, but its `next` is the routing history of the tree that ran it
+// and is not a typed output, so a hand-off to an operator this tree renamed or retired is not read.
+export async function validateResponse(root, dir, { requirements = {}, exchange = null, goal, packages, kinds, registry, origin = false } = {}) {
   const errors = [];
   const rel = (f) => path.relative(sessionRootOf(dir) ?? dir, path.join(dir, f)).split(path.sep).join('/');
   const file = path.join(dir, 'response', 'response.json');
@@ -230,8 +234,9 @@ export async function validateResponse(root, dir, { requirements = {}, exchange 
     for (const c of declaredTaken) if (!taken.includes(c)) errors.push(`${rel('response/response.json')}: fallback ${c} is not recorded under ## Fallbacks taken in response.md`);
   }
   // next names only what the operator's own Next table offers (or user / external); a workflow cannot add a hand-off the operator does not declare.
+  // An imported origin is exempt from this one check and nothing else (see `origin` above).
   const nextTable = new Set((op.tables.next?.rows ?? []).map((r) => unquote(r.operator)));
-  for (const nextId of response.next ?? []) {
+  for (const nextId of origin ? [] : response.next ?? []) {
     if (nextId === 'user' || nextId === 'external') continue;
     if (!packages.some((p) => p.manifest.id === nextId)) errors.push(`${rel('response/response.json')}: next names unknown operator ${nextId}`);
     else if (!nextTable.has(nextId)) errors.push(`${rel('response/response.json')}: next names ${nextId}, which the Next table of ${op.id} does not offer`);

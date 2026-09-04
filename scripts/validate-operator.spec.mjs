@@ -50,7 +50,7 @@ test('every operator.md package in the tree passes both checks', async () => {
 });
 
 // The graph is closed: scripts/validate-operator.mjs#checkGraphClosure.
-import { checkGraphClosure } from './validate-operator.mjs';
+import { checkGraphClosure, checkReachability } from './validate-operator.mjs';
 const pkgOf = (id, { inputs = [], outputs = [], next = [], primary = null } = {}) => ({
   shape: 'v9', name: id.replace(/\./g, '-'), manifest: { id, primaryOutput: primary },
   en: { tables: {
@@ -74,4 +74,12 @@ test('a required input nobody produces, and a primary output nobody reads or end
   assert.ok(self.some((e) => e.includes('required input run is produced by no other operator')));
   // An optional input needs no producer; the publish and the deploy end a chain without a user row.
   assert.deepEqual(checkGraphClosure([pkgOf('git.publish', { inputs: [['nothing', false]], outputs: ['pub'], primary: 'pub' })]), []);
+});
+
+test('an operator no Next table reaches from environment.preflight is refused', () => {
+  const chain = [pkgOf('environment.preflight', { outputs: ['r'], primary: 'r', next: ['a.b', 'user'] }), pkgOf('a.b', { outputs: ['x'], primary: 'x', next: ['c.d'] }), pkgOf('c.d', { outputs: ['y'], primary: 'y', next: ['user'] })];
+  assert.deepEqual(checkReachability(chain), []);
+  const island = checkReachability([...chain, pkgOf('e.f', { outputs: ['z'], primary: 'z', next: ['user'] })]);
+  assert.ok(island.some((e) => e.includes('no Next table reaches e.f')));
+  assert.ok(checkReachability([pkgOf('a.b', { outputs: ['x'], primary: 'x' })]).some((e) => e.includes('no package environment.preflight')));
 });

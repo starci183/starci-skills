@@ -5,6 +5,7 @@ Cây này chứa decision authority, không chứa workflow.
 | Nhánh | Sở hữu | Không được sở hữu |
 | --- | --- | --- |
 | [`ui/`](ui/INDEX.vi.md) | Rule condition-to-Grammar dùng chung giữa family, ví dụ Core thực dụng, quan hệ UI đo được và review falsifier | Business fact, copy page, route, identity artwork, effect một lần hay operator orchestration |
+| [`findings/`](findings/INDEX.vi.md) | Sổ ghi những gì audit và lượt đi thử phát hiện, mỗi họ grammar một `<family>.jsonl`, cùng các đề xuất soạn từ finding chưa có rule để một người viết thành luật | Luật, một context mà operator bind, hay một rule do script tự ghi vào `ui/` |
 | [`grammars/<family>/`](grammars/starci/INDEX.vi.md) | Exact public export của `<family>`, contract component/state/composition, direct consumption và luật extension của derived family | Product truth, substitute cục bộ hay sửa Grammar output ở app |
 
 Chỉ load file `.md` tiếng Anh canonical và indexed rule nhỏ nhất có thể đổi quyết định hiện tại. File

@@ -87,6 +87,23 @@ test('an optional input orders after an in-chain producer; a one-way Next row or
   assert.ok(p.dropped.some((d) => /architecture.decide → business.decide \(optional architecture-decision\)/.test(d)));
   assert.equal(p.presets['3/1'], undefined, 'no preset, no entry');
 });
+test('a kind an imported slot carries is already produced: no producer is added, the branch records the slot, the preview says where it came from', () => {
+  const imported = [{ cell: '10/1', operatorId: 'architecture.decide', sourceSessionId: 'earlier', sourceStep: 21, sourceParallel: 1, outputs: { 'architecture-decision': 'step-10/parallel-1/response/response.md' } }];
+  // "Implement what was already decided": the architecture was imported, so nothing decides it again.
+  const decided = [line('backend.generate'), line('quality.verify'), line('business.reconcile')];
+  const p = plan(decided, { roles: ['be'], imported });
+  assert.deepEqual(ops(p), [['environment.preflight'], ['workspace.bind#be'], ['backend.generate'], ['quality.verify'], ['business.reconcile']]);
+  const cell = Object.keys(p.steps).find((c) => p.steps[c] === 'backend.generate');
+  assert.deepEqual(p.imports, { [cell]: { 'architecture-decision': { input: 'step-10/parallel-1/response/response.md', cell: '10/1', sourceSessionId: 'earlier', sourceStep: 21, sourceParallel: 1 } } });
+  assert.ok(previewChain(p, fakeMission(decided)).split('\n').includes(`[${cell} backend.generate] architecture-decision imported from earlier step 21 (step-10/parallel-1/response/response.md)`));
+  assert.deepEqual(accepted(p, fakeMission(decided), { imported: { [cell]: new Set(['architecture-decision']) } }), []);
+  // Without the slot the same mission walks back to architecture.decide through the tables.
+  assert.ok(ops(plan(decided, { roles: ['be'] })).flat().includes('architecture.decide'));
+  // A producer the mission names itself wins over the slot: the person asked for a fresh decision.
+  const fresh = plan([line('architecture.decide'), line('backend.generate')], { roles: ['be'], imported });
+  assert.ok(ops(fresh).flat().includes('architecture.decide'));
+  assert.deepEqual(fresh.imports, {});
+});
 test('the mission roles bind a checkout no table pulls in; the parallel cap and shared writes shape a step', () => {
   const p = plan([line('release.deploy')], { roles: ['be'] });
   assert.deepEqual(ops(p), [['environment.preflight'], ['workspace.bind#be'], ['quality.verify'], ['release.deploy']]);

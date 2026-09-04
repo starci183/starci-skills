@@ -5,7 +5,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import test from 'node:test';
 import { validateSession, missionHistoryErrors, provenErrors, threeBranchStopErrors, loggedErrors } from './validate-session.mjs';
-import { sessionBudgetErrors, effectiveBudget, goalDecisionId } from './validate-request.mjs';
+import { sessionBudgetErrors, effectiveBudget, goalDecisionId, validateRequest } from './validate-request.mjs';
 import { fakeTree } from './chain-fixture.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -28,8 +28,8 @@ const chainOf = (steps) => { const by = new Map(); for (const b of Object.keys(s
 const fe = { requirements: { role: 'fe' } };
 const be = { requirements: { role: 'be' } };
 
-// receipts[branch] is a status word or a whole response.json; requests[branch] is the request.json body (its goal is what the ledger reads); files[branch] are response-relative files to create.
-function session({ steps, current, transitions = [dispatched], withBrief = true, withBudget = true, receipts = {}, requests = {}, files = {}, proven, status = 'running', stoppedAt, choices, extensions, mission: m }) {
+// receipts[branch] is a status word or a whole response.json; requests[branch] is the request.json body (its goal is what the ledger reads), or null for a branch not dispatched yet; files[branch] are response-relative files to create; planned is state.json.planned.
+function session({ steps, current, transitions = [dispatched], withBrief = true, withBudget = true, receipts = {}, requests = {}, files = {}, proven, status = 'running', stoppedAt, choices, extensions, mission: m, planned }) {
   const dir = mkdtempSync(path.join(tmpdir(), 'session-'));
   const state = { id: 'x', project: 'p', startedAt: 'now', status, chain: chainOf(steps), steps, current, requestHashes: {}, transitions };
   if (withBrief) state.brief = proven ? { ...brief, proven } : brief;
@@ -37,10 +37,12 @@ function session({ steps, current, transitions = [dispatched], withBrief = true,
   if (stoppedAt) state.stoppedAt = stoppedAt;
   if (choices) state.choices = choices;
   if (m) state.mission = m;
+  if (planned) state.planned = planned;
   writeFileSync(path.join(dir, 'state.json'), JSON.stringify(state));
   for (const branch of Object.keys(steps)) {
     const [n, m] = branch.split('/');
     const b = path.join(dir, `step-${n}`, `parallel-${m}`);
+    if (requests[branch] === null) continue;
     mkdirSync(path.join(b, 'request'), { recursive: true });
     writeFileSync(path.join(b, 'request', 'request.json'), JSON.stringify({ operatorId: steps[branch], ...(requests[branch] ?? {}) }));
     const r = receipts[branch];
@@ -154,6 +156,22 @@ test('the chain is checked against the operator tables and the requests: adjacen
   assert.ok(unbound.some((e) => e.includes('requires @workspaces/fe')));
   const goalless = await run(session({ steps: writing, current: '2/1', receipts: { '1/1': 'done' }, requests: { '1/1': fe, '2/1': { goal: { doneWhen: 0 } } }, mission: writingMission(), choices: confirmed() }));
   assert.ok(goalless.some((e) => e.includes('1/1: request.json names no goal')));
+});
+// The chain is drawn before step 1, so the binds it names have no request yet: the plan carries their roles
+// (state.json.planned), and a request that dispatches a planned branch carries the planned values unchanged.
+test('a chain drawn before its binds are dispatched validates on the planned roles; a dispatched bind that left the plan is refused', async () => {
+  const drawn = { '1/1': 'environment.preflight', '2/1': 'workspace.bind', '2/2': 'workspace.bind', '3/1': 'interface.generate' };
+  const planned = { '1/1': { requirements: { roles: ['be', 'fe'] } }, '2/1': { requirements: { role: 'be' } }, '2/2': { requirements: { role: 'fe' } } };
+  const first = { '1/1': { requirements: { roles: ['be', 'fe'] }, goal: { prerequisite: '2/1' } }, '2/1': null, '2/2': null, '3/1': null };
+  assert.deepEqual(await run(session({ steps: drawn, current: '1/1', requests: first, planned, mission: writingMission(), choices: confirmed() })), []);
+  const unplanned = await run(session({ steps: drawn, current: '1/1', requests: first, mission: writingMission(), choices: confirmed() }));
+  assert.ok(unplanned.some((e) => e.includes('3/1: interface.generate requires @workspaces/fe')));
+  const drifted = await run(session({ steps: drawn, current: '2/1', receipts: { '1/1': 'done' }, requests: { ...first, '2/2': { requirements: { role: 'be' }, goal: { prerequisite: '3/1' } } }, planned, mission: writingMission(), choices: confirmed() }));
+  assert.ok(drifted.some((e) => e.includes('2/2: request.json: requirements.role is "be" and the plan fixed it as "fe"')));
+  // The request gate refuses the same drift before dispatch.
+  const s = session({ steps: { '1/1': 'workspace.bind' }, current: '1/1', transitions: [], withBrief: false, withBudget: false, planned: { '1/1': { requirements: { role: 'fe' } } }, requests: { '1/1': { schemaVersion: 9, step: 1, parallel: 1, sessionId: 'x', contexts: [], requirements: { project: 'p', role: 'be' }, inputs: {}, resume: null } } });
+  try { assert.ok((await validateRequest(root, path.join(s.dir, 'step-1', 'parallel-1'), packages)).errors.some((e) => e.includes('request.json: requirements.role is "be" and the plan fixed it as "fe"'))); }
+  finally { rmSync(s.dir, { recursive: true, force: true }); }
 });
 // The goal ledger: brief.proven cites only done-when lines a validator-accepted goalCheck evidenced.
 const chain = { '1/1': 'workspace.bind', '2/1': 'quality.verify', '3/1': 'git.publish' };

@@ -1,34 +1,13 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync, mkdirSync, readFileSync, writeFileSync, rmSync, symlinkSync, unlinkSync, rmdirSync, cpSync } from 'node:fs';
+import { readFileSync, symlinkSync, unlinkSync, rmdirSync, cpSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
-import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { createHash } from 'node:crypto';
 import { importProducer, validateImportedInput } from './producer-import.mjs';
 import { validateRequest } from './validate-request.mjs';
-const ROOT=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'..'),HEAD='1'.repeat(40);
-const digest=b=>'sha256:'+createHash('sha256').update(b).digest('hex');
-const write=(p,v)=>{mkdirSync(path.dirname(p),{recursive:true});writeFileSync(p,typeof v==='string'?v:JSON.stringify(v,null,2)+'\n');};
-const read=p=>JSON.parse(readFileSync(p,'utf8'));
-function fixture(){
-  const host=mkdtempSync(path.join(tmpdir(),'producer-import-')),sessions=path.join(host,'.worktrees/sessions'),sourceSession=path.join(sessions,'original'),targetSession=path.join(sessions,'receiver'),source=path.join(sourceSession,'step-1/parallel-1'),target=path.join(targetSession,'step-10/parallel-1');
-  const req={schemaVersion:9,operatorId:'git.publish',step:1,parallel:1,sessionId:'original',contexts:[],requirements:{},inputs:{},resume:null};
-  write(path.join(source,'request/request.json'),req);
-  write(path.join(sourceSession,'state.json'),{id:'original',steps:{'1/1':'git.publish'},requestHashes:{'1/1':digest(readFileSync(path.join(source,'request/request.json')))}});
-  write(path.join(targetSession,'state.json'),{id:'receiver',steps:{'2/1':'quality.verify'},requestHashes:{},chain:[['2/1']],current:'2/1'});
-  const table=(h,header,rows)=>`## ${h}\n\n| ${header.join(' | ')} |\n| ${header.map(()=>'---').join(' | ')} |\n${rows.map(r=>`| ${r.join(' | ')} |`).join('\n')}\n\n`;
-  const contract=read(path.join(ROOT,'templates/kinds/git-publication.contract.json'));
-  let md='# git-publication — fixture\n\n';
-  for(const s of contract.sections){const name=s.heading.slice(4,-1);if(s.rows)md+=table(name,['Field','Value'],s.rows.map(row=>[row,row==='Operator'?'git.publish':row==='Frozen head'?HEAD:'fixture']));else if(name==='Published heads')md+=table(name,['Checkout','Branch','Head','Previous remote head','Commits'],[['fixture','fixture','`'+HEAD+'`','—','1']]);else if(name==='Hooks')md+=table(name,['Hook','Reference','Outcome'],[['`pre-commit`','fixture','passed']]);else md+=table(name,['Code','Subject','Statement'],[['`BOUNDARY_CLEAN`','fixture','Synthetic typed fixture; no publication performed']]);}
-  write(path.join(source,'response/response.md'),md);write(path.join(source,'response/artifacts/raw.log'),'raw gate output\n');
-  write(path.join(source,'response/response.json'),{schemaVersion:9,operatorId:'git.publish',step:1,parallel:1,status:'done',fields:{'git-publication':'response/response.md'},fallbacks:[],commits:[],next:[]});
-  const args={sourceSessionId:'original',sourceStep:1,sourceParallel:1,targetSessionId:'receiver',targetStep:10,targetParallel:1,root:ROOT,hostRoot:host};
-  const check=()=>validateImportedInput(ROOT,targetSession,'step-10/parallel-1/response/response.md','git-publication',{hostRoot:host});
-  const cleanup=()=>{if(!path.resolve(host).startsWith(path.resolve(tmpdir())+path.sep))throw Error('unsafe fixture cleanup');rmSync(host,{recursive:true,force:true});};
-  return {host,sourceSession,targetSession,source,target,args,check,cleanup};
-}
+import { producerImportFixture as fixture, HEAD, digest, write, read } from './producer-import-fixture.mjs';
+const ROOT=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'..');
 test('imports preserve original bytes and ownership without receiver history edits',async()=>{
   const f=fixture();try{const state=readFileSync(path.join(f.targetSession,'state.json'));await importProducer(f.args);assert.deepEqual(await f.check(),[]);assert.ok((await validateRequest(ROOT,f.target)).errors.some(e=>e.includes('evidence-only')));assert.deepEqual(readFileSync(path.join(f.target,'request/request.json')),readFileSync(path.join(f.source,'request/request.json')));assert.equal(read(path.join(f.target,'request/request.json')).sessionId,'original');assert.deepEqual(readFileSync(path.join(f.targetSession,'state.json')),state);await assert.rejects(importProducer(f.args),/already exists/);}finally{f.cleanup();}
 });
@@ -46,6 +25,22 @@ for(const [name,mutate,needle]of [
   ['Windows alternate data stream path',f=>{const p=path.join(f.target,'import.json'),v=read(p);v.files[0].path='response/file.log:stream';write(p,v);},'invalid import file inventory'],
   ['NUL path',f=>{const p=path.join(f.target,'import.json'),v=read(p);v.files[0].path='response/file\0.log';write(p,v);},'invalid import file inventory'],
 ])test(`rejects ${name}`,async()=>{const f=fixture();try{await importProducer(f.args);mutate(f);assert.ok((await f.check()).some(e=>e.includes(needle)));}finally{f.cleanup();}});
+// The origin's `next` is the routing history of the tree that produced it, not a typed output: a
+// hand-off to an operator this tree renamed or retired does not block the import, while a missing
+// declared output still does.
+test('an origin whose next names an operator this tree does not carry imports; an origin missing a typed output does not',async()=>{
+  const f=fixture();try{
+    const file=path.join(f.source,'response/response.json'),response=read(file);
+    write(file,{...response,next:['backend.source.apply']});
+    await importProducer(f.args);assert.deepEqual(await f.check(),[]);
+    assert.ok((await validateRequest(ROOT,f.target)).errors.some(e=>e.includes('evidence-only')),'the imported slot stays evidence-only');
+  }finally{f.cleanup();}
+  const g=fixture();try{
+    const file=path.join(g.source,'response/response.json'),response=read(file);
+    write(file,{...response,fields:{},next:['backend.source.apply']});
+    await assert.rejects(importProducer(g.args),/typed output gate: .*required output git-publication is not in fields/);
+  }finally{g.cleanup();}
+});
 test('rejects undeclared output and unsafe source coordinates',async()=>{const f=fixture();try{await importProducer(f.args);assert.ok((await validateImportedInput(ROOT,f.targetSession,'step-10/parallel-1/response/artifacts/raw.log','git-publication',{hostRoot:f.host})).some(e=>e.includes('not an output')));await assert.rejects(importProducer({...f.args,sourceSessionId:'../escape',targetStep:11}),/strict/);await assert.rejects(importProducer({...f.args,targetStep:-1}),/strict/);}finally{f.cleanup();}});
 test('rejects symlinked imported evidence',async()=>{const f=fixture();try{await importProducer(f.args);const dir=path.join(f.target,'response/artifacts');unlinkSync(path.join(dir,'raw.log'));rmdirSync(dir);symlinkSync(path.join(f.source,'response/artifacts'),dir,process.platform==='win32'?'junction':'dir');assert.ok((await f.check()).some(e=>e.includes('symlink')));}finally{f.cleanup();}});
 test('local input ownership uses receiving request identity rather than fixture folder name',async()=>{const f=fixture();try{const local=path.join(f.targetSession,'step-12/parallel-1');write(path.join(local,'request/request.json'),{sessionId:'logical-session'});write(path.join(local,'response/response.md'),'local input');const ref='step-12/parallel-1/response/response.md';assert.deepEqual(await validateImportedInput(ROOT,f.targetSession,ref,'git-publication',{hostRoot:f.host,receivingSessionId:'logical-session'}),[]);assert.ok((await validateImportedInput(ROOT,f.targetSession,ref,'git-publication',{hostRoot:f.host,receivingSessionId:'other-session'})).some(e=>e.includes('explicit import manifest')));await importProducer(f.args);assert.ok((await validateImportedInput(ROOT,f.targetSession,'step-10/parallel-1/response/response.md','git-publication',{hostRoot:f.host,receivingSessionId:'logical-session'})).some(e=>e.includes('target does not match')));}finally{f.cleanup();}});
