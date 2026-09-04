@@ -64,7 +64,10 @@ route's checkout is at — present among the commits the entry records as contai
 `@workspaces/ports/<project>` projects for the role answer a probe through `@tools/http`. A port that
 answers while the entry names no server, or is held by a process the registry does not record, is a
 wall with the holder as evidence and never permission to reclaim it. The host checks ask whether a
-browser binary exists for the audit profile, whether the container daemon answers an inspection
+browser binary exists for the audit profile, whether the host's one Playwright install stands where
+the browser tool's mode `playwright` loads it from — the runner `scripts/browser-walk.mjs` reads
+the place from the tool registry and this operator's validator reads the same place back, so a report
+that says `ok` over an absent install is refused — whether the container daemon answers an inspection
 through `@tools/container`, whether each checkout's dependencies are installed as its lockfile
 records, and whether a checkout nested under another repository would have that repository's
 `node_modules/@types` enter its typecheck — a leak that fails a typecheck for reasons no source
@@ -129,7 +132,7 @@ replace. It makes no product decision and carries no verdict about the source.
 | 3 | Check each checkout: the route carries a git policy, the tree is clean and the branch is one the policy permits | — | @workspaces/local/routes/<project>/<role>, the resolved checkout, its branch and its working tree, @tools/git | — | — |
 | 4 | Check identity custody: the sealed admin credential preflight through `scripts/identity-custody.mjs`, and when a flow is named its account record and a sign-in probe | `flow`, `env` | @workspaces/device-state, @worktrees/uat/<flow> for the account record of `env`, @worktrees/sessions/central-runtime for the identity provider of each route's entry, @tools/secrets, @tools/http | — | — |
 | 5 | Check the runtime: the registry entry of each route, whether the served head contains the checkout's head, whether the projected ports answer, and any port a foreign process holds | — | @worktrees/sessions/central-runtime, @workspaces/ports/<project>, @tools/http, @tools/shell | — | — |
-| 6 | Check the host: a browser binary for the audit profile, a reachable container daemon, installed dependencies per checkout and ancestor type isolation | — | the resolved checkouts and their lockfiles, @tools/shell, @tools/container | — | — |
+| 6 | Check the host: a browser binary for the audit profile, the Playwright install the walk runner loads (`host.playwright`, a wall in the runner's own wording when absent), a reachable container daemon, installed dependencies per checkout and ancestor type isolation | — | the resolved checkouts and their lockfiles, the install place `resources/tools.json` names for the browser tool, @tools/shell, @tools/container | — | — |
 | 7 | Check the approvals: which operation classes the environment declaration marks declared or person, an omitted class taking the schema default | `env` | the environment declaration of `env` and the environment schema | — | — |
 | 8 | Emit the report, blocked with every wall named when any stands | — | everything above | `response/response.md`, `response/data/readiness-report.json`, `response/response.json` | `ENVIRONMENT_NOT_READY` |
 

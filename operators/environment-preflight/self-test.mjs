@@ -21,6 +21,15 @@ const PROJECT = 'sample-product';
 const host = mkdtempSync(path.join(tmpdir(), 'environment-host-'));
 mkdirSync(path.join(host, '.stacks', ENV), { recursive: true });
 writeFileSync(path.join(host, '.stacks', ENV, 'environment.json'), JSON.stringify({ schemaVersion: 9, env: ENV, production: false, authorization: { 'external-upload': 'person' } }, null, 2));
+// The synthetic host also carries a Playwright install of the shape the walk runner loads — the
+// package under the install and a Chromium under its browsers path — so the ready branch is ready;
+// the mutation below removes it and the report's ok is refused against the host, not the report.
+const { playwrightInstallOf, playwrightInstallStatus, missingInstallMessage } = await import('../../scripts/browser-walk.mjs');
+const install = playwrightInstallOf(host, ROOT);
+mkdirSync(path.dirname(install.module), { recursive: true });
+writeFileSync(install.module, JSON.stringify({ name: 'playwright', version: '0.0.0-synthetic' }));
+mkdirSync(path.join(install.browsers, 'chromium-0000'), { recursive: true });
+assert.equal(playwrightInstallStatus(host, ROOT).present, true, 'the synthetic install is the shape the runner loads');
 const envSchema = await loadEnvironmentSchema(ROOT);
 const reportSchema = JSON.parse(await readFile(path.join(ROOT, 'templates', 'kinds', 'readiness-report.schema.json'), 'utf8'));
 const CLASSES = authorizationClasses(envSchema);
@@ -37,6 +46,7 @@ function evidenceFor(id, authorization) {
   if (id === 'identity.flow.signin') return 'sign-in answered 200 with the password resolved by name';
   if (family === 'runtime') return { entry: 'the registry holds the entry of this route', head: 'the served head contains the checkout head', port: 'the projected port answers 200', holder: 'the port is held by the process the registry records' }[id.split('.')[2]];
   if (id === 'host.browser') return 'a browser binary resolves for the audit profile';
+  if (id === 'host.playwright') return 'playwright 0.0.0-synthetic and a chromium stand at the install the runner loads';
   if (id === 'host.container') return 'the container daemon answers an inspection';
   if (second === 'deps') return 'the installed manifest matches the lockfile';
   if (second === 'types') return 'no ancestor node_modules reaches the typecheck';
@@ -221,6 +231,19 @@ await expectError({ ...ready(), 'response/response.md': ready()['response/respon
 
 // Custody.
 await expectError(mutateBoth(ready(), (r) => { r.checks.find((c) => c.id === 'identity.custody').evidence = 'password: hunter2-resolved'; }), 'carries a credential-shaped value', 'a custody check that printed the value');
+
+// The walk runner's install is read back from the host: a wall over a present install, an ok over an
+// absent one, and a wall whose repair does not name the place are each refused.
+await expectError(mutateBoth(ready(), (r) => { const c = r.checks.find((x) => x.id === 'host.playwright'); c.status = 'wall'; c.owner = 'host'; r.walls.push({ checkId: c.id, owner: 'host', repair: missingInstallMessage(host, ROOT) }); }), 'while Playwright and a Chromium stand at', 'a playwright wall over a present install');
+rmSync(install.root, { recursive: true, force: true });
+assert.equal(playwrightInstallStatus(host, ROOT).present, false);
+await expectError(ready(), 'is ok while no Playwright install stands at', 'a playwright ok over an absent install');
+const playwrightWall = () => {
+  const report = buildReport({ walls: [{ checkId: 'host.playwright', owner: 'host', repair: missingInstallMessage(host, ROOT), evidence: 'no package resolves under the install and no chromium sits under its browsers path' }] });
+  return { 'request/request.json': requestJson(), 'response/response.json': responseJson({ status: 'blocked', stop: 'ENVIRONMENT_NOT_READY', reason: 'One wall stands: host.playwright; install Playwright once at the host, then the chain re-enters.' }), 'response/response.md': receiptOf(report), 'response/data/readiness-report.json': report };
+};
+await expectValid(playwrightWall(), 'blocked on the absent walk runner install, in the runner\'s wording');
+await expectError(mutateBoth(playwrightWall(), (r) => { r.walls[0].repair = 'install a browser somewhere'; }), 'does not name the install place', 'a playwright wall whose repair names no place');
 
 rmSync(host, { recursive: true, force: true });
 process.stdout.write('environment.preflight self-test: two lawful branches, one gate stop and every mutation refused\n');

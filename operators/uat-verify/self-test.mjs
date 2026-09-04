@@ -13,6 +13,7 @@ import { createHash } from 'node:crypto';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { validateUatStep, UAT_CLASSES } from './validate.mjs';
+import { walkFingerprint, stepControl } from '../../scripts/validate-walk.mjs';
 
 const FEATURE = 'enrollment';
 const FLOW = 'paid-enrollment';
@@ -515,4 +516,105 @@ for (const variation of ['valid', 'missing-snapshot-scope', 'changed-quality-sco
   } finally { rmSync(session, { recursive: true, force: true }); }
 }
 
-process.stdout.write('uat.verify self-test: admission, scope and mutation checks passed\n');
+// Mode playwright: the walk is written, the runner ran it, and the receipt is held to both. One
+// lawful branch carries a walk that signs in by credential name and evidences every frozen assertion
+// through a role-and-name target, the runner's result beside it at the walk's digest, and captures
+// whose controls are the walk's own. Each mutation below is one way a fake walk could have read like
+// an honest one, and each must fail with a line that names the defect.
+const ROUTE = 'http://127.0.0.1:60000/';
+const WALK_ID = 'paid-enrollment-walk';
+const WALK_REF = `response/data/walks/${WALK_ID}/walk.json`;
+const RESULT_REF = `response/data/walks/${WALK_ID}/walk-result.json`;
+const expectId = (caseId, a) => `${caseId}-${a}`;
+function walkDoc() {
+  const steps = [
+    { id: 'open', action: 'goto', target: null, value: ROUTE },
+    { id: 'user', action: 'fill', target: { role: 'textbox', name: 'Username' }, value: `uat-${FLOW}-learner` },
+    { id: 'pass', action: 'fill', target: { role: 'textbox', name: 'Password' }, value: { credential: 'uat-shared' } },
+    { id: 'sign-in', action: 'click', target: { role: 'button', name: 'Sign in' } },
+    { id: 'landed', action: 'expect', target: null, expect: { url: '/' } },
+  ];
+  for (const c of CASES) {
+    for (const a of ASSERTIONS[c]) steps.push({ id: expectId(c, a), action: 'expect', target: { role: 'heading', name: `${c} ${a}` }, expect: { visible: true }, assertion: { caseId: c, assertionId: a, lane: a === 'entry' ? 'ui' : 'behavior' } });
+    steps.push({ id: `${c}-shot`, action: 'capture', target: null, capture: { name: c } });
+  }
+  return {
+    schemaVersion: 9, id: WALK_ID, flow: FLOW,
+    entry: { route: ROUTE, viewport: { width: 1280, height: 800, deviceScaleFactor: 1 }, colorScheme: 'light', reducedMotion: 'reduce', locale: 'en' },
+    account: { alias: 'learner', credentialName: 'uat-shared', credentialRef: `.stacks/${ENV}/secrets/uat.enc` },
+    run: { runId: RUN, cases: CASES.map((c, i) => ({ caseId: c, order: i + 1 })) },
+    steps,
+  };
+}
+// The result the runner would write for a walk whose every step passed. writeBranch stringifies with
+// two-space indentation, so the fingerprint is taken over exactly those bytes.
+function walkResult(w, { outcomes = {} } = {}) {
+  return {
+    schemaVersion: 9, mode: 'playwright', walkRef: WALK_REF, walkFingerprint: walkFingerprint(Buffer.from(JSON.stringify(w, null, 2))), route: ROUTE,
+    outcome: 'pass', startedAt: T(19), finishedAt: T(25),
+    driver: { playwright: '1.0.0', browser: 'chromium', browserVersion: '100.0.0.0', headless: true, context: { fresh: true, viewport: [1280, 800], deviceScaleFactor: 1, colorScheme: 'light', reducedMotion: 'reduce', locale: 'en' } },
+    steps: w.steps.map((s) => ({ id: s.id, action: s.action, control: stepControl(w, s.id), outcome: outcomes[s.id] ?? 'pass', url: ROUTE, ms: 1 })),
+    firstFailure: null,
+    captures: w.steps.filter((s) => s.action === 'capture').map((s) => ({ name: s.capture.name, stepId: s.id, screenshotRef: `response/artifacts/${s.capture.name}.png`, axRef: `response/artifacts/${s.capture.name}.ax.txt`, domRef: `response/artifacts/${s.capture.name}.dom.json` })),
+  };
+}
+const drivenCapture = (w, caseId, over = {}) => capture(caseId, {
+  driver: { mode: 'playwright', walkRef: WALK_REF, resultRef: RESULT_REF },
+  assertions: ASSERTIONS[caseId].map((a) => ({ assertionId: a, lane: a === 'entry' ? 'ui' : 'behavior', observed: `${stepControl(w, expectId(caseId, a))}: observed visible`, control: stepControl(w, expectId(caseId, a)), evidenceRef: `response/artifacts/${caseId}.png`, outcome: 'pass', stepId: expectId(caseId, a) })),
+  ...over,
+});
+function playwrightFiles({ w = walkDoc(), result = walkResult(w), captures = {} } = {}) {
+  const files = baseline();
+  files['response/response.json'].fields['uat-walk'] = WALK_REF;
+  files['response/response.json'].fields['walk-result'] = RESULT_REF;
+  files[WALK_REF] = w;
+  files[RESULT_REF] = result;
+  for (const c of CASES) files[`response/data/captures/${c}.json`] = captures[c] ?? drivenCapture(w, c);
+  return files;
+}
+await expectValid(playwrightFiles(), 'a walk written by the agent, run by the runner, every control the walk\'s own');
+{
+  const w = walkDoc(); w.steps[3].target = { css: '#sign-in' };
+  await expectError(playwrightFiles({ w }), 'no unique allowed schema branch', 'a walk whose target is a selector');
+}
+{
+  const w = walkDoc(); w.steps.splice(5, 0, { id: 'jump', action: 'goto', target: null, value: `${ROUTE}checkout` });
+  await expectError(playwrightFiles({ w }), 'the walk navigates once, at step 1', 'a walk that navigates by address bar mid-flow');
+}
+{
+  const w = walkDoc(); w.steps[2].value = 'hunter2hunter2';
+  await expectError(playwrightFiles({ w }), 'with a literal value', 'a walk carrying the password as a literal');
+}
+{
+  const w = walkDoc();
+  const c = drivenCapture(w, CASES[0]); c.assertions[1].control = 'button "Pay now"';
+  await expectError(playwrightFiles({ w, captures: { [CASES[0]]: c } }), 'the control is copied from the walk, never written by the agent', 'a capture whose control differs from the walk step\'s target');
+}
+{
+  const files = playwrightFiles();
+  delete files['response/response.json'].fields['uat-walk'];
+  delete files[WALK_REF];
+  await expectError(files, 'a capture without its walk is refused', 'a capture that names a walk the receipt does not carry');
+}
+{
+  const files = playwrightFiles();
+  delete files['response/response.json'].fields['walk-result'];
+  delete files[RESULT_REF];
+  await expectError(files, 'a capture whose walk nobody ran is refused', 'a walk with no result beside it');
+}
+await expectError(playwrightFiles({ captures: { [CASES[1]]: capture(CASES[1]) } }), 'this capture carries no driver', 'a receipt that records mode playwright with one capture the runner did not produce');
+{
+  const w = walkDoc(); const result = walkResult(w); w.steps[1].value = 'someone-else';
+  await expectError(playwrightFiles({ w, result }), 'a walk edited after its run is a walk nobody ran', 'a walk edited after the runner hashed it');
+}
+{
+  const w = walkDoc();
+  await expectError(playwrightFiles({ w, result: walkResult(w, { outcomes: { [expectId(CASES[0], 'terminal')]: 'fail' } }) }), 'the outcome is the runner\'s', 'an assertion passed by the agent that the runner recorded as failed');
+}
+{
+  const w = walkDoc();
+  const c = drivenCapture(w, CASES[0]); delete c.assertions[0].stepId;
+  await expectError(playwrightFiles({ w, captures: { [CASES[0]]: c } }), 'names no walk step', 'an assertion that names no walk step under mode playwright');
+}
+
+process.stdout.write('uat.verify self-test: admission, scope, walk and mutation checks passed\n');

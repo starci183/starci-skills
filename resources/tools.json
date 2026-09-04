@@ -133,18 +133,26 @@
       "purpose": "Drive a real browser against a served route: navigate, act, capture screenshots and DOM measurements.",
       "modes": {
         "never": "the operator opens no browser",
-        "required": "the operator's evidence comes from a driven browser"
+        "required": "the operator's evidence comes from a driven browser; its Steps name the mode the browser is driven in, and a receipt that records mode playwright is held to that mode's law by the operator's validator",
+        "playwright": "the operator writes a declarative walk (the data kind uat-walk: role-and-name targets only, the entry route once at step 1, a credential by name) and the tree's runner scripts/browser-walk.mjs executes it: one Playwright and one Chromium installed once at the host, outside the tree, at <hostRoot>/.tools/playwright (install below); Chromium headless; one fresh browser context per run carrying the walk's own storage, cookies, viewport, deviceScaleFactor, colorScheme and reducedMotion, never a person's profile; every step's control is copied from the walk, the first failed step ends the run with nothing retried and no locator guessed, and the runner writes walk-result, the per-step ledger, a screenshot with an accessibility snapshot and a DOM record per capture, and a trace"
+      },
+      "install": {
+        "path": ".tools/playwright",
+        "browsersPath": ".tools/playwright/browsers",
+        "note": "Relative to the host root, the parent of the runtime tree (scripts/validate-request.mjs#hostRootOf). A plain npm project holding playwright, with PLAYWRIGHT_BROWSERS_PATH set to browsersPath so the browser binaries live beside the package and not in a person's cache. environment.preflight reports host.playwright as a wall when it is absent; the runner exits with the same wording.",
+        "command": "npm init -y && npm i playwright && npx playwright install chromium"
       },
       "support": {
         "openai": {
           "supported": true,
-          "via": "Codex computer use, which opens the person's own Chrome; every UAT or audit run must use a dedicated browser profile (the shared UAT identity), never the person's logged-in profile"
+          "via": "mode required: Codex computer use, which opens the person's own Chrome, on a dedicated browser profile (the shared UAT identity), never the person's logged-in profile; mode playwright: node scripts/browser-walk.mjs <walk.json> <response dir> through the shell of the Codex session (the tree ships the runner; nothing is written ad hoc)"
         },
         "claude": {
           "supported": true,
-          "via": "the in-app Browser pane, or Claude in Chrome when the task needs the person's sessions"
+          "via": "mode required: the in-app Browser pane, or Claude in Chrome when the task needs the person's sessions; mode playwright: node scripts/browser-walk.mjs <walk.json> <response dir> through the shell of the Claude Code session (the tree ships the runner; nothing is written ad hoc)"
         }
-      }
+      },
+      "script": "scripts/browser-walk.mjs"
     },
     "http": {
       "purpose": "Probe an endpoint: readiness, health, a served route, a GraphQL typename, a status page.",

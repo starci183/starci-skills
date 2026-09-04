@@ -13,6 +13,19 @@
     },
     "scheme": { "enum": ["light", "dark"] },
     "state": { "type": "string", "minLength": 1 },
+    "driver": {
+      "description": "Present when the entry's screenshot was taken by scripts/browser-walk.mjs from a declarative walk (@tools/browsercontrol mode playwright): the walk, the result the runner wrote beside it, the capture step of that walk whose name is this matrixId, and the control that step followed, copied from the walk and never from the agent. The validator refuses a capture that names a walk with no result on disk, a step the walk does not carry, or a control the walk did not state.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["mode", "walkRef", "resultRef", "stepId", "control"],
+      "properties": {
+        "mode": { "const": "playwright" },
+        "walkRef": { "type": "string", "pattern": "^response/data/walks/[a-z0-9][a-z0-9-]*/walk\\.json$" },
+        "resultRef": { "type": "string", "pattern": "^response/data/walks/[a-z0-9][a-z0-9-]*/walk-result\\.json$" },
+        "stepId": { "type": "string", "pattern": "^[a-z0-9][a-z0-9-]*$" },
+        "control": { "type": "string", "minLength": 1 }
+      }
+    },
     "nodes": {
       "type": "array",
       "minItems": 1,

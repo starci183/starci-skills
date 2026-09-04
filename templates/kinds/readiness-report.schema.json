@@ -1,6 +1,6 @@
 {
   "$id": "kind:readiness-report",
-  "description": "What environment.preflight found, as data: one record per readiness check and one per wall. The Checks table of the environment-readiness receipt and `checks` agree one-to-one by id and status; every `wall` check has exactly one entry in `walls`. The check vocabulary is closed and lives in `$defs.checkIds`: the validator expands `<role>` over the requested roles and `<class>` over the operation classes the environment schema publishes, and the id set of a report equals that expansion exactly, so a check that was not run is visible as a missing id and never as silence. A check's family is the first segment of its id.",
+  "description": "What environment.preflight found, as data: one record per readiness check and one per wall. The Checks table of the environment-readiness receipt and `checks` agree one-to-one by id and status; every `wall` check has exactly one entry in `walls`. The check vocabulary is closed and lives in `$defs.checkIds`: the validator expands `<role>` over the requested roles and `<class>` over the operation classes the environment schema publishes, and the id set of a report equals that expansion exactly, so a check that was not run is visible as a missing id and never as silence. A check's family is the first segment of its id. Two checks are read back from the host by the validator rather than taken from the report: the approval checks against the declaration on disk, and host.playwright against the install scripts/browser-walk.mjs would load.",
   "type": "object",
   "additionalProperties": false,
   "required": [
@@ -158,7 +158,7 @@
       ]
     },
     "checkIds": {
-      "description": "The closed vocabulary of checks, one template per readiness question. `<role>` expands over the requested roles, `<class>` over the operation classes the environment schema publishes under authorization. declaration: the portable declaration exists and its hydrated route projects it. checkout: the route carries a git policy, the tree is clean, the branch is one the policy permits. identity: the sealed admin credential preflight, and the flow's account record and sign-in probe when a flow is named. runtime: the registry entry of the route, the served head containing the bound head, the projected port answering, and no foreign process holding it. host: a browser binary for the audit profile, a reachable container daemon, installed dependencies per checkout, and no ancestor node_modules leaking types into the checkout's typecheck. approval: who authorises each operation class.",
+      "description": "The closed vocabulary of checks, one template per readiness question. `<role>` expands over the requested roles, `<class>` over the operation classes the environment schema publishes under authorization. declaration: the portable declaration exists and its hydrated route projects it. checkout: the route carries a git policy, the tree is clean, the branch is one the policy permits. identity: the sealed admin credential preflight, and the flow's account record and sign-in probe when a flow is named. runtime: the registry entry of the route, the served head containing the bound head, the projected port answering, and no foreign process holding it. host: a browser binary for the audit profile, the host's Playwright install for @tools/browsercontrol mode playwright (present where resources/tools.json → browsercontrol.install says, with a Chromium under its browsers path), a reachable container daemon, installed dependencies per checkout, and no ancestor node_modules leaking types into the checkout's typecheck. approval: who authorises each operation class.",
       "templates": [
         "declaration.<role>",
         "checkout.<role>.policy",
@@ -172,6 +172,7 @@
         "runtime.<role>.port",
         "runtime.<role>.holder",
         "host.browser",
+        "host.playwright",
         "host.container",
         "host.deps.<role>",
         "host.types.<role>",

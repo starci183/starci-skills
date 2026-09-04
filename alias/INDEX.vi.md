@@ -73,7 +73,7 @@ Sinh trong phiên hiện tại bởi một bước trước và xoá cùng phiê
 
 | Alias | Tham số | Trỏ tới | Bind | Ai ghi | Operator ràng | Mục đích |
 | --- | --- | --- | --- | --- | --- | --- |
-| `@tools/browsercontrol` | — | `resources/tools.json#tools.browsercontrol` | mode declared in operator.json → resources.tools; modes: never \| required | — | — | Drive a real browser against a served route: navigate, act, capture screenshots and DOM measurements. |
+| `@tools/browsercontrol` | — | `resources/tools.json#tools.browsercontrol` | mode declared in operator.json → resources.tools; modes: never \| required \| playwright | — | — | Drive a real browser against a served route: navigate, act, capture screenshots and DOM measurements. |
 | `@tools/ci` | — | `resources/tools.json#tools.ci` | mode declared in operator.json → resources.tools; modes: never \| read \| dispatch | — | — | Observe or dispatch continuous-integration runs. |
 | `@tools/container` | — | `resources/tools.json#tools.container` | mode declared in operator.json → resources.tools; modes: never \| read \| operate | — | — | Inspect or operate containers and images: compose services, GHCR images by digest. |
 | `@tools/database` | — | `resources/tools.json#tools.database` | mode declared in operator.json → resources.tools; modes: never \| read \| namespaced-write | — | — | Read or write the product database for verification: seeds, fixtures, is_uat records. |

@@ -162,6 +162,22 @@ context khai đủ để agent mù chạy được, log đủ để người đ�
       sạch cùng finding.
       (`orchestrator.json#fixSize.generateTopics|generatePrefixes|escalateAfter`, `validate-request.mjs#fixKindErrors`)
 
+## 4. Playwright là một chế độ của browsercontrol: lượt đi thử khai báo, agent không viết mã trình duyệt
+
+- [x] `@tools/browsercontrol` có chế độ `playwright`: một Playwright + Chromium cài một lần ở máy chủ,
+      ngoài cây (`resources/tools.json#browsercontrol.install`), mỗi nhánh một ngữ cảnh trình duyệt
+      riêng; kind `uat-walk` là lượt đi agent VIẾT và runner `scripts/browser-walk.mjs` CHẠY — target
+      chỉ là role + name, không selector, không URL ngoài `entry.route` ở bước 1, không script; ô bí
+      mật điền `{ credential: <name> }` do runner phân giải từ tham chiếu niêm phong, không bao giờ in
+      ra; `scripts/validate-walk.mjs` + sweep từ chối selector, goto giữa luồng, bí mật viết chữ, URL
+      lạ, `page.evaluate`/`page.request`/`locator(`; `uat.verify` và `interface.audit` có dòng viết
+      lượt đi và dòng chạy nó, validator đòi control của capture bằng target của bước, kết cục là của
+      runner, và `walk-result` cạnh lượt đi; `environment.preflight` báo tường `host.playwright` và
+      validator đọc lại bản cài từ máy chủ.
+      (`templates/kinds/uat-walk.schema.json`, `walk-result.schema.json`, `scripts/browser-walk.mjs`,
+      `validate-walk.mjs`, `browser-walk.spec.mjs` — runner chạy thật trên một trang tĩnh qua
+      `host-artifacts.mjs`, bỏ qua có nêu lý do khi máy chủ chưa cài; self-test của ba operator)
+
 ## 3. Chứng minh trên nhiệm vụ thật
 
 - [ ] Chạy lại một nhiệm vụ đã hỏng (seed UAT của S2, hoặc refactor Setup) trên 2.0 với Sol 5.6 và

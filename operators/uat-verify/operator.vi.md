@@ -113,6 +113,20 @@ lệnh chẩn đoán theo đúng luật mà `identity.provision` đã nêu cho v
 rằng kho đã trả lời, không bao giờ báo cáo nó trả lời bằng gì, để việc chứng minh sẵn sàng không trở
 thành đường thứ hai khiến giá trị rời khỏi vòng giữ.
 
+## Lượt đi thử được viết ra, không bao giờ được lập trình
+
+Dưới `@tools/browsercontrol` chế độ `playwright`, operator viết lượt đi thử và tự mình không thực thi
+gì cả: một `uat-walk` gọi tên từng bước bằng vai trò và tên truy cập của điều khiển nó bấm, route vào
+đúng một lần ở bước đầu, và thông tin đăng nhập theo tên ở nơi một ô đọc như một bí mật; runner của
+cây lái nó trong một ngữ cảnh trình duyệt mới tinh, chép mọi điều khiển từ lượt đi vào bức chụp, dừng
+ở bước hỏng đầu tiên và ghi `walk-result` cạnh lượt đi. Một bước mà cây truy cập không gọi tên được
+thì không bấm được, và không bước nào gõ địa chỉ sau bước đầu, đó chính là điều giữ cho một lượt đi
+không chạm tới sản phẩm ngoài bề mặt của nó. Một biên nhận ghi chế độ này bị giữ đúng chế độ ấy: mọi
+bức chụp nêu lượt đi của mình và bước nào của lượt đi sinh ra từng khẳng định, kết quả đứng cạnh lượt
+đi ở đúng digest đã chạy, điều khiển của khẳng định bằng đúng target của lượt đi và kết cục của nó
+bằng kết cục runner ghi, còn một bức chụp không có lượt đi bên cạnh bị từ chối. Điều runner chưa tới
+được là `EVIDENCE_UNAVAILABLE`, không bao giờ là đạt.
+
 ## Đóng băng đi trước thực thi
 
 Snapshot được ghi trước mọi hành động lên sản phẩm và không bao giờ sửa lại sau đó. Nó nêu commit, các
@@ -221,14 +235,15 @@ bước chạm tới sản phẩm bằng cách khác — một endpoint, một m
 | 3 | Preflight runtime và danh tính của luồng: thông tin đăng nhập niêm phong giải được theo tên, store trả lời, và luồng chưa có tài khoản thì bàn giao chứ không dừng | `env` | @workspaces/device-state để lấy thông tin đăng nhập mà `accounts.<env>.json` nêu tên, @worktrees/sessions/central-runtime để lấy entry của route đã bind, generation và các origin, đầu vào `uat-account` khi danh tính đã được cấp, @tools/secrets, @tools/http | — | `PROVISIONING_UNAVAILABLE`, `IDENTITY_MISSING` |
 | 4 | Phác từ khuôn những gì thư mục luồng còn thiếu, rồi đóng băng snapshot từ `flow.md`, `accounts.<env>.json` và `seed/` | `feature`, `flow`, `env`, `cases` | @worktrees/uat/<flow>/<case>, @worktrees/_templates để lấy khuôn luồng | @worktrees/uat/<flow>/<case> (snapshot), `response/data/snapshot.json`, @tools/sourcewrite | `CANONICAL_WRITE_DENIED` |
 | 5 | Gieo các bản ghi đã đóng băng vào namespace lượt chạy | `runId` | `response/data/snapshot.json`, @workspaces/be | @tools/database | `FIXTURE_VIOLATION` |
-| 6 | Chạy các case đã đóng băng theo thứ tự trên endpoint mà route đã ràng mang, tại commit đã ghim | — | `response/data/snapshot.json`, đầu vào `route` để lấy endpoint lượt chạy này lái theo, @worktrees/sessions/central-runtime để lấy generation đứng sau endpoint đó, @workspaces/device-state để lấy thông tin đăng nhập chỉ lúc đăng nhập, @tools/browsercontrol, @tools/websearch | — | `LEASE_INVALID`, `RUNTIME_UNAVAILABLE` |
-| 7 | Capture tại từng khẳng định có tên với ô mật khẩu đã che, rồi ghép tấm sheet | — | `response/data/snapshot.json`, @worktrees/sessions/central-runtime để lấy bằng chứng runtime trực tiếp nhất | `response/data/captures/<case>.json`, `response/artifacts/<case>.png`, `response/artifacts/sheet.png`, @tools/visualize, @tools/print | `EVIDENCE_UNAVAILABLE` |
-| 8 | Xét ba làn tách rời nhau, và chấm làn trải nghiệm theo từng tiêu chí | — | @knowledge/ui/proof (topic UX và rule đóng của nó), `response/data/captures/<case>.json` | `response/data/verdicts.json` | — |
-| 9 | Kiểm chỉ-đọc, rồi xoá namespace lượt chạy và không gì khác | `runId` | @workspaces/be để lấy các bản ghi mang `is_uat=true` và namespace này, `response/data/verdicts.json` | @tools/database | — |
-| 10 | Thêm `runs/<runId>/`, trỏ `latest.json` vào nó, thêm dòng lịch sử, rồi phát | `runId` | mọi thứ ở trên | @worktrees/uat/<flow>/<case> (runs/<runId>/, latest.json và history.md), `response/response.md`, `response/response.json`, `audit-scope`, `findings`, @tools/sourcewrite, @tools/print | — |
+| 6 | Viết lượt đi thử cho các case đã đóng băng theo thứ tự: một vai trò và một tên cho mỗi điều khiển, route vào đúng một lần ở bước 1, thông tin đăng nhập theo tên ở nơi một ô đọc như một bí mật, một bức chụp mỗi case sau khi chuyển hướng đăng nhập đã hạ | — | `response/data/snapshot.json`, đầu vào `route` để lấy endpoint lượt chạy này lái theo, @worktrees/uat/<flow>/<case> để lấy các bước `flow.md` khai | `uat-walk` | `LEASE_INVALID` |
+| 7 | Chạy lượt đi qua runner của cây dưới @tools/browsercontrol chế độ `playwright` — một ngữ cảnh trình duyệt mới tinh tại endpoint mà route đã ràng mang, tại commit đã ghim, thông tin đăng nhập phân giải theo tên ngay lúc điền và che trong mọi khung hình — hoặc lái các case đã đóng băng qua trình duyệt dưới chế độ `required` khi không viết lượt đi nào | — | `uat-walk`, đầu vào `route` để lấy endpoint lượt chạy này lái theo, @worktrees/sessions/central-runtime để lấy generation đứng sau endpoint đó, @workspaces/device-state để lấy thông tin đăng nhập chỉ lúc đăng nhập, @tools/browsercontrol, @tools/secrets, @tools/websearch | `walk-result`, `response/data/captures/<case>.json`, `response/artifacts/<case>.png` | `RUNTIME_UNAVAILABLE` |
+| 8 | Capture tại từng khẳng định có tên với ô mật khẩu đã che ở nơi runner chưa làm, rồi ghép tấm sheet | — | `response/data/snapshot.json`, `walk-result`, @worktrees/sessions/central-runtime để lấy bằng chứng runtime trực tiếp nhất | `response/data/captures/<case>.json`, `response/artifacts/<case>.png`, `response/artifacts/sheet.png`, @tools/visualize, @tools/print | `EVIDENCE_UNAVAILABLE` |
+| 9 | Xét ba làn tách rời nhau, và chấm làn trải nghiệm theo từng tiêu chí | — | @knowledge/ui/proof (topic UX và rule đóng của nó), `response/data/captures/<case>.json` | `response/data/verdicts.json` | — |
+| 10 | Kiểm chỉ-đọc, rồi xoá namespace lượt chạy và không gì khác | `runId` | @workspaces/be để lấy các bản ghi mang `is_uat=true` và namespace này, `response/data/verdicts.json` | @tools/database | — |
+| 11 | Thêm `runs/<runId>/`, trỏ `latest.json` vào nó, thêm dòng lịch sử, rồi phát | `runId` | mọi thứ ở trên | @worktrees/uat/<flow>/<case> (runs/<runId>/, latest.json và history.md), `response/response.md`, `response/response.json`, `audit-scope`, `findings`, @tools/sourcewrite, @tools/print | — |
 
-Một phán quyết không ai được cho xem là một phán quyết không ai đọc. Bậc 7 in bản tóm tắt các ảnh
-chụp theo bước và bậc 10 in bảng `## Verdict` qua `@tools/print`, thẳng vào cuộc trò chuyện mà người
+Một phán quyết không ai được cho xem là một phán quyết không ai đọc. Bậc 8 in bản tóm tắt các ảnh
+chụp theo bước và bậc 11 in bảng `## Verdict` qua `@tools/print`, thẳng vào cuộc trò chuyện mà người
 đang đọc, còn biên nhận liệt kê cả hai dưới `## Printed` kèm lý do in; ô đăng
 nhập vẫn được che trong mọi khung được in, đúng như trong mọi khung được ghi.
 
@@ -262,6 +277,8 @@ xong mà sổ cái không giữ các lần hỏng của nó.
 | `uat-verdicts` | `response/data/verdicts.json` | data | có |
 | `audit-scope` | `response/data/audit-scope.json` | data | không |
 | `findings` | `response/data/findings.json` | data | không |
+| `uat-walk` | `response/data/walks/<walk>/walk.json` | data | không |
+| `walk-result` | `response/data/walks/<walk>/walk-result.json` | data | không |
 | `screenshot` | `response/artifacts/<case>.png` | artifact | có |
 | `sheet` | `response/artifacts/sheet.png` | artifact | có |
 

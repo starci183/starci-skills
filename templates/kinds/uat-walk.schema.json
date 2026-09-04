@@ -1,0 +1,159 @@
+{
+  "$id": "kind:uat-walk",
+  "description": "A declarative browser walk: what an agent writes and scripts/browser-walk.mjs executes under @tools/browsercontrol mode playwright. The agent never authors browser code. Every target is a role and an accessible name (Playwright getByRole) — there is no selector, no script, and no URL other than the flow's entry route, which the first step and only the first step navigates to. That is the gate against the fake walk: the agent cannot press anything the accessibility tree does not name, and cannot navigate by address bar mid-flow. A fill on a field whose name reads as a password or secret takes a credential by name, which the runner resolves from the sealed reference the account declares at the moment of the fill and nowhere else. The relations a schema cannot state — unique step ids, goto only at step 1 and only to entry.route, unique capture names, a credential fill naming the account's credential — live in scripts/validate-walk.mjs.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "id", "flow", "entry", "account", "steps"],
+  "properties": {
+    "schemaVersion": { "const": 9 },
+    "id": { "$ref": "#/$defs/slug", "description": "The walk's own id; the runner writes its result, its ledger and its trace under response/data/walks/<id>/." },
+    "flow": { "$ref": "#/$defs/slug" },
+    "entry": {
+      "description": "The one navigation the walk makes and the fresh browser context it runs in. The context is the branch's own: storage, cookies, viewport, scale, colour scheme, motion preference and locale, never a person's profile.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["route", "viewport", "colorScheme", "reducedMotion", "locale"],
+      "properties": {
+        "route": { "type": "string", "pattern": "^https?://[^\\s\"'<>]+$", "description": "The bound route's endpoint, the only URL the walk may carry." },
+        "viewport": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["width", "height", "deviceScaleFactor"],
+          "properties": {
+            "width": { "type": "integer", "minimum": 240, "maximum": 7680 },
+            "height": { "type": "integer", "minimum": 240, "maximum": 4320 },
+            "deviceScaleFactor": { "type": "number", "minimum": 1, "maximum": 4 }
+          }
+        },
+        "colorScheme": { "enum": ["light", "dark"] },
+        "reducedMotion": { "enum": ["reduce", "no-preference"] },
+        "locale": { "type": "string", "pattern": "^[a-z]{2,3}(?:-[A-Za-z]{2,4})?$" },
+        "stepTimeoutMs": { "type": "integer", "minimum": 1000, "maximum": 60000, "description": "How long one step may wait for its target or its expectation; the runner never retries a step, it waits at most this long once." }
+      }
+    },
+    "account": {
+      "description": "The flow's account, as names only: the alias, the credential's name and the sealed file the environment declares. Null when the walk signs in as nobody.",
+      "oneOf": [
+        { "type": "null" },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["alias", "credentialName", "credentialRef"],
+          "properties": {
+            "alias": { "type": "string", "pattern": "^[a-z][a-z0-9-]*$" },
+            "credentialName": { "type": "string", "pattern": "^[a-z][a-z0-9-]*$" },
+            "credentialRef": { "type": "string", "pattern": "^\\.stacks/[a-z0-9][a-z0-9-]*/secrets/uat\\.enc$" }
+          }
+        }
+      ]
+    },
+    "run": {
+      "description": "Present when the walk verifies frozen UAT cases: the run id and the cases in their frozen order, so the runner can emit one uat-capture per case from the expect steps that carry an assertion.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["runId", "cases"],
+      "properties": {
+        "runId": { "type": "string", "pattern": "^[A-Za-z0-9._-]+$" },
+        "cases": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 64,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["caseId", "order"],
+            "properties": {
+              "caseId": { "$ref": "#/$defs/slug" },
+              "order": { "type": "integer", "minimum": 1 }
+            }
+          }
+        }
+      }
+    },
+    "steps": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 128,
+      "items": { "$ref": "#/$defs/step" }
+    }
+  },
+  "$defs": {
+    "slug": { "type": "string", "pattern": "^[a-z0-9][a-z0-9-]*$" },
+    "target": {
+      "description": "A role and an accessible name, resolved by getByRole. Nothing else identifies a control.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["role", "name"],
+      "properties": {
+        "role": { "enum": ["alert", "alertdialog", "application", "article", "banner", "blockquote", "button", "caption", "cell", "checkbox", "code", "columnheader", "combobox", "complementary", "contentinfo", "definition", "deletion", "dialog", "directory", "document", "emphasis", "feed", "figure", "form", "generic", "grid", "gridcell", "group", "heading", "img", "insertion", "link", "list", "listbox", "listitem", "log", "main", "marquee", "math", "meter", "menu", "menubar", "menuitem", "menuitemcheckbox", "menuitemradio", "navigation", "none", "note", "option", "paragraph", "presentation", "progressbar", "radio", "radiogroup", "region", "row", "rowgroup", "rowheader", "scrollbar", "search", "searchbox", "separator", "slider", "spinbutton", "status", "strong", "subscript", "superscript", "switch", "tab", "table", "tablist", "tabpanel", "term", "textbox", "time", "timer", "toolbar", "tooltip", "tree", "treegrid", "treeitem"] },
+        "name": { "type": "string", "minLength": 1, "maxLength": 200 },
+        "exact": { "type": "boolean" },
+        "nth": { "type": "integer", "minimum": 0, "maximum": 99 }
+      }
+    },
+    "credential": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["credential"],
+      "properties": { "credential": { "type": "string", "pattern": "^[a-z][a-z0-9-]*$" } }
+    },
+    "step": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "action", "target"],
+      "properties": {
+        "id": { "$ref": "#/$defs/slug" },
+        "action": { "enum": ["goto", "click", "fill", "press", "select", "check", "expect", "capture", "wait"] },
+        "target": { "oneOf": [{ "type": "null" }, { "$ref": "#/$defs/target" }] },
+        "value": {
+          "description": "goto: the entry route; fill: the text, or a credential by name; press: a key; select: an option label or value; check: true or false; wait: milliseconds.",
+          "oneOf": [
+            { "type": "string", "maxLength": 2000 },
+            { "type": "integer", "minimum": 0, "maximum": 60000 },
+            { "type": "boolean" },
+            { "$ref": "#/$defs/credential" }
+          ]
+        },
+        "expect": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "visible": { "const": true },
+            "hidden": { "const": true },
+            "text": { "type": "string", "minLength": 1, "maxLength": 2000 },
+            "url": { "type": "string", "pattern": "^/[^\\s\"'<>]*$", "description": "A path under the entry route's origin; never a full URL." },
+            "count": { "type": "integer", "minimum": 0 },
+            "attribute": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["name", "value"],
+              "properties": { "name": { "type": "string", "pattern": "^[A-Za-z][A-Za-z0-9:_-]*$" }, "value": { "type": "string", "maxLength": 2000 } }
+            },
+            "checked": { "type": "boolean" },
+            "value": { "type": "string", "maxLength": 2000 }
+          }
+        },
+        "assertion": {
+          "description": "On an expect step of a UAT walk: the frozen case and assertion this expectation evidences, and the lane that judges it.",
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["caseId", "assertionId", "lane"],
+          "properties": {
+            "caseId": { "$ref": "#/$defs/slug" },
+            "assertionId": { "type": "string", "minLength": 1 },
+            "lane": { "enum": ["behavior", "ux", "ui"] }
+          }
+        },
+        "capture": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["name"],
+          "properties": {
+            "name": { "$ref": "#/$defs/slug", "description": "The screenshot, accessibility snapshot and DOM record are written under response/artifacts/<name>.*; a UAT case's capture carries the case id as its name." },
+            "fullPage": { "type": "boolean" }
+          }
+        }
+      }
+    }
+  }
+}

@@ -65,8 +65,11 @@ checkout của route đang đứng — có mặt trong các commit mà entry ghi
 `@workspaces/ports/<project>` chiếu cho role trả lời một probe qua `@tools/http`. Một cổng trả lời
 trong khi entry không nêu server nào, hoặc bị một tiến trình mà registry không ghi giữ, là một bức
 tường với kẻ giữ làm bằng chứng và không bao giờ là giấy phép giành lại. Các phép kiểm máy chủ hỏi
-liệu có một tệp nhị phân trình duyệt cho profile audit không, liệu daemon container trả lời một lần
-inspect qua `@tools/container` không, liệu dependency của mỗi checkout được cài đúng như lockfile ghi
+liệu có một tệp nhị phân trình duyệt cho profile audit không, liệu bản cài Playwright duy nhất của
+máy chủ có đứng đúng chỗ mà tool trình duyệt ở chế độ `playwright` nạp nó không — runner
+`scripts/browser-walk.mjs` đọc chỗ ấy từ sổ đăng ký tool và validator của operator này đọc lại đúng
+chỗ ấy, nên một báo cáo ghi `ok` trên một bản cài không tồn tại bị từ chối — liệu daemon container
+trả lời một lần inspect qua `@tools/container` không, liệu dependency của mỗi checkout được cài đúng như lockfile ghi
 không, và liệu một checkout nằm lồng dưới một kho khác có để `node_modules/@types` của kho ấy lọt vào
 typecheck của mình không — một rò rỉ làm typecheck hỏng vì những lý do không thay đổi source nào giải
 thích được. Mọi quan sát ở đây là một lệnh đã khai qua `@tools/shell` với đầu ra giữ làm bằng chứng;
@@ -130,7 +133,7 @@ bức tường đầu tiên chính là chuỗi các bức tường mà operator 
 | 3 | Kiểm từng checkout: route mang chính sách git, cây sạch và nhánh là một nhánh chính sách cho phép | — | @workspaces/local/routes/<project>/<role>, checkout đã phân giải, nhánh và cây làm việc của nó, @tools/git | — | — |
 | 4 | Kiểm custody danh tính: preflight credential admin đã niêm phong qua `scripts/identity-custody.mjs`, và khi có luồng được nêu thì hồ sơ tài khoản cùng một probe đăng nhập | `flow`, `env` | @workspaces/device-state, @worktrees/uat/<flow> cho hồ sơ tài khoản của `env`, @worktrees/sessions/central-runtime cho nhà cung cấp danh tính trong entry của mỗi route, @tools/secrets, @tools/http | — | — |
 | 5 | Kiểm runtime: entry registry của mỗi route, head phục vụ có chứa head của checkout không, các cổng đã chiếu có trả lời không, và cổng nào bị tiến trình lạ giữ | — | @worktrees/sessions/central-runtime, @workspaces/ports/<project>, @tools/http, @tools/shell | — | — |
-| 6 | Kiểm máy chủ: tệp nhị phân trình duyệt cho profile audit, daemon container tới được, dependency đã cài cho từng checkout và cách ly kiểu với thư mục tổ tiên | — | các checkout đã phân giải và lockfile của chúng, @tools/shell, @tools/container | — | — |
+| 6 | Kiểm máy chủ: tệp nhị phân trình duyệt cho profile audit, bản cài Playwright mà runner đi thử nạp (`host.playwright`, là một bức tường với đúng lời của runner khi thiếu), daemon container tới được, dependency đã cài cho từng checkout và cách ly kiểu với thư mục tổ tiên | — | các checkout đã phân giải và lockfile của chúng, chỗ cài mà `resources/tools.json` nêu cho tool trình duyệt, @tools/shell, @tools/container | — | — |
 | 7 | Kiểm phê duyệt: lớp thao tác nào khai báo môi trường đánh dấu declared hay person, lớp bị bỏ qua nhận mặc định của schema | `env` | khai báo môi trường của `env` và schema môi trường | — | — |
 | 8 | Phát báo cáo, chặn với mọi bức tường được nêu khi có bức nào đứng | — | mọi thứ ở trên | `response/response.md`, `response/data/readiness-report.json`, `response/response.json` | `ENVIRONMENT_NOT_READY` |
 

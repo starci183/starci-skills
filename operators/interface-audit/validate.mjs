@@ -14,6 +14,7 @@ import { tableUnder, userRouted } from '../../scripts/validate-response.mjs';
 import { loadErrorsRegistry } from '../../scripts/errors-registry.mjs';
 import { sessionRootOf, missingStack } from '../../scripts/validate-request.mjs';
 import { validateAgainst } from '../../scripts/json-schema.mjs';
+import { validateWalkFile, stepControl } from '../../scripts/validate-walk.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 const empty = (v) => v === undefined || v === null || v === '' || v === '—';
@@ -169,6 +170,36 @@ export async function validateAuditStep(branchDir, root = ROOT) {
     let doc = null;
     try { doc = JSON.parse(await read(ref)); } catch { doc = null; }
     if (doc) captures.set(doc.matrixId, { doc, ref });
+  }
+
+  // Mode playwright: the auditor wrote one walk per entry and the runner drove it. A capture that
+  // records the mode names its walk and the runner's result beside it at the digest that ran, the
+  // capture step of that walk whose name is the matrix id, and the control that step followed as the
+  // walk states it; its viewport and scheme are the walk's own; a capture without its walk, and a walk
+  // with a capture the runner did not produce, are refused.
+  const walks = new Map();
+  for (const ref of list(response.fields?.['uat-walk'])) {
+    if (!has(ref)) continue;
+    const { errors: walkProblems, walk, result } = validateWalkFile(path.join(branchDir, ref), path.join(branchDir, 'response'), { root });
+    errors.push(...walkProblems);
+    if (walk) walks.set(ref, { walk, result });
+  }
+  const resultRefs = new Set(list(response.fields?.['walk-result']));
+  for (const [matrixId, { doc, ref }] of captures) {
+    const driver = doc.driver ?? null;
+    if (!driver) { if (walks.size) errors.push(`${ref}: the receipt records mode playwright (it declares a uat-walk) and this capture carries no driver; under that mode every screenshot is produced by the runner from a walk`); continue; }
+    const bound = walks.get(driver.walkRef);
+    if (!bound) { errors.push(`${ref}: names walk ${driver.walkRef}, which the receipt does not declare under uat-walk or which is not on disk; a capture without its walk is refused`); continue; }
+    if (!resultRefs.has(driver.resultRef) || !has(driver.resultRef) || !bound.result) { errors.push(`${ref}: names result ${driver.resultRef}, and no walk-result stands beside the walk on disk and under fields; a capture whose walk nobody ran is refused`); continue; }
+    const { walk, result } = bound;
+    const step = walk.steps.find((s) => s.id === driver.stepId);
+    if (!step || step.action !== 'capture' || step.capture?.name !== matrixId) errors.push(`${ref}: names step ${driver.stepId}, which is not the capture step named ${matrixId} of the walk`);
+    const expected = stepControl(walk, driver.stepId);
+    if (driver.control !== expected) errors.push(`${ref}: records control ${JSON.stringify(driver.control)} and the walk's step ${driver.stepId} followed ${JSON.stringify(expected)}; the control is copied from the walk, never written by the agent`);
+    if (doc.viewport[0] !== walk.entry.viewport.width || doc.viewport[1] !== walk.entry.viewport.height) errors.push(`${ref}: claims viewport ${doc.viewport.join('x')} and the walk ran at ${walk.entry.viewport.width}x${walk.entry.viewport.height}`);
+    if (doc.scheme !== walk.entry.colorScheme) errors.push(`${ref}: claims scheme ${doc.scheme} and the walk ran ${walk.entry.colorScheme}`);
+    const produced = result.captures.find((c) => c.name === matrixId && c.stepId === driver.stepId);
+    if (!produced || produced.screenshotRef !== `response/artifacts/${matrixId}.png` || result.steps.find((s) => s.id === driver.stepId)?.outcome !== 'pass') errors.push(`${ref}: the runner did not produce response/artifacts/${matrixId}.png at step ${driver.stepId} of this walk`);
   }
 
   const ids = new Set();

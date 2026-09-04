@@ -23,7 +23,8 @@ Primary output: `uat-flow-verification`
 `uat-capture` `response/data/captures/<case>.json`
 `uat-verdicts` `response/data/verdicts.json`
 `audit-scope` `response/data/audit-scope.json` (optional)
-`findings` `response/data/findings.json` (optional)
+`uat-walk` `response/data/walks/<walk>/walk.json` (optional)
+`walk-result` `response/data/walks/<walk>/walk-result.json` (optional)
 `screenshot` `response/artifacts/<case>.png`
 `sheet` `response/artifacts/sheet.png`
 

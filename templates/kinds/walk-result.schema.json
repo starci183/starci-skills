@@ -1,0 +1,92 @@
+{
+  "$id": "kind:walk-result",
+  "description": "What scripts/browser-walk.mjs recorded of one uat-walk it executed: the walk it ran, by reference and by digest of its bytes; the driver that ran it; pass or fail per step in order; the first failure, after which nothing ran; and the captures it produced. Written by the runner beside the walk under response/data/walks/<walk>/, never by an agent. A capture that names a walk with no result beside it is a capture nobody ran.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "mode", "walkRef", "walkFingerprint", "route", "outcome", "startedAt", "finishedAt", "driver", "steps", "firstFailure", "captures"],
+  "properties": {
+    "schemaVersion": { "const": 9 },
+    "mode": { "const": "playwright" },
+    "walkRef": { "type": "string", "pattern": "^response/data/walks/[a-z0-9][a-z0-9-]*/walk\\.json$" },
+    "walkFingerprint": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
+    "route": { "type": "string", "pattern": "^https?://[^\\s\"'<>]+$" },
+    "outcome": { "enum": ["pass", "fail"] },
+    "startedAt": { "type": "string", "format": "date-time" },
+    "finishedAt": { "type": "string", "format": "date-time" },
+    "driver": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["playwright", "browser", "browserVersion", "headless", "context"],
+      "properties": {
+        "playwright": { "type": "string", "minLength": 1 },
+        "browser": { "const": "chromium" },
+        "browserVersion": { "type": "string", "minLength": 1 },
+        "headless": { "const": true },
+        "context": {
+          "description": "The fresh context the walk ran in: the walk's own entry settings, and no profile of any person.",
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["fresh", "viewport", "deviceScaleFactor", "colorScheme", "reducedMotion", "locale"],
+          "properties": {
+            "fresh": { "const": true },
+            "viewport": { "type": "array", "minItems": 2, "maxItems": 2, "items": { "type": "integer", "minimum": 240 } },
+            "deviceScaleFactor": { "type": "number", "minimum": 1 },
+            "colorScheme": { "enum": ["light", "dark"] },
+            "reducedMotion": { "enum": ["reduce", "no-preference"] },
+            "locale": { "type": "string", "minLength": 2 }
+          }
+        }
+      }
+    },
+    "steps": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 128,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "action", "control", "outcome", "url", "ms"],
+        "properties": {
+          "id": { "type": "string", "pattern": "^[a-z0-9][a-z0-9-]*$" },
+          "action": { "enum": ["goto", "click", "fill", "press", "select", "check", "expect", "capture", "wait"] },
+          "control": { "description": "The control this step pressed, copied from the walk's target and never from anything else; the entry route for the first step; null for a step that pressed nothing and followed nothing.", "oneOf": [{ "type": "null" }, { "type": "string", "minLength": 1 }] },
+          "outcome": { "enum": ["pass", "fail", "skipped"] },
+          "url": { "oneOf": [{ "type": "null" }, { "type": "string", "minLength": 1 }] },
+          "ms": { "type": "integer", "minimum": 0 }
+        }
+      }
+    },
+    "firstFailure": {
+      "oneOf": [
+        { "type": "null" },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["stepId", "message"],
+          "properties": {
+            "stepId": { "type": "string", "pattern": "^[a-z0-9][a-z0-9-]*$" },
+            "message": { "type": "string", "minLength": 1, "maxLength": 400 }
+          }
+        }
+      ]
+    },
+    "captures": {
+      "type": "array",
+      "maxItems": 128,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["name", "stepId", "screenshotRef", "axRef", "domRef"],
+        "properties": {
+          "name": { "type": "string", "pattern": "^[a-z0-9][a-z0-9-]*$" },
+          "stepId": { "type": "string", "pattern": "^[a-z0-9][a-z0-9-]*$" },
+          "screenshotRef": { "type": "string", "pattern": "^response/artifacts/[a-z0-9][a-z0-9-]*\\.png$" },
+          "axRef": { "type": "string", "pattern": "^response/artifacts/[a-z0-9][a-z0-9-]*\\.ax\\.txt$" },
+          "domRef": { "type": "string", "pattern": "^response/artifacts/[a-z0-9][a-z0-9-]*\\.dom\\.json$" }
+        }
+      }
+    },
+    "traceRef": { "type": "string", "pattern": "^response/data/walks/[a-z0-9][a-z0-9-]*/trace\\.zip$" },
+    "ledgerRef": { "type": "string", "pattern": "^response/data/walks/[a-z0-9][a-z0-9-]*/capture\\.json$" }
+  }
+}

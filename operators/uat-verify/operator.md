@@ -114,6 +114,20 @@ diagnostic under the same law `identity.provision` states for its own job: it re
 the store answered, never what it answered with, so proving readiness never becomes the second way a
 value leaves custody.
 
+## The walk is written, never coded
+
+Under `@tools/browsercontrol` mode `playwright` the operator writes the walk and executes nothing
+itself: a `uat-walk` names each step by the role and accessible name of the control it presses, the
+entry route once at its first step, and a credential by name where a field reads as a secret, and the
+tree's runner drives it in a fresh browser context, copies every control from the walk into the
+capture, stops at the first failed step and writes the `walk-result` beside the walk. A step the
+accessibility tree cannot name cannot be pressed, and no step navigates by address bar after the
+first, which is what keeps a walk from reaching the product past its surface. A receipt that records
+this mode is held to it: every capture names its walk and the walk step that produced each assertion,
+the result stands beside the walk at the digest that ran, the assertion's control equals the walk's
+own target and its outcome the runner's, and a capture with no walk beside it is refused. What the
+runner did not reach is `EVIDENCE_UNAVAILABLE`, never a pass.
+
 ## Freeze precedes execution
 
 The snapshot is written before any product action and never edited afterwards. It states the commit,
@@ -224,14 +238,15 @@ pass.
 | 3 | Preflight the runtime and the flow's identity: the sealed credential resolves by name, the store answers, and a flow with no account hands over instead of stopping | `env` | @workspaces/device-state for the credential named by `accounts.<env>.json`, @worktrees/sessions/central-runtime for the entry of the bound route, its generation and origins, input `uat-account` when the identity was provisioned, @tools/secrets, @tools/http | — | `PROVISIONING_UNAVAILABLE`, `IDENTITY_MISSING` |
 | 4 | Draft from the template whatever the flow folder lacks, then freeze the snapshot from `flow.md`, `accounts.<env>.json` and `seed/` | `feature`, `flow`, `env`, `cases` | @worktrees/uat/<flow>/<case>, @worktrees/_templates for the flow template | @worktrees/uat/<flow>/<case> (snapshot), `response/data/snapshot.json`, @tools/sourcewrite | `CANONICAL_WRITE_DENIED` |
 | 5 | Seed the frozen records into the run namespace | `runId` | `response/data/snapshot.json`, @workspaces/be | @tools/database | `FIXTURE_VIOLATION` |
-| 6 | Execute the frozen cases in order against the endpoint the bound route carries, at the pinned commit | — | `response/data/snapshot.json`, input `route` for the endpoint this run drives, @worktrees/sessions/central-runtime for the generation behind that endpoint, @workspaces/device-state for the credential at login only, @tools/browsercontrol, @tools/websearch | — | `LEASE_INVALID`, `RUNTIME_UNAVAILABLE` |
-| 7 | Capture at each named assertion with the login field masked, and stitch the sheet | — | `response/data/snapshot.json`, @worktrees/sessions/central-runtime for the most direct runtime evidence | `response/data/captures/<case>.json`, `response/artifacts/<case>.png`, `response/artifacts/sheet.png`, @tools/visualize, @tools/print | `EVIDENCE_UNAVAILABLE` |
-| 8 | Judge the three lanes apart, and score the experience lane criterion by criterion | — | @knowledge/ui/proof (the UX topic and its closing rule), `response/data/captures/<case>.json` | `response/data/verdicts.json` | — |
-| 9 | Verify read-only, then delete the run namespace and nothing else | `runId` | @workspaces/be for the records carrying `is_uat=true` and this namespace, `response/data/verdicts.json` | @tools/database | — |
-| 10 | Append `runs/<runId>/`, point `latest.json` at it, add the history line, and emit | `runId` | everything above | @worktrees/uat/<flow>/<case> (runs/<runId>/, latest.json and history.md), `response/response.md`, `response/response.json`, `audit-scope`, `findings`, @tools/sourcewrite, @tools/print | — |
+| 6 | Write the walk of the frozen cases in their order: a role and a name per control, the entry route once at step 1, a credential by name where a field reads as a secret, one capture per case after the sign-in redirect landed | — | `response/data/snapshot.json`, input `route` for the endpoint this run drives, @worktrees/uat/<flow>/<case> for the steps `flow.md` declares | `uat-walk` | `LEASE_INVALID` |
+| 7 | Run the walk through the tree's runner under @tools/browsercontrol mode `playwright` — a fresh browser context at the endpoint the bound route carries, at the pinned commit, the credential resolved by name at the fill and masked in every frame — or drive the frozen cases through the browser under mode `required` when no walk was written | — | `uat-walk`, input `route` for the endpoint this run drives, @worktrees/sessions/central-runtime for the generation behind that endpoint, @workspaces/device-state for the credential at login only, @tools/browsercontrol, @tools/secrets, @tools/websearch | `walk-result`, `response/data/captures/<case>.json`, `response/artifacts/<case>.png` | `RUNTIME_UNAVAILABLE` |
+| 8 | Capture at each named assertion with the login field masked where the runner did not, and stitch the sheet | — | `response/data/snapshot.json`, `walk-result`, @worktrees/sessions/central-runtime for the most direct runtime evidence | `response/data/captures/<case>.json`, `response/artifacts/<case>.png`, `response/artifacts/sheet.png`, @tools/visualize, @tools/print | `EVIDENCE_UNAVAILABLE` |
+| 9 | Judge the three lanes apart, and score the experience lane criterion by criterion | — | @knowledge/ui/proof (the UX topic and its closing rule), `response/data/captures/<case>.json` | `response/data/verdicts.json` | — |
+| 10 | Verify read-only, then delete the run namespace and nothing else | `runId` | @workspaces/be for the records carrying `is_uat=true` and this namespace, `response/data/verdicts.json` | @tools/database | — |
+| 11 | Append `runs/<runId>/`, point `latest.json` at it, add the history line, and emit | `runId` | everything above | @worktrees/uat/<flow>/<case> (runs/<runId>/, latest.json and history.md), `response/response.md`, `response/response.json`, `audit-scope`, `findings`, @tools/sourcewrite, @tools/print | — |
 
-A verdict nobody was shown is a verdict nobody read. Step 7 prints the run's step-capture summary and
-step 10 prints the `## Verdict` table over `@tools/print`, into the conversation the person is
+A verdict nobody was shown is a verdict nobody read. Step 8 prints the run's step-capture summary and
+step 11 prints the `## Verdict` table over `@tools/print`, into the conversation the person is
 reading, and the receipt lists both under `## Printed` with why each was printed; the
 login field stays masked in every frame that is printed, exactly as in every frame that is written.
 
@@ -265,6 +280,8 @@ whose failures the ledger does not hold.
 | `uat-verdicts` | `response/data/verdicts.json` | data | yes |
 | `audit-scope` | `response/data/audit-scope.json` | data | no |
 | `findings` | `response/data/findings.json` | data | no |
+| `uat-walk` | `response/data/walks/<walk>/walk.json` | data | no |
+| `walk-result` | `response/data/walks/<walk>/walk-result.json` | data | no |
 | `screenshot` | `response/artifacts/<case>.png` | artifact | yes |
 | `sheet` | `response/artifacts/sheet.png` | artifact | yes |
 

@@ -19,6 +19,7 @@ import { PASSWORD_LEAK } from '../../scripts/sweep-secrets.mjs';
 import { tableUnder } from '../../scripts/validate-response.mjs';
 import { auditScopeCarryErrors, upstreamAuditScope } from '../../scripts/audit-scope.mjs';
 import { hostRootOf, sessionRootOf, missingStack, loadEnvironmentSchema, parseDeclarationReference, stackDeclaration } from '../../scripts/validate-request.mjs';
+import { validateWalkFile, stepControl } from '../../scripts/validate-walk.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 // What this run itself writes: seeding the frozen records and signing in as the flow's dedicated
@@ -183,6 +184,7 @@ export async function validateUatStep(branchDir, root = ROOT, { hostRoot = hostR
     if (request?.inputs?.[kind] === undefined) errors.push(`request.json: ADMISSION_MISSING — input ${kind} is absent`);
   }
 
+  const parsedCaptures = [];
   let snapshot = null;
   if (present.has('uat-snapshot') && has('response/data/snapshot.json')) {
     try { snapshot = JSON.parse(await read('response/data/snapshot.json')); } catch { snapshot = null; }
@@ -255,6 +257,7 @@ export async function validateUatStep(branchDir, root = ROOT, { hostRoot = hostR
     for (const f of captureFiles) {
       if (!has(f)) continue;
       let capture; try { capture = JSON.parse(await read(f)); } catch { continue; }
+      parsedCaptures.push({ f, capture });
       const frozen = frozenById.get(capture.caseId);
       if (!frozen) { errors.push(`${f}: case ${capture.caseId} was captured without being frozen into the snapshot`); continue; }
       if (capture.order !== frozen.order) errors.push(`${f}: case ${capture.caseId} was executed out of its frozen order`);
@@ -265,6 +268,43 @@ export async function validateUatStep(branchDir, root = ROOT, { hostRoot = hostR
       for (const a of frozen.assertions) if (!seen.has(a)) errors.push(`${f}: the frozen assertion ${a} was never observed`);
       for (const a of capture.assertions) if (!frozen.assertions.includes(a.assertionId)) errors.push(`${f}: the assertion ${a.assertionId} was never frozen`);
     }
+  }
+
+  // Mode playwright: the walk is written and the runner ran it. A receipt that records the mode is
+  // held to it — every walk the receipt declares passes the walk gate and has its result beside it at
+  // the digest that ran; every capture names one of those walks and, per assertion, the expect step
+  // that produced it, whose target as the walk states it is the capture's control and whose outcome the
+  // runner recorded is the assertion's; a capture without its walk, or a walk with a capture the
+  // runner did not produce, is refused.
+  const walkRefs = asList(response.fields?.['uat-walk']);
+  const resultRefs = new Set(asList(response.fields?.['walk-result']));
+  const walks = new Map();
+  for (const ref of walkRefs) {
+    if (!has(ref)) continue;
+    const { errors: walkProblems, walk, result } = validateWalkFile(path.join(branchDir, ref), path.join(branchDir, 'response'), { root });
+    errors.push(...walkProblems);
+    if (walk) walks.set(ref, { walk, result });
+  }
+  for (const { f, capture } of parsedCaptures) {
+    const driver = capture.driver ?? null;
+    if (!driver) { if (walks.size) errors.push(`${f}: the receipt records mode playwright (it declares a uat-walk) and this capture carries no driver; under that mode every capture is produced by the runner from the walk`); continue; }
+    const bound = walks.get(driver.walkRef);
+    if (!bound) { errors.push(`${f}: names walk ${driver.walkRef}, which the receipt does not declare under uat-walk or which is not on disk; a capture without its walk is refused`); continue; }
+    if (!resultRefs.has(driver.resultRef) || !has(driver.resultRef) || !bound.result) { errors.push(`${f}: names result ${driver.resultRef}, and no walk-result stands beside the walk on disk and under fields; a capture whose walk nobody ran is refused`); continue; }
+    const { walk, result } = bound;
+    if (walk.run?.runId !== capture.runId) errors.push(`${f}: the walk ran ${walk.run?.runId ?? 'no run'} and the capture belongs to ${capture.runId}`);
+    const resultOutcome = new Map(result.steps.map((s) => [s.id, s.outcome]));
+    for (const a of capture.assertions) {
+      if (!a.stepId) { errors.push(`${f}: assertion ${a.assertionId} names no walk step; under mode playwright every assertion is the expect step that produced it`); continue; }
+      const step = walk.steps.find((s) => s.id === a.stepId);
+      if (!step) { errors.push(`${f}: assertion ${a.assertionId} names step ${a.stepId}, which the walk does not carry`); continue; }
+      if (step.action !== 'expect' || step.assertion?.caseId !== capture.caseId || step.assertion?.assertionId !== a.assertionId) errors.push(`${f}: assertion ${a.assertionId} names step ${a.stepId}, which does not evidence ${capture.caseId}/${a.assertionId} in the walk`);
+      const expected = stepControl(walk, a.stepId);
+      if (a.control !== expected) errors.push(`${f}: assertion ${a.assertionId} records control ${JSON.stringify(a.control)} and the walk's step ${a.stepId} pressed ${JSON.stringify(expected)}; the control is copied from the walk, never written by the agent`);
+      const ran = resultOutcome.get(a.stepId);
+      if (ran !== a.outcome) errors.push(`${f}: assertion ${a.assertionId} is ${a.outcome} here and the runner recorded step ${a.stepId} as ${ran ?? 'not run'}; the outcome is the runner's`);
+    }
+    if (!result.captures.some((c) => c.screenshotRef === capture.screenshotRef)) errors.push(`${f}: points at ${capture.screenshotRef}, which the runner did not produce for this walk`);
   }
 
   if (verdicts) {

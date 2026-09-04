@@ -18,6 +18,7 @@
       "const": true
     },
     "outcome": { "enum": ["pass", "fail"] },
+    "driver": { "$ref": "#/$defs/driver" },
     "assertions": {
       "type": "array",
       "minItems": 1,
@@ -36,8 +37,22 @@
             "minLength": 1
           },
           "evidenceRef": { "type": "string", "minLength": 1 },
-          "outcome": { "enum": ["pass", "fail"] }
+          "outcome": { "enum": ["pass", "fail"] },
+          "stepId": { "description": "Under driver mode playwright: the expect step of the walk that produced this assertion; the validator requires control to equal that step's target as the walk states it.", "type": "string", "pattern": "^[a-z0-9][a-z0-9-]*$" }
         }
+      }
+    }
+  },
+  "$defs": {
+    "driver": {
+      "description": "Present when the capture was produced by scripts/browser-walk.mjs from a declarative walk (@tools/browsercontrol mode playwright): the walk it ran and the result the runner wrote beside it. A capture that carries this and no walk or result on disk is refused, and every assertion's control is checked against the walk step it names.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["mode", "walkRef", "resultRef"],
+      "properties": {
+        "mode": { "const": "playwright" },
+        "walkRef": { "type": "string", "pattern": "^response/data/walks/[a-z0-9][a-z0-9-]*/walk\\.json$" },
+        "resultRef": { "type": "string", "pattern": "^response/data/walks/[a-z0-9][a-z0-9-]*/walk-result\\.json$" }
       }
     }
   }

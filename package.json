@@ -1,6 +1,6 @@
 {
   "name": "@starci/skills",
-  "version": "2.0.2-rc.1",
+  "version": "2.0.3-alpha.1",
   "description": "StarCi Skills: one entry, bounded operators, a closed routing map and a tool registry, installed as the .claude runtime of a repository for Claude Code and Codex.",
   "license": "MIT",
   "type": "module",

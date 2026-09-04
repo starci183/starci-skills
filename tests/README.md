@@ -226,3 +226,20 @@ evidence stub here for any rule-less finding seen in two sessions, for a person 
 `UPDATE.md`. Evidence notes the promoter writes land in this folder as
 `evidence/<date>-findings-<slug>.md`; they are occurrences, never law, and a draft under
 `knowledge/findings/proposals/` cites no ordinal until the rule exists.
+
+## Round 4 — 2026-09-05, the walk runner
+
+The evidence note on the surface-only control (`evidence/20260903-uat-verify-surface-only-control.md`)
+records why a walk driven by hand cannot be told from a fake one by reading its receipt; 2.0.3 answers
+it by taking the browser out of the agent's hands. `scripts/browser-walk.spec.mjs` proves the gate and
+the sweep on synthetic walks with no browser at all — a selector target, a goto after step 1, a literal
+secret, a capture taken before a sign-in redirect landed, a foreign URL and browser code are each
+refused by name — and proves the runner itself by one real run: a static page with a labelled field, a
+button and a heading is served on loopback by the tree's own `scripts/host-artifacts.mjs`, a walk
+fills, clicks, expects and captures it, and the run leaves the walk beside its result at the walk's
+digest, the ledger, the trace, the screenshot with its accessibility and DOM records, and a
+`uat-capture` whose control is the walk's; a second walk names a button the page does not have and
+stops at that step with the rest skipped. That run needs the host's Playwright install and is skipped,
+with the runner's own wording as the reason, on a host that has none — it is never faked. The three
+operator self-tests carry the same lawful walk and the same refusals through `uat.verify`,
+`interface.audit` and `environment.preflight`.

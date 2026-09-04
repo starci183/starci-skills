@@ -123,6 +123,19 @@ application CSS workaround for the component's own behavior. The interior
 of an application-owned node carries no claim and is not audited at all; only that node's own measure
 rules are.
 
+## The walk is written, never coded
+
+Under `@tools/browsercontrol` mode `playwright` the auditor writes one `uat-walk` per matrix entry —
+the entry's viewport and colour scheme as the walk's own context, role-and-name targets to reach the
+state, the entry route once at step 1, a credential by name where the route is guarded, and a
+capture named after the matrix entry — and the tree's runner drives it, so the screenshot, the
+accessibility snapshot and the DOM record the audit measures came from a browser nobody scripted.
+A capture that records this mode names its walk, the runner's `walk-result` beside it at the digest
+that ran, the capture step of that walk whose name is the matrix id, and the control that step
+followed as the walk states it; its viewport and scheme are the walk's; and a capture with no walk
+beside it, or a walk with a capture the runner did not produce, is refused. The nodes, their claims
+and their measurements stay the auditor's, read from the record the runner wrote.
+
 ## The audit changes nothing
 
 No verdict is a repair, a workaround or an instruction. A failure stays a failure in the receipt
@@ -179,15 +192,17 @@ a node passes.
 | 2 | Bind the authority | — | @knowledge/ui/proof (every topic with its fingerprint and inventory), input `frontend-source-application` (the claims), input `frontend-presentation-resolution` (the owner of every node), @worktrees/sessions/central-runtime | — | — |
 | 3 | Bind the primary-surface scope, selected matrix entries and declared surface class | `auditScope`, `matrix` | input `frontend-direction-decision` (its `response/data/coverage.json`: state by viewport by colour scheme, and the `surfaceClass` that decision declared) | — | `SURFACE_CLASS_MISSING` |
 | 4 | Reach readiness for each entry on the port the runtime owner's entry for this route carries, in this session's own browser profile, signing in as the flow's account when the route requires an identity | `readinessProbe`, `account`, `env` | @worktrees/sessions/central-runtime for the entry of this project route and the endpoint it serves, input `uat-account` for the account of names, @tools/http, @tools/secrets, @tools/browsercontrol | — | `RUNTIME_UNAVAILABLE`, `IDENTITY_MISSING` |
-| 5 | Capture and measure each entry | — | @worktrees/sessions/central-runtime, @workspaces/fe (the observed owners and the identifiers each node carries), @tools/browsercontrol | `response/artifacts/<matrixId>.png`, `response/data/captures/<matrixId>.json` | `EVIDENCE_MISSING` |
-| 6 | Judge the measurable lanes per entry: compare against the claims and the proof rules, judge by owner, and let each measurable topic close itself | — | @knowledge/ui/proof, @knowledge/grammars/<family>, the captures | — | `UNKNOWN_RULE` |
-| 7 | Score the taste lens once over every sheet of the scope, calibrated on the three anchors and ranked relatively, then emit | — | @knowledge/ui/proof (the calibration set under `calibration/`: the anchors, their bands and the tolerance), the captures of every selected surface | `verdicts`, `frontend-surface-audit`, `findings`, `response/response.json`, `host` | `CALIBRATION_OFF`, `NO_PROGRESS` |
+| 5 | Write one walk per matrix entry: the entry's viewport and scheme as the context, role-and-name targets to the state, the entry route once at step 1, a credential by name where the route is guarded, a capture named after the entry | — | input `frontend-direction-decision` (the matrix entries), input `route`, input `uat-account` for the account of names | `uat-walk` | — |
+| 6 | Run each walk through the tree's runner under @tools/browsercontrol mode `playwright` — a fresh browser context per walk at the endpoint the runtime owner's entry carries — or drive the entry through the browser under mode `required` when no walk was written | — | `uat-walk`, @worktrees/sessions/central-runtime for the endpoint, @tools/browsercontrol, @tools/secrets | `walk-result`, `response/artifacts/<matrixId>.png` | `RUNTIME_UNAVAILABLE` |
+| 7 | Capture and measure each entry, reading the nodes, their claims and their values off the record the runner wrote or the driven browser shows | — | @worktrees/sessions/central-runtime, @workspaces/fe (the observed owners and the identifiers each node carries), `walk-result`, @tools/browsercontrol | `response/artifacts/<matrixId>.png`, `response/data/captures/<matrixId>.json` | `EVIDENCE_MISSING` |
+| 8 | Judge the measurable lanes per entry: compare against the claims and the proof rules, judge by owner, and let each measurable topic close itself | — | @knowledge/ui/proof, @knowledge/grammars/<family>, the captures | — | `UNKNOWN_RULE` |
+| 9 | Score the taste lens once over every sheet of the scope, calibrated on the three anchors and ranked relatively, then emit | — | @knowledge/ui/proof (the calibration set under `calibration/`: the anchors, their bands and the tolerance), the captures of every selected surface | `verdicts`, `frontend-surface-audit`, `findings`, `response/response.json`, `host` | `CALIBRATION_OFF`, `NO_PROGRESS` |
 
-Step 6 judges every claim and lets each measurable proof topic close itself. The canon judgement is
+Step 8 judges every claim and lets each measurable proof topic close itself. The canon judgement is
 the one above: every claim measured, judged against the published rule, routed by the owner of the
 node it stands on; bounded search (`@tools/websearch`) resolves a referent a rule names and settles
 nothing else. Each bound topic computes its own verdict by its own closing rule — the arithmetic
-lives there and is not repeated here — and step 7 publishes one row per topic under `## Verdict`:
+lives there and is not repeated here — and step 9 publishes one row per topic under `## Verdict`:
 presentation, composition, responsive, motion, accessibility, contrast, render-truth and taste, each
 with the verdict that topic's rule produced and the route a failure carries. A topic whose evidence
 never arrived is `blocked`, which is never reported as a pass and never as a failure. The taste row
@@ -207,7 +222,7 @@ the first free port of the registry's range and records the URL, the port, the f
 `response/artifacts/host.json`, stopping when the branch ends or is resumed; a person opens the sheet
 and sees every matrix entry beside its verdicts. Nothing binds `0.0.0.0`.
 
-Serving is not telling. Step 7 prints over `@tools/print`, into the conversation the person is
+Serving is not telling. Step 9 prints over `@tools/print`, into the conversation the person is
 reading, the sheet's URL, the worst-scoring capture of each topic and the `## Verdict` table, and the
 receipt lists each printed artifact under `## Printed` with why it was printed. A verdict a person
 never saw sends nobody anywhere, and an audit that files its sheet and says nothing has audited only
@@ -283,6 +298,8 @@ keep their own coverage contracts unchanged.
 | `screenshot` | `response/artifacts/<matrixId>.png` | artifact | yes |
 | `verdicts` | `response/data/verdicts.json` | data | yes |
 | `findings` | `response/data/findings.json` | data | no |
+| `uat-walk` | `response/data/walks/<walk>/walk.json` | data | no |
+| `walk-result` | `response/data/walks/<walk>/walk-result.json` | data | no |
 | `host` | `response/artifacts/host.json` | artifact | no |
 
 ## Stops

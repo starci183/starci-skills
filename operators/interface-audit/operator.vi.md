@@ -121,6 +121,19 @@ của component. Phần
 ruột của node do ứng dụng sở hữu không mang lời khai nào và không bị audit; chỉ các luật đo của chính
 node ấy bị audit.
 
+## Lượt đi thử được viết ra, không bao giờ được lập trình
+
+Dưới `@tools/browsercontrol` chế độ `playwright`, người audit viết một `uat-walk` cho mỗi mục ma
+trận — viewport và tông màu của mục làm ngữ cảnh riêng của lượt đi, các target theo vai trò và tên
+để tới được trạng thái, route vào đúng một lần ở bước 1, thông tin đăng nhập theo tên khi route có
+cổng canh, và một bức chụp mang tên mục ma trận — rồi runner của cây lái nó, nên ảnh chụp, ảnh cây
+truy cập và bản ghi DOM mà audit đo tới từ một trình duyệt không ai lập trình. Một bức chụp ghi chế
+độ này nêu lượt đi của mình, `walk-result` mà runner ghi cạnh đó ở đúng digest đã chạy, bước chụp
+của lượt đi mang tên mục ma trận, và điều khiển mà bước ấy đi theo đúng như lượt đi nêu; viewport và
+tông màu của nó là của lượt đi; còn một bức chụp không có lượt đi bên cạnh, hay một lượt đi có bức
+chụp runner không sinh ra, bị từ chối. Các node, lời khai và phép đo của chúng vẫn là của người audit,
+đọc từ bản ghi runner để lại.
+
 ## Audit không đổi gì cả
 
 Không phán quyết nào là một lần sửa, một cách chữa cháy hay một mệnh lệnh. Một chỗ hỏng vẫn là chỗ
@@ -177,15 +190,17 @@ làm bằng chứng rằng node đã pass.
 | 2 | Bind thẩm quyền | — | @knowledge/ui/proof (mọi topic kèm fingerprint và kho luật), đầu vào `frontend-source-application` (các lời khai), đầu vào `frontend-presentation-resolution` (chủ sở hữu của từng node), @worktrees/sessions/central-runtime | — | — |
 | 3 | Bind phạm vi bề mặt chính, các mục ma trận và lớp bề mặt đã khai | `auditScope`, `matrix` | đầu vào `frontend-direction-decision` (chính `response/data/coverage.json` của nó: state nhân viewport nhân bảng màu, và `surfaceClass` mà quyết định ấy đã khai) | — | `SURFACE_CLASS_MISSING` |
 | 4 | Chờ từng mục tới lúc sẵn sàng trên cổng mà entry của chủ runtime cho route này mang theo, trong profile trình duyệt của riêng phiên này, đăng nhập bằng tài khoản của luồng khi route đòi một danh tính | `readinessProbe`, `account`, `env` | @worktrees/sessions/central-runtime để lấy entry của đúng route này và endpoint nó phục vụ, đầu vào `uat-account` cho hồ sơ toàn tên, @tools/http, @tools/secrets, @tools/browsercontrol | — | `RUNTIME_UNAVAILABLE`, `IDENTITY_MISSING` |
-| 5 | Chụp và đo từng mục | — | @worktrees/sessions/central-runtime, @workspaces/fe (các owner được quan sát và identifier từng node mang), @tools/browsercontrol | `response/artifacts/<matrixId>.png`, `response/data/captures/<matrixId>.json` | `EVIDENCE_MISSING` |
-| 6 | Phán các làn đo được theo từng mục: đối chiếu với lời khai và luật proof, phán theo chủ sở hữu, và để từng topic đo được tự đóng | — | @knowledge/ui/proof, @knowledge/grammars/<family>, các bức chụp | — | `UNKNOWN_RULE` |
-| 7 | Chấm ống kính thẩm mỹ một lần trên mọi tấm của phạm vi, hiệu chuẩn trên ba tấm mốc và xếp hạng theo tương quan, rồi phát | — | @knowledge/ui/proof (bộ hiệu chuẩn dưới `calibration/`: các mốc, dải của chúng và khoảng dung sai), các bức chụp của mọi bề mặt đã chọn | `verdicts`, `frontend-surface-audit`, `findings`, `response/response.json`, `host` | `CALIBRATION_OFF`, `NO_PROGRESS` |
+| 5 | Viết một lượt đi thử cho mỗi mục ma trận: viewport và tông màu của mục làm ngữ cảnh, target theo vai trò và tên để tới trạng thái, route vào đúng một lần ở bước 1, thông tin đăng nhập theo tên khi route có cổng canh, một bức chụp mang tên mục | — | đầu vào `frontend-direction-decision` (các mục ma trận), đầu vào `route`, đầu vào `uat-account` cho hồ sơ toàn tên | `uat-walk` | — |
+| 6 | Chạy từng lượt đi qua runner của cây dưới @tools/browsercontrol chế độ `playwright` — một ngữ cảnh trình duyệt mới tinh cho mỗi lượt đi tại endpoint mà entry của chủ runtime mang — hoặc lái mục đó qua trình duyệt dưới chế độ `required` khi không viết lượt đi nào | — | `uat-walk`, @worktrees/sessions/central-runtime để lấy endpoint, @tools/browsercontrol, @tools/secrets | `walk-result`, `response/artifacts/<matrixId>.png` | `RUNTIME_UNAVAILABLE` |
+| 7 | Chụp và đo từng mục, đọc các node, lời khai và giá trị của chúng từ bản ghi runner để lại hoặc từ trình duyệt đang lái | — | @worktrees/sessions/central-runtime, @workspaces/fe (các owner được quan sát và identifier từng node mang), `walk-result`, @tools/browsercontrol | `response/artifacts/<matrixId>.png`, `response/data/captures/<matrixId>.json` | `EVIDENCE_MISSING` |
+| 8 | Phán các làn đo được theo từng mục: đối chiếu với lời khai và luật proof, phán theo chủ sở hữu, và để từng topic đo được tự đóng | — | @knowledge/ui/proof, @knowledge/grammars/<family>, các bức chụp | — | `UNKNOWN_RULE` |
+| 9 | Chấm ống kính thẩm mỹ một lần trên mọi tấm của phạm vi, hiệu chuẩn trên ba tấm mốc và xếp hạng theo tương quan, rồi phát | — | @knowledge/ui/proof (bộ hiệu chuẩn dưới `calibration/`: các mốc, dải của chúng và khoảng dung sai), các bức chụp của mọi bề mặt đã chọn | `verdicts`, `frontend-surface-audit`, `findings`, `response/response.json`, `host` | `CALIBRATION_OFF`, `NO_PROGRESS` |
 
-Bậc 6 phán mọi lời khai và để từng topic proof đo được tự đóng lại. Phần phán canon là cái ở trên: mọi
+Bậc 8 phán mọi lời khai và để từng topic proof đo được tự đóng lại. Phần phán canon là cái ở trên: mọi
 lời khai đều được đo, phán theo luật đã publish, định tuyến theo chủ sở hữu của node nó đứng lên; tra
 cứu có giới hạn (`@tools/websearch`) chỉ giải nghĩa một referent mà rule gọi tên, không quyết thêm gì.
 Mỗi topic được ràng tự tính verdict của mình bằng chính rule đóng của nó — phần số học sống ở đó và
-không nhắc lại ở đây — và bậc 7 publish mỗi topic một hàng dưới `## Verdict`: presentation,
+không nhắc lại ở đây — và bậc 9 publish mỗi topic một hàng dưới `## Verdict`: presentation,
 composition, responsive, motion, accessibility, contrast, render-truth và taste, mỗi hàng mang verdict
 mà rule của topic ấy sinh ra cùng đường đi của một lần fail. Một topic không có bằng chứng tới nơi là
 `blocked`, và `blocked` không bao giờ được báo thành đạt cũng không bao giờ thành hỏng. Hàng taste
@@ -204,7 +219,7 @@ cổng trống đầu tiên trong dải của sổ đăng ký và ghi URL, cổn
 `response/artifacts/host.json`, rồi dừng khi nhánh kết thúc hoặc được resume; một người mở bảng ấy và
 thấy từng mục ma trận cạnh phán quyết của nó. Không gì bind `0.0.0.0`.
 
-Phục vụ chưa phải là nói. Bậc 7 in qua `@tools/print`, thẳng vào cuộc trò chuyện người ta đang
+Phục vụ chưa phải là nói. Bậc 9 in qua `@tools/print`, thẳng vào cuộc trò chuyện người ta đang
 đọc, URL của bảng chụp, ảnh chụp điểm thấp nhất của từng topic và bảng `## Verdict`, còn biên nhận
 liệt kê từng artifact đã in dưới `## Printed` kèm lý do. Một phán quyết không ai thấy thì không đưa ai
 đi đâu, và một lượt soi lưu bảng chụp rồi im lặng chỉ soi chính nó.
@@ -277,6 +292,8 @@ Các gate unit, integration và regression giữ nguyên hợp đồng coverage 
 | `screenshot` | `response/artifacts/<matrixId>.png` | artifact | có |
 | `verdicts` | `response/data/verdicts.json` | data | có |
 | `findings` | `response/data/findings.json` | data | không |
+| `uat-walk` | `response/data/walks/<walk>/walk.json` | data | không |
+| `walk-result` | `response/data/walks/<walk>/walk-result.json` | data | không |
 | `host` | `response/artifacts/host.json` | artifact | không |
 
 ## Dừng

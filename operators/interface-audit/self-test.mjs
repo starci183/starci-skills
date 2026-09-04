@@ -635,4 +635,60 @@ const repairToPerson = familyFinding();
 repairToPerson['response/response.json'] = responseJson({ status: 'blocked', stop: 'NO_PROGRESS', next: [], reason: 'wait for a person to publish the library repair' });
 await expectError(repairToPerson, 'not handed to a person to publish', 'existing authorized library behavior repair cannot be handed to the user');
 
-process.stdout.write('interface.audit self-test: scope, owner routing, evidence and mutation checks passed\n');
+// Mode playwright: one walk per matrix entry, written by the auditor and run by the runner; the
+// screenshot the audit measures came from that run and the capture says which step took it. Each
+// mutation below is one way a screenshot nobody drove could have read like a driven one.
+const { walkFingerprint, stepControl } = await import('../../scripts/validate-walk.mjs');
+const ROUTE = 'http://127.0.0.1:60000/plans';
+const WALK_REF = (id) => `response/data/walks/${id}/walk.json`;
+const RESULT_REF = (id) => `response/data/walks/${id}/walk-result.json`;
+const auditWalk = (id) => ({
+  schemaVersion: 9, id, flow: 'plan-picker',
+  entry: { route: ROUTE, viewport: { width: id === WIDE ? 1440 : 390, height: id === WIDE ? 900 : 844, deviceScaleFactor: 1 }, colorScheme: 'light', reducedMotion: 'reduce', locale: 'en' },
+  account: null,
+  steps: [
+    { id: 'open', action: 'goto', target: null, value: ROUTE },
+    { id: 'loaded', action: 'expect', target: { role: 'heading', name: 'Plans' }, expect: { visible: true } },
+    { id: 'shot', action: 'capture', target: null, capture: { name: id } },
+  ],
+});
+const auditResult = (w) => ({
+  schemaVersion: 9, mode: 'playwright', walkRef: WALK_REF(w.id), walkFingerprint: walkFingerprint(Buffer.from(JSON.stringify(w, null, 2))), route: ROUTE,
+  outcome: 'pass', startedAt: '2026-09-03T00:10:00Z', finishedAt: '2026-09-03T00:10:05Z',
+  driver: { playwright: '1.0.0', browser: 'chromium', browserVersion: '100.0.0.0', headless: true, context: { fresh: true, viewport: [w.entry.viewport.width, w.entry.viewport.height], deviceScaleFactor: 1, colorScheme: 'light', reducedMotion: 'reduce', locale: 'en' } },
+  steps: w.steps.map((s) => ({ id: s.id, action: s.action, control: stepControl(w, s.id), outcome: 'pass', url: ROUTE, ms: 1 })),
+  firstFailure: null,
+  captures: [{ name: w.id, stepId: 'shot', screenshotRef: SHOT(w.id), axRef: `response/artifacts/${w.id}.ax.txt`, domRef: `response/artifacts/${w.id}.dom.json` }],
+});
+const drivenCapture = (w, over = {}) => ({ ...capture(w.id), driver: { mode: 'playwright', walkRef: WALK_REF(w.id), resultRef: RESULT_REF(w.id), stepId: 'shot', control: stepControl(w, 'shot'), ...over } });
+function drivenFiles({ walks = [auditWalk(WIDE), auditWalk(NARROW)], captures = {} } = {}) {
+  const files = baseline();
+  files['response/response.json'] = responseJson({ fields: { 'frontend-surface-audit': 'response/response.md', verdicts: 'response/data/verdicts.json', capture: [CAP(WIDE), CAP(NARROW)], screenshot: [SHOT(WIDE), SHOT(NARROW)], 'uat-walk': walks.map((w) => WALK_REF(w.id)), 'walk-result': walks.map((w) => RESULT_REF(w.id)) } });
+  for (const w of walks) { files[WALK_REF(w.id)] = w; files[RESULT_REF(w.id)] = auditResult(w); files[CAP(w.id)] = captures[w.id] ?? drivenCapture(w); }
+  return files;
+}
+await expectValid(drivenFiles(), 'two entries, each captured by the runner from its own walk at its own viewport');
+{
+  const w = auditWalk(WIDE); w.steps[1].target = { css: 'h1' };
+  await expectError(drivenFiles({ walks: [w, auditWalk(NARROW)] }), 'no unique allowed schema branch', 'a walk whose target is a selector');
+}
+{
+  const w = auditWalk(WIDE); w.steps.splice(2, 0, { id: 'jump', action: 'goto', target: null, value: `${ROUTE}/compare` });
+  await expectError(drivenFiles({ walks: [w, auditWalk(NARROW)] }), 'the walk navigates once, at step 1', 'a walk that navigates by address bar mid-flow');
+}
+await expectError(drivenFiles({ captures: { [WIDE]: drivenCapture(auditWalk(WIDE), { control: 'button "Compare plans"' }) } }), 'the control is copied from the walk, never written by the agent', 'a capture whose control differs from the walk step');
+await expectError(drivenFiles({ captures: { [WIDE]: drivenCapture(auditWalk(WIDE), { stepId: 'loaded' }) } }), `is not the capture step named ${WIDE}`, 'a capture that names a step which took no screenshot');
+await expectError(drivenFiles({ captures: { [NARROW]: capture(NARROW) } }), 'this capture carries no driver', 'a receipt that records mode playwright with one screenshot the runner did not take');
+{
+  const files = drivenFiles();
+  delete files[WALK_REF(NARROW)];
+  await expectError(files, 'a capture without its walk is refused', 'a capture whose walk is not on disk');
+}
+{
+  const files = drivenFiles();
+  delete files[RESULT_REF(NARROW)];
+  await expectError(files, 'a capture whose walk nobody ran is refused', 'a walk with no result beside it');
+}
+await expectError(drivenFiles({ captures: { [WIDE]: { ...drivenCapture(auditWalk(WIDE)), viewport: [1280, 800] } } }), 'the walk ran at 1440x900', 'a capture claiming a viewport the walk did not run');
+
+process.stdout.write('interface.audit self-test: scope, owner routing, evidence, walk and mutation checks passed\n');

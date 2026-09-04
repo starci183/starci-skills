@@ -19,6 +19,7 @@ import { validateStep } from '../../scripts/validate-step.mjs';
 import { credentialShaped } from '../../scripts/sweep-secrets.mjs';
 import { tableUnder } from '../../scripts/validate-response.mjs';
 import { hostRootOf, missingStack, loadEnvironmentSchema, stackDeclaration } from '../../scripts/validate-request.mjs';
+import { playwrightInstallStatus, missingInstallMessage, CHECK_ID as PLAYWRIGHT_CHECK } from '../../scripts/browser-walk.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 const OPERATOR = 'environment.preflight';
@@ -175,6 +176,20 @@ export async function validateEnvironmentStep(branchDir, root = ROOT, hostRoot =
     } else {
       if (report.declarationRef !== null) errors.push(`${REPORT}: declarationRef names a declaration that ${decl.exists ? 'fails its schema' : 'does not exist'}; the report records null and every approval check as a wall`);
       for (const cls of classes) { const c = byId.get(`approval.${cls}`); if (c && c.status !== 'wall') errors.push(`${REPORT}: approval.${cls} is ${c.status} while the environment declares nothing valid; every approval check is a wall owned by approval`); }
+    }
+
+    // The walk runner's install is read back from the host the way the declaration is: the check says
+    // what scripts/browser-walk.mjs would find at the place resources/tools.json names, and an absent
+    // install is a wall in the runner's own wording, never an ok the runner would then contradict.
+    const playwright = byId.get(PLAYWRIGHT_CHECK);
+    if (playwright && playwright.status !== 'skipped') {
+      const install = playwrightInstallStatus(hostRoot, root);
+      if (install.present && playwright.status !== 'ok') errors.push(`${REPORT}: ${PLAYWRIGHT_CHECK} is ${playwright.status} while Playwright and a Chromium stand at ${install.root}; the runner would load them`);
+      if (!install.present && playwright.status !== 'wall') errors.push(`${REPORT}: ${PLAYWRIGHT_CHECK} is ok while no Playwright install stands at ${install.root}; the runner exits with "${missingInstallMessage(hostRoot, root)}", and the check is a wall owned by host with that repair`);
+      if (!install.present && playwright.status === 'wall') {
+        const wall = wallsById.get(PLAYWRIGHT_CHECK);
+        if (wall && !String(wall.repair).includes(install.root)) errors.push(`${REPORT}: wall ${PLAYWRIGHT_CHECK} names a repair that does not name the install place ${install.root}; the repair is the runner's own wording`);
+      }
     }
   }
 
