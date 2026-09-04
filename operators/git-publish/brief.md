@@ -14,7 +14,7 @@ Primary output: `git-publication`
 
 ## Inputs
 
-`workspace-route-binding`, `changes`, `quality-verification`
+`workspace-route-binding`, `changes`, `quality-verification`, `business-reconciliation` (optional)
 
 ## Outputs
 

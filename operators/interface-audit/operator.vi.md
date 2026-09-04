@@ -156,6 +156,7 @@ làm bằng chứng rằng node đã pass.
 | `route` | `workspace.bind`, route đã bind: checkout đã kiểm và source head mà commit đã áp xuất phát từ đó; endpoint lấy từ entry của chủ runtime, không bao giờ từ đây | có |
 | `uat-account` | `identity.provision`, tài khoản dùng để đi vào route có cổng canh; vắng ở lượt đầu, và đó chính là thứ `IDENTITY_MISSING` bàn giao | không |
 | `platform-operation-receipt` | `runtime.serve`, lượt phục vụ đã đưa commit vào quan sát trên cổng của sản phẩm; vắng khi bề mặt đã được phục vụ sẵn | không |
+| `seed-receipt` | `data.seed`, những dòng đã đặt ở mức khối lượng đại diện của luồng để mật độ được chấm trên dữ liệu chứ không trên kho rỗng | không |
 
 ## Yêu cầu
 

@@ -308,6 +308,7 @@ nó biết nó đã quyết gì và ghi gì, không bao giờ biết nó render 
 | `architecture-decision` | `architecture.decide`; bắt buộc khi một ranh giới đổi | không |
 | `frontend-direction-decision` | một lần chạy `interface.generate` trước trên cùng target, đọc khi chạy lại | không |
 | `frontend-surface-audit` | `interface.audit`, các phát hiện mở ra vòng này; chỉ có mặt khi đây là một vòng lặp | không |
+| `library-source-application` | `library.update`, lần sửa owner mà một route `chain` sinh ra cho lỗ hổng grammar bề mặt này đụng phải; chỉ có mặt khi vào lại sau nhiệm vụ anh em đó | không |
 | `units` | `interface.plan`; bản đồ bề mặt mà nhánh này sinh đúng một đơn vị, gọi tên bằng `request.unit` | không |
 | `findings` | sổ cái findings, như `scripts/record-findings.mjs` đã vật chất hoá các dòng đang mở của nó cạnh biên nhận `interface.audit` hay `uat.verify` gần nhất của bề mặt này; mọi dòng cho target hay đơn vị này được trả lời dưới `## Findings answered` của quyết định, nếu không nhánh bị từ chối | không |
 

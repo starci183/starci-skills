@@ -339,6 +339,7 @@ written source: it knows what it decided and what it wrote, never how it renders
 | `architecture-decision` | `architecture.decide`; required when a boundary changes | no |
 | `frontend-direction-decision` | a prior run of `interface.generate` on the same target, read when resuming | no |
 | `frontend-surface-audit` | `interface.audit`, the findings that opened this round; present only when this is a loop | no |
+| `library-source-application` | `library.update`, the owner repair a `chain` route produced for a grammar gap this surface hit; present only when re-entering after that sibling mission | no |
 | `units` | `interface.plan`; the surface map whose one unit this branch generates, named by `request.unit` | no |
 
 ## Requirements

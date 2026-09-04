@@ -14,7 +14,7 @@ Primary output: `uat-flow-verification`
 
 ## Inputs
 
-`frontend-surface-audit`, `quality-verification`, `route`, `uat-account` (optional), `units` (optional)
+`frontend-surface-audit`, `quality-verification`, `route`, `uat-account` (optional), `units` (optional), `uat-plan` (optional), `seed-receipt` (optional)
 
 ## Outputs
 
