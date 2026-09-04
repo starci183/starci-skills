@@ -65,6 +65,15 @@ alias. `features/` is the only segment between the root and a feature, so a head
 the previous head is named rather than erased, and the coverage fingerprint travels unchanged, so
 quality and UAT can prove they consumed the same matrix rather than a paraphrase of it.
 
+## A reconciled head is reconciled again when the delivery moves
+
+A head published `implemented` binds its fact claims to one source head. When the delivered source moves
+after that — a repair under a red gate, a re-verification at a new commit — the promise is compared again
+at the new head and, when no discrepancy stands, republished `implemented` over the transition
+`implemented->implemented`: the same state, new bindings, because a published head that cites a commit the
+gates never passed on is a promise resting on the wrong evidence. Only this operator takes that transition;
+a decision that changes the promise still moves the state.
+
 ## Boundary
 
 Context is read-only apart from the one feature head. The operator writes only `response/` of its

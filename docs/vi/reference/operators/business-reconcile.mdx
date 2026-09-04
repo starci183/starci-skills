@@ -65,6 +65,14 @@ chối. Chuyển trạng thái hợp lệ so với trạng thái head được t
 không xoá, và fingerprint phủ đi nguyên vẹn, để quality và UAT chứng minh được rằng chúng tiêu thụ
 đúng ma trận ấy chứ không phải một bản diễn giải.
 
+## Head đã đối chiếu được đối chiếu lại khi bản giao dời đi
+
+Một head đã công bố `implemented` ràng các fact claim của nó vào một source head. Khi source đã giao dời
+đi sau đó — một lần sửa dưới cổng đỏ, một lần kiểm lại ở commit mới — lời hứa được so lại ở head mới và,
+khi không còn sai lệch nào, được công bố lại `implemented` qua transition `implemented->implemented`: cùng
+trạng thái, ràng buộc mới, vì một head đã công bố mà trích một commit các cổng chưa từng pass là một lời hứa
+đặt trên bằng chứng sai. Chỉ operator này đi transition ấy; một quyết định đổi lời hứa vẫn đổi trạng thái.
+
 ## Ranh giới
 
 Context chỉ đọc, trừ đúng một head feature. Operator chỉ ghi `response/` của nhánh mình —

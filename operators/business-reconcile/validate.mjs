@@ -21,6 +21,10 @@ const LEGAL_TRANSITIONS = {
   'in-progress->implemented': { from: 'in-progress', to: 'implemented' },
   'in-progress->rejected': { from: 'in-progress', to: 'rejected' },
   'implemented->in-progress': { from: 'implemented', to: 'in-progress' },
+  // A rebinding: the delivered source moved after the head was reconciled (a repair, a re-verification) and the
+  // promise still holds with no discrepancy, so the head is republished implemented with its claims bound to
+  // the new source head; only a reconciliation takes it, never a decision.
+  'implemented->implemented': { from: 'implemented', to: 'implemented' },
   'implemented->rejected': { from: 'implemented', to: 'rejected' },
   'rejected->pending': { from: 'rejected', to: 'pending' },
 };
