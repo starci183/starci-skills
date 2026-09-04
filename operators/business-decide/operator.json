@@ -11,11 +11,13 @@
     "profile": "sol-fresh",
     "grammarBound": false,
     "dispatch": "fresh",
+    "mode": "isolated",
     "tools": {
       "@tools/fileread": "context-aliases",
       "@tools/sourcewrite": "declared-write-set",
       "@tools/git": "read",
       "@tools/websearch": "bounded"
     }
-  }
+  },
+  "primaryOutput": "business-promise-authority"
 }

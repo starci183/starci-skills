@@ -11,6 +11,7 @@
     "profile": "sol-fresh",
     "grammarBound": false,
     "dispatch": "fresh",
+    "mode": "isolated",
     "tools": {
       "@tools/fileread": "context-aliases",
       "@tools/sourcewrite": "declared-write-set",
@@ -23,5 +24,6 @@
       "@tools/database": "namespaced-write",
       "@tools/print": "decision-points"
     }
-  }
+  },
+  "primaryOutput": "uat-flow-verification"
 }

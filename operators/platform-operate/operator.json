@@ -11,6 +11,7 @@
     "profile": "luna",
     "grammarBound": false,
     "dispatch": "inline",
+    "mode": "inline",
     "tools": {
       "@tools/fileread": "context-aliases",
       "@tools/git": "merge-into-integration-branch",
@@ -22,5 +23,6 @@
       "@tools/browsercontrol": "required",
       "@tools/database": "namespaced-write"
     }
-  }
+  },
+  "primaryOutput": "platform-operation-receipt"
 }

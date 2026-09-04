@@ -11,6 +11,7 @@
     "profile": "sol-fresh",
     "grammarBound": true,
     "dispatch": "fresh",
+    "mode": "isolated",
     "tools": {
       "@tools/fileread": "context-aliases",
       "@tools/git": "read",
@@ -20,5 +21,6 @@
       "@tools/host": "loopback",
       "@tools/print": "decision-points"
     }
-  }
+  },
+  "primaryOutput": "frontend-direction-decision"
 }

@@ -11,11 +11,13 @@
     "profile": "luna",
     "grammarBound": false,
     "dispatch": "inline",
+    "mode": "inline",
     "tools": {
       "@tools/fileread": "context-aliases",
       "@tools/sourcewrite": "declared-write-set",
       "@tools/git": "commit-session-branch",
       "@tools/shell": "declared-commands"
     }
-  }
+  },
+  "primaryOutput": "dependency-update"
 }

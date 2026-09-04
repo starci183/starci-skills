@@ -11,11 +11,13 @@
     "profile": "luna",
     "grammarBound": false,
     "dispatch": "inline",
+    "mode": "inline",
     "tools": {
       "@tools/fileread": "context-aliases",
       "@tools/git": "read",
       "@tools/shell": "declared-commands",
       "@tools/http": "probe"
     }
-  }
+  },
+  "primaryOutput": "quality-verification"
 }

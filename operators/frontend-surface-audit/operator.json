@@ -11,6 +11,7 @@
     "profile": "sol-reviewer",
     "grammarBound": true,
     "dispatch": "fresh",
+    "mode": "isolated",
     "tools": {
       "@tools/fileread": "context-aliases",
       "@tools/git": "read",
@@ -22,5 +23,6 @@
       "@tools/secrets": "resolve-by-name",
       "@tools/print": "decision-points"
     }
-  }
+  },
+  "primaryOutput": "frontend-surface-audit"
 }

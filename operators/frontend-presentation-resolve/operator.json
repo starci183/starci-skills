@@ -11,10 +11,12 @@
     "profile": "luna",
     "grammarBound": true,
     "dispatch": "inline",
+    "mode": "inline",
     "tools": {
       "@tools/fileread": "context-aliases",
       "@tools/git": "read",
       "@tools/registry": "read"
     }
-  }
+  },
+  "primaryOutput": "frontend-presentation-resolution"
 }

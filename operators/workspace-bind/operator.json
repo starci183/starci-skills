@@ -11,6 +11,7 @@
     "profile": "luna",
     "grammarBound": false,
     "dispatch": "inline",
+    "mode": "inline",
     "tools": {
       "@tools/fileread": "context-aliases",
       "@tools/git": "read",
@@ -18,5 +19,6 @@
       "@tools/http": "probe",
       "@tools/secrets": "resolve-by-name"
     }
-  }
+  },
+  "primaryOutput": "workspace-route-binding"
 }

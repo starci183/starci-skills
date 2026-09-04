@@ -11,11 +11,13 @@
     "profile": "luna",
     "grammarBound": false,
     "dispatch": "inline",
+    "mode": "inline",
     "tools": {
       "@tools/fileread": "context-aliases",
       "@tools/git": "merge-and-push",
       "@tools/shell": "declared-commands",
       "@tools/ci": "read"
     }
-  }
+  },
+  "primaryOutput": "git-publication"
 }

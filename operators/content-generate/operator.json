@@ -11,6 +11,7 @@
     "profile": "luna",
     "grammarBound": false,
     "dispatch": "fresh",
+    "mode": "isolated",
     "tools": {
       "@tools/fileread": "context-aliases",
       "@tools/shell": "declared-commands",
@@ -18,5 +19,6 @@
       "@tools/imagegen": "required",
       "@tools/objectstorage": "read"
     }
-  }
+  },
+  "primaryOutput": "content-generation-receipt"
 }

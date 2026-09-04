@@ -11,11 +11,13 @@
     "profile": "sol-fresh",
     "grammarBound": false,
     "dispatch": "fresh",
+    "mode": "isolated",
     "tools": {
       "@tools/fileread": "context-aliases",
       "@tools/git": "read",
       "@tools/websearch": "bounded",
       "@tools/visualize": "html"
     }
-  }
+  },
+  "primaryOutput": "architecture-decision"
 }

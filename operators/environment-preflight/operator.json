@@ -11,6 +11,7 @@
     "profile": "luna",
     "grammarBound": false,
     "dispatch": "inline",
+    "mode": "inline",
     "tools": {
       "@tools/fileread": "context-aliases",
       "@tools/git": "read",
@@ -19,5 +20,6 @@
       "@tools/secrets": "resolve-by-name",
       "@tools/container": "read"
     }
-  }
+  },
+  "primaryOutput": "environment-readiness"
 }

@@ -11,6 +11,7 @@
     "profile": "luna",
     "grammarBound": true,
     "dispatch": "fresh",
+    "mode": "isolated",
     "tools": {
       "@tools/fileread": "context-aliases",
       "@tools/sourcewrite": "declared-write-set",
@@ -18,5 +19,6 @@
       "@tools/git": "commit-session-branch",
       "@tools/imagegen": "judged"
     }
-  }
+  },
+  "primaryOutput": "frontend-source-application"
 }

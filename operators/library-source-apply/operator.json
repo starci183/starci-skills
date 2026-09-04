@@ -11,11 +11,13 @@
     "profile": "luna",
     "grammarBound": false,
     "dispatch": "fresh",
+    "mode": "isolated",
     "tools": {
       "@tools/fileread": "context-aliases",
       "@tools/sourcewrite": "declared-write-set",
       "@tools/git": "commit-session-branch",
       "@tools/shell": "declared-commands"
     }
-  }
+  },
+  "primaryOutput": "library-source-application"
 }
