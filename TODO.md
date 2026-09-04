@@ -150,6 +150,15 @@ context khai đủ để agent mù chạy được, log đủ để người đ�
 - [x] Self-test không phụ thuộc vị trí checkout: `data.seed`, `uat.verify` dùng host giả của chính chúng
       cho tra cứu `.stacks/<env>`.
 
+## 2e. Nợ 2.0.4 lộ ra trong hai lần chạy trên 2.0.3
+
+- [ ] Gate cho lệnh git bị cấm: brief cấm stash/reset/force nhưng không gate nào đọc reflog; một nhánh
+      `backend.generate` đã `git stash push` trong checkout sản phẩm (tự khai, không mất gì). Sửa: receipt ghi
+      source bị từ chối khi reflog stash của checkout có thêm entry trong thời gian nhánh chạy, hay HEAD reflog có
+      reset/checkout không phải commit của nhánh (`validate-response` hoặc `validate.mjs` của operator ghi source).
+- [ ] Preflight trước lần ghi đầu: session Setup viết bản sửa owner rồi mới chạy `--preflight`; brief của operator
+      ghi source nên đặt preflight là dòng Steps đầu và validator từ chối receipt không có bằng chứng preflight.
+
 ## 2c. Bốn chỗ yếu của harness, mỗi chỗ một gate
 
 - [x] Planner: `validate-operator` bắt mọi Input có producer và mọi primaryOutput có consumer hoặc là
