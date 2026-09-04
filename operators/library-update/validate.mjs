@@ -438,11 +438,12 @@ export function bindPackageCommit(ctx, delivery) {
 export async function validateLibraryUpdateStep(branch, root = ROOT, preflight = false) {
   const errors = [];
   try {
+    // A blocked branch is judged on its stop, not on the checkout its plan could not resolve: the shared
+    // step check and the status come first, and the context is loaded only for a done receipt or a preflight.
+    const base = preflight ? null : await validateStep(root, branch);
+    if (base) { errors.push(...base.errors); if (base.response?.status !== 'done') return { errors }; }
     const ctx = await loadContext(branch, root);
     if (preflight) return { errors: worktreeErrors(ctx, { phase: 'pristine' }) };
-    const base = await validateStep(root, branch);
-    errors.push(...base.errors);
-    if (base.response?.status !== 'done') return { errors };
     const commits = base.response.commits ?? [];
     if (commits.length !== 2) errors.push(`response.json records ${commits.length} commits; this job commits the package delivery and then the consumer metadata, in that order`);
     // The package half.

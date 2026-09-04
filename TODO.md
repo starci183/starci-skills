@@ -125,6 +125,9 @@ context khai đủ để agent mù chạy được, log đủ để người đ�
       `validate-chain` (D2); cổng origin của `producer-import` kiểm output và byte, không kiểm `next` (D5);
       chuỗi hợp lệ trước khi request của nhánh bind tồn tại, kế hoạch mang `role` (D3); `gitPolicy` đúng
       kiểu route khai (D4).
+- [x] `library.update` chấm nhánh blocked theo mã dừng của nó, không nạp checkout trước khi đọc trạng thái
+      (D7 của session Setup: `operators/library-update/validate.mjs#validateLibraryUpdateStep`); còn nợ một
+      fixture nhánh blocked trong self-test.
 - [x] Self-test không phụ thuộc vị trí checkout: `data.seed`, `uat.verify` dùng host giả của chính chúng
       cho tra cứu `.stacks/<env>`.
 
