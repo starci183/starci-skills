@@ -109,9 +109,16 @@ tree the runner itself captured, and resolved first time. No selector was writte
 **A capture became a measurement mid-run, and that changed the outcome.** At the start of this session
 a capture wrote only a screenshot, an accessibility snapshot and raw markup, with no computed value
 anywhere and browser code refused, so an `interface.audit` could not measure presentation, contrast or
-hit area at all. That gap was reported and closed inside the run: a capture now also writes a
-`capture-measurements` record with boxes, computed values and contrast. The 4.86 contrast figure above
-is the runner's own number, and it is the difference between a claim and a measurement.
+hit area at all. That gap was reported and closed inside the run (`ae6e6167`): a capture now also writes a
+`capture-measurements` record with boxes, computed values, effective background, contrast and the
+`data-contract` tokens, `walk-result` names it, and under mode `playwright` every measurable claim of
+an audit must cite `measurement { ref, property, value }` from it. The 4.86 contrast figure above is
+the runner's own number, and it is the difference between a claim and a measurement.
+
+That new gate is exactly right and this run cannot demonstrate it, which is worth saying plainly. The
+twelve entries an audit would cite are the ones no walk can reach, so the measurements that exist here
+are of a surface the mission was not auditing. The gate's first real test belongs to whichever run
+follows the reachability fix.
 
 **One `goto` is the rule that found the product defect.** The walk's entry route is the Setup module
 deep link. It redirects to sign-in, the walk signs in, and the product lands on `/overview` rather
@@ -140,8 +147,11 @@ must start from a reachable entry.
 
 ## Runtime defects met, with file and line
 
-Four were repaired inside the run after being reported, and are recorded here as the evidence that
-they were real. Three stand.
+All seven were reported with a file and a line, and all seven were repaired inside the run. They are
+recorded here as the evidence that each was real, with the commit that closed it. Every repair was
+verified in the tree's own code before it was written down here, and both session ledgers were
+revalidated against the repaired runtime afterwards: still `session valid`, and the sibling's
+`library.update` receipt still `valid library.update branch` — this time with no PATH workaround.
 
 **D1 — retired operator ids could not import.** `scripts/validate-response.mjs:168` returned
 `unknown operator` for every 2026-09-04 producer, because 2.0.0 renamed them all. **Repaired**
@@ -157,37 +167,50 @@ D1 by driving `planChain` with the three kinds credited: the refusal only change
 by the new `interface.fix → runtime.serve | library.update` and
 `library.update → runtime.serve | interface.audit` rows.
 
-**D3 — readiness expanded the runtime family over roles requested for their checkout.** The sibling
+**D3 (repaired, `4c20c602`) — readiness expanded the runtime family over roles requested for their
+checkout.** The sibling
 repairs a package and its chain contains no serve, audit or walk, yet it was blocked by two walls
 about a frontend it never touches: the academy `uat` head does not contain `main` at `acc1dc7`, and
 pid 9564 holds port 3000 while the entry records no listener at all. **Repaired** by presetting which
-roles' runtimes a chain touches; the walls were accepted as a limit in the meantime.
+roles' runtimes a chain touches: `environment.preflight` takes `runtimeRoles`, preset by the planner
+as every bound role when the chain holds a serve, an audit or a walk, and as none otherwise. Verified
+by replanning the sibling's own mission on the repaired runtime, read-only:
+`roles=["fe"] runtimeRoles=[]`, and the chain reports no runtime wall at all.
+
+The sibling session was **not** re-run against it, deliberately, and the accepted-limit choice stands
+as the record. Re-running would have produced a clean preflight describing conditions that were not
+the conditions the owner repair actually ran under. Those two walls were reported, a person waived
+them, and the package was repaired under that waiver; replacing that history with a tidier one records
+the work instead of gating it, which is the thing the session lifecycle exists to prevent. The fix is
+proven by the replan, not by rewriting a finished ledger.
 
 **D4 — the runner labelled a targetless step with the previous step's target.** **Repaired.**
 
-**D5 (stands) — `regressionFailed` cannot take a sentence.**
+**D5 (repaired, `2da3b6b0` and `7016278b`) — `regressionFailed` could not take a sentence.**
 `operators/library-update/validate.mjs:65` required a single output line containing the whole
 `assertion` string plus a failure marker. A test runner prints the test title, not the plan's prose,
 so `assertion` is forced to be the test name verbatim and cannot describe what is asserted. A
-proper sentence was refused. Partly repaired during the run (the assertion is now matched over the
-whole failing block); the constraint that it must appear in runner output at all remains.
+proper sentence was refused, and the plan had to carry the test title verbatim. The matcher now reads
+the failing block with whitespace collapsed, so a wrapped title or a sentence the block contains both
+work, and the plan schema says so.
 
-**D6 (stands) — `releaseErrors` shells out to `tar` on a drive-letter path.**
+**D6 (repaired, `2da3b6b0`) — `releaseErrors` shelled out to `tar` on a drive-letter path.**
 `operators/library-update/validate.mjs:447`. With Git's GNU tar first on PATH,
 `tar -tvf D:\...` reads the drive letter as a remote host and dies with
 `Cannot connect to D: resolve failed`. Windows' own `System32\tar.exe` handles it. Worked around by
 ordering PATH; partly repaired during the run by running tar beside the archive on its base name.
 
-**D7 (stands) — `serve-runtime.mjs` reuses a live server without comparing heads.**
+**D7 (repaired, `cd332a37`) — `serve-runtime.mjs` reused a live server without comparing heads.**
 `scripts/serve-runtime.mjs:267` returns `{ ...existing, reused: true }` for any live server before it
 compares `headOf(worktree)` to `existing.head`. After merging into the integration branch, the first
 serve reported `reused: true` at the old head, and the registry would have gone on claiming
 `f2021b06`; measured against the running server, the served stylesheet still carried none of the
 repair. An explicit stop and start then cleared the cache for `manifests-changed` and came up at
 `cd0f661`. The 1.7.2 lineage promises a restart that is idempotent *by head*; the implementation
-short-circuits on liveness. Believed fix: compare the worktree head to the record before the
-liveness test, and reuse only when the running head already contains the wanted commit — which is what
-the `runtimeLadder.observed.containsWanted` field already exists to record.
+short-circuited on liveness. A live record is now `reusable` only while its head *and* its manifest
+digest equal the worktree's, so a moved worktree is stopped and started again and a server that cannot
+be stopped is a named error rather than a silent reuse. Nothing here needed redoing: 3067 already
+served `cd0f661` by the stop-and-start above.
 
 ## Harness metrics
 
@@ -200,7 +223,7 @@ the `runtimeLadder.observed.containsWanted` field already exists to record.
 | `RECEIPT_MISSING` | 0 |
 | Same-operator re-entries | 0 |
 | Times a person had to answer | 2 asked, 2 answered, both unblocking |
-| Runtime defects hit | 7; 4 repaired inside the run, 3 stand |
+| Runtime defects hit | 7, all 7 reported with file and line and all 7 repaired inside the run |
 | Playwright walks | 6, all gate-validated before running; 5 passed every step, 1 failed at its sixth and stopped |
 | Session ledgers | both `session valid` |
 | Gates at the repaired head | 6 of 6 pass; coverage 89.21 / 89.21 / 87.65 / 88.19 against 80 |
@@ -219,8 +242,12 @@ was still going, which is what a runtime that is being used rather than demonstr
 2. **Publish `@starci/grammar` 0.4.10, or decide not to.** The repair is proven and packed; a registry
    push is a person's authority. Until then the hit area stays open at the consumer with its owner
    named, which is a correct receipt and not a failure.
-3. **The three standing defects, D5 to D7.** D7 is the one that can mislead: a registry that claims a
-   head it is not serving is worse than one that admits it does not know.
+3. **Nothing from the defect list.** All seven were repaired while the run was still going, verified
+   in code here, and both ledgers revalidate against the repaired runtime. What the list leaves behind
+   is a debt the tree has already written down: this session reached `library.update`'s request
+   preflight only after its first write, where the 2.0.0 rerun ran `--preflight` first and caught its
+   refusal with nothing on disk. Preflight before the first write is the rule that was missing, and it
+   is mine to have skipped, not the tree's to have allowed.
 4. **The deep-link-behind-sign-in gap in mode `playwright`.** Either a walk can carry a session
    between runs, or every guarded flow must be walkable from a reachable entry. Today a product that
    drops its return-to makes its own deep-linked surfaces unauditable.
