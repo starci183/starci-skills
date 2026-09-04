@@ -1,11 +1,14 @@
-// One branch of one step, both halves: validate-request on request/request.json, validate-response on
-// response/, and the same pair on every nested exchange folder the response awaited or the operator
-// declares. Used by operator self-tests and audits; the orchestrator runs the halves separately, the
-// request before it spawns the agent and the response after.
+// One branch of one step. The shared laws: validate-request on request/request.json, validate-response
+// on response/, and the same pair on every nested exchange folder the response awaited or the operator
+// declares. Then, when asked (`operator: true` — the CLI always asks), the operator's own law:
+// operators/<id>/validate.mjs, its one export named validate<Name>Step, over the whole branch. Every
+// operator validator opens by calling this file for the shared laws, so a validator never dispatches
+// itself, and the orchestrator's "step valid" after a branch is this CLI: shared laws and operator law
+// in one verdict.
 import { existsSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 import process from 'node:process';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import { validateRequest } from './validate-request.mjs';
 import { validateResponse } from './validate-response.mjs';
 import { loadOperatorPackages, exchangeOf } from './operator-md.mjs';
@@ -19,7 +22,18 @@ const unquote = (s) => { const t = String(s ?? '').trim(); return /^`[^`]*`$/.te
 // request was judged when it ran and its hash is held by the import gate, so the request is read and not
 // re-judged by today's session gates, and the response is judged as an origin (validate-response#origin:
 // `next` is routing history). The operator's own law still runs on it.
-export async function validateStep(root, branchDir, { origin = false } = {}) {
+// The operator's own validator: the one export of operators/<dir>/validate.mjs named validate<Name>Step.
+export async function operatorValidator(root, pkg) {
+  if (!pkg?.name) return null;
+  const file = path.join(root, 'operators', pkg.name, 'validate.mjs');
+  if (!existsSync(file)) return null;
+  const mod = await import(pathToFileURL(file).href);
+  const names = Object.keys(mod).filter((k) => /^validate[A-Za-z]*Step$/.test(k) && typeof mod[k] === 'function');
+  if (names.length !== 1) throw new Error(`operators/${pkg.name}/validate.mjs exports ${names.length} step validators (${names.join(', ')}); one operator, one law`);
+  return mod[names[0]];
+}
+
+export async function validateStep(root, branchDir, { origin = false, operator = false } = {}) {
   const packages = await loadOperatorPackages(root);
   const kinds = await loadKindTemplates(root);
   const registry = await loadErrorsRegistry(root);
@@ -43,6 +57,11 @@ export async function validateStep(root, branchDir, { origin = false } = {}) {
       if (res.response?.status === 'done' && exRes.response?.status !== 'done') errors.push(`${ex}/response/response.json: the branch is done but the exchange is ${exRes.response?.status ?? 'missing'}`);
     }
   }
+  // The operator's law over the branch the shared laws have read. An origin is judged by its operator through the importer's own path.
+  if (operator && !origin && pkg?.shape === 'v9') {
+    const law = await operatorValidator(root, pkg);
+    if (law) for (const e of (await law(branchDir, root))?.errors ?? []) if (!errors.includes(e)) errors.push(e);
+  }
   return { errors, request: req.request, response: res.response, requirements, present, pkg };
 }
 
@@ -57,6 +76,6 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
   const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
   const target = process.argv[2];
   if (!target) { process.stderr.write('usage: node scripts/validate-step.mjs <session>/step-N/parallel-M\n'); process.exit(2); }
-  const { errors } = await validateStep(root, path.resolve(target));
+  const { errors } = await validateStep(root, path.resolve(target), { operator: true });
   if (errors.length) { process.stderr.write(`${errors.join('\n')}\n`); process.exitCode = 1; } else process.stdout.write('step valid\n');
 }
