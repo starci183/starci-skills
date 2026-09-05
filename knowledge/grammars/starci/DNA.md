@@ -1,6 +1,6 @@
 # StarCi Core — DNA
 
-`@starci/grammar@0.4.12` · checkout `67680f824464ae34c497fbe3703032af314f383a` · generated 2026-09-05
+`@starci/grammar@0.4.13` · checkout `41be722701c439e76910f80a8cbb65261da72e01` · generated 2026-09-05
 
 This file is generated from the live `@starci/grammar` package, never written by hand: identity, tokens, renderers, published props, `data-contract` claims, and emitted classes are read out of `src/`, and the gap list is copied from the `## Gaps` table in [Family and DNA](family.md). Prime a direction agent with this file: it says what exists. [Idioms](idioms.md) says how StarCi composes it, and [Playbook](playbook.md) says which idioms a business shape needs. Regenerate with `node scripts/generate-grammar-dna.mjs`, and verify with `--check`; it needs the routed FE checkout, so it is not part of `npm test`.
 
@@ -9,13 +9,13 @@ This file is generated from the live `@starci/grammar` package, never written by
 | Fact | Value |
 | --- | --- |
 | Package | `@starci/grammar` |
-| Version | `0.4.12` |
-| Checkout head | `67680f824464ae34c497fbe3703032af314f383a` |
+| Version | `0.4.13` |
+| Checkout head | `41be722701c439e76910f80a8cbb65261da72e01` |
 | Family id | `core` |
 | Root component | `CoreGrammarRoot` |
 | Family scope | `data-grammar-family="core"` |
 | Style entrypoint | `@starci/grammar/core/styles.css` |
-| Counts | 42 renderers · 66 tokens · 112 claim entries · 13 gaps |
+| Counts | 42 renderers · 66 tokens · 111 claim entries · 13 gaps |
 
 ## Tokens
 
@@ -123,7 +123,7 @@ This file is generated from the live `@starci/grammar` package, never written by
 | `StaticStateRow` `StaticStateRowProps` | composite | state: PresentationState; verdict: `success` \| `danger` | BOUNDARY-3 GAP-1 GAP-3 PADDING-4 | — |
 | `EmptyNotice` `EmptyNoticeProps` | composite | iconSource: IconSource; actionVariant: ButtonVariant | GAP-3 PADDING-4 | `starci-core-empty-notice` |
 | `HorizontalScrollRegion` `HorizontalScrollRegionProps` | composite | overflow: `always` \| `needed` | computed: MEASURE-3 OVERFLOW-3 OVERFLOW-4 OVERFLOW-5 PADDING-1 | `starci-core-horizontal-scroll-region` |
-| `VerticalScrollRegion` `VerticalScrollRegionProps` | composite | — | MEASURE-7 OVERFLOW-3 | — |
+| `VerticalScrollRegion` `VerticalScrollRegionProps` | composite | overflow: `always` \| `needed` | computed: MEASURE-7 OVERFLOW-3 OVERFLOW-4 | — |
 | `SurfaceCard` `SurfaceCardProps` | branch | depth: `top` \| `nested`; state: PresentationState; frame: `bounded` \| `frameless`; scroll: `page` \| `contained`; composition: `single` \| `joined`; measure: `content` \| `form` \| `formCompact`; height: `auto` \| `fill` | GAP-2 computed: BOUNDARY-5 BOUNDARY-6 GAP-0 OVERFLOW-1 OVERFLOW-2 PADDING-0 PADDING-4 SURFACE-1 SURFACE-2 SURFACE-4 | `starci-core-frameless-surface` `starci-core-surface` `starci-core-surface-card` `starci-core-surface-card--fill` `starci-core-surface-content` `starci-core-surface-highlight` `starci-core-surface-highlight-sweep` `starci-core-surface-label` |
 | `SurfaceListCard` `SurfaceListCardProps` | branch | depth: `top` \| `nested` | GAP-2 OVERFLOW-2 PADDING-0 SURFACE-2 computed: FONT-1 FONT-2 TONE-2 | `starci-core-list-shell` `starci-core-owned-collection` `starci-core-surface` `starci-core-surface-fact` `starci-core-surface-footer` `starci-core-surface-label` `starci-core-surface-list` |
 | `FencedCodeBlock` `FencedCodeBlockProps` | branch | measure: `reading` \| `compact` | OVERFLOW-4 | `starci-core-fenced-code-block` `starci-core-fenced-code-header` `starci-core-markdown-article` `starci-core-markdown-table-frame` |

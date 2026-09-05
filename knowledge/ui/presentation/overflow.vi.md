@@ -60,7 +60,8 @@ Sinh từ claim của `@grammar/core` bằng `scripts/generate-presentation-owne
 | `SurfaceCard` | card content, frame!="frameless" | OVERFLOW-2 |
 | `SurfaceCard` | card content, frame="frameless" | OVERFLOW-1 |
 | `SurfaceListCard` | root | OVERFLOW-2 |
-| `VerticalScrollRegion` | root, isScrollable | OVERFLOW-3 |
+| `VerticalScrollRegion` | root, isScrollable, overflow!="needed" | OVERFLOW-3 |
+| `VerticalScrollRegion` | root, isScrollable, overflow="needed" | OVERFLOW-4 |
 | `WorkspaceShell` | floating layer, hasFloatingLayer | OVERFLOW-4 |
 
 ## OVERFLOW-1 — Hiện ra ngoài
