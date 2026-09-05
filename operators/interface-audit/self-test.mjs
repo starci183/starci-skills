@@ -230,7 +230,7 @@ const requestJson = ({ extra = {}, contexts = [] } = {}) => ({
   parallel: 1,
   sessionId: 's-test',
   contexts: [{ alias: '@knowledge/ui/proof', head: null }, { alias: '@workspaces/fe', head: 'e'.repeat(40) }, { alias: '@worktrees/sessions/central-runtime', head: null }, ...contexts],
-  requirements: { auditScope: { surfaces: structuredClone(SURFACES) }, matrix: [], readinessProbe: 'route-served', resume: null, ...extra },
+  requirements: { feature: 'fixture-feature', auditScope: { surfaces: structuredClone(SURFACES) }, matrix: [], readinessProbe: 'route-served', resume: null, ...extra },
   inputs: {
     'frontend-source-application': 'step-3/parallel-1/response/response.md',
     'frontend-presentation-resolution': 'step-3/parallel-1/response/resolution.md',
