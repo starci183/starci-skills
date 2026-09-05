@@ -121,6 +121,10 @@ cùng những luồng như nhánh nó chạy lại là `NO_PROGRESS`.
 | `uat-case-sheet` | `response/data/cases.json` | data | có |
 | `units` | `response/data/units.json` | data | có |
 
+## Kết quả tốt nhất
+
+Khi `done`, in **Kết quả tốt nhất** là bảng flow và case từ `response/data/cases.json`, hiện actor, entry, account alias, fixture ref và namespace cô lập, kèm `response/data/units.json` cùng `response/response.md` làm evidence plan phụ. Entry hoặc fixture còn thiếu phải giữ thành dòng unchecked rõ ràng và không được trình bày như case có thể chạy.
+
 ## Dừng
 
 | Code | Xử lý |

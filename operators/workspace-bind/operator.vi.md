@@ -165,6 +165,10 @@ trước khi dispatch và ràng id phiên vào tọa độ chứa request, trạ
 | `workspace-route-binding` | `response/response.md` | md | có |
 | `route` | `response/data/route.json` | data | có |
 
+## Kết quả tốt nhất
+
+Khi `done`, in **Kết quả tốt nhất** là bảng route đã resolve từ `response/data/route.json`, gồm checkout, revision và runtime binding, kèm `response/response.md` làm receipt dễ đọc. Route mơ hồ hoặc sai phải hiện các candidate hay declaration hỏng và không link một workspace đoán ra.
+
 ## Dừng
 
 | Code | Xử lý |

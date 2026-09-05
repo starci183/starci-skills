@@ -173,6 +173,10 @@ and runs every check again; a re-entry whose report names the same walls as the 
 | `environment-readiness` | `response/response.md` | md | yes |
 | `readiness-report` | `response/data/readiness-report.json` | data | yes |
 
+## The best outcome
+
+Print **The best outcome** as the complete readiness table rendered from `response/data/readiness-report.json`, with `response/response.md` as its summary. A wall or skipped check stays visible with its owner and evidence; readiness is shown only when every required row is `ok`.
+
 ## Stops
 
 | Code | Disposition |

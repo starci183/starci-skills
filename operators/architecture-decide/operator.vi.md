@@ -167,6 +167,10 @@ mình.
 | `alternatives` | `response/artifacts/<decisionId>-alternatives.html` | artifact | không |
 | `independent-critique` | `critique/response/critique.md` | md | có |
 
+## Kết quả tốt nhất
+
+Khi `done`, in **Kết quả tốt nhất** là ranh giới đã chấp nhận trong `response/response.md`; khi có `response/artifacts/<decisionId>-alternatives.html`, render hoặc link nó như diagram dễ duyệt nhất và giữ `response/data/current-state.json` cùng `response/data/stack-model.json` làm evidence phụ. `RESTATEMENT_UNCONFIRMED` phải hiện restatement chưa xác nhận và điểm dừng thay vì trình bày một architecture như đã được chọn.
+
 ## Dừng
 
 | Code | Xử lý |

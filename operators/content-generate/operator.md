@@ -153,6 +153,10 @@ publication, no learner outcome in production, and no acceptance beyond the chec
 | `image-prompt` | `response/artifacts/prompt.<name>.txt` | artifact | no |
 | `track` | `response/artifacts/track.<language>.<extension>` | artifact | no |
 
+## The best outcome
+
+On `done`, print **The best outcome** by rendering `response/artifacts/article.<language>.md`; display each declared `response/artifacts/image.<name>` beside the relevant passage and link any `response/artifacts/track.<language>.<extension>` as secondary output. A failed review presents `review/response/review.md` and the unresolved issue, never the draft as finished content.
+
 ## Stops
 
 | Code | Disposition |

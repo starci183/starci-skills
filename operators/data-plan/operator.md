@@ -128,6 +128,10 @@ whose plan names the same units as the branch it resumes is `NO_PROGRESS`.
 | `seed-plan` | `response/response.md` | md | yes |
 | `units` | `response/data/units.json` | data | yes |
 
+## The best outcome
+
+On `done`, print **The best outcome** as the seed-unit table in `response/data/units.json`, including namespace, order, expected state and rollback, with `response/response.md` as the readable plan. Missing store or isolation facts are shown as plan gaps and not as executable seed instructions.
+
 ## Stops
 
 | Code | Disposition |

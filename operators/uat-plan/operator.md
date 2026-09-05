@@ -122,6 +122,10 @@ whose plan names the same flows as the branch it resumes is `NO_PROGRESS`.
 | `uat-case-sheet` | `response/data/cases.json` | data | yes |
 | `units` | `response/data/units.json` | data | yes |
 
+## The best outcome
+
+On `done`, print **The best outcome** as the flow and case table from `response/data/cases.json`, showing actor, entry, account alias, fixture reference and isolated namespace, with `response/data/units.json` and `response/response.md` as secondary plan evidence. Missing entries or fixtures remain explicit unchecked rows and are never presented as runnable cases.
+
 ## Stops
 
 | Code | Disposition |

@@ -178,6 +178,10 @@ là một lần sửa hồ sơ cũ.
 | `api-verdicts` | `response/data/verdicts.json` | data | có |
 | `api-output` | `response/artifacts/api-output.txt` | artifact | có |
 
+## Kết quả tốt nhất
+
+Khi `done`, in **Kết quả tốt nhất** thành bảng verdict theo case và lane từ `response/data/verdicts.json`; đính kèm `response/data/cases.json` và `response/artifacts/api-output.txt` làm evidence phụ. Suite fail hoặc chưa đủ phải hiện đúng các dòng case fail và raw output, không bao giờ trình bày run đó như đã verify.
+
 ## Dừng
 
 | Code | Xử lý |

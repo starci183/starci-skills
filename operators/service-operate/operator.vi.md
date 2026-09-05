@@ -150,6 +150,10 @@ cho dịch vụ, bản khai báo hay thẩm quyền là `NO_PROGRESS`.
 | --- | --- | --- | --- |
 | `service-receipt` | `response/response.md` | md | có |
 
+## Kết quả tốt nhất
+
+In **Kết quả tốt nhất** là trạng thái service được yêu cầu và đã quan sát cùng probe chứng minh trong `response/response.md`. Dừng do approval hoặc probe fail phải hiện service không đổi và owner của nó thay vì tuyên bố service đã được chuyển trạng thái.
+
 ## Dừng
 
 | Code | Xử lý |

@@ -103,6 +103,10 @@ with a missing, invalid or stale source writes `outcome: incomplete` and never o
 | `banked-mission` | `@worktrees/banked/<product>/<missionId>/mission.json` | data | yes |
 | `helper-run` | `@worktrees/helpers/<id>/runs/<runId>/run.json` | data | yes |
 
+## The best outcome
+
+After every terminal helper run, print **The best outcome** as the reviewable queue change: link the preserved `bank-queue` and the affected `banked-mission` records for `drafted`, `updated` or `reused`; for `empty` or `incomplete`, link the `helper-run` record and show its source-coverage reason. This presentation never fabricates an operator receipt, never treats a proposal as approved, and keeps existing approval bytes and running or done statuses visible.
+
 ## Stops
 
 | Code | Disposition |

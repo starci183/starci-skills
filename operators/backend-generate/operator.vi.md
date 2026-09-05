@@ -236,6 +236,10 @@ không thể cho một câu trả lời khác.
 | `conformance` | `response/data/conformance/<operationId>.<facet>.json` | data | không |
 | `proof` | `response/data/proofs/<operationId>.<proofKind>.json` | data | không |
 
+## Kết quả tốt nhất
+
+Khi `done`, in **Kết quả tốt nhất** là thay đổi source có thể review mà `response/changes.md` gọi tên, kèm `response/data/mutations.json` và các file conformance hoặc proof đã khai làm evidence phụ. Implementation bị blocked hay mismatch phải hiện contract, proof hoặc dòng ownership đang fail và không mô tả backend như đã bàn giao.
+
 ## Dừng
 
 | Code | Xử lý |

@@ -289,6 +289,10 @@ xong mà sổ cái không giữ các lần hỏng của nó.
 | `screenshot` | `response/artifacts/<case>.png` | artifact | có |
 | `sheet` | `response/artifacts/sheet.png` | artifact | có |
 
+## Kết quả tốt nhất
+
+Khi `done`, hiển thị `response/artifacts/sheet.png` làm **Kết quả tốt nhất**, rồi hiển thị hoặc link các capture bắt buộc `response/artifacts/<case>.png` cùng dòng verdict trong `response/data/verdicts.json`. Attempt fail và incomplete phải hiện actual state đã capture cùng assertion còn thiếu và không bao giờ dùng lại ảnh pass cũ làm kết quả hiện tại.
+
 ## Dừng
 
 | Code | Xử lý |

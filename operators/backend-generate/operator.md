@@ -246,6 +246,10 @@ fingerprint cannot yield a different answer.
 | `conformance` | `response/data/conformance/<operationId>.<facet>.json` | data | no |
 | `proof` | `response/data/proofs/<operationId>.<proofKind>.json` | data | no |
 
+## The best outcome
+
+On `done`, print **The best outcome** as the reviewable source change named by `response/changes.md`, with `response/data/mutations.json` and any declared conformance or proof files as secondary evidence. A blocked or mismatched implementation shows the failing contract, proof or ownership row and does not describe the backend as delivered.
+
 ## Stops
 
 | Code | Disposition |

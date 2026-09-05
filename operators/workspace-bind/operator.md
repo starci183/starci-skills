@@ -168,6 +168,10 @@ session id to its containing coordinate, session state and frozen request hash.
 | `workspace-route-binding` | `response/response.md` | md | yes |
 | `route` | `response/data/route.json` | data | yes |
 
+## The best outcome
+
+On `done`, print **The best outcome** as the resolved route table from `response/data/route.json`, including checkout, revision and runtime binding, with `response/response.md` as the readable receipt. An ambiguous or invalid route shows the candidates or broken declaration and does not link a guessed workspace.
+
 ## Stops
 
 | Code | Disposition |

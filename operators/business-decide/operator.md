@@ -180,6 +180,10 @@ cannot yield a different answer.
 | `coverage-matrix` | `response/data/coverage-matrix.json` | data | yes |
 | `model` | `response/data/model.json` | data | yes |
 
+## The best outcome
+
+On `done`, print **The best outcome** as the promise coverage table in `response/data/coverage-matrix.json`, with the accepted authority in `response/response.md` and `response/data/model.json` as secondary evidence. An unconfirmed restatement is shown from `response/restatement.md` with its stop and is never presented as the decided promise.
+
 ## Stops
 
 | Code | Disposition |

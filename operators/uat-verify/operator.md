@@ -292,6 +292,10 @@ whose failures the ledger does not hold.
 | `screenshot` | `response/artifacts/<case>.png` | artifact | yes |
 | `sheet` | `response/artifacts/sheet.png` | artifact | yes |
 
+## The best outcome
+
+On `done`, display `response/artifacts/sheet.png` as **The best outcome**, then display or link the required `response/artifacts/<case>.png` captures and the verdict rows in `response/data/verdicts.json`. Failed and incomplete attempts show their actual captured state and missing assertions and never reuse a prior pass image as the current result.
+
 ## Stops
 
 | Code | Disposition |

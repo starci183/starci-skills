@@ -120,6 +120,10 @@ chưa giữ; một lần resume không thêm thẩm quyền, tài khoản, seed 
 | --- | --- | --- | --- |
 | `seed-receipt` | `response/response.md` | md | có |
 
+## Kết quả tốt nhất
+
+Khi `done`, in **Kết quả tốt nhất** là bảng record đã apply, reuse hoặc remove cùng proof before/after theo namespace trong `response/response.md`. Apply dở, rollback fail hoặc kết quả store chưa chắc phải đưa đúng các dòng incomplete và điểm dừng lên trước; không được báo namespace đã sẵn sàng.
+
 ## Dừng
 
 | Code | Xử lý |

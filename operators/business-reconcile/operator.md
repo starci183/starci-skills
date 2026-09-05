@@ -162,6 +162,10 @@ delivered source again; a resume that adds no delivered change, approval or evid
 | `claims` | `response/data/claims.json` | data | yes |
 | `model` | `response/data/model.json` | data | yes |
 
+## The best outcome
+
+On `done`, print **The best outcome** as the promise-to-delivery reconciliation in `response/response.md`, with `response/data/claims.json` and `response/data/model.json` as secondary tables. A mismatch leads with the unresolved claim rows and their evidence instead of claiming the promise is implemented.
+
 ## Stops
 
 | Code | Disposition |

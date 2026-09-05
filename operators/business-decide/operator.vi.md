@@ -177,6 +177,10 @@ một câu trả lời khác.
 | `coverage-matrix` | `response/data/coverage-matrix.json` | data | có |
 | `model` | `response/data/model.json` | data | có |
 
+## Kết quả tốt nhất
+
+Khi `done`, in **Kết quả tốt nhất** là bảng phủ lời hứa trong `response/data/coverage-matrix.json`, kèm authority đã chấp nhận ở `response/response.md` và `response/data/model.json` làm evidence phụ. Restatement chưa xác nhận phải được hiện từ `response/restatement.md` cùng điểm dừng và không bao giờ được trình bày như lời hứa đã quyết.
+
 ## Dừng
 
 | Code | Xử lý |

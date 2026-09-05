@@ -218,6 +218,10 @@ remote head because the same observation cannot yield a different result.
 | --- | --- | --- | --- |
 | `git-publication` | `response/response.md` | md | yes |
 
+## The best outcome
+
+On `done`, print **The best outcome** as the published branch and commit link recorded in `response/response.md`. A rejected push, non-fast-forward conflict or authority stop shows the unchanged remote state and exact next owner instead of a publication link.
+
 ## Stops
 
 | Code | Disposition |

@@ -123,6 +123,10 @@ what the store does not yet hold; a resume that adds no authority, account, seed
 | --- | --- | --- | --- |
 | `seed-receipt` | `response/response.md` | md | yes |
 
+## The best outcome
+
+On `done`, print **The best outcome** as the applied, reused or removed record table and namespace-scoped before/after proof in `response/response.md`. A partial apply, failed rollback or uncertain store result leads with the exact incomplete rows and stop; it never reports the namespace as ready.
+
 ## Stops
 
 | Code | Disposition |

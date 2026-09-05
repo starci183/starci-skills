@@ -127,6 +127,10 @@ hoạch gọi tên cùng những đơn vị như nhánh nó chạy lại là `NO
 | `seed-plan` | `response/response.md` | md | có |
 | `units` | `response/data/units.json` | data | có |
 
+## Kết quả tốt nhất
+
+Khi `done`, in **Kết quả tốt nhất** là bảng seed unit trong `response/data/units.json`, gồm namespace, thứ tự, expected state và rollback, kèm `response/response.md` làm plan dễ đọc. Store hoặc dữ kiện isolation còn thiếu phải hiện thành khoảng trống của plan, không phải chỉ dẫn seed có thể thực thi.
+
 ## Dừng
 
 | Code | Xử lý |

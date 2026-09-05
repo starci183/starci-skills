@@ -189,6 +189,10 @@ deployment; a resume that adds no authorization, manifest, credential or observa
 | `release-deployment` | `response/response.md` | md | yes |
 | `probes` | `response/data/probes.json` | data | yes |
 
+## The best outcome
+
+On `done`, print **The best outcome** as the deployed release address or identifier in `response/response.md`, followed by the health and readiness rows from `response/data/probes.json`. A failed probe shows the deployed state and failing observation truthfully and does not advertise the release as healthy.
+
 ## Stops
 
 | Code | Disposition |

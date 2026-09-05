@@ -1,0 +1,129 @@
+{
+  "schemaVersion": 1,
+  "kinds": {
+    "image": {
+      "responseTypes": ["artifact"]
+    },
+    "table": {
+      "responseTypes": ["md", "data"]
+    },
+    "code": {
+      "responseTypes": ["artifact", "md"]
+    },
+    "diagram": {
+      "responseTypes": ["artifact", "md"]
+    },
+    "document": {
+      "responseTypes": ["md", "artifact"]
+    },
+    "link": {
+      "responseTypes": ["md", "artifact", "data"]
+    }
+  },
+  "operators": {
+    "api.verify": {
+      "primaryKinds": ["table", "document"],
+      "guidance": "Show the case and lane verdicts first, with the raw runner output as secondary evidence."
+    },
+    "architecture.decide": {
+      "primaryKinds": ["diagram", "document", "table"],
+      "guidance": "Show the accepted boundary and stack model; use the alternatives artifact when it makes the trade-off easier to review."
+    },
+    "backend.generate": {
+      "primaryKinds": ["code", "document", "table"],
+      "guidance": "Show the source change or reviewable diff first, followed by conformance and proof records."
+    },
+    "backend.plan": {
+      "primaryKinds": ["diagram", "table", "document"],
+      "guidance": "Show the module plan and executable unit table before implementation begins."
+    },
+    "business.decide": {
+      "primaryKinds": ["table", "diagram", "document"],
+      "guidance": "Show the decided promise and coverage matrix, with the model as supporting evidence."
+    },
+    "business.reconcile": {
+      "primaryKinds": ["table", "document"],
+      "guidance": "Show the promise-to-delivery reconciliation and unresolved claim rows."
+    },
+    "content.generate": {
+      "primaryKinds": ["document", "image", "link"],
+      "guidance": "Render the finished article first; display a generated image when present and link any audio track as secondary output."
+    },
+    "data.plan": {
+      "primaryKinds": ["table", "document"],
+      "guidance": "Show the seed units with namespace, order, expected state and rollback."
+    },
+    "data.seed": {
+      "primaryKinds": ["table", "document"],
+      "guidance": "Show the applied, reused or removed records and the namespace-scoped before/after proof."
+    },
+    "environment.preflight": {
+      "primaryKinds": ["table", "document"],
+      "guidance": "Show the complete readiness table, including every wall and skipped check."
+    },
+    "git.publish": {
+      "primaryKinds": ["link", "document"],
+      "guidance": "Show the published branch and commit reference, with the publication receipt as evidence."
+    },
+    "identity.provision": {
+      "primaryKinds": ["table", "document"],
+      "guidance": "Show per-alias reuse, create or repair status and safe sign-in checks; never show credential values."
+    },
+    "interface.audit": {
+      "primaryKinds": ["image", "table", "document"],
+      "guidance": "Display the audited screenshot first, then the verdict and finding tables."
+    },
+    "interface.fix": {
+      "primaryKinds": ["code", "document"],
+      "guidance": "Show the focused source diff and the finding it resolves."
+    },
+    "interface.generate": {
+      "primaryKinds": ["image"],
+      "guidance": "Display a rendered image of the generated surface as the primary outcome; source and decision artifacts are secondary."
+    },
+    "interface.plan": {
+      "primaryKinds": ["table", "diagram", "document"],
+      "guidance": "Show the surface map and unit sequence in a reviewable table or diagram."
+    },
+    "knowledge.repair": {
+      "primaryKinds": ["table"],
+      "guidance": "Show the repaired rule, changed source references and checks as a reviewable table from the repair receipt."
+    },
+    "library.update": {
+      "primaryKinds": ["link", "code", "document", "table"],
+      "guidance": "Show the mode-specific release or dependency result, with the source change and proof records as secondary evidence."
+    },
+    "migration.release": {
+      "primaryKinds": ["table", "document"],
+      "guidance": "Show each migration disposition and its release proof, linking logs only as secondary evidence."
+    },
+    "quality.verify": {
+      "primaryKinds": ["table", "document"],
+      "guidance": "Show the gate result table first, including failures and skipped gates."
+    },
+    "release.deploy": {
+      "primaryKinds": ["link", "table", "document"],
+      "guidance": "Show the deployed release address or identifier and the probe results that verify it."
+    },
+    "runtime.serve": {
+      "primaryKinds": ["link", "table", "document"],
+      "guidance": "Show the served URL and head first, followed by runtime checks and the operation receipt."
+    },
+    "service.operate": {
+      "primaryKinds": ["table", "document", "link"],
+      "guidance": "Show the service's requested and observed states with its probe result."
+    },
+    "uat.plan": {
+      "primaryKinds": ["table", "document"],
+      "guidance": "Show the flow and case sheet with actors, entry points, accounts, fixtures and isolated namespaces."
+    },
+    "uat.verify": {
+      "primaryKinds": ["image", "table", "document"],
+      "guidance": "Display the run sheet image first, followed by per-case screenshots and verdict evidence."
+    },
+    "workspace.bind": {
+      "primaryKinds": ["table", "document", "link"],
+      "guidance": "Show the resolved route, checkout, revision and runtime binding."
+    }
+  }
+}

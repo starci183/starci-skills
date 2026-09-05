@@ -244,6 +244,10 @@ thành đạt vì gate hoặc UAT đạt. Các gate chất lượng và các cas
 | `coverage` | `response/data/coverage.json` | data | không |
 | `audit-scope` | `response/data/audit-scope.json` | data | không |
 
+## Kết quả tốt nhất
+
+In **Kết quả tốt nhất** là bảng gate trong `response/response.md`, link từng kết quả bắt buộc `response/data/gates/<gate>.json` và `response/data/coverage.json` khi có. Gate fail và gate bị skip phải tách biệt, luôn hiện; bộ gate đỏ hoặc chưa đủ không được trình bày như quality đã verify.
+
 ## Dừng
 
 | Code | Xử lý |

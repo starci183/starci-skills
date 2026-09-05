@@ -161,6 +161,10 @@ source đã giao; một lần chạy lại không thêm thay đổi đã giao, p
 | `claims` | `response/data/claims.json` | data | có |
 | `model` | `response/data/model.json` | data | có |
 
+## Kết quả tốt nhất
+
+Khi `done`, in **Kết quả tốt nhất** là bản đối chiếu lời hứa với phần đã giao trong `response/response.md`, kèm `response/data/claims.json` và `response/data/model.json` làm bảng phụ. Mismatch phải đưa các dòng claim chưa khớp cùng evidence lên trước thay vì tuyên bố lời hứa đã được implement.
+
 ## Dừng
 
 | Code | Xử lý |

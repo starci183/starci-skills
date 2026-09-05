@@ -152,6 +152,10 @@ change to the service, the declaration or the authority is `NO_PROGRESS`.
 | --- | --- | --- | --- |
 | `service-receipt` | `response/response.md` | md | yes |
 
+## The best outcome
+
+Print **The best outcome** as the requested and observed service states with the proving probe in `response/response.md`. An approval stop or failed probe shows the unchanged service and its owner rather than claiming the service was moved.
+
 ## Stops
 
 | Code | Disposition |

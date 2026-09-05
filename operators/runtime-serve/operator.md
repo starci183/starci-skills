@@ -331,6 +331,10 @@ Raw gate evidence stays bound to this merged head.
 | `checks` | `response/data/checks.json` | data | yes |
 | `changes` | `response/changes.md` | md | no |
 
+## The best outcome
+
+On `done`, print **The best outcome** as the served URL and attested head in `response/response.md`, with `response/data/checks.json` and `response/data/delta.json` as secondary evidence. A held port, stale head or failed probe shows the conflicting holder or observation and never offers the route as ready.
+
 ## Stops
 
 | Code | Disposition |

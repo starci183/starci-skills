@@ -177,6 +177,10 @@ second attempt after a published run is a new `runId`, never an edit of the old 
 | `api-verdicts` | `response/data/verdicts.json` | data | yes |
 | `api-output` | `response/artifacts/api-output.txt` | artifact | yes |
 
+## The best outcome
+
+On `done`, print **The best outcome** as the case and lane verdict table from `response/data/verdicts.json`; attach `response/data/cases.json` and `response/artifacts/api-output.txt` as secondary evidence. A failed or incomplete suite shows the exact failing case rows and raw output and never presents that run as verified.
+
 ## Stops
 
 | Code | Disposition |

@@ -253,6 +253,10 @@ passed because quality gates or UAT pass. Quality thresholds and frozen UAT case
 | `coverage` | `response/data/coverage.json` | data | no |
 | `audit-scope` | `response/data/audit-scope.json` | data | no |
 
+## The best outcome
+
+Print **The best outcome** as the gate table in `response/response.md`, linking each required `response/data/gates/<gate>.json` result and `response/data/coverage.json` when present. Failed and skipped gates remain distinct and visible; a red or incomplete gate set is not presented as verified quality.
+
 ## Stops
 
 | Code | Disposition |

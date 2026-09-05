@@ -187,6 +187,10 @@ một lần resume không thêm thẩm quyền, manifest, credential hay quan s�
 | `release-deployment` | `response/response.md` | md | có |
 | `probes` | `response/data/probes.json` | data | có |
 
+## Kết quả tốt nhất
+
+Khi `done`, in **Kết quả tốt nhất** là địa chỉ hoặc định danh release đã deploy trong `response/response.md`, sau đó là các dòng health và readiness từ `response/data/probes.json`. Probe fail phải hiện trung thực deployed state và observation đang fail, không quảng bá release là khỏe.
+
 ## Dừng
 
 | Code | Xử lý |

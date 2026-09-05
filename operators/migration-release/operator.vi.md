@@ -117,6 +117,10 @@ journal đã mang; một lần resume không thêm thẩm quyền, plan hay thay
 | `migration-release-proof` | `response/data/migration-release.json` | data | có |
 | `migration-log` | `response/artifacts/migration-<n>.log` | artifact | không |
 
+## Kết quả tốt nhất
+
+Khi `done`, in **Kết quả tốt nhất** là bảng disposition migration trong `response/migration-release.md`, được `response/data/migration-release.json` chứng minh; chỉ link `response/artifacts/migration-<n>.log` cho dòng cần chi tiết thực thi. Migration fail hoặc chưa chắc phải đưa actual state và owner recovery lên trước, không bao giờ gợi ý apply mù lần nữa.
+
 ## Dừng
 
 | Code | Xử lý |

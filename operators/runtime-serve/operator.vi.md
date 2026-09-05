@@ -324,6 +324,10 @@ này.
 | `checks` | `response/data/checks.json` | data | có |
 | `changes` | `response/changes.md` | md | không |
 
+## Kết quả tốt nhất
+
+Khi `done`, in **Kết quả tốt nhất** là URL đang serve và head đã attest trong `response/response.md`, kèm `response/data/checks.json` và `response/data/delta.json` làm evidence phụ. Port bị giữ, head stale hoặc probe fail phải hiện holder hay observation xung đột và không bao giờ đưa route ra như đã sẵn sàng.
+
 ## Dừng
 
 | Code | Xử lý |

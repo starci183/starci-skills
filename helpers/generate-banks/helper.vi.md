@@ -102,6 +102,10 @@ missing, invalid hay stale ghi `outcome: incomplete` và không overwrite bank h
 | `banked-mission` | `@worktrees/banked/<product>/<missionId>/mission.json` | data | có |
 | `helper-run` | `@worktrees/helpers/<id>/runs/<runId>/run.json` | data | có |
 
+## Kết quả tốt nhất
+
+Sau mọi helper run kết thúc, in **Kết quả tốt nhất** là thay đổi queue có thể review: link `bank-queue` đã bảo toàn cùng các record `banked-mission` bị tác động cho `drafted`, `updated` hoặc `reused`; với `empty` hay `incomplete`, link record `helper-run` và hiện lý do source coverage. Cách trình bày này không tạo giả operator receipt, không coi đề nghị là đã duyệt, và luôn giữ hiện approval bytes cùng status running hoặc done sẵn có.
+
 ## Dừng
 
 | Mã | Xử lý |

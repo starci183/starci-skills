@@ -153,6 +153,10 @@ quá các phép kiểm đã thực sự chạy.
 | `image-prompt` | `response/artifacts/prompt.<name>.txt` | artifact | không |
 | `track` | `response/artifacts/track.<language>.<extension>` | artifact | không |
 
+## Kết quả tốt nhất
+
+Khi `done`, in **Kết quả tốt nhất** bằng cách render `response/artifacts/article.<language>.md`; hiển thị từng `response/artifacts/image.<name>` đã khai cạnh đoạn liên quan và link mọi `response/artifacts/track.<language>.<extension>` làm đầu ra phụ. Review fail phải trình bày `review/response/review.md` cùng vấn đề chưa khép, không bao giờ coi draft là content hoàn tất.
+
 ## Dừng
 
 | Code | Xử lý |

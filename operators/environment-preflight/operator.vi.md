@@ -174,6 +174,10 @@ chạy lại là `NO_PROGRESS`.
 | `environment-readiness` | `response/response.md` | md | có |
 | `readiness-report` | `response/data/readiness-report.json` | data | có |
 
+## Kết quả tốt nhất
+
+In **Kết quả tốt nhất** là bảng readiness đầy đủ render từ `response/data/readiness-report.json`, kèm `response/response.md` làm phần tóm tắt. Wall hoặc check bị skip phải vẫn hiện cùng owner và evidence; chỉ trình bày môi trường sẵn sàng khi mọi dòng bắt buộc đều `ok`.
+
 ## Dừng
 
 | Code | Xử lý |

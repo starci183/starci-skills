@@ -121,6 +121,10 @@ journal already carries; a resume that adds no authority, plan or source change 
 | `migration-release-proof` | `response/data/migration-release.json` | data | yes |
 | `migration-log` | `response/artifacts/migration-<n>.log` | artifact | no |
 
+## The best outcome
+
+On `done`, print **The best outcome** as the migration disposition table in `response/migration-release.md`, backed by `response/data/migration-release.json`; link `response/artifacts/migration-<n>.log` only for a row that needs its execution detail. A failed or uncertain migration leads with its actual state and recovery owner and never suggests blindly reapplying it.
+
 ## Stops
 
 | Code | Disposition |
