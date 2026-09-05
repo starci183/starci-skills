@@ -88,7 +88,7 @@
       }
     },
     "workerSlots": {
-      "description": "The single session-wide scheduler ledger. Nested exchanges, repairs and retries acquire from these same three slots.",
+      "description": "The single session-wide scheduler ledger. Nested exchanges, repairs, retries and mission-owned helpers acquire from these same three slots.",
       "type": "array", "maxItems": 3,
       "items": {
         "type": "object", "additionalProperties": false,
@@ -98,11 +98,23 @@
           "token": { "type": "string", "minLength": 1 },
           "attemptId": { "type": "string", "minLength": 1 },
           "workerId": { "type": "string", "minLength": 1 },
-          "branch": { "type": "string", "pattern": "^[0-9]+/[0-9]+(?:/[a-z][a-z-]*)?$" },
+          "branch": { "type": "string", "pattern": "^(?:[0-9]+/[0-9]+(?:/[a-z][a-z-]*)?|helper/[a-z][a-z0-9-]*/[0-9]{8}-[0-9]{6}(?:-[A-Za-z0-9._-]+)?)$" },
           "exclusive": { "type": "array", "items": { "type": "string" } },
           "environment": { "type": "object" },
-          "acquiredAt": { "type": "string", "minLength": 1 }
-        }
+          "acquiredAt": { "type": "string", "minLength": 1 },
+          "workerKind": { "const": "helper" },
+          "helperId": { "type": "string", "pattern": "^[a-z][a-z0-9-]*$" },
+          "runId": { "type": "string", "pattern": "^[0-9]{8}-[0-9]{6}(?:-[A-Za-z0-9._-]+)?$" },
+          "requestHash": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
+          "boundProfile": { "type": "string", "pattern": "^[a-z][a-z0-9-]*$" },
+          "ranProfile": { "type": "string", "pattern": "^[a-z][a-z0-9-]*$" }
+        },
+        "allOf": [
+          {
+            "if": { "required": ["workerKind"], "properties": { "workerKind": { "const": "helper" } } },
+            "then": { "required": ["helperId", "runId", "requestHash", "boundProfile", "ranProfile"] }
+          }
+        ]
       }
     },
     "choices": {

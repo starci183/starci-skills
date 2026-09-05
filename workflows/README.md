@@ -20,6 +20,13 @@ slots shared by top-level branches, nested exchanges, helpers, repairs and retri
 overlapping exclusive paths/resources and the fourth ready worker queue. A writing attempt leases a
 concrete owner; source-writing work automatically leases the real workspace even through a junction,
 symlink or Windows case alias. Waiting releases its slot.
+For a local Input, existence is insufficient: `validate-request` resolves the producing cell, requires
+its attempt to be matched, verifies its accepted evidence manifest against the current request and
+response inventory, and checks that `response.fields[<kind>]` emitted that exact ref. An explicit
+cross-session import remains governed by its import manifest. A mission-owned helper writes a
+`templates/step/helper-request.schema.json` dispatch request under its run directory;
+`scripts/worker-slots.mjs acquire-helper` verifies its host-session binding and concrete `.worktrees`
+write owners before it enters the same cap, and the common release command frees its slot.
 `attempt-gate accept` runs the full shared and operator gates, resolves actual evidence and compares
 every criterion, then seals the exact request/response file inventory in the attempt's
 `evidenceManifest`. Only a matched receipt advances. Mismatch is preserved and leads to repair, retry or

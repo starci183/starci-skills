@@ -73,8 +73,13 @@ nested exchanges and retries bind to that host session; none creates another use
    versioned `expected`, its attempt identity and previous attempt, its exact environment and resource
    ownership, and every request-side artifact under `frozenInputs`. `scripts/attempt-gate.mjs open`
    semantically validates those sidecars, freezes the request and creates the running receipt. Then
-   `scripts/worker-slots.mjs acquire` must grant one of the same session's three slots before the
-   operator runs. A missing session, unopened attempt or queued slot means no execution.
+   `scripts/worker-slots.mjs acquire <branch> <workerId> <ranProfile>` must grant one of the same
+   session's three slots and record the actual dispatch profile before the operator runs. A missing
+   session, unopened attempt or queued slot means no execution. A same-session Input is available
+   only from a matched attempt whose accepted evidence manifest still seals the exact declared kind.
+   A mission-owned helper first writes `templates/step/helper-request.schema.json`, then
+   `worker-slots.mjs acquire-helper <session> <request.json> <workerId>` leases its concrete support
+   write owners from those same three slots; the normal release command releases either worker kind.
 5. Select the first operator of that chain. Read only that operator's `operator.md` and
    `operator.json`.
 6. Run that operator, end to end, on the one profile its `operator.json` names under `resources`, with

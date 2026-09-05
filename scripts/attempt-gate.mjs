@@ -28,6 +28,7 @@ export async function openAttempt(branch) {
   const key = branchKey(branch);
   const requestFile = path.join(branch, 'request', 'request.json');
   let frozenRequest;
+  let boundProfile;
   const result = await mutateSession(session, async (state) => {
     const before = await readFile(requestFile);
     const inside = await validateRequest(root, branch);
@@ -37,6 +38,7 @@ export async function openAttempt(branch) {
     const request = inside.request;
     if (request.contractVersion !== V22_CONTRACT) throw new Error(`request.json: attempt-gate opens only ${V22_CONTRACT} attempts; legacy bundles are read-only compatibility`);
     frozenRequest = request;
+    boundProfile = inside.pkg.manifest.resources?.profile;
     const expectedBytes = Buffer.from(JSON.stringify(request.expected));
     state.attempts ??= {};
     const existing = state.attempts[key];
@@ -77,6 +79,7 @@ export async function openAttempt(branch) {
       parallel: request.parallel,
       ...(request.exchange ? { exchange: request.exchange } : {}),
       status: 'running', fields: {}, fallbacks: [], commits: [], next: [],
+      boundProfile,
       attempt: { id: request.attempt.id, number: request.attempt.number, expectedVersion: request.expected.version }
     }, null, 2)}\n`, 'utf8');
   }

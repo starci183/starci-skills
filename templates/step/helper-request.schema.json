@@ -1,0 +1,69 @@
+{
+  "$id": "step:helper-request",
+  "description": "The immutable scheduler request written before one v2.2 helper starts. It binds the helper to an existing user session and names every concrete support path whose ownership the shared three-worker gate must lease.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["contractVersion", "schemaVersion", "helperId", "runId", "hostBinding", "profile", "environment"],
+  "properties": {
+    "contractVersion": { "const": "starci/v2.2" },
+    "schemaVersion": { "const": 1 },
+    "helperId": { "type": "string", "pattern": "^[a-z][a-z0-9-]*$" },
+    "runId": { "type": "string", "pattern": "^[0-9]{8}-[0-9]{6}(?:-[A-Za-z0-9._-]+)?$" },
+    "hostBinding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "hostId", "worktree", "starciSessionId"],
+      "properties": {
+        "kind": { "enum": ["codex-task", "claude-session"] },
+        "hostId": { "type": "string", "minLength": 1, "maxLength": 200 },
+        "worktree": { "type": "string", "minLength": 1, "maxLength": 500 },
+        "starciSessionId": { "type": "string", "minLength": 1, "maxLength": 128 }
+      }
+    },
+    "profile": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["boundProfile", "ranProfile"],
+      "properties": {
+        "boundProfile": { "type": "string", "pattern": "^[a-z][a-z0-9-]*$" },
+        "ranProfile": { "type": "string", "pattern": "^[a-z][a-z0-9-]*$" }
+      }
+    },
+    "environment": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["isolationId", "mode", "reads", "writes", "exclusive", "outputRoot"],
+      "properties": {
+        "isolationId": { "type": "string", "minLength": 1, "maxLength": 200 },
+        "mode": { "enum": ["inline", "isolated"] },
+        "reads": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": { "type": "string", "pattern": "^@[a-z][a-z-]*(?:/[^\\s]+)?$" }
+        },
+        "writes": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 32,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["alias", "path"],
+            "properties": {
+              "alias": { "type": "string", "pattern": "^@worktrees/[a-z][a-z-]*(?:/[^\\s]+)?$" },
+              "path": { "type": "string", "minLength": 1, "maxLength": 1000 }
+            }
+          }
+        },
+        "exclusive": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 32,
+          "uniqueItems": true,
+          "items": { "type": "string", "minLength": 1, "maxLength": 1000 }
+        },
+        "outputRoot": { "type": "string", "minLength": 1, "maxLength": 1000 }
+      }
+    }
+  }
+}

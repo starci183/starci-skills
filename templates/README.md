@@ -17,6 +17,7 @@ is how a person reads it.
 | `kinds/<kind>.contract.json` | markdown files inside a session branch (`response/response.md`, `critique/response/critique.md`) | pure JSON, checked against `kinds/contract.schema.json`: title regex, ordered sections, each table's header, row count, required rows, cell regexes; `kinds/<kind>.skeleton.md` is the copyable skeleton and must itself pass the contract; `scripts/validate-response.mjs` loads contracts by kind |
 | `kinds/<kind>.schema.json` | `response/data/<name>.json` inside a session branch | JSON Schema of one machine kind |
 | `step/request.schema.json`, `step/response.schema.json` | `request/request.json` and `response/response.json` of every branch and nested exchange | the two gates shared by every operator; `scripts/validate-request.mjs` runs before an agent, `scripts/validate-response.mjs` after |
+| `step/helper-request.schema.json` | `<Source>/.worktrees/helpers/<id>/runs/<runId>/request.json` before a mission-owned helper runs | binds the helper to its existing user session, actual profile and concrete support write owners so `scripts/worker-slots.mjs acquire-helper` can admit it to the shared cap |
 | `kinds/` artifact kinds | files an operator declares with type `artifact` (`alternatives`, `direction-image`, `resolved-tree`, `screenshot`, `sheet`, `article`, `image`, `image-prompt`, `track`) | no contract or schema on purpose: the validators check that the file exists and is pointed to; the operator's own `validate.mjs` may inspect it |
 
 ## Contract vocabulary

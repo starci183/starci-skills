@@ -16,6 +16,7 @@ vào, cùng bản `.vi.md` của file ấy. Hợp đồng là thẩm quyền; b�
 | `kinds/<kind>.contract.json` | file markdown trong một nhánh của phiên (`response/response.md`, `critique/response/critique.md`) | JSON thuần, kiểm bằng `kinds/contract.schema.json`: regex tiêu đề, mục theo thứ tự, header từng bảng, số dòng, dòng bắt buộc, regex ô; `kinds/<kind>.skeleton.md` là bộ xương để chép và tự nó phải qua hợp đồng; `scripts/validate-response.mjs` nạp hợp đồng theo kind |
 | `kinds/<kind>.schema.json` | `response/data/<name>.json` trong một nhánh của phiên | JSON Schema của một kind máy |
 | `step/request.schema.json`, `step/response.schema.json` | `request/request.json` và `response/response.json` của mọi nhánh và mọi cuộc trao đổi lồng | hai gate dùng chung cho mọi operator; `scripts/validate-request.mjs` chạy trước agent, `scripts/validate-response.mjs` chạy sau |
+| `step/helper-request.schema.json` | `<Source>/.worktrees/helpers/<id>/runs/<runId>/request.json` trước khi helper thuộc mission chạy | bind helper vào user session hiện có, profile thực sự và các support write owner cụ thể để `scripts/worker-slots.mjs acquire-helper` nhận nó vào giới hạn chung |
 | `kinds/` kind artifact | file mà operator khai kiểu `artifact` (`alternatives`, `direction-image`, `resolved-tree`, `screenshot`, `sheet`, `article`, `image`, `image-prompt`, `track`) | cố ý không có hợp đồng hay schema: validator chỉ kiểm file tồn tại và được trỏ tới; `validate.mjs` của operator có thể soi thêm |
 
 ## Từ vựng của hợp đồng

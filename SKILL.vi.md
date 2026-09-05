@@ -19,7 +19,11 @@ Trong v2.2, draft scope được trình bằng bảng Goal, Target, Trong scope,
 Phạm vi kiểm và Ví dụ. Prompt đã nêu rõ và cấp quyền đúng bảng đó được ghi làm `as-stated`, không hỏi
 lặp thường lệ. Sửa tạo version kế tiếp; từ chối hoặc im lặng giữ draft và chặn dispatch. Trước mỗi
 invocation, `attempt-gate open` đóng băng expected, input sidecar và environment; `worker-slots`
-cấp một trong ba slot chung toàn host session. `attempt-gate accept` chỉ cho advance khi actual có
+cấp một trong ba slot chung toàn host session và ghi profile thực sự được dispatch. Input nội bộ chỉ
+được chuyển tiếp từ attempt đã match khi manifest bằng chứng được chấp nhận vẫn niêm phong đúng kind.
+Helper thuộc mission phải ghi `templates/step/helper-request.schema.json`, rồi dùng `acquire-helper`
+để lease các support owner cụ thể từ cùng ba slot và dùng lệnh release chung khi nhả slot.
+`attempt-gate accept` chỉ cho advance khi actual có
 bằng chứng và match từng expected bắt buộc. Mismatch được giữ để repair, retry hoặc blocked; retry
 không được hạ expected. Attempt có ghi dữ liệu phải lease owner cụ thể; source-writing tự lease
 worktree thật sau khi chuẩn hóa junction, symlink và chữ hoa/thường của đường dẫn Windows. Chỉ tín

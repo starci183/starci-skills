@@ -17,6 +17,7 @@ import { validateAgainst } from './json-schema.mjs';
 import { loadOperatorPackages, kindOf, isYes, exchangeOf, cellAliases } from './operator-md.mjs';
 import { loadInteractionPolicy, selectionErrors } from './validate-interaction.mjs';
 import { validateImportedInput } from './producer-import.mjs';
+import { evidenceManifestErrors } from './evidence-manifest.mjs';
 import { isJourney, journeyUnits, tierOf, verifiesUnits, laneOf } from './unchecked.mjs';
 import { normalizeResource, resourcesOverlap } from './resource-locks.mjs';
 import { currentRequestPhase } from './validation-phase.mjs';
@@ -222,6 +223,48 @@ export async function frozenInputErrors(dir, request) {
     const actual = `sha256:${createHash('sha256').update(await readFile(file)).digest('hex')}`;
     if (actual !== item.sha256) errors.push(`request.json: frozenInputs ${item.ref} has ${actual}, expected ${item.sha256}; request-side evidence changed after it was frozen`);
   }
+  return errors;
+}
+
+// A same-session response is usable only after the producer's exact attempt was accepted. Merely
+// finding bytes under response/ is not a handoff: agents write those bytes before the acceptance
+// gate runs, and a dependent worker must not observe an unaccepted or subsequently changed draft.
+// Explicit producer imports keep their own compatibility gate and are deliberately excluded here.
+export async function localAcceptedInputErrors(sessionRoot, state, inputRef, kind) {
+  const match = /^step-([1-9]\d*)\/parallel-([1-9]\d*)\/(?:([a-z][a-z-]*)\/)?response\/(.+)$/.exec(String(inputRef));
+  if (!match || state?.contractVersion !== V22_CONTRACT) return [];
+  const [, step, parallel, exchange, tail] = match;
+  const topBranch = path.join(sessionRoot, `step-${step}`, `parallel-${parallel}`);
+  if (existsSync(path.join(topBranch, 'import.json'))) return [];
+  const key = `${step}/${parallel}${exchange ? `/${exchange}` : ''}`;
+  const branch = path.join(topBranch, ...(exchange ? [exchange] : []));
+  const attempt = state.attempts?.[key];
+  if (!attempt || attempt.status !== 'matched') return [`request.json: inputs.${kind} names local producer ${key}, whose attempt is ${attempt?.status ?? 'missing'}; a dependent worker waits for matched acceptance`];
+  const expectedRequestRef = `step-${step}/parallel-${parallel}${exchange ? `/${exchange}` : ''}/request/request.json`;
+  const expectedResponseRef = `step-${step}/parallel-${parallel}${exchange ? `/${exchange}` : ''}/response/response.json`;
+  const errors = [];
+  if (attempt.requestRef !== expectedRequestRef || attempt.responseRef !== expectedResponseRef) errors.push(`request.json: inputs.${kind} producer ${key} is not linked to its accepted request/response refs`);
+  for (const error of await evidenceManifestErrors(branch, attempt.evidenceManifest)) errors.push(`request.json: inputs.${kind} producer ${key} ${error}`);
+  let producerRequest;
+  let producerResponse;
+  try { producerRequest = JSON.parse(await readFile(path.join(branch, 'request', 'request.json'), 'utf8')); }
+  catch (error) { errors.push(`request.json: inputs.${kind} producer ${key} request is unreadable: ${error.message}`); }
+  try { producerResponse = JSON.parse(await readFile(path.join(branch, 'response', 'response.json'), 'utf8')); }
+  catch (error) { errors.push(`request.json: inputs.${kind} producer ${key} response is unreadable: ${error.message}`); }
+  if (producerRequest) {
+    const requestHash = `sha256:${createHash('sha256').update(await readFile(path.join(branch, 'request', 'request.json'))).digest('hex')}`;
+    if (producerRequest.contractVersion !== V22_CONTRACT || state.requestHashes?.[key] !== requestHash) errors.push(`request.json: inputs.${kind} producer ${key} does not match its frozen v2.2 request hash`);
+    if (producerRequest.attempt?.id !== attempt.id || producerRequest.operatorId !== attempt.operatorId || state.steps?.[`${step}/${parallel}`] !== attempt.operatorId) errors.push(`request.json: inputs.${kind} producer ${key} is not linked to attempt ${attempt.id} and its recorded operator`);
+  }
+  if (producerResponse) {
+    const expectedAttemptId = attempt.id;
+    if (!attempt.endedAt || canonicalJson(attempt.comparison) !== canonicalJson(producerResponse.comparison) || producerResponse.contractVersion !== V22_CONTRACT || producerResponse.status !== 'done' || producerResponse.operatorId !== attempt.operatorId || producerResponse.attempt?.id !== expectedAttemptId || producerResponse.attempt?.expectedVersion !== attempt.expectedVersion || producerResponse.comparison?.verdict !== 'matched' || producerResponse.comparison?.next !== 'advance') errors.push(`request.json: inputs.${kind} producer ${key} is not the matched response accepted for attempt ${expectedAttemptId}`);
+    const declared = producerResponse.fields?.[kind];
+    const refs = Array.isArray(declared) ? declared : [declared];
+    const wanted = `response/${tail}`;
+    if (!refs.includes(wanted)) errors.push(`request.json: inputs.${kind} = ${inputRef} is not emitted by producer ${key} as fields.${kind}`);
+  }
+  for (const error of await evidenceManifestErrors(branch, attempt.evidenceManifest)) if (!errors.some((item) => item.endsWith(error))) errors.push(`request.json: inputs.${kind} producer ${key} ${error}`);
   return errors;
 }
 
@@ -585,6 +628,7 @@ export async function validateRequest(root, dir, packages, { phase = currentRequ
       errors.push(...validateAgainst(JSON.parse(await readFile(path.join(root, 'templates', 'step', 'state.schema.json'), 'utf8')), state, 'state.json'));
       errors.push(...v22RequestErrors(state, request, pkg, dir));
       errors.push(...await attemptProgressErrors(sessionRoot, state, request));
+      if (request.contractVersion === V22_CONTRACT) for (const [kind, inputRef] of Object.entries(request.inputs ?? {})) errors.push(...await localAcceptedInputErrors(sessionRoot, state, inputRef, kind));
       // A resume re-enters the same operator and names a branch state.json knows; a re-entry state.json does not record is unrecorded evidence.
       if (request.resume) {
         const target = `${request.resume.step}/${request.resume.parallel}`;
