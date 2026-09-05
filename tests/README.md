@@ -360,3 +360,66 @@ the way through it (`UNCHECKED_UNLAWFUL`) and a deferred state with no reason fo
 republished `implemented` while a journey entry stands; and `release.deploy` refuses a production
 release over a journey entry while passing one over a unit outside the journey. Each of those runs
 against a synthetic ledger root, so no test reads or writes the host's own `@worktrees/unchecked`.
+
+## Round 5 — 2026-09-05, the reachability session on 2.1.0, judged for 2.1.2
+
+One live mission ran the whole ladder on 2.1.0 — two routed checkouts, two repairs, a serve, two
+audits under the walk runner, the gates and a Playwright walk that reached the surface the 2.0.3 run
+could not ([`evidence/20260905-nivo-reachability-fix.md`](evidence/20260905-nivo-reachability-fix.md))
+— and met seven defects of the tree itself. Each is closed here by a gate with a spec, and the same
+note is the evidence behind them.
+
+The first two are one wall seen twice. The walk sweep read the runner's own record of the page
+against the route's origin, so every capture of a page that draws an inline icon or runs a framework
+in development tripped it — 3 lines on one branch, 15 on another, 64 on the walk — and
+`record-findings.mjs`, which records only a receipt its operator's validator accepts, then refused all
+three. The origin question is *did the agent go somewhere the route does not cover*, so it is now
+asked of what the agent wrote: `scripts/validate-walk.mjs#PAGE_RECORD` keeps the DOM record, the
+accessibility snapshot, the measurements and the host receipt out of that one check while the secret
+and browser-code checks still read every byte a run left. `scripts/browser-walk.spec.mjs` proves both
+directions — a page record carrying an SVG namespace and a framework's own link passes, the same URL
+inside the capture record the agent wrote is refused, a walk naming another origin is refused, and a
+token inside a page record is still swept — and `operators/interface-audit/self-test.mjs` carries a
+driven receipt with those records through the operator's own validator and then through the ledger, so
+the findings of a Playwright audit reach `knowledge/findings/<family>.jsonl` instead of being lost.
+
+The third is a platform truth the tree had never met: `--stop <pid>` sent `SIGTERM`, which Node
+implements on Windows as a hard terminate, so the artifact host died before it could complete its own
+receipt and every sheet read as a server still running. A stop is now a marker the running server
+polls and honours, named after the pid in the system temp folder — the one address a stopper holding
+nothing but a pid can compute — and the signal is the last resort for a server that never answered
+(`scripts/host-artifacts.mjs#requestStop`). `scripts/host-artifacts.spec.mjs` proves the receipt gains
+its `stoppedAt`, the port is freed, a marker left by an earlier server with the same pid stops nobody,
+and a pid nothing runs at is reported rather than faked.
+
+The fourth is a memory with no room for half of what a mission proves: `brief.proven` admitted only
+done-when lines, so a bind, a preflight or an audit that existed to enable a later branch had nowhere
+to be recorded and lived in the transition notes. `templates/step/state.schema.json#/$defs/provenEntry`
+now publishes both spellings and `scripts/validate-session.mjs#provenErrors` reads that pattern rather
+than carrying a copy, resolving `prerequisite:<N/M>` through the same ledger as a done-when line: the
+branch is the chain's, its goal was a prerequisite, and its `goalCheck` was accepted.
+
+The fifth and sixth are the same misjudgement of a refine. `TASTE-12` Case 1 falsified every one of
+them — a refine's direction names no reference standards by law, and a gating criterion cannot be
+failed by a rule that does not apply — and a `fix-first` taste lens then demanded a direction round
+over composition the delivery had never touched, which no chain could follow. `TASTE-12` Case 5 says
+the criterion does not apply where the presentation delta is `none`: the row reads `n/a`, out of the
+mean and out of the gating set. The lens itself is inherited rather than re-scored, cited under
+`## Calibration` as `inherited` with the branch that scored it, and a `fix-first` carried that way
+leaves the finding where it was raised and lets `next` name `quality.verify`
+(`operators/interface-audit/validate.mjs`, its self-test's refine cases, and the widened
+`## Calibration` cells of the audit contract). A fix-first on composition the delivery did touch keeps
+the law it always had.
+
+The seventh is the packing law. A two-route mission that publishes both could not end in one chain,
+because after `uat.verify` no Next table permitted `quality.verify`, so the second route's gate — and
+with it its publish — was left behind. `uat.verify` now hands to `quality.verify` when another routed
+checkout still awaits its gates; the planner places a boundary once every remaining branch is itself a
+boundary, so two publishes end a chain one after the other; and which branch of a repeated operator a
+consumer reads is settled by the mission's own order of done-when lines, so the walk reads the gates
+that precede it and not the ones that follow. `tests/chains/two-route-publish.json` is the proof:
+nine done-when lines plan as preflight → the two binds → the backend and the frontend deliveries →
+serve → audit → the frontend gates → the walk → the backend gates → both publishes, accepted by
+`scripts/validate-chain.mjs`. `scripts/plan-chain.spec.mjs` now reads every example as a subsequence
+of the planned steps, so an operator a fixture names twice must occupy two planned steps rather than
+being matched twice against one.

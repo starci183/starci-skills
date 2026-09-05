@@ -166,10 +166,11 @@ Chi phối việc bề mặt có thuộc về lớp mà nó tự nhận không.
 
 | Case | Dùng khi | Quan sát |
 | --- | --- | --- |
-| Case 1 | Đọc quyết định direction | Nó gọi tên các chuẩn tham chiếu mà bề mặt này nhắm tới, theo lớp chứ không theo tính từ. Một direction không gọi tên chuẩn nào sẽ bác bỏ cả lần audit trước khi chấm bất kỳ ảnh nào |
+| Case 1 | Đọc quyết định direction và nó có bố cục gì đó | Nó gọi tên các chuẩn tham chiếu mà bề mặt này nhắm tới, theo lớp chứ không theo tính từ. Một direction không gọi tên chuẩn nào sẽ bác bỏ cả lần audit trước khi chấm bất kỳ ảnh nào |
 | Case 2 | Đặt ảnh chụp cạnh các tham chiếu đó | Một người đọc không biết cả hai sản phẩm vẫn xếp bề mặt vào cùng một lớp. Xếp nó vào một lớp xoàng hơn sẽ bác bỏ nó |
 | Case 3 | Mô tả khoảng cách | Receipt gọi tên tiêu chí nào ở trên gánh phần chênh đó, để khác biệt là một finding chứ không phải một cảm tưởng |
 | Case 4 | Tham chiếu chỏi với một rule của canon | Canon thắng và tham chiếu bị bỏ, vì taste được quyền từ chối một bề mặt tuân thủ nhưng không bao giờ được cấp phép cho một bề mặt không tuân thủ |
+| Case 5 | Direction khai delta trình bày là `none` | Bản giao không bố cục gì để mà xếp lớp, nên tiêu chí này không áp dụng: hàng của nó ghi `n/a`, không mang điểm, và được để ngoài điểm trung bình lẫn tập chặn cửa. Lớp mà bề mặt thuộc về là lớp mà direction nó tinh chỉnh đã được chấm, và vòng này không giành lại cũng không đánh mất |
 
 ## TASTE-13 — Chấm điểm và verdict của taste
 

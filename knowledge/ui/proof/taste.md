@@ -166,10 +166,11 @@ Governs whether the surface belongs to the class it claims.
 
 | Case | When | Observe |
 | --- | --- | --- |
-| Case 1 | The direction decision is read | It names the reference standards this surface is aiming at, by class rather than by adjective. A direction naming none falsifies the audit before any capture is scored |
+| Case 1 | The direction decision is read and it composed something | It names the reference standards this surface is aiming at, by class rather than by adjective. A direction naming none falsifies the audit before any capture is scored |
 | Case 2 | The capture is placed beside those references | A reader who knows neither product would sort the surface into the same class. Sorting it into a plainer class falsifies it |
 | Case 3 | The gap is described | The receipt names which of the criteria above accounts for the distance, so the difference is a finding rather than an impression |
 | Case 4 | The references disagree with a canon rule | Canon wins and the reference is dropped, because taste may reject a conforming surface but may never license a non-conforming one |
+| Case 5 | The direction declares a presentation delta of `none` | The delivery composed nothing to be sorted, so the criterion does not apply: its row reads `n/a`, carries no score, and is left out of the mean and out of the gating set. The class the surface belongs to is the one the direction it refines was scored against, and this round neither re-earns it nor loses it |
 
 ## TASTE-13 — Scoring and the taste verdict
 

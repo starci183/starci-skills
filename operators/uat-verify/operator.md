@@ -309,6 +309,7 @@ whose failures the ledger does not hold.
 | --- | --- |
 | all three lanes pass | `git.publish` |
 | all three lanes pass and the promise must be reconciled against the journey that was actually walked | `business.reconcile` |
+| the walk passed and another routed checkout of the mission still awaits its gates | `quality.verify` |
 | the UI lane fails on an application-owned node | `interface.generate` |
 | the behaviour lane fails | `backend.generate` |
 | the flow has no dedicated account yet, so the identity is provisioned before the run continues | `identity.provision` |

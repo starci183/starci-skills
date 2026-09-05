@@ -13,7 +13,7 @@
 // scripts/validate-chain.mjs against the operator tables and each branch's request. The per-branch
 // gates stay in validate-request and validate-response; this file reads only the ledger they leave
 // behind.
-import { existsSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
 import path from 'node:path';
 import process from 'node:process';
@@ -29,6 +29,15 @@ import { extractUnchecked, UNCHECKED_OPERATORS } from './record-unchecked.mjs';
 import { budgetUnitsOf, hostRootOf, loadUnits } from './validate-request.mjs';
 import { readUnchecked } from './unchecked.mjs';
 
+const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+export const STATE_SCHEMA = path.join('templates', 'step', 'state.schema.json');
+const stateSchemas = new Map();
+export function loadStateSchema(root = ROOT) {
+  if (!stateSchemas.has(root)) stateSchemas.set(root, JSON.parse(readFileSync(path.join(root, STATE_SCHEMA), 'utf8')));
+  return stateSchemas.get(root);
+}
+// The spellings brief.proven admits, read from the schema that publishes them.
+export const provenEntry = (root = ROOT) => new RegExp(loadStateSchema(root).$defs.provenEntry.pattern);
 const branchDir = (session, branch) => { const [n, m] = branch.split('/'); return path.join(session, `step-${n}`, `parallel-${m}`); };
 const stepOf = (branch) => Number(branch.split('/')[0]);
 const parallelOf = (branch) => Number(branch.split('/')[1]);
@@ -47,20 +56,34 @@ export async function goalLedger(session, state) {
     const goal = request?.goal ?? null;
     const done = response?.status === 'done';
     const accepted = done && response.goalCheck !== undefined && goalCheckErrors(dir, response, goal).length === 0;
-    out.push({ branch, operator: state.steps[branch], doneWhen: goal?.doneWhen ?? null, done, achieved: accepted && response.goalCheck.achieved === true });
+    out.push({ branch, operator: state.steps[branch], doneWhen: goal?.doneWhen ?? null, prerequisite: goal?.prerequisite ?? null, done, achieved: accepted && response.goalCheck.achieved === true });
   }
   return out;
 }
-// brief.proven on a mission session cites done-when lines and nothing else: every entry opens with
-// "doneWhen:<n> " and that n has a done branch whose validator-accepted goalCheck says achieved.
-export function provenErrors(state, ledger) {
+// brief.proven on a mission session cites what a receipt evidenced and nothing else, in the two
+// spellings the state schema publishes (#/$defs/provenEntry): "doneWhen:<n> " for a done-when line,
+// and "prerequisite:<N/M> " for a branch whose goal was to enable another one — a bind, a preflight,
+// an audit a later walk needed. Both resolve through the same ledger: the branch is done and its
+// goalCheck was accepted by the response gate. A prerequisite branch evidences no done-when line by
+// design, so without this spelling the memory of the orchestrator has nowhere to record it and a
+// proven step of the mission lives only in the transition notes.
+export function provenErrors(state, ledger, { root = ROOT } = {}) {
   const errors = [];
   if (!state?.mission) return errors;
   const lines = state.mission.doneWhen ?? [];
+  const spelling = provenEntry(root);
   for (const entry of state.brief?.proven ?? []) {
-    const m = /^doneWhen:(\d+) /.exec(entry);
-    if (!m) { errors.push(`state.json: brief.proven "${entry.slice(0, 60)}" cites no done-when line; on a mission every proven entry opens with "doneWhen:<n> " and only a validator-accepted goalCheck puts it there`); continue; }
-    const n = Number(m[1]);
+    const m = spelling.exec(entry);
+    if (!m) { errors.push(`state.json: brief.proven "${entry.slice(0, 60)}" cites neither a done-when line nor a prerequisite branch; on a mission every proven entry opens with "doneWhen:<n> " or "prerequisite:<N/M> " and only a validator-accepted goalCheck puts it there`); continue; }
+    if (m.groups.prerequisite !== undefined) {
+      const branch = m.groups.prerequisite;
+      const record = ledger.find((b) => b.branch === branch);
+      if (!record) { errors.push(`state.json: brief.proven cites prerequisite:${branch}, which state.json.steps does not record; a proven prerequisite is a branch of this chain`); continue; }
+      if (record.prerequisite === null) { errors.push(`state.json: brief.proven cites prerequisite:${branch}, whose goal is done-when line ${record.doneWhen}; a branch that evidences a done-when line is proven as "doneWhen:${record.doneWhen} "`); continue; }
+      if (!record.achieved) errors.push(`state.json: brief.proven cites prerequisite:${branch} (${record.operator}, enabling ${record.prerequisite}) and that branch carries no validator-accepted goalCheck with achieved true; what no receipt evidenced is not proven`);
+      continue;
+    }
+    const n = Number(m.groups.doneWhen);
     if (!lines[n]) { errors.push(`state.json: brief.proven cites doneWhen:${n}, which the mission does not have (${lines.length} lines)`); continue; }
     if (!ledger.some((b) => b.doneWhen === n && b.achieved)) errors.push(`state.json: brief.proven cites doneWhen:${n} ("${lines[n].evidence}") and no done branch carries a validator-accepted goalCheck with achieved true for it; what no receipt evidenced is not proven`);
   }
@@ -197,7 +220,7 @@ export async function validateSession(root, session, { packages = null, ledgerDi
   const stateFile = path.join(session, 'state.json');
   if (!existsSync(stateFile)) return { errors: ['state.json: missing'], state: null };
   let state; try { state = JSON.parse(await readFile(stateFile, 'utf8')); } catch (e) { return { errors: [`state.json: ${e.message}`], state: null }; }
-  errors.push(...validateAgainst(JSON.parse(await readFile(path.join(root, 'templates', 'step', 'state.schema.json'), 'utf8')), state, 'state.json'));
+  errors.push(...validateAgainst(loadStateSchema(root), state, 'state.json'));
   const live = (state.transitions ?? []).length > 0;
   if (live) {
     if (!state.brief) errors.push('state.json: a session with a transition carries brief');
@@ -214,7 +237,7 @@ export async function validateSession(root, session, { packages = null, ledgerDi
   errors.push(...validateChain(root, packages, state.chain, state.steps, byBranch, { graph, mission: state.mission ?? null, maxParallel: await loadMaxParallel(root), planned: state.planned ?? {}, imported: await readImportedInputs(root, session, byBranch, { planned: state.planned ?? {} }), evidenceCells: (await readImportedSlots(session, graph, root)).map((s) => s.cell) }));
   // On a mission: proven cites only evidenced done-when lines, three unevidenced done branches in a row stop the chain, every transition was logged.
   const ledger = await goalLedger(session, state);
-  errors.push(...provenErrors(state, ledger));
+  errors.push(...provenErrors(state, ledger, { root }));
   errors.push(...threeBranchStopErrors(state, ledger));
   errors.push(...loggedErrors(state));
   // Every done audit or walk with a failing verdict left its findings in the family's ledger.

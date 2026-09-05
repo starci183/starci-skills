@@ -184,7 +184,7 @@ const provenOnly = (errors) => errors.filter((e) => !e.includes('3/1'));
 test('proven cites a done-when line whose branch carries a validator-accepted goalCheck with achieved true', async () => {
   assert.deepEqual(provenOnly(await run(proving())), []);
   const prose = await run(proving({ proven: ['the outer surface is committed'] }));
-  assert.ok(prose.some((e) => e.includes('cites no done-when line')));
+  assert.ok(prose.some((e) => e.includes('cites neither a done-when line nor a prerequisite branch')));
   const unknown = await run(proving({ proven: ['doneWhen:3 something else'] }));
   assert.ok(unknown.some((e) => e.includes('doneWhen:3') && e.includes('does not have')));
   const notAchieved = await run(proving({ receipts: { '1/1': 'done', '2/1': evidenced(false) } }));
@@ -195,6 +195,24 @@ test('proven cites a done-when line whose branch carries a validator-accepted go
   // Without a mission, proven is free prose.
   const free = await run(session({ steps: { '1/1': 'workspace.bind' }, current: '1/1', proven: ['the outer surface is committed'] }));
   assert.deepEqual(free, []);
+});
+// A prerequisite branch evidences no done-when line by design, and it is still something a receipt
+// proved: the second spelling of a proven entry names that branch, and resolves through the same ledger.
+test('proven also cites a prerequisite branch, and only one whose own receipt was accepted', async () => {
+  const bound = { status: 'done', fields: { route: 'response/data/route.json' }, goalCheck: { achieved: true, evidence: ['response/data/route.json'] } };
+  const files = { ...gateFiles, '1/1': ['response/data/route.json'] };
+  const both = proving({ receipts: { '1/1': bound, '2/1': evidenced() }, files, proven: ['prerequisite:1/1 the checkout the gates ran in', 'doneWhen:0 the committed head passes the gates'] });
+  assert.deepEqual(provenOnly(await run(both)), []);
+  const unproved = await run(proving({ files, proven: ['prerequisite:1/1 the checkout the gates ran in'] }));
+  assert.ok(unproved.some((e) => e.includes('prerequisite:1/1') && e.includes('achieved true')), 'a bind that recorded no goalCheck proves nothing');
+  const stranger = await run(proving({ receipts: { '1/1': bound, '2/1': evidenced() }, files, proven: ['prerequisite:9/9 a branch of another chain'] }));
+  assert.ok(stranger.some((e) => e.includes('prerequisite:9/9') && e.includes('does not record')));
+  const served0 = await run(proving({ receipts: { '1/1': bound, '2/1': evidenced() }, files, proven: ['prerequisite:2/1 the gates'] }));
+  assert.ok(served0.some((e) => e.includes('whose goal is done-when line 0') && e.includes('"doneWhen:0 "')), 'a branch that evidences a line is proven as that line');
+  // The two spellings are the schema's, not this gate's: it reads $defs.provenEntry.
+  const ledger = [{ branch: '1/1', operator: 'workspace.bind', doneWhen: null, prerequisite: '2/1', done: true, achieved: true }];
+  assert.deepEqual(provenErrors({ mission: mission(), brief: { proven: ['prerequisite:1/1 x'] } }, ledger), []);
+  assert.equal(provenErrors({ mission: mission(), brief: { proven: ['prerequisite:1/1x'] } }, ledger).length, 1, 'the coordinate is followed by a space and then what it proved');
 });
 test('three consecutive done branches that served a done-when line and evidenced none stop the chain; prerequisite branches are not counted', async () => {
   // Three gate runs, each serving the one done-when line, none evidencing it.

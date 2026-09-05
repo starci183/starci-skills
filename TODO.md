@@ -314,3 +314,45 @@ không lần chạy nào render mọi màn hình "cho chắc".
       nay một flow bị bỏ là một unit `secondary`, và cửa fan-out đã từ chối nó trước khi dispatch. Khi
       nào một lượt đi cần hoãn một case của flow nó *đang* đi thì mới mở `deferrals` cho hai operator
       ấy — thêm bây giờ là một mã dừng không đường nào chạm tới.
+
+## 6. Bảy khiếm khuyết runtime của phiên reachability trên 2.1.0 (2.1.2)
+
+Một nhiệm vụ thật leo hết thang trên 2.1.0 — hai checkout, hai bản sửa, một lần serve, hai lần audit
+dưới runner, các gate và một lượt đi Playwright tới được bề mặt mà lần chạy 2.0.3 không tới nổi — và
+gặp bảy khiếm khuyết của chính cây, ghi trong `tests/evidence/20260905-nivo-reachability-fix.md`. Mỗi
+mục dưới đây đóng một cái, bằng một gate kèm spec, không bằng lời khuyên.
+
+- [x] Sweep origin của lượt đi đọc chính bản ghi trang của runner: mọi bức chụp một trang có icon
+      hay có link dev của framework đều bị chặn. Sửa: câu hỏi origin chỉ hỏi thứ agent tự viết —
+      `scripts/validate-walk.mjs#PAGE_RECORD` để bản ghi DOM, ảnh cây accessibility, bản đo và biên
+      nhận host ra ngoài đúng phép kiểm ấy, còn sweep bí mật và sweep mã trình duyệt vẫn đọc mọi byte
+      (`scripts/browser-walk.spec.mjs`, `operators/interface-audit/self-test.mjs`).
+- [x] Sổ finding không ghi được chừng nào 1 còn đứng: `record-findings.mjs` chỉ ghi biên nhận mà
+      validator của operator chấp nhận. Đóng cùng 1, và self-test của `interface.audit` chạy một biên
+      nhận playwright có `dom.json` qua đúng đường ấy tới ledger.
+- [x] `--stop <pid>` của `@tools/host` gửi `SIGTERM`, mà Node trên Windows làm nó thành kết liễu cứng,
+      nên `host.json` không bao giờ có `stoppedAt`. Sửa: dừng là một marker mà chính server đang chạy
+      dò và tuân theo (đặt tên theo pid trong thư mục temp — địa chỉ duy nhất mà bên dừng chỉ cầm pid
+      tính ra được), tín hiệu chỉ còn là phương án cuối cho server không trả lời
+      (`scripts/host-artifacts.mjs#requestStop`, `host-artifacts.spec.mjs`).
+- [x] `brief.proven` chỉ nhận dòng "xong khi", nên một nhánh mở đường (`goal.prerequisite`) không có
+      chỗ nào để được ghi là đã chứng minh. Sửa: `templates/step/state.schema.json#/$defs/provenEntry`
+      công bố cả hai cách viết và `validate-session.mjs#provenErrors` đọc chính pattern ấy, giải
+      `prerequisite:<N/M>` qua đúng cái sổ goal như một dòng "xong khi" (`validate-session.spec.mjs`).
+- [x] `next` mà một audit taste `fix-first` bắt buộc phải gọi tên thì chuỗi không đi theo được, khi
+      chính bản giao ấy không bố cục gì. Sửa: delta trình bày `none` thì ống kính là của lần audit
+      trước, trích dẫn dưới `## Calibration` là `inherited` kèm nhánh đã chấm, không nợ mốc nào, và
+      `next` được phép gọi tên `quality.verify`; `fix-first` trên bố cục mà bản giao có chạm thì giữ
+      luật cũ (`operators/interface-audit/{operator.md,validate.mjs,self-test.mjs}`, hợp đồng
+      `frontend-surface-audit`).
+- [x] `TASTE-12` Case 1 bác bỏ mọi bản tinh chỉnh: bảng `## References` rỗng làm hỏng một tiêu chí
+      chặn cửa trước khi chấm bất kỳ ảnh nào. Sửa: `TASTE-12` Case 5 — delta trình bày `none` thì tiêu
+      chí không áp dụng, hàng đọc `n/a`, không điểm, ngoài trung bình lẫn tập chặn cửa; validator ràng
+      dấu ấy vào đúng tiêu chí tham chiếu và đúng delta ấy.
+- [x] Luật đóng gói: một nhiệm vụ hai route không kết thúc hợp lệ trong một chuỗi vì `quality.verify`
+      không phải Kế tiếp của `uat.verify`, nên lần publish của route thứ hai bị bỏ lại. Sửa: dòng Kế
+      tiếp mới của `uat.verify`; planner xếp một ranh giới khi mọi nhánh còn lại đều là ranh giới; và
+      thứ tự các dòng "xong khi" phân xử consumer đọc nhánh nào của một operator lặp lại
+      (`tests/chains/two-route-publish.json`, `plan-chain.spec.mjs` đọc mỗi ví dụ như một dãy con).
+- [ ] Chứng minh trên một nhiệm vụ thật: chạy lại chính nhiệm vụ hai route ấy trên 2.1.2 và publish cả
+      hai route trong một chuỗi, rồi ghi vào `tests/evidence/`.

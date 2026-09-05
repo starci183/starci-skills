@@ -106,6 +106,34 @@ test('the sweep reads what a run wrote under the response folder and leaves the 
   } finally { rmSync(dir, { recursive: true, force: true }); }
 });
 
+// The origin check answers one question — did the agent go somewhere the route does not cover — so it
+// reads what the agent wrote. A rendered page carries URLs of its own (an inline SVG namespace, a
+// framework's development links), and the runner's record of that page is not the agent speaking.
+test('the origin check reads what the agent wrote, and the runner\'s page records carry the page\'s own URLs', () => {
+  const dir = mkdtempSync(path.join(tmpdir(), 'walk-origin-'));
+  try {
+    const response = path.join(dir, 'response');
+    const w = walk();
+    const walkText = JSON.stringify(w, null, 2);
+    mkdirSync(path.join(response, 'data', 'walks', w.id), { recursive: true });
+    mkdirSync(path.join(response, 'data', 'captures'), { recursive: true });
+    mkdirSync(path.join(response, 'artifacts'), { recursive: true });
+    writeFileSync(path.join(response, 'data', 'walks', w.id, 'walk.json'), walkText);
+    const page = '<svg xmlns="http://www.w3.org/2000/svg"><path d="M0 0"/></svg> https://react.dev/link/switch-to-createroot';
+    writeFileSync(path.join(response, 'artifacts', 'entry.dom.json'), JSON.stringify({ url: ROUTE, title: 'Sign in', html: page }));
+    writeFileSync(path.join(response, 'artifacts', 'entry.ax.txt'), `- link "Docs" /url: https://react.dev/link/x`);
+    writeFileSync(path.join(response, 'artifacts', 'entry.measurements.json'), JSON.stringify({ capture: 'entry', elements: [{ ref: 'link "Docs"', text: 'https://react.dev/link/x' }] }));
+    writeFileSync(path.join(response, 'artifacts', 'host.json'), JSON.stringify({ url: 'http://127.0.0.1:60007/', pages: [] }));
+    assert.deepEqual(sweepWalkRun(walkText, response, w.id, { relativeTo: dir }), [], 'every page record of one capture of a page with an icon passes');
+    // What the agent writes keeps the check: its own capture record, and the walk itself.
+    writeFileSync(path.join(response, 'data', 'captures', 'entry.json'), JSON.stringify({ matrixId: 'entry', nodes: [{ path: 'a', measured: { href: 'https://evil.example/collect' } }] }));
+    assert.deepEqual(sweepWalkRun(walkText, response, w.id, { relativeTo: dir }).map((f) => [f.file, f.pattern]), [['response/data/captures/entry.json', 'foreign-url']], 'a capture record the agent wrote is read');
+    rmSync(path.join(response, 'data', 'captures', 'entry.json'));
+    const foreign = JSON.stringify({ ...w, flow: 'https://evil.example/collect' }, null, 2);
+    assert.ok(sweepWalkRun(foreign, response, w.id, { relativeTo: dir }).some((f) => f.file === 'walk.json' && f.pattern === 'foreign-url'), 'a walk that names another origin is still refused');
+  } finally { rmSync(dir, { recursive: true, force: true }); }
+});
+
 test('a verdict\'s citation resolves against the measurements record by ref and dotted property', () => {
   const doc = { schemaVersion: 9, capture: 'entry', viewport: [1280, 800], deviceScaleFactor: 1, colorScheme: 'light', elements: [{ ref: 'heading "Sign in"', tag: 'h1', bbox: { x: 8, y: 21, width: 1264, height: 37 }, computed: { fontSize: '32px', fontWeight: '700', lineHeight: 'normal', color: 'rgb(0, 0, 0)', backgroundColor: 'rgb(255, 255, 255)', minHeight: '0px', padding: { top: '0px', right: '0px', bottom: '0px', left: '0px' }, margin: { top: '21px', right: '0px', bottom: '21px', left: '0px' }, gap: { row: 'normal', column: 'normal' }, borderRadius: '0px', border: { top: '0px none rgb(0, 0, 0)', right: '0px none rgb(0, 0, 0)', bottom: '0px none rgb(0, 0, 0)', left: '0px none rgb(0, 0, 0)' }, overflow: { x: 'visible', y: 'visible' }, display: 'block', visibility: 'visible' }, contrast: 21, text: 'Sign in' }] };
   assert.deepEqual(validateAgainst(loadMeasurementsSchema(root), doc, 'm'), []);
@@ -133,7 +161,9 @@ test('a run beside its walk: the result hashes the walk, and every text the run 
     writeFileSync(under(files.result), JSON.stringify(result, null, 2));
     assert.deepEqual(validateWalkFile(under(files.walk), response, { root }).errors, []);
     writeFileSync(path.join(response, 'artifacts', 'entry.dom.json'), '{ "html": "<a href=\\"https://tracker.example/x\\">" }');
-    assert.ok(sweepWalkRun(bytes.toString(), response, w.id, { relativeTo: dir }).some((f) => f.file === 'response/artifacts/entry.dom.json' && f.pattern === 'foreign-url'), 'a DOM record that reached another origin is swept');
+    assert.deepEqual(sweepWalkRun(bytes.toString(), response, w.id, { relativeTo: dir }), [], 'a URL the page carries is the page\'s, and the record of it is the runner\'s');
+    writeFileSync(path.join(response, 'artifacts', 'entry.dom.json'), '{ "html": "<p>eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxMjM0NTY3ODkwIn0.dBjftJeZ4CVPmB92K27uhbUJU1p1r_wW1gFWFOEjXk</p>" }');
+    assert.ok(sweepWalkRun(bytes.toString(), response, w.id, { relativeTo: dir }).some((f) => f.file === 'response/artifacts/entry.dom.json' && f.pattern === 'jwt'), 'the secret sweep still reads every record a run wrote');
     writeFileSync(under(files.walk), JSON.stringify({ ...w, flow: 'edited' }, null, 2));
     assert.ok(validateWalkFile(under(files.walk), response, { root }).errors.some((e) => e.includes('a walk edited after its run')));
   } finally { rmSync(dir, { recursive: true, force: true }); }

@@ -156,7 +156,7 @@ const fixturesDir = path.join(root, 'tests', 'chains');
 const fixtures = await Promise.all((await readdir(fixturesDir)).filter((f) => f.endsWith('.json')).sort().map(async (f) => JSON.parse(await readFile(path.join(fixturesDir, f), 'utf8'))));
 const strip = (id) => id.split('#')[0];
 test('every fixture names its mission, its example chain and its end, and its id equals its file name', async () => {
-  assert.equal(fixtures.length, 16);
+  assert.equal(fixtures.length, 17);
   for (const fx of fixtures) {
     assert.ok(fx.mission?.doneWhen?.length, `${fx.id}: mission.doneWhen`);
     assert.ok(Array.isArray(fx.example) && fx.example.length, `${fx.id}: example`);
@@ -178,11 +178,25 @@ for (const fx of fixtures) {
     const byBranch = {}; for (const [c, op] of Object.entries(p.steps)) byBranch[c] = { operatorId: op, requirements: p.presets[c] ?? {}, goal: p.goals[c] };
     const credited = Object.fromEntries(Object.entries(p.imports ?? {}).map(([c, kinds]) => [c, new Set(Object.keys(kinds))]));
     assert.deepEqual(validateChain(root, real, p.chain, p.steps, byBranch, { graph: realGraph, mission: fx.mission, maxParallel, imported: credited }), []);
-    // Every example operator is there, no example order is inverted, and the end matches.
+    // The example is a subsequence of the planned steps: every operator it names is there, in an order
+    // no pair inverts, and an operator the example names twice occupies two planned steps — a second
+    // branch of one operator is another route, another unit or another finding, never the same branch
+    // counted twice. Extra planned branches between them (a plan step, a decision) are allowed.
     const planned = ops(p);
     const at = (id) => planned.findIndex((step) => step.includes(id));
-    for (const id of fx.example.flat()) assert.notEqual(at(id), -1, `${fx.id}: ${id} is missing from ${JSON.stringify(planned)}`);
-    fx.example.forEach((step, n) => fx.example.slice(n + 1).forEach((later) => { for (const a of step) for (const b of later) assert.ok(at(a) <= at(b), `${fx.id}: ${a} must not run after ${b}: ${JSON.stringify(planned)}`); }));
+    const seen = new Map();
+    let cursor = 0;
+    for (const step of fx.example) {
+      let last = cursor;
+      for (const id of step) {
+        const from = Math.max(cursor, (seen.get(id) ?? -1) + 1);
+        const found = planned.findIndex((s, i) => i >= from && s.includes(id));
+        assert.notEqual(found, -1, `${fx.id}: ${id} is missing from ${JSON.stringify(planned)} at or after step ${from + 1}`);
+        seen.set(id, found);
+        last = Math.max(last, found);
+      }
+      cursor = last;
+    }
     assert.equal(p.ends, fx.ends, `${fx.id}: ends`);
     // Every branch has a goal, and every done-when line has its branch.
     for (const c of Object.keys(p.steps)) assert.ok(p.goals[c], `${fx.id}: ${c} has a goal`);

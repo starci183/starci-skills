@@ -128,6 +128,18 @@ vòng chưa được chứng minh, không điểm nào nó sinh ra so sánh đư
 chấm các mốc lần nữa. Một nhánh đơn vị chấm thẩm mỹ cho một tính năng bị chia qua nhiều nhánh thì xếp
 hạng so với riêng các mốc, và đó chính là thứ khiến điểm của hai nhánh so được với nhau.
 
+Một bản giao không bố cục gì thì không bị phán như thể nó có. Khi direction mà lần audit này đọc khai
+delta trình bày là `none` — một thay đổi chữ, hành vi hay ràng buộc, không publish giá trị trình bày
+nào — thì bố cục dưới bức chụp là của một direction trước đó, nên vòng này mang theo ống kính thẩm mỹ
+của lần audit ấy thay vì lấy lại cái thang: `## Calibration` ghi mỗi ống kính một hàng có ô mốc đọc là
+`inherited` và ô kỳ vọng gọi tên nhánh đã chấm ống kính ấy, verdicts không mang điểm mốc nào, và
+`## Ranked against` không xếp gì, vì ở đây không có gì được xếp. Cũng dưới delta ấy, tiêu chí tham
+chiếu thôi không áp dụng, theo đúng những gì `TASTE-12` Case 5 nêu, và validator chỉ cho dấu ấy đứng
+trên đúng tiêu chí đó và đúng delta đó. Một `fix-first` mang theo kiểu ấy là finding của chính bố
+cục trước đó: nó đứng nguyên chỗ nó được nêu, nhánh này không mở vòng direction nào cho nó, và `next`
+được phép gọi tên `quality.verify`. Một `fix-first` trên bố cục mà chính bản giao này có chạm thì giữ
+luật ở trên — bề mặt được bố cục lại từ một direction mới và các gate của checkout chờ một `ship`.
+
 ## Chủ sở hữu quyết định chỗ hỏng đi về đâu
 
 Một lời khai hỏng trên node do ứng dụng sở hữu là một giá trị mà resolution phải publish lại, nên nó
