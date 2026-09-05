@@ -6,6 +6,22 @@ kiểm mỗi lần vẽ. Các chuỗi mẫu thư mục này từng giữ giờ l
 `tests/chains/`, và `scripts/plan-chain.spec.mjs` chứng minh planner vẫn suy ra được từng chuỗi ấy
 từ kết quả mà nhiệm vụ của nó gọi tên.
 
+## Vòng đời v2.2 thực thi được
+
+Prompt đầu mở hoặc dùng lại draft đã bind với host bằng `scripts/session-open.mjs` trước khi xác nhận
+scope. Xác nhận kích hoạt đúng một phiên bản. Planner vẫn là owner duy nhất của chain: nó suy ra các
+bước từ goal đã xác nhận, và replan trong scope chỉ đổi chain, không viết lại goal hay hỏi theo từng
+operator.
+
+Mỗi invocation đã plan trở thành một attempt có version. Request đóng băng `expected.criteria`,
+`environment`, quyền sở hữu tài nguyên và `frozenInputs` phía request trước
+`scripts/attempt-gate.mjs open`. `scripts/worker-slots.mjs` cấp tối đa ba slot active dùng chung cho
+nhánh chính, exchange lồng nhau, helper, repair và retry. Thiếu input, tài nguyên exclusive chồng nhau
+và worker sẵn sàng thứ tư phải chờ; trạng thái waiting trả slot. `attempt-gate accept` chạy đủ gate
+chung và gate operator, phân giải bằng chứng actual rồi đối chiếu từng tiêu chí. Chỉ receipt match mới
+được advance. Mismatch được giữ lại và dẫn tới repair, retry hoặc blocked; retry trỏ về attempt trước
+và không được hạ expected bắt buộc trong cùng goal version.
+
 ## Chuỗi được suy ra thế nào
 
 Planner xuất phát từ nhiệm vụ đã xác nhận (`state.json.mission`): mỗi dòng "xong khi" gọi tên
@@ -38,10 +54,9 @@ mà mỗi operator công bố trong `operator.md` của mình:
 - nhiệm vụ gọi tên `git.publish` trong khi có nhánh ghi source frontend dưới `mode: apply` thì nợ
   audit và lượt đi thử ở giữa — luật dòng dài, phát biểu theo kind: operator có primary output là
   `frontend-surface-audit`, rồi `uat.verify`, trước khi publish;
-- nhiệm vụ anh em của một route `chain` được lập kế hoạch từ đích của route như mọi nhiệm vụ khác,
-  nên bức tường mà một thư viện owner dựng lên trở thành một dòng "xong khi" của `library.update`
-  dưới mode `publish` trên route owner, còn nhiệm vụ bị chặn vào lại bằng một nhánh `library.update`
-  dưới mode `consume` bind `library-release` của phiên anh em ấy qua `producer-import`.
+- route `chain` thêm owner đích và prerequisite vào plan của chính host session. Attempt blocked chờ
+  mà không giữ slot, rồi vào lại từ output đã accept. Nó không mở user session anh em hay tạo thêm
+  hạn mức concurrency.
 
 Hai chỗ mà đầu vào bắt buộc để ngỏ cũng do các bảng phân xử: một Đầu vào tuỳ chọn xếp consumer sau
 producer đã có trong chuỗi, và một dòng Kế tiếp một chiều xếp operator bàn giao trước operator được

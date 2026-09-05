@@ -11,7 +11,7 @@ import { readFile, readdir } from 'node:fs/promises';
 import { createHash } from 'node:crypto';
 import path from 'node:path';
 import process from 'node:process';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import { isDeepStrictEqual } from 'node:util';
 import { validateAgainst } from './json-schema.mjs';
 import { loadOperatorPackages, kindOf, isYes, exchangeOf, cellAliases } from './operator-md.mjs';
@@ -199,6 +199,140 @@ export function plannedRequirementErrors(planned, request, at = 'request.json') 
     if (actual !== ref) errors.push(`${at}: inputs.${kind} ${actual === undefined ? 'is absent' : `is ${JSON.stringify(actual)}`} and the plan bound it to the imported slot ${ref} (state.json.planned)`);
   }
   return errors;
+}
+
+export const V22_CONTRACT = 'starci/v2.2';
+const FAMILY_BOUND_OPERATORS = new Set(['interface.plan', 'interface.generate', 'interface.fix', 'interface.audit', 'knowledge.repair']);
+const canonicalJson = (value) => {
+  if (Array.isArray(value)) return `[${value.map(canonicalJson).join(',')}]`;
+  if (value && typeof value === 'object') return `{${Object.keys(value).sort().map((key) => `${JSON.stringify(key)}:${canonicalJson(value[key])}`).join(',')}}`;
+  return JSON.stringify(value);
+};
+
+export async function frozenInputErrors(dir, request) {
+  const errors = [];
+  for (const item of request?.frozenInputs ?? []) {
+    const file = path.resolve(dir, item.ref);
+    const requestRoot = `${path.resolve(dir, 'request')}${path.sep}`;
+    if (!file.startsWith(requestRoot)) { errors.push(`request.json: frozenInputs ref ${item.ref} escapes request/`); continue; }
+    if (!existsSync(file)) { errors.push(`request.json: frozenInputs ref ${item.ref} is missing before dispatch`); continue; }
+    const actual = `sha256:${createHash('sha256').update(await readFile(file)).digest('hex')}`;
+    if (actual !== item.sha256) errors.push(`request.json: frozenInputs ${item.ref} has ${actual}, expected ${item.sha256}; request-side evidence changed after it was frozen`);
+  }
+  return errors;
+}
+
+const UI_BINDINGS = {
+  'interface.plan': ['@knowledge/ui/composition'],
+  'interface.generate': ['@knowledge/ui/composition', '@knowledge/ui/presentation', '@knowledge/ui/proof'],
+  'interface.fix': ['@knowledge/ui/presentation'],
+  'interface.audit': ['@knowledge/ui/composition', '@knowledge/ui/presentation', '@knowledge/ui/proof']
+};
+export async function uiKnowledgeRequestErrors(root, dir, request) {
+  if (request?.contractVersion !== V22_CONTRACT) return [];
+  const aliases = (request.contexts ?? []).map((context) => context.alias);
+  const familyAliases = aliases.filter((alias) => /^@knowledge\/grammars\/[a-z0-9][a-z0-9-]*$/.test(alias));
+  const affected = FAMILY_BOUND_OPERATORS.has(request.operatorId) || (request.operatorId === 'library.update' && familyAliases.length > 0);
+  if (!affected) return [];
+  const manifestModule = path.join(root, 'scripts', 'knowledge-manifest.mjs');
+  const familyModule = path.join(root, 'scripts', 'ui-knowledge-gate.mjs');
+  if (!existsSync(manifestModule) || !existsSync(familyModule)) return ['request.json: the v2.2 UI knowledge semantic gates are unavailable; hashes alone cannot freeze an incomplete manifest'];
+  const [{ knowledgeManifestErrors }, { frozenFamilyUnderstandingErrors, routedFamily }] = await Promise.all([import(pathToFileURL(manifestModule).href), import(pathToFileURL(familyModule).href)]);
+  const family = routedFamily(request);
+  if (!family) return ['request.json: no unique concrete @knowledge/grammars/<family> binding; a family is never inferred or defaulted'];
+  let bindings = UI_BINDINGS[request.operatorId] ?? [];
+  if (request.operatorId === 'knowledge.repair') bindings = aliases.filter((alias) => alias.startsWith('@knowledge/ui/'));
+  bindings = [...new Set([...bindings, `@knowledge/grammars/${family}`])];
+  return [
+    ...await knowledgeManifestErrors({ root, branchDir: dir, bindings, family }),
+    ...await frozenFamilyUnderstandingErrors(dir, { root, family })
+  ];
+}
+
+export function expectedNotWeakenedErrors(previous, current, at = 'request.json') {
+  const errors = [];
+  if (!previous || !current) return errors;
+  if (current.goalVersion < previous.goalVersion) errors.push(`${at}: expected.goalVersion moved backwards from ${previous.goalVersion} to ${current.goalVersion}`);
+  if (current.version < previous.version) errors.push(`${at}: expected.version moved backwards from ${previous.version} to ${current.version}`);
+  if (current.goalVersion !== previous.goalVersion) return errors;
+  const before = new Map((previous.criteria ?? []).map((criterion) => [criterion.id, criterion]));
+  const after = new Map((current.criteria ?? []).map((criterion) => [criterion.id, criterion]));
+  for (const [id, criterion] of before) {
+    if (!criterion.required) continue;
+    const next = after.get(id);
+    if (!next) errors.push(`${at}: expected criterion ${id} was required by the previous attempt and is missing; retry history may keep or strengthen expected, never erase it`);
+    else if (!next.required) errors.push(`${at}: expected criterion ${id} changed from required to optional; actual cannot weaken expected`);
+    else if (next.expected !== criterion.expected || next.verification !== criterion.verification) errors.push(`${at}: required expected criterion ${id} changed under goal version ${current.goalVersion}; preserve it or confirm a new goal version`);
+  }
+  if (current.version === previous.version && canonicalJson(previous) !== canonicalJson(current)) errors.push(`${at}: expected version ${current.version} changed content; changing expected creates a new version and preserves the old one`);
+  return errors;
+}
+
+export function v22RequestErrors(state, request, pkg, dir = null) {
+  const errors = [];
+  const stateV22 = state?.contractVersion === V22_CONTRACT;
+  const requestV22 = request?.contractVersion === V22_CONTRACT;
+  if (stateV22 && !requestV22) errors.push(`request.json: contractVersion ${V22_CONTRACT} is required by this v2.2 session; legacy compatibility is not an execution bypass`);
+  if (requestV22 && !stateV22) errors.push(`request.json: a v2.2 attempt cannot run under a legacy or unmarked state.json`);
+  if (!stateV22 || !requestV22) return errors;
+  if (request.sessionId !== state.id) errors.push(`request.json: sessionId ${request.sessionId} does not match the owning session ${state.id}`);
+  if (state.lifecycle?.phase !== 'active') errors.push(`state.json: lifecycle.phase is ${state.lifecycle?.phase ?? 'missing'}; only an active, confirmed user session dispatches attempts`);
+  if (state.mission?.confirmation?.status !== 'confirmed') errors.push(`state.json: mission version ${state.mission?.version ?? 'missing'} is not explicitly confirmed`);
+  if (request.expected?.goalVersion !== state.mission?.version) errors.push(`request.json: expected.goalVersion ${request.expected?.goalVersion ?? 'missing'} does not match mission.version ${state.mission?.version ?? 'missing'}`);
+  const expectedSource = request.goal?.doneWhen !== undefined
+    ? `state.json#mission:v${state.mission?.version}/doneWhen:${request.goal.doneWhen}`
+    : request.goal?.prerequisite ? `state.json#mission:v${state.mission?.version}/prerequisite:${request.goal.prerequisite}` : null;
+  if (expectedSource && request.expected?.sourceRef !== expectedSource) errors.push(`request.json: expected.sourceRef is ${request.expected?.sourceRef ?? 'missing'}; this branch resolves to ${expectedSource}`);
+  if (request.environment?.mode !== pkg?.manifest?.resources?.mode) errors.push(`request.json: environment.mode ${request.environment?.mode ?? 'missing'} does not match ${request.operatorId}'s ${pkg?.manifest?.resources?.mode ?? 'missing'} mode`);
+  if (dir && request.environment?.outputRoot) {
+    const output = path.resolve(dir, request.environment.outputRoot);
+    const owned = path.resolve(dir, 'response');
+    if (output !== owned) errors.push(`request.json: environment.outputRoot resolves to ${output}; an attempt owns only ${owned}`);
+  }
+  if (request.environment?.workspace?.worktree && !path.isAbsolute(request.environment.workspace.worktree)) errors.push(`request.json: environment.workspace.worktree is not absolute; isolation names the exact worktree`);
+  const criteria = request.expected?.criteria ?? [];
+  const criterionIds = criteria.map((criterion) => criterion.id);
+  if (new Set(criterionIds).size !== criterionIds.length) errors.push(`request.json: expected.criteria ids are not unique`);
+  const contextAliases = new Set((request.contexts ?? []).map((context) => context.alias));
+  const reads = new Set(request.environment?.reads ?? []);
+  for (const alias of contextAliases) if (!reads.has(alias)) errors.push(`request.json: environment.reads does not name context ${alias}; the environment binding lists every readable input`);
+  const families = [...contextAliases].filter((alias) => /^@knowledge\/grammars\/[a-z0-9][a-z0-9-]*$/.test(alias));
+  if (FAMILY_BOUND_OPERATORS.has(request.operatorId) || (request.operatorId === 'library.update' && families.length > 0)) {
+    if (families.length !== 1) errors.push(`request.json: ${request.operatorId} binds exactly one concrete @knowledge/grammars/<family> context; no root or fallback family is accepted`);
+    const frozen = new Set((request.frozenInputs ?? []).map((item) => item.ref));
+    for (const ref of ['request/knowledge-manifest.json', 'request/family-understanding.json']) if (!frozen.has(ref)) errors.push(`request.json: ${request.operatorId} freezes ${ref} before attempt-gate open`);
+  }
+  const mine = `${request.step}/${request.parallel}${request.exchange ? `/${request.exchange}` : ''}`;
+  const attempts = Object.entries(state.attempts ?? {});
+  for (const [branch, attempt] of attempts) if (branch !== mine && attempt.id === request.attempt?.id) errors.push(`request.json: attempt.id ${attempt.id} already belongs to ${branch}`);
+  const previousId = request.attempt?.previous;
+  const previousEntry = attempts.find(([, attempt]) => attempt.id === previousId);
+  if (request.attempt?.number === 1) {
+    if (previousId !== null) errors.push(`request.json: attempt number 1 has no previous attempt`);
+    if (request.attempt?.kind !== 'initial') errors.push(`request.json: attempt number 1 has kind initial`);
+  } else {
+    if (!previousId) errors.push(`request.json: attempt number ${request.attempt?.number} names the previous attempt`);
+    else if (!previousEntry) errors.push(`request.json: attempt.previous ${previousId} is not preserved in state.json.attempts`);
+    else {
+      const [, previous] = previousEntry;
+      if (previous.operatorId !== request.operatorId) errors.push(`request.json: attempt.previous ${previousId} ran ${previous.operatorId}, not ${request.operatorId}`);
+      if (request.attempt.number !== previous.number + 1) errors.push(`request.json: attempt.number ${request.attempt.number} does not follow ${previous.number}`);
+      errors.push(...expectedNotWeakenedErrors(previous.expected, request.expected));
+    }
+  }
+  return errors;
+}
+
+export async function attemptProgressErrors(sessionRoot, state, request) {
+  if (request?.contractVersion !== V22_CONTRACT || request.attempt?.number === 1) return [];
+  const previous = Object.values(state.attempts ?? {}).find((attempt) => attempt.id === request.attempt.previous);
+  if (!previous || !['mismatched', 'inconclusive'].includes(previous.status) || !previous.requestRef) return [];
+  try {
+    const before = JSON.parse(await readFile(path.join(sessionRoot, previous.requestRef), 'utf8'));
+    const fingerprint = (value) => canonicalJson({ expected: value.expected, requirements: value.requirements, inputs: value.inputs, contexts: value.contexts, workspace: value.environment?.workspace, reads: value.environment?.reads, writes: value.environment?.writes, exclusive: value.environment?.exclusive, frozenInputs: value.frozenInputs });
+    if (fingerprint(before) === fingerprint(request)) return [`request.json: retry ${request.attempt.id} repeats the same expected, inputs, frozen evidence, environment revision and resource ownership after ${previous.id} was ${previous.status} (NO_PROGRESS); repair the cause, change the verified method, or stay blocked`];
+  } catch (error) { return [`state.json: previous attempt ${previous.id} cannot be read for progress comparison: ${error.message}`]; }
+  return [];
 }
 
 // Whether a Context table row covers a request alias: the row's alias, with each <placeholder> standing
@@ -426,6 +560,8 @@ export async function validateRequest(root, dir, packages) {
       const state = JSON.parse(await readFile(path.join(sessionRoot, 'state.json'), 'utf8'));
       recordedChoices = state.choices ?? {};
       errors.push(...validateAgainst(JSON.parse(await readFile(path.join(root, 'templates', 'step', 'state.schema.json'), 'utf8')), state, 'state.json'));
+      errors.push(...v22RequestErrors(state, request, pkg, dir));
+      errors.push(...await attemptProgressErrors(sessionRoot, state, request));
       // A resume re-enters the same operator and names a branch state.json knows; a re-entry state.json does not record is unrecorded evidence.
       if (request.resume) {
         const target = `${request.resume.step}/${request.resume.parallel}`;
@@ -458,6 +594,8 @@ export async function validateRequest(root, dir, packages) {
     } catch (e) { errors.push(`state.json: ${e.message}`); }
   }
   errors.push(...selectionErrors(policy, request, recordedChoices));
+  if (request.contractVersion === V22_CONTRACT) errors.push(...await frozenInputErrors(dir, request));
+  errors.push(...await uiKnowledgeRequestErrors(root, dir, request));
   if (!errors.length && request.operatorId === 'workspace.bind' && !request.exchange) {
     const { validateWorkspaceCheckoutRequest } = await import('./workspace-checkout.mjs');
     errors.push(...validateWorkspaceCheckoutRequest(root, request, dir));

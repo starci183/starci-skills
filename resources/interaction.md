@@ -12,19 +12,17 @@ is diagnostic evidence, not a question to forward automatically.
 Record an actual answer in `state.json.choices[decisionId]` with `selected`, `selectedBy` and
 `sourceRef` pointing to the user's message. A continuation request carries `decisionId` and
 `selectedOption`; its gate checks them against that record. Recommendations are not user choices.
-Do not create a new decision id merely to ask the same question again. A mission without a material
-choice needs no choice record.
+Do not create a new decision id merely to ask the same question again. Every v2.2 mission version
+has one confirmation record; an already explicit and authorized prompt can be that record.
 
-A `goal-confirm` question is asked once, at the start of a mission that will write routed source or
-touch a runtime, and never for read-only work: the orchestrator prints the block `state.json.mission`
-holds — goal, inclusions and exclusions, the done-when lines, and the scope line
-`scope: <n> journey units, <m> unchecked` once a plan has filled `mission.scope` — as at most
-five lines in the person's language with one question, and records the answer at
-`state.json.choices["goal:<sessionId>:v<version>"]`.
-`corrected` writes the next version and asks again; only a latest version selected `as-stated` lets
-anything run (`scripts/validate-request.mjs#missionGateErrors`, `scripts/validate-session.mjs`). Whether
-a mission writes or touches a runtime is read from the tools its operators declare, never from a list
-of operator ids.
+`scripts/session-open.mjs` opens or reuses the user session from the first prompt, before confirmation
+and before operator work. The draft is shown as a table with Goal, Target, In scope, Out of scope,
+Outputs, Done when, Verification reach and Example. The answer is recorded at
+`state.json.choices["goal:<sessionId>:v<version>"]` and bound again in `mission.confirmation`.
+When the opening prompt already states and authorizes exactly that scope, its message reference is
+reused as `as-stated`; no routine second question is sent. A correction creates the next draft version.
+Rejection or no answer leaves lifecycle `draft`, which cannot dispatch. Follow-ups and replans under
+the confirmed goal reuse the same host binding and ask nothing.
 
 After every transition of a mission the orchestrator prints to the root chat exactly the two lines
 `interaction.json#transitionLog` declares — the branch's goal, then its outcome with the count of

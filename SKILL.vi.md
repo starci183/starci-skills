@@ -10,6 +10,21 @@ Trước khi đặt câu hỏi, áp dụng [chính sách tương tác](resources
 Điều này chỉ thay đổi giao tiếp: mọi chuyển bước định tuyến, ranh giới operator và thẩm quyền bắt
 buộc bên dưới vẫn giữ nguyên. Cột Ask hay reason chẩn đoán không phải câu hỏi tự động đem chuyển.
 
+Mỗi prompt người dùng trước hết chạy `scripts/session-open.mjs open`: tạo hoặc dùng lại đúng một
+ledger StarCi đã bind với task Codex hay session Claude gốc và worktree người dùng. Việc này xảy ra
+trước xác nhận scope, plan, dispatch, design hay mutation. Agent, helper, exchange lồng nhau và retry
+bind về host session đó; không mục nào tạo thêm một user session.
+
+Trong v2.2, draft scope được trình bằng bảng Goal, Target, Trong scope, Ngoài scope, Đầu ra, Đạt khi,
+Phạm vi kiểm và Ví dụ. Prompt đã nêu rõ và cấp quyền đúng bảng đó được ghi làm `as-stated`, không hỏi
+lặp thường lệ. Sửa tạo version kế tiếp; từ chối hoặc im lặng giữ draft và chặn dispatch. Trước mỗi
+invocation, `attempt-gate open` đóng băng expected, input sidecar và environment; `worker-slots`
+cấp một trong ba slot chung toàn host session. `attempt-gate accept` chỉ cho advance khi actual có
+bằng chứng và match từng expected bắt buộc. Mismatch được giữ để repair, retry hoặc blocked; retry
+không được hạ expected. Chỉ tín hiệu close-success riêng mới compact và kiểm bundle dưới
+`@worktrees/done` rồi xóa đúng folder session tạm; publish không đóng session, không xóa worktree hay
+branch người dùng.
+
 1. Đóng băng một phạm vi nhiệm vụ: đơn vị, đích, phần bao gồm và phần loại trừ, các gốc được ghi,
    hiệu ứng ra bên ngoài, và thứ sẽ được tính là bằng chứng. Hai cách đọc làm đổi bất kỳ điểm nào
    trong số đó là một câu hỏi tập trung, không phải một phỏng đoán. Đóng băng không diễn ra trong im
@@ -151,9 +166,9 @@ request/request.json -> validate-request.mjs -> agent ghi response/ -> validate-
    operator) lấy `domain`, rồi tra domain đó trong `routing.json`:
    - `operator` gọi operator được nêu tên, rồi quay lại đây;
    - `resume` vào lại chính operator đó ở một bậc mới, `request.json.resume` gọi tên nhánh đã bị chặn;
-   - `chain` mở một phiên anh em cho kết quả mà target của route gọi tên, chuỗi của phiên đó vẽ từ
-     nhiệm vụ của nó như mọi nhiệm vụ khác, nhánh bị chặn chờ phiên đó kết thúc và vào lại với thứ nó
-     sinh ra — một lỗi thư viện owner được sửa và tiêu thụ theo cách này, và không hỏi người điều gì;
+   - `chain` thêm owner và prerequisite vào plan động của chính host session này, giữ goal đã xác
+     nhận; nhánh bị chặn chờ không giữ slot rồi vào lại với evidence đã accept, không mở user session
+     anh em;
    - `user` dừng và báo điều người phải quyết hay công bố;
    - `external` dừng và báo thứ gì ngoài runtime phải thay đổi.
    Mã có cách xử lý `fallback` không bao giờ chặn: agent làm đúng fallback, ghi dưới
@@ -260,7 +275,8 @@ khai và những tool mà `operator.json` của nó khai (`@tools/<id>` từ `re
 một mode), không hơn, và được chờ theo sự kiện hoàn tất, không bao giờ theo đồng hồ. `resources/orchestrator.json` chốt luật: tối đa ba agent
 cùng lúc, các nhánh cùng bậc không bao giờ chung alias ghi, điều phối theo chuỗi đã vẽ và `routing.json`,
 bàn giao chỉ qua các trường của `response.json` trong phiên (`state.json`,
-`step-N/parallel-M/{request,response}`), phiên do orchestrator tạo trước và xoá sau `git.publish`. Agent
+`step-N/parallel-M/{request,response}`). Publish không xóa session. Chỉ close-success đã compact và
+kiểm bundle bền mới xóa đúng folder session tạm; session blocked/failed vẫn resumable. Agent
 không bao giờ khởi động agent khác; một cuộc trao đổi lồng (phản biện, review) là một agent mới do
 orchestrator tạo cho nhánh đang `waiting`. Mọi file agent ghi dưới `response/` được gate response quét
 giá trị hình dạng bí mật (`scripts/sweep-secrets.mjs`) trước khi nhánh được định tuyến. `alias/alias.json` là nơi duy nhất một alias phân giải ra vị

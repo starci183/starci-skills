@@ -6,6 +6,22 @@ mission, by `scripts/plan-chain.mjs`, from the operator tables alone, and it is 
 planner fixtures now, under `tests/chains/`, and `scripts/plan-chain.spec.mjs` proves the planner
 still derives each of them from the outcome its mission names.
 
+## Executable v2.2 lifecycle
+
+The first prompt opens or reuses the host-bound draft with `scripts/session-open.mjs` before scope
+confirmation. Confirmation activates one version. The planner remains the only chain owner: it derives
+steps from that confirmed goal, and a replan inside the scope changes the chain without rewriting the
+goal or asking per operator.
+
+Every planned invocation becomes a versioned attempt. Its request freezes `expected.criteria`, the
+exact `environment` and resource ownership, and request-side `frozenInputs` before
+`scripts/attempt-gate.mjs open`. `scripts/worker-slots.mjs` then grants one of at most three active
+slots shared by top-level branches, nested exchanges, helpers, repairs and retries. Missing inputs,
+overlapping exclusive paths/resources and the fourth ready worker queue. Waiting releases its slot.
+`attempt-gate accept` runs the full shared and operator gates, resolves actual evidence and compares
+every criterion. Only a matched receipt advances. Mismatch is preserved and leads to repair, retry or
+blocked; a retry points to it and cannot weaken required expected under the same goal version.
+
 ## How a chain is derived
 
 The planner starts from the confirmed mission (`state.json.mission`): every "done when" line names
@@ -38,10 +54,9 @@ through the tables every operator publishes in its `operator.md`:
 - a mission that names `git.publish` while a branch writes frontend source under `mode: apply` owes
   the audit and the walk in between — the long-flow law, stated in kinds: the operator whose primary
   output is `frontend-surface-audit`, then `uat.verify`, before the publish;
-- a `chain` route's sibling mission is planned from the route's target like any other, so a wall an
-  owner library raised becomes a `library.update` done-when line under mode `publish` on the owner
-  route, and the blocked mission re-enters through a `library.update` branch under mode `consume`
-  that binds that sibling's `library-release` through `producer-import`.
+- a `chain` route adds the target owner and its prerequisites to this host-bound session's plan. The
+  blocked attempt waits without a slot, then re-enters from the accepted output. It never opens a
+  sibling user session or gains a second concurrency allowance.
 
 Two ties the required inputs leave open are settled by the tables too: an optional Input orders its
 consumer after a producer already in the chain, and a one-way Next row orders the operator that
@@ -102,6 +117,11 @@ carrying its note and the goal version it runs under: the current version when o
 changed (a red gate routed back to its owner, a plan produced its units, a stop added an operator),
 and the next version — confirmed through `goal-confirm` like the first plan — when the goal itself
 was corrected; never a silent rewrite (`scripts/validate-session.mjs#missionHistoryErrors`).
+
+Goal achieved, operator done and publish success are not a user-session close. An explicit
+close-success event first writes and verifies the compact and durable bundle under
+`@worktrees/done/<sessionId>`, then removes only the matching temporary session folder. Blocked,
+failed and waiting ledgers stay in place for resume; user worktrees and branches are outside cleanup.
 
 ## The fixtures
 

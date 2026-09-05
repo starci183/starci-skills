@@ -15,6 +15,44 @@
     "endedAt"
   ],
   "properties": {
+    "contractVersion": { "const": "starci/v2.2", "description": "Every helper run created by v2.2 carries this marker; absence is legacy evidence only." },
+    "hostBinding": {
+      "type": "object", "additionalProperties": false,
+      "required": ["kind", "hostId", "worktree", "starciSessionId"],
+      "properties": {
+        "kind": { "enum": ["codex-task", "claude-session"] },
+        "hostId": { "type": "string", "minLength": 1, "maxLength": 200 },
+        "worktree": { "type": "string", "minLength": 1, "maxLength": 500 },
+        "starciSessionId": { "type": ["string", "null"], "maxLength": 128, "description": "The existing owning StarCi session when invoked from a mission. A helper never creates one." }
+      }
+    },
+    "sourceCoverage": {
+      "type": "array", "minItems": 1, "maxItems": 512,
+      "items": {
+        "type": "object", "additionalProperties": false,
+        "required": ["ref", "state", "evidence"],
+        "properties": {
+          "ref": { "type": "string", "minLength": 1, "maxLength": 400 },
+          "state": { "enum": ["valid", "missing", "invalid", "stale"] },
+          "evidence": { "type": "array", "minItems": 1, "uniqueItems": true, "items": { "type": "string", "minLength": 1, "maxLength": 500 } }
+        }
+      }
+    },
+    "bankBefore": { "$ref": "#/$defs/bankSummary" },
+    "bankAfter": { "$ref": "#/$defs/bankSummary" },
+    "outcome": { "enum": ["drafted", "updated", "reused", "empty", "incomplete"] },
+    "deduplications": {
+      "type": "array", "maxItems": 512,
+      "items": {
+        "type": "object", "additionalProperties": false,
+        "required": ["keptMissionId", "mergedMissionIds", "evidence"],
+        "properties": {
+          "keptMissionId": { "$ref": "#/$defs/missionId" },
+          "mergedMissionIds": { "type": "array", "minItems": 1, "uniqueItems": true, "items": { "$ref": "#/$defs/missionId" } },
+          "evidence": { "type": "array", "minItems": 1, "uniqueItems": true, "items": { "type": "string", "minLength": 1, "maxLength": 500 } }
+        }
+      }
+    },
     "schemaVersion": {
       "const": 9
     },
@@ -92,7 +130,27 @@
       "description": "the stop code the run ended with, or absent when it finished; a helper stop terminates and hands to the person, because there is no chain to route it into"
     }
   },
+  "allOf": [
+    { "if": { "required": ["contractVersion"] }, "then": { "required": ["hostBinding", "sourceCoverage", "bankBefore", "bankAfter", "outcome", "deduplications"] } }
+  ],
   "$defs": {
+    "missionId": { "type": "string", "pattern": "^[a-z0-9][a-z0-9-]*$" },
+    "bankSummary": {
+      "type": "object", "additionalProperties": false,
+      "required": ["queueHash", "approvalHash", "entries"],
+      "properties": {
+        "queueHash": { "type": ["string", "null"], "pattern": "^sha256:[0-9a-f]{64}$" },
+        "approvalHash": { "type": ["string", "null"], "pattern": "^sha256:[0-9a-f]{64}$" },
+        "entries": {
+          "type": "array", "maxItems": 512,
+          "items": {
+            "type": "object", "additionalProperties": false,
+            "required": ["missionId", "status"],
+            "properties": { "missionId": { "$ref": "#/$defs/missionId" }, "status": { "type": "string", "minLength": 1, "maxLength": 100 } }
+          }
+        }
+      }
+    },
     "instant": {
       "type": "string",
       "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(?:\\.[0-9]+)?Z$"

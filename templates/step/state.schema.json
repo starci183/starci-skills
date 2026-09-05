@@ -20,6 +20,71 @@
     "requestHashes"
   ],
   "properties": {
+    "contractVersion": { "const": "starci/v2.2", "description": "Marks a session created by the v2.2 runtime. A missing marker is legacy read compatibility only." },
+    "hostBinding": {
+      "type": "object", "additionalProperties": false,
+      "required": ["kind", "hostId", "worktree", "sourcePromptRef"],
+      "properties": {
+        "kind": { "enum": ["codex-task", "claude-session"] },
+        "hostId": { "type": "string", "minLength": 1, "maxLength": 200 },
+        "worktree": { "type": "string", "minLength": 1, "maxLength": 500 },
+        "sourcePromptRef": { "type": "string", "minLength": 1, "maxLength": 400 }
+      }
+    },
+    "lifecycle": {
+      "type": "object", "additionalProperties": false,
+      "required": ["phase", "openedAt"],
+      "properties": {
+        "phase": { "enum": ["draft", "active", "blocked", "failed", "closing", "closed-success"] },
+        "openedAt": { "type": "string", "minLength": 1 },
+        "closedAt": { "type": "string", "minLength": 1 },
+        "closeReason": { "type": "string", "minLength": 1, "maxLength": 500 },
+        "compactRef": { "type": "string", "minLength": 1, "maxLength": 500 }
+      }
+    },
+    "attempts": {
+      "description": "Immutable per-invocation history. A retry or repair uses another branch and points request.attempt.previous at the latest attempt id.",
+      "type": "object",
+      "additionalProperties": {
+        "type": "object", "additionalProperties": false,
+        "required": ["id", "operatorId", "number", "kind", "expectedVersion", "expectedHash", "expected", "frozenInputs", "status", "requestRef", "startedAt"],
+        "properties": {
+          "id": { "type": "string", "minLength": 1 },
+          "operatorId": { "type": "string", "pattern": "^[a-z]+(?:\\.[a-z]+)+$" },
+          "number": { "type": "integer", "minimum": 1 },
+          "kind": { "enum": ["initial", "repair", "retry", "resume"] },
+          "previous": { "type": ["string", "null"] },
+          "expectedVersion": { "type": "integer", "minimum": 1 },
+          "expectedHash": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
+          "expected": { "type": "object" },
+          "frozenInputs": { "type": "array" },
+          "status": { "enum": ["running", "matched", "mismatched", "inconclusive", "blocked", "waiting"] },
+          "requestRef": { "type": "string", "minLength": 1 },
+          "responseRef": { "type": "string", "minLength": 1 },
+          "startedAt": { "type": "string", "minLength": 1 },
+          "endedAt": { "type": "string", "minLength": 1 },
+          "comparison": { "type": "object" }
+        }
+      }
+    },
+    "workerSlots": {
+      "description": "The single session-wide scheduler ledger. Nested exchanges, repairs and retries acquire from these same three slots.",
+      "type": "array", "maxItems": 3,
+      "items": {
+        "type": "object", "additionalProperties": false,
+        "required": ["slot", "token", "attemptId", "workerId", "branch", "exclusive", "environment", "acquiredAt"],
+        "properties": {
+          "slot": { "type": "integer", "minimum": 1, "maximum": 3 },
+          "token": { "type": "string", "minLength": 1 },
+          "attemptId": { "type": "string", "minLength": 1 },
+          "workerId": { "type": "string", "minLength": 1 },
+          "branch": { "type": "string", "pattern": "^[0-9]+/[0-9]+(?:/[a-z][a-z-]*)?$" },
+          "exclusive": { "type": "array", "items": { "type": "string" } },
+          "environment": { "type": "object" },
+          "acquiredAt": { "type": "string", "minLength": 1 }
+        }
+      }
+    },
     "choices": {
       "type": "object",
       "additionalProperties": {
@@ -75,7 +140,7 @@
     },
     "chain": {
       "type": "array",
-      "minItems": 1,
+      "minItems": 0,
       "items": {
         "type": "array",
         "minItems": 1,
@@ -483,6 +548,12 @@
           "minLength": 1,
           "maxLength": 240
         },
+        "target": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 300,
+          "description": "The product, source, runtime or artifact affected, shown in the v2.2 scope table."
+        },
         "includes": {
           "type": "array",
           "minItems": 1,
@@ -525,6 +596,28 @@
                 "description": "the operator whose receipt is this evidence"
               }
             }
+          }
+        },
+        "outputs": {
+          "type": "array", "minItems": 1, "maxItems": 12,
+          "items": { "type": "string", "minLength": 1, "maxLength": 300 }
+        },
+        "verification": {
+          "type": "string", "minLength": 1, "maxLength": 500,
+          "description": "Evidence reach and the limits of the conclusion, shown before confirmation."
+        },
+        "example": {
+          "type": ["string", "null"], "maxLength": 500,
+          "description": "An example only when one materially disambiguates the draft scope."
+        },
+        "confirmation": {
+          "type": "object", "additionalProperties": false,
+          "required": ["status", "decisionId", "sourceRef"],
+          "properties": {
+            "status": { "enum": ["draft", "confirmed", "corrected", "rejected"] },
+            "decisionId": { "type": "string", "minLength": 1 },
+            "sourceRef": { "type": ["string", "null"], "maxLength": 400 },
+            "confirmedAt": { "type": "string", "minLength": 1 }
           }
         },
         "sourceRef": {
@@ -577,5 +670,11 @@
         }
       }
     }
-  }
+  },
+  "allOf": [
+    {
+      "if": { "required": ["contractVersion"] },
+      "then": { "required": ["hostBinding", "lifecycle", "attempts", "workerSlots", "mission", "choices", "brief", "budget"] }
+    }
+  ]
 }

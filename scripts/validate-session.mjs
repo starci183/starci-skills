@@ -18,8 +18,9 @@ import { readFile } from 'node:fs/promises';
 import path from 'node:path';
 import process from 'node:process';
 import { fileURLToPath } from 'node:url';
+import { createHash } from 'node:crypto';
 import { validateAgainst } from './json-schema.mjs';
-import { effectiveBudget, missionGateErrors, goalDecisionId } from './validate-request.mjs';
+import { effectiveBudget, missionGateErrors, goalDecisionId, V22_CONTRACT } from './validate-request.mjs';
 import { goalCheckErrors } from './validate-response.mjs';
 import { loadOperatorPackages } from './operator-md.mjs';
 import { loadInteractionPolicy } from './validate-interaction.mjs';
@@ -33,6 +34,100 @@ import { readBank, currentApproval, sessionOf, isDone, canonical } from './bank.
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 export const STATE_SCHEMA = path.join('templates', 'step', 'state.schema.json');
 const stateSchemas = new Map();
+
+const expectedHash = (expected) => `sha256:${createHash('sha256').update(JSON.stringify(expected)).digest('hex')}`;
+
+export async function v22SessionErrors(session, state) {
+  const errors = [];
+  if (state?.contractVersion !== V22_CONTRACT) return errors;
+  const mission = state.mission ?? {};
+  for (const field of ['target', 'outputs', 'verification', 'confirmation']) if (mission[field] === undefined) errors.push(`state.json: v2.2 mission.${field} is required by the scope table`);
+  if (!path.isAbsolute(state.hostBinding?.worktree ?? '')) errors.push('state.json: hostBinding.worktree is not an absolute user worktree binding');
+  if (state.hostBinding?.hostId === state.id) errors.push('state.json: hostBinding.hostId is the native Codex task or Claude session id, not the StarCi session id');
+  const phase = state.lifecycle?.phase;
+  if (phase === 'draft') {
+    if ((state.chain ?? []).length || Object.keys(state.steps ?? {}).length || Object.keys(state.attempts ?? {}).length) errors.push('state.json: a draft session has no planned or dispatched operator work');
+    if (Object.keys(state.leases ?? {}).length) errors.push('state.json: a draft session holds no worker or resource lease');
+    if (mission.confirmation?.status === 'confirmed') errors.push('state.json: a confirmed mission is active, not draft');
+  }
+  if (phase === 'active') {
+    const confirmation = mission.confirmation;
+    if (confirmation?.status !== 'confirmed') errors.push('state.json: an active session carries a confirmed mission version');
+    const choice = state.choices?.[confirmation?.decisionId];
+    if (!choice || choice.selected !== 'as-stated' || choice.selectedBy !== 'user' || choice.sourceRef !== confirmation?.sourceRef) errors.push('state.json: mission.confirmation does not bind the matching explicit user goal-confirm choice');
+  }
+  if (phase === 'closed-success') {
+    for (const field of ['closedAt', 'closeReason', 'compactRef']) if (!state.lifecycle?.[field]) errors.push(`state.json: lifecycle.${field} is required for closed-success`);
+    if (Object.keys(state.leases ?? {}).length) errors.push('state.json: a closed-success session still holds worker leases');
+  }
+  const ids = new Set();
+  for (const [branch, attempt] of Object.entries(state.attempts ?? {})) {
+    if (ids.has(attempt.id)) errors.push(`state.json: attempt id ${attempt.id} is duplicated`);
+    ids.add(attempt.id);
+    if (state.steps?.[branch.replace(/\/[a-z][a-z-]*$/, '')] !== attempt.operatorId) errors.push(`state.json: attempts[${branch}] runs ${attempt.operatorId}, which state.steps does not own`);
+    if (attempt.expectedHash !== expectedHash(attempt.expected)) errors.push(`state.json: attempts[${branch}].expected changed after dispatch; its expectedHash no longer matches`);
+    const parts = branch.split('/');
+    const refBase = `step-${parts[0]}/parallel-${parts[1]}${parts[2] ? `/${parts[2]}` : ''}`;
+    const requiredRequestRef = `${refBase}/request/request.json`;
+    const requiredResponseRef = `${refBase}/response/response.json`;
+    if (attempt.requestRef !== requiredRequestRef) errors.push(`state.json: attempts[${branch}].requestRef must be ${requiredRequestRef}; attempt refs cannot escape their branch`);
+    if (attempt.responseRef && attempt.responseRef !== requiredResponseRef) errors.push(`state.json: attempts[${branch}].responseRef must be ${requiredResponseRef}; attempt refs cannot escape their branch`);
+    const requestFile = path.join(session, requiredRequestRef);
+    if (!existsSync(requestFile)) errors.push(`state.json: attempts[${branch}] preserves no request.json`);
+    else {
+      try {
+        const request = JSON.parse(await readFile(requestFile, 'utf8'));
+        if (request.attempt?.id !== attempt.id) errors.push(`state.json: attempts[${branch}].id does not match its request`);
+        if (expectedHash(request.expected) !== attempt.expectedHash) errors.push(`state.json: attempts[${branch}] does not preserve the expected written before execution`);
+        if (JSON.stringify(request.frozenInputs ?? []) !== JSON.stringify(attempt.frozenInputs ?? [])) errors.push(`state.json: attempts[${branch}] does not preserve its request-side frozenInputs commitments`);
+      } catch (error) { errors.push(`state.json: attempts[${branch}] request cannot be read: ${error.message}`); }
+    }
+    if (attempt.number > 1) {
+      const previous = Object.values(state.attempts).find((candidate) => candidate.id === attempt.previous);
+      if (!previous) errors.push(`state.json: attempts[${branch}].previous ${attempt.previous ?? 'missing'} is not preserved`);
+      else if (previous.number + 1 !== attempt.number) errors.push(`state.json: attempts[${branch}].number does not follow ${previous.id}`);
+    }
+    if (attempt.status !== 'running' && attempt.status !== 'waiting' && !attempt.responseRef) errors.push(`state.json: terminal attempt ${attempt.id} preserves no responseRef`);
+  }
+  if (state.status === 'done' || phase === 'closed-success') {
+    for (let index = 0; index < (mission.doneWhen ?? []).length; index += 1) {
+      let backed = false;
+      for (const [branch, attempt] of Object.entries(state.attempts ?? {})) {
+        if (attempt.status !== 'matched') continue;
+        try {
+          const parts = branch.split('/');
+          const base = path.join(session, `step-${parts[0]}`, `parallel-${parts[1]}`, ...(parts[2] ? [parts[2]] : []));
+          const request = JSON.parse(await readFile(path.join(base, 'request', 'request.json'), 'utf8'));
+          const response = JSON.parse(await readFile(path.join(base, 'response', 'response.json'), 'utf8'));
+          const required = new Set((request.expected?.criteria ?? []).filter((criterion) => criterion.required).map((criterion) => criterion.id));
+          const observations = response.actual?.observations ?? [];
+          const observed = new Map(observations.map((observation) => [observation.criterionId, observation]));
+          const compared = new Map((response.comparison?.criteria ?? []).map((criterion) => [criterion.criterionId, criterion]));
+          const declared = new Set(Object.values(response.fields ?? {}).flatMap((value) => Array.isArray(value) ? value : [value]));
+          const criterionProof = required.size > 0 && [...required].every((id) => {
+            const observation = observed.get(id);
+            const comparison = compared.get(id);
+            return observation?.evidence?.length && comparison?.verdict === 'matched' && comparison.evidence?.length
+              && observation.evidence.every((ref) => declared.has(ref) && existsSync(path.join(base, ref)))
+              && comparison.evidence.every((ref) => observation.evidence.includes(ref));
+          });
+          if (request.goal?.doneWhen === index
+            && response.contractVersion === V22_CONTRACT
+            && response.status === 'done'
+            && response.attempt?.id === attempt.id
+            && response.attempt?.expectedVersion === attempt.expectedVersion
+            && response.actual?.expectedVersion === attempt.expectedVersion
+            && response.comparison?.expectedVersion === attempt.expectedVersion
+            && response.comparison?.verdict === 'matched'
+            && response.comparison?.next === 'advance'
+            && criterionProof) { backed = true; break; }
+        } catch {}
+      }
+      if (!backed) errors.push(`state.json: doneWhen:${index} is not backed by a matched v2.2 attempt with actual evidence; brief.proven prose cannot close a goal`);
+    }
+  }
+  return errors;
+}
 export function loadStateSchema(root = ROOT) {
   if (!stateSchemas.has(root)) stateSchemas.set(root, JSON.parse(readFileSync(path.join(root, STATE_SCHEMA), 'utf8')));
   return stateSchemas.get(root);
@@ -293,6 +388,9 @@ export async function validateSession(root, session, { packages = null, ledgerDi
   if (!existsSync(stateFile)) return { errors: ['state.json: missing'], state: null };
   let state; try { state = JSON.parse(await readFile(stateFile, 'utf8')); } catch (e) { return { errors: [`state.json: ${e.message}`], state: null }; }
   errors.push(...validateAgainst(loadStateSchema(root), state, 'state.json'));
+  errors.push(...await v22SessionErrors(session, state));
+  if (state.contractVersion === V22_CONTRACT && state.lifecycle?.phase === 'draft') return { errors, state };
+  if (state.contractVersion === V22_CONTRACT && state.lifecycle?.phase === 'active' && state.status === 'running' && !(state.chain ?? []).length && !Object.keys(state.attempts ?? {}).length) return { errors, state };
   const live = (state.transitions ?? []).length > 0;
   if (live) {
     if (!state.brief) errors.push('state.json: a session with a transition carries brief');

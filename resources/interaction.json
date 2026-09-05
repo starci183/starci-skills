@@ -1,5 +1,5 @@
 {
-  "schemaVersion": 3,
+  "schemaVersion": 4,
   "questionKinds": [
     "tier-choice",
     "restatement-confirm",
@@ -9,14 +9,15 @@
   "minOptions": 2,
   "maxOptions": 3,
   "selectionSource": "user",
-  "rule": "Within work already authorized by the user, do not request routine confirmation. Ask only when the user must choose between materially different tiers or directions, such as UX/UI alternatives. Tier does not mean execution model profile. Present the alternatives and their tradeoffs, let the user select, and reuse the selection on continuation without asking again. Obtain ordinary missing inputs from existing context and evidence. This is a communication policy only: it grants no source write, package publication, deployment, credential access or other external action, and overrides no mandatory host approval, access control, operator boundary or quality gate. When work cannot proceed within existing authority, report the exact limitation and continue independent authorized work; never invent approval or claim completion. A restatement-confirm question restates a rule the person gave in their own words, in their language, in at most five lines, before any operator designs on it; it is a material choice, not routine confirmation. A goal-confirm question confirms the mission's goal once at its start: a mission that will write routed source or touch a runtime prints its goal, its inclusions and exclusions, what will count as done, and how far the verification will reach, as one block of at most five lines, in the person's language, and runs nothing until the person selects as-stated; read-only work asks nothing. The scope line is `scope: <n> journey units, <m> unchecked`, filled from the plans' own counts when a plan lands and refilled from every landed plan at each later one (state.json.mission.scope, scripts/validate-session.mjs#missionScopeErrors), and empty before the first: the person sees the narrowing once, inside the confirmation they were already given, and is never asked about it again — what was deferred and why is on the ledger under @worktrees/unchecked, not in a second question. A budget-choice question is put when a session budget is exhausted. Every turn the root ends with a person reaches them as one of reportShapes, in the person's language; a hand-off to another mission is a waiting state with a wake condition, never the end of a turn.",
+  "rule": "Every user prompt enters StarCi by opening or reusing the host-bound user session before any goal confirmation or work. The mission draft is shown as scopeTable. Its version is activated only by an explicit as-stated user answer; when the original prompt already states and authorizes exactly that table, its message reference is reused as the answer and no routine duplicate question is asked. Correction creates the next draft version; rejection or silence never activates work. Follow-ups, operator attempts, helpers, retries and nested exchanges keep the same host binding. Replan inside the confirmed scope is automatic. A change to goal or scope creates a versioned confirmation; budget and user routes remain typed choices. This communication policy grants no extra effect authority.",
   "gate": "scripts/validate-interaction.mjs",
+  "scopeTable": ["Goal", "Target", "In scope", "Out of scope", "Outputs", "Done when", "Verification reach", "Example"],
   "language": {
     "source": "resources/settings.json#language, over resources/settings.example.json (default vi)",
     "rule": "Every line printed to the person — the goal block, the two-line transition log, the end-of-turn report, every question and its options — is in the display language the settings name; a new mission records it as mission.language unless the person's own message is plainly in another language, in which case that one is recorded and used. The law of the tree stays English and its mirrors Vietnamese; the display language changes nothing that is validated."
   },
   "asks": {
-    "rule": "A new prompt that opens a mission asks exactly once: the goal block, confirmed through goal-confirm before step 1. After that the run is smooth — the transition log prints and never waits, a replan under the same goal asks nothing, a routed re-entry asks nothing — and the only things that stop for the person are a `user` route (a stop code whose domain routing answers with user), a `budget-choice`, and a corrected goal, which is printed again for confirmation. A continuation of an existing mission asks nothing at all. A helper asks nothing at all: it opens no session, so there is no goal block to confirm and no choice to record (resources/orchestrator.json#helpers). A mission opened from an approved banked entry asks nothing either — the approval of the queue is the answer, and the block is printed rather than put (scripts/validate-session.mjs#bankRefErrors)."
+    "rule": "The first prompt opens the draft session before the confirmation is evaluated. Ask goal-confirm only when the prompt itself does not already explicitly authorize the exact versioned scope table. Record the authorizing prompt or answer as sourceRef. Continuations under the same confirmed goal, replans, attempts, helpers and nested exchanges ask nothing. A corrected scope is a new version and is confirmed again. A helper reuses hostBinding and never creates a user session or a goal choice. An approved bank answer may be reused only for the unchanged banked goal version."
   },
   "reportShapes": {
     "delivered": "What was delivered and where it is: the head, the served URL or the evidence folder.",
@@ -27,8 +28,8 @@
     "linesPerBranch": 2,
     "shape": [
       "[N/M operator] goal: <doneWhen:n line | prerequisite: N/M>",
-      "[N/M operator] <done | blocked STOP> · <k>/<n> done-when evidenced · <artifact paths> · <next cell>"
+      "[N/M operator] <done | mismatch | blocked STOP> · <k>/<n> done-when evidenced · <artifact paths> · <next cell | repair | retry>"
     ],
-    "rule": "After every transition the orchestrator prints exactly these two lines to the root chat, N/M being the branch and operator its id: the first names the goal the branch serves (request.json.goal), the second its outcome, how many of the mission's done-when lines now carry a validator-accepted goalCheck, the artifact paths the receipt lists, and the next cell of the chain (or the stop code and the domain it routes to). Full outputs stay in the session folder; nothing else about the branch is printed to the chat, and a transition that was printed is recorded with logged: true in state.json.transitions."
+    "rule": "After every transition the orchestrator prints exactly these two lines to the root chat. The first names the branch goal. The second names done, mismatch or a blocked stop, the accepted done-when count, resolvable evidence paths, and the next cell or repair/retry action. Full outputs and prior failed attempts stay in the session folder ledger. A printed transition records logged:true."
   }
 }

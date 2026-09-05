@@ -42,6 +42,7 @@ export function selectionErrors(policy, request, choices = {}) {
 export function compileLogShape(template) {
   const escaped = String(template).replace(/[.+^${}()|[\]\\]/g, '\\$&');
   const pattern = escaped
+    .replace('<done \\| mismatch \\| blocked STOP>', '(?:done|mismatch|blocked [A-Z][A-Z0-9_]+)')
     .replace(/<done \\\| blocked STOP>/g, '(?:done|blocked [A-Z][A-Z0-9_]+)')
     .replace(/<k>\/<n>/g, '\\d+/\\d+')
     .replace(/<[^<>]+>/g, '.+')

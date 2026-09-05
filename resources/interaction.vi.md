@@ -12,18 +12,17 @@ không tự động trở thành câu hỏi đem chuyển cho người dùng.
 Ghi câu trả lời thật vào `state.json.choices[decisionId]` gồm `selected`, `selectedBy`, `sourceRef`
 trỏ tới tin nhắn người dùng. Request tiếp tục mang `decisionId`, `selectedOption`; gate đối chiếu
 với bản ghi đó. Đề xuất của agent không phải lựa chọn của người dùng. Không tạo id mới chỉ để hỏi
-lại cùng một điều. Nhiệm vụ không có lựa chọn khác biệt thì không cần bản ghi lựa chọn.
+lại cùng một điều. Mỗi phiên bản nhiệm vụ v2.2 có đúng một bản ghi xác nhận; prompt đã nêu rõ và
+cấp quyền có thể chính là bản ghi đó.
 
-Câu hỏi `goal-confirm` được hỏi một lần, ở đầu nhiệm vụ sẽ ghi source đã route hay chạm tới một
-runtime, và không bao giờ cho việc chỉ đọc: orchestrator in khối mà `state.json.mission` giữ — mục
-tiêu, phần bao gồm và loại trừ, các dòng "xong khi", và dòng phạm vi
-`scope: <n> journey units, <m> unchecked` một khi plan đã điền `mission.scope` — thành tối đa
-năm dòng bằng ngôn ngữ của người kèm một câu hỏi, rồi ghi câu trả lời vào
-`state.json.choices["goal:<sessionId>:v<version>"]`.
-`corrected` viết phiên bản kế tiếp rồi hỏi lại; chỉ phiên bản mới nhất được chọn `as-stated` mới cho
-phép chạy bất cứ gì (`scripts/validate-request.mjs#missionGateErrors`, `scripts/validate-session.mjs`).
-Nhiệm vụ có ghi hay chạm runtime hay không được đọc từ các tool mà operator của nó khai, không bao
-giờ từ một danh sách id operator.
+`scripts/session-open.mjs` mở hoặc dùng lại phiên người dùng ngay từ prompt đầu, trước xác nhận và
+trước mọi công việc operator. Draft được trình bày bằng bảng gồm Goal, Target, Trong scope, Ngoài
+scope, Đầu ra, Đạt khi, Phạm vi kiểm và Ví dụ. Câu trả lời được ghi ở
+`state.json.choices["goal:<sessionId>:v<version>"]` và bind lại trong `mission.confirmation`.
+Khi prompt mở đầu đã nêu và cấp quyền đúng scope đó, tham chiếu tới chính prompt được dùng làm
+`as-stated`; không hỏi xác nhận thường lệ lần hai. Sửa scope tạo phiên bản draft kế tiếp. Từ chối
+hoặc chưa trả lời giữ lifecycle `draft`, nên không thể dispatch. Follow-up và replan trong goal đã
+xác nhận dùng lại cùng host binding và không hỏi lại.
 
 Sau mỗi chuyển bước của một nhiệm vụ, orchestrator in vào chat gốc đúng hai dòng mà
 `interaction.json#transitionLog` khai — mục tiêu của nhánh, rồi kết quả kèm số dòng "xong khi" đã có

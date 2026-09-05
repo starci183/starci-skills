@@ -15,14 +15,19 @@ Before communicating a question, apply [the interaction policy](resources/intera
 This changes communication only: all routing transitions, operator boundaries and required
 authorizations below remain in force. An Ask column or diagnostic reason is not a prompt to forward.
 
+Every user prompt first runs `scripts/session-open.mjs open`: it creates or reuses the one StarCi
+ledger bound to the native Codex task or Claude session and its user worktree. This happens before
+scope confirmation, planning, operator dispatch, helper dispatch, design or mutation. Agents, helpers,
+nested exchanges and retries bind to that host session; none creates another user session.
+
 1. Freeze one mission scope: the unit, the target, inclusions and exclusions, write roots, external
    effects, and what will count as proof. Two readings that would change any of those is one focused
-   question, not a guess. Freezing is not silent: for a mission that will write routed source or touch
-   a runtime, the frozen scope is printed to the person as one block of at most five lines in the
-   display language (`resources/settings.json#language` over `settings.example.json`, default `vi`;
-   a person who writes in another language is answered in it) — the goal, what is in and what is
-   out, the "done when" lines, how far the verification reaches, one question — and confirmed once
-   through a `goal-confirm` choice before step 2. The scope line is the one place the narrowing is put
+   question, not a guess. Freezing is not silent: the already-open draft is printed as one table in
+   the display language with Goal, Target, In scope, Out of scope, Outputs, Done when, Verification
+   reach and Example, and its version is confirmed before step 2. If the prompt already stated and
+   authorized exactly that table, record that prompt as `as-stated` instead of asking routinely.
+   Correction creates the next draft version; rejection or silence leaves it non-executable. The scope
+   line is the one place the narrowing is put
    to the person: it is filled from the counts of every plan this session has landed, at each plan
    transition (`state.json.mission.scope`, `resources/interaction.json#rule`), and what it says was deferred
    stands on the unchecked ledger under `@worktrees/unchecked` rather than in a second question. That
@@ -31,7 +36,7 @@ authorizations below remain in force. An Ask column or diagnostic reason is not 
    nothing, and only a `user` route, a `budget-choice` or a corrected goal stops for the person
    (`resources/interaction.json#asks`). Each "done when" line names the
    operator whose receipt is that evidence, and a request from which no "done when" line can be
-   written does not start. The block and the answer are what step 4 records as `state.json.mission`
+   written does not start. The table and the answer are recorded as `state.json.mission`
    and `choices["goal:<sessionId>:v<version>"]`: `corrected` writes the next version and asks again,
    and a mission whose latest version is not `as-stated` runs nothing
    (`scripts/validate-request.mjs`). A mission opened from an approved banked entry
@@ -40,7 +45,7 @@ authorizations below remain in force. An Ask column or diagnostic reason is not 
    it lists, recorded as this session's own choice with the approval as its `sourceRef`
    (`scripts/validate-session.mjs#bankRefErrors`). A goal corrected at open time is not covered by it:
    the bank entry is rewritten, which ends the approval, and the next version is asked the same way.
-   Read-only work asks nothing.
+   A follow-up within the confirmed goal asks nothing.
 2. Run `environment.preflight` first for any mission that touches routed source or a runtime: every
    wall the mission could meet — an undeclared or near-named route, a missing git policy, a dirty
    checkout, a sign-in that fails, a served head that does not contain the bound one, a held port, a
@@ -63,23 +68,13 @@ authorizations below remain in force. An Ask column or diagnostic reason is not 
    accepts it before step 5; a chain the tables leave ambiguous is a refusal naming the ambiguity,
    never a guess. Every stop that changes what the mission needs redraws the chain the same way and
    records it as a `replanned` transition with its note and goal version.
-4. Create the session before anything else happens. Nothing is designed, written or committed outside
-   a session: the first act of a mission that will write anything is, in order, the session folder,
-   the branch the route's git policy names for session work, and a validated `request.json` — never a
-   question put to a person about whether to open one or which of those to do, because the tree has
-   already answered both, and never something done after the first write. Before any file outside the
-   session folder is read in order to change it, and before any file outside the session folder is
-   written, `<Source>/.worktrees/sessions/<sessionId>/state.json` and
-   `step-1/parallel-1/request/request.json` exist on disk and `scripts/validate-request.mjs` is green
-   on that branch. An agent that finds itself editing routed source, or publishing it, with no
-   `step-N/parallel-M` under a session stops and reports `SESSION_MISSING`. Its repair is fixed, not a
-   choice to surface: open the session now, move the already-written change onto the branch its git
-   policy names for session work, and run the operators that owe the receipt for it — the same
-   recovery `SESSION_MISSING` itself states — never write the session afterwards to make the past look
-   gated, because that records the work instead of gating it. Designing by hand and committing on a
-   session branch with no session on disk is the same violation as writing with no request: the
-   candidates nobody saw, the screenshots nobody took and the UAT nobody ran are exactly what the
-   missing folder was supposed to hold.
+4. Activate the already-open session only when its latest mission version is explicitly confirmed.
+   Plan the chain into that ledger. Before each invocation, write the v2.2 `request.json` with one
+   versioned `expected`, its attempt identity and previous attempt, its exact environment and resource
+   ownership, and every request-side artifact under `frozenInputs`. `scripts/attempt-gate.mjs open`
+   semantically validates those sidecars, freezes the request and creates the running receipt. Then
+   `scripts/worker-slots.mjs acquire` must grant one of the same session's three slots before the
+   operator runs. A missing session, unopened attempt or queued slot means no execution.
 5. Select the first operator of that chain. Read only that operator's `operator.md` and
    `operator.json`.
 6. Run that operator, end to end, on the one profile its `operator.json` names under `resources`, with
@@ -136,39 +131,44 @@ Support work is not in that table, because it is not a mission. A request to pre
 what a product left behind and draft a bank of missions from it, and whatever else the support layer
 grows — is a `helper` route (`routing.json#kinds.helper`, `resources/orchestrator.json#helpers`): the
 person writes `/helper <id> <args>` or names the job, the helper listed in
-[`helpers/INDEX.md`](helpers/INDEX.md) runs on its own profile with no session, and it leaves one run
-record under `@worktrees/helpers/<id>/runs/<runId>/`. A helper opens no session, writes no product
+[`helpers/INDEX.md`](helpers/INDEX.md) runs on its own profile and leaves one run record under
+`@worktrees/helpers/<id>/runs/<runId>/`. Its v2.2 receipt binds the existing host session and owning
+StarCi session when there is one; it never opens another user session. A helper writes no product
 source, touches no runtime, publishes nothing and asks nothing; one that finds it must do any of those
-has found an operator's job, and the table above is where that job is.
+has found an operator's job.
 
 ## The loop
 
 ```text
-request/request.json -> validate-request.mjs -> agent writes response/ -> validate-response.mjs + the operator's validate.mjs -> route
+attempt-gate open -> worker-slots acquire -> agent writes actual -> attempt-gate accept -> compare -> route | repair | retry | blocked
 ```
 
 Routing reads `response.json` and nothing else:
 
-1. `done` advances the chain to the next step the plan names (`state.json.chain`, drawn by
+1. `done` advances only when `comparison.verdict` is `matched`, every required expected criterion has
+   one actual observation and resolvable evidence, and `comparison.next` is `advance`. It then follows
+   the next step the dynamic plan names (`state.json.chain`, drawn by
    `scripts/plan-chain.mjs` and accepted by `scripts/validate-chain.mjs`); the next branch's
    `request.json` points at this branch's outputs by explicit path.
-2. `waiting` runs the nested exchange the response awaits (`<exchange>/request` and `response` inside
-   the same branch), then resumes the same agent; sibling branches keep running.
-3. `blocked` reads `stop`, looks the code up in the merged registry (`operators/errors.json` plus the
+2. `mismatch` never advances. It preserves the request, response, actual evidence and comparison in
+   `state.json.attempts`, then chooses repair, retry or blocked. The next attempt points at the previous
+   id, keeps or strengthens required expected under the same goal version, and records what changed.
+3. `waiting` releases its worker slot, runs the nested exchange as another attempt under the same
+   session-wide cap, then reacquires a slot to resume; sibling branches keep running.
+4. `blocked` reads `stop`, looks the code up in the merged registry (`operators/errors.json` plus the
    operator's own `errors.json`) for its `domain`, and resolves that domain in `routing.json`:
    - `operator` invokes the named operator, then returns here;
    - `resume` re-enters the same operator in a new step, `request.json.resume` naming the blocked one;
-   - `chain` opens a sibling session for the outcome the route's target names, its chain planned from
-     that mission like any other, the blocked branch waiting on that session's end and re-entering
-     with what it produced — an owner library defect is repaired and consumed this way, and a person
-     is asked nothing;
+   - `chain` adds the target owner and prerequisites to this session's dynamic plan, preserving the
+     host binding and confirmed goal; the blocked attempt waits without a slot and re-enters after
+     the added branch produces accepted evidence;
    - `user` stops and reports what the person must decide or publish;
    - `external` stops and reports what outside the runtime must change.
    A code whose disposition is `fallback` never blocks: the agent performs the fallback, records it
    under `## Fallbacks taken`, and continues, unless the code's `unless` param says otherwise.
 
-A response that fails either validator does not route. Prose in `response.md` does not route. Only a
-validated field of `response.json` does. The orchestrator writes `response.json` as a `running`
+A response that fails the shared contract or operator validator does not route. Prose in `response.md`
+does not route. Only a validated comparison and field of `response.json` does. The orchestrator writes `response.json` as a `running`
 skeleton at dispatch; an agent that exits without replacing it is followed up once and then recorded
 as `RECEIPT_MISSING`, so a branch that narrated its work and wrote no receipt is visible in the ledger
 instead of silently passed.
@@ -183,10 +183,12 @@ Every operator carries its own resume and fingerprint semantics, so this file ho
 counter and no handoff state. A `resume` route that returns `NO_PROGRESS` means the same input
 reached the same wall: report the wall rather than trying again.
 
-A cycle between two operators is valid only while the progress fingerprint changes. A repeated
-fingerprint, or the same material finding twice, ends the loop and reports the smaller owner. A
-replan is a `replanned` transition carrying its note and the goal version it moves to, confirmed again
-through `goal-confirm`, never a silent rewrite of the chain.
+A cycle between two operators is valid only while the progress fingerprint changes. A retry that
+reuses the same expected, inputs, environment revision and method after the same mismatch is
+`NO_PROGRESS`; a repeated fingerprint ends the loop and reports the smaller owner. A
+replan is a `replanned` transition carrying its note and the goal version it moves to. It runs without
+another question inside the confirmed scope; a goal or scope change creates the next confirmation
+version, never a silent rewrite.
 
 The session runs under a budget (`state.json.budget`, from `resources/orchestrator.json#budget`): a
 step cap and a same-operator cap. A request that would pass either is `BUDGET_EXHAUSTED`, and the
@@ -269,10 +271,14 @@ only the generated `operators/<id>/brief.md`, its `request.json` and the files i
 profile the operator names, with the aliases its Context table declares and the tools its
 `operator.json` declares (`@tools/<id>` from `resources/tools.json`, one mode each) and nothing else,
 and is awaited on its completion event, never on a timer. `resources/orchestrator.json` fixes the
-rules: at most three agents at once, branches of one step never sharing a write alias, dispatch by
+rules: `scripts/worker-slots.mjs` permits at most three active workers across the whole host-bound
+session, including nested exchanges, helpers and retries; normalized overlapping resources queue;
+branches run only with accepted inputs and isolated environment ownership; dispatch follows
 the planned chain and `routing.json`, hand-off only through `response.json` fields inside the session
-(`state.json`, `step-N/parallel-M/{request,response}`), a session the orchestrator creates first and
-deletes after `git.publish`. An agent never starts another agent; a nested exchange (a critique, a
+(`state.json`, `step-N/parallel-M/{request,response}`). Publication does not close a session. Only an
+explicit close-success event may compact and verify its durable bundle under `@worktrees/done` before
+deleting exactly that session folder; blocked and failed sessions remain resumable, and no user
+worktree or branch is deleted. An agent never starts another agent; a nested exchange (a critique, a
 review) is a second new agent, in the operator's own mode, that the orchestrator spawns for a branch
 that paused with `waiting`. Every file an agent writes under `response/` is swept for
 secret-shaped values by the response gate (`scripts/sweep-secrets.mjs`) before the branch can route. `alias/alias.json` is the one place an alias resolves to a location, and `alias/INDEX.md` is

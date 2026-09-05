@@ -12,6 +12,7 @@ import path from 'node:path';
 import process from 'node:process';
 import { fileURLToPath } from 'node:url';
 import { validateAgainst } from './json-schema.mjs';
+import { V22_CONTRACT } from './validate-request.mjs';
 import { checkDocument, loadKindTemplates } from './validate-templates.mjs';
 import { loadOperatorPackages, kindOf, isYes, exchangeOf } from './operator-md.mjs';
 import { loadErrorsRegistry } from './errors-registry.mjs';
@@ -128,11 +129,66 @@ export function goalCheckErrors(dir, response, goal, { rel = (f) => f, exchange 
   if (check.achieved === true && !(check.evidence ?? []).length) errors.push(`${rel('response/response.json')}: goalCheck.achieved is true with no evidence; an achieved done-when line is evidenced by at least one declared file`);
   return errors;
 }
+
+export function attemptContractErrors(dir, response, request, { rel = (f) => f } = {}) {
+  const errors = [];
+  const requestV22 = request?.contractVersion === V22_CONTRACT;
+  const responseV22 = response?.contractVersion === V22_CONTRACT;
+  if (requestV22 && !responseV22) errors.push(`${rel('response/response.json')}: contractVersion ${V22_CONTRACT} is required by the v2.2 request`);
+  if (responseV22 && !requestV22) errors.push(`${rel('response/response.json')}: a v2.2 receipt cannot answer a legacy or unmarked request`);
+  if (!requestV22 || !responseV22) return errors;
+  const expected = request.expected ?? {};
+  const attempt = request.attempt ?? {};
+  if (response.attempt?.id !== attempt.id) errors.push(`${rel('response/response.json')}: attempt.id does not match request.attempt.id ${attempt.id}`);
+  if (response.attempt?.number !== attempt.number) errors.push(`${rel('response/response.json')}: attempt.number does not match request.attempt.number ${attempt.number}`);
+  if (response.attempt?.expectedVersion !== expected.version) errors.push(`${rel('response/response.json')}: attempt.expectedVersion does not match request.expected.version ${expected.version}`);
+  if (response.status === 'running' || response.status === 'waiting') return errors;
+  if (response.actual?.expectedVersion !== expected.version) errors.push(`${rel('response/response.json')}: actual.expectedVersion does not match frozen expected version ${expected.version}`);
+  const observedAt = Date.parse(response.actual?.observedAt);
+  if (!Number.isFinite(observedAt) || observedAt > Date.now() + 300_000) errors.push(`${rel('response/response.json')}: actual.observedAt is not a valid observation instant`);
+  if (response.comparison?.expectedVersion !== expected.version) errors.push(`${rel('response/response.json')}: comparison.expectedVersion does not match frozen expected version ${expected.version}`);
+  const criteria = new Map((expected.criteria ?? []).map((criterion) => [criterion.id, criterion]));
+  const observations = new Map();
+  for (const observation of response.actual?.observations ?? []) {
+    if (observations.has(observation.criterionId)) errors.push(`${rel('response/response.json')}: actual repeats criterion ${observation.criterionId}`);
+    observations.set(observation.criterionId, observation);
+  }
+  const comparisons = new Map();
+  for (const comparison of response.comparison?.criteria ?? []) {
+    if (comparisons.has(comparison.criterionId)) errors.push(`${rel('response/response.json')}: comparison repeats criterion ${comparison.criterionId}`);
+    comparisons.set(comparison.criterionId, comparison);
+  }
+  const declared = new Set(Object.values(response.fields ?? {}).flatMap((value) => Array.isArray(value) ? value : [value]));
+  for (const [id] of criteria) {
+    if (!observations.has(id)) errors.push(`${rel('response/response.json')}: actual has no observation for expected criterion ${id}`);
+    if (!comparisons.has(id)) errors.push(`${rel('response/response.json')}: comparison has no verdict for expected criterion ${id}`);
+  }
+  for (const [id, observation] of observations) {
+    if (!criteria.has(id)) errors.push(`${rel('response/response.json')}: actual names unknown criterion ${id}`);
+    for (const evidence of observation.evidence ?? []) {
+      if (!declared.has(evidence)) errors.push(`${rel('response/response.json')}: actual evidence ${evidence} is not a declared output`);
+      else if (!existsSync(path.join(dir, evidence))) errors.push(`${rel(evidence)}: actual evidence is missing`);
+    }
+  }
+  for (const [id, comparison] of comparisons) {
+    if (!criteria.has(id)) errors.push(`${rel('response/response.json')}: comparison names unknown criterion ${id}`);
+    const observedEvidence = new Set(observations.get(id)?.evidence ?? []);
+    for (const evidence of comparison.evidence ?? []) if (!observedEvidence.has(evidence)) errors.push(`${rel('response/response.json')}: comparison evidence ${evidence} for ${id} was not observed by this attempt`);
+  }
+  const requiredVerdicts = [...criteria].filter(([, criterion]) => criterion.required).map(([id]) => comparisons.get(id)?.verdict ?? 'inconclusive');
+  const derived = requiredVerdicts.includes('mismatched') ? 'mismatched' : requiredVerdicts.includes('inconclusive') ? 'inconclusive' : 'matched';
+  if (response.comparison?.verdict !== derived) errors.push(`${rel('response/response.json')}: comparison.verdict ${response.comparison?.verdict ?? 'missing'} disagrees with required criteria (${derived})`);
+  if (response.status === 'done' && (derived !== 'matched' || response.comparison?.next !== 'advance')) errors.push(`${rel('response/response.json')}: status done advances only after every required criterion matched and comparison.next is advance`);
+  if (response.status === 'mismatch' && (derived === 'matched' || !['repair', 'retry', 'blocked'].includes(response.comparison?.next))) errors.push(`${rel('response/response.json')}: status mismatch records a mismatched or inconclusive comparison and chooses repair, retry or blocked`);
+  if (response.status === 'mismatch' && (response.next ?? []).length) errors.push(`${rel('response/response.json')}: a mismatch does not route to the next operator; attempt-gate records repair or retry first`);
+  if (response.goalCheck?.achieved === true && derived !== 'matched') errors.push(`${rel('response/response.json')}: goalCheck cannot be achieved while required expected criteria are ${derived}`);
+  return errors;
+}
 // The goal the branch's request carried, read from disk when the caller did not pass it.
-async function requestGoalOf(dir, exchange) {
+async function requestOf(dir, exchange) {
   const file = path.join(exchange ? path.dirname(dir) : dir, 'request', 'request.json');
   if (!existsSync(file)) return null;
-  try { return JSON.parse(await readFile(file, 'utf8')).goal ?? null; } catch { return null; }
+  try { return JSON.parse(await readFile(file, 'utf8')); } catch { return null; }
 }
 
 // `dir` is the branch (or exchange) folder; `requirements` and `goal` come from the branch's request.json.
@@ -146,6 +202,7 @@ export async function validateResponse(root, dir, { requirements = {}, exchange 
   const file = path.join(dir, 'response', 'response.json');
   if (!existsSync(file)) return { errors: [`${rel('response/response.json')}: missing`], response: null, present: new Set() };
   let response; try { response = JSON.parse(await readFile(file, 'utf8')); } catch (e) { return { errors: [`${rel('response/response.json')}: ${e.message}`], response: null, present: new Set() }; }
+  const request = await requestOf(dir, exchange);
   const schema = JSON.parse(await readFile(path.join(root, 'templates', 'step', 'response.schema.json'), 'utf8'));
   errors.push(...validateAgainst(schema, response, rel('response/response.json')));
   const stateFile = path.join(sessionRootOf(dir) ?? dir, 'state.json');
@@ -159,8 +216,9 @@ export async function validateResponse(root, dir, { requirements = {}, exchange 
   if (response.status === 'running') errors.push(`${rel('response/response.json')}: status running is the dispatch skeleton, not a receipt; the agent replaces it with done, blocked or waiting, and an agent that exits leaving it is RECEIPT_MISSING`);
   // A sealed value never reaches a receipt, an artifact or a log an agent kept.
   errors.push(...secretErrors(path.join(dir, 'response'), { relativeTo: sessionRootOf(dir) ?? dir }));
+  errors.push(...attemptContractErrors(dir, response, request, { rel }));
   // The branch goal is answered in the receipt: a done branch that serves a done-when line says whether it evidenced it.
-  errors.push(...goalCheckErrors(dir, response, goal === undefined ? await requestGoalOf(dir, exchange) : goal, { rel, exchange }));
+  errors.push(...goalCheckErrors(dir, response, goal === undefined ? request?.goal ?? null : goal, { rel, exchange }));
   if (response.status !== 'blocked' && response.stop !== undefined) errors.push(`${rel('response/response.json')}: only a blocked response carries a stop`);
   if (response.status !== 'waiting' && response.awaiting !== undefined) errors.push(`${rel('response/response.json')}: only a waiting response carries awaiting`);
   if ((response.exchange ?? null) !== exchange) errors.push(`${rel('response/response.json')}: exchange ${response.exchange ?? 'none'} does not match the folder ${exchange ?? 'none'}`);
