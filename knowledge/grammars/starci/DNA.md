@@ -1,6 +1,6 @@
 # StarCi Core — DNA
 
-`@starci/grammar@0.4.11` · checkout `0564837a4ba345ff9a472296b10127289eb22c29` · generated 2026-09-05
+`@starci/grammar@0.4.12` · checkout `67680f824464ae34c497fbe3703032af314f383a` · generated 2026-09-05
 
 This file is generated from the live `@starci/grammar` package, never written by hand: identity, tokens, renderers, published props, `data-contract` claims, and emitted classes are read out of `src/`, and the gap list is copied from the `## Gaps` table in [Family and DNA](family.md). Prime a direction agent with this file: it says what exists. [Idioms](idioms.md) says how StarCi composes it, and [Playbook](playbook.md) says which idioms a business shape needs. Regenerate with `node scripts/generate-grammar-dna.mjs`, and verify with `--check`; it needs the routed FE checkout, so it is not part of `npm test`.
 
@@ -9,8 +9,8 @@ This file is generated from the live `@starci/grammar` package, never written by
 | Fact | Value |
 | --- | --- |
 | Package | `@starci/grammar` |
-| Version | `0.4.11` |
-| Checkout head | `0564837a4ba345ff9a472296b10127289eb22c29` |
+| Version | `0.4.12` |
+| Checkout head | `67680f824464ae34c497fbe3703032af314f383a` |
 | Family id | `core` |
 | Root component | `CoreGrammarRoot` |
 | Family scope | `data-grammar-family="core"` |
