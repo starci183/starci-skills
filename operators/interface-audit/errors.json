@@ -2,6 +2,18 @@
   "schemaVersion": 9,
   "note": "Stop codes interface.audit emits. INVALID_INPUT, SOURCE_DRIFT, EVIDENCE_MISSING and NO_PROGRESS come from operators/errors.json. RUNTIME_UNAVAILABLE is defined here and also emitted by uat.verify; UNKNOWN_RULE is emitted here and by interface.generate; both live in operators/errors.json with a scope list naming every operator that emits them.",
   "codes": {
+    "UNCHECKED_UNLAWFUL": {
+      "domain": "plan",
+      "disposition": "terminate",
+      "meaning": {
+        "en": "A state of a unit the mission's journey passes through was deferred rather than measured. A journey unit is proved in every state a reader meets on the way through it (templates/kinds/audit-scope.schema.json#journeyStates), so that coverage is not something this audit may leave unchecked.",
+        "vi": "Một state của unit mà hành trình của nhiệm vụ đi qua đã bị hoãn thay vì đo. Unit thuộc hành trình phải được chứng minh ở mọi state người đọc gặp trên đường đi (templates/kinds/audit-scope.schema.json#journeyStates), nên phần phủ đó không phải thứ lần audit này được phép để lại chưa kiểm."
+      },
+      "resume": {
+        "en": "The plan re-tiers the unit, or the audit captures the state; a smaller audit is not the repair.",
+        "vi": "Plan xếp lại tier cho unit, hoặc audit chụp state ấy; audit hẹp hơn không phải cách sửa."
+      }
+    },
     "CALIBRATION_OFF": {
       "domain": "interface",
       "disposition": "terminate",

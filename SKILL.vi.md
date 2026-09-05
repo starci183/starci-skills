@@ -14,11 +14,14 @@ buộc bên dưới vẫn giữ nguyên. Cột Ask hay reason chẩn đoán khô
    hiệu ứng ra bên ngoài, và thứ sẽ được tính là bằng chứng. Hai cách đọc làm đổi bất kỳ điểm nào
    trong số đó là một câu hỏi tập trung, không phải một phỏng đoán. Đóng băng không diễn ra trong im
    lặng: với nhiệm vụ sẽ ghi source đã route hay chạm tới một runtime, phạm vi đã đóng băng được in
-   cho người thành một khối tối đa bốn dòng bằng ngôn ngữ hiển thị (`resources/settings.json#language`
+   cho người thành một khối tối đa năm dòng bằng ngôn ngữ hiển thị (`resources/settings.json#language`
    đè lên `settings.example.json`, mặc định `vi`; người viết bằng ngôn ngữ khác thì được trả lời bằng
-   ngôn ngữ đó) — mục tiêu, cái gì trong và cái gì ngoài, các dòng "xong khi", một câu hỏi — và được
-   xác nhận một lần qua lựa chọn `goal-confirm` trước bước 2. Khối đó là câu hỏi duy nhất một prompt
-   mới đặt ra; từ đó lượt chạy phải mượt: log transition in ra mà không chờ, vẽ lại dưới cùng goal và
+   ngôn ngữ đó) — mục tiêu, cái gì trong và cái gì ngoài, các dòng "xong khi", việc kiểm chứng với
+   tới đâu, một câu hỏi — và được xác nhận một lần qua lựa chọn `goal-confirm` trước bước 2. Dòng
+   phạm vi là nơi duy nhất phần thu hẹp được đưa ra cho người: nó được điền từ chính các con số đếm
+   của kế hoạch khi một kế hoạch tới nơi (`state.json.mission.scope`, `resources/interaction.json#rule`),
+   và thứ nó nói là đã hoãn thì đứng trên sổ chưa kiểm dưới `@worktrees/unchecked` chứ không đứng
+   trong một câu hỏi thứ hai. Khối đó là câu hỏi duy nhất một prompt mới đặt ra; từ đó lượt chạy phải mượt: log transition in ra mà không chờ, vẽ lại dưới cùng goal và
    vào lại theo route không hỏi gì, và chỉ route `user`, một `budget-choice` hay goal được sửa mới dừng
    để hỏi người (`resources/interaction.json#asks`). Mỗi dòng "xong khi" gọi tên operator mà biên nhận của nó là bằng chứng ấy, và một
    yêu cầu không viết nổi dòng "xong khi" nào thì không bắt đầu. Khối và câu trả lời là thứ bước 4 ghi

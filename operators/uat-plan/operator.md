@@ -9,8 +9,8 @@ each walk one flow and no two of them ever share a row.
 ## Done when
 
 Done when the `uat-plan` names one flow per journey the goal names, each with its entry route, its
-step budget, its own account alias and its own seed namespace, and the `units` file carries one flow
-unit per Flows row with the same id.
+step budget, its own account alias, its own seed namespace and its tier, and the `units` file carries
+one flow unit per Flows row with the same id and tier.
 
 ## The unit of a blind walker is one flow
 
@@ -42,6 +42,18 @@ with a surface map that names the entry, or with the entry route named in the go
 caller's defect and never becomes `INVALID_INPUT`, because a goal is allowed to name a journey in a
 person's words and it is this operator that turns words into an entry route.
 
+## The journey is walked, and everything else is unchecked
+
+The goal names journeys; the mission's "done when" lines name which of them this run has to prove.
+Those flows are `journey` and the walker is dispatched over them. A flow the plan names because the
+feature has it, but no done-when line reaches, is `secondary`: it carries one sentence saying why, and
+is written down as unchecked in the walk lane under `@worktrees/unchecked` rather than walked — so a
+run that proves three journeys out of seven says which four it did not, instead of leaving the reader
+to assume it proved everything. A flow the feature already carries an open walk entry on is taken back
+into the journey by this plan, which covers it when the walk runs, or extended by a secondary row with a
+reason of this plan's own; a plan that drops it from the list defers it again with nobody's agreement,
+and is refused.
+
 ## Boundary
 
 Context is read-only. The operator writes only `response/` of its own branch: the plan, the unit list
@@ -55,6 +67,7 @@ It names credentials by alias only and has no field that could hold one.
 | --- | --- | --- |
 | `@worktrees/_templates` | the UAT flow template the tree ships: the shape a flow folder takes, its cases, the aliases they act as and its seed, so every planned flow is one a walker can draft | yes |
 | `@worktrees/uat/<flow>` | the flow folders that already exist under the feature: a flow that exists keeps its name, its account aliases and its seed namespace | no |
+| `@worktrees/unchecked/<product>` | the unchecked coverage this feature already carries in the walk lane: every flow an earlier mission deferred, so this plan covers it or extends it rather than deferring it again in silence | no |
 
 ## Inputs
 
@@ -81,8 +94,9 @@ It names credentials by alias only and has no field that could hold one.
 | 4 | Read the flow folders that exist under the feature: a flow that exists keeps its name, its aliases and its namespace | `feature`, `env` | @worktrees/uat/<flow>, @worktrees/_templates for the shape a flow folder takes | — | — |
 | 5 | Name one flow per journey with its entry route and its budget in steps | — | the journeys, the map, the existing flows | — | `FLOW_UNDEFINED` |
 | 6 | Give every flow its own account alias and its own seed namespace, disjoint from every other flow of the plan | `env` | the flows, @worktrees/uat/<flow> for the aliases already provisioned | — | — |
-| 7 | Write the unit list: one flow unit per Flows row with the same id and the journey as its goal | — | the plan | `units` | — |
-| 8 | Emit the plan and the receipt | — | everything above | `uat-plan`, `response/response.json` | — |
+| 7 | Tier every flow against the mission's done-when lines: `journey` where a line walks it, `secondary` with one sentence of reason where none does, and every open entry of this feature taken back or extended | — | the mission's done-when lines, the flows, @worktrees/unchecked/<product> | — | — |
+| 8 | Write the unit list: one flow unit per Flows row with the same id and tier, the journey as its goal and its deferral reason where it has one | — | the plan | `units` | — |
+| 9 | Emit the plan and the receipt | — | everything above | `uat-plan`, `response/response.json` | — |
 
 Step 5 is the only step that stops on the plan itself: a journey that step 2 found and no map or
 folder gives an entry to is `FLOW_UNDEFINED`, with the reason naming it in one paragraph, and

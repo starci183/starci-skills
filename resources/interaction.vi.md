@@ -16,8 +16,10 @@ lại cùng một điều. Nhiệm vụ không có lựa chọn khác biệt th�
 
 Câu hỏi `goal-confirm` được hỏi một lần, ở đầu nhiệm vụ sẽ ghi source đã route hay chạm tới một
 runtime, và không bao giờ cho việc chỉ đọc: orchestrator in khối mà `state.json.mission` giữ — mục
-tiêu, phần bao gồm và loại trừ, các dòng "xong khi" — thành tối đa bốn dòng bằng ngôn ngữ của người
-kèm một câu hỏi, rồi ghi câu trả lời vào `state.json.choices["goal:<sessionId>:v<version>"]`.
+tiêu, phần bao gồm và loại trừ, các dòng "xong khi", và dòng phạm vi
+`scope: <n> journey units, <m> unchecked` một khi plan đã điền `mission.scope` — thành tối đa
+năm dòng bằng ngôn ngữ của người kèm một câu hỏi, rồi ghi câu trả lời vào
+`state.json.choices["goal:<sessionId>:v<version>"]`.
 `corrected` viết phiên bản kế tiếp rồi hỏi lại; chỉ phiên bản mới nhất được chọn `as-stated` mới cho
 phép chạy bất cứ gì (`scripts/validate-request.mjs#missionGateErrors`, `scripts/validate-session.mjs`).
 Nhiệm vụ có ghi hay chạm runtime hay không được đọc từ các tool mà operator của nó khai, không bao

@@ -99,6 +99,18 @@ at the new head and, when no discrepancy stands, republished `implemented` over 
 gates never passed on is a promise resting on the wrong evidence. Only this operator takes that transition;
 a decision that changes the promise still moves the state.
 
+## A promise is proved as far as it was measured
+
+A delivery is compared with its promise, and how much of the delivery anybody looked at is part of that
+comparison. The `## Unchecked` table copies the feature's open unchecked ledger into the receipt, so a reader
+of one reconciliation sees the limits of the delivery beside its claims instead of inferring them from a
+run they were not present for. An entry of tier `secondary` is a unit the mission's journey never entered
+and does not stand in the way of `implemented`. An entry of tier `journey` is a state of a surface the
+journey itself passes through that no lane measured: the promise has been carried as far as it has been
+carried and no further, which is what `in-progress` already means, so the head is republished in that
+state rather than declared enforced. Nothing new is invented to say it; the lifecycle already had the
+word.
+
 ## Boundary
 
 Context is read-only apart from the one head it publishes. The operator writes only `response/` of
@@ -118,6 +130,7 @@ modifies product source, or claims that a quality gate or a UAT run has passed.
 | --- | --- | --- |
 | `@worktrees/businesses/<featureId>` | the published head, its state and its frozen coverage matrix, by content address from the head index; the one place this operator writes outside its branch, as the feature directory, the archived objects and the feature's index entry together | yes |
 | `@workspaces/be` | the routed backend checkout read at the frozen head; every fact claim cites it by path, line range and head | yes |
+| `@worktrees/unchecked/<product>` | the feature's open unchecked coverage: the units and states the delivery's own verification did not take, listed in the receipt beside the claims | no |
 
 ## Inputs
 
@@ -144,7 +157,7 @@ modifies product source, or claims that a quality gate or a UAT run has passed.
 | 1 | Validate the gate, the delivered-source input and the resume | `resume` | `request/request.json`, input `backend-source-application`, @workspaces/be at the frozen head | — | `INVALID_INPUT`, `SOURCE_DRIFT`, `NO_PROGRESS` |
 | 2 | Read the published head, its state and its frozen coverage matrix, and check the transition and the authority it needs | `featureId`, `targetState`, `approval` | @worktrees/businesses/&lt;featureId>: the current head, its state, its matrix and its fingerprints | — | `HEAD_NOT_RECONCILABLE`, `APPROVAL_REQUIRED` |
 | 3 | Normalize the delivered source into fact claims, each with its path, line range and head | — | input `backend-source-application`, @workspaces/be at the frozen head, inputs `quality-verification` and `uat-flow-verification` as evidence only, @tools/git | `response/data/claims.json` | `EVIDENCE_MISSING` |
-| 4 | Compare every row of the frozen matrix with the delivered claims and record each discrepancy against its dimension | — | `response/data/claims.json`, @worktrees/businesses/&lt;featureId> for the matrix at the published head | `response/response.md` | `RECONCILIATION_DISCREPANCY` |
+| 4 | Compare every row of the frozen matrix with the delivered claims and record each discrepancy against its dimension, and list the feature's open unchecked coverage beside them | — | `response/data/claims.json`, @worktrees/businesses/&lt;featureId> for the matrix at the published head, @worktrees/unchecked/&lt;product> for what the delivery's verification did not take | `response/response.md` | `RECONCILIATION_DISCREPANCY` |
 | 5 | Publish the head under an exclusive lease with the reconciliation it now carries: the feature directory, the object it is archived under and the entry that names it | — | `response/data/claims.json`, @worktrees/businesses/&lt;featureId> at the previous head, its archived object and the head index entry that names it | @worktrees/businesses/&lt;featureId> as the new model.json head, its object in the content store and the feature's entry in the head index, `response/data/model.json`, @tools/sourcewrite | `SOURCE_DRIFT` |
 | 6 | Emit | — | everything above | `response/response.json` | — |
 

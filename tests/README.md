@@ -335,3 +335,28 @@ of the same chain is allowed to have advanced past and an unrelated commit or an
 into being is not read as the branch gaining an entry, a stash and its drop are, and a shared installed
 tree binds only where the request declared `sharedInstall` — and the five operator self-tests carry the
 same refusals through their own receipts.
+
+## What a run decided not to prove
+
+A mission's verification covers the surfaces its done-when journey passes through, and everything else
+is written down rather than skipped in silence. `scripts/unchecked.spec.mjs` proves the ledger under
+`@worktrees/unchecked` in both directions: an absent `tier` reads as `journey` so a plan written before the
+field stays fully verified; an entry's id is derived from what it is about, so recording one receipt
+twice appends nothing and a lane that finally covers it resolves the line it already has; no line is
+ever edited, a resolution is a second line, and coverage taken and then dropped is unchecked again; a line
+that does not match the kind is refused rather than written; a plan writes one entry per deferred unit
+carrying that unit's own reason and none of its own; an open entry is covered by planning the unit into the
+journey or extended by planning it secondary, and a plan that drops it from the list is refused; and a
+verification covers what it took in its lane while recording the states it deferred, at the heavier
+tier, because a state of a surface the journey walks is not the same as a surface it never enters.
+`scripts/unit-gate.spec.mjs` proves the other half at the request gate: a verifying lane is fanned out
+over the journey units alone and a `secondary` unit dispatched to one is refused by name, while
+`interface.generate` — absent from the lane map on purpose — still builds everything the plan lists.
+The operator self-tests carry the same law through their own receipts: the two plans refuse a Tier cell
+that disagrees with the unit list, a deferral with no reason, and a plan that defers every unit it
+names; `interface.audit` refuses a journey surface deferring one of the four states a reader meets on
+the way through it (`UNCHECKED_UNLAWFUL`) and a deferred state with no reason for the ledger to copy;
+`business.reconcile` refuses a receipt that leaves an open entry out of its `## Unchecked` table and a head
+republished `implemented` while a journey entry stands; and `release.deploy` refuses a production
+release over a journey entry while passing one over a unit outside the journey. Each of those runs
+against a synthetic ledger root, so no test reads or writes the host's own `@worktrees/unchecked`.

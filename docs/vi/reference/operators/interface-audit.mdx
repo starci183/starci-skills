@@ -180,6 +180,7 @@ làm bằng chứng rằng node đã pass.
 | `@workspaces/fe` | checkout được route ở commit mà lần áp dụng đã ghi; chủ sở hữu và identifier được quan sát ở đó | có |
 | `@worktrees/sessions/central-runtime` | chủ runtime dùng chung: preview đang phục vụ worktree phiên ở commit ấy | có |
 | `@knowledge/grammars/<family>` | họ mà route đã bind gọi tên (`context.grammarId`) được kỳ vọng hiện thực hoá Common ra sao, và gap của họ được ghi ở đâu | không |
+| `@worktrees/unchecked/<product>` | phần chưa kiểm của tính năng này: những đơn vị và state mà các nhiệm vụ trước để lại chưa chứng minh trong làn audit, và cái nào trong số đó vòng này kiểm | không |
 
 ## Đầu vào
 
@@ -211,7 +212,7 @@ làm bằng chứng rằng node đã pass.
 | --- | --- | --- | --- | --- | --- |
 | 1 | Kiểm cổng vào và resume, và xác nhận commit đã áp nằm trong head mà route đang phục vụ | `resume` | `request/request.json`, đầu vào `frontend-source-application` (commit nó đã ghi), đầu vào `route` (nhánh đang phục vụ, head đang phục vụ và những commit head đó chứa), @workspaces/fe tại head đã đóng băng, @worktrees/sessions/central-runtime, @tools/git | — | `INVALID_INPUT`, `SOURCE_DRIFT`, `NO_PROGRESS` |
 | 2 | Bind thẩm quyền | — | @knowledge/ui/proof (mọi topic kèm fingerprint và kho luật), đầu vào `frontend-source-application` (các lời khai), đầu vào `frontend-presentation-resolution` (chủ sở hữu của từng node), @worktrees/sessions/central-runtime | — | — |
-| 3 | Bind phạm vi bề mặt chính, các mục ma trận và lớp bề mặt đã khai | `auditScope`, `matrix` | đầu vào `frontend-direction-decision` (chính `response/data/coverage.json` của nó: state nhân viewport nhân bảng màu, và `surfaceClass` mà quyết định ấy đã khai) | — | `SURFACE_CLASS_MISSING` |
+| 3 | Bind phạm vi bề mặt chính, các mục ma trận và lớp bề mặt đã khai, rồi cho mỗi state vòng này sẽ không tới đúng một câu nói vì sao | `auditScope`, `matrix` | đầu vào `frontend-direction-decision` (chính `response/data/coverage.json` của nó: state nhân viewport nhân bảng màu, và `surfaceClass` mà quyết định ấy đã khai), @worktrees/unchecked/&lt;product> cho thứ tính năng này đang nợ trong làn audit | — | `SURFACE_CLASS_MISSING`, `UNCHECKED_UNLAWFUL` |
 | 4 | Chờ từng mục tới lúc sẵn sàng trên cổng mà entry của chủ runtime cho route này mang theo, trong profile trình duyệt của riêng phiên này, đăng nhập bằng tài khoản của luồng khi route đòi một danh tính | `readinessProbe`, `account`, `env` | @worktrees/sessions/central-runtime để lấy entry của đúng route này và endpoint nó phục vụ, đầu vào `uat-account` cho hồ sơ toàn tên, @tools/http, @tools/secrets, @tools/browsercontrol | — | `RUNTIME_UNAVAILABLE`, `IDENTITY_MISSING` |
 | 5 | Viết một lượt đi thử cho mỗi mục ma trận: viewport và tông màu của mục làm ngữ cảnh, target theo vai trò và tên để tới trạng thái, route vào đúng một lần ở bước 1, thông tin đăng nhập theo tên khi route có cổng canh, một bức chụp mang tên mục | — | đầu vào `frontend-direction-decision` (các mục ma trận), đầu vào `route`, đầu vào `uat-account` cho hồ sơ toàn tên | `uat-walk` | — |
 | 6 | Chạy từng lượt đi qua runner của cây dưới @tools/browsercontrol chế độ `playwright` — một ngữ cảnh trình duyệt mới tinh cho mỗi lượt đi tại endpoint mà entry của chủ runtime mang — hoặc lái mục đó qua trình duyệt dưới chế độ `required` khi không viết lượt đi nào | — | `uat-walk`, @worktrees/sessions/central-runtime để lấy endpoint, @tools/browsercontrol, @tools/secrets | `walk-result`, `response/artifacts/<matrixId>.png` | `RUNTIME_UNAVAILABLE` |
@@ -305,6 +306,16 @@ không được biến các topic đạt thành lời khai đã kiểm toàn b�
 đã khai vẫn bị chặn và ghi `## Coverage gaps`. `TASTE-13` Case 8 sở hữu việc so state và so các vòng.
 Các gate unit, integration và regression giữ nguyên hợp đồng coverage riêng.
 
+Một state được hoãn là phần phủ chưa kiểm, và nó được ghi xuống đúng như thế. Mỗi mục của
+`deferredStates` mang lý do của mình trong `deferrals`, chính câu mà sổ cái dưới `@worktrees/unchecked`
+chép lại chứ không tự bịa, để một người đọc sổ cái nhiều tháng sau học được vì sao state ấy bị bỏ qua
+từ chính lượt audit đã bỏ qua nó. Nhánh này đo đúng một đơn vị mà hành trình của nhiệm vụ đi qua —
+việc toả nhánh không bao giờ gửi một đơn vị đã hoãn tới đây — và một đơn vị hành trình được chứng
+minh ở mọi state mà người đọc gặp trên đường đi qua nó: bốn state mà schema phạm vi publish thành
+`journeyStates`. Gọi tên một trong bốn state ấy là đã hoãn là `UNCHECKED_UNLAWFUL` và quay về bản kế
+hoạch, vì cách sửa cho phần phủ mà hành trình cần là một lần xếp tier khác, không bao giờ là một lượt
+audit nhỏ hơn.
+
 
 ## Đầu ra
 
@@ -331,6 +342,7 @@ Các gate unit, integration và regression giữ nguyên hợp đồng coverage 
 | `UNKNOWN_RULE` | terminate |
 | `SURFACE_CLASS_MISSING` | terminate |
 | `CALI<br />ATION_OFF` | terminate |
+| `UNCHECKED_UNLAWFUL` | terminate |
 | `NO_PROGRESS` | terminate |
 
 ## Kế tiếp
@@ -343,6 +355,7 @@ Các gate unit, integration và regression giữ nguyên hợp đồng coverage 
 | grammar-gap xác định hành vi thư viện hiện có bị lỗi, nên bind checkout chủ thư viện trước khi thực hiện yêu cầu sửa đã được cho phép | `workspace.bind` |
 | phát hiện trên Grammar đòi hướng trình bày hoặc tier thật sự mới, nên quyết hướng do người dùng chọn trước khi triển khai | `interface.generate` |
 | một topic đọc xuyên state bị blocked vì matrix bỏ sót một state mà coverage của hướng đã khai, nên bề mặt được audit lại khi matrix đã phủ đủ | `interface.audit` |
+| một state của đơn vị hành trình bị hoãn thay vì được đo, nên bản kế hoạch đã xếp tier cho đơn vị ấy xếp lại tier trước khi bề mặt được audit | `interface.plan` |
 | một tiêu chí mật độ được đo dưới khối lượng seed đại diện của luồng, nên dữ liệu được seed trước khi bề mặt được phán lại | `data.seed` |
 | route đòi một danh tính mà luồng này chưa có tài khoản, nên tài khoản được cấp trước khi bề mặt được quan sát | `identity.provision` |
 

@@ -8,7 +8,7 @@ Enumerate the user journeys the mission goal names, one flow per journey with it
 
 ## Done when
 
-Done when the `uat-plan` names one flow per journey the goal names, each with its entry route, its step budget, its own account alias and its own seed namespace, and the `units` file carries one flow unit per Flows row with the same id.
+Done when the `uat-plan` names one flow per journey the goal names, each with its entry route, its step budget, its own account alias, its own seed namespace and its tier, and the `units` file carries one flow unit per Flows row with the same id and tier.
 
 Primary output: `uat-plan`
 

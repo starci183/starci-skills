@@ -200,6 +200,7 @@ bước chạm tới sản phẩm bằng cách khác — một endpoint, một m
 | `@workspaces/be` | checkout backend được route tại commit đã ghim, nơi luồng kiểm hành vi và nơi store giữ các bản ghi có namespace | có |
 | `@workspaces/fe` | head frontend khi bề mặt trình duyệt và backend tách biệt; bắt buộc khi route hoặc admission nêu head frontend khác | không |
 | `@knowledge/ui/proof` | topic UX: các tiêu chí làn trải nghiệm chấm và rule biến chúng thành phán quyết của làn | có |
+| `@worktrees/unchecked/<product>` | phần chưa kiểm của feature này ở làn walk: những flow mà các nhiệm vụ trước để lại chưa đi, và cái nào trong số đó lần chạy này kiểm | không |
 
 ## Đầu vào
 

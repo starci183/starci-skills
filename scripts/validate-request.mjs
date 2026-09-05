@@ -17,6 +17,7 @@ import { validateAgainst } from './json-schema.mjs';
 import { loadOperatorPackages, kindOf, isYes, exchangeOf, cellAliases } from './operator-md.mjs';
 import { loadInteractionPolicy, selectionErrors } from './validate-interaction.mjs';
 import { validateImportedInput } from './producer-import.mjs';
+import { isJourney, journeyUnits, tierOf, verifiesUnits, laneOf } from './unchecked.mjs';
 
 // Only a fully quoted cell is unquoted: a sentence that opens with a code span keeps its backticks.
 const unquote = (s) => { const t = String(s ?? '').trim(); return /^`[^`]*`$/.test(t) ? t.slice(1, -1) : t; };
@@ -222,8 +223,12 @@ export function isolatedContextErrors(pkg, request) {
 // The unit of a blind agent is one page, one modal, one flow. A plan operator, <domain>.plan, writes the
 // data kind `units` (templates/kinds/units.schema.json): the closed list of what the execute operators
 // of its domain do one branch at a time. The schema states the shape; the two relations a schema cannot
-// state are read here — ids are unique, and dependsOn names ids of the same file — so the plan's own
-// validator, the fan-out gate and the spec share one reading of the file.
+// state are read here — ids are unique, dependsOn names ids of the same file, and a unit's tier agrees
+// with its deferral — so the plan's own validator, the fan-out gate and the spec share one reading of
+// the file. The tier relation is the coverage ruling made refusable: a secondary unit is one the
+// mission's journey does not pass through, so it is not verified and is written down as unchecked, and
+// coverage left unchecked with no reason is a skip nobody can read; a journey unit is verified, so it
+// defers nothing.
 export const UNITS_SCHEMA = path.join('templates', 'kinds', 'units.schema.json');
 export function unitsErrors(doc, at = 'units.json') {
   const errors = [];
@@ -236,6 +241,14 @@ export function unitsErrors(doc, at = 'units.json') {
     if (d === u.id) errors.push(`${at}: unit ${u.id} depends on itself`);
     else if (!ids.has(d)) errors.push(`${at}: unit ${u.id} depends on ${d}, which this file does not declare; dependsOn names units of the same plan`);
   }
+  for (const u of doc?.units ?? []) {
+    if (isJourney(u)) {
+      if (u.deferral !== undefined) errors.push(`${at}: unit ${u.id} is tier journey and carries a deferral; the mission's journey passes through it, so it is verified and nothing about it is owed`);
+    } else if (!u.deferral?.reason) {
+      errors.push(`${at}: unit ${u.id} is tier secondary and carries no deferral.reason; a unit the journey does not reach is not verified, and coverage nobody gave a reason for is a skip rather than a recorded gap`);
+    }
+  }
+  if (doc?.units?.length && !journeyUnits(doc).length) errors.push(`${at}: every unit is tier secondary, so the mission's done-when journey passes through none of them and nothing would be verified; a plan whose journey is empty is a plan of the wrong mission`);
   return errors;
 }
 // Reads one units.json against its schema and the relations above; `units` is null when it cannot be read.
@@ -351,9 +364,22 @@ export async function unitGateErrors(root, state, request, packages, sessionRoot
   if (!units) return errors;
   const producer = (packages ?? []).find((p) => p.manifest?.id === units.producedBy);
   if (!producer || !producesUnits(producer)) errors.push(`${file}: producedBy ${units.producedBy} is not an operator whose Outputs declare units; a unit list comes from a plan operator`);
-  if (!units.units.some((u) => u.id === request.unit)) errors.push(`request.json: unit ${request.unit} is not an id of ${file} (${units.units.map((u) => u.id).join(', ')}); an execute branch runs one unit the plan named`);
+  const named = units.units.find((u) => u.id === request.unit);
+  if (!named) errors.push(`request.json: unit ${request.unit} is not an id of ${file} (${units.units.map((u) => u.id).join(', ')}); an execute branch runs one unit the plan named`);
+  // Verification follows the journey. A verifying operator (scripts/unchecked.mjs#VERIFY_LANES) is
+  // dispatched only over the units the mission's done-when journey passes through; a secondary unit is
+  // an entry on the unchecked ledger, not a branch, and a run that fans out over it is the "render
+  // every screen to be safe" the tiering exists to stop. Generation is not narrowed this way: interface.generate builds
+  // what the plan lists, because generation scope is the person's goal rather than a proof.
+  else if (verifiesUnits(request.operatorId) && !isJourney(named)) {
+    errors.push(`request.json: ${request.operatorId} proves the ${laneOf(request.operatorId)} lane and unit ${request.unit} is tier ${tierOf(named)} in ${file}; verification covers the units the mission's journey passes through, and a secondary unit is carried as unchecked in that lane under @worktrees/unchecked rather than dispatched (${(units.units.filter(isJourney).map((u) => u.id).join(', ')) || 'no journey unit'} may be verified)`);
+  }
   return errors;
 }
+// How many branches a plan's fan-out is paid for: the units a verifying lane will actually run. The
+// step cap grows by orchestrator.json#budget.perUnit for each of these and by nothing for a unit that
+// was deferred, so a mission that narrows its coverage narrows its budget in the same movement.
+export const budgetUnitsOf = (doc) => journeyUnits(doc).length;
 
 export async function validateRequest(root, dir, packages) {
   const errors = [];

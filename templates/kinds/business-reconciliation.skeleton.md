@@ -37,6 +37,12 @@ read by `git.publish`, which publishes a delivery only once the head it carries 
 | --- | --- | --- |
 | `entitlement-consumer` | `src/course/guard.ts` | — |
 
+## Unchecked
+
+| Unit | State | Lane | Tier | Reason |
+| --- | --- | --- | --- | --- |
+| `unit-id` | `state-name` | audit | journey | why that coverage was not taken |
+
 ## Findings
 
 | Code | Severity | Dimension | Statement |

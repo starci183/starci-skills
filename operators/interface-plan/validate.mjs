@@ -6,6 +6,11 @@
 // the map is titled by the feature the request named; and a MAP_INCOMPLETE stop names, in one
 // paragraph, the route or host the map failed to name. The Shell floor (at least one row) and the
 // closed Kind and Element vocabularies live in the kind contract and are checked by the response gate.
+// The Map's Tier column is the same tiering the unit list carries, written where a person reads it:
+// `journey` for a unit the mission's done-when journey passes through, `secondary — <reason>` for one
+// it does not, and the reason is the unit's own deferral.reason rather than a second sentence. What a
+// tier means for the run — that only a journey unit is audited, and that a secondary one is unchecked
+// under @worktrees/unchecked — is scripts/unchecked.mjs, and an open entry this map drops is refused here.
 import { existsSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
 import path from 'node:path';
@@ -13,7 +18,9 @@ import process from 'node:process';
 import { fileURLToPath } from 'node:url';
 import { validateStep } from '../../scripts/validate-step.mjs';
 import { tableUnder } from '../../scripts/validate-response.mjs';
-import { unitsErrors } from '../../scripts/validate-request.mjs';
+import { unitsErrors, hostRootOf } from '../../scripts/validate-request.mjs';
+import { openUnchecked, planUncheckedErrors, laneOfPlan, tierErrors } from '../../scripts/unchecked.mjs';
+import { ledgerKeyOf } from '../../scripts/record-unchecked.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 const OPERATOR = 'interface.plan';
@@ -24,7 +31,7 @@ const INCOMPLETE = 'MAP_INCOMPLETE';
 const UNIT_KINDS = new Set(['page', 'modal']);
 const empty = (v) => v === undefined || v === null || v === '' || v === '—';
 
-export async function validateInterfacePlanStep(branchDir, root = ROOT) {
+export async function validateInterfacePlanStep(branchDir, root = ROOT, { uncheckedRoot = null } = {}) {
   const base = await validateStep(root, branchDir);
   const errors = [...base.errors];
   const { response, requirements = {}, present = new Set() } = base;
@@ -59,13 +66,23 @@ export async function validateInterfacePlanStep(branchDir, root = ROOT) {
     }
     // The Map and the unit list are one list.
     const mapIds = new Set();
-    for (const [id, kind, , goal] of tableUnder(receipt, '## Map') ?? []) {
+    const tierRows = [];
+    for (const [id, kind, , goal, tier] of tableUnder(receipt, '## Map') ?? []) {
       if (mapIds.has(id)) errors.push(`${RECEIPT}: Map lists ${id} twice; one unit has one row`);
       mapIds.add(id);
+      tierRows.push([id, tier]);
       const u = byId.get(id);
       if (!u) { errors.push(`${RECEIPT}: Map row ${id} has no entry in ${UNITS}; the map and the unit list are one list`); continue; }
       if (u.kind !== kind) errors.push(`${RECEIPT}: Map row ${id} is a ${kind}, ${UNITS} says ${u.kind}`);
       if (u.goal !== goal) errors.push(`${RECEIPT}: Map row ${id} goal differs from ${UNITS}; a generator reads one goal line, not two`);
+    }
+    errors.push(...tierErrors(tierRows, units, { at: RECEIPT, table: 'Map' }));
+    // Every entry this feature already carries in the audit lane is either covered by a journey row or extended
+    // by a secondary one; a plan that simply drops it re-defers coverage nobody agreed to drop again.
+    const { product, featureId } = await ledgerKeyOf(branchDir);
+    if (product && featureId) {
+      const open = await openUnchecked(uncheckedRoot ?? hostRootOf(root), product, featureId);
+      errors.push(...planUncheckedErrors(open, units, laneOfPlan(OPERATOR), UNITS));
     }
     for (const id of byId.keys()) if (!mapIds.has(id)) errors.push(`${UNITS}: unit ${id} has no Map row; a unit nobody can read in the map is a unit nobody planned`);
     // Every unit has exactly one data contract, and no contract names a unit the map does not.

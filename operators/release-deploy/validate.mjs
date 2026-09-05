@@ -4,7 +4,9 @@
 // monitoring stayed inside the deadline, a failing condition persisted across at least two
 // observations before recovery, and one transient probe never became a branch; a foreign release
 // terminates instead of being recovered; and steady state is proved by the digest, the targets and
-// every declared probe across the whole window, never by a single observation.
+// every declared probe across the whole window, never by a single observation; and a production
+// deployment of a feature whose unchecked ledger still carries an open journey entry is refused, because
+// a journey the run left partly unproved is not something a deployment gets to assume.
 import { existsSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
 import path from 'node:path';
@@ -12,15 +14,19 @@ import process from 'node:process';
 import { fileURLToPath } from 'node:url';
 import { validateStep } from '../../scripts/validate-step.mjs';
 import { tableUnder } from '../../scripts/validate-response.mjs';
+import { hostRootOf } from '../../scripts/validate-request.mjs';
+import { openUnchecked } from '../../scripts/unchecked.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 const DIGEST = /^sha256:[0-9a-f]{64}$/;
 const SECRET = /(?:ghp_[A-Za-z0-9]{16,}|glpat-[A-Za-z0-9_-]{16,}|xox[baprs]-[A-Za-z0-9-]{16,}|AKIA[0-9A-Z]{12,}|eyJ[A-Za-z0-9_-]{20,}\.[A-Za-z0-9_-]{10,})/;
 const empty = (v) => v === undefined || v === null || v === '' || v === '—';
+// The environment unchecked coverage is allowed to stop, named where the receipt names it.
+const PRODUCTION = 'production';
 const rows = (text, heading) => tableUnder(text, heading) ?? [];
 const fields = (text, heading) => Object.fromEntries(rows(text, heading).map(([k, v]) => [k, v]));
 
-export async function validateReleaseStep(branchDir, root = ROOT) {
+export async function validateReleaseStep(branchDir, root = ROOT, { uncheckedRoot = null } = {}) {
   const base = await validateStep(root, branchDir);
   const errors = [...base.errors];
   const { response, request, requirements = {}, present = new Set() } = base;
@@ -77,6 +83,20 @@ export async function validateReleaseStep(branchDir, root = ROOT) {
   if (SECRET.test(text)) errors.push('response/response.md: the receipt carries something shaped like a resolved credential value');
   const binding = fields(text, '## Binding');
   const outcome = fields(text, '## Outcome');
+
+  // Coverage nobody took is not coverage a deployment may assume. A release that names its feature
+  // reads that feature's ledger (@worktrees/unchecked, scripts/unchecked.mjs): an open entry of tier `journey`
+  // is a state of a surface the mission's own journey passes through that no lane ever measured, so
+  // production does not change over it (UNCHECKED_OPEN) and the person either has the lane run or accepts
+  // it, which resolves the line. A `secondary` entry is a unit outside the journey and passes,
+  // and every non-production target passes, because the point is what a user will meet, not tidiness.
+  const feature = empty(requirements.feature) ? null : requirements.feature;
+  const product = empty(binding.Project) ? null : String(binding.Project).replace(/`/g, '');
+  if (feature && product && String(binding.Environment) === PRODUCTION) {
+    const open = await openUnchecked(uncheckedRoot ?? hostRootOf(root), product, feature);
+    const blocking = open.filter((d) => d.tier === 'journey');
+    for (const d of blocking) errors.push(`response/response.md: ${product}/${feature} carries an open ${d.lane} entry on ${d.unit}/${d.state} (${d.reason}), which sits inside the journey this release delivers, and Binding names environment ${PRODUCTION}; a journey the run left partly unproved is not deployed to production on the assumption that it holds (UNCHECKED_OPEN)`);
+  }
   const steps = rows(text, '## Steps');
   const monitoring = fields(text, '## Monitoring');
   const steady = fields(text, '## Steady state');

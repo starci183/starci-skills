@@ -12,6 +12,7 @@ import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { validateReconcileStep } from './validate.mjs';
+import { uncheckedId, ledgerFile } from '../../scripts/unchecked.mjs';
 import { REGISTRY_FILE, applyHeadPublication, archiveObject, contentAddress, objectRef, objectRelPath, openStore, planHeadPublication, selfFingerprint } from '../../scripts/business-registry.mjs';
 
 const OPERATOR = 'business.reconcile';
@@ -72,10 +73,11 @@ function publishHead(root, model, claims) {
   applyHeadPublication(store, planHeadPublication({ store, featureId: FEATURE, model, claims, coverage: COVERAGE }));
 }
 
-function responseMd({ state = 'implemented', transition = 'in-progress->implemented', previousHead, previousArchived = 'before this branch', previousState = 'in-progress', coverage = coverageFingerprint, claimsFp, headRef, headObject, delivered = DELIVERED, feature = FEATURE, rows = DIMENSIONS.map((d) => [d, '`src/entitlement/guard.ts`', '—']), findings = [], claims = [['c-fact', 'fact'], ['c-settle', 'fact']] } = {}) {
+function responseMd({ state = 'implemented', transition = 'in-progress->implemented', previousHead, previousArchived = 'before this branch', previousState = 'in-progress', coverage = coverageFingerprint, claimsFp, headRef, headObject, delivered = DELIVERED, feature = FEATURE, rows = DIMENSIONS.map((d) => [d, '`src/entitlement/guard.ts`', '—']), findings = [], unchecked = [], claims = [['c-fact', 'fact'], ['c-settle', 'fact']] } = {}) {
   const claimRows = claims.map(([id, kind]) => `| \`${id}\` | ${kind} | what ${id} observes | \`src/entitlement/guard.ts\` | 10-24 | ${kind === 'fact' ? `\`${head}\`` : '—'} |`).join('\n');
   const reconciliationRows = rows.map(([dimension, evidence, discrepancy]) => `| \`${dimension}\` | ${evidence} | ${discrepancy} |`).join('\n');
   const findingRows = findings.map(([code, severity, dimension, statement]) => `| \`${code}\` | ${severity} | \`${dimension}\` | ${statement} |`).join('\n');
+  const uncheckedRows = unchecked.map((d) => `| \`${d.unit}\` | ${d.state === null ? '—' : `\`${d.state}\``} | ${d.lane} | ${d.tier} | ${d.reason} |`).join('\n');
   return `# business-reconciliation — ${feature}
 
 The published promise compared, dimension by dimension, against the source the backend run delivered.
@@ -113,6 +115,11 @@ ${claimRows}
 | --- | --- | --- |
 ${reconciliationRows}
 
+## Unchecked
+
+| Unit | State | Lane | Tier | Reason |
+| --- | --- | --- | --- | --- |
+${uncheckedRows}${uncheckedRows ? '\n' : ''}
 ## Findings
 
 | Code | Severity | Dimension | Statement |
@@ -144,16 +151,25 @@ function writeBranch(files) {
   }
   return { branch, session };
 }
-async function expectValid(files, label) {
+// The ledger half runs against a synthetic root, so the tree's own @worktrees/unchecked is never read.
+async function runStep(files, { unchecked = [] } = {}) {
   const { branch, session } = writeBranch(files);
-  const { errors } = await validateReconcileStep(branch);
+  const uncheckedRoot = mkdtempSync(path.join(tmpdir(), 'unchecked-'));
+  if (unchecked.length) {
+    const file = ledgerFile(uncheckedRoot, 'starci-academy', FEATURE);
+    mkdirSync(path.dirname(file), { recursive: true });
+    writeFileSync(file, unchecked.map((d) => JSON.stringify(d)).join('\n') + '\n');
+  }
+  const { errors } = await validateReconcileStep(branch, undefined, { uncheckedRoot });
   rmSync(session, { recursive: true, force: true });
-  assert.deepEqual(errors, [], `${label} should be valid`);
+  rmSync(uncheckedRoot, { recursive: true, force: true });
+  return errors;
 }
-async function expectError(files, needle, label) {
-  const { branch, session } = writeBranch(files);
-  const { errors } = await validateReconcileStep(branch);
-  rmSync(session, { recursive: true, force: true });
+async function expectValid(files, label, options) {
+  assert.deepEqual(await runStep(files, options), [], `${label} should be valid`);
+}
+async function expectError(files, needle, label, options) {
+  const errors = await runStep(files, options);
   assert.ok(errors.some((e) => e.includes(needle)), `${label}: expected an error containing "${needle}", got:\n${errors.join('\n') || '(none)'}`);
 }
 
@@ -253,4 +269,17 @@ await expectError(reconciled({ md: { findings: [['LEGACY_COEXISTENCE', 'error', 
 await expectError(reconciled({ md: { rows: [] } }), 'table needs at least 1 rows', 'a reconciliation with no row');
 await expectError(reconciled({ files: { 'response/response.md': responseMd({ previousHead: 'x', claimsFp: 'x', headRef: 'x', headObject: 'x' }).replace('## Reconciliation', '## Comparison') } }), 'missing section ^## Reconciliation$', 'receipt section renamed');
 
-process.stdout.write('business.reconcile self-test: 5 valid branches, 42 rejected mutations\n');
+// Coverage nobody took is part of the comparison: the receipt lists what the feature still owes, and a
+// journey entry keeps the head at in-progress rather than declaring the promise enforced.
+const uncheckedLine = (tier, unit = 'plan-picker', state = 'offline') => {
+  const line = { product: 'starci-academy', featureId: FEATURE, unit, state, lane: 'audit', tier, reason: 'the offline condition was outside this run', recordedBy: 's-old/2/1', recordedAt: '2026-09-01T00:00:00.000Z', resolvedBy: null, resolvedAt: null };
+  return { ...line, id: uncheckedId(line) };
+};
+const SECONDARY = uncheckedLine('secondary', 'plan-archive', null);
+const JOURNEY = uncheckedLine('journey');
+await expectValid(reconciled({ md: { unchecked: [SECONDARY] } }), 'a head republished implemented while a unit outside the journey stays unchecked', { unchecked: [SECONDARY] });
+await expectValid(reconciled({ previousState: 'implemented', targetState: 'in-progress', model: { state: 'in-progress', transition: 'implemented->in-progress' }, md: { unchecked: [JOURNEY] } }), 'a journey entry carried as in-progress', { unchecked: [JOURNEY] });
+await expectError(reconciled({ md: { unchecked: [SECONDARY] } }), 'Unchecked omits the open audit entry on plan-picker/offline', 'a reconciliation that leaves an open entry out of its receipt', { unchecked: [SECONDARY, JOURNEY] });
+await expectError(reconciled({ md: { unchecked: [JOURNEY] } }), 'republished implemented while the feature carries an open journey entry', 'a promise declared enforced over a journey nobody finished measuring', { unchecked: [JOURNEY] });
+
+process.stdout.write('business.reconcile self-test: 7 valid branches, 44 rejected mutations\n');

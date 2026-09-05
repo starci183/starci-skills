@@ -203,6 +203,7 @@ pass.
 | `@workspaces/be` | the routed backend checkout at the pinned commit, whose behaviour the flow verifies and whose store holds the namespaced records | yes |
 | `@workspaces/fe` | the frontend delivery head when the browser surface and backend are distinct; required whenever route or admission evidence identifies a different frontend head | no |
 | `@knowledge/ui/proof` | the UX topic: the criteria the experience lane scores and the rule that turns them into its verdict | yes |
+| `@worktrees/unchecked/<product>` | the unchecked coverage of this feature in the walk lane: which flows earlier missions left unwalked, and which of them this run covers | no |
 
 ## Inputs
 

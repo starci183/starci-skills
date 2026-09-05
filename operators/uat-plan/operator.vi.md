@@ -9,8 +9,8 @@ cái đi một luồng và không hai cái nào từng dùng chung một dòng d
 ## Xong khi
 
 Xong khi `uat-plan` gọi tên một luồng cho mỗi hành trình mà goal nêu, mỗi luồng với route vào, ngân
-sách bước, alias tài khoản riêng và namespace seed riêng, và file `units` mang một đơn vị luồng cho
-mỗi dòng Flows với cùng id.
+sách bước, alias tài khoản riêng, namespace seed riêng và tier của nó, và file `units` mang một đơn
+vị luồng cho mỗi dòng Flows với cùng id và tier.
 
 ## Đơn vị của một walker mù là một luồng
 
@@ -41,6 +41,18 @@ lại với một bản đồ bề mặt nêu lối vào, hoặc với route và
 của bên gọi và không bao giờ thành `INVALID_INPUT`, vì goal được phép nêu một hành trình bằng lời của
 người, và chính operator này là bên biến lời thành route vào.
 
+## Hành trình được đi thử, còn mọi thứ khác là chưa kiểm
+
+Goal gọi tên các hành trình; các dòng "xong khi" của nhiệm vụ gọi tên hành trình nào trong số đó lượt
+chạy này phải chứng minh. Những luồng ấy là `journey` và walker được toả nhánh lên chúng. Một luồng
+mà kế hoạch gọi tên vì tính năng có nó, nhưng không dòng "xong khi" nào với tới, là `secondary`: nó
+mang đúng một câu nói vì sao, và được ghi xuống là chưa kiểm ở làn đi thử dưới
+`@worktrees/unchecked` thay vì được đi — để một lượt chạy chứng minh ba trên bảy hành trình nói rõ bốn
+hành trình nào nó đã không đi, thay vì để người đọc tự cho rằng nó đã chứng minh mọi thứ. Một luồng
+mà tính năng đang mang một mục chưa kiểm còn mở ở làn đi thử thì được kế hoạch này lấy trở lại vào
+hành trình, và lượt đi chạy sẽ kiểm nó, hoặc được gia hạn bằng một dòng secondary với lý do của chính kế hoạch này;
+một kế hoạch bỏ nó khỏi danh sách là hoãn nó thêm lần nữa mà không ai đồng ý, và bị từ chối.
+
 ## Ranh giới
 
 Context chỉ đọc. Operator chỉ ghi `response/` của nhánh mình: bản kế hoạch, danh sách đơn vị và
@@ -54,6 +66,7 @@ credential chỉ bằng alias và không có trường nào có thể chứa m�
 | --- | --- | --- |
 | `@worktrees/_templates` | template luồng UAT mà cây cung cấp: hình dạng một thư mục luồng, các case, các alias chúng đóng vai và seed của nó, để mọi luồng được lên kế hoạch là luồng một walker soạn được | có |
 | `@worktrees/uat/<flow>` | các thư mục luồng đã tồn tại dưới tính năng: luồng đã tồn tại giữ nguyên tên, các alias tài khoản và namespace seed của nó | không |
+| `@worktrees/unchecked/<product>` | phần chưa kiểm mà tính năng này đang mang trong làn đi thử: mọi luồng một nhiệm vụ trước đã hoãn, để kế hoạch này kiểm nó hay gia hạn nó thay vì lại lặng lẽ hoãn thêm lần nữa | không |
 
 ## Đầu vào
 
@@ -80,8 +93,9 @@ credential chỉ bằng alias và không có trường nào có thể chứa m�
 | 4 | Đọc các thư mục luồng đã tồn tại dưới tính năng: luồng đã tồn tại giữ nguyên tên, alias và namespace | `feature`, `env` | @worktrees/uat/<flow>, @worktrees/_templates cho hình dạng một thư mục luồng | — | — |
 | 5 | Gọi tên một luồng cho mỗi hành trình với route vào và ngân sách tính bằng bước | — | các hành trình, bản đồ, các luồng có sẵn | — | `FLOW_UNDEFINED` |
 | 6 | Cho mỗi luồng alias tài khoản riêng và namespace seed riêng, tách biệt với mọi luồng khác của kế hoạch | `env` | các luồng, @worktrees/uat/<flow> cho các alias đã được cấp | — | — |
-| 7 | Ghi danh sách đơn vị: một đơn vị luồng cho mỗi dòng Flows với cùng id và hành trình làm goal | — | bản kế hoạch | `units` | — |
-| 8 | Phát bản kế hoạch và biên nhận | — | mọi thứ ở trên | `uat-plan`, `response/response.json` | — |
+| 7 | Xếp tier cho từng luồng theo các dòng "xong khi" của nhiệm vụ: `journey` nơi một dòng đi qua nó, `secondary` kèm một câu lý do nơi không dòng nào đi qua, và mọi mục chưa kiểm còn mở của tính năng này được lấy lại hay gia hạn | — | các dòng "xong khi" của nhiệm vụ, các luồng, @worktrees/unchecked/<product> | — | — |
+| 8 | Ghi danh sách đơn vị: một đơn vị luồng cho mỗi dòng Flows với cùng id và tier, hành trình làm goal và lý do hoãn của nó khi nó có một lý do | — | bản kế hoạch | `units` | — |
+| 9 | Phát bản kế hoạch và biên nhận | — | mọi thứ ở trên | `uat-plan`, `response/response.json` | — |
 
 Bước 5 là bước duy nhất dừng vì chính bản kế hoạch: một hành trình bước 2 tìm thấy mà không bản đồ
 hay thư mục nào cho lối vào là `FLOW_UNDEFINED`, với reason nêu nó trong một đoạn, và không phát gì

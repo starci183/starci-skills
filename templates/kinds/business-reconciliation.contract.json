@@ -6,6 +6,7 @@
     { "heading": "^## Lineage$", "table": "| Field | Value |", "rows": ["Previous head", "Previous head archived", "Previous state", "Transition", "Head object"], "cell": { "Value": "\\S" } },
     { "heading": "^## Cited claims$", "table": "| Claim | Kind | Role | Source | Lines | Head |", "minRows": 1, "cell": { "Claim": "^`[a-z0-9][a-z0-9-]*`$", "Kind": "^(fact|intent|example|unknown|contradiction)$", "Lines": "^\\d+-\\d+$" } },
     { "heading": "^## Reconciliation$", "table": "| Dimension | Delivered evidence | Discrepancy |", "minRows": 1, "cell": { "Dimension": "^`[a-z0-9][a-z0-9-]*`$", "Delivered evidence": "\\S", "Discrepancy": "\\S" } },
+    { "heading": "^## Unchecked$", "table": "| Unit | State | Lane | Tier | Reason |", "cell": { "Unit": "^`[a-z0-9][a-z0-9-]*`$", "State": "^(—|`[a-z0-9][a-z0-9-]*`)$", "Lane": "^(audit|walk|e2e)$", "Tier": "^(journey|secondary)$", "Reason": "\\S" } },
     { "heading": "^## Findings$", "table": "| Code | Severity | Dimension | Statement |", "cell": { "Code": "^`[A-Z][A-Z0-9_]*`$", "Severity": "^(info|warning|error)$" } }
   ]
 }

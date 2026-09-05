@@ -9,8 +9,8 @@ trong một shell thay vì mỗi cái tự bịa một shell.
 ## Xong khi
 
 Xong khi `surface-map` gọi tên mọi trang và modal mà tham chiếu hay source cho thấy, mỗi cái với
-route hay host và một dòng goal, quyết định shell chung đúng một lần, và file `units` mang một đơn vị
-trang hay modal cho mỗi dòng Map với cùng id và goal.
+route hay host, một dòng goal và tier của nó, quyết định shell chung đúng một lần, và file `units`
+mang một đơn vị trang hay modal cho mỗi dòng Map với cùng id, goal và tier.
 
 ## Đơn vị của một agent mù là một trang hay một modal
 
@@ -54,6 +54,20 @@ source đặt cho các thao tác, để một generator mù học được các 
 hoặc không từ đâu cả. Phụ thuộc giữa các đơn vị — một modal cần trang chứa nó, một trang chi tiết cần
 trang danh sách — được ghi trong `dependsOn` để orchestrator sắp thứ tự toả nhánh chỉ từ bản kế hoạch.
 
+## Hành trình được audit, còn mọi thứ khác là chưa kiểm
+
+Một bản đồ gọi tên mọi trang và modal mà tính năng có; các dòng "xong khi" của nhiệm vụ gọi tên một
+hành trình đi qua một số trong đó. Đó là các đơn vị `journey`, và chúng là những đơn vị mà lượt audit
+theo sau được toả nhánh lên. Mọi đơn vị còn lại là `secondary`, mang đúng một câu nói vì sao hành
+trình không đi qua nó, và được ghi xuống là chưa kiểm ở làn audit dưới `@worktrees/unchecked`
+thay vì được kiểm chứng — để một lượt chạy bị thu hẹp là bị thu hẹp trên giấy trắng mực đen, và không
+lượt nào đo mọi màn hình nó tìm thấy chỉ vì chẳng ai nói màn hình nào mới quan trọng. Một đơn vị mà
+tính năng đang mang một mục chưa kiểm còn mở thì hoặc được bản đồ này lấy trở lại vào hành trình, và
+lượt audit chạy sẽ kiểm nó, hoặc được gia hạn bằng một dòng secondary với lý do của chính bản đồ này; một bản đồ
+chỉ đơn giản bỏ nó ra ngoài là hoãn nó lần thứ hai mà không ai đồng ý, và bị từ chối. Việc sinh không
+bị thu hẹp theo cách ấy: mọi đơn vị bản đồ gọi tên đều được dựng, vì dựng gì là mục tiêu của người,
+còn chỉ chứng minh gì mới là chuyện của hành trình.
+
 ## Ranh giới
 
 Context chỉ đọc. Operator chỉ ghi `response/` của nhánh mình: bản đồ, danh sách đơn vị và
@@ -68,6 +82,7 @@ quyết nào về source.
 | --- | --- | --- |
 | `@grammar/core` | Grammar đã publish như app được ràng resolve: các composition shell và điều hướng mà một dòng Shell được gọi tên, và các composition một đơn vị có thể ràng sau này | có |
 | `@workspaces/fe` | checkout frontend được route ở head đã đóng băng: các route, layout, modal và drawer đã tồn tại, đọc như bằng chứng về thứ bản đồ phải gọi tên và không bao giờ như chính bản đồ | có |
+| `@worktrees/unchecked/<product>` | phần chưa kiểm mà tính năng này đang mang trong làn audit: mọi đơn vị một nhiệm vụ trước đã hoãn, để bản đồ này kiểm nó hay gia hạn nó thay vì lại lặng lẽ hoãn thêm lần nữa | không |
 
 ## Đầu vào
 
@@ -93,9 +108,10 @@ quyết nào về source.
 | 4 | Đọc lời hứa khi được ràng: các hành trình, trạng thái và thao tác mà các đơn vị phải bao phủ | — | đầu vào `business-promise-authority` | — | — |
 | 5 | Quyết định shell một lần: sidebar, header, breadcrumb và thứ tự điều hướng, mỗi cái với chủ sở hữu render nó | — | @grammar/core cho các composition shell và điều hướng mà family publish, tham chiếu, source | — | — |
 | 6 | Gọi tên mọi đơn vị: một dòng cho mỗi trang và mỗi modal, với route hay host và một dòng goal | — | tham chiếu, source, lời hứa | — | `MAP_INCOMPLETE` |
-| 7 | Khai contract dữ liệu của từng đơn vị: nó đọc gì và ghi gì | — | các đơn vị, đầu vào `business-promise-authority` | — | — |
-| 8 | Ghi danh sách đơn vị: một entry cho mỗi dòng Map với cùng id và goal, và các đơn vị mỗi cái phụ thuộc | — | bản đồ | `units` | — |
-| 9 | Phát bản đồ và biên nhận | — | mọi thứ ở trên | `surface-map`, `response/response.json` | — |
+| 7 | Xếp tier cho từng đơn vị theo các dòng "xong khi" của nhiệm vụ: `journey` nơi hành trình đi qua nó, `secondary` kèm một câu lý do nơi hành trình không đi qua, và mọi mục chưa kiểm còn mở của tính năng này được lấy lại hay gia hạn | — | các dòng "xong khi" của nhiệm vụ, các đơn vị, @worktrees/unchecked/<product> | — | — |
+| 8 | Khai contract dữ liệu của từng đơn vị: nó đọc gì và ghi gì | — | các đơn vị, đầu vào `business-promise-authority` | — | — |
+| 9 | Ghi danh sách đơn vị: một entry cho mỗi dòng Map với cùng id, goal và tier, lý do hoãn của nó khi nó có một lý do, và các đơn vị mỗi cái phụ thuộc | — | bản đồ | `units` | — |
+| 10 | Phát bản đồ và biên nhận | — | mọi thứ ở trên | `surface-map`, `response/response.json` | — |
 
 Bước 6 là bước duy nhất dừng vì chính bản đồ: một route hay host mà bước 2 và 3 tìm thấy nhưng không
 dòng nào gọi tên là `MAP_INCOMPLETE`, với reason nêu nó trong một đoạn, và không phát gì cả. Chạy lại

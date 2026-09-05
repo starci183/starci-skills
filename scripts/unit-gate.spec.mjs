@@ -109,6 +109,26 @@ test('a unit resolves through inputs.units to a plan an earlier branch produced,
     assert.ok((await unitGateErrors(root, state, req('uat.verify', { unit: 'open-item', inputs: { units: 'step-1/parallel-2/response/data/units.json' } }), packages, session)).some((e) => e.includes('missing')));
   } finally { rmSync(session, { recursive: true, force: true }); }
 });
+// Verification follows the journey: the fan-out is dispatched over the journey units and not over the
+// units the plan deferred, which are entries on the unchecked ledger rather than branches. Generation is not narrowed
+// this way — interface.generate builds what the plan lists.
+test('a verifying lane is fanned out over the journey units alone; a deferred unit is unchecked, not a branch', async () => {
+  const session = mkdtempSync(path.join(tmpdir(), 'unit-gate-'));
+  try {
+    const producer = path.join(session, 'step-1/parallel-1/response/data');
+    mkdirSync(producer, { recursive: true });
+    const deferred = unit('archive-item', { tier: 'secondary', deferral: { reason: 'no done-when line walks the archive' } });
+    writeFileSync(path.join(producer, 'units.json'), JSON.stringify(plan([unit('open-item'), unit('remove-item', { tier: 'journey' }), deferred])));
+    const state = onMission(2);
+    const bound = { units: 'step-1/parallel-1/response/data/units.json' };
+    assert.deepEqual(await unitGateErrors(root, state, req('uat.verify', { unit: 'open-item', inputs: bound }), packages, session), []);
+    const refused = await unitGateErrors(root, state, req('uat.verify', { unit: 'archive-item', inputs: bound }), packages, session);
+    assert.ok(refused.some((e) => e.includes('proves the walk lane and unit archive-item is tier secondary') && e.includes('open-item, remove-item')), refused.join('\n'));
+    // A relation the gate reads out of the file itself, so a plan cannot narrow coverage without saying why.
+    writeFileSync(path.join(producer, 'units.json'), JSON.stringify(plan([unit('open-item'), unit('archive-item', { tier: 'secondary' })])));
+    assert.ok((await unitGateErrors(root, state, req('uat.verify', { unit: 'open-item', inputs: bound }), packages, session)).some((e) => e.includes('carries no deferral.reason')));
+  } finally { rmSync(session, { recursive: true, force: true }); }
+});
 // The request gate runs the unit gate on a live mission session: an execute branch without its unit is refused, one with it passes.
 test('the request gate refuses a fan-out branch without its unit and accepts one that names a planned unit', async () => {
   const session = mkdtempSync(path.join(tmpdir(), 'unit-gate-'));

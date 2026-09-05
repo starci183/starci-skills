@@ -282,3 +282,35 @@ context khai đủ để agent mù chạy được, log đủ để người đ�
       thấy, không in.
 - [ ] `uat.verify` và `interface.audit` thêm dòng Steps dùng runner; trace/video và accessibility tree vào
       `response/artifacts/`; ảnh chụp deterministic là đầu vào của làn taste và của bộ hiệu chuẩn.
+
+## 5. Sổ chưa kiểm: cái gì cố ý không đo thì phải ghi ra (2.1.1)
+
+Chuẩn: kiểm chứng của một nhiệm vụ chỉ phủ những bề mặt mà hành trình "xong khi" của nó đi qua; mọi
+thứ còn lại không được kiểm và phải được ghi là chưa kiểm, để không có gì bị bỏ qua trong im lặng và
+không lần chạy nào render mọi màn hình "cho chắc".
+
+- [x] `templates/kinds/units.schema.json`: mỗi unit có `tier: journey | secondary` (vắng đọc là
+      `journey`) và `deferral.reason` cho unit `secondary`; `interface.plan` và `uat.plan` xếp tier từ
+      các dòng "xong khi", và cột `Tier` của biên nhận nói đúng điều dữ liệu nói.
+      (`validate-request.mjs#unitsErrors`, `unchecked.mjs#tierErrors`, hai self-test)
+- [x] Fan-out và ngân sách đi theo hành trình: làn kiểm chứng (`unchecked.mjs#VERIFY_LANES`) chỉ được
+      dispatch trên unit `journey`, và `budget.units` đếm đúng số đó; `interface.generate` vẫn dựng
+      hết những gì plan liệt kê, vì phạm vi sinh là mục tiêu của người chứ không phải một phép chứng minh.
+      (`validate-request.mjs#unitGateErrors|budgetUnitsOf`, `validate-session.mjs#unitBudgetErrors`)
+- [x] Sổ: `@worktrees/unchecked/<product>/<featureId>.jsonl`, một dòng JSON một mục
+      (`templates/kinds/unchecked.schema.json`), chỉ ghi thêm — kiểm nốt là một dòng thứ hai cùng id.
+      (`scripts/unchecked.mjs`, `scripts/record-unchecked.mjs`, `validate-session.mjs#uncheckedLedgerErrors`)
+- [x] Cửa hoãn: hoãn một state của unit thuộc hành trình là `UNCHECKED_UNLAWFUL`, trả về đúng plan đã xếp
+      tier cho nó; mọi state được hoãn phải mang lý do để sổ chép lại.
+      (`audit-scope.schema.json#journeyStates|deferrals`, `interface-audit/validate.mjs`)
+- [x] Phần chưa kiểm được tiêu: plan phải kiểm nốt hoặc gia hạn mục đang mở, không được lặng lẽ bỏ nó
+      khỏi danh sách; `business.reconcile` liệt kê mục đang mở trong `## Unchecked` và giữ head ở
+      `in-progress` khi còn mục `journey`; `release.deploy` từ chối deploy production trên một mục
+      `journey` (`UNCHECKED_OPEN`).
+- [ ] Chứng minh trên một nhiệm vụ thật: một feature có bề mặt ngoài hành trình, chạy hết một vòng
+      plan → generate → audit → walk → reconcile, và đọc lại sổ ở nhiệm vụ sau để thấy plan kế tiếp
+      phải kiểm nốt hoặc gia hạn. Ghi vào `tests/evidence/`.
+- [ ] `uat.verify` và `api.verify` chưa có chỗ nào hoãn được một case bên trong một flow đã đi: hôm
+      nay một flow bị bỏ là một unit `secondary`, và cửa fan-out đã từ chối nó trước khi dispatch. Khi
+      nào một lượt đi cần hoãn một case của flow nó *đang* đi thì mới mở `deferrals` cho hai operator
+      ấy — thêm bây giờ là một mã dừng không đường nào chạm tới.

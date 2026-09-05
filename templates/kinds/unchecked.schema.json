@@ -1,0 +1,107 @@
+{
+  "$id": "kind:unchecked",
+  "description": "One line of the unchecked ledger under @worktrees/unchecked/<product>/<featureId>.jsonl, one JSON object per line, append-only. An entry is coverage a mission decided not to take: the mission's verification covers the surfaces its done-when journey passes through, and every other unit — and every state of a secondary unit a lane did not reach — is written down here rather than silently skipped. Nothing edits a line: an entry is resolved by appending the same id again with resolvedBy and resolvedAt filled, so the newest line per id is the entry's state (scripts/unchecked.mjs#readUnchecked). scripts/record-unchecked.mjs appends after a done plan or verification branch and scripts/validate-session.mjs#uncheckedLedgerErrors refuses a session whose done branch deferred something the ledger does not hold.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "id",
+    "product",
+    "featureId",
+    "unit",
+    "state",
+    "lane",
+    "tier",
+    "reason",
+    "recordedBy",
+    "recordedAt",
+    "resolvedBy",
+    "resolvedAt"
+  ],
+  "properties": {
+    "id": {
+      "type": "string",
+      "pattern": "^u[0-9a-f]{12}$",
+      "description": "Derived from what the entry is about (product, feature, unit, state, lane), so recording one receipt twice appends nothing and a later lane that covers it resolves the line it already has."
+    },
+    "product": {
+      "$ref": "#/$defs/identifier"
+    },
+    "featureId": {
+      "$ref": "#/$defs/identifier"
+    },
+    "unit": {
+      "$ref": "#/$defs/identifier",
+      "description": "The units.json id the entry stands against."
+    },
+    "state": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/identifier"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "description": "The surface state left uncovered, or null when the whole surface is."
+    },
+    "lane": {
+      "$ref": "#/$defs/lane"
+    },
+    "tier": {
+      "enum": [
+        "journey",
+        "secondary"
+      ],
+      "description": "How much of the mission's journey the entry sits inside, and therefore how heavy it is. `secondary`: a whole unit the journey does not pass through, deferred by the plan that named it. `journey`: a state of a unit the journey does pass through, left unmeasured by the verification that ran it — the journey is only partly proved, which is why a production deploy refuses to run over one (UNCHECKED_OPEN) and passes over a secondary one."
+    },
+    "reason": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 240,
+      "description": "Copied from the plan's unit deferral.reason, or from the verifying receipt's own deferral entry; the ledger states no reason of its own."
+    },
+    "recordedBy": {
+      "$ref": "#/$defs/coordinate"
+    },
+    "recordedAt": {
+      "type": "string",
+      "minLength": 1
+    },
+    "resolvedBy": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/coordinate"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "description": "The branch whose verification covered what the entry named; null while the entry is open."
+    },
+    "resolvedAt": {
+      "type": [
+        "string",
+        "null"
+      ]
+    }
+  },
+  "$defs": {
+    "identifier": {
+      "type": "string",
+      "pattern": "^[a-z0-9][a-z0-9-]*$"
+    },
+    "lane": {
+      "enum": [
+        "audit",
+        "walk",
+        "e2e"
+      ],
+      "description": "Which proof was not taken. The lane of an operator is scripts/unchecked.mjs#VERIFY_LANES and is stated nowhere else."
+    },
+    "coordinate": {
+      "type": "string",
+      "pattern": "^[^/]+/[1-9][0-9]*/[1-9][0-9]*$",
+      "description": "<sessionId>/<step>/<parallel>."
+    }
+  }
+}

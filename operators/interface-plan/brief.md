@@ -8,7 +8,7 @@ Name every page and modal of one feature once, decide the shared shell once, and
 
 ## Done when
 
-Done when the `surface-map` names every page and modal the reference or the source shows, each with its route or host and one goal line, decides the shared shell once, and the `units` file carries one page or modal unit per Map row with the same id and goal.
+Done when the `surface-map` names every page and modal the reference or the source shows, each with its route or host, one goal line and its tier, decides the shared shell once, and the `units` file carries one page or modal unit per Map row with the same id, goal and tier.
 
 Primary output: `surface-map`
 

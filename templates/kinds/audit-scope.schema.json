@@ -23,6 +23,31 @@
         "minLength": 1
       }
     },
+    "deferrals": {
+      "type": "array",
+      "uniqueItems": true,
+      "maxItems": 64,
+      "description": "One entry per deferredStates entry, giving the reason that state was not reached. A state deferred with no reason is a skip nobody can read, and scripts/record-unchecked.mjs copies this sentence into the ledger line so the ledger states no reason of its own.",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "state",
+          "reason"
+        ],
+        "properties": {
+          "state": {
+            "type": "string",
+            "minLength": 1
+          },
+          "reason": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 240
+          }
+        }
+      }
+    },
     "coverageClaim": {
       "enum": [
         "selected-surfaces",
@@ -107,6 +132,15 @@
     "deferredTasteRule": {
       "enum": [
         "TASTE-10"
+      ]
+    },
+    "journeyStates": {
+      "description": "The states a unit the mission's journey passes through is always measured in, and which therefore cannot be carried as unchecked. They are the conditions a person meets on the way through — waiting for the data, waiting with a placeholder, arriving at nothing, and arriving at a failure — the same four the taste lens scores a captured state on (TASTE-10 and the loading, empty and error cases of the taste topic). A deferral naming one of these under a journey unit is UNCHECKED_UNLAWFUL and goes back to the plan that tiered the unit, because the fix is a tier, not a smaller audit. This list is the one home of that set; the gate reads it from here.",
+      "enum": [
+        "loading",
+        "skeleton",
+        "empty",
+        "error"
       ]
     }
   }

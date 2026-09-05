@@ -25,6 +25,9 @@ import { loadOperatorPackages } from './operator-md.mjs';
 import { loadInteractionPolicy } from './validate-interaction.mjs';
 import { validateChain, loadOperatorGraph, loadMaxParallel, readBranchRequests, readImportedInputs, readImportedSlots } from './validate-chain.mjs';
 import { extractFindings, readLedger, LEDGER_DIR, LEDGER_OPERATORS } from './record-findings.mjs';
+import { extractUnchecked, UNCHECKED_OPERATORS } from './record-unchecked.mjs';
+import { budgetUnitsOf, hostRootOf, loadUnits } from './validate-request.mjs';
+import { readUnchecked } from './unchecked.mjs';
 
 const branchDir = (session, branch) => { const [n, m] = branch.split('/'); return path.join(session, `step-${n}`, `parallel-${m}`); };
 const stepOf = (branch) => Number(branch.split('/')[0]);
@@ -136,7 +139,60 @@ export async function findingsLedgerErrors(root, session, state, { ledgerDir = p
   return errors;
 }
 
-export async function validateSession(root, session, { packages = null, ledgerDir } = {}) {
+// The unchecked ledger (@worktrees/unchecked/<product>/<featureId>.jsonl, scripts/unchecked.mjs): every
+// done branch that deferred coverage has its entries in the feature's ledger, appended by
+// scripts/record-unchecked.mjs at the transition that accepted the receipt. A plan that tiered a unit
+// `secondary`, or a verification whose receipt deferred a state, and a ledger that does not hold the
+// matching lines, is a run that narrowed itself and left no trace of the narrowing — which is the one
+// outcome the tiering exists to prevent. A branch that deferred nothing records nothing.
+export async function uncheckedLedgerErrors(root, session, state, { hostRoot = hostRootOf(root) } = {}) {
+  const errors = [];
+  for (const branch of Object.keys(state?.steps ?? {}).sort(byChainOrder)) {
+    const operator = state.steps[branch];
+    if (!UNCHECKED_OPERATORS.has(operator)) continue;
+    const dir = branchDir(session, branch);
+    const response = await readJson(path.join(dir, 'response', 'response.json'));
+    if (response?.status !== 'done') continue;
+    const at = `step-${branch.replace('/', '/parallel-')}`;
+    let found = null;
+    try { found = await extractUnchecked(dir, { root, hostRoot }); } catch (e) { errors.push(`${at}: ${e.message}`); continue; }
+    if (!found || !found.append.length) continue;
+    const ledger = await readUnchecked(hostRoot, found.product, found.featureId);
+    const missing = found.append.filter((d) => !ledger.latest.has(d.id));
+    if (missing.length) errors.push(`${at}: a done ${operator} branch deferred ${missing.length} unit(s) or state(s) the ${found.lane} ledger of ${found.product}/${found.featureId} does not hold (${missing.map((d) => `${d.unit}${d.state ? `/${d.state}` : ''}`).join(', ')}); coverage that is not taken is written down (node scripts/record-unchecked.mjs ${at})`);
+  }
+  return errors;
+}
+
+// The fan-out is paid for by the units it runs, and it runs the journey. state.json.budget.units is
+// how many units the latest plan produced that a verifying lane will actually be dispatched over —
+// the journey units — so a mission that defers half its surfaces does not also carry the budget for
+// verifying them (resources/orchestrator.json#budget, scripts/validate-request.mjs#effectiveBudget).
+export async function unitBudgetErrors(root, session, state) {
+  const errors = [];
+  if (state?.budget?.units === undefined) return errors;
+  let latest = null;
+  for (const branch of Object.keys(state?.steps ?? {}).sort(byChainOrder)) {
+    const file = path.join(branchDir(session, branch), 'response', 'data', 'units.json');
+    if (!existsSync(file)) continue;
+    const response = await readJson(path.join(branchDir(session, branch), 'response', 'response.json'));
+    if (response?.status !== 'done') continue;
+    latest = { branch, file };
+  }
+  if (!latest) return errors;
+  const { units } = await loadUnits(root, latest.file, latest.file);
+  if (!units) return errors;
+  const expected = budgetUnitsOf(units);
+  if (state.budget.units !== expected) errors.push(`state.json: budget.units is ${state.budget.units} and the plan of step-${latest.branch.replace('/', '/parallel-')} carries ${expected} journey unit(s) of ${units.units.length}; the step cap grows per unit a lane is dispatched over, and a deferred unit is unchecked rather than a branch`);
+  // The scope line of the goal block, once a plan has said how far the verification reaches.
+  const scope = state.mission?.scope;
+  if (scope && (scope.journey !== expected || scope.deferred !== units.units.length - expected)) {
+    errors.push(`state.json: mission.scope says ${scope.journey} journey and ${scope.deferred} deferred, and the plan of step-${latest.branch.replace('/', '/parallel-')} carries ${expected} and ${units.units.length - expected}; the scope line the person read is the plan's own count, not a second one`);
+  }
+  return errors;
+}
+
+export async function validateSession(root, session, { packages = null, ledgerDir, uncheckedRoot } = {}) {
   const errors = [];
   const stateFile = path.join(session, 'state.json');
   if (!existsSync(stateFile)) return { errors: ['state.json: missing'], state: null };
@@ -163,6 +219,10 @@ export async function validateSession(root, session, { packages = null, ledgerDi
   errors.push(...loggedErrors(state));
   // Every done audit or walk with a failing verdict left its findings in the family's ledger.
   errors.push(...await findingsLedgerErrors(root, session, state, ledgerDir ? { ledgerDir } : {}));
+  // Every done plan or verification that deferred coverage left its entries in the feature's ledger, and
+  // the fan-out budget counts the journey the mission actually verifies.
+  errors.push(...await uncheckedLedgerErrors(root, session, state, uncheckedRoot ? { hostRoot: uncheckedRoot } : {}));
+  errors.push(...await unitBudgetErrors(root, session, state));
   if (state.brief?.report) {
     const shapes = Object.keys(policy.reportShapes ?? {});
     if (!shapes.includes(state.brief.report.shape)) errors.push(`state.json: brief.report.shape ${state.brief.report.shape} is not one of ${shapes.join(', ')}`);

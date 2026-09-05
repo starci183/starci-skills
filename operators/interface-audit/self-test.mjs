@@ -586,20 +586,27 @@ await expectError({ ...coverageGapFiles(), 'response/response.md': coverageGapMd
 await expectError(coverageGapFiles({}, ['interface.fix', 'quality.verify']), 'quality.verify follows only once every topic ships or passes', 'a narrowed round claiming to close the loop into quality.verify', EMPTY_STATE);
 await expectError(coverageGapFiles({}, ['interface.fix', 'interface.generate']), 'a matrix gap is not a composition finding', 'a narrowed round sent to direction as if it were a composition finding', EMPTY_STATE);
 
-const deferredTaste = () => {
+// A deferral leaves coverage unchecked, and that is lawful only over a state the mission's journey does not
+// need. `offline` is such a state; the four journeyStates the scope schema publishes are not.
+const OFFLINE_STATE = { coverageStates: [{ meaning: 'offline', carrier: 'the offer region' }] };
+const DEFERRAL = { state: 'offline', reason: 'the offline condition is outside every done-when line of this mission' };
+const deferredTaste = (state = 'offline') => () => {
   const lens = taste();
-  lens.entries[9] = { rule: 'TASTE-10', measured: 'deferred secondary state: empty', score: null, verdict: 'deferred', routeTo: 'none' };
+  lens.entries[9] = { rule: 'TASTE-10', measured: `deferred secondary state: ${state}`, score: null, verdict: 'deferred', routeTo: 'none' };
   return lens;
 };
-const primaryDeferred = () => ({
+const primaryDeferred = (over = {}, state = 'offline') => ({
   ...baseline(),
-  'response/data/verdicts.json': { ...verdicts(deferredTaste), auditScope: scope({ deferredStates: ['empty'] }) },
-  'response/response.md': responseMd(deferredTaste()).replace('| null | deferred |', '| — | deferred |'),
+  'response/data/verdicts.json': { ...verdicts(deferredTaste(state)), auditScope: scope({ deferredStates: [state], deferrals: [{ state, reason: DEFERRAL.reason }], ...over }) },
+  'response/response.md': responseMd(deferredTaste(state)()).replace('| null | deferred |', '| — | deferred |'),
   'response/response.json': responseJson({ next: ['interface.fix', 'quality.verify'] }),
 });
-await expectValid(primaryDeferred(), 'default primary scope defers secondary states and permits independent quality gates', EMPTY_STATE);
-await expectError({ ...primaryDeferred(), 'response/data/verdicts.json': { ...verdicts(deferredTaste), auditScope: scope({ deferredStates: ['empty'], coverageClaim: 'full-state-matrix' }) } }, 'coverage claim must be selected-surfaces', 'primary audit falsely claiming full-state coverage', EMPTY_STATE);
-await expectError({ ...primaryDeferred(), 'response/data/verdicts.json': { ...verdicts(), auditScope: scope({ deferredStates: ['empty'] }) } }, 'state-comparison criterion must be deferred', 'unobserved secondary states falsely given a passing score', EMPTY_STATE);
+await expectValid(primaryDeferred(), 'default primary scope defers a secondary state with its reason and permits independent quality gates', OFFLINE_STATE);
+await expectError(primaryDeferred({ coverageClaim: 'full-state-matrix' }), 'coverage claim must be selected-surfaces', 'primary audit falsely claiming full-state coverage', OFFLINE_STATE);
+await expectError({ ...primaryDeferred(), 'response/data/verdicts.json': { ...verdicts(), auditScope: scope({ deferredStates: ['offline'], deferrals: [DEFERRAL] }) } }, 'state-comparison criterion must be deferred', 'unobserved secondary states falsely given a passing score', OFFLINE_STATE);
+await expectError(primaryDeferred({ deferrals: [] }), 'auditScope.deferrals gives no reason for it', 'a state deferred with no reason to carry into the ledger', OFFLINE_STATE);
+await expectError(primaryDeferred({ deferrals: [DEFERRAL, { state: 'stale', reason: 'x' }] }), 'auditScope.deferrals names stale, which this audit did not defer', 'a reason for a state nothing deferred', OFFLINE_STATE);
+await expectError(primaryDeferred({}, 'empty'), 'UNCHECKED_UNLAWFUL', 'a journey unit deferring the state a reader meets when there is nothing to show', EMPTY_STATE);
 await expectError({ ...baseline(), 'request/request.json': requestJson({ extra: { auditScope: { surfaces: [...SURFACES, { id: 'results', type: 'page', route: '/results', matrixIds: ['results-wide'] }] } } }) }, 'selected surface entry results-wide was not fully audited', 'one of several selected primary pages omitted');
 const deferredDrawer = { id: 'details', type: 'drawer', route: '/plans#details', priority: 'deferred', matrixIds: [] };
 const drawerInventory = [...structuredClone(SURFACES), deferredDrawer];

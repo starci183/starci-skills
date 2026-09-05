@@ -148,6 +148,7 @@ quan sát probe duy nhất hay từ một rollout được giả định.
 | `@remote/ghcr/<image>` | image bất biến theo digest | có |
 | `@workspaces/device-state` | handle credential theo tên và custody của chúng; giá trị không bao giờ xuất hiện | có |
 | `@remote/github-actions/<runId>` | bằng chứng CI của build và rollout, chỉ đọc | không |
+| `@worktrees/unchecked/<product>` | phần chưa kiểm của tính năng đang được release: cái nào còn mở, và có cái nào nằm bên trong hành trình hay không | không |
 
 ## Đầu vào
 
@@ -166,6 +167,7 @@ quan sát probe duy nhất hay từ một rollout được giả định.
 | `probes` | list of `{probeId, kind, endpointRef, expectStatus}` | the probes the validated manifest declares | Trạng thái ổn định được đo bằng gì; ít nhất một probe là công khai |
 | `steadyDeadline` | number | 600 | Deadline giám sát có chặn trên, tính bằng giây, đo theo thời gian boot mà dự án này cho thấy |
 | `rollbackIdentity` | `{releaseId, artifactRef, digest, dataCompatible}` | — | Đúng release an toàn mà fallback rollback khôi phục, theo digest |
+| `feature` | id | null | Tính năng mà release này giao, để sổ cái phủ của nó được đọc trước khi production bị đổi; một release không giao tính năng nào thì không gọi tên tính năng nào |
 | `resume` | token | null | Token của nhánh bị chặn khi vào lại sau một mã dừng |
 
 ## Các bước
@@ -173,7 +175,7 @@ quan sát probe duy nhất hay từ một rollout được giả định.
 | # | Bước | Tham số | Đọc | Ghi | Dừng với |
 | --- | --- | --- | --- | --- | --- |
 | 1 | Kiểm cổng vào, thẩm quyền mà Đầu vào mang, và resume | `resume` | `request/request.json`, Đầu vào `quality-verification` là thẩm quyền lượt chạy này đứng lên | — | `INVALID_INPUT`, `AUTHORIZATION_MISSING`, `NO_PROGRESS` |
-| 2 | Ràng release và biên dịch kế hoạch | `release`, `target`, `approval` | @remote/ghcr/&lt;image> tại digest đã đóng băng, @remote/github-actions/&lt;runId> cho trạng thái quan sát được, đầu vào `migration-release` cho schema mà image phụ thuộc khi đã release một cái, @tools/git, @tools/ci | — | `MANIFEST_INVALID`, `APPROVAL_REQUIRED` |
+| 2 | Ràng release và biên dịch kế hoạch, rồi đọc sổ chưa kiểm của tính năng trước khi production bị đổi | `release`, `target`, `approval`, `feature` | @remote/ghcr/&lt;image> tại digest đã đóng băng, @remote/github-actions/&lt;runId> cho trạng thái quan sát được, đầu vào `migration-release` cho schema mà image phụ thuộc khi đã release một cái, @worktrees/unchecked/&lt;product> cho phần chưa kiểm còn mở của tính năng, @tools/git, @tools/ci | — | `MANIFEST_INVALID`, `APPROVAL_REQUIRED`, `UNCHECKED_OPEN` |
 | 3 | Khởi tạo execution root và phân giải credential theo tên | — | @workspaces/device-state cho các handle đã khai và custody của chúng, @tools/secrets | — | `CREDENTIAL_UNAVAILABLE` |
 | 4 | Chuẩn bị host, publish artifact theo digest, migrate và đối chiếu domain | — | @remote/ghcr/&lt;image> cho artifact theo digest, @remote/github-actions/&lt;runId> cho revision trước và sau của từng boundary | @tools/shell | `HOST_UNAVAILABLE`, `ARTIFACT_MISSING`, `MIGRATION_BLOCKED`, `DOMAIN_UNRECONCILED` |
 | 5 | Roll out | — | @remote/ghcr/&lt;image> cho revision của target trước và sau | @tools/container | `ROLLOUT_FAILED` |
@@ -204,6 +206,7 @@ một lần resume không thêm thẩm quyền, manifest, credential hay quan s�
 | `NO_PROGRESS` | terminate |
 | `AUTHORIZATION_MISSING` | terminate |
 | `MANIFEST_INVALID` | terminate |
+| `UNCHECKED_OPEN` | terminate |
 | `APPROVAL_REQUIRED` | terminate |
 | `CREDENTIAL_UNAVAILABLE` | terminate |
 | `HOST_UNAVAILABLE` | terminate |

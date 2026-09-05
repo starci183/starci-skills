@@ -1,11 +1,13 @@
 // Proves validate.mjs on a synthetic session branch: one lawful plan of two flows with their own
 // aliases and namespaces, one gate stop, one FLOW_UNDEFINED stop with its reason, and one mutation per
-// law, each of which must fail with a line that names the defect.
+// law, each of which must fail with a line that names the defect. The ledger half runs against a
+// synthetic ledger root, so the tree's own @worktrees/unchecked is never read.
 import assert from 'node:assert/strict';
 import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { validateUatPlanStep } from './validate.mjs';
+import { uncheckedId, ledgerFile } from '../../scripts/unchecked.mjs';
 
 const OPERATOR = 'uat.plan';
 const FEATURE = 'items';
@@ -18,16 +20,17 @@ const ROWS = {
   'remove-item': { entry: '`/items`', steps: 5, alias: 'viewer-remove', namespace: 'uat-remove-item' },
 };
 const unitsDoc = (units = UNITS, producedBy = OPERATOR) => ({ schemaVersion: 9, producedBy, units });
-function receiptOf(units, { feature = FEATURE, rows = ROWS, extraRows = [] } = {}) {
-  const flows = [...units.map((u) => { const r = rows[u.id]; return `| \`${u.id}\` | ${r.entry} | ${r.steps} | \`${r.alias}\` | \`${r.namespace}\` |`; }), ...extraRows].join('\n');
+function receiptOf(units, { feature = FEATURE, rows = ROWS, extraRows = [], tierCell = {} } = {}) {
+  const tierOfRow = (u) => tierCell[u.id] ?? (u.tier === 'secondary' ? `secondary — ${u.deferral?.reason ?? ''}` : 'journey');
+  const flows = [...units.map((u) => { const r = rows[u.id]; return `| \`${u.id}\` | ${r.entry} | ${r.steps} | \`${r.alias}\` | \`${r.namespace}\` | ${tierOfRow(u)} |`; }), ...extraRows].join('\n');
   return `# uat-plan — ${feature}
 
 The goal names ${units.length} journeys of the ${feature} feature; each becomes one flow with its own account alias and seed namespace.
 
 ## Flows
 
-| Flow | Entry | Steps | Account | Seed namespace |
-| --- | --- | --- | --- | --- |
+| Flow | Entry | Steps | Account | Seed namespace | Tier |
+| --- | --- | --- | --- | --- | --- |
 ${flows}
 
 ## Fallbacks taken
@@ -59,15 +62,22 @@ function writeBranch(files) {
   }
   return { branch, session };
 }
-async function run(files) {
+async function run(files, { unchecked = [] } = {}) {
   const { branch, session } = writeBranch(files);
-  const { errors } = await validateUatPlanStep(branch);
+  const uncheckedRoot = mkdtempSync(path.join(tmpdir(), 'unchecked-'));
+  if (unchecked.length) {
+    const file = ledgerFile(uncheckedRoot, 'sample-product', FEATURE);
+    mkdirSync(path.dirname(file), { recursive: true });
+    writeFileSync(file, unchecked.map((d) => JSON.stringify(d)).join('\n') + '\n');
+  }
+  const { errors } = await validateUatPlanStep(branch, undefined, { uncheckedRoot });
   rmSync(session, { recursive: true, force: true });
+  rmSync(uncheckedRoot, { recursive: true, force: true });
   return errors;
 }
-async function expectValid(files, label) { assert.deepEqual(await run(files), [], `${label} should be valid`); }
-async function expectError(files, needle, label) {
-  const errors = await run(files);
+async function expectValid(files, label, options) { assert.deepEqual(await run(files, options), [], `${label} should be valid`); }
+async function expectError(files, needle, label, options) {
+  const errors = await run(files, options);
   assert.ok(errors.some((e) => e.includes(needle)), `${label}: expected an error containing "${needle}", got:\n${errors.join('\n') || '(none)'}`);
 }
 
@@ -108,4 +118,22 @@ await expectError({ ...lawful(), 'response/response.json': responseJson({ status
 await expectError({ ...lawful(), 'response/response.json': responseJson({ status: 'blocked', stop: 'FLOW_UNDEFINED', reason: REASON, next: [] }) }, 'emits no plan', 'an undefined flow that still emitted a plan');
 await expectError({ ...lawful(), 'response/response.json': responseJson({ next: ['git.publish'] }) }, 'which the Next table of uat.plan does not offer', 'a hand-off the Next table does not offer');
 
-process.stdout.write('uat.plan self-test: one lawful plan, two lawful stops and every mutation refused\n');
+// Tiering: a journey the mission does not walk is planned secondary with its reason, and the plan says so.
+const DEFERRED = { id: 'archive-item', kind: 'flow', goal: 'a viewer archives an item and it leaves the list', inputs: [], dependsOn: [], tier: 'secondary', deferral: { reason: 'no done-when line walks the archive' } };
+const TIERED = [...UNITS, DEFERRED];
+const TIERED_ROWS = { ...ROWS, 'archive-item': { entry: '`/items`', steps: 3, alias: 'viewer-archive', namespace: 'uat-archive-item' } };
+await expectValid(lawful(TIERED, { rows: TIERED_ROWS }), 'a plan that defers one journey and says why');
+await expectError(lawful(TIERED, { rows: TIERED_ROWS, tierCell: { 'archive-item': 'journey' } }), 'and the unit list says "secondary — no done-when line walks the archive"', 'a Flows row that hides a deferral the unit list carries');
+await expectError(withUnits(lawful(TIERED, { rows: TIERED_ROWS }), unitsDoc([...UNITS, { ...DEFERRED, deferral: undefined }])), 'carries no deferral.reason', 'a flow deferred with no reason');
+await expectError(withUnits(lawful(), unitsDoc([{ ...UNITS[0], deferral: { reason: 'x' } }, UNITS[1]])), 'is tier journey and carries a deferral', 'a journey flow that defers anything');
+
+// An entry already open in the walk lane is covered or extended by this plan, never silently dropped.
+const openLine = (unit, reason) => {
+  const line = { product: 'sample-product', featureId: FEATURE, unit, state: null, lane: 'walk', tier: 'secondary', reason, recordedBy: 's-old/1/1', recordedAt: '2026-09-01T00:00:00.000Z', resolvedBy: null, resolvedAt: null };
+  return { ...line, id: uncheckedId(line) };
+};
+await expectValid(lawful(TIERED, { rows: TIERED_ROWS }), 'a plan that extends the walk entry it already carried', { unchecked: [openLine('archive-item', 'no done-when line walks the archive')] });
+await expectValid(lawful(), 'a plan that covers its open walk entry by tiering the flow back into the journey', { unchecked: [openLine('open-item', 'was deferred last time')] });
+await expectError(lawful(), 'carries an open walk entry on unit archive-item', 'a plan that drops an open walk entry from its list', { unchecked: [openLine('archive-item', 'no done-when line walks the archive')] });
+
+process.stdout.write('uat.plan self-test: one lawful plan, one tiered plan, two lawful stops and every mutation refused\n');

@@ -5,7 +5,11 @@
 // account alias or a seed namespace, because two walkers that share either prove each other's run; the
 // plan is titled by the feature the request named; and a FLOW_UNDEFINED stop names, in one paragraph,
 // the journey that has no entry. The step budget floor and the alias and namespace shapes live in the
-// kind contract and are checked by the response gate.
+// kind contract and are checked by the response gate. The Flows table's Tier column is the same
+// tiering the unit list carries, written where a person reads it: `journey` for a flow the mission's
+// done-when journey walks, `secondary — <reason>` for one it does not, and only a journey flow is ever
+// dispatched to the walker (scripts/unchecked.mjs). A flow the feature already carries an open walk entry on is
+// paid by tiering it into the journey or extended with a reason, never dropped from the plan.
 import { existsSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
 import path from 'node:path';
@@ -13,7 +17,9 @@ import process from 'node:process';
 import { fileURLToPath } from 'node:url';
 import { validateStep } from '../../scripts/validate-step.mjs';
 import { tableUnder } from '../../scripts/validate-response.mjs';
-import { unitsErrors } from '../../scripts/validate-request.mjs';
+import { unitsErrors, hostRootOf } from '../../scripts/validate-request.mjs';
+import { openUnchecked, planUncheckedErrors, laneOfPlan, tierErrors } from '../../scripts/unchecked.mjs';
+import { ledgerKeyOf } from '../../scripts/record-unchecked.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 const OPERATOR = 'uat.plan';
@@ -22,7 +28,7 @@ const UNITS = 'response/data/units.json';
 const UNDEFINED = 'FLOW_UNDEFINED';
 const empty = (v) => v === undefined || v === null || v === '' || v === '—';
 
-export async function validateUatPlanStep(branchDir, root = ROOT) {
+export async function validateUatPlanStep(branchDir, root = ROOT, { uncheckedRoot = null } = {}) {
   const base = await validateStep(root, branchDir);
   const errors = [...base.errors];
   const { response, requirements = {}, present = new Set() } = base;
@@ -59,14 +65,24 @@ export async function validateUatPlanStep(branchDir, root = ROOT) {
     const flowIds = new Set();
     const aliases = new Map();
     const namespaces = new Map();
-    for (const [id, , , alias, namespace] of tableUnder(receipt, '## Flows') ?? []) {
+    const tierRows = [];
+    for (const [id, , , alias, namespace, tier] of tableUnder(receipt, '## Flows') ?? []) {
       if (flowIds.has(id)) errors.push(`${RECEIPT}: Flows lists ${id} twice; one flow has one row`);
       flowIds.add(id);
+      tierRows.push([id, tier]);
       if (!byId.has(id)) errors.push(`${RECEIPT}: Flows row ${id} has no entry in ${UNITS}; the plan and the unit list are one list`);
       if (aliases.has(alias)) errors.push(`${RECEIPT}: flows ${aliases.get(alias)} and ${id} share the account alias ${alias}; two walkers that share a sign-in prove each other's session`);
       aliases.set(alias, id);
       if (namespaces.has(namespace)) errors.push(`${RECEIPT}: flows ${namespaces.get(namespace)} and ${id} share the seed namespace ${namespace}; one run's rollback would be the other's failure`);
       namespaces.set(namespace, id);
+    }
+    errors.push(...tierErrors(tierRows, units, { at: RECEIPT, table: 'Flows' }));
+    // Every entry this feature already carries in the walk lane is covered by a journey row or extended by a
+    // secondary one; a plan that simply drops it re-defers a journey nobody agreed to stop walking.
+    const { product, featureId } = await ledgerKeyOf(branchDir);
+    if (product && featureId) {
+      const open = await openUnchecked(uncheckedRoot ?? hostRootOf(root), product, featureId);
+      errors.push(...planUncheckedErrors(open, units, laneOfPlan(OPERATOR), UNITS));
     }
     for (const id of byId.keys()) if (!flowIds.has(id)) errors.push(`${UNITS}: unit ${id} has no Flows row; a flow nobody can read in the plan is a flow nobody planned`);
   }

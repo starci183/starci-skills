@@ -6,6 +6,7 @@ import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { validateReleaseStep } from './validate.mjs';
+import { uncheckedId, ledgerFile } from '../../scripts/unchecked.mjs';
 
 const RELEASE = 'release:2026.01.10-1';
 const PREVIOUS = 'release:2026.01.03-2';
@@ -20,6 +21,11 @@ const PROBES = [
   { probeId: 'public-graphql-typename', kind: 'public', endpointRef: 'https://api.example/graphql', expectStatus: 200 },
 ];
 const ROLLBACK = { releaseId: PREVIOUS, artifactRef: ARTIFACT, digest: SAFE_DIGEST, dataCompatible: true };
+const FEATURE = 'checkout';
+const uncheckedLine = (tier, unit = 'plan-picker', state = 'offline') => {
+  const line = { product: 'starci-academy', featureId: FEATURE, unit, state, lane: 'audit', tier, reason: 'the offline condition was outside this run', recordedBy: 's-old/2/1', recordedAt: '2026-01-09T00:00:00.000Z', resolvedBy: null, resolvedAt: null };
+  return { ...line, id: uncheckedId(line) };
+};
 
 const observation = (at, condition, status = 'pass') => ({
   observedAt: at, condition, activeReleaseIds: [RELEASE], activeDigest: DIGEST, availableTargets: 1,
@@ -172,16 +178,25 @@ const rolledBack = () => baseline({
   }),
 });
 
-async function expectValid(files, label) {
+// The ledger half runs against a synthetic root, so the tree's own @worktrees/unchecked is never read.
+async function run(files, { unchecked = [] } = {}) {
   const { branch, session } = writeBranch(files);
-  const { errors } = await validateReleaseStep(branch);
+  const uncheckedRoot = mkdtempSync(path.join(tmpdir(), 'unchecked-'));
+  if (unchecked.length) {
+    const file = ledgerFile(uncheckedRoot, 'starci-academy', FEATURE);
+    mkdirSync(path.dirname(file), { recursive: true });
+    writeFileSync(file, unchecked.map((d) => JSON.stringify(d)).join('\n') + '\n');
+  }
+  const { errors } = await validateReleaseStep(branch, undefined, { uncheckedRoot });
   rmSync(session, { recursive: true, force: true });
-  assert.deepEqual(errors, [], `${label} should be valid`);
+  rmSync(uncheckedRoot, { recursive: true, force: true });
+  return errors;
 }
-async function expectError(files, needle, label) {
-  const { branch, session } = writeBranch(files);
-  const { errors } = await validateReleaseStep(branch);
-  rmSync(session, { recursive: true, force: true });
+async function expectValid(files, label, options) {
+  assert.deepEqual(await run(files, options), [], `${label} should be valid`);
+}
+async function expectError(files, needle, label, options) {
+  const errors = await run(files, options);
   assert.ok(errors.some((e) => e.includes(needle)), `${label}: expected an error containing "${needle}", got:\n${errors.join('\n') || '(none)'}`);
 }
 
@@ -234,4 +249,11 @@ await expectError(baseline({ 'response/response.md': responseMd({ monitoring: { 
 await expectError(baseline({ 'response/data/probes.json': { ...probesJson(), finalCondition: 'nope' } }), 'finalCondition', 'probes schema');
 await expectError(baseline({ 'response/response.md': responseMd().replace('## Steady state', '## Stable state') }), 'missing section ^## Steady state$', 'receipt section renamed');
 
-process.stdout.write('release.deploy self-test: 4 valid branches, 28 rejected mutations\n');
+// Coverage the run decided not to take is read before production changes.
+const forFeature = () => baseline({ 'request/request.json': requestJson({ extra: { feature: FEATURE } }) });
+await expectValid(forFeature(), 'a production release of a feature that owes nothing');
+await expectValid(forFeature(), 'a production release over an entry outside the journey', { unchecked: [uncheckedLine('secondary', 'plan-archive', null)] });
+await expectValid(baseline(), 'a release that names no feature reads no ledger', { unchecked: [uncheckedLine('journey')] });
+await expectError(forFeature(), 'UNCHECKED_OPEN', 'a production release over a journey the run left partly unproved', { unchecked: [uncheckedLine('journey')] });
+
+process.stdout.write('release.deploy self-test: 7 valid branches, 29 rejected mutations\n');

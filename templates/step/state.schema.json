@@ -447,7 +447,7 @@
       }
     },
     "mission": {
-      "description": "the mission's goal as the person confirmed it: written at create from the request, printed to the person as one block of at most four lines and confirmed through a goal-confirm choice at choices[\"goal:<sessionId>:v<version>\"]; a corrected reading is written as the next version and asked again; a replan is a replanned transition carrying the new version, never a silent rewrite",
+      "description": "the mission's goal as the person confirmed it: written at create from the request, printed to the person as one block of at most five lines — the last being the scope the plan filled into mission.scope — and confirmed through a goal-confirm choice at choices[\"goal:<sessionId>:v<version>\"]; a corrected reading is written as the next version and asked again; a replan is a replanned transition carrying the new version, never a silent rewrite",
       "type": "object",
       "additionalProperties": false,
       "required": [
@@ -523,6 +523,25 @@
           "type": "string",
           "minLength": 1,
           "description": "the person's message the block was read from"
+        },
+        "scope": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "journey",
+            "deferred"
+          ],
+          "description": "how far the mission's verification reaches, counted off the plan's units.json when it lands (scripts/validate-session.mjs#unitBudgetErrors): journey units are the ones a lane is dispatched over, deferred ones are carried as unchecked under @worktrees/unchecked. It is the scope line of the goal block, so the person sees the narrowing once, in the same confirmation, and is never asked about it again; before a plan has run there is no scope and the field is absent",
+          "properties": {
+            "journey": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "deferred": {
+              "type": "integer",
+              "minimum": 0
+            }
+          }
         }
       }
     }

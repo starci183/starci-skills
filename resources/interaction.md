@@ -17,8 +17,10 @@ choice needs no choice record.
 
 A `goal-confirm` question is asked once, at the start of a mission that will write routed source or
 touch a runtime, and never for read-only work: the orchestrator prints the block `state.json.mission`
-holds — goal, inclusions and exclusions, the done-when lines — as at most four lines in the person's
-language with one question, and records the answer at `state.json.choices["goal:<sessionId>:v<version>"]`.
+holds — goal, inclusions and exclusions, the done-when lines, and the scope line
+`scope: <n> journey units, <m> unchecked` once a plan has filled `mission.scope` — as at most
+five lines in the person's language with one question, and records the answer at
+`state.json.choices["goal:<sessionId>:v<version>"]`.
 `corrected` writes the next version and asks again; only a latest version selected `as-stated` lets
 anything run (`scripts/validate-request.mjs#missionGateErrors`, `scripts/validate-session.mjs`). Whether
 a mission writes or touches a runtime is read from the tools its operators declare, never from a list

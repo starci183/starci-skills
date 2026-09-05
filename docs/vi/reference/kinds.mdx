@@ -103,6 +103,7 @@ Khung: [`templates/kinds/business-reconciliation.skeleton.md`](https://github.co
 | `^## Lineage$` | `\| Field \| Value \|` | `Previous head`, `Previous head archived`, `Previous state`, `Transition`, `Head object` | `Value`: `\S` |
 | `^## Cited claims$` | `\| Claim \| Kind \| Role \| Source \| Lines \| Head \|` | minRows 1 | `Claim`: `^`[a-z0-9][a-z0-9-]*`$`<br />`Kind`: `^(fact\|intent\|example\|unknown\|contradiction)$`<br />`Lines`: `^\d+-\d+$` |
 | `^## Reconciliation$` | `\| Dimension \| Delivered evidence \| Discrepancy \|` | minRows 1 | `Dimension`: `^`[a-z0-9][a-z0-9-]*`$`<br />`Delivered evidence`: `\S`<br />`Discrepancy`: `\S` |
+| `^## Unchecked$` | `\| Unit \| State \| Lane \| Tier \| Reason \|` | — | `Unit`: `^`[a-z0-9][a-z0-9-]*`$`<br />`State`: `^(—\|`[a-z0-9][a-z0-9-]*`)$`<br />`Lane`: `^(audit\|walk\|e2e)$`<br />`Tier`: `^(journey\|secondary)$`<br />`Reason`: `\S` |
 | `^## Findings$` | `\| Code \| Severity \| Dimension \| Statement \|` | — | `Code`: `^`[A-Z][A-Z0-9_]*`$`<br />`Severity`: `^(info\|warning\|error)$` |
 
 ### `changes`
@@ -395,7 +396,7 @@ Khung: [`templates/kinds/surface-map.skeleton.md`](https://github.com/starci183/
 
 | Mục | Dòng đầu của bảng | Số dòng | Ràng buộc ô |
 | --- | --- | --- | --- |
-| `^## Map$` | `\| Unit \| Kind \| Route or host \| Goal \|` | minRows 1 | `Unit`: `^`[a-z0-9][a-z0-9-]*`$`<br />`Kind`: `^(page\|modal)$`<br />`Route or host`: `\S`<br />`Goal`: `\S` |
+| `^## Map$` | `\| Unit \| Kind \| Route or host \| Goal \| Tier \|` | minRows 1 | `Unit`: `^`[a-z0-9][a-z0-9-]*`$`<br />`Kind`: `^(page\|modal)$`<br />`Route or host`: `\S`<br />`Goal`: `\S`<br />`Tier`: `^(journey\|secondary — \S.*)$` |
 | `^## Shell$` | `\| Element \| Owner \| Decided \|` | minRows 1 | `Element`: `^(sidebar\|header\|breadcrumb\|navigation order)$`<br />`Owner`: `\S`<br />`Decided`: `\S` |
 | `^## Data contracts$` | `\| Unit \| Reads \| Writes \|` | minRows 1 | `Unit`: `^`[a-z0-9][a-z0-9-]*`$`<br />`Reads`: `\S`<br />`Writes`: `\S` |
 | `^## Fallbacks taken$` | `\| Code \| Action \|` | — | `Code`: `^`[A-Z][A-Z0-9_]+`$`<br />`Action`: `\S` |
@@ -427,7 +428,7 @@ Khung: [`templates/kinds/uat-plan.skeleton.md`](https://github.com/starci183/sta
 
 | Mục | Dòng đầu của bảng | Số dòng | Ràng buộc ô |
 | --- | --- | --- | --- |
-| `^## Flows$` | `\| Flow \| Entry \| Steps \| Account \| Seed namespace \|` | minRows 1 | `Flow`: `^`[a-z0-9][a-z0-9-]*`$`<br />`Entry`: `\S`<br />`Steps`: `^[1-9][0-9]*$`<br />`Account`: `^`[a-z][a-z0-9-]*`$`<br />`Seed namespace`: `^`uat-[A-Za-z0-9._-]+`$` |
+| `^## Flows$` | `\| Flow \| Entry \| Steps \| Account \| Seed namespace \| Tier \|` | minRows 1 | `Flow`: `^`[a-z0-9][a-z0-9-]*`$`<br />`Entry`: `\S`<br />`Steps`: `^[1-9][0-9]*$`<br />`Account`: `^`[a-z][a-z0-9-]*`$`<br />`Seed namespace`: `^`uat-[A-Za-z0-9._-]+`$`<br />`Tier`: `^(journey\|secondary — \S.*)$` |
 | `^## Fallbacks taken$` | `\| Code \| Action \|` | — | `Code`: `^`[A-Z][A-Z0-9_]+`$`<br />`Action`: `\S` |
 
 ### `workspace-route-binding`
@@ -490,6 +491,7 @@ Khung: [`templates/kinds/workspace-route-binding.skeleton.md`](https://github.co
 | `uat-verdicts` | [`templates/kinds/uat-verdicts.schema.json`](https://github.com/starci183/starci-skills/blob/main/templates/kinds/uat-verdicts.schema.json) | `runId`, `commit`, `resultRef`, `latestRef`, `historyRef`, `lanes`, `experience`, `cleanup` |
 | `uat-walk` | [`templates/kinds/uat-walk.schema.json`](https://github.com/starci183/starci-skills/blob/main/templates/kinds/uat-walk.schema.json) | `schemaVersion`, `id`, `flow`, `entry`, `account`, `steps` |
 | `ui-coverage` | [`templates/kinds/ui-coverage.schema.json`](https://github.com/starci183/starci-skills/blob/main/templates/kinds/ui-coverage.schema.json) | `directionId`, `surfaceClass`, `actions`, `regions`, `states`, `responsive` |
+| `unchecked` | [`templates/kinds/unchecked.schema.json`](https://github.com/starci183/starci-skills/blob/main/templates/kinds/unchecked.schema.json) | `id`, `product`, `featureId`, `unit`, `state`, `lane`, `tier`, `reason`, `recordedBy`, `recordedAt`, `resolvedBy`, `resolvedAt` |
 | `units` | [`templates/kinds/units.schema.json`](https://github.com/starci183/starci-skills/blob/main/templates/kinds/units.schema.json) | `schemaVersion`, `producedBy`, `units` |
 | `verdicts` | [`templates/kinds/verdicts.schema.json`](https://github.com/starci183/starci-skills/blob/main/templates/kinds/verdicts.schema.json) | `entries` |
 | `walk-result` | [`templates/kinds/walk-result.schema.json`](https://github.com/starci183/starci-skills/blob/main/templates/kinds/walk-result.schema.json) | `schemaVersion`, `mode`, `walkRef`, `walkFingerprint`, `route`, `outcome`, `startedAt`, `finishedAt`, `driver`, `steps`, `firstFailure`, `captures` |

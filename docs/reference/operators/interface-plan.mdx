@@ -31,8 +31,8 @@ of each inventing a shell of their own.
 ## Done when
 
 Done when the `surface-map` names every page and modal the reference or the source shows, each with
-its route or host and one goal line, decides the shared shell once, and the `units` file carries one
-page or modal unit per Map row with the same id and goal.
+its route or host, one goal line and its tier, decides the shared shell once, and the `units` file
+carries one page or modal unit per Map row with the same id, goal and tier.
 
 ## The unit of a blind agent is one page or one modal
 
@@ -77,6 +77,19 @@ learns the operations its page binds from this table or from nothing. Dependenci
 a modal that needs its host page, a detail page that needs its list — are recorded in `dependsOn`
 so the orchestrator orders the fan-out from the plan alone.
 
+## The journey is audited, and everything else is unchecked
+
+A map names every page and modal the feature has; the mission's "done when" lines name a journey
+through some of them. Those are the `journey` units, and they are the ones the audit that follows is
+dispatched over. Every other unit is `secondary`, carries the one sentence saying why the journey does
+not pass through it, and is written down as unchecked in the audit lane under `@worktrees/unchecked`
+instead of being verified — so a narrowed run is narrowed on record, and no run measures every screen
+it can find because nobody said which ones mattered. A unit the feature already carries an open entry on is
+either taken back into the journey by this map, which covers it when the audit runs, or extended by a
+secondary row with a reason of this map's own; a map that simply leaves it out defers it a second time
+with nobody's agreement, and is refused. Generation is not narrowed this way: every unit the map names
+is built, because what to build is the person's goal and only what to prove is the journey's.
+
 ## Boundary
 
 Context is read-only. The operator writes only `response/` of its own branch: the map, the unit list
@@ -91,6 +104,7 @@ verdict about the source.
 | --- | --- | --- |
 | `@grammar/core` | the published Grammar as the bound app resolves it: the shell and navigation compositions a Shell row may name, and the compositions a unit may later bind | yes |
 | `@workspaces/fe` | the routed frontend checkout at the frozen head: the routes, layouts, modals and drawers that already exist, read as evidence of what the map must name and never as the map itself | yes |
+| `@worktrees/unchecked/<product>` | the unchecked coverage this feature already carries in the audit lane: every unit an earlier mission deferred, so this map covers it or extends it rather than deferring it again in silence | no |
 
 ## Inputs
 
@@ -116,9 +130,10 @@ verdict about the source.
 | 4 | Read the promise when bound: the journeys, states and operations the units must cover | — | input `business-promise-authority` | — | — |
 | 5 | Decide the shell once: sidebar, header, breadcrumb and navigation order, each with the owner that renders it | — | @grammar/core for the shell and navigation compositions the family publishes, the reference, the source | — | — |
 | 6 | Name every unit: one row per page and per modal, with its route or host and one goal line | — | the reference, the source, the promise | — | `MAP_INCOMPLETE` |
-| 7 | Declare each unit's data contract: what it reads and what it writes | — | the units, input `business-promise-authority` | — | — |
-| 8 | Write the unit list: one entry per Map row with the same id and goal, and the units each depends on | — | the map | `units` | — |
-| 9 | Emit the map and the receipt | — | everything above | `surface-map`, `response/response.json` | — |
+| 7 | Tier every unit against the mission's done-when lines: `journey` where the journey passes through it, `secondary` with one sentence of reason where it does not, and every open entry of this feature taken back or extended | — | the mission's done-when lines, the units, @worktrees/unchecked/&lt;product> | — | — |
+| 8 | Declare each unit's data contract: what it reads and what it writes | — | the units, input `business-promise-authority` | — | — |
+| 9 | Write the unit list: one entry per Map row with the same id, goal and tier, its deferral reason where it has one, and the units each depends on | — | the map | `units` | — |
+| 10 | Emit the map and the receipt | — | everything above | `surface-map`, `response/response.json` | — |
 
 Step 6 is the only step that stops on the map itself: a route or host that steps 2 and 3 found and
 no row names is `MAP_INCOMPLETE`, with the reason naming it in one paragraph, and nothing is emitted.

@@ -1,11 +1,13 @@
 // Proves validate.mjs on a synthetic session branch: one lawful map of a page and its modal, one gate
-// stop, one MAP_INCOMPLETE stop with its reason, and one mutation per law, each of which must fail with
-// a line that names the defect.
+// stop, one MAP_INCOMPLETE stop with its reason, one map that tiers a unit as secondary and pays for it
+// with a reason, and one mutation per law, each of which must fail with a line that names the defect.
+// The ledger half runs against a synthetic ledger root, so the tree's own @worktrees/unchecked is never read.
 import assert from 'node:assert/strict';
 import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { validateInterfacePlanStep } from './validate.mjs';
+import { uncheckedId, ledgerFile } from '../../scripts/unchecked.mjs';
 
 const OPERATOR = 'interface.plan';
 const FEATURE = 'items';
@@ -22,8 +24,9 @@ const SHELL = [
   ['navigation order', 'the feature layout', 'items, then archive'],
 ];
 const unitsDoc = (units = UNITS, producedBy = OPERATOR) => ({ schemaVersion: 9, producedBy, units });
-function receiptOf(units, { feature = FEATURE, shell = SHELL, contracts = null, mapKind = {} } = {}) {
-  const map = units.map((u) => `| \`${u.id}\` | ${mapKind[u.id] ?? u.kind} | ${ROUTE[u.id] ?? '`/other`'} | ${u.goal} |`).join('\n');
+function receiptOf(units, { feature = FEATURE, shell = SHELL, contracts = null, mapKind = {}, tierCell = {} } = {}) {
+  const tierOfRow = (u) => tierCell[u.id] ?? (u.tier === 'secondary' ? `secondary — ${u.deferral?.reason ?? ''}` : 'journey');
+  const map = units.map((u) => `| \`${u.id}\` | ${mapKind[u.id] ?? u.kind} | ${ROUTE[u.id] ?? '`/other`'} | ${u.goal} | ${tierOfRow(u)} |`).join('\n');
   const rows = contracts ?? units.map((u) => [u.id, 'the item operations the unit reads', u.kind === 'modal' ? 'the item removal operation' : '—']);
   const contractText = rows.map(([id, reads, writes]) => `| \`${id}\` | ${reads} | ${writes} |`).join('\n');
   const shellText = shell.map((r) => `| ${r.join(' | ')} |`).join('\n');
@@ -33,8 +36,8 @@ The ${feature} feature mapped from the person's reference and the source at the 
 
 ## Map
 
-| Unit | Kind | Route or host | Goal |
-| --- | --- | --- | --- |
+| Unit | Kind | Route or host | Goal | Tier |
+| --- | --- | --- | --- | --- |
 ${map}
 
 ## Shell
@@ -76,15 +79,22 @@ function writeBranch(files) {
   }
   return { branch, session };
 }
-async function run(files) {
+async function run(files, { unchecked = [] } = {}) {
   const { branch, session } = writeBranch(files);
-  const { errors } = await validateInterfacePlanStep(branch);
+  const uncheckedRoot = mkdtempSync(path.join(tmpdir(), 'unchecked-'));
+  if (unchecked.length) {
+    const file = ledgerFile(uncheckedRoot, 'sample-product', FEATURE);
+    mkdirSync(path.dirname(file), { recursive: true });
+    writeFileSync(file, unchecked.map((d) => JSON.stringify(d)).join('\n') + '\n');
+  }
+  const { errors } = await validateInterfacePlanStep(branch, undefined, { uncheckedRoot });
   rmSync(session, { recursive: true, force: true });
+  rmSync(uncheckedRoot, { recursive: true, force: true });
   return errors;
 }
-async function expectValid(files, label) { assert.deepEqual(await run(files), [], `${label} should be valid`); }
-async function expectError(files, needle, label) {
-  const errors = await run(files);
+async function expectValid(files, label, options) { assert.deepEqual(await run(files, options), [], `${label} should be valid`); }
+async function expectError(files, needle, label, options) {
+  const errors = await run(files, options);
   assert.ok(errors.some((e) => e.includes(needle)), `${label}: expected an error containing "${needle}", got:\n${errors.join('\n') || '(none)'}`);
 }
 
@@ -126,4 +136,24 @@ await expectError({ ...lawful(), 'response/response.json': responseJson({ status
 await expectError({ ...lawful(), 'response/response.json': responseJson({ status: 'blocked', stop: 'MAP_INCOMPLETE', reason: REASON, next: [] }) }, 'emits no map', 'an incomplete map that still emitted a map');
 await expectError({ ...lawful(), 'response/response.json': responseJson({ next: ['git.publish'] }) }, 'which the Next table of interface.plan does not offer', 'a hand-off the Next table does not offer');
 
-process.stdout.write('interface.plan self-test: one lawful map, two lawful stops and every mutation refused\n');
+// Tiering: a unit the mission's journey does not reach is planned secondary with its reason, and the Map says so.
+const DEFERRED = { id: 'item-archive', kind: 'page', goal: 'show the archived items of the feature', inputs: [], dependsOn: [], tier: 'secondary', deferral: { reason: 'no done-when line walks the archive' } };
+const TIERED = [...UNITS, DEFERRED];
+const TIERED_OPTS = { contracts: [...UNITS, DEFERRED].map((u) => [u.id, 'the item operations the unit reads', '—']) };
+await expectValid(lawful(TIERED, TIERED_OPTS), 'a map that defers one page and says why');
+await expectError(lawful(TIERED, { ...TIERED_OPTS, tierCell: { 'item-archive': 'journey' } }), 'is tier "journey" and the unit list says "secondary — no done-when line walks the archive"', 'a Map that hides a deferral the unit list carries');
+await expectError(lawful(TIERED, { ...TIERED_OPTS, tierCell: { 'item-archive': 'secondary — because' } }), 'the tiering a person reads and the tiering the fan-out runs on are one statement', 'a Map that gives the deferral a second reason');
+await expectError(withUnits(lawful(TIERED, TIERED_OPTS), unitsDoc([...UNITS, { ...DEFERRED, deferral: undefined }])), 'carries no deferral.reason', 'a unit deferred with no reason');
+await expectError(withUnits(lawful(), unitsDoc([{ ...UNITS[0], deferral: { reason: 'x' } }, UNITS[1]])), 'is tier journey and carries a deferral', 'a journey unit that defers anything');
+await expectError(withUnits(lawful(), unitsDoc(UNITS.map((u) => ({ ...u, tier: 'secondary', deferral: { reason: 'later' } })))), 'journey passes through none of them', 'a plan that defers every unit it names');
+
+// An entry already open in the audit lane is covered by a journey row or extended by a secondary one, never dropped.
+const openLine = (unit, reason) => {
+  const line = { product: 'sample-product', featureId: FEATURE, unit, state: null, lane: 'audit', tier: 'secondary', reason, recordedBy: 's-old/1/1', recordedAt: '2026-09-01T00:00:00.000Z', resolvedBy: null, resolvedAt: null };
+  return { ...line, id: uncheckedId(line) };
+};
+await expectValid(lawful(TIERED, TIERED_OPTS), 'a plan that extends the entry it already carried', { unchecked: [openLine('item-archive', 'no done-when line walks the archive')] });
+await expectValid(lawful(), 'a plan that covers its open entry by tiering the unit back into the journey', { unchecked: [openLine('item-list', 'was deferred last time')] });
+await expectError(lawful(), 'carries an open audit entry on unit item-archive', 'a plan that drops an open entry from its list', { unchecked: [openLine('item-archive', 'no done-when line walks the archive')] });
+
+process.stdout.write('interface.plan self-test: one lawful map, one tiered map, two lawful stops and every mutation refused\n');

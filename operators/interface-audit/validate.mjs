@@ -298,6 +298,19 @@ export async function validateAuditStep(branchDir, root = ROOT) {
   }
   const coverageClaim = missingSelected.length || missingStates.size ? 'incomplete' : scopeMode === 'exhaustive' ? 'full-state-matrix' : 'selected-surfaces';
   if (JSON.stringify([...(verdicts.auditScope?.deferredStates ?? [])].sort()) !== JSON.stringify(deferredStates.sort())) errors.push(`${at}: deferred states must name exactly the declared secondary states not captured in this primary-surface audit`);
+  // A deferral leaves coverage unchecked, and that is lawful only over coverage the mission's journey
+  // does not need. This branch runs one unit, and the fan-out gate has already refused a secondary one
+  // (scripts/validate-request.mjs#unitGateErrors), so the surface under audit is a journey surface and
+  // the states a person meets on the way through it — the schema's journeyStates — cannot be skipped:
+  // that is UNCHECKED_UNLAWFUL, and it goes back to the plan that tiered the unit, because the repair is a
+  // tier and not a smaller audit. Every state that may lawfully be deferred carries the sentence saying
+  // why, which scripts/record-unchecked.mjs copies into the ledger line.
+  const journeyStates = new Set(scopeSchema.$defs.journeyStates.enum);
+  const unlawful = deferredStates.filter((state) => journeyStates.has(state));
+  if (unlawful.length) errors.push(`${at}: ${unlawful.join(', ')} ${unlawful.length > 1 ? 'are states' : 'is a state'} of a unit the mission's journey passes through, and a journey unit is measured in every one of ${[...journeyStates].join(', ')}; deferring one is not coverage this audit may leave unchecked (UNCHECKED_UNLAWFUL) — the unit is re-tiered by the plan, or the state is captured`);
+  const reasoned = new Map((verdicts.auditScope?.deferrals ?? []).map((d) => [d.state, d.reason]));
+  for (const state of deferredStates) if (!reasoned.has(state)) errors.push(`${at}: state ${state} is deferred and auditScope.deferrals gives no reason for it; coverage left unchecked with no reason is a skip nobody can read, and the ledger copies this sentence rather than inventing one`);
+  for (const state of reasoned.keys()) if (!deferredStates.includes(state)) errors.push(`${at}: auditScope.deferrals names ${state}, which this audit did not defer`);
   if (verdicts.auditScope?.coverageClaim !== coverageClaim) errors.push(`${at}: coverage claim must be ${coverageClaim}; selected surfaces cannot claim full UI state coverage`);
 
   // The taste lens. A done audit publishes it for every entry it judged: all twelve scored criteria,

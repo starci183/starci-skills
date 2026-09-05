@@ -5,7 +5,9 @@
 // every row of the reconciliation rests on delivered evidence; a discrepancy stops the branch and
 // publishes no head; an implemented head carries the reconciliation that earned it; and the head is
 // published rather than merely written — archived under its content address and named by the index of
-// the businesses root, with a lineage that is a chain of objects.
+// the businesses root, with a lineage that is a chain of objects; and what the feature still has unchecked
+// are carried in the receipt, with a journey entry keeping the head at in-progress rather than
+// implemented, because a promise whose own journey was left partly unmeasured is not yet enforced.
 import { existsSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
 import path from 'node:path';
@@ -14,6 +16,9 @@ import { fileURLToPath } from 'node:url';
 import { validateStep } from '../../scripts/validate-step.mjs';
 import { tableUnder } from '../../scripts/validate-response.mjs';
 import { businessesRootOf, contentAddress, objectRef, openStore, verifyHeadPublication } from '../../scripts/business-registry.mjs';
+import { hostRootOf } from '../../scripts/validate-request.mjs';
+import { openUnchecked } from '../../scripts/unchecked.mjs';
+import { ledgerKeyOf } from '../../scripts/record-unchecked.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 export const OPERATOR = 'business.reconcile';
@@ -38,7 +43,7 @@ const BUSINESSES_ROOT = /\.worktrees\/businesses$/;
 const empty = (v) => v === undefined || v === null || v === '' || v === '—';
 const fields = (rows) => Object.fromEntries((rows ?? []).map(([k, v]) => [k, v]));
 
-export async function validateReconcileStep(branchDir, root = ROOT) {
+export async function validateReconcileStep(branchDir, root = ROOT, { uncheckedRoot = null } = {}) {
   const base = await validateStep(root, branchDir);
   const errors = [...base.errors];
   const { request, response, requirements = {}, present = new Set() } = base;
@@ -152,6 +157,26 @@ export async function validateReconcileStep(branchDir, root = ROOT) {
     }
     if (model?.reconciliation && standing !== model.reconciliation.discrepancies.length) errors.push(`response/response.md: Reconciliation names ${standing} standing discrepancy or discrepancies, the model carries ${model.reconciliation.discrepancies.length}`);
     if (discrepancyStop && standing === 0) errors.push('response/response.md: the branch stopped on RECONCILIATION_DISCREPANCY and the reconciliation names no discrepancy; a stop names what stands');
+    // What was promised is compared with what was delivered, and coverage nobody took is part of that
+    // comparison: a promise proved over three surfaces of five was proved over three. The Unchecked table
+    // is the feature's open coverage ledger (@worktrees/unchecked, scripts/unchecked.mjs) copied into the
+    // receipt, so the reader of a reconciliation sees the delivery's limits beside its claims. An entry
+    // of tier `journey` — a state of a surface the journey itself passes through, left unmeasured —
+    // means the delivery does not yet enforce the promise end to end, and `implemented` is not the
+    // state that describes it; the head is republished `in-progress`, which is the vocabulary the
+    // lifecycle already has for a promise carried as far as it has been carried.
+    const { product, featureId } = await ledgerKeyOf(branchDir);
+    if (product && featureId) {
+      const open = await openUnchecked(uncheckedRoot ?? hostRootOf(root), product, featureId);
+      const listed = new Set((tableUnder(text, '## Unchecked') ?? []).map(([unit, state]) => `${unit}|${state}`));
+      for (const d of open) {
+        const key = `${d.unit}|${d.state === null ? '—' : d.state}`;
+        if (!listed.has(key)) errors.push(`response/response.md: Unchecked omits the open ${d.lane} entry on ${d.unit}${d.state ? `/${d.state}` : ''} the feature still carries; a reconciliation states the limits of the delivery beside its claims`);
+      }
+      if (response.status === 'done' && target === 'implemented' && open.some((d) => d.tier === 'journey')) {
+        errors.push(`response/response.md: the head is republished implemented while the feature carries an open journey entry (${open.filter((d) => d.tier === 'journey').map((d) => `${d.unit}/${d.state}`).join(', ')}); a promise whose own journey was left partly unmeasured is carried as in-progress, not declared enforced`);
+      }
+    }
     if (response.status === 'done') for (const [code, severity] of tableUnder(text, '## Findings') ?? []) if (severity === 'error') errors.push(`response/response.md: finding ${code} is still an open error, so the head cannot be republished`);
   }
   return { errors };

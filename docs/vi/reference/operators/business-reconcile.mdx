@@ -98,6 +98,18 @@ khi không còn sai lệch nào, được công bố lại `implemented` qua tra
 trạng thái, ràng buộc mới, vì một head đã công bố mà trích một commit các cổng chưa từng pass là một lời hứa
 đặt trên bằng chứng sai. Chỉ operator này đi transition ấy; một quyết định đổi lời hứa vẫn đổi trạng thái.
 
+## Một lời hứa chỉ được chứng minh xa đúng bằng mức đã được đo
+
+Một bản giao được so với lời hứa của nó, và chuyện đã có ai nhìn tới đâu trong bản giao ấy cũng là một
+phần của phép so đó. Bảng `## Unchecked` chép phần chưa kiểm còn mở của feature vào receipt, để người đọc một
+lần đối chiếu thấy được giới hạn của bản giao ngay cạnh các claim của nó, thay vì phải suy ra từ một
+lượt chạy mà họ không có mặt. Một mục tier `secondary` là một đơn vị mà hành trình của nhiệm vụ
+chưa từng bước vào và không cản đường `implemented`. Một mục tier `journey` là một state của một
+bề mặt mà chính hành trình đi qua nhưng không làn nào đo: lời hứa mới được mang đi xa đúng bằng mức nó
+đã được mang, không hơn, và đó chính là điều `in-progress` vốn đã có nghĩa, nên head được công bố lại ở
+trạng thái ấy chứ không được tuyên bố là đã thực thi. Không có gì mới được bịa ra để nói điều đó; vòng
+đời đã sẵn có từ ấy.
+
 ## Ranh giới
 
 Context chỉ đọc, trừ đúng một head nó publish. Operator chỉ ghi `response/` của nhánh mình —
@@ -117,6 +129,7 @@ vòng đời không cho phép, sửa source sản phẩm, hay tuyên bố rằng
 | --- | --- | --- |
 | `@worktrees/businesses/<featureId>` | head đã publish, trạng thái và ma trận phủ đã đóng băng của nó, theo địa chỉ nội dung từ chỉ mục head; nơi duy nhất operator này ghi ngoài nhánh của mình, gồm thư mục feature, các object đã lưu trữ và mục chỉ mục của feature đi cùng nhau | có |
 | `@workspaces/be` | checkout backend được route, đọc ở head đã đóng băng; mọi fact claim dẫn nó theo path, khoảng dòng và head | có |
+| `@worktrees/unchecked/<product>` | phần chưa kiểm còn mở của feature: những đơn vị và state mà chính lần kiểm chứng của bản giao đã không lấy, được liệt kê trong receipt cạnh các claim | không |
 
 ## Đầu vào
 
@@ -143,7 +156,7 @@ vòng đời không cho phép, sửa source sản phẩm, hay tuyên bố rằng
 | 1 | Kiểm gate, đầu vào source đã giao và resume | `resume` | `request/request.json`, đầu vào `backend-source-application`, @workspaces/be ở head đóng băng | — | `INVALID_INPUT`, `SOURCE_DRIFT`, `NO_PROGRESS` |
 | 2 | Đọc head đã publish, trạng thái và ma trận phủ đã đóng băng của nó, rồi kiểm chuyển trạng thái và thẩm quyền nó cần | `featureId`, `targetState`, `approval` | @worktrees/businesses/&lt;featureId>: head hiện tại, trạng thái, ma trận và các fingerprint của nó | — | `HEAD_NOT_RECONCILABLE`, `APPROVAL_REQUIRED` |
 | 3 | Chuẩn hoá source đã giao thành fact claim, mỗi claim kèm path, khoảng dòng và head | — | đầu vào `backend-source-application`, @workspaces/be ở head đóng băng, đầu vào `quality-verification` và `uat-flow-verification` chỉ như bằng chứng, @tools/git | `response/data/claims.json` | `EVIDENCE_MISSING` |
-| 4 | So từng hàng của ma trận đóng băng với các claim đã giao và ghi từng sai lệch theo chiều của nó | — | `response/data/claims.json`, @worktrees/businesses/&lt;featureId> cho ma trận ở head đã publish | `response/response.md` | `RECONCILIATION_DISCREPANCY` |
+| 4 | So từng hàng của ma trận đóng băng với các claim đã giao và ghi từng sai lệch theo chiều của nó, rồi liệt kê phần chưa kiểm còn mở của feature bên cạnh chúng | — | `response/data/claims.json`, @worktrees/businesses/&lt;featureId> cho ma trận ở head đã publish, @worktrees/unchecked/&lt;product> cho thứ lần kiểm chứng của bản giao đã không lấy | `response/response.md` | `RECONCILIATION_DISCREPANCY` |
 | 5 | Publish head dưới lease độc quyền cùng phần đối chiếu nó đang mang: thư mục feature, object nó được lưu trữ dưới, và mục gọi tên nó | — | `response/data/claims.json`, @worktrees/businesses/&lt;featureId> ở head trước, object đã lưu trữ của nó và mục chỉ mục head gọi tên nó | @worktrees/businesses/&lt;featureId> thành model.json head mới, object của nó trong kho nội dung và mục của feature trong chỉ mục head, `response/data/model.json`, @tools/sourcewrite | `SOURCE_DRIFT` |
 | 6 | Phát | — | mọi thứ ở trên | `response/response.json` | — |
 

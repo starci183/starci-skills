@@ -18,11 +18,15 @@ authorizations below remain in force. An Ask column or diagnostic reason is not 
 1. Freeze one mission scope: the unit, the target, inclusions and exclusions, write roots, external
    effects, and what will count as proof. Two readings that would change any of those is one focused
    question, not a guess. Freezing is not silent: for a mission that will write routed source or touch
-   a runtime, the frozen scope is printed to the person as one block of at most four lines in the
+   a runtime, the frozen scope is printed to the person as one block of at most five lines in the
    display language (`resources/settings.json#language` over `settings.example.json`, default `vi`;
    a person who writes in another language is answered in it) — the goal, what is in and what is
-   out, the "done when" lines, one question — and confirmed once through a `goal-confirm` choice
-   before step 2. That block is the one question a new prompt asks; from then on the run is smooth:
+   out, the "done when" lines, how far the verification reaches, one question — and confirmed once
+   through a `goal-confirm` choice before step 2. The scope line is the one place the narrowing is put
+   to the person: it is filled from the plan's own counts when a plan lands
+   (`state.json.mission.scope`, `resources/interaction.json#rule`), and what it says was deferred
+   stands on the unchecked ledger under `@worktrees/unchecked` rather than in a second question. That
+   block is the one question a new prompt asks; from then on the run is smooth:
    the transition log prints and never waits, a replan under the same goal and a routed re-entry ask
    nothing, and only a `user` route, a `budget-choice` or a corrected goal stops for the person
    (`resources/interaction.json#asks`). Each "done when" line names the

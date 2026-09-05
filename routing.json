@@ -231,6 +231,10 @@
       }
     },
     "interface.audit": {
+      "plan": {
+        "kind": "operator",
+        "target": "interface.plan"
+      },
       "workspace": {
         "kind": "operator",
         "target": "workspace.bind"

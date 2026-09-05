@@ -2,6 +2,18 @@
   "schemaVersion": 9,
   "note": "Stop codes only release.deploy emits. Same entry shape as operators/errors.json, scope implicit. Shared codes (INVALID_INPUT, NO_PROGRESS) come from operators/errors.json; APPROVAL_REQUIRED is defined by business.decide and belongs in operators/errors.json with both operators in scope. ROLLOUT_FAILED and RECOVERY_EXHAUSTED are the two ordered fallbacks: a failed rollout takes the recovery branch, and exhausted recovery takes the rollback branch; everything after that terminates.",
   "codes": {
+    "UNCHECKED_OPEN": {
+      "domain": "caller",
+      "disposition": "terminate",
+      "meaning": {
+        "en": "A unit of the feature the mission's journey passes through carries coverage left unchecked under @worktrees/unchecked, and this deployment serves production. Coverage a run decided not to take is a thing a person may accept; it is not a thing a deployment may assume.",
+        "vi": "Một unit của feature mà hành trình của nhiệm vụ đi qua đang mang phần phủ chưa kiểm còn mở dưới @worktrees/unchecked, và lần deploy này phục vụ production. Phần phủ một lần chạy quyết định không lấy là điều một người có thể chấp nhận; không phải điều một lần deploy được tự cho là xong."
+      },
+      "resume": {
+        "en": "Run the lane that covers the unit, or the person accepts it and the ledger records who resolved it.",
+        "vi": "Chạy đúng lane phủ unit ấy, hoặc người chấp nhận nó và sổ ghi lại ai đã tất toán."
+      }
+    },
     "AUTHORIZATION_MISSING": {
       "domain": "approval",
       "disposition": "terminate",

@@ -127,6 +127,7 @@ probe observation or from an assumed rollout.
 | `@remote/ghcr/<image>` | the immutable image by digest | yes |
 | `@workspaces/device-state` | credential handles by name and their custody; values never appear | yes |
 | `@remote/github-actions/<runId>` | CI evidence of the build and the rollout, read only | no |
+| `@worktrees/unchecked/<product>` | the unchecked coverage of the feature being released: which of them are still open, and whether any of them sits inside the journey | no |
 
 ## Inputs
 
@@ -145,6 +146,7 @@ probe observation or from an assumed rollout.
 | `probes` | list of `{probeId, kind, endpointRef, expectStatus}` | the probes the validated manifest declares | What steady state is measured by; at least one probe is public |
 | `steadyDeadline` | number | 600 | The bounded monitoring deadline in seconds, measured against the boot time this project shows |
 | `rollbackIdentity` | `{releaseId, artifactRef, digest, dataCompatible}` | — | The exact safe release the rollback fallback restores, by digest |
+| `feature` | id | null | The feature this release delivers, so its coverage ledger is read before production is changed; a release that delivers no one feature names none |
 | `resume` | token | null | The blocked branch's token when re-entering after a stop |
 
 ## Steps
@@ -152,7 +154,7 @@ probe observation or from an assumed rollout.
 | # | Step | Params | Reads | Writes | Stops with |
 | --- | --- | --- | --- | --- | --- |
 | 1 | Validate the gate, the authorization the input carries, and the resume | `resume` | `request/request.json`, input `quality-verification` as the authorization this run stands on | — | `INVALID_INPUT`, `AUTHORIZATION_MISSING`, `NO_PROGRESS` |
-| 2 | Bind the release and compile the plan | `release`, `target`, `approval` | @remote/ghcr/<image> at the frozen digest, @remote/github-actions/<runId> for the observed state, input `migration-release` for the schema the image depends on when one was released, @tools/git, @tools/ci | — | `MANIFEST_INVALID`, `APPROVAL_REQUIRED` |
+| 2 | Bind the release and compile the plan, and read the feature's unchecked ledger before production is changed | `release`, `target`, `approval`, `feature` | @remote/ghcr/<image> at the frozen digest, @remote/github-actions/<runId> for the observed state, input `migration-release` for the schema the image depends on when one was released, @worktrees/unchecked/<product> for the feature's open unchecked entries, @tools/git, @tools/ci | — | `MANIFEST_INVALID`, `APPROVAL_REQUIRED`, `UNCHECKED_OPEN` |
 | 3 | Initialize the execution root and resolve the credentials by name | — | @workspaces/device-state for the declared handles and their custody, @tools/secrets | — | `CREDENTIAL_UNAVAILABLE` |
 | 4 | Prepare the host, publish the artifact by digest, migrate and reconcile the domain | — | @remote/ghcr/<image> for the artifact by digest, @remote/github-actions/<runId> for each boundary's revision before and after | @tools/shell | `HOST_UNAVAILABLE`, `ARTIFACT_MISSING`, `MIGRATION_BLOCKED`, `DOMAIN_UNRECONCILED` |
 | 5 | Roll out | — | @remote/ghcr/<image> for the target revision before and after | @tools/container | `ROLLOUT_FAILED` |
@@ -184,6 +186,7 @@ deployment; a resume that adds no authorization, manifest, credential or observa
 | `NO_PROGRESS` | terminate |
 | `AUTHORIZATION_MISSING` | terminate |
 | `MANIFEST_INVALID` | terminate |
+| `UNCHECKED_OPEN` | terminate |
 | `APPROVAL_REQUIRED` | terminate |
 | `CREDENTIAL_UNAVAILABLE` | terminate |
 | `HOST_UNAVAILABLE` | terminate |
