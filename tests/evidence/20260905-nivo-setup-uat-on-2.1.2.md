@@ -129,3 +129,53 @@ receipt. Flow folder `.worktrees/uat/agentos-modules/module-setup/runs/20260905-
 unchecked ledger `.worktrees/unchecked/nivo/agentos-module-setup.jsonl`. The findings ledgers
 `knowledge/findings/core.jsonl` and `starci.jsonl`. Published head: `nivo-fe` `main` at
 `e2f4968fcee02afd81ccf99aa3f691af4c9bc625` on `github.com/starci-lab/nivo-fe`.
+
+## Follow-on: consuming 0.4.11 and re-verifying at the owner's request (2026-09-05, later)
+
+The owner (relayed by the peer session) reopened the mission after the fe publish to consume
+`@starci/grammar` 0.4.11, re-audit at it, walk the two remaining flows, and re-publish. This work
+sits on disk (the consume branch `session/20260905-130417-nivo-consume`, the follow-on receipts under
+`step-12`/`step-13`, and the two flow folders); it is not chain steps in the session ledger, because
+the 2.1.3 chain ends at the `git.publish` of `step-11` and cannot extend past it in one session — a
+defect recorded below.
+
+| Piece | Verdict | Result |
+| --- | --- | --- |
+| Consume 0.4.11 | **DONE** | the four manifests and the lockfile bumped to 0.4.11; the consumer regression `GrammarFamilyOverflow.spec.tsx` fails at 0.4.9 and passes at 0.4.11; typecheck, lint, build and test:ci (744) green (`d2d35d0`) |
+| Re-serve 0.4.11 | **DONE** | `d2d35d0` merged into `uat` as `293e56e3`, served on 3067 (pid 27536); the control-centre DOM carries the corrected `data-grammar-overflow` stamp (`step-12/parallel-1`) |
+| Re-audit control-centre | **DONE — gaps closed** | 636 claims, **0 failing**: the three grammar-gaps (OVERFLOW-2, PADDING-4 on the frameless SurfaceCard, OVERFLOW-3 on HorizontalScrollRegion under Tabs) are all closed at 0.4.11 (`step-13/parallel-1`) |
+| Re-audit module-setup | **DONE — a new regression found** | 593 claims, 12 failing, all grammar-owned: 4 OVERFLOW-3 on the chat message region (a vertical scroll the 0.4.11 fix does not touch) and, **new at 0.4.11**, 8 FONT failures — the Setup module title renders 36px and the section heading 30px while stamped FONT-4/FONT-3 (20/16), a heading-size regression 0.4.11 introduced (`step-13/parallel-2`) |
+| UAT `setup-reach` | **DONE (1 of 3 cases)** | `deep-link-signed-out` passes behaviour; `wrong-password-refused` and `reload-keeps-session` are coverage gaps the runner cannot walk (a refused sign-in trips the credential sweep; there is no reload action). Flow folder `.worktrees/uat/agentos-modules/setup-reach/runs/20260905-170000-d2d35d0/` |
+| UAT `control-centre-unprovisioned` | **DONE (3 cases)** | `summary-null-instance`, `apps-unavailable`, `retry-settles` all pass behaviour. Flow folder `.worktrees/uat/agentos-modules/control-centre-unprovisioned/runs/20260905-170100-d2d35d0/` |
+| `git.publish` 0.4.11 | **HELD → the person** | not published: 0.4.11 regresses the two Setup headings. `nivo-fe` `main` stays at `e2f4968f` (0.4.9), which has no heading regression; the control-centre overflow gaps there are pre-existing family gaps the app cannot fix. The person chooses: publish 0.4.11 anyway, wait for a grammar 0.4.12, or publish with an owner grammar-fix |
+
+### The 0.4.11 heading regression, measured
+
+Direct measurement, not judge interpretation. On the Setup module page (`module-setup-vi-wide`):
+
+| Heading | Stamp | 0.4.9 render | 0.4.11 render |
+| --- | --- | --- | --- |
+| `Dedicated Setup QA generic agent` (module title) | FONT-4 (20px) | 20px | **36px** |
+| `Thiết lập module` (section) | FONT-3 (16px) | 16px | **30px** |
+
+Every other text node is byte-identical between the two versions; only these two headings changed.
+The grammar `Heading` in 0.4.11 (the 0.4.10 sheet change that sits between 0.4.9 and 0.4.11) renders
+FONT-4/FONT-3 headings at FONT-6/FONT-5 sizes while still stamping FONT-4/FONT-3. It is grammar-owned
+and routes to the grammar owner. So 0.4.11 fixes three family gaps on the control centre and
+introduces one on every surface that heads with these levels.
+
+### Runtime defects met in the follow-on, with file and line
+
+- **The session chain cannot extend past `git.publish`.** `scripts/validate-session.mjs` refuses a
+  chain where `git.publish` is not the terminus ("a chain ends at git.publish, release.deploy or a
+  person"), so a mission reopened after its publish to consume a dependency and re-verify has nowhere
+  to put the new branches; they were kept on disk and out of the chain, and this note is their record.
+  A post-publish reopen wants either a fresh session or a chain that may carry a second publish.
+- **`mission.scope.deferred` is forced to the latest plan's count, not the surface plan's.**
+  `scripts/validate-session.mjs:213` compares `state.mission.scope` against the *latest* plan branch
+  (here `uat.plan` at `step-9`, which defers nothing), so it forced `scope.deferred` to 0 even though
+  the surface plan (`interface.plan` at `step-3`) wrote 11 secondary surfaces to the unchecked ledger
+  `@worktrees/unchecked/nivo/agentos-module-setup.jsonl`. The person-facing scope line therefore reads
+  "3 journey, 0 deferred" while 11 surfaces stand unchecked in the ledger. The line should read the
+  count of the plan whose lane the scope describes (the surface plan for the audit lane), not
+  whichever plan ran last. Recorded, not fixed, at the owner's instruction.
