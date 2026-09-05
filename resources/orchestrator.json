@@ -9,7 +9,7 @@
     "dispatch": "one new agent that inherits the orchestrator's transcript (the profile's forkTurns.dispatch turns), on the operator's profile, with the brief (operators/<id>/brief.md) and request.json as its instruction; at most concurrency.maxDispatch such agents at a time; awaited on its completion event, never on a timer",
     "isolated": "one new agent with an empty context (forkTurns.isolated is none), on the operator's profile, that sees only brief.md, request.json and the files request.inputs and request.contexts name, in its own worktree and browser profile; awaited on its completion event, never on a timer"
   },
-  "wait": "completion: a dispatched or isolated agent is awaited on its completion event and a chain route on its sibling session's end; a timed poll is not a step of any chain, and a wait that returns nothing is not evidence of anything",
+  "wait": "completion: a dispatched or isolated agent is awaited on its completion event and a chain route on its same-session prerequisite branch's accepted completion; a timed poll is not a step of any chain, and a wait that returns nothing is not evidence of anything",
   "receiptSkeleton": true,
   "briefBytes": 3072,
   "budget": {
@@ -133,7 +133,7 @@
     ]
   },
   "sourceWrites": {
-    "rule": "an operator that writes source (interface.generate, interface.fix, backend.generate, library.update) writes only on the session branch session/<sessionId> of the routed checkout, in a git worktree the orchestrator prepared from the frozen head; it commits the declared write set once and records the sha in response.json.commits; the person's checked-out branch is never touched",
+    "rule": "an operator that writes source (interface.generate, interface.fix, backend.generate, library.update, knowledge.repair on its owner source) writes only on the session branch session/<sessionId> of the routed checkout, in a git worktree the orchestrator prepared from the frozen head; it commits the declared write set once and records the sha in response.json.commits; the person's checked-out branch is never touched",
     "track": "changes.md names every path with before/after hashes and the commit; the next requests pin @workspaces/<role> at that sha (contexts[].head) so quality.verify and interface.audit verify exactly what was written",
     "publish": "git.publish merges the session branch into the target branch: fast-forward when the target has not moved; a merge commit only when there is no conflict and the gates are re-run on the merge result; a conflict is NON_FAST_FORWARD and a person resolves it; never rebase, never force",
     "cleanup": "Publication never closes or cleans a user session. On an explicit close-success event, scripts/session-cleanup.mjs writes and verifies @worktrees/done/<sessionId>.md plus <sessionId>/bundle/{state.json, retained request/response/evidence/import files}, then removes only @worktrees/sessions/<sessionId>. It never removes a user worktree, branch, sessions root or central-runtime; blocked, failed and waiting sessions remain resumable.",

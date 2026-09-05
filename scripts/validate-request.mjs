@@ -19,6 +19,7 @@ import { loadInteractionPolicy, selectionErrors } from './validate-interaction.m
 import { validateImportedInput } from './producer-import.mjs';
 import { isJourney, journeyUnits, tierOf, verifiesUnits, laneOf } from './unchecked.mjs';
 import { normalizeResource, resourcesOverlap } from './resource-locks.mjs';
+import { currentRequestPhase } from './validation-phase.mjs';
 
 // Only a fully quoted cell is unquoted: a sentence that opens with a code span keeps its backticks.
 const unquote = (s) => { const t = String(s ?? '').trim(); return /^`[^`]*`$/.test(t) ? t.slice(1, -1) : t; };
@@ -204,7 +205,7 @@ export function plannedRequirementErrors(planned, request, at = 'request.json') 
 
 export const V22_CONTRACT = 'starci/v2.2';
 const FAMILY_BOUND_OPERATORS = new Set(['interface.plan', 'interface.generate', 'interface.fix', 'interface.audit', 'knowledge.repair']);
-const SOURCE_WRITING_OPERATORS = new Set(['backend.generate', 'interface.generate', 'interface.fix', 'library.update']);
+const SOURCE_WRITING_OPERATORS = new Set(['backend.generate', 'interface.generate', 'interface.fix', 'knowledge.repair', 'library.update']);
 const canonicalJson = (value) => {
   if (Array.isArray(value)) return `[${value.map(canonicalJson).join(',')}]`;
   if (value && typeof value === 'object') return `{${Object.keys(value).sort().map((key) => `${JSON.stringify(key)}:${canonicalJson(value[key])}`).join(',')}}`;
@@ -230,7 +231,7 @@ const UI_BINDINGS = {
   'interface.fix': ['@knowledge/ui/presentation'],
   'interface.audit': ['@knowledge/ui/composition', '@knowledge/ui/presentation', '@knowledge/ui/proof']
 };
-export async function uiKnowledgeRequestErrors(root, dir, request) {
+export async function uiKnowledgeRequestErrors(root, dir, request, { phase = currentRequestPhase() } = {}) {
   if (request?.contractVersion !== V22_CONTRACT) return [];
   const aliases = (request.contexts ?? []).map((context) => context.alias);
   const familyAliases = aliases.filter((alias) => /^@knowledge\/grammars\/[a-z0-9][a-z0-9-]*$/.test(alias));
@@ -239,14 +240,18 @@ export async function uiKnowledgeRequestErrors(root, dir, request) {
   const manifestModule = path.join(root, 'scripts', 'knowledge-manifest.mjs');
   const familyModule = path.join(root, 'scripts', 'ui-knowledge-gate.mjs');
   if (!existsSync(manifestModule) || !existsSync(familyModule)) return ['request.json: the v2.2 UI knowledge semantic gates are unavailable; hashes alone cannot freeze an incomplete manifest'];
-  const [{ knowledgeManifestErrors }, { frozenFamilyUnderstandingErrors, routedFamily }] = await Promise.all([import(pathToFileURL(manifestModule).href), import(pathToFileURL(familyModule).href)]);
+  const [{ knowledgeManifestErrors, frozenKnowledgeManifestErrors }, { frozenFamilyUnderstandingErrors, routedFamily }] = await Promise.all([import(pathToFileURL(manifestModule).href), import(pathToFileURL(familyModule).href)]);
   const family = routedFamily(request);
   if (!family) return ['request.json: no unique concrete @knowledge/grammars/<family> binding; a family is never inferred or defaulted'];
   let bindings = UI_BINDINGS[request.operatorId] ?? [];
   if (request.operatorId === 'knowledge.repair') bindings = aliases.filter((alias) => alias.startsWith('@knowledge/ui/'));
   bindings = [...new Set([...bindings, `@knowledge/grammars/${family}`])];
+  if (phase === 'accept' && typeof frozenKnowledgeManifestErrors !== 'function') return ['request/knowledge-manifest.json: the phase-safe frozen manifest validator is unavailable; acceptance cannot compare a pre-mutation manifest to mutated live sources'];
+  const manifestErrors = phase === 'accept'
+    ? await frozenKnowledgeManifestErrors({ root, branchDir: dir, bindings, family })
+    : await knowledgeManifestErrors({ root, branchDir: dir, bindings, family });
   return [
-    ...await knowledgeManifestErrors({ root, branchDir: dir, bindings, family }),
+    ...manifestErrors,
     ...await frozenFamilyUnderstandingErrors(dir, { root, family })
   ];
 }
@@ -526,7 +531,7 @@ export async function unitGateErrors(root, state, request, packages, sessionRoot
 // was deferred, so a mission that narrows its coverage narrows its budget in the same movement.
 export const budgetUnitsOf = (doc) => journeyUnits(doc).length;
 
-export async function validateRequest(root, dir, packages) {
+export async function validateRequest(root, dir, packages, { phase = currentRequestPhase() } = {}) {
   const errors = [];
   if(existsSync(path.join(dir,'import.json')))return {errors:['request.json: an imported producer slot is evidence-only and cannot execute an operator'],request:null};
   const rel = (f) => path.relative(sessionRootOf(dir) ?? dir, path.join(dir, f)).split(path.sep).join('/');
@@ -606,7 +611,7 @@ export async function validateRequest(root, dir, packages) {
   }
   errors.push(...selectionErrors(policy, request, recordedChoices));
   if (request.contractVersion === V22_CONTRACT) errors.push(...await frozenInputErrors(dir, request));
-  errors.push(...await uiKnowledgeRequestErrors(root, dir, request));
+  errors.push(...await uiKnowledgeRequestErrors(root, dir, request, { phase }));
   if (!errors.length && request.operatorId === 'workspace.bind' && !request.exchange) {
     const { validateWorkspaceCheckoutRequest } = await import('./workspace-checkout.mjs');
     errors.push(...validateWorkspaceCheckoutRequest(root, request, dir));

@@ -90,7 +90,7 @@ export async function acceptAttempt(branch) {
   if (request.contractVersion !== V22_CONTRACT) throw new Error(`request.json: attempt-gate accepts only ${V22_CONTRACT} attempts`);
   const exchange = /^parallel-\d+$/.test(path.basename(branch)) ? null : path.basename(branch);
   const topBranch = exchange ? path.dirname(branch) : branch;
-  const checked = await validateStep(root, topBranch, { operator: true });
+  const checked = await validateStep(root, topBranch, { operator: true, requestPhase: 'accept' });
   if (checked.errors.length) throw new Error(checked.errors.join('\n'));
   const responseFile = path.join(branch, 'response', 'response.json');
   const responseBytes = await readFile(responseFile);
@@ -100,7 +100,7 @@ export async function acceptAttempt(branch) {
     const record = state.attempts?.[key];
     if (!record || record.id !== request.attempt.id) throw new Error(`state.json: attempts[${key}] was not opened for ${request.attempt.id}`);
     if (record.status !== 'running' && record.status !== 'waiting') throw new Error(`state.json: attempt ${record.id} is already ${record.status}`);
-    const requestCheck = await validateRequest(root, branch);
+    const requestCheck = await validateRequest(root, branch, undefined, { phase: 'accept' });
     if (requestCheck.errors.length) throw new Error(requestCheck.errors.join('\n'));
     if (sha(await readFile(responseFile)) !== sha(responseBytes)) throw new Error('response/response.json changed during acceptance; rerun the full step gate');
     if (response.actual && Date.parse(response.actual.observedAt) < Date.parse(record.startedAt)) throw new Error(`response/response.json: actual.observedAt predates attempt ${record.id}; stale evidence cannot satisfy its expected`);

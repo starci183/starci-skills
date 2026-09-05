@@ -14,6 +14,7 @@ import { validateResponse } from './validate-response.mjs';
 import { loadOperatorPackages, exchangeOf } from './operator-md.mjs';
 import { loadKindTemplates } from './validate-templates.mjs';
 import { loadErrorsRegistry } from './errors-registry.mjs';
+import { currentRequestPhase, withRequestPhase } from './validation-phase.mjs';
 
 // Only a fully quoted cell is unquoted: a sentence that opens with a code span keeps its backticks.
 const unquote = (s) => { const t = String(s ?? '').trim(); return /^`[^`]*`$/.test(t) ? t.slice(1, -1) : t; };
@@ -33,11 +34,11 @@ export async function operatorValidator(root, pkg) {
   return mod[names[0]];
 }
 
-export async function validateStep(root, branchDir, { origin = false, operator = false } = {}) {
+export async function validateStep(root, branchDir, { origin = false, operator = false, requestPhase = currentRequestPhase() } = {}) {
   const packages = await loadOperatorPackages(root);
   const kinds = await loadKindTemplates(root);
   const registry = await loadErrorsRegistry(root);
-  const req = origin ? readFrozenRequest(branchDir, packages) : await validateRequest(root, branchDir, packages);
+  const req = origin ? readFrozenRequest(branchDir, packages) : await validateRequest(root, branchDir, packages, { phase: requestPhase });
   const errors = [...req.errors];
   const requirements = req.request?.requirements ?? {};
   const res = await validateResponse(root, branchDir, { requirements, exchange: null, packages, kinds, registry, origin });
@@ -49,7 +50,7 @@ export async function validateStep(root, branchDir, { origin = false, operator =
     for (const ex of exchanges) {
       const exDir = path.join(branchDir, ex);
       if (!existsSync(path.join(exDir, 'request', 'request.json'))) { if (res.response?.status === 'done') errors.push(`${ex}/: the operator declares this exchange and the branch is done, but it never ran`); continue; }
-      const exReq = origin ? readFrozenRequest(exDir, packages) : await validateRequest(root, exDir, packages);
+      const exReq = origin ? readFrozenRequest(exDir, packages) : await validateRequest(root, exDir, packages, { phase: requestPhase });
       errors.push(...exReq.errors);
       const exRes = await validateResponse(root, exDir, { requirements, exchange: ex, packages, kinds, registry, origin });
       errors.push(...exRes.errors);
@@ -60,7 +61,7 @@ export async function validateStep(root, branchDir, { origin = false, operator =
   // The operator's law over the branch the shared laws have read. An origin is judged by its operator through the importer's own path.
   if (operator && !origin && pkg?.shape === 'v9') {
     const law = await operatorValidator(root, pkg);
-    if (law) for (const e of (await law(branchDir, root))?.errors ?? []) if (!errors.includes(e)) errors.push(e);
+    if (law) for (const e of (await withRequestPhase(requestPhase, () => law(branchDir, root)))?.errors ?? []) if (!errors.includes(e)) errors.push(e);
   }
   return { errors, request: req.request, response: res.response, requirements, present, pkg };
 }
