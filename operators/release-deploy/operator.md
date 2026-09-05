@@ -191,7 +191,7 @@ deployment; a resume that adds no authorization, manifest, credential or observa
 
 ## The best outcome
 
-On `done`, print **The best outcome** as the deployed release address or identifier in `response/response.md`, followed by the health and readiness rows from `response/data/probes.json`. A failed probe shows the deployed state and failing observation truthfully and does not advertise the release as healthy.
+Print **The best outcome** from the steady state in `response/response.md` and its health and readiness rows in `response/data/probes.json`: a successful rollout shows the new release address, identifier and digest, while a fallback rollback shows the exact prior release restored and never calls it a new delivery. A failed probe shows the actual deployed state and failing observation truthfully and does not advertise the release as healthy.
 
 ## Stops
 

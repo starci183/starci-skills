@@ -10,7 +10,8 @@ non-force và chỉ fast-forward, và dừng bằng một lỗi có kiểu thay 
 Xong khi `git-publication` ghi nhận rằng đúng commit mà biên nhận quality đã đo đã tới ref được
 route trên remote bằng một lần push non-force tạo mới hoặc fast-forward ref ấy với mọi hook đã qua,
 nhánh phiên đã được merge và không bao giờ rebase, nhiều nhất một tag có chú thích trỏ vào head mà
-chính lần publish này đã push, và worktree, nhánh cùng thư mục phiên đã được gỡ.
+chính lần publish này đã push, còn worktree, nhánh cùng thư mục phiên vẫn nguyên vẹn cho vòng đời
+session-cleanup riêng.
 
 ## Nó không quyết gì về bản thân thay đổi
 

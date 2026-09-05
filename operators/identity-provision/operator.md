@@ -173,7 +173,7 @@ the exact delta; a resume that adds no authority, provider or desired-state chan
 
 ## The best outcome
 
-On `done`, print **The best outcome** as the per-alias reuse, create or repair table from `response/data/delta.json` and the safe sign-in results in `response/data/checks.json`; `response/data/account.json` may identify the account by name as secondary evidence. Never print, link or copy a credential value, sealed file or secret-bearing command; an unproved login is shown as unproved.
+For provisioning, print **The best outcome** as the per-alias reuse, create or repair table from `response/data/delta.json` and the safe sign-in results in `response/data/checks.json`; `response/data/account.json` may identify the account by name as secondary evidence. For admin rotation, show the old credential rejected and the replacement accepted without emitting an account record; never print, link or copy a credential value, sealed file or secret-bearing command, and show an unproved login as unproved.
 
 ## Stops
 

@@ -10,7 +10,8 @@ fast-forward-only semantics, and stop with a typed failure rather than reaching 
 Done when the `git-publication` records that the exact commit the quality receipt measured reached
 the routed ref on the remote through a non-force push that created or fast-forwarded it with every
 hook passed, the session branch was merged and never rebased, at most one annotated tag points at
-the head this same publication pushed, and the session worktree, branch and folder are removed.
+the head this same publication pushed, and the session worktree, branch and folder remain intact for
+the separate session-cleanup lifecycle.
 
 ## It decides nothing about the change
 

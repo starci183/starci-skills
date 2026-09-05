@@ -326,7 +326,7 @@ này.
 
 ## Kết quả tốt nhất
 
-Khi `done`, in **Kết quả tốt nhất** là URL đang serve và head đã attest trong `response/response.md`, kèm `response/data/checks.json` và `response/data/delta.json` làm evidence phụ. Port bị giữ, head stale hoặc probe fail phải hiện holder hay observation xung đột và không bao giờ đưa route ra như đã sẵn sàng.
+Với `stack-up`, `locate`, `start-role`, `serve`, `restart` hoặc `reset`, in **Kết quả tốt nhất** là URL, generation và head đã attest sau thao tác trong `response/response.md`, kèm `response/data/checks.json` và `response/data/delta.json` làm evidence phụ; một lần reuse đã chứng minh phải được ghi là no-op. Với `stop`, hiện generation đã dừng cùng lease hay port được thả thay vì một URL; port bị giữ, head stale hoặc probe fail phải đưa holder hay observation xung đột lên trước và không bao giờ đưa route ra như đã sẵn sàng.
 
 ## Dừng
 

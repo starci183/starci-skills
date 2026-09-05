@@ -119,7 +119,7 @@ journal đã mang; một lần resume không thêm thẩm quyền, plan hay thay
 
 ## Kết quả tốt nhất
 
-Khi `done`, in **Kết quả tốt nhất** là bảng disposition migration trong `response/migration-release.md`, được `response/data/migration-release.json` chứng minh; chỉ link `response/artifacts/migration-<n>.log` cho dòng cần chi tiết thực thi. Migration fail hoặc chưa chắc phải đưa actual state và owner recovery lên trước, không bao giờ gợi ý apply mù lần nữa.
+In **Kết quả tốt nhất** là bảng disposition pending, applied hoặc already-applied trong `response/migration-release.md`, được `response/data/migration-release.json` chứng minh; tập already-applied phải được ghi là no-op đã chứng minh, và chỉ link `response/artifacts/migration-<n>.log` cho dòng cần chi tiết thực thi. Migration fail hoặc chưa chắc phải đưa actual journal state và owner recovery lên trước, không bao giờ gợi ý apply mù lần nữa.
 
 ## Dừng
 

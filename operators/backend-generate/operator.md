@@ -248,7 +248,7 @@ fingerprint cannot yield a different answer.
 
 ## The best outcome
 
-On `done`, print **The best outcome** as the reviewable source change named by `response/changes.md`, with `response/data/mutations.json` and any declared conformance or proof files as secondary evidence. A blocked or mismatched implementation shows the failing contract, proof or ownership row and does not describe the backend as delivered.
+Under `mode: apply`, print **The best outcome** as the reviewable source change named by `response/changes.md`, with `response/data/mutations.json` and any declared conformance or proof files as secondary evidence. Under `mode: dry`, show the proposed mutations and write set as unapplied, with no commit or test claim; a blocked or mismatched implementation leads with the failing contract, proof or ownership row and does not describe the backend as delivered.
 
 ## Stops
 

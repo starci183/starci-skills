@@ -170,7 +170,7 @@ session id to its containing coordinate, session state and frozen request hash.
 
 ## The best outcome
 
-On `done`, print **The best outcome** as the resolved route table from `response/data/route.json`, including checkout, revision and runtime binding, with `response/response.md` as the readable receipt. An ambiguous or invalid route shows the candidates or broken declaration and does not link a guessed workspace.
+On `done`, print **The best outcome** as the resolved route table from `response/data/route.json`, including checkout, branch, revision and declared runtime coordinate when present, with `response/response.md` as the readable receipt. State clearly that a source binding does not prove a runtime is serving that revision; an ambiguous or invalid route shows the candidates or broken declaration and does not link a guessed workspace.
 
 ## Stops
 

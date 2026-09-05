@@ -255,7 +255,7 @@ passed because quality gates or UAT pass. Quality thresholds and frozen UAT case
 
 ## The best outcome
 
-Print **The best outcome** as the gate table in `response/response.md`, linking each required `response/data/gates/<gate>.json` result and `response/data/coverage.json` when present. Failed and skipped gates remain distinct and visible; a red or incomplete gate set is not presented as verified quality.
+Print **The best outcome** as the gate table in `response/response.md`, linking each required `response/data/gates/<gate>.json` result and `response/data/coverage.json` when present. Completing the verification may validly produce a failing verdict: failed, skipped and not-run gates remain distinct and visible, and a red or incomplete set is never presented as passing quality.
 
 ## Stops
 

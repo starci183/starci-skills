@@ -238,7 +238,7 @@ không thể cho một câu trả lời khác.
 
 ## Kết quả tốt nhất
 
-Khi `done`, in **Kết quả tốt nhất** là thay đổi source có thể review mà `response/changes.md` gọi tên, kèm `response/data/mutations.json` và các file conformance hoặc proof đã khai làm evidence phụ. Implementation bị blocked hay mismatch phải hiện contract, proof hoặc dòng ownership đang fail và không mô tả backend như đã bàn giao.
+Với `mode: apply`, in **Kết quả tốt nhất** là thay đổi source có thể review mà `response/changes.md` gọi tên, kèm `response/data/mutations.json` và các file conformance hoặc proof đã khai làm evidence phụ. Với `mode: dry`, hiện các mutation và write set được đề xuất là chưa áp dụng, không có commit hay claim test; implementation bị blocked hoặc mismatch phải đưa contract, proof hay dòng ownership đang fail lên trước và không mô tả backend như đã bàn giao.
 
 ## Dừng
 

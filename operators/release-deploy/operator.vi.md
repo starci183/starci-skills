@@ -189,7 +189,7 @@ một lần resume không thêm thẩm quyền, manifest, credential hay quan s�
 
 ## Kết quả tốt nhất
 
-Khi `done`, in **Kết quả tốt nhất** là địa chỉ hoặc định danh release đã deploy trong `response/response.md`, sau đó là các dòng health và readiness từ `response/data/probes.json`. Probe fail phải hiện trung thực deployed state và observation đang fail, không quảng bá release là khỏe.
+In **Kết quả tốt nhất** từ steady state trong `response/response.md` cùng các dòng health và readiness ở `response/data/probes.json`: rollout thành công hiện địa chỉ, định danh và digest release mới, còn fallback rollback hiện đúng release trước đã khôi phục và không gọi đó là một bản giao mới. Probe fail phải hiện trung thực deployed state và observation đang fail, không quảng bá release là khỏe.
 
 ## Dừng
 

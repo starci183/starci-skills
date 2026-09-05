@@ -123,7 +123,7 @@ journal already carries; a resume that adds no authority, plan or source change 
 
 ## The best outcome
 
-On `done`, print **The best outcome** as the migration disposition table in `response/migration-release.md`, backed by `response/data/migration-release.json`; link `response/artifacts/migration-<n>.log` only for a row that needs its execution detail. A failed or uncertain migration leads with its actual state and recovery owner and never suggests blindly reapplying it.
+Print **The best outcome** as the pending, applied or already-applied disposition table in `response/migration-release.md`, backed by `response/data/migration-release.json`; an already-applied set is labeled a proved no-op, and `response/artifacts/migration-<n>.log` is linked only for a row that needs execution detail. A failed or uncertain migration leads with its actual journal state and recovery owner and never suggests blindly reapplying it.
 
 ## Stops
 

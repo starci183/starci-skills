@@ -246,7 +246,7 @@ thành đạt vì gate hoặc UAT đạt. Các gate chất lượng và các cas
 
 ## Kết quả tốt nhất
 
-In **Kết quả tốt nhất** là bảng gate trong `response/response.md`, link từng kết quả bắt buộc `response/data/gates/<gate>.json` và `response/data/coverage.json` khi có. Gate fail và gate bị skip phải tách biệt, luôn hiện; bộ gate đỏ hoặc chưa đủ không được trình bày như quality đã verify.
+In **Kết quả tốt nhất** là bảng gate trong `response/response.md`, link từng kết quả bắt buộc `response/data/gates/<gate>.json` và `response/data/coverage.json` khi có. Hoàn tất việc kiểm có thể cho một verdict fail hợp lệ: gate fail, bị skip và chưa chạy phải tách biệt, luôn hiện, còn bộ gate đỏ hay chưa đủ không bao giờ được trình bày như quality đã pass.
 
 ## Dừng
 

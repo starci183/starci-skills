@@ -167,7 +167,7 @@ trước khi dispatch và ràng id phiên vào tọa độ chứa request, trạ
 
 ## Kết quả tốt nhất
 
-Khi `done`, in **Kết quả tốt nhất** là bảng route đã resolve từ `response/data/route.json`, gồm checkout, revision và runtime binding, kèm `response/response.md` làm receipt dễ đọc. Route mơ hồ hoặc sai phải hiện các candidate hay declaration hỏng và không link một workspace đoán ra.
+Khi `done`, in **Kết quả tốt nhất** là bảng route đã resolve từ `response/data/route.json`, gồm checkout, branch, revision và tọa độ runtime đã khai khi có, kèm `response/response.md` làm receipt dễ đọc. Phải nói rõ source binding không chứng minh runtime đang serve revision đó; route mơ hồ hoặc sai phải hiện các candidate hay declaration hỏng và không link một workspace đoán ra.
 
 ## Dừng
 
