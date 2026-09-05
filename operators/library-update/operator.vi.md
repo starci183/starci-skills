@@ -6,8 +6,8 @@ Cập nhật một package của owner đã được uỷ quyền rõ ràng từ
 package, sửa nó, tăng version patch, build và gate package, rồi tiêu thụ đúng bản phát hành ấy trong
 metadata dependency của consumer cùng proof regression consumer không đổi, trong hai commit phiên chịu
 trách nhiệm cho từng byte của cả hai; `mode` nói nhánh này chạy nửa nào, nên một package owner và một
-consumer nằm ở hai repository là hai route, hai phiên và hai nhánh của cùng operator này chứ không
-phải một việc không ai khai nổi.
+consumer nằm ở hai repository dùng hai worktree và hai nhánh cô lập trong chính một phiên user host,
+cả hai do operator này sở hữu chứ không tách thành hai việc không liên quan.
 
 ## Xong khi
 
@@ -23,7 +23,8 @@ trên đó, và `changes` nêu các đường dẫn của cả hai commit; hoặ
 dừng tại `library-release` ấy cạnh `library-archive` của nó, đã phát hành lên registry mà manifest
 package gọi tên dưới đúng integrity của archive trừ khi yêu cầu xin không phát hành, mà không chạm
 metadata consumer nào; hoặc,
-dưới mode `consume`, riêng nửa consumer chạy trên `library-release` mà một phiên anh em đã sinh, ghi
+dưới mode `consume`, riêng nửa consumer chạy trên `library-release` mà nhánh owner trước đó trong cùng
+phiên user host đã sinh, hoặc một bản phát hành lịch sử tương thích được import từ phiên anh em, ghi
 đúng một commit metadata và không ghi một dòng source package nào.
 
 ## Một package, một consumer, một việc
@@ -54,8 +55,8 @@ gate bên dưới chỉ đọc đúng nửa mà chế độ ấy cần:
   chính câu trả lời của registry làm lý do — không bao giờ là một receipt lặng lẽ ghi pending. Chỉ một
   trường hợp pending là hợp lệ: yêu cầu đặt sẵn `publish: false` vì người sẽ tự phát hành archive ấy.
 - `consume` — riêng route consumer. `consumer` được cấp còn `plan` thì không; đầu vào là
-  `library-release` của một nhánh trước — của phiên anh em đã import vào phiên này, hoặc của một nhánh
-  sớm hơn trong chính phiên này — và việc đúng bằng nửa consumer: delta manifest chính xác, danh tính
+  `library-release` của nhánh owner trước đó trong phiên user host này, hoặc một bản phát hành lịch sử
+  tương thích từ phiên anh em được import vào, và việc đúng bằng nửa consumer: delta manifest chính xác, danh tính
   lock, bao đóng dependency và các proof consumer trên bản phát hành ấy. Không ghi source package,
   receipt không được mang tiết mục package nào, và danh tính package cùng version tiêu thụ được đọc từ
   bản ghi phát hành chứ không từ một plan. Bản ghi ấy có thể `published` hoặc `pending`; pending giờ là
@@ -63,8 +64,9 @@ gate bên dưới chỉ đọc đúng nửa mà chế độ ấy cần:
   metadata trỏ về chỗ không checkout nào khác có là `DEPENDENCY_BOUNDARY_REJECTED`.
 
 Vậy một package owner ở repository này và consumer của nó ở repository khác là một nhánh `publish`
-trên route owner và một nhánh `consume` trên route consumer, nhánh sau bind `library-release` của
-nhánh trước qua `producer-import`; một route `chain` gọi tên operator này là đang xin cái thứ nhất.
+trong worktree owner cô lập và một nhánh `consume` trong worktree consumer cô lập thuộc cùng phiên
+user host. Nhánh sau bind `library-release` của nhánh trước qua `producer-import`; import chéo phiên
+lịch sử vẫn tương thích. Một route `chain` gọi tên operator này là đang xin nhánh đầu tiên.
 
 ## Ranh giới nửa package
 

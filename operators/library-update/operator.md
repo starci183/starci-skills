@@ -6,8 +6,8 @@ Update one explicitly authorized owner package end to end: reproduce the regress
 repair it, bump the patch version, build and gate the package, then consume that exact release in the
 consumer's dependency metadata with the unchanged consumer regression proof, in two session commits
 that account for every byte of both; `mode` says which of those halves this branch runs, so an owner
-package and a consumer that live in two repositories are two routes, two sessions and two branches of
-this one operator rather than a job nobody can express.
+package and a consumer that live in two repositories use two isolated worktrees, one branch in each, inside
+the same user host session, both owned by this one operator rather than split into unrelated jobs.
 
 ## Done when
 
@@ -24,7 +24,8 @@ the paths of both commits; or, under mode `publish`, the package half alone ends
 `library-release` beside its `library-archive`, published to the registry the package manifest names
 under the archive's own integrity unless the request asked for no publication, with no consumer
 metadata touched; or, under mode
-`consume`, the consumer half alone runs against the `library-release` a sibling session produced,
+`consume`, the consumer half alone runs against the `library-release` the earlier owner branch in the
+same user host session produced, or a compatible historical release imported from a sibling session,
 writing the one metadata commit and no package source at all.
 
 ## One package, one consumer, one job
@@ -57,8 +58,8 @@ gate below reads only the half its mode needs:
   publication is lawful in one case only: a request that preset `publish: false` because a person will
   publish that archive themselves.
 - `consume` — the consumer route alone. `consumer` is supplied and `plan` is not; the input is the
-  `library-release` of an earlier branch — a sibling session's, imported into this session, or an
-  earlier branch of this one — and the job is exactly the consumer half: the exact manifest delta,
+  `library-release` of the earlier owner branch in this user host session, or a compatible historical
+  sibling-session release imported into it, and the job is exactly the consumer half: the exact manifest delta,
   the lock identity, the dependency closure and the consumer proofs against that release. No package
   source is written, no package section may appear in the receipt, and the package identity and the
   version consumed are read from the release record rather than from a plan. That record may be
@@ -66,9 +67,11 @@ gate below reads only the half its mode needs:
   only inside the producing session, and a consumer whose metadata resolves to a place no other
   checkout has is `DEPENDENCY_BOUNDARY_REJECTED`.
 
-So an owner package in one repository and its consumer in another are a `publish` branch on the owner
-route and a `consume` branch on the consumer route, the second binding the first's `library-release`
-through `producer-import`; a `chain` route that names this operator is asking for the first of those.
+So an owner package in one repository and its consumer in another are a `publish` branch in an
+isolated owner worktree and a `consume` branch in an isolated consumer worktree within the same user
+host session. The second binds the first's `library-release` through `producer-import`; historical
+cross-session imports remain compatible. A `chain` route that names this operator is asking for the
+first of those branches.
 
 ## Boundary of the package half
 
