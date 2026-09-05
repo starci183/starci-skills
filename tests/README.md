@@ -170,7 +170,7 @@ but no live run yet; a served preview for `interface.audit` and a `runtime.serve
 the stale registry remain owed from round 2. The rebuild that followed — goal per mission, branch
 and operator; one operator one job (21 packages); `inline`/`isolated` modes; plan/execute pairs;
 full Sol; the planned chain — has validators, self-tests and specs, and no live Sol 5.6 mission yet:
-that run is `TODO.md` item 3 and the evidence it leaves decides the publish.
+that live rerun remained the required proof before publishing the rebuild.
 
 Round 3 also retired the example workflows as runtime inputs. The eleven chains that used to live
 under `workflows/` are planner fixtures now, one file per chain under `scripts/fixtures/chains/`: each carries

@@ -1,6 +1,6 @@
 # Rerunning the Nivo workspace auto-recovery mission on StarCi Skills 2.0.0
 
-Proof run of `TODO.md` item 3: a stopped Codex mission of the 1.7–1.9 tree, rerun on 2.0.0 by an
+A live proof run of the rebuild: a stopped Codex mission of the 1.7–1.9 tree, rerun on 2.0.0 by an
 Opus processor, with the harness measured while it ran.
 
 - Mission: the OUTER AgentOS workspace auto-recovery backend, frozen by business19 and

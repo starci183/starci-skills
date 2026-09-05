@@ -12,3 +12,8 @@ worktrees/
 
 # the person's own settings; resources/settings.example.json is the tracked shape
 resources/settings.json
+
+# Dependencies and process-local generated state
+node_modules/
+__pycache__/
+/scheduled_tasks.lock

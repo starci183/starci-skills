@@ -2,8 +2,8 @@
 
 Session `20260905-020000-nivo-environment.preflight`, runtime `.claude` at `4b622b09` (2.0.0).
 Rerun of Codex task `01a0692b-d82f-7ef3-b7df-814c310ac664`, whose handoff is
-`.worktrees/sessions/20260904-042915-nivo-workspace.bind/OPUS-HANDOFF.md`. This is also the proof run
-of `TODO.md` item 3.
+`.worktrees/sessions/20260904-042915-nivo-workspace.bind/OPUS-HANDOFF.md`. This also provides the
+required live rerun evidence for the 2.0 rebuild.
 
 The mission's chain never reached its second step. What follows separates three things that are easy
 to blur: what the runtime proved through an operator receipt, what this session measured directly on
