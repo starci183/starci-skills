@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync, symlinkSync, unlinkSync, rmdirSync, cpSync } from 'node:fs';
+import { readFileSync, symlinkSync, unlinkSync, rmdirSync, cpSync, rmSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -8,6 +8,18 @@ import { importProducer, validateImportedInput } from './producer-import.mjs';
 import { validateRequest } from './validate-request.mjs';
 import { producerImportFixture as fixture, HEAD, digest, write, read } from './producer-import-fixture.mjs';
 const ROOT=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'..');
+
+test('a retained producer remains importable after its active session is removed, and archive tampering fails',async()=>{
+  const f=fixture();try{
+    const {retainSessionBundle}=await import('./session-cleanup.mjs');
+    const state={...read(path.join(f.sourceSession,'state.json')),contractVersion:'starci/v2.2',status:'done',hostBinding:{kind:'codex-task',hostId:'source-task',worktree:f.host},lifecycle:{phase:'active'},mission:{version:1,goal:'publish the fixture',target:'fixture',includes:['fixture'],outputs:['git-publication'],verification:'synthetic typed proof'},brief:{proven:['doneWhen:0 typed publication']},attempts:{'1/1':{id:'original-1',status:'matched',requestRef:'step-1/parallel-1/request/request.json',responseRef:'step-1/parallel-1/response/response.json'}}};
+    const retained=await retainSessionBundle(f.sourceSession,state,'fixture completed');
+    rmSync(f.sourceSession,{recursive:true});
+    await importProducer(f.args);assert.deepEqual(await f.check(),[]);
+    write(path.join(retained.bundle,'step-1/parallel-1/response/artifacts/raw.log'),'tampered archive');
+    assert.ok((await f.check()).some(error=>error.includes('RETENTION_CHANGED')));
+  }finally{f.cleanup();}
+});
 test('imports preserve original bytes and ownership without receiver history edits',async()=>{
   const f=fixture();try{const state=readFileSync(path.join(f.targetSession,'state.json'));await importProducer(f.args);assert.deepEqual(await f.check(),[]);assert.ok((await validateRequest(ROOT,f.target)).errors.some(e=>e.includes('evidence-only')));assert.deepEqual(readFileSync(path.join(f.target,'request/request.json')),readFileSync(path.join(f.source,'request/request.json')));assert.equal(read(path.join(f.target,'request/request.json')).sessionId,'original');assert.deepEqual(readFileSync(path.join(f.targetSession,'state.json')),state);await assert.rejects(importProducer(f.args),/already exists/);}finally{f.cleanup();}
 });

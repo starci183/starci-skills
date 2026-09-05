@@ -26,10 +26,11 @@ function within(base,relative,{missing=false}={}){
 function roots(hostRoot,sourceSessionId,targetSessionId,sourceStep,sourceParallel,targetStep,targetParallel){
   if(!ID.test(sourceSessionId)||!ID.test(targetSessionId)||sourceSessionId===targetSessionId||![sourceStep,sourceParallel,targetStep,targetParallel].every(positive))throw Error('import session IDs and coordinates must be strict and distinct');
   const sessions=within(hostRoot,'.worktrees/sessions');
-  const sourceSession=within(sessions,sourceSessionId),targetSession=within(sessions,targetSessionId);
+  const archive=existsSync(path.join(sessions,sourceSessionId))?null:within(hostRoot,`.worktrees/done/${sourceSessionId}`);
+  const sourceSession=archive?within(archive,'bundle'):within(sessions,sourceSessionId),targetSession=within(sessions,targetSessionId);
   const source=within(sourceSession,`step-${sourceStep}/parallel-${sourceParallel}`);
   const target=within(targetSession,`step-${targetStep}/parallel-${targetParallel}`,{missing:true});
-  return {sourceSession,targetSession,source,target};
+  return {sourceSession,targetSession,source,target,archive};
 }
 // The evidence range: imported slots sit at step numbers from resources/orchestrator.json#session.imports.stepBase upward, where no chain cell is ever numbered.
 export function importStepBase(root){try{return JSON.parse(readFileSync(path.join(root,'resources','orchestrator.json'),'utf8')).session?.imports?.stepBase??100;}catch{return 100;}}
@@ -52,6 +53,11 @@ function metadata(source,manifest){
   return {request,response};
 }
 async function originAuthority(root,r,m){
+  if(r.archive){
+    const {verifyRetention}=await import('./session-cleanup.mjs');
+    const retained=await verifyRetention(r.archive,json(within(r.archive,'retention.json')));
+    if(retained.id!==m.sourceSessionId)throw Error('retained origin is not the requested source session');
+  }
   if(existsSync(path.join(r.source,'import.json')))throw Error('an imported slot cannot be laundered into a new producer');
   const original=metadata(r.source,m),state=json(within(r.sourceSession,'state.json')),key=`${m.sourceStep}/${m.sourceParallel}`;
   if(state.id!==m.sourceSessionId||state.steps?.[key]!==original.request.operatorId||state.requestHashes?.[key]!==hash(readFileSync(within(r.source,'request/request.json'))))throw Error('origin request does not match its original session operator and frozen request hash');
