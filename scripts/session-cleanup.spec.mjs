@@ -1,12 +1,13 @@
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync, renameSync, symlinkSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
 import { retainSessionBundle, verifyRetention, closeSuccessfulSession } from './session-cleanup.mjs';
 import { openSession, confirmSession } from './session-open.mjs';
 import { openAttempt } from './attempt-gate.mjs';
+import { buildEvidenceManifest } from './evidence-manifest.mjs';
 
 async function fixture(run) {
   const base = mkdtempSync(path.join(tmpdir(), 'starci-retention-'));
@@ -75,6 +76,16 @@ test('missing and tampered evidence refuses retention verification and leaves ac
   assert.ok(existsSync(session));
 }));
 
+test('archive verification refuses injected unlisted bytes and a junction replacing the archive root',async()=>fixture(async({session,state,branch})=>{
+  branch('1/1');
+  const result=await retainSessionBundle(session,state,'finished');
+  const extra=path.join(result.bundle,'step-1/parallel-1/response/injected.md');writeFileSync(extra,'unsealed');
+  await assert.rejects(()=>verifyRetention(result.doneDir,result.manifest,state),/inventory/);
+  rmSync(extra);
+  const moved=`${result.doneDir}-moved`;renameSync(result.doneDir,moved);symlinkSync(moved,result.doneDir,process.platform==='win32'?'junction':'dir');
+  await assert.rejects(()=>verifyRetention(result.doneDir,result.manifest,state),/RETENTION_PATH/);
+}));
+
 test('retention rejects traversal and missing dependencies before any active data can be deleted', async () => fixture(async ({session,state,branch}) => {
   branch('1/1',{ absent:'step-0/parallel-1/response/missing.md' });
   await assert.rejects(() => retainSessionBundle(session,state,'finished'),/RETENTION_MISSING/);
@@ -112,7 +123,7 @@ test('closing an accepted goal retains its proof and deletes only its exact sess
   const evidence=['response/response.md'];
   const response={contractVersion:'starci/v2.2',schemaVersion:9,operatorId:request.operatorId,step:1,parallel:1,status:'done',fields:{'environment-readiness':'response/response.md'},fallbacks:[],commits:[],next:[],attempt:{id:'ready-1',number:1,expectedVersion:1},goalCheck:{achieved:true,evidence},actual:{expectedVersion:1,observedAt:new Date().toISOString(),observations:[{criterionId:'ready',observed:'ready observed',evidence}]},comparison:{expectedVersion:1,verdict:'matched',criteria:[{criterionId:'ready',verdict:'matched',note:'observed',evidence}],next:'advance'}};
   writeFileSync(path.join(branch,'response','response.json'),JSON.stringify(response));
-  state=JSON.parse(readFileSync(stateFile,'utf8'));state.attempts['1/1']={...state.attempts['1/1'],status:'matched',responseRef:'step-1/parallel-1/response/response.json',endedAt:new Date().toISOString(),comparison:response.comparison};state.status='done';state.brief.proven=['doneWhen:0 readiness proof retained'];writeFileSync(stateFile,JSON.stringify(state));
+  state=JSON.parse(readFileSync(stateFile,'utf8'));state.attempts['1/1']={...state.attempts['1/1'],status:'matched',responseRef:'step-1/parallel-1/response/response.json',endedAt:new Date().toISOString(),comparison:response.comparison,evidenceManifest:await buildEvidenceManifest(branch)};state.status='done';state.brief.proven=['doneWhen:0 readiness proof retained'];writeFileSync(stateFile,JSON.stringify(state));
   const central=path.join(sessions,'central-runtime');mkdirSync(central);
   const result=await closeSuccessfulSession(opened.session,'The goal is accepted and this host session is closing.');
   assert.ok(!existsSync(opened.session));assert.ok(existsSync(central));assert.ok(existsSync(worktree));

@@ -9,6 +9,7 @@ import assert from 'node:assert/strict';
 import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { validateAuditStep } from './validate.mjs';
 import { writeUiKnowledgeFixture } from '../../scripts/ui-knowledge-fixture.mjs';
 
@@ -317,7 +318,7 @@ function writeBranch(files, { decisionClass = 'console', decision = {}, coverage
     writeFileSync(path.join(branch, name), typeof content === 'string' ? content : JSON.stringify(content, null, 2));
   }
   if (files['response/response.json']?.status === 'done') {
-    writeUiKnowledgeFixture(path.resolve('.'), branch, ['@knowledge/ui/composition', '@knowledge/ui/presentation', '@knowledge/ui/proof', '@knowledge/grammars/<family>'], `response/data/captures/${WIDE}.json`);
+    writeUiKnowledgeFixture(path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..'), branch, ['@knowledge/ui/composition', '@knowledge/ui/presentation', '@knowledge/ui/proof', '@knowledge/grammars/<family>'], `response/data/captures/${WIDE}.json`);
   }
   return { branch, session };
 }

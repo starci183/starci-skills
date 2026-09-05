@@ -1,9 +1,10 @@
-import { existsSync, lstatSync, realpathSync, readdirSync, readFileSync, mkdirSync, writeFileSync } from 'node:fs';
-import { createHash } from 'node:crypto';
+import { existsSync, lstatSync, realpathSync, readdirSync, readFileSync, mkdirSync, writeFileSync, renameSync, rmSync } from 'node:fs';
+import { createHash, randomUUID } from 'node:crypto';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { loadOperatorPackages, kindOf } from './operator-md.mjs';
 import { packageForOrigin } from './retired-operators.mjs';
+import { withSessionLock } from './session-lock.mjs';
 
 const ROOT=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'..');
 const ID=/^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/;
@@ -103,15 +104,39 @@ export async function validateImportedInput(root,session,inputRef,kind,{hostRoot
 
 export async function importProducer({sourceSessionId,sourceStep,sourceParallel,targetSessionId,targetStep,targetParallel,root=ROOT,hostRoot=path.dirname(root)}){
   const m={schemaVersion:1,sourceSessionId,sourceStep,sourceParallel,targetSessionId,targetStep,targetParallel,files:[]};
-  const r=roots(hostRoot,sourceSessionId,targetSessionId,sourceStep,sourceParallel,targetStep,targetParallel);
-  if(existsSync(r.target))throw Error('import target already exists; never overwrite evidence');
-  withinEvidenceRange(targetStep,importStepBase(root));evidenceOnly(r.targetSession,targetStep,targetParallel);await originAuthority(root,r,m);m.files=inventory(r.source);manifestShape(m);
-  const bytes=m.files.map(f=>[f.path,readFileSync(within(r.source,f.path))]);
-  if(bytes.some(([p,b])=>hash(b)!==m.files.find(f=>f.path===p).sha256))throw Error('origin changed during import');
-  mkdirSync(r.target,{recursive:true});
-  for(const [p,b]of bytes){const dest=within(r.target,p,{missing:true});mkdirSync(path.dirname(dest),{recursive:true});writeFileSync(dest,b,{flag:'wx'});}
-  writeFileSync(path.join(r.target,'import.json'),JSON.stringify(m,null,2)+'\n',{flag:'wx'});
-  return {target:r.target,files:m.files.length,sourceSessionId};
+  const locate=()=>roots(hostRoot,sourceSessionId,targetSessionId,sourceStep,sourceParallel,targetStep,targetParallel);
+  let r=locate();
+  withinEvidenceRange(targetStep,importStepBase(root));
+  const snapshot=async()=>{
+    await originAuthority(root,r,m);m.files=inventory(r.source);manifestShape(m);
+    const bytes=m.files.map(f=>[f.path,readFileSync(within(r.source,f.path))]);
+    if(bytes.some(([p,b])=>hash(b)!==m.files.find(f=>f.path===p).sha256))throw Error('origin changed during import');
+    return bytes;
+  };
+  let bytes;
+  if(r.archive)bytes=await snapshot();
+  else try{bytes=await withSessionLock(r.sourceSession,snapshot);}
+  catch(error){
+    if(existsSync(path.join(r.sourceSession,'state.json')))throw error;
+    r=locate();if(!r.archive)throw error;bytes=await snapshot();
+  }
+  // Never hold source and receiver locks together. Publish only a fully staged copy.
+  return withSessionLock(r.targetSession,async()=>{
+    if(existsSync(r.target))throw Error('import target already exists; never overwrite evidence');
+    const receiver=json(within(r.targetSession,'state.json'));
+    if(receiver.contractVersion==='starci/v2.2' && (receiver.lifecycle?.phase!=='active'||receiver.status!=='running'))throw Error('import receiver must be an active running session');
+    evidenceOnly(r.targetSession,targetStep,targetParallel);
+    const stageRef=`step-${targetStep}/.parallel-${targetParallel}-import-${randomUUID()}`;
+    const stage=within(r.targetSession,stageRef,{missing:true});
+    mkdirSync(stage,{recursive:true});
+    try{
+      for(const [p,b]of bytes){const dest=within(stage,p,{missing:true});mkdirSync(path.dirname(dest),{recursive:true});writeFileSync(dest,b,{flag:'wx'});}
+      writeFileSync(path.join(stage,'import.json'),JSON.stringify(m,null,2)+'\n',{flag:'wx'});
+      if(JSON.stringify(inventory(stage))!==JSON.stringify(m.files))throw Error('staged import differs from the frozen source snapshot');
+      renameSync(stage,r.target);
+    }finally{if(existsSync(stage))rmSync(within(r.targetSession,stageRef),{recursive:true});}
+    return {target:r.target,files:m.files.length,sourceSessionId};
+  });
 }
 if(process.argv[1]&&path.resolve(process.argv[1])===fileURLToPath(import.meta.url)){
   const failed=error=>{process.stderr.write(error.message+'\n');process.exitCode=1;};

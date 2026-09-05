@@ -116,13 +116,10 @@ function writeBootstraps(repo, log) {
     const file = path.join(repo, name);
     if (!existsSync(file)) { writeFileSync(file, BOOTSTRAP); log(`wrote ${name}`); continue; }
     const current = readFileSync(file, 'utf8');
-    if (current.includes('.claude/INDEX.md')) {
-      if (!current.includes(ENTRY_MARKER)) {
-        appendFileSync(file, `${current.endsWith('\n') ? '\n' : '\n\n'}${PROMPT_ENTRY}\n`);
-        log(`updated ${name} (added prompt entry; preserved existing instructions)`);
-      } else log(`kept ${name} (already routes every prompt to StarCi)`);
-    }
-    else log(`NOTICE ${name} exists and does not route to .claude/INDEX.md; add the bootstrap paragraph yourself`);
+    if (!current.includes(ENTRY_MARKER)) {
+      appendFileSync(file, `${current.endsWith('\n') ? '\n' : '\n\n'}${PROMPT_ENTRY}\n`);
+      log(`updated ${name} (added prompt entry; preserved existing instructions)`);
+    } else log(`kept ${name} (already routes every prompt to StarCi)`);
   }
   const ignore = path.join(repo, '.gitignore');
   const lines = existsSync(ignore) ? readFileSync(ignore, 'utf8').split(/\r?\n/) : [];

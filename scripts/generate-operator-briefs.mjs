@@ -1,6 +1,6 @@
 // operators/<id>/brief.md is generated from operator.md: the prompt of one dispatched or isolated agent
 // (resources.mode), capped at resources/orchestrator.json#briefBytes. It carries what an agent must know
-// before its first tool call — the job, when it is done and its primary output, the inputs, the outputs,
+// before its first tool call — when it is done and its primary output, the inputs, the outputs,
 // the stop codes, and for an isolated agent that nothing outside request.json exists — and nothing the
 // agent can read for itself at the step it is on or in its request.json. Generating it keeps the brief and the
 // operator one home: a table edited in operator.md reaches the brief on the next run, and `--check`
@@ -23,7 +23,7 @@ export function renderBrief(pkg) {
   const op = pkg.en;
   const id = pkg.manifest.id;
   const inputs = (op.tables.inputs?.rows ?? []).filter((r) => kindOf(r.kind) !== '—' && kindOf(r.kind) !== '');
-  const optional = (r) => (isYes(r.required) ? '' : ' (optional)');
+  const optional = (r) => (isYes(r.required) ? '' : '?');
   // The Requirements are not repeated here: the orchestrator fills their defaults into request.json
   // before dispatch (resources/orchestrator.json#agent.requirements), so the agent reads every value
   // there. The Next table is the orchestrator's, not the agent's: an agent ends its branch and never
@@ -35,11 +35,7 @@ export function renderBrief(pkg) {
   const lines = [
     `# ${id} — brief`,
     '',
-    `Read operator.md at your step; write only response/ of your branch; replace the running response.json skeleton before you exit; * marks a fallback stop.${isolated ? ' You see only what request.json names; nothing else exists.' : ''}`,
-    '',
-    '## Job',
-    '',
-    op.job,
+    `Follow operator.md; write its declared paths and your branch response/; replace the running response.json before exit. ? optional; * fallback.${isolated ? ' Context is limited to what request.json names.' : ''}`,
     '',
     '## Done when',
     '',

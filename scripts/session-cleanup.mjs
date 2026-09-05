@@ -24,6 +24,26 @@ async function confinedFile(base, ref) {
   return file;
 }
 
+async function archiveInventory(directory) {
+  const files=[];
+  async function walk(folder) {
+    for (const entry of await readdir(folder,{withFileTypes:true})) {
+      const file=path.join(folder,entry.name);
+      if (entry.isSymbolicLink()) throw new Error(`RETENTION_PATH: archive symlink ${file}`);
+      if (entry.isDirectory()) await walk(file);
+      else if (entry.isFile()) files.push(slash(path.relative(directory,file)));
+      else throw new Error(`RETENTION_PATH: non-regular archive file ${file}`);
+    }
+  }
+  await walk(directory);
+  return files.filter(ref=>ref!=='retention.json').sort();
+}
+
+async function assertArchiveRoot(directory) {
+  const parent=path.dirname(directory);
+  if (path.basename(parent)!=='done' || (await lstat(parent)).isSymbolicLink() || (await lstat(directory)).isSymbolicLink() || path.dirname(await realpath(directory))!==await realpath(parent)) throw new Error('RETENTION_PATH: archive must be a real child of the named done directory');
+}
+
 async function retainedFiles(session, state) {
   const retained = new Set();
   const add = async ref => { await confinedFile(session, ref); retained.add(slash(ref)); };
@@ -68,6 +88,7 @@ function compactText(state) {
 
 export async function verifyRetention(doneDir, manifest, sourceState = null) {
   doneDir = path.resolve(doneDir);
+  await assertArchiveRoot(doneDir);
   if (manifest.contractVersion !== V22_CONTRACT || !Array.isArray(manifest.files) || !manifest.files.length) throw new Error('RETENTION_INVALID: contract or files');
   if (sourceState && (manifest.sessionId !== sourceState.id || manifest.sourceStateHash !== stateHash(sourceState))) throw new Error('RETENTION_CONFLICT: existing archive belongs to different session proof');
   const seen = new Set();
@@ -77,6 +98,7 @@ export async function verifyRetention(doneDir, manifest, sourceState = null) {
     if (await digest(await confinedFile(doneDir, item.ref)) !== item.sha256) throw new Error(`RETENTION_CHANGED: ${item.ref}`);
   }
   if (!seen.has('bundle/state.json') || !seen.has('compact.md')) throw new Error('RETENTION_MISSING: state or compact');
+  if (JSON.stringify(await archiveInventory(doneDir))!==JSON.stringify([...seen].sort())) throw new Error('RETENTION_CHANGED: archive file inventory differs from its sealed manifest');
   const archived = await json(path.join(doneDir, 'bundle', 'state.json'));
   if (archived.id !== manifest.sessionId || stateHash(archived) !== manifest.sourceStateHash || archived.lifecycle?.phase !== 'closed-success') throw new Error('RETENTION_CONFLICT: archived state does not match its manifest');
   return archived;
@@ -90,6 +112,7 @@ export async function retainSessionBundle(session, state, reason) {
   const compact = path.join(doneRoot, `${state.id}.md`);
   if (!within(doneRoot, doneDir) || path.dirname(doneDir) !== doneRoot || state.id !== path.basename(session)) throw new Error('RETENTION_PATH: session id must be one path segment');
   await mkdir(doneRoot, { recursive: true });
+  if ((await lstat(doneRoot)).isSymbolicLink()) throw new Error('RETENTION_PATH: done root cannot be a symlink');
   let manifest;
   if (existsSync(doneDir)) {
     manifest = await json(path.join(doneDir, 'retention.json'));

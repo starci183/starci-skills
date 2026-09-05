@@ -12,7 +12,8 @@ npx @starci/skills init
 ```
 
 Run it at the root of the repository that will own the runtime. Every prompt enters StarCi; follow-ups reuse the host session. It copies the tree into `./.claude`,
-writes `CLAUDE.md` (read by Claude Code) and `AGENTS.md` (read by Codex) when they do not exist, and
+writes `CLAUDE.md` (read by Claude Code) and `AGENTS.md` (read by Codex) when they do not exist, appends the
+StarCi entry once to existing files while preserving their instructions, and
 adds `.worktrees/sessions/` to `.gitignore`, where sessions live. Commit `.claude/` with the repository:
 it is source, not a cache. Requires Node 20 or newer; the CLI has no dependencies. The same CLI runs
 straight from the Git branch when the registry has not yet listed a version:

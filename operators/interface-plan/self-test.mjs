@@ -6,6 +6,7 @@ import assert from 'node:assert/strict';
 import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { validateInterfacePlanStep } from './validate.mjs';
 import { uncheckedId, ledgerFile } from '../../scripts/unchecked.mjs';
 import { writeUiKnowledgeFixture } from '../../scripts/ui-knowledge-fixture.mjs';
@@ -79,7 +80,7 @@ function writeBranch(files) {
     writeFileSync(path.join(branch, name), typeof content === 'string' ? content : JSON.stringify(content, null, 2));
   }
   if (files['response/response.json']?.status === 'done') {
-    writeUiKnowledgeFixture(path.resolve('.'), branch, ['@knowledge/ui/composition', '@knowledge/grammars/<family>'], 'response/data/units.json');
+    writeUiKnowledgeFixture(path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..'), branch, ['@knowledge/ui/composition', '@knowledge/grammars/<family>'], 'response/data/units.json');
   }
   return { branch, session };
 }

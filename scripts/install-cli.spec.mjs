@@ -83,11 +83,12 @@ test('update adds prompt routing once to an existing bootstrap without replacing
   const repo = freshRepo();
   try {
     init({ dir: repo, force: false, bootstrap: false }, quiet);
-    const custom = '# Team instructions\n\nRead .claude/INDEX.md first.\nKeep our local review policy.\n';
+    const custom = '# Team instructions\n\nKeep our local review policy.\n';
     writeFileSync(path.join(repo, 'AGENTS.md'), custom);
     update({ dir: repo, force: false }, quiet);
     const first = readFileSync(path.join(repo, 'AGENTS.md'), 'utf8');
     assert.ok(first.startsWith(custom), 'local instructions survive the entry upgrade');
+    assert.ok(first.includes('.claude/INDEX.md'), 'a pre-existing file without a StarCi link is also routed');
     assert.equal(first.split('<!-- starci:prompt-entry -->').length - 1, 1);
     update({ dir: repo, force: false }, quiet);
     assert.equal(readFileSync(path.join(repo, 'AGENTS.md'), 'utf8'), first, 'updating again does not append duplicate policy');
@@ -103,5 +104,20 @@ test('update --no-bootstrap preserves existing host instructions byte for byte',
     update({ dir: repo, force: false, bootstrap: false }, quiet);
     assert.equal(readFileSync(path.join(repo, 'AGENTS.md'), 'utf8'), custom);
     assert.ok(!existsSync(path.join(repo, 'CLAUDE.md')));
+  } finally { rmSync(repo, { recursive: true, force: true }); }
+});
+
+test('init adds entry to both existing host files while preserving their custom content', () => {
+  const repo = freshRepo();
+  try {
+    const originals = { 'AGENTS.md': '# Team\r\nCustom Codex instructions.', 'CLAUDE.md': '# Team\nCustom Claude instructions.\n' };
+    for (const [name, content] of Object.entries(originals)) writeFileSync(path.join(repo, name), content);
+    init({ dir: repo, force: false, bootstrap: true }, quiet);
+    for (const [name, content] of Object.entries(originals)) {
+      const result = readFileSync(path.join(repo, name), 'utf8');
+      assert.ok(result.startsWith(content), name);
+      assert.equal(result.split('<!-- starci:prompt-entry -->').length - 1, 1);
+      assert.ok(result.includes('.claude/INDEX.md'));
+    }
   } finally { rmSync(repo, { recursive: true, force: true }); }
 });

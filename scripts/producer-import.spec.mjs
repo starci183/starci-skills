@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync, symlinkSync, unlinkSync, rmdirSync, cpSync, rmSync } from 'node:fs';
+import { readFileSync, symlinkSync, unlinkSync, rmdirSync, cpSync, rmSync, readdirSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -22,6 +22,16 @@ test('a retained producer remains importable after its active session is removed
 });
 test('imports preserve original bytes and ownership without receiver history edits',async()=>{
   const f=fixture();try{const state=readFileSync(path.join(f.targetSession,'state.json'));await importProducer(f.args);assert.deepEqual(await f.check(),[]);assert.ok((await validateRequest(ROOT,f.target)).errors.some(e=>e.includes('evidence-only')));assert.deepEqual(readFileSync(path.join(f.target,'request/request.json')),readFileSync(path.join(f.source,'request/request.json')));assert.equal(read(path.join(f.target,'request/request.json')).sessionId,'original');assert.deepEqual(readFileSync(path.join(f.targetSession,'state.json')),state);await assert.rejects(importProducer(f.args),/already exists/);}finally{f.cleanup();}
+});
+
+test('concurrent imports publish one complete target and leave no staging debris',async()=>{
+  const f=fixture();try{
+    const results=await Promise.allSettled([importProducer(f.args),importProducer(f.args)]);
+    assert.equal(results.filter(result=>result.status==='fulfilled').length,1);
+    assert.match(String(results.find(result=>result.status==='rejected').reason),/already exists/);
+    assert.deepEqual(await f.check(),[]);
+    assert.ok(!readdirSync(path.dirname(f.target)).some(name=>name.includes('-import-')));
+  }finally{f.cleanup();}
 });
 for(const [name,mutate,needle]of [
   ['changed copy',f=>write(path.join(f.target,'response/artifacts/raw.log'),'changed'),'bytes or origin'],
