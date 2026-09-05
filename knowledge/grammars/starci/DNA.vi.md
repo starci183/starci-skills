@@ -1,6 +1,6 @@
 # StarCi Core — DNA
 
-`@starci/grammar@0.4.11` · checkout `0564837a4ba345ff9a472296b10127289eb22c29` · sinh ngày 2026-09-05
+`@starci/grammar@0.4.12` · checkout `67680f824464ae34c497fbe3703032af314f383a` · sinh ngày 2026-09-05
 
 File này được sinh ra từ package `@starci/grammar` đang chạy, không viết tay: danh tính, token, renderer, prop công bố, claim `data-contract` và class phát ra đều đọc thẳng từ `src/`, còn danh sách gap được chép từ bảng `## Gap` trong [Family và DNA](family.vi.md). Hãy mồi cho agent định hướng bằng đúng file này: nó nói cái gì đang tồn tại. [Idiom](idioms.vi.md) nói StarCi ghép chúng ra sao, còn [Playbook](playbook.vi.md) nói hình dạng nghiệp vụ nào cần chuỗi idiom nào. Sinh lại bằng `node scripts/generate-grammar-dna.mjs`, kiểm bằng `--check`; lệnh này cần checkout FE đã định tuyến nên không nằm trong `npm test`.
 
@@ -9,8 +9,8 @@ File này được sinh ra từ package `@starci/grammar` đang chạy, không v
 | Dữ kiện | Giá trị |
 | --- | --- |
 | Package | `@starci/grammar` |
-| Phiên bản | `0.4.11` |
-| Head của checkout | `0564837a4ba345ff9a472296b10127289eb22c29` |
+| Phiên bản | `0.4.12` |
+| Head của checkout | `67680f824464ae34c497fbe3703032af314f383a` |
 | Family id | `core` |
 | Component gốc | `CoreGrammarRoot` |
 | Phạm vi family | `data-grammar-family="core"` |
