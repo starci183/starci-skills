@@ -116,6 +116,17 @@ commit cho push áp được, không squash phần phân kỳ đi, không force,
 sử phân kỳ là đổi thứ người khác đã pull về, nên nó thuộc về người sở hữu nhánh, và người đó không
 phải operator này.
 
+## Luồng attempt cụ thể
+
+Các row của operator này được gate bởi hợp đồng attempt expected/actual dùng chung trong `scripts/attempt-gate.mjs`.
+
+| Trạng thái quan sát | Hành động | Kiểm actual | Nhánh kế tiếp |
+| --- | --- | --- | --- |
+| target ref ở observed base và session head fast-forward | non-force fast-forward | đọc remote head, hook, integrated tree | phát publication; host lifecycle đóng session |
+| target ref thiếu và approval cho create | tạo exact ref một lần từ verified commit | fetch và đọc ref đã tạo | ghi creation |
+| hook/receipt/boundary/ancestry sai | không publish | ghi mọi check fail và current remote | conflict theo closed rule có thể sửa/regate; lỗi khác handoff owner |
+| remote đổi hoặc effect không chắc | không force/reset/clean/stash/rebase/bypass/retry mù | giữ rejected push và remote observation | attempt mới chỉ sau fingerprint đổi |
+
 ## Ranh giới là chính xác
 
 Ranh giới là toàn bộ những gì lần publish này sở hữu, và Đầu vào `changes` nêu các path nằm trong đó.
@@ -131,11 +142,11 @@ nhánh worktree, head được publish nằm trên nhánh mutation đã route, v
 annotated và trỏ vào một head mà chính lần publish này đã đẩy. Một tag trên head mà lần chạy này
 không đẩy là một cái nhãn mà commit của người khác đang phải mang.
 
-## Dọn dẹp là một phần của publish
+## Cleanup theo sau publish qua host lifecycle
 
-Sau khi push thành công, worktree phiên và nhánh phiên được xóa cùng thư mục phiên, vì bằng chứng
-chúng giữ vừa trở thành một commit đã publish. Một phiên bị chặn giữ lại cả hai: bằng chứng về việc
-đã thử làm gì nằm ở đó cho tới khi có người đọc.
+Sau khi push thành công, operator này ghi rõ worktree, branch và folder của phiên vẫn được giữ.
+Host session lifecycle quyết định lúc đóng chúng sau khi receipt và attempt đã được nhận; publication
+không xóa bằng chứng phiên.
 
 
 Server đã phục vụ phần việc của phiên không phải của operator này để dừng: chủ runtime giữ lease và
@@ -146,7 +157,7 @@ Context chỉ đọc, trừ merge và push. Operator chỉ ghi vào `response/` 
 checkout đã route, và cú push tới `@remote/git/<project>/<role>`: head đã duyệt trên ref đã route, và
 tối đa một tag tiếp nối annotated trỏ vào một head mà chính lần publish này đã đẩy. Nó không force
 push, không lease-force push, không viết lại lịch sử đã publish; không chạy reset, clean hay stash;
-không xóa nhánh nào ngoài nhánh phiên nó đang dọn; không bỏ qua, bỏ sót hay tắt một Git hook; không
+không xóa branch, worktree hay session folder; không bỏ qua, bỏ sót hay tắt một Git hook; không
 amend, rebase hay squash một commit để một push bị từ chối đi lọt; không publish một head ngoài ranh
 giới đã duyệt; và không publish khi chưa có route đã kiểm và một phê duyệt ràng vào đúng ranh giới này.
 
@@ -185,11 +196,11 @@ giới đã duyệt; và không publish khi chưa có route đã kiểm và mộ
 | 3 | Ràng phê duyệt vào đúng ranh giới này | `boundary`, `approval` | phần requirements của `request/request.json`, Đầu vào `changes` là tập file, Đầu vào `quality-verification` là commit đã đo | — | `APPROVAL_MISSING` |
 | 4 | Kiểm cây: bẩn ngoài ranh giới, chính sách nhánh | — | @workspaces/local/routes/<project>/<role>, các path bẩn, mọi nhánh, chính sách đã route | — | `DIRTY_OUTSIDE_BOUNDARY`, `BRANCH_POLICY_VIOLATION` |
 | 5 | Chạy hook | — | @workspaces/<project>/<role>/husky: các hook đã cài, trong đó có `pre-push` | @tools/shell | `HOOK_BLOCKED` |
-| 6 | Ràng biên nhận của phiên, rồi merge nhánh phiên vào nhánh đích, giải từng hunk xung đột bằng bộ luật dùng chung và ghi lại | — | thư mục phiên: `state.json`, nhánh `interface.generate`, `interface.fix`, `backend.generate` hay `library.update` có `commits` mang head phiên, và các nhánh `interface.audit` cùng `uat.verify` với artifact `screenshot` của chúng khi chuỗi có các bước đó; đầu vào `changes` cho những file mà tập ghi của phiên sở hữu; @workspaces/local/routes/<project>/<role> cho head đích, base phiên và head phiên | @workspaces/local/routes/<project>/<role>, nhánh đích của checkout đó, @tools/git | `SESSION_MISSING`, `NON_FAST_FORWARD` |
+| 6 | Kiểm session receipt, target ref và ancestry; tái dùng receipt hợp lệ, chỉ resolve hunk được phép, và từ chối boundary evidence thiếu/sai trước merge | — | thư mục phiên: `state.json`, nhánh `interface.generate`, `interface.fix`, `backend.generate` hay `library.update` có `commits` mang head phiên, và các nhánh `interface.audit` cùng `uat.verify` với artifact `screenshot` của chúng khi chuỗi có các bước đó; đầu vào `changes` cho những file mà tập ghi của phiên sở hữu; @workspaces/local/routes/<project>/<role> cho head đích, base phiên và head phiên | @workspaces/local/routes/<project>/<role>, nhánh đích của checkout đó, @tools/git | `SESSION_MISSING`, `NON_FAST_FORWARD` |
 | 7 | Chạy lại những cổng mà bản kiểm định đã nêu trên head đã merge khi lần merge có giải một hunk | — | đầu vào `quality-verification` cho những cổng nó đã chạy, @workspaces/local/routes/<project>/<role> tại head đã merge, @tools/shell | @tools/shell | `NON_FAST_FORWARD` |
-| 8 | Push non-force, chỉ fast-forward | — | @workspaces/local/routes/<project>/<role> cho head đã duyệt, @remote/git/<project>/<role> tại remote head quan sát được, @tools/ci | @remote/git/<project>/<role>, @tools/git | `NON_FAST_FORWARD` |
+| 8 | Tạo approved ref còn thiếu hoặc non-force fast-forward ref đã quan sát, rồi fetch và đọc lại exact remote head; không retry mù remote đã đổi | — | @workspaces/local/routes/<project>/<role> cho head đã duyệt, @remote/git/<project>/<role> tại remote head quan sát được, @tools/ci | @remote/git/<project>/<role>, @tools/git | `NON_FAST_FORWARD` |
 | 9 | Push tag tiếp nối | `tag` | @workspaces/local/routes/<project>/<role> cho head mà lần publish này đã đẩy | @remote/git/<project>/<role>, @tools/git | — |
-| 10 | Xóa worktree và nhánh phiên, viết biên bản và phát | — | mọi thứ ở trên | @workspaces/local/routes/<project>/<role>, `response/response.md`, `response/response.json`, @tools/git | — |
+| 10 | Ghi publication receipt và emit; ghi worktree, branch và folder là được giữ cho host session lifecycle | — | mọi thứ ở trên | `response/response.md`, `response/response.json` | — |
 
 Tạo một remote ref và fast-forward một remote ref là hai hành động khác nhau với hai người duyệt khác
 nhau, nên head đã publish ghi lại nó đã làm cái nào. Một lần resume bắt đầu lại từ cổng vào, chỉ dùng

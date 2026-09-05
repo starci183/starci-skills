@@ -15,13 +15,14 @@ const UNITS = [
   { id: 'item-catalogue', kind: 'table', goal: 'the catalogue the list page shows stands at its density before the page is judged', inputs: [], dependsOn: ['open-item'] },
 ];
 const ROWS = {
-  'open-item': { serves: 'flow `open-item`', namespace: 'uat-open-item', targets: [['items', 'owner', 3, "every items row the unit's account owns"]] },
-  'item-catalogue': { serves: 'family `catalogue`', namespace: 'uat-item-catalogue', targets: [['items', 'prefix', 24, "every items row whose id carries the unit's prefix"], ['categories', 'prefix', 4, "every categories row whose id carries the unit's prefix"]] },
+  'open-item': { serves: 'flow `open-item`', namespace: 'uat-open-item', targets: [['items', 'owner', 3, "every items row the unit's account owns"]], fixture: ['valid', 'reuse', '.worktrees/uat/items/open-item/seed/records.json', '—', 'three owned item rows read back', 'false'] },
+  'item-catalogue': { serves: 'family `catalogue`', namespace: 'uat-item-catalogue', targets: [['items', 'prefix', 24, "every items row whose id carries the unit's prefix"], ['categories', 'prefix', 4, "every categories row whose id carries the unit's prefix"]], fixture: ['missing', 'create', '.worktrees/uat/items/item-catalogue/seed/records.json', '.worktrees/uat/items/item-catalogue/seed/records.sql', 'catalogue density reads back', 'false'] },
 };
 const unitsDoc = (units = UNITS, producedBy = OPERATOR) => ({ schemaVersion: 9, producedBy, units });
 function receiptOf(units, { feature = FEATURE, rows = ROWS, extraRows = [], extraTargets = [], goals = {} } = {}) {
   const unitRows = [...units.map((u) => { const r = rows[u.id]; return `| \`${u.id}\` | ${r.serves} | \`${r.namespace}\` | ${goals[u.id] ?? u.goal} |`; }), ...extraRows].join('\n');
   const targetRows = [...units.flatMap((u) => (rows[u.id].targets ?? []).map(([store, attribution, volume, rollback]) => `| \`${u.id}\` | \`${store}\` | ${attribution} | ${volume} | ${rollback} |`)), ...extraTargets].join('\n');
+  const fixtureRows = units.map((u) => `| \`${u.id}\` | ${(rows[u.id].fixture ?? [])[0]} | ${(rows[u.id].fixture ?? [])[1]} | \`${(rows[u.id].fixture ?? [])[2]}\` | ${(rows[u.id].fixture ?? [])[3] === '—' ? '—' : `\`${rows[u.id].fixture[3]}\``} | ${(rows[u.id].fixture ?? [])[4]} | ${(rows[u.id].fixture ?? [])[5]} |`).join('\n');
   return `# seed-plan — ${feature}
 
 The goal names ${units.length} seeds of the ${feature} feature; each becomes one unit with its own namespace and its targets.
@@ -37,6 +38,12 @@ ${unitRows}
 | Unit | Store | Attribution | Volume | Rollback |
 | --- | --- | --- | --- | --- |
 ${targetRows}
+
+## Fixtures
+
+| Unit | State | Action | JSON | SQL | Expected | Creates outcome |
+| --- | --- | --- | --- | --- | --- | --- |
+${fixtureRows}
 
 ## Fallbacks taken
 
@@ -114,6 +121,10 @@ await expectError(lawful(UNITS, { extraTargets: ['| `open-item` | `items` | pref
 await expectError(lawful(UNITS, { rows: rowsWith('open-item', { targets: [['items', 'column', 3, 'every row']] }) }), 'cell Attribution "column" does not match', 'an attribution outside the isolation law');
 await expectError(lawful(UNITS, { rows: rowsWith('open-item', { targets: [['items', 'owner', 0, 'every row']] }) }), 'cell Volume "0" does not match', 'a target with no volume');
 await expectError(lawful(UNITS, { rows: rowsWith('open-item', { namespace: 'Uat Open' }) }), 'cell Namespace', 'a namespace that is not a slug');
+await expectError(lawful(UNITS, { rows: rowsWith('open-item', { fixture: ['valid', 'create', '.worktrees/uat/items/open-item/seed/records.json', '—', 'rows read back', 'false'] }) }), 'is valid and action create', 'a valid fixture recreated');
+await expectError(lawful(UNITS, { rows: rowsWith('open-item', { fixture: ['missing', 'create', '.worktrees/uat/items/open-item/seed/records.txt', '—', 'rows read back', 'false'] }) }), 'has no JSON execution source', 'a fixture without executable JSON');
+await expectError(lawful(UNITS, { rows: rowsWith('open-item', { fixture: ['invalid', 'update', '.worktrees/uat/items/open-item/seed/records.json', '.worktrees/uat/items/open-item/seed/records.txt', 'rows read back', 'false'] }) }), 'SQL is neither optional nor executable', 'an invalid SQL reference');
+await expectError(lawful(UNITS, { rows: rowsWith('open-item', { fixture: ['valid', 'reuse', '.worktrees/uat/items/open-item/seed/records.json', '—', 'rows read back', 'true'] }) }), 'creates the outcome', 'a seed fixture that creates the asserted outcome');
 
 // Title, gate and stop shape.
 await expectError({ ...lawful(), 'request/request.json': requestJson({ feature: 'archive' }) }, 'the request names feature archive', 'a plan titled by another feature');

@@ -247,7 +247,6 @@ await expectError(servingFirst({ 'request/request.json': requestJson({ effects: 
 await expectError(servingFirst({ 'request/request.json': requestJson({ effects: SERVE_EFFECTS, observationOnlyResourceRefs: [ENTRY], extra: { commit: WANT } }) }), 'cannot be both mutable and observation-only', 'a resource in both scope sets');
 await expectError(servingFirst({ 'request/request.json': requestJson({ effects: SERVE_EFFECTS, portClaims: [{ port: 3067, resourceRef: 'product/web' }], extra: { commit: WANT } }) }), 'which this rung does not own', 'a port claimed for a foreign resource');
 await expectError(servingFirst({ 'request/request.json': requestJson({ effects: SERVE_EFFECTS, portClaims: [{ port: 3067, resourceRef: ENTRY }, { port: 3067, resourceRef: ENTRY }], extra: { commit: WANT } }) }), 'must not claim the same port twice', 'the same port claimed twice');
-await expectError(servingFirst({ 'request/request.json': requestJson({ effects: SERVE_EFFECTS, env: 'no-such-stack', extra: { commit: WANT } }) }), 'which this installation does not have', 'an env with no stack');
 
 // The delta.
 await expectError(servingFirst({ 'response/data/delta.json': delta({ effects: SERVE_EFFECTS, runtimeLadder: ladder(), resources: [resource('other/service')] }) }), 'was not inventoried before the rung', 'the entry never inventoried');
@@ -327,6 +326,7 @@ const declare = (env, body) => {
 const DEV_REF = declare('dev', { schemaVersion: 9, env: 'dev', production: false });
 const PROD_REF = declare('production', { schemaVersion: 9, env: 'production', production: true });
 const onHost = { hostRoot: HOST };
+await expectError(servingFirst({ 'request/request.json': requestJson({ effects: SERVE_EFFECTS, env: 'no-such-stack', extra: { commit: WANT } }) }), 'which this installation does not have', 'an env with no stack', onHost);
 const servingDeclared = ({ approval = DEV_REF, env = 'dev' } = {}) => rungBranch({ rung: 'serve', extra: { commit: WANT, env }, approval });
 await expectValid(servingDeclared(), 'a serve on the dev runtime approved by the environment declaration', onHost);
 await expectError(servingDeclared({ approval: PROD_REF, env: 'production' }), 'marks runtime as person', 'a declaration reference for a production runtime, which the production defaults keep with a person', onHost);

@@ -94,6 +94,18 @@ per-case results publishes its record whether they passed or not, because the ca
 delivery owner reads; a run that never reached the suite publishes none, because a half-written record
 is the artifact a later reader mistakes for a decision.
 
+## Concrete attempt flow
+
+This operator's rows are gated by the shared expected/actual attempt contract in `scripts/attempt-gate.mjs`.
+
+| Observed state | Action | Actual check | Next branch |
+| --- | --- | --- | --- |
+| suite, endpoint, account and seed current | reuse declarations; open fresh append-only run | prove generation contains commit and prerequisites share namespace | run suite as client |
+| prerequisite missing/invalid | run no case | name exact suite, identity, data or runtime delta | owner handoff then changed-evidence attempt |
+| cases execute | record every printed case and response observation | judge contract/data/lifecycle; absent output inconclusive | append pass, fail and incomplete run ids |
+| case fails | edit no product or suite source | route behavior to source owner and prerequisites to their owner | new head/prerequisite creates new attempt |
+| cleanup required | use only seed receipt ownership | read no owned records remain | outside row is `API_NAMESPACE_LEAK`, never guessed deletion |
+
 ## Boundary
 
 Context is read-only apart from the flow's API history. The operator writes the run record under
@@ -139,14 +151,14 @@ record, and does not delete anything outside the run namespace the seed named.
 | # | Step | Params | Reads | Writes | Stops with |
 | --- | --- | --- | --- | --- | --- |
 | 1 | Validate the gate, the resume and the run's authority | `approval`, `resume` | `request/request.json`, @worktrees/e2e/<flow> for the API history and the prior run record, @workspaces/be at the pinned commit, the environment's declaration when `approval` references it, @tools/git | — | `INVALID_INPUT`, `SOURCE_DRIFT`, `NO_PROGRESS`, `AUTHORITY_DRIFT` |
-| 2 | Bind the served entry the platform receipt attests, the head it serves and whether that head contains the pinned commit | — | input `platform-operation-receipt`, @worktrees/sessions/central-runtime for the generation behind that entry, @tools/http | — | `RUNTIME_UNAVAILABLE` |
+| 2 | Inspect the attested entry, suite, account and seed receipt, classifying each prerequisite reusable, missing or invalid at the pinned head and namespace before any case runs | — | input `platform-operation-receipt`, @worktrees/sessions/central-runtime for the generation behind that entry, @tools/http | — | `RUNTIME_UNAVAILABLE` |
 | 3 | Bind the namespace the seed placed and the account the suite signs in as, resolving the credential by name | `env` | input `seed-receipt`, input `uat-account`, @worktrees/e2e/<flow> for the account record, @workspaces/device-state, @tools/secrets | — | `INVALID_INPUT` |
 | 4 | Take the command the route's gate plan declares for the end-to-end gate; a case or a script this branch would write belongs to the operator that owns source | `flow` | @workspaces/be for the declared commands and the suite the flow names, input `quality-verification` for the gates already taken at this head | — | `INVALID_INPUT` |
 | 5 | Run that command as a client against the bound entry and keep the runner's own output whole | `runId` | @workspaces/be, @tools/shell | `api-output` | `RUNTIME_UNAVAILABLE` |
-| 6 | Copy the runner's per-case results — the identifier it printed, the request, the status, the assertion, the duration and where each is read back — inventing none | — | `api-output` | `api-cases` | `API_CASE_FAILED` |
+| 6 | Copy every runner case and record missing, failed and incomplete output as actual evidence; never invent a case or turn absent output into pass | — | `api-output` | `api-cases` | `API_CASE_FAILED` |
 | 7 | Read every record the suite wrote back through the API and judge the three lanes apart | — | `api-cases`, @tools/http | `api-verdicts` | `API_NAMESPACE_LEAK` |
 | 8 | Verify the namespace read-only, then delete it through the API and nothing else | `runId` | `api-verdicts`, @tools/http | — | `API_NAMESPACE_LEAK` |
-| 9 | Append the run record under `runs/<runId>/`, point the pointer at it, add the history line, and emit | `runId` | everything above | @worktrees/e2e/<flow>, `response/response.md`, `response/response.json`, @tools/sourcewrite, @tools/print | — |
+| 9 | Append pass, fail and incomplete attempts under distinct run ids, update the pointer to the immutable result, add history and emit | `runId` | everything above | @worktrees/e2e/<flow>, `response/response.md`, `response/response.json`, @tools/sourcewrite, @tools/print | — |
 
 A verdict nobody was shown is a verdict nobody read. Step 6 prints the per-case results and step 9
 prints the lane table over @tools/print, into the conversation the person is reading, and the receipt

@@ -134,6 +134,10 @@
           "alias",
           "username",
           "role",
+          "memberships",
+          "providerAccountRef",
+          "accountAction",
+          "loginProof",
           "credentialName",
           "credentialRef",
           "custody",
@@ -154,6 +158,27 @@
           "role": {
             "type": "string",
             "minLength": 1
+          },
+          "memberships": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 16,
+            "uniqueItems": true,
+            "items": { "type": "string", "minLength": 1 }
+          },
+          "providerAccountRef": { "type": "string", "minLength": 1 },
+          "accountAction": { "enum": ["reuse", "create", "repair"] },
+          "loginProof": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["method", "endpoint", "outcome", "evidenceRef", "verifiedAt"],
+            "properties": {
+              "method": { "const": "browser" },
+              "endpoint": { "type": "string", "pattern": "^https?://" },
+              "outcome": { "const": "passed" },
+              "evidenceRef": { "type": "string", "minLength": 1 },
+              "verifiedAt": { "type": "string", "format": "date-time" }
+            }
           },
           "credentialName": {
             "type": "string",
@@ -226,11 +251,8 @@
       }
     },
     "flowSource": {
-      "enum": [
-        "committed",
-        "drafted-from-template"
-      ],
-      "description": "Where the flow document and its seed came from. A flow folder that did not exist is created from the shipped template and the receipt says so: a drafted flow is honest, an absent flow would have been a stop, and a draft reported as committed is the one outcome neither is."
+      "const": "planned",
+      "description": "The immutable uat.plan and uat-case-sheet inputs from which this verifier froze the run. This verifier never drafts canonical flow material."
     },
     "golden": {
       "description": "The approved reference this run is compared against. A flow with no approved reference yet does not fail: this run becomes the candidate, and only a person's approval promotes it, so no run ever approves its own baseline.",

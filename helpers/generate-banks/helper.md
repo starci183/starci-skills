@@ -24,6 +24,26 @@ The unchecked ledger says what an earlier mission deliberately did not prove, an
 
 Everything the Reads table names is read-only. The only places written are the two the Writes table names, which are the two `alias/alias.json` marks writable by the support layer. No checkout, no runtime owner, no registry, no session folder and no ledger the operators own is touched, and there is no field here that could hold a credential.
 
+## Concrete run flow
+
+The invocation reuses the host session binding already established by StarCi and records it in
+`helper-run`; it does not open an operator session. Before reading evidence it records the requested
+product, routes, evidence classes and limit as the expected coverage. The run record is written for
+every terminal outcome, including `BANK_EMPTY`, invalid optional sources and a no-change rerun.
+
+| Observed bank/evidence state | Action | Actual check |
+| --- | --- | --- |
+| An existing mission still has the same evidence, goal and dependencies | reuse its stable mission id and content | the emitted queue points to the same mission bytes and retains its status |
+| New evidence belongs to an existing mission | update that draft by joining the evidence refs and recomputing dependencies | one mission names all contributing observations; no duplicate mission describes the same owner outcome |
+| A grounded thread has no mission | create one draft with the confirmed route and evidence refs | schema, route, dependency and grounding checks pass |
+| An optional source is missing, stale, unreadable or invalid | record that source state and continue with the valid sources | the run outcome is incomplete and never claims that evidence class was checked |
+| A queue has approval or a `running`/`done` status | preserve approval bytes and every non-draft status; never rewrite them as banked | before/after summaries prove the preserved authority and progress |
+| No grounded thread remains | write no queue or mission change, but write the run record with outcome empty | the record lists what was read and why no mission was emitted |
+
+A retry is a new run id and never overwrites an earlier run. It may replace an invalid draft only
+after recording the changed evidence; changing queue composition invalidates approval through
+`scripts/bank.mjs`, while a no-change reuse preserves it.
+
 ## Reads
 
 | Alias | Bind | Required |
@@ -36,6 +56,7 @@ Everything the Reads table names is read-only. The only places written are the t
 | `@worktrees/uat/<flow>` | the walks this product has run and what they failed on | no |
 | `@worktrees/e2e/<flow>` | the API runs this product has run and which cases they failed | no |
 | `@worktrees/businesses` | the feature models and the promises they publish, so a drafted mission is about a promise and not about a file | no |
+| `@worktrees/banked/<product>` | the existing queue, missions, approval bytes and statuses used for reuse, update and duplicate checks | no |
 
 ## Writes
 
@@ -59,18 +80,20 @@ Everything the Reads table names is read-only. The only places written are the t
 
 | # | Step | Params | Reads | Writes | Stops with |
 | --- | --- | --- | --- | --- | --- |
-| 1 | Validate the invocation and its arguments | `product`, `runId` | the invocation | — | `INVALID_INPUT` |
-| 2 | Read the product's route declarations, its port projection and the head of each routed checkout | `product` | @workspaces/projects, @workspaces/ports, @workspaces/<project>/<role>, @tools/git | — | `PRODUCT_UNROUTED` |
-| 3 | Read the open entries of the product's unchecked ledger, each with its lane, its unit and its reason | `product` | @worktrees/unchecked/<product> | — | — |
-| 4 | Read the open findings of every family this product composes | — | @knowledge/findings | — | — |
-| 5 | Read the last walk of every flow and the last API run of every e2e flow, and what each one failed on | — | @worktrees/uat/<flow>, @worktrees/e2e/<flow> | — | — |
-| 6 | Read the feature models this product publishes and the person's notes the invocation named | `notes` | @worktrees/businesses | — | — |
-| 7 | Draft one mission per open thread: its goal block, its routes, its environment, its evidence refs and its tier hint | `product`, `env`, `language`, `limit` | everything read above | `banked-mission` | `BANK_EMPTY` |
-| 8 | Refuse every draft that names no evidence ref, naming the thread it came from | — | the drafts | — | `BANK_UNGROUNDED` |
-| 9 | Order the queue by what each mission waits for, then by priority | — | the drafts | `bank-queue` | — |
-| 10 | Record the run: every input with the head it was read at, every output written, the profile and the two instants | `runId` | everything above | `helper-run` | — |
+| 1 | Validate the invocation and bind this helper run to the existing Codex or Claude host session; never create a StarCi user session | `product`, `runId` | invocation and host binding | — | `INVALID_INPUT` |
+| 2 | Read routes, ports and checkout heads, then inspect the existing queue, missions, approval bytes and statuses before deciding reuse, update or create | `product` | @workspaces/projects, @workspaces/ports, @workspaces/<project>/<role>, @worktrees/banked/<product>, @tools/git | — | `PRODUCT_UNROUTED` |
+| 3 | Read and classify every unchecked-ledger source as valid, missing, invalid or stale, preserving evidence for the classification | `product` | @worktrees/unchecked/<product> | — | — |
+| 4 | Read and classify the open findings of every family this product composes | — | @knowledge/findings | — | — |
+| 5 | Read and classify the last UAT walk and API run of each e2e flow, including incomplete and failed attempts | — | @worktrees/uat/<flow>, @worktrees/e2e/<flow> | — | — |
+| 6 | Read and classify the published feature models and the referenced person notes; optional absent sources make the run incomplete rather than silently empty | `notes` | @worktrees/businesses | — | — |
+| 7 | Resolve duplicate open threads against the existing bank; reuse an unchanged mission, update only changed draft fields, or create one mission for a new thread | `product`, `env`, `language`, `limit` | classified sources and bank-before snapshot | `banked-mission` | `BANK_EMPTY` |
+| 8 | Refuse drafts without evidence and record every merge as kept mission, merged mission ids and supporting refs | — | drafts and deduplication map | — | `BANK_UNGROUNDED` |
+| 9 | Order the queue while preserving approval bytes and every running or done status; never reopen a terminal mission during refresh | — | bank-before and accepted drafts | `bank-queue` | — |
+| 10 | Record every run, including empty and incomplete outcomes, source coverage, before/after hashes and entries, deduplications, outputs, profile, host binding and instants | `runId` | everything above | `helper-run` | — |
 
-Step 7 is the only step that reads the person's goal for the product, and it reads it from what the product left behind rather than from a person: a thread is an open unchecked entry, an unanswered finding, a failed case or a promise the models carry and no delivery reaches. A reading that finds no thread at all is `BANK_EMPTY`, and nothing is written — an empty bank is a fact about the product, not a bank.
+Step 7 reads the person's goal only through referenced product evidence. A run finding no open thread
+does not write a queue or mission, but it still writes an `outcome: empty` helper-run record. A run
+with a missing, invalid or stale source writes `outcome: incomplete` and never overwrites a valid bank.
 
 ## Outputs
 

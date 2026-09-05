@@ -152,6 +152,17 @@ dạng khác là `fail`, kể cả một cổng bắt buộc bị môi trường
 qua. Một cổng không bắt buộc mà fail thì được ghi lại và tự nó không làm phán quyết đỏ, đó chính là lý
 do `required` tồn tại, và nó là khai báo của kế hoạch cổng chứ không bao giờ là phán đoán của operator.
 
+## Luồng attempt cụ thể
+
+Các row của operator này được gate bởi hợp đồng attempt expected/actual dùng chung trong `scripts/attempt-gate.mjs`.
+
+| Trạng thái quan sát | Hành động | Kiểm actual | Nhánh kế tiếp |
+| --- | --- | --- | --- |
+| result hiện hành đúng head/command/config | tái dùng sau khi đọc lại evidence và exit | mọi fingerprint, threshold match | chép measurement |
+| result thiếu | chạy declared gate | thu command, exit, diagnostic, evidence; chưa chạy không là pass | so threshold đóng băng |
+| result stale hoặc sai | loại và chạy lại nếu khả dụng | ghi lý do evidence cũ không dùng | verdict đỏ handoff source owner; verifier không sửa |
+| retry gate không ổn định | attempt và transcript mới | phân loại lý do rerun có giới hạn | fail không đổi lặp lại route owner |
+
 ## Ranh giới
 
 Context chỉ đọc. Operator chỉ ghi vào `response/` của nhánh mình: một file `gate-result` cho mỗi cổng
@@ -202,9 +213,9 @@ Gate result giữ nhánh đo thực trong sessionBranch. Giá trị ngoài sessi
 | --- | --- | --- | --- | --- | --- |
 | 1 | Kiểm cổng vào, xác nhận head đã đóng băng và resume | `resume` | `request/request.json`, @workspaces/be hoặc @workspaces/fe tại commit mà request đã ghim, @tools/git | — | `INVALID_INPUT`, `SOURCE_DRIFT`, `NO_PROGRESS` |
 | 2 | Tiêu thụ tiền nhiệm nguyên vẹn | — | Đầu vào `backend-source-application`, `frontend-source-application` và `changes` tại fingerprint của chúng, cùng commit mà mỗi cái đã ghi | — | `PREDECESSOR_MIXED`, `PREDECESSOR_STALE` |
-| 3 | Chạy các cổng theo thứ tự đã khai | `gates`, `explicitE2eRequest`, `sonarScope`, `lintScope` | @workspaces/<project>/<role>/gates, @workspaces/be hoặc @workspaces/fe là chủ thể mỗi cổng đo, @tools/http | `response/data/gates/<gate>.json`, @tools/shell | `GATE_UNAVAILABLE` |
+| 3 | Kiểm prior evidence theo exact head, command, configuration; chỉ tái dùng result hiện hành đầy đủ, chạy gate thiếu, và chạy lại evidence stale hoặc invalid theo thứ tự | `gates`, `explicitE2eRequest`, `sonarScope`, `lintScope` | @workspaces/<project>/<role>/gates, @workspaces/be hoặc @workspaces/fe là chủ thể mỗi cổng đo, @tools/http | `response/data/gates/<gate>.json`, @tools/shell | `GATE_UNAVAILABLE` |
 | 4 | Áp chính sách coverage | `thresholds`, `coveragePolicy` | artifact cấu hình có hiệu lực đã đóng băng, `response/data/gates/<gate>.json` của cổng unit | `response/data/coverage.json` | — |
-| 5 | Phân loại từng lỗi từ chẩn đoán của nó | — | `response/data/gates/<gate>.json` của mọi cổng đỏ | — | — |
+| 5 | Phân loại failure từ diagnostic thành transient retry, source-owner repair, boundary hoặc external; giữ transcript và không sửa source ở đây | — | `response/data/gates/<gate>.json` của mọi cổng đỏ | — | — |
 | 6 | Áp nợ đã được duyệt | `declaredDebts` | @worktrees/debts, `response/data/gates/<gate>.json` | — | `DEBT_UNAPPROVED` |
 | 7 | Chép verdict của từng topic từ biên nhận đã tính ra nó | — | đầu vào `frontend-surface-audit` và `uat-flow-verification` ở cùng head đã ghim | — | `PREDECESSOR_MIXED` |
 | 8 | Tính phán quyết cổng và scorecard, viết biên bản và phát | — | mọi thứ ở trên | `response/response.md`, `response/response.json`, `audit-scope` | — |

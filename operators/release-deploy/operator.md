@@ -106,6 +106,17 @@ and `probes` default to the set the validated manifest declares, so a person who
 still measured against something real. `approval` has no default at all: changing what production
 serves is always something a person said yes to.
 
+## Concrete attempt flow
+
+This operator's rows are gated by the shared expected/actual attempt contract in `scripts/attempt-gate.mjs`.
+
+| Observed state | Action | Actual check | Next branch |
+| --- | --- | --- | --- |
+| exact digest active and probes pass full window | reuse; no rollout | compare digest, manifest, domain, schema and probes | emit idempotent receipt |
+| target empty | create declared host/artifact/domain under compare-and-set | read every revision and steady probe | emit after required match |
+| different valid release | update to frozen digest preserving rollback identity | verify compatibility, domain, digest and probes | bounded same-release recovery then exact rollback |
+| state/effect uncertain or concurrent drift | make no repeated/destructive guess | record before/after revisions and foreign drift | typed replan/block; new identity needs reconfirmed expected |
+
 ## Boundary
 
 Context is read-only apart from the declared mutations. The operator applies only the declared host,
@@ -154,13 +165,13 @@ probe observation or from an assumed rollout.
 | # | Step | Params | Reads | Writes | Stops with |
 | --- | --- | --- | --- | --- | --- |
 | 1 | Validate the gate, the authorization the input carries, and the resume | `resume` | `request/request.json`, input `quality-verification` as the authorization this run stands on | — | `INVALID_INPUT`, `AUTHORIZATION_MISSING`, `NO_PROGRESS` |
-| 2 | Bind the release and compile the plan, and read the feature's unchecked ledger before production is changed | `release`, `target`, `approval`, `feature` | @remote/ghcr/<image> at the frozen digest, @remote/github-actions/<runId> for the observed state, input `migration-release` for the schema the image depends on when one was released, @worktrees/unchecked/<product> for the feature's open unchecked entries, @tools/git, @tools/ci | — | `MANIFEST_INVALID`, `APPROVAL_REQUIRED`, `UNCHECKED_OPEN` |
+| 2 | Bind the immutable release and inspect artifact, host, active digest, schema, domain and target revisions, classifying each reusable, missing, invalid or foreign before any effect | `release`, `target`, `approval`, `feature` | @remote/ghcr/<image> at the frozen digest, @remote/github-actions/<runId> for the observed state, input `migration-release` for the schema the image depends on when one was released, @worktrees/unchecked/<product> for the feature's open unchecked entries, @tools/git, @tools/ci | — | `MANIFEST_INVALID`, `APPROVAL_REQUIRED`, `UNCHECKED_OPEN` |
 | 3 | Initialize the execution root and resolve the credentials by name | — | @workspaces/device-state for the declared handles and their custody, @tools/secrets | — | `CREDENTIAL_UNAVAILABLE` |
-| 4 | Prepare the host, publish the artifact by digest, migrate and reconcile the domain | — | @remote/ghcr/<image> for the artifact by digest, @remote/github-actions/<runId> for each boundary's revision before and after | @tools/shell | `HOST_UNAVAILABLE`, `ARTIFACT_MISSING`, `MIGRATION_BLOCKED`, `DOMAIN_UNRECONCILED` |
+| 4 | Reuse matching host, artifact and domain state; create missing declared state or update invalid declared state only under compare-and-set revisions | — | @remote/ghcr/<image> for the artifact by digest, @remote/github-actions/<runId> for each boundary's revision before and after | @tools/shell | `HOST_UNAVAILABLE`, `ARTIFACT_MISSING`, `MIGRATION_BLOCKED`, `DOMAIN_UNRECONCILED` |
 | 5 | Roll out | — | @remote/ghcr/<image> for the target revision before and after | @tools/container | `ROLLOUT_FAILED` |
 | 6 | Monitor within the deadline, with backoff | `steadyDeadline`, `probes` | @remote/github-actions/<runId> for the probe observations across the window, @tools/http | `response/data/probes.json` | — |
 | 7 | Detect concurrent drift before acting | — | `response/data/probes.json`, @remote/ghcr/<image> for the active release by digest | — | `CONCURRENT_DRIFT` |
-| 8 | Take the recovery branch when the failure persists | — | `response/data/probes.json`, @remote/ghcr/<image> at the same release identity | @tools/container | `RECOVERY_EXHAUSTED` |
+| 8 | Take only bounded reversible recovery actions for the same release identity, recording each observation and effect; never repeat an uncertain mutation | — | `response/data/probes.json`, @remote/ghcr/<image> at the same release identity | @tools/container | `RECOVERY_EXHAUSTED` |
 | 9 | Take the rollback branch when recovery cannot hold | `rollbackIdentity` | @remote/ghcr/<image> at the exact safe digest | @tools/container | `ROLLBACK_IDENTITY_MISSING` |
 | 10 | Prove the steady state, write the receipt and emit | — | everything above | `response/response.md`, `response/response.json` | `STEADY_STATE_UNPROVEN` |
 

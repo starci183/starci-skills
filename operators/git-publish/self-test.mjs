@@ -45,7 +45,7 @@ The write set is the one file above.
 function responseMd({
   boundary = BOUNDARY, approval = APPROVAL, mode = 'fast-forward-only', forced = 'no', merge = 'fast-forward',
   verified = HEAD, heads = [['`@workspaces/be`', '`mtp`', HEAD, REMOTE, '4']], hooks = [['`pre-push`', '`.husky/pre-push`', 'passed']],
-  tag = null, cleanup = 'worktree and session branch removed', resolutions = [],
+  tag = null, cleanup = 'worktree, branch and folder preserved for host session lifecycle', resolutions = [],
   findings = [['HOOK_ENFORCED', '`pre-push`', 'the hook ran and was not bypassed'], ['REMOTE_FAST_FORWARDED', '`@workspaces/be`', 'the ref advanced from the remote head it carried']],
 } = {}) {
   return `# git-publication — ${boundary}
@@ -244,7 +244,7 @@ await expectError(baseline({
   'request/request.json': requestJson({ tag: TAG }),
   'response/response.md': responseMd({ tag: { ...TAG, head: OTHER }, findings: [['HOOK_ENFORCED', '`pre-push`', 'ran'], ['CONTINUATION_TAG_PUBLISHED', '`v1.4.0`', 'pushed']] }),
 }), 'which this publication did not push', 'a tag on somebody else\'s commit');
-await expectError(baseline({ 'response/response.md': responseMd({ cleanup: 'worktree kept for inspection' }) }), 'removes the worktree and the session branch', 'a published branch that never cleaned up');
+await expectError(baseline({ 'response/response.md': responseMd({ cleanup: 'worktree and session branch removed' }) }), 'must not remove session evidence', 'a publication that deleted session evidence');
 await expectError(baseline({ 'response/response.json': responseJson({ commits: [] }) }), 'commits does not register the published head', 'a receipt whose commit the response hides');
 await expectError(baseline({ 'response/response.json': responseJson({ commits: [HEAD, OTHER] }) }), 'which the receipt did not publish', 'a commit the receipt never published');
 await expectError(baseline({ 'request/request.json': requestJson({ inputs: { 'workspace-route-binding': 'step-1/parallel-1/response/response.md', changes: 'step-1/parallel-1/response/changes.md' } }) }), 'required input quality-verification is absent', 'a publish with nothing verified');

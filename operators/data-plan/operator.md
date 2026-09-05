@@ -59,6 +59,17 @@ because a goal is allowed to name a family in a person's words and it is this op
 words into a store. A target the plan would name that the checkout does not declare is
 `EVIDENCE_MISSING`: a claim about the stores with no file behind it.
 
+## Concrete attempt flow
+
+This operator's rows are gated by the shared expected/actual attempt contract in `scripts/attempt-gate.mjs`.
+
+| Observed state | Action | Actual check | Next branch |
+| --- | --- | --- | --- |
+| plan matches schema, cases and namespace | reuse unit id, JSON ref, optional SQL ref and cleanup | each precondition maps once; fixture does not create asserted outcome | emit plan unchanged |
+| plan missing | create unit with JSON; SQL only for bound runner | case sheet has actor, precondition, input, actions, expected, verification, cleanup before seed | emit seed-plan and units |
+| plan invalid | update affected refs/volume/attribution/cleanup | validate JSON/SQL and disjoint namespaces | undefined store hands to `architecture.decide` |
+| seed effect requested | write no data | record `data.seed` as sole effect owner | typed handoff |
+
 ## Boundary
 
 Context is read-only. The operator writes only `response/` of its own branch: the plan, the unit list
@@ -99,9 +110,9 @@ names accounts by alias only and has no field that could hold a credential.
 | 3 | Read the UAT plan when bound: one unit per flow, with the namespace the flow's row declares | — | input `uat-plan` | — | — |
 | 4 | Read the surface map when bound: the stores each page's data contract reads, so a family has its targets | — | input `surface-map` | — | — |
 | 5 | Read the stores at the frozen head: every entity, table and collection, and for each whether it has an owner column or a prefixable identifier | `env` | @workspaces/be, @tools/git | — | — |
-| 6 | Read the flow folders that exist under the feature: a flow with a seed keeps its namespace, and no new unit claims a namespace already held | `feature` | @worktrees/uat/<flow>, @worktrees/_templates for the shape a seed directory takes | — | — |
-| 7 | Name one unit per flow and per uncovered family, with its goal line and its own namespace, disjoint from every other unit | — | the families, the flows, the existing folders | — | `SEED_UNDEFINED` |
-| 8 | Declare each unit's targets: the store, its attribution, its representative volume and what removes exactly its rows | — | the units, the stores | — | `EVIDENCE_MISSING` |
+| 6 | Inspect existing plans and fixtures, retaining reusable namespaces and classifying missing or invalid JSON, optional SQL, expected-state and cleanup refs | `feature` | @worktrees/uat/<flow>, @worktrees/_templates for the shape a seed directory takes | — | — |
+| 7 | Reuse valid units, create missing units and update invalid ones with disjoint namespaces and no fixture that pre-creates a tested outcome | — | the families, the flows, the existing folders | — | `SEED_UNDEFINED` |
+| 8 | Declare each unit's JSON fixture, optional SQL input, stores, attribution, volume, expected read-back and exact cleanup; verify them against schema | — | the units, the stores | — | `EVIDENCE_MISSING` |
 | 9 | Write the unit list: one entry per Units row with the same id and goal, and the units each depends on | — | the plan | `units` | — |
 | 10 | Emit the plan and the receipt | — | everything above | `seed-plan`, `response/response.json` | — |
 

@@ -13,7 +13,7 @@ served head that contains it, the cases in order with their assertions, the acco
 and the seed fingerprint, every frozen case has its `uat-capture` and masked `screenshot` taken
 after the sign-in redirect landed through the rendered controls alone, the `uat-verdicts` judge the
 behaviour, experience and interface lanes on their own evidence with the experience lane scored
-criterion by criterion, the run namespace was deleted and nothing else, the append-only run record
+criterion by criterion, the exact rollback handoff for the run namespace was accepted by `data.seed`, the append-only run record
 exists with its pointer and history line, and the `uat-flow-verification` lists the `sheet` and the
 verdict table it printed to the person, carrying the `audit-scope` unchanged when the admitted audit
 had one.
@@ -33,16 +33,15 @@ use, and a gate that accepts prose accepts an empty field. `LEASE_INVALID` is a 
 keeps its own place: it is the lease that exists and is expired, foreign, or bound to another run,
 noticed at step 6 against the flow directory this run holds.
 
-What this run touches beyond its own reading — seeding the frozen records into the environment's
-data, and signing in as the flow's dedicated account — is authorised the way every platform operation
+What this run touches beyond its own reading — signing in as the flow's dedicated account — is authorised the way every platform operation
 in this installation is: by the environment's own declaration, and by a person only where that
-declaration says a person is needed. `.stacks/<env>/environment.json` marks the `seed` and
-`identity-provisioning` classes `declared` or `person` for `env`, and
+declaration says a person is needed. `.stacks/<env>/environment.json` marks the
+`identity-provisioning` class `declared` or `person` for `env`, and
 `readiness/initialization/stacks/environment.schema.json` states the shape, the reference format and
 the production default once, read from there and never copied here. A non-production environment
-that has not tightened either class needs nothing further: `approval` carries that declaration's
+that has not tightened that class needs nothing further: `approval` carries that declaration's
 reference — its path and the hash of its bytes — and the run proceeds with no person in the loop. An
-environment that marks either class `person`, which production always does, needs an approval id
+environment that marks that class `person`, which production always does, needs an approval id
 instead, and `approval` has no default: silence is not consent, whatever reached this operator.
 
 ## The endpoint is the bound one, never a re-derived one
@@ -67,21 +66,16 @@ The isolation law is published once, by the operator that owns the runtime, and 
 inside it rather than restating it. Three of its clauses are things only this receipt can carry, so
 the snapshot states them and they are checked: this run belongs to the session the request names and
 writes no other session's folder; it drives its own browser profile, because two runs sharing one
-profile share a sign-in and then each proves the other's; and it seeds only identifiers under its own
-run namespace and rolls back only what it seeded, because a fixture that reaches a shared row is how
-one run's cleanup becomes another run's failure.
+profile share a sign-in and then each proves the other's; and it accepts only a `data.seed` receipt
+whose identifiers and rollback set stay under this run's namespace.
 
-## A missing record is created, not reported
+## Missing prerequisites are routed to their owners
 
-A flow nobody has run yet has no folder, no flow document, no seed, no account and no approved
-reference, and none of that is a stop. The flow document and the seed are drafted from the shipped
-template and named in the receipt as drafts; the account is provisioned by the operator that owns
-identity and this branch is re-entered with it; and the first run becomes the candidate baseline that
-only a person promotes. `IDENTITY_MISSING` is that hand-off and not a verdict — it names the flow
-whose account does not exist yet, and the identity operator answers it. The honest stops on this path
-are the two dependencies nobody here can conjure: a provider, a sealed file or a store that cannot be
-reached at all is `PROVISIONING_UNAVAILABLE`, and a request that names no flow to run is
-`INVALID_INPUT`. Stopping at "a person must create an account" is neither of them.
+This verifier does not draft a flow, case sheet or seed. Missing or invalid flow material returns a
+typed handoff to `uat.plan`; missing or invalid seed material returns one to `data.plan` and then
+`data.seed`. A missing or invalid account returns `IDENTITY_MISSING` to `identity.provision`, which
+must return a real product-login proof before a new attempt begins. An unreachable provider, sealed
+file or store is `PROVISIONING_UNAVAILABLE`; a request naming no flow is `INVALID_INPUT`.
 
 ## The flow folder has one shape
 
@@ -164,11 +158,10 @@ resolves a question of intent by re-running the flow harder.
 
 ## The namespace owns everything this run wrote
 
-Every record this run writes carries `is_uat=true` and the `runId` namespace, so what the run created
-is separable from what the product already had. Cleanup deletes exactly that namespace and nothing
-else: not another run's namespace, not a record that merely carries the UAT flag, and never a run
-record. Verification itself reads and does not write, and a seed may never create the outcome under
-test.
+Every seed record this run consumes carries `is_uat=true` and the `runId` namespace, so it is
+separable from product data. Verification never mutates that data. It hands the exact receipt-owned
+rollback set to `data.seed`, which deletes only that namespace and returns cleanup evidence; run
+records remain append-only. A seed may never create the outcome under test.
 
 ## Runs are append-only
 
@@ -176,6 +169,18 @@ test.
 and `history.md` gains its line. A run folder that already exists is never rewritten, never trimmed and never corrected: a
 second attempt is a new `runId`, and the old record stays as the evidence of what was observed then.
 History that can be edited is not history.
+
+## Concrete attempt flow
+
+This operator's rows are gated by the shared expected/actual attempt contract in `scripts/attempt-gate.mjs`.
+
+| Observed state | Action | Actual check | Next branch |
+| --- | --- | --- | --- |
+| plan, real-login account and seed receipt valid for env/namespace/revisions | reuse prerequisites; open fresh run/browser profile; freeze before action | snapshot fingerprints plan, actors, seed, FE/BE heads, endpoint, cases and expected | drive product |
+| prerequisite missing or invalid | no browser action and no seed effect | name exact UAT, identity, data, runtime or admission delta | typed owner handoff then new UAT attempt |
+| walk runs | record actual/evidence for every assertion, including unreached/inconclusive | append complete attempt under new runId; preserve fail/incomplete | advance only when all required assertions match |
+| owned defect found | edit no owner source and overwrite no run | classify owner and affected cases | owner repairs; new run reruns failed and affected cases |
+| cleanup due | hand exact rollback set to `data.seed` | cleanup receipt proves only owned namespace removed | this verifier performs no database mutation |
 
 ## Boundary
 
@@ -185,8 +190,8 @@ record under `@worktrees/uat/<flow>/<case>` while it holds the exclusive lease, 
 `data/verdicts.json`, the screenshots and the sheet under `response/artifacts/`, `response.md` and
 `response.json`. It does not read or write the password as a value, does not ask a person to sign in
 or paste a credential, does not repair the product to make a case pass, does not edit the frozen
-snapshot after execution begins, does not rewrite or delete a run record, does not delete anything
-outside its own fixture namespace, and does not make anything happen other than through the control
+snapshot after execution begins, does not rewrite or delete a run record, performs no seed or cleanup
+effect, and does not make anything happen other than through the control
 each capture names: a walk is evidence only for what it pressed, so a step that reaches the product by
 any other means — an endpoint, a mutation, a console command in place of the rendered control (`UX-1`
 Case 2) — is not a step of the walk, and a criterion scored from it is `EVIDENCE_UNAVAILABLE`, never a
@@ -197,7 +202,7 @@ pass.
 | Alias | Bind | Required |
 | --- | --- | --- |
 | `@worktrees/uat/<flow>/<case>` | the flow directory in its one shape: `flow.md`, `accounts.<env>.json`, `seed/`, the approved `snapshots/`, the append-only `runs/<runId>/` history, the `latest.json` pointer and `history.md`, bound by fingerprint per file and written only under the exclusive lease | yes |
-| `@worktrees/_templates` | the UAT flow template a missing flow folder is drafted from, which the tree ships at `templates/uat/` with `README.md` as the contract for the whole folder: `flow.md` with the cases, the aliases they act as and their named assertions, `accounts.json.example` with names only and no field that could hold a secret, and `seed/` with the records a run namespaces; consumed, never modified | yes |
+| `@worktrees/_templates` | the UAT folder contract used only to validate the planned flow shape; canonical creation belongs to `uat.plan` and `data.plan`; consumed, never modified | yes |
 | `@worktrees/sessions/central-runtime` | the runtime owner's generation behind the bound endpoint; readiness is proved by the `route` Input, never re-derived from this registry | yes |
 | `@workspaces/device-state` | the sealed credential roster; the shared UAT password is resolved by name here at login and read nowhere else | yes |
 | `@workspaces/be` | the routed backend checkout at the pinned commit, whose behaviour the flow verifies and whose store holds the namespaced records | yes |
@@ -212,16 +217,17 @@ pass.
 | `frontend-surface-audit` | the surface audit that found the frontend clean, taken at the pinned commit | yes |
 | `quality-verification` | the quality gate that passed, taken at the same pinned commit | yes |
 | `route` | `workspace.bind` on the fe role; the bound route whose endpoint this run drives | yes |
-| `uat-account` | `identity.provision`, the dedicated account it provisioned for this flow; absent on the first pass, which is what `IDENTITY_MISSING` hands over | no |
+| `uat-account` | `identity.provision`; every actor alias, provider account, role/membership observation and real product-login proof for this environment | yes |
 | `units` | `uat.plan`; the flow list whose one flow this branch walks, named by `request.unit` | no |
-| `uat-plan` | `uat.plan`; the plan receipt that defined this flow's entry route, step budget, account alias and namespace | no |
-| `seed-receipt` | `data.seed`; the rows this flow walks on, attributable to its namespace, with their rollback | no |
+| `uat-plan` | `uat.plan`; the flow entry, budget, actor aliases and namespace | yes |
+| `uat-case-sheet` | `uat.plan`; the immutable machine table of actor, preconditions, actions, assertions, expected and fixture refs | yes |
+| `seed-receipt` | `data.seed`; the rows this flow walks on, attributable to its namespace, with their rollback | yes |
 
 ## Requirements
 
 | Field | Type | Default | Ask |
 | --- | --- | --- | --- |
-| `approval` | id | — | The authority covering this run's own writes — seeding the frozen records and signing in as the flow's account: an approval id, or the environment declaration's reference — its path and content hash — when that declaration marks `seed` and `identity-provisioning` `declared` for `env`; no default, because silence is not consent |
+| `approval` | id | — | The authority covering sign-in as the flow's account: an approval id, or the environment declaration's reference — its path and content hash — when `identity-provisioning` is `declared` for `env`; no default, because silence is not consent |
 | `feature` | id | — | The feature key that addresses the flow directory |
 | `flow` | id | — | The one product flow this invocation verifies |
 | `env` | id | dev | The stack this run drives: it selects the accounts file, the sealed secret, the runtime registry entry, the seed target and the approved reference |
@@ -236,26 +242,26 @@ pass.
 | --- | --- | --- | --- | --- | --- |
 | 1 | Validate the gate, the resume, the exclusive lease and the run's authority | `approval`, `lease`, `resume` | `request/request.json`, @worktrees/uat/<flow>/<case> for `latest` and the prior run record, @workspaces/be at the pinned commit, the environment's declaration when `approval` references it, @tools/git | — | `INVALID_INPUT`, `SOURCE_DRIFT`, `NO_PROGRESS`, `AUTHORITY_DRIFT` |
 | 2 | Confirm the clean surface and green quality admissions at the frontend head, preserving the backend head separately | — | input `frontend-surface-audit`, input `quality-verification` | — | `ADMISSION_MISSING` |
-| 3 | Preflight the runtime and the flow's identity: the sealed credential resolves by name, the store answers, and a flow with no account hands over instead of stopping | `env` | @workspaces/device-state for the credential named by `accounts.<env>.json`, @worktrees/sessions/central-runtime for the entry of the bound route, its generation and origins, input `uat-account` when the identity was provisioned, @tools/secrets, @tools/http | — | `PROVISIONING_UNAVAILABLE`, `IDENTITY_MISSING` |
-| 4 | Draft from the template whatever the flow folder lacks, then freeze the snapshot from `flow.md`, `accounts.<env>.json` and `seed/` | `feature`, `flow`, `env`, `cases` | @worktrees/uat/<flow>/<case>, @worktrees/_templates for the flow template | @worktrees/uat/<flow>/<case> (snapshot), `response/data/snapshot.json`, @tools/sourcewrite | `CANONICAL_WRITE_DENIED` |
-| 5 | Seed the frozen records into the run namespace | `runId` | `response/data/snapshot.json`, @workspaces/be | @tools/database | `FIXTURE_VIOLATION` |
+| 3 | Validate the runtime, real product login proof and `seed-receipt` for the exact environment, actor aliases, namespace and FE/BE revisions; hand every missing or invalid prerequisite to its owner before browser action | `env` | @workspaces/device-state for the credential named by `accounts.<env>.json`, @worktrees/sessions/central-runtime for the entry of the bound route, its generation and origins, input `uat-account` when the identity was provisioned, @tools/secrets, @tools/http | — | `PROVISIONING_UNAVAILABLE`, `IDENTITY_MISSING` |
+| 4 | Freeze the already planned machine case sheet, account refs, seed receipt, endpoint, revisions and expected assertions; this verifier neither drafts canonical flow data nor changes expected | `feature`, `flow`, `env`, `cases` | @worktrees/uat/<flow>/<case>, @worktrees/_templates for the flow template | @worktrees/uat/<flow>/<case> (snapshot), `response/data/snapshot.json`, @tools/sourcewrite | `CANONICAL_WRITE_DENIED` |
+| 5 | Verify the seed receipt read-only against the run namespace and planned preconditions; perform no seed or cleanup effect in this operator | `runId` | input `seed-receipt`, `response/data/snapshot.json`, @workspaces/be | — | `FIXTURE_VIOLATION` |
 | 6 | Write the walk of the frozen cases in their order: a role and a name per control, the entry route once at step 1, a credential by name where a field reads as a secret, one capture per case after the sign-in redirect landed | — | `response/data/snapshot.json`, input `route` for the endpoint this run drives, @worktrees/uat/<flow>/<case> for the steps `flow.md` declares | `uat-walk` | `LEASE_INVALID` |
 | 7 | Run the walk through the tree's runner under @tools/browsercontrol mode `playwright` — a fresh browser context at the endpoint the bound route carries, at the pinned commit, the credential resolved by name at the fill and masked in every frame — or drive the frozen cases through the browser under mode `required` when no walk was written | — | `uat-walk`, input `route` for the endpoint this run drives, @worktrees/sessions/central-runtime for the generation behind that endpoint, @workspaces/device-state for the credential at login only, @tools/browsercontrol, @tools/secrets, @tools/websearch | `walk-result`, `response/data/captures/<case>.json`, `response/artifacts/<case>.png` | `RUNTIME_UNAVAILABLE` |
-| 8 | Capture at each named assertion with the login field masked where the runner did not, and stitch the sheet | — | `response/data/snapshot.json`, `walk-result`, @worktrees/sessions/central-runtime for the most direct runtime evidence | `response/data/captures/<case>.json`, `response/artifacts/<case>.png`, `response/artifacts/sheet.png`, @tools/visualize, @tools/print | `EVIDENCE_UNAVAILABLE` |
+| 8 | Record actual and evidence for every assertion, including unreached and inconclusive assertions, and stitch the sheet without turning missing evidence into pass | — | `response/data/snapshot.json`, `walk-result`, @worktrees/sessions/central-runtime for the most direct runtime evidence | `response/data/captures/<case>.json`, `response/artifacts/<case>.png`, `response/artifacts/sheet.png`, @tools/visualize, @tools/print | `EVIDENCE_UNAVAILABLE` |
 | 9 | Judge the three lanes apart, and score the experience lane criterion by criterion | — | @knowledge/ui/proof (the UX topic and its closing rule), `response/data/captures/<case>.json` | `response/data/verdicts.json` | — |
-| 10 | Verify read-only, then delete the run namespace and nothing else | `runId` | @workspaces/be for the records carrying `is_uat=true` and this namespace, `response/data/verdicts.json` | @tools/database | — |
-| 11 | Append `runs/<runId>/`, point `latest.json` at it, add the history line, and emit | `runId` | everything above | @worktrees/uat/<flow>/<case> (runs/<runId>/, latest.json and history.md), `response/response.md`, `response/response.json`, `audit-scope`, `findings`, @tools/sourcewrite, @tools/print | — |
+| 10 | Prepare the exact cleanup handoff from the seed receipt's rollback set to `data.seed`; perform no database mutation here | `runId` | input `seed-receipt`, `response/data/verdicts.json` | — | — |
+| 11 | Append every completed, failed or incomplete attempt under its new `runId`, update the latest pointer to that immutable result, add history, and emit | `runId` | everything above | @worktrees/uat/<flow>/<case> (runs/<runId>/, latest.json and history.md), `response/response.md`, `response/response.json`, `audit-scope`, `findings`, @tools/sourcewrite, @tools/print | — |
 
 A verdict nobody was shown is a verdict nobody read. Step 8 prints the run's step-capture summary and
 step 11 prints the `## Verdict` table over `@tools/print`, into the conversation the person is
 reading, and the receipt lists both under `## Printed` with why each was printed; the
 login field stays masked in every frame that is printed, exactly as in every frame that is written.
 
-A blocked run publishes no run record at all, because a half-written record is the artifact a later
-reader would mistake for a decision. A resume begins again at validation, reuses only observations
-whose fingerprints are unchanged, and writes under the same lease; a resume that adds no admission,
-lease, evidence or case change is `NO_PROGRESS`. A second attempt after a published run is a new
-`runId`, never an edit of the old one.
+A pre-action admission block may publish only its blocked attempt receipt. Once the snapshot is
+frozen or any browser action starts, the attempt is appended as incomplete, failed or complete with
+the evidence actually observed; it is never discarded. A resume begins again at validation, reuses
+only observations whose fingerprints are unchanged, and writes under the same lease; a resume that
+adds no admission, lease, evidence or case change is `NO_PROGRESS`. Every retry uses a new `runId`.
 
 
 When the admitted audit carries scope, run `node scripts/audit-scope.mjs <branch>` to copy
@@ -313,5 +319,8 @@ whose failures the ledger does not hold.
 | the UI lane fails on an application-owned node | `interface.generate` |
 | the behaviour lane fails | `backend.generate` |
 | the flow has no dedicated account yet, so the identity is provisioned before the run continues | `identity.provision` |
+| the flow or machine case sheet is missing or invalid | `uat.plan` |
+| the seed plan or receipt is missing or invalid | `data.plan` |
+| a valid seed receipt must be created or its exact namespace rolled back after any completed, failed or incomplete action attempt | `data.seed` |
 | the UX lane fails: a person decides what the experience should be, and the flow is verified again only after that decision | `user` |
 | the run produced the first baseline of this flow, so a person promotes the candidate before it is a reference | `user` |

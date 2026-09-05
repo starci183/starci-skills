@@ -146,6 +146,17 @@ rather than being reclassified. Each touched file carries one change record with
 before and after hashes, because a modified file whose two hashes agree records a mutation that did
 not happen.
 
+## Concrete attempt flow
+
+This operator's rows are gated by the shared expected/actual attempt contract in `scripts/attempt-gate.mjs`.
+
+| Observed state | Action | Actual check | Next branch |
+| --- | --- | --- | --- |
+| conforming artifact exists | reuse and record unchanged hashes | contract facets and proofs pass | record no-change observation |
+| artifact missing | create only frozen operation and integration points | snapshot, conformance and proofs cover it | commit once after match |
+| artifact invalid | update smallest owner-owned set | rerun affected facets, proofs and snapshots | new repair attempt; wider contract hands to `architecture.decide` |
+| same failure fingerprint | never reapply blindly | preserve both attempts | `NO_PROGRESS` or typed owner handoff |
+
 ## Boundary
 
 The operator writes product source only inside the owner boundary or outside it as a recorded
@@ -203,11 +214,11 @@ the publication was withheld. When it is absent the published head is the author
 | --- | --- | --- | --- | --- | --- |
 | 1 | Validate the gate and resume, confirm the session, and run the request preflight before the first write outside the session folder | `resume`, `mode` | `request/request.json`, the session's `state.json` and this branch's `step-N/parallel-M`, input `backend-source-application` when present, @workspaces/be at the frozen head | — | `INVALID_INPUT`, `SESSION_MISSING`, `SOURCE_DRIFT`, `NO_PROGRESS` |
 | 2 | Bind authority, contract and patterns | `featureId`, `contractFingerprint` | input `model` when present, otherwise @worktrees/businesses/<featureId> at its published head, input `architecture-decision` as the frozen contract and the source of its `operations`, @knowledge/patterns/be one pattern per aspect | — | `CONTRACT_UNFROZEN`, `BUSINESS_AUTHORITY_MISSING`, `PATTERN_UNBOUND` |
-| 3 | Fill one contract operation at a time, on the session branch, in full or as a fix | `mutableFileRefs`, `protectedRefs`, `scope` | @knowledge/patterns/be for each aspect, @workspaces/be inside the owner boundary | @workspaces/be/branch/session inside the owner boundary, or outside it as a recorded widening and never inside a protected ref, under an exclusive lease, @tools/sourcewrite | `CONTRACT_WIDENED`, `OWNER_WIDENED`, `OWNER_CONFLICT` |
+| 3 | Inspect each operation's artifacts, reuse conforming ones, create missing ones and update the smallest invalid owner-owned set on the session branch | `mutableFileRefs`, `protectedRefs`, `scope` | @knowledge/patterns/be for each aspect, @workspaces/be inside the owner boundary | @workspaces/be/branch/session inside the owner boundary, or outside it as a recorded widening and never inside a protected ref, under an exclusive lease, @tools/sourcewrite | `CONTRACT_WIDENED`, `OWNER_WIDENED`, `OWNER_CONFLICT` |
 | 4 | Check every mutation against the frozen contract and record it with its before and after hash | `mode` | @workspaces/be, the touched files and the frozen contract | `response/data/mutations.json` | — |
 | 5 | Revalidate persisted snapshots on read | — | @workspaces/be, the persisted snapshot, @knowledge/patterns/be for the rules that drift after it | — | — |
 | 6 | Prove each declared facet | — | @workspaces/be, the measurement behind each facet | `response/data/conformance/<operationId>.<facet>.json` | — |
-| 7 | Run each declared proof | — | @workspaces/be, the pinned command of each declared proof kind | `response/data/proofs/<operationId>.<proofKind>.json`, @tools/shell | `PROOF_UNAVAILABLE` |
+| 7 | Run each proof, compare actual output with the frozen criterion, and preserve mismatch transcripts for a new repair or transient retry attempt instead of weakening the contract | — | @workspaces/be, the pinned command of each declared proof kind | `response/data/proofs/<operationId>.<proofKind>.json`, @tools/shell | `PROOF_UNAVAILABLE` |
 | 8 | Commit the write set once, write the receipt and emit | `outcome` | everything above | @workspaces/be/branch/session as one commit, `response/changes.md`, `response/response.md`, `response/response.json`, @tools/git | — |
 
 Under `mode = dry` step 3 projects the fill onto the declared paths without writing one of them, step

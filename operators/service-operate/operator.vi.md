@@ -80,6 +80,17 @@ trong lúc phiên khác đang giữ thì chờ và được cho biết ai đang 
 được giữ cho một lệnh và một probe, không bao giờ cho suốt độ dài của công việc mà dịch vụ ấy tồn
 tại để đỡ.
 
+## Luồng attempt cụ thể
+
+Các row của operator này được gate bởi hợp đồng attempt expected/actual dùng chung trong `scripts/attempt-gate.mjs`.
+
+| Trạng thái quan sát | Hành động | Kiểm actual | Nhánh kế tiếp |
+| --- | --- | --- | --- |
+| declared service khớp config và functional probe | tái dùng và ghi live identity | health và goal-specific probe pass | phát receipt không đổi |
+| service thiếu | chỉ create/start approved kind và refs | đọc process/container, endpoint, probe | phát delta mới |
+| service sai | chỉ update mutable declared refs | chạy lại health và probe fail | repair attempt mới; handoff foreign/wider owner |
+| mutation không chắc | inventory lại trước action | phân loại converged, not converged, uncertain | không lặp mù |
+
 ## Ranh giới
 
 Context là chỉ đọc trừ entry dịch vụ. Operator chạy đúng lệnh mà bản khai báo gọi tên, cho đúng dịch
@@ -124,8 +135,8 @@ nhập, handle capability hay token có hình dạng bí mật ở bất cứ đ
 | 2 | Ràng đúng một dịch vụ mà môi trường khai: kind, lệnh đã khai, probe, holder và cổng công khai của nó | `service`, `env` | bản khai báo môi trường của `env`, @worktrees/sessions/central-runtime cho entry dịch vụ | — | `INVALID_INPUT` |
 | 3 | Ràng thẩm quyền cho lớp `service` và cho chính holder của dịch vụ này, giải thông tin đăng nhập của lệnh theo tên | `approval` | bản khai báo môi trường đọc lại và hash lại, @workspaces/device-state cho thông tin đăng nhập theo tên, @tools/secrets | — | `SERVICE_APPROVAL_REQUIRED` |
 | 4 | Đọc bản chiếu cổng và ghi một cổng công khai đã khai mà một route sản phẩm đã sở hữu như một finding, không bao giờ như một cổng để dời | — | @workspaces/ports/<project>, @tools/shell cho bảng socket | — | — |
-| 5 | Quan sát dịch vụ trước khi có gì dời: đọc probe đã khai và kẻ đang giữ mà entry ghi lại | — | @tools/http, @tools/shell, @worktrees/sessions/central-runtime | — | — |
-| 6 | Lấy lease và chạy lệnh đã khai cho trạng thái được hỏi, hoặc không đổi gì khi `desired` là `attested` hay dịch vụ đã đứng sẵn ở đó | `desired` | @tools/shell, @tools/container, @worktrees/sessions/central-runtime cho lease và hàng đợi | @worktrees/sessions/central-runtime | — |
+| 5 | Kiểm declared probe, process/container holder và config, phân loại service reusable, missing, invalid hoặc uncertain trước command | — | @tools/http, @tools/shell, @worktrees/sessions/central-runtime | — | — |
+| 6 | Tái dùng service state khớp, create/start service thiếu, chỉ update mutable resource đã khai bị sai, và không đổi ownership uncertain/foreign | `desired` | @tools/shell, @tools/container, @worktrees/sessions/central-runtime cho lease và hàng đợi | @worktrees/sessions/central-runtime | — |
 | 7 | Chứng minh trạng thái quan sát được chỉ từ probe đã khai: một `up` trả lời nó, một `down` để cổng trống, và pid trả lời được ghi lại | — | @tools/http, @tools/shell | @worktrees/sessions/central-runtime | `SERVICE_UNPROVEN` |
 | 8 | Nhả lease, viết biên nhận và phát | — | mọi thứ ở trên | `service-receipt`, `response/response.json` | — |
 

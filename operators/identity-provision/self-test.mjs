@@ -96,7 +96,7 @@ ${findings.map((f) => `| \`${f.code}\` | \`${f.resourceRef}\` | — | — | ${f.
 }
 const accountRecord = ({ accounts, env = ENV, ...over } = {}) => ({
   env, flow: FLOW, identity: ENTRY, plaintextRecorded: false,
-  accounts: accounts ?? { learner: { username: `uat-${FLOW}-learner`, role: 'learner', credentialName: 'uat-shared', sealed: `.stacks/${env}/secrets/uat.enc`, provisionedBy: '20260110-000000-1111111', createdAt: '2026-01-10T00:05:00.000Z' } },
+  accounts: accounts ?? { learner: { username: `uat-${FLOW}-learner`, role: 'learner', memberships: ['learners'], providerAccountRef: 'provider://accounts/learner', action: 'create', observedAt: '2026-01-10T00:06:00.000Z', loginProof: { method: 'browser', endpoint: 'http://localhost:3000/login', outcome: 'passed', evidenceRef: 'response/data/checks.json#login', verifiedAt: '2026-01-10T00:06:00.000Z' }, credentialName: 'uat-shared', sealed: `.stacks/${env}/secrets/uat.enc`, provisionedBy: '20260110-000000-1111111', createdAt: '2026-01-10T00:05:00.000Z' } },
   ...over,
 });
 const requestJson = ({ effects = PROVISION, flow = FLOW, env = ENV, approval = APPROVAL, kind = 'identity', routeKey = ENTRY, resourceRefs = [ENTRY], mutableResourceRefs = [ENTRY], extra = {} } = {}) => ({
@@ -178,7 +178,6 @@ await expectError(provisioning({ 'request/request.json': requestJson({ effects: 
 await expectError(provisioning({ 'request/request.json': requestJson({ kind: 'runtime' }) }), 'this operator provisions identity and nothing else', 'another service kind');
 await expectError(provisioning({ 'request/request.json': requestJson({ flow: null }) }), 'flow names none', 'provisioning for no flow at all');
 await expectError(provisioning({ 'request/request.json': requestJson({ routeKey: 'demo-product' }) }), 'is not a <project>/<role> registry entry', 'a route key that names no route');
-await expectError(provisioning({ 'request/request.json': requestJson({ env: 'no-such-stack' }) }), 'which this installation does not have', 'an env with no stack');
 
 // The delta and the checks.
 await expectError(provisioning({ 'response/data/delta.json': delta({ caps: [] }) }), 'requires the identity:account-admin capability', 'provisioning without its capability');
@@ -198,12 +197,16 @@ await expectError(provisioning({ 'response/response.json': responseJson({ accoun
 await expectError(provisioning({ 'response/data/account.json': accountRecord({ identity: 'demo-product/be' }) }), 'belongs to registry entry', 'an account filed under another registry entry');
 await expectError(provisioning({ 'response/data/account.json': accountRecord({ flow: 'other-flow' }) }), 'belongs to flow other-flow', 'an account filed under another flow');
 await expectError(provisioning({ 'response/data/account.json': accountRecord({ env: 'staging' }) }), 'belongs to environment staging', 'an account of another environment');
-await expectError(provisioning({ 'response/data/account.json': accountRecord({ accounts: { learner: { username: `uat-${FLOW}-learner`, role: 'learner', credentialName: 'uat-shared', sealed: `.stacks/${ENV}/secrets/uat.enc`, provisionedBy: null, createdAt: '2026-01-10T00:05:00.000Z' } } }) }), 'names the run that provisioned it', 'an account this run created and left unattributed');
-await expectError(provisioning({ 'response/data/account.json': accountRecord({ accounts: { learner: { username: `uat-${FLOW}-learner`, role: 'password: hunter2-hunter2', credentialName: 'uat-shared', sealed: `.stacks/${ENV}/secrets/uat.enc`, provisionedBy: '20260110-000000-1111111', createdAt: '2026-01-10T00:05:00.000Z' } } }) }), 'carries a credential', 'a secret filed in the account record');
+await expectError(provisioning({ 'response/data/account.json': accountRecord({ accounts: { learner: { ...accountRecord().accounts.learner, action: 'reuse', provisionedBy: null } } }) }), 'names the run that provisioned it', 'an account this run created and left unattributed');
+await expectError(provisioning({ 'response/data/account.json': accountRecord({ accounts: { learner: { ...accountRecord().accounts.learner, loginProof: { ...accountRecord().accounts.learner.loginProof, method: 'token' } } } }) }), 'needs a passing real product login through browser evidence', 'a token check offered as real product login proof');
+await expectError(provisioning({ 'response/data/account.json': accountRecord({ accounts: { learner: { ...accountRecord().accounts.learner, providerAccountRef: '' } } }) }), 'names no stable provider account reference', 'an account with no provider identity for safe reuse');
+await expectError(provisioning({ 'response/data/account.json': accountRecord({ accounts: { learner: { ...accountRecord().accounts.learner, memberships: [] } } }) }), 'records no observed provider membership', 'an account whose provider role was never observed');
+await expectError(provisioning({ 'response/data/account.json': accountRecord({ accounts: { learner: { ...accountRecord().accounts.learner, action: 'reuse' } } }) }), 'changed account learner cannot record action reuse', 'a changed account mislabeled as reused');
+await expectError(provisioning({ 'response/data/account.json': accountRecord({ accounts: { learner: { ...accountRecord().accounts.learner, role: 'password: hunter2-hunter2' } } }) }), 'carries a credential', 'a secret filed in the account record');
 await expectError(provisioning({ 'response/data/account.json': { ...accountRecord(), password: 'x' } }), 'unexpected property', 'an account record with a place to hold a secret');
 
 // One branch, the flow's whole cast: the plan lists every alias and the record publishes every one.
-const castAccount = (alias) => ({ username: `uat-${FLOW}-${alias}`, role: alias, credentialName: 'uat-shared', sealed: `.stacks/${ENV}/secrets/uat.enc`, provisionedBy: '20260110-000000-1111111', createdAt: '2026-01-10T00:05:00.000Z' });
+const castAccount = (alias) => ({ ...accountRecord().accounts.learner, username: `uat-${FLOW}-${alias}`, role: alias, memberships: [`${alias}s`], providerAccountRef: `provider://accounts/${alias}` });
 const castPlan = (aliases) => ({ accounts: aliases.map((alias) => ({ alias, username: `uat-${FLOW}-${alias}`, email: `uat-${FLOW}-${alias}@example.test`, firstName: 'Uat', lastName: alias, usernameMaxLength: 40 })) });
 const cast = (planned, published, over = {}) => provisioning({
   'request/identity-plan.json': castPlan(planned),
@@ -242,6 +245,7 @@ const TIGHT_REF = declare('tight', { schemaVersion: 9, env: 'tight', production:
 const PROD_REF = declare('production', { schemaVersion: 9, env: 'production', production: true });
 const LOOSE_REF = declare('loose', { schemaVersion: 9, env: 'loose', production: true, authorization: { release: 'declared', 'identity-provisioning': 'declared' } });
 const onHost = { hostRoot: HOST };
+await expectError(provisioning({ 'request/request.json': requestJson({ env: 'no-such-stack' }) }), 'which this installation does not have', 'an env with no stack', onHost);
 const provisioningDeclared = ({ approval = DEV_REF, env = 'dev', effects = PROVISION } = {}) => provisioning({
   'request/request.json': requestJson({ effects, env, approval }),
   'response/response.md': responseMd({ effects, approval }),

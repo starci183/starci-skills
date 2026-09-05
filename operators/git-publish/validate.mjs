@@ -6,8 +6,8 @@
 // incoming session's side taken only inside the files its own write set owns;
 // every hook ran and passed, `pre-push` among them; the head actually advanced; a continuation tag
 // exists exactly when the request asked for one and points at the head this run pushed; the session
-// that produced the merged branch is on disk with the receipt that authorized it; and the worktree
-// and the session branch were cleaned up on a done branch.
+// that produced the merged branch is on disk with the receipt that authorized it; publication
+// preserves the worktree, session branch and folder for the host session lifecycle.
 import { existsSync } from 'node:fs';
 import { readdir, readFile } from 'node:fs/promises';
 import path from 'node:path';
@@ -181,8 +181,9 @@ export async function validateGitPublishStep(branchDir, root = ROOT, { verifiedC
     errors.push(...await sessionReceiptErrors(branchDir, { pushedHeads, sessionBranch: publication['Session branch'] ?? '' }));
   }
 
-  // Cleanup is part of the publish, and only on a done branch.
-  if (response.status === 'done' && !/removed/i.test(publication.Cleanup ?? '')) errors.push('response/response.md: a published branch removes the worktree and the session branch');
+  // Session cleanup is a host lifecycle event, never a publication side effect.
+  if (response.status === 'done' && !/(preserv|kept).*(host|session lifecycle)/i.test(publication.Cleanup ?? '')) errors.push('response/response.md: Cleanup must preserve the worktree, branch and folder for the host session lifecycle');
+  if (/remov|delet|cleaned/i.test(publication.Cleanup ?? '')) errors.push('response/response.md: git.publish must not remove session evidence');
 
   // The commit the response registers is the commit the receipt published.
   const commits = new Set(response.commits ?? []);

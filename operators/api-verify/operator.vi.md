@@ -94,6 +94,18 @@ lượt chạy đã tồn tại thì không bao giờ bị ghi đè, bị cắt 
 thứ người sở hữu bản giao đọc; một lượt chạy chưa từng tới được bộ kiểm thì không phát hành gì, bởi một
 hồ sơ viết dở là thứ người đọc sau này nhầm thành một quyết định.
 
+## Luồng attempt cụ thể
+
+Các row của operator này được gate bởi hợp đồng attempt expected/actual dùng chung trong `scripts/attempt-gate.mjs`.
+
+| Trạng thái quan sát | Hành động | Kiểm actual | Nhánh kế tiếp |
+| --- | --- | --- | --- |
+| suite, endpoint, account, seed hiện hành | tái dùng declaration; mở run append-only mới | chứng minh generation chứa commit và prerequisite chung namespace | chạy suite như client |
+| prerequisite thiếu/sai | không chạy case | nêu exact suite, identity, data, runtime delta | owner handoff rồi attempt evidence mới |
+| case thực thi | ghi mọi case runner in và response observation | xét contract/data/lifecycle; thiếu output inconclusive | append run id pass, fail, incomplete |
+| case fail | không sửa product hay suite source | route behavior về source owner, prerequisite về owner | head/prerequisite mới tạo attempt mới |
+| cần cleanup | chỉ dùng ownership từ seed receipt | đọc lại không còn owned record | row ngoài là `API_NAMESPACE_LEAK`, không xóa đoán |
+
 ## Ranh giới
 
 Context là chỉ-đọc trừ lịch sử API của luồng. Operator ghi hồ sơ lượt chạy dưới `@worktrees/e2e/<flow>`
@@ -139,14 +151,14 @@ tên.
 | # | Bước | Tham số | Đọc | Ghi | Dừng với |
 | --- | --- | --- | --- | --- | --- |
 | 1 | Kiểm gate, lần vào lại và thẩm quyền của lượt chạy | `approval`, `resume` | `request/request.json`, @worktrees/e2e/<flow> cho lịch sử API và hồ sơ lượt chạy trước, @workspaces/be tại commit đã ghim, bản khai báo môi trường khi `approval` tham chiếu nó, @tools/git | — | `INVALID_INPUT`, `SOURCE_DRIFT`, `NO_PROGRESS`, `AUTHORITY_DRIFT` |
-| 2 | Bind entry đang phục vụ mà platform receipt chứng thực, head nó phục vụ, và việc head ấy có chứa commit đã ghim hay không | — | input `platform-operation-receipt`, @worktrees/sessions/central-runtime cho generation đứng sau entry ấy, @tools/http | — | `RUNTIME_UNAVAILABLE` |
+| 2 | Kiểm attested entry, suite, account, seed receipt, phân loại prerequisite reusable, missing hoặc invalid tại pinned head và namespace trước khi chạy case | — | input `platform-operation-receipt`, @worktrees/sessions/central-runtime cho generation đứng sau entry ấy, @tools/http | — | `RUNTIME_UNAVAILABLE` |
 | 3 | Bind namespace seed đã đặt và tài khoản bộ kiểm đăng nhập, giải credential theo tên | `env` | input `seed-receipt`, input `uat-account`, @worktrees/e2e/<flow> cho bản ghi tài khoản, @workspaces/device-state, @tools/secrets | — | `INVALID_INPUT` |
 | 4 | Lấy lệnh mà gate plan của route khai báo cho gate end-to-end; một case hay một script nhánh này định viết thuộc về operator sở hữu mã nguồn | `flow` | @workspaces/be cho các lệnh đã khai báo và bộ kiểm mà luồng gọi tên, input `quality-verification` cho các gate đã lấy tại head này | — | `INVALID_INPUT` |
 | 5 | Chạy đúng lệnh ấy như một client đối với entry đã bind và giữ nguyên vẹn đầu ra của chính runner | `runId` | @workspaces/be, @tools/shell | `api-output` | `RUNTIME_UNAVAILABLE` |
-| 6 | Chép kết quả từng case của runner — định danh nó in ra, request, trạng thái, assertion, thời lượng và chỗ đọc lại từng thứ — không bịa cái nào | — | `api-output` | `api-cases` | `API_CASE_FAILED` |
+| 6 | Chép mọi runner case và ghi output missing, failed, incomplete làm actual evidence; không tạo case hay biến output thiếu thành pass | — | `api-output` | `api-cases` | `API_CASE_FAILED` |
 | 7 | Đọc lại qua API mọi bản ghi bộ kiểm đã ghi rồi xét ba làn riêng nhau | — | `api-cases`, @tools/http | `api-verdicts` | `API_NAMESPACE_LEAK` |
 | 8 | Thẩm tra namespace ở chế độ chỉ-đọc, rồi xoá nó qua API và không gì khác | `runId` | `api-verdicts`, @tools/http | — | `API_NAMESPACE_LEAK` |
-| 9 | Thêm hồ sơ lượt chạy dưới `runs/<runId>/`, chỉ con trỏ vào nó, thêm dòng lịch sử, và phát hành | `runId` | mọi thứ ở trên | @worktrees/e2e/<flow>, `response/response.md`, `response/response.json`, @tools/sourcewrite, @tools/print | — |
+| 9 | Append attempt pass, fail, incomplete dưới run id riêng, update pointer tới immutable result, thêm history và emit | `runId` | mọi thứ ở trên | @worktrees/e2e/<flow>, `response/response.md`, `response/response.json`, @tools/sourcewrite, @tools/print | — |
 
 Một phán quyết không ai được xem là một phán quyết không ai đọc. Bước 6 in kết quả từng case và bước 9
 in bảng làn qua @tools/print, vào đúng cuộc trò chuyện người đang đọc, và biên nhận liệt kê cả hai dưới

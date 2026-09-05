@@ -96,6 +96,16 @@ wait for a person. The receipt's Declaration row and the report's `declarationRe
 declaration's path and the hash of its bytes; a declaration that is missing or does not match its
 schema makes every approval check a wall owned by `approval`.
 
+## Concrete attempt flow
+
+This operator's rows are gated by the shared expected/actual attempt contract in `scripts/attempt-gate.mjs`.
+
+| Observed state | Action | Actual check | Next branch |
+| --- | --- | --- | --- |
+| valid declared prerequisite | reuse its fingerprint and run the real probe | readiness item records observed value and evidence | advance only when every required item is ready |
+| missing prerequisite | record every missing item; create nothing | item names owner domain and required delta | typed owner handoff, then re-enter on changed fingerprint |
+| stale, near-named or invalid prerequisite | refuse cached readiness | record declared/observed mismatch | owner repairs; new attempt verifies it |
+
 ## Boundary
 
 Context is read-only. The operator writes only `response/` of its own branch: `response.md`,
@@ -147,7 +157,7 @@ replace. It makes no product decision and carries no verdict about the source.
 | 6 | Check the host: a browser binary for the audit profile, the Playwright install the walk runner loads (`host.playwright`, a wall in the runner's own wording when absent), a reachable container daemon, installed dependencies per checkout and ancestor type isolation | — | the resolved checkouts and their lockfiles, the install place `resources/tools.json` names for the browser tool, @tools/shell, @tools/container | — | — |
 | 7 | Check the approvals: which operation classes the environment declaration marks declared or person, an omitted class taking the schema default | `env` | the environment declaration of `env` and the environment schema | — | — |
 | 8 | Check the declared services: each service the declaration names under `services` is complete, and its probe answers when the declaration wants it up | `env` | the environment declaration of `env` for its services, @tools/http, @tools/shell | — | — |
-| 9 | Emit the report, blocked with every wall named when any stands | — | everything above | `response/response.md`, `response/data/readiness-report.json`, `response/response.json` | `ENVIRONMENT_NOT_READY` |
+| 9 | Compare every prerequisite with observations, emit one report containing all ready, missing and invalid items plus owner deltas, and block when any required criterion is not ready | — | everything above | `response/response.md`, `response/data/readiness-report.json`, `response/response.json` | `ENVIRONMENT_NOT_READY` |
 
 Step 9 is the only step that stops on a wall: a wall found at steps 2 to 8 is recorded and the next
 step runs, so the report the person reads is complete whichever check failed first. A role whose

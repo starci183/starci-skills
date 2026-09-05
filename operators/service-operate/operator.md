@@ -81,6 +81,17 @@ probe has answered; a session that asks while another holds it waits and is told
 is short by construction: a lease is held for one command and one probe, never for the length of the
 work the service exists to support.
 
+## Concrete attempt flow
+
+This operator's rows are gated by the shared expected/actual attempt contract in `scripts/attempt-gate.mjs`.
+
+| Observed state | Action | Actual check | Next branch |
+| --- | --- | --- | --- |
+| declared service matches config and functional probe | reuse and record live identity | health and goal-specific probe pass | emit unchanged receipt |
+| service missing | create/start only approved kind and refs | read process/container, endpoint and probe | emit created delta |
+| service invalid | update mutable declared refs only | rerun health and failed functional probe | new repair attempt; foreign/wider effect owner handoff |
+| mutation uncertain | inventory again before action | classify converged, not converged or uncertain | never blind-repeat |
+
 ## Boundary
 
 Context is read-only apart from the service entry. The operator runs exactly the command the
@@ -126,8 +137,8 @@ anywhere in what it writes.
 | 2 | Bind the one service the environment declares: its kind, its declared command, its probe, its holder and its public port | `service`, `env` | the environment's declaration of `env`, @worktrees/sessions/central-runtime for the service entry | — | `INVALID_INPUT` |
 | 3 | Bind the authority for the `service` class and for this service's own holder, resolving the command's credential by name | `approval` | the environment's declaration re-read and re-hashed, @workspaces/device-state for the credential by name, @tools/secrets | — | `SERVICE_APPROVAL_REQUIRED` |
 | 4 | Read the port projection and record a declared public port a product route already owns as a finding, never as a port to move | — | @workspaces/ports/<project>, @tools/shell for the socket table | — | — |
-| 5 | Observe the service before anything moves: read the declared probe and the holder the entry records | — | @tools/http, @tools/shell, @worktrees/sessions/central-runtime | — | — |
-| 6 | Take the lease and run the declared command for the asked state, or change nothing when `desired` is `attested` or the service already stands in it | `desired` | @tools/shell, @tools/container, @worktrees/sessions/central-runtime for the lease and the queue | @worktrees/sessions/central-runtime | — |
+| 5 | Inspect the declared probe, process or container holder and configuration, classifying the service reusable, missing, invalid or uncertain before any command | — | @tools/http, @tools/shell, @worktrees/sessions/central-runtime | — | — |
+| 6 | Reuse matching service state, create or start a missing service, update only invalid declared mutable resources, and change nothing on uncertain or foreign ownership | `desired` | @tools/shell, @tools/container, @worktrees/sessions/central-runtime for the lease and the queue | @worktrees/sessions/central-runtime | — |
 | 7 | Prove the observed state from the declared probe alone: an `up` answers it, a `down` leaves its port free, and the pid that answers is recorded | — | @tools/http, @tools/shell | @worktrees/sessions/central-runtime | `SERVICE_UNPROVEN` |
 | 8 | Release the lease, write the receipt and emit | — | everything above | `service-receipt`, `response/response.json` | — |
 

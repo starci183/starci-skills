@@ -54,6 +54,17 @@ into the journey by this plan, which covers it when the walk runs, or extended b
 reason of this plan's own; a plan that drops it from the list defers it again with nobody's agreement,
 and is refused.
 
+## Concrete attempt flow
+
+This operator's rows are gated by the shared expected/actual attempt contract in `scripts/attempt-gate.mjs`.
+
+| Observed state | Action | Actual check | Next branch |
+| --- | --- | --- | --- |
+| flow and case sheet still match journey, route and env | reuse stable ids, aliases and namespace | validate table and machine JSON against goal and route | emit reused plan and sheet |
+| missing | create one flow per journey and cases before execution | each case has actor, precondition, input, UI actions, assertions, expected, verification, JSON, optional SQL and cleanup | emit plan, sheet and units |
+| stale or invalid | update affected case/alias/fixture refs; keep history | rerun route, actor, assertion, namespace and fixture checks | repair attempt; undefined route owner handoff |
+| fixture creates asserted outcome | reject fixture | name conflicting precondition/assertion | handoff `data.plan` |
+
 ## Boundary
 
 Context is read-only. The operator writes only `response/` of its own branch: the plan, the unit list
@@ -91,12 +102,12 @@ It names credentials by alias only and has no field that could hold one.
 | 1 | Validate the gate and resume | `resume` | `request/request.json`, the blocked plan when resuming | — | `INVALID_INPUT`, `NO_PROGRESS` |
 | 2 | Read the goal: every user journey it names, each as one sentence with the actor that walks it | `goal` | the goal the request carries | — | — |
 | 3 | Read the surface map when bound: the entry route each journey starts at and the pages and modals it crosses | — | input `surface-map` | — | — |
-| 4 | Read the flow folders that exist under the feature: a flow that exists keeps its name, its aliases and its namespace | `feature`, `env` | @worktrees/uat/<flow>, @worktrees/_templates for the shape a flow folder takes | — | — |
-| 5 | Name one flow per journey with its entry route and its budget in steps | — | the journeys, the map, the existing flows | — | `FLOW_UNDEFINED` |
+| 4 | Inspect existing flow folders and machine case sheets, classifying stable flows and cases reusable, missing or invalid while preserving names, aliases, namespaces and history | `feature`, `env` | @worktrees/uat/<flow>, @worktrees/_templates for the shape a flow folder takes | — | — |
+| 5 | Reuse, update or create one flow per journey and write its cases before execution: actor, precondition, input, ordered UI actions, assertions, expected result, verification, JSON fixture, optional SQL and cleanup | — | the journeys, the map, the existing flows | — | `FLOW_UNDEFINED` |
 | 6 | Give every flow its own account alias and its own seed namespace, disjoint from every other flow of the plan | `env` | the flows, @worktrees/uat/<flow> for the aliases already provisioned | — | — |
 | 7 | Tier every flow against the mission's done-when lines: `journey` where a line walks it, `secondary` with one sentence of reason where none does, and every open entry of this feature taken back or extended | — | the mission's done-when lines, the flows, @worktrees/unchecked/<product> | — | — |
 | 8 | Write the unit list: one flow unit per Flows row with the same id and tier, the journey as its goal and its deferral reason where it has one | — | the plan | `units` | — |
-| 9 | Emit the plan and the receipt | — | everything above | `uat-plan`, `response/response.json` | — |
+| 9 | Emit the human plan, machine case sheet, matching units and receipt only after every case and fixture reference validates | — | everything above | `uat-plan`, `uat-case-sheet`, `response/data/cases.json`, `units`, `response/response.json` | — |
 
 Step 5 is the only step that stops on the plan itself: a journey that step 2 found and no map or
 folder gives an entry to is `FLOW_UNDEFINED`, with the reason naming it in one paragraph, and
@@ -108,6 +119,7 @@ whose plan names the same flows as the branch it resumes is `NO_PROGRESS`.
 | Kind | File | Type | Required |
 | --- | --- | --- | --- |
 | `uat-plan` | `response/response.md` | md | yes |
+| `uat-case-sheet` | `response/data/cases.json` | data | yes |
 | `units` | `response/data/units.json` | data | yes |
 
 ## Stops

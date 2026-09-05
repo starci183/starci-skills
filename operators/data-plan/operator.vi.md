@@ -58,6 +58,17 @@ bao giờ thành `INVALID_INPUT`, vì goal được phép nêu một họ bằng
 là bên biến lời thành kho. Một đích mà kế hoạch định nêu nhưng checkout không khai là
 `EVIDENCE_MISSING`: một khẳng định về các kho không có file nào đứng sau.
 
+## Luồng attempt cụ thể
+
+Các row của operator này được gate bởi hợp đồng attempt expected/actual dùng chung trong `scripts/attempt-gate.mjs`.
+
+| Trạng thái quan sát | Hành động | Kiểm actual | Nhánh kế tiếp |
+| --- | --- | --- | --- |
+| plan khớp schema, case, namespace | tái dùng unit id, JSON ref, SQL tùy chọn, cleanup | mỗi precondition map một lần; fixture không tạo outcome được assert | phát plan không đổi |
+| plan thiếu | tạo unit có JSON; SQL chỉ cho runner đã bind | case sheet có actor, precondition, input, action, expected, verification, cleanup trước seed | phát seed-plan và units |
+| plan sai | update ref/volume/attribution/cleanup bị ảnh hưởng | validate JSON/SQL và namespace rời nhau | store chưa rõ handoff `architecture.decide` |
+| yêu cầu seed effect | không ghi data | ghi `data.seed` là effect owner duy nhất | typed handoff |
+
 ## Ranh giới
 
 Context chỉ đọc. Operator chỉ ghi `response/` của nhánh mình: bản kế hoạch, danh sách đơn vị và
@@ -98,9 +109,9 @@ khoản chỉ bằng alias và không có trường nào có thể chứa một 
 | 3 | Đọc kế hoạch UAT khi được ràng: mỗi luồng một đơn vị, với namespace mà dòng của luồng khai | — | đầu vào `uat-plan` | — | — |
 | 4 | Đọc bản đồ bề mặt khi được ràng: các kho mà contract dữ liệu của từng trang đọc, để một họ có đích của nó | — | đầu vào `surface-map` | — | — |
 | 5 | Đọc các kho ở head đã đóng băng: mọi entity, bảng và collection, và với từng cái, nó có cột chủ sở hữu hay định danh gắn tiền tố được không | `env` | @workspaces/be, @tools/git | — | — |
-| 6 | Đọc các thư mục luồng đã tồn tại dưới tính năng: luồng đã có seed giữ nguyên namespace, và không đơn vị mới nào nhận namespace đã bị giữ | `feature` | @worktrees/uat/<flow>, @worktrees/_templates cho hình dạng một thư mục seed | — | — |
-| 7 | Gọi tên một đơn vị cho mỗi luồng và mỗi họ chưa được bao, với dòng goal và namespace riêng, tách biệt với mọi đơn vị khác | — | các họ, các luồng, các thư mục có sẵn | — | `SEED_UNDEFINED` |
-| 8 | Khai các đích của từng đơn vị: kho, cách quy nguồn, khối lượng đại diện và thứ gỡ đúng các dòng của nó | — | các đơn vị, các kho | — | `EVIDENCE_MISSING` |
+| 6 | Kiểm plan và fixture hiện có, giữ namespace reusable và phân loại JSON, SQL tùy chọn, expected-state, cleanup ref thiếu hoặc sai | `feature` | @worktrees/uat/<flow>, @worktrees/_templates cho hình dạng một thư mục seed | — | — |
+| 7 | Tái dùng unit hợp lệ, tạo unit thiếu và update unit sai với namespace rời nhau, không fixture nào tạo sẵn outcome cần test | — | các họ, các luồng, các thư mục có sẵn | — | `SEED_UNDEFINED` |
+| 8 | Khai JSON fixture, SQL input tùy chọn, store, attribution, volume, expected read-back và exact cleanup cho mỗi unit; xác minh theo schema | — | các đơn vị, các kho | — | `EVIDENCE_MISSING` |
 | 9 | Ghi danh sách đơn vị: một entry cho mỗi dòng Units với cùng id và goal, và các đơn vị mà mỗi cái phụ thuộc | — | bản kế hoạch | `units` | — |
 | 10 | Phát bản kế hoạch và biên nhận | — | mọi thứ ở trên | `seed-plan`, `response/response.json` | — |
 

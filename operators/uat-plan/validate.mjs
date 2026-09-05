@@ -25,6 +25,7 @@ const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '.
 const OPERATOR = 'uat.plan';
 const RECEIPT = 'response/response.md';
 const UNITS = 'response/data/units.json';
+const CASES = 'response/data/cases.json';
 const UNDEFINED = 'FLOW_UNDEFINED';
 const empty = (v) => v === undefined || v === null || v === '' || v === '—';
 
@@ -38,13 +39,15 @@ export async function validateUatPlanStep(branchDir, root = ROOT, { uncheckedRoo
   const receipt = present.has('uat-plan') && has(RECEIPT) ? await read(RECEIPT) : null;
   let units = null;
   if (present.has('units') && has(UNITS)) { try { units = JSON.parse(await read(UNITS)); } catch { units = null; } }
+  let sheet = null;
+  if (present.has('uat-case-sheet') && has(CASES)) { try { sheet = JSON.parse(await read(CASES)); } catch { sheet = null; } }
 
   // A journey with no entry is named, not narrated: the reason carries every such journey in one paragraph.
   if (response.status === 'blocked' && response.stop === UNDEFINED) {
     const reason = String(response.reason ?? '');
     if (!reason.trim()) errors.push(`response/response.json: a ${UNDEFINED} stop carries a reason naming the journey that has no entry route`);
     else if (/[\r\n]/.test(reason)) errors.push('response/response.json: reason spans more than one paragraph; every journey without an entry is listed in one so the re-entry answers them together');
-    if (receipt || units) errors.push(`response/response.json: a ${UNDEFINED} stop emits no plan; the plan is written whole or not at all`);
+    if (receipt || units || sheet) errors.push(`response/response.json: a ${UNDEFINED} stop emits no plan; the plan and case sheet are written whole or not at all`);
   }
 
   // The plan is titled by the feature the request named.
@@ -85,6 +88,39 @@ export async function validateUatPlanStep(branchDir, root = ROOT, { uncheckedRoo
       errors.push(...planUncheckedErrors(open, units, laneOfPlan(OPERATOR), UNITS));
     }
     for (const id of byId.keys()) if (!flowIds.has(id)) errors.push(`${UNITS}: unit ${id} has no Flows row; a flow nobody can read in the plan is a flow nobody planned`);
+
+    if (!sheet) {
+      errors.push(`${CASES}: a done UAT plan needs the machine case sheet before identity, seed or browser action`);
+    } else {
+      if (sheet.feature !== requirements.feature) errors.push(`${CASES}: feature ${sheet.feature} does not match request feature ${requirements.feature}`);
+      if (sheet.env !== requirements.env) errors.push(`${CASES}: environment ${sheet.env} does not match request environment ${requirements.env}`);
+      const sheetFlows = new Map();
+      for (const flow of sheet.flows ?? []) {
+        if (sheetFlows.has(flow.flowId)) errors.push(`${CASES}: flow ${flow.flowId} is classified twice`);
+        sheetFlows.set(flow.flowId, flow);
+        if (!flowIds.has(flow.flowId)) errors.push(`${CASES}: classified flow ${flow.flowId} has no Flows row`);
+        const row = (tableUnder(receipt, '## Flows') ?? []).find(([id]) => id === flow.flowId);
+        if (row && (row[1].replaceAll('`', '') !== flow.entry || row[4].replaceAll('`', '') !== flow.namespace)) errors.push(`${CASES}: flow ${flow.flowId} entry or namespace differs from the human plan`);
+      }
+      for (const id of flowIds) if (!sheetFlows.has(id)) errors.push(`${CASES}: flow ${id} has no reuse/update/create classification`);
+
+      const caseIds = new Set();
+      const orders = new Set();
+      const coveredFlows = new Set();
+      for (const c of sheet.cases ?? []) {
+        if (caseIds.has(c.caseId)) errors.push(`${CASES}: case ${c.caseId} is declared twice`);
+        caseIds.add(c.caseId);
+        const flow = sheetFlows.get(c.flowId);
+        if (!flow) { errors.push(`${CASES}: case ${c.caseId} names unknown flow ${c.flowId}`); continue; }
+        coveredFlows.add(c.flowId);
+        if (!flow.actorAliases.includes(c.actor)) errors.push(`${CASES}: case ${c.caseId} actor ${c.actor} is absent from flow ${c.flowId}`);
+        const order = `${c.flowId}:${c.order}`;
+        if (orders.has(order)) errors.push(`${CASES}: flow ${c.flowId} repeats case order ${c.order}`);
+        orders.add(order);
+        if (c.fixture?.createsAssertedOutcome !== false) errors.push(`${CASES}: case ${c.caseId} fixture creates the outcome the walk must prove`);
+      }
+      for (const id of flowIds) if (!coveredFlows.has(id)) errors.push(`${CASES}: flow ${id} has no case row; a flow cannot be executed from its name alone`);
+    }
   }
   return { errors };
 }

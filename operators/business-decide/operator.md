@@ -99,6 +99,16 @@ that classification decides which lifecycle transition is legal. Rejection prese
 naming the previous head rather than erasing it, and `implemented` is never published on the strength
 of a plan: delivered source is compared against the frozen matrix first, by `business.reconcile`.
 
+## Concrete attempt flow
+
+This operator's rows are gated by the shared expected/actual attempt contract in `scripts/attempt-gate.mjs`.
+
+| Observed state | Action | Actual check | Next branch |
+| --- | --- | --- | --- |
+| current published promise | reuse valid actor/rule/outcome rows | rerun scenarios for retained and requested rows | emit lineage to reused head |
+| missing promise | create from confirmed restatement | every matrix dimension has observable outcome and evidence | publish only after required criteria match |
+| stale or invalid dimension | update only disproved rows | check changed and retained scenarios | repair in new attempt; scope growth emits replan evidence |
+
 ## Boundary
 
 Context is read-only apart from the one feature head. The operator writes only `response/` of its own
@@ -144,8 +154,8 @@ that an implementation, a quality gate, or a UAT run has passed.
 | 1 | Validate the gate and resume | `resume` | `request/request.json`, @workspaces/be at the frozen head | — | `INVALID_INPUT`, `SOURCE_DRIFT`, `NO_PROGRESS` |
 | 2 | Restate the promise in the person's language and hold for their confirmation, when the request supplies it | `promise` | `request/request.json`: `requirements.promise`, and its `decisionId` and `selectedOption` when the choice is already recorded | `restatement` | `RESTATEMENT_UNCONFIRMED` |
 | 3 | Normalize the evidence into claims | — | @workspaces/be, every observation with its role, path, line range and head, input `architecture-decision` when present as evidence only, @tools/git | `response/data/claims.json` | `EVIDENCE_MISSING`, `CONTRADICTION_UNRESOLVED` |
-| 4 | Check the published head and the transition authority | `featureId`, `targetState`, `approval` | @worktrees/businesses/<featureId>: the current head, its state and its frozen evidence | — | `LIFECYCLE_TRANSITION_INVALID`, `AUTHORITY_CONFLICT`, `APPROVAL_REQUIRED` |
-| 5 | Model the promise, its actor and its eligibility: fact claims carry every enforcing row, the intent claim carries the promise itself | `promise` | `response/data/claims.json`, @workspaces/be at the frozen head, @tools/websearch | — | `EVIDENCE_MISSING` |
+| 4 | Inspect the published head and transition authority, classifying the requested promise as reusable, missing or invalid before any model write | `featureId`, `targetState`, `approval` | @worktrees/businesses/<featureId>: the current head, its state and its frozen evidence | — | `LIFECYCLE_TRANSITION_INVALID`, `AUTHORITY_CONFLICT`, `APPROVAL_REQUIRED` |
+| 5 | Reuse valid promise rows, create missing requested rows and update only invalid requested rows; keep unaffected decisions unchanged | `promise` | `response/data/claims.json`, @workspaces/be at the frozen head, @tools/websearch | — | `EVIDENCE_MISSING` |
 | 6 | Freeze the coverage matrix | `dimensions` | `response/data/claims.json`, @workspaces/be and the surface it discovers | `response/data/coverage-matrix.json` | `COVERAGE_INCOMPLETE`, `CONSUMER_UNPROVEN` |
 | 7 | Dispose legacy coexistence | — | `response/data/coverage-matrix.json`: the legacy create, read and settle rows and their proof | — | `CONTRADICTION_UNRESOLVED` |
 | 8 | Publish one head under an exclusive lease | — | `response/data/claims.json`, @worktrees/businesses/<featureId> at the previous head | @worktrees/businesses/<featureId> as the new model.json head, `response/data/model.json`, @tools/sourcewrite | `SOURCE_DRIFT` |

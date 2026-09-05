@@ -229,6 +229,17 @@ không bao giờ bị đổi trên sự im lặng, và điều bản khai báo t
 trường được tính là phê duyệt, chứ không phải câu hỏi thôi được đặt ra. `portClaims` mặc định là danh
 sách rỗng, vì phần lớn bậc không cần cổng nào, và một claim không ai đặt thì không thể đụng ai.
 
+## Luồng attempt cụ thể
+
+Các row của operator này được gate bởi hợp đồng attempt expected/actual dùng chung trong `scripts/attempt-gate.mjs`.
+
+| Trạng thái quan sát | Hành động | Kiểm actual | Nhánh kế tiếp |
+| --- | --- | --- | --- |
+| entry serve head chứa requested commit, config và health khớp | tái dùng process và lease; không restart | đọc generation, ancestry, endpoint, process, probe | phát runtime receipt hiện có |
+| process hoặc entry thiếu | tạo generation và start source-owned command trên projected port | chứng minh ancestry và health | phát generation và lease mới |
+| head/config/health sai | dưới exclusive lease update integration head hoặc declared process | đọc lại generation, process, ancestry, health | repair attempt mới; handoff foreign owner |
+| ownership lần start không chắc | không kill hay overwrite | ghi pid, port, registry mismatch | block tới khi ownership được chứng minh |
+
 ## Ranh giới ghi
 
 Context chỉ đọc, trừ phần delta đã duyệt. Operator chỉ áp delta effect đã duyệt lên entry route đã
@@ -284,10 +295,10 @@ phê duyệt release hay bằng chứng UAT nào.
 | --- | --- | --- | --- | --- | --- |
 | 1 | Kiểm cổng vào và resume theo generation đã đóng băng | `resume` | `request/request.json`, @worktrees/sessions/central-runtime tại generation đã đóng băng | — | `INVALID_INPUT`, `SOURCE_DRIFT`, `NO_PROGRESS` |
 | 2 | Ràng thẩm quyền — một id phê duyệt, hoặc bản khai báo của môi trường được đọc lại và băm lại — và capability ghi sổ đăng ký theo tên | `approval`, `env` | @workspaces/device-state cho handle capability kèm bằng chứng custody, bản khai báo của môi trường khi `approval` tham chiếu tới nó, @tools/secrets | — | `AUTHORITY_DRIFT`, `CAPABILITY_MISSING` |
-| 3 | Kiểm lại entry của route một lần trước khi có gì thay đổi, và từ chối một fingerprint đã đổi | `routeKey` | @worktrees/sessions/central-runtime cho entry được quan sát lại, @tools/git cho head đang phục vụ | — | `INVENTORY_DRIFT` |
+| 3 | Kiểm lại route entry và phân loại process, generation, served head, config, health là reusable, missing, invalid hoặc uncertain trước effect | `routeKey` | @worktrees/sessions/central-runtime cho entry được quan sát lại, @tools/git cho head đang phục vụ | — | `INVENTORY_DRIFT` |
 | 4 | Phân giải các port claim theo phép chiếu và ghi ai đang giữ từng cổng | `portClaims` | @workspaces/ports/<project> cho các cổng được chiếu ra, @worktrees/sessions/central-runtime cho chủ giữ quan sát được của chúng, @tools/shell cho bảng socket | — | `PORT_CONFLICT` |
-| 5 | Ghi delta giữa entry quan sát được và trạng thái mong muốn | `desiredState` | @worktrees/sessions/central-runtime cho entry quan sát được, `request/request.json` cho trạng thái mong muốn | `response/data/delta.json` | `EFFECT_UNAUTHORIZED` |
-| 6 | Leo bậc đã nêu dưới lease — dựng hạ tầng, phân giải checkout, khởi động role, merge `commit` vào nhánh tích hợp rồi serve, restart, reset hay stop đúng một server detached qua `scripts/serve-runtime.mjs` — hoặc xếp hàng sau phiên đang giữ lease | `operation`, `commit` | @workspaces/projects/<project>/<role> cho lệnh dev và nhánh tích hợp, đầu vào `changes` cho tập ghi của phiên, @worktrees/sessions/central-runtime cho lease và hàng đợi, @tools/git, @tools/container, @tools/shell | @worktrees/sessions/central-runtime, `response/data/delta.json`, `changes` | `SERVICE_UNAVAILABLE`, `PROVISIONING_UNAVAILABLE`, `INTEGRATION_FAILED`, `INVALID_INPUT` |
+| 5 | Ghi desired delta: tái dùng generation healthy khớp, tạo generation thiếu, hoặc chỉ update declared field sai; holder foreign/uncertain không bị mutation | `desiredState` | @worktrees/sessions/central-runtime cho entry quan sát được, `request/request.json` cho trạng thái mong muốn | `response/data/delta.json` | `EFFECT_UNAUTHORIZED` |
+| 6 | Dưới lease chỉ làm create hoặc update đã phân loại, queue khi conflict, và giữ effect transcript trước để resume không lặp mù | `operation`, `commit` | @workspaces/projects/<project>/<role> cho lệnh dev và nhánh tích hợp, đầu vào `changes` cho tập ghi của phiên, @worktrees/sessions/central-runtime cho lease và hàng đợi, @tools/git, @tools/container, @tools/shell | @worktrees/sessions/central-runtime, `response/data/delta.json`, `changes` | `SERVICE_UNAVAILABLE`, `PROVISIONING_UNAVAILABLE`, `INTEGRATION_FAILED`, `INVALID_INPUT` |
 | 7 | Chứng thực entry: ping mọi endpoint đã khai, ghi head đang phục vụ, những gì nó chứa và bản ghi server, rồi đặt trạng thái theo cái đã trả lời | — | @worktrees/sessions/central-runtime cho các endpoint của entry, @tools/http | @worktrees/sessions/central-runtime, `response/data/delta.json` | `SERVICE_UNAVAILABLE` |
 | 8 | Chứng minh trọn bộ check của bậc trên entry đã chứng thực | — | @worktrees/sessions/central-runtime đọc lại theo bộ chứng minh của bậc, @tools/http | `response/data/checks.json` | `PROOF_FAILED` |
 | 9 | Viết biên bản và phát | — | mọi thứ ở trên | `response/response.md`, `response/response.json` | — |

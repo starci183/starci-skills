@@ -133,15 +133,26 @@ published head is ahead of its upstream and the ref actually moved.
 and that tag is annotated and points at a head this same publication pushed. A tag on a head this
 run did not push is a label somebody else's commit now wears.
 
-## Cleanup is part of the publish
+## Cleanup follows the publish through the host lifecycle
 
-After the push succeeds, the session worktree and the session branch are removed together with the
-session folder, because the evidence they held has just become a published commit. A blocked session
-keeps both: the evidence of what was attempted lives there until a person has read it.
+After the push succeeds, this operator records that the session worktree, branch and folder remain
+preserved. The host session lifecycle decides when to close them after receipts and attempts are
+accepted; publication itself never deletes session evidence.
 
 The server that served the session's work is not this operator's to stop: the runtime owner holds
 the lease and the pid, and releasing them is its own job, reached through the Next table once the
 publish is done.
+
+## Concrete attempt flow
+
+This operator's rows are gated by the shared expected/actual attempt contract in `scripts/attempt-gate.mjs`.
+
+| Observed state | Action | Actual check | Next branch |
+| --- | --- | --- | --- |
+| target ref at observed base and session head fast-forwards | non-force fast-forward | read remote head, hooks and integrated tree | emit publication; host lifecycle closes session |
+| target ref missing and approval covers creation | create exact ref once from verified commit | fetch and read created ref | record creation |
+| hook/receipt/boundary/ancestry invalid | publish nothing | record every failed check and current remote | closed-rule conflict may repair/regate; otherwise owner handoff |
+| remote changed or effect uncertain | never force/reset/clean/stash/rebase/bypass/blind retry | preserve rejected push and remote observation | new attempt only after changed fingerprint |
 
 ## Boundary
 
@@ -149,8 +160,8 @@ Context is read-only apart from the merge and the push. The operator writes only
 own branch, the target branch of the routed checkout, and the push to `@remote/git/<project>/<role>`:
 the approved head on the routed ref, and at most one annotated continuation tag pointing at a head
 this same publication pushed. It does not force push, lease-force push, or rewrite published history;
-does not run reset, clean, or stash; does not delete a branch other than the session branch it is
-cleaning up; does not bypass, skip, or disable a Git hook; does not amend, rebase, or squash a commit
+does not run reset, clean, or stash; does not delete a branch, worktree or session folder; does not
+bypass, skip, or disable a Git hook; does not amend, rebase, or squash a commit
 to make a rejected push succeed; does not publish a head outside the approved boundary; and does not
 publish without a verified route and an approval bound to this exact boundary.
 
@@ -189,11 +200,11 @@ publish without a verified route and an approval bound to this exact boundary.
 | 3 | Bind the approval to this exact boundary | `boundary`, `approval` | `request/request.json` requirements, input `changes` as the file set, input `quality-verification` as the measured commit | — | `APPROVAL_MISSING` |
 | 4 | Verify the tree: dirty outside the boundary, branch policy | — | @workspaces/local/routes/<project>/<role>, the dirty paths, every branch, the routed policy | — | `DIRTY_OUTSIDE_BOUNDARY`, `BRANCH_POLICY_VIOLATION` |
 | 5 | Run the hooks | — | @workspaces/<project>/<role>/husky: the installed hooks, `pre-push` among them | @tools/shell | `HOOK_BLOCKED` |
-| 6 | Bind the session's receipts, then merge the session branch into the target branch, resolving each conflicting hunk under the shared rule set and recording it | — | the session folder: `state.json`, the `interface.generate`, `interface.fix`, `backend.generate` or `library.update` branch whose `commits` carry the session head, and the `interface.audit` and `uat.verify` branches with their `screenshot` artifacts when the chain has them; input `changes` for the files the session's write set owns; @workspaces/local/routes/<project>/<role> for the target head, the session base and the session head | @workspaces/local/routes/<project>/<role>, the target branch of that checkout, @tools/git | `SESSION_MISSING`, `NON_FAST_FORWARD` |
+| 6 | Inspect session receipts, target ref and ancestry; reuse valid receipts, resolve only covered hunks, and refuse missing or invalid boundary evidence before merge | — | the session folder: `state.json`, the `interface.generate`, `interface.fix`, `backend.generate` or `library.update` branch whose `commits` carry the session head, and the `interface.audit` and `uat.verify` branches with their `screenshot` artifacts when the chain has them; input `changes` for the files the session's write set owns; @workspaces/local/routes/<project>/<role> for the target head, the session base and the session head | @workspaces/local/routes/<project>/<role>, the target branch of that checkout, @tools/git | `SESSION_MISSING`, `NON_FAST_FORWARD` |
 | 7 | Re-run the gates the verification named on the merged head when the merge resolved a hunk | — | input `quality-verification` for the gates it ran, @workspaces/local/routes/<project>/<role> at the merged head, @tools/shell | @tools/shell | `NON_FAST_FORWARD` |
-| 8 | Push non-force, fast-forward only | — | @workspaces/local/routes/<project>/<role> for the approved head, @remote/git/<project>/<role> at the observed remote head, @tools/ci | @remote/git/<project>/<role>, @tools/git | `NON_FAST_FORWARD` |
+| 8 | Create an approved missing ref or non-force fast-forward an existing observed ref, then fetch and read back the exact remote head; never blindly retry a changed remote | — | @workspaces/local/routes/<project>/<role> for the approved head, @remote/git/<project>/<role> at the observed remote head, @tools/ci | @remote/git/<project>/<role>, @tools/git | `NON_FAST_FORWARD` |
 | 9 | Push the continuation tag | `tag` | @workspaces/local/routes/<project>/<role> for the head this publication pushed | @remote/git/<project>/<role>, @tools/git | — |
-| 10 | Remove the worktree and the session branch, write the receipt and emit | — | everything above | @workspaces/local/routes/<project>/<role>, `response/response.md`, `response/response.json`, @tools/git | — |
+| 10 | Write the publication receipt and emit; record the worktree, branch and folder as preserved for the host session lifecycle | — | everything above | `response/response.md`, `response/response.json` | — |
 
 Creating a remote ref and fast-forwarding one are different acts with different reviewers, so the
 published head records which of the two it performed. A resume begins again at validation, reuses

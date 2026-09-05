@@ -3,7 +3,7 @@
 // classes declared; both admissions are present and taken at the pinned commit; the snapshot froze
 // the requested cases in a contiguous order; every frozen case has a capture and a screenshot; the
 // verdicts carry exactly the three independent lanes; the published result carries the pinned commit;
-// cleanup deletes the run namespace and never a run record; the run history is append-only; and no
+// cleanup is handed to data.seed for the run namespace and never deletes a run record; history is append-only; and no
 // capture, snapshot, verdict or published sentence contains the password. Masking is proved, not
 // promised: the chosen placeholder for the shared UAT password may appear nowhere this operator
 // writes. A walk is evidence only for what it pressed: the shared step check already refuses a
@@ -22,9 +22,9 @@ import { hostRootOf, sessionRootOf, missingStack, loadEnvironmentSchema, parseDe
 import { validateWalkFile, stepControl } from '../../scripts/validate-walk.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
-// What this run itself writes: seeding the frozen records and signing in as the flow's dedicated
-// account. Provisioning the account is identity.provision's own job and is not asked here.
-export const UAT_CLASSES = ['seed', 'identity-provisioning'];
+// This run signs in as the flow's dedicated account. data.seed is the sole owner of seed and cleanup
+// effects; this verifier consumes its receipt and never requests seed authority.
+export const UAT_CLASSES = ['identity-provisioning'];
 const LANES = ['behavior', 'ux', 'ui'];
 // knowledge/ui/proof/ux.md: UX-1..UX-11 are the scored criteria and UX-12 is the arithmetic over
 // them. `ship` needs no failure on the five criteria that strand a person mid-task, and a mean of at
@@ -142,7 +142,7 @@ export async function validateUatStep(branchDir, root = ROOT, { hostRoot = hostR
   if (response.status === 'done') errors.push(...auditScopeCarryErrors(branchDir, request, response, root));
   const has = (f) => existsSync(path.join(branchDir, f));
   const read = (f) => readFile(path.join(branchDir, f), 'utf8');
-  const decided = response.status === 'done';
+  const decided = response.status === 'done' || response.status === 'mismatch';
 
   // The run identifier and the exclusive lease arrive from the orchestrator, never from a person.
   if (decided && empty(requirements.runId)) errors.push('request.json: the orchestrator supplies runId; a decided run cannot namespace its records without one');
@@ -152,12 +152,12 @@ export async function validateUatStep(branchDir, root = ROOT, { hostRoot = hostR
   const missing = missingStack(root, requirements.env, hostRoot);
   if (missing) errors.push(`request.json: env ${requirements.env} names ${missing}, which this installation does not have`);
 
-  // Authority for this run's own writes: an approval id, or the environment's own declaration when it
-  // marks `seed` and `identity-provisioning` declared for `env`. The declaration is read as it stands,
+  // Authority for sign-in: an approval id, or the environment's own declaration when it marks
+  // `identity-provisioning` declared for `env`. The declaration is read as it stands,
   // hashed, and checked against the environment schema; a reference is refused for a declaration that
-  // is absent, moved, belongs to another environment, is refused by its schema, or marks either class
+  // is absent, moved, belongs to another environment, is refused by its schema, or marks the class
   // person.
-  if (decided && empty(requirements.approval)) errors.push('request.json: approval has no default; a UAT run is never authorised on silence, and an environment that authorises its seeding and its sign-in says so in a declaration the request references');
+  if (decided && empty(requirements.approval)) errors.push('request.json: approval has no default; a UAT run is never authorised on silence, and the environment authority for sign-in is named by approval id or declaration reference');
   else if (!empty(requirements.approval)) {
     const envSchema = await loadEnvironmentSchema(root);
     const ref = parseDeclarationReference(envSchema, requirements.approval);
@@ -183,6 +183,31 @@ export async function validateUatStep(branchDir, root = ROOT, { hostRoot = hostR
   for (const kind of ADMISSIONS) {
     if (request?.inputs?.[kind] === undefined) errors.push(`request.json: ADMISSION_MISSING — input ${kind} is absent`);
   }
+  for (const kind of ['uat-plan', 'uat-case-sheet', 'uat-account', 'seed-receipt']) {
+    if (request?.inputs?.[kind] === undefined) errors.push(`request.json: ${kind} is required before UAT freezes or drives a browser`);
+  }
+
+  const sessionRoot = sessionRootOf(branchDir);
+  const readInput = async (kind) => {
+    const ref = request?.inputs?.[kind];
+    if (!ref) return null;
+    try { return await readFile(path.resolve(sessionRoot, ref), 'utf8'); } catch { errors.push(`request.json: input ${kind} at ${ref} cannot be read`); return null; }
+  };
+  const accountText = await readInput('uat-account');
+  const sheetText = await readInput('uat-case-sheet');
+  const seedText = await readInput('seed-receipt');
+  let accountInput = null;
+  let caseSheet = null;
+  try { if (accountText) accountInput = JSON.parse(accountText); } catch { errors.push('request.json: uat-account is not valid JSON'); }
+  try { if (sheetText) caseSheet = JSON.parse(sheetText); } catch { errors.push('request.json: uat-case-sheet is not valid JSON'); }
+  if (accountInput) {
+    if (accountInput.env !== requirements.env || accountInput.flow !== requirements.flow) errors.push('request.json: uat-account belongs to another environment or flow');
+    for (const [alias, account] of Object.entries(accountInput.accounts ?? {})) {
+      if (account.loginProof?.method !== 'browser' || account.loginProof?.outcome !== 'passed') errors.push(`request.json: uat-account alias ${alias} has no passing real product-login proof`);
+      if (!account.providerAccountRef) errors.push(`request.json: uat-account alias ${alias} has no stable provider account reference`);
+    }
+  }
+  if (caseSheet && (caseSheet.feature !== requirements.feature || caseSheet.env !== requirements.env)) errors.push('request.json: uat-case-sheet belongs to another feature or environment');
 
   const parsedCaptures = [];
   let snapshot = null;
@@ -203,6 +228,31 @@ export async function validateUatStep(branchDir, root = ROOT, { hostRoot = hostR
     if (!empty(requirements.approval) && snapshot.approval !== requirements.approval) errors.push('response/data/snapshot.json: the snapshot names another authority than the one the request declared');
     if (snapshot.fixtureNamespace !== `uat-${snapshot.runId}`) errors.push(`response/data/snapshot.json: the fixture namespace must be uat-${snapshot.runId}, so cleanup can name exactly what this run wrote`);
     if (snapshot.seed.namespace !== snapshot.fixtureNamespace) errors.push('response/data/snapshot.json: the seed namespace must equal the run fixture namespace');
+    if (seedText) {
+      const seedBinding = Object.fromEntries((tableUnder(seedText, '## Binding') ?? []).map(([k, v]) => [k, String(v).replaceAll('`', '')]));
+      if (seedBinding.Flow !== snapshot.flow || seedBinding.Environment !== snapshot.env) errors.push('request.json: seed-receipt belongs to another flow or environment');
+      if (seedBinding.Namespace !== snapshot.fixtureNamespace) errors.push('request.json: seed-receipt namespace differs from the frozen UAT namespace');
+      if (seedBinding['Seed fingerprint'] !== snapshot.seed.fingerprint) errors.push('request.json: seed-receipt fingerprint differs from the frozen seed');
+    }
+    if (accountInput) {
+      const inputAccounts = accountInput.accounts ?? {};
+      for (const frozen of snapshot.accounts) {
+        const supplied = inputAccounts[frozen.alias];
+        if (!supplied) { errors.push(`response/data/snapshot.json: alias ${frozen.alias} is absent from uat-account`); continue; }
+        if (supplied.providerAccountRef !== frozen.providerAccountRef || supplied.role !== frozen.role || JSON.stringify(supplied.memberships) !== JSON.stringify(frozen.memberships)) errors.push(`response/data/snapshot.json: alias ${frozen.alias} differs from the provisioned account proof`);
+        if (JSON.stringify(supplied.loginProof) !== JSON.stringify(frozen.loginProof)) errors.push(`response/data/snapshot.json: alias ${frozen.alias} did not freeze the real product-login proof`);
+      }
+    }
+    if (caseSheet) {
+      const planned = new Map((caseSheet.cases ?? []).filter((c) => c.flowId === snapshot.flow).map((c) => [c.caseId, c]));
+      for (const frozen of snapshot.cases) {
+        const supplied = planned.get(frozen.caseId);
+        if (!supplied) { errors.push(`response/data/snapshot.json: case ${frozen.caseId} is absent from uat-case-sheet`); continue; }
+        if (supplied.actor !== frozen.as) errors.push(`response/data/snapshot.json: case ${frozen.caseId} actor differs from uat-case-sheet`);
+        if (JSON.stringify(supplied.assertions) !== JSON.stringify(frozen.assertions)) errors.push(`response/data/snapshot.json: case ${frozen.caseId} assertions differ from the frozen expected sheet`);
+      }
+      if (planned.size !== snapshot.cases.length) errors.push('response/data/snapshot.json: frozen case selection does not cover the planned case sheet exactly');
+    }
     // Two sessions may run against one product at once, under the isolation law runtime.serve
     // publishes. Each clause of it that this receipt can carry is checked here.
     const iso = snapshot.isolation;
@@ -323,7 +373,10 @@ export async function validateUatStep(branchDir, root = ROOT, { hostRoot = hostR
       if (verdicts.cleanup.namespace !== snapshot.fixtureNamespace) errors.push('response/data/verdicts.json: cleanup must name the exact run fixture namespace and nothing wider');
     }
     if (pinned !== null && verdicts.commit !== pinned) errors.push(`response/data/verdicts.json: the result commit ${verdicts.commit} is not the pinned head ${pinned}`);
-    if (decided && !verdicts.cleanup.performed) errors.push('response/data/verdicts.json: a decided run cleans its own namespace before it publishes');
+    if (verdicts.cleanup.performed) errors.push('response/data/verdicts.json: uat.verify must not perform cleanup; data.seed is the sole seed effect owner');
+    if (verdicts.cleanup.owner !== 'data.seed') errors.push('response/data/verdicts.json: cleanup must hand to data.seed');
+    if (verdicts.cleanup.seedReceiptRef !== request?.inputs?.['seed-receipt']) errors.push('response/data/verdicts.json: cleanup must preserve the exact seed-receipt ref');
+    if (!(response.next ?? []).includes('data.seed')) errors.push('response/response.json: every acted UAT attempt hands its exact rollback to data.seed, including failed and incomplete attempts');
 
     const failing = verdicts.lanes.filter((l) => l.verdict === 'fail').map((l) => l.lane);
     const next = new Set(response.next ?? []);
@@ -351,7 +404,7 @@ export async function validateUatStep(branchDir, root = ROOT, { hostRoot = hostR
       if (snap.Namespace !== snapshot.fixtureNamespace) errors.push('response/response.md: Snapshot names another fixture namespace');
       if (snap.Approval !== snapshot.approval) errors.push('response/response.md: Snapshot names another approval');
       if (snap.Environment !== snapshot.env) errors.push('response/response.md: Snapshot names another environment than the run drove');
-      if (snap['Flow source'] !== snapshot.flowSource) errors.push(`response/response.md: Snapshot reads ${snap['Flow source']} but the flow was ${snapshot.flowSource}; a drafted flow is honest and an undeclared draft is not`);
+      if (snap['Flow source'] !== snapshot.flowSource) errors.push(`response/response.md: Snapshot reads ${snap['Flow source']} but the frozen plan source was ${snapshot.flowSource}`);
       if (!String(snap.Golden ?? '').startsWith(snapshot.golden.state)) errors.push(`response/response.md: Snapshot reads Golden "${snap.Golden}" but the reference is ${snapshot.golden.state}`);
       if (String(snap.Accounts ?? '').replaceAll('`', '') !== snapshot.accounts.map((a) => a.alias).join(', ')) errors.push('response/response.md: Snapshot names another set of accounts than the run froze');
       const admission = tableUnder(text, '## Admission') ?? [];
@@ -422,9 +475,8 @@ export async function validateUatStep(branchDir, root = ROOT, { hostRoot = hostR
     }
   }
 
-  // A missing record is created, not reported: a drafted flow is honest and says so, and the first run
-  // of a flow is the candidate baseline a person promotes rather than a failure against a reference
-  // that never existed. Both facts are carried, so neither can be quietly reported as the other.
+  // The first observed run may be the candidate baseline a person promotes. The flow itself always
+  // comes from uat.plan; this verifier neither drafts canonical material nor approves its own baseline.
   if (snapshot) {
     const at = 'response/data/snapshot.json';
     const m = RUN_ID.exec(String(snapshot.runId));
@@ -432,7 +484,6 @@ export async function validateUatStep(branchDir, root = ROOT, { hostRoot = hostR
     else if (m[3] !== String(snapshot.commit).slice(0, 7)) errors.push(`${at}: runId names commit ${m[3]} and the run was pinned at ${String(snapshot.commit).slice(0, 7)}`);
     if (!empty(requirements.env) && snapshot.env !== requirements.env) errors.push(`${at}: the snapshot froze environment ${snapshot.env} and the request named ${requirements.env}`);
     if (snapshot.golden.env !== snapshot.env) errors.push(`${at}: the approved reference was taken in ${snapshot.golden.env} and this run drove ${snapshot.env}; a golden from one environment is not authority for another`);
-    if (snapshot.flowSource === 'drafted-from-template' && snapshot.golden.state !== 'candidate') errors.push(`${at}: the flow was drafted this run, so it can have no approved reference yet; the first run is the candidate a person promotes`);
     const aliases = new Set();
     for (const account of snapshot.accounts) {
       if (aliases.has(account.alias)) errors.push(`${at}: the alias ${account.alias} is frozen twice; one alias is one account`);

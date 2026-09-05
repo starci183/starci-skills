@@ -17,6 +17,7 @@ const APPROVAL = '@worktrees/debts/be.md#seed-approval';
 const NS = `uat-${FLOW}`;
 const ACCOUNT = `uat-${FLOW}-learner`;
 const FINGERPRINT = `sha256:${'5'.repeat(64)}`;
+const PLAN = `# seed-plan — paid-enrolment\n\n## Fixtures\n\n| Unit | State | Action | JSON | SQL | Expected | Creates outcome |\n| --- | --- | --- | --- | --- | --- | --- |\n| \`${FLOW}\` | valid | reuse | \`fixtures/${FLOW}.json\` | — | prerequisites read back | false |\n`;
 
 const RECORDS = [
   [`${NS}-course-1`, 'courses', 'prefix', 'yes'],
@@ -69,7 +70,7 @@ const requestJson = ({ flow = FLOW, routeKey = ENTRY, env = ENV, approval = APPR
   schemaVersion: 9, operatorId: OPERATOR, step: 1, parallel: 1, sessionId: 's-test',
   contexts: [{ alias: `@worktrees/uat/${flow}`, head: null }, { alias: '@worktrees/sessions/central-runtime', head: null }, { alias: '@workspaces/device-state', head: null }],
   requirements: { flow, routeKey, env, approval, operation, resume: null, ...extra },
-  inputs: {}, resume: null,
+  inputs: { 'seed-plan': 'seed-plan.md' }, resume: null,
 });
 const responseJson = ({ status = 'done', stop, next = ['uat.verify'], withReceipt = status === 'done' } = {}) => ({
   schemaVersion: 9, operatorId: OPERATOR, step: 1, parallel: 1, status, ...(stop ? { stop } : {}),
@@ -81,6 +82,7 @@ function writeBranch(files) {
   const branch = path.join(session, 'step-1', 'parallel-1');
   for (const d of ['request', 'response/data', 'response/artifacts']) mkdirSync(path.join(branch, d), { recursive: true });
   writeFileSync(path.join(session, 'state.json'), JSON.stringify({ id: 's-test', project: 'demo-product', startedAt: '2026-09-03T00:00:00Z', requestHashes: {}, chain: [['1/1']], steps: { '1/1': OPERATOR }, current: '1/1', status: 'running' }));
+  writeFileSync(path.join(session, 'seed-plan.md'), PLAN);
   for (const [name, content] of Object.entries(files)) {
     if (content === null) continue;
     writeFileSync(path.join(branch, name), typeof content === 'string' ? content : JSON.stringify(content, null, 2));
@@ -101,7 +103,6 @@ async function expectError(files, needle, label, options = {}) {
 }
 
 const applied = (over = {}) => ({ 'request/request.json': requestJson(), 'response/response.json': responseJson(), 'response/response.md': receipt(), ...over });
-const drafted = () => applied({ 'response/response.md': receipt({ drafted: 'yes', findings: [['SEED_DRAFTED', 'the flow had no seed directory, so one was drafted from the template and the flow document']] }) });
 const rolledBack = () => applied({ 'request/request.json': requestJson({ operation: 'rollback' }), 'response/response.md': receipt({ operation: 'rollback', findings: [['SEED_ROLLED_BACK', 'the rollback set was removed and no other row']] }) });
 const limited = () => applied({ 'response/response.md': receipt({ records: [...RECORDS, ['setting:theme', 'settings', 'limitation', 'yes']], findings: [['SEED_LIMITATION', 'the settings store has neither an owner column nor a prefixable identifier; its one row is removed by this seed and cannot be told from another session\'s']] }) });
 const sharedRow = () => ({
@@ -116,7 +117,6 @@ const failing = (name, stop) => ({
 });
 
 await expectValid(applied(), 'a seed placed at volume under the flow account and prefix');
-await expectValid(drafted(), 'a seed drafted from the template and placed in the same branch');
 await expectValid(rolledBack(), 'the rollback set removed and nothing else');
 await expectValid(limited(), 'a store with neither owner column nor prefix recorded as a limitation, never as a schema change');
 await expectValid(sharedRow(), 'a record that would land on a shared row refused before anything was written');
@@ -166,8 +166,9 @@ await expectError(applied({ 'response/response.md': receipt({ records: [] }) }),
 await expectError(applied({ 'request/request.json': requestJson({ operation: 'rollback' }), 'response/response.md': receipt({ operation: 'rollback', records: [[`${NS}-course-1`, 'courses', 'prefix', 'no']], findings: [['SEED_ROLLED_BACK', 'x']] }) }), 'stays after a rollback', 'a rollback that left a row');
 await expectError(applied({ 'request/request.json': requestJson({ operation: 'rollback' }), 'response/response.md': receipt({ operation: 'rollback' }) }), 'a rollback records SEED_ROLLED_BACK', 'a rollback the receipt never names');
 await expectError(applied({ 'response/response.md': receipt({ findings: [['SEED_ROLLED_BACK', 'x']] }) }), 'SEED_ROLLED_BACK is recorded under operation apply', 'an application that claims a rollback');
-await expectError(applied({ 'response/response.md': receipt({ drafted: 'yes' }) }), 'does not record SEED_DRAFTED', 'a draft the receipt never names');
-await expectError(applied({ 'response/response.md': receipt({ findings: [['SEED_DRAFTED', 'x']] }) }), 'SEED_DRAFTED is recorded while Drafted says no', 'a draft claimed for a committed seed');
+await expectError(applied({ 'response/response.md': receipt({ drafted: 'yes' }) }), 'Drafted must be no', 'a seeder that drafted a plan');
+await expectError(applied({ 'response/response.md': receipt({ findings: [['SEED_DRAFTED', 'x']] }) }), 'SEED_DRAFTED is forbidden', 'a seed effect claimed as plan drafting');
+await expectError(applied({ 'request/request.json': { ...requestJson(), inputs: {} } }), 'required input seed-plan is absent', 'a seed effect without its plan');
 
 // Shared rows and checks.
 await expectError(applied({ 'response/response.md': receipt({ findings: [['SHARED_ROW_REFUSED', 'x']] }) }), 'stops the branch with SEED_SHARED_ROW', 'a refused row on a placed outcome');

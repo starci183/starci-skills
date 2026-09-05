@@ -89,6 +89,17 @@ carried and no further, which is what `in-progress` already means, so the head i
 state rather than declared enforced. Nothing new is invented to say it; the lifecycle already had the
 word.
 
+## Concrete attempt flow
+
+This operator's rows are gated by the shared expected/actual attempt contract in `scripts/attempt-gate.mjs`.
+
+| Observed state | Action | Actual check | Next branch |
+| --- | --- | --- | --- |
+| promise and delivery match | reuse content; update allowed lifecycle/lineage | compare every dimension and evidence | publish reconciled head |
+| promise missing or invalid | repair nothing here | record complete missing/invalid set | handoff `business.decide` |
+| delivery discrepancy | record every mismatch | each row names promise, actual and evidence | handoff `backend.generate`; retry on new head |
+| incomplete evidence | publish no implemented claim | comparison is inconclusive with unchecked coverage | emit typed replan/repair evidence |
+
 ## Boundary
 
 Context is read-only apart from the one head it publishes. The operator writes only `response/` of
@@ -133,9 +144,9 @@ modifies product source, or claims that a quality gate or a UAT run has passed.
 | # | Step | Params | Reads | Writes | Stops with |
 | --- | --- | --- | --- | --- | --- |
 | 1 | Validate the gate, the delivered-source input and the resume | `resume` | `request/request.json`, input `backend-source-application`, @workspaces/be at the frozen head | — | `INVALID_INPUT`, `SOURCE_DRIFT`, `NO_PROGRESS` |
-| 2 | Read the published head, its state and its frozen coverage matrix, and check the transition and the authority it needs | `featureId`, `targetState`, `approval` | @worktrees/businesses/<featureId>: the current head, its state, its matrix and its fingerprints | — | `HEAD_NOT_RECONCILABLE`, `APPROVAL_REQUIRED` |
+| 2 | Inspect the promise and classify it reusable, missing or invalid before transition checks; hand missing or invalid promise to business.decide and create nothing here | `featureId`, `targetState`, `approval` | @worktrees/businesses/<featureId>: the current head, its state, its matrix and its fingerprints | — | `HEAD_NOT_RECONCILABLE`, `APPROVAL_REQUIRED` |
 | 3 | Normalize the delivered source into fact claims, each with its path, line range and head | — | input `backend-source-application`, @workspaces/be at the frozen head, inputs `quality-verification` and `uat-flow-verification` as evidence only, @tools/git | `response/data/claims.json` | `EVIDENCE_MISSING` |
-| 4 | Compare every row of the frozen matrix with the delivered claims and record each discrepancy against its dimension, and list the feature's open unchecked coverage beside them | — | `response/data/claims.json`, @worktrees/businesses/<featureId> for the matrix at the published head, @worktrees/unchecked/<product> for what the delivery's verification did not take | `response/response.md` | `RECONCILIATION_DISCREPANCY` |
+| 4 | Compare every matrix row with delivery, record the complete discrepancy and unchecked sets, and emit typed repair or replan evidence without rewriting the goal | — | `response/data/claims.json`, @worktrees/businesses/<featureId> for the matrix at the published head, @worktrees/unchecked/<product> for what the delivery's verification did not take | `response/response.md` | `RECONCILIATION_DISCREPANCY` |
 | 5 | Publish the head under an exclusive lease with the reconciliation it now carries: the feature directory, the object it is archived under and the entry that names it | — | `response/data/claims.json`, @worktrees/businesses/<featureId> at the previous head, its archived object and the head index entry that names it | @worktrees/businesses/<featureId> as the new model.json head, its object in the content store and the feature's entry in the head index, `response/data/model.json`, @tools/sourcewrite | `SOURCE_DRIFT` |
 | 6 | Emit | — | everything above | `response/response.json` | — |
 

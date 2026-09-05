@@ -235,6 +235,11 @@ export async function validateIdentityStep(branchDir, root = ROOT, { hostRoot = 
         errors.push(...await planCastErrors(branchDir, aliases, accountFile));
         for (const [alias, entry] of aliases) {
           if (provisioned && entry.provisionedBy === null) errors.push(`${accountFile}: this run created ${alias}, so the record names the run that provisioned it`);
+          if (entry.provisionedBy === null && entry.action !== 'reuse') errors.push(`${accountFile}: existing account ${alias} must record action reuse`);
+          if (entry.provisionedBy !== null && entry.action === 'reuse') errors.push(`${accountFile}: changed account ${alias} cannot record action reuse`);
+          if (entry.loginProof?.method !== 'browser' || entry.loginProof?.outcome !== 'passed') errors.push(`${accountFile}: ${alias} needs a passing real product login through browser evidence`);
+          if (!entry.providerAccountRef) errors.push(`${accountFile}: ${alias} names no stable provider account reference, so an uncertain retry could create a duplicate`);
+          if (!(entry.memberships ?? []).length) errors.push(`${accountFile}: ${alias} records no observed provider membership`);
           if (account.env && !String(entry.sealed).startsWith(`.stacks/${account.env}/`)) errors.push(`${accountFile}: ${alias} is sealed in another environment than ${account.env}; an account of one environment is not an account in another`);
         }
         forEachString(account, (text, at) => { if (credentialLeak(text)) errors.push(`${accountFile}: ${at} carries a credential; the account record holds names and references only`); });

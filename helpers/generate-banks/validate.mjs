@@ -19,7 +19,7 @@ import path from 'node:path';
 import process from 'node:process';
 import { fileURLToPath } from 'node:url';
 import { validateAgainst } from '../../scripts/json-schema.mjs';
-import { validateBank, plannedOrder, isDropped } from '../../scripts/bank.mjs';
+import { validateBank, plannedOrder, isDropped, canonical, sha256 } from '../../scripts/bank.mjs';
 import { writeAliasOf } from '../../scripts/helper-md.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
@@ -50,8 +50,24 @@ export async function validateGenerateBanksRun(runDir, hostRoot, { root = ROOT }
 
   const product = run.args?.product;
   const wroteBank = (run.outputs ?? []).some((o) => o.startsWith('@worktrees/banked'));
+  if (run.contractVersion === 'starci/v2.2') {
+    const inputRefs = new Set((run.inputs ?? []).map((input) => input.ref));
+    for (const source of run.sourceCoverage ?? []) {
+      if (!inputRefs.has(source.ref)) errors.push(`${at}: sourceCoverage ref ${source.ref} is absent from inputs; coverage names what this run actually read`);
+      if (!(source.evidence ?? []).length) errors.push(`${at}: sourceCoverage ref ${source.ref} carries no evidence`);
+      for (const evidence of source.evidence ?? []) if (!inputRefs.has(evidence)) errors.push(`${at}: sourceCoverage evidence ${evidence} is absent from inputs; evidence must resolve to a recorded read`);
+    }
+    const incomplete = (run.sourceCoverage ?? []).some((source) => source.state !== 'valid');
+    if (incomplete && run.outcome !== 'incomplete') errors.push(`${at}: missing, invalid or stale source coverage requires outcome incomplete`);
+    if (!incomplete && run.outcome === 'incomplete') errors.push(`${at}: outcome incomplete names no missing, invalid or stale source`);
+    if (run.outcome === 'empty' && wroteBank) errors.push(`${at}: outcome empty names a bank output; an empty reading changes no bank`);
+    if (['incomplete', 'reused'].includes(run.outcome) && wroteBank) errors.push(`${at}: outcome ${run.outcome} names a bank output; an unchanged bank is not rewritten`);
+    if (['drafted', 'updated'].includes(run.outcome) && !wroteBank) errors.push(`${at}: outcome ${run.outcome} names no bank output`);
+    if (!(run.outputs ?? []).includes(`@worktrees/helpers/${HELPER}/runs/${run.runId}/run.json`)) errors.push(`${at}: every outcome, including empty and incomplete, names its own immutable run record`);
+  }
   if (run.stop) {
     if (NOTHING_WRITTEN.has(run.stop) && wroteBank) errors.push(`${at}: stopped with ${run.stop} and still names a bank output; a bank is written whole or not at all`);
+    if (run.contractVersion === 'starci/v2.2' && JSON.stringify(run.bankBefore) !== JSON.stringify(run.bankAfter)) errors.push(`${at}: a stopped run changed its bank summary`);
     return { errors };
   }
   if (!product) { errors.push(`${at}: a finished run names the product it banked in args.product`); return { errors }; }
@@ -60,10 +76,32 @@ export async function validateGenerateBanksRun(runDir, hostRoot, { root = ROOT }
   errors.push(...bankErrors);
   if (bankErrors.length || !bank.queue) return { errors };
 
+  if (run.contractVersion === 'starci/v2.2') {
+    const after = run.bankAfter;
+    if (after.queueHash !== bank.hash) errors.push(`${at}: bankAfter.queueHash ${after.queueHash} does not match emitted bank ${bank.hash}`);
+    const approvalHash = bank.approvals ? sha256(canonical(bank.approvals)) : null;
+    if (after.approvalHash !== approvalHash) errors.push(`${at}: bankAfter.approvalHash does not match approvals.json bytes`);
+    const actualEntries = bank.queue.entries.map(({ missionId, status }) => ({ missionId, status }));
+    if (JSON.stringify(after.entries) !== JSON.stringify(actualEntries)) errors.push(`${at}: bankAfter.entries does not match the emitted queue order and status`);
+    const beforeById = new Map((run.bankBefore?.entries ?? []).map((entry) => [entry.missionId, entry.status]));
+    const afterById = new Map((after.entries ?? []).map((entry) => [entry.missionId, entry.status]));
+    for (const [missionId, status] of beforeById) {
+      if (status !== 'banked' && afterById.get(missionId) !== status) errors.push(`${at}: existing mission ${missionId} status ${status} was not preserved`);
+    }
+    if (run.bankBefore?.approvalHash !== null && run.bankBefore?.approvalHash !== after.approvalHash) errors.push(`${at}: existing approval bytes changed during helper drafting`);
+    for (const join of run.deduplications ?? []) {
+      if (!afterById.has(join.keptMissionId)) errors.push(`${at}: deduplication keeps missing mission ${join.keptMissionId}`);
+      for (const merged of join.mergedMissionIds) if (afterById.has(merged)) errors.push(`${at}: deduplication says ${merged} merged into ${join.keptMissionId}, but both remain in the queue`);
+      if (!(join.evidence ?? []).length) errors.push(`${at}: deduplication for ${join.keptMissionId} names no joined evidence`);
+    }
+    if (['empty', 'incomplete', 'reused'].includes(run.outcome) && JSON.stringify(run.bankBefore) !== JSON.stringify(run.bankAfter)) errors.push(`${at}: outcome ${run.outcome} changed the bank summary`);
+  }
+
   const names = (o) => o?.helper === HELPER && o?.runId === run.runId;
-  if (!names(bank.queue.bankedBy)) errors.push(`@worktrees/banked/${product}/queue.json: bankedBy does not name run ${run.runId} of ${HELPER}; every bank names the run that drafted it`);
+  const wroteThisBank = run.contractVersion !== 'starci/v2.2' || ['drafted', 'updated'].includes(run.outcome);
+  if (wroteThisBank && !names(bank.queue.bankedBy)) errors.push(`@worktrees/banked/${product}/queue.json: bankedBy does not name run ${run.runId} of ${HELPER}; every changed bank names the run that drafted it`);
   for (const [id, mission] of bank.missions) {
-    if (!names(mission.bankedBy)) errors.push(`@worktrees/banked/${product}/${id}/mission.json: bankedBy does not name run ${run.runId} of ${HELPER}`);
+    if (wroteThisBank && !names(mission.bankedBy)) errors.push(`@worktrees/banked/${product}/${id}/mission.json: bankedBy does not name run ${run.runId} of ${HELPER}`);
     if (mission.tierHint && !(mission.evidenceRefs ?? []).some((r) => r.startsWith('unchecked:'))) errors.push(`@worktrees/banked/${product}/${id}/mission.json: tierHint ${mission.tierHint} names no unchecked: evidence ref; a tier hint is copied from the ledger entry it came from, never invented`);
   }
   const live = bank.queue.entries.filter((e) => !isDropped(e));

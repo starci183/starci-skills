@@ -66,6 +66,16 @@ hydration head two commits behind the checkout is not a stop.
 A blocked branch emits no receipt and no route: `response.json` is the whole record, and `reason`
 carries the observation that justified the stop.
 
+## Concrete attempt flow
+
+This operator's rows are gated by the shared expected/actual attempt contract in `scripts/attempt-gate.mjs`.
+
+| Observed state | Action | Actual check | Next branch |
+| --- | --- | --- | --- |
+| valid declared checkout | reuse exact disk path, head and policy | read back Git root, installed tree and write roots | emit the binding |
+| missing declaration or hydration | guess no similar path and create nothing | record missing declaration/hydration evidence | workspace owner handoff |
+| invalid identity, head or policy | refuse cached binding | record the conflicting root, revision or policy | owner repair, then a new read-only attempt |
+
 ## Boundary
 
 Context is read-only apart from the machine-local hydrated route state, which Git ignores. The
@@ -110,8 +120,8 @@ workspace, or provisions an account. It makes no product decision and carries no
 | --- | --- | --- | --- | --- | --- |
 | 1 | Validate the gate and resume, and refuse every hint it carries | `resume` | `request/request.json`, its requirements and its frozen head | — | `INVALID_INPUT`, `SOURCE_DRIFT`, `NO_PROGRESS` |
 | 2 | Bind bootstrap and identity | — | @workspaces/device-state, the machine identity and the sealed credential roster, @tools/secrets | — | `IDENTITY_UNVERIFIED` |
-| 3 | Resolve the route | `project`, `role`, `checkout` | @workspaces/projects/<project>/<role> for exactly this project and role, @workspaces/local/routes/<project>/<role>, @tools/git | — | `ROUTE_UNDECLARED`, `ROUTE_UNHYDRATED`, `ROUTE_MISMATCH` |
-| 4 | Verify the checkout: branch policy, a clean tree, the write roots and the installed tree | `gitPolicy`, `declaredWriteRoots`, `sharedInstall` | @workspaces/local/routes/<project>/<role>, the resolved checkout, its branch, its head, its working tree and its `node_modules`, @tools/git, @tools/shell | — | `BRANCH_POLICY_VIOLATION`, `CHECKOUT_DIRTY` |
+| 3 | Inspect the exact declaration and checkout, classify it reusable, missing or invalid by identity and head, and resolve only a reusable declared route | `project`, `role`, `checkout` | @workspaces/projects/<project>/<role> for exactly this project and role, @workspaces/local/routes/<project>/<role>, @tools/git | — | `ROUTE_UNDECLARED`, `ROUTE_UNHYDRATED`, `ROUTE_MISMATCH` |
+| 4 | Verify branch policy, clean tree, write roots and installed tree; record the exact owner delta for every invalid check and repair nothing here | `gitPolicy`, `declaredWriteRoots`, `sharedInstall` | @workspaces/local/routes/<project>/<role>, the resolved checkout, its branch, its head, its working tree and its `node_modules`, @tools/git, @tools/shell | — | `BRANCH_POLICY_VIOLATION`, `CHECKOUT_DIRTY` |
 | 5 | Bind provenance and freshness, then emit | — | everything above, @workspaces/device-state | `response/response.md`, `response/data/route.json`, `response/response.json` | — |
 
 Under `worktreeBranches` set to forbidden, a route binds only on the mutation branch and

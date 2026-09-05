@@ -88,6 +88,17 @@ bề mặt mà chính hành trình đi qua nhưng không làn nào đo: lời h�
 trạng thái ấy chứ không được tuyên bố là đã thực thi. Không có gì mới được bịa ra để nói điều đó; vòng
 đời đã sẵn có từ ấy.
 
+## Luồng attempt cụ thể
+
+Các row của operator này được gate bởi hợp đồng attempt expected/actual dùng chung trong `scripts/attempt-gate.mjs`.
+
+| Trạng thái quan sát | Hành động | Kiểm actual | Nhánh kế tiếp |
+| --- | --- | --- | --- |
+| promise và delivery khớp | tái dùng content; update lifecycle/lineage được phép | so mọi dimension và evidence | publish reconciled head |
+| promise thiếu hoặc sai | không sửa ở đây | ghi trọn tập thiếu/sai | handoff `business.decide` |
+| delivery lệch | ghi mọi mismatch | mỗi row nêu promise, actual, evidence | handoff `backend.generate`; retry trên head mới |
+| evidence thiếu | không publish claim implemented | comparison inconclusive và unchecked coverage | phát typed replan/repair evidence |
+
 ## Ranh giới
 
 Context chỉ đọc, trừ đúng một head nó publish. Operator chỉ ghi `response/` của nhánh mình —
@@ -132,9 +143,9 @@ vòng đời không cho phép, sửa source sản phẩm, hay tuyên bố rằng
 | # | Bước | Tham số | Đọc | Ghi | Dừng với |
 | --- | --- | --- | --- | --- | --- |
 | 1 | Kiểm gate, đầu vào source đã giao và resume | `resume` | `request/request.json`, đầu vào `backend-source-application`, @workspaces/be ở head đóng băng | — | `INVALID_INPUT`, `SOURCE_DRIFT`, `NO_PROGRESS` |
-| 2 | Đọc head đã publish, trạng thái và ma trận phủ đã đóng băng của nó, rồi kiểm chuyển trạng thái và thẩm quyền nó cần | `featureId`, `targetState`, `approval` | @worktrees/businesses/<featureId>: head hiện tại, trạng thái, ma trận và các fingerprint của nó | — | `HEAD_NOT_RECONCILABLE`, `APPROVAL_REQUIRED` |
+| 2 | Kiểm promise và phân loại reusable, missing hoặc invalid trước transition check; handoff promise thiếu/sai cho business.decide và không tạo ở đây | `featureId`, `targetState`, `approval` | @worktrees/businesses/<featureId>: head hiện tại, trạng thái, ma trận và các fingerprint của nó | — | `HEAD_NOT_RECONCILABLE`, `APPROVAL_REQUIRED` |
 | 3 | Chuẩn hoá source đã giao thành fact claim, mỗi claim kèm path, khoảng dòng và head | — | đầu vào `backend-source-application`, @workspaces/be ở head đóng băng, đầu vào `quality-verification` và `uat-flow-verification` chỉ như bằng chứng, @tools/git | `response/data/claims.json` | `EVIDENCE_MISSING` |
-| 4 | So từng hàng của ma trận đóng băng với các claim đã giao và ghi từng sai lệch theo chiều của nó, rồi liệt kê phần chưa kiểm còn mở của feature bên cạnh chúng | — | `response/data/claims.json`, @worktrees/businesses/<featureId> cho ma trận ở head đã publish, @worktrees/unchecked/<product> cho thứ lần kiểm chứng của bản giao đã không lấy | `response/response.md` | `RECONCILIATION_DISCREPANCY` |
+| 4 | Đối chiếu mọi matrix row với delivery, ghi toàn bộ discrepancy và unchecked, và phát typed repair hoặc replan evidence mà không viết lại goal | — | `response/data/claims.json`, @worktrees/businesses/<featureId> cho ma trận ở head đã publish, @worktrees/unchecked/<product> cho thứ lần kiểm chứng của bản giao đã không lấy | `response/response.md` | `RECONCILIATION_DISCREPANCY` |
 | 5 | Publish head dưới lease độc quyền cùng phần đối chiếu nó đang mang: thư mục feature, object nó được lưu trữ dưới, và mục gọi tên nó | — | `response/data/claims.json`, @worktrees/businesses/<featureId> ở head trước, object đã lưu trữ của nó và mục chỉ mục head gọi tên nó | @worktrees/businesses/<featureId> thành model.json head mới, object của nó trong kho nội dung và mục của feature trong chỉ mục head, `response/data/model.json`, @tools/sourcewrite | `SOURCE_DRIFT` |
 | 6 | Phát | — | mọi thứ ở trên | `response/response.json` | — |
 

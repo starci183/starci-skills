@@ -37,6 +37,11 @@
         "required": [
           "username",
           "role",
+          "memberships",
+          "providerAccountRef",
+          "action",
+          "observedAt",
+          "loginProof",
           "credentialName",
           "sealed",
           "provisionedBy",
@@ -51,6 +56,37 @@
             "type": "string",
             "minLength": 1,
             "description": "The product role this alias holds. A flow that is only true when two roles meet needs both, which is why the document is a map and not a single account."
+          },
+          "memberships": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 16,
+            "uniqueItems": true,
+            "items": { "type": "string", "minLength": 1 },
+            "description": "The provider memberships observed after reuse, create or repair."
+          },
+          "providerAccountRef": {
+            "type": "string",
+            "minLength": 1,
+            "description": "A stable provider-side account reference used to avoid duplicate creation after an uncertain effect."
+          },
+          "action": {
+            "enum": ["reuse", "create", "repair"],
+            "description": "The concrete convergence action selected after classifying the existing account."
+          },
+          "observedAt": { "type": "string", "format": "date-time" },
+          "loginProof": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["method", "endpoint", "outcome", "evidenceRef", "verifiedAt"],
+            "properties": {
+              "method": { "const": "browser" },
+              "endpoint": { "type": "string", "pattern": "^https?://" },
+              "outcome": { "const": "passed" },
+              "evidenceRef": { "type": "string", "minLength": 1 },
+              "verifiedAt": { "type": "string", "format": "date-time" }
+            },
+            "description": "A real sign-in through the bound product endpoint. A token endpoint alone is not product-login proof."
           },
           "credentialName": {
             "type": "string",

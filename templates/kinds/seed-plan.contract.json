@@ -26,6 +26,20 @@
       }
     },
     {
+      "heading": "^## Fixtures$",
+      "table": "| Unit | State | Action | JSON | SQL | Expected | Creates outcome |",
+      "minRows": 1,
+      "cell": {
+        "Unit": "^`[a-z0-9][a-z0-9-]*`$",
+        "State": "^(valid|missing|invalid)$",
+        "Action": "^(reuse|create|update)$",
+        "JSON": "^`\\.worktrees/uat/[a-z0-9-]+/[a-z0-9-]+/seed/[A-Za-z0-9._-]+\\.json`$",
+        "SQL": "^(—|`\\.worktrees/uat/[a-z0-9-]+/[a-z0-9-]+/seed/[A-Za-z0-9._-]+\\.sql`)$",
+        "Expected": "\\S",
+        "Creates outcome": "^false$"
+      }
+    },
+    {
       "heading": "^## Fallbacks taken$",
       "table": "| Code | Action |",
       "cell": {

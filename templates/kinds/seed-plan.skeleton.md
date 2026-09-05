@@ -20,6 +20,13 @@ namespace, so no two seeders share a row.
 | `open-item` | `items` | owner | 3 | every items row the unit's account owns |
 | `item-catalogue` | `items` | prefix | 24 | every items row whose id carries the unit's prefix |
 
+## Fixtures
+
+| Unit | State | Action | JSON | SQL | Expected | Creates outcome |
+| --- | --- | --- | --- | --- | --- | --- |
+| `open-item` | valid | reuse | `.worktrees/uat/items/open-item/seed/records.json` | — | the planned item rows are readable under the namespace | false |
+| `item-catalogue` | missing | create | `.worktrees/uat/items/item-catalogue/seed/records.json` | `.worktrees/uat/items/item-catalogue/seed/records.sql` | the catalogue has the representative planned volume | false |
+
 ## Fallbacks taken
 
 | Code | Action |

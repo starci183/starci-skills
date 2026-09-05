@@ -85,6 +85,17 @@ input, never the author's rationale, and runs a fresh agent on this operator's o
 inherited turns. That agent writes only `critique/response/`. When its response is done the paused
 agent resumes at the confirmation step. Other branches of the same step keep running throughout.
 
+## Concrete attempt flow
+
+This operator's rows are gated by the shared expected/actual attempt contract in `scripts/attempt-gate.mjs`.
+
+| Observed state | Action | Actual check | Next branch |
+| --- | --- | --- | --- |
+| prior decision satisfies constraints | reuse as a scored candidate and refresh changed evidence | all mandatory axes and current-state inventory pass | select by recorded policy |
+| missing decision | create and deepen requested candidates | selected candidate owns every operation and store | emit after critique matches |
+| invalid candidate | repair it or create another; never relabel failure | compatibility and critique expose each failure | new attempt |
+| valid candidates tie | choose by goal/mandatory fit, reference/Grammar fit, lower cost, stable id | record scores and first differentiator | continue; never `CHOICE_REQUIRED` merely for tie |
+
 ## Boundary
 
 Context is read-only. The operator writes only `response/` of its own branch: `response.md`,
@@ -130,16 +141,16 @@ When it is absent the published head is the authority.
 
 | # | Step | Params | Reads | Writes | Stops with |
 | --- | --- | --- | --- | --- | --- |
-| 1 | Validate the gate and resume | `resume`, `approval` | `request/request.json`, input `architecture-decision` when present, @workspaces/be at the frozen head | — | `INVALID_INPUT`, `SOURCE_DRIFT`, `NO_PROGRESS` |
+| 1 | Validate the gate and resume, then classify the prior decision as reusable, missing or invalid against frozen constraints and current source | `resume`, `approval` | `request/request.json`, input `architecture-decision` when present, @workspaces/be at the frozen head | — | `INVALID_INPUT`, `SOURCE_DRIFT`, `NO_PROGRESS` |
 | 2 | Restate the objective in the person's language and hold for their confirmation | `objective`, `decisionId` | `request/request.json`: `requirements.objective`, and its top-level `decisionId` and `selectedOption` when the choice is already recorded | `restatement` | `RESTATEMENT_UNCONFIRMED` |
 | 3 | Observe the current state | — | @workspaces/be at the frozen head: manifests, configuration, deployment files, @tools/git | `response/data/current-state.json` | `CURRENT_STATE_UNOBSERVED` |
 | 4 | Bind the inventory to the business promise | — | `response/data/current-state.json`, input `model` when present, otherwise @worktrees/businesses/<featureId> at its published head | — | `BUSINESS_AUTHORITY_REQUIRED`, `EVIDENCE_MISSING` |
 | 5 | Frame the decision | `objective`, `decisionId`, `constraints`, `tradeoffAxes` | `request/request.json` requirements | — | `CONSTRAINT_CONTRADICTION` |
 | 6 | Generate the alternatives | `alternatives` | `response/data/current-state.json`, @knowledge/patterns, @tools/websearch | `response/artifacts/<decisionId>-alternatives.html` only when more than one alternative was asked for, @tools/visualize | `NO_VIABLE_ALTERNATIVE` |
-| 7 | Select | `selectionPolicy`, `tradeoffAxes`, `approval` | `response/artifacts/<decisionId>-alternatives.html` when present | — | `CHOICE_REQUIRED` |
+| 7 | Score and select automatically; on a valid tie apply goal fit, approved reference or Grammar fit, lower cost, then stable id, recording the first differentiator | `selectionPolicy`, `tradeoffAxes`, `approval` | `response/artifacts/<decisionId>-alternatives.html` when present | — | `CHOICE_REQUIRED` |
 | 8 | Deepen the selected alternative and declare the operations it commits to | `constraints` | `response/data/current-state.json`, the bound business head's coverage matrix for the dimensions each operation cites | `response/data/stack-model.json`, including its `operations` | `DATA_OWNERSHIP_UNASSIGNED`, `COMPATIBILITY_UNVERIFIED` |
 | 9 | Await the critique: pause, a fresh agent attacks the selection, resume when it answers | — | `critique/response/critique.md` once the exchange is done | `response/response.json` (waiting, awaiting critique) | `CRITIQUE_UNRESOLVED` |
-| 10 | Confirm or return the selection | `selectionPolicy` | `critique/response/critique.md`, `response/data/stack-model.json` | — | `CHOICE_REQUIRED`, `NO_VIABLE_ALTERNATIVE` |
+| 10 | Compare critique with every frozen criterion; repair or replace a failing candidate in a new attempt, and confirm a valid candidate without stopping merely for a tie | `selectionPolicy` | `critique/response/critique.md`, `response/data/stack-model.json` | — | `CHOICE_REQUIRED`, `NO_VIABLE_ALTERNATIVE` |
 | 11 | Write the handoff and emit | — | everything above | `response/response.md`, `response/response.json` | — |
 
 Under the defaults, step 6 produces one design and no comparison page, step 7 has nothing to

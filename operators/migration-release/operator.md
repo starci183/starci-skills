@@ -53,6 +53,17 @@ returns output hashes and a failure category. Resolved values and arbitrary proc
 persisted. Failure or uncertainty is `MIGRATION_FAILED`: it blocks without retrying a partial effect
 or running a down migration, and the journal is left exactly as the runner left it.
 
+## Concrete attempt flow
+
+This operator's rows are gated by the shared expected/actual attempt contract in `scripts/attempt-gate.mjs`.
+
+| Observed state | Action | Actual check | Next branch |
+| --- | --- | --- | --- |
+| journal already has frozen set and none pending | reuse applied state; no apply | second inspect proves identical journal and prior rows | emit no-op proof |
+| declared set pending and none journaled | apply exact digest once via source runner | inspect and replay prove journaled set and no-op replay | emit proof |
+| plan/runner/object missing or invalid | apply and edit nothing | name artifact and digest mismatch | handoff `backend.generate`; corrected plan is new attempt |
+| apply partial/uncertain or transcript lost | never reapply, down-migrate or guess | preserve logs and uncertain effects | block until inspection proves remaining set safe |
+
 ## Boundary
 
 Context is read-only apart from the migration the runner applies. The operator applies only the
@@ -94,8 +105,8 @@ claim a migrated outcome without the replay that proves it.
 | # | Step | Params | Reads | Writes | Stops with |
 | --- | --- | --- | --- | --- | --- |
 | 1 | Validate the gate, the three producer inputs at one source commit, and the resume | `resume` | `request/request.json`, inputs `route`, `backend-source-application` and `quality-verification` | — | `INVALID_INPUT`, `NO_PROGRESS` |
-| 2 | Bind the plan by digest, the environment declaration by hash, its one migration target and the release authority, and verify every pinned file at the checkout head | `release`, `target`, `approval`, `migration` | `request/migration-release.json`, the environment's declaration, @workspaces/be at the frozen source head, @tools/git | — | `MIGRATION_PLAN_INVALID`, `APPROVAL_REQUIRED`, `SOURCE_DRIFT` |
-| 3 | Run `scripts/migration-release-run.mjs` through @tools/shell — inspect, apply, inspect — with the connection custody resolved by name inside the runner and never outside it | — | @workspaces/be for the runner and its configuration, @workspaces/device-state for the custody by name, @tools/secrets | `migration-log`: response/artifacts/migration-1.log and migration-2.log | `MIGRATION_FAILED` |
+| 2 | Bind and inspect the digest-frozen plan, runner files, target and journal, classifying the set already applied, safely pending, missing or invalid, or partial and uncertain before execution | `release`, `target`, `approval`, `migration` | `request/migration-release.json`, the environment's declaration, @workspaces/be at the frozen source head, @tools/git | — | `MIGRATION_PLAN_INVALID`, `APPROVAL_REQUIRED`, `SOURCE_DRIFT` |
+| 3 | Run inspect-apply-inspect only for a wholly safe pending set; reuse an already applied set as no-op, hand missing or invalid owner artifacts back, and never reapply a partial or uncertain effect | — | @workspaces/be for the runner and its configuration, @workspaces/device-state for the custody by name, @tools/secrets | `migration-log`: response/artifacts/migration-1.log and migration-2.log | `MIGRATION_FAILED` |
 | 4 | Prove the replay — no pending migration, the journal unchanged, every prior row preserved — and write the proof | — | `response/artifacts/migration-1.log`, `response/artifacts/migration-2.log` | `migration-release-proof` | `MIGRATION_FAILED` |
 | 5 | Write the receipt and emit | — | everything above | `migration-release`, `response/response.json` | — |
 

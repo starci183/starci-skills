@@ -3,8 +3,8 @@
 // operation and approval the request named; every row placed is attributed — owned by the flow's
 // account, or carrying the flow's prefix, or recorded as a limitation of the store — and never a
 // shared row; the rollback set is a subset of the rows placed, and a rollback removes them all;
-// the four checks are proved before a placed outcome and a failed one names its stop; a drafted seed
-// says so; and nothing written carries a credential.
+// the four checks are proved before a placed outcome and a failed one names its stop; its data.plan
+// fixture row is executable and cannot create the asserted outcome; and nothing written carries a credential.
 import { existsSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
 import path from 'node:path';
@@ -12,7 +12,7 @@ import process from 'node:process';
 import { fileURLToPath } from 'node:url';
 import { validateStep } from '../../scripts/validate-step.mjs';
 import { tableUnder } from '../../scripts/validate-response.mjs';
-import { hostRootOf, missingStack } from '../../scripts/validate-request.mjs';
+import { hostRootOf, missingStack, sessionRootOf } from '../../scripts/validate-request.mjs';
 import { platformAuthorityErrors } from '../../scripts/platform-authority.mjs';
 import { credentialShaped } from '../../scripts/sweep-secrets.mjs';
 
@@ -32,7 +32,7 @@ const fields = (rows) => Object.fromEntries((rows ?? []).map(([k, v]) => [k, v])
 export async function validateSeedStep(branchDir, root = ROOT, { hostRoot = hostRootOf(root) } = {}) {
   const base = await validateStep(root, branchDir);
   const errors = [...base.errors];
-  const { response, requirements = {}, present = new Set() } = base;
+  const { response, request, requirements = {}, present = new Set() } = base;
   if (!response || response.operatorId !== OPERATOR) return { errors };
   const has = (f) => existsSync(path.join(branchDir, f));
   const read = (f) => readFile(path.join(branchDir, f), 'utf8');
@@ -45,6 +45,23 @@ export async function validateSeedStep(branchDir, root = ROOT, { hostRoot = host
   if (!OPERATIONS.includes(operation)) errors.push(`request.json: operation ${operation} is neither apply nor rollback`);
   errors.push(...await platformAuthorityErrors({ root, hostRoot, requirements, kind: 'seed', desiredEffects: SEED_EFFECTS, operationClasses }));
   for (const [key, value] of Object.entries(requirements)) if (typeof value === 'string' && credentialShaped(value)) errors.push(`request.json: requirements.${key} carries a credential-shaped value; a seed names a credential and never carries one`);
+
+  const planRef = request?.inputs?.['seed-plan'];
+  if (planRef) {
+    try {
+      const plan = await readFile(path.join(sessionRootOf(branchDir), planRef), 'utf8');
+      const fixtureRows = tableUnder(plan, '## Fixtures') ?? [];
+      const row = fixtureRows.find(([id]) => unquote(id) === requirements.flow);
+      if (!row) errors.push(`request.json: seed-plan has no Fixtures row for ${requirements.flow}`);
+      else {
+        const [, state, action, jsonRef, , , createsOutcome] = row;
+        const expectedAction = { valid: 'reuse', missing: 'create', invalid: 'update' }[state];
+        if (!expectedAction || action !== expectedAction) errors.push(`request.json: seed-plan fixture ${requirements.flow} is ${state}/${action}; expected a valid reuse, missing create or invalid update classification`);
+        if (!unquote(jsonRef).endsWith('.json')) errors.push(`request.json: seed-plan fixture ${requirements.flow} has no JSON execution source`);
+        if (createsOutcome !== 'false') errors.push(`request.json: seed-plan fixture ${requirements.flow} creates the asserted UAT outcome`);
+      }
+    } catch { errors.push(`request.json: seed-plan ${planRef} cannot be read`); }
+  }
 
   if (!(present.has('seed-receipt') && has(RECEIPT))) {
     if (response.status === 'done') errors.push(`${RECEIPT}: a done branch needs the seed receipt`);
@@ -69,9 +86,8 @@ export async function validateSeedStep(branchDir, root = ROOT, { hostRoot = host
   else if (!empty(requirements.flow) && !namespace.startsWith(`uat-${requirements.flow}`)) errors.push(`${RECEIPT}: Namespace ${namespace} does not carry the flow ${requirements.flow}; the prefix is the flow's, so a row can be told from another flow's`);
   if (!/^sha256:[0-9a-f]{64}$/.test(unquote(binding['Seed fingerprint']))) errors.push(`${RECEIPT}: Seed fingerprint is not a sha256 digest; the snapshot freezes it to tell whether the seed changed`);
   const drafted = unquote(binding.Drafted);
-  if (!['yes', 'no'].includes(drafted)) errors.push(`${RECEIPT}: Drafted is ${drafted}; it says yes or no`);
-  if (drafted === 'yes' && !findings.has('SEED_DRAFTED')) errors.push(`${RECEIPT}: the seed was drafted from the template and the receipt does not record SEED_DRAFTED`);
-  if (drafted === 'no' && findings.has('SEED_DRAFTED')) errors.push(`${RECEIPT}: SEED_DRAFTED is recorded while Drafted says no`);
+  if (drafted !== 'no') errors.push(`${RECEIPT}: Drafted must be no; data.plan owns the seed plan and data.seed only executes it`);
+  if (findings.has('SEED_DRAFTED')) errors.push(`${RECEIPT}: SEED_DRAFTED is forbidden; create is the planned effect for a missing fixture, not a new plan`);
   const account = unquote(binding.Account);
   if (!/^uat-[A-Za-z0-9._-]+$/.test(account)) errors.push(`${RECEIPT}: Account ${account} is not a provisioned uat- username; the rows are owned by the flow's account`);
 

@@ -50,6 +50,17 @@ loại lỗi. Không lưu giá trị đã giải mã hay output tiến trình t�
 `MIGRATION_FAILED`: block, không thử lại tác động dở dang hoặc chạy down migration, và journal được
 giữ đúng như runner để lại.
 
+## Luồng attempt cụ thể
+
+Các row của operator này được gate bởi hợp đồng attempt expected/actual dùng chung trong `scripts/attempt-gate.mjs`.
+
+| Trạng thái quan sát | Hành động | Kiểm actual | Nhánh kế tiếp |
+| --- | --- | --- | --- |
+| journal có frozen set và không pending | tái dùng applied state; không apply | inspect hai chứng minh journal y hệt và prior row giữ | phát no-op proof |
+| declared set pending và chưa journal | apply exact digest một lần qua source runner | inspect/replay chứng minh journaled set và replay no-op | phát proof |
+| plan/runner/object thiếu hoặc sai | không apply và edit | nêu artifact và digest mismatch | handoff `backend.generate`; plan sửa là attempt mới |
+| apply partial/không chắc hoặc mất transcript | không reapply/down-migrate/đoán | giữ log và uncertain effect | block tới khi inspect chứng minh remaining set an toàn |
+
 ## Ranh giới ghi
 
 Context chỉ đọc, trừ migration mà runner áp. Operator chỉ áp tập migration đã khai lên source head
@@ -90,8 +101,8 @@ chạm môi trường production; và không tuyên bố đã migrate mà không
 | # | Bước | Tham số | Đọc | Ghi | Dừng với |
 | --- | --- | --- | --- | --- | --- |
 | 1 | Kiểm cổng vào, ba đầu vào producer ở cùng một source commit, và resume | `resume` | `request/request.json`, đầu vào `route`, `backend-source-application` và `quality-verification` | — | `INVALID_INPUT`, `NO_PROGRESS` |
-| 2 | Ràng plan theo digest, bản khai báo môi trường theo hash, đúng một migration target của nó và thẩm quyền release, và kiểm mọi tệp đã ghim tại head checkout | `release`, `target`, `approval`, `migration` | `request/migration-release.json`, bản khai báo của môi trường, @workspaces/be ở source head đóng băng, @tools/git | — | `MIGRATION_PLAN_INVALID`, `APPROVAL_REQUIRED`, `SOURCE_DRIFT` |
-| 3 | Chạy `scripts/migration-release-run.mjs` qua @tools/shell — inspect, apply, inspect — với custody kết nối được giải theo tên bên trong runner và không bao giờ bên ngoài | — | @workspaces/be cho runner và cấu hình, @workspaces/device-state cho custody theo tên, @tools/secrets | `migration-log`: response/artifacts/migration-1.log and migration-2.log | `MIGRATION_FAILED` |
+| 2 | Bind và inspect plan đóng băng theo digest, runner file, target, journal, phân loại set đã applied, safely pending, missing/sai, hoặc partial/uncertain trước thực thi | `release`, `target`, `approval`, `migration` | `request/migration-release.json`, bản khai báo của môi trường, @workspaces/be ở source head đóng băng, @tools/git | — | `MIGRATION_PLAN_INVALID`, `APPROVAL_REQUIRED`, `SOURCE_DRIFT` |
+| 3 | Chỉ chạy inspect-apply-inspect cho pending set hoàn toàn an toàn; tái dùng set đã applied như no-op, handoff owner artifact thiếu/sai, và không reapply effect partial/uncertain | — | @workspaces/be cho runner và cấu hình, @workspaces/device-state cho custody theo tên, @tools/secrets | `migration-log`: response/artifacts/migration-1.log and migration-2.log | `MIGRATION_FAILED` |
 | 4 | Chứng minh replay — không còn migration chờ, journal không đổi, mọi hàng trước đó được giữ — và ghi proof | — | `response/artifacts/migration-1.log`, `response/artifacts/migration-2.log` | `migration-release-proof` | `MIGRATION_FAILED` |
 | 5 | Viết biên bản và phát | — | mọi thứ ở trên | `migration-release`, `response/response.json` | — |
 

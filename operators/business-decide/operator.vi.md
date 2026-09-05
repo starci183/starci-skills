@@ -96,6 +96,16 @@ trạng thái nào hợp lệ. Từ chối vẫn giữ dòng dõi bằng cách n
 `implemented` không bao giờ được publish dựa trên một kế hoạch: source đã giao phải được đối chiếu
 với ma trận đóng băng trước, bởi `business.reconcile`.
 
+## Luồng attempt cụ thể
+
+Các row của operator này được gate bởi hợp đồng attempt expected/actual dùng chung trong `scripts/attempt-gate.mjs`.
+
+| Trạng thái quan sát | Hành động | Kiểm actual | Nhánh kế tiếp |
+| --- | --- | --- | --- |
+| published promise còn hiệu lực | tái dùng row actor/rule/outcome hợp lệ | chạy lại scenario cho row giữ và row yêu cầu | phát lineage tới head tái dùng |
+| promise thiếu | tạo từ restatement đã xác nhận | mọi matrix dimension có outcome quan sát và evidence | chỉ publish khi criterion bắt buộc match |
+| dimension stale hoặc sai | chỉ cập nhật row bị bác bỏ | kiểm scenario đã đổi và giữ | repair attempt mới; mở rộng scope phát replan evidence |
+
 ## Ranh giới
 
 Context chỉ đọc, trừ đúng một head feature. Operator chỉ ghi `response/` của nhánh mình, gồm
@@ -141,8 +151,8 @@ lượt UAT đã qua.
 | 1 | Kiểm gate và chạy lại | `resume` | `request/request.json`, @workspaces/be ở head đóng băng | — | `INVALID_INPUT`, `SOURCE_DRIFT`, `NO_PROGRESS` |
 | 2 | Nói lại lời hứa bằng ngôn ngữ của người và chờ họ xác nhận, khi request cung cấp nó | `promise` | `request/request.json`: `requirements.promise`, cùng `decisionId` và `selectedOption` của nó khi lựa chọn đã được ghi | `restatement` | `RESTATEMENT_UNCONFIRMED` |
 | 3 | Chuẩn hoá bằng chứng thành claim | — | @workspaces/be, mọi quan sát kèm vai, path, khoảng dòng và head, đầu vào `architecture-decision` nếu có và chỉ như bằng chứng, @tools/git | `response/data/claims.json` | `EVIDENCE_MISSING`, `CONTRADICTION_UNRESOLVED` |
-| 4 | Kiểm head đã publish và thẩm quyền chuyển trạng thái | `featureId`, `targetState`, `approval` | @worktrees/businesses/<featureId>: head hiện tại, trạng thái và bằng chứng đóng băng của nó | — | `LIFECYCLE_TRANSITION_INVALID`, `AUTHORITY_CONFLICT`, `APPROVAL_REQUIRED` |
-| 5 | Mô hình lời hứa, actor và eligibility: claim fact gánh mọi hàng enforcing, claim intent gánh chính lời hứa | `promise` | `response/data/claims.json`, @workspaces/be ở head đóng băng, @tools/websearch | — | `EVIDENCE_MISSING` |
+| 4 | Kiểm published head và transition authority, phân loại promise được yêu cầu là reusable, missing hoặc invalid trước mọi model write | `featureId`, `targetState`, `approval` | @worktrees/businesses/<featureId>: head hiện tại, trạng thái và bằng chứng đóng băng của nó | — | `LIFECYCLE_TRANSITION_INVALID`, `AUTHORITY_CONFLICT`, `APPROVAL_REQUIRED` |
+| 5 | Tái dùng promise row hợp lệ, tạo row được yêu cầu còn thiếu và chỉ update row sai; giữ decision không bị ảnh hưởng | `promise` | `response/data/claims.json`, @workspaces/be ở head đóng băng, @tools/websearch | — | `EVIDENCE_MISSING` |
 | 6 | Đóng băng ma trận phủ | `dimensions` | `response/data/claims.json`, @workspaces/be và bề mặt nó phát hiện | `response/data/coverage-matrix.json` | `COVERAGE_INCOMPLETE`, `CONSUMER_UNPROVEN` |
 | 7 | Xử lý phần chung sống với legacy | — | `response/data/coverage-matrix.json`: các hàng legacy create, read, settle và bằng chứng của chúng | — | `CONTRADICTION_UNRESOLVED` |
 | 8 | Publish một head dưới lease độc quyền | — | `response/data/claims.json`, @worktrees/businesses/<featureId> ở head trước | @worktrees/businesses/<featureId> thành model.json head mới, `response/data/model.json`, @tools/sourcewrite | `SOURCE_DRIFT` |

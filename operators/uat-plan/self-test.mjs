@@ -20,6 +20,22 @@ const ROWS = {
   'remove-item': { entry: '`/items`', steps: 5, alias: 'viewer-remove', namespace: 'uat-remove-item' },
 };
 const unitsDoc = (units = UNITS, producedBy = OPERATOR) => ({ schemaVersion: 9, producedBy, units });
+const caseSheetDoc = (units = UNITS, rows = ROWS) => ({
+  contractVersion: 'starci/v2.2', feature: FEATURE, env: 'dev', planVersion: 'uat-plan/1',
+  flows: units.map((u) => ({
+    flowId: u.id, state: 'missing', action: 'create', entry: rows[u.id].entry.replaceAll('`', ''),
+    actorAliases: [rows[u.id].alias], namespace: rows[u.id].namespace,
+  })),
+  cases: units.map((u, i) => ({
+    caseId: `${u.id}-case`, flowId: u.id, order: 1, actor: rows[u.id].alias,
+    preconditions: ['the actor account exists and the planned rows are present'],
+    inputs: ['one representative item'], actions: ['open the entry route', 'complete the named journey'],
+    assertions: [`${u.id}-outcome`], expected: [u.goal],
+    verification: ['observe the named outcome through the product UI'],
+    fixture: { jsonRef: `.worktrees/uat/${FEATURE}/${u.id}/seed/records.json`, sqlRef: null, createsAssertedOutcome: false },
+    cleanup: 'data.seed rolls back exactly the receipt-owned namespace',
+  })),
+});
 function receiptOf(units, { feature = FEATURE, rows = ROWS, extraRows = [], tierCell = {} } = {}) {
   const tierOfRow = (u) => tierCell[u.id] ?? (u.tier === 'secondary' ? `secondary — ${u.deferral?.reason ?? ''}` : 'journey');
   const flows = [...units.map((u) => { const r = rows[u.id]; return `| \`${u.id}\` | ${r.entry} | ${r.steps} | \`${r.alias}\` | \`${r.namespace}\` | ${tierOfRow(u)} |`; }), ...extraRows].join('\n');
@@ -47,7 +63,7 @@ const requestJson = ({ feature = FEATURE } = {}) => ({
 });
 const responseJson = ({ status = 'done', stop, reason, fields = null, next = ['uat.verify'] } = {}) => ({
   schemaVersion: 9, operatorId: OPERATOR, step: 1, parallel: 1, status, ...(stop ? { stop } : {}), fallbacks: [],
-  fields: fields ?? { 'uat-plan': 'response/response.md', units: 'response/data/units.json' },
+  fields: fields ?? { 'uat-plan': 'response/response.md', 'uat-case-sheet': 'response/data/cases.json', units: 'response/data/units.json' },
   ...(reason ? { reason } : {}), commits: [], next,
 });
 
@@ -85,6 +101,7 @@ const lawful = (units = UNITS, opts = {}) => ({
   'request/request.json': requestJson(),
   'response/response.json': responseJson(),
   'response/response.md': receiptOf(units, opts),
+  'response/data/cases.json': caseSheetDoc(units, opts.rows ?? ROWS),
   'response/data/units.json': unitsDoc(units),
 });
 const withUnits = (files, units) => ({ ...files, 'response/data/units.json': units });
@@ -92,8 +109,8 @@ const REASON = 'The goal names a viewer archiving an item, and neither the surfa
 const rowsWith = (id, patch) => ({ ...ROWS, [id]: { ...ROWS[id], ...patch } });
 
 await expectValid(lawful(), 'two flows with their own aliases and namespaces');
-await expectValid({ ...lawful(), 'response/response.json': responseJson({ status: 'blocked', stop: 'INVALID_INPUT', fields: {}, next: [] }), 'response/response.md': null, 'response/data/units.json': null }, 'a gate stop with no plan');
-await expectValid({ ...lawful(), 'response/response.json': responseJson({ status: 'blocked', stop: 'FLOW_UNDEFINED', reason: REASON, fields: {}, next: [] }), 'response/response.md': null, 'response/data/units.json': null }, 'a journey without an entry named in its reason');
+await expectValid({ ...lawful(), 'response/response.json': responseJson({ status: 'blocked', stop: 'INVALID_INPUT', fields: {}, next: [] }), 'response/response.md': null, 'response/data/cases.json': null, 'response/data/units.json': null }, 'a gate stop with no plan');
+await expectValid({ ...lawful(), 'response/response.json': responseJson({ status: 'blocked', stop: 'FLOW_UNDEFINED', reason: REASON, fields: {}, next: [] }), 'response/response.md': null, 'response/data/cases.json': null, 'response/data/units.json': null }, 'a journey without an entry named in its reason');
 
 // One list: the Flows table and the unit list agree by id.
 await expectError(withUnits(lawful(), unitsDoc([UNITS[0]])), 'Flows row remove-item has no entry', 'a Flows row without a unit');
@@ -113,10 +130,14 @@ await expectError(lawful(UNITS, { rows: rowsWith('remove-item', { steps: 0 }) })
 
 // Title, gate and stop shape.
 await expectError({ ...lawful(), 'request/request.json': requestJson({ feature: 'archive' }) }, 'the request names feature archive', 'a plan titled by another feature');
-await expectError({ ...lawful(), 'response/response.json': responseJson({ status: 'blocked', stop: 'FLOW_UNDEFINED', fields: {}, next: [] }), 'response/response.md': null, 'response/data/units.json': null }, 'carries a reason naming the journey', 'an undefined flow with no reason');
-await expectError({ ...lawful(), 'response/response.json': responseJson({ status: 'blocked', stop: 'FLOW_UNDEFINED', reason: 'two journeys:\narchive\nrestore', fields: {}, next: [] }), 'response/response.md': null, 'response/data/units.json': null }, 'spans more than one paragraph', 'a reason in several paragraphs');
+await expectError({ ...lawful(), 'response/response.json': responseJson({ status: 'blocked', stop: 'FLOW_UNDEFINED', fields: {}, next: [] }), 'response/response.md': null, 'response/data/cases.json': null, 'response/data/units.json': null }, 'carries a reason naming the journey', 'an undefined flow with no reason');
+await expectError({ ...lawful(), 'response/response.json': responseJson({ status: 'blocked', stop: 'FLOW_UNDEFINED', reason: 'two journeys:\narchive\nrestore', fields: {}, next: [] }), 'response/response.md': null, 'response/data/cases.json': null, 'response/data/units.json': null }, 'spans more than one paragraph', 'a reason in several paragraphs');
 await expectError({ ...lawful(), 'response/response.json': responseJson({ status: 'blocked', stop: 'FLOW_UNDEFINED', reason: REASON, next: [] }) }, 'emits no plan', 'an undefined flow that still emitted a plan');
 await expectError({ ...lawful(), 'response/response.json': responseJson({ next: ['git.publish'] }) }, 'which the Next table of uat.plan does not offer', 'a hand-off the Next table does not offer');
+
+await expectError({ ...lawful(), 'response/data/cases.json': { ...caseSheetDoc(), flows: caseSheetDoc().flows.map((f, i) => i ? f : { ...f, state: 'valid', action: 'create' }) } }, 'expected "reuse"', 'a valid flow classified for creation');
+await expectError({ ...lawful(), 'response/data/cases.json': { ...caseSheetDoc(), cases: caseSheetDoc().cases.map((c, i) => i ? c : { ...c, actor: 'another-actor' }) } }, 'absent from flow', 'a case assigned to an undeclared actor');
+await expectError({ ...lawful(), 'response/data/cases.json': { ...caseSheetDoc(), cases: caseSheetDoc().cases.map((c, i) => i ? c : { ...c, fixture: { ...c.fixture, createsAssertedOutcome: true } }) } }, 'expected false', 'a fixture that creates the asserted outcome');
 
 // Tiering: a journey the mission does not walk is planned secondary with its reason, and the plan says so.
 const DEFERRED = { id: 'archive-item', kind: 'flow', goal: 'a viewer archives an item and it leaves the list', inputs: [], dependsOn: [], tier: 'secondary', deferral: { reason: 'no done-when line walks the archive' } };

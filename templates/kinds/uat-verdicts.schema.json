@@ -81,18 +81,27 @@
       }
     },
     "cleanup": {
-      "description": "Cleanup deletes the run namespace and nothing else; a run record is history and is never deleted.",
+      "description": "Cleanup is a typed handoff to data.seed, the sole owner of the seed effect. uat.verify records the exact namespace and seed receipt but performs no database mutation.",
       "type": "object",
       "additionalProperties": false,
       "required": [
         "performed",
+        "owner",
+        "seedReceiptRef",
         "isUat",
         "namespace",
         "runRecordsDeleted"
       ],
       "properties": {
         "performed": {
-          "type": "boolean"
+          "const": false
+        },
+        "owner": {
+          "const": "data.seed"
+        },
+        "seedReceiptRef": {
+          "type": "string",
+          "minLength": 1
         },
         "isUat": {
           "const": true

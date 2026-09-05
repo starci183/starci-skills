@@ -65,6 +65,16 @@ mới thắng, và một head hydrate chậm hơn checkout hai commit không ph�
 Một nhánh bị chặn không phát biên nhận và không phát route: `response.json` là toàn bộ hồ sơ, còn
 `reason` mang quan sát đã biện minh cho lần dừng.
 
+## Luồng attempt cụ thể
+
+Các row của operator này được gate bởi hợp đồng attempt expected/actual dùng chung trong `scripts/attempt-gate.mjs`.
+
+| Trạng thái quan sát | Hành động | Kiểm actual | Nhánh kế tiếp |
+| --- | --- | --- | --- |
+| checkout đã khai hợp lệ | tái dùng đúng disk path, head, policy | đọc lại Git root, installed tree, write roots | phát binding |
+| thiếu declaration hoặc hydration | không đoán path gần giống và không tạo | ghi evidence thiếu | handoff workspace owner |
+| identity, head hoặc policy sai | từ chối binding cache | ghi root, revision hoặc policy xung đột | owner sửa, rồi attempt chỉ đọc mới |
+
 ## Ranh giới
 
 Context chỉ đọc, trừ trạng thái route đã hydrate cục bộ của máy, thứ mà Git bỏ qua. Operator chỉ ghi
@@ -110,8 +120,8 @@ và không mang phán quyết nào.
 | --- | --- | --- | --- | --- | --- |
 | 1 | Kiểm gate và chạy lại, và từ chối mọi hint nó mang | `resume` | `request/request.json`, phần requirements và head đóng băng của nó | — | `INVALID_INPUT`, `SOURCE_DRIFT`, `NO_PROGRESS` |
 | 2 | Ràng bootstrap và identity | — | @workspaces/device-state, định danh máy và roster credential đã niêm phong, @tools/secrets | — | `IDENTITY_UNVERIFIED` |
-| 3 | Phân giải route | `project`, `role`, `checkout` | @workspaces/projects/<project>/<role> đúng project và role này, @workspaces/local/routes/<project>/<role>, @tools/git | — | `ROUTE_UNDECLARED`, `ROUTE_UNHYDRATED`, `ROUTE_MISMATCH` |
-| 4 | Kiểm checkout: chính sách nhánh, cây sạch, các write root và cây đã cài | `gitPolicy`, `declaredWriteRoots`, `sharedInstall` | @workspaces/local/routes/<project>/<role>, checkout đã phân giải, nhánh, head, cây làm việc và `node_modules` của nó, @tools/git, @tools/shell | — | `BRANCH_POLICY_VIOLATION`, `CHECKOUT_DIRTY` |
+| 3 | Kiểm exact declaration và checkout, phân loại reusable, missing hoặc invalid theo identity và head, và chỉ resolve route đã khai reusable | `project`, `role`, `checkout` | @workspaces/projects/<project>/<role> đúng project và role này, @workspaces/local/routes/<project>/<role>, @tools/git | — | `ROUTE_UNDECLARED`, `ROUTE_UNHYDRATED`, `ROUTE_MISMATCH` |
+| 4 | Xác minh branch policy, clean tree, write roots và installed tree; ghi exact owner delta cho check sai và không sửa ở đây | `gitPolicy`, `declaredWriteRoots`, `sharedInstall` | @workspaces/local/routes/<project>/<role>, checkout đã phân giải, nhánh, head, cây làm việc và `node_modules` của nó, @tools/git, @tools/shell | — | `BRANCH_POLICY_VIOLATION`, `CHECKOUT_DIRTY` |
 | 5 | Ràng provenance và độ tươi, rồi phát | — | mọi thứ ở trên, @workspaces/device-state | `response/response.md`, `response/data/route.json`, `response/response.json` | — |
 
 Dưới

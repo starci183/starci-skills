@@ -36,13 +36,41 @@ const ASSERTIONS = { 'pay-and-enrol': ['entry', 'commitment', 'terminal'], 'aban
 const AUDIT_IN = 'step-1/parallel-1/response/response.md';
 const QUALITY_IN = 'step-2/parallel-1/response/response.md';
 const ROUTE_IN = 'step-1/parallel-2/response/data/route.json';
+const ACCOUNT_IN = 'step-2/parallel-2/response/data/account.json';
+const UAT_PLAN_IN = 'step-1/parallel-3/response/response.md';
+const CASE_SHEET_IN = 'step-1/parallel-3/response/data/cases.json';
+const SEED_IN = 'step-2/parallel-3/response/response.md';
 // The placeholder this operator's law forbids anywhere it writes.
 const LEAK = 'UAT-SHARED-PASSWORD';
 
 const frozenCase = (caseId, i, over = {}) => ({ caseId, order: i + 1, as: 'learner', assertions: [...ASSERTIONS[caseId]], ...over });
 const account = (alias = 'learner', over = {}) => ({
-  alias, username: `uat-${FLOW}-${alias}`, role: alias, credentialName: 'uat-shared', credentialRef: `.stacks/${ENV}/secrets/uat.enc`,
+  alias, username: `uat-${FLOW}-${alias}`, role: alias,
+  memberships: [`${alias}s`], providerAccountRef: `provider://accounts/${alias}`, accountAction: 'create',
+  loginProof: { method: 'browser', endpoint: 'http://localhost:3000/login', outcome: 'passed', evidenceRef: 'response/data/captures/login.json', verifiedAt: T(9) },
+  credentialName: 'uat-shared', credentialRef: `.stacks/${ENV}/secrets/uat.enc`,
   custody: 'sealed-shared-master-identity', isUat: true, plaintextRecorded: false, identity: ENTRY, provisionedBy: RUN, ...over,
+});
+const accountInput = (env = ENV) => ({
+  env, flow: FLOW, identity: ENTRY,
+  accounts: Object.fromEntries(snapshot({ env, accounts: [account('learner', { credentialRef: `.stacks/${env}/secrets/uat.enc` })] }).accounts.map((a) => [a.alias, {
+    username: a.username, role: a.role, memberships: a.memberships, providerAccountRef: a.providerAccountRef,
+    action: a.accountAction, observedAt: T(9), loginProof: a.loginProof,
+    credentialName: a.credentialName, sealed: a.credentialRef, provisionedBy: a.provisionedBy, createdAt: T(8),
+  }])),
+  plaintextRecorded: false,
+});
+const caseSheetInput = (env = ENV) => ({
+  contractVersion: 'starci/v2.2', feature: FEATURE, env, planVersion: 'uat-plan/1',
+  flows: [{ flowId: FLOW, state: 'valid', action: 'reuse', entry: '/enroll', actorAliases: ['learner'], namespace: NS }],
+  cases: CASES.map((caseId, i) => ({
+    caseId, flowId: FLOW, order: i + 1, actor: 'learner',
+    preconditions: ['the account and namespaced seed are ready'], inputs: ['representative enrollment'],
+    actions: ['enter the flow', 'complete the case'], assertions: [...ASSERTIONS[caseId]],
+    expected: ASSERTIONS[caseId].map((id) => `${id} holds`), verification: ['observe each assertion through the UI'],
+    fixture: { jsonRef: `.worktrees/uat/${FEATURE}/${FLOW}/seed/records.json`, sqlRef: null, createsAssertedOutcome: false },
+    cleanup: 'data.seed rolls back the receipt-owned namespace',
+  })),
 });
 
 // One product serves one integration branch on one port, so what keeps two concurrent runs apart is
@@ -70,7 +98,7 @@ function snapshot(over = {}) {
       { kind: 'quality-verification', ref: QUALITY_IN, commit: COMMIT },
     ],
     accounts: [account()],
-    flowSource: 'drafted-from-template',
+    flowSource: 'planned',
     golden: { state: 'candidate', ref: `${DIR}/snapshots/snapshot.json`, approvedBy: null, env: ENV },
     fixtureNamespace: NS,
     seed: { recordsRef: `${DIR}/seed/records.json`, expectedRef: `${DIR}/seed/expected.json`, fingerprint: FP(4), namespace: NS, isUat: true },
@@ -125,7 +153,7 @@ const lanes = (over = {}) => ['behavior', 'ux', 'ui'].map((l) => lane(l, over[l]
 function verdicts(over = {}) {
   return {
     runId: RUN, commit: COMMIT, resultRef: `${DIR}/runs/${RUN}/result.json`, latestRef: `${DIR}/latest.json`, historyRef: `${DIR}/history.md`,
-    lanes: lanes(), experience: experience(), cleanup: { performed: true, isUat: true, namespace: NS, runRecordsDeleted: false },
+    lanes: lanes(), experience: experience(), cleanup: { performed: false, owner: 'data.seed', seedReceiptRef: SEED_IN, isUat: true, namespace: NS, runRecordsDeleted: false },
     ...over,
   };
 }
@@ -213,11 +241,11 @@ const requestJson = ({ extra = {}, inputs, cases = [...CASES] } = {}) => ({
   schemaVersion: 9, operatorId: 'uat.verify', step: 3, parallel: 1, sessionId: 's-test',
   contexts: [{ alias: '@workspaces/be', head: COMMIT }, { alias: '@worktrees/uat/enrollment/paid-enrollment', head: null }],
   requirements: { approval: APPROVAL, feature: FEATURE, flow: FLOW, env: ENV, cases, runId: RUN, lease: `uat-lease://s-test/${FLOW}`, resume: null, ...extra },
-  inputs: inputs ?? { 'frontend-surface-audit': AUDIT_IN, 'quality-verification': QUALITY_IN, route: ROUTE_IN },
+  inputs: inputs ?? { 'frontend-surface-audit': AUDIT_IN, 'quality-verification': QUALITY_IN, route: ROUTE_IN, 'uat-account': ACCOUNT_IN, 'uat-plan': UAT_PLAN_IN, 'uat-case-sheet': CASE_SHEET_IN, 'seed-receipt': SEED_IN },
   resume: null,
 });
 
-function responseJson({ status = 'done', stop, next = ['git.publish', 'user'], captures = CASES.map((c) => `response/data/captures/${c}.json`), shots = CASES.map((c) => `response/artifacts/${c}.png`), drop } = {}) {
+function responseJson({ status = 'done', stop, next = ['data.seed', 'git.publish', 'user'], captures = CASES.map((c) => `response/data/captures/${c}.json`), shots = CASES.map((c) => `response/artifacts/${c}.png`), drop } = {}) {
   const fields = {
     'uat-flow-verification': 'response/response.md',
     'uat-snapshot': 'response/data/snapshot.json',
@@ -235,14 +263,20 @@ function responseJson({ status = 'done', stop, next = ['git.publish', 'user'], c
 // same runId; 'stale-latest' points latest at another run.
 function writeBranch(files, history = 'match') {
   files = structuredClone(files);
+  const requestEnv = files['request/request.json']?.requirements?.env ?? ENV;
   if (files['response/response.md'] && !files['response/response.md'].includes('## Audit scope')) files['response/response.md'] += "\n## Audit scope\n\n| Field | Value |\n| --- | --- |\n| Mode | not-recorded |\n| Coverage claim | not-recorded |\n| Deferred states | — |\n";
 
   const session = mkdtempSync(path.join(tmpdir(), 'uat-session-'));
   const branch = path.join(session, 'step-3', 'parallel-1');
   for (const d of ['request', 'response/data/captures', 'response/artifacts']) mkdirSync(path.join(branch, d), { recursive: true });
-  for (const input of [AUDIT_IN, QUALITY_IN, ROUTE_IN]) {
+  for (const input of [AUDIT_IN, QUALITY_IN, ROUTE_IN, ACCOUNT_IN, UAT_PLAN_IN, CASE_SHEET_IN, SEED_IN]) {
     mkdirSync(path.dirname(path.join(session, input)), { recursive: true });
-    writeFileSync(path.join(session, input), input.endsWith('.json') ? '{}\n' : '# admitting receipt\n');
+    const content = input === ACCOUNT_IN ? accountInput(requestEnv)
+      : input === CASE_SHEET_IN ? caseSheetInput(requestEnv)
+      : input === SEED_IN ? `# seed-receipt — ${FLOW}\n\n## Binding\n\n| Field | Value |\n| --- | --- |\n| Flow | ${FLOW} |\n| Environment | ${requestEnv} |\n| Namespace | ${NS} |\n| Seed fingerprint | ${FP(4)} |\n`
+      : input === UAT_PLAN_IN ? `# uat-plan — ${FEATURE}\n\n## Flows\n\n| Flow | Entry | Steps | Account | Seed namespace | Tier |\n| --- | --- | --- | --- | --- | --- |\n| ${FLOW} | /enroll | 4 | learner | ${NS} | journey |\n`
+      : input.endsWith('.json') ? {} : '# admitting receipt\n';
+    writeFileSync(path.join(session, input), typeof content === 'string' ? content : JSON.stringify(content, null, 2));
   }
   if(files['request/request.json']?.contexts?.some(c=>c.alias==='@workspaces/fe')) {
     for(const [kind,ref,operator]of [['frontend-surface-audit',AUDIT_IN,'interface.audit'],['quality-verification',QUALITY_IN,'quality.verify']]){
@@ -350,8 +384,8 @@ for(const [mutate,needle,label]of [
   [f=>{f['../../step-2/parallel-1/response/response.md']=`# quality\n\n## Binding\n\n| Field | Value |\n| --- | --- |\n| Head | ${OTHER_COMMIT} |\n| Checkout | @workspaces/fe |\n`;},'receipt names a stale or cross-role head','actual quality receipt disagrees with owner context'],
   [f=>{f['../../step-1/parallel-2/response/data/route.json']={role:'be'};},'browser route must identify the frontend role','backend endpoint cannot stand in for browser route'],
 ]){const f=splitRole();mutate(f);await expectError(f,needle,label);}
-await expectValid(withVerdicts({ behavior: 'fail' }, { next: ['backend.generate', 'user'], outcomes: { 'pay-and-enrol': 'fail', 'abandon-checkout': 'pass' } }), 'a behaviour failure routed to the backend');
-await expectValid(withVerdicts({ ux: 'fail' }, { next: ['user'], outcomes: { 'pay-and-enrol': 'fail', 'abandon-checkout': 'pass' } }), 'a UX failure routed to a person');
+await expectValid(withVerdicts({ behavior: 'fail' }, { next: ['data.seed', 'backend.generate', 'user'], outcomes: { 'pay-and-enrol': 'fail', 'abandon-checkout': 'pass' } }), 'a behaviour failure routed to cleanup and the backend');
+await expectValid(withVerdicts({ ux: 'fail' }, { next: ['data.seed', 'user'], outcomes: { 'pay-and-enrol': 'fail', 'abandon-checkout': 'pass' } }), 'a UX failure routed to cleanup and a person');
 await expectValid(blocked(), 'blocked on a missing admission, publishing nothing', 'none');
 await expectValid({ 'request/request.json': requestJson(), 'response/response.json': { schemaVersion: 9, operatorId: 'uat.verify', step: 3, parallel: 1, status: 'blocked', stop: 'IDENTITY_MISSING', fallbacks: [], fields: {}, commits: [], next: ['identity.provision'] } }, 'a flow with no account yet: handed to provisioning, which creates it', 'none');
 
@@ -376,7 +410,7 @@ await expectError({ ...baseline(), 'response/data/verdicts.json': verdicts({ lan
 await expectError({ ...baseline(), 'response/data/verdicts.json': verdicts({ lanes: [lane('behavior'), { ...lane('ux'), evidenceRefs: [] }, lane('ui')] }) }, 'array is too short', 'a lane with no evidence');
 await expectError({ ...withVerdicts({ behavior: 'fail' }, { next: ['git.publish'] }) }, 'a failing lane cannot hand to git.publish', 'a failing run handed to publication');
 await expectError({ ...baseline(), 'response/response.json': responseJson({ next: [] }) }, 'hands to git.publish', 'a passing run that routes nowhere');
-await expectError({ ...withVerdicts({ ux: 'fail' }, { next: ['backend.generate'] }) }, 'it hands to a person', 'a UX failure routed away from the person');
+await expectError({ ...withVerdicts({ ux: 'fail' }, { next: ['data.seed', 'backend.generate'] }) }, 'it hands to a person', 'a UX failure routed away from the person');
 
 // Evidence per case.
 await expectError({ ...baseline(), 'response/response.json': responseJson({ captures: [`response/data/captures/${CASES[0]}.json`] }), [`response/data/captures/${CASES[1]}.json`]: null }, `case ${CASES[1]} has no capture registered`, 'a frozen case with no capture');
@@ -400,8 +434,8 @@ await expectError({ ...baseline(), 'response/data/snapshot.json': snapshot({ acc
 await expectError({ ...baseline(), 'response/data/snapshot.json': snapshot({ accounts: [account('learner', { credentialRef: '.stacks/local/secrets/uat.txt' })] }) }, 'string does not match', 'a credential outside the sealed file');
 
 // Namespace and append-only history.
-await expectError({ ...baseline(), 'response/data/verdicts.json': verdicts({ cleanup: { performed: true, isUat: true, namespace: 'uat-anything', runRecordsDeleted: false } }) }, 'cleanup must name the exact run fixture namespace', 'a cleanup wider than the run');
-await expectError({ ...baseline(), 'response/data/verdicts.json': verdicts({ cleanup: { performed: true, isUat: true, namespace: NS, runRecordsDeleted: true } }) }, 'expected false', 'a cleanup that deleted a run record');
+await expectError({ ...baseline(), 'response/data/verdicts.json': verdicts({ cleanup: { ...verdicts().cleanup, namespace: 'uat-anything' } }) }, 'cleanup must name the exact run fixture namespace', 'a cleanup wider than the run');
+await expectError({ ...baseline(), 'response/data/verdicts.json': verdicts({ cleanup: { ...verdicts().cleanup, runRecordsDeleted: true } }) }, 'expected false', 'a cleanup that deleted a run record');
 await expectError(baseline(), 'runs are append-only', 'a run record rewritten with another result', 'rewritten');
 await expectError(baseline(), 'appends its record under runs/', 'a decided run that appended nothing', 'missing-run');
 await expectError(baseline(), 'but this run published', 'a latest pointer left on another run', 'stale-latest');
@@ -412,29 +446,27 @@ await expectError({ ...baseline(), 'response/response.md': responseMd().replace(
 await expectError({ ...baseline(), 'response/response.json': responseJson({ drop: 'uat-verdicts' }) }, 'required output uat-verdicts is not in fields', 'a decided run that published no verdicts');
 
 // The experience lane is scored, not asserted: UX-12 computes it, and the receipt copies it.
-await expectValid(withVerdicts({ ux: 'fail' }, { next: ['user'], outcomes: { 'pay-and-enrol': 'fail', 'abandon-checkout': 'pass' } }), 'a run whose experience lane is fix-first on a gating criterion');
+await expectValid(withVerdicts({ ux: 'fail' }, { next: ['data.seed', 'user'], outcomes: { 'pay-and-enrol': 'fail', 'abandon-checkout': 'pass' } }), 'a run whose experience lane is fix-first on a gating criterion');
 await expectError({ ...baseline(), 'response/data/verdicts.json': verdicts({ experience: { ...experience(), mean: 5 } }) }, 'the eleven scores average 4.00', 'an experience mean nobody computed');
 await expectError({ ...baseline(), 'response/data/verdicts.json': verdicts({ experience: { ...experience(), verdict: 'fix-first' } }) }, 'UX-12 makes it ship', 'an experience verdict UX-12 does not produce');
 await expectError({ ...baseline(), 'response/data/verdicts.json': verdicts({ experience: { ...experience(), entries: experience().entries.slice(0, 10) } }) }, 'array is too short', 'a criterion left out of the experience lane');
 await expectError({ ...baseline(), 'response/data/verdicts.json': verdicts({ experience: (() => { const l = experience(); l.entries[0] = { ...l.entries[0], verdict: 'fail', routeTo: 'none' }; l.mean = 4; l.verdict = 'fix-first'; l.routeTo = 'direction'; return l; })() }) }, 'fails UX-1 and routes nowhere', 'an experience failure that routes nowhere');
 await expectError({ ...baseline(), 'response/response.md': responseMd().replace('| `experience` | ship | none |', '| `experience` | fix-first | direction |') }, 'Verdict records fix-first', 'a receipt whose experience row differs from the lane');
 
-// A missing record is created, not reported. The baseline above is exactly that branch: a flow with
-// no folder yields a done run that drafted the flow document and its seed, ran as an account this run
-// provisioned, and left the first baseline as a candidate for a person to promote.
-const drafted = snapshot();
-assert.equal(drafted.flowSource, 'drafted-from-template');
-assert.equal(drafted.accounts[0].provisionedBy, RUN);
-assert.equal(drafted.golden.state, 'candidate');
+// The verifier freezes a planned flow and may publish the first candidate baseline it observed.
+const firstRun = snapshot();
+assert.equal(firstRun.flowSource, 'planned');
+assert.equal(firstRun.accounts[0].provisionedBy, RUN);
+assert.equal(firstRun.golden.state, 'candidate');
 
 // A flow whose folder already stood, verified against an approved reference.
 const settled = () => {
   const snap = snapshot({
-    flowSource: 'committed',
+    flowSource: 'planned',
     golden: { state: 'approved', ref: `${DIR}/snapshots/snapshot.json`, approvedBy: 'the product owner', env: ENV },
     accounts: [account('learner', { provisionedBy: null })],
   });
-  return { ...baseline(), 'response/data/snapshot.json': snap, 'response/response.md': responseMd({ snap }), 'response/response.json': responseJson({ next: ['git.publish'] }) };
+  return { ...baseline(), 'response/data/snapshot.json': snap, 'response/response.md': responseMd({ snap }), 'response/response.json': responseJson({ next: ['data.seed', 'git.publish'] }) };
 };
 await expectValid(settled(), 'a flow that already existed, verified against an approved reference');
 
@@ -442,7 +474,6 @@ await expectValid(settled(), 'a flow that already existed, verified against an a
 await expectError({ ...baseline(), 'response/data/snapshot.json': snapshot({ runId: 'run-1' }), 'response/data/verdicts.json': verdicts({ runId: 'run-1' }) }, 'is not <yyyymmdd-HHMMss>-<commit7>', 'a run identifier that names neither a moment nor a commit');
 await expectError({ ...baseline(), 'response/data/snapshot.json': snapshot({ runId: '20260110-000000-2222222' }), 'response/data/verdicts.json': verdicts({ runId: '20260110-000000-2222222' }) }, 'and the run was pinned at', 'a run identifier naming another commit than the run verified');
 await expectError({ ...baseline(), 'response/data/snapshot.json': snapshot({ golden: { state: 'candidate', ref: `${DIR}/snapshots/snapshot.json`, approvedBy: null, env: 'staging' } }) }, 'is not authority for another', 'a reference taken in another environment');
-await expectError({ ...baseline(), 'response/data/snapshot.json': snapshot({ flowSource: 'drafted-from-template', golden: { state: 'approved', ref: `${DIR}/snapshots/snapshot.json`, approvedBy: 'the product owner', env: ENV } }) }, 'the first run is the candidate a person promotes', 'a flow drafted this run that claims an approved reference');
 await expectError({ ...baseline(), 'response/data/snapshot.json': snapshot({ cases: [{ ...frozenCase(CASES[0], 0), as: 'reviewer' }, frozenCase(CASES[1], 1)] }) }, 'which no frozen account carries', 'a case acting as an alias nobody provisioned');
 // The host is the self-test's own: a stack lookup must not depend on where this checkout sits.
 const HOST = mkdtempSync(path.join(tmpdir(), 'uat-host-'));
@@ -453,15 +484,15 @@ const declare = (env, body) => {
   return `.stacks/${env}/environment.json#sha256:${createHash('sha256').update(bytes).digest('hex')}`;
 };
 const DEV_REF = declare('dev', { schemaVersion: 9, env: 'dev', production: false });
-const TIGHT_REF = declare('tight', { schemaVersion: 9, env: 'tight', production: false, authorization: { seed: 'person' } });
-assert.deepEqual(UAT_CLASSES, ['seed', 'identity-provisioning']);
+const TIGHT_REF = declare('tight', { schemaVersion: 9, env: 'tight', production: false, authorization: { 'identity-provisioning': 'person' } });
+assert.deepEqual(UAT_CLASSES, ['identity-provisioning']);
 const MOVED_REF = DEV_REF.replace(/[0-9a-f]{64}$/, '9'.repeat(64));
 const onHost = { hostRoot: HOST };
 await expectError({ ...baseline(), 'request/request.json': requestJson({ extra: { env: 'nowhere' } }) }, 'which this installation does not have', 'a run pointed at a stack nobody installed', undefined, onHost);
 await expectError({ ...baseline(), 'response/data/snapshot.json': snapshot({ accounts: [account('learner'), account('learner')] }) }, 'is frozen twice', 'one alias with two accounts');
 await expectError({ ...baseline(), 'response/data/snapshot.json': snapshot({ accounts: [account('learner', { credentialRef: '.stacks/staging/secrets/uat.enc' })] }) }, 'resolves its credential in another environment', 'an account sealed in another environment than the run drove');
-await expectError({ ...baseline(), 'response/response.json': responseJson({ next: ['git.publish'] }) }, 'no run approves its own reference', 'a first baseline promoted by the run that made it');
-await expectError({ ...baseline(), 'response/response.md': responseMd().replace('| Flow source | drafted-from-template |', '| Flow source | committed |') }, 'a drafted flow is honest and an undeclared draft is not', 'a drafted flow reported as a committed one');
+await expectError({ ...baseline(), 'response/response.json': responseJson({ next: ['data.seed', 'git.publish'] }) }, 'no run approves its own reference', 'a first baseline promoted by the run that made it');
+await expectError({ ...baseline(), 'response/response.md': responseMd().replace('| Flow source | planned |', '| Flow source | committed |') }, 'frozen plan source was planned', 'a planned flow reported as another source');
 
 // The record has to survive the machine that made it.
 await expectError(baseline(), 'appends one line to the flow history', 'a run that left no history line', 'no-history');
@@ -489,8 +520,8 @@ const authorityBranch = ({ approval, env = ENV }) => {
 };
 
 await expectValid(authorityBranch({ approval: DEV_REF }), 'a dev walk authorised by the environment declaration itself, no approval id needed', undefined, onHost);
-await expectValid(authorityBranch({ approval: APPROVAL, env: 'tight' }), 'an environment that tightened seed to person satisfied by a plain approval id', undefined, onHost);
-await expectError(authorityBranch({ approval: TIGHT_REF, env: 'tight' }), 'marks seed as person', 'an environment that tightened seed to person refusing a declaration reference', undefined, onHost);
+await expectValid(authorityBranch({ approval: APPROVAL, env: 'tight' }), 'an environment that tightened sign-in authority to person satisfied by a plain approval id', undefined, onHost);
+await expectError(authorityBranch({ approval: TIGHT_REF, env: 'tight' }), 'marks identity-provisioning as person', 'an environment that tightened sign-in authority to person refusing a declaration reference', undefined, onHost);
 await expectError(authorityBranch({ approval: MOVED_REF }), 'the declaration moved since it was read', 'a declaration reference whose hash no longer matches the file', undefined, onHost);
 await expectError(authorityBranch({ approval: DEV_REF, env: 'tight' }), 'authorises its own environment only', 'a dev declaration offered as approval for another environment', undefined, onHost);
 

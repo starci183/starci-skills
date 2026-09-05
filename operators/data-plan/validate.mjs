@@ -87,6 +87,19 @@ export async function validateDataPlanStep(branchDir, root = ROOT) {
       targeted.add(id);
     }
     for (const id of unitIds) if (!targeted.has(id)) errors.push(`${RECEIPT}: unit ${id} has no Targets row; a seeder learns which store its rows land in, whose they are and how many from this table or from nothing`);
+    const fixtureIds = new Set();
+    for (const [id, state, action, jsonRef, sqlRef, expected, createsOutcome] of tableUnder(receipt, '## Fixtures') ?? []) {
+      if (!unitIds.has(id)) errors.push(`${RECEIPT}: Fixtures names ${id}, which Units does not`);
+      if (fixtureIds.has(id)) errors.push(`${RECEIPT}: Fixtures lists ${id} twice`);
+      fixtureIds.add(id);
+      const expectedAction = { valid: 'reuse', missing: 'create', invalid: 'update' }[state];
+      if (action !== expectedAction) errors.push(`${RECEIPT}: fixture ${id} is ${state} and action ${action}; it must ${expectedAction}`);
+      if (!String(jsonRef).endsWith('.json')) errors.push(`${RECEIPT}: fixture ${id} has no JSON execution source`);
+      if (sqlRef !== '—' && !String(sqlRef).endsWith('.sql')) errors.push(`${RECEIPT}: fixture ${id} SQL is neither optional nor executable`);
+      if (!String(expected).trim()) errors.push(`${RECEIPT}: fixture ${id} has no expected read-back`);
+      if (createsOutcome !== 'false') errors.push(`${RECEIPT}: fixture ${id} creates the outcome the consumer must test`);
+    }
+    for (const id of unitIds) if (!fixtureIds.has(id)) errors.push(`${RECEIPT}: unit ${id} has no Fixtures row; data.seed cannot act from a target name alone`);
   }
   return { errors };
 }
