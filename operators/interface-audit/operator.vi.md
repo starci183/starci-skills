@@ -20,6 +20,11 @@ Tách chúng ra đã sinh ra một kiểu hỏng quen thuộc: một bức chụ
 phán quyết bởi một bước không còn cách nào biết điều đó, dựa trên bằng chứng mà chính nó không thu.
 Một operator vừa chờ, vừa đo, vừa phán quyết dưới một biên nhận thì không đánh mất mối nối ấy.
 
+Với hình ảnh, áp playbook của family đã bind vào chủ thể, kích thước, tương phản và crop thực tế.
+Ghi hình làm nổi bật ý nào và thứ tự chú ý sau render có hỗ trợ nội dung cùng hành động chính không.
+Điểm nhấn thị giác hoặc cảm xúc phù hợp có thể đáng dùng; lấp kín khoảng trống hay chỉ có một hình
+trên trang đều chưa chứng minh chất lượng.
+
 ## Route có cổng canh thì đi vào, không phải tuyên bố runtime chết
 
 Một route trả về màn hình đăng nhập là đang phục vụ rất tốt; thứ còn thiếu là một danh tính, và danh

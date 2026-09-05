@@ -20,6 +20,11 @@ Splitting them produced a familiar failure: a capture taken before the surface w
 step that could no longer tell, against evidence it had not itself collected. One operator that
 waits, measures and judges under one receipt cannot lose that connection.
 
+For imagery, apply the bound family's playbook to the rendered subject, scale, contrast and crop.
+Record which idea the image highlights and whether the resulting attention order supports the
+content and primary action. A relevant visual or emotional focal point can earn its place; neither
+empty-space coverage nor the mere presence of an image proves quality.
+
 ## A guarded route is reached, not declared unavailable
 
 A route that answers with a sign-in screen is serving perfectly well; what is missing is an identity,
