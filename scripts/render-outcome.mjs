@@ -22,27 +22,93 @@ function branchIdentity(branch) {
 
 const markdownLabel = (value) => String(value).replace(/([\\\[\]])/g, '\\$1').replace(/[\r\n]+/g, ' ').trim();
 const markdownPath = (value) => path.resolve(value).split(path.sep).join('/').replaceAll('>', '%3E');
-const limited = (value, lines = 40, chars = 4000) => String(value).split(/\r?\n/).slice(0, lines).join('\n').slice(0, chars).trim();
+const limited = (value, lines = 80, chars = 8000) => {
+  const source = String(value).split(/\r?\n/);
+  const kept = source.slice(0, lines);
+  let text = kept.join('\n');
+  if (text.length > chars) {
+    const boundary = text.lastIndexOf('\n', chars);
+    text = text.slice(0, boundary > 0 ? boundary : chars);
+  }
+  if (kept.length < source.length || text.length < kept.join('\n').length) text += '\n…';
+  return text.trim();
+};
 const fenced = (text, language = '') => `\`\`\`${language}\n${limited(text)}\n\`\`\``;
 
-function jsonTable(value) {
-  const rows = Array.isArray(value) ? value : value && typeof value === 'object' ? Object.entries(value).map(([key, item]) => ({ key, value: item })) : [];
+const display = (value) => String(typeof value === 'object' ? JSON.stringify(value) : value ?? '').replaceAll('|', '\\|').replace(/[\r\n]+/g, ' ').slice(0, 240);
+const headingLabel = (value) => String(value || 'Summary').replace(/([a-z0-9])([A-Z])/g, '$1 $2').replaceAll('-', ' ').replace(/^./, (letter) => letter.toUpperCase());
+const resultWeight = (value) => /(?:result|verdict|lane|gate|change|file|rule|case|finding|record|evidence|check|status|outcome|decision)/i.test(value) ? 1 : 0;
+
+function rowsTable(rows) {
   if (!rows.length || rows.some((row) => !row || typeof row !== 'object' || Array.isArray(row))) return null;
-  const headings = [...new Set(rows.slice(0, 10).flatMap((row) => Object.keys(row)))].slice(0, 12);
+  const headings = [...new Set(rows.slice(0, 20).flatMap((row) => Object.keys(row)))].slice(0, 16);
   if (!headings.length) return null;
-  const cell = (value2) => String(typeof value2 === 'object' ? JSON.stringify(value2) : value2 ?? '').replaceAll('|', '\\|').replace(/[\r\n]+/g, ' ').slice(0, 300);
-  return [`| ${headings.join(' | ')} |`, `| ${headings.map(() => '---').join(' | ')} |`, ...rows.slice(0, 10).map((row) => `| ${headings.map((heading) => cell(row[heading])).join(' | ')} |`)].join('\n');
+  // Wide case sheets can carry several arrays per row. Keep whole rows and leave room for the other
+  // sibling tables, rather than slicing midway through the first giant JSON string.
+  const rowLimit = Math.max(3, Math.min(20, Math.floor(40 / headings.length)));
+  const shown = rows.slice(0, rowLimit);
+  const lines = [`| ${headings.join(' | ')} |`, `| ${headings.map(() => '---').join(' | ')} |`, ...shown.map((row) => `| ${headings.map((heading) => display(row[heading])).join(' | ')} |`)];
+  if (shown.length < rows.length) lines.push('', `_${rows.length - shown.length} more row(s) remain in the full artifact._`);
+  return lines.join('\n');
 }
 
-function markdownTable(text) {
+function jsonTables(value) {
+  if (!value || typeof value !== 'object') return fenced(JSON.stringify(value, null, 2), 'json');
+  const sections = [];
+  const visit = (current, label, depth) => {
+    if (!current || typeof current !== 'object' || depth > 2) return;
+    if (Array.isArray(current)) {
+      if (!current.length) return;
+      const body = current.every((item) => item && typeof item === 'object' && !Array.isArray(item))
+        ? rowsTable(current)
+        : current.slice(0, 20).map((item) => `- ${display(item)}`).join('\n');
+      sections.push({ label, weight: resultWeight(label), body });
+      return;
+    }
+    const scalars = Object.entries(current).filter(([, item]) => item === null || typeof item !== 'object');
+    if (scalars.length) sections.push({ label: label || 'Summary', weight: resultWeight(label) + (label ? 0 : 0.5), body: rowsTable(scalars.map(([Field, Value]) => ({ Field, Value }))) });
+    for (const [field, item] of Object.entries(current)) if (item && typeof item === 'object') visit(item, field, depth + 1);
+  };
+  visit(value, '', 0);
+  sections.sort((left, right) => right.weight - left.weight);
+  const rendered = sections.filter((section) => section.body).map((section) => `### ${headingLabel(section.label)}\n\n${section.body}`).join('\n\n');
+  return rendered ? limited(rendered, 240, 12000) : fenced(JSON.stringify(value, null, 2), 'json');
+}
+
+function markdownTables(text) {
   const lines = String(text).split(/\r?\n/);
+  const tables = [];
   for (let index = 0; index < lines.length - 1; index += 1) {
     if (!/^\s*\|/.test(lines[index]) || !/^\s*\|(?:\s*:?-{3,}:?\s*\|)+\s*$/.test(lines[index + 1])) continue;
     const table = [];
-    for (let cursor = index; cursor < lines.length && /^\s*\|/.test(lines[cursor]); cursor += 1) table.push(lines[cursor]);
-    return table.slice(0, 12).join('\n');
+    let cursor = index;
+    for (; cursor < lines.length && /^\s*\|/.test(lines[cursor]); cursor += 1) table.push(lines[cursor]);
+    let title = 'Result';
+    for (let before = index - 1; before >= 0; before -= 1) if (/^#{1,6}\s+/.test(lines[before])) { title = lines[before].replace(/^#{1,6}\s+/, '').trim(); break; }
+    const weight = resultWeight(`${title} ${table[0] ?? ''}`) * 10 + (/binding|context|input/i.test(title) ? -5 : 0);
+    tables.push({ title, table, weight, index });
+    index = cursor - 1;
   }
-  return null;
+  tables.sort((left, right) => right.weight - left.weight || left.index - right.index);
+  const candidates = tables.some((item) => item.weight > 0) ? tables.filter((item) => item.weight >= 0) : tables;
+  const rendered = candidates.slice(0, 4).map(({ title, table }) => {
+    const shown = table.slice(0, 22);
+    if (shown.length < table.length) shown.push('', `_${table.length - shown.length} more row(s) remain in the full artifact._`);
+    return `### ${title}\n\n${shown.join('\n')}`;
+  }).join('\n\n');
+  return rendered ? limited(rendered, 180, 12000) : null;
+}
+
+function selectedMarkdownSections(text, pattern) {
+  const lines = String(text).split(/\r?\n/);
+  const sections = [];
+  for (let index = 0; index < lines.length; index += 1) {
+    if (!/^##\s+/.test(lines[index]) || !pattern.test(lines[index])) continue;
+    let end = index + 1;
+    while (end < lines.length && !/^##\s+/.test(lines[end])) end += 1;
+    sections.push(lines.slice(index, end).join('\n').trim());
+  }
+  return sections.length ? limited(sections.join('\n\n'), 160, 12000) : null;
 }
 
 function isReadableText(bytes) {
@@ -59,26 +125,31 @@ async function presentPrimary(branch, item) {
   const label = markdownLabel(item.label);
   if (item.kind === 'image') return `![${label}](<${target}>)`;
   if (item.kind === 'link') return `[${label}](<${target}>)`;
+  const withFullArtifact = (excerpt) => `${excerpt}\n\n[Open the full ${label} artifact](<${target}>)`;
   const bytes = await readFile(absolute);
   if (!isReadableText(bytes)) return `[${label}](<${target}>)`;
   const text = bytes.toString('utf8').replace(/^\uFEFF/, '');
   if (item.kind === 'table') {
-    let rendered = markdownTable(text);
+    let rendered = markdownTables(text);
     if (!rendered && path.extname(absolute).toLowerCase() === '.json') {
-      try { rendered = jsonTable(JSON.parse(text)); } catch { /* Full validation already reports malformed data output. */ }
+      try { rendered = jsonTables(JSON.parse(text)); } catch { /* Full validation already reports malformed data output. */ }
     }
-    return rendered || fenced(text, path.extname(absolute).toLowerCase() === '.json' ? 'json' : 'text');
+    return withFullArtifact(rendered || fenced(text, path.extname(absolute).toLowerCase() === '.json' ? 'json' : 'text'));
   }
   if (item.kind === 'code') {
-    if (path.extname(absolute).toLowerCase() === '.md') return limited(text);
-    const language = ({ '.js': 'javascript', '.mjs': 'javascript', '.ts': 'typescript', '.tsx': 'tsx', '.jsx': 'jsx', '.json': 'json', '.py': 'python', '.sh': 'bash', '.ps1': 'powershell', '.html': 'html', '.css': 'css', '.sql': 'sql' })[path.extname(absolute).toLowerCase()] ?? '';
-    return fenced(text, language);
+    if (path.extname(absolute).toLowerCase() === '.md') return withFullArtifact(selectedMarkdownSections(text, /(?:change|diff|file|mutation|result|verdict)/i) || limited(text));
+    const language = ({ '.js': 'javascript', '.mjs': 'javascript', '.ts': 'typescript', '.tsx': 'tsx', '.jsx': 'jsx', '.json': 'json', '.py': 'python', '.sh': 'bash', '.ps1': 'powershell', '.html': 'html', '.css': 'css', '.sql': 'sql', '.diff': 'diff', '.patch': 'diff' })[path.extname(absolute).toLowerCase()] ?? '';
+    return withFullArtifact(fenced(text, language));
   }
   if (item.kind === 'diagram') {
     const trimmed = text.trimStart();
-    return fenced(text, /^(?:flowchart|graph|sequenceDiagram|classDiagram|stateDiagram|erDiagram|journey|gantt|pie)\b/.test(trimmed) ? 'mermaid' : 'text');
+    const markdownMermaid = /```mermaid\s*[\s\S]*?```/i.exec(text)?.[0];
+    const rendered = markdownMermaid ?? (path.extname(absolute).toLowerCase() === '.md'
+      ? selectedMarkdownSections(text, /(?:diagram|model|flow|boundary|sequence)/i) || limited(text)
+      : fenced(text, /^(?:flowchart|graph|sequenceDiagram|classDiagram|stateDiagram|erDiagram|journey|gantt|pie)\b/.test(trimmed) ? 'mermaid' : 'text'));
+    return withFullArtifact(rendered);
   }
-  return limited(text);
+  return withFullArtifact(limited(text));
 }
 
 export async function renderOutcome(root, branch, { validateStepFn = validateStep, evidenceErrorsFn = evidenceManifestErrors } = {}) {
@@ -108,7 +179,9 @@ export async function renderOutcome(root, branch, { validateStepFn = validateSte
   const lines = ['## The best outcome', '', response.outcome.summary.trim(), '', await presentPrimary(branch, response.outcome.primary)];
   if (response.outcome.selectionReason) lines.push('', response.outcome.selectionReason.trim());
   if (response.outcome.secondary?.length) {
-    lines.push('', ...response.outcome.secondary.map((item) => `- [${markdownLabel(item.label)}](<${markdownPath(path.resolve(branch, item.ref))}>)`));
+    lines.push('', ...response.outcome.secondary.map((item) => item.kind === 'image'
+      ? `![${markdownLabel(item.label)}](<${markdownPath(path.resolve(branch, item.ref))}>)`
+      : `- [${markdownLabel(item.label)}](<${markdownPath(path.resolve(branch, item.ref))}>)`));
   }
   return `${lines.join('\n')}\n`;
 }
