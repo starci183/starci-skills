@@ -215,6 +215,35 @@
           }
         }
       }
+    },
+    "outcome": {
+      "description": "The reviewable result presented after a v2.2 done attempt is accepted. Every ref is one of this response's owned fields and is sealed with the attempt evidence.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["summary", "primary"],
+      "properties": {
+        "summary": { "type": "string", "minLength": 1, "maxLength": 1000 },
+        "primary": { "$ref": "#/definitions/outcomeItem" },
+        "secondary": {
+          "type": "array",
+          "maxItems": 8,
+          "uniqueItems": true,
+          "items": { "$ref": "#/definitions/outcomeItem" }
+        },
+        "selectionReason": { "type": "string", "minLength": 1, "maxLength": 1000 }
+      }
+    }
+  },
+  "definitions": {
+    "outcomeItem": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "label", "ref"],
+      "properties": {
+        "kind": { "enum": ["image", "table", "code", "diagram", "document", "link"] },
+        "label": { "type": "string", "minLength": 1, "maxLength": 200 },
+        "ref": { "type": "string", "pattern": "^(?:[a-z][a-z-]*/)?response/(?:(?:[a-z][a-z-]*/)*[A-Za-z0-9_.-]+\\.md|data/[A-Za-z0-9_./-]+\\.json|artifacts/[A-Za-z0-9_./-]+)$" }
+      }
     }
   },
   "allOf": [
@@ -229,6 +258,10 @@
     {
       "if": { "required": ["contractVersion"], "properties": { "status": { "enum": ["done", "blocked", "mismatch"] } } },
       "then": { "required": ["actual", "comparison"] }
+    },
+    {
+      "if": { "required": ["contractVersion"], "properties": { "status": { "const": "done" } } },
+      "then": { "required": ["outcome"] }
     },
     {
       "if": {

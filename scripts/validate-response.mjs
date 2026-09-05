@@ -7,7 +7,7 @@
 // exchange's own response is checked the same way. Effective means after `unless` is evaluated
 // against request.json requirements. Operator-specific law lives in operators/<id>/validate.mjs.
 import { existsSync } from 'node:fs';
-import { readFile, readdir } from 'node:fs/promises';
+import { lstat, readFile, readdir } from 'node:fs/promises';
 import path from 'node:path';
 import process from 'node:process';
 import { fileURLToPath } from 'node:url';
@@ -220,6 +220,114 @@ export async function profileReceiptErrors(root, pkg, response, { renamed = fals
   if (typeof ran === 'string' && ran !== bound && ran !== equivalent) errors.push(`${at}: ranProfile ${ran} is neither boundProfile ${bound} nor its configured equivalent ${equivalent ?? '(none)'}`);
   return errors;
 }
+
+const outcomeKinds = new Set(['image', 'table', 'code', 'diagram', 'document', 'link']);
+const inside = (parent, child) => {
+  const relative = path.relative(parent, child);
+  return relative !== '' && !relative.startsWith(`..${path.sep}`) && relative !== '..' && !path.isAbsolute(relative);
+};
+
+async function ownedArtifactErrors(dir, ref, kind, at) {
+  const errors = [];
+  const branch = path.resolve(dir);
+  const absolute = path.resolve(branch, ref);
+  if (!inside(branch, absolute)) return [`${at}.ref: ${ref} leaves its attempt branch`];
+  let current = absolute;
+  try {
+    while (inside(branch, current)) {
+      const stat = await lstat(current);
+      if (stat.isSymbolicLink()) return [`${at}.ref: ${ref} crosses a symbolic link`];
+      if (current === absolute && !stat.isFile()) return [`${at}.ref: ${ref} is not a regular file`];
+      current = path.dirname(current);
+    }
+  } catch (error) {
+    return [`${at}.ref: ${ref} is not a readable owned artifact (${error.code ?? error.message})`];
+  }
+  let bytes;
+  try { bytes = await readFile(absolute); }
+  catch (error) { return [`${at}.ref: ${ref} is not readable (${error.code ?? error.message})`]; }
+  if (bytes.length === 0) errors.push(`${at}.ref: ${ref} is empty`);
+  if (kind !== 'image' && !bytes.toString('utf8').trim()) errors.push(`${at}.ref: ${ref} has no readable content`);
+  if (kind === 'image' && bytes.length) {
+    const ext = path.extname(absolute).toLowerCase();
+    const png = bytes.length >= 33
+      && bytes.subarray(0, 8).equals(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]))
+      && bytes.subarray(12, 16).toString('ascii') === 'IHDR'
+      && bytes.readUInt32BE(16) > 0 && bytes.readUInt32BE(20) > 0
+      && bytes.subarray(bytes.length - 8, bytes.length - 4).toString('ascii') === 'IEND';
+    const jpeg = bytes.length >= 4 && bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[bytes.length - 2] === 0xff && bytes[bytes.length - 1] === 0xd9;
+    const webp = bytes.length >= 16 && bytes.subarray(0, 4).toString('ascii') === 'RIFF'
+      && bytes.subarray(8, 12).toString('ascii') === 'WEBP' && bytes.readUInt32LE(4) + 8 === bytes.length;
+    const svgText = ext === '.svg' ? bytes.toString('utf8').replace(/^\uFEFF/, '') : '';
+    const svg = ext === '.svg' && !svgText.includes('\u0000') && /^(?:\s*<\?xml[^>]*>\s*)?(?:\s*<!--[^]*?-->\s*)*<svg(?:\s|>)/i.test(svgText)
+      && /(?:<\/svg>\s*$|<svg[^>]*\/\s*>\s*$)/i.test(svgText);
+    const valid = (ext === '.png' && png) || (['.jpg', '.jpeg'].includes(ext) && jpeg) || (ext === '.webp' && webp) || svg;
+    if (!valid) errors.push(`${at}.ref: ${ref} is not a valid PNG, JPEG, WebP or SVG image matching its extension`);
+  }
+  return errors;
+}
+
+export async function loadOutcomeRegistry(root) {
+  const file = path.join(root, 'resources', 'outcomes.json');
+  try { return JSON.parse(await readFile(file, 'utf8')); }
+  catch (error) { throw new Error(`resources/outcomes.json: ${error.message}`); }
+}
+
+// The accepted result is reviewable before routing: it selects a declared, operator-owned output;
+// outcomes.json says which presentation kinds that output type can support; and the selected files
+// are real, readable evidence. Array-valued fields are flattened so an operator can select one
+// candidate capture without copying or rewriting it after the receipt is sealed.
+export async function outcomeErrors(root, dir, response, pkg, { exchange = null, rel = (f) => f, registry: suppliedRegistry } = {}) {
+  if (response?.contractVersion !== V22_CONTRACT) return [];
+  const at = rel('response/response.json');
+  if (response.status !== 'done') return response.outcome === undefined ? [] : [`${at}: outcome is reserved for an accepted done result; ${response.status} reports its truthful typed state without a best-outcome block`];
+  if (!response.outcome) return [`${at}: every v2.2 done receipt selects outcome.primary for “The best outcome”`];
+  let outcomeRegistry = suppliedRegistry;
+  if (!outcomeRegistry) {
+    try { outcomeRegistry = await loadOutcomeRegistry(root); }
+    catch (error) { return [error.message]; }
+  }
+  const errors = [];
+  if (outcomeRegistry?.schemaVersion !== 1 || !outcomeRegistry.kinds || !outcomeRegistry.operators) {
+    return ['resources/outcomes.json: expected schemaVersion 1 with kinds and operators maps'];
+  }
+  const operatorRule = outcomeRegistry.operators[response.operatorId];
+  if (!operatorRule || !Array.isArray(operatorRule.primaryKinds)) errors.push(`resources/outcomes.json: no primaryKinds policy for ${response.operatorId}`);
+
+  const outputs = (pkg?.en?.tables?.outputs?.rows ?? []).filter((row) => exchangeOf(unquote(row.file)) === exchange);
+  const fieldTypes = new Map();
+  for (const row of outputs) {
+    const field = kindOf(row.kind);
+    if (!fieldTypes.has(field)) fieldTypes.set(field, new Set());
+    fieldTypes.get(field).add(String(row.type ?? '').trim());
+  }
+  const declared = new Map();
+  for (const [field, value] of Object.entries(response.fields ?? {})) {
+    for (const ref of Array.isArray(value) ? value : [value]) {
+      if (!declared.has(ref)) declared.set(ref, new Set());
+      declared.get(ref).add(field);
+    }
+  }
+  const items = [response.outcome.primary, ...(response.outcome.secondary ?? [])];
+  const seen = new Set();
+  for (const [index, item] of items.entries()) {
+    const itemAt = `${at}.outcome.${index === 0 ? 'primary' : `secondary[${index - 1}]`}`;
+    if (!item || !outcomeKinds.has(item.kind) || typeof item.ref !== 'string') continue; // Structural errors come from response.schema.json.
+    if (seen.has(item.ref)) errors.push(`${itemAt}.ref: ${item.ref} is already selected; outcome links each artifact once`);
+    seen.add(item.ref);
+    if (index === 0 && operatorRule && !operatorRule.primaryKinds.includes(item.kind)) errors.push(`${itemAt}.kind: ${item.kind} is not an allowed primary kind for ${response.operatorId}`);
+    const kindRule = outcomeRegistry.kinds[item.kind];
+    if (!kindRule || !Array.isArray(kindRule.responseTypes)) errors.push(`resources/outcomes.json: kind ${item.kind} has no responseTypes policy`);
+    const fields = declared.get(item.ref);
+    if (!fields) errors.push(`${itemAt}.ref: ${item.ref} is not one of response.fields, so the operator does not own it as evidence`);
+    else if (kindRule) {
+      const compatible = [...fields].some((field) => [...(fieldTypes.get(field) ?? [])].some((type) => kindRule.responseTypes.includes(type)));
+      if (!compatible) errors.push(`${itemAt}: ${item.kind} cannot present ${item.ref}; its declared Output type is outside ${kindRule.responseTypes.join('|')}`);
+    }
+    errors.push(...await ownedArtifactErrors(dir, item.ref, item.kind, itemAt));
+  }
+  return errors;
+}
 // The goal the branch's request carried, read from disk when the caller did not pass it.
 async function requestOf(dir, exchange) {
   const file = path.join(exchange ? path.dirname(dir) : dir, 'request', 'request.json');
@@ -305,6 +413,7 @@ export async function validateResponse(root, dir, { requirements = {}, exchange 
     }
   }
   for (const kind of Object.keys(response.fields ?? {})) if (!outputs.some((r) => kindOf(r.kind) === kind)) errors.push(`${rel('response/response.json')}: fields.${kind} is not an Output of ${op.id}${exchange ? ` in exchange ${exchange}` : ''}`);
+  errors.push(...await outcomeErrors(root, dir, response, pkg, { exchange, rel }));
 
   // Stops, fallbacks, waiting.
   const stopsTable = new Set((op.tables.stops?.rows ?? []).map((r) => unquote(r.code)));
