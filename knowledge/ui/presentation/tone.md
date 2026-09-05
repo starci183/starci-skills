@@ -46,10 +46,13 @@ Generated from `@grammar/core` claims by `scripts/generate-presentation-owned.mj
 | `ChatWorkspace` | rail trigger, hasRail, isCompactRail | TONE-1 |
 | `Heading` | root, scale!="display", level=4 | TONE-2 |
 | `IconTile` | root, not (isSkeleton || showsArtwork), tone="neutral" | TONE-2 |
-| `Input` | button, not (!isSecret || toggleLabel === undefined) | TONE-2 |
-| `Sidebar` | group label, group.label!=undefined, not collapsed | TONE-2 |
-| `Sidebar` | list box item | TONE-1 |
-| `SurfaceAccordionCard` | accordion body | TONE-1 |
+| `Input` | reveal, not (!isSecret || toggleLabel === undefined) | TONE-2 |
+| `PressableField` | placeholder | TONE-2 |
+| `PressableField` | root | TONE-1 |
+| `PressableField` | shortcut, shortcut!=undefined | TONE-2 |
+| `Sidebar` | item | TONE-1 |
+| `Sidebar` | section label, group.label!=undefined, not collapsed | TONE-2 |
+| `SurfaceAccordionCard` | div | TONE-1 |
 | `SurfaceListCard` | fact, not (label === undefined || labelHidden), fact!=undefined | TONE-2 |
 | `Text` | root, not isSkeleton, resolvedTone="accent" | TONE-3 |
 | `Text` | root, not isSkeleton, resolvedTone="default" | TONE-1 |

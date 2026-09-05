@@ -15,7 +15,10 @@ through the tables every operator publishes in its `operator.md`:
 - a required **Input** pulls in the operator that produces that kind — a producer already in the
   chain first, else the one operator whose `primaryOutput` is that kind (two primaries are settled
   by the operator the Inputs row names), else the only producer; a kind the tables leave ambiguous
-  is a refusal that names the candidates, never a guess;
+  is a refusal that names the candidates, never a guess; and when the chain already holds several
+  branches of one operator, the mission's own order of "done when" lines settles which of them a
+  consumer reads — the branches whose lines come before its own, never a later one, because a later
+  branch of the same operator is another route, another finding or a later head;
 - a required Input whose kind an **imported slot** of the session already carries
   (`scripts/producer-import.mjs`: an evidence-only coordinate holding `import.json` beside a copied
   producer bundle) is already produced when no branch of the chain produces it: no producer is
@@ -47,7 +50,9 @@ edges win and the dropped edge is on record in the plan. The nodes are then pack
 a branch runs only when everything it depends on ran in an earlier step and a Next table of the step
 before names it; at most three branches per step (`resources/orchestrator.json#maxConcurrentAgents`,
 or `#concurrency.maxParallel` when declared); never two writers of one alias in one step; a fan-out
-branch alone in its step so its units can expand in place. Every branch gets a goal — the done-when
+branch alone in its step so its units can expand in place; and a publish or a deploy only once every
+branch still unplaced is itself a boundary, so a mission that publishes two routes ends with both,
+one after the other. Every branch gets a goal — the done-when
 line it evidences, or the earliest later branch it enables — which is what `request.json.goal`
 carries and `validate-request` checks.
 

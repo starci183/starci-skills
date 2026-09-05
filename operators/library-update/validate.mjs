@@ -352,7 +352,11 @@ export function presentationProjection(ts, text, file) {
   const visit = (node) => {
     if (ts.isJsxOpeningElement(node) || ts.isJsxSelfClosingElement(node) || ts.isJsxClosingElement(node)) result.push(`${node.kind}:${node.tagName.getText(source)}`);
     if (ts.isJsxText(node)) result.push(`text:${node.getText(source).trim()}`);
-    if (ts.isJsxAttribute(node) && ['className', 'style', 'data-contract'].includes(node.name.getText(source))) { result.push(node.getText(source)); collectNames(node); }
+    // The projection is what a node paints and how the tree is shaped: its classes, its inline style, its tag
+    // and its text. A `data-contract` claim is what the node says it paints, proved by the package's own claim
+    // gate and by the audit that measures the node; correcting a claim the render contradicts is the repair a
+    // grammar gap asks of the owner, so a claim is not frozen here.
+    if (ts.isJsxAttribute(node) && ['className', 'style'].includes(node.name.getText(source))) { result.push(node.getText(source)); collectNames(node); }
     if ((ts.isPropertyAssignment(node) || ts.isPropertyDeclaration(node)) && /^(?:className|style|styles|css|sx)$/.test(node.name?.getText(source) ?? '')) result.push(node.getText(source));
     if (ts.isImportDeclaration(node) && /\.(?:css|scss|sass|less)["']$/.test(node.moduleSpecifier.getText(source))) result.push(node.getText(source));
     if (ts.isBinaryExpression(node) && /\.(?:className|style|classList)(?:\.|\[|$)/.test(node.left.getText(source))) result.push(node.getText(source));
@@ -384,7 +388,10 @@ export function changeErrors(ctx) {
   for (const file of ctx.plan.files) {
     const full = safePath(ctx.checkout, file.path, false);
     const old = baseBytes(ctx.checkout, ctx.base, file.path);
-    if (file.kind === 'behavior' && !same(presentationProjection(ts, old.toString(), file.path), presentationProjection(ts, readFileSync(full, 'utf8'), file.path))) errors.push(`presentation changed in behavior repair: ${file.path}`);
+    // A script repair changes no presentation: its projection stays what it was. A style sheet is the presentation
+    // the family ships as its law (planErrors admits it as a behavior file), so the sheet itself is the repair and no
+    // script projection reads it.
+    if (file.kind === 'behavior' && /\.[cm]?[jt]sx?$/.test(file.path) && !same(presentationProjection(ts, old.toString(), file.path), presentationProjection(ts, readFileSync(full, 'utf8'), file.path))) errors.push(`presentation changed in behavior repair: ${file.path}`);
     if (file.kind === 'lockfile') {
       const original = JSON.parse(old);
       const expectedLock = structuredClone(original);

@@ -66,6 +66,21 @@ export function planChain({ packages, mission, options = {} }) {
     const roles = graph.get(consumer.operator).roles;
     const binds = picked.filter((n) => n.operator === BIND_OPERATOR);
     if (binds.length > 1 && roles.size) { const mine = binds.filter((n) => roles.has(n.presets.role)); if (mine.length) picked = [...picked.filter((n) => n.operator !== BIND_OPERATOR), ...mine]; }
+    // Several branches of one operator: which of them a consumer reads is settled by the mission's own
+    // order of done-when lines. A consumer that evidences line n reads the branches whose lines come
+    // before it, and not the ones that come after — a later branch of the same operator is another
+    // route, another finding or a later head, and depending on it would order every consumer after work
+    // it never reads. A consumer with no line of its own (a bind, a preflight) reads them all, and a
+    // consumer whose producers all come after it still reads the earliest, because it must read one.
+    const line = consumer.target ?? Infinity;
+    const byOperator = new Map();
+    for (const n of picked) if (n.operator !== BIND_OPERATOR) byOperator.set(n.operator, [...(byOperator.get(n.operator) ?? []), n]);
+    for (const [operator, branches] of byOperator) {
+      if (branches.length < 2) continue;
+      const earlier = branches.filter((n) => (n.target ?? -1) < line);
+      const kept = new Set((earlier.length ? earlier : [branches[0]]).map((n) => n.key));
+      picked = picked.filter((n) => n.operator !== operator || kept.has(n.key));
+    }
     return picked.map((n) => n.key);
   };
   const depend = (n, key) => { if (key !== n.key) n.deps.add(key); };
@@ -216,9 +231,12 @@ export function planChain({ packages, mission, options = {} }) {
     const ready = [...nodes.keys()].filter((k) => !placed.has(k) && [...edges.get(k)].every((d) => placed.has(d))).sort((a, b) => weight.get(b) - weight.get(a) || byKey(a, b));
     if (!ready.length) throw new PlanError([`the chain has a cycle among ${[...nodes.keys()].filter((k) => !placed.has(k)).join(', ')}`]);
     const previous = steps.length ? steps[steps.length - 1].map((k) => nodes.get(k).operator) : null;
-    // A publish or a deploy ends the chain: it is placed only when nothing else is left to place.
+    // A publish or a deploy ends the chain: it is placed only when nothing else is left to place —
+    // that is, when every node still unplaced is itself a boundary. A mission that publishes two routes
+    // holds two of them, one after the other, and the second is not a reason to hold the first back.
     const terminal = (k) => [PUBLISH_OPERATOR, DEPLOY_OPERATOR].includes(nodes.get(k).operator);
-    const pending = ready.filter((k) => !terminal(k) || placed.size + ready.filter(terminal).length === nodes.size);
+    const working = [...nodes.keys()].some((k) => !placed.has(k) && !terminal(k));
+    const pending = ready.filter((k) => !terminal(k) || !working);
     const allowed = previous ? pending.filter((k) => previous.some((p) => p === nodes.get(k).operator || graph.get(p).next.has(nodes.get(k).operator))) : pending;
     if (!allowed.length) throw new PlanError([`${(pending.length ? pending : ready).map((k) => nodes.get(k).operator).join(', ')} could run next, and no Next table of ${(previous ?? []).join(', ')} permits any of them${pending.length ? '' : ' before the chain ends'}`]);
     const chosen = [];

@@ -7,9 +7,18 @@
 // It never binds anything but 127.0.0.1, so nothing it serves leaves the machine. `--stop <pid>`
 // ends a server this script started and marks its receipt stopped. The process stays in the
 // foreground; a branch that ends or resumes stops it (SIGINT/SIGTERM) and the receipt says so.
-import { createReadStream, existsSync, readdirSync, statSync, writeFileSync, readFileSync } from 'node:fs';
+//
+// A server is asked to stop by a marker it polls itself, never by a signal alone: only the process
+// that holds the receipt can complete it, and a signal does not always leave it the chance —
+// Node implements SIGTERM on Windows as a hard terminate, so a receipt closed that way never gains
+// its stoppedAt and reads as a server still running. The marker is a file named after the pid in the
+// system temp folder, which is the one address a stopper holding nothing but a pid can compute; the
+// server removes a stale one at start, honours a fresh one within a poll, and the stopper terminates
+// only a server that has not answered within the grace period.
+import { createReadStream, existsSync, readdirSync, rmSync, statSync, writeFileSync, readFileSync } from 'node:fs';
 import http from 'node:http';
 import net from 'node:net';
+import { tmpdir } from 'node:os';
 import path from 'node:path';
 import process from 'node:process';
 
@@ -86,7 +95,31 @@ export async function listen(server, port = PORT_RANGE.first) {
   throw new Error(`no free port in ${PORT_RANGE.first}-${PORT_RANGE.last}`);
 }
 
-export async function start(folder, receiptPath = path.join(folder, 'host.json')) {
+// The address of a stop request: a file named after the pid in the system temp folder. A stopper holds
+// a pid and nothing else, and the server holds its receipt, so this name is what the two share.
+export const stopMarker = (pid, dir = tmpdir()) => path.join(dir, `starci-host-${pid}.stop`);
+const alive = (pid) => { try { process.kill(pid, 0); return true; } catch { return false; } };
+const remove = (file) => { try { if (existsSync(file)) rmSync(file); } catch { /* another process got there first */ } };
+const sleep = (ms) => new Promise((resolve) => { setTimeout(resolve, ms).unref?.(); });
+
+// Ask the server at `pid` to stop and give it the grace period to complete its own receipt; terminate
+// only one that never answered. Returns how it ended: `stopped` (the marker was honoured), `terminated`
+// (the grace period passed and the process was killed) or `gone` (nothing was running there).
+export async function requestStop(pid, { dir = tmpdir(), graceMs = 5000, pollMs = 100, terminate = true } = {}) {
+  if (!alive(pid)) return 'gone';
+  const marker = stopMarker(pid, dir);
+  writeFileSync(marker, `${new Date().toISOString()}\n`);
+  for (let waited = 0; waited < graceMs; waited += pollMs) {
+    await sleep(pollMs);
+    if (!alive(pid)) return 'stopped';
+  }
+  remove(marker);
+  if (!terminate) return 'stopped';
+  try { process.kill(pid, 'SIGTERM'); } catch { /* it ended between the last poll and here */ }
+  return 'terminated';
+}
+
+export async function start(folder, receiptPath = path.join(folder, 'host.json'), { markerDir = tmpdir(), pollMs = 100, onStopped = null } = {}) {
   if (!existsSync(folder) || !statSync(folder).isDirectory()) throw new Error(`${folder} is not a folder`);
   const server = serve(folder);
   const port = await listen(server);
@@ -97,21 +130,30 @@ export async function start(folder, receiptPath = path.join(folder, 'host.json')
     stopsWhen: 'the branch ends or is resumed',
   };
   writeFileSync(receiptPath, `${JSON.stringify(receipt, null, 2)}\n`);
+  const marker = stopMarker(receipt.pid, markerDir);
+  remove(marker); // a marker left by an earlier server with this pid stops nobody
+  let watcher = null;
   const stop = () => {
+    if (watcher) { clearInterval(watcher); watcher = null; }
+    remove(marker);
     server.close();
     try { writeFileSync(receiptPath, `${JSON.stringify({ ...receipt, stoppedAt: new Date().toISOString() }, null, 2)}\n`); } catch { /* the folder may be gone */ }
   };
-  return { server, receipt, stop };
+  watcher = setInterval(() => { if (existsSync(marker)) { stop(); onStopped?.(); } }, pollMs);
+  watcher.unref?.(); // the server is what keeps the process alive, never the poll
+  return { server, receipt, stop, marker };
 }
 
 if (process.argv[1] && path.resolve(process.argv[1]) === new URL(import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, '$1').split('/').join(path.sep)) {
   const opts = parseArgs(process.argv.slice(2));
   if (opts.stop) {
-    try { process.kill(opts.stop, 'SIGTERM'); console.log(`stopped ${opts.stop}`); } catch (e) { console.error(`host: ${e.message}`); process.exitCode = 1; }
+    const ended = await requestStop(opts.stop);
+    if (ended === 'gone') { console.error(`host: no server is running at pid ${opts.stop}`); process.exitCode = 1; }
+    else console.log(`${ended} ${opts.stop}${ended === 'terminated' ? '; it never answered the stop marker, so its receipt has no stoppedAt' : ''}`);
   } else if (!opts.folder) {
     console.error('usage: node scripts/host-artifacts.mjs <folder> [--receipt <path>] | --stop <pid>'); process.exitCode = 2;
   } else {
-    const { receipt, stop } = await start(opts.folder, opts.receipt ?? path.join(opts.folder, 'host.json'));
+    const { receipt, stop } = await start(opts.folder, opts.receipt ?? path.join(opts.folder, 'host.json'), { onStopped: () => process.exit(0) });
     console.log(`${receipt.url} (pid ${receipt.pid}, ${receipt.pages.length} page(s)); Ctrl+C or --stop ${receipt.pid} to end`);
     for (const sig of ['SIGINT', 'SIGTERM']) process.on(sig, () => { stop(); process.exit(0); });
   }

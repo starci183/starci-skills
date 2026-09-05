@@ -223,13 +223,13 @@ ${printed.join(String.fromCharCode(10))}
 | --- | --- |
 `;
 
-const requestJson = ({ extra = {} } = {}) => ({
+const requestJson = ({ extra = {}, contexts = [] } = {}) => ({
   schemaVersion: 9,
   operatorId: 'interface.audit',
   step: 4,
   parallel: 1,
   sessionId: 's-test',
-  contexts: [{ alias: '@knowledge/ui/proof', head: null }, { alias: '@workspaces/fe', head: 'e'.repeat(40) }, { alias: '@worktrees/sessions/central-runtime', head: null }],
+  contexts: [{ alias: '@knowledge/ui/proof', head: null }, { alias: '@workspaces/fe', head: 'e'.repeat(40) }, { alias: '@worktrees/sessions/central-runtime', head: null }, ...contexts],
   requirements: { auditScope: { surfaces: structuredClone(SURFACES) }, matrix: [], readinessProbe: 'route-served', resume: null, ...extra },
   inputs: {
     'frontend-source-application': 'step-3/parallel-1/response/response.md',
@@ -261,7 +261,7 @@ const responseJson = ({ status = 'done', stop, fields, next = ['interface.fix'],
 
 // The direction decision this audit reads: its selection policy and the scores the printed sheet
 // showed the person, with `failing` naming the criteria the selected candidate was shown failing.
-const decisionMd = ({ policy = 'approval-required', selected = 'one-column', failing = [] } = {}) => [
+const decisionMd = ({ policy = 'approval-required', selected = 'one-column', failing = [], presentationDelta = 'app-owned' } = {}) => [
   '# frontend-direction-decision — plan-picker',
   '',
   '## Decision',
@@ -270,7 +270,7 @@ const decisionMd = ({ policy = 'approval-required', selected = 'one-column', fai
   '| --- | --- |',
   `| Direction id | ${BT}plan-picker${BT} |`,
   `| Selection policy | ${BT}${policy}${BT} |`,
-  `| Presentation delta | ${BT}app-owned${BT} |`,
+  `| Presentation delta | ${BT}${presentationDelta}${BT} |`,
   `| Selected candidate | ${BT}${selected}${BT} |`,
   '',
   '## Scores',
@@ -465,6 +465,42 @@ await expectError(lensBranch(() => tastePersonAccepted('nowhere'), SHIPPED), 'na
 await expectError(lensBranch(() => tastePersonAccepted('step-9/parallel-9'), SHIPPED), 'not the decision this audit reads', 'a person-accepted row naming another decision', { decision: { failing: ['TASTE-2'] } });
 await expectError(lensBranch(tastePersonAccepted, SHIPPED), 'was not shown failing', 'a person-accepted criterion the chosen candidate was never shown failing', { decision: { failing: [] } });
 await expectError(lensBranch(tastePersonAccepted, SHIPPED), 'took by itself', 'a person-accepted row over a decision the operator took automatically', { decision: { policy: 'automatic', failing: ['TASTE-2'] } });
+
+// A refine that composed nothing (the direction declares Presentation delta none): the reference
+// criterion does not apply and reads `n/a` out of the arithmetic (TASTE-12 Case 5), and the lens
+// itself is the prior audit's, cited under ## Calibration as inherited — so no anchors are owed, the
+// verdicts carry none, and a fix-first carried this way lets the checkout's gates run.
+const REFINE = { decision: { presentationDelta: 'none' } };
+const INHERITED_ROW = `| ${BT}inherited${BT} | taste step-3/parallel-1 | — |`;
+const notApplicable = (over = {}) => {
+  const lens = taste();
+  lens.entries[11] = { rule: 'TASTE-12', measured: `${'n/a'}: the direction declares Presentation delta none, so this delivery composed nothing to sort`, score: null, verdict: 'pass', routeTo: 'none' };
+  return { ...lens, mean: 4, verdict: 'ship', ...over };
+};
+const refineFiles = (lens, { calibrationRows = INHERITED_ROW, calibration = undefined, next = ['interface.fix', 'quality.verify'] } = {}) => ({
+  ...baseline(),
+  'response/data/verdicts.json': { ...verdicts(lens, calibration), ...(calibration === undefined ? { calibration: undefined } : {}) },
+  'response/response.md': responseMd(lens(), PRINTED, served(), { calibrationRows }).replace('| null | pass |', '| — | pass |'),
+  'response/response.json': responseJson({ next }),
+});
+await expectValid(refineFiles(notApplicable), 'a refine: the reference criterion reads n/a out of the mean, and the lens is inherited from the audit that scored the composition', REFINE);
+// The same lens fix-first on a criterion the earlier composition owns: the finding stands where it was
+// raised, so this branch may hand to the gates instead of opening a direction round it did not cause.
+const refineFixFirst = () => { const lens = notApplicable(); lens.entries[1] = { rule: 'TASTE-2', measured: VOID_BAND, score: 2, verdict: 'fail', routeTo: 'direction' }; lens.mean = 3.82; lens.verdict = 'fix-first'; return lens; };
+await expectValid(refineFiles(refineFixFirst), 'a fix-first lens inherited by a refine hands to the gates: the composition it judges is not the one this branch delivered', REFINE);
+await expectError(refineFiles(refineFixFirst, { calibrationRows: CALIBRATION_ROWS(), calibration: CALIBRATION, next: ['interface.fix', 'quality.verify'] }), 'the taste lens is fix-first, so next names interface.generate', 'a refine that scored the lens itself and still skipped the direction round');
+await expectError(refineFiles(notApplicable), 'a delivery that composed something is scored on the sheets it composed', 'an app-owned delivery inheriting a lens it owes anchors for');
+await expectError(refineFiles(notApplicable, { calibrationRows: `| ${BT}inherited${BT} | taste 1–2 | — |` }), 'names no branch it was scored in', 'an inherited lens with no branch behind it', REFINE);
+await expectError(refineFiles(notApplicable, { calibrationRows: `| ${BT}inherited${BT} | taste step-4/parallel-1 | — |` }), 'which is this branch', 'a lens inherited from itself', REFINE);
+await expectError(refineFiles(notApplicable, { calibration: CALIBRATION, calibrationRows: `${INHERITED_ROW}` }), 'an inherited lens took no anchors of its own', 'an inherited lens with anchor scores beside it', REFINE);
+await expectValid(refineFiles(notApplicable, { calibrationRows: CALIBRATION_ROWS(), calibration: CALIBRATION }), 'a refine that scores its own lens on its own anchors: inheriting is a permission, not an obligation', REFINE);
+await expectError(refineFiles(() => { const l = notApplicable(); l.entries[11] = { ...l.entries[11], score: 4 }; return l; }), 'passes nothing and routes nowhere', 'a criterion that does not apply and still carries a score', REFINE);
+await expectError(refineFiles(() => { const l = notApplicable(); l.entries[0] = { rule: 'TASTE-1', measured: 'n/a: not looked at', score: null, verdict: 'pass', routeTo: 'none' }; return l; }), 'only the reference criterion TASTE-12 stops applying', 'another criterion marked as not applying', REFINE);
+{
+  // Under an app-owned delta the criterion applies: TASTE-12 is scored like the other eleven.
+  const files = refineFiles(notApplicable, { calibrationRows: CALIBRATION_ROWS(), calibration: CALIBRATION });
+  await expectError(files, 'a delivery that composed something is sorted into the class its own references name', 'a criterion marked n/a while the delivery composed');
+}
 
 // The matrix paragraph and TASTE-13 Case 8: a state the direction's coverage declares (`empty`) was
 // never captured, so composition, accessibility and taste — the topics whose rules read across
@@ -736,5 +772,34 @@ await expectError(drivenFiles({ captures: { [NARROW]: capture(NARROW) } }), 'thi
   await expectError(files, 'a capture whose walk nobody ran is refused', 'a walk with no result beside it');
 }
 await expectError(drivenFiles({ captures: { [WIDE]: { ...drivenCapture(auditWalk(WIDE)), viewport: [1280, 800] } } }), 'the walk ran at 1440x900', 'a capture claiming a viewport the walk did not run');
+
+// The runner's own records of the page stand beside every driven screenshot, and a page that draws an
+// inline icon or runs a framework in development carries URLs of its own. The origin sweep reads what
+// the agent wrote (scripts/validate-walk.mjs#PAGE_RECORD), so such a receipt validates rather than
+// tripping the gate once per captured page.
+const PAGE_HTML = '<svg xmlns="http://www.w3.org/2000/svg"><path d="M0 0"/></svg> https://react.dev/link/switch-to-createroot';
+const withPageRecords = (files) => {
+  for (const id of [WIDE, NARROW]) {
+    files[`response/artifacts/${id}.dom.json`] = JSON.stringify({ url: ROUTE, title: 'Plans', html: PAGE_HTML }, null, 2);
+    files[`response/artifacts/${id}.ax.txt`] = `- heading "Plans"${String.fromCharCode(10)}- link "Docs" /url: https://react.dev/link/x`;
+  }
+  return files;
+};
+await expectValid(withPageRecords(drivenFiles()), 'the runner\'s DOM and accessibility records of a page carrying an inline SVG namespace and a framework link');
+await expectError(withPageRecords(drivenFiles({ captures: { [WIDE]: { ...drivenCapture(auditWalk(WIDE)), nodes: [{ path: MAIN, owner: 'app', claims: ['GAP-5'], measured: { gap: '1.5rem', href: 'https://evil.example/collect' } }, capture(WIDE).nodes[1]] } } })), 'foreign-url', 'a capture record the agent wrote that names another origin');
+
+// And the ledger records it: the receipt the operator's own validator accepts is the one
+// scripts/record-findings.mjs appends from, so a driven audit's findings reach the family's ledger.
+{
+  const { recordFindings } = await import('../../scripts/record-findings.mjs');
+  const files = withPageRecords(drivenFiles());
+  files['request/request.json'] = requestJson({ contexts: [{ alias: '@knowledge/grammars/core', head: null }] });
+  const { branch, session } = writeBranch(files);
+  const ledgerDir = path.join(session, 'ledger');
+  const recorded = await recordFindings(branch, { ledgerDir });
+  assert.equal(recorded.family, 'core');
+  assert.ok(recorded.appended >= 1, 'the failing verdict of a driven audit reaches the ledger');
+  rmSync(session, { recursive: true, force: true });
+}
 
 process.stdout.write('interface.audit self-test: scope, owner routing, evidence, walk, measurement citation and mutation checks passed\n');

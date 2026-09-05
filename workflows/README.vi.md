@@ -15,7 +15,10 @@ mà mỗi operator công bố trong `operator.md` của mình:
 - một **Đầu vào** bắt buộc kéo vào operator sinh ra kind đó — ưu tiên producer đã có trong chuỗi,
   rồi đến operator duy nhất có `primaryOutput` là kind ấy (hai primary thì phân xử bằng operator mà
   dòng Đầu vào gọi tên), rồi đến producer duy nhất; kind nào các bảng để mập mờ thì bị từ chối kèm
-  tên các ứng viên, không bao giờ đoán;
+  tên các ứng viên, không bao giờ đoán; và khi chuỗi đã có nhiều nhánh của cùng một operator, chính
+  thứ tự các dòng "xong khi" của nhiệm vụ phân xử consumer đọc nhánh nào — những nhánh có dòng đứng
+  trước dòng của nó, không bao giờ một nhánh đứng sau, vì nhánh sau của cùng một operator là một
+  route khác, một finding khác hay một head sau này;
 - một Đầu vào bắt buộc mà kind của nó đã nằm sẵn trong một **slot nhập** của phiên
   (`scripts/producer-import.mjs`: một tọa độ chỉ-là-bằng-chứng giữ `import.json` bên cạnh bundle
   producer đã chép) thì coi như đã được sinh khi không nhánh nào của chuỗi sinh ra nó: không thêm
@@ -47,7 +50,9 @@ trong plan. Rồi các nút được xếp thành bậc: một nhánh chỉ ch�
 bậc trước và bảng Kế tiếp của bậc trước gọi tên nó; tối đa ba nhánh một bậc
 (`resources/orchestrator.json#maxConcurrentAgents`, hoặc `#concurrency.maxParallel` khi được khai);
 không bao giờ hai nhánh cùng ghi một alias trong một bậc; nhánh toả đứng riêng một bậc để các đơn
-vị của nó mở rộng tại chỗ. Mỗi nhánh có một goal — dòng "xong khi" nó chứng minh, hoặc nhánh sau
+vị của nó mở rộng tại chỗ; và một lần publish hay deploy chỉ được xếp khi mọi nhánh còn lại đều là
+ranh giới, nên một nhiệm vụ publish hai route kết thúc bằng cả hai, cái này sau cái kia. Mỗi nhánh
+có một goal — dòng "xong khi" nó chứng minh, hoặc nhánh sau
 sớm nhất mà nó mở đường — chính là thứ `request.json.goal` mang và `validate-request` kiểm.
 
 Plan cố định requirements của một nhánh trước khi request của nó tồn tại — `role` của bind, `roles`

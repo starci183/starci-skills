@@ -70,13 +70,24 @@ const DATA_BOUND = 'data-bound';
 // of that decision, and is kept out of the arithmetic: the rubric never overturns a decision the
 // person took on its own evidence in the same session.
 const PERSON_ACCEPTED = 'person-accepted';
+// TASTE-12 Case 5: a delivery whose direction declares a presentation delta of `none` composed nothing
+// to be sorted into a class, so the reference criterion does not apply to it. Its row reads `n/a` with
+// no score and stays out of the arithmetic — the class is the one the direction it refines was scored
+// against. Only that criterion takes this marker, and only under that delta.
+const NOT_APPLICABLE = 'n/a';
+const REFERENCE_RULE = 'TASTE-12';
+// The two values a direction's `Presentation delta` takes (interface.generate publishes the field);
+// `none` is the delivery that changed copy, behaviour or a binding and no presentation value.
+const DELTA_NONE = 'none';
 const BRANCH = /step-\d+\/parallel-\d+/;
+const branchOf = (dir) => { const m = /step-(\d+)[\\/]parallel-(\d+)$/.exec(path.resolve(dir)); return m ? `step-${m[1]}/parallel-${m[2]}` : null; };
 const measuredText = (row) => (Array.isArray(row.measured) ? row.measured : [row.measured]).map(String).join(' ');
 export const isBelowVolume = (row) => measuredText(row).includes(BELOW_VOLUME);
 export const isDataBound = (row) => measuredText(row).includes(DATA_BOUND);
 export const isPersonAccepted = (row) => measuredText(row).includes(PERSON_ACCEPTED);
+export const isNotApplicable = (row) => measuredText(row).includes(NOT_APPLICABLE);
 export function tasteVerdict(rows) {
-  const scored = rows.filter((r) => r.verdict !== 'deferred' && !isDataBound(r) && !isBelowVolume(r) && !isPersonAccepted(r));
+  const scored = rows.filter((r) => r.verdict !== 'deferred' && !isDataBound(r) && !isBelowVolume(r) && !isPersonAccepted(r) && !isNotApplicable(r));
   const mean = scored.length ? scored.reduce((sum, r) => sum + Number(r.score), 0) / scored.length : 0;
   if (rows.some(isBelowVolume)) return { mean, verdict: 'blocked', routeTo: 'seed' };
   const gated = scored.some((r) => r.verdict === 'fail' && TASTE_GATES.has(r.rule));
@@ -116,6 +127,22 @@ export function calibrationErrors({ at, calibration, scored, lenses }) {
   }
   return errors;
 }
+// A delivery whose direction declares a presentation delta of `none` composed nothing: it carries the
+// taste of the audit that judged the composition it left alone, rather than scoring a surface it did
+// not compose on a scale it would have to prove again. The receipt says so where the scale is
+// recorded — one `## Calibration` row per lens, its anchor cell reading `inherited` and its expected
+// cell naming the branch whose lens this is, in place of the three anchors of a round nobody took.
+export const INHERITED = 'inherited';
+export function inheritedLenses(text) {
+  const out = new Map(); // lens -> the branch cited, or null when the row names none
+  for (const [anchor, expected] of tableUnder(text ?? '', '## Calibration') ?? []) {
+    if (String(anchor).replaceAll('`', '').trim() !== INHERITED) continue;
+    const cell = String(expected ?? '');
+    out.set(/^(taste|ux)\b/.exec(cell)?.[1] ?? null, BRANCH.exec(cell)?.[0] ?? null);
+  }
+  return out;
+}
+
 const sectionText = (text, heading) => {
   const lines = text.split(/\r?\n/);
   const from = lines.findIndex((l) => l.trimEnd() === heading);
@@ -280,6 +307,23 @@ export async function validateAuditStep(branchDir, root = ROOT) {
   // the taste rollup, so a blocked lens is blocked in both the ## Taste line and the ## Verdict row.
   const decisionRef = base.request?.inputs?.['frontend-direction-decision'];
   const sessionRoot = sessionRootOf(branchDir);
+  // The direction this audit reads, once: its `## Decision` table carries the surface's selection
+  // policy, the candidate the person chose and the presentation delta this delivery declared, and the
+  // taste lens below reads all three from here rather than from three separate readings of one file.
+  let decisionText = '';
+  let decision = {};
+  if (decisionRef && sessionRoot) {
+    const decisionFile = path.join(sessionRoot, String(decisionRef));
+    if (existsSync(decisionFile)) {
+      decisionText = await readFile(decisionFile, 'utf8');
+      decision = Object.fromEntries((tableUnder(decisionText, '## Decision') ?? []).map(([k, v]) => [k, String(v ?? '').replaceAll('`', '').trim()]));
+    }
+  }
+  const presentationDelta = decision['Presentation delta'] ?? null;
+  const composed = presentationDelta !== DELTA_NONE;
+  // The lens this receipt inherits rather than scores, read from the sheet the person will read.
+  const receiptText = present.has('frontend-surface-audit') && has('response/response.md') ? await read('response/response.md') : null;
+  const inherited = inheritedLenses(receiptText);
   let coverageDoc = null;
   let missingStates = new Set();
   let deferredStates = [];
@@ -332,12 +376,17 @@ export async function validateAuditStep(branchDir, root = ROOT) {
       const deferable = scopeSchema.$defs.deferredTasteRule.enum.includes(row.rule);
       if (row.verdict === 'deferred') {
         if (scopeMode !== 'primary-surfaces' || !deferredStates.length || !deferable || row.score !== null || row.routeTo !== 'none' || !deferredStates.every((state) => row.measured.includes(state))) errors.push(`${at}: deferred criterion must name its deferred states, carry no score and belong to the primary-surface scope`);
-      } else {
+      } else if (!isNotApplicable(row)) {
         if (row.score === null) errors.push(`${at}: a judged criterion must carry its measured score`);
         if (deferable && scopeMode === 'primary-surfaces' && deferredStates.length) errors.push(`${at}: state-comparison criterion must be deferred when its declared secondary states were not captured`);
       }
-      const marker = isBelowVolume(row) ? BELOW_VOLUME : isDataBound(row) ? DATA_BOUND : isPersonAccepted(row) ? PERSON_ACCEPTED : null;
+      const marker = isBelowVolume(row) ? BELOW_VOLUME : isDataBound(row) ? DATA_BOUND : isPersonAccepted(row) ? PERSON_ACCEPTED : isNotApplicable(row) ? NOT_APPLICABLE : null;
       if ((marker === BELOW_VOLUME || marker === DATA_BOUND) && row.rule !== VOLUME_RULE) errors.push(`${at}: ${entry.matrixId} marks ${row.rule} ${marker}; only the density criterion ${VOLUME_RULE} depends on data volume (TASTE-9 Case 5)`);
+      if (marker === NOT_APPLICABLE) {
+        if (row.rule !== REFERENCE_RULE) errors.push(`${at}: ${entry.matrixId} marks ${row.rule} ${NOT_APPLICABLE}; only the reference criterion ${REFERENCE_RULE} stops applying, and only to a delivery that composed nothing (TASTE-12 Case 5)`);
+        else if (composed) errors.push(`${at}: ${entry.matrixId} marks ${REFERENCE_RULE} ${NOT_APPLICABLE} and the direction declares Presentation delta ${presentationDelta ?? '(absent)'}; a delivery that composed something is sorted into the class its own references name (TASTE-12 Case 5)`);
+        if (row.score !== null || row.verdict !== 'pass' || row.routeTo !== 'none') errors.push(`${at}: ${entry.matrixId} records ${row.rule} ${NOT_APPLICABLE} with a score, a failure or a route; a criterion that does not apply carries no score, passes nothing and routes nowhere (TASTE-12 Case 5)`);
+      }
       if (marker === PERSON_ACCEPTED) {
         if (row.routeTo !== 'none' || row.verdict !== 'fail') errors.push(`${at}: ${entry.matrixId} records ${row.rule} person-accepted; the row keeps its fail and routes nowhere, the choice closed it (TASTE-13 Case 7)`);
         const branch = BRANCH.exec(measuredText(row))?.[0] ?? null;
@@ -361,7 +410,9 @@ export async function validateAuditStep(branchDir, root = ROOT) {
         if (!prior) rolled.set(row.rule, { score: row.score, verdict: row.verdict, measured: [row.measured] });
         else {
           const verdict = prior.verdict === 'fail' || row.verdict === 'fail' ? 'fail' : prior.verdict === 'deferred' || row.verdict === 'deferred' ? 'deferred' : 'pass';
-          rolled.set(row.rule, { score: verdict === 'deferred' ? null : Math.min(prior.score ?? Infinity, row.score ?? Infinity), verdict, measured: [...prior.measured, row.measured] });
+          // A row that carries no score — deferred, or a criterion that does not apply — contributes none.
+          const scores = [prior.score, row.score].filter((s) => typeof s === 'number');
+          rolled.set(row.rule, { score: verdict === 'deferred' || !scores.length ? null : Math.min(...scores), verdict, measured: [...prior.measured, row.measured] });
         }
       }
     }
@@ -377,7 +428,11 @@ export async function validateAuditStep(branchDir, root = ROOT) {
   // A blocked branch routes by its stop, not by next; the hand-offs below are read on a done one.
   if (surface && response.status === 'done') {
     const next = response.next ?? [];
-    if (surface.verdict === 'fix-first') {
+    // A fix-first lens sends the surface back to be composed again — unless this delivery composed
+    // nothing and the lens is the prior audit's, carried under `## Calibration` as inherited. Then the
+    // finding is the earlier composition's and stands where it was raised; this branch neither opens a
+    // direction round for it nor holds the checkout's gates behind one.
+    if (surface.verdict === 'fix-first' && !inherited.has('taste')) {
       if (!next.includes('interface.generate')) errors.push('response/response.json: the taste lens is fix-first, so next names interface.generate');
       if (next.includes('quality.verify')) errors.push('response/response.json: the taste lens is fix-first, so the checkout\'s own gates do not run yet; quality.verify follows a ship');
     }
@@ -397,7 +452,17 @@ export async function validateAuditStep(branchDir, root = ROOT) {
   // compare; a branch that scored nothing owes no anchor.
   const calibration = await loadCalibration(root);
   const lenses = new Set(verdicts.entries.some((e) => e.taste) ? ['taste'] : []);
-  errors.push(...calibrationErrors({ at, calibration, scored: verdicts.calibration, lenses }));
+  // A lens the receipt carries as inherited was scored in the round the citation names, on that round's
+  // anchors: this branch proves no scale of its own and records none. Anything else keeps Case 9.
+  const scoredHere = new Set([...lenses].filter((lens) => !inherited.has(lens)));
+  for (const [lens, from] of inherited) {
+    if (!lenses.has(lens)) { errors.push(`${at}: the receipt inherits a ${lens ?? '(unnamed)'} lens this branch does not score`); continue; }
+    if (composed) errors.push(`${at}: the receipt inherits the ${lens} lens from ${from ?? 'nowhere'} while the direction declares Presentation delta ${presentationDelta ?? '(absent)'}; a delivery that composed something is scored on the sheets it composed, on anchors of its own round (TASTE-13 Case 9)`);
+    if (!from) errors.push(`${at}: the receipt inherits the ${lens} lens and names no branch it was scored in; an inherited lens cites the audit that took it, as step-N/parallel-M`);
+    else if (from === branchOf(branchDir)) errors.push(`${at}: the receipt inherits the ${lens} lens from ${from}, which is this branch; a lens is inherited from the audit that scored the composition this delivery did not touch`);
+    if ((verdicts.calibration ?? []).length) errors.push(`${at}: the receipt inherits the ${lens} lens and the verdicts still carry ${verdicts.calibration.length} anchor score(s); an inherited lens took no anchors of its own`);
+  }
+  errors.push(...calibrationErrors({ at, calibration, scored: verdicts.calibration, lenses: scoredHere }));
 
   // One surface, one class: every entry carries the class the coverage declared, and they agree.
   const classes = new Set(verdicts.entries.map((e) => e.surfaceClass));
@@ -418,10 +483,6 @@ export async function validateAuditStep(branchDir, root = ROOT) {
   // candidate they chose. Anything else is a fail dressed as an acceptance.
   if (personAccepted.length && decisionRef && sessionRoot) {
     const decisionBranch = BRANCH.exec(String(decisionRef))?.[0] ?? null;
-    const decisionFile = path.join(sessionRoot, String(decisionRef));
-    let decisionText = '';
-    if (existsSync(decisionFile)) decisionText = await readFile(decisionFile, 'utf8');
-    const decision = Object.fromEntries((tableUnder(decisionText, '## Decision') ?? []).map(([k, v]) => [k, v]));
     const shownFailing = new Set((tableUnder(decisionText, '## Scores') ?? []).filter(([candidate, , , , verdict]) => candidate === decision['Selected candidate'] && verdict === 'fail').map(([, , criterion]) => criterion));
     for (const { matrixId, rule, branch } of personAccepted) {
       if (branch !== decisionBranch) { errors.push(`${at}: ${matrixId} records ${rule} person-accepted by ${branch}, which is not the decision this audit reads (${decisionBranch})`); continue; }
@@ -475,8 +536,8 @@ export async function validateAuditStep(branchDir, root = ROOT) {
     errors.push(`response/response.json: the ${open.join(' and ')} verdict is open and the branch hands to a person; a composition or taste finding routes to direction, which scores the rendered candidates and decides or proves the tie, and a density below representative volume routes to seed; this audit asks nobody`);
   }
 
-  if (present.has('frontend-surface-audit') && has('response/response.md')) {
-    const text = await read('response/response.md');
+  if (receiptText !== null) {
+    const text = receiptText;
     const rel = 'response/response.md';
     const scopeRows = Object.fromEntries(tableUnder(text, '## Audit scope') ?? []);
     const expectedScopeRows = { Mode: scopeMode, 'Selected surfaces': selectedSurfaces.map((surface) => surface.id).join(', '), 'Coverage claim': coverageClaim, 'Deferred states': deferredStates.join(', ') || '—' };
@@ -552,10 +613,10 @@ export async function validateAuditStep(branchDir, root = ROOT) {
     // taste lens was placed among: every other selected surface of the scope when there is more than
     // one, never a sheet outside it. A table missing while a lens is scored is the same absence the
     // data check names above.
-    if (lenses.size) {
-      const calRows = tableUnder(text, '## Calibration') ?? [];
+    if (scoredHere.size) {
+      const calRows = (tableUnder(text, '## Calibration') ?? []).filter(([anchor]) => String(anchor).replaceAll('`', '').trim() !== INHERITED);
       const scored = Array.isArray(verdicts.calibration) ? verdicts.calibration : [];
-      if (!calRows.length) errors.push(`${rel}: ## Calibration carries no row while the ${[...lenses].join(' and ')} lens is scored; the three anchors are scored in the same round and recorded here (CALIBRATION_OFF)`);
+      if (!calRows.length) errors.push(`${rel}: ## Calibration carries no row while the ${[...scoredHere].join(' and ')} lens is scored; the three anchors are scored in the same round and recorded here (CALIBRATION_OFF)`);
       if (calRows.length !== scored.length) errors.push(`${rel}: Calibration has ${calRows.length} rows, the verdicts carry ${scored.length} anchor scores`);
       for (const [anchor, expected, score] of calRows) {
         const m = /^(taste|ux) ([1-5])–([1-5])$/.exec(expected ?? '');

@@ -3,6 +3,13 @@
   "description": "state.json at the session root; the orchestrator writes it, no agent does. Documented in resources/orchestrator.json#session.manifest. brief and budget are written at create and are required from the first transition on; mission is written at create from the request and is required by the gates for a session that writes routed source or touches a runtime (scripts/validate-request.mjs#missionGateErrors).",
   "type": "object",
   "additionalProperties": false,
+  "$defs": {
+    "provenEntry": {
+      "description": "The two spellings an entry of brief.proven opens with on a mission, and the whole of what may open one: `doneWhen:<n> ` for a done-when line of the mission, and `prerequisite:<N/M> ` for a branch whose goal was to enable another branch (request.json.goal.prerequisite) — a bind, a preflight, an audit a later walk needed. Both name a branch whose receipt is done and whose goalCheck the response gate accepted, which is the only thing that puts an entry here; the gate that resolves them reads this pattern rather than carrying a copy of it (scripts/validate-session.mjs#provenErrors)",
+      "type": "string",
+      "pattern": "^(?:doneWhen:(?<doneWhen>[0-9]+)|prerequisite:(?<prerequisite>[0-9]+/[0-9]+)) "
+    }
+  },
   "required": [
     "id",
     "project",
@@ -291,6 +298,7 @@
       ],
       "properties": {
         "proven": {
+          "description": "what a receipt evidenced, one entry per proof. On a mission every entry opens with the coordinate that carries the evidence, in one of the two spellings $defs.provenEntry publishes, and scripts/validate-session.mjs#provenErrors resolves it against the goal ledger; off a mission the field is free prose and nothing resolves it",
           "type": "array",
           "maxItems": 24,
           "items": {

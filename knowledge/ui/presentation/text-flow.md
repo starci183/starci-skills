@@ -39,6 +39,7 @@ Generated from `@grammar/core` claims by `scripts/generate-presentation-owned.mj
 | Component | Element or condition | Rule |
 | --- | --- | --- |
 | `MediaFrame` | caption, caption!=undefined | FLOW-3 |
+| `PressableField` | placeholder | FLOW-4 |
 | `SectionHeader` | title | FLOW-3 |
 | `Sidebar` | item label, not collapsed | FLOW-4 |
 | `Subnav` | title | FLOW-4 |

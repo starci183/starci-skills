@@ -39,6 +39,7 @@ Sinh từ claim của `@grammar/core` bằng `scripts/generate-presentation-owne
 | Component | Phần tử hoặc điều kiện | Rule |
 | --- | --- | --- |
 | `MediaFrame` | caption, caption!=undefined | FLOW-3 |
+| `PressableField` | placeholder | FLOW-4 |
 | `SectionHeader` | title | FLOW-3 |
 | `Sidebar` | item label, not collapsed | FLOW-4 |
 | `Subnav` | title | FLOW-4 |

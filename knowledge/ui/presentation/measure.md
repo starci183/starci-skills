@@ -65,9 +65,11 @@ Generated from `@grammar/core` claims by `scripts/generate-presentation-owned.mj
 
 | Component | Element or condition | Rule |
 | --- | --- | --- |
+| `Button` | root, width="fill" | MEASURE-2 |
 | `HorizontalScrollRegion` | root | MEASURE-3 |
 | `NavigationFeatureNav` | root | MEASURE-2 |
 | `PageContainer` | root | MEASURE-1 |
+| `PressableField` | root | MEASURE-2 |
 | `Progress` | root | MEASURE-2 |
 | `Rail` | body, height="fill" | MEASURE-6 |
 | `Sidebar` | root, presentation!="drawer" | MEASURE-6 |

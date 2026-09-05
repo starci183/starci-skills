@@ -6,11 +6,13 @@
 // carries an expectation and every other step carries none; a fill on a field whose name reads as a
 // password or secret takes a credential by name, the name is the account's, and no other fill takes
 // one; a UAT walk's assertions name a frozen case with a capture of the case's own name, taken after
-// the sign-in redirect has landed. The sweep refuses, in a walk or in anything a run wrote, a URL not
-// under the entry route's origin, a credential-shaped value, and the three spellings of agent-authored
-// browser code (page.evaluate, page.request, locator( ) — a walk carries targets, never code. The
+// the sign-in redirect has landed. The sweep refuses, in a walk or in anything a run wrote, a
+// credential-shaped value and the three spellings of agent-authored browser code (page.evaluate,
+// page.request, locator( ) — a walk carries targets, never code. The
 // sweep reads the walk folder, the kind captures and the artifacts under a response folder, and
-// nothing else: the tree's own scripts are code by design and are never its input.
+// nothing else: the tree's own scripts are code by design and are never its input. The origin check
+// reads a narrower set still — what the agent itself wrote — because the runner's records of the page
+// carry the page's own bytes.
 //
 // A control has two spellings here, for two questions. `stepControl` answers what a step's observation
 // is evidence of — its own target, else the nearest earlier target pressed, else the entry — and is
@@ -39,6 +41,12 @@ export const MEASUREMENTS_SCHEMA = path.join('templates', 'kinds', 'capture-meas
 export const SECRET_FIELD = /password|passcode|passphrase|secret|\btoken\b|\bpin\b|otp|mật khẩu/i;
 // The three spellings of browser code an agent might smuggle into a walk or a capture.
 export const AGENT_CODE = /page\.evaluate|page\.request|locator\(/;
+// What a run leaves that is not the agent's writing: the runner's records of the page it opened — the
+// DOM, the accessibility snapshot and the measurements — and the receipt @tools/host writes for the
+// sheet it serves. Their bytes are the page's or the tool's, so the origin check does not read them:
+// an inline SVG namespace and a framework's own documentation link are the rendered page speaking, and
+// a loopback sheet is the host answering. The secret and browser-code checks still read every file.
+export const PAGE_RECORD = /(?:\.dom\.json|\.ax\.txt|\.measurements\.json|(?:^|\/)host\.json)$/;
 const ACTION_STEPS = new Set(['click', 'fill', 'press', 'select', 'check']);
 const TARGETLESS = new Set(['goto', 'capture']);
 const URL_RE = /https?:\/\/[^\s"'<>)\]]+/g;
@@ -174,18 +182,19 @@ export function walkErrors(walk, { root = ROOT, at = 'walk.json', schema = loadW
 
 // Every text a walk or a run wrote, line by line: a URL outside the route's origin, a value shaped like
 // a secret, or browser code. A finding names the file, the line and what kind of thing it found.
-export function sweepWalkText(text, origin, { file = 'walk.json', patterns = SECRET_PATTERNS, passwordLeak = true } = {}) {
+// `origins` is off for a file the agent did not write (PAGE_RECORD), whose URLs are the page's own.
+export function sweepWalkText(text, origin, { file = 'walk.json', patterns = SECRET_PATTERNS, passwordLeak = true, origins = true } = {}) {
   const findings = [];
   String(text).split(/\r?\n/).forEach((line, i) => {
     const push = (pattern) => findings.push({ file, line: i + 1, pattern });
     if (AGENT_CODE.test(line)) push('agent-code');
-    for (const url of line.match(URL_RE) ?? []) if (originOf(url) !== origin) push('foreign-url');
+    if (origins) for (const url of line.match(URL_RE) ?? []) if (originOf(url) !== origin) push('foreign-url');
     for (const { id, re } of patterns) if (re.test(line)) push(id);
     if (passwordLeak && PASSWORD_LEAK.test(line)) push('password-leak');
   });
   return findings;
 }
-export const sweepFindingErrors = (findings) => findings.map((f) => `${f.file}:${f.line}: carries ${f.pattern}; a walk carries role-and-name targets, one entry route and a credential by name, and what a run wrote carries nothing outside the route's origin, nothing shaped like a secret and no browser code`);
+export const sweepFindingErrors = (findings) => findings.map((f) => `${f.file}:${f.line}: carries ${f.pattern}; a walk carries role-and-name targets, one entry route and a credential by name, what a run wrote carries nothing shaped like a secret and no browser code, and what the agent wrote carries no URL outside the route's origin`);
 
 const TEXT = new Set(['.json', '.txt', '.md', '.log', '.html']);
 function* textFiles(dir) {
@@ -198,7 +207,9 @@ function* textFiles(dir) {
 // The walk and every text file a run of it left under the response folder: the walk folder, the kind
 // captures and the artifacts. The password-leak pattern is applied to the walk only — the operator's own
 // custody check already applies it to the captures it publishes — because a rendered page that labels a
-// field "Password:" is not a leaked value.
+// field "Password:" is not a leaked value. The origin check is applied to what the agent wrote and not
+// to the runner's page records (PAGE_RECORD), for the same reason: a URL the page carries is the
+// page's, and only a URL the agent carries says where the agent went.
 export function sweepWalkRun(walkText, responseDir, walkId, { relativeTo = responseDir } = {}) {
   let walk = null;
   try { walk = JSON.parse(walkText); } catch { /* the schema pass names the parse error */ }
@@ -211,7 +222,7 @@ export function sweepWalkRun(walkText, responseDir, walkId, { relativeTo = respo
     for (const file of textFiles(dir)) {
       const rel = path.relative(relativeTo, file).split(path.sep).join('/');
       if (rel.endsWith('/walk.json')) continue;
-      findings.push(...sweepWalkText(readFileSync(file, 'utf8'), origin, { file: rel, passwordLeak: false }));
+      findings.push(...sweepWalkText(readFileSync(file, 'utf8'), origin, { file: rel, passwordLeak: false, origins: !PAGE_RECORD.test(rel) }));
     }
   }
   return findings;

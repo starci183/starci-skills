@@ -1,0 +1,96 @@
+{
+  "schemaVersion": 1,
+  "id": "two-route-publish",
+  "when": {
+    "en": "One mission delivers on two routed checkouts and publishes both: the frontend surface is served, audited and walked, and the backend checkout still owes its own gates at the head that will be pushed. The walk proves the product once; each route's gates then prove the code that route publishes, so the chain carries two quality.verify branches and two git.publish branches, and the second pair runs after the walk rather than before it.",
+    "vi": "Một nhiệm vụ giao trên hai checkout đã định tuyến và publish cả hai: bề mặt frontend được phục vụ, audit và đi thử, còn checkout backend vẫn nợ gate của chính nó tại head sắp được đẩy. Lượt đi chứng minh sản phẩm một lần; sau đó gate của từng route chứng minh phần mã mà route ấy publish, nên chuỗi mang hai nhánh quality.verify và hai nhánh git.publish, và cặp thứ hai chạy sau lượt đi chứ không phải trước."
+  },
+  "mission": {
+    "goal": "one feature lands on both routes and both are published from heads their own gates measured",
+    "doneWhen": [
+      {
+        "evidence": "the surface is committed on the frontend session branch",
+        "producedBy": "interface.generate"
+      },
+      {
+        "evidence": "the handler is committed on the backend session branch",
+        "producedBy": "backend.generate"
+      },
+      {
+        "evidence": "both committed heads are served on the product ports",
+        "producedBy": "runtime.serve"
+      },
+      {
+        "evidence": "the served surface passes the audit with its screenshots kept",
+        "producedBy": "interface.audit"
+      },
+      {
+        "evidence": "the frontend checkout's gates are green at the served head",
+        "producedBy": "quality.verify"
+      },
+      {
+        "evidence": "a person's journey completes on the served surface",
+        "producedBy": "uat.verify"
+      },
+      {
+        "evidence": "the backend checkout's gates are green at the head that will be published",
+        "producedBy": "quality.verify"
+      },
+      {
+        "evidence": "the frontend session branch is merged and pushed",
+        "producedBy": "git.publish"
+      },
+      {
+        "evidence": "the backend session branch is merged and pushed",
+        "producedBy": "git.publish"
+      }
+    ]
+  },
+  "options": {
+    "requirements": {
+      "interface.generate": {
+        "intent": "modify",
+        "changeLevel": "refine",
+        "mode": "apply"
+      }
+    }
+  },
+  "example": [
+    [
+      "environment.preflight"
+    ],
+    [
+      "workspace.bind#be",
+      "workspace.bind#fe"
+    ],
+    [
+      "backend.generate"
+    ],
+    [
+      "interface.generate"
+    ],
+    [
+      "runtime.serve"
+    ],
+    [
+      "interface.audit"
+    ],
+    [
+      "quality.verify"
+    ],
+    [
+      "uat.verify"
+    ],
+    [
+      "quality.verify"
+    ],
+    [
+      "git.publish"
+    ],
+    [
+      "git.publish"
+    ]
+  ],
+  "ends": "git.publish",
+  "note": "New at 2.1.2, from the reachability session that could not publish its second route (tests/evidence/20260905-nivo-reachability-fix.md, defect 7). Two done-when lines name quality.verify and two name git.publish, so each becomes a second branch of its operator after the first; the mission's own line order decides which branch a consumer reads, so the walk reads the frontend gates that precede it and not the backend gates that follow, and the Next row uat.verify → quality.verify is what lets the second route's gates run after the walk."
+}
