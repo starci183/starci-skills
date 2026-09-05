@@ -3,7 +3,7 @@
 Không còn file workflow nào. Một chuỗi không bao giờ được chọn từ ví dụ: nó được suy ra từ nhiệm
 vụ, bởi `scripts/plan-chain.mjs`, chỉ từ các bảng của operator, và được `scripts/validate-chain.mjs`
 kiểm mỗi lần vẽ. Các chuỗi mẫu thư mục này từng giữ giờ là fixture của planner, nằm ở
-`tests/chains/`, và `scripts/plan-chain.spec.mjs` chứng minh planner vẫn suy ra được từng chuỗi ấy
+`scripts/fixtures/chains/`, và `scripts/plan-chain.spec.mjs` chứng minh planner vẫn suy ra được từng chuỗi ấy
 từ kết quả mà nhiệm vụ của nó gọi tên.
 
 ## Vòng đời v2.2 thực thi được
@@ -123,7 +123,7 @@ khi chính goal được sửa; không bao giờ viết lại trong im lặng
 
 ## Các fixture
 
-`tests/chains/<id>.json` giữ mười một chuỗi mẫu của 2.0.0 viết lại theo id operator hiện tại, mỗi
+`scripts/fixtures/chains/<id>.json` giữ các chuỗi mẫu của 2.0.0 viết lại theo id operator hiện tại, mỗi
 chuỗi kèm nhiệm vụ mà các dòng "xong khi" gọi tên kết quả của nó, thứ tự operator nó chờ đợi, và
 ghi chú về cách viết lại. Chúng là đầu vào cho spec của planner, không phải cho runtime: cửa vào
 không bao giờ đọc chúng.

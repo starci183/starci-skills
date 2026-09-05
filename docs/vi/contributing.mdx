@@ -60,7 +60,7 @@ không ai đọc.
 ## Thêm một fixture cho planner
 
 Không có file workflow nào để thêm: chuỗi được `scripts/plan-chain.mjs` suy từ nhiệm vụ. Một chuỗi
-đáng giữ làm bằng chứng thì thành một fixture dưới `tests/chains/<id>.json`, mang nhiệm vụ mà các
+đáng giữ làm bằng chứng thì thành một fixture dưới `scripts/fixtures/chains/<id>.json`, mang nhiệm vụ mà các
 dòng "xong khi" gọi tên kết quả của nó, thứ tự operator mong đợi, và điểm kết nó khai;
 `scripts/plan-chain.spec.mjs` rồi chứng minh planner vẫn suy ra được nó từ nhiệm vụ đó và kết quả
 qua được `scripts/validate-chain.mjs`. Hình dạng nào planner không tới được từ các bảng là một lỗ

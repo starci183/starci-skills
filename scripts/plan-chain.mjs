@@ -26,7 +26,7 @@ import path from 'node:path';
 import process from 'node:process';
 import { fileURLToPath } from 'node:url';
 import { loadOperatorPackages } from './operator-md.mjs';
-import { operatorEffects } from './validate-request.mjs';
+import { goalDecisionId, operatorEffects, V22_CONTRACT } from './validate-request.mjs';
 import { operatorGraph, loadOperatorGraph, loadMaxParallel, readImportedSlots, producersOf, primaryProducerOf, writesSurface, planOf, cellOf, stepOf, parallelOf, SURFACE_AUDIT_KIND, WALK_OPERATOR, PUBLISH_OPERATOR, DEPLOY_OPERATOR, BIND_OPERATOR, PREFLIGHT_OPERATOR, UNITS_KIND } from './validate-chain.mjs';
 
 export class PlanError extends Error { constructor(errors) { super(errors.join('\n')); this.errors = errors; } }
@@ -258,11 +258,13 @@ export function planChain({ packages, mission, options = {} }) {
   const cell = new Map();
   steps.forEach((step, n) => step.forEach((k, m) => cell.set(k, cellOf(n + 1, m + 1))));
   const chain = steps.map((step) => step.map((k) => cell.get(k)));
-  const out = { chain, steps: {}, goals: {}, reasons: {}, presets: {}, fanout: {}, imports: {}, dropped: [], ends: 'user' };
+  const out = { chain, steps: {}, goals: {}, reasons: {}, dependencies: {}, requestRefs: {}, presets: {}, fanout: {}, imports: {}, dropped: [], ends: 'user' };
   for (const step of chain) for (const c of step) {
     const k = [...cell].find(([, v]) => v === c)[0];
     const n = nodes.get(k);
     out.steps[c] = n.operator;
+    out.dependencies[c] = [...edges.get(k)].map((dependency) => cell.get(dependency)).sort((a, b) => stepOf(a) - stepOf(b) || parallelOf(a) - parallelOf(b));
+    out.requestRefs[c] = `step-${stepOf(c)}/parallel-${parallelOf(c)}/request/request.json`;
     if (Object.keys(n.presets).length) out.presets[c] = n.presets;
     if (n.fanout) out.fanout[c] = n.fanout;
     // What the branch reads from an imported slot: kind -> { input (the request's inputs.<kind> path), the slot's cell and origin }.
@@ -285,25 +287,50 @@ export function planChain({ packages, mission, options = {} }) {
   return out;
 }
 
-// The two-line preview of a planned chain, one pair per branch: the goal, then why the branch is there.
+// The two-line preview of a planned chain, one pair per branch: the goal-derived expected source,
+// then why the branch is there plus the dependencies and request binding owed before dispatch.
 export function previewChain(plan, mission) {
   const out = [];
   for (const step of plan.chain) for (const c of step) {
     const op = plan.steps[c];
     const goal = plan.goals[c];
+    const goalVersion = mission?.version ?? 'pending';
     const line = goal.doneWhen !== undefined ? `doneWhen:${goal.doneWhen} ${mission?.doneWhen?.[goal.doneWhen]?.evidence ?? ''}`.trim() : `prerequisite: ${goal.prerequisite}`;
+    const expectedSource = goal.doneWhen !== undefined ? `state.json#mission:v${goalVersion}/doneWhen:${goal.doneWhen}` : `state.json#mission:v${goalVersion}/prerequisite:${goal.prerequisite}`;
+    const dependencies = plan.dependencies?.[c]?.length ? plan.dependencies[c].join(', ') : 'none';
+    const requestRef = plan.requestRefs?.[c] ?? `step-${stepOf(c)}/parallel-${parallelOf(c)}/request/request.json`;
     const extras = [plan.reasons[c], plan.presets[c] ? Object.entries(plan.presets[c]).map(([k, v]) => `${k}=${JSON.stringify(v)}`).join(' ') : null, plan.fanout[c] ? `fanout: ${plan.fanout[c]}` : null].filter(Boolean);
-    out.push(`[${c} ${op}] goal: ${line}`);
-    out.push(`[${c} ${op}] ${extras.join(' · ')}`);
+    out.push(`[${c} ${op}] expected: ${line} · source: ${expectedSource}`);
+    out.push(`[${c} ${op}] ${extras.join(' · ')} · dependencies: ${dependencies} · request: ${requestRef} (pending expected.criteria and environment isolationId/mode/workspace/reads/writes/exclusive/outputRoot; freeze before dispatch)`);
     for (const [kind, from] of Object.entries(plan.imports?.[c] ?? {})) out.push(`[${c} ${op}] ${kind} imported from ${from.sourceSessionId} step ${from.sourceStep} (${from.input})`);
   }
   out.push(`ends: ${plan.ends}`);
   return out.join('\n');
 }
 
+export function planningStateErrors(state) {
+  if (state?.contractVersion !== V22_CONTRACT) return [];
+  const errors = [];
+  if (state.lifecycle?.phase !== 'active') errors.push(`state.json: lifecycle.phase is ${state.lifecycle?.phase ?? 'missing'}; ${V22_CONTRACT} planning requires an active, confirmed session`);
+  const mission = state.mission;
+  if (!mission) {
+    errors.push(`state.json: ${V22_CONTRACT} planning requires the confirmed mission`);
+    return errors;
+  }
+  const confirmation = mission.confirmation;
+  if (confirmation?.status !== 'confirmed') errors.push(`state.json: mission version ${mission.version ?? 'missing'} is ${confirmation?.status ?? 'unconfirmed'}; planning requires explicit confirmation`);
+  const decisionId = goalDecisionId(state.id, mission.version);
+  if (confirmation?.decisionId !== decisionId) errors.push(`state.json: mission.confirmation.decisionId is ${confirmation?.decisionId ?? 'missing'}; expected ${decisionId}`);
+  const choice = state.choices?.[decisionId];
+  if (!choice || choice.selected !== 'as-stated' || choice.selectedBy !== 'user' || !choice.sourceRef || choice.sourceRef !== confirmation?.sourceRef) errors.push(`state.json: choices["${decisionId}"] does not bind the confirmed mission to the matching explicit user as-stated choice`);
+  return errors;
+}
+
 export async function planSession(root, session, flags = {}) {
   const state = JSON.parse(await readFile(path.join(session, 'state.json'), 'utf8'));
   if (!state.mission) throw new PlanError(['state.json carries no mission; the chain is planned from mission.doneWhen']);
+  const stateErrors = planningStateErrors(state);
+  if (stateErrors.length) throw new PlanError(stateErrors);
   const packages = await loadOperatorPackages(root);
   const graph = await loadOperatorGraph(root, packages);
   const imported = await readImportedSlots(session, graph, root);

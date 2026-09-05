@@ -173,7 +173,7 @@ full Sol; the planned chain — has validators, self-tests and specs, and no liv
 that run is `TODO.md` item 3 and the evidence it leaves decides the publish.
 
 Round 3 also retired the example workflows as runtime inputs. The eleven chains that used to live
-under `workflows/` are planner fixtures now, one file per chain under `tests/chains/`: each carries
+under `workflows/` are planner fixtures now, one file per chain under `scripts/fixtures/chains/`: each carries
 the mission whose done-when lines name the chain's outcomes, the operator order the 2.0.0 example
 expected (rewritten to the split and merged operator ids), the end it declares, and a note on how it
 was rewritten. `scripts/plan-chain.spec.mjs` plans every fixture from its mission on this tree's own
@@ -311,7 +311,7 @@ declared services and refuses a receipt about another service, a kind the declar
 `up` observed without its probe, a holder that is a name rather than a pid, a `down` whose probe
 answered or that still claims a holder, an attestation that ran the declared command, a move that
 recorded neither a command nor a no-op, a person-held service brought up anyway, an approval naming a
-declaration that moved, and a receipt that printed the command's credential. `tests/chains/service-fanout.json`
+declaration that moved, and a receipt that printed the command's credential. `scripts/fixtures/chains/service-fanout.json`
 is the planner's half: two services named on two done-when lines become two branches of one operator,
 because the enumeration is the declaration's and there is no plan to fan out over.
 
@@ -417,7 +417,7 @@ with it its publish — was left behind. `uat.verify` now hands to `quality.veri
 checkout still awaits its gates; the planner places a boundary once every remaining branch is itself a
 boundary, so two publishes end a chain one after the other; and which branch of a repeated operator a
 consumer reads is settled by the mission's own order of done-when lines, so the walk reads the gates
-that precede it and not the ones that follow. `tests/chains/two-route-publish.json` is the proof:
+that precede it and not the ones that follow. `scripts/fixtures/chains/two-route-publish.json` is the proof:
 nine done-when lines plan as preflight → the two binds → the backend and the frontend deliveries →
 serve → audit → the frontend gates → the walk → the backend gates → both publishes, accepted by
 `scripts/validate-chain.mjs`. `scripts/plan-chain.spec.mjs` now reads every example as a subsequence

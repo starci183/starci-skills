@@ -61,7 +61,7 @@ A rule that no operator's bound inventory can reach is not a rule; it is a file 
 ## Adding a planner fixture
 
 There is no workflow file to add: the chain is derived from the mission by `scripts/plan-chain.mjs`.
-A chain worth keeping as evidence becomes a fixture under `tests/chains/<id>.json`, carrying the
+A chain worth keeping as evidence becomes a fixture under `scripts/fixtures/chains/<id>.json`, carrying the
 mission whose "done when" lines name its outcomes, the operator order expected, and the end it
 declares; `scripts/plan-chain.spec.mjs` then proves the planner still derives it from that mission
 and that the result passes `scripts/validate-chain.mjs`. A shape the planner cannot reach from the

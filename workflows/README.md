@@ -3,7 +3,7 @@
 There are no workflow files. A chain is never chosen from an example: it is derived from the
 mission, by `scripts/plan-chain.mjs`, from the operator tables alone, and it is checked by
 `scripts/validate-chain.mjs` every time it is drawn. The example chains this folder used to hold are
-planner fixtures now, under `tests/chains/`, and `scripts/plan-chain.spec.mjs` proves the planner
+planner fixtures now, under `scripts/fixtures/chains/`, and `scripts/plan-chain.spec.mjs` proves the planner
 still derives each of them from the outcome its mission names.
 
 ## Executable v2.2 lifecycle
@@ -128,7 +128,7 @@ failed and waiting ledgers stay in place for resume; user worktrees and branches
 
 ## The fixtures
 
-`tests/chains/<id>.json` holds the eleven 2.0.0 example chains rewritten to the current operator
+`scripts/fixtures/chains/<id>.json` holds the 2.0.0 example chains rewritten to the current operator
 ids, each with the mission whose done-when lines name its outcomes, the operator order it expects,
 and a note on how it was rewritten. They are inputs to the planner's spec, not to the runtime: the
 entry never reads them.

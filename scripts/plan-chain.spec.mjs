@@ -1,16 +1,17 @@
 // The planner: scripts/plan-chain.mjs. Two halves. The first runs on the synthetic tree of
 // chain-fixture.mjs and proves each rule of the algorithm. The second runs on this tree's own
-// operator packages against tests/chains/*.json — the 2.0.0 example workflows rewritten to the
+// operator packages against scripts/fixtures/chains/*.json — the 2.0.0 example workflows rewritten to the
 // current operator ids — and proves that a mission whose done-when lines name an example's outcome
 // operators plans a chain validate-chain accepts and that carries the example's operators in a
 // compatible order (no pair inverted; extra branches such as a plan step are allowed). A fixture that
 // names an operator this tree does not carry yet is skipped by name, never silently passed.
 import assert from 'node:assert/strict';
-import { readdir, readFile } from 'node:fs/promises';
+import { mkdtemp, readdir, readFile, rm, writeFile } from 'node:fs/promises';
+import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import test from 'node:test';
-import { planChain, previewChain, PlanError } from './plan-chain.mjs';
+import { planChain, planSession, planningStateErrors, previewChain, PlanError } from './plan-chain.mjs';
 import { validateChain, operatorGraph, loadOperatorGraph, loadMaxParallel, planOf } from './validate-chain.mjs';
 import { loadOperatorPackages } from './operator-md.mjs';
 import { fakeTree, fakePackage, fakeMission, line } from './chain-fixture.mjs';
@@ -144,15 +145,54 @@ test('the planner refuses what the tables leave ambiguous or unreachable, naming
 });
 test('the preview prints two lines per branch and the end', () => {
   const mission = fakeMission([line('content.generate', 'the unit exists')]);
-  const text = previewChain(planChain({ packages, mission, options: { graph } }), mission);
-  assert.deepEqual(text.split('\n'), ['[1/1 content.generate] goal: doneWhen:0 the unit exists', '[1/1 content.generate] evidence for done-when 0: "the unit exists"', 'ends: user']);
+  const p = planChain({ packages, mission, options: { graph } });
+  const text = previewChain(p, mission);
+  assert.deepEqual(p.dependencies, { '1/1': [] });
+  assert.deepEqual(p.requestRefs, { '1/1': 'step-1/parallel-1/request/request.json' });
+  assert.deepEqual(text.split('\n'), [
+    '[1/1 content.generate] expected: doneWhen:0 the unit exists · source: state.json#mission:v1/doneWhen:0',
+    '[1/1 content.generate] evidence for done-when 0: "the unit exists" · dependencies: none · request: step-1/parallel-1/request/request.json (pending expected.criteria and environment isolationId/mode/workspace/reads/writes/exclusive/outputRoot; freeze before dispatch)',
+    'ends: user'
+  ]);
+  assert.doesNotMatch(text, /isolationId=[^/ ]+/, 'a preview never invents an isolation id before request binding');
+});
+
+test('v2.2 session planning refuses drafts and accepts only the matching confirmed user choice; legacy planning remains readable', async () => {
+  const session = await mkdtemp(path.join(os.tmpdir(), 'starci-plan-session-'));
+  const mission = fakeMission([line('content.generate')], { target: 'fixture', outputs: ['content-generation-receipt'], verification: 'the receipt is checked' });
+  const decisionId = 'goal:plan-session:v1';
+  const state = {
+    contractVersion: 'starci/v2.2', id: 'plan-session', lifecycle: { phase: 'draft' },
+    mission: { ...mission, confirmation: { status: 'draft', decisionId, sourceRef: null } }, choices: {}
+  };
+  try {
+    await writeFile(path.join(session, 'state.json'), `${JSON.stringify(state)}\n`);
+    await assert.rejects(planSession(root, session), (error) => error instanceof PlanError && /active, confirmed session/.test(error.message) && /explicit confirmation/.test(error.message));
+
+    state.lifecycle.phase = 'active';
+    state.mission.confirmation = { status: 'confirmed', decisionId, sourceRef: 'user-message:confirm' };
+    await writeFile(path.join(session, 'state.json'), `${JSON.stringify(state)}\n`);
+    await assert.rejects(planSession(root, session), (error) => error instanceof PlanError && /matching explicit user as-stated choice/.test(error.message));
+
+    state.choices[decisionId] = { selected: 'as-stated', selectedBy: 'user', sourceRef: 'user-message:confirm' };
+    assert.deepEqual(planningStateErrors(state), []);
+    await writeFile(path.join(session, 'state.json'), `${JSON.stringify(state)}\n`);
+    assert.deepEqual(Object.values((await planSession(root, session)).plan.steps), ['content.generate']);
+
+    delete state.contractVersion;
+    delete state.lifecycle;
+    delete state.mission.confirmation;
+    delete state.choices;
+    await writeFile(path.join(session, 'state.json'), `${JSON.stringify(state)}\n`);
+    assert.deepEqual(Object.values((await planSession(root, session)).plan.steps), ['content.generate']);
+  } finally { await rm(session, { recursive: true, force: true }); }
 });
 
 // The fixtures: the example workflows, reproduced from their outcomes on this tree's real packages.
 const real = await loadOperatorPackages(root);
 const realGraph = await loadOperatorGraph(root, real);
 const maxParallel = await loadMaxParallel(root);
-const fixturesDir = path.join(root, 'tests', 'chains');
+const fixturesDir = path.join(root, 'scripts', 'fixtures', 'chains');
 const fixtures = await Promise.all((await readdir(fixturesDir)).filter((f) => f.endsWith('.json')).sort().map(async (f) => JSON.parse(await readFile(path.join(fixturesDir, f), 'utf8'))));
 const strip = (id) => id.split('#')[0];
 test('every fixture names its mission, its example chain and its end, and its id equals its file name', async () => {
