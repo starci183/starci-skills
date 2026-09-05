@@ -181,3 +181,23 @@ heads they were cut at and the merges into `uat` were clean.
 - Checkouts: `D:/Repositories/nivo-be-reach-20260905-074125`, `D:/Repositories/nivo-fe-reach-20260905-074125`,
   branch `session/20260905-074125-nivo-environment.preflight` in each; integration worktrees
   `.worktrees/runtime/nivo-be` and `.worktrees/nivo/uat` on `uat`.
+
+## Goal v3: the publications
+
+After the walk, the person lifted the exclusion "git.publish: heads stay on session branches" (relayed
+by the sibling session `local_2fb3366c-682b-4d88-abfc-a42476278021` at 08:36, recorded as
+`goal:<id>:v3` as-stated and `approval:<id>:publish-main` in `state.json.choices`), and the goal was
+redrawn to end with `git.publish` for both routes into `main` through the repos' own hooks.
+
+| # | Done-when line | Verdict | Where | Result | Evidence |
+| --- | --- | --- | --- | --- | --- |
+| 6 | `git.publish` nivo/fe into main | **DONE** | `D:/Repositories/nivo-fe`, `refs/heads/main` of `starci-lab/nivo-fe` | fast-forward `35e606cb` → `7cff0ea6` (the verified commit, two commits), pushed non-force through `.husky/pre-push` (lint, architecture check, 165 files / 741 tests), nothing bypassed; session worktree and branch removed; the served `uat` worktree untouched | `step-15/parallel-1/` |
+| 7 | `git.publish` nivo/be into main | **NOT TESTED — not plannable in this session** | `nivo-backend` main is `fae6462e` (the lint baseline), past the verified `ab36b8d6` | the head a publish would push is a merge commit no gate measured, and after `uat.verify` no Next table permits `quality.verify` (`scripts/plan-chain.mjs`, the packing law), so no lawful publish exists inside this chain; the session branch `session/20260905-074125-nivo-environment.preflight` at `ab36b8d6` stays in `D:/Repositories/nivo-be-reach-20260905-074125`; nothing was merged by hand | `state.json` (the replanned transition on 14/1 and `brief.blocked`) |
+
+The backend publication is one short chain away: `workspace.bind` nivo/be at `main`, merge the
+session branch (a merge commit, since main moved), `quality.verify` at the merged head, `git.publish`.
+A seventh runtime observation belongs with the six above: **a mission that adds `git.publish` for a
+second route after `uat.verify` has no lawful path to that route's quality receipt**, because the
+packing law reaches a step only through the Next table of the step before; the plan would need
+`quality.verify` to be a permitted successor of `uat.verify` (or of `git.publish`) for a two-route
+mission to end lawfully in one chain.
