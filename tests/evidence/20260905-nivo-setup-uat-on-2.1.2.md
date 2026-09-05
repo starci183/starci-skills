@@ -18,7 +18,7 @@ and were fixed in place; both are below.
 
 | # | Done-when line | Verdict | Where | Result | Evidence |
 | --- | --- | --- | --- | --- | --- |
-| 0 | `library.update` consume `@starci/grammar` 0.4.11 | **BLOCKED → owner** | consumer plan at `step-3/parallel-2` | `DEPENDENCY_PROOF_FAILED`: the consume law needs a consumer regression that FAILS at the installed 0.4.9 and passes at 0.4.11, and nivo-fe has no such existing spec, so the before-proof cannot be shown; the worktree was left untouched | `step-3/parallel-2/` |
+| 0 | `library.update` consume `@starci/grammar` 0.4.11 | **DONE via the owner's fallback** (bump committed, awaiting the after-audit) | first `DEPENDENCY_PROOF_FAILED` at `step-3/parallel-2`; resolved after the owner answered | the consume law needs a consumer regression that FAILS at 0.4.9 and passes at 0.4.11, which the audit is not; the owner ruled to write the minimal spec. `GrammarFamilyOverflow.spec.tsx` reads the family stamps off the markup — it fails at 0.4.9 (no `data-grammar-overflow`; body claims `OVERFLOW-1 OVERFLOW-2`) and passes at 0.4.11; the four manifests + lockfile were bumped to 0.4.11 and typecheck/lint/build/test:ci (744) are green | branch `session/20260905-130417-nivo-consume` (`64a19de`, `d2d35d0`) |
 | 1 | `runtime.serve` `nivo/be` on 3068 at main `ca60f419` | **DONE** | `nivo/be` served on 3068 under the lease; main `ca60f419` merged into `uat` as `0546d0fb` (61 files), typecheck/lint/handler-spec 18/18 green | entry attested; the control-centre probe answers the seeded workspace with instance null | `step-5/parallel-1/` |
 | 2 | `runtime.serve` `nivo/fe` on 3067 at the session head | **DONE** | `nivo/fe` served on 3067; session head `e2f4968f` merged into `uat` as `15f0a4c7` (4 files), gates green | entry generation 19; the served head contains the delivery | `step-6/parallel-1/` |
 | 3 | `interface.plan` surface map + units | **DONE** | 14 units: 3 journey (sign-in-return-to, module-setup, workspace-control-centre), 11 secondary with reasons | the 11 secondary surfaces are on the audit-lane unchecked ledger `@worktrees/unchecked/nivo/agentos-module-setup.jsonl` | `step-3/parallel-1/` |
@@ -87,10 +87,21 @@ Both fixes are in the runtime repo's own commit alongside this note.
 
 ## Blocked, deferred and excluded, with reasons
 
-- **`library.update` consume 0.4.11 (line 0) — blocked on the owner.** The consume law's before-proof
-  needs a consumer regression that fails at the installed version; nivo-fe has none. Routed to the
-  person; the worktree was not touched. `@starci/grammar` 0.4.11 is published (owner main `0564837`)
-  and repairs the three family gaps the audits name.
+- **`library.update` consume 0.4.11 (line 0) — first blocked, then done via the owner's fallback.**
+  The consume law's before-proof needs a consumer regression that fails at the installed version, and
+  nivo-fe had none, so `step-3/parallel-2` blocked `DEPENDENCY_PROOF_FAILED`. The owner (relayed by a
+  peer session) ruled: the consume validator refuses an audit-shaped authority
+  (`operators/library-update/validate.mjs:217` demands an existing test not in the write set, `:571`
+  demands a real fail-then-pass), so write the minimal consumer regression. Done:
+  `apps/app/src/components/blocks/agentos/GrammarFamilyOverflow.spec.tsx` renders
+  `HorizontalScrollRegion overflow="needed"` and a frameless `SurfaceCard` and reads the stamps off
+  the markup — it fails at 0.4.9 (no `data-grammar-overflow`; the body claims
+  `SURFACE-1 OVERFLOW-1 OVERFLOW-2 BOUNDARY-6`) and passes at 0.4.11. The four manifests and the
+  lockfile were bumped to 0.4.11; typecheck, lint, build and test:ci (744 tests) are green. The work
+  sits on `session/20260905-130417-nivo-consume` (`64a19de` the spec, `d2d35d0` the bump) atop the
+  published main; the after-half — an audit of the control centre at 0.4.11 showing the three claims
+  pass, then a publish — is deferred to a later branch, as the owner directed. The gap that forced
+  the spec (an audit cannot be a consume authority) was reported for widening in 2.1.4.
 - **The wrong-password / refused sign-in case (flow `setup-reach`) — uncapturable by the runner.** The
   sign-in form still holds the sealed credential in its accessibility tree when the refusal renders,
   so `scripts/browser-walk.mjs` refuses to write the frame (`OUTPUT_SECRET_DETECTED`), even when the
