@@ -3,13 +3,15 @@
 // (`consumer-before`, `consumer-after`, `consumer-<gate>`) runs at the consumer root after the commit
 // the consumer half starts from, with COVERAGE_BASE_SHA bound to that commit for test:ci. A phase of a
 // half this branch's mode does not run is refused. Only existing scripts or the regression binary of a
-// declared dependency run, with argument arrays and no shell.
+// declared dependency run, with argument arrays and no shell. Under an audit-shaped consume
+// (dependency-plan#regression kind audit) there is no consumer regression file: the two audits are the
+// before and after, and a gate proof binds regressionHash null, as validate.mjs#consumerProofErrors reads it.
 //   node run-proof.mjs <branch> <phase>
 import { mkdirSync, writeFileSync, readFileSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { loadContext, worktreeErrors, changeErrors, consumerChangeErrors, resolveCommand, consumerCommand, snapshots, consumerSnapshots, baseWorkingBytes, hash, git, same, regressionFailed, proofEnvironment, installedIdentity, bindRelease, runsPackageHalf, runsConsumerHalf, bareConsumerPhase, CONSUMER } from './validate.mjs';
+import { loadContext, worktreeErrors, changeErrors, consumerChangeErrors, resolveCommand, consumerCommand, snapshots, consumerSnapshots, baseWorkingBytes, hash, git, same, regressionFailed, proofEnvironment, installedIdentity, bindRelease, runsPackageHalf, runsConsumerHalf, bareConsumerPhase, isAuditRegression, CONSUMER } from './validate.mjs';
 
 export async function runProof(branch, phase) {
   const ctx = await loadContext(branch);
@@ -48,7 +50,7 @@ export async function runProof(branch, phase) {
   const outputRef = `response/artifacts/proofs/${phase}.log`;
   mkdirSync(path.dirname(path.join(branch, outputRef)), { recursive: true });
   writeFileSync(path.join(branch, outputRef), output);
-  if (consumer) proof = { phase, base: ctx.packageCommit, planHash: ctx.consumerPlanHash, command, commandHash: resolved.commandHash, environment, files, regressionHash: hash(readFileSync(path.join(ctx.checkout, ctx.consumer.regression.file))), installed, exitCode: result.status, outputRef, outputHash: hash(output), startedAt, finishedAt: new Date().toISOString() };
+  if (consumer) proof = { phase, base: ctx.packageCommit, planHash: ctx.consumerPlanHash, command, commandHash: resolved.commandHash, environment, files, regressionHash: isAuditRegression(ctx.consumer.regression) ? null : hash(readFileSync(path.join(ctx.checkout, ctx.consumer.regression.file))), installed, exitCode: result.status, outputRef, outputHash: hash(output), startedAt, finishedAt: new Date().toISOString() };
   else proof = { phase, planHash: ctx.planHash, base: ctx.base, head: ctx.base, command, commandHash: resolved.commandHash, files, exitCode: result.status, outputRef, outputHash: hash(output), startedAt, finishedAt: new Date().toISOString() };
   const folder = path.join(branch, 'response/data/proofs');
   mkdirSync(folder, { recursive: true });
