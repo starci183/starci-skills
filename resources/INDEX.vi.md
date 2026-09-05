@@ -1,111 +1,59 @@
-# Resources
+# Tài nguyên
 
-Câu hỏi và lựa chọn đã ghi nhận tuân theo [tương tác](interaction.vi.md).
-Provision danh tính tuân theo [custody bind theo provider](identity.vi.md).
+Khai báo `resources` của operator chọn vai trò; `agents/profiles/<runtime>.json` chọn model và quyền.
+[Tương tác](interaction.vi.md) sở hữu giao tiếp và [identity](identity.md) sở hữu credential provider.
+Quyền của operator luôn bị giới hạn bởi tác vụ, dù model có khả năng rộng hơn.
 
-Ai chạy operator nào, bằng gì, và dưới những chính sách thường trực nào. Hai chỗ đóng mang việc đó:
+## Vai trò và runtime
 
-- `agents/profiles/<runtime>.json`: mỗi runtime một file (`openai.json`, `claude.json`); file giữ provider,
-  profile mang model, cách cô lập, model làm được gì ở đây
-  (`capabilities`), và một operator trên profile đó được phép dùng gì (`permits`).
-- `operators/<id>/operator.json` → `resources`: nằm trong chính operator: đúng một profile chạy nó từ
-  đầu tới cuối, những quyền nó thật sự cần, và câu trả lời cho ba câu hỏi thường trực. `context.md`
-  của mỗi operator nói cùng ràng buộc đó bằng văn xuôi. Không có file assignment trung tâm.
+| Vai trò | OpenAI profile / model | Claude profile / model |
+| --- | --- | --- |
+| Suy luận, lập kế hoạch, đánh giá bằng chứng | `sol-reviewer` / `gpt-5.6-sol` | `fable` / `claude-fable-5-1` |
+| Triển khai, viết nội dung, thực hiện thao tác | `sol-fresh` / `gpt-5.6-sol` | `opus` / `claude-opus-5` |
 
-`scripts/validate-resources.mjs` chạy bên trong `npm test`. Nó từ chối operator mà `operator.json` không khai
-`resources`, operator trỏ tới profile không tồn tại, một id profile khai ở hai runtime, quyền được yêu cầu mà không profile nào được cấp, profile cho phép
-thứ model không làm được, câu trả lời
-chính sách mâu thuẫn với quyền, model mà schema của operator đã ghim nhưng không phải model của profile nó, và một dòng trong ma
-trận bên dưới lệch với operator mà nó tóm tắt. Nhờ vậy sổ đăng ký, các operator và bản tóm tắt này
-không thể lặng lẽ lệch nhau.
+Sol phục vụ cả hai vai trò bằng context và quyền riêng. Reviewer chỉ viết quyết định và bằng chứng của mình,
+chuyển việc sửa cho operator sở hữu. Agent mới chỉ nhận input được khai báo; reviewer không nhận lời giải thích
+của producer. Mỗi lần chạy ghi boundProfile và ranProfile theo `orchestrator.json#profileEquivalents`;
+không âm thầm đổi model. `astra` và `fable-legacy` đã ngừng dùng cho tác vụ mới, chỉ giữ để đọc receipt cũ.
 
-## Luật ràng buộc
+Chế độ web, Grammar và ảnh nằm trong khai báo tool và knowledge của từng operator. Ảnh phải phục vụ nội dung
+hoặc tác vụ; một vùng trống chưa đủ lý do tạo artwork. Owner và cách đọc reference nằm trong knowledge family.
 
-Operator ràng đúng một profile và chạy trọn trên đó, không theo từng lần gọi và không chia cho
-nhiều profile: một bước phản biện, review hay phán xét bên trong operator là một bước của chính lần
-thực thi đó, và đưa model thứ hai vào là thành workflow. Profile quyết model và cách cô lập;
-bảng Các bước trong `operator.md` của operator quyết công việc; `resources.requires` quyết công việc đó được chạm tới quyền nào.
-Một quyền không nằm trong `requires` thì operator không dùng được dù profile có cho phép. Năng lực là sự thật về model; quyền là chính sách về operator:
-`gpt-5.6-sol` tìm được, vẽ được, lái được trình duyệt và ghi được source, nên `sol-fresh` được dùng cả
-bốn, còn `astra` (Astra 6, người đọc và chấm) không được sinh ảnh và không được kho đối tượng, vì một reviewer mà tự tạo ra thì
-không còn là reviewer. Brainstorm
-và review quan trọng luôn là một lần thực thi mới, không thừa hưởng lượt nào, và reviewer chỉ nhận
-artifact với lời khai, không bao giờ nhận lý lẽ của người tạo ra.
+## Ma trận thực thi
 
-## Ba câu hỏi thường trực
+Các giá trị bên dưới đối chiếu trực tiếp operator.json. Scheduler/isolation có một nơi định nghĩa tại
+orchestrator.json; mode không tạo thêm user session hoặc hạn mức parallel riêng.
 
-**Có tìm trên mạng khi trong cây không có tham chiếu không?** Chỉ ở nơi `policy.webSearch` là
-`bounded`: các operator ra quyết định và bước brief của nội dung. Nghiên cứu bị giới hạn bởi đúng
-khoảng trống phải lấp, ghi lại đã dùng gì, và không bao giờ chép một trang, một thương hiệu, một
-bảng màu, hay giải phẫu một component. Một giá trị presentation mà knowledge không publish là
-`RULE_MISSING`, không bao giờ là việc phải đi tìm.
-
-**Có tuân thủ Grammar đã publish không?** Ở nơi `policy.grammarBound` là true: bốn operator
-frontend. Direction ràng các composition của Grammar; presentation chỉ giải quyết dựa trên những
-quan hệ Grammar đã sở hữu; apply chỉ ghi những class đã resolve; audit phán xét theo cùng một luật.
-Thiếu một capability tái dùng là `GRAMMAR_REQUIRED` hay `COMMON_CAPABILITY_MISSING`, không bao giờ
-là dựng bản nhái cục bộ.
-
-**Có sinh hình không?** `required` chỉ ở sinh nội dung, nơi hình được tạo theo một tuyên bố đã nêu
-và được kiểm độ trung thành với tuyên bố đó. `authority-only` ở direction frontend: bản thân
-direction render một trang xem được, còn artwork sản phẩm chỉ được sinh khi thẩm quyền sản phẩm gọi
-tên nó. Mọi nơi khác, `never`.
-
-## Ma trận quy trình
-
-Bản tóm tắt những gì mỗi `operator.json` khai; validator từ chối dòng nào lệch.
-
-| Operator | Profile | Grammar | Tool | Chế độ | Vì sao |
+| Operator | Profile | Grammar | Tools | Mode | Why |
 | --- | --- | --- | --- | --- | --- |
-| `environment.preflight` | astra | không | `fileread:context-aliases`, `git:read`, `shell:declared-commands`, `http:probe`, `secrets:resolve-by-name`, `container:read` | inline | Đọc khai báo, checkout, custody, sổ đăng ký và máy chủ một lần rồi báo mọi bức tường cùng lúc; không sửa gì |
-| `workspace.bind` | sol-fresh | không | `fileread:context-aliases`, `git:read`, `shell:declared-commands`, `secrets:resolve-by-name` | inline | Đọc file chuẩn và một sổ đăng ký; không phán xét |
-| `business.decide` | sol-fresh | không | `fileread:context-aliases`, `sourcewrite:declared-write-set`, `git:read`, `websearch:bounded` | isolated | Một mô hình nghiệp vụ lạ có thể cần tra cứu tham chiếu trước khi chốt coverage |
-| `architecture.decide` | sol-fresh | không | `fileread:context-aliases`, `git:read`, `websearch:bounded`, `visualize:html` | isolated | Phương án và tương thích cần bằng chứng ngoài repo; schema ghim model |
-| `interface.plan` | astra | có | `fileread:context-aliases`, `git:read` | isolated | Đọc tham chiếu, source và lời hứa một lần rồi gọi tên mọi trang và modal với một shell chung; không quyết gì bên trong một đơn vị |
-| `interface.generate` | sol-fresh | có | `fileread:context-aliases`, `git:commit-session-branch`, `websearch:bounded`, `imagegen:judged`, `visualize:html`, `host:loopback`, `print:decision-points`, `registry:read`, `sourcewrite:declared-write-set`, `shell:declared-commands` | isolated | Một agent mù dựng, render và in các ứng viên, resolve theo inventory đóng và ghi cây một lần |
-| `interface.audit` | astra | có | `fileread:context-aliases`, `git:read`, `websearch:bounded`, `visualize:html`, `browsercontrol:required`, `http:probe`, `host:loopback`, `secrets:resolve-by-name`, `print:decision-points` | isolated | Chỉ trình duyệt, không ghi source: người chấm không được sửa thứ mình đo, và đăng nhập bằng tên credential để tới route có cổng canh |
-| `interface.fix` | sol-fresh | có | `fileread:context-aliases`, `sourcewrite:declared-write-set`, `shell:declared-commands`, `git:commit-session-branch` | inline | Một finding, một commit nhỏ từ inventory của generator; lớn hơn là FIX_TOO_LARGE |
-| `library.update` | sol-fresh | không | `fileread:context-aliases`, `sourcewrite:declared-write-set`, `git:commit-session-branch`, `shell:declared-commands`, `registry:publish`, `secrets:resolve-by-name` | isolated | Sửa package của owner với bằng chứng trước/sau, đóng gói bản phát hành, đẩy lên registry mà manifest gọi tên và tiêu thụ nó bằng metadata chính xác ở phía dùng; `mode` chạy cả hai nửa (`full`), riêng nửa owner và dừng ở bản phát hành đã publish (`publish`), hoặc riêng nửa consumer trên bản phát hành đã bind (`consume`), nên hai repository là hai route |
-| `backend.plan` | astra | không | `fileread:context-aliases`, `git:read` | isolated | Đọc contract đã đóng băng và source một lần rồi gom các thao tác thành module với proof, migration và thứ tự của chúng; không điền gì |
-| `backend.generate` | sol-fresh | không | `fileread:context-aliases`, `sourcewrite:declared-write-set`, `git:commit-session-branch`, `shell:declared-commands` | isolated | Ghi bên trong một contract đã đóng băng theo patterns/be, trọn vẹn hay dưới dạng fix |
-| `identity.provision` | sol-fresh | không | `fileread:context-aliases`, `shell:declared-commands`, `http:probe`, `secrets:resolve-by-name`, `sourcewrite:declared-write-set`, `browsercontrol:required` | inline | Tạo tài khoản của luồng tại provider đã khai bằng credential resolve theo tên và chứng minh đăng nhập được; chỉ ghi tên |
-| `data.plan` | astra | không | `fileread:context-aliases`, `git:read` | isolated | Đọc goal, kế hoạch UAT, bản đồ và các kho một lần rồi gọi tên mỗi luồng hay họ dữ liệu một đơn vị seed với namespace và đích riêng; không đặt gì |
-| `data.seed` | sol-fresh | không | `fileread:context-aliases`, `sourcewrite:declared-write-set`, `secrets:resolve-by-name`, `http:probe`, `database:namespaced-write` | inline | Ghi và áp seed của một luồng theo luật cô lập, mọi dòng quy được nguồn, kèm rollback |
-| `runtime.serve` | sol-fresh | không | `fileread:context-aliases`, `git:merge-into-integration-branch`, `shell:declared-commands`, `http:probe`, `container:operate`, `secrets:resolve-by-name` | inline | Merge một phiên vào nhánh tích hợp, khởi động lại đúng một server theo head, chứng thực entry, giữ lease |
-| `service.operate` | sol-fresh | không | `fileread:context-aliases`, `shell:declared-commands`, `container:operate`, `http:probe`, `secrets:resolve-by-name` | inline | Chạy lệnh đã khai của đúng một dịch vụ phụ trợ đã khai, chứng minh trạng thái từ chính probe của nó, ghi kẻ đang giữ, giữ lease |
-| `migration.release` | sol-fresh | không | `fileread:context-aliases`, `git:read`, `shell:declared-commands`, `secrets:resolve-by-name` | inline | Áp bộ migration đã khai đúng một lần qua runner do source sở hữu, giữ nguyên journal |
-| `business.reconcile` | sol-fresh | không | `fileread:context-aliases`, `sourcewrite:declared-write-set`, `git:read` | isolated | So head lời hứa đã công bố với source đã giao và ghi lại mọi sai lệch |
-| `quality.verify` | astra | không | `fileread:context-aliases`, `git:read`, `shell:declared-commands`, `http:probe` | inline | Chạy gate, không sửa gì |
-| `uat.plan` | astra | không | `fileread:context-aliases` | isolated | Đọc goal và bản đồ một lần rồi gọi tên mỗi hành trình một luồng với alias và namespace riêng; không đi thử gì |
-| `api.verify` | astra | không | `fileread:context-aliases`, `sourcewrite:declared-write-set`, `git:read`, `shell:declared-commands`, `http:probe`, `secrets:resolve-by-name`, `print:decision-points` | isolated | Chạy bộ kiểm end-to-end của chính bản giao như một client đối với runtime đang phục vụ và không được ghi source; các case là của runner, các làn được xét riêng |
-| `uat.verify` | astra | không | `fileread:context-aliases`, `sourcewrite:declared-write-set`, `git:read`, `websearch:bounded`, `visualize:html`, `browsercontrol:required`, `http:probe`, `secrets:resolve-by-name`, `database:namespaced-write`, `print:decision-points` | isolated | Đi hành trình thật trong trình duyệt và không được ghi gì; verdict mới cho từng làn |
-| `release.deploy` | sol-fresh | không | `fileread:context-aliases`, `git:read`, `shell:declared-commands`, `http:probe`, `container:operate`, `ci:read`, `secrets:resolve-by-name` | inline | Phát hành image bất biến dưới uỷ quyền đã khai, kèm probe và rollback |
-| `content.generate` | sol-fresh | không | `fileread:context-aliases`, `shell:declared-commands`, `websearch:bounded`, `imagegen:required`, `objectstorage:read` | isolated | Tra cứu brief trong giới hạn, rồi viết, code và vẽ theo một claim; schema ghim model này |
-| `git.publish` | sol-fresh | không | `fileread:context-aliases`, `git:merge-and-push`, `shell:declared-commands`, `ci:read` | inline | Publish không force; thao tác huỷ diệt không biểu diễn được |
+| `api.verify` | sol-reviewer | no | `fileread:context-aliases`, `sourcewrite:declared-write-set`, `git:read`, `shell:declared-commands`, `http:probe`, `secrets:resolve-by-name`, `print:decision-points` | isolated | Suy luận và kiểm bằng chứng trong ranh giới operator |
+| `architecture.decide` | sol-reviewer | no | `fileread:context-aliases`, `git:read`, `websearch:bounded`, `visualize:html` | isolated | Suy luận và kiểm bằng chứng trong ranh giới operator |
+| `backend.generate` | sol-fresh | no | `fileread:context-aliases`, `sourcewrite:declared-write-set`, `git:commit-session-branch`, `shell:declared-commands` | isolated | Thực thi trong phạm vi ghi và tác động được giao |
+| `backend.plan` | sol-reviewer | no | `fileread:context-aliases`, `git:read` | isolated | Suy luận và kiểm bằng chứng trong ranh giới operator |
+| `business.decide` | sol-reviewer | no | `fileread:context-aliases`, `sourcewrite:declared-write-set`, `git:read`, `websearch:bounded` | isolated | Suy luận và kiểm bằng chứng trong ranh giới operator |
+| `business.reconcile` | sol-reviewer | no | `fileread:context-aliases`, `sourcewrite:declared-write-set`, `git:read` | isolated | Suy luận và kiểm bằng chứng trong ranh giới operator |
+| `content.generate` | sol-fresh | no | `fileread:context-aliases`, `shell:declared-commands`, `websearch:bounded`, `imagegen:required`, `objectstorage:read` | isolated | Thực thi trong phạm vi ghi và tác động được giao |
+| `data.plan` | sol-reviewer | no | `fileread:context-aliases`, `git:read` | isolated | Suy luận và kiểm bằng chứng trong ranh giới operator |
+| `data.seed` | sol-fresh | no | `fileread:context-aliases`, `sourcewrite:declared-write-set`, `secrets:resolve-by-name`, `http:probe`, `database:namespaced-write` | inline | Thực thi trong phạm vi ghi và tác động được giao |
+| `environment.preflight` | sol-reviewer | no | `fileread:context-aliases`, `git:read`, `shell:declared-commands`, `http:probe`, `secrets:resolve-by-name`, `container:read` | inline | Suy luận và kiểm bằng chứng trong ranh giới operator |
+| `git.publish` | sol-fresh | no | `fileread:context-aliases`, `git:merge-and-push`, `shell:declared-commands`, `ci:read` | inline | Thực thi trong phạm vi ghi và tác động được giao |
+| `identity.provision` | sol-fresh | no | `fileread:context-aliases`, `shell:declared-commands`, `http:probe`, `secrets:resolve-by-name`, `sourcewrite:declared-write-set`, `browsercontrol:required` | inline | Thực thi trong phạm vi ghi và tác động được giao |
+| `interface.audit` | sol-reviewer | yes | `fileread:context-aliases`, `git:read`, `websearch:bounded`, `visualize:html`, `browsercontrol:required`, `http:probe`, `host:loopback`, `secrets:resolve-by-name`, `print:decision-points` | isolated | Suy luận và kiểm bằng chứng trong ranh giới operator |
+| `interface.fix` | sol-fresh | yes | `fileread:context-aliases`, `sourcewrite:declared-write-set`, `shell:declared-commands`, `git:commit-session-branch` | inline | Thực thi trong phạm vi ghi và tác động được giao |
+| `interface.generate` | sol-fresh | yes | `fileread:context-aliases`, `git:commit-session-branch`, `websearch:bounded`, `imagegen:judged`, `visualize:html`, `host:loopback`, `print:decision-points`, `registry:read`, `sourcewrite:declared-write-set`, `shell:declared-commands` | isolated | Thực thi trong phạm vi ghi và tác động được giao |
+| `interface.plan` | sol-reviewer | yes | `fileread:context-aliases`, `git:read` | isolated | Suy luận và kiểm bằng chứng trong ranh giới operator |
+| `knowledge.repair` | sol-fresh | no | `fileread:context-aliases`, `git:read-write`, `sourcewrite:declared-paths` | isolated | Thực thi trong phạm vi ghi và tác động được giao |
+| `library.update` | sol-fresh | no | `fileread:context-aliases`, `sourcewrite:declared-write-set`, `git:commit-session-branch`, `shell:declared-commands`, `registry:publish`, `secrets:resolve-by-name` | isolated | Thực thi trong phạm vi ghi và tác động được giao |
+| `migration.release` | sol-fresh | no | `fileread:context-aliases`, `git:read`, `shell:declared-commands`, `secrets:resolve-by-name` | inline | Thực thi trong phạm vi ghi và tác động được giao |
+| `quality.verify` | sol-reviewer | no | `fileread:context-aliases`, `git:read`, `shell:declared-commands`, `http:probe` | inline | Suy luận và kiểm bằng chứng trong ranh giới operator |
+| `release.deploy` | sol-fresh | no | `fileread:context-aliases`, `git:read`, `shell:declared-commands`, `http:probe`, `container:operate`, `ci:read`, `secrets:resolve-by-name` | inline | Thực thi trong phạm vi ghi và tác động được giao |
+| `runtime.serve` | sol-fresh | no | `fileread:context-aliases`, `git:merge-into-integration-branch`, `shell:declared-commands`, `http:probe`, `container:operate`, `secrets:resolve-by-name` | inline | Thực thi trong phạm vi ghi và tác động được giao |
+| `service.operate` | sol-fresh | no | `fileread:context-aliases`, `shell:declared-commands`, `container:operate`, `http:probe`, `secrets:resolve-by-name` | inline | Thực thi trong phạm vi ghi và tác động được giao |
+| `uat.plan` | sol-reviewer | no | `fileread:context-aliases` | isolated | Suy luận và kiểm bằng chứng trong ranh giới operator |
+| `uat.verify` | sol-reviewer | no | `fileread:context-aliases`, `sourcewrite:declared-write-set`, `git:read`, `websearch:bounded`, `visualize:html`, `browsercontrol:required`, `http:probe`, `secrets:resolve-by-name`, `database:namespaced-write`, `print:decision-points` | isolated | Suy luận và kiểm bằng chứng trong ranh giới operator |
+| `workspace.bind` | sol-fresh | no | `fileread:context-aliases`, `git:read`, `shell:declared-commands`, `secrets:resolve-by-name` | inline | Thực thi trong phạm vi ghi và tác động được giao |
 
-## Profile
+## Thay đổi
 
-### Runtime `openai` (provider `openai`)
-
-| Profile | Model | Năng lực | Được cấp | Dùng cho |
-| --- | --- | --- | --- | --- |
-| `sol-fresh` | `gpt-5.6-sol` | mạng, hình, trình duyệt, source | mạng, hình, trình duyệt, source | Quyết định và direction, từ đầu tới cuối |
-| `astra` | `gpt-6-astra` | mạng, hình, trình duyệt, source | trình duyệt | Audit và UAT; chỉ quan sát, không bao giờ ghi |
-
-### Runtime `claude` (provider `anthropic`)
-
-| Profile | Model | Năng lực | Được cấp | Dùng cho |
-| --- | --- | --- | --- | --- |
-| `opus` | `claude-opus-5` | mạng, trình duyệt, source | trình duyệt, source | Tác giả nặng và mutation rủi ro cao |
-| `fable` | `claude-fable-5-1` | mạng, trình duyệt, source | source | Trích xuất và audit bám source |
-
-`fable` được đăng ký cho việc audit và trích xuất đã tạo ra `patterns/`; hôm nay chưa operator nào
-ràng nó.
-
-## Thứ được phép đổi ở đây
-
-Model hay quyền của một profile, profile của một operator, và bất kỳ câu trả lời chính sách nào đều
-là quyết định của chủ. Đổi một thứ là sửa file profile hay `operator.json` của operator, dòng tương ứng trong `context.md`
-của nó, cộng `npm test` xanh. Thêm một loại quyền
-nghĩa là phải thêm nó tường minh vào mọi profile, vì validator từ chối profile nào bỏ trống một
-quyền.
+Đổi profile phải đồng bộ bảng này, assignment trong package và mirror. Gate từ chối assignment không tồn tại
+hoặc đã ngừng dùng, grant không được phép và sai mode khai báo.

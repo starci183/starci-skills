@@ -7,7 +7,7 @@
   "validator": "validate.mjs",
   "selfTest": "self-test.mjs",
   "resources": {
-    "profile": "astra",
+    "profile": "sol-reviewer",
     "mode": "isolated",
     "tools": {
       "@tools/fileread": "context-aliases",

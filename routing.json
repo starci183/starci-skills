@@ -219,7 +219,8 @@
         "target": "library.update"
       },
       "knowledge": {
-        "kind": "user"
+        "kind": "chain",
+        "target": "knowledge.repair"
       },
       "resolution": {
         "kind": "resume"
@@ -258,6 +259,10 @@
       "runtime": {
         "kind": "operator",
         "target": "runtime.serve"
+      },
+      "knowledge": {
+        "kind": "chain",
+        "target": "knowledge.repair"
       }
     },
     "interface.fix": {
@@ -275,6 +280,10 @@
       },
       "caller": {
         "kind": "user"
+      },
+      "knowledge": {
+        "kind": "chain",
+        "target": "knowledge.repair"
       }
     },
     "library.update": {
@@ -295,6 +304,10 @@
       },
       "caller": {
         "kind": "user"
+      },
+      "knowledge": {
+        "kind": "chain",
+        "target": "knowledge.repair"
       }
     },
     "uat.plan": {
@@ -411,6 +424,14 @@
       },
       "caller": {
         "kind": "user"
+      }
+    },
+    "knowledge.repair": {
+      "caller": {
+        "kind": "user"
+      },
+      "knowledge": {
+        "kind": "resume"
       }
     }
   }

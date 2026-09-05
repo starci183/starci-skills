@@ -28,7 +28,7 @@ npx --package=github:starci183/starci-skills#main starci-skills init
 | `npx @starci/skills doctor [--dir <repo>] [--quick]` | Runs the tree's own validators on the installed copy (routing, alias, operators, workflows, defaults, templates, knowledge citations, the operator and helper self-tests and the script specs) and reports files changed since install. |
 | `npx @starci/skills version` | Prints the package version. |
 
-The runtime paths are `INDEX.md`, `INDEX.vi.md`, `SKILL.md`, `SKILL.vi.md`, `routing.json`, `alias/`,
+The runtime paths are `UPDATE.md`, `UPDATE.vi.md`, `INDEX.md`, `INDEX.vi.md`, `SKILL.md`, `SKILL.vi.md`, `routing.json`, `alias/`,
 `helpers/`, `knowledge/`, `operators/`, `readiness/`, `resources/`, `scripts/`, `templates/`, `workflows/`. The
 manifest `.claude/.starci-skills.json` records the installed version and a hash per file; `update` and
 `doctor` read it.

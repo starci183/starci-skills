@@ -27,7 +27,7 @@ npx --package=github:starci183/starci-skills#main starci-skills init
 | `npx @starci/skills doctor [--dir <repo>] [--quick]` | Chạy chính bộ validator của cây trên bản đã cài (routing, alias, operator, workflow, mặc định, template, trích dẫn knowledge, self-test của operator và helper, và spec của script) và báo những file đã đổi từ lúc cài. |
 | `npx @starci/skills version` | In phiên bản gói. |
 
-Các đường dẫn runtime là `INDEX.md`, `INDEX.vi.md`, `SKILL.md`, `SKILL.vi.md`, `routing.json`,
+Các đường dẫn runtime là `UPDATE.md`, `UPDATE.vi.md`, `INDEX.md`, `INDEX.vi.md`, `SKILL.md`, `SKILL.vi.md`, `routing.json`,
 `alias/`, `helpers/`, `knowledge/`, `operators/`, `readiness/`, `resources/`, `scripts/`, `templates/`,
 `workflows/`. Manifest `.claude/.starci-skills.json` ghi phiên bản đã cài và hash từng file; `update` và
 `doctor` đọc nó.
