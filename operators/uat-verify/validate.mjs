@@ -226,7 +226,10 @@ export async function validateUatStep(branchDir, root = ROOT, { hostRoot = hostR
     if (!empty(requirements.flow) && snapshot.flow !== requirements.flow) errors.push('response/data/snapshot.json: the snapshot names another flow');
     if (!empty(requirements.runId) && snapshot.runId !== requirements.runId) errors.push('response/data/snapshot.json: the snapshot names another runId');
     if (!empty(requirements.approval) && snapshot.approval !== requirements.approval) errors.push('response/data/snapshot.json: the snapshot names another authority than the one the request declared');
-    if (snapshot.fixtureNamespace !== `uat-${snapshot.runId}`) errors.push(`response/data/snapshot.json: the fixture namespace must be uat-${snapshot.runId}, so cleanup can name exactly what this run wrote`);
+    // The run's namespace is the one its seed receipt binds — the flow-owned namespace data.plan gave the
+    // seed and data.seed placed it under, which a run reuses rather than renames — and only a run that
+    // binds no seed receipt namespaces its records by its own runId.
+    if (!seedText && snapshot.fixtureNamespace !== `uat-${snapshot.runId}`) errors.push(`response/data/snapshot.json: the fixture namespace must be uat-${snapshot.runId}, so cleanup can name exactly what this run wrote`);
     if (snapshot.seed.namespace !== snapshot.fixtureNamespace) errors.push('response/data/snapshot.json: the seed namespace must equal the run fixture namespace');
     if (seedText) {
       const seedBinding = Object.fromEntries((tableUnder(seedText, '## Binding') ?? []).map(([k, v]) => [k, String(v).replaceAll('`', '')]));

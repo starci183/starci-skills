@@ -180,8 +180,9 @@ resolves a question of intent by re-running the flow harder.
 
 ## The namespace owns everything this run wrote
 
-Every seed record this run consumes carries `is_uat=true` and the `runId` namespace, so it is
-separable from product data. Verification never mutates that data. It hands the exact receipt-owned
+Every seed record this run consumes carries `is_uat=true` and the namespace the seed receipt binds —
+the flow's own, as the seed plan gave it — so it is separable from product data; a run that binds no
+seed receipt namespaces its records by its `runId`. Verification never mutates that data. It hands the exact receipt-owned
 rollback set to `data.seed`, which deletes only that namespace and returns cleanup evidence; run
 records remain append-only. A seed may never create the outcome under test.
 

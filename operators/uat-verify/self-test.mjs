@@ -273,7 +273,7 @@ function writeBranch(files, history = 'match') {
     mkdirSync(path.dirname(path.join(session, input)), { recursive: true });
     const content = input === ACCOUNT_IN ? accountInput(requestEnv)
       : input === CASE_SHEET_IN ? caseSheetInput(requestEnv)
-      : input === SEED_IN ? `# seed-receipt — ${FLOW}\n\n## Binding\n\n| Field | Value |\n| --- | --- |\n| Flow | ${FLOW} |\n| Environment | ${requestEnv} |\n| Namespace | ${NS} |\n| Seed fingerprint | ${FP(4)} |\n`
+      : input === SEED_IN ? `# seed-receipt — ${FLOW}\n\n## Binding\n\n| Field | Value |\n| --- | --- |\n| Flow | ${FLOW} |\n| Environment | ${requestEnv} |\n| Namespace | ${files['response/data/snapshot.json']?.fixtureNamespace ?? NS} |\n| Seed fingerprint | ${FP(4)} |\n`
       : input === UAT_PLAN_IN ? `# uat-plan — ${FEATURE}\n\n## Flows\n\n| Flow | Entry | Steps | Account | Seed namespace | Tier |\n| --- | --- | --- | --- | --- | --- |\n| ${FLOW} | /enroll | 4 | learner | ${NS} | journey |\n`
       : input.endsWith('.json') ? {} : '# admitting receipt\n';
     writeFileSync(path.join(session, input), typeof content === 'string' ? content : JSON.stringify(content, null, 2));
@@ -358,6 +358,15 @@ async function expectError(files, needle, label, history, options = {}) {
 }
 
 await expectValid(baseline(), 'a run triggered by a chain, authorised, admitted at the pinned commit, three lanes passing');
+// The run's namespace is the flow-owned one its seed receipt binds (data.plan gives a flow its namespace
+// once and a later run reuses it); uat-<runId> is owed only by a run that binds no seed receipt.
+const FLOW_NS = `uat-${FLOW}-7`;
+const flowNamespaced = () => {
+  const snap = snapshot({ fixtureNamespace: FLOW_NS, seed: { ...snapshot().seed, namespace: FLOW_NS }, isolation: isolation({ seededIds: [`${FLOW_NS}-learner`, `${FLOW_NS}-enrollment`], rollbackIds: [`${FLOW_NS}-enrollment`] }) });
+  const verd = verdicts({ cleanup: { ...verdicts().cleanup, namespace: FLOW_NS } });
+  return { ...baseline(), 'response/data/snapshot.json': snap, 'response/data/verdicts.json': verd, 'response/response.md': responseMd({ snap, verd }) };
+};
+await expectValid(flowNamespaced(), 'a run whose fixture namespace is the flow-owned namespace its seed receipt binds');
 const splitRole = () => {
   const files=baseline(), provenance={fe:COMMIT,be:OTHER_COMMIT};
   files['request/request.json'].contexts=[{alias:'@workspaces/fe',head:COMMIT},{alias:'@workspaces/be',head:OTHER_COMMIT},{alias:'@worktrees/uat/enrollment/paid-enrollment',head:null}];

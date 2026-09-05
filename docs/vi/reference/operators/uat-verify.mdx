@@ -178,8 +178,9 @@ bằng cách chạy lại luồng mạnh tay hơn.
 
 ## Namespace sở hữu mọi thứ lượt chạy này ghi ra
 
-Mọi bản ghi seed mà lượt chạy tiêu thụ đều mang `is_uat=true` và namespace `runId`, nên chúng tách
-bạch với dữ liệu sản phẩm. Verifier không mutate dữ liệu đó. Nó handoff rollback set chính xác của
+Mọi bản ghi seed mà lượt chạy tiêu thụ đều mang `is_uat=true` và namespace mà seed receipt bind —
+namespace riêng của flow, như kế hoạch seed đã cấp — nên chúng tách bạch với dữ liệu sản phẩm; một
+lượt chạy không bind seed receipt thì namespace bản ghi của nó theo `runId`. Verifier không mutate dữ liệu đó. Nó handoff rollback set chính xác của
 receipt cho `data.seed`; operator ấy chỉ xoá namespace đó và trả bằng chứng cleanup. Run record vẫn
 chỉ-thêm, và seed không bao giờ được tạo ra chính kết quả cần kiểm.
 
