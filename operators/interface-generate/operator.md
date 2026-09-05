@@ -123,12 +123,12 @@ the full scores and declared limits.
 
 ## Images are judged, not requested
 
-An image is a composition decision like any other: when a candidate leaves a region that reads empty
-(a hero without a subject, an empty state with only a sentence, a card row whose copy cannot carry the
-width), the operator adds an image made to one stated claim of the direction (`@tools/imagegen`) and
-records why, in the `## Images` table. It does not wait for a person to ask, and it does not decorate:
-a region that the copy and the Grammar objects already carry gets no image, and an image never encodes
-a claim the business promise did not make. The asset and its prompt land under
+An image is a composition decision like any other. It may highlight a key idea, explain content, or
+create a relevant focal point and deliberate visual hierarchy, including with an evocative accent
+whose subject supports the surface's meaning. The operator judges the subject, relevance, attention
+and hierarchy against the stated claim and the competing CTA, then records that purpose in the
+`## Images` table. Empty space alone is never evidence for an image, and an image is never filler,
+density balancing or an invented business claim. The asset and its prompt land under
 `response/artifacts/images/`, and step 11 writes them with the declared write set.
 
 ## Structure is decided before a value is
@@ -331,7 +331,7 @@ written source: it knows what it decided and what it wrote, never how it renders
 | `changeLevel` | choice | — | new, reconstruct or refine; an audit that must end in a passing surface is reconstruct |
 | `ownerCeiling` | choice | surface-and-nested-layouts | surface-only, surface-and-nested-layouts or ancestor-layouts-authorized |
 | `candidates` | number 1–3 | 1 | How many directions to form; more than one only when a comparison is wanted |
-| `preview` | choice | no | yes renders the single candidate as an inspectable page |
+| `preview` | choice | no | yes requests an additional interactive preview; every candidate is rendered, served and printed regardless |
 | `references` | list | [] | The person's references: a URL, a screenshot path or a description each; bounded research runs only when this is empty |
 | `selectionPolicy` | choice | automatic | `automatic` for internal comparisons within a selected direction; `approval-required` for material tier/direction alternatives under the interaction policy |
 | `approval` | id | null | The candidate actually selected by the user; required under `approval-required` and reused on continuation |
@@ -367,11 +367,11 @@ band and stops it. Every change level declares one; a refine inherits nothing an
 Step 4 leaves the receipt with the standards this surface is aiming at, each named by class, each
 carrying what is borrowed and what it does not settle. Under `new` and `reconstruct` that table has
 at least one row and step 4 stops with `REFERENCE_MISSING` when it cannot produce one; under
-`refine` it stays empty. Step 6 renders before step 7 writes the decision, because a structure
-nobody has seen cannot be approved and a candidate described in prose is not a candidate anybody can
-judge. Under `new` and `reconstruct` every candidate the run forms is rendered as its own page,
-whatever `preview` says and however many there are: that is `@tools/visualize`, needs no grant, and
-every runtime does it.
+`refine` it stays empty. Step 6 renders before step 7 writes the decision, because a candidate nobody
+has seen cannot be judged and a candidate described in prose supplies no visual evidence. At every
+change level, including `refine`, every candidate the run forms is rendered as its own page, whatever
+`preview` says and however many there are: that is `@tools/visualize`, needs no grant, and every
+runtime does it.
 
 The candidate pages are not files a person is asked to find. Step 6 serves the artifacts folder over
 `@tools/host` (the tool the registry ships, never a server written for the occasion) on the loopback
@@ -398,10 +398,9 @@ never overturns a decision the person took on its own evidence. Operational stop
 the owning limitation and carry no tier question; they remain subject to existing authority and the
 interaction policy.
 
-Under `refine` the page stays optional — the structure was approved before this run began — and is
-rendered only when more than one candidate was formed or `preview` is yes; a single refine candidate
-under the defaults produces no page and rests on the falsification. Under `automatic`, a dominant
-candidate is selected and a tie takes the recorded fallback; `approval-required` stops with
+Every `refine` candidate is rendered and scored even when it is the sole candidate and `preview` is
+`no`; prior approval of the structure does not prove the current visual change. Under `automatic`, a
+dominant candidate is selected and a tie takes the recorded fallback; `approval-required` stops with
 `DIRECTION_CHOICE_REQUIRED` until the person returns with `approval`, and the run resumes at step 8
 with the approved candidate. The decision receipt authorizes the resolution to work inside the
 frozen owner ceiling and proves nothing about how the result renders.

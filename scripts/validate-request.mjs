@@ -231,6 +231,15 @@ const UI_BINDINGS = {
   'interface.fix': ['@knowledge/ui/presentation'],
   'interface.audit': ['@knowledge/ui/composition', '@knowledge/ui/presentation', '@knowledge/ui/proof']
 };
+const ALL_UI_BINDINGS = ['@knowledge/ui/composition', '@knowledge/ui/presentation', '@knowledge/ui/proof'];
+
+export function uiKnowledgeBindingsFor(request) {
+  const aliases = (request?.contexts ?? []).map((context) => context.alias);
+  const familyAliases = aliases.filter((alias) => /^@knowledge\/grammars\/[a-z0-9][a-z0-9-]*$/.test(alias));
+  const ui = request?.operatorId === 'knowledge.repair' ? ALL_UI_BINDINGS : (UI_BINDINGS[request?.operatorId] ?? []);
+  return [...new Set([...ui, ...familyAliases])];
+}
+
 export async function uiKnowledgeRequestErrors(root, dir, request, { phase = currentRequestPhase() } = {}) {
   if (request?.contractVersion !== V22_CONTRACT) return [];
   const aliases = (request.contexts ?? []).map((context) => context.alias);
@@ -243,9 +252,7 @@ export async function uiKnowledgeRequestErrors(root, dir, request, { phase = cur
   const [{ knowledgeManifestErrors, frozenKnowledgeManifestErrors }, { frozenFamilyUnderstandingErrors, routedFamily }] = await Promise.all([import(pathToFileURL(manifestModule).href), import(pathToFileURL(familyModule).href)]);
   const family = routedFamily(request);
   if (!family) return ['request.json: no unique concrete @knowledge/grammars/<family> binding; a family is never inferred or defaulted'];
-  let bindings = UI_BINDINGS[request.operatorId] ?? [];
-  if (request.operatorId === 'knowledge.repair') bindings = aliases.filter((alias) => alias.startsWith('@knowledge/ui/'));
-  bindings = [...new Set([...bindings, `@knowledge/grammars/${family}`])];
+  const bindings = uiKnowledgeBindingsFor(request);
   if (phase === 'accept' && typeof frozenKnowledgeManifestErrors !== 'function') return ['request/knowledge-manifest.json: the phase-safe frozen manifest validator is unavailable; acceptance cannot compare a pre-mutation manifest to mutated live sources'];
   const manifestErrors = phase === 'accept'
     ? await frozenKnowledgeManifestErrors({ root, branchDir: dir, bindings, family })

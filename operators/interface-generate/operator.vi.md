@@ -122,12 +122,13 @@ Quyết định trên nhiều phương án đã render vẫn phải có đủ đ
 
 ## Hình là thứ operator tự xét, không chờ yêu cầu
 
-Một tấm hình là quyết định composition như mọi quyết định khác: khi một ứng viên để lại vùng đọc lên
-thấy trống (hero không có chủ thể, empty state chỉ có một câu, hàng card mà chữ không gánh nổi chiều
-rộng), operator thêm hình làm theo đúng một claim của hướng (`@tools/imagegen`) và ghi lý do vào
-bảng `## Images`. Nó không chờ người nói, và cũng không trang trí: vùng mà chữ và Grammar object đã
-gánh được thì không thêm hình, và hình không bao giờ mã hoá claim mà lời hứa nghiệp vụ không hề nêu.
-Asset và prompt nằm dưới `response/artifacts/images/`, và bước 11 ghi chúng cùng write set đã khai.
+Một tấm hình là quyết định composition như mọi quyết định khác. Hình có thể làm nổi bật ý chính, giải
+thích nội dung, hoặc tạo điểm nhấn phù hợp và hệ phân cấp thị giác có chủ đích, kể cả một accent giàu
+cảm xúc có chủ thể nâng đỡ ý nghĩa của bề mặt. Operator xét chủ thể, độ liên quan, sức hút chú ý và hệ
+phân cấp so với claim đã nêu cùng CTA cạnh tranh, rồi ghi mục đích ấy vào bảng `## Images`. Chỉ có
+khoảng trống thì không đủ làm bằng chứng để thêm hình; hình không được làm đồ lấp chỗ, cân mật độ hay
+tự bịa claim nghiệp vụ. Asset và prompt nằm dưới `response/artifacts/images/`, và bước 11 ghi chúng
+cùng write set đã khai.
 
 ## Cấu trúc quyết trước, giá trị quyết sau
 
@@ -321,7 +322,7 @@ nó biết nó đã quyết gì và ghi gì, không bao giờ biết nó render 
 | `changeLevel` | choice | — | new, reconstruct hay refine; một lượt audit phải kết thúc bằng bề mặt pass là reconstruct |
 | `ownerCeiling` | choice | surface-and-nested-layouts | surface-only, surface-and-nested-layouts hay ancestor-layouts-authorized |
 | `candidates` | number 1–3 | 1 | Hình thành bao nhiêu hướng; nhiều hơn một chỉ khi muốn so sánh |
-| `preview` | choice | no | yes thì render phương án duy nhất thành một trang xem được |
+| `preview` | choice | no | yes yêu cầu thêm preview tương tác; mọi phương án vẫn được render, phục vụ và in ra bất kể giá trị này |
 | `references` | list | [] | Tham chiếu của người: mỗi cái là một URL, một đường dẫn ảnh chụp hay một mô tả; nghiên cứu có giới hạn chỉ chạy khi ô này rỗng |
 | `selectionPolicy` | choice | automatic | `automatic` cho so sánh nội bộ trong hướng đã chọn; `approval-required` cho các tier/hướng khác nhau về bản chất theo chính sách tương tác |
 | `approval` | id | null | Id phương án người dùng thực sự chọn; bắt buộc dưới `approval-required`, dùng lại khi tiếp tục |
@@ -357,10 +358,11 @@ không thừa kế ngầm mà nêu lại.
 Bước 4 để lại trong biên nhận các chuẩn mà bề mặt này nhắm tới, mỗi chuẩn gọi tên theo lớp, kèm thứ
 được mượn và thứ nó không giải quyết. Dưới `new` và `reconstruct` bảng ấy có ít nhất một dòng và bước
 4 dừng bằng `REFERENCE_MISSING` khi không sinh nổi một dòng nào; dưới `refine` nó để trống. Bước 6
-render trước khi bước 7 ghi quyết định, vì một cấu trúc chưa ai nhìn thấy thì không thể duyệt, và một
-phương án chỉ được tả bằng văn xuôi thì không ai phán được. Dưới `new` và `reconstruct`, mọi phương án
-mà lượt chạy hình thành đều được render thành trang riêng, bất kể `preview` nói gì và bất kể có bao
-nhiêu phương án: đó là `@tools/visualize`, không cần cấp quyền, và mọi runtime đều làm được.
+render trước khi bước 7 ghi quyết định, vì một phương án chưa ai nhìn thấy thì không thể được chấm và
+phương án chỉ được tả bằng văn xuôi không tạo ra bằng chứng thị giác. Ở mọi mức thay đổi, kể cả
+`refine`, mọi phương án mà lượt chạy hình thành đều được render thành trang riêng, bất kể `preview`
+nói gì và bất kể có bao nhiêu phương án: đó là `@tools/visualize`, không cần cấp quyền, và mọi runtime
+đều làm được.
 
 Trang phương án không phải file để người ta tự đi tìm. Bước 6 phục vụ thư mục artifacts qua
 `@tools/host` (tool có sẵn trong sổ đăng ký, không viết server mới cho từng lần) trên loopback, ở cổng
@@ -385,10 +387,10 @@ này, và audit sau đó ghi nó là person-accepted, gọi tên nhánh này, th
 của mình. Reason của mã dừng vận hành mô tả giới hạn tại owner, không mang câu hỏi tier; thẩm quyền
 hiện hành và chính sách tương tác vẫn áp dụng.
 
-Dưới `refine` trang vẫn là tuỳ chọn — cấu trúc đã được duyệt từ trước lượt chạy này — và chỉ render
-khi có nhiều hơn một phương án được hình thành hoặc `preview` là yes; một phương án refine duy nhất
-dưới mặc định không sinh trang nào và dựa vào phản chứng. Dưới `automatic`, chọn phương án trội hoặc
-ghi fallback khi hoà; `approval-required` dừng với `DIRECTION_CHOICE_REQUIRED` cho tới khi người quay
+Mọi phương án `refine` đều được render và chấm, kể cả khi chỉ có một phương án và `preview` là `no`;
+việc cấu trúc từng được duyệt không chứng minh thay đổi thị giác hiện tại. Dưới `automatic`, chọn
+phương án trội hoặc ghi fallback khi hoà; `approval-required` dừng với
+`DIRECTION_CHOICE_REQUIRED` cho tới khi người quay
 lại với `approval`, và lần chạy tiếp tục ở bước 8 với phương án đã duyệt. Biên nhận quyết định uỷ
 quyền cho lượt resolve làm việc bên trong trần owner đã đóng băng và không chứng minh gì về việc kết
 quả render ra sao.
