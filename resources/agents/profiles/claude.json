@@ -2,7 +2,7 @@
   "schemaVersion": 8,
   "runtime": "claude",
   "provider": "anthropic",
-  "note": "Execution profiles run by the claude runtime, split by task: Opus 5 (`opus`) produces — decisions, generation, execution, publication; Fable 5.1 (`fable`) reads and judges — readiness, plans, audits, gates, walks — and repairs nothing. Profile ids are unique across every file in this directory and are what each operator binds under `resources` in its operator.json. `capabilities` states what the model can do in this workspace; `permits` states what a role on this profile may use, and must be a subset of capabilities; the operator's own tool grants stay the real bound. `forkTurns` states, per resources/orchestrator.json#modes, how many of the orchestrator's turns an agent in mode dispatch inherits and that one in mode isolated inherits none; inline runs no agent and has no entry.",
+  "note": "Fable performs reasoning and review; Opus performs execution. Cross-runtime equivalents preserve the role and the operator grants. fable-legacy resolves historical Astra receipt pairs only and is not assigned to new work.",
   "profiles": {
     "opus": {
       "model": "claude-opus-5",
@@ -49,7 +49,8 @@
         "database": true,
         "host": true,
         "print": true
-      }
+      },
+      "roleClass": "working"
     },
     "fable": {
       "model": "claude-fable-5-1",
@@ -58,7 +59,7 @@
         "dispatch": 40
       },
       "count": 1,
-      "role": "The reader and judge of the claude runtime: readiness, plans, audits that must count rather than assert, gates and walks, grounded in source; it writes only what its operator's own grants name and never a source tree.",
+      "role": "Reason, plan and judge on the evidence under the same ownership boundary as sol-reviewer.",
       "capabilities": {
         "fileread": true,
         "sourcewrite": true,
@@ -96,7 +97,57 @@
         "database": true,
         "host": true,
         "print": true
-      }
+      },
+      "roleClass": "reasoning"
+    },
+    "fable-legacy": {
+      "model": "claude-fable-5-1",
+      "forkTurns": {
+        "isolated": "none",
+        "dispatch": 40
+      },
+      "count": 1,
+      "role": "Historical counterpart for retired Astra receipts; never assigned to current work.",
+      "capabilities": {
+        "fileread": true,
+        "sourcewrite": true,
+        "git": true,
+        "shell": true,
+        "websearch": true,
+        "imagegen": false,
+        "visualize": true,
+        "browsercontrol": true,
+        "http": true,
+        "registry": true,
+        "container": true,
+        "ci": true,
+        "objectstorage": true,
+        "secrets": true,
+        "database": true,
+        "host": true,
+        "print": true
+      },
+      "permits": {
+        "fileread": true,
+        "sourcewrite": true,
+        "git": true,
+        "shell": true,
+        "websearch": true,
+        "imagegen": false,
+        "visualize": true,
+        "browsercontrol": true,
+        "http": true,
+        "registry": true,
+        "container": true,
+        "ci": true,
+        "objectstorage": false,
+        "secrets": true,
+        "database": true,
+        "host": true,
+        "print": true
+      },
+      "roleClass": "legacy",
+      "retired": true
     }
   }
 }

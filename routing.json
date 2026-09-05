@@ -1,14 +1,14 @@
 {
   "schemaVersion": 9,
-  "note": "Closed routing map. A skill reads a validated operator output and routes on outcome, then on failure.owningDomain. It never reads prose to decide the next step. A chain route hands a wall to a sibling session whose goal is the named operator's primary output; the blocked branch waits on that session's end and re-enters with what it produced.",
+  "note": "Closed routing map. Route only a validated typed operator outcome and failure.owningDomain. A chain inserts goal-derived prerequisite work into the same user host session; child workers never create sibling user sessions.",
   "kinds": {
     "operator": "Invoke the named operator next.",
     "resume": "Invoke the same operator again with the required delta from its resume token.",
-    "chain": "Open a sibling session whose mission's done-when is the primary output of the named operator (planned by plan-chain like any mission); the blocked branch stays waiting on that session and re-enters with the delta it produced. A person is asked nothing.",
+    "chain": "Plan prerequisite work whose goal is the named operator primary output inside the current host session. The blocked branch waits and re-enters with the validated delta. Keep the same goal authority and shared worker limit; do not ask a person for an already authorized repair.",
     "user": "Stop. A person owns this and must decide or publish before the mission continues.",
     "external": "Stop. The blocker is outside the runtime and no operator can clear it.",
-    "helper": "Run the named helper (helpers/<id>) on its own profile, outside any session: support work that prepares or tidies and is never a step of a chain. The person reaches it directly — \"/helper <id> <args>\", or by naming the job — and it leaves one run record under @worktrees/helpers/<id>/runs/<runId>/. No route table names this kind, because a stop code never hands to a helper: a helper is entered from the person, not from a wall (resources/orchestrator.json#helpers).",
-    "bank": "Take the next mission of a product's bank (@worktrees/banked/<product>, scripts/bank.mjs) and open a session for it. The person reaches it directly — \"run the bank for <product>\" — and it is not a step of a chain: the orchestrator takes scripts/bank.mjs#next, marks the entry running:<sessionId>, opens the session with state.json.mission.bankRef and the goal the entry banked, and marks it done:<sessionId> only when that session ends done, so a mission that stopped for the person stays running and pauses the bank. No route table names this kind, because a stop code never hands to a bank: a bank is entered from the person, not from a wall (resources/orchestrator.json#helpers.bank, SKILL.md Entry)."
+    "helper": "Run the named helper on its declared profile inside the current host session context. Its support run record remains under @worktrees/helpers/<id>/runs/<runId>/; it is not a product operator branch and cannot write source or perform publication. User entry only; stop codes do not route to helpers.",
+    "bank": "Take scripts/bank.mjs#next from the approved product bank. Run one entry at a time using the same host binding, record mission.bankRef, mark running:<sessionId>, and mark done:<sessionId> only after its goal is proved. Dependencies and a blocked entry pause the bank. Approval remains bound to the queue content hash; a changed goal needs renewed authority."
   },
   "routes": {
     "architecture.decide": {

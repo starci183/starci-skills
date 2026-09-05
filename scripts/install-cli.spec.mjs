@@ -39,8 +39,9 @@ test('init installs the tree, writes both bootstraps and the sessions ignore, an
     for (const name of ['CLAUDE.md', 'AGENTS.md']) {
       const text = readFileSync(path.join(repo, name), 'utf8');
       assert.match(text, /\.claude\/INDEX\.md/);
-      // The session-first law rides on the bootstrap, so an agent meets it before it reads anything.
-      assert.match(text, /Nothing is designed, written or committed outside a session: the first act of a mission is the session\nfolder and a validated request\.json\./);
+      // Every prompt reaches the one entry; its protocol owns session and goal mechanics.
+      assert.match(text, /For every user prompt, enter \[StarCi\]\(\.claude\/INDEX\.md\)/);
+      assert.match(text, /Follow-up prompts reuse that host session/);
     }
     assert.match(readFileSync(path.join(repo, '.gitignore'), 'utf8'), /^\.worktrees\/sessions\/$/m);
     assert.equal(doctor({ dir: repo, quick: true }, quiet), 0);
@@ -75,5 +76,32 @@ test('update keeps a locally changed file and lists it; --force takes the packag
     assert.ok(lines.some((l) => l.startsWith('kept workflows/README.md')));
     update({ dir: repo, force: true }, quiet);
     assert.equal(readFileSync(target, 'utf8'), original);
+  } finally { rmSync(repo, { recursive: true, force: true }); }
+});
+
+test('update adds prompt routing once to an existing bootstrap without replacing local instructions', () => {
+  const repo = freshRepo();
+  try {
+    init({ dir: repo, force: false, bootstrap: false }, quiet);
+    const custom = '# Team instructions\n\nRead .claude/INDEX.md first.\nKeep our local review policy.\n';
+    writeFileSync(path.join(repo, 'AGENTS.md'), custom);
+    update({ dir: repo, force: false }, quiet);
+    const first = readFileSync(path.join(repo, 'AGENTS.md'), 'utf8');
+    assert.ok(first.startsWith(custom), 'local instructions survive the entry upgrade');
+    assert.equal(first.split('<!-- starci:prompt-entry -->').length - 1, 1);
+    update({ dir: repo, force: false }, quiet);
+    assert.equal(readFileSync(path.join(repo, 'AGENTS.md'), 'utf8'), first, 'updating again does not append duplicate policy');
+  } finally { rmSync(repo, { recursive: true, force: true }); }
+});
+
+test('update --no-bootstrap preserves existing host instructions byte for byte', () => {
+  const repo = freshRepo();
+  try {
+    init({ dir: repo, force: false, bootstrap: false }, quiet);
+    const custom = '# Existing host\nRead .claude/INDEX.md.\n';
+    writeFileSync(path.join(repo, 'AGENTS.md'), custom);
+    update({ dir: repo, force: false, bootstrap: false }, quiet);
+    assert.equal(readFileSync(path.join(repo, 'AGENTS.md'), 'utf8'), custom);
+    assert.ok(!existsSync(path.join(repo, 'CLAUDE.md')));
   } finally { rmSync(repo, { recursive: true, force: true }); }
 });

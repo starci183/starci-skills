@@ -83,6 +83,7 @@ for (const [id, resources] of operators) {
   const { profile: profileId, grammarBound, tools = {} } = resources;
   const profile = profiles[profileId];
   if (typeof profileId !== 'string' || !profile) { errors.push(`${id}: resources.profile ${profileId} is not a declared profile`); continue; }
+  if (profile.retired === true) errors.push(`${id}: resources.profile ${profileId} is retired; it resolves historical receipts, not current operator assignments`);
   used.add(profileId);
   if (typeof grammarBound !== 'boolean') errors.push(`${id}: resources.grammarBound must be true or false`);
   if (!MODES.has(resources.mode)) errors.push(`${id}: resources.mode must be one of ${[...MODES].join(', ')} (resources/orchestrator.json#modes)`);
@@ -98,6 +99,15 @@ for (const [id, resources] of operators) {
     if (!profile.permits?.[m[1]]) errors.push(`${id}: declares ${ref} but profile ${profileId} does not permit it`);
   }
   if (!tools['@tools/fileread']) errors.push(`${id}: every operator reads its Context aliases; declare @tools/fileread`);
+}
+
+// Support work uses the same active-profile policy without inheriting operator effect grants.
+for (const entry of await readdir(path.join(root, 'helpers'), { withFileTypes: true })) {
+  if (!entry.isDirectory()) continue;
+  const helper = JSON.parse(await readFile(path.join(root, 'helpers', entry.name, 'helper.json'), 'utf8'));
+  const profileId = helper.resources?.profile;
+  if (!profiles[profileId]) errors.push(`helper ${helper.id}: unknown profile ${profileId}`);
+  else if (profiles[profileId].retired === true) errors.push(`helper ${helper.id}: profile ${profileId} is retired; select an active support profile`);
 }
 
 // resources/INDEX.md repeats the bindings: | Operator | Profile | Grammar | Tools | Mode | Why |. The

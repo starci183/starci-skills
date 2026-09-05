@@ -30,18 +30,21 @@ export const PAYLOAD = [
 ];
 const MANIFEST = '.starci-skills.json';
 const SESSIONS_IGNORE = '.worktrees/sessions/';
+const ENTRY_MARKER = '<!-- starci:prompt-entry -->';
+const PROMPT_ENTRY = `${ENTRY_MARKER}
+For every user prompt, enter [StarCi](.claude/INDEX.md) before planning or target work and follow
+the entry's user-session and goal protocol. Follow-up prompts reuse that host session.
+<!-- /starci:prompt-entry -->`;
 
 const BOOTSTRAP = `# StarCi agent bootstrap
 
-Before planning, reading target source, or running a skill, read
-[\`<Source>/.claude/INDEX.md\`](.claude/INDEX.md) completely and follow its load order.
+${PROMPT_ENTRY}
+
+Read [\`<Source>/.claude/INDEX.md\`](.claude/INDEX.md) completely and follow its load order.
 
 \`<Source>\` is the single host repository that owns this bootstrap and the \`.claude\` runtime. A routed
 repository checkout or Git worktree follows that Source; do not rebind \`<Source>\` to it or expect it to
 contain another \`.claude/INDEX.md\`.
-
-Nothing is designed, written or committed outside a session: the first act of a mission is the session
-folder and a validated request.json.
 
 This file is only a bootstrap. Do not copy context, brainstorm, compiler, gate or skill rules into it:
 the entry routes, and a rule copied here becomes a second home that nobody remembers to update.
@@ -113,7 +116,12 @@ function writeBootstraps(repo, log) {
     const file = path.join(repo, name);
     if (!existsSync(file)) { writeFileSync(file, BOOTSTRAP); log(`wrote ${name}`); continue; }
     const current = readFileSync(file, 'utf8');
-    if (current.includes('.claude/INDEX.md')) log(`kept ${name} (already routes to .claude/INDEX.md)`);
+    if (current.includes('.claude/INDEX.md')) {
+      if (!current.includes(ENTRY_MARKER)) {
+        appendFileSync(file, `${current.endsWith('\n') ? '\n' : '\n\n'}${PROMPT_ENTRY}\n`);
+        log(`updated ${name} (added prompt entry; preserved existing instructions)`);
+      } else log(`kept ${name} (already routes every prompt to StarCi)`);
+    }
     else log(`NOTICE ${name} exists and does not route to .claude/INDEX.md; add the bootstrap paragraph yourself`);
   }
   const ignore = path.join(repo, '.gitignore');
@@ -164,6 +172,7 @@ export function update(opts, log = console.log) {
   log(`updated ${manifest.name}@${manifest.version} -> ${pkg.name}@${pkg.version} in ${target}`);
   for (const rel of kept) log(`kept ${rel} (changed locally; pass --force to take the package version)`);
   if (opts.force && (locallyChanged.length || locallyAdded.length)) log(`replaced ${locallyChanged.length + locallyAdded.length} locally changed file(s)`);
+  if (opts.bootstrap !== false) writeBootstraps(opts.dir, log);
   return written;
 }
 

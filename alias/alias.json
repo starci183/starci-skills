@@ -1,6 +1,6 @@
 {
   "schemaVersion": 8,
-  "note": "Closed registry of reference aliases. An alias reads like the place it names. Static: @workspaces/fe and @workspaces/be (the bound project's routed checkouts), @workspaces/<project>/<role>, @workspaces/{projects,local/routes,ports,device-state}, @grammar/<family>, @knowledge/{ui,grammars,findings,patterns}, @worktrees/{businesses,uat,e2e,debts,unchecked,helpers,banked,_templates,sessions/central-runtime}, @remote/{npm,git,ghcr,github-actions,minio}. Dynamic: @dynamic, the current session branch, typed by kind. `<Source>` is the host repository that owns this .claude. A sub-path after a registered alias narrows it; a segment in angle brackets is supplied by the invocation. The registry is a tree: one root per zone, children by path segment, a node with resolvesTo is a definition. Resolution picks the longest registered prefix.",
+  "note": "Closed registry of reference aliases. An alias reads like the place it names. Static: @workspaces/fe and @workspaces/be (the bound project's routed checkouts), @workspaces/<project>/<role>, @workspaces/{projects,local/routes,ports,device-state}, @grammar/<family>, @knowledge/{ui,grammars,findings,patterns}, @worktrees/{businesses,uat,e2e,debts,unchecked,helpers,banked,done,_templates,sessions/central-runtime}, @remote/{npm,git,ghcr,github-actions,minio}. Dynamic: @dynamic, the current session branch, typed by kind. `<Source>` is the host repository that owns this .claude. A sub-path after a registered alias narrows it; a segment in angle brackets is supplied by the invocation. The registry is a tree: one root per zone, children by path segment, a node with resolvesTo is a definition. Resolution picks the longest registered prefix.",
   "zones": {
     "remote": {
       "en": "Internet. Registries, git remotes, image registries, CI runs, object storage. Read through a network; bound by version, digest, or observed head.",
@@ -23,8 +23,8 @@
       "vi": "Thẩm quyền và bằng chứng máy-cục-bộ ngoài mọi checkout: head nghiệp vụ, UAT pair, nợ, phần chưa kiểm, kho nhiệm vụ, lần chạy helper, khuôn, runtime owner dùng chung."
     },
     "dynamic": {
-      "en": "Produced inside the current session by an earlier step and deleted with the session. Never exists before the run.",
-      "vi": "Sinh trong phiên hiện tại bởi một bước trước và xoá cùng phiên. Không tồn tại trước lần chạy."
+      "en": "Produced inside the current host session. Successful close retains declared fields and evidence in the done bundle before removing the active folder; blocked or failed work remains resumable.",
+      "vi": "Sinh trong host session hiện tại. Đóng thành công giữ field và bằng chứng đã khai báo trong bundle done trước khi xóa thư mục active; phiên blocked hoặc failed vẫn tiếp tục được."
     }
   },
   "segments": {
@@ -119,9 +119,11 @@
         "kind": "dir",
         "resolvesTo": "<Source>/.claude/knowledge/ui/  (composition/, presentation/, proof/; a sub-path narrows: @knowledge/ui/presentation)",
         "scheme": "knowledge://ui/<group>/<topic>",
-        "bind": "fingerprint per file; rule inventory = every `## PREFIX-n` heading in the folder",
-        "writers": [],
-        "purpose": "Universal UI law: what a tree must contain, which value an app boundary takes, what is only true once rendered."
+        "bind": "fingerprint per canonical file; exhaustive manifest of published rule IDs (including nonnumeric IDs) and each Case, plus catalogs and bound calibration dependencies",
+        "writers": [
+          "knowledge.repair"
+        ],
+        "purpose": "Universal UI law: what a tree must contain, which value an app boundary takes, what is only true once rendered. Canonical changes are owned by knowledge.repair after evidence-backed applicability and ownership analysis; readers cannot override rules locally."
       },
       "grammars": {
         "params": [],
@@ -129,8 +131,10 @@
         "resolvesTo": "<Source>/.claude/knowledge/grammars/<family>/  (DNA.md generated from the package; idioms.md and playbook.md are the owner's taste; family.md holds the visual DNA and the gap table)",
         "scheme": "knowledge://grammars/<family>/<topic>",
         "bind": "fingerprint per file; DNA.md additionally binds the package version and checkout head it was generated from",
-        "writers": [],
-        "purpose": "How the family composes: the owner's taste (idioms, playbook) and what exists (DNA). Never the Grammar itself; where a taste row disagrees with @grammar, @grammar is the fact and the row is the finding."
+        "writers": [
+          "knowledge.repair"
+        ],
+        "purpose": "How the family composes: the owner's taste (idioms, playbook) and what exists (DNA). Never the Grammar itself; where a taste row disagrees with @grammar, @grammar is the fact and the row is the finding. Canonical changes are owned by knowledge.repair after evidence-backed applicability and ownership analysis; readers cannot override rules locally."
       },
       "findings": {
         "params": [],
@@ -277,6 +281,15 @@
         "bind": "fingerprint per file",
         "writers": [],
         "purpose": "Authority templates for new heads, debts, sessions, and UAT flows. The UAT flow template ships with the tree at templates/uat/ (README.md as the folder contract, flow.md, accounts.json.example, run.md, seed/), so a fresh install has one without provisioning a worktree, and a flow folder that does not exist yet is drafted from it. Consumed, never modified."
+      },
+      "done": {
+        "params": [],
+        "kind": "dir",
+        "resolvesTo": "<Source>/.worktrees/done/  (<sessionId>.md compact; <sessionId>/bundle/ retained state and branch request/response artifacts; retention.json hashes and import references)",
+        "scheme": "session-archive://<sessionId>",
+        "bind": "retention manifest and content hashes",
+        "writers": [],
+        "purpose": "Owned by scripts/session-cleanup.mjs close-success, not an operator write target. Verify every retained reference before removing only the corresponding active session; keep central-runtime and user source worktrees."
       }
     },
     "@grammar": {
@@ -360,7 +373,7 @@
         "kind"
       ],
       "kind": "dir",
-      "resolvesTo": "<Source>/.worktrees/sessions/<sessionId>/step-<N>/parallel-<M>/ — one branch of one step. request/request.json is the gate in (orchestrator writes it); response/ is the agent's: response.json (gate out), response.md and other markdown kinds, data/<name>.json, artifacts/<file>; a nested exchange adds <exchange>/request/ and <exchange>/response/. A kind is passed by explicit path in request.json inputs, from the session root. Dynamic files are passed as kinds (templates/kinds/<kind>), never as aliases. The session folder is created by the orchestrator and deleted when git.publish finishes; a blocked run keeps it for resume",
+      "resolvesTo": "<Source>/.worktrees/sessions/<sessionId>/step-<N>/parallel-<M>/ — one branch of one step. request/request.json is the gate in (orchestrator writes it); response/ is the agent's: response.json (gate out), response.md and other markdown kinds, data/<name>.json, artifacts/<file>; a nested exchange adds <exchange>/request/ and <exchange>/response/. A kind is passed by explicit path in request.json inputs, from the session root. Dynamic files are passed as kinds (templates/kinds/<kind>), never as aliases. The orchestrator creates the session folder. scripts/session-cleanup.mjs close-success retains required artifacts in @worktrees/done and verifies them before removing only this folder; git.publish does not delete the session or user worktree. Blocked or failed work is kept for resume",
       "scheme": "step://<sessionId>/<N>/<M>/<path>",
       "bind": "kind contract or schema under templates/kinds; response.json fields is the registry of what a branch produced",
       "writers": [
