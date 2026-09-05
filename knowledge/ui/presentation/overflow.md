@@ -45,8 +45,9 @@ Generated from `@grammar/core` claims by `scripts/generate-presentation-owned.mj
 | `ChatWorkspace` | overlay rail, hasRail, not isCompactRail | OVERFLOW-4 |
 | `ChatWorkspace` | overlay rail, hasRail, not isCompactRail | OVERFLOW-5 |
 | `FencedCodeBlock` | root | OVERFLOW-4 |
-| `HorizontalScrollRegion` | root | OVERFLOW-3 |
 | `HorizontalScrollRegion` | root | OVERFLOW-5 |
+| `HorizontalScrollRegion` | root, overflow!="needed" | OVERFLOW-3 |
+| `HorizontalScrollRegion` | root, overflow="needed" | OVERFLOW-4 |
 | `IconTile` | root | OVERFLOW-2 |
 | `MarkdownTableFrame` | root | OVERFLOW-4 |
 | `MediaFrame` | root | OVERFLOW-2 |
@@ -56,10 +57,9 @@ Generated from `@grammar/core` claims by `scripts/generate-presentation-owned.mj
 | `Sidebar` | root | OVERFLOW-2 |
 | `SurfaceAccordionCard` | accordion shell | OVERFLOW-2 |
 | `SurfaceAccordionCard` | accordion shell, not bounded | OVERFLOW-1 |
-| `SurfaceCard` | card content | OVERFLOW-2 |
+| `SurfaceCard` | card content, frame!="frameless" | OVERFLOW-2 |
 | `SurfaceCard` | card content, frame="frameless" | OVERFLOW-1 |
 | `SurfaceListCard` | root | OVERFLOW-2 |
-| `Tabs` | scroll | OVERFLOW-4 |
 | `VerticalScrollRegion` | root, isScrollable | OVERFLOW-3 |
 | `WorkspaceShell` | floating layer, hasFloatingLayer | OVERFLOW-4 |
 

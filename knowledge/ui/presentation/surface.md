@@ -54,7 +54,8 @@ Generated from `@grammar/core` claims by `scripts/generate-presentation-owned.mj
 | `IconTile` | root, not (isSkeleton || showsArtwork), tone="success" | SURFACE-5 |
 | `MediaFrame` | root, treatment!="plain" | SURFACE-3 |
 | `MediaFrame` | root, treatment="plain" | SURFACE-1 |
-| `Sidebar` | list box item | SURFACE-4 |
+| `PressableField` | root | SURFACE-4 |
+| `Sidebar` | item | SURFACE-4 |
 | `SurfaceAccordionCard` | accordion shell, bounded | SURFACE-2 |
 | `SurfaceAccordionCard` | accordion shell, not bounded | SURFACE-1 |
 | `SurfaceCard` | card content, frame!="frameless" | SURFACE-2 |

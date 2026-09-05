@@ -60,26 +60,32 @@ Sinh từ claim của `@grammar/core` bằng `scripts/generate-presentation-owne
 | `HorizontalScrollRegion` | root | PADDING-1 |
 | `NavigationFeatureNav` | primary | PADDING-3 |
 | `OtpInput` | root | PADDING-1 |
+| `PressableField` | root | PADDING-3 |
+| `PressableField` | shortcut, shortcut!=undefined | PADDING-1 |
 | `Rail` | body, inset="content" | PADDING-3 |
 | `Rail` | body, inset="content" | PADDING-5 |
 | `Sidebar` | footer, not (collapsed || footer == null) | PADDING-0 |
 | `Sidebar` | footer, not (collapsed || footer == null) | PADDING-3 |
-| `Sidebar` | group label, group.label!=undefined, not collapsed | PADDING-1 |
-| `Sidebar` | group label, group.label!=undefined, not collapsed | PADDING-2 |
-| `Sidebar` | group label, group.label!=undefined, not collapsed | PADDING-3 |
 | `Sidebar` | header, not (collapsed || header == null) | PADDING-3 |
-| `Sidebar` | icon button wrapper, canToggle | PADDING-2 |
-| `Sidebar` | list box item, not collapsed | PADDING-2 |
-| `Sidebar` | list box item, not collapsed | PADDING-3 |
-| `Sidebar` | list box, collapsed | PADDING-2 |
-| `Sidebar` | list box, not collapsed | PADDING-3 |
+| `Sidebar` | item, not collapsed | PADDING-2 |
+| `Sidebar` | item, not collapsed | PADDING-3 |
+| `Sidebar` | list, collapsed | PADDING-2 |
+| `Sidebar` | list, not collapsed | PADDING-3 |
+| `Sidebar` | section label, group.label!=undefined, not collapsed | PADDING-1 |
+| `Sidebar` | section label, group.label!=undefined, not collapsed | PADDING-2 |
+| `Sidebar` | section label, group.label!=undefined, not collapsed | PADDING-3 |
+| `Sidebar` | toggle, canToggle | PADDING-2 |
 | `StaticStateRow` | root | PADDING-4 |
 | `Subnav` | root | PADDING-3 |
-| `SurfaceAccordionCard` | accordion body | PADDING-8 |
-| `SurfaceAccordionCard` | accordion body wrapper | PADDING-0 |
+| `SurfaceAccordionCard` | accordion panel | PADDING-0 |
 | `SurfaceAccordionCard` | accordion trigger | PADDING-4 |
-| `SurfaceCard` | card content, composition!="joined" | PADDING-4 |
-| `SurfaceCard` | card content, composition="joined" | PADDING-0 |
+| `SurfaceAccordionCard` | div | PADDING-0 |
+| `SurfaceAccordionCard` | div | PADDING-3 |
+| `SurfaceAccordionCard` | div | PADDING-4 |
+| `SurfaceAccordionCard` | div | PADDING-5 |
+| `SurfaceCard` | content, composition!="joined", frame!="frameless" | PADDING-4 |
+| `SurfaceCard` | content, composition!="joined", frame="frameless" | PADDING-0 |
+| `SurfaceCard` | content, composition="joined" | PADDING-0 |
 | `SurfaceListCard` | root | PADDING-0 |
 | `Tabs` | hero tabs tab | PADDING-3 |
 | `Tabs` | root, inset="page" | PADDING-5 |

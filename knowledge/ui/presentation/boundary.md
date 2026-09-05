@@ -49,7 +49,7 @@ Generated from `@grammar/core` claims by `scripts/generate-presentation-owned.mj
 | --- | --- | --- |
 | `ChatWorkspace` | composer | BOUNDARY-1 |
 | `ChatWorkspace` | rail trigger boundary, hasRail, isCompactRail | BOUNDARY-1 |
-| `Divider` | span | BOUNDARY-5 |
+| `Divider` | rule | BOUNDARY-5 |
 | `MediaFrame` | root, treatment!="plain" | BOUNDARY-5 |
 | `NavigationFeatureNav` | root | BOUNDARY-1 |
 | `StaticStateRow` | root | BOUNDARY-3 |

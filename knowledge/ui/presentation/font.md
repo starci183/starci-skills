@@ -51,11 +51,13 @@ Generated from `@grammar/core` claims by `scripts/generate-presentation-owned.mj
 | `Heading` | root, scale!="display", level=3 | FONT-2 |
 | `Heading` | root, scale!="display", level=4 | FONT-1 |
 | `Heading` | root, scale="display" | FONT-6 |
-| `Input` | toggle label, not (!isSecret || toggleLabel === undefined), ToggleIcon=undefined | FONT-1 |
+| `Input` | reveal label, not (!isSecret || toggleLabel === undefined), ToggleIcon=undefined | FONT-1 |
 | `Label` | root, depth!="nested" | FONT-2 |
 | `Label` | root, depth="nested" | FONT-1 |
-| `Sidebar` | group label, group.label!=undefined, not collapsed | FONT-1 |
+| `PressableField` | placeholder | FONT-2 |
+| `PressableField` | shortcut, shortcut!=undefined | FONT-1 |
 | `Sidebar` | item label, not collapsed | FONT-2 |
+| `Sidebar` | section label, group.label!=undefined, not collapsed | FONT-1 |
 | `SurfaceListCard` | fact, not (label === undefined || labelHidden), fact!=undefined, depth!="nested" | FONT-2 |
 | `SurfaceListCard` | fact, not (label === undefined || labelHidden), fact!=undefined, depth="nested" | FONT-1 |
 | `Text` | root, size="md" | FONT-3 |
