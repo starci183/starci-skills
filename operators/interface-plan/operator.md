@@ -131,6 +131,13 @@ names the same units as the branch it resumes is `NO_PROGRESS`.
 | `knowledge-coverage` | `response/data/knowledge-coverage.json` | data | no |
 | `family-understanding` | `response/data/family-understanding.json` | data | no |
 
+## The best outcome
+
+For a successful plan, `outcome.primary` points to the declared surface map or its clearest declared
+table, diagram or document view. Its label names the planning decision a person can inspect; units
+and coverage may be secondary evidence. It never points at an undeclared scratch visualization or
+claims a blocked or mismatched plan as the best outcome.
+
 ## Stops
 
 | Code | Disposition |

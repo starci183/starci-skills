@@ -131,6 +131,13 @@ bắt đầu lại từ bước 1 và đọc lại tham chiếu và source; mộ
 | `knowledge-coverage` | `response/data/knowledge-coverage.json` | data | không |
 | `family-understanding` | `response/data/family-understanding.json` | data | không |
 
+## Kết quả tốt nhất
+
+Với plan thành công, `outcome.primary` trỏ tới surface map đã khai hoặc bản table, diagram hay
+document rõ nhất của nó. Nhãn gọi tên quyết định lập kế hoạch mà một người có thể xem; units và
+coverage có thể làm bằng chứng phụ. Nó không trỏ tới bản trực quan nháp chưa khai hoặc gọi một plan
+blocked hay mismatch là kết quả tốt nhất.
+
 ## Dừng
 
 | Code | Xử lý |

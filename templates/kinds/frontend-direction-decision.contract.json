@@ -116,6 +116,16 @@
       }
     },
     {
+      "heading": "^## Selected capture$",
+      "table": "| Candidate | Source | Viewport | Screenshot |",
+      "cell": {
+        "Candidate": "^`[a-z0-9][a-z0-9-]*`$",
+        "Source": "^https?://\\S+$",
+        "Viewport": "^[a-z0-9][a-z0-9-]*$",
+        "Screenshot": "^`response/artifacts/[a-z0-9][a-z0-9-]*\\.[a-z0-9][a-z0-9-]*\\.png`$"
+      }
+    },
+    {
       "heading": "^## Findings answered$",
       "table": "| Finding | How |",
       "cell": {

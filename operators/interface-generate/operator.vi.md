@@ -13,9 +13,10 @@ commit trên nhánh phiên mà `writes` mang mọi đường dẫn đã khai v�
 `inventory` đóng băng cạnh `frontend-presentation-resolution` và `resolved-tree` công bố, với lượt
 quét sạch và cây đã commit bằng cây đã resolve, cây ấy hiện thực hướng mà `frontend-direction-decision`
 đã chọn trên các `candidates` phục vụ qua `host`, được in, bị phản chứng và được chấm điểm, với lớp
-bề mặt trong `ui-coverage`; hoặc, dưới mode dry, y như vậy với commit null và checkout không bị đụng
-tới; hoặc, khi hướng đã khai delta trình bày là none, owner map rỗng, không chọn luật nào và một
-inventory rỗng.
+bề mặt trong `ui-coverage`, còn PNG của render đã chọn được ghi làm `selected-candidate-capture` và
+`outcome.primary`; hoặc, dưới mode dry, y như vậy với commit null và checkout không bị đụng tới;
+hoặc, khi hướng đã khai delta trình bày là none, vẫn có bằng chứng render đã chọn ấy bên cạnh owner
+map rỗng, không chọn luật nào và một inventory rỗng.
 
 ## Một agent, một trang
 
@@ -340,7 +341,7 @@ nó biết nó đã quyết gì và ghi gì, không bao giờ biết nó render 
 | 3 | Quan sát context đang có và tham chiếu của người, rồi biên UI contract, coverage của nó và lớp bề mặt | `references` | @workspaces/fe (artifact trực tiếp của target, hoặc host được uỷ quyền và họ sản phẩm khi target chưa tồn tại), @worktrees/uat/<flow>/<case> nếu có, @knowledge/ui/composition (`COVERAGE-1` Case 7 publish bộ từ vựng lớp), đầu vào `business-promise-authority` nếu có | `ui-coverage` | `EVIDENCE_MISSING`, `SCOPE_UNFROZEN` |
 | 4 | Chốt các chuẩn tham chiếu theo lớp, có giới hạn | `references`, `changeLevel` | @knowledge/ui/composition (khoảng trống mà nghiên cứu phải lấp), @tools/websearch | — | `REFERENCE_EVIDENCE_EXHAUSTED`, `REFERENCE_MISSING` |
 | 5 | Hình thành các phương án và áp bộ lọc Grammar | `candidates`, `ownerCeiling` | UI contract vừa biên, @grammar/core (component sở hữu gì và có prop nào), @knowledge/grammars/<family> | — | `NO_VIABLE_DIRECTION`, `GRAMMAR_REQUIRED` |
-| 6 | Render mọi phương án còn sống kèm hình đã tự xét, phục vụ các trang cho một người xem rồi in ra | `candidates`, `preview` | các phương án còn sống, @knowledge/grammars/<family>, @tools/visualize, @tools/imagegen, @tools/host, @tools/print | `candidates`, `direction-image`, `host` | — |
+| 6 | Render mọi phương án còn sống kèm hình đã tự xét, phục vụ các trang cho một người xem rồi in ra | `candidates`, `preview` | các phương án còn sống, @knowledge/grammars/<family>, @tools/visualize, @tools/imagegen, @tools/host, @tools/print | `candidates`, `selected-candidate-capture`, `direction-image`, `host` | — |
 | 7 | Phản chứng và chấm mọi phương án đã render theo conform cùng chất lượng thật cho tác vụ, rồi viết quyết định | `selectionPolicy`, `approval` | các phương án, tham chiếu, đầu vào `business-promise-authority` và `backend-source-application`, `ui-coverage`, @knowledge/ui/proof | `frontend-direction-decision`, `knowledge-coverage`, `family-understanding`, hoặc `knowledge-question` khi mâu thuẫn | `NO_VIABLE_DIRECTION`, `DIRECTION_CHOICE_REQUIRED`, `KNOWLEDGE_QUESTION` |
 | 8 | Bind thẩm quyền trình bày và đi hết cây đã quyết một lượt dưới trần owner | — | @knowledge/ui/presentation (mọi topic kèm fingerprint và kho luật), @grammar/core (các quan hệ đã sở hữu của gói đã publish), @workspaces/fe (cây đóng băng, theo thứ tự tài liệu), `frontend-direction-decision`, @tools/registry | — | `KNOWLEDGE_UNBOUND`, `GRAMMAR_UNPUBLISHED`, `OWNER_CONFLICT` |
 | 9 | Chọn một luật đã publish cho mỗi thuộc tính ứng dụng sở hữu, bỏ những gì cây không được mang, ghi các khoảng trống và phát lời khai | `contractEmission` | @knowledge/ui/presentation (các case topic được bind publish), @grammar/core (các quan hệ đã sở hữu, giải phẫu Grammar và thang đóng), @workspaces/fe (thuộc tính mỗi node đang mang) | `inventory`, `resolved-tree`, `frontend-presentation-resolution` | `RULE_MISSING`, `UNKNOWN_RULE` |
@@ -420,6 +421,7 @@ minh rằng cây đã commit đúng là cây đã resolve. `changes.md` là bả
 | `frontend-direction-decision` | `response/direction.md` | md | có |
 | `ui-coverage` | `response/data/coverage.json` | data | có |
 | `candidates` | `response/artifacts/<candidateId>.html` | artifact | không |
+| `selected-candidate-capture` | `response/artifacts/<candidateId>.<viewport>.png` | artifact | có |
 | `direction-image` | `response/artifacts/images/<slot>.png` | artifact | không |
 | `host` | `response/artifacts/host.json` | artifact | không |
 | `knowledge-question` | `response/data/knowledge-question.json` | data | không |
@@ -431,6 +433,15 @@ minh rằng cây đã commit đúng là cây đã resolve. `changes.md` là bả
 | `frontend-source-application` | `response/response.md` | md | có |
 | `changes` | `response/changes.md` | md | có |
 | `writes` | `response/data/writes.json` | data | có |
+
+## Kết quả tốt nhất
+
+Ở mọi lượt chạy thành công — `apply` hoặc `dry`, tại mọi change level gồm `new`, `reconstruct` và
+`refine` — `outcome.primary` là `image` có ref trỏ tới `selected-candidate-capture` bắt buộc.
+`## Selected capture` bind PNG đó
+với phương án đã chọn, URL HTML được phục vụ và viewport; `## Printed` chứng minh chính ảnh ấy đã
+được đưa ra xem. Asset direction-image, đường dẫn HTML hoặc ảnh chụp phương án không được chọn không
+thể thay cho kết quả. Biên nhận quyết định và source có thể là mục phụ.
 
 ## Dừng
 

@@ -81,6 +81,12 @@
 | --- | --- |
 | `other-candidate-id` | which attack it failed, or the scores it lost on; no rows when one candidate was formed |
 
+## Selected capture
+
+| Candidate | Source | Viewport | Screenshot |
+| --- | --- | --- | --- |
+| `candidate-id` | http://127.0.0.1:60000/candidate-id.html?viewport=wide | wide | `response/artifacts/candidate-id.wide.png` |
+
 ## Findings answered
 
 | Finding | How |
@@ -92,7 +98,9 @@
 | Artifact | Why |
 | --- | --- |
 | http://127.0.0.1:60000/candidate-id.html?viewport=wide | the candidate at the wide viewport, put in front of the person before the decision was written |
+| `response/artifacts/candidate-id.wide.png` | the PNG printed from that served candidate and promoted as the primary outcome when it is selected |
 | http://127.0.0.1:60000/candidate-id.html?viewport=narrow | the same candidate at the narrow viewport; every candidate is printed at every viewport the coverage names |
+| `response/artifacts/candidate-id.narrow.png` | the PNG printed from the same candidate at the narrow viewport |
 
 ## Fallbacks taken
 

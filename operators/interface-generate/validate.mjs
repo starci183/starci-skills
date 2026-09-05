@@ -35,7 +35,7 @@ import { validateStep } from '../../scripts/validate-step.mjs';
 import { knowledgeQuestionStopErrors, uiKnowledgeGateErrors } from '../../scripts/ui-knowledge-gate.mjs';
 import { tableUnder, userRouted, choiceHandoffErrors, printedCandidates } from '../../scripts/validate-response.mjs';
 import { loadErrorsRegistry } from '../../scripts/errors-registry.mjs';
-import { sessionRootOf } from '../../scripts/validate-request.mjs';
+import { sessionRootOf, V22_CONTRACT } from '../../scripts/validate-request.mjs';
 import { validateAgainst } from '../../scripts/json-schema.mjs';
 import { loadFindingsSchema } from '../../scripts/record-findings.mjs';
 import { TASTE_RULES } from '../interface-audit/validate.mjs';
@@ -117,6 +117,55 @@ export function scoreCoverageErrors({ at, scores, rendered, printed }) {
     if (id !== rendered[0] && (keys.size !== first.size || [...keys].some((k) => !first.has(k)))) {
       errors.push(`${at}: candidate ${id} is scored on a different criterion set than ${rendered[0]}; means over different criteria cannot be compared`);
     }
+  }
+  return errors;
+}
+
+const PNG_SIGNATURE = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+
+// The primary UI result is a capture of the candidate the decision selected. The receipt binds that
+// capture to the served candidate URL and viewport, so an artwork asset or unrelated pretty mock
+// cannot be substituted for the surface that was scored and applied.
+export async function selectedCaptureErrors({ branchDir, response, text }) {
+  if (response?.status !== 'done') return [];
+  const errors = [];
+  const at = FILES.direction;
+  const decision = Object.fromEntries((tableUnder(text, '## Decision') ?? []).map(([key, value]) => [key, value]));
+  const selected = decision['Selected candidate'];
+  const rows = tableUnder(text, '## Selected capture') ?? [];
+  if (rows.length !== 1) {
+    errors.push(`${at}: a done direction carries exactly one ## Selected capture row linking the selected candidate to its served source, viewport and PNG`);
+    return errors;
+  }
+  const [candidate, source, viewport, screenshot] = rows[0];
+  if (candidate !== selected) errors.push(`${at}: Selected capture names ${candidate}, but ## Decision selected ${selected}`);
+  const captureRefs = list(response.fields?.['selected-candidate-capture']);
+  if (captureRefs.length !== 1 || captureRefs[0] !== screenshot) errors.push(`response/response.json: selected-candidate-capture must contain only ${screenshot}, the PNG linked by ## Selected capture`);
+  if (captureRefs.some((ref) => /\/images\/|\.html(?:$|\?)/.test(ref))) errors.push('response/response.json: direction-image artwork and HTML are not the rendered outcome; selected-candidate-capture is the printed selected surface PNG');
+  if (!new RegExp(`^response/artifacts/${String(selected).replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\.${String(viewport).replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\.png$`).test(screenshot ?? '')) {
+    errors.push(`${at}: selected screenshot ${screenshot ?? '(absent)'} must name response/artifacts/${selected}.${viewport}.png; direction-image artwork and HTML are not the rendered outcome`);
+  }
+  let sourceUrl;
+  try { sourceUrl = new URL(source); } catch { sourceUrl = null; }
+  if (!sourceUrl || !['127.0.0.1', 'localhost'].includes(sourceUrl.hostname) || !sourceUrl.pathname.endsWith(`/${selected}.html`) || sourceUrl.searchParams.get('viewport') !== viewport) {
+    errors.push(`${at}: Selected capture source must be the loopback-served ${selected}.html URL at viewport ${viewport}`);
+  }
+  const rendered = list(response.fields?.candidates);
+  if (!rendered.some((ref) => ref.endsWith(`/${selected}.html`))) errors.push(`response/response.json: the selected capture names ${selected}, which is not a rendered candidate`);
+  const printed = new Set((tableUnder(text, '## Printed') ?? []).map(([artifact]) => artifact));
+  if (!printed.has(source)) errors.push(`${at}: ## Printed does not contain the selected capture source ${source}`);
+  if (!printed.has(screenshot)) errors.push(`${at}: ## Printed does not contain the selected outcome screenshot ${screenshot}`);
+  if (!(tableUnder(text, '## Scores') ?? []).some(([scoredCandidate, scoredViewport]) => scoredCandidate === selected && scoredViewport === viewport)) {
+    errors.push(`${at}: the selected outcome screenshot at ${viewport} is not linked to a score for candidate ${selected}`);
+  }
+  const full = path.join(branchDir, screenshot ?? '');
+  if (screenshot && existsSync(full)) {
+    const bytes = await readFile(full);
+    if (bytes.length < PNG_SIGNATURE.length || !bytes.subarray(0, PNG_SIGNATURE.length).equals(PNG_SIGNATURE)) errors.push(`${screenshot}: selected-candidate-capture is not PNG evidence`);
+  }
+  if (response.contractVersion === V22_CONTRACT) {
+    if (response.outcome?.primary?.kind !== 'image') errors.push('response/response.json: interface.generate outcome.primary.kind must be image');
+    if (response.outcome?.primary?.ref !== screenshot) errors.push(`response/response.json: outcome.primary.ref must be the selected candidate screenshot ${screenshot}`);
   }
   return errors;
 }
@@ -385,6 +434,7 @@ export async function directionErrors({ branchDir, root = ROOT, request, respons
         // Scores inform a recommendation; they do not replace the user's explicit tier choice.
       }
     }
+    errors.push(...await selectedCaptureErrors({ branchDir, response, text }));
 
     // What the ledger knows about this surface is answered, not ignored.
     const findingsRef = request?.inputs?.findings;

@@ -338,6 +338,14 @@ different tiering, never a smaller audit.
 | `family-understanding` | `response/data/family-understanding.json` | data | no |
 | `knowledge-question` | `response/data/knowledge-question.json` | data | no |
 
+## The best outcome
+
+For a completed audit, `outcome.primary` is an actual declared `image` capture of the audited
+surface. A verdict table or the audit document is required as a secondary item so the image is never
+presented without its finding and conformance/quality conclusion. The label identifies the attained
+or failing region and verdict visible in the chosen decision-useful state and viewport; the primary
+is the audit's own capture, never a prettier unrelated mock.
+
 ## Stops
 
 | Code | Disposition |

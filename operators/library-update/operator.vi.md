@@ -210,6 +210,13 @@ chế độ chứ không phải của một cột: `validate.mjs` đòi tập pa
 consumer dưới `full` và `consume`, và từ chối tập của nửa kia như một tiết mục nhánh ấy không có thẩm
 quyền viết.
 
+## Kết quả tốt nhất
+
+Với lượt chạy thành công, `outcome.primary` chọn link, code, document hay table đã khai chứng minh
+trực tiếp nhất nửa được giao: thay đổi package/release proof cho `publish`, dependency và phép kiểm
+consumer cho `consume`, và proof quyết định cho `full`. Before/after cùng proof của nửa còn lại có thể
+làm mục phụ. Không nâng archive hay log package thành kết quả chỉ vì nó tồn tại.
+
 ## Dừng
 
 | Code | Xử lý |

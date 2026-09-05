@@ -332,6 +332,14 @@ audit nhỏ hơn.
 | `family-understanding` | `response/data/family-understanding.json` | data | không |
 | `knowledge-question` | `response/data/knowledge-question.json` | data | không |
 
+## Kết quả tốt nhất
+
+Với audit đã hoàn tất, `outcome.primary` là một capture `image` thật đã khai của bề mặt được audit.
+Một verdict table hoặc tài liệu audit bắt buộc làm mục phụ để ảnh không bao giờ được trình mà thiếu
+finding và kết luận conform/chất lượng. Nhãn xác định vùng đạt hoặc lỗi cùng verdict thấy được trong
+state và viewport hữu ích nhất cho quyết định; primary là capture của chính lượt audit, không phải
+mock đẹp hơn nhưng không liên quan.
+
 ## Dừng
 
 | Code | Xử lý |

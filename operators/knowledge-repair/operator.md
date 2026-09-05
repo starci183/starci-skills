@@ -51,6 +51,13 @@ The operator writes only the challenged canonical English file and its Vietnames
 | --- | --- | --- | --- |
 | `knowledge-repair-receipt` | `response/data/knowledge-repair.json` | data | yes |
 
+## The best outcome
+
+For a successful repair, `outcome.primary` is the declared table view of the typed repair receipt.
+It shows the exact before/after owner files, evidence, rule scope and affected consumers;
+the modified source alone is not a result a person can assess. Revalidation may be secondary, while
+the originating operator's retry remains the authority for whether the repaired knowledge works.
+
 ## Stops
 
 | Code | Disposition |

@@ -219,6 +219,13 @@ mode's answer and not a column's: `validate.mjs` requires the package set under 
 the consumer set under `full` and `consume`, and refuses the other half's set as a section that
 branch had no authority to write.
 
+## The best outcome
+
+For a successful run, `outcome.primary` chooses the declared link, code, document or table that most
+directly proves the requested half: package change/release proof for `publish`, consumer dependency
+and verification for `consume`, and the decisive proof for `full`. Before/after and the other half's
+proof may be secondary. A package archive or log is not promoted merely because it exists.
+
 ## Stops
 
 | Code | Disposition |

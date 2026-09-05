@@ -127,6 +127,13 @@ moved, which claims they carry, and which surface must be measured or walked aga
 | `knowledge-coverage` | `response/data/knowledge-coverage.json` | data | no |
 | `family-understanding` | `response/data/family-understanding.json` | data | no |
 
+## The best outcome
+
+For a successful fix, `outcome.primary` is the declared code or document view that most directly
+shows the bounded repair, normally the changes diff or source application. The targeted test or
+verification that passed is a secondary item beside it. It does not present an unverified visual
+claim as the result; the next audit owns that judgment.
+
 ## Stops
 
 | Code | Disposition |

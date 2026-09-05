@@ -46,6 +46,11 @@ treats as a reason, what it must observe before it proposes. Prose, not tables.
 | --- | --- | --- | --- |
 | `kind-name` | `response/response.md` | md | yes |
 
+## The best outcome
+
+One paragraph: on a v2.2 done response, which declared output should be `outcome.primary`, which kind
+presents it, what makes it the most useful result to inspect, and which evidence belongs in secondary.
+
 ## Stops
 
 | Code | Disposition |
@@ -72,6 +77,7 @@ treats as a reason, what it must observe before it proposes. Prose, not tables.
     { "en": "^## Requirements$", "vi": "^## Yêu cầu$", "table": { "en": "| Field | Type | Default | Ask |", "vi": "| Field | Kiểu | Mặc định | Hỏi |" } },
     { "en": "^## Steps$", "vi": "^## Các bước$", "table": { "en": "| # | Step | Params | Reads | Writes | Stops with |", "vi": "| # | Bước | Tham số | Đọc | Ghi | Dừng với |" }, "minRows": 2 },
     { "en": "^## Outputs$", "vi": "^## Đầu ra$", "table": { "en": "| Kind | File | Type | Required |", "vi": "| Kind | File | Kiểu | Bắt buộc |" }, "minRows": 1, "cell": { "Type": "^(md|data|artifact)$", "Kiểu": "^(md|data|artifact)$" } },
+    { "en": "^## The best outcome$", "vi": "^## Kết quả tốt nhất$" },
     { "en": "^## Stops$", "vi": "^## Dừng$", "table": { "en": "| Code | Disposition |", "vi": "| Code | Xử lý |" }, "minRows": 1, "cell": { "Disposition": "^(terminate|fallback)$", "Xử lý": "^(terminate|fallback)$" } },
     { "en": "^## Next$", "vi": "^## Kế tiếp$", "table": { "en": "| When | Operator |", "vi": "| Khi | Operator |" } }
   ],

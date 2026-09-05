@@ -13,7 +13,7 @@ import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { validateGenerateStep, fingerprintOf } from './validate.mjs';
+import { validateGenerateStep, fingerprintOf, selectedCaptureErrors } from './validate.mjs';
 import { writeUiKnowledgeFixture } from '../../scripts/ui-knowledge-fixture.mjs';
 
 const HEAD = '0f1e2d3c4b5a69788796a5b4c3d2e1f009182736';
@@ -23,6 +23,7 @@ const NAMES = ['one-column', 'split-view', 'stepper'];
 const VIEWPORTS = ['wide', 'narrow'];
 const TASTE = Array.from({ length: 12 }, (_, i) => `TASTE-${i + 1}`);
 const BT = String.fromCharCode(96);
+const PNG = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x00]);
 const fp = (c) => `sha256:${c.repeat(64)}`;
 
 // ---------------------------------------------------------------------------------------------------
@@ -77,7 +78,10 @@ function directionMd({
   const formed = NAMES.slice(0, candidates);
   const shown = printed ?? formed;
   const scoreRows = scores === 'none' ? [] : scoreTable(formed, winner ?? (selected === '—' ? formed[0] : selected), scores, scoreOverrides);
-  const printedRows = shown.flatMap((id) => VIEWPORTS.map((viewport) => `| http://127.0.0.1:60000/${id}.html?viewport=${viewport} | the ${viewport} render of the candidate, shown before the decision was written |`));
+  const printedRows = shown.flatMap((id) => VIEWPORTS.flatMap((viewport) => [
+    `| http://127.0.0.1:60000/${id}.html?viewport=${viewport} | the ${viewport} render of the candidate, shown before the decision was written |`,
+    `| ${BT}response/artifacts/${id}.${viewport}.png${BT} | the ${viewport} capture printed from that served candidate |`,
+  ]));
   const attacks = formed.map((id) => `| content stress | ${BT}${id}${BT} | ${selectedFails && id === selected ? 'fails' : 'holds'} | the widest plan name still fits at 360px |`);
   const others = rejectAll ? formed.filter((id) => id !== selected).map((id) => `| ${BT}${id}${BT} | it loses the offer above the fold on the narrow branch |`) : [];
   const limitRows = limits.map(({ candidate, criterion, says }) => `| ${BT}${candidate}${BT} | ${BT}${criterion}${BT} | ${says} |`);
@@ -164,6 +168,12 @@ ${scoreRows.join('\n')}
 | Candidate | Rejected because |
 | --- | --- |
 ${others.join('\n')}
+
+## Selected capture
+
+| Candidate | Source | Viewport | Screenshot |
+| --- | --- | --- | --- |
+${selected === '—' ? '' : `| ${BT}${selected}${BT} | http://127.0.0.1:60000/${selected}.html?viewport=wide | wide | ${BT}response/artifacts/${selected}.wide.png${BT} |`}
 
 ## Findings answered
 
@@ -446,7 +456,7 @@ const requestJson = ({ extra = {}, inputs = {} } = {}) => ({
 const DIRECTION_FIELDS = { 'frontend-direction-decision': 'response/direction.md', 'ui-coverage': 'response/data/coverage.json' };
 const RESOLUTION_FIELDS = { 'frontend-presentation-resolution': 'response/resolution.md', inventory: 'response/data/inventory.json', 'resolved-tree': TREE };
 const APPLICATION_FIELDS = { 'frontend-source-application': 'response/response.md', changes: 'response/changes.md', writes: 'response/data/writes.json' };
-const allFields = (candidates = ['response/artifacts/one-column.html']) => ({ ...DIRECTION_FIELDS, ...(candidates.length ? { candidates } : {}), ...RESOLUTION_FIELDS, ...APPLICATION_FIELDS });
+const allFields = (candidates = ['response/artifacts/one-column.html']) => ({ ...DIRECTION_FIELDS, ...(candidates.length ? { candidates } : {}), 'selected-candidate-capture': 'response/artifacts/one-column.wide.png', ...RESOLUTION_FIELDS, ...APPLICATION_FIELDS });
 
 const responseJson = ({ status = 'done', stop, fields, fallbacks = [], commits = [COMMIT], next = ['interface.audit'], reason, interaction } = {}) => ({
   schemaVersion: 9,
@@ -475,7 +485,7 @@ function writeBranch(files) {
     if (content === null) continue;
     const target = name.startsWith('../../') ? path.join(session, name.slice(6)) : path.join(branch, name);
     mkdirSync(path.dirname(target), { recursive: true });
-    writeFileSync(target, typeof content === 'string' ? content : JSON.stringify(content, null, 2));
+    writeFileSync(target, typeof content === 'string' || Buffer.isBuffer(content) ? content : JSON.stringify(content, null, 2));
   }
   if (files['response/response.json']?.status === 'done') {
     writeUiKnowledgeFixture(path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..'), branch, ['@knowledge/ui/composition', '@knowledge/ui/presentation', '@knowledge/ui/proof', '@knowledge/grammars/<family>'], 'response/artifacts/one-column.html');
@@ -491,6 +501,8 @@ const baseline = () => ({
   'response/direction.md': directionMd(),
   'response/data/coverage.json': coverage(),
   'response/artifacts/one-column.html': '<!doctype html><title>one-column</title>',
+  'response/artifacts/one-column.wide.png': PNG,
+  'response/artifacts/one-column.narrow.png': PNG,
   'response/resolution.md': resolutionMd(),
   'response/data/inventory.json': inventory(),
   [TREE]: resolvedTree(),
@@ -521,6 +533,7 @@ const threeCandidates = ({ policy = 'automatic', approval = null, tie = false, e
   'response/direction.md': directionMd({ policy, candidates: 3, scores: tie ? 'tie' : 'dominant', fallbacks: tie && policy === 'automatic' ? ['DIRECTION_CHOICE_REQUIRED'] : [], ...md }),
   'response/response.md': applicationMd({ fallbacks: tie && policy === 'automatic' ? ['DIRECTION_CHOICE_REQUIRED'] : [] }),
   ...Object.fromEntries(NAMES.map((n) => [`response/artifacts/${n}.html`, `<!doctype html><title>${n}</title>`])),
+  ...Object.fromEntries(NAMES.flatMap((n) => VIEWPORTS.map((viewport) => [`response/artifacts/${n}.${viewport}.png`, PNG]))),
 });
 
 // A copy-only change: the direction declares Presentation delta none, the resolution resolves
@@ -596,6 +609,7 @@ const printedChoice = ({ candidates = 3, printed = NAMES.slice(0, candidates), r
   }),
   ...(receipt ? { 'response/direction.md': directionMd({ policy: 'approval-required', candidates, selected: '—', rejectAll: false, printed, scores }), 'response/data/coverage.json': coverage() } : {}),
   ...Object.fromEntries(NAMES.slice(0, candidates).map((n) => [`response/artifacts/${n}.html`, `<!doctype html><title>${n}</title>`])),
+  ...Object.fromEntries(NAMES.slice(0, candidates).flatMap((n) => VIEWPORTS.map((viewport) => [`response/artifacts/${n}.${viewport}.png`, PNG]))),
 });
 await expectValid(printedChoice(), 'DIRECTION_CHOICE_REQUIRED under approval-required over a proven tie: three candidates printed at both viewports, one question for the person');
 await expectValid(printedChoice({ scores: 'loser' }), 'DIRECTION_CHOICE_REQUIRED over the other tie: the top mean loses a failed criterion to another candidate');
@@ -613,6 +627,12 @@ await expectError({ ...baseline(), 'request/request.json': requestJson({ extra: 
 await expectError({ ...baseline(), 'request/request.json': requestJson({ extra: { candidates: 2 } }), 'response/response.json': responseJson({ fields: allFields([]) }) }, 'more than one candidate was formed but none was rendered', 'comparison without pages');
 await expectValid(refine(), 'a single refine is rendered, printed and scored before source write');
 await expectError({ ...baseline(), 'response/response.json': responseJson({ fields: allFields([]) }) }, 'a reconstruct direction renders every candidate it forms', 'a reconstruct whose candidate nobody can see');
+await expectError({ ...baseline(), 'response/response.json': responseJson({ fields: (() => { const fields = allFields(); delete fields['selected-candidate-capture']; return fields; })() }) }, 'required output selected-candidate-capture is not in fields', 'a done UI generation with no main screenshot output');
+await expectError({ ...baseline(), 'response/response.json': responseJson({ fields: { ...allFields(), 'selected-candidate-capture': 'response/artifacts/images/accent.png' } }) }, 'direction-image artwork and HTML are not the rendered outcome', 'a decorative direction image substituted for the selected render');
+await expectError({ ...baseline(), 'response/artifacts/one-column.wide.png': 'not a png' }, 'selected-candidate-capture is not PNG evidence', 'a text file renamed to the selected screenshot');
+await expectError({ ...baseline(), 'response/direction.md': directionMd().replace('| `response/artifacts/one-column.wide.png` | the wide capture printed from that served candidate |', '') }, 'does not contain the selected outcome screenshot', 'the primary screenshot was never printed');
+await expectError({ ...baseline(), 'response/direction.md': directionMd().replace('http://127.0.0.1:60000/one-column.html?viewport=wide | wide |', 'https://example.com/one-column.html?viewport=wide | wide |') }, 'must be the loopback-served one-column.html URL', 'an unrelated public mock named as the selected source');
+await expectError({ ...threeCandidates(), 'response/response.json': responseJson({ fields: { ...allFields(NAMES.map((n) => `response/artifacts/${n}.html`)), 'selected-candidate-capture': 'response/artifacts/split-view.wide.png' } }), 'response/direction.md': directionMd({ candidates: 3 }).replace('| `one-column` | http://127.0.0.1:60000/one-column.html?viewport=wide | wide | `response/artifacts/one-column.wide.png` |', '| `split-view` | http://127.0.0.1:60000/split-view.html?viewport=wide | wide | `response/artifacts/split-view.wide.png` |') }, 'Selected capture names split-view, but ## Decision selected one-column', 'an unselected candidate screenshot promoted as the result');
 await expectError({ ...threeCandidates(), 'response/response.json': responseJson({ fields: allFields(['response/artifacts/one-column.html']) }) }, '3 formed and 1 rendered', 'a reconstruct that rendered only the candidate it liked');
 await expectError({ ...baseline(), 'response/direction.md': directionMd({ changeLevel: 'refine' }) }, 'Change level refine differs from the request', 'receipt and request disagree on the change level');
 await expectError(refine({ 'response/direction.md': directionMd({ changeLevel: 'refine' }) }), 'a refine is classified locked-refine', 'refine classified dominant');
@@ -658,6 +678,22 @@ await expectError({ ...baseline(), 'response/direction.md': directionMd().replac
 await expectError({ ...baseline(), 'response/response.json': responseJson({ status: 'blocked', stop: 'DIRECTION_CHOICE_REQUIRED' }) }, 'has disposition fallback under these requirements', 'terminating on the choice under automatic');
 await expectError({ ...baseline(), 'response/response.json': responseJson({ status: 'blocked', stop: 'MADE_UP_CODE' }) }, 'not a registered code', 'unknown stop code');
 await expectError({ ...baseline(), 'response/direction.md': directionMd({ presentationDelta: 'cosmetic' }) }, 'is neither app-owned nor none', 'an unknown delta value');
+
+// A v2.2 response promotes the selected rendered screenshot itself, never the HTML or an image asset.
+{
+  const files = baseline();
+  const { branch, session } = writeBranch(files);
+  const base = {
+    ...files['response/response.json'],
+    contractVersion: 'starci/v2.2',
+    outcome: { summary: 'The selected one-column result at the wide viewport.', primary: { kind: 'image', label: 'Selected plans UI', ref: 'response/artifacts/one-column.wide.png' } }
+  };
+  try {
+    assert.deepEqual(await selectedCaptureErrors({ branchDir: branch, response: base, text: files['response/direction.md'] }), []);
+    assert.ok((await selectedCaptureErrors({ branchDir: branch, response: { ...base, outcome: { ...base.outcome, primary: { ...base.outcome.primary, kind: 'document' } } }, text: files['response/direction.md'] })).some((error) => error.includes('primary.kind must be image')));
+    assert.ok((await selectedCaptureErrors({ branchDir: branch, response: { ...base, outcome: { ...base.outcome, primary: { ...base.outcome.primary, ref: 'response/artifacts/one-column.html' } } }, text: files['response/direction.md'] })).some((error) => error.includes('primary.ref must be the selected candidate screenshot')));
+  } finally { rmSync(session, { recursive: true, force: true }); }
+}
 
 // The findings ledger, answered: every open line for this target is named under ## Findings answered
 // with what the direction does about it; a line for another surface is owed nothing; a row naming

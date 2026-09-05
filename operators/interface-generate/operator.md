@@ -13,9 +13,10 @@ commit on the session branch whose `writes` carry every declared path with both 
 the `inventory` frozen beside the `frontend-presentation-resolution` and `resolved-tree` publishes,
 with a clean sweep and the committed tree equal to the resolved one, that tree realizing the direction
 the `frontend-direction-decision` selected over `candidates` served on `host`, printed, falsified and
-scored, with the surface class in the `ui-coverage`; or, under mode dry, the same with a null commit
-and an untouched checkout; or, when the direction declared a presentation delta of none, an empty
-owner map, no chosen rule and an empty inventory.
+scored, with the surface class in the `ui-coverage` and the selected rendered PNG recorded as
+`selected-candidate-capture` and `outcome.primary`; or, under mode dry, the same with a null commit
+and an untouched checkout; or, when the direction declared a presentation delta of none, the same
+selected render evidence beside an empty owner map, no chosen rule and an empty inventory.
 
 ## One agent, one page
 
@@ -349,7 +350,7 @@ written source: it knows what it decided and what it wrote, never how it renders
 | 3 | Observe the existing context and the person's reference, then compile the UI contract, its coverage and the surface class | `references` | @workspaces/fe (the target's direct artifacts, or the authorized host and product family when the target is absent), @worktrees/uat/<flow>/<case> when present, @knowledge/ui/composition (`COVERAGE-1` Case 7 publishes the class vocabulary), input `business-promise-authority` when present | `ui-coverage` | `EVIDENCE_MISSING`, `SCOPE_UNFROZEN` |
 | 4 | Resolve the reference standards by class, bounded | `references`, `changeLevel` | @knowledge/ui/composition (the gap the research must close), @tools/websearch | — | `REFERENCE_EVIDENCE_EXHAUSTED`, `REFERENCE_MISSING` |
 | 5 | Form the candidates and apply the Grammar filter | `candidates`, `ownerCeiling` | the compiled UI contract, @grammar/core (what a component owns and which props exist), @knowledge/grammars/<family> | — | `NO_VIABLE_DIRECTION`, `GRAMMAR_REQUIRED` |
-| 6 | Render every surviving candidate with its judged images, serve the pages for a person and print them | `candidates`, `preview` | the surviving candidates, @knowledge/grammars/<family>, @tools/visualize, @tools/imagegen, @tools/host, @tools/print | `candidates`, `direction-image`, `host` | — |
+| 6 | Render every surviving candidate with its judged images, serve the pages for a person and print them | `candidates`, `preview` | the surviving candidates, @knowledge/grammars/<family>, @tools/visualize, @tools/imagegen, @tools/host, @tools/print | `candidates`, `selected-candidate-capture`, `direction-image`, `host` | — |
 | 7 | Falsify and score every rendered candidate for conformance and perceived task quality, then write the decision | `selectionPolicy`, `approval` | the candidates, reference, inputs `business-promise-authority` and `backend-source-application`, `ui-coverage`, @knowledge/ui/proof | `frontend-direction-decision`, `knowledge-coverage`, `family-understanding`, or `knowledge-question` when contradicted | `NO_VIABLE_DIRECTION`, `DIRECTION_CHOICE_REQUIRED`, `KNOWLEDGE_QUESTION` |
 | 8 | Bind the presentation authority and walk the decided tree once under the owner ceiling | — | @knowledge/ui/presentation (every topic with its fingerprint and rule inventory), @grammar/core (the published package's owned relationships), @workspaces/fe (the frozen tree, in document order), `frontend-direction-decision`, @tools/registry | — | `KNOWLEDGE_UNBOUND`, `GRAMMAR_UNPUBLISHED`, `OWNER_CONFLICT` |
 | 9 | Resolve one published rule per application-owned property, remove what the tree may not carry, record the gaps and emit the claims | `contractEmission` | @knowledge/ui/presentation (the cases the bound topics publish), @grammar/core (the owned relationships, Grammar anatomy and the closed scale), @workspaces/fe (the properties each node presently carries) | `inventory`, `resolved-tree`, `frontend-presentation-resolution` | `RULE_MISSING`, `UNKNOWN_RULE` |
@@ -430,6 +431,7 @@ surfaces must now be observed.
 | `frontend-direction-decision` | `response/direction.md` | md | yes |
 | `ui-coverage` | `response/data/coverage.json` | data | yes |
 | `candidates` | `response/artifacts/<candidateId>.html` | artifact | no |
+| `selected-candidate-capture` | `response/artifacts/<candidateId>.<viewport>.png` | artifact | yes |
 | `direction-image` | `response/artifacts/images/<slot>.png` | artifact | no |
 | `host` | `response/artifacts/host.json` | artifact | no |
 | `knowledge-question` | `response/data/knowledge-question.json` | data | no |
@@ -441,6 +443,15 @@ surfaces must now be observed.
 | `frontend-source-application` | `response/response.md` | md | yes |
 | `changes` | `response/changes.md` | md | yes |
 | `writes` | `response/data/writes.json` | data | yes |
+
+## The best outcome
+
+On every successful run — `apply` or `dry`, at every change level including `new`, `reconstruct` and
+`refine` — `outcome.primary` is an `image` whose ref is the required
+`selected-candidate-capture`. `## Selected capture` binds
+that PNG to the selected candidate, its served HTML URL and viewport, and `## Printed` proves the
+same capture was shown. A direction-image asset, an HTML path, or a screenshot of an unselected
+candidate cannot stand in for the result. The decision and source receipts may be secondary items.
 
 ## Stops
 
