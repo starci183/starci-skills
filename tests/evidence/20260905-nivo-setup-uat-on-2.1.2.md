@@ -147,7 +147,8 @@ defect recorded below.
 | Re-audit module-setup | **DONE — a new regression found** | 593 claims, 12 failing, all grammar-owned: 4 OVERFLOW-3 on the chat message region (a vertical scroll the 0.4.11 fix does not touch) and, **new at 0.4.11**, 8 FONT failures — the Setup module title renders 36px and the section heading 30px while stamped FONT-4/FONT-3 (20/16), a heading-size regression 0.4.11 introduced (`step-13/parallel-2`) |
 | UAT `setup-reach` | **DONE (1 of 3 cases)** | `deep-link-signed-out` passes behaviour; `wrong-password-refused` and `reload-keeps-session` are coverage gaps the runner cannot walk (a refused sign-in trips the credential sweep; there is no reload action). Flow folder `.worktrees/uat/agentos-modules/setup-reach/runs/20260905-170000-d2d35d0/` |
 | UAT `control-centre-unprovisioned` | **DONE (3 cases)** | `summary-null-instance`, `apps-unavailable`, `retry-settles` all pass behaviour. Flow folder `.worktrees/uat/agentos-modules/control-centre-unprovisioned/runs/20260905-170100-d2d35d0/` |
-| `git.publish` 0.4.11 | **HELD → the person** | not published: 0.4.11 regresses the two Setup headings. `nivo-fe` `main` stays at `e2f4968f` (0.4.9), which has no heading regression; the control-centre overflow gaps there are pre-existing family gaps the app cannot fix. The person chooses: publish 0.4.11 anyway, wait for a grammar 0.4.12, or publish with an owner grammar-fix |
+| Quality at the served 0.4.11 head | **GREEN** | typecheck 0, lint:check 0 (with the architecture check), build of three apps 0, test:ci 744/166 at `d2d35d0` in the consume worktree |
+| `git.publish` 0.4.11 | **HELD by the person (option b)** | not published. The person chose to hold: a 36px heading under a FONT-4 stamp is a first-screen regression, and the overflow gaps it would fix are invisible by comparison. `nivo-fe` `main` stays at `e2f4968f` (0.4.9). The heading regression is recorded as a family finding routed grammar-gap in `knowledge/findings/starci.jsonl` (8 FONT entries) and below. A Grammar 0.4.12 mission is opened to keep the overflow/padding fix and restore the FONT-n heading sizes; it will re-enter consume at 0.4.12, re-audit both surfaces and publish. The branch `session/20260905-130417-nivo-consume` and the 3067 serve are kept for it |
 
 ### The 0.4.11 heading regression, measured
 
@@ -179,3 +180,44 @@ introduces one on every surface that heads with these levels.
   "3 journey, 0 deferred" while 11 surfaces stand unchecked in the ledger. The line should read the
   count of the plan whose lane the scope describes (the surface plan for the audit lane), not
   whichever plan ran last. Recorded, not fixed, at the owner's instruction.
+
+
+## Khối kiểm thử cho chủ sở hữu (tiếng Việt)
+
+Nhiệm vụ đã publish `nivo/fe` `main` lên `e2f4968f` (bản 0.4.9, đã sửa UX-9: nút gửi của phần trò chuyện Setup nằm trong khung ở điện thoại). Bản consume `@starci/grammar` 0.4.11 đã được chứng minh nhưng GIỮ, không publish, vì nó làm to hai tiêu đề trang Setup; chủ đã chọn giữ ở 0.4.9 và mở một nhiệm vụ Grammar 0.4.12 riêng.
+
+### Máy chủ đang chạy
+
+- Deep link Setup (3067): `http://localhost:3067/vi/agentos/workspaces/8c8b0002-0429-4268-aa15-000000000026/modules/8c8b0003-0429-4268-aa15-000000000026/setup`
+- Trung tâm điều khiển không gian làm việc (3067): `http://localhost:3067/vi/agentos/workspaces/8c8b0002-0429-4268-aa15-000000000026`
+- Backend (3068): `http://localhost:3068/graphql`
+
+Máy chủ 3067 hiện phục vụ head tích hợp `293e56e3` (0.4.11, để cho nhiệm vụ 0.4.12 tiếp quản); hành vi của cả ba flow giống nhau ở 0.4.9 và 0.4.11.
+
+### Tài khoản và thông tin đăng nhập
+
+Một tài khoản chuyên dụng cho cả ba flow: `uat-nivo-setup-042915` (alias theo flow: `owner` cho module-setup, `reach-owner` cho setup-reach, `centre-owner` cho control-centre-unprovisioned; đều trỏ về cùng tài khoản này vì nó sở hữu không gian làm việc đã seed). Mật khẩu là `uat-shared`, niêm phong tại `.stacks/dev/secrets/uat.enc`, chỉ giải theo tên lúc đăng nhập; không có giá trị nào nằm trong file, log, ảnh hay biên nhận.
+
+### Các bước và bằng chứng theo từng flow
+
+**module-setup** — runId `20260905-155900-e2f4968` (ở head đã publish `e2f4968f`, phục vụ trên 3067):
+1. Mở deep link Setup khi đã đăng nhập, thấy một cài đặt agent theo tên hiển thị, ở 1441x1000 và 390x844.
+- Ảnh: `.worktrees/sessions/20260905-130417-nivo-environment.preflight/step-10/parallel-1/response/artifacts/setup-loads-owned-fixture.png`, `setup-compact-390.png`, tờ tổng hợp `sheet.png`; bản trong flow folder `.worktrees/uat/agentos-modules/module-setup/runs/20260905-155900-e2f4968/result.json`. UX-9 đo đã sửa: nút `Gửi` ở y=764 trong khung 844.
+
+**setup-reach** — runId `20260905-170000-d2d35d0`:
+1. Mở deep link Setup khi đăng xuất, đăng nhập qua form, địa chỉ quay về đúng trang Setup (ca `deep-link-signed-out`, đạt).
+- Ảnh: `.worktrees/uat/agentos-modules/setup-reach/runs/20260905-170000-d2d35d0/deep-link-signed-out.png`.
+- Hai ca không đi được (ghi là khoảng trống phủ): `wrong-password-refused` (runner từ chối chụp form còn giữ mật khẩu niêm phong trong cây accessibility) và `reload-keeps-session` (runner khai báo chỉ điều hướng một lần ở bước 1, không có hành động reload).
+
+**control-centre-unprovisioned** — runId `20260905-170100-d2d35d0`:
+1. Mở control centre không gian làm việc đã seed, đăng nhập, tóm tắt nói "chưa được cấp instance" (ca `summary-null-instance`, đạt).
+2. Đọc vùng ứng dụng: cả hai app "Chưa sẵn sàng", nút mở bị vô hiệu (ca `apps-unavailable`, đạt).
+3. Mở một không gian làm việc lạ, nhấn "Thử lại", lời từ chối vẫn còn (ca `retry-settles`, đạt).
+- Ảnh: `.worktrees/uat/agentos-modules/control-centre-unprovisioned/runs/20260905-170100-d2d35d0/{summary-null-instance,apps-unavailable,retry-settles}.png`.
+
+### Mục unchecked, sha main, và bản consume đang giữ
+
+- Sổ unchecked: `.worktrees/unchecked/nivo/agentos-module-setup.jsonl` (15 dòng: 11 bề mặt phụ mà interface.plan hoãn + 4 state hoãn của audit module-setup).
+- sha main đã publish: `nivo-fe` `main` = `e2f4968fcee02afd81ccf99aa3f691af4c9bc625` (0.4.9). `nivo-be` `main` = `ca60f419` (đã là head, nhiệm vụ này không ghi be).
+- Bản consume đang GIỮ (không publish): `@starci/grammar` 0.4.11, commit `d2d35d0c8a48682b5d4b54c0538d74acd271a593` trên nhánh `session/20260905-130417-nivo-consume` (spec hồi quy `64a19de`, bump `d2d35d0`). Giữ nguyên cùng máy chủ 3067 cho nhiệm vụ Grammar 0.4.12 vào lại.
+- Khe Grammar mới 0.4.11 gây ra (đã ghi vào sổ findings, định tuyến grammar-gap cho owner): tiêu đề module Setup render 36px và tiêu đề mục render 30px trong khi dán nhãn FONT-4/FONT-3 (20/16); bằng chứng `step-13/parallel-2` verdicts và `module-setup-vi-wide.measurements.json`.
