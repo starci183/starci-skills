@@ -361,39 +361,6 @@ republished `implemented` while a journey entry stands; and `release.deploy` ref
 release over a journey entry while passing one over a unit outside the journey. Each of those runs
 against a synthetic ledger root, so no test reads or writes the host's own `@worktrees/unchecked`.
 
-<<<<<<< HEAD
-## The support layer and the bank it drafts
-
-A helper is not an operator, and the whole of that difference is refusable. `scripts/validate-helper.mjs`
-reads each helper package the way `validate-operator` reads an operator one — Params against
-Requirements, Steps against Stops against the registry, Outputs against the kind schemas, English
-against its Vietnamese mirror — and adds the three refusals that make the support layer a support
-layer: a Writes alias must be one `alias/alias.json` marks `helperWritable` (which no product source
-route, no runtime owner and no publication target carries, so the registry answers rather than a
-second list); a tool must be one of the modes `resources/orchestrator.json#helpers.tools` permits (which
-is why `git` stops at `read` and every mode that writes a checkout, operates a runtime, publishes or
-resolves a secret is absent rather than declared `never`); and the mode must be `inline` or `isolated`,
-because a helper is entered from the person and there is no transcript to inherit.
-
-`scripts/bank.spec.mjs` proves the bank itself: that the canonical form ignores key order, that the
-approval hash covers the composition of the queue and the content of its missions and deliberately not
-their progress — running and finishing leave it alone, adding, reordering, dropping and correcting a
-goal do not — that `next` hands back one mission at a time and waits for a dependency whatever its
-priority, that a drafted bank comes out ordered by what a mission waits for then by priority then by
-id, and that a mission with no evidence ref, or with prose where an evidence ref belongs, is refused.
-It also proves that a bank is swept for secret-shaped values exactly as a receipt is, through
-`scripts/sweep-secrets.mjs` and no second list of patterns. The same file proves the session half: `validate-session.mjs#bankRefErrors` refuses a `mission.bankRef`
-whose entry is gone, whose entry belongs to another session, whose goal is not the one the bank carries
-word for word, or whose approval no longer covers the bank as it stands — while a mission that was
-never banked answers to none of it.
-
-`helpers/generate-banks/self-test.mjs` runs the first helper's own validator against a synthetic host:
-one lawful bank of three missions drafted from an unchecked entry, a finding and a walk, one lawful
-`BANK_EMPTY` stop that wrote nothing at all, and one mutation per law — a mission drafted from nothing,
-a tier hint no unchecked entry backs, a queue that ignores its own dependency order, a bank that names
-another run, a run that wrote product source, a stop that still left a bank behind. Every fixture lives
-in a temporary host root, so no test reads or writes the machine's own `@worktrees/banked`.
-=======
 ## Round 5 — 2026-09-05, the reachability session on 2.1.0, judged for 2.1.2
 
 One live mission ran the whole ladder on 2.1.0 — two routed checkouts, two repairs, a serve, two
@@ -456,4 +423,35 @@ serve → audit → the frontend gates → the walk → the backend gates → bo
 `scripts/validate-chain.mjs`. `scripts/plan-chain.spec.mjs` now reads every example as a subsequence
 of the planned steps, so an operator a fixture names twice must occupy two planned steps rather than
 being matched twice against one.
->>>>>>> b086039c
+
+## The support layer and the bank it drafts
+
+A helper is not an operator, and the whole of that difference is refusable. `scripts/validate-helper.mjs`
+reads each helper package the way `validate-operator` reads an operator one — Params against
+Requirements, Steps against Stops against the registry, Outputs against the kind schemas, English
+against its Vietnamese mirror — and adds the three refusals that make the support layer a support
+layer: a Writes alias must be one `alias/alias.json` marks `helperWritable` (which no product source
+route, no runtime owner and no publication target carries, so the registry answers rather than a
+second list); a tool must be one of the modes `resources/orchestrator.json#helpers.tools` permits (which
+is why `git` stops at `read` and every mode that writes a checkout, operates a runtime, publishes or
+resolves a secret is absent rather than declared `never`); and the mode must be `inline` or `isolated`,
+because a helper is entered from the person and there is no transcript to inherit.
+
+`scripts/bank.spec.mjs` proves the bank itself: that the canonical form ignores key order, that the
+approval hash covers the composition of the queue and the content of its missions and deliberately not
+their progress — running and finishing leave it alone, adding, reordering, dropping and correcting a
+goal do not — that `next` hands back one mission at a time and waits for a dependency whatever its
+priority, that a drafted bank comes out ordered by what a mission waits for then by priority then by
+id, and that a mission with no evidence ref, or with prose where an evidence ref belongs, is refused.
+It also proves that a bank is swept for secret-shaped values exactly as a receipt is, through
+`scripts/sweep-secrets.mjs` and no second list of patterns. The same file proves the session half: `validate-session.mjs#bankRefErrors` refuses a `mission.bankRef`
+whose entry is gone, whose entry belongs to another session, whose goal is not the one the bank carries
+word for word, or whose approval no longer covers the bank as it stands — while a mission that was
+never banked answers to none of it.
+
+`helpers/generate-banks/self-test.mjs` runs the first helper's own validator against a synthetic host:
+one lawful bank of three missions drafted from an unchecked entry, a finding and a walk, one lawful
+`BANK_EMPTY` stop that wrote nothing at all, and one mutation per law — a mission drafted from nothing,
+a tier hint no unchecked entry backs, a queue that ignores its own dependency order, a bank that names
+another run, a run that wrote product source, a stop that still left a bank behind. Every fixture lives
+in a temporary host root, so no test reads or writes the machine's own `@worktrees/banked`.

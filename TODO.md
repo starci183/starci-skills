@@ -315,37 +315,6 @@ không lần chạy nào render mọi màn hình "cho chắc".
       nào một lượt đi cần hoãn một case của flow nó *đang* đi thì mới mở `deferrals` cho hai operator
       ấy — thêm bây giờ là một mã dừng không đường nào chạm tới.
 
-<<<<<<< HEAD
-## 6. Tầng hỗ trợ: helper và kho nhiệm vụ (2.1.3)
-
-- [x] `helpers/` bên cạnh `operators/`: `helper.md` (+vi) với Việc, Xong khi, Đọc, Ghi, Yêu cầu, Các
-      bước, Đầu ra, Dừng; `helper.json` (profile, mode, tools, writes, primaryOutput); `errors.json`;
-      `validate.mjs`; `self-test.mjs`; `brief.md` sinh tự động; `helpers/INDEX.md` (+vi) sinh tự động.
-      (`scripts/helper-md.mjs`, `scripts/generate-helpers-index.mjs`, `scripts/generate-helper-briefs.mjs`)
-- [x] Cửa: `scripts/validate-helper.mjs` trong `npm test` — profile phải có thật, tool phải nằm trong
-      bộ chế độ `resources/orchestrator.json#helpers.tools` cho phép, mode là inline hoặc isolated, và
-      mọi alias trong bảng Ghi phải được `alias/alias.json` đánh dấu `helperWritable`; luật của tầng hỗ
-      trợ có một nhà duy nhất là đoạn `helpers` của orchestrator.json.
-- [x] Gọi: route kind `helper` trong `routing.json`, một đoạn trong Entry của `SKILL.md`, và một bản
-      ghi lần chạy duy nhất ở `@worktrees/helpers/<id>/runs/<runId>/run.json`
-      (`templates/kinds/helper-run.schema.json`); helper không mở phiên và không hỏi gì
-      (`resources/interaction.json#asks`).
-- [x] Kho: `@worktrees/banked/<product>/` với `queue.json`, `<missionId>/mission.json` + `mission.md`
-      và `approvals.json`; mọi nhiệm vụ phải có ít nhất một `evidenceRefs` (`BANK_UNGROUNDED`).
-      (`scripts/bank.mjs` + spec, `templates/kinds/{bank-queue,banked-mission,bank-approvals}.schema.json`)
-- [x] Chạy kho: một phê duyệt `bank:<product>:v<n>` tính là goal-confirm của mọi nhiệm vụ hàng đợi liệt
-      kê, hash phủ thành phần và nội dung chứ không phủ tiến độ, mỗi sản phẩm một nhiệm vụ một lúc,
-      `dependsOn` được chờ; `state.json.mission.bankRef` bị từ chối khi phê duyệt hết hiệu lực
-      (`scripts/validate-session.mjs#bankRefErrors`).
-- [x] Helper đầu tiên `generate-banks` chạy trên profile đọc (`astra`) và self-test của nó.
-- [ ] Chưa có: harness chưa tự nhận nhiệm vụ kế tiếp từ kho. `bank.mjs#next|markRunning|markDone` đã
-      có và đã được spec, nhưng chưa vòng nào của orchestrator gọi chúng, và chưa có `SKILL.md` bước
-      nào nói ai ghi `queue.json` khi một phiên mở ra hay đóng lại. Làm điều đó rồi mới ghi bằng chứng.
-- [ ] Chưa có: kho `nivo-agentos` mà một phiên Astra đã viết vẫn ở hình dạng cũ
-      (`index.json`/`ORDER.md`/`workflows/<id>/workflow.json`/`BRIEF.md`). 17 nhiệm vụ của nó hợp lệ
-      với `banked-mission.schema.json` sau khi đổi tên và dời trường, không phải sửa nội dung nào; việc
-      chuyển thật thuộc về chủ kho ấy, không phải phiên này.
-=======
 ## 6. Bảy khiếm khuyết runtime của phiên reachability trên 2.1.0 (2.1.2)
 
 Một nhiệm vụ thật leo hết thang trên 2.1.0 — hai checkout, hai bản sửa, một lần serve, hai lần audit
@@ -387,4 +356,33 @@ mục dưới đây đóng một cái, bằng một gate kèm spec, không bằn
       (`tests/chains/two-route-publish.json`, `plan-chain.spec.mjs` đọc mỗi ví dụ như một dãy con).
 - [ ] Chứng minh trên một nhiệm vụ thật: chạy lại chính nhiệm vụ hai route ấy trên 2.1.2 và publish cả
       hai route trong một chuỗi, rồi ghi vào `tests/evidence/`.
->>>>>>> b086039c
+
+## 7. Tầng hỗ trợ: helper và kho nhiệm vụ (2.1.3)
+
+- [x] `helpers/` bên cạnh `operators/`: `helper.md` (+vi) với Việc, Xong khi, Đọc, Ghi, Yêu cầu, Các
+      bước, Đầu ra, Dừng; `helper.json` (profile, mode, tools, writes, primaryOutput); `errors.json`;
+      `validate.mjs`; `self-test.mjs`; `brief.md` sinh tự động; `helpers/INDEX.md` (+vi) sinh tự động.
+      (`scripts/helper-md.mjs`, `scripts/generate-helpers-index.mjs`, `scripts/generate-helper-briefs.mjs`)
+- [x] Cửa: `scripts/validate-helper.mjs` trong `npm test` — profile phải có thật, tool phải nằm trong
+      bộ chế độ `resources/orchestrator.json#helpers.tools` cho phép, mode là inline hoặc isolated, và
+      mọi alias trong bảng Ghi phải được `alias/alias.json` đánh dấu `helperWritable`; luật của tầng hỗ
+      trợ có một nhà duy nhất là đoạn `helpers` của orchestrator.json.
+- [x] Gọi: route kind `helper` trong `routing.json`, một đoạn trong Entry của `SKILL.md`, và một bản
+      ghi lần chạy duy nhất ở `@worktrees/helpers/<id>/runs/<runId>/run.json`
+      (`templates/kinds/helper-run.schema.json`); helper không mở phiên và không hỏi gì
+      (`resources/interaction.json#asks`).
+- [x] Kho: `@worktrees/banked/<product>/` với `queue.json`, `<missionId>/mission.json` + `mission.md`
+      và `approvals.json`; mọi nhiệm vụ phải có ít nhất một `evidenceRefs` (`BANK_UNGROUNDED`).
+      (`scripts/bank.mjs` + spec, `templates/kinds/{bank-queue,banked-mission,bank-approvals}.schema.json`)
+- [x] Chạy kho: một phê duyệt `bank:<product>:v<n>` tính là goal-confirm của mọi nhiệm vụ hàng đợi liệt
+      kê, hash phủ thành phần và nội dung chứ không phủ tiến độ, mỗi sản phẩm một nhiệm vụ một lúc,
+      `dependsOn` được chờ; `state.json.mission.bankRef` bị từ chối khi phê duyệt hết hiệu lực
+      (`scripts/validate-session.mjs#bankRefErrors`).
+- [x] Helper đầu tiên `generate-banks` chạy trên profile đọc (`astra`) và self-test của nó.
+- [ ] Chưa có: harness chưa tự nhận nhiệm vụ kế tiếp từ kho. `bank.mjs#next|markRunning|markDone` đã
+      có và đã được spec, nhưng chưa vòng nào của orchestrator gọi chúng, và chưa có `SKILL.md` bước
+      nào nói ai ghi `queue.json` khi một phiên mở ra hay đóng lại. Làm điều đó rồi mới ghi bằng chứng.
+- [ ] Chưa có: kho `nivo-agentos` mà một phiên Astra đã viết vẫn ở hình dạng cũ
+      (`index.json`/`ORDER.md`/`workflows/<id>/workflow.json`/`BRIEF.md`). 17 nhiệm vụ của nó hợp lệ
+      với `banked-mission.schema.json` sau khi đổi tên và dời trường, không phải sửa nội dung nào; việc
+      chuyển thật thuộc về chủ kho ấy, không phải phiên này.
