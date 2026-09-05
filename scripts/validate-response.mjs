@@ -273,11 +273,37 @@ export async function loadOutcomeRegistry(root) {
   catch (error) { throw new Error(`resources/outcomes.json: ${error.message}`); }
 }
 
+export function outcomeRegistryErrors(outcomeRegistry, packages) {
+  if (outcomeRegistry?.schemaVersion !== 1 || !outcomeRegistry.kinds || !outcomeRegistry.operators) return ['resources/outcomes.json: expected schemaVersion 1 with kinds and operators maps'];
+  const errors = [];
+  for (const [operatorId, rule] of Object.entries(outcomeRegistry.operators)) {
+    const pkg = packages.find((candidate) => candidate.manifest.id === operatorId);
+    if (!pkg) { errors.push(`resources/outcomes.json: operator ${operatorId} has no active package`); continue; }
+    const outputs = new Map();
+    for (const row of pkg.en.tables.outputs?.rows ?? []) {
+      const field = kindOf(row.kind);
+      if (!outputs.has(field)) outputs.set(field, new Set());
+      outputs.get(field).add(String(row.type ?? '').trim());
+    }
+    for (const kind of rule.primaryKinds ?? []) if (!Array.isArray(outcomeRegistry.kinds[kind]?.responseTypes)) errors.push(`resources/outcomes.json: ${operatorId}.primaryKinds names unknown kind ${kind}`);
+    if (rule.primaryOutputs !== undefined) {
+      if (!Array.isArray(rule.primaryOutputs) || !rule.primaryOutputs.length) { errors.push(`resources/outcomes.json: ${operatorId}.primaryOutputs must be a nonempty output-name array when present`); continue; }
+      for (const field of rule.primaryOutputs) {
+        const types = outputs.get(field);
+        if (!types) { errors.push(`resources/outcomes.json: ${operatorId}.primaryOutputs names undeclared Output ${field}`); continue; }
+        const compatible = (rule.primaryKinds ?? []).some((kind) => [...types].some((type) => outcomeRegistry.kinds[kind]?.responseTypes?.includes(type)));
+        if (!compatible) errors.push(`resources/outcomes.json: ${operatorId}.primaryOutputs ${field} has no type compatible with its primaryKinds`);
+      }
+    }
+  }
+  return errors;
+}
+
 // The accepted result is reviewable before routing: it selects a declared, operator-owned output;
 // outcomes.json says which presentation kinds that output type can support; and the selected files
 // are real, readable evidence. Array-valued fields are flattened so an operator can select one
 // candidate capture without copying or rewriting it after the receipt is sealed.
-export async function outcomeErrors(root, dir, response, pkg, { exchange = null, rel = (f) => f, registry: suppliedRegistry } = {}) {
+export async function outcomeErrors(root, dir, response, pkg, { exchange = null, rel = (f) => f, registry: suppliedRegistry, packages } = {}) {
   if (response?.contractVersion !== V22_CONTRACT) return [];
   const at = rel('response/response.json');
   if (response.status !== 'done') return response.outcome === undefined ? [] : [`${at}: outcome is reserved for an accepted done result; ${response.status} reports its truthful typed state without a best-outcome block`];
@@ -291,6 +317,7 @@ export async function outcomeErrors(root, dir, response, pkg, { exchange = null,
   if (outcomeRegistry?.schemaVersion !== 1 || !outcomeRegistry.kinds || !outcomeRegistry.operators) {
     return ['resources/outcomes.json: expected schemaVersion 1 with kinds and operators maps'];
   }
+  if (packages) errors.push(...outcomeRegistryErrors(outcomeRegistry, packages));
   const operatorRule = outcomeRegistry.operators[response.operatorId];
   if (!operatorRule || !Array.isArray(operatorRule.primaryKinds)) errors.push(`resources/outcomes.json: no primaryKinds policy for ${response.operatorId}`);
 
@@ -323,6 +350,9 @@ export async function outcomeErrors(root, dir, response, pkg, { exchange = null,
     else if (kindRule) {
       const compatible = [...fields].some((field) => [...(fieldTypes.get(field) ?? [])].some((type) => kindRule.responseTypes.includes(type)));
       if (!compatible) errors.push(`${itemAt}: ${item.kind} cannot present ${item.ref}; its declared Output type is outside ${kindRule.responseTypes.join('|')}`);
+      if (index === 0 && Array.isArray(operatorRule?.primaryOutputs) && ![...fields].some((field) => operatorRule.primaryOutputs.includes(field))) {
+        errors.push(`${itemAt}.ref: ${item.ref} is not emitted by one of ${response.operatorId}.primaryOutputs (${operatorRule.primaryOutputs.join(', ')})`);
+      }
     }
     errors.push(...await ownedArtifactErrors(dir, item.ref, item.kind, itemAt));
   }
@@ -413,7 +443,7 @@ export async function validateResponse(root, dir, { requirements = {}, exchange 
     }
   }
   for (const kind of Object.keys(response.fields ?? {})) if (!outputs.some((r) => kindOf(r.kind) === kind)) errors.push(`${rel('response/response.json')}: fields.${kind} is not an Output of ${op.id}${exchange ? ` in exchange ${exchange}` : ''}`);
-  errors.push(...await outcomeErrors(root, dir, response, pkg, { exchange, rel }));
+  errors.push(...await outcomeErrors(root, dir, response, pkg, { exchange, rel, packages }));
 
   // Stops, fallbacks, waiting.
   const stopsTable = new Set((op.tables.stops?.rows ?? []).map((r) => unquote(r.code)));

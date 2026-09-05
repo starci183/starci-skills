@@ -6,7 +6,7 @@ import test from 'node:test';
 import { fileURLToPath } from 'node:url';
 import { buildEvidenceManifest } from './evidence-manifest.mjs';
 import { validateAgainst } from './json-schema.mjs';
-import { outcomeErrors } from './validate-response.mjs';
+import { outcomeErrors, outcomeRegistryErrors } from './validate-response.mjs';
 import { renderOutcome } from './render-outcome.mjs';
 
 const sourceRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -79,6 +79,30 @@ test('outcome gate rejects fake images, traversal, missing outcomes and false su
   assert.match((await outcomeErrors(sourceRoot, f.branch, mismatch, pkg, { registry })).join('\n'), /reserved for an accepted done result/);
   const legacy = structuredClone(f.response); delete legacy.contractVersion; delete legacy.outcome;
   assert.deepEqual(await outcomeErrors(sourceRoot, f.branch, legacy, pkg, { registry }), []);
+});
+
+test('primaryOutputs refuses a report in place of an audit capture and a wrong code artifact', async (t) => {
+  const f = await fixture(); t.after(() => rm(f.base, { recursive: true, force: true }));
+  await writeFile(path.join(f.branch, 'response', 'response.md'), '# Review report\n\nThe capture passed.\n');
+  const auditRegistry = structuredClone(registry);
+  auditRegistry.operators['demo.make'] = { primaryKinds: ['image'], primaryOutputs: ['captures'], guidance: 'Show the capture.' };
+  const report = structuredClone(f.response);
+  report.fields.report = 'response/response.md';
+  report.outcome.primary = { kind: 'document', label: 'Report', ref: 'response/response.md' };
+  const reportErrors = await outcomeErrors(sourceRoot, f.branch, report, pkg, { registry: auditRegistry });
+  assert.match(reportErrors.join('\n'), /not an allowed primary kind/);
+  assert.match(reportErrors.join('\n'), /not emitted by one of demo\.make\.primaryOutputs \(captures\)/);
+
+  const codeRegistry = structuredClone(registry);
+  codeRegistry.operators['demo.make'] = { primaryKinds: ['code'], primaryOutputs: ['report'], guidance: 'Show changes.' };
+  const wrongCode = structuredClone(f.response);
+  wrongCode.fields.report = 'response/response.md';
+  wrongCode.outcome.primary = { kind: 'code', label: 'Wrong artifact', ref: 'response/artifacts/selected.png' };
+  assert.match((await outcomeErrors(sourceRoot, f.branch, wrongCode, pkg, { registry: codeRegistry })).join('\n'), /not emitted by one of demo\.make\.primaryOutputs \(report\)/);
+
+  const brokenRegistry = structuredClone(codeRegistry);
+  brokenRegistry.operators['demo.make'].primaryOutputs = ['not-declared'];
+  assert.match(outcomeRegistryErrors(brokenRegistry, [{ manifest: { id: 'demo.make' }, ...pkg }]).join('\n'), /names undeclared Output not-declared/);
 });
 
 test('renderer requires a matched accepted seal and emits the native image as an absolute embed', async (t) => {
