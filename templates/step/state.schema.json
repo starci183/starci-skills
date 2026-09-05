@@ -542,6 +542,30 @@
               "minimum": 0
             }
           }
+        },
+        "bankRef": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "product",
+            "missionId",
+            "approval"
+          ],
+          "description": "the banked entry this mission was opened from (@worktrees/banked/<product>/<missionId>), present only when it was. It is what makes the goal block print without waiting: the person approved the whole queue once and that answer is the goal-confirm of every mission the queue listed. scripts/validate-session.mjs#bankRefErrors refuses a bankRef whose entry is gone, whose goal is not the one the bank carries, or whose approval no longer covers the bank as it stands — so a corrected goal, a reordered queue or an edited mission puts the question back to the person",
+          "properties": {
+            "product": {
+              "type": "string",
+              "pattern": "^[a-z0-9][a-z0-9-]*$"
+            },
+            "missionId": {
+              "type": "string",
+              "pattern": "^[a-z0-9][a-z0-9-]*$"
+            },
+            "approval": {
+              "type": "string",
+              "pattern": "^bank:[a-z0-9][a-z0-9-]*:v[1-9][0-9]*$"
+            }
+          }
         }
       }
     }

@@ -42,9 +42,20 @@ for (const entry of await readdir(operatorsDir, { withFileTypes: true })) {
   operatorIds.add(manifest.id);
   manifests.push({ dir, manifest });
 }
+// A writer is an operator, or — for the two locations the support layer owns — a helper. `*` still
+// means every operator, as it does for the session container.
+const helperIds = new Set();
+if (existsSync(path.join(root, 'helpers'))) {
+  for (const entry of await readdir(path.join(root, 'helpers'), { withFileTypes: true })) {
+    if (!entry.isDirectory()) continue;
+    helperIds.add(JSON.parse(await readFile(path.join(root, 'helpers', entry.name, 'helper.json'), 'utf8')).id);
+  }
+}
 for (const [alias, def] of Object.entries(aliases)) {
   for (const w of def.writers ?? []) {
-    if (w !== '*' && !operatorIds.has(w)) errors.push(`alias.json: ${alias} names writer ${w}, which is not an operator`);
+    if (w === '*' || operatorIds.has(w)) continue;
+    if (def.helperWritable === true && helperIds.has(w)) continue;
+    errors.push(`alias.json: ${alias} names writer ${w}, which is not an operator${def.helperWritable === true ? ' or a helper' : ''}`);
   }
 }
 

@@ -26,7 +26,7 @@ const pkg = JSON.parse(readFileSync(path.join(packageRoot, 'package.json'), 'utf
 export const PAYLOAD = [
   'UPDATE.md', 'UPDATE.vi.md',
   'INDEX.md', 'INDEX.vi.md', 'SKILL.md', 'SKILL.vi.md', 'routing.json',
-  'alias', 'knowledge', 'operators', 'readiness', 'resources', 'scripts', 'templates', 'workflows',
+  'alias', 'helpers', 'knowledge', 'operators', 'readiness', 'resources', 'scripts', 'templates', 'workflows',
 ];
 const MANIFEST = '.starci-skills.json';
 const SESSIONS_IGNORE = '.worktrees/sessions/';
@@ -52,8 +52,8 @@ the entry routes, and a rule copied here becomes a second home that nobody remem
 const DOCTOR_QUICK = ['validate-routing.mjs', 'validate-alias.mjs', 'validate-operator.mjs'];
 const DOCTOR_FULL = [
   'validate-routing.mjs', 'validate-resources.mjs', 'validate-knowledge-citations.mjs', 'validate-alias.mjs',
-  ['generate-alias-doc.mjs', '--check'], 'validate-operator.mjs', 'validate-defaults.mjs',
-  ['generate-operators-index.mjs', '--check'], 'validate-templates.mjs', 'run-operator-self-tests.mjs',
+  ['generate-alias-doc.mjs', '--check'], 'validate-operator.mjs', 'validate-helper.mjs', 'validate-defaults.mjs',
+  ['generate-operators-index.mjs', '--check'], ['generate-helpers-index.mjs', '--check'], 'validate-templates.mjs', 'run-operator-self-tests.mjs',
 ];
 
 function parseArgs(argv) {

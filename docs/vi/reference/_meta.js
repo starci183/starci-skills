@@ -4,5 +4,6 @@ export default {
   "kinds": "Kind",
   "alias": "Alias",
   "stop-codes": "Mã dừng",
-  "knowledge": "Tri thức"
+  "knowledge": "Tri thức",
+  "helpers": "Helper"
 }

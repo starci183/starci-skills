@@ -1,6 +1,6 @@
 {
   "schemaVersion": 8,
-  "note": "Closed registry of reference aliases. An alias reads like the place it names. Static: @workspaces/fe and @workspaces/be (the bound project's routed checkouts), @workspaces/<project>/<role>, @workspaces/{projects,local/routes,ports,device-state}, @grammar/<family>, @knowledge/{ui,grammars,patterns}, @worktrees/{businesses,uat,debts,unchecked,_templates,sessions/central-runtime}, @remote/{npm,git,ghcr,github-actions,minio}. Dynamic: @dynamic, the current session branch, typed by kind. `<Source>` is the host repository that owns this .claude. A sub-path after a registered alias narrows it; a segment in angle brackets is supplied by the invocation. The registry is a tree: one root per zone, children by path segment, a node with resolvesTo is a definition. Resolution picks the longest registered prefix.",
+  "note": "Closed registry of reference aliases. An alias reads like the place it names. Static: @workspaces/fe and @workspaces/be (the bound project's routed checkouts), @workspaces/<project>/<role>, @workspaces/{projects,local/routes,ports,device-state}, @grammar/<family>, @knowledge/{ui,grammars,findings,patterns}, @worktrees/{businesses,uat,e2e,debts,unchecked,helpers,banked,_templates,sessions/central-runtime}, @remote/{npm,git,ghcr,github-actions,minio}. Dynamic: @dynamic, the current session branch, typed by kind. `<Source>` is the host repository that owns this .claude. A sub-path after a registered alias narrows it; a segment in angle brackets is supplied by the invocation. The registry is a tree: one root per zone, children by path segment, a node with resolvesTo is a definition. Resolution picks the longest registered prefix.",
   "zones": {
     "remote": {
       "en": "Internet. Registries, git remotes, image registries, CI runs, object storage. Read through a network; bound by version, digest, or observed head.",
@@ -19,8 +19,8 @@
       "vi": "Vùng làm việc: các checkout đã route của project đang bind, và khai báo, route, port, danh tính để tìm ra chúng."
     },
     "worktrees": {
-      "en": "Machine-local authority and evidence outside any checkout: business heads, UAT pairs, debts, unchecked coverage, templates, the shared runtime owner.",
-      "vi": "Thẩm quyền và bằng chứng máy-cục-bộ ngoài mọi checkout: head nghiệp vụ, UAT pair, nợ, phần chưa kiểm, khuôn, runtime owner dùng chung."
+      "en": "Machine-local authority and evidence outside any checkout: business heads, UAT pairs, debts, unchecked coverage, banked missions, helper runs, templates, the shared runtime owner.",
+      "vi": "Thẩm quyền và bằng chứng máy-cục-bộ ngoài mọi checkout: head nghiệp vụ, UAT pair, nợ, phần chưa kiểm, kho nhiệm vụ, lần chạy helper, khuôn, runtime owner dùng chung."
     },
     "dynamic": {
       "en": "Produced inside the current session by an earlier step and deleted with the session. Never exists before the run.",
@@ -132,6 +132,15 @@
         "writers": [],
         "purpose": "How the family composes: the owner's taste (idioms, playbook) and what exists (DNA). Never the Grammar itself; where a taste row disagrees with @grammar, @grammar is the fact and the row is the finding."
       },
+      "findings": {
+        "params": [],
+        "kind": "dir",
+        "resolvesTo": "<Source>/.claude/knowledge/findings/  (<family>.jsonl, one append-only line per finding; INDEX.md is the reading map)",
+        "scheme": "finding://<family>/<id>",
+        "bind": "a finding binds by its id, whose newest line is its state",
+        "writers": [],
+        "purpose": "What audits and walks found and nobody has answered yet, per visual family: appended by scripts/record-findings.mjs after every done audit or walk, materialized beside a receipt as the findings kind, and read by the support layer to see what is still open across a product."
+      },
       "patterns": {
         "params": [],
         "kind": "dir",
@@ -231,6 +240,34 @@
           "api.verify"
         ],
         "purpose": "Coverage a mission deliberately did not take, on record: a unit or a state the verification did not cover because the done-when journey does not pass through it, written by scripts/record-unchecked.mjs so that narrowing a run is visible to the next plan instead of silent. Read also by business.reconcile, which lists what is still unchecked beside the claims, and by release.deploy, which refuses production over an unchecked journey."
+      },
+      "helpers": {
+        "params": [
+          "id"
+        ],
+        "kind": "dir",
+        "resolvesTo": "<Source>/.worktrees/helpers/<id>/runs/<runId>/  (run.json against templates/kinds/helper-run.schema.json: the helper, its arguments, every input it read with the head it read at, every output it wrote, the instants it ran between and the profile it ran on)",
+        "scheme": "helper://<id>/<runId>",
+        "bind": "fingerprint of run.json; a run binds by its runId",
+        "writers": [
+          "generate-banks"
+        ],
+        "helperWritable": true,
+        "purpose": "The run record of the support layer: one folder per helper, one append-only run inside it, so every draft a helper left names the run that drafted it. No session, no chain, no receipt — a helper runs outside any workflow and this is the whole trace it leaves."
+      },
+      "banked": {
+        "params": [
+          "product"
+        ],
+        "kind": "dir",
+        "resolvesTo": "<Source>/.worktrees/banked/<product>/  (queue.json against templates/kinds/bank-queue.schema.json: the ordered entries with their status, dependsOn and priority; approvals.json against bank-approvals.schema.json: the person's approval of one queue hash; <missionId>/mission.json against banked-mission.schema.json and <missionId>/mission.md the person reads)",
+        "scheme": "bank://<product>/<missionId>",
+        "bind": "the queue hash of queue.json; a mission binds by its missionId inside it",
+        "writers": [
+          "generate-banks"
+        ],
+        "helperWritable": true,
+        "purpose": "A bank of missions the harness can run one after another without the person composing a prompt each time: each entry carries the goal block a session needs and at least one evidence ref, and one approval of the whole queue counts as the goal-confirm of every mission it lists."
       },
       "_templates": {
         "params": [],

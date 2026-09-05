@@ -34,7 +34,13 @@ authorizations below remain in force. An Ask column or diagnostic reason is not 
    written does not start. The block and the answer are what step 4 records as `state.json.mission`
    and `choices["goal:<sessionId>:v<version>"]`: `corrected` writes the next version and asks again,
    and a mission whose latest version is not `as-stated` runs nothing
-   (`scripts/validate-request.mjs`). Read-only work asks nothing.
+   (`scripts/validate-request.mjs`). A mission opened from an approved banked entry
+   (`@worktrees/banked/<product>`, `state.json.mission.bankRef`) prints that block and does not wait:
+   the person approved the whole queue once, and that one answer is the goal-confirm of every mission
+   it lists, recorded as this session's own choice with the approval as its `sourceRef`
+   (`scripts/validate-session.mjs#bankRefErrors`). A goal corrected at open time is not covered by it:
+   the bank entry is rewritten, which ends the approval, and the next version is asked the same way.
+   Read-only work asks nothing.
 2. Run `environment.preflight` first for any mission that touches routed source or a runtime: every
    wall the mission could meet — an undeclared or near-named route, a missing git policy, a dirty
    checkout, a sign-in that fails, a served head that does not contain the bound one, a held port, a
@@ -112,6 +118,15 @@ Cross-session evidence uses scripts/producer-import.mjs. Copy a completed produc
 
 A request that names no owner, or two owners whose scopes differ materially, stops here with one
 focused question naming the competing boundaries.
+
+Support work is not in that table, because it is not a mission. A request to prepare or tidy — to read
+what a product left behind and draft a bank of missions from it, and whatever else the support layer
+grows — is a `helper` route (`routing.json#kinds.helper`, `resources/orchestrator.json#helpers`): the
+person writes `/helper <id> <args>` or names the job, the helper listed in
+[`helpers/INDEX.md`](helpers/INDEX.md) runs on its own profile with no session, and it leaves one run
+record under `@worktrees/helpers/<id>/runs/<runId>/`. A helper opens no session, writes no product
+source, touches no runtime, publishes nothing and asks nothing; one that finds it must do any of those
+has found an operator's job, and the table above is where that job is.
 
 ## The loop
 

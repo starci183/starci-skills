@@ -27,7 +27,13 @@ buộc bên dưới vẫn giữ nguyên. Cột Ask hay reason chẩn đoán khô
    yêu cầu không viết nổi dòng "xong khi" nào thì không bắt đầu. Khối và câu trả lời là thứ bước 4 ghi
    thành `state.json.mission` và `choices["goal:<sessionId>:v<version>"]`: `corrected` viết phiên
    bản kế tiếp rồi hỏi lại, và nhiệm vụ mà phiên bản mới nhất chưa là `as-stated` thì không chạy gì
-   (`scripts/validate-request.mjs`). Việc chỉ đọc không hỏi gì.
+   (`scripts/validate-request.mjs`). Một nhiệm vụ mở ra từ một mục đã được duyệt trong kho
+   (`@worktrees/banked/<product>`, `state.json.mission.bankRef`) in khối đó ra và không chờ: người đã
+   duyệt cả hàng đợi một lần, và câu trả lời duy nhất ấy là goal-confirm của mọi nhiệm vụ hàng đợi liệt
+   kê, được ghi lại thành lựa chọn của chính phiên này với phê duyệt ấy làm `sourceRef`
+   (`scripts/validate-session.mjs#bankRefErrors`). Một goal bị sửa lúc mở thì không nằm trong phạm vi
+   đó: mục trong kho được viết lại, phê duyệt hết hiệu lực, và phiên bản kế tiếp được hỏi như thường.
+   Việc chỉ đọc không hỏi gì.
 2. Chạy `environment.preflight` trước cho mọi nhiệm vụ chạm tới source đã route hay một runtime:
    mọi bức tường nhiệm vụ có thể gặp — route chưa khai hay gần trùng tên, thiếu chính sách git,
    checkout bẩn, đăng nhập thất bại, head đang phục vụ không chứa head đã bind, port bị giữ, thiếu
@@ -104,6 +110,15 @@ Bằng chứng giữa các phiên dùng scripts/producer-import.mjs. Chép bundl
 
 Một yêu cầu không gọi tên chủ nào, hoặc gọi hai chủ có phạm vi khác nhau đáng kể, dừng lại ở đây với
 một câu hỏi tập trung nêu tên các ranh giới đang cạnh tranh.
+
+Việc hỗ trợ không nằm trong bảng đó, vì nó không phải một nhiệm vụ. Một yêu cầu chuẩn bị hay dọn dẹp —
+đọc những gì một sản phẩm để lại rồi phác một kho nhiệm vụ từ đó, và bất cứ thứ gì tầng hỗ trợ sẽ có
+thêm — là một route kind `helper` (`routing.json#kinds.helper`, `resources/orchestrator.json#helpers`):
+người viết `/helper <id> <args>` hoặc nêu tên công việc, helper được liệt kê trong
+[`helpers/INDEX.md`](helpers/INDEX.md) chạy trên profile của chính nó mà không mở phiên, và để lại một
+bản ghi lần chạy dưới `@worktrees/helpers/<id>/runs/<runId>/`. Helper không mở phiên, không ghi source
+sản phẩm, không chạm runtime, không publish và không hỏi gì; cái nào thấy mình phải làm một trong
+những việc đó thì đã tìm ra việc của một operator, và bảng trên là nơi có việc ấy.
 
 ## Vòng lặp
 

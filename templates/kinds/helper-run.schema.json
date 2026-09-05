@@ -1,0 +1,101 @@
+{
+  "$id": "kind:helper-run",
+  "description": "The whole trace one helper run leaves, at @worktrees/helpers/<id>/runs/<runId>/run.json. A helper opens no session, so there is no state.json, no request, no receipt and no transition log to read it back from: this record is the only place that says which helper ran, on which profile, with which arguments, what it read and at which head, what it wrote and between which instants. Every artifact a helper drafts names its run (bankedBy), so a bank can always be traced to the reading that produced it and a stale draft can be told from a fresh one by the heads its run recorded.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "helper",
+    "runId",
+    "profile",
+    "args",
+    "inputs",
+    "outputs",
+    "startedAt",
+    "endedAt"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "const": 9
+    },
+    "helper": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9-]*$"
+    },
+    "runId": {
+      "type": "string",
+      "pattern": "^[0-9]{8}-[0-9]{6}(?:-[A-Za-z0-9._-]+)?$"
+    },
+    "profile": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9-]*$",
+      "description": "the profile the helper actually ran on; where a runtime lacks the bound profile this is its equivalent (resources/orchestrator.json#profileEquivalents)"
+    },
+    "boundProfile": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9-]*$",
+      "description": "the profile helper.json binds, recorded only when it differs from the one that ran"
+    },
+    "args": {
+      "type": "object",
+      "description": "the arguments the invocation carried, filled from the helper's Requirements table and its defaults"
+    },
+    "inputs": {
+      "type": "array",
+      "maxItems": 512,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "ref"
+        ],
+        "properties": {
+          "ref": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 400,
+            "description": "what was read, by alias or by the evidence-ref grammar of templates/kinds/banked-mission.schema.json"
+          },
+          "head": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 200,
+            "description": "the head, digest or fingerprint it was read at; null where the location carries none"
+          }
+        }
+      }
+    },
+    "outputs": {
+      "type": "array",
+      "maxItems": 512,
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "pattern": "^@[a-z][a-z-]*(?:/[^\\s]+)?$",
+        "description": "what was written, addressed by the Writes alias it sits under; a path outside every Writes alias of the helper is refused before the run, not recorded after it"
+      }
+    },
+    "startedAt": {
+      "$ref": "#/$defs/instant"
+    },
+    "endedAt": {
+      "$ref": "#/$defs/instant"
+    },
+    "stop": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "pattern": "^[A-Z][A-Z0-9_]+$",
+      "description": "the stop code the run ended with, or absent when it finished; a helper stop terminates and hands to the person, because there is no chain to route it into"
+    }
+  },
+  "$defs": {
+    "instant": {
+      "type": "string",
+      "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(?:\\.[0-9]+)?Z$"
+    }
+  }
+}

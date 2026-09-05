@@ -25,11 +25,11 @@ npx --package=github:starci183/starci-skills#v1.1.0 starci-skills init
 | --- | --- |
 | `npx @starci/skills init [--dir <repo>] [--force] [--no-bootstrap]` | Cài cây và hai bootstrap. Từ chối một `.claude` đã có sẵn mà không do nó cài, trừ khi `--force`, và kể cả khi đó cũng chỉ thay các đường dẫn runtime. |
 | `npx @starci/skills update [--dir <repo>] [--force]` | Nâng cây đã cài lên phiên bản của gói. File đã sửa tay được giữ lại và liệt kê; `--force` lấy bản của gói. File ngoài các đường dẫn runtime không bao giờ bị đụng. |
-| `npx @starci/skills doctor [--dir <repo>] [--quick]` | Chạy chính bộ validator của cây trên bản đã cài (routing, alias, operator, workflow, mặc định, template, trích dẫn knowledge, self-test của operator và spec của script) và báo những file đã đổi từ lúc cài. |
+| `npx @starci/skills doctor [--dir <repo>] [--quick]` | Chạy chính bộ validator của cây trên bản đã cài (routing, alias, operator, workflow, mặc định, template, trích dẫn knowledge, self-test của operator và helper, và spec của script) và báo những file đã đổi từ lúc cài. |
 | `npx @starci/skills version` | In phiên bản gói. |
 
 Các đường dẫn runtime là `INDEX.md`, `INDEX.vi.md`, `SKILL.md`, `SKILL.vi.md`, `routing.json`,
-`alias/`, `knowledge/`, `operators/`, `readiness/`, `resources/`, `scripts/`, `templates/`,
+`alias/`, `helpers/`, `knowledge/`, `operators/`, `readiness/`, `resources/`, `scripts/`, `templates/`,
 `workflows/`. Manifest `.claude/.starci-skills.json` ghi phiên bản đã cài và hash từng file; `update` và
 `doctor` đọc nó.
 

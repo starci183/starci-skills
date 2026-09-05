@@ -5,7 +5,10 @@
 import { readFile } from 'node:fs/promises';
 import path from 'node:path';
 
-export const DEF_KEYS = new Set(['params', 'kind', 'resolvesTo', 'scheme', 'bind', 'writers', 'purpose', 'note']);
+// `helperWritable` is the registry's own answer to "may the support layer write here": it is the one
+// home of the support write set, so scripts/validate-helper.mjs asks alias.json rather than carrying a
+// second list of locations a helper may touch.
+export const DEF_KEYS = new Set(['params', 'kind', 'resolvesTo', 'scheme', 'bind', 'writers', 'purpose', 'note', 'helperWritable']);
 
 export async function loadAliasRegistry(root) {
   const raw = JSON.parse(await readFile(path.join(root, 'alias', 'alias.json'), 'utf8'));

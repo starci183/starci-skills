@@ -1,0 +1,97 @@
+{
+  "$id": "kind:bank-queue",
+  "description": "The order a product's banked missions are taken in, at @worktrees/banked/<product>/queue.json. The queue is `entries`, in order: the array position is the order and there is no second list of ids to drift from it (scripts/bank.mjs#reorder rewrites the array). An entry names one mission of the same bank, what has become of it (banked, running under a session, done under a session, or dropped), what it waits for and how urgent it is; `next` is the first entry that is `banked`, whose every dependsOn is `done`, while no sibling of the same product is `running` — one mission per product at a time, and a mission that stopped for the person pauses the bank because its entry stays `running`. The queue hash the approval records is taken over this file's canonical form (scripts/bank.mjs#queueHash), so adding, reordering or dropping an entry invalidates the approval and the person is asked once more.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "product",
+    "entries"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "const": 9
+    },
+    "product": {
+      "$ref": "#/$defs/productId"
+    },
+    "bankedBy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "helper",
+        "runId"
+      ],
+      "description": "the helper run that last drafted this queue; every bank names the run that drafted it (@worktrees/helpers/<id>/runs/<runId>/)",
+      "properties": {
+        "helper": {
+          "$ref": "#/$defs/helperId"
+        },
+        "runId": {
+          "$ref": "#/$defs/runId"
+        }
+      }
+    },
+    "entries": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 64,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "missionId",
+          "status",
+          "dependsOn",
+          "priority"
+        ],
+        "properties": {
+          "missionId": {
+            "$ref": "#/$defs/missionId"
+          },
+          "status": {
+            "type": "string",
+            "pattern": "^(?:banked|dropped|(?:running|done):[A-Za-z0-9][A-Za-z0-9._-]*)$",
+            "description": "banked, dropped, or running:<sessionId> / done:<sessionId> — a mission that ran names the session that ran it, so the bank and the session ledger point at each other"
+          },
+          "dependsOn": {
+            "type": "array",
+            "maxItems": 16,
+            "uniqueItems": true,
+            "items": {
+              "$ref": "#/$defs/missionId"
+            },
+            "description": "missions of this bank that must be done before this one is taken; each is an entry of this file"
+          },
+          "priority": {
+            "type": "string",
+            "enum": [
+              "P0",
+              "P1",
+              "P2",
+              "P3"
+            ]
+          }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "productId": {
+      "type": "string",
+      "pattern": "^[a-z0-9][a-z0-9-]*$"
+    },
+    "missionId": {
+      "type": "string",
+      "pattern": "^[a-z0-9][a-z0-9-]*$"
+    },
+    "helperId": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9-]*$"
+    },
+    "runId": {
+      "type": "string",
+      "pattern": "^[0-9]{8}-[0-9]{6}(?:-[A-Za-z0-9._-]+)?$"
+    }
+  }
+}

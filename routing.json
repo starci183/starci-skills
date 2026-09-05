@@ -6,7 +6,8 @@
     "resume": "Invoke the same operator again with the required delta from its resume token.",
     "chain": "Open a sibling session whose mission's done-when is the primary output of the named operator (planned by plan-chain like any mission); the blocked branch stays waiting on that session and re-enters with the delta it produced. A person is asked nothing.",
     "user": "Stop. A person owns this and must decide or publish before the mission continues.",
-    "external": "Stop. The blocker is outside the runtime and no operator can clear it."
+    "external": "Stop. The blocker is outside the runtime and no operator can clear it.",
+    "helper": "Run the named helper (helpers/<id>) on its own profile, outside any session: support work that prepares or tidies and is never a step of a chain. The person reaches it directly — \"/helper <id> <args>\", or by naming the job — and it leaves one run record under @worktrees/helpers/<id>/runs/<runId>/. No route table names this kind, because a stop code never hands to a helper: a helper is entered from the person, not from a wall (resources/orchestrator.json#helpers)."
   },
   "routes": {
     "architecture.decide": {

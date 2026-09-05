@@ -28,6 +28,7 @@ import { extractFindings, readLedger, LEDGER_DIR, LEDGER_OPERATORS } from './rec
 import { extractUnchecked, UNCHECKED_OPERATORS } from './record-unchecked.mjs';
 import { budgetUnitsOf, hostRootOf, loadUnits } from './validate-request.mjs';
 import { readUnchecked } from './unchecked.mjs';
+import { readBank, currentApproval, sessionOf, canonical } from './bank.mjs';
 
 const branchDir = (session, branch) => { const [n, m] = branch.split('/'); return path.join(session, `step-${n}`, `parallel-${m}`); };
 const stepOf = (branch) => Number(branch.split('/')[0]);
@@ -192,6 +193,45 @@ export async function unitBudgetErrors(root, session, state) {
   return errors;
 }
 
+// A mission opened from an approved bank (@worktrees/banked/<product>, scripts/bank.mjs): the person
+// approved the whole queue once, and that one answer is the goal-confirm of every mission the queue
+// listed — which is why such a session prints its goal block and does not wait. This is what keeps
+// that shortcut honest. The goal-confirm choice is still recorded, exactly as any other mission's is
+// (missionGateErrors), but its sourceRef names the approval rather than a message, and here that
+// approval must actually be there: the entry exists and is not dropped, it names this session, the
+// goal the session runs is the goal the bank carries word for word, and the approval still covers the
+// bank as it stands. Correcting a goal at open time rewrites the bank entry, which changes the queue
+// hash, which ends the approval — so a corrected mission is asked again by construction.
+export async function bankRefErrors(state, { hostRoot = hostRootOf(process.cwd()) } = {}) {
+  const ref = state?.mission?.bankRef;
+  if (!ref) return [];
+  const errors = [];
+  const { product, missionId, approval } = ref;
+  const at = `@worktrees/banked/${product}`;
+  const bank = await readBank(hostRoot, product);
+  if (!bank.queue) return [`state.json: mission.bankRef names ${at}, which carries no queue.json; a mission cannot be opened from a bank that is not there`];
+  const entry = bank.queue.entries.find((e) => e.missionId === missionId);
+  if (!entry) return [`state.json: mission.bankRef names ${missionId}, which ${at}/queue.json does not list`];
+  if (entry.status === 'dropped') errors.push(`state.json: mission.bankRef names ${missionId}, which the bank dropped; a dropped mission is not taken`);
+  else if (sessionOf(entry) !== state.id) errors.push(`state.json: ${at}/queue.json has ${missionId} at status ${entry.status} and this session is ${state.id}; the bank entry names the session that took it, and one mission of a product runs at a time`);
+  const banked = bank.missions.get(missionId);
+  if (!banked) errors.push(`${at}/${missionId}/mission.json: missing, and the session says it opened from it`);
+  else {
+    const draft = banked.goalDraft ?? {};
+    const mission = state.mission;
+    for (const field of ['goal', 'includes', 'excludes', 'doneWhen']) {
+      if (canonical(draft[field]) !== canonical(mission[field])) errors.push(`state.json: mission.${field} is not what ${at}/${missionId}/mission.json banked; a mission opened from a bank runs the goal the person approved, and a corrected goal rewrites the bank entry and is confirmed again`);
+    }
+  }
+  const current = currentApproval(bank.approvals, bank.hash);
+  if (!current) errors.push(`${at}/approvals.json: no approval covers the bank as it stands (${bank.hash}); the queue was reordered, extended, dropped from or its missions edited since it was approved, so the person answers once more before another banked mission opens`);
+  else if (current.choice !== approval) errors.push(`state.json: mission.bankRef names approval ${approval} and the current one is ${current.choice}`);
+  else if (!current.missionIds.includes(missionId)) errors.push(`${at}/approvals.json: ${current.choice} does not list ${missionId}; an approval is the goal-confirm of exactly the missions it names`);
+  const choice = state.choices?.[goalDecisionId(state.id, state.mission.version)];
+  if (choice && !String(choice.sourceRef ?? '').includes(approval)) errors.push(`state.json: the goal-confirm of a banked mission carries the approval ${approval} as its sourceRef; that approval is the person's answer, and a session that claims one must name it`);
+  return errors;
+}
+
 export async function validateSession(root, session, { packages = null, ledgerDir, uncheckedRoot } = {}) {
   const errors = [];
   const stateFile = path.join(session, 'state.json');
@@ -223,6 +263,8 @@ export async function validateSession(root, session, { packages = null, ledgerDi
   // the fan-out budget counts the journey the mission actually verifies.
   errors.push(...await uncheckedLedgerErrors(root, session, state, uncheckedRoot ? { hostRoot: uncheckedRoot } : {}));
   errors.push(...await unitBudgetErrors(root, session, state));
+  // A mission opened from an approved bank names an entry that is there, is its own, and is still covered.
+  errors.push(...await bankRefErrors(state, { hostRoot: uncheckedRoot ?? hostRootOf(root) }));
   if (state.brief?.report) {
     const shapes = Object.keys(policy.reportShapes ?? {});
     if (!shapes.includes(state.brief.report.shape)) errors.push(`state.json: brief.report.shape ${state.brief.report.shape} is not one of ${shapes.join(', ')}`);

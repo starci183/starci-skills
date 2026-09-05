@@ -33,9 +33,12 @@ function firstTable(lines, from, to) {
   return null;
 }
 
-export function parseOperatorMd(text, lang = 'en') {
+// The one parser of an authored package file. An operator.md and a helper.md differ only in which
+// headings they carry and which columns each table has, so both pass their own maps here rather than
+// keeping a second copy of the reader (scripts/helper-md.mjs).
+export function parseSectioned(text, lang, headingsByLang, columns) {
   const lines = text.split(/\r?\n/);
-  const h = HEADINGS[lang];
+  const h = headingsByLang[lang];
   const heads = lines.map((l, i) => ({ l: l.trimEnd(), i })).filter((x) => x.l.startsWith('## '));
   const sectionOf = (heading) => {
     const idx = heads.findIndex((x) => x.l === heading);
@@ -50,12 +53,12 @@ export function parseOperatorMd(text, lang = 'en') {
   const out = { id: (lines[0] ?? '').replace(/^#\s*/, '').replace(/`/g, '').trim(), lang, tables: {}, job: '', doneWhen: '', headings: heads.map((x) => x.l) };
   out.job = prose(sectionOf(h.job));
   out.doneWhen = prose(sectionOf(h.doneWhen));
-  for (const key of Object.keys(COLUMNS)) {
+  for (const key of Object.keys(columns)) {
     const sec = sectionOf(h[key]);
     if (!sec) { out.tables[key] = null; continue; }
     const table = firstTable(lines, sec.from, sec.to);
     if (!table) { out.tables[key] = null; continue; }
-    const cols = COLUMNS[key];
+    const cols = columns[key];
     out.tables[key] = {
       line: table.line,
       header: table.header,
@@ -68,6 +71,8 @@ export function parseOperatorMd(text, lang = 'en') {
   }
   return out;
 }
+
+export const parseOperatorMd = (text, lang = 'en') => parseSectioned(text, lang, HEADINGS, COLUMNS);
 
 // Convenience views over the parsed tables.
 export const cellCodes = (cell) => [...cell.matchAll(/`([A-Z][A-Z0-9_]+)`/g)].map((m) => m[1]);

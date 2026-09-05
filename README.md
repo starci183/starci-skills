@@ -25,11 +25,11 @@ npx --package=github:starci183/starci-skills#v1.1.0 starci-skills init
 | --- | --- |
 | `npx @starci/skills init [--dir <repo>] [--force] [--no-bootstrap]` | Installs the tree and the bootstraps. Refuses a populated `.claude` it did not install unless `--force`, and even then replaces only the runtime paths. |
 | `npx @starci/skills update [--dir <repo>] [--force]` | Brings an installed tree to this package's version. A file changed locally is kept and listed; `--force` takes the package version. Files outside the runtime paths are never touched. |
-| `npx @starci/skills doctor [--dir <repo>] [--quick]` | Runs the tree's own validators on the installed copy (routing, alias, operators, workflows, defaults, templates, knowledge citations, the operator self-tests and the script specs) and reports files changed since install. |
+| `npx @starci/skills doctor [--dir <repo>] [--quick]` | Runs the tree's own validators on the installed copy (routing, alias, operators, workflows, defaults, templates, knowledge citations, the operator and helper self-tests and the script specs) and reports files changed since install. |
 | `npx @starci/skills version` | Prints the package version. |
 
 The runtime paths are `INDEX.md`, `INDEX.vi.md`, `SKILL.md`, `SKILL.vi.md`, `routing.json`, `alias/`,
-`knowledge/`, `operators/`, `readiness/`, `resources/`, `scripts/`, `templates/`, `workflows/`. The
+`helpers/`, `knowledge/`, `operators/`, `readiness/`, `resources/`, `scripts/`, `templates/`, `workflows/`. The
 manifest `.claude/.starci-skills.json` records the installed version and a hash per file; `update` and
 `doctor` read it.
 

@@ -29,12 +29,14 @@ its fingerprint and complete rule inventory, and may emit no identifier outside 
 
 ```text
 SKILL.md                 one entry, operators listed in operators/INDEX.md, one routing map
-routing.json             closed operator routes, five kinds: operator | resume | chain | user | external
+routing.json             closed operator routes, six kinds: operator | resume | chain | user | external | helper (the last is entered from the person, never from a stop, so no route table names it)
 alias/                   alias.json (machine registry: location, scheme, binding, writers, zone) + INDEX.md (generated map by zone); every operator reads by alias only
 resources/               settings.example.json (the person's settings: the display language, default vi; copy to settings.json to override, untracked) + tools.json (the closed tool registry: modes and per-runtime support, addressed as @tools/<id>) + agents/profiles/{openai,claude}.json (6 profiles, permits per tool) + orchestrator.json (dispatch modes inline | fresh, max 3 agents, completion waits, the running skeleton, the brief, the budget, profile equivalents) + interaction.json (question kinds and report shapes); validated
 workflows/               README.md only: how scripts/plan-chain.mjs derives the chain from the mission's done-when lines and what scripts/validate-chain.mjs refuses; no example is read at runtime — the 2.0.0 examples live on as planner fixtures under tests/chains/
 operators/INDEX.md       generated: what each operator reads, which kinds it consumes and produces, its steps, and every stop code with its disposition; operators/errors.json holds the codes several operators share
 operators/<id>/          operator.md (+vi) one authored file per operator, operator.json (id, domain, primaryOutput, resources incl. mode), errors.json (its own codes), validate.mjs, self-test.mjs, brief.md (generated: the dispatch prompt of one fresh agent, at most orchestrator.json#briefBytes)
+helpers/INDEX.md         generated: the support layer beside the operators — what each helper reads, where it may write, its steps and its stop codes
+helpers/<id>/            helper.md (+vi) one authored file per helper (Job, Done when, Reads, Writes, Requirements, Steps, Outputs, Stops), helper.json (id, resources incl. profile and mode, writes, primaryOutput), errors.json, validate.mjs, self-test.mjs, brief.md (generated). A helper opens no session, writes no product source, touches no runtime and publishes nothing: resources/orchestrator.json#helpers is its law and scripts/validate-helper.mjs refuses a package that leaves it
 knowledge/
   ui/composition/        what a tree must contain, before it exists   -> interface.plan, interface.generate
   ui/presentation/       which CSS value an app-owned boundary takes  -> interface.generate
@@ -44,7 +46,7 @@ knowledge/
   grammars/<family>/     one visual family's realization of Common
 templates/               one template per document kind; each carries the json template-contract the tree is checked against;
                          kinds/ types every file that crosses between steps (<kind>.contract.json + <kind>.skeleton.md for markdown, <kind>.schema.json for data); step/ holds the request.json and response.json gates
-scripts/                 validate-routing.mjs, validate-resources.mjs, validate-knowledge-citations.mjs, validate-alias.mjs, validate-templates.mjs, validate-operator.mjs, plan-chain.mjs (the chain from the mission; imported slots count as produced), validate-chain.mjs (the chain against the tables, the plan and the requests), validate-walk.mjs (the walk gate and its sweep), browser-walk.mjs (@tools/browsercontrol mode playwright: the runner of a declarative walk), record-findings.mjs, promote-findings.mjs, validate-request.mjs, validate-response.mjs, validate-step.mjs, validate-session.mjs (the whole ledger: brief, budget, abandoned branches, the chain), sweep-secrets.mjs (the one home of secret-shaped patterns, run by the response gate), generate-operator-briefs.mjs, run-operator-self-tests.mjs;
+scripts/                 validate-routing.mjs, validate-resources.mjs, validate-knowledge-citations.mjs, validate-alias.mjs, validate-templates.mjs, validate-operator.mjs, plan-chain.mjs (the chain from the mission; imported slots count as produced), validate-chain.mjs (the chain against the tables, the plan and the requests), validate-walk.mjs (the walk gate and its sweep), browser-walk.mjs (@tools/browsercontrol mode playwright: the runner of a declarative walk), record-findings.mjs, promote-findings.mjs, validate-request.mjs, validate-response.mjs, validate-step.mjs, validate-session.mjs (the whole ledger: brief, budget, abandoned branches, the chain), sweep-secrets.mjs (the one home of secret-shaped patterns, run by the response gate), generate-operator-briefs.mjs, run-operator-self-tests.mjs (every package family: the operators and the helpers), validate-helper.mjs, generate-helpers-index.mjs, generate-helper-briefs.mjs, bank.mjs (+ spec: the queue, its hash and the next mission of a product’s bank);
                          unchecked.mjs and record-unchecked.mjs (+ spec), the unchecked ledger read and written;
                          device-state.mjs and workspace-portable.mjs (+ specs), which the backend package.json calls
 readiness/               workspaces/ schemas that the portable and hydrated route declarations name as $schema
@@ -59,7 +61,18 @@ reason, the fan-out never dispatches one to a verifying lane, and `scripts/recor
 writes it down instead — so a run narrows its coverage on record and the next plan reads back what is
 still unchecked (`scripts/unchecked.mjs`, `scripts/validate-session.mjs#uncheckedLedgerErrors`).
 
-`npm test` runs the routing validation, the resources validation, the knowledge citation check, the template check, the generated briefs check, every operator self-test, and the script specs. It is green at the published
+The bank of missions lives outside the tree as well, under `@worktrees/banked`
+(`<Source>/.worktrees/banked/<product>/`: `queue.json` the order, `<missionId>/mission.json` and
+`mission.md` the content, `approvals.json` the person's one answer over the whole queue). It is what a
+helper drafts and the harness takes from: one approval counts as the goal-confirm of every mission the
+queue lists, one mission of a product runs at a time, `dependsOn` is waited for, and the approval's
+hash covers the composition of the queue and the content of its missions but not their progress — so
+running and finishing change nothing, while adding, reordering, dropping or correcting a goal put the
+question back to the person (`scripts/bank.mjs`, `scripts/validate-session.mjs#bankRefErrors`). Beside
+it, `@worktrees/helpers/<id>/runs/<runId>/run.json` is the whole trace a helper run leaves, and every
+bank names the run that drafted it.
+
+`npm test` runs the routing validation, the resources validation, the knowledge citation check, the template check, the generated briefs check, every operator and helper self-test, and the script specs. It is green at the published
 head or the head is not publishable.
 
 ## Rules that hold everywhere

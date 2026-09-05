@@ -1,0 +1,22 @@
+{
+  "schemaVersion": 9,
+  "id": "generate-banks",
+  "job": "Read what a product has already left behind — its routes, the coverage nobody took, the findings nobody answered, the walks and the API runs that failed, the feature models and the person's own notes — and draft a bank of missions the harness can take one after another, each with the goal block a session needs and at least one observation it came from.",
+  "package": "helper.md",
+  "errors": "errors.json",
+  "validator": "validate.mjs",
+  "selfTest": "self-test.mjs",
+  "resources": {
+    "profile": "astra",
+    "mode": "isolated",
+    "tools": {
+      "@tools/fileread": "context-aliases",
+      "@tools/git": "read"
+    }
+  },
+  "writes": [
+    "@worktrees/banked",
+    "@worktrees/helpers"
+  ],
+  "primaryOutput": "bank-queue"
+}

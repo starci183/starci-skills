@@ -28,12 +28,14 @@ fingerprint và danh sách rule đầy đủ, và không được phát ra mã n
 
 ```text
 SKILL.md                 một cửa vào, operator được liệt kê ở operators/INDEX.md, một bảng định tuyến
-routing.json             route operator đóng, năm loại: operator | resume | chain | user | external
+routing.json             route operator đóng, sáu loại: operator | resume | chain | user | external | helper (loại cuối vào từ người dùng chứ không từ một stop, nên không bảng route nào gọi tên nó)
 alias/                   alias.json (sổ cho máy: vị trí, scheme, bind, ai ghi, vùng) + INDEX.md (bản đồ sinh theo vùng); operator chỉ đọc qua alias
 resources/               settings.example.json (cài đặt của người: ngôn ngữ hiển thị, mặc định vi; chép thành settings.json để đè, không track) + tools.json (sổ tool đóng: mode và hỗ trợ theo runtime, gọi bằng @tools/<id>) + agents/profiles/{openai,claude}.json (6 profile, quyền theo tool) + orchestrator.json (chế độ dispatch inline | fresh, tối đa 3 agent, chờ theo hoàn tất, khung running, brief, budget, profile tương đương) + interaction.json (loại câu hỏi và dạng báo cáo); có kiểm
 workflows/               chỉ còn README.md: cách scripts/plan-chain.mjs suy chuỗi từ các dòng "xong khi" của nhiệm vụ và scripts/validate-chain.mjs từ chối gì; runtime không đọc ví dụ nào — các ví dụ 2.0.0 sống tiếp làm fixture của planner trong tests/chains/
 operators/INDEX.md       sinh tự động: mỗi operator đọc gì, tiêu thụ và sinh kind nào, số bước, và mọi mã dừng kèm cách xử lý; operators/errors.json giữ mã dùng chung
 operators/<id>/          operator.md (+vi) một file viết tay cho mỗi operator, operator.json (id, domain, resources gồm mode), errors.json (mã riêng), validate.mjs, self-test.mjs, brief.md (sinh tự động: prompt dispatch cho một agent mới, tối đa orchestrator.json#briefBytes)
+helpers/INDEX.md         sinh tự động: tầng hỗ trợ bên cạnh các operator — mỗi helper đọc gì, được ghi ở đâu, các bước và mã dừng của nó
+helpers/<id>/            helper.md (+vi) một file viết tay cho mỗi helper (Việc, Xong khi, Đọc, Ghi, Yêu cầu, Các bước, Đầu ra, Dừng), helper.json (id, resources gồm profile và mode, writes, primaryOutput), errors.json, validate.mjs, self-test.mjs, brief.md (sinh tự động). Helper không mở phiên, không ghi source sản phẩm, không chạm runtime và không publish: resources/orchestrator.json#helpers là luật của nó và scripts/validate-helper.mjs từ chối gói nào ra khỏi luật ấy
 knowledge/
   ui/composition/        cây phải chứa gì, trước khi nó tồn tại      -> interface.plan, interface.generate
   ui/presentation/       ranh giới do app sở hữu lấy giá trị CSS nào -> interface.generate
@@ -43,7 +45,7 @@ knowledge/
   grammars/<họ>/         cách một họ hình ảnh hiện thực Common
 templates/               mỗi loại tài liệu một template; mỗi template mang khối json template-contract dùng để kiểm cả cây;
                          kinds/ định kiểu mọi file đi qua giữa các bước (<kind>.contract.json + <kind>.skeleton.md cho markdown, <kind>.schema.json cho dữ liệu); step/ giữ hai gate request.json và response.json
-scripts/                 validate-routing.mjs, validate-resources.mjs, validate-knowledge-citations.mjs, validate-alias.mjs, validate-templates.mjs, validate-operator.mjs, plan-chain.mjs (chuỗi từ nhiệm vụ; slot import tính là đã sinh), validate-chain.mjs (chuỗi đối chiếu bảng, kế hoạch và request), validate-walk.mjs (cổng của lượt đi thử và sweep của nó), browser-walk.mjs (@tools/browsercontrol chế độ playwright: runner của một lượt đi khai báo), record-findings.mjs, promote-findings.mjs, validate-request.mjs, validate-response.mjs, validate-step.mjs, validate-session.mjs (cả sổ: brief, budget, nhánh bị bỏ rơi, chuỗi), sweep-secrets.mjs (nhà duy nhất của các mẫu hình dạng bí mật, gate response chạy), generate-operator-briefs.mjs, run-operator-self-tests.mjs;
+scripts/                 validate-routing.mjs, validate-resources.mjs, validate-knowledge-citations.mjs, validate-alias.mjs, validate-templates.mjs, validate-operator.mjs, plan-chain.mjs (chuỗi từ nhiệm vụ; slot import tính là đã sinh), validate-chain.mjs (chuỗi đối chiếu bảng, kế hoạch và request), validate-walk.mjs (cổng của lượt đi thử và sweep của nó), browser-walk.mjs (@tools/browsercontrol chế độ playwright: runner của một lượt đi khai báo), record-findings.mjs, promote-findings.mjs, validate-request.mjs, validate-response.mjs, validate-step.mjs, validate-session.mjs (cả sổ: brief, budget, nhánh bị bỏ rơi, chuỗi), sweep-secrets.mjs (nhà duy nhất của các mẫu hình dạng bí mật, gate response chạy), generate-operator-briefs.mjs, run-operator-self-tests.mjs (mọi họ gói: operator và helper), validate-helper.mjs, generate-helpers-index.mjs, generate-helper-briefs.mjs, bank.mjs (+ spec: hàng đợi, hash của nó và nhiệm vụ kế tiếp của kho một sản phẩm);
                          unchecked.mjs và record-unchecked.mjs (+ spec), sổ chưa kiểm được đọc và được ghi;
                          device-state.mjs và workspace-portable.mjs (+ spec), thứ package.json của backend gọi tới
 readiness/               các schema workspaces/ mà khai báo route portable và hydrate gọi tên trong $schema
@@ -59,7 +61,17 @@ chứng, và `scripts/record-unchecked.mjs` ghi nó xuống thay vào đó — �
 của mình trên giấy trắng mực đen và bản kế hoạch kế tiếp đọc lại được thứ vẫn còn chưa kiểm
 (`scripts/unchecked.mjs`, `scripts/validate-session.mjs#uncheckedLedgerErrors`).
 
-`npm test` chạy kiểm định tuyến, kiểm resources, kiểm trích dẫn knowledge, kiểm template, kiểm brief sinh ra, mọi self-test của operator, và các spec của script. Head đã publish phải xanh, không xanh
+Kho nhiệm vụ cũng nằm ngoài cây, dưới `@worktrees/banked` (`<Source>/.worktrees/banked/<product>/`:
+`queue.json` là thứ tự, `<missionId>/mission.json` và `mission.md` là nội dung, `approvals.json` là câu
+trả lời duy nhất của người trên cả hàng đợi). Đó là thứ một helper phác ra và harness nhận việc từ đó:
+một phê duyệt tính là goal-confirm của mọi nhiệm vụ hàng đợi liệt kê, mỗi sản phẩm chỉ chạy một nhiệm
+vụ một lúc, `dependsOn` được chờ, và hash của phê duyệt bao phủ thành phần hàng đợi cùng nội dung các
+nhiệm vụ chứ không bao phủ tiến độ — nên chạy và xong không đổi gì, còn thêm, đổi thứ tự, bỏ hay sửa
+goal thì trả câu hỏi về cho người (`scripts/bank.mjs`, `scripts/validate-session.mjs#bankRefErrors`).
+Bên cạnh nó, `@worktrees/helpers/<id>/runs/<runId>/run.json` là toàn bộ dấu vết một lần chạy helper để
+lại, và mọi kho đều gọi tên lần chạy đã phác ra nó.
+
+`npm test` chạy kiểm định tuyến, kiểm resources, kiểm trích dẫn knowledge, kiểm template, kiểm brief sinh ra, mọi self-test của operator và helper, và các spec của script. Head đã publish phải xanh, không xanh
 thì không được publish.
 
 ## Luật áp dụng khắp nơi

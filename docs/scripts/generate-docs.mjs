@@ -122,6 +122,23 @@ async function loadOperators() {
   return ops.sort((a, b) => a.id.localeCompare(b.id));
 }
 
+async function loadHelpers() {
+  let entries = [];
+  try { entries = await readdir(path.join(root, 'helpers'), { withFileTypes: true }); } catch { return []; }
+  const helpers = [];
+  for (const dir of entries.filter((e) => e.isDirectory()).map((e) => e.name).sort()) {
+    const manifest = await readJson(`helpers/${dir}/helper.json`);
+    helpers.push({
+      dir,
+      id: manifest.id,
+      manifest,
+      en: await read(`helpers/${dir}/helper.md`),
+      vi: await read(`helpers/${dir}/helper.vi.md`).catch(() => null),
+    });
+  }
+  return helpers.sort((a, b) => a.id.localeCompare(b.id));
+}
+
 async function loadKinds() {
   const files = (await readdir(path.join(root, 'templates/kinds'))).sort();
   const contracts = [];
@@ -168,6 +185,11 @@ const L = {
     refDesc: 'Generated from the tree at build time.',
     refIntro: 'Every page under Reference is produced by `docs/scripts/generate-docs.mjs` from the files the runtime itself reads. `npm run check` in `sites/docs` regenerates them and fails when the committed output differs, so a page here cannot describe a tree that no longer exists.',
     refTable: ['Page', 'Generated from'],
+    helpIndexTitle: 'Helpers',
+    helpIndexDesc: 'The support layer beside the operators: work that prepares and tidies, outside any session.',
+    helpIndexIntro: 'A helper opens no session, writes no product source, touches no runtime, publishes nothing and asks nothing. It is reached from the person — `/helper <id> <args>`, or by naming the job — runs on its own profile, and leaves one run record under `@worktrees/helpers/<id>/runs/<runId>/`. Its law is `resources/orchestrator.json#helpers` and its gate is `scripts/validate-helper.mjs`. The page for a helper is its own `helper.md`, the file the runtime reads.',
+    helpTable: ['Helper', 'Profile', 'Mode', 'Single job'],
+    helpSource: (rel) => `Source: [\`${rel}\`](${blob(rel)}).`,
   },
   vi: {
     opIndexTitle: 'Các operator',
@@ -199,6 +221,11 @@ const L = {
     refDesc: 'Sinh từ cây lúc build.',
     refIntro: 'Mọi trang trong mục Tham chiếu đều do `docs/scripts/generate-docs.mjs` sinh ra từ chính các tệp mà runtime đọc. `npm run check` trong `sites/docs` sinh lại và báo lỗi khi bản đã commit khác đi, nên một trang ở đây không thể mô tả một cái cây không còn tồn tại.',
     refTable: ['Trang', 'Sinh từ'],
+    helpIndexTitle: 'Helper',
+    helpIndexDesc: 'Tầng hỗ trợ bên cạnh các operator: việc chuẩn bị và dọn dẹp, nằm ngoài mọi phiên.',
+    helpIndexIntro: 'Một helper không mở phiên, không ghi source sản phẩm, không chạm runtime, không publish và không hỏi gì. Nó được gọi từ người dùng — `/helper <id> <args>`, hoặc bằng cách nêu tên công việc — chạy trên profile của chính nó, và để lại một bản ghi lần chạy dưới `@worktrees/helpers/<id>/runs/<runId>/`. Luật của nó là `resources/orchestrator.json#helpers` và cửa kiểm là `scripts/validate-helper.mjs`. Trang của một helper chính là `helper.vi.md` của nó, bản đối chiếu của tệp mà runtime đọc.',
+    helpTable: ['Helper', 'Profile', 'Chế độ', 'Việc duy nhất'],
+    helpSource: (rel) => `Nguồn: [\`${rel}\`](${blob(rel)}). Chỉ tệp tiếng Anh mới là thẩm quyền runtime.`,
   },
 };
 
@@ -237,6 +264,41 @@ function operatorIndexPage(ops, lang) {
     cell(o.manifest.job),
   ]);
   return `${front(t.opIndexTitle, t.opIndexDesc)}# ${t.opIndexTitle}\n\n${mdx(t.opIndexIntro)}\n\n${table(t.opTable, rows)}\n`;
+}
+
+function helperPage(helper, lang) {
+  const t = L[lang];
+  const body = lang === 'en' ? helper.en : helper.vi;
+  const rel = `helpers/${helper.dir}/helper.${lang === 'en' ? 'md' : 'vi.md'}`;
+  const r = helper.manifest.resources ?? {};
+  const binding = table(t.opBindingRows, [
+    ['`id`', tick(helper.manifest.id)],
+    ['`resources.profile`', tick(r.profile ?? '—')],
+    ['`resources.mode`', tick(r.mode ?? '—')],
+    ['`resources.tools`', Object.entries(r.tools ?? {}).map(([k, v]) => tick(`${k}:${v}`)).join(', ') || '—'],
+    ['`writes`', (helper.manifest.writes ?? []).map(tick).join(', ') || '—'],
+    ['`primaryOutput`', tick(helper.manifest.primaryOutput ?? '—')],
+  ]);
+  return [
+    front(helper.manifest.id, helper.manifest.job),
+    callout,
+    `# ${helper.manifest.id}\n`,
+    generatedBy(`[\`${rel}\`](${blob(rel)}) and [\`helpers/${helper.dir}/helper.json\`](${blob(`helpers/${helper.dir}/helper.json`)})`),
+    `\n## ${t.opBinding}\n\n${binding}\n`,
+    `\n${mdx(stripH1(body).trim())}\n`,
+    `\n---\n\n${mdx(t.helpSource(rel))}\n`,
+  ].join('');
+}
+
+function helperIndexPage(helpers, lang) {
+  const t = L[lang];
+  const rows = helpers.map((h) => [
+    `[\`${h.id}\`](/reference/helpers/${h.dir})`,
+    tick(h.manifest.resources?.profile ?? '—'),
+    tick(h.manifest.resources?.mode ?? '—'),
+    cell(h.manifest.job),
+  ]);
+  return `${front(t.helpIndexTitle, t.helpIndexDesc)}# ${t.helpIndexTitle}\n\n${mdx(t.helpIndexIntro)}\n\n${table(t.helpTable, rows)}\n`;
 }
 
 function presetOf(branch) {
@@ -290,6 +352,7 @@ function referenceIndexPage(lang) {
   const t = L[lang];
   const rows = [
     [`[${t.opIndexTitle}](/reference/operators)`, '`operators/<id>/operator.md`, `operator.json`'],
+    [`[${t.helpIndexTitle}](/reference/helpers)`, '`helpers/<id>/helper.md`, `helper.json`'],
     [`[${t.kindsTitle}](/reference/kinds)`, '`templates/kinds/*`'],
     [`[${t.aliasTitle}](/reference/alias)`, '`alias/INDEX.md`'],
     [`[${t.stopTitle}](/reference/stop-codes)`, '`operators/INDEX.md` § Stop codes'],
@@ -303,6 +366,7 @@ function referenceIndexPage(lang) {
 // ---------------------------------------------------------------------------
 async function render() {
   const ops = await loadOperators();
+  const helpers = await loadHelpers();
   const kinds = await loadKinds();
   const aliasEn = await read('alias/INDEX.md');
   const aliasVi = await read('alias/INDEX.vi.md');
@@ -334,6 +398,7 @@ async function render() {
       alias: t.aliasTitle,
       'stop-codes': t.stopTitle,
       knowledge: t.knowTitle,
+      helpers: t.helpIndexTitle,
     }, null, 2)}\n`);
     put('index.mdx', referenceIndexPage(lang));
 
@@ -343,6 +408,14 @@ async function render() {
     for (const op of ops) {
       if (lang === 'vi' && !op.vi) continue;
       put(`operators/${op.dir}.mdx`, operatorPage(op, lang));
+    }
+
+    put('helpers/_meta.js', `export default ${JSON.stringify(
+      Object.fromEntries([['index', t.helpIndexTitle], ...helpers.map((h) => [h.dir, h.id])]), null, 2)}\n`);
+    put('helpers/index.mdx', helperIndexPage(helpers, lang));
+    for (const helper of helpers) {
+      if (lang === 'vi' && !helper.vi) continue;
+      put(`helpers/${helper.dir}.mdx`, helperPage(helper, lang));
     }
 
     put('kinds.mdx', kindsPage(kinds, lang));

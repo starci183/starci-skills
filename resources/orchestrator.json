@@ -30,6 +30,44 @@
     "escalateAfter": 1,
     "note": "the line between interface.fix and interface.generate, in count, in kind and in patience. Count: a fix moves at most maxFiles declared paths, creates and deletes none, and writes only classes the frozen inventory publishes (operators/interface-fix/validate.mjs#fixSizeErrors). Kind: a finding whose rule is published under a generateTopics folder of knowledge/ui, or whose rule prefix is in generatePrefixes, is a composition or a taste decision and goes to interface.generate however small its patch would be; every other rule (a presentation value, a proof measurement, a UAT step) is fix-eligible (scripts/validate-request.mjs#fixKindErrors). Patience: after escalateAfter interface.fix branches for one finding in a session, the next repair of that finding is interface.generate, never another fix"
   },
+  "helpers": {
+    "note": "The support layer beside the operators. An operator does one job on one unit inside a session chain; a helper does support work outside any workflow: it opens no session, writes no product source, touches no runtime, publishes nothing, and asks nothing — it prepares and tidies. It is invoked by the `helper` route kind of routing.json (the person writes \"/helper <id> <args>\" or names the job), runs on its own profile in the mode helpers/<id>/helper.json declares, and leaves one run record under @worktrees/helpers/<id>/runs/<runId>/ so every draft it left names the run that drafted it. Because no session is opened, no goal block is printed and no goal-confirm choice is recorded: the goal-block law asks a person once per mission, and a helper is not a mission (resources/interaction.json#asks). A helper that finds it must write product source, touch a runtime or publish has found an operator's job and stops.",
+    "modes": [
+      "inline",
+      "isolated"
+    ],
+    "defaultProfile": "astra",
+    "writes": "alias/alias.json is the one home of the support write set: a Writes alias of a helper is an alias the registry marks helperWritable, which no product source route, no runtime owner and no publication target carries (scripts/validate-helper.mjs)",
+    "tools": {
+      "@tools/fileread": [
+        "context-aliases"
+      ],
+      "@tools/git": [
+        "read"
+      ],
+      "@tools/websearch": [
+        "bounded"
+      ]
+    },
+    "toolsNote": "the closed set of tool modes the support layer may hold, and the one home of it: reading is a helper's whole authority, so git stops at read and every mode that writes a checkout, operates a runtime, publishes to a registry or resolves a secret is absent rather than declared never",
+    "maxSteps": 12,
+    "stepVerbs": [
+      "Read",
+      "Validate",
+      "Resolve",
+      "Collect",
+      "Count",
+      "Draft",
+      "Order",
+      "Check",
+      "Refuse",
+      "Write",
+      "Record",
+      "Emit"
+    ],
+    "stepVerbsNote": "a Steps row of a helper opens with one of these verbs, so its procedure reads as a procedure and not as a description of a state; the list grows when a helper needs a verb it lacks, never a second list",
+    "bank": "What a helper drafts, the orchestrator takes from: @worktrees/banked/<product> (scripts/bank.mjs, alias/alias.json). The person approves one queue once — the choice bank:<product>:v<n> in approvals.json, over the queue hash — and that answer is the goal-confirm of every mission the queue lists: a session opened from a banked entry writes state.json.mission from the entry's goalDraft unchanged, records its own goal-confirm choice with the approval as sourceRef, prints the block and does not wait (SKILL.md step 1). The orchestrator is the only writer of queue.json during a run: it marks the entry running:<sessionId> when it opens the session and done:<sessionId> when the session ends done, and it takes only what scripts/bank.mjs#next hands back — the first banked entry whose every dependsOn is done, and nothing at all while a sibling of the same product is running, so one mission of a product runs at a time and a mission that stopped for the person pauses the bank by staying running. Nothing in a bank pins a head: each mission preflights and plans its own chain when it opens. A goal corrected at open time is not covered by the approval: the bank entry is rewritten, which changes the queue hash, which ends the approval, and the person is asked again (scripts/validate-session.mjs#bankRefErrors)."
+  },
   "interactionPolicy": "resources/interaction.json",
   "agent": {
     "profile": "operator.json → resources.profile",

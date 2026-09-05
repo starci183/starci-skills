@@ -4,5 +4,6 @@ export default {
   "kinds": "Kinds",
   "alias": "Alias",
   "stop-codes": "Stop codes",
-  "knowledge": "Knowledge"
+  "knowledge": "Knowledge",
+  "helpers": "Helpers"
 }

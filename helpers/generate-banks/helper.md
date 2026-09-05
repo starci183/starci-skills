@@ -1,0 +1,90 @@
+# generate-banks
+
+## Job
+
+Read what a product has already left behind — its routes, the coverage nobody took, the findings nobody answered, the walks and the API runs that failed, the feature models and the person's own notes — and draft a bank of missions the harness can take one after another, each with the goal block a session needs and at least one observation it came from.
+
+## Done when
+
+Done when the `bank-queue` orders one entry per mission the reading found, every entry has a `banked-mission` carrying its goal block, its routes, its environment and at least one evidence ref, and the `helper-run` names every input read with the head it was read at.
+
+## A helper is not an operator
+
+An operator does one job on one unit inside a session chain, under a goal a person confirmed. This runs before any of that: it opens no session, writes no product source, touches no runtime, publishes nothing and asks nothing. Its whole authority is reading, and its whole output is a proposal — a bank the person approves once, after which the harness can open mission after mission without anybody composing a prompt. Nothing here decides that a mission is right; the person's approval does that, and the plan of each mission is drawn when the mission opens, against heads read then rather than heads read here.
+
+## A mission with no evidence is an idea
+
+Every mission this drafts names at least one observation it was drafted from: an entry of the unchecked ledger, a finding, a walk or an API run, a source path in a bound route, or a reference to something the person wrote. A draft that cannot name one is refused with `BANK_UNGROUNDED` rather than banked with a plausible reason, because a bank of plausible missions is worse than an empty one: the person approves it once and the harness runs it all.
+
+## What the reading carries forward, and what it does not
+
+The unchecked ledger says what an earlier mission deliberately did not prove, and with what reason. A mission drafted from an open entry carries that entry's tier as a hint, so a reader can tell a mission that closes a journey gap from one that closes a deferral. It stays a hint: the tier itself belongs to the plan of the mission, which reads it against a done-when journey that does not exist yet at banking time.
+
+## Boundary
+
+Everything the Reads table names is read-only. The only places written are the two the Writes table names, which are the two `alias/alias.json` marks writable by the support layer. No checkout, no runtime owner, no registry, no session folder and no ledger the operators own is touched, and there is no field here that could hold a credential.
+
+## Reads
+
+| Alias | Bind | Required |
+| --- | --- | --- |
+| `@workspaces/projects` | the product's route declarations: which roles it has and what each one is, so a drafted mission names routes that exist | yes |
+| `@workspaces/ports` | the port projection of the product, so a mission that needs a served runtime names the slot it would run on | no |
+| `@workspaces/<project>/<role>` | the product's routed checkouts, read only and at their observed head: what a `source:` evidence ref points at, and what tells a promise already delivered from one still owed | no |
+| `@worktrees/unchecked/<product>` | the coverage earlier missions deliberately did not take, each with its lane, its unit and its reason: the first source of a mission nobody has run yet | no |
+| `@knowledge/findings` | the findings audits and walks recorded and nobody has answered, per family | no |
+| `@worktrees/uat/<flow>` | the walks this product has run and what they failed on | no |
+| `@worktrees/e2e/<flow>` | the API runs this product has run and which cases they failed | no |
+| `@worktrees/businesses` | the feature models and the promises they publish, so a drafted mission is about a promise and not about a file | no |
+
+## Writes
+
+| Alias | What |
+| --- | --- |
+| `@worktrees/banked/<product>` | the queue of the product's bank and one folder per mission it drafts, each with the mission a person reads beside the one the harness reads |
+| `@worktrees/helpers/<id>` | the run record of this reading: what was read at which head, what was written, and between which instants |
+
+## Requirements
+
+| Field | Type | Default | Ask |
+| --- | --- | --- | --- |
+| `product` | id | — | The product whose ledgers, evidence and routes are read and whose bank is drafted |
+| `env` | id | dev | The environment whose declaration the drafted missions name |
+| `language` | tag | settings | The language the goal blocks and the mission documents are written in; the display language unless the invocation names another |
+| `limit` | count | 12 | The most missions one bank may carry; a reading that finds more banks the most grounded and says what it left |
+| `notes` | ref | null | A reference to what the person wrote that this bank should answer; it becomes a `note:` evidence ref |
+| `runId` | token | — | The run id of this invocation, which the run record and every mission it drafts name |
+
+## Steps
+
+| # | Step | Params | Reads | Writes | Stops with |
+| --- | --- | --- | --- | --- | --- |
+| 1 | Validate the invocation and its arguments | `product`, `runId` | the invocation | — | `INVALID_INPUT` |
+| 2 | Read the product's route declarations, its port projection and the head of each routed checkout | `product` | @workspaces/projects, @workspaces/ports, @workspaces/<project>/<role>, @tools/git | — | `PRODUCT_UNROUTED` |
+| 3 | Read the open entries of the product's unchecked ledger, each with its lane, its unit and its reason | `product` | @worktrees/unchecked/<product> | — | — |
+| 4 | Read the open findings of every family this product composes | — | @knowledge/findings | — | — |
+| 5 | Read the last walk of every flow and the last API run of every e2e flow, and what each one failed on | — | @worktrees/uat/<flow>, @worktrees/e2e/<flow> | — | — |
+| 6 | Read the feature models this product publishes and the person's notes the invocation named | `notes` | @worktrees/businesses | — | — |
+| 7 | Draft one mission per open thread: its goal block, its routes, its environment, its evidence refs and its tier hint | `product`, `env`, `language`, `limit` | everything read above | `banked-mission` | `BANK_EMPTY` |
+| 8 | Refuse every draft that names no evidence ref, naming the thread it came from | — | the drafts | — | `BANK_UNGROUNDED` |
+| 9 | Order the queue by what each mission waits for, then by priority | — | the drafts | `bank-queue` | — |
+| 10 | Record the run: every input with the head it was read at, every output written, the profile and the two instants | `runId` | everything above | `helper-run` | — |
+
+Step 7 is the only step that reads the person's goal for the product, and it reads it from what the product left behind rather than from a person: a thread is an open unchecked entry, an unanswered finding, a failed case or a promise the models carry and no delivery reaches. A reading that finds no thread at all is `BANK_EMPTY`, and nothing is written — an empty bank is a fact about the product, not a bank.
+
+## Outputs
+
+| Kind | File | Type | Required |
+| --- | --- | --- | --- |
+| `bank-queue` | `@worktrees/banked/<product>/queue.json` | data | yes |
+| `banked-mission` | `@worktrees/banked/<product>/<missionId>/mission.json` | data | yes |
+| `helper-run` | `@worktrees/helpers/<id>/runs/<runId>/run.json` | data | yes |
+
+## Stops
+
+| Code | Disposition |
+| --- | --- |
+| `INVALID_INPUT` | terminate |
+| `PRODUCT_UNROUTED` | terminate |
+| `BANK_EMPTY` | terminate |
+| `BANK_UNGROUNDED` | terminate |

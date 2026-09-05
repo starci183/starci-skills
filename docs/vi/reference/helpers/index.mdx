@@ -1,0 +1,12 @@
+---
+title: "Helper"
+description: "Tầng hỗ trợ bên cạnh các operator: việc chuẩn bị và dọn dẹp, nằm ngoài mọi phiên."
+---
+
+# Helper
+
+Một helper không mở phiên, không ghi source sản phẩm, không chạm runtime, không publish và không hỏi gì. Nó được gọi từ người dùng — `/helper <id> <args>`, hoặc bằng cách nêu tên công việc — chạy trên profile của chính nó, và để lại một bản ghi lần chạy dưới `@worktrees/helpers/<id>/runs/<runId>/`. Luật của nó là `resources/orchestrator.json#helpers` và cửa kiểm là `scripts/validate-helper.mjs`. Trang của một helper chính là `helper.vi.md` của nó, bản đối chiếu của tệp mà runtime đọc.
+
+| Helper | Profile | Chế độ | Việc duy nhất |
+| --- | --- | --- | --- |
+| [`generate-banks`](/reference/helpers/generate-banks) | `astra` | `isolated` | Read what a product has already left behind — its routes, the coverage nobody took, the findings nobody answered, the walks and the API runs that failed, the feature models and the person's own notes — and draft a bank of missions the harness can take one after another, each with the goal block a session needs and at least one observation it came from. |
