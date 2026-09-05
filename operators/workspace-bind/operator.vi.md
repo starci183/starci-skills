@@ -188,6 +188,7 @@ trước khi dispatch và ràng id phiên vào tọa độ chứa request, trạ
 | route đã ràng và một ranh giới phải được quyết bên trong nó | `architecture.decide` |
 | route đã ràng và một contract backend phải được điền bên trong nó | `backend.generate` |
 | route đã ràng và các trang, modal một tính năng cần phải được gọi tên trước khi mỗi nhánh sinh một cái | `interface.plan` |
+| route đã ràng và product journey, actor, case cùng fixture ref phải được đóng băng trước effect identity và seed | `uat.plan` |
 | route đã ràng và các seed nhiệm vụ cần phải được lên kế hoạch trên các kho của nó trước khi mỗi nhánh đặt một seed | `data.plan` |
 | route đã ràng và một bề mặt frontend phải được sinh bên trong nó | `interface.generate` |
 | route đã ràng và một phát hiện trên bề mặt đã sinh phải được sửa bên trong nó | `interface.fix` |

@@ -134,4 +134,5 @@ cùng những luồng như nhánh nó chạy lại là `NO_PROGRESS`.
 | Khi | Operator |
 | --- | --- |
 | mọi luồng đã có lối vào, alias tài khoản và namespace: mỗi luồng được đi thử trên nhánh riêng, mang id đơn vị của nó | `uat.verify` |
+| mọi case đã đóng băng precondition và fixture ref cần trở thành một seed unit thực thi được cho mỗi flow | `data.plan` |
 | một hành trình goal gọi tên là thứ người có thể không muốn đi thử, nên người nói nó có thuộc nhiệm vụ hay không | `user` |

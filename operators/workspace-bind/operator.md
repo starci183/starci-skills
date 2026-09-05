@@ -191,6 +191,7 @@ session id to its containing coordinate, session state and frozen request hash.
 | the route is bound and a boundary must be decided inside it | `architecture.decide` |
 | the route is bound and a backend contract must be filled inside it | `backend.generate` |
 | the route is bound and the pages and modals a feature needs must be named before one is generated per branch | `interface.plan` |
+| the route is bound and the product journeys, actors, cases and fixture references must be frozen before identity and seed effects | `uat.plan` |
 | the route is bound and the seeds a mission needs must be planned against its stores before one is placed per branch | `data.plan` |
 | the route is bound and a frontend surface must be generated inside it | `interface.generate` |
 | the route is bound and one finding on a generated surface must be repaired inside it | `interface.fix` |

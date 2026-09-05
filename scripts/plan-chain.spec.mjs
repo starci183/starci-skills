@@ -201,13 +201,14 @@ for (const fx of fixtures) {
     // Every branch has a goal, and every done-when line has its branch.
     for (const c of Object.keys(p.steps)) assert.ok(p.goals[c], `${fx.id}: ${c} has a goal`);
     fx.mission.doneWhen.forEach((l, i) => assert.ok(Object.values(p.goals).some((g) => g.doneWhen === i) || Object.entries(p.steps).some(([c, op]) => op === l.producedBy && p.fanout[c]), `${fx.id}: done-when ${i} (${l.producedBy}) has a branch, or is a unit of its operator's fanned-out branch`));
-    // A plan sibling, when this tree has one and more than one line names the execute operator, precedes
-    // its execute branch, which fans out; with one line there is no plan step.
+    // A plan sibling precedes execution when several done-when lines need fan-out or when execution
+    // requires the plan's primary output even for one unit. Only the multi-unit case fans out.
     for (const [c, op] of Object.entries(p.steps)) {
       const sibling = planOf(realGraph, op);
       if (!sibling) continue;
       const count = fx.mission.doneWhen.filter((l) => l.producedBy === op).length;
-      if (count > 1) { assert.ok(at(sibling.id) !== -1 && at(sibling.id) < at(op), `${fx.id}: ${sibling.id} precedes ${op}`); assert.equal(p.fanout[c], 'units'); }
+      const requiresSibling = realGraph.get(op).required.some((input) => input.kind === sibling.primary && input.from.includes(sibling.id));
+      if (count > 1 || requiresSibling) { assert.ok(at(sibling.id) !== -1 && at(sibling.id) < at(op), `${fx.id}: ${sibling.id} precedes ${op}`); if (count > 1) assert.equal(p.fanout[c], 'units'); }
       else assert.equal(at(sibling.id), -1, `${fx.id}: one ${op} unit needs no ${sibling.id}`);
     }
     // A served head is observed after it is served, when the chain serves one.

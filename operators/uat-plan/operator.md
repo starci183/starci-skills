@@ -135,4 +135,5 @@ whose plan names the same flows as the branch it resumes is `NO_PROGRESS`.
 | When | Operator |
 | --- | --- |
 | every flow has its entry, its account alias and its namespace: each flow is walked on its own branch carrying its unit id | `uat.verify` |
+| every case has frozen preconditions and fixture references that must become one executable seed unit per flow | `data.plan` |
 | a journey the goal names is one the person may not want walked, so the person says whether it belongs to the mission | `user` |
