@@ -85,13 +85,13 @@
     ]
   },
   "concurrency": {
-    "rule": "scripts/worker-slots.mjs is the executable session-wide gate: at most maxConcurrentAgents active workers across top-level branches, nested exchanges, helpers, repairs and retries. A wait releases its slot. A branch queues when its inputs are not accepted or its normalized exclusive resource overlaps a live lease, including parent/child paths and Windows case variants.",
+    "rule": "scripts/worker-slots.mjs is the executable session-wide gate: at most maxConcurrentAgents active workers across top-level branches, nested exchanges, helpers, repairs and retries. A wait releases its slot. A branch queues when its inputs are not accepted or its normalized exclusive resource overlaps a live lease, including parent/child paths, Windows case variants and junction/symlink aliases resolved through the nearest existing ancestor.",
     "gate": "node scripts/worker-slots.mjs acquire|resume <branch> <workerId>; node scripts/worker-slots.mjs release <session> <token>",
     "state": "state.json.workerSlots and state.json.leases, mutated with scripts/session-lock.mjs",
     "maxDispatch": 1,
     "maxParallel": 3,
     "dispatchRule": "at most maxDispatch agents in mode dispatch at once, because each one carries the orchestrator's transcript and two such transcripts diverge; isolated agents are bounded only by maxConcurrentAgents",
-    "sharedCheckout": "two agents may read one checkout; only one may hold it for writing (backend.generate, interface.generate, git.publish are exclusive per checkout)",
+    "sharedCheckout": "two agents may read one checkout; only one may hold it for writing. A request with environment.writes must name a concrete exclusive owner, and a source-writing attempt must carry environment.workspace.worktree. The gate automatically leases that real worktree even when environment.exclusive omitted it.",
     "sharedRoot": "business.decide is exclusive per businesses root; runtime.serve is exclusive per runtime owner, identity.provision per provider realm, data.seed per flow namespace"
   },
   "handoff": {

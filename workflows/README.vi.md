@@ -16,7 +16,9 @@ operator.
 Mỗi invocation đã plan trở thành một attempt có version. Request đóng băng `expected.criteria`,
 `environment`, quyền sở hữu tài nguyên và `frozenInputs` phía request trước
 `scripts/attempt-gate.mjs open`. `scripts/worker-slots.mjs` cấp tối đa ba slot active dùng chung cho
-nhánh chính, exchange lồng nhau, helper, repair và retry. Thiếu input, tài nguyên exclusive chồng nhau
+nhánh chính, exchange lồng nhau, helper, repair và retry. Attempt có ghi dữ liệu phải lease owner cụ
+thể; source-writing tự lease worktree thật sau khi chuẩn hóa junction, symlink và chữ hoa/thường trên
+Windows. Thiếu input, tài nguyên exclusive chồng nhau
 và worker sẵn sàng thứ tư phải chờ; trạng thái waiting trả slot. `attempt-gate accept` chạy đủ gate
 chung và gate operator, phân giải bằng chứng actual rồi đối chiếu từng tiêu chí. Chỉ receipt match mới
 được advance. Mismatch được giữ lại và dẫn tới repair, retry hoặc blocked; retry trỏ về attempt trước

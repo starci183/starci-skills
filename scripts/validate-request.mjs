@@ -18,6 +18,7 @@ import { loadOperatorPackages, kindOf, isYes, exchangeOf, cellAliases } from './
 import { loadInteractionPolicy, selectionErrors } from './validate-interaction.mjs';
 import { validateImportedInput } from './producer-import.mjs';
 import { isJourney, journeyUnits, tierOf, verifiesUnits, laneOf } from './unchecked.mjs';
+import { normalizeResource, resourcesOverlap } from './resource-locks.mjs';
 
 // Only a fully quoted cell is unquoted: a sentence that opens with a code span keeps its backticks.
 const unquote = (s) => { const t = String(s ?? '').trim(); return /^`[^`]*`$/.test(t) ? t.slice(1, -1) : t; };
@@ -203,6 +204,7 @@ export function plannedRequirementErrors(planned, request, at = 'request.json') 
 
 export const V22_CONTRACT = 'starci/v2.2';
 const FAMILY_BOUND_OPERATORS = new Set(['interface.plan', 'interface.generate', 'interface.fix', 'interface.audit', 'knowledge.repair']);
+const SOURCE_WRITING_OPERATORS = new Set(['backend.generate', 'interface.generate', 'interface.fix', 'library.update']);
 const canonicalJson = (value) => {
   if (Array.isArray(value)) return `[${value.map(canonicalJson).join(',')}]`;
   if (value && typeof value === 'object') return `{${Object.keys(value).sort().map((key) => `${JSON.stringify(key)}:${canonicalJson(value[key])}`).join(',')}}`;
@@ -290,6 +292,15 @@ export function v22RequestErrors(state, request, pkg, dir = null) {
     if (output !== owned) errors.push(`request.json: environment.outputRoot resolves to ${output}; an attempt owns only ${owned}`);
   }
   if (request.environment?.workspace?.worktree && !path.isAbsolute(request.environment.workspace.worktree)) errors.push(`request.json: environment.workspace.worktree is not absolute; isolation names the exact worktree`);
+  const writes = request.environment?.writes ?? [];
+  const exclusive = request.environment?.exclusive ?? [];
+  const workspace = request.environment?.workspace?.worktree ?? null;
+  if (writes.length && SOURCE_WRITING_OPERATORS.has(request.operatorId) && !workspace) errors.push(`request.json: ${request.operatorId} writes source but environment.workspace.worktree is absent; the actual isolated checkout is always leased`);
+  if (writes.length && !workspace && !exclusive.length) errors.push('request.json: environment.writes is nonempty while no concrete environment.exclusive owner or workspace worktree is leased');
+  const owners = [...exclusive, ...(workspace ? [workspace] : [])].filter((value) => path.isAbsolute(value)).map(normalizeResource);
+  for (const write of writes.filter((value) => path.isAbsolute(value)).map(normalizeResource)) {
+    if (!owners.some((owner) => resourcesOverlap(owner, write))) errors.push(`request.json: environment.writes path ${write} is not covered by a concrete exclusive owner or workspace worktree`);
+  }
   const criteria = request.expected?.criteria ?? [];
   const criterionIds = criteria.map((criterion) => criterion.id);
   if (new Set(criterionIds).size !== criterionIds.length) errors.push(`request.json: expected.criteria ids are not unique`);

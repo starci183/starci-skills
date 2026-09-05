@@ -21,7 +21,9 @@ lặp thường lệ. Sửa tạo version kế tiếp; từ chối hoặc im l�
 invocation, `attempt-gate open` đóng băng expected, input sidecar và environment; `worker-slots`
 cấp một trong ba slot chung toàn host session. `attempt-gate accept` chỉ cho advance khi actual có
 bằng chứng và match từng expected bắt buộc. Mismatch được giữ để repair, retry hoặc blocked; retry
-không được hạ expected. Chỉ tín hiệu close-success riêng mới compact và kiểm bundle dưới
+không được hạ expected. Attempt có ghi dữ liệu phải lease owner cụ thể; source-writing tự lease
+worktree thật sau khi chuẩn hóa junction, symlink và chữ hoa/thường của đường dẫn Windows. Chỉ tín
+hiệu close-success riêng mới compact và kiểm bundle dưới
 `@worktrees/done` rồi xóa đúng folder session tạm; publish không đóng session, không xóa worktree hay
 branch người dùng.
 

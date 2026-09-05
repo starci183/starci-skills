@@ -273,7 +273,8 @@ profile the operator names, with the aliases its Context table declares and the 
 and is awaited on its completion event, never on a timer. `resources/orchestrator.json` fixes the
 rules: `scripts/worker-slots.mjs` permits at most three active workers across the whole host-bound
 session, including nested exchanges, helpers and retries; normalized overlapping resources queue;
-branches run only with accepted inputs and isolated environment ownership; dispatch follows
+an attempt with writes leases its concrete owner, and source-writing work automatically leases the
+real worktree after junction/symlink and Windows-case normalization; branches run only with accepted inputs and isolated environment ownership; dispatch follows
 the planned chain and `routing.json`, hand-off only through `response.json` fields inside the session
 (`state.json`, `step-N/parallel-M/{request,response}`). Publication does not close a session. Only an
 explicit close-success event may compact and verify its durable bundle under `@worktrees/done` before

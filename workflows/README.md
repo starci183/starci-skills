@@ -17,7 +17,9 @@ Every planned invocation becomes a versioned attempt. Its request freezes `expec
 exact `environment` and resource ownership, and request-side `frozenInputs` before
 `scripts/attempt-gate.mjs open`. `scripts/worker-slots.mjs` then grants one of at most three active
 slots shared by top-level branches, nested exchanges, helpers, repairs and retries. Missing inputs,
-overlapping exclusive paths/resources and the fourth ready worker queue. Waiting releases its slot.
+overlapping exclusive paths/resources and the fourth ready worker queue. A writing attempt leases a
+concrete owner; source-writing work automatically leases the real workspace even through a junction,
+symlink or Windows case alias. Waiting releases its slot.
 `attempt-gate accept` runs the full shared and operator gates, resolves actual evidence and compares
 every criterion. Only a matched receipt advances. Mismatch is preserved and leads to repair, retry or
 blocked; a retry points to it and cannot weaken required expected under the same goal version.

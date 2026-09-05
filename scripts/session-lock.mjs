@@ -23,11 +23,17 @@ export async function withOwnedFileLock(lock, operation) {
       await handle.sync();
       break;
     } catch (error) {
-      if (error.code !== 'EEXIST') throw error;
-      try {
-        const held = JSON.parse(await readFile(lock, 'utf8'));
-        if (!processLives(held.pid)) await rm(lock, { force: true });
-      } catch {}
+      if (!['EEXIST', 'EPERM', 'ENOENT'].includes(error.code)) throw error;
+      if (error.code === 'ENOENT') await mkdir(path.dirname(lock), { recursive: true });
+      if (error.code === 'EEXIST') {
+        try {
+          const held = JSON.parse(await readFile(lock, 'utf8'));
+          if (!processLives(held.pid)) await rm(lock, { force: true });
+        } catch {}
+      }
+      // Windows can briefly return EPERM while another owner has closed and its lock file is
+      // delete-pending. Retrying never removes that ambiguous file and therefore cannot unlock a
+      // live writer; a persistent permission failure reaches SESSION_STATE_BUSY below.
       await wait(10);
     }
   }

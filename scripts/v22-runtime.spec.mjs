@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
-import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
@@ -10,7 +10,7 @@ import { openAttempt } from './attempt-gate.mjs';
 import { attemptContractErrors } from './validate-response.mjs';
 import { validateRequest, V22_CONTRACT } from './validate-request.mjs';
 import { v22SessionErrors } from './validate-session.mjs';
-import { acquireWorkerSlot, releaseWorkerSlot, resourcesOverlap } from './worker-slots.mjs';
+import { acquireWorkerSlot, normalizeResource, releaseWorkerSlot, resourcesOverlap } from './worker-slots.mjs';
 import { mutateSession } from './session-lock.mjs';
 
 const sha = (bytes) => `sha256:${createHash('sha256').update(bytes).digest('hex')}`;
@@ -166,4 +166,44 @@ test('one atomic session gate caps concurrent workers at three, prevents duplica
   assert.ok(resourcesOverlap(active.exclusive[0], nestedRequest.environment.exclusive[0]));
   await Promise.all(Array.from({ length: 20 }, () => mutateSession(opened.session, async (fresh) => { fresh.budget.units = (fresh.budget.units ?? 0) + 1; })));
   assert.equal(JSON.parse(readFileSync(stateFile, 'utf8')).budget.units, 20);
+}));
+
+test('a source-writing attempt automatically leases the real workspace behind a junction alias', async () => fixture(async ({ sessions, worktree }) => {
+  const opened = await openSession(sessions, draft(worktree));
+  await confirmSession(opened.session, { selected: 'as-stated', selectedBy: 'user', sourceRef: 'user-message:1' });
+  const realCheckout = path.join(worktree, 'real-checkout');
+  const aliasCheckout = path.join(worktree, 'checkout-alias');
+  mkdirSync(realCheckout, { recursive: true });
+  symlinkSync(realCheckout, aliasCheckout, process.platform === 'win32' ? 'junction' : 'dir');
+  assert.equal(normalizeResource(realCheckout), normalizeResource(aliasCheckout));
+  const stateFile = path.join(opened.session, 'state.json');
+  const state = JSON.parse(readFileSync(stateFile, 'utf8'));
+  state.chain = [['1/1'], ['2/1']];
+  state.steps = { '1/1': 'environment.preflight', '2/1': 'environment.preflight' };
+  writeFileSync(stateFile, JSON.stringify(state));
+  for (const [index, checkout] of [realCheckout, aliasCheckout].entries()) {
+    const n = index + 1;
+    const branch = path.join(opened.session, `step-${n}`, 'parallel-1');
+    mkdirSync(path.join(branch, 'request'), { recursive: true });
+    const request = {
+      contractVersion: V22_CONTRACT, schemaVersion: 9, operatorId: 'environment.preflight', step: n, parallel: 1, sessionId: opened.sessionId,
+      contexts: [], requirements: { project: 'sample' }, inputs: {}, resume: null, goal: { doneWhen: 0 },
+      attempt: { id: `junction-a${n}`, number: 1, kind: 'initial', previous: null },
+      expected: { version: 1, goalVersion: 1, sourceRef: 'state.json#mission:v1/doneWhen:0', criteria: [{ id: 'ready', required: true, expected: 'ready', verification: 'receipt' }] },
+      environment: { isolationId: `junction-a${n}`, mode: 'inline', workspace: { alias: '@workspaces/fe', worktree: checkout, revision: null }, reads: [], writes: ['@workspaces/fe'], exclusive: [], outputRoot: 'response' },
+      frozenInputs: []
+    };
+    if (n === 1) {
+      const uncovered = { ...request, environment: { ...request.environment, workspace: null } };
+      writeFileSync(path.join(branch, 'request', 'request.json'), JSON.stringify(uncovered));
+      assert.ok((await validateRequest(root, branch)).errors.some((error) => error.includes('no concrete environment.exclusive owner')));
+    }
+    writeFileSync(path.join(branch, 'request', 'request.json'), JSON.stringify(request));
+    await openAttempt(branch);
+  }
+  const first = await acquireWorkerSlot(path.join(opened.session, 'step-1', 'parallel-1'), 'writer-1');
+  assert.equal(first.status, 'acquired');
+  const second = await acquireWorkerSlot(path.join(opened.session, 'step-2', 'parallel-1'), 'writer-2');
+  assert.equal(second.reason, 'resource-conflict');
+  assert.equal(second.conflictsWith, '1/1');
 }));

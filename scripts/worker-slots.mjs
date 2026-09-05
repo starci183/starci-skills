@@ -5,22 +5,14 @@ import process from 'node:process';
 import { fileURLToPath } from 'node:url';
 import { sessionRootOf, V22_CONTRACT, validateRequest } from './validate-request.mjs';
 import { mutateSession } from './session-lock.mjs';
+import { effectiveExclusiveResources, resourcesOverlap } from './resource-locks.mjs';
+
+export { effectiveExclusiveResources, normalizeResource, resourcesOverlap } from './resource-locks.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const policy = JSON.parse(await readFile(path.join(root, 'resources', 'orchestrator.json'), 'utf8'));
 export const MAX_ACTIVE_WORKERS = policy.maxConcurrentAgents;
 const sha = (value) => `sha256:${createHash('sha256').update(value).digest('hex')}`;
-
-export function normalizeResource(resource) {
-  let value = String(resource).trim().replace(/\\/g, '/').replace(/\/+$/, '');
-  if (/^[A-Za-z]:\//.test(value) || value.startsWith('/')) value = path.resolve(value).replace(/\\/g, '/');
-  return process.platform === 'win32' ? value.toLowerCase() : value;
-}
-export function resourcesOverlap(left, right) {
-  const a = normalizeResource(left);
-  const b = normalizeResource(right);
-  return a === b || a.startsWith(`${b}/`) || b.startsWith(`${a}/`);
-}
 
 export async function acquireWorkerSlot(branch, workerId, { resume = false } = {}) {
   branch = path.resolve(branch);
@@ -35,7 +27,7 @@ export async function acquireWorkerSlot(branch, workerId, { resume = false } = {
     if (sha(before) !== sha(after)) throw new Error('request.json changed while worker slot acquisition was validating it');
     const request = checked.request;
     const key = `${request.step}/${request.parallel}${request.exchange ? `/${request.exchange}` : ''}`;
-    const exclusive = [...new Set((request.environment?.exclusive ?? []).map(normalizeResource))].sort();
+    const exclusive = effectiveExclusiveResources(request);
     if (state.contractVersion !== V22_CONTRACT || request.contractVersion !== V22_CONTRACT) throw new Error(`worker-slots is mandatory for ${V22_CONTRACT} sessions; legacy evidence cannot acquire a live slot`);
     if (state.lifecycle?.phase !== 'active') throw new Error(`state.json: lifecycle.phase ${state.lifecycle?.phase ?? 'missing'} cannot acquire a worker slot`);
     const wantedStatus = resume ? 'waiting' : 'running';
