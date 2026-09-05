@@ -66,6 +66,21 @@ test('an origin whose next names an operator this tree does not carry imports; a
 test('rejects undeclared output and unsafe source coordinates',async()=>{const f=fixture();try{await importProducer(f.args);assert.ok((await validateImportedInput(ROOT,f.targetSession,'step-100/parallel-1/response/artifacts/raw.log','git-publication',{hostRoot:f.host})).some(e=>e.includes('not an output')));await assert.rejects(importProducer({...f.args,sourceSessionId:'../escape',targetStep:11}),/strict/);await assert.rejects(importProducer({...f.args,targetStep:-1}),/strict/);}finally{f.cleanup();}});
 test('rejects symlinked imported evidence',async()=>{const f=fixture();try{await importProducer(f.args);const dir=path.join(f.target,'response/artifacts');unlinkSync(path.join(dir,'raw.log'));rmdirSync(dir);symlinkSync(path.join(f.source,'response/artifacts'),dir,process.platform==='win32'?'junction':'dir');assert.ok((await f.check()).some(e=>e.includes('symlink')));}finally{f.cleanup();}});
 test('local input ownership uses receiving request identity rather than fixture folder name',async()=>{const f=fixture();try{const local=path.join(f.targetSession,'step-12/parallel-1');write(path.join(local,'request/request.json'),{sessionId:'logical-session'});write(path.join(local,'response/response.md'),'local input');const ref='step-12/parallel-1/response/response.md';assert.deepEqual(await validateImportedInput(ROOT,f.targetSession,ref,'git-publication',{hostRoot:f.host,receivingSessionId:'logical-session'}),[]);assert.ok((await validateImportedInput(ROOT,f.targetSession,ref,'git-publication',{hostRoot:f.host,receivingSessionId:'other-session'})).some(e=>e.includes('explicit import manifest')));await importProducer(f.args);assert.ok((await validateImportedInput(ROOT,f.targetSession,'step-100/parallel-1/response/response.md','git-publication',{hostRoot:f.host,receivingSessionId:'logical-session'})).some(e=>e.includes('target does not match')));}finally{f.cleanup();}});
+// An origin is judged by the tree that accepted it as done: its primary output and the outputs it declares
+// are owed; a document section a later release added to the contract is this tree's history and does
+// not refuse the import, while a broken document (its title) and a missing primary output still do.
+test('an origin missing a contract section a later release added still imports; a broken title and a missing primary output do not',async()=>{
+  const f=fixture();try{
+    const file=path.join(f.source,'response/response.md'),text=readFileSync(file,'utf8');
+    const cut=text.lastIndexOf('\n## ');assert.ok(cut>0,'the fixture receipt has a last section to remove');
+    write(file,text.slice(0,cut+1));
+    await importProducer(f.args);assert.deepEqual(await f.check(),[]);
+  }finally{f.cleanup();}
+  const g=fixture();try{
+    write(path.join(g.source,'response/response.md'),'# not the receipt\n\n## Binding\n');
+    await assert.rejects(importProducer(g.args),/typed output gate: .*title must match/);
+  }finally{g.cleanup();}
+});
 test('actual CLI subprocess completes its dynamic validator imports and exits zero',async()=>{
   const f=fixture();try{
     const runtime=path.join(f.host,'.claude');

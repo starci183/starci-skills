@@ -102,7 +102,9 @@ function tableRowsAt(lines, headerLine) {
 const unquote = (s) => s.replace(/^`|`$/g, '');
 
 // A contract value is either one string (a single-language kind template) or { en, vi }.
-export function checkDocument(rel, text, contract, lang) {
+// tolerateMissingSections: an imported origin is judged on the sections it has, not on the ones a later release
+// added to the contract (scripts/validate-response.mjs, origin); every other check of the document still runs.
+export function checkDocument(rel, text, contract, lang, { tolerateMissingSections = false } = {}) {
   const L = (v) => (typeof v === 'string' ? v : v?.[lang] ?? v?.en ?? v?.heading);
   const errors = [];
   const lines = text.split(/\r?\n/);
@@ -123,7 +125,7 @@ export function checkDocument(rel, text, contract, lang) {
     const re = new RegExp(L(section), 'u');
     let found = -1;
     for (let i = cursor; i < frame.length; i += 1) if (re.test(frame[i].text)) { found = i; break; }
-    if (found === -1) { errors.push(`${rel}: missing section ${L(section)}`); continue; }
+    if (found === -1) { if (!tolerateMissingSections) errors.push(`${rel}: missing section ${L(section)}`); continue; }
     if (found > cursor && !freeZone) {
       for (let i = cursor; i < found; i += 1) errors.push(`${rel}:${frame[i].line}: unexpected section "${frame[i].text}" before ${L(section)}`);
     }

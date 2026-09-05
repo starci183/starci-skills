@@ -409,7 +409,10 @@ export async function validateResponse(root, dir, { requirements = {}, exchange 
   // tree, not its successor's: it is judged on the outputs it declares — each file present and readable, each data
   // kind against its schema — and not on today's required outputs, declared file patterns, markdown contracts or
   // profile, which are this tree's history, exactly as `next` and the operator id are. An origin of an operator
-  // that still exists owes today's contract in full.
+  // that still exists owes its primary output, the file names and profile of that operator, and every output it
+  // declares (present, readable, each data kind against its schema); a required output or a document section a
+  // later release added is this tree's history too, because the tree that accepted the origin as done did not know
+  // it, and the input the receiving branch reads is what producer-import#validateImportedInput holds it to.
   const renamed = origin && pkg.manifest.id !== response.operatorId;
 
   // Which Outputs belong to this folder: the branch owns files without an exchange prefix, an exchange owns its own.
@@ -422,7 +425,7 @@ export async function validateResponse(root, dir, { requirements = {}, exchange 
     const declaredFile = exchange ? unquote(row.file).replace(`${exchange}/`, '') : unquote(row.file);
     const value = response.fields?.[kind];
     const files = value === undefined ? [] : Array.isArray(value) ? value : [value];
-    if (files.length === 0) { if (isYes(row.required) && response.status === 'done' && !renamed) errors.push(`${rel('response/response.json')}: required output ${kind} is not in fields`); continue; }
+    if (files.length === 0) { if (isYes(row.required) && response.status === 'done' && !renamed && (!origin || kind === pkg.manifest.primaryOutput)) errors.push(`${rel('response/response.json')}: required output ${kind} is not in fields`); continue; }
     present.add(kind);
     const re = patternOf(declaredFile);
     for (const f of files) {
@@ -433,7 +436,7 @@ export async function validateResponse(root, dir, { requirements = {}, exchange 
         if (renamed) continue;
         const contract = kinds.get(kind);
         if (!contract) { errors.push(`templates/kinds/${kind}.contract.json: missing`); continue; }
-        errors.push(...checkDocument(rel(f), await readFile(full, 'utf8'), contract, 'en'));
+        errors.push(...checkDocument(rel(f), await readFile(full, 'utf8'), contract, 'en', { tolerateMissingSections: origin }));
       } else if (type === 'data') {
         const schemaPath = path.join(root, 'templates', 'kinds', `${kind}.schema.json`);
         if (!existsSync(schemaPath)) { errors.push(`templates/kinds/${kind}.schema.json: missing`); continue; }
